@@ -26,11 +26,9 @@
  *     through the same morph: the send control, `Escape` in the field, and the `composer-state`
  *     attribute (a dev-only handle for live measurement, which is why an external write is routed
  *     through the morph rather than applied straight).
- *  5. **The one ask.** A send opens a turn and dispatches it through `sv3-ask.ts`, the window's ONE
- *     issuance site, holding the `AbortController` that Stop uses and settling the turn on whichever
- *     terminal the stream reports. Phase A1's SEARCH issuance (`setQuery` + `submitSearch`) is
- *     still here and still exactly one request,
- *     but it is the SECONDARY axis now: only the palette's "Search this text" reaches it.
+ *  5. **Ask's rendered projection.** `Sv3AskDomain` opens and settles the turns and retains the
+ *     conversation's stream and Stop handles; `sv3-ask.ts` remains its one issuance site. The host
+ *     supplies composer routing, session transforms, activity and presentation.
  *  6. **The session list, as a PROJECTION of the product's record** (Phase A2; conversations since
  *     F1; on the record since F6). A session IS a conversation: its identity and its listing come
  *     from `state/conversationListStore.ts`, and its transcript from the canonical
@@ -54,6 +52,8 @@ import { Sv3ContextDomain } from './sv3-context-domain.js';
 import { Sv3ContextController } from './sv3-context-controller.js';
 import { Sv3DraftDomain, type HumanTask } from './sv3-draft-domain.js';
 import { Sv3DraftController } from './sv3-draft-controller.js';
+import { Sv3AskDomain } from './sv3-ask-domain.js';
+import { Sv3AskController } from './sv3-ask-controller.js';
 import { Sv3ComposerPort } from './Sv3ComposerPort.js';
 import type { ComposerCapture } from '../../state/composerPort.js';
 import { flushPendingNavigationWrite, refreshProjection } from '../../router/URLProjector.js';
@@ -62,7 +62,6 @@ import { CORE_INTERACTION_SHAPES, ONE_WINDOW_MOUNT_TAG } from '../../plugin-api/
 import { subscribeInspector, setOpen as setInspectorOpen } from '../../state/inspectorState.js';
 import type { DocumentLineRange } from '../../components/documentPane/DocumentPane.js';
 import { peekSearchV3Handoff, takeSearchV3Handoff } from '../../utils/compose.js';
-import type { SelectionPayload } from '../../../api/types/selection.js';
 import { html, css, nothing, type TemplateResult } from 'lit';
 import { keyed } from 'lit/directives/keyed.js';
 import { EMPTY_PREFIX_SENTINEL } from '../unifiedChatRequest.js';
@@ -72,7 +71,7 @@ import { sv3Tokens } from './sv3-tokens.css.js';
 import { sv3Shared } from './sv3-shared-styles.js';
 import { COMPOSER_STATE_DEFAULT, WINDOW_TITLE, type Sv3ComposerState } from './fixtures.js';
 import { removeScopeChip, resetSearchState, setSearchApiBase } from '../../state/searchState.js';
-import { clearFilters, getFilters, hasActiveFilter, restrictionWire, setFilters, toggleFacetValue } from '../../state/searchFiltersState.js';
+import { clearFilters, getFilters, hasActiveFilter, setFilters, toggleFacetValue } from '../../state/searchFiltersState.js';
 import {
   adoptSv3MorphSheet,
   releaseSv3MorphSheet,
@@ -93,7 +92,7 @@ import {
   sv3ScopeLabel,
   type Sv3AskScope,
 } from './sv3-search.js';
-import { restrictionLabels, withoutRestriction } from './sv3-filter-input.js';
+import { withoutRestriction } from './sv3-filter-input.js';
 import { localizeResourceKey } from '../../../i18n/resourceCatalog.js';
 import type { Sv3ResultsFilterRemove } from './Sv3Results.js';
 import type { CardSelectionDetail } from '../../components/searchResults/ResultsCard.js';
@@ -149,7 +148,6 @@ import {
   settleTurn,
   startNewSession,
   submitInSession,
-  sv3ShouldGenerateTitle,
   SV3_SESSIONS_EMPTY,
   type Sv3RunGate,
   type Sv3Session,
@@ -162,7 +160,6 @@ import {
   sv3ContextMenuItems,
   sv3ExcludedTurnCount,
   sv3FloorUnseen,
-  type sv3FollowUpContext,
   sv3UnseenExcludedIds,
   type Sv3ContextAction,
   type Sv3ContextActionId,
@@ -200,9 +197,7 @@ import { projectSv3RecordTurns } from './sv3-record.js';
 import {
   SV3_ASK_SHAPE_ID,
   SV3_EFFORT_DEFAULT,
-  sv3Ask,
   SV3_MODEL_SHAPE_ID,
-  sv3StopAsk,
   type Sv3Effort,
 } from './sv3-ask.js';
 // The app-wide CONVERSATION authority (tempdoc 510 Design D; inventory A1). A v3 session IS a
@@ -276,7 +271,6 @@ import {
   peekAgentSessionController,
 } from '../../state/agentSessionStore.js';
 import type { AgentSessionController } from '../../controllers/AgentSessionController.js';
-import { StopAttempt } from '../../state/stopAttempt.js';
 import {
   sv3PrimaryAction,
   SV3_TIER_DEFAULT,
@@ -1026,10 +1020,9 @@ export class SearchV3View extends JfElement {
     </div>`;
   }
 
-  private contextAskPending = new Set<string>();
   private readonly composerDraft = new Sv3ComposerPort(() => this.composer);
 
-  private readonly draftDomain = new Sv3DraftDomain({
+  private readonly draftDomain: Sv3DraftDomain = new Sv3DraftDomain({
     connected: () => this.isConnected,
     activeConversationId: () => this.sessions.activeId,
     lastTurnShape: () => this.activeSession?.turns.at(-1)?.shapeId,
@@ -1064,9 +1057,9 @@ export class SearchV3View extends JfElement {
     restoreLastViewed: () => this.restoreLastViewed(),
     revealRecoveryOutcome: () => this.revealRecoveryOutcome(),
     focusComposer: () => this.focusComposer(),
-    abortAsk: () => this.abortAsk(),
+    abortAsk: () => this.askDomain.abortAsk(),
     setComposerState: state => this.setComposerState(state),
-    runAsk: (question, scope, schema, model, options) => this.runAsk(question, scope, schema, model, options),
+    runAsk: (question, scope, schema, model, options) => this.askDomain.runAsk(question, scope, schema, model, options),
     peekHandoff: peekSearchV3Handoff,
     takeHandoff: takeSearchV3Handoff,
     refreshProjection,
@@ -1152,44 +1145,46 @@ export class SearchV3View extends JfElement {
     setTimeout: (callback, ms) => window.setTimeout(callback, ms),
     clearTimeout: timer => window.clearTimeout(timer),
   });
-  /** The in-flight ask's abort handle; null exactly when no response is streaming. */
-  private askAbort: AbortController | null = null;
-  /** The reader's Stop for that ask: the Engine is asked to end the turn, and its stream says how. */
-  private askStop: (() => void) | null = null;
-  private readonly liveAsks = new Map<string, {
-    abort: AbortController; stop: () => void; reasoning: ReasoningController;
-    turnId: string; stopping: Sv3StopState | null; checkingTurnId: string | null;
-  }>();
+  private readonly askDomain: Sv3AskDomain = new Sv3AskDomain({
+    activeConversationId: () => this.sessions.activeId,
+    session: id => sessionById(this.sessions, id),
+    connected: () => this.isConnected,
+    streaming: () => this.streaming,
+    shapeId: () => this.shapeId,
+    apiBase: () => this.apiBase,
+    draft: () => this.draftDomain,
+    context: () => this.contextDomain,
+    search: () => this.search,
+    submitTurn: (question, now, kind, target, shape, selectionKind) => {
+      this.sessions = submitInSession(this.sessions, question, now, kind, target, shape, selectionKind);
+      return latestTurnRef(this.sessions);
+    },
+    dropTurn: ref => { this.sessions = dropTurn(this.sessions, ref); },
+    setReasoning: (ref, blocks) => { this.sessions = setTurnReasoning(this.sessions, ref, blocks); },
+    settleTurn: (ref, status, now, detail, model) => { this.sessions = settleTurn(this.sessions, ref, status, now, detail, model); },
+    appendDelta: (ref, text) => { this.sessions = appendTurnDelta(this.sessions, ref, text); },
+    setEvidence: (ref, evidence) => { this.sessions = setTurnEvidence(this.sessions, ref, evidence); },
+    setRewrite: (ref, standalone) => { this.sessions = setTurnRewrite(this.sessions, ref, standalone); },
+    projectActiveAsk: (streaming, stopping, checkingTurnId) => {
+      this.streaming = streaming;
+      this.askStopping = stopping;
+      this.askCheckingTurnId = checkingTurnId;
+    },
+    createReasoning: () => new ReasoningController(() => this.requestUpdate()),
+    runInFlight: () => this.agentController()?.runInFlight === true,
+    modelAnswerUnavailableReason: () => this.modelAnswerUnavailableReason,
+    currentModelLabel: () => this.currentModelLabel,
+    claimConversation: id => this.claimConversation(id),
+    setComposerState: state => this.setComposerState(state),
+    focusComposer: () => this.focusComposer(),
+    writeDraft: text => this.writeDraft(text),
+    startActivity: (shapeId, now, stop) => setAiActivity({ state: 'streaming', shapeId, startedAtMs: now, canCancel: true, cancel: stop }),
+    settleAiActivity: () => this.settleAiActivity(),
+    noteRefusedWhileLocked: () => this.noteRefusedWhileLocked(),
+    announce: (message, severity) => emitEphemeralToast({ message, severity }),
+    requestUpdate: () => this.requestUpdate(),
+  }, { createConversationId, rememberServerConversation, loadConversations, generateConversationTitle });
 
-  /** The slot belongs to the place on screen; streams keep their own handles until they settle. */
-  private syncActiveAsk(): void {
-    const ask = this.liveAsks.get(this.sessions.activeId ?? '');
-    this.streaming = ask !== undefined;
-    this.askAbort = ask?.abort ?? null;
-    this.askStop = ask?.stop ?? null;
-    this.askStopping = ask?.stopping ?? null;
-    this.askCheckingTurnId = ask?.checkingTurnId ?? null;
-    this.askReasoningTurnId = ask?.turnId ?? null;
-    if (ask !== undefined) this.askReasoning = ask.reasoning;
-  }
-  /**
-   * Conversations this window has already asked the model to name (inventory A11). Once per
-   * conversation: the title is the row's label forever, so a second generation would rename a row
-   * the reader has already learned to recognise.
-   */
-  private readonly titledSessionIds = new Set<string>();
-  /**
-   * The SHARED reasoning model for the ask that is streaming (inventory C9). One controller, reset
-   * per ask, exactly as the shipped window holds it (`views/UnifiedChatView.ts:645`) — its blocks are
-   * handed to the turn at the terminal, which is what makes a past turn's thinking survive the reset.
-   */
-  private askReasoning = new ReasoningController(() => this.requestUpdate());
-  /**
-   * The turn the ask controller above is streaming for, or null (tempdoc 848 §2.7). Handed down so
-   * the transcript binds the live thinking to ONE turn by id, exactly as it binds the run feed —
-   * `streaming` status alone is per-turn and reachable for two turns at once.
-   */
-  private askReasoningTurnId: string | null = null;
   /**
    * WP1.1 — Search mode: the shared search store's reader, the result list's chosen rows, and the
    * files a prepared Ask is limited to (`sv3-search.ts`). The window keeps only the navigation.
@@ -1206,6 +1201,7 @@ export class SearchV3View extends JfElement {
   constructor() {
     super();
     new Sv3RunController(this, this.runDomain);
+    new Sv3AskController(this, this.askDomain, () => this.sessions);
     this.composerState = COMPOSER_STATE_DEFAULT;
     // Read in the CONSTRUCTOR, not on connect: the attribute is reflected, so a value arriving one
     // render late would paint the dark set for a frame in a light app — the flash the app's own
@@ -1464,10 +1460,7 @@ export class SearchV3View extends JfElement {
     this.chatWidthUnsubscribe = null;
     // Lifecycle containment: an unmounted window's stream would keep a connection open against the
     // shared channel budget and settle a turn nobody can see.
-    for (const ask of this.liveAsks.values()) { ask.abort.abort(); ask.reasoning.destroy(); }
-    // The controller runs a 1s tick while the model is thinking; an unmounted window's tick would go
-    // on requesting updates on a detached element forever.
-    this.askReasoning.destroy();
+    this.askDomain.disconnect();
     this.boxObserver?.disconnect();
     this.boxObserver = null;
     this.dockObserver?.disconnect();
@@ -1634,7 +1627,7 @@ export class SearchV3View extends JfElement {
   protected override willUpdate(changed: Map<string, unknown>): void {
     const previousSessions = changed.get('sessions') as Sv3SessionList | undefined;
     if (previousSessions && previousSessions.activeId !== this.sessions.activeId) this.leaveForgetPlacement();
-    if (changed.has('sessions')) { this.syncActiveAsk(); this.upgradeOpenPaneAnchor(); }
+    if (changed.has('sessions')) { this.upgradeOpenPaneAnchor(); }
     this.syncForkReads();
     if (changed.has('sidebarWidthPx') || changed.has('paneWidthPx') || changed.has('paneDocPath')) {
       this.reflowSidebar();
@@ -1831,10 +1824,10 @@ export class SearchV3View extends JfElement {
     const turn = session.turns.find(turn => turn.id === detail.turnId);
     const shapeId = turn?.shapeId;
     const retryNote = turn?.kind === 'model' ? 'This answer does not search your files.' : sv3ExplainsRankingTrace(turn ?? null)
-      ? this.summaryInputs.has(detail.turnId) ? 'Explain with the original ranking trace.' : 'After reload, start Explain from the result again.'
-      : shapeId === 'core.extract' ? this.structuredNote(detail.turnId)
+      ? (this.askDomain.summaryInput(detail.turnId) !== undefined) ? 'Explain with the original ranking trace.' : 'After reload, start Explain from the result again.'
+      : shapeId === 'core.extract' ? this.askDomain.structuredNote(detail.turnId)
       : shapeId === 'core.summarize'
-        ? this.summaryInputs.has(detail.turnId) ? 'Summarize with the original inputs.' : 'Opens Summarize; choose the original inputs before sending.'
+        ? (this.askDomain.summaryInput(detail.turnId) !== undefined) ? 'Summarize with the original inputs.' : 'Opens Summarize; choose the original inputs before sending.'
         : sv3ResendScopeNote(this.search.scopesByTurn.get(detail.turnId), this.search.filtersOfTurn(detail.turnId));
     const chosen = await openContextMenu({
       // The branch acts lead: they fork the conversation, and the context acts change what the next
@@ -2010,8 +2003,8 @@ export class SearchV3View extends JfElement {
       emitEphemeralToast({ message: this.draftDomain.recoveryError, severity: 'warning' });
       return;
     }
-    if (detail.action !== 'branch' && (summary && !this.summaryInputs.has(detail.turnId)
-      || tier === 'structured' && !this.structuredInputs.has(detail.turnId))) {
+    if (detail.action !== 'branch' && (summary && this.askDomain.summaryInput(detail.turnId) === undefined
+      || tier === 'structured' && this.askDomain.structuredInput(detail.turnId) === undefined)) {
       this.draftDomain.recoveryError = summary && turn && sv3ExplainsRankingTrace(turn)
         ? 'Retry/Edit cannot restore the original Explain input after reload. Start Explain from the result again.'
         : 'The original schema or summary input is not available. Prepare a new task and review its inputs before sending.';
@@ -2026,14 +2019,14 @@ export class SearchV3View extends JfElement {
       const reason = this.draftDomain.humanUnavailable(shape);
       if (reason) { emitEphemeralToast({ message: reason, severity: 'warning' }); return; }
       if (lineage.forkKey === null || text === '' || (detail.action === 'edit' && !lineage.canEdit)) return;
-      const inputs = summary ? this.summaryInputs.get(detail.turnId) : this.structuredInputs.get(detail.turnId);
+      const inputs = summary ? this.askDomain.summaryInput(detail.turnId) : this.askDomain.structuredInput(detail.turnId);
       // Missing schema/passage already has an explicit review path below, with no dispatch.
       if ((!summary && tier !== 'structured') || inputs !== undefined) {
         const task = this.draftDomain.reserveHumanTask(text,
-          summary ? this.summaryInputs.get(detail.turnId)?.scope ?? null
-            : tier === 'structured' ? this.structuredInputs.get(detail.turnId)?.scope ?? null : this.search.scopeOfTurn(detail.turnId),
-          tier === 'structured' ? this.structuredInputs.get(detail.turnId)?.schema : undefined,
-          shape, summary ? this.summaryInputs.get(detail.turnId)?.selection ?? null : null,
+          summary ? this.askDomain.summaryInput(detail.turnId)?.scope ?? null
+            : tier === 'structured' ? this.askDomain.structuredInput(detail.turnId)?.scope ?? null : this.search.scopeOfTurn(detail.turnId),
+          tier === 'structured' ? this.askDomain.structuredInput(detail.turnId)?.schema : undefined,
+          shape, summary ? this.askDomain.summaryInput(detail.turnId)?.selection ?? null : null,
           false, lineage.forkKey, detail.action === 'edit' ? detail.text : undefined, this.search.filtersOfTurn(detail.turnId));
         if (task === null) return;
         humanTask = task;
@@ -2042,7 +2035,7 @@ export class SearchV3View extends JfElement {
     if (turn?.shapeId === 'core.summarize' && detail.action !== 'branch') {
       const text = detail.action === 'edit' ? (detail.text ?? '').trim() : turn.question;
       if (lineage.forkKey === null || text === '' || !lineage.canEdit) return;
-      const inputs = this.summaryInputs.get(turn.id);
+      const inputs = this.askDomain.summaryInput(turn.id);
       if (!await this.branchInto(lineage.forkFromId, lineage.forkKey, null, 'ask', null, humanTask)) return;
       this.tier = 'ask';
       this.draftDomain.preparedHandoff = { shapeId: 'core.summarize', selection: inputs?.selection ?? null };
@@ -2054,14 +2047,14 @@ export class SearchV3View extends JfElement {
         this.writeDraft(text);
         this.requestUpdate();
       } else {
-        await this.runAsk(text, inputs.scope, undefined, false, { task: humanTask, turnAction: true });
+        await this.askDomain.runAsk(text, inputs.scope, undefined, false, { task: humanTask, turnAction: true });
       }
       return;
     }
     if (tier === 'structured' && detail.action !== 'branch') {
       const text = detail.action === 'edit' ? (detail.text ?? '').trim() : turn?.question ?? '';
       if (lineage.forkKey === null || text === '' || !lineage.canEdit) return;
-      const inputs = this.structuredInputs.get(detail.turnId);
+      const inputs = this.askDomain.structuredInput(detail.turnId);
       if (!await this.branchInto(lineage.forkFromId, lineage.forkKey, null, tier, null, humanTask)) return;
       this.tier = 'structured';
       this.draftDomain.tierFollowsPlace = false;
@@ -2069,7 +2062,7 @@ export class SearchV3View extends JfElement {
         this.writeDraft(text);
         this.requestUpdate();
       } else {
-        await this.runAsk(text, inputs.scope, inputs.schema, false, { task: humanTask, turnAction: true });
+        await this.askDomain.runAsk(text, inputs.scope, inputs.schema, false, { task: humanTask, turnAction: true });
       }
       return;
     }
@@ -2183,7 +2176,7 @@ export class SearchV3View extends JfElement {
       this.delegate(resend, true);
     } else {
       if (!this.canRerun(tier)) return true;
-      await this.runAsk(resend, scope, undefined, tier === 'model', { task, turnAction: true });
+      await this.askDomain.runAsk(resend, scope, undefined, tier === 'model', { task, turnAction: true });
     }
     return true;
   }
@@ -2872,11 +2865,11 @@ export class SearchV3View extends JfElement {
       return;
     }
     if (detail?.tier === 'structured') {
-      void this.runAsk(text, this.search.pendingScope, this.draftDomain.schemaDraft);
+      void this.askDomain.runAsk(text, this.search.pendingScope, this.draftDomain.schemaDraft);
       return;
     }
     // A hand-off and a results Ask share the same fixed, one-send file scope.
-    void this.runAsk(text, this.search.showing || this.draftDomain.preparedHandoff !== null || this.draftDomain.placeScopes.has(this.sessions.activeId ?? '') ? this.search.pendingScope : null);
+    void this.askDomain.runAsk(text, this.search.showing || this.draftDomain.preparedHandoff !== null || this.draftDomain.placeScopes.has(this.sessions.activeId ?? '') ? this.search.pendingScope : null);
   }
 
   /** Whether a response or a delegated run is live — the slot's `running`, read in one place. */
@@ -2940,7 +2933,7 @@ export class SearchV3View extends JfElement {
   }
 
   private onRestrictionsCommitted(): void {
-    this.askFilterError = '';
+    this.askDomain.askFilterError = '';
     if (this.search.showing && this.currentDraft().trim() && !this.historyLocked
       && this.draftDomain.humanTask === null && !this.draftDomain.draftReview && this.draftDomain.draftMayIssue(false)) this.search.rerun();
   }
@@ -3109,19 +3102,7 @@ export class SearchV3View extends JfElement {
   }
 
   private onModelAnswer(event: Event): void {
-    const id = (event as CustomEvent<{ turnId?: string }>).detail?.turnId;
-    const turn = this.activeSession?.turns.at(-1);
-    if (turn === undefined || turn.shapeId === 'core.extract' || turn.id !== id || this.streaming
-      || this.contextAskPending.size > 0 || this.agentController()?.runInFlight === true) return;
-    if (turn.status !== 'no-evidence'
-      && !(turn.kind === 'model' && ['failed', 'halted', 'refused'].includes(turn.status))) return;
-    const reason = this.modelAnswerUnavailableReason;
-    if (reason !== '') {
-      emitEphemeralToast({ message: reason, severity: 'warning' });
-      return;
-    }
-    void this.runAsk(turn.question, null, undefined, true, { turnAction: true, record: turn.id });
-    void this.focusComposer();
+    this.askDomain.modelAnswer((event as CustomEvent<{ turnId?: string }>).detail?.turnId);
   }
 
   /**
@@ -3160,320 +3141,6 @@ export class SearchV3View extends JfElement {
     const availability = projectAvailability('agent', this.aiSnapshot);
     return availability.kind === 'unavailable' ? availability.reason : '';
   }
-  private readonly summaryInputs = new Map<string, { scope: Sv3AskScope | null; selection: SelectionPayload | null }>();
-  private structuredError = '';
-  private readonly structuredInputs = new Map<string, { schema: string; scope: Sv3AskScope | null }>();
-
-  private structuredNote(turnId: string): string {
-    const inputs = this.structuredInputs.get(turnId);
-    return inputs === undefined
-      ? 'Original Structured inputs are unavailable. Prepare a new Structured task and review its schema and inputs.'
-      : `Runs Structured with schema ${inputs.schema}; inputs: ${inputs.scope?.paths.join(', ') ?? 'typed text'} and this conversation.`;
-  }
-
-  /**
-   * The ONE path a question takes. There is no second entry: the composer refuses an unavailable or
-   * busy send before it leaves, and the model action checks its own gate. This method
-   * opens the turn, dispatches through the window's single ask site, and settles that turn.
-   */
-  private askFilterError = '';
-
-  private async runAsk(rawQuestion: string, scope: Sv3AskScope | null = null, schema?: string, modelAnswer = false,
-    options: { task?: HumanTask; continuation?: boolean; turnAction?: boolean; record?: string; authored?: string } = {}): Promise<void> {
-    let question = rawQuestion.trim();
-    if (question === '' || this.streaming) return;
-    if (!options.task && !options.turnAction && !this.draftDomain.draftMayIssue(false)) return;
-    const handoff = options.task ? { shapeId: options.task.saved.shape, selection: options.task.selection }
-      : modelAnswer ? null : this.draftDomain.preparedHandoff;
-    modelAnswer = modelAnswer || handoff?.shapeId === SV3_MODEL_SHAPE_ID
-      || (schema === undefined && handoff === null && (this.shapeId === SV3_MODEL_SHAPE_ID || this.activeSession?.turns.at(-1)?.shapeId === SV3_MODEL_SHAPE_ID));
-    const shapeId: RecoveryShape = modelAnswer ? SV3_MODEL_SHAPE_ID : schema !== undefined ? 'core.extract' : (handoff?.shapeId as RecoveryShape | null) ?? SV3_ASK_SHAPE_ID;
-    const unavailable = this.draftDomain.humanUnavailable(shapeId, options.continuation);
-    if (unavailable !== '') { emitEphemeralToast({ message: unavailable, severity: 'warning' }); return; }
-    if (schema !== undefined) {
-      try {
-        const parsed: unknown = JSON.parse(schema);
-        if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) throw new Error('object');
-      } catch { this.structuredError = 'Enter a JSON schema object.'; this.requestUpdate(); return; }
-    }
-    // Keep the actual trace visible in the durable user turn even if its instructions were edited.
-    if (shapeId === 'core.summarize' && handoff?.selection?.kind === 'search-trace') {
-      const trace = handoff.selection.summary;
-      if (typeof trace === 'string' && trace && !question.includes(trace)) question += `\n\nRanking trace:\n${trace}`;
-    }
-    if (schema !== undefined && (scope?.paths.length ?? 0) > 5) {
-      this.structuredError = 'Choose at most 5 files for one extraction.';
-      this.requestUpdate();
-      return;
-    }
-    this.structuredError = '';
-    const task = options.task ?? this.draftDomain.reserveHumanTask(question, modelAnswer ? null : scope, schema, shapeId,
-      modelAnswer ? null : handoff?.selection ?? null, options.turnAction !== true, options.record ?? null, options.authored);
-    if (task === null || this.draftDomain.humanTask !== task) return;
-    if (options.task && !this.draftDomain.humanOwned(task)) return;
-    const draft = task.draft;
-    const sessionId = this.sessions.activeId;
-    if (sessionId !== null && this.contextAskPending.has(sessionId)) return;
-    let context: ReturnType<typeof sv3FollowUpContext> = [];
-    if (sessionId !== null && !modelAnswer) {
-      this.contextAskPending.add(sessionId);
-      try {
-        const resolved = await this.contextDomain.followUpContext(sessionId);
-        if (resolved === null || !this.isConnected || this.sessions.activeId !== sessionId) {
-          this.contextDomain.refuseQuestion(sessionId, question);
-          this.requestUpdate();
-          return;
-        }
-        context = resolved;
-        this.contextDomain.clearRefusedQuestion(sessionId);
-      } finally {
-        this.contextAskPending.delete(sessionId);
-      }
-    }
-    if (!this.isConnected || this.sessions.activeId !== sessionId || this.draftDomain.humanTask !== task || task.abandoned) return;
-    if (options.task && !this.draftDomain.humanOwned(task)) return;
-    if (options.task && task.context !== null && JSON.stringify(context) !== JSON.stringify(task.context)) {
-      task.revoked = true;
-      this.draftDomain.recoveryError = 'Saved context changed. Review the retained question before a new submission.';
-      this.requestUpdate();
-      return;
-    }
-    if (this.draftDomain.humanUnavailable(shapeId, options.continuation) !== '') { this.requestUpdate(); return; }
-    task.context = context.map(m => ({ ...m }));
-    task.saved.target = sessionId ?? createConversationId();
-    task.saved.delivery = 'unknown';
-    task.refusal = null;
-    if (!this.draftDomain.saveRecovery(task) || !this.isConnected || this.sessions.activeId !== sessionId
-      || this.draftDomain.humanTask !== task || task.abandoned || this.draftDomain.humanUnavailable(shapeId, options.continuation) !== '') return;
-    if (options.task && !this.draftDomain.humanOwned(task)) return;
-    if (!modelAnswer && task.ownsComposer && draft.port.isCurrent(draft) && this.draftDomain.preparedHandoff === handoff) {
-      this.draftDomain.preparedHandoff = null;
-      this.draftDomain.handoffNotice = ''; this.draftDomain.handoffBlocked = false;
-    }
-    this.draftDomain.leaveResultsBySending();
-    this.sessions = submitInSession(this.sessions, task.question, Date.now(), modelAnswer ? 'model' : 'ask', task.saved.target!, shapeId, task.selection?.kind);
-    const ref = latestTurnRef(this.sessions);
-    if (ref === null) return;
-    if (schema !== undefined) this.structuredInputs.set(ref.turnId, { schema, scope });
-    if (shapeId === 'core.summarize') this.summaryInputs.set(ref.turnId, { scope, selection: handoff?.selection ?? null });
-    // WP1.1 S1.7 — remembered by turn so its Retry/Edit can keep the same files. Window-local: the
-    // store keeps no scope with a turn, so after reload its original scope is unknown and Retry/Edit must refuse.
-    if (shapeId === SV3_ASK_SHAPE_ID) this.search.recordTurnScope(ref.turnId, task.scope, task.filters);
-    if (schema === undefined && task.ownsComposer && draft.port.isCurrent(draft)
-      && this.search.pendingScope === task.scopeOwner) this.search.clearScope();
-    if (!modelAnswer) this.draftDomain.placeScopes.delete(ref.sessionId);
-    this.claimConversation(ref.sessionId);
-    // The submitted question is fixed; input typed while confirmation waited belongs to the reader.
-    if (task.ownsComposer && schema === undefined && draft.port.isCurrent(draft)) {
-      this.draftDomain.assigningHumanDraft = true;
-      try { draft.port.clearIf(draft); } finally { this.draftDomain.assigningHumanDraft = false; }
-      task.draft = draft.port.snapshot();
-    }
-    this.draftDomain.saveRecovery(task);
-    const sentDraft = draft.port.snapshot();
-    void this.setComposerState('docked');
-
-    const abort = new AbortController();
-    // Stop is explicit: the Engine is told to end THIS turn, and the stream is KEPT until the Engine
-    // ends it. Only the Engine knows whether the Stop landed before the answer was saved, so only its
-    // terminal says "stopped" (an error with CANCELLED, saved as stopped) or "finished" (`done`), and
-    // every word it sent before the Stop landed, which it saves, reaches the turn. A question still
-    // waiting to be sent (for the conversation's settings, or for Engine capacity) is sent all the
-    // same, and the Engine records it as stopped. Only a window that unmounts or starts afresh lets
-    // the stream go (`abortAsk`): the Engine finishes and saves the turn, as it does for a closed tab.
-    // The id the Stop names is this dispatch's own, never the turn's place in the list, which another
-    // window or a reload can hand out again: the Engine ignores a Stop for a turn that finished.
-    const dispatchId = crypto.randomUUID();
-    const reasoning = new ReasoningController(() => this.requestUpdate());
-    const stopAttempt = new StopAttempt();
-    const stop = (): void => {
-      if (stopAttempt.pending || stopAttempt.outcome === 'accepted') return;
-      stopAttempt.latch();
-      this.draftDomain.revokeHumanTask();
-      this.draftDomain.saveRecovery();
-      const ask = this.liveAsks.get(ref.sessionId);
-      if (ask === undefined) return;
-      ask.stopping = { turnId: ref.turnId, state: 'stopping' };
-      this.syncActiveAsk();
-      void stopAttempt.deliver((signal) => sv3StopAsk(this.apiBase, ref.sessionId, dispatchId, signal)).then(() => {
-        if (stopAttempt.outcome === 'accepted' || this.liveAsks.get(ref.sessionId)?.abort !== abort) return;
-        // Refused or unanswered: the answer goes on, and Stop can be pressed again.
-        ask.stopping = { turnId: ref.turnId, state: 'failed' };
-        this.syncActiveAsk();
-      });
-    };
-    this.liveAsks.set(ref.sessionId, { abort, stop, reasoning, turnId: ref.turnId, stopping: null, checkingTurnId: null });
-    this.syncActiveAsk();
-    // The controller is per-ASK, not per-turn: it accumulates and times one stream's thinking, and
-    // the blocks it finalizes are written onto the turn below. Resetting here is what stops the
-    // previous answer's thinking appearing under this one.
-    reasoning.reset();
-    // The app-wide activity indicator, raised for the duration and settled at the terminal below
-    // (inventory G11). Cancelling through the SAME stop the Stop control uses, so there is one way
-    // to stop this turn however the reader reaches it.
-    setAiActivity({
-      state: 'streaming',
-      shapeId,
-      startedAtMs: Date.now(),
-      canCancel: true,
-      cancel: stop,
-    });
-    // Every terminal below settles the SAME ref the dispatch opened, so a reader who claims another
-    // session mid-stream still gets the answer written where it was asked.
-    const settle = (
-      status: 'complete' | 'halted' | 'refused' | 'failed' | 'no-evidence' | 'left',
-      detail = '',
-    ): void => {
-      if (status === 'left') {
-        // Not stopped and not finished here: the Engine goes on and saves the turn, and the record
-        // shows what it saved the next time this conversation is read.
-        this.sessions = dropTurn(this.sessions, ref);
-      } else {
-        // The thinking is closed out and RECORDED on the turn at every terminal, including a halt:
-        // what the model thought before the reader stopped it was really produced, and dropping it
-        // would lose evidence the window actually received (inventory C9).
-        reasoning.finalize();
-        this.sessions = setTurnReasoning(this.sessions, ref, [...reasoning.reasoningBlocks]);
-        this.sessions = settleTurn(
-          this.sessions,
-          ref,
-          status,
-          Date.now(),
-          detail,
-          // The model AS OF THIS TERMINAL (inventory C1). Recorded rather than read at render, so a
-          // transcript re-read after a model swap still names the one that wrote each answer.
-          this.currentModelLabel,
-        );
-        if (schema !== undefined && (status === 'complete' || status === 'failed' || status === 'refused')) {
-          // The existing window message channel supplies the polite live region. Failures also
-          // stay in the transcript; this notice must not interrupt speech or take keyboard focus.
-          emitEphemeralToast({
-            message: status === 'complete' ? 'Extraction complete.' : `Extraction failed: ${detail}`,
-            severity: 'info',
-          });
-        }
-      }
-      // Only THIS dispatch's terminal may clear the window's busy state: a later ask has already
-      // installed its own controller, and clearing it here would strand a live stream with a Send
-      // control in the slot.
-      if (this.liveAsks.get(ref.sessionId)?.abort === abort) this.liveAsks.delete(ref.sessionId);
-      reasoning.destroy();
-      this.syncActiveAsk();
-      if (this.liveAsks.size === 0 && this.agentController()?.runInFlight !== true) this.settleAiActivity();
-      this.requestUpdate();
-    };
-    await sv3Ask(
-      {
-        apiBase: this.apiBase,
-        schema,
-        shapeId,
-        selection: task.selection,
-        question: task.question,
-        conversationId: ref.sessionId,
-        modelAnswer,
-        // The rung AS OF THIS SEND (tempdoc 822 Phase F10). Read here rather than inside the ask
-        // client, so the one place a question is dispatched is also the one place its parameters
-        // are decided — and a rung changed mid-stream cannot rewrite a request already in flight.
-        effort: task.saved.effort,
-        // The chosen files' PATHS (what the backend's `docIds` filter matches), or none at all —
-        // never an empty list standing in for a choice, which would mean the whole index.
-        ...(task.scope !== null ? { docIds: task.scope.paths } : {}),
-        filters: restrictionWire(task.filters),
-        context,
-        turnId: dispatchId,
-        signal: abort.signal,
-      },
-      {
-        onDelta: (text) => {
-          if (text) rememberServerConversation(ref.sessionId);
-          this.sessions = appendTurnDelta(this.sessions, ref, text);
-        },
-        onChecking: (checking) => {
-          const ask = this.liveAsks.get(ref.sessionId);
-          if (ask?.abort !== abort) return;
-          ask.checkingTurnId = checking ? ref.turnId : null;
-          this.syncActiveAsk();
-        },
-        onEvidence: (evidence) => {
-          this.sessions = setTurnEvidence(this.sessions, ref, evidence);
-        },
-        onReasoning: (payload) => {
-          reasoning.handleReasoningChunk(payload);
-        },
-        onRewrite: (standalone) => {
-          this.sessions = setTurnRewrite(this.sessions, ref, standalone);
-        },
-        onDone: (usage) => {
-          if (schema !== undefined && task.ownsComposer && draft.port.isCurrent(draft) && this.search.pendingScope === task.scopeOwner) this.search.clearScope();
-          if (schema !== undefined && task.ownsComposer && draft.port.isCurrent(draft)) {
-            this.draftDomain.assigningHumanDraft = true;
-            try { draft.port.clearIf(draft); } finally { this.draftDomain.assigningHumanDraft = false; }
-          }
-          this.draftDomain.retireHumanTask(task);
-          // Tempdoc 610 §E.4 — the occupancy this turn reported, recorded on the CONVERSATION that
-          // spent it (a terminal that reported none leaves the previous reading standing rather than
-          // replacing it with a zero the backend never sent).
-          this.contextDomain.recordUsage(ref.sessionId, usage);
-          // The answer has arrived, so the thinking that preceded it is over — the shipped window
-          // ends it on the first content chunk; ending it at the terminal is the same edge for a
-          // window whose transcript renders the block beside the answer rather than instead of it.
-          settle('complete');
-          // The record now holds this turn; the store now holds the conversation. Both refreshed so
-          // a reload projects exactly what is on screen (inventory A1 + D1).
-          void loadConversations();
-          void this.contextDomain.refreshRecord(ref.sessionId);
-          void this.maybeGenerateTitle(ref.sessionId);
-        },
-        // The lock's refusal is worded by the ONE reason vocabulary, not re-phrased here.
-        onRefused: () => {
-          task.saved.delivery = 'unaccepted';
-          task.revoked = true;
-          this.draftDomain.saveRecovery(task);
-          settle('refused', reasonFor('conversations.locked').wording);
-          // The SERVER just said the store is locked, which is newer than any poll (inventory E4/E5).
-          this.noteRefusedWhileLocked();
-        },
-        onHalted: () => {
-          this.draftDomain.retireHumanTask(task);
-          settle('halted');
-          // Saved as stopped: the record gives the turn its store ids (so it can be retried,
-          // edited or branched) and the list its conversation, as after a finished answer.
-          void loadConversations();
-          void this.contextDomain.refreshRecord(ref.sessionId);
-        },
-        onLeft: () => { task.revoked = true; this.draftDomain.saveRecovery(task); settle('left'); },
-        onFailed: (message, code, refusal) => {
-          if (refusal !== null && refusal !== undefined) {
-            task.saved.delivery = 'unaccepted';
-            task.refusal = refusal;
-            task.retryAt = Date.now() + (refusal.retryAfterMs ?? 0);
-            this.draftDomain.scheduleHumanRetry(task);
-            this.draftDomain.saveRecovery(task);
-            settle('left');
-            return;
-          }
-          // A terminal Structured turn without accepted output is final, never a retryable
-          // delivery uncertainty or an answer for the next turn's context.
-          if (code === 'NO_CONTENT') this.draftDomain.retireHumanTask(task);
-          else { task.saved.delivery = 'unknown'; task.revoked = true; this.draftDomain.saveRecovery(task); }
-          if (code === 'INVALID_REQUEST' && /pathPrefix|modifiedAt|sizeBytes/.test(message)) this.askFilterError = message;
-          const restricted = hasActiveFilter(task.filters);
-          if (code === 'NO_CONTENT' && restricted) message += ` ${localizeResourceKey('search.filters.no-content')} ${restrictionLabels(task.filters).map(f => f.label).join('; ')}`;
-          const noEvidence = !restricted && shapeId === SV3_ASK_SHAPE_ID && code === 'NO_CONTENT' && scope === null;
-          settle(noEvidence ? 'no-evidence' : 'failed', noEvidence ? '' : message);
-          void loadConversations();
-          void this.contextDomain.refreshRecord(ref.sessionId);
-          if (handoff !== null && this.sessions.activeId === ref.sessionId && task.ownsComposer && sentDraft.port.isCurrent(sentDraft)) {
-            this.draftDomain.preparedHandoff = handoff;
-            this.search.prepare(scope);
-            this.draftDomain.assigningHumanDraft = true;
-            try { this.writeDraft(task.saved.raw); } finally { this.draftDomain.assigningHumanDraft = false; }
-            this.draftDomain.saveRecovery(task);
-          }
-        },
-      },
-    );
-  }
 
   /**
    * The composer announced a new effort rung (tempdoc 822 Phase F10). The window keeps it, and the
@@ -3493,36 +3160,6 @@ export class SearchV3View extends JfElement {
     this.draftDomain.changeTier((event as CustomEvent<Sv3TierChange>).detail?.tier);
   }
 
-  /**
-   * Lets the stream go without telling the Engine (leaving is not stopping); the turn leaves the
-   * transcript through the sink's own `onLeft`, and the record later shows what the Engine saved.
-   */
-  private abortAsk(): void {
-    this.askAbort?.abort();
-  }
-
-  /**
-   * A11 — ask the model to name the conversation, through the store's own authority
-   * (`generateConversationTitle`, which asks the conversation's own auto-title route: background
-   * inference that never counts as a person acting, retried until the chat lane is free, and stored
-   * by the server only over no name). The window neither prompts nor parses: it decides
-   * WHETHER, and `sv3-sessions.ts`'s `sv3ShouldGenerateTitle` is where that decision lives.
-   *
-   * ONCE per conversation, and never over a rename. A rename made while naming is in flight needs
-   * nothing more from this window: the server stores the model's name only over no name, the rename
-   * was written through when it was made, and the store does not show a late model name over it.
-   * Writing the rename again when the answer lands would put this window's name back over a newer
-   * one from another tab, unattended, as a person's write.
-   */
-  private async maybeGenerateTitle(sessionId: string): Promise<void> {
-    if (this.titledSessionIds.has(sessionId)) return;
-    const session = sessionById(this.sessions, sessionId);
-    if (session === null || !sv3ShouldGenerateTitle(session)) return;
-    this.titledSessionIds.add(sessionId);
-    const turn = session.turns.find((t) => t.kind === 'ask' && t.status === 'complete');
-    if (turn === undefined) return;
-    await generateConversationTitle(sessionId, turn.question, turn.answer);
-  }
 
   /** Pin the session before the export's independent reads can yield to navigation. */
   private exportActiveConversation(): void {
@@ -3540,24 +3177,6 @@ export class SearchV3View extends JfElement {
    */
   private agentController(): AgentSessionController | null {
     return peekAgentSessionController();
-  }
-
-  /**
-   * The live thinking on the ASK tier, and only that (tempdoc 859 §A §1.9, superseding 848 §2.8).
-   *
-   * The delegate tier's fallback that used to live here — hand the transcript the shared agent
-   * controller so the stack above the turn could render a run's live reasoning — is deleted. A
-   * delegate run's thinking now arrives through the run feed, in the position it was produced
-   * (`projectSv3RunFeed`'s trailing open-region item), so keeping the fallback would draw the same
-   * live thought twice: once in the stack and once in the timeline.
-   */
-  private liveReasoning(): ReasoningController | null {
-    return this.streaming ? this.askReasoning : null;
-  }
-
-  /** The turn that owns {@link liveReasoning}'s controller — the id the transcript binds it to. */
-  private liveReasoningTurnId(): string | null {
-    return this.streaming ? this.askReasoningTurnId : null;
   }
 
   /**
@@ -3886,7 +3505,7 @@ export class SearchV3View extends JfElement {
   private onComposerStop(): void {
     if (this.draftDomain.humanLoad !== null && !this.streaming) { this.draftDomain.revokeHumanTask(); this.draftDomain.saveRecovery(); return; }
     if (this.streaming) {
-      this.askStop?.();
+      this.askDomain.stop();
       return;
     }
     this.runDomain.haltRun();
@@ -4048,16 +3667,16 @@ export class SearchV3View extends JfElement {
           .turnScopes=${this.search.scopesByTurn}
           .turnFilters=${this.search.filtersByTurn}
           .modelAnswerUnavailableReason=${this.modelAnswerUnavailableReason}
-          ?model-answer-busy=${this.contextAskPending.size > 0 || this.agentController()?.runInFlight === true}
-          .structuredNotes=${new Map(turns.filter(t => t.shapeId === 'core.extract').map(t => [t.id, this.structuredNote(t.id)]))}
+          ?model-answer-busy=${this.askDomain.contextPending || this.agentController()?.runInFlight === true}
+          .structuredNotes=${new Map(turns.filter(t => t.shapeId === 'core.extract').map(t => [t.id, this.askDomain.structuredNote(t.id)]))}
           .run=${visibleRun}
           .liveEvidencePaths=${this.agentController()?.groundingDeltaPaths ?? EMPTY_EVIDENCE_PATHS}
           .unconfirmedSteerNotes=${this.runDomain.unconfirmedSteerNotes}
           ?record-notice=${this.contextDomain.recordNotice}
           ?history-locked=${this.historyLocked}
           ?locked-refusal=${this.lockedRefusal}
-          .reasoning=${this.liveReasoning()}
-          .reasoningTurnId=${this.liveReasoningTurnId()}
+          .reasoning=${this.askDomain.liveReasoning()}
+          .reasoningTurnId=${this.askDomain.liveReasoningTurnId()}
           .currentModelLabel=${this.currentModelLabel}
           ?detailed=${isAdvancedMode()}
           .turnContexts=${contexts}
@@ -4099,13 +3718,13 @@ export class SearchV3View extends JfElement {
           .searchError=${this.search.snapshot?.errorInfo?.code === 'SEARCH_SYNTAX_INVALID' ? this.search.snapshot.error ?? '' : ''}
           .schemaDraft=${this.draftDomain.schemaDraft}
           .filterNote=${this.filterNote}
-          .filterError=${this.askFilterError || (this.search.snapshot?.errorInfo?.status === 400 && this.search.snapshot.errorInfo.code !== 'SEARCH_SYNTAX_INVALID' ? this.search.snapshot.errorInfo.message : '')}
+          .filterError=${this.askDomain.askFilterError || (this.search.snapshot?.errorInfo?.status === 400 && this.search.snapshot.errorInfo.code !== 'SEARCH_SYNTAX_INVALID' ? this.search.snapshot.errorInfo.message : '')}
           .recentItems=${this.recentItems}
           .recentLocked=${this.historyLocked}
           @sv3-recents-refresh=${() => { void this.refreshRecents(); }}
           @sv3-recents-clear=${this.clearRecents}
           @sv3-recent-select=${this.onRecentSelect}
-          .structuredError=${this.structuredError}
+          .structuredError=${this.askDomain.structuredError}
           task-notice=${this.draftDomain.retiredHandoffNotice || this.draftDomain.handoffNotice || (this.draftDomain.preparedHandoff?.shapeId === 'core.summarize' ? 'Summarize prepared. Edit the instruction and send.' : '')}
           scope-label=${scope !== null ? sv3ScopeLabel(scope) : ''}
           model-label=${this.currentModelLabel ?? ''}

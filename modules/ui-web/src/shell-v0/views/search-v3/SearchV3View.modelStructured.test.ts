@@ -38,8 +38,8 @@ async function mount(saved = false): Promise<View> {
   document.body.append(view); await settle(view); return view;
 }
 async function send(view: View, text: string, requestedSchema?: string, modelAnswer = false): Promise<void> {
-  await (view as unknown as { runAsk(q: string, scope: null, schema?: string, modelAnswer?: boolean): Promise<void> })
-    .runAsk(text, null, requestedSchema, modelAnswer);
+  await (view as unknown as { askDomain: { runAsk(q: string, scope: null, schema?: string, modelAnswer?: boolean): Promise<void> } })
+    .askDomain.runAsk(text, null, requestedSchema, modelAnswer);
   await settle(view);
 }
 beforeEach(() => {
@@ -119,7 +119,7 @@ it('remembered Structured Retry reuses its schema without becoming a model answe
   const view = await mount(true);
   const main = part(view, 'jf-sv3-main');
   const turnId = main.shadowRoot!.querySelectorAll('[data-testid="sv3-turn-question"]')[2]!.getAttribute('data-item-id')!.replace(/:q$/, '');
-  (view as unknown as { structuredInputs: Map<string, unknown> }).structuredInputs = new Map([[turnId, { schema, scope: null }]]);
+  (view as unknown as { askDomain: { structuredInputs: Map<string, unknown> } }).askDomain.structuredInputs = new Map([[turnId, { schema, scope: null }]]);
   main.dispatchEvent(new CustomEvent('sv3-branch-action', { bubbles: true, composed: true, detail: { action: 'retry', turnId } }));
   await settle(view);
   expect(dispatches()).toHaveLength(1);
