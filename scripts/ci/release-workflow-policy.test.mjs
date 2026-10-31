@@ -11,12 +11,73 @@ const read = name => readFileSync(new URL(`../../${name}`, import.meta.url), 'ut
 const workflow = name => yaml.load(read(`.github/workflows/${name}.yml`));
 const privateSecret = /secrets(?:\.JUSTSEARCH_(?:CODESIGN_\w+|TAURI_UPDATER_PRIVATE_KEY\w*|RELEASE_METADATA_PRIVATE_KEY_PEM)|\[['"]JUSTSEARCH_(?:CODESIGN_\w+|TAURI_UPDATER_PRIVATE_KEY\w*|RELEASE_METADATA_PRIVATE_KEY_PEM)['"]\])/;
 
+// Keep the write-enabled scripts closed to additional commands, including in the
+// runner guard and embedded Python. Only line endings and outer whitespace vary.
+const normalizeScript = script => script.replaceAll('\r\n', '\n').trim();
+const allowedRunnerGuard = {
+  linux: '[[ $RUNNER_ENVIRONMENT == github-hosted ]]',
+  windows: "if ($env:RUNNER_ENVIRONMENT -cne 'github-hosted') { throw 'Refusing a non-hosted runner' }",
+};
+const allowedDraftFetch = {
+  linux: String.raw`
+set -euo pipefail
+[[ "$RELEASE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[A-Za-z0-9.-]+)?$ ]]
+mkdir -p "$RUNNER_TEMP/release-assets"
+gh release view "$RELEASE_TAG" --json isDraft,tagName,targetCommitish > "$RUNNER_TEMP/draft.json"
+jq -e '.isDraft == true' "$RUNNER_TEMP/draft.json"
+gh release download "$RELEASE_TAG" --dir "$RUNNER_TEMP/release-assets" \
+  --pattern '*.deb' --pattern justsearch-mcp.mcpb --pattern SHA256SUMS
+gh api "repos/$GITHUB_REPOSITORY/contents/packaging/mcpb/server.json?ref=$RELEASE_TAG" \
+  --jq .content | base64 --decode > "$RUNNER_TEMP/server.json"
+python3 - "$RUNNER_TEMP/release-assets" <<'PY'
+import sys
+from pathlib import Path
+sys.path.insert(0, 'scripts/release/qual/journeys')
+from runner import verify_assets
+root = Path(sys.argv[1])
+packages = list(root.glob('*.deb'))
+assert len(packages) == 1, 'Expected one Linux draft package'
+verify_assets(root, [packages[0].name, 'justsearch-mcp.mcpb'])
+PY`,
+  windows: String.raw`
+if ($env:RELEASE_TAG -cnotmatch '^v[0-9]+\.[0-9]+\.[0-9]+(-[A-Za-z0-9.-]+)?$') { throw 'Invalid release tag' }
+$assets=Join-Path $env:RUNNER_TEMP release-assets
+New-Item -ItemType Directory -Path $assets | Out-Null
+$draft=& gh release view $env:RELEASE_TAG --json isDraft,tagName,targetCommitish
+if ($LASTEXITCODE) { throw 'Draft lookup failed' }
+$draft | Set-Content (Join-Path $env:RUNNER_TEMP draft.json)
+if (($draft | ConvertFrom-Json).isDraft -ne $true) { throw 'An existing draft release is required' }
+& gh release download $env:RELEASE_TAG --dir $assets --pattern '*-setup.exe' --pattern justsearch-mcp.mcpb --pattern SHA256SUMS
+if ($LASTEXITCODE) { throw 'Draft download failed' }
+$content=& gh api "repos/$env:GITHUB_REPOSITORY/contents/packaging/mcpb/server.json?ref=$env:RELEASE_TAG" --jq .content
+if ($LASTEXITCODE) { throw 'Tagged registry fetch failed' }
+[IO.File]::WriteAllBytes((Join-Path $env:RUNNER_TEMP server.json),[Convert]::FromBase64String(($content -join '')))
+@'
+import os, sys
+from pathlib import Path
+sys.path.insert(0, 'scripts/release/qual/journeys')
+from runner import verify_assets
+root=Path(os.environ['RUNNER_TEMP'])/'release-assets'
+packages=list(root.glob('*-setup.exe'))
+assert len(packages)==1, 'Expected exactly one Windows NSIS draft asset'
+verify_assets(root,[packages[0].name,'justsearch-mcp.mcpb'])
+'@ | python -
+if ($LASTEXITCODE) { throw 'SHA256SUMS verification failed' }`,
+};
+
+function assertRequiredBeforeProvision(job, index) {
+  const step = job.steps[index];
+  assert(!Object.hasOwn(step, 'if'), `${step.name} must have no if`);
+  assert(!Object.hasOwn(step, 'continue-on-error'), `${step.name} must have no continue-on-error`);
+  const provisionIndex = job.steps.findIndex(s => s.name === 'Provision qualification tools');
+  assert(index < provisionIndex, `${step.name} must precede provisioning`);
+}
+
 for (const platform of ['linux', 'windows']) {
   const name = `qualify-release-${platform}`;
   const fetchJob = w => Object.entries(w.jobs).find(([, job]) => job.steps.some(s => /gh release (view|download)/.test(s.run)));
 
-  test(`${name}: only the draft fetch job has write access and cannot run candidate code`, () => {
-    const w = workflow(name);
+  const assertFetchPolicy = w => {
     const [id, job] = fetchJob(w);
     assert.deepEqual(job.permissions, { contents: 'write' }, 'draft lookup needs push access');
     assert.notEqual(id, 'journeys');
@@ -25,22 +86,23 @@ for (const platform of ['linux', 'windows']) {
       if (otherId !== id) assert.deepEqual(other.permissions, { contents: 'read' });
     }
     assert.deepEqual(job.steps.filter(s => s.uses).map(s => s.uses), ['actions/checkout@v4', 'actions/upload-artifact@v7']);
+    assert.deepEqual(job.steps.map(s => s.uses ?? s.name), [
+      'Require a disposable GitHub-hosted runner',
+      'actions/checkout@v4',
+      platform === 'linux' ? 'Fetch draft bytes and tagged registry metadata' : 'Fetch and verify exact draft bytes and tagged registry',
+      'actions/upload-artifact@v7',
+    ], 'the write-enabled job may contain only the guard, checkout, fetch/verify and upload');
     assert.equal(job.steps.find(s => s.uses?.startsWith('actions/checkout@')).with['persist-credentials'], false);
     const runs = job.steps.filter(s => s.run);
     assert.equal(runs.length, 2, 'only the hosted guard and fetch/verify may run with write access');
-    assert.match(runs[0].run, /RUNNER_ENVIRONMENT/);
+    assert.equal(normalizeScript(runs[0].run), allowedRunnerGuard[platform], 'runner guard may run only the allowed command');
     const fetch = runs[1];
-    assert.match(fetch.run, /gh release view/);
-    assert.match(fetch.run, /gh release download/);
-    assert.match(fetch.run, /isDraft/);
-    assert.match(fetch.run, /server\.json\?ref=/);
-    assert.match(fetch.run, /verify_assets\(root/);
-    assert.doesNotMatch(fetch.run, /cargo |unittest|hosted\.py|windows-tools|sudo |npm /);
+    assert.equal(normalizeScript(fetch.run), normalizeScript(allowedDraftFetch[platform]), 'draft fetch may run only the allowed commands');
     assert.equal(fetch.env.GH_TOKEN, '${{ github.token }}');
-  });
+  };
+  test(`${name}: only the draft fetch job has write access and cannot run candidate code`, () => assertFetchPolicy(workflow(name)));
 
-  test(`${name}: journeys reverify transferred bytes before provisioning with a read-only token`, () => {
-    const w = workflow(name);
+  const assertJourneysVerificationPolicy = w => {
     const [id, fetch] = fetchJob(w);
     const job = w.jobs.journeys;
     assert.deepEqual(job.permissions, { contents: 'read' });
@@ -60,20 +122,22 @@ for (const platform of ['linux', 'windows']) {
     const verifyIndex = job.steps.findIndex(s => /verify_assets\(root/.test(s.run));
     const provisionIndex = job.steps.findIndex(s => s.name === 'Provision qualification tools');
     assert(verifyIndex > downloadIndex && verifyIndex < provisionIndex, 'downloaded bytes must be verified before provisioning');
+    assertRequiredBeforeProvision(job, verifyIndex);
     const packagePattern = platform === 'linux' ? '*.deb' : '*-setup.exe';
     assert(job.steps[verifyIndex].run.includes(packagePattern));
     assert.match(job.steps[verifyIndex].run, /justsearch-mcp\.mcpb/);
     assert(!job.steps.some(s => /gh release (view|download)/.test(s.run)), 'journeys cannot fetch private drafts');
-  });
+  };
+  test(`${name}: journeys reverify transferred bytes before provisioning with a read-only token`, () => assertJourneysVerificationPolicy(workflow(name)));
 
-  test(`${name}: failed or skipped draft fetch still records unavailable journeys`, () => {
-    const w = workflow(name);
+  const assertFetchFailurePolicy = w => {
     const [id] = fetchJob(w);
     const job = w.jobs.journeys;
     assert.equal(job.if, 'always()');
     const guardIndex = job.steps.findIndex(s => s.env?.FETCH_RESULT === `\${{ needs.${id}.result }}`);
     const downloadIndex = job.steps.findIndex(s => s.uses?.startsWith('actions/download-artifact@'));
     assert(guardIndex >= 0 && guardIndex < downloadIndex, 'fetch failure must stop candidate preparation');
+    assertRequiredBeforeProvision(job, guardIndex);
     assert.match(job.steps[guardIndex].run, /FETCH_RESULT/);
     assert.match(job.steps[guardIndex].run, /success/);
     const record = job.steps.find(s => s.run?.includes('preparation_failure('));
@@ -84,7 +148,43 @@ for (const platform of ['linux', 'windows']) {
     assert.equal(upload.with['retention-days'], 30);
     assert.match(upload.with.path, /journey-evidence/);
     assert.match(upload.with.path, /draft\.json/);
-  });
+  };
+  test(`${name}: failed or skipped draft fetch still records unavailable journeys`, () => assertFetchFailurePolicy(workflow(name)));
+
+  for (const [index, label] of [[0, 'runner guard'], [2, 'draft fetch']]) {
+    test(`${name}: policy rejects a candidate command appended to the ${label}`, () => {
+      const w = workflow(name);
+      w.jobs.fetch.steps[index].run += '\npython candidate.py\n';
+      assert.throws(() => assertFetchPolicy(w), { code: 'ERR_ASSERTION', message: /may run only the allowed command/ });
+    });
+  }
+  for (const step of [{ run: 'python candidate.py' }, { uses: 'actions/setup-python@v5' }, { name: 'Unexpected step' }]) {
+    test(`${name}: policy rejects an extra fetch step ${JSON.stringify(step)}`, () => {
+      const w = workflow(name);
+      w.jobs.fetch.steps.push(step);
+      assert.throws(() => assertFetchPolicy(w), { code: 'ERR_ASSERTION' });
+    });
+  }
+  for (const [stepName, check] of [
+    ['Verify downloaded draft bytes', assertJourneysVerificationPolicy],
+    ['Require successful draft fetch', assertFetchFailurePolicy],
+  ]) {
+    for (const [key, value] of [['if', false], ['continue-on-error', true]]) {
+      test(`${name}: policy rejects ${key}: ${value} on ${stepName}`, () => {
+        const w = workflow(name);
+        w.jobs.journeys.steps.find(s => s.name === stepName)[key] = value;
+        assert.throws(() => check(w), { code: 'ERR_ASSERTION', message: `${stepName} must have no ${key}` });
+      });
+    }
+    test(`${name}: policy rejects provisioning before ${stepName}`, () => {
+      const w = workflow(name);
+      const steps = w.jobs.journeys.steps;
+      const provisionIndex = steps.findIndex(s => s.name === 'Provision qualification tools');
+      const [provision] = steps.splice(provisionIndex, 1);
+      steps.splice(steps.findIndex(s => s.name === stepName), 0, provision);
+      assert.throws(() => check(w), { code: 'ERR_ASSERTION', message: /before provisioning|must precede provisioning/ });
+    });
+  }
 }
 
 test('production secrets belong only to release-signing jobs; unsigned builds have no secret references', () => {
