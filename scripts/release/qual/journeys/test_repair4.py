@@ -136,21 +136,31 @@ class Repair4Tests(unittest.TestCase):
             command.assert_not_called(); spawn.assert_not_called()
 
     def test_hosted_result_survives_unremovable_portal_mount(self):
-        class Storage:
-            def __init__(self, prefix, ignore_cleanup_errors=False):
-                self.temp = tempfile.mkdtemp(prefix=prefix); self.ignore = ignore_cleanup_errors
-            def __enter__(self): return self.temp
-            def __exit__(self, *exc):
-                shutil.rmtree(self.temp)
-                if not self.ignore:
-                    raise PermissionError(1, 'Operation not permitted', self.temp + '/runtime/doc')
-        with patch.dict(os.environ, {'DISPLAY': ':99', 'DBUS_SESSION_BUS_ADDRESS': 'fake', 'GITHUB_ACTIONS': 'true',
-                                     'RUNNER_ENVIRONMENT': 'github-hosted'}, clear=True), \
-             patch.object(hosted.subprocess, 'run', return_value=SimpleNamespace(returncode=0)), \
-             patch.object(hosted.subprocess, 'Popen') as spawn, patch('sys.argv', ['hosted.py']), \
-             patch.object(hosted.tempfile, 'TemporaryDirectory', Storage):
-            spawn.return_value.poll.return_value = 0
-            self.assertEqual(hosted.main(), 0)
+        # Like the portal's FUSE mount: neither removable nor chmod-able.
+        rmdir, chmod = os.rmdir, os.chmod
+        def mounted(func):
+            def call(path, *args, **kwargs):
+                if str(path).endswith('/runtime/doc') or path == 'doc':
+                    raise PermissionError(1, 'Operation not permitted', str(path))
+                return func(path, *args, **kwargs)
+            return call
+        runtimes = []
+        def command(args, env=None, **kwargs):
+            # The journeys' viewer launch makes the portal mount runtime/doc.
+            runtimes.append(Path(env['XDG_RUNTIME_DIR'])); (runtimes[-1] / 'doc').mkdir(exist_ok=True)
+            return SimpleNamespace(returncode=0)
+        try:
+            with patch.dict(os.environ, {'DISPLAY': ':99', 'DBUS_SESSION_BUS_ADDRESS': 'fake', 'GITHUB_ACTIONS': 'true',
+                                         'RUNNER_ENVIRONMENT': 'github-hosted'}, clear=True), \
+                 patch.object(hosted.subprocess, 'run', side_effect=command), \
+                 patch.object(hosted.subprocess, 'Popen') as spawn, patch('sys.argv', ['hosted.py']), \
+                 patch.object(os, 'rmdir', mounted(rmdir)), patch.object(os, 'chmod', mounted(chmod)):
+                spawn.return_value.poll.return_value = 0
+                self.assertEqual(hosted.main(), 0)
+            self.assertTrue((runtimes[-1] / 'doc').is_dir(), 'fixture did not keep the mount in place')
+        finally:
+            for runtime in runtimes[-1:]:
+                shutil.rmtree(runtime.parent, ignore_errors=True)
 
     def test_direct_local_apt_refuses_developer_host(self):
         with tempfile.TemporaryDirectory() as temp, patch.dict(os.environ, {}, clear=True), \
