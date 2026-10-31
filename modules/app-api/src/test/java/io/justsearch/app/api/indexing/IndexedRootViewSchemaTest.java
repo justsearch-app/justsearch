@@ -63,13 +63,13 @@ final class IndexedRootViewSchemaTest {
   }
 
   @Test
-  @DisplayName("IndexedRootView schema matches the committed SSOT baseline")
+  // IndexedRootView schema matches the committed SSOT baseline
   void indexedRootViewSchema() throws Exception {
     captureOrVerify(IndexedRootView.class, "indexed-root.v1.json");
   }
 
   @Test
-  @DisplayName("baseline carries the tempdoc 813 per-root coverage fields")
+  // baseline carries the tempdoc 813 per-root coverage fields
   void baselineCarriesCoverageFields() throws Exception {
     JsonNode properties =
         MAPPER.readTree(Files.readString(schemasDir.resolve("indexed-root.v1.json")))

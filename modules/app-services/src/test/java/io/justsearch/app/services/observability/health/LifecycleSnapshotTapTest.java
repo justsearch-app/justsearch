@@ -1,5 +1,6 @@
 package io.justsearch.app.services.observability.health;
 
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
@@ -86,7 +87,8 @@ final class LifecycleSnapshotTapTest {
   void chunkDegradationUpdatesAndClearsItsOwnCondition() {
     for (String reason : List.of("chunk_embedding.not_ready", "chunk_embedding.in_progress")) {
       tap.accept(singleDim(ReadinessDimension.CHUNK_EMBEDDING, component("DEGRADED", reason)));
-      var condition = (AssertedCondition) conditions.find("embedding.not-ready", "worker.chunk-embedding").orElseThrow().body();
+      var condition = (AssertedCondition) assertDoesNotThrow(() ->
+          conditions.find("embedding.not-ready", "worker.chunk-embedding").orElseThrow().body());
       assertEquals(LifecycleSnapshotTap.toPascalReason(reason), condition.reason());
     }
     tap.accept(singleDim(ReadinessDimension.CHUNK_EMBEDDING, component("UNKNOWN", null)));
@@ -654,7 +656,7 @@ final class LifecycleSnapshotTapTest {
   }
 
   @Test
-  @DisplayName("Chunk degradation emits a condition while an unconfigured model remains silent")
+  // Chunk degradation emits a condition while an unconfigured model remains silent
   void chunkDegradationDoesNotChangeTheUnconfiguredModelMapping() {
     Map<ReadinessDimension, ReadinessComponentView> dims = new LinkedHashMap<>();
     dims.put(

@@ -1,5 +1,6 @@
 package io.justsearch.app.services.worker;
 
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -56,7 +57,7 @@ final class WorkerStatusMapperTest {
     assertEquals(-1, view.enrichment().chunk().chunkEmbeddingPendingCount());
     assertEquals(-1, view.enrichment().chunk().chunkSpladePendingCount());
     assertEquals(-1, view.enrichment().pendingNerCount());
-    assertFalse(view.enrichment().completenessKnown());
+    assertFalse(assertDoesNotThrow(() -> view.enrichment().completenessKnown().booleanValue()));
     assertTrue(view.enrichment().completeness().isEmpty());
     assertEquals("stale", view.countObservations().get("active").state());
     assertEquals(1234, view.countObservations().get("active").observedAtMs());

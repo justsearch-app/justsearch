@@ -14,13 +14,13 @@ import org.junit.jupiter.api.io.TempDir;
 class CudaRuntimeDetectionTest {
 
   @Test
-  @DisplayName("Null executable returns null")
+  // Null executable returns null
   void nullExecutable() {
     assertNull(CudaRuntimeDetection.detectCudaRuntimeWarning(null));
   }
 
   @Test
-  @DisplayName("Missing Windows CUDA library retains its diagnostic and returns null")
+  // Missing Windows CUDA library retains its diagnostic and returns null
   void noGgmlCudaDll(@TempDir Path dir) {
     Path fakeExe = dir.resolve("llama-server.exe");
     var logger = (ch.qos.logback.classic.Logger) org.slf4j.LoggerFactory.getLogger(CudaRuntimeDetection.class);
@@ -41,7 +41,7 @@ class CudaRuntimeDetectionTest {
   }
 
   @Test
-  @DisplayName("Large statically-linked ggml-cuda.dll returns null")
+  // Large statically-linked ggml-cuda.dll returns null
   void largeStaticDll(@TempDir Path dir) throws IOException {
     Path fakeExe = dir.resolve("llama-server.exe");
     Files.createFile(fakeExe);
@@ -54,7 +54,7 @@ class CudaRuntimeDetectionTest {
   }
 
   @Test
-  @DisplayName("Small dynamically-linked dll with cudart present returns null")
+  // Small dynamically-linked dll with cudart present returns null
   void smallDllWithCudart(@TempDir Path dir) throws IOException {
     Path fakeExe = dir.resolve("llama-server.exe");
     Files.createFile(fakeExe);
@@ -66,7 +66,7 @@ class CudaRuntimeDetectionTest {
   }
 
   @Test
-  @DisplayName("Small dynamically-linked dll without cudart returns warning")
+  // Small dynamically-linked dll without cudart returns warning
   void smallDllWithoutCudart(@TempDir Path dir) throws IOException {
     Path fakeExe = dir.resolve("llama-server.exe");
     Files.createFile(fakeExe);
@@ -75,7 +75,7 @@ class CudaRuntimeDetectionTest {
     String warning = CudaRuntimeDetection.detectCudaRuntimeWarning(fakeExe, io.justsearch.configuration.NativeTargets.forTarget("windows-x86_64"));
     assertTrue(warning != null && warning.contains("CUDA Toolkit runtime not found"));
   }
-  @org.junit.jupiter.params.ParameterizedTest
+  @org.junit.jupiter.params.ParameterizedTest(name = "{displayName} [{index}] {arguments}")
   @org.junit.jupiter.params.provider.ValueSource(strings = {"Linux", "Windows 11"})
   @org.junit.jupiter.api.parallel.ResourceLock(org.junit.jupiter.api.parallel.Resources.SYSTEM_PROPERTIES)
   void linuxRuntimeDoesNotLogMissingWindowsDll(String hostOs, @TempDir Path dir) throws IOException {

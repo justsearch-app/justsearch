@@ -409,7 +409,7 @@ final class StatusLifecycleHandlerTest {
         after.composites().get("retrieval").reasonCodes());
   }
 
-  @ParameterizedTest
+  @ParameterizedTest(name = "{displayName} [{index}] {arguments}")
   @org.junit.jupiter.params.provider.ValueSource(strings = {
       "rebuild_brake_exhausted", "rebuild_brake_unreadable", "rebuild_brake_state_lost"})
   void servingBrakeTransitionsThroughHandlerAndHealthTap(String brakeReason) throws Exception {
@@ -444,7 +444,7 @@ final class StatusLifecycleHandlerTest {
     }
   }
 
-  @ParameterizedTest
+  @ParameterizedTest(name = "{displayName} [{index}] {arguments}")
   @org.junit.jupiter.params.provider.CsvSource({
       "audit,true", "embedding,true", "splade,true", "ner,true", "chunkSplade,true",
       "audit,false", "embedding,false", "splade,false", "ner,false", "chunkSplade,false"})
@@ -516,7 +516,7 @@ final class StatusLifecycleHandlerTest {
     assertEquals("READY", envelope.composites().get("retrieval").state());
   }
 
-  @ParameterizedTest
+  @ParameterizedTest(name = "{displayName} [{index}] {arguments}")
   @org.junit.jupiter.params.provider.CsvSource({
       "embed,failed,false", "splade,failed,false", "ner,failed,false", "chunk_embed,failed,false",
       "embed,missing,false", "splade,missing,false", "ner,missing,false", "chunk_embed,missing,false",
@@ -591,7 +591,7 @@ final class StatusLifecycleHandlerTest {
     }
   }
 
-  @ParameterizedTest
+  @ParameterizedTest(name = "{displayName} [{index}] {arguments}")
   @org.junit.jupiter.params.provider.ValueSource(doubles = {0, 94, 95, 99.9, 99.99, 100})
   void incompleteVectorsHaveAHealthConditionRegardlessOfRetrievalEligibility(double coverage) throws Exception {
     var conditions = new io.justsearch.app.observability.health.ConditionStore();

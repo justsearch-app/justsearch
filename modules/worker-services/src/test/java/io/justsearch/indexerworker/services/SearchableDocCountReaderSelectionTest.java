@@ -58,7 +58,7 @@ final class SearchableDocCountReaderSelectionTest extends io.justsearch.adapters
   }
 
   @Test
-  @DisplayName("during a rebuild the field follows the SEARCH reader, not the half-built ingest one")
+  // during a rebuild the field follows the SEARCH reader, not the half-built ingest one
   void followsSearchServingReader() throws Exception {
     // The generation search still serves: 3 default-scope documents.
     serving = open("serving");
@@ -95,7 +95,7 @@ final class SearchableDocCountReaderSelectionTest extends io.justsearch.adapters
   }
 
   @Test
-  @DisplayName("a failed filtered read is unknown until that population has been observed")
+  // a failed filtered read is unknown until that population has been observed
   void ioExceptionFallsBackInsteadOfReportingZero() throws Exception {
     IndexCountOps failing = mock(IndexCountOps.class);
     when(failing.docCount()).thenReturn(12L);
@@ -115,7 +115,7 @@ final class SearchableDocCountReaderSelectionTest extends io.justsearch.adapters
   }
 
   @Test
-  @DisplayName("positive control — with a healthy reader the scoped count is what is reported")
+  // positive control — with a healthy reader the scoped count is what is reported
   void healthyReaderReportsScopedCount() throws Exception {
     IndexCountOps healthy = mock(IndexCountOps.class);
     when(healthy.docCount()).thenReturn(12L);
