@@ -236,6 +236,8 @@ public final class CombinedEnrichmentBackfillOps {
    *     one wrong use: driving a loop's continue-condition (a 20-minute ingest livelock, zero
    *     diagnostics). It selects combined-vs-individual mode and feeds logging/sleep selection —
    *     it must NEVER be a loop's continue-condition. Use {@link #progressed()} for that.
+   *     Mode selection also keeps combined mode when {@link #recordTiming()} is true: selected
+   *     work may have deferred its write to protect completed SPLADE postings.
    * @param progressed whether the whole submitted RMW batch succeeded and at least one document
    *     actually ADVANCED a stage: a stage completed, an attempted stage failed (the encoder ran
    *     and its retry seam consumed the attempt), or a document with no usable content reached its
@@ -262,7 +264,8 @@ public final class CombinedEnrichmentBackfillOps {
    * @param recordTiming the original {@code recordTiming} flag: {@code true} once processing got
    *     past the early-return/interruption checks (mirrors the pre-move gate on whether the
    *     {@code finally} block recorded anything at all). {@code false} means every count/timing
-   *     field below is a meaningless zero and must NOT be recorded.
+   *     field below is a meaningless zero and must NOT be recorded. Also distinguishes selected
+   *     combined work (including deferred writes) from an unavailable combined pass.
    * @param embedProcessed / spladeProcessed / nerProcessed document counts (not batch counts).
    * @param embedMs / spladeMs / nerMs / fetchMs / writeMs / totalMs per-phase wall-clock ms.
    * @param workSetSignature identifies WHICH documents this batch selected and how they were routed
@@ -1191,7 +1194,7 @@ public final class CombinedEnrichmentBackfillOps {
             if (context.spladeEncoderSupplier().get() != encoder || SpladeBackfillOps.isSystemicFailure(failure)) {
               systemicSpladeFailure = true;
               context.spladeBackfillResult().accept(false);
-            } else {
+            } else if (!preserving) {
               for (String id : sliceIds) {
                 if (updatesByDocId.get(id).containsKey(SchemaFields.SPLADE)) continue;
                 var escalation = SpladeBackfillOps.computeSpladeFailureUpdate(
@@ -1216,8 +1219,7 @@ public final class CombinedEnrichmentBackfillOps {
       spladeMs = (System.nanoTime() - tSplade) / 1_000_000;
       for (String id : preservationIds) {
         Map<String, Object> updates = updatesByDocId.get(id);
-        if (!updates.containsKey(SchemaFields.SPLADE)
-            && !updates.containsKey(SchemaFields.SPLADE_RETRY_COUNT)) {
+        if (!updates.containsKey(SchemaFields.SPLADE)) {
           updates.clear();
         }
       }

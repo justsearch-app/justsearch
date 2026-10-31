@@ -124,7 +124,7 @@ class CombinedEnrichmentRmwIntegrationTest extends io.justsearch.adapters.lucene
   }
 
   @Test
-  void failedRederivationResetsStatusAndRemovesOldPostingsWithRetry() throws Exception {
+  void failedPreservationWithholdsEntireUpdateAndKeepsOldPostings() throws Exception {
     EmbeddingProvider embedding = mock(EmbeddingProvider.class);
     SpladeEncoder splade = mock(SpladeEncoder.class);
     when(embedding.isAvailable()).thenReturn(true);
@@ -144,18 +144,16 @@ class CombinedEnrichmentRmwIntegrationTest extends io.justsearch.adapters.lucene
     CombinedEnrichmentBackfillOps.processCombinedBackfill(context(embedding, splade, null));
     refresh();
 
+    assertTrue(hasSparseHit("old", docId), "failed preservation must leave existing postings intact");
     assertEquals(
-        SchemaFields.EMBEDDING_STATUS_COMPLETED,
+        SchemaFields.EMBEDDING_STATUS_PENDING,
         runtime.documentFieldOps().getDocumentField(docId, SchemaFields.EMBEDDING_STATUS));
     assertEquals(
-        SchemaFields.SPLADE_STATUS_PENDING,
+        SchemaFields.SPLADE_STATUS_COMPLETED,
         runtime.documentFieldOps().getDocumentField(docId, SchemaFields.SPLADE_STATUS));
     assertEquals(
-        "1",
+        null,
         runtime.documentFieldOps().getDocumentField(docId, SchemaFields.SPLADE_RETRY_COUNT));
-    assertFalse(
-        hasSparseHit("old", docId),
-        "failed re-derivation must not claim stale postings survived");
   }
 
   @Test

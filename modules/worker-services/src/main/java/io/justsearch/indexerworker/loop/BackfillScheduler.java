@@ -269,10 +269,9 @@ public final class BackfillScheduler {
       // The mode-selection probe is the batch that re-selects the head of the pending queue each
       // cycle — the one whose signature repeated byte-identically for 12+ minutes in the field.
       noteWorkSet(outcome);
-      // Mode selection reads ACTIVITY (did the combined pass touch anything at all); the tight
-      // loop below reads PROGRESS. Tempdoc 798: these are different questions and conflating
-      // them is what livelocked ingest.
-      boolean useCombined = outcome.wroteAnything();
+      // docs/tempdocs/711-rmw-preservation-and-followup-designs.md: deferred combined work
+      // must not fall through to individual writes that omit non-stored SPLADE postings.
+      boolean useCombined = outcome.wroteAnything() || outcome.recordTiming();
       if (useCombined) {
         // Tempdoc 710 Move 2 item 4: this cycle used the combined pass — the only path taken
         // between here and the next runIdleCycle() call (the tight loop below stays combined
@@ -288,7 +287,7 @@ public final class BackfillScheduler {
         // that same condition, which is how the mid-batch signal ended up costing a further ~5s of
         // GPU instead of returning control. Mode selection itself is unchanged: this cycle still
         // used the combined pass, and the next idle cycle picks the enrichment up where it stopped.
-        final boolean[] useCombinedRef = {!outcome.aborted()};
+        final boolean[] useCombinedRef = {outcome.wroteAnything() && !outcome.aborted()};
         final int[] tightLoopBatches = {1};
         // Tempdoc 809 finding 3: the mode-selection probe above is a full batch and is now
         // interruptible too, so it can be the call that spends the budget. Seeding from it keeps
@@ -717,7 +716,9 @@ public final class BackfillScheduler {
     StageAvailability available = stageAvailability();
     int availCount = (available.embedding() ? 1 : 0) + (available.sparse() ? 1 : 0)
         + (available.ner() ? 1 : 0);
-    if (availCount < 2) {
+    // docs/tempdocs/711-rmw-preservation-and-followup-designs.md: retain combined publication
+    // protection through sparse recovery, even if encoder retirement reduces stage availability.
+    if (availCount < 2 && consecutiveSpladeFailures == 0) {
       return CombinedEnrichmentBackfillOps.CombinedOutcome.none();
     }
 

@@ -12,6 +12,9 @@ import static org.mockito.ArgumentMatchers.anySet;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.spi.ILoggingEvent;
@@ -742,6 +745,38 @@ class BackfillSchedulerSlowBatchTest {
     for (int cycle = 0; cycle < 2; cycle++) timeIdleCycle(scheduler);
     assertEquals("COMPLETED", state.get("sparse-only").get(SchemaFields.SPLADE_STATUS));
     assertEquals("COMPLETED_EMPTY", state.get("ner-only").get(SchemaFields.NER_STATUS));
+  }
+
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  void deferredPreservationNeverFallsThroughToIndividualEmbeddingIncludingBackoff(boolean encoderRetires) throws Exception {
+    Map<String, Map<String, Object>> state = new java.util.LinkedHashMap<>();
+    state.put("doc", new HashMap<>(Map.of(
+        SchemaFields.SPLADE_STATUS, "COMPLETED",
+        SchemaFields.NER_STATUS, "COMPLETED_EMPTY",
+        SchemaFields.EMBEDDING_STATUS, "PENDING")));
+    wirePopulation(state);
+    lenient().when(nerService.isAvailable()).thenReturn(false);
+    lenient().when(documentFieldOps.getDocumentContent("doc")).thenReturn("long content for doc");
+    sparseEncoder = mock(io.justsearch.indexerworker.splade.SpladeEncoder.class);
+    when(sparseEncoder.encodeBatch(anyList()))
+        .thenThrow(new io.justsearch.ort.SessionTemporarilyUnavailableException("encoder unavailable"))
+        .thenReturn(List.of(Map.of("preserved", 1f)));
+    BackfillScheduler scheduler = scheduler(monotonicNanos::get);
+    timeIdleCycle(scheduler);
+    var recoveringEncoder = sparseEncoder;
+    if (encoderRetires) sparseEncoder = null;
+    timeIdleCycle(scheduler);
+    sparseEncoder = recoveringEncoder;
+    assertEquals("PENDING", state.get("doc").get(SchemaFields.EMBEDDING_STATUS));
+    verify(indexingCoordinator, never()).updateDocumentsBatch(anyList());
+    verify(sparseEncoder).encodeBatch(anyList());
+    var retryTime = BackfillScheduler.class.getDeclaredField("nextSpladeRetryTime");
+    retryTime.setAccessible(true);
+    retryTime.setLong(scheduler, 0);
+    timeIdleCycle(scheduler);
+    assertEquals("COMPLETED", state.get("doc").get(SchemaFields.EMBEDDING_STATUS));
+    assertEquals("COMPLETED", state.get("doc").get(SchemaFields.SPLADE_STATUS));
   }
 
   @ParameterizedTest

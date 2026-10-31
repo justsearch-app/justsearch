@@ -140,9 +140,11 @@ public final class EmbeddingBackfillOps {
               vectors.size());
         }
         for (int i = 0; i < batchDocIds.size(); i++) {
+          if (checkInterrupt(context, embeddingProvider, "Backfill")) break;
           int[] counts =
               embedAndUpdateSingle(
                   context, batch, embeddingProvider, batchDocIds.get(i), batchContents.get(i));
+          if (counts == null) break;
           processed += counts[0];
           failed += counts[1];
           markedFailed += counts[2];
@@ -262,6 +264,7 @@ public final class EmbeddingBackfillOps {
     int markedFailed = 0;
     try {
       float[] vector = embeddingProvider.embedDocument(content, InferenceRequest.background());
+      if (checkInterrupt(context, embeddingProvider, "Backfill")) return null;
       if (vector != null && vector.length > 0) {
         Map<String, Object> updates = new HashMap<>();
         updates.put(SchemaFields.VECTOR, vector);
@@ -274,6 +277,8 @@ public final class EmbeddingBackfillOps {
         failed = 1;
       }
     } catch (Exception e) {
+      if (checkInterrupt(context, embeddingProvider, "Backfill")
+          || SpladeBackfillOps.isSystemicFailure(e)) return null;
       context.log().error("Backfill failed for doc {}: {}", docId, e.getMessage());
       markedFailed =
           batch.failure(docId, SchemaFields.EMBEDDING_RETRY_COUNT, EmbeddingBackfillOps::computeEmbeddingFailureUpdate);
@@ -405,10 +410,12 @@ public final class EmbeddingBackfillOps {
               vectors.size());
         }
         for (int i = 0; i < batchChunkIds.size(); i++) {
+          if (checkInterrupt(context, embeddingProvider, "Chunk backfill")) break;
           String chunkId = batchChunkIds.get(i);
           try {
             float[] vector =
                 embeddingProvider.embedDocument(batchContents.get(i), InferenceRequest.background());
+            if (checkInterrupt(context, embeddingProvider, "Chunk backfill")) break;
             if (vector != null && vector.length > 0) {
               Map<String, Object> updates = new HashMap<>();
               updates.put(SchemaFields.CHUNK_VECTOR, vector);
@@ -421,6 +428,8 @@ public final class EmbeddingBackfillOps {
               failed++;
             }
           } catch (Exception e) {
+            if (checkInterrupt(context, embeddingProvider, "Chunk backfill")
+                || SpladeBackfillOps.isSystemicFailure(e)) break;
             context.log().error("Chunk backfill failed for {}: {}", chunkId, e.getMessage());
             markedFailed +=
                 batch.failure(chunkId, SchemaFields.CHUNK_EMBEDDING_RETRY_COUNT, EmbeddingBackfillOps::computeChunkEmbeddingFailureUpdate);

@@ -921,8 +921,8 @@ class CombinedEnrichmentBackfillOpsTest {
   }
 
   @Test
-  @DisplayName("a re-derived parent SPLADE failure writes a truthful retry outcome")
-  void completedParentSplade_encoderFailure_writesRetryOutcome() throws Exception {
+  @DisplayName("a parent SPLADE preservation failure withholds the whole update")
+  void completedParentSplade_encoderFailure_withholdsEntireUpdate() throws Exception {
     seedDoc(
         "parent-failure",
         "parent content",
@@ -937,25 +937,10 @@ class CombinedEnrichmentBackfillOpsTest {
 
     verify(spladeEncoder).encodeBatch(List.of("parent content"));
     Map<String, Object> state = fakeIndex.get("parent-failure");
-    assertEquals(SchemaFields.EMBEDDING_STATUS_COMPLETED, state.get(SchemaFields.EMBEDDING_STATUS));
-    assertEquals("1", state.get(SchemaFields.SPLADE_RETRY_COUNT));
-    // This map fixture does not implement Lucene's RMW reset policy. Assert the writer input
-    // here; the real-index regression asserts the resulting PENDING status and absent postings.
-    verify(indexingCoordinator)
-        .updateDocumentsBatch(
-            argThat(
-                batch ->
-                    batch.stream()
-                        .anyMatch(
-                            entry ->
-                                entry.getKey().equals("parent-failure")
-                                    && "1"
-                                        .equals(
-                                            entry
-                                                .getValue()
-                                                .get(SchemaFields.SPLADE_RETRY_COUNT))
-                                    && !entry.getValue().containsKey(SchemaFields.SPLADE_STATUS)
-                                    && !entry.getValue().containsKey(SchemaFields.SPLADE))));
+    assertEquals(SchemaFields.EMBEDDING_STATUS_PENDING, state.get(SchemaFields.EMBEDDING_STATUS));
+    assertEquals(SchemaFields.SPLADE_STATUS_COMPLETED, state.get(SchemaFields.SPLADE_STATUS));
+    assertNull(state.get(SchemaFields.SPLADE_RETRY_COUNT));
+    verify(indexingCoordinator, never()).updateDocumentsBatch(anyList());
   }
 
   @Test
