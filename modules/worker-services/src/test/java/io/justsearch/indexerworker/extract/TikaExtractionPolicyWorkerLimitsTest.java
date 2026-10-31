@@ -33,7 +33,7 @@ class TikaExtractionPolicyWorkerLimitsTest {
   }
 
   @Test
-  @DisplayName("limits equal to the defaults keep the tika-default-v8 identity")
+  // limits equal to the defaults keep the tika-default-v8 identity
   void defaultEquivalentLimitsKeepDefaultIdentity() {
     TikaExtractionPolicy p =
         TikaExtractionPolicy.fromWorkerLimits(
@@ -45,7 +45,7 @@ class TikaExtractionPolicyWorkerLimitsTest {
   }
 
   @Test
-  @DisplayName("THE INVARIANT: differing limits must NOT reuse the default policy id")
+  // THE INVARIANT: differing limits must NOT reuse the default policy id
   void differingLimitsGetADistinctIdentity() {
     TikaExtractionPolicy configured =
         TikaExtractionPolicy.fromWorkerLimits(worker(1_000_000, 5_000_000L));
@@ -76,7 +76,7 @@ class TikaExtractionPolicyWorkerLimitsTest {
   }
 
   @Test
-  @DisplayName("non-positive limits fall back rather than disabling the guard")
+  // non-positive limits fall back rather than disabling the guard
   void nonPositiveLimitsFallBack() {
     TikaExtractionPolicy p = TikaExtractionPolicy.fromWorkerLimits(worker(0, 0L));
     assertEquals(TikaExtractionPolicy.DEFAULT_MAX_EXTRACTED_CHARS, p.maxExtractedChars());
@@ -94,7 +94,7 @@ class TikaExtractionPolicyWorkerLimitsTest {
   }
 
   @Test
-  @DisplayName("defaults() is untouched by this factory — the sandbox-child path depends on it")
+  // defaults() is untouched by this factory — the sandbox-child path depends on it
   void defaultsRemainStable() {
     TikaExtractionPolicy a = TikaExtractionPolicy.defaults();
     TikaExtractionPolicy.fromWorkerLimits(worker(1_000_000, 5_000_000L));

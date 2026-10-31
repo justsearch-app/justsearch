@@ -11,7 +11,7 @@ import org.junit.jupiter.api.Test;
 
 final class VisualRoutingDecisionTest {
 
-  @org.junit.jupiter.params.ParameterizedTest
+  @org.junit.jupiter.params.ParameterizedTest(name = "{displayName} [{index}] {arguments}")
   @org.junit.jupiter.params.provider.ValueSource(strings = {".tif", ".tiff", ".TIF", ".TIFF"})
   void tiffAliasesPersistEquivalentFallbackDemand(String suffix) throws Exception {
     var artifact = io.justsearch.indexerworker.extract.ExtractionArtifact.full(
@@ -25,7 +25,7 @@ final class VisualRoutingDecisionTest {
     assertEquals(SchemaFields.VDU_DEMAND_KIND_BASELINE_TEXT, doc.fields().get(SchemaFields.VDU_DEMAND_KIND));
   }
 
-  @org.junit.jupiter.params.ParameterizedTest
+  @org.junit.jupiter.params.ParameterizedTest(name = "{displayName} [{index}] {arguments}")
   @org.junit.jupiter.params.provider.ValueSource(strings = {
       "\"pagesMissingReadableText\":1", "\"contentTruncated\":true"})
   void highConfidencePartialFullPdfOcrPersistsFallbackDemand(String partial) throws Exception {

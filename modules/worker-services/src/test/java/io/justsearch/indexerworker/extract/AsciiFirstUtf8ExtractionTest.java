@@ -53,7 +53,7 @@ class AsciiFirstUtf8ExtractionTest extends io.justsearch.adapters.lucene.runtime
                 .map(text -> Arguments.of(format, prefix, text))));
   }
 
-  @ParameterizedTest(name = "asciiFirstTextAcrossFormatsAndRoutes({0}, prefix {1}, {2})")
+  @ParameterizedTest(name = "{displayName} [{index}] {arguments}")
   @MethodSource("formatsAndPrefixes")
   @Timeout(180)
   void asciiFirstTextAcrossFormatsAndRoutes(String format, int prefix, String text) throws Exception {

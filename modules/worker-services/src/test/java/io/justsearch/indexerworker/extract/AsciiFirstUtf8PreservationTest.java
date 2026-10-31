@@ -159,7 +159,7 @@ class AsciiFirstUtf8PreservationTest {
     }
   }
 
-  @ParameterizedTest(name = "embeddedBodiesKeepOriginalText({0})")
+  @ParameterizedTest(name = "{displayName} [{index}] {arguments}")
   @ValueSource(strings = {"zip", "attachment", "plain", "html"})
   void embeddedBodiesKeepOriginalText(String kind) throws Exception {
     String text = "a".repeat(16_384) + "é";

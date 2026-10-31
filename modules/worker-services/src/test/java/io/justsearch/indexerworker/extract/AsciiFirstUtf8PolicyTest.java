@@ -11,7 +11,7 @@ import org.junit.jupiter.params.provider.NullAndEmptySource;
 import org.junit.jupiter.params.provider.ValueSource;
 
 class AsciiFirstUtf8PolicyTest {
-  @ParameterizedTest(name = "blankOrNullIdentityUsesVersionSix({arguments})")
+  @ParameterizedTest(name = "{displayName} [{index}] {arguments}")
   @NullAndEmptySource
   @ValueSource(strings = {" ", "\t"})
   void blankOrNullIdentityUsesVersionSix(String identity) {

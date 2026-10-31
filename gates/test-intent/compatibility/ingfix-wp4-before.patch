@@ -1,0 +1,15 @@
+diff --git a/modules/worker-services/src/main/java/io/justsearch/indexerworker/extract/PdfOcrEngine.java b/modules/worker-services/src/main/java/io/justsearch/indexerworker/extract/PdfOcrEngine.java
+index 7b0c36dec9..81a0115be2 100644
+--- a/modules/worker-services/src/main/java/io/justsearch/indexerworker/extract/PdfOcrEngine.java
++++ b/modules/worker-services/src/main/java/io/justsearch/indexerworker/extract/PdfOcrEngine.java
+@@ -830,6 +830,10 @@ final class PdfOcrEngine implements AutoCloseable {
+       boolean truncated,
+       OcrSkipReason failureReason,
+       int pagesProcessed) {
++    java.util.Set<Integer> coveredPages() {
++      return java.util.Set.of();
++    }
++
+     static OcrEngineResult failed(OcrSkipReason reason) {
+       return new OcrEngineResult("", OcrConfidenceExtractor.Summary.empty(), false, reason, 0);
+     }

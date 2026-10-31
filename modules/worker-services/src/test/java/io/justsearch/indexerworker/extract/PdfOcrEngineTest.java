@@ -146,7 +146,7 @@ final class PdfOcrEngineTest {
     }
   }
 
-  @org.junit.jupiter.params.ParameterizedTest
+  @org.junit.jupiter.params.ParameterizedTest(name = "{displayName} [{index}] {arguments}")
   @org.junit.jupiter.params.provider.ValueSource(strings = {"exit", "spawn", "timeout", "execution"})
   @Timeout(30)
   void oneFailedPageMakesUsefulOcrPartial(String mode) throws Exception {

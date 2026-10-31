@@ -88,7 +88,7 @@ class Utf8WithoutBomExtractionTest extends io.justsearch.adapters.lucene.runtime
     }
   }
 
-  @ParameterizedTest(name = "childReuseAndReplacementKeepUtf8TextAndPolicyIdentity({arguments})")
+  @ParameterizedTest(name = "{displayName} [{index}] {arguments}")
   @ValueSource(booleans = {false, true})
   @Timeout(90)
   void childReuseAndReplacementKeepUtf8TextAndPolicyIdentity(boolean configured) throws Exception {

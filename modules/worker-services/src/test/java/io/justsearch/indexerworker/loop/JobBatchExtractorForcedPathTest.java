@@ -164,7 +164,7 @@ final class JobBatchExtractorForcedPathTest {
    * failed count read as 0, the batch was treated as "first index of an empty index", the unchanged
    * check was skipped and every unchanged file was extracted and written again.
    */
-  @org.junit.jupiter.params.ParameterizedTest
+  @org.junit.jupiter.params.ParameterizedTest(name = "{displayName} [{index}] {arguments}")
   @org.junit.jupiter.params.provider.ValueSource(booleans = {false, true})
   @org.junit.jupiter.api.Timeout(45)
   void recoveredChildSourceIoReachesRetryableQueueOutcome(boolean symlink) throws Exception {

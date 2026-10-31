@@ -11,7 +11,7 @@ import org.junit.jupiter.params.provider.ValueSource;
 import org.xml.sax.helpers.AttributesImpl;
 
 class StructuredLimitFidelityTest {
-  @ParameterizedTest @ValueSource(strings = {"h2", "ul", "ol", "table"})
+  @ParameterizedTest(name = "{displayName} [{index}] {arguments}") @ValueSource(strings = {"h2", "ul", "ol", "table"})
   void activeStructureRetainsPrefixAndFinalizesOnce(String kind) throws Exception {
     for (boolean exact : List.of(true, false)) {
       var handler = new StructuredContentHandler(10);
@@ -31,7 +31,7 @@ class StructuredLimitFidelityTest {
     }
   }
 
-  @ParameterizedTest @ValueSource(strings = {"ul", "ol", "table"})
+  @ParameterizedTest(name = "{displayName} [{index}] {arguments}") @ValueSource(strings = {"ul", "ol", "table"})
   void completedMembersAndActivePrefixSurvive(String kind) throws Exception {
     var handler = new StructuredContentHandler(10);
     start(handler, kind);
@@ -45,7 +45,7 @@ class StructuredLimitFidelityTest {
     assertFalse(text.contains("Secret"));
   }
 
-  @ParameterizedTest @ValueSource(strings = {"h1", "ul", "table", "p"})
+  @ParameterizedTest(name = "{displayName} [{index}] {arguments}") @ValueSource(strings = {"h1", "ul", "table", "p"})
   void supplementaryCharactersAreNotSplitAtTheBoundary(String kind) throws Exception {
     for (boolean splitEvent : List.of(true, false)) {
       var handler = new StructuredContentHandler(3);
