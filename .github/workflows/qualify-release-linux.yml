@@ -117,7 +117,7 @@ jobs:
           [[ ${#packages[@]} == 1 ]]
           crash_since=$(date --iso-8601=seconds)
           set +e
-          xvfb-run -a -s '-screen 0 1440x1000x24' dbus-run-session -- \
+          QUALDIAG_J3=1 xvfb-run -a -s '-screen 0 1440x1000x24' dbus-run-session -- \
             python3 scripts/release/qual/journeys/hosted.py \
               --assets "$RUNNER_TEMP/release-assets" --package "${packages[0]}" \
               --registry "$RUNNER_TEMP/server.json" --evidence "$RUNNER_TEMP/journey-evidence"

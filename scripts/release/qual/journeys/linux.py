@@ -302,8 +302,13 @@ res['epoch']=time.time(); print(json.dumps(res))
 """
 
 
+DIAG = bool(__import__('os').environ.get('QUALDIAG_J3'))
+
+
 def diag_capture(run, label, operations=()):
     # Diagnostic branch only (t-20261027-4e4d6b J3 stall): never merged.
+    if not DIAG:
+        return
     out = str(run.out / 'J3-diag')
     try:
         res = run.target.json(DIAG_DUMP, {'data': run.data, 'out': out, 'label': label}, timeout=180, desktop=False)
@@ -322,6 +327,8 @@ def diag_capture(run, label, operations=()):
 
 
 def diag_follow(run):
+    if not DIAG:
+        return None
     out = run.out / 'J3-diag'
     out.mkdir(exist_ok=True)
     proc = subprocess.Popen(['tail', '-F', '-n', '+1', run.data + '/logs/engine.log'],
@@ -418,7 +425,8 @@ print(json.dumps(dict(m,epochSeconds=time.time(),usedKiB=m['MemTotal']-m['MemAva
         diag_capture(run, 'activated')
     finally:
         time.sleep(5)
-        follower.terminate()
+        if follower:
+            follower.terminate()
     status = active['install']
     # Acquisition stages belong to this download session, not rebooted caches.
     if not resumed:
@@ -1086,12 +1094,15 @@ def mcp(run):
     for name, args in [('list', ['--method', 'tools/list']),
                        ('status', ['--method', 'tools/call', '--tool-name', 'justsearch_status']),
                        ('search', ['--method', 'tools/call', '--tool-name', 'justsearch_search', '--tool-arg', 'query=' + QUERY])]:
-        wrapper = Path(run.work) / 'mcpb' / ('diag-bridge-' + name + '.sh')
-        wrapper.write_text('#!/bin/sh\nexec node %s "$@" 2>>%s\n' % (
-            shlex.quote(run.work + '/mcpb/server/index.js'), shlex.quote(str(run.out / ('J8-bridge-' + name + '.stderr.log')))))
-        wrapper.chmod(0o755)
+        command = ['node', run.work + '/mcpb/server/index.js']
+        if DIAG:
+            wrapper = Path(run.work) / 'mcpb' / ('diag-bridge-' + name + '.sh')
+            wrapper.write_text('#!/bin/sh\nexec node %s "$@" 2>>%s\n' % (
+                shlex.quote(run.work + '/mcpb/server/index.js'), shlex.quote(str(run.out / ('J8-bridge-' + name + '.stderr.log')))))
+            wrapper.chmod(0o755)
+            command = [str(wrapper)]
         result = run.target.run(['npx', '--yes', '@modelcontextprotocol/inspector@0.21.1', '--cli',
-                                 str(wrapper), *args], timeout=180, check=False)
+                                 *command, *args], timeout=180, check=False)
         (run.out / ('J8-inspector-' + name + '.log')).write_text(result.stdout + result.stderr)
         if result.returncode:
             if any(v in result.stderr for v in ('npm ERR', 'npm error', 'ENOTFOUND', 'ECONNRESET')):
