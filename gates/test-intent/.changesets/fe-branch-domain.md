@@ -77,3 +77,15 @@ Fault checks ran separately against candidate 11600e464d in a temporary shared c
 - Starting `refreshRecord(id)` without awaiting it in `openConversation`: the independent thread hold case failed at `expect(backend.dispatches).toEqual([])`, with `AssertionError: expected [ { …(2) } ] to deeply equal []`. Received a dispatch to `uc-branch-branch-1` asking `and the second one?` while the thread response was held and history had completed; 1 failed, 60 skipped, exit 1.
 
 The accepted-output inheritance test still serves the same records for parent and child, so it cannot establish inheritance by the branch operation. Its catalog-bound title and its checks are unchanged in this test-quality round; this remains a verification limitation.
+
+## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a190c1-b18e-7690-90b4-23f3b52ab017",
+  "verdict": "accept",
+  "digest": "sha256:387242d4b960f1f56512759e44e9684cfd2b324ac1ac32c8b997eacbebf6cda7"
+}
+```
