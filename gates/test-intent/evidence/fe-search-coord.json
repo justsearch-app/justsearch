@@ -1,0 +1,169 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
+  },
+  "createdAt": "2026-10-31T09:12:51.783Z",
+  "revision": "c732647cf0937f594ff50aa08cb9eea018a8d342",
+  "tree": "b98c6c7173d1c334509797a78a29352cadca645a",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/search-v3/SearchV3View.searchPreservation.test.ts\" \"src/shell-v0/views/search-v3/Sv3ComposerPort.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/5yd8_7ek/tmp/test-intent-vitest-3-1793437964365.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 7412
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchPreservation.test.ts",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchPreservation.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:9993250b4dca05544a16a79da9806236d9cf33afc23b4d75e08aa1ebbb0a8a14",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "'Enter' refuses Search when attachment acknowledgement fails ('write')",
+          "status": "passed"
+        },
+        {
+          "name": "'Enter' refuses Search when attachment acknowledgement fails ('stale')",
+          "status": "passed"
+        },
+        {
+          "name": "'Enter' refuses Search when attachment acknowledgement fails ('readback')",
+          "status": "passed"
+        },
+        {
+          "name": "'typing' refuses Search when attachment acknowledgement fails ('write')",
+          "status": "passed"
+        },
+        {
+          "name": "'typing' refuses Search when attachment acknowledgement fails ('stale')",
+          "status": "passed"
+        },
+        {
+          "name": "'typing' refuses Search when attachment acknowledgement fails ('readback')",
+          "status": "passed"
+        },
+        {
+          "name": "'palette' refuses Search when attachment acknowledgement fails ('write')",
+          "status": "passed"
+        },
+        {
+          "name": "'palette' refuses Search when attachment acknowledgement fails ('stale')",
+          "status": "passed"
+        },
+        {
+          "name": "'palette' refuses Search when attachment acknowledgement fails ('readback')",
+          "status": "passed"
+        },
+        {
+          "name": "Enter searches when attachment storage is writable",
+          "status": "passed"
+        },
+        {
+          "name": "typing searches when attachment storage is writable",
+          "status": "passed"
+        },
+        {
+          "name": "palette searches when attachment storage is writable",
+          "status": "passed"
+        },
+        {
+          "name": "entering results from Enter refuses a failed second attachment acknowledgement",
+          "status": "passed"
+        },
+        {
+          "name": "entering results from typing refuses a failed second attachment acknowledgement",
+          "status": "passed"
+        },
+        {
+          "name": "preparing card-file Ask keeps Search preparation when storage refuses",
+          "status": "passed"
+        },
+        {
+          "name": "preparing chosen-file Ask keeps Search preparation when storage refuses",
+          "status": "passed"
+        },
+        {
+          "name": "preparing card-file Ask succeeds when attachment storage is writable",
+          "status": "passed"
+        },
+        {
+          "name": "preparing chosen-file Ask succeeds when attachment storage is writable",
+          "status": "passed"
+        },
+        {
+          "name": "blank palette Search changes preparation without submitting",
+          "status": "passed"
+        },
+        {
+          "name": "obsolete capability reads cannot enable Forget after disconnect, reconnect or API-base change",
+          "status": "passed"
+        },
+        {
+          "name": "a whitespace-only card-file path cannot prepare unrestricted Ask",
+          "status": "passed"
+        },
+        {
+          "name": "a whitespace-only chosen-file path cannot prepare unrestricted Ask",
+          "status": "passed"
+        },
+        {
+          "name": "Forget refuses a target whose hit id and path do not both match ('wrong-id', '/chosen.txt')",
+          "status": "passed"
+        },
+        {
+          "name": "Forget refuses a target whose hit id and path do not both match ('chosen', '/different.txt')",
+          "status": "passed"
+        },
+        {
+          "name": "Forget folder refuses a filesystem root before invoking an operation",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/Sv3ComposerPort.test.ts",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/Sv3ComposerPort.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:e1cd3dde1760795274445383605dfb714bce50bc8610e2a1488f951968fdc0d4",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "composer element binding readMounted ignores a pending pre-render seed and follows the mounted composer draft",
+          "status": "passed"
+        },
+        {
+          "name": "composer element binding CP4 a replacement element with equal text and draftVersion makes the old capture stale",
+          "status": "passed"
+        },
+        {
+          "name": "composer element binding CP4 reconnecting the same unedited element reuses its port and restores capture validity",
+          "status": "passed"
+        },
+        {
+          "name": "composer element binding CP8 a pre-render capture can clear only as a no-op on the pending seed and becomes stale on first render",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:d163aba764a9747c8b4d09a7b246c4f47f72bdc2d9e648d743a6f4091164c1bb"
+}
