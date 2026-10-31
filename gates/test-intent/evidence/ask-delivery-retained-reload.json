@@ -1,0 +1,235 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
+  },
+  "createdAt": "2026-10-31T15:23:30.520Z",
+  "revision": "061c80d200458655c59109b50c4ef65bb63cf68e",
+  "tree": "1c2ad661fa0e7ab31060b6b671e4e1af127bdd3f",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/search-v3/SearchV3View.delivery.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/7wt_z96m/tmp/test-intent-vitest-64-1793460172396.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 17487
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.delivery.test.ts",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.delivery.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:69749fbc08cf3bf4338911b7ee4c0be421dae68daec0016e0879948c57ee27a0",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "addresses progress to the exact live attempt after opening another conversation",
+          "status": "passed"
+        },
+        {
+          "name": "resolves the retained exact saved outcome after New without sending again",
+          "status": "passed"
+        },
+        {
+          "name": "resolves the retained exact saved outcome after reload without sending again",
+          "status": "passed"
+        },
+        {
+          "name": "preserves uncertainty without exact terminal evidence: question only",
+          "status": "passed"
+        },
+        {
+          "name": "preserves uncertainty without exact terminal evidence: different dispatch",
+          "status": "passed"
+        },
+        {
+          "name": "preserves uncertainty without exact terminal evidence: synthetic incomplete",
+          "status": "passed"
+        },
+        {
+          "name": "preserves uncertainty without exact terminal evidence: empty",
+          "status": "passed"
+        },
+        {
+          "name": "preserves uncertainty without exact terminal evidence: failed read",
+          "status": "passed"
+        },
+        {
+          "name": "preserves uncertainty without exact terminal evidence: legacy",
+          "status": "passed"
+        },
+        {
+          "name": "reads a retained address even before the conversation appears in the list",
+          "status": "passed"
+        },
+        {
+          "name": "reload after a lost terminal shows the saved answer and retires only its attempt",
+          "status": "passed"
+        },
+        {
+          "name": "a saved error resolves delivery and shows the actual outcome",
+          "status": "passed"
+        },
+        {
+          "name": "a saved no evidence resolves delivery and shows the actual outcome",
+          "status": "passed"
+        },
+        {
+          "name": "a saved stopped resolves delivery and shows the actual outcome",
+          "status": "passed"
+        },
+        {
+          "name": "completion saved before the Stop response wins even when its live terminal is lost",
+          "status": "passed"
+        },
+        {
+          "name": "a failed retirement ACK retains recoverable A and companion B until a successful check",
+          "status": "passed"
+        },
+        {
+          "name": "resolving saved A after reload never authorizes restored B to send before review",
+          "status": "passed"
+        },
+        {
+          "name": "each authorized admission continuation retains a fresh identity before its POST",
+          "status": "passed"
+        },
+        {
+          "name": "S15 finite checking budget retains uncertainty until manual rearms it",
+          "status": "passed"
+        },
+        {
+          "name": "S15 finite checking budget retains uncertainty until open rearms it",
+          "status": "passed"
+        },
+        {
+          "name": "S15 finite checking budget retains uncertainty until reconnect rearms it",
+          "status": "passed"
+        },
+        {
+          "name": "S15 a slow record read survives polling ticks and can settle its own attempt",
+          "status": "passed"
+        },
+        {
+          "name": "S15 bounds an opening read started before recovery restoration: stalled",
+          "status": "passed"
+        },
+        {
+          "name": "S15 bounds an opening read started before recovery restoration: old snapshot",
+          "status": "passed"
+        },
+        {
+          "name": "S15 a timed-out abort-ignoring read cannot stop checking or override a newer result",
+          "status": "passed"
+        },
+        {
+          "name": "S15 a late retained-address read cannot undo navigate",
+          "status": "passed"
+        },
+        {
+          "name": "S15 a late retained-address read cannot undo delete",
+          "status": "passed"
+        },
+        {
+          "name": "S15 an empty view without a retained attempt never starts automatic record reads",
+          "status": "passed"
+        },
+        {
+          "name": "S15 leaves an unrelated opening read unbounded without a retained attempt",
+          "status": "passed"
+        },
+        {
+          "name": "a Retry gets a fresh retained dispatch and resolves only in the fork actually sent to",
+          "status": "passed"
+        },
+        {
+          "name": "saved completion invalidates cached companion history before a follow-up consumes context",
+          "status": "passed"
+        },
+        {
+          "name": "a stale admission refusal cannot overwrite the replacement attempt after explicit discard",
+          "status": "passed"
+        },
+        {
+          "name": "R3 restores checks outside the displayed place: New, reload before save",
+          "status": "passed"
+        },
+        {
+          "name": "R3 restores checks outside the displayed place: New, reload after save",
+          "status": "passed"
+        },
+        {
+          "name": "R3 restores checks outside the displayed place: another conversation, reload before save",
+          "status": "passed"
+        },
+        {
+          "name": "R3 restores checks outside the displayed place: another conversation, reload after save",
+          "status": "passed"
+        },
+        {
+          "name": "R3 Retry then New reload checks the dispatched child without displaying it",
+          "status": "passed"
+        },
+        {
+          "name": "R3 reload on the retained target still adopts its opening read without a duplicate",
+          "status": "passed"
+        },
+        {
+          "name": "R3 each reload re-arms one bounded window and ticks never overlap the retained read",
+          "status": "passed"
+        },
+        {
+          "name": "R3 confirmed deletion stops restored target checks and keeps the retained task handling",
+          "status": "passed"
+        },
+        {
+          "name": "R3 unreachable reload keeps uncertainty and reconnect re-arms the retained target",
+          "status": "passed"
+        },
+        {
+          "name": "R3 restored target budget expires before save and only Check again re-arms it",
+          "status": "passed"
+        },
+        {
+          "name": "R3 an old restored task without dispatchTurnId stays unresolved even when its target is opened",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "061c80d200",
+    "revision": "061c80d200458655c59109b50c4ef65bb63cf68e",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/search-v3/SearchV3View.delivery.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/7wt_z96m/tmp/test-intent-vitest-64-1793460192115.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 17872,
+        "output": "JSON report written to /home/elias/.cache/am/7wt_z96m/tmp/test-intent-vitest-64-1793460192115.json\n\n"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.delivery.test.ts",
+        "classification": "assertion",
+        "detail": "R3 restores checks outside the displayed place: New, reload before save:  AssertionError: expected 0 to be greater than 0\n    at /home/elias/.cache/am/7wt_z96m/tmp/test-intent-before-Bm1Sek/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.delivery.test.ts:583:38\n    at file:///home/elias/.cache/am/7wt_z96m/tmp/test-intent-before-Bm1Sek/modules/ui-web/node_modules/ | R3 restores checks outside the displayed place: New, reload after save:  AssertionError: expected +0 to be 1 // Object.is e"
+      }
+    ]
+  },
+  "digest": "sha256:4a50f2de884807478b73d77db6070fd2a4013b7808e022f57e192a31efe85972"
+}

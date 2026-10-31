@@ -45,7 +45,7 @@ type DraftSearch = Pick<Sv3SearchController, 'showing' | 'pendingScope' | 'query
   | 'prepare' | 'show' | 'type' | 'reset' | 'scopeFromSelection' | 'prepareFromSelection' | 'reconcileForgotten'>;
 type DraftStore = Pick<DraftPersistence, 'restoreUnavailable' | 'adoptLegacy' | 'openSessionAttachment'
   | 'saveSessionAttachment' | 'retireRawDraft'>;
-type DraftContext = Pick<Sv3ContextDomain, 'clearRefusedQuestion' | 'followUpContextOf' | 'hasPendingWrite'>;
+type DraftContext = Pick<Sv3ContextDomain, 'clearRefusedQuestion' | 'followUpContextOf' | 'hasPendingWrite' | 'checkRetainedAttempt'>;
 
 interface DraftHost {
   connected(): boolean;
@@ -474,6 +474,8 @@ export class Sv3DraftDomain {
         draft: this.composer.snapshot(), epoch: this.humanEpoch, ownsComposer: false, revoked: true, abandoned: true,
         restored: true, context: null, refusal: null, retryAt: 0,
       };
+      // Recovery can finish after connect, with the attempt's target outside the displayed place.
+      this.contextDomain.checkRetainedAttempt();
     }
     this.host.requestUpdate();
   }

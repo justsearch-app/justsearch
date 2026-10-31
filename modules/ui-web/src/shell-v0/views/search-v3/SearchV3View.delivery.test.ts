@@ -4,7 +4,7 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import './SearchV3View.js';
 import type { SearchV3View } from './SearchV3View.js';
 import type { Sv3Composer } from './Sv3Composer.js';
-import { __feedContactForTest, __feedForTest, __resetAiStateForTest } from '../../state/aiStateStore.js';
+import { __feedContactForTest, __feedForTest, __resetAiStateForTest, getAiState } from '../../state/aiStateStore.js';
 import type { ThreadEvent } from '../unifiedThreadProjection.js';
 import type { StatusSnapshot } from '../../utils/statusPoll.js';
 import { restoreActiveConversation, loadConversations, __resetConversationListForTest } from '../../state/conversationListStore.js';
@@ -37,9 +37,10 @@ function field(el: SearchV3View): HTMLTextAreaElement { return composer(el).shad
 async function type(el: SearchV3View, text: string): Promise<void> {
   field(el).value = text; field(el).dispatchEvent(new Event('input')); await composer(el).updateComplete;
 }
-async function mount(shape?: string): Promise<SearchV3View> {
+async function mount(shape?: string, initialNavigationPending = false): Promise<SearchV3View> {
   const el = document.createElement('jf-sv3-window') as SearchV3View;
   el.apiBase = 'http://127.0.0.1:9999';
+  el.initialNavigationPending = initialNavigationPending;
   if (shape) el.setAttribute('shape-id', shape);
   document.body.append(el);
   (el as unknown as { tier: string }).tier = shape === 'core.extract' ? 'structured' : 'ask';
@@ -533,4 +534,248 @@ it('a stale admission refusal cannot overwrite the replacement attempt after exp
   expect(retained().payload.task).toMatchObject({ raw: 'B replacement', dispatchTurnId: body(1).turnId, delivery: 'unknown' });
   expect(composer(el).slotKind).toBe('stop');
   expect(action(el, 'sv3-residency-force')).toBeNull();
+});
+
+/** A page reload loses controllers and the shared active pointer, but keeps this tab's storage. */
+async function coldReload(el: SearchV3View): Promise<SearchV3View> {
+  const displayed = el.sessions.activeId;
+  el.remove();
+  __resetConversationListForTest();
+  __resetDraftProvidersForTest();
+  // Shell holds draft recovery until initial address navigation completes, after connect.
+  const restored = await mount(undefined, true);
+  if (displayed !== null) { restoreActiveConversation(displayed); await settle(restored); }
+  restored.initialNavigationPending = false;
+  await settle(restored);
+  return restored;
+}
+const readsOf = (id: string) => recordReads().filter(c => String(c[0]).endsWith('/api/thread/' + id));
+async function tick(el: SearchV3View, ms = 500): Promise<void> {
+  await vi.advanceTimersByTimeAsync(ms); await settle(el);
+}
+
+it.each([
+  ['New', 'before'], ['New', 'after'], ['another conversation', 'before'], ['another conversation', 'after'],
+] as const)('R3 restores checks outside the displayed place: %s, reload %s save', async (departure, timing) => {
+  vi.useFakeTimers();
+  let el = await mount(); await send(el, 'same words');
+  const original = target();
+  if (departure === 'New') newConversation(el);
+  else restoreActiveConversation('other');
+  await settle(el);
+  const fallback = http.getMockImplementation()!;
+  let unrelatedSignal: AbortSignal | undefined;
+  http.mockImplementation((url: unknown, init?: RequestInit) => {
+    if (String(url).endsWith('/api/thread/other')) {
+      // The shown conversation's slow read must not be needed to start checking the retained target.
+      unrelatedSignal = init!.signal!; return new Promise<Response>(() => {});
+    }
+    return fallback(url, init);
+  });
+  if (timing === 'after') saveOutcome();
+  const start = readsOf(original).length;
+  el = await coldReload(el);
+  const displayed = departure === 'New' ? null : 'other';
+  expect(el.sessions.activeId).toBe(displayed);
+  if (timing === 'before') {
+    expect(el.shadowRoot!.textContent).toContain('Delivery unknown');
+    await tick(el);
+    expect(readsOf(original).length).toBeGreaterThan(start);
+    expect(retained().payload.task).toMatchObject({ target: original, dispatchTurnId: turnId() });
+    // Equal words and another dispatch's terminal cannot settle this attempt.
+    saveOutcome('another-window'); await tick(el);
+    expect(retained().payload.task).not.toBeNull();
+    saveOutcome();
+  }
+  await tick(el);
+  expect(readsOf(original).length - start).toBe(timing === 'after' ? 1 : 3);
+  expect(retained().payload.task).toBeNull();
+  expect(el.shadowRoot!.textContent).not.toContain('Delivery unknown');
+  expect(el.sessions.activeId).toBe(displayed);
+  expect(answer(el)).not.toContain('Saved answer');
+  const settled = readsOf(original).length;
+  await tick(el, 31000);
+  expect(readsOf(original)).toHaveLength(settled);
+  if (departure === 'another conversation') expect(unrelatedSignal?.aborted).toBe(false);
+  expect(dispatches()).toHaveLength(1);
+});
+
+it('R3 Retry then New reload checks the dispatched child without displaying it', async () => {
+  vi.useFakeTimers();
+  let el = await mount(); await send(el, 'same words'); saveOutcome();
+  rows = rows.map((r, i) => ({ ...r, id: `11111111-2222-4333-8444-${String(i + 1).padStart(12, '0')}` }));
+  stream.enqueue(new TextEncoder().encode('event: done\ndata: {}\n\n')); stream.close(); await settle(el);
+  const turn = el.sessions.sessions.find(s => s.id === target())!.turns[0]!;
+  const fallback = http.getMockImplementation()!;
+  let childRows = [...rows];
+  http.mockImplementation((url: unknown, init?: RequestInit) => {
+    const path = String(url);
+    if (path.includes('/branch?')) return Promise.resolve(json({ sessionId: 'child-fork' }));
+    if (path.includes('/api/thread/child-fork')) return Promise.resolve(json({ conversationId: 'child-fork', events: childRows, lifecycles: [] }));
+    return fallback(url, init);
+  });
+  el.shadowRoot!.querySelector('jf-sv3-main')!.dispatchEvent(new CustomEvent('sv3-branch-action', {
+    detail: { action: 'retry', turnId: turn.id }, bubbles: true, composed: true,
+  })); await settle(el);
+  expect(body(1).conversationId).toBe('child-fork');
+  newConversation(el); await settle(el);
+  const start = readsOf('child-fork').length;
+  el = await coldReload(el); await tick(el);
+  expect(readsOf('child-fork').length).toBeGreaterThan(start);
+  expect(retained().payload.task).toMatchObject({ target: 'child-fork', dispatchTurnId: body(1).turnId });
+  childRows = [row('child-question', 'USER_MESSAGE', 'same words', String(body(1).turnId)),
+    row('child-answer', 'ASSISTANT_MESSAGE', 'Child saved answer', String(body(1).turnId))];
+  await tick(el);
+  expect(retained().payload.task).toBeNull();
+  expect(el.sessions.activeId).toBeNull();
+  expect(dispatches()).toHaveLength(2);
+});
+
+it('R3 reload on the retained target still adopts its opening read without a duplicate', async () => {
+  vi.useFakeTimers();
+  let el = await mount(); await send(el, 'same words');
+  const original = target();
+  const fallback = http.getMockImplementation()!;
+  let release!: (r: Response) => void;
+  http.mockImplementation((url: unknown, init?: RequestInit) => String(url).endsWith('/api/thread/' + original)
+    ? new Promise<Response>(r => { release = r; }) : fallback(url, init));
+  const start = readsOf(original).length;
+  el = await coldReload(el); await tick(el, 2500);
+  expect(el.sessions.activeId).toBe(original);
+  expect(readsOf(original).length - start).toBe(1);
+  saveOutcome(); release(json({ conversationId: original, events: rows, lifecycles: [] })); await settle(el);
+  expect(retained().payload.task).toBeNull();
+  expect(answer(el)).toContain('Saved answer');
+  expect(dispatches()).toHaveLength(1);
+});
+
+it('R3 each reload re-arms one bounded window and ticks never overlap the retained read', async () => {
+  vi.useFakeTimers();
+  let el = await mount(); await send(el, 'same words'); newConversation(el); await settle(el);
+  const original = target();
+  const fallback = http.getMockImplementation()!;
+  const signals: AbortSignal[] = [];
+  let release!: (r: Response) => void;
+  http.mockImplementation((url: unknown, init?: RequestInit) => {
+    if (String(url).endsWith('/api/thread/' + original)) {
+      signals.push(init!.signal!);
+      return new Promise<Response>(r => { release = r; });
+    }
+    return fallback(url, init);
+  });
+  for (let mountIndex = 0; mountIndex < 3; mountIndex++) {
+    el = await coldReload(el);
+    const start = readsOf(original).length;
+    await tick(el, 3000);
+    expect(readsOf(original).length - start).toBe(1);
+    expect(signals.at(-1)!.aborted).toBe(false);
+    await tick(el, 38000);
+    expect(signals.slice(-3).every(signal => signal.aborted)).toBe(true);
+    const exhausted = readsOf(original).length;
+    await tick(el, 31000);
+    expect(readsOf(original)).toHaveLength(exhausted);
+    expect(retained().payload.task).not.toBeNull();
+    expect(action(el, 'sv3-residency-check')).not.toBeNull();
+  }
+  // Even the last abort-ignoring response has no authority after the window expired.
+  release(json({ conversationId: original, events: [], lifecycles: [] })); await settle(el);
+  expect(el.sessions.activeId).toBeNull();
+  expect(dispatches()).toHaveLength(1);
+});
+
+it('R3 confirmed deletion stops restored target checks and keeps the retained task handling', async () => {
+  vi.useFakeTimers();
+  let el = await mount(); await send(el, 'same words'); newConversation(el); await settle(el);
+  const original = target();
+  const fallback = http.getMockImplementation()!;
+  let release!: (r: Response) => void;
+  let signal!: AbortSignal;
+  let deleted = false;
+  http.mockImplementation((url: unknown, init?: RequestInit) => {
+    const path = String(url);
+    if (path.endsWith('/api/thread/' + original)) {
+      signal = init!.signal!; return new Promise<Response>(r => { release = r; });
+    }
+    if (path.includes('/api/chat/conversations?')) return Promise.resolve(json({ sessions: [], deletedIds: deleted ? [original] : [] }));
+    return fallback(url, init);
+  });
+  el = await coldReload(el); await tick(el);
+  expect(release).toBeTypeOf('function');
+  const task = retained().payload.task;
+  deleted = true;
+  await loadConversations(); await settle(el);
+  expect(signal.aborted).toBe(true);
+  saveOutcome(); release(json({ conversationId: original, events: rows, lifecycles: [] })); await settle(el);
+  const stopped = readsOf(original).length;
+  await tick(el, 60000);
+  expect(readsOf(original)).toHaveLength(stopped);
+  expect(retained().payload.task).toEqual(task);
+  expect(el.sessions.sessions.some(s => s.id === original)).toBe(false);
+  expect(el.sessions.activeId).toBeNull();
+  expect(dispatches()).toHaveLength(1);
+});
+
+it('R3 unreachable reload keeps uncertainty and reconnect re-arms the retained target', async () => {
+  vi.useFakeTimers();
+  let el = await mount(); await send(el, 'same words'); newConversation(el); await settle(el);
+  const original = target();
+  const fallback = http.getMockImplementation()!;
+  let reachable = false;
+  http.mockImplementation((url: unknown, init?: RequestInit) => !reachable
+    ? Promise.reject(new TypeError('Failed to fetch')) : fallback(url, init));
+  // Age out every pre-reload positive contact (the origin lease is 40 seconds).
+  el.remove(); await vi.advanceTimersByTimeAsync(41000); __feedContactForTest(0);
+  const start = readsOf(original).length;
+  el = await coldReload(el); await tick(el, 31000);
+  expect(readsOf(original).length).toBeGreaterThan(start);
+  expect(retained().payload.task).not.toBeNull();
+  expect(el.shadowRoot!.textContent).toContain('Delivery unknown');
+  expect(action(el, 'sv3-residency-check')).not.toBeNull();
+  expect(getAiState().connection.reachable).toBe(false);
+  const exhausted = readsOf(original).length;
+  saveOutcome(); reachable = true;
+  await tick(el, 31000);
+  expect(readsOf(original)).toHaveLength(exhausted);
+  __feedContactForTest(); await tick(el);
+  expect(readsOf(original).length).toBeGreaterThan(exhausted);
+  expect(retained().payload.task).toBeNull();
+  expect(el.sessions.activeId).toBeNull();
+  expect(dispatches()).toHaveLength(1);
+});
+
+it('R3 restored target budget expires before save and only Check again re-arms it', async () => {
+  vi.useFakeTimers();
+  let el = await mount(); await send(el, 'same words'); newConversation(el); await settle(el);
+  const original = target();
+  const start = readsOf(original).length;
+  el = await coldReload(el); await tick(el, 31000);
+  const exhausted = readsOf(original).length;
+  expect(exhausted - start).toBeGreaterThan(0);
+  expect(exhausted - start).toBeLessThanOrEqual(60);
+  saveOutcome(); await tick(el, 60000);
+  expect(readsOf(original)).toHaveLength(exhausted);
+  expect(retained().payload.task).not.toBeNull();
+  expect(el.shadowRoot!.textContent).toContain('Delivery unknown');
+  action(el, 'sv3-residency-check')!.click(); await settle(el);
+  expect(retained().payload.task).toBeNull();
+  expect(el.sessions.activeId).toBeNull();
+  expect(dispatches()).toHaveLength(1);
+});
+
+it('R3 an old restored task without dispatchTurnId stays unresolved even when its target is opened', async () => {
+  vi.useFakeTimers();
+  let el = await mount(); await send(el, 'same words'); newConversation(el); await settle(el);
+  el.remove();
+  const recovery = retained(); delete recovery.payload.task!.dispatchTurnId;
+  sessionStorage.setItem(attachmentKey, JSON.stringify(recovery));
+  const start = readsOf(target()).length;
+  saveOutcome(); el = await coldReload(el); await tick(el, 31000);
+  expect(readsOf(target())).toHaveLength(start);
+  expect(retained().payload.task).not.toBeNull();
+  expect(el.shadowRoot!.textContent).toContain('Delivery unknown');
+  expect(action(el, 'sv3-residency-check')).toBeNull();
+  restoreActiveConversation(target()); await settle(el);
+  expect(retained().payload.task).not.toBeNull();
+  expect(el.sessions.activeId).toBe(target());
+  expect(dispatches()).toHaveLength(1);
 });

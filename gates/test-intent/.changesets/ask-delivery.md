@@ -2,7 +2,7 @@
 schema: test-intent.v1
 task: t-20261031-unsent-work
 author-role: builder
-author-session: builder-4
+author-session: builder-retained-reload-round3
 ---
 
 # Test-intent entries
@@ -18,6 +18,22 @@ regression covers an abort-ignoring stall and a late old snapshot; both must res
 saved outcome before the 30-second budget expires without a second dispatch. An unrelated
 opening read keeps its existing lifetime. Additional execution evidence against stage 1 is in
 `gates/test-intent/evidence/ask-delivery-opening-read.json`.
+
+Final repair round against 061c80d200: recovery can finish after the Shell's initial navigation
+handshake and after the connect-time checker ran. Restoring the retained task now notifies the
+existing bounded record checker even when its target is outside the displayed place. Reconnect
+continues to use the existing rearm path. No conversation is displayed and no request is resent.
+The durable R3 view checks cover New and another conversation before/after the save, Retry's
+dispatch child, the retained target itself, repeated reloads with non-overlapping reads, confirmed
+deletion, unreachable reload/reconnect, budget exhaustion/manual rearm, and legacy tasks without
+dispatchTurnId. A stalled read of the displayed conversation retains its unrelated lifetime.
+The original 32 delivery cases remain unchanged apart from the mount helper's optional initial
+navigation flag (false for existing callers). New repair cases fail against 061c80d200 because no
+retained-target read starts; the displayed-target and legacy preservation cases pass there.
+Round-specific execution evidence is in `gates/test-intent/evidence/ask-delivery-retained-reload.json`.
+Removing the restore-time checker call in an isolated clone reproduces the same nine R3 assertion
+failures; the unmutated candidate passes all eleven R3 cases. The verifier must record fresh
+acceptance on the final digest; the earlier acceptance below is intentionally left stale.
 
 The first-live-merge test now requires live A's own saved question ID. The Java model-input
 contract additionally consumes stamped persisted historical question/answer rows and requires
@@ -118,8 +134,13 @@ message allowlist fail independently of the original pre-stage-1 failure evidenc
         "modules/ui-web/src/shell-v0/views/search-v3/sv3-dispatch-record.test.ts"
       ],
       "class": "New",
-      "behaviour": "Live ownership suppresses false uncertainty; exact saved outcomes retire only their retained attempt with storage ACK and preserved draft review. Correlation separates interleaved writers, forks, legacy rows, synthetic incomplete errors, history mapping, export and companion context. Read timeouts and budgets preserve uncertainty, support explicit rearming and isolate navigation/deletion. Reads begun before recovery restoration are bounded on adoption, late old snapshots cannot undo resolution, and unrelated reads retain their lifetime. The first live merge must attach the live dispatch to its own saved question ID.",
+      "behaviour": "Live ownership suppresses false uncertainty; exact saved outcomes retire only their retained attempt with storage ACK and preserved draft review. Correlation separates interleaved writers, forks, legacy rows, synthetic incomplete errors, history mapping, export and companion context. Read timeouts and budgets preserve uncertainty, support explicit rearming and isolate navigation/deletion. Reads begun before recovery restoration are bounded on adoption, late old snapshots cannot undo resolution, and unrelated reads retain their lifetime. Recovery restored after connect automatically arms bounded checks of a retained target outside the displayed place, including Retry's child. Repeated reloads rearm one window each without overlapping same-conversation reads; deletion stops checks, reconnect rearms them, budget exhaustion preserves manual checking, and legacy tasks without dispatchTurnId never resolve automatically. Nothing is resent and the displayed place is preserved. The first live merge must attach the live dispatch to its own saved question ID.",
       "sources": [
+        {
+          "kind": "owner-words",
+          "quote": "after a reload, a retained unknown-delivery Ask attempt whose conversation is not the one shown (for example the user pressed New mid-answer, or opened another conversation, then reloaded) is checked automatically with the existing bounded record reads, and \"Delivery unknown\" clears once that exact attempt's outcome is saved; nothing is resent.",
+          "location": "task t-20261031-unsent-work request, 2026-10-31"
+        },
         {
           "kind": "owner-words",
           "quote": "proceed autonomously with the remaining work",
