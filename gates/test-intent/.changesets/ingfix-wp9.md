@@ -507,3 +507,14 @@ The behavioural replacements were selected by method name and run on both states
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a19281-7bd8-7071-b23d-246fc2d1152e",
+  "verdict": "accept",
+  "digest": "sha256:b8938ec731081cca71b637ad231f74935050ff1743a6adf0e62375d0c4a28182",
+  "note": "Independent verifier (codex gpt-6.1-sol) on 86b1bb73be: entries 1-12 accepted; 20 repair checks reproduced as assertion failures at 9eb36cc792 with the compatibility patch and pass on the candidate; 4 preservation checks pass on both."
+}
+```
