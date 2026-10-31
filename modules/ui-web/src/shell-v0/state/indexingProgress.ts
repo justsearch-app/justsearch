@@ -398,7 +398,7 @@ function readEnrichmentWork(status: StatusResponse | null | undefined): Enrichme
     (count(chunk?.chunkDocCount) > 0 && typeof chunk?.chunkVectorCoveragePercent === 'number' && chunk.chunkVectorCoveragePercent < 100))) ||
     (applicable.splade && count(enrichment?.spladeFailedCount) > 0) ||
     (applicable.ner && count(enrichment?.failedNerCount) > 0) ||
-    (enrichment?.completeness ?? []).some(stage => applicableStage(stage.stageId) && (stage.missing > 0 || stage.failed > 0));
+    (enrichment?.completeness ?? []).some(stage => applicableStage(stage.stageId ?? '') && (count(stage.missing) > 0 || count(stage.failed) > 0));
 
   return { applicable, rows, rawPending, blockedPending, embeddingBlocked, unknown, incomplete };
 }
