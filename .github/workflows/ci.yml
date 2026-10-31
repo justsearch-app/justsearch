@@ -317,6 +317,9 @@ jobs:
       - name: ui-web gate runner parses the whole recipe
         run: node scripts/ci/run-ui-web-gates.test.mjs
 
+      - name: Test the thread client's use of the generated event kinds
+        run: node scripts/ci/check-thread-event-kinds.test.mjs
+
       # Tempdoc 879. Both gates below existed only as manual pre-merge rows, which is the same
       # defect they check for: a mechanism nothing runs cannot contradict anything. The store
       # register's gate was in fact RED on main for ~90 commits (an unclassified persistence
