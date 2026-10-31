@@ -532,6 +532,10 @@ try {
   $uiJar = Get-ChildItem -LiteralPath $InstallDir -Filter "ui-headless.jar" -Recurse -File -ErrorAction SilentlyContinue | Select-Object -First 1
   Assert ($null -ne $uiJar) "Installed payload missing ui-headless.jar under $InstallDir"
   $headlessDir = Split-Path -Parent $uiJar.FullName
+  foreach ($legalFile in @("LICENSE", "NOTICE", "THIRD_PARTY_NOTICES", "T3-CODE-NOTICE.md", "LUCIDE-LICENSE.txt")) {
+    $legalPath = Join-Path -Path $headlessDir -ChildPath "legal/$legalFile"
+    Assert (Test-Path -LiteralPath $legalPath -PathType Leaf) "Installed payload missing legal/$legalFile at $legalPath"
+  }
 
   # ---------------------------------------------------------------------------
   # 3) Validate expected sidecar files exist
