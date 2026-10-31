@@ -36,6 +36,7 @@ export class Sv3ComposerPort {
 
   snapshot(): ComposerCapture { return this.current().snapshot(); }
   read(): string { return this.snapshot().text; }
+  readMounted(): string { return this.composer()?.draft ?? ''; }
   replace(text: string): void { this.current().replace(text); }
   clear(): void { this.current().clear(); }
 

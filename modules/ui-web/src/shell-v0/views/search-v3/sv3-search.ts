@@ -19,6 +19,7 @@ import type { ReactiveController, ReactiveControllerHost } from 'lit';
 import { localizeResourceKey } from '../../../i18n/resourceCatalog.js';
 import {
   getScopeChips,
+  removeScopeChip,
   invalidateSearchRestrictions,
   setQuery,
   submitSearch,
@@ -32,15 +33,51 @@ import {
   getFacetSelections,
   getFilters,
   restrictionWire,
+  setFilters,
+  toggleFacetValue,
   subscribeFacetSelections,
   subscribeFilters,
   type SearchFilterSpec,
 } from '../../state/searchFiltersState.js';
-import { restrictionLabels, type RestrictionKind } from './sv3-filter-input.js';
+import { restrictionLabels, withoutRestriction, type RestrictionKind } from './sv3-filter-input.js';
 import { FACET_LABELS } from '../../components/searchResults/facetChips.js';
 import { clearSelection, getSelection, setSelection, DEFAULT_CAPABILITIES_BY_KIND } from '../../state/selectionState.js';
 import type { Availability } from '../../state/availability.js';
-import { forgetContainsPath, type ForgetScope } from '../../../api/domains/forget.js';
+import { completedForget, createForgetAttempt, executeForget, forgetContainsPath, forgetObservationText,
+  forgetParentFolder, readUnfinishedForgets, type ForgetConsent, type ForgetScope,
+  type IndexedForgetCompletion } from '../../../api/domains/forget.js';
+import { describeExactPath } from '../../../api/exclusionPolicy.js';
+import type { Sv3DraftDomain } from './sv3-draft-domain.js';
+import { SV3_RESULT_NO_DOCUMENT } from './fixtures.js';
+
+type SearchDraft = Pick<Sv3DraftDomain, 'draftMayIssue' | 'enterResults' | 'humanTask' | 'draftReview'
+  | 'revokeHumanTask' | 'tier' | 'prepareAsk' | 'applyPreparation' | 'reconcileForgotten'>;
+
+/** Existing authorities and presentation callbacks; no element or alternate state owner. */
+interface SearchHost extends Pick<ReactiveControllerHost, 'addController' | 'requestUpdate'> {
+  readonly composer: { read(): string; readMounted(): string };
+  draft(): SearchDraft;
+  historyLocked(): boolean;
+  clearAskFilterError(): void;
+  recordSearch(query: string): void;
+  closeRecents(): void;
+  focusComposer(): Promise<void>;
+  connected(): boolean;
+  apiBase(): string;
+  activeConversationId(): string | null;
+  forgetCompletionOwner(): object | undefined;
+  paneDocPath(): string | null;
+  closePane(): void;
+  openResult(path: string): void;
+  announceWarning(message: string): void;
+  confirmForget(prompt: ForgetConsent, signal: AbortSignal): Promise<boolean>;
+  publishForgetCompletion(detail: IndexedForgetCompletion): void;
+}
+
+interface ForgetFocus {
+  cancelled(current: () => boolean): Promise<void>;
+  completed(): void;
+}
 
 /** The files one Ask is limited to — document PATHS, which is what the backend's filter matches. */
 export interface Sv3AskScope {
@@ -74,7 +111,7 @@ export function sv3ScopeFromHits(
 }
 
 /** A single document as a scope, refusing a hit with no document path. */
-export function sv3ScopeFromPath(path: string): Sv3AskScope | null {
+function sv3ScopeFromPath(path: string): Sv3AskScope | null {
   return path.trim() === '' ? null : { paths: [path] };
 }
 
@@ -227,8 +264,201 @@ export class Sv3SearchController implements ReactiveController {
   private readonly turnScopes = new Map<string, Sv3AskScope | null>();
   private unsubscribers: Array<() => void> = [];
 
-  constructor(private readonly host: ReactiveControllerHost, private readonly filtersChanged: () => void = () => {}) {
+  private forgetPlacement = 0;
+  private forgetConsent: AbortController | null = null;
+  private forgetCapabilityRead: AbortController | null = null;
+  private forgetCapabilityBase: string | null = null;
+  private forgetAvailableValue = false;
+  private forgetBusyValue = false;
+  private forgetNoticeValue = '';
+
+  get forgetAvailable(): boolean { return this.forgetAvailableValue; }
+  private set forgetAvailable(value: boolean) {
+    if (this.forgetAvailableValue === value) return;
+    this.forgetAvailableValue = value; this.host.requestUpdate();
+  }
+  get forgetBusy(): boolean { return this.forgetBusyValue; }
+  private set forgetBusy(value: boolean) {
+    if (this.forgetBusyValue === value) return;
+    this.forgetBusyValue = value; this.host.requestUpdate();
+  }
+  get forgetNotice(): string { return this.forgetNoticeValue; }
+  private set forgetNotice(value: string) {
+    if (this.forgetNoticeValue === value) return;
+    this.forgetNoticeValue = value; this.host.requestUpdate();
+  }
+
+  constructor(private readonly host: SearchHost) {
     host.addController(this);
+  }
+
+  /** Enter in Search mode, or the palette's search: the full pass, now. */
+  searchNow(text: string): boolean {
+    if (!this.host.draft().draftMayIssue()) return false;
+    if (!this.host.draft().enterResults(this.host.composer.read(), text)) return false;
+    const query = text.trim();
+    this.host.recordSearch(query);
+    this.host.closeRecents();
+    this.submit(query);
+    return true;
+  }
+
+  onRestrictionsCommitted(): void {
+    this.host.clearAskFilterError();
+    if (this.showing && this.host.composer.read().trim() && !this.host.historyLocked()
+      && this.host.draft().humanTask === null && !this.host.draft().draftReview && this.host.draft().draftMayIssue(false)) this.rerun();
+  }
+
+  onResultsFilterRemove(filter: Sv3ActiveFilter | undefined): void {
+    if (filter === undefined) return;
+    if (filter.kind === 'date' || filter.kind === 'folder' || filter.kind === 'size') {
+      setFilters(withoutRestriction(getFilters(), filter.kind)); return;
+    }
+    if (this.host.draft().humanTask !== null || this.host.historyLocked() || !this.host.draft().draftMayIssue(false)) return;
+    if (filter.kind === 'scope') removeScopeChip(filter.index);
+    else if (filter.kind === 'facet') toggleFacetValue(filter.field, filter.value);
+    if (this.showing) this.rerun();
+  }
+
+  /** The card's facet chips — the default window's handler, on the same store. */
+  onCardFacetToggle(detail: { field: string; value: string } | undefined): void {
+    if (detail === undefined) return;
+    if (this.host.draft().draftReview ? !this.hasPlace : !this.host.draft().draftMayIssue()) return;
+    toggleFacetValue(detail.field, detail.value);
+    this.rerun();
+  }
+
+  onCardSelection(detail: { ids: readonly string[] } | undefined): void {
+    if (detail === undefined) return;
+    this.host.draft().revokeHumanTask();
+    this.select(detail.ids);
+    if (this.host.draft().tier === 'structured' && this.showing && this.prepareFromSelection() === null) {
+      this.clearScope();
+    }
+  }
+
+  leaveForgetPlacement(): void {
+    this.forgetPlacement++;
+    this.forgetConsent?.abort();
+    this.forgetConsent = null;
+    this.forgetNotice = '';
+  }
+
+  async loadForgetCapability(): Promise<void> {
+    this.forgetCapabilityRead?.abort();
+    const read = new AbortController();
+    this.forgetCapabilityRead = read;
+    const base = this.host.apiBase();
+    this.forgetCapabilityBase = base;
+    this.forgetAvailable = false;
+    try {
+      await readUnfinishedForgets(base, 0, read.signal, 1);
+      if (this.host.connected() && !read.signal.aborted && this.host.apiBase() === base) this.forgetAvailable = true;
+    } catch { /* A host must prove that it handles the action before any card offers it. */ }
+  }
+
+  /** One target-specific reconciliation for initial completion and the owning Stage's Retry. */
+  reconcileConfirmedForget(detail: IndexedForgetCompletion): void {
+    if (detail.apiBase !== this.host.apiBase() || detail.owner !== this.host.forgetCompletionOwner()) return;
+    const outcome = completedForget(detail.outcome);
+    if (outcome?.path == null || outcome.scope === null) return;
+    this.host.draft().reconcileForgotten(outcome.path, outcome.scope);
+    const paneDocPath = this.host.paneDocPath();
+    if (paneDocPath !== null && forgetContainsPath(outcome.path, outcome.scope, paneDocPath)) this.host.closePane();
+  }
+
+  async onCardForget(detail: { id: string; path: string; scope: ForgetScope } | undefined, focus: ForgetFocus): Promise<void> {
+    if (!detail || !this.forgetAvailable || this.forgetBusy || !this.showing) return;
+    const hit = this.snapshot?.results.find(row => row.id === detail.id && row.path === detail.path);
+    if (!hit) return;
+    const path = detail.scope === 'FILE' ? detail.path : forgetParentFolder(detail.path);
+    if (path === null) {
+      this.forgetNotice = 'Use Library root controls for a filesystem root.';
+      return;
+    }
+    const placement = this.forgetPlacement;
+    const session = this.host.activeConversationId();
+    const base = this.host.apiBase();
+    const completionOwner = this.host.forgetCompletionOwner();
+    const current = () => this.host.connected() && this.forgetPlacement === placement
+      && this.host.activeConversationId() === session && this.host.apiBase() === base && this.showing;
+    const consent = new AbortController();
+    this.forgetConsent = consent;
+    this.forgetBusy = true;
+    this.forgetNotice = 'Preparing the exact forget target…';
+    try {
+      const attempt = createForgetAttempt(path, detail.scope);
+      const outcome = await executeForget(base, attempt, async prompt =>
+        current() && !consent.signal.aborted && await this.host.confirmForget(prompt, consent.signal) && current());
+      if (!current()) {
+        if (outcome?.status === 'COMPLETE') {
+          this.reconcileConfirmedForget({ apiBase: base, owner: completionOwner, outcome });
+          this.host.publishForgetCompletion({ apiBase: base, outcome, owner: completionOwner });
+        }
+        return;
+      }
+      if (outcome === null) {
+        this.forgetNotice = 'Forget cancelled before approval. This request changed nothing.';
+        this.forgetBusy = false;
+        await focus.cancelled(current);
+        return;
+      }
+      this.forgetNotice = `${describeExactPath(path)}: ${forgetObservationText(outcome)}`;
+      if (outcome.status === 'COMPLETE' && outcome.path !== null && outcome.scope !== null) {
+        this.reconcileConfirmedForget({ apiBase: base, owner: completionOwner, outcome });
+        this.host.publishForgetCompletion({ apiBase: base, outcome, owner: completionOwner });
+        focus.completed();
+      }
+    } catch {
+      if (current()) this.forgetNotice = 'The forget outcome could not be confirmed. Review unfinished forgets in Library.';
+    } finally {
+      if (this.forgetConsent === consent) this.forgetConsent = null;
+      this.forgetBusy = false;
+    }
+  }
+
+  /** Open a hit in the document pane — the one pane writer, with no citation to anchor. */
+  onCardOpen(id: string | undefined): void {
+    const hit = this.snapshot?.results.find((candidate) => candidate.id === id);
+    if (hit === undefined) return;
+    if (hit.path === '') {
+      this.host.announceWarning(SV3_RESULT_NO_DOCUMENT);
+      return;
+    }
+    this.host.openResult(hit.path);
+  }
+
+  onCardScopeFile(path: string): void {
+    this.host.draft().prepareAsk(sv3ScopeFromPath(path));
+  }
+
+  onResultsAsk(): void {
+    this.host.draft().prepareAsk(this.scopeFromSelection());
+  }
+
+  /** The palette searches only a mounted composer's draft, just as before extraction. */
+  paletteSearch(): void {
+    if (!this.host.draft().draftMayIssue()) return;
+    this.host.draft().applyPreparation({ kind: 'search' });
+    const draft = this.host.composer.readMounted().trim();
+    if (draft !== '') this.searchNow(draft);
+    void this.host.focusComposer();
+  }
+
+  /** Called at the view's existing disconnect point, before draft retention and teardown. */
+  disconnectForget(): void {
+    this.leaveForgetPlacement();
+    this.forgetCapabilityRead?.abort();
+    this.forgetCapabilityRead = null;
+    this.forgetAvailable = false;
+  }
+
+  /** Keep the existing post-render API-base transition and probe timing. */
+  updateForgetApiBase(): void {
+    if (this.forgetCapabilityBase !== this.host.apiBase()) {
+      this.leaveForgetPlacement();
+      void this.loadForgetCapability();
+    }
   }
 
   hostConnected(): void {
@@ -241,7 +471,7 @@ export class Sv3SearchController implements ReactiveController {
       subscribeFilters((spec) => {
         const changed = JSON.stringify(restrictionWire(spec)) !== JSON.stringify(restrictionWire(this.dates));
         this.dates = spec;
-        if (changed) { this.selected = new Set(); invalidateSearchRestrictions(); this.filtersChanged(); }
+        if (changed) { this.selected = new Set(); invalidateSearchRestrictions(); this.onRestrictionsCommitted(); }
         this.host.requestUpdate();
       }),
       subscribeFacetSelections((selections) => {

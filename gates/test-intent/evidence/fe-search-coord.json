@@ -1,0 +1,122 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
+  },
+  "createdAt": "2026-10-31T07:54:37.766Z",
+  "revision": "f88714bfaf92ee04b4fa3adfe1e3febb4c89f895",
+  "tree": "94b23de1505a78f42dd26aea760de3cf96307c77",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/search-v3/SearchV3View.searchPreservation.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/e4fkw1rd/tmp/test-intent-vitest-3-1793433271488.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 6275
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchPreservation.test.ts",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchPreservation.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:79cb50f3861d2b1e7418d29ea02c77c6ae9d00305dd1b4c695fdb4df2a2fac53",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "'Enter' refuses Search when attachment acknowledgement fails ('write')",
+          "status": "passed"
+        },
+        {
+          "name": "'Enter' refuses Search when attachment acknowledgement fails ('stale')",
+          "status": "passed"
+        },
+        {
+          "name": "'Enter' refuses Search when attachment acknowledgement fails ('readback')",
+          "status": "passed"
+        },
+        {
+          "name": "'typing' refuses Search when attachment acknowledgement fails ('write')",
+          "status": "passed"
+        },
+        {
+          "name": "'typing' refuses Search when attachment acknowledgement fails ('stale')",
+          "status": "passed"
+        },
+        {
+          "name": "'typing' refuses Search when attachment acknowledgement fails ('readback')",
+          "status": "passed"
+        },
+        {
+          "name": "'palette' refuses Search when attachment acknowledgement fails ('write')",
+          "status": "passed"
+        },
+        {
+          "name": "'palette' refuses Search when attachment acknowledgement fails ('stale')",
+          "status": "passed"
+        },
+        {
+          "name": "'palette' refuses Search when attachment acknowledgement fails ('readback')",
+          "status": "passed"
+        },
+        {
+          "name": "entering results from Enter refuses a failed second attachment acknowledgement",
+          "status": "passed"
+        },
+        {
+          "name": "entering results from typing refuses a failed second attachment acknowledgement",
+          "status": "passed"
+        },
+        {
+          "name": "preparing card-file Ask keeps Search preparation when storage refuses",
+          "status": "passed"
+        },
+        {
+          "name": "preparing chosen-file Ask keeps Search preparation when storage refuses",
+          "status": "passed"
+        },
+        {
+          "name": "blank palette Search changes preparation without submitting",
+          "status": "passed"
+        },
+        {
+          "name": "obsolete capability reads cannot enable Forget after disconnect, reconnect or API-base change",
+          "status": "passed"
+        },
+        {
+          "name": "a whitespace-only card-file path cannot prepare unrestricted Ask",
+          "status": "passed"
+        },
+        {
+          "name": "a whitespace-only chosen-file path cannot prepare unrestricted Ask",
+          "status": "passed"
+        },
+        {
+          "name": "Forget refuses a target whose hit id and path do not both match ('wrong-id', '/chosen.txt')",
+          "status": "passed"
+        },
+        {
+          "name": "Forget refuses a target whose hit id and path do not both match ('chosen', '/different.txt')",
+          "status": "passed"
+        },
+        {
+          "name": "Forget folder refuses a filesystem root before invoking an operation",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:9c0dfa7bd551790b14b7e0115469a4945c18cea5faeb4c8d9c21644f91483ad6"
+}
