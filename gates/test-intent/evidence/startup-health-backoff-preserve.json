@@ -1,0 +1,92 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
+  },
+  "createdAt": "2026-10-31T16:39:23.439Z",
+  "revision": "de89b16c070b8b41ba781b220bf81066ef1fe382",
+  "tree": "6a9d20c62bc0561b5b75c5b676e2b91be107aba3",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": "openjdk version \"25.0.4.1\" 2026-08-18 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "./gradlew :modules:app-inference:test --tests \"io.justsearch.app.inference.LlamaServerStartupHealthPollTest.aServerHealthyOnTheFirstProbeNeedsNoPause\" --tests \"io.justsearch.app.inference.LlamaServerStartupHealthPollTest.anInterruptDuringAPauseEndsTheWaitAsInterrupted\" --tests \"io.justsearch.app.inference.LlamaServerStartupHealthPollTest.aServerThatExitsJustAfterHealthIsReportedExactlyOnce\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 10762
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaServerStartupHealthPollTest.java#aServerHealthyOnTheFirstProbeNeedsNoPause",
+      "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaServerStartupHealthPollTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:3d95fb3e293aeb6df5abbab1c6985024910b191d5ab857598ba1bcf0c3abd41a",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aServerHealthyOnTheFirstProbeNeedsNoPause()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaServerStartupHealthPollTest.java#anInterruptDuringAPauseEndsTheWaitAsInterrupted",
+      "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaServerStartupHealthPollTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:3d95fb3e293aeb6df5abbab1c6985024910b191d5ab857598ba1bcf0c3abd41a",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "anInterruptDuringAPauseEndsTheWaitAsInterrupted()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaServerStartupHealthPollTest.java#aServerThatExitsJustAfterHealthIsReportedExactlyOnce",
+      "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaServerStartupHealthPollTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:3d95fb3e293aeb6df5abbab1c6985024910b191d5ab857598ba1bcf0c3abd41a",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aServerThatExitsJustAfterHealthIsReportedExactlyOnce(int) exit after 0 ms",
+          "status": "passed"
+        },
+        {
+          "name": "aServerThatExitsJustAfterHealthIsReportedExactlyOnce(int) exit after 5 ms",
+          "status": "passed"
+        },
+        {
+          "name": "aServerThatExitsJustAfterHealthIsReportedExactlyOnce(int) exit after 25 ms",
+          "status": "passed"
+        },
+        {
+          "name": "aServerThatExitsJustAfterHealthIsReportedExactlyOnce(int) exit after 100 ms",
+          "status": "passed"
+        },
+        {
+          "name": "aServerThatExitsJustAfterHealthIsReportedExactlyOnce(int) exit after 400 ms",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:3fc7359bc0acbf25d91d6c728295ff5e44be33f09104a9f1144271cc955d0dbf"
+}
