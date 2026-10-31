@@ -761,9 +761,15 @@ print(json.dumps({'files':[name for _,name in files[:64]],'errors':errors}))
             errors.extend(snapshot['errors'])
             # Reserve space for omission diagnostics within the collection's 32 MB.
             remaining = 32_000_000 - 64_000
+            # One budget for every snapshot of the run keeps the whole evidence
+            # archive within the VM extractor's 100 MB and 1000-member limits.
+            budget = self.__dict__.setdefault('log_budget', {'bytes': 40_000_000, 'files': 192})
             for relative in snapshot['files']:
                 if remaining <= 0:
                     errors.append('Collection limit 32 MB reached; remaining older files omitted')
+                    break
+                if budget['bytes'] <= 0 or budget['files'] <= 0:
+                    errors.append('Run log budget (40 MB, 192 files) reached; remaining older files omitted')
                     break
                 try:
                     result = self.target.json(r'''
@@ -819,7 +825,7 @@ marker=content.find(b'<redacted>',max(0,offset-9),offset+9)
 if 0<=marker<offset<marker+10:offset=marker+10
 content=content[offset:].decode('utf-8',errors='ignore')
 print(json.dumps({'content':content,'truncated':offset>0}))
-''', {'data': self.data, 'relative': relative, 'cap': min(4_000_000, remaining)}, timeout=60)
+''', {'data': self.data, 'relative': relative, 'cap': min(4_000_000, remaining, budget['bytes'])}, timeout=60)
                     content = result['content']
                     if result['truncated']:
                         errors.append(relative + ': text tail truncated to saved-byte limit')
@@ -829,6 +835,8 @@ print(json.dumps({'content':content,'truncated':offset>0}))
                     destination.parent.mkdir(parents=True, exist_ok=True)
                     destination.write_text(content, encoding='utf-8', newline='')
                     remaining -= len(content.encode('utf-8'))
+                    budget['bytes'] -= len(content.encode('utf-8'))
+                    budget['files'] -= 1
                 except Exception as exc:
                     errors.append(relative + ': ' + str(exc))
         except Exception as exc:

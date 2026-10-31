@@ -200,6 +200,19 @@ class LogEvidenceContract:
         self.assertIn('individual transfer rejected', (folder / 'collection-error.txt').read_text())
         self.assertGreater(len(sizes), 1, 'logs were transferred as one aggregate payload')
 
+    def test_repeated_snapshots_share_one_run_budget_within_extractor_limits(self):
+        for index in range(10):
+            path = self.logs / f'large-{index:02}.log'
+            path.write_bytes(bytes([65 + index]) * 4_000_000)
+        for index in range(6):
+            self.fail_check(name=f'failing-{index}')
+        self.finish()
+        saved = [p for p in self.run.out.rglob('*') if p.is_file()]
+        # vm-run.extract_evidence refuses archives above 100 MB or 1000 members.
+        self.assertLess(sum(p.stat().st_size for p in saved), 60_000_000)
+        self.assertLess(len(saved), 400)
+        self.assertIn('Run log budget', (self.run.out / 'J3-failing-5-logs/collection-error.txt').read_text())
+
     def test_traversal_is_bounded_and_reports_omissions(self):
         outside = self.root / 'outside'
         outside.mkdir()

@@ -174,7 +174,8 @@ v2 predecessor as above.
 Record J5 **unavailable** only when no published v2 release and no signed rehearsal draft
 exists (the rehearsal run itself). Never substitute 0.3.0, an unsigned failed build or
 fabricated metadata. Run the remaining applicable journeys as explicit subsets without
-predecessor/mirror arguments; retain their incomplete status and record the J5 gap in the
+predecessor/mirror arguments; they report `failed` (exit 1) only because of the added J5
+**unavailable** rows. Confirm every other check passed and record the J5 gap in the
 release evidence. When a predecessor exists, download it separately and hash-check it:
 
 ```bash
@@ -276,8 +277,9 @@ PREVIOUS_TAG=$(gh release view --repo "$REPO" --json tagName --jq .tagName)
 
 **Never pass `--development-pack-mirror`** for release qualification. The runner decides
 J9 relevance from that source's release diff. Explicit `--journeys` subsets report
-`status: incomplete` and exit 1 even when every selected check passed. Inspect each check's
-status; keep subset/resume evidence separate from full acceptance.
+`status: incomplete` and exit 1 even when every selected check passed; a Wayland subset
+without predecessor inputs reports `failed` instead, because it adds J5 **unavailable**
+rows. Inspect each check's status; keep subset/resume evidence separate from full acceptance.
 
 **Coverage limits:** the journey implementations remain experimental; their READMEs record
 unqualified paths. Hosted crash coverage can cap an otherwise successful run at pending

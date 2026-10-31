@@ -180,7 +180,9 @@ linking `coredumps.json` and `hosted-crashes.json`. Even an empty journal cannot
 yield better than `passed-pending-owner-validation` (exit 2); a product crash
 still fails the lane. CoreDump bytes are skipped while scanning, so later diagnostic fields are retained.
 Installed package paths are read and every report is attributed
-before reports move aside, so a lookup failure leaves reports available for retry.
+before reports move aside. A lookup failure is reported as infrastructure, attribution
+continues on package and process evidence, and the reports are still recorded in
+`guest-crashes.json` and moved to `/var/crash/qualification-recorded-*`.
 A report naming Package: just-search, an installed package executable, a bundled
 JVM or a WebKit subprocess is a product finding, as is a report belonging to the
 observed app process tree. Process observations retain PID/start identities and
@@ -666,7 +668,9 @@ failures are retried; a product API failure seen during the deadline retains its
 attribution if the last observation is an infrastructure error.
 
 Explicit `--journeys` subsets report `status: incomplete` and exit 1 even when
-every selected check passed; inspect the individual check statuses.
+every selected check passed; a Wayland subset without predecessor inputs reports
+`failed` instead, because it adds J5 `unavailable` rows. Inspect the individual
+check statuses.
 A complete lane without failed or unavailable checks reports `status: passed`
 only when every executed result is automatically proven. Any owner-validation
 rows change it to `passed-pending-owner-validation`; `ownerValidation` lists
