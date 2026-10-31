@@ -1589,9 +1589,9 @@ val verifySidecarLegalResources by tasks.registering {
   doLast {
     listOf("LICENSE", "NOTICE", "THIRD_PARTY_NOTICES", "T3-CODE-NOTICE.md", "LUCIDE-LICENSE.txt")
         .forEach { name ->
-          val file = headlessDir.asFile.resolve("legal/$name")
-          if (!file.isFile) {
-            throw GradleException("Missing required bundle legal file: ${file.absolutePath}")
+          val legalNotice = headlessDir.asFile.resolve("legal/$name")
+          if (!legalNotice.isFile) {
+            throw GradleException("Missing required bundle legal file: ${legalNotice.absolutePath}")
           }
         }
   }
