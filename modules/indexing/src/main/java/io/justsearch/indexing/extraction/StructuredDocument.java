@@ -64,8 +64,11 @@ public record StructuredDocument(List<Element> elements, int pageCount) {
   public AnnotatedText toAnnotatedText(int maxChars) {
     if (maxChars < 0) throw new IllegalArgumentException("maxChars must not be negative");
     BoundedText sb = new BoundedText(maxChars);
-    try {
-      for (Element el : elements) {
+    Map<Integer, Integer> pageTextChars = new HashMap<>();
+    boolean truncated = false;
+    for (Element el : elements) {
+      int before = sb.length();
+      try {
         switch (el) {
           case Heading h -> appendHeading(sb, h);
           case Paragraph p -> appendParagraph(sb, p);
@@ -73,14 +76,20 @@ public record StructuredDocument(List<Element> elements, int pageCount) {
           case PageBreak ignored -> appendPageBreak(sb);
           case ListBlock lb -> appendListBlock(sb, lb);
         }
+      } catch (OutputLimitReached ignored) {
+        truncated = true;
       }
-    } catch (OutputLimitReached ignored) {
-      return new AnnotatedText(sb.text(), true);
+      if (!(el instanceof PageBreak)) {
+        int retained = sb.buffer.substring(before).strip().length();
+        if (retained > 0) pageTextChars.merge(el.pageIndex(), retained, Integer::sum);
+      }
+      if (truncated) break;
     }
-    return new AnnotatedText(sb.text(), false);
+    return new AnnotatedText(sb.text(), truncated, Map.copyOf(pageTextChars));
   }
 
-  public record AnnotatedText(String text, boolean truncated) {}
+  /** Character counts include only serialized text retained within the output budget. */
+  public record AnnotatedText(String text, boolean truncated, Map<Integer, Integer> pageTextChars) {}
 
   /**
    * Serialize to flat text (backward-compatible with parseToString output). Simple concatenation
@@ -230,6 +239,7 @@ public record StructuredDocument(List<Element> elements, int pageCount) {
 
     if (t.hasHeaders()) {
       List<String> headers = t.rows().getFirst();
+      boolean emittedValue = false;
       for (int r = 1; r < t.rows().size(); r++) {
         List<String> row = t.rows().get(r);
         // Use first column as row identifier if available
@@ -238,6 +248,7 @@ public record StructuredDocument(List<Element> elements, int pageCount) {
           String colHeader = c < headers.size() ? headers.get(c).strip() : "";
           String cellValue = row.get(c).strip();
           if (cellValue.isEmpty()) continue;
+          emittedValue = true;
           if (c < headers.size() && !rowId.isEmpty() && c > 0) {
             sb.append(rowId).append(", ");
           }
@@ -246,6 +257,11 @@ public record StructuredDocument(List<Element> elements, int pageCount) {
           }
           sb.append(cellValue);
           sb.append('\n');
+        }
+      }
+      if (!emittedValue) {
+        for (String header : headers) {
+          if (!header.isBlank()) sb.append(header.strip()).append('\n');
         }
       }
     } else {

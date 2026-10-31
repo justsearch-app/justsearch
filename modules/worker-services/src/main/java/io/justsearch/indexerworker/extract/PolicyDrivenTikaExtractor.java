@@ -195,8 +195,8 @@ public final class PolicyDrivenTikaExtractor implements ContentExtractorProvider
       try {
       ExtractionArtifact ocrArtifact =
           summary.mixedPdf()
-              ? trySelectivePdfOcr(ocrFile, result, summary, ocrEvidence)
-              : tryOcr(ocrFile, result, summary, ocrEvidence);
+              ? trySelectivePdfOcr(ocrFile, result, summary, structured, ocrEvidence)
+              : tryOcr(ocrFile, result, summary, structured, ocrEvidence);
       if (ocrArtifact != null) {
         return ocrArtifact.withEmbeddedCounts(
             structured.embeddedResourceCount(), structured.maxEmbeddedDepth());
@@ -393,12 +393,13 @@ public final class PolicyDrivenTikaExtractor implements ContentExtractorProvider
       Path file,
       ExtractionResult baseline,
       StructuredDocumentSummary baselineSummary,
+      StructuredContentExtractor.StructuredExtractionResult structured,
       OcrEvidenceBuilder ocrEvidence) {
     if (isRasterImageFile(file, baseline.mimeType())) {
       return tryImageOcr(file, baseline, ocrEvidence);
     }
     if (isPdfFile(file, baseline.mimeType())) {
-      return tryPdfOcr(file, baseline, baselineSummary, ocrEvidence);
+      return tryPdfOcr(file, baseline, baselineSummary, structured, ocrEvidence);
     }
     return null;
   }
@@ -407,6 +408,7 @@ public final class PolicyDrivenTikaExtractor implements ContentExtractorProvider
       Path file,
       ExtractionResult baseline,
       StructuredDocumentSummary baselineSummary,
+      StructuredContentExtractor.StructuredExtractionResult structured,
       OcrEvidenceBuilder ocrEvidence) {
     long startedAtNanos = System.nanoTime();
     String baselineText = baseline.content() == null ? "" : baseline.content().stripTrailing();
@@ -423,14 +425,14 @@ public final class PolicyDrivenTikaExtractor implements ContentExtractorProvider
       double mergedQuality = TextQualityAnalyzer.computeQualityScore(merged, pages);
       if (mergedQuality >= baselineQuality) {
         ocrMetricCatalog.succeeded();
-        ocrEvidence.truncated(ocr.truncated());
+        ocrEvidence.truncated(structured.truncated() || ocr.truncated());
         ExtractionResult result =
             new ExtractionResult(
                 merged, baseline.title(), baseline.mimeType(), baseline.author(), baseline.frontmatterMetadata());
-        StructuredDocumentSummary summary = ocrCoveredPdfSummary(file, baselineSummary, merged, ocr);
+        StructuredDocumentSummary summary = ocrCoveredPdfSummary(file, baselineSummary, merged, ocr, structured.retainedReadablePages());
         return withVisualEvidence(
             ExtractionArtifact.full(result, policy, OcrRoutingConfig.PARSER_ID,
-                ocr.truncated() || summary.pagesMissingReadableText() > 0),
+                structured.truncated() || ocr.truncated() || summary.pagesMissingReadableText() > 0),
             summary,
             "ocr_full",
             true,
@@ -504,10 +506,11 @@ public final class PolicyDrivenTikaExtractor implements ContentExtractorProvider
       Path file,
       ExtractionResult baseline,
       StructuredDocumentSummary baselineSummary,
+      StructuredContentExtractor.StructuredExtractionResult structured,
       OcrEvidenceBuilder ocrEvidence) {
     PdfVisualAnalyzer.PdfPageEvidence pageEvidence = PdfVisualAnalyzer.analyze(file);
     if (pageEvidence == null || !pageEvidence.mixed()) {
-      return tryOcr(file, baseline, baselineSummary, ocrEvidence);
+      return tryOcr(file, baseline, baselineSummary, structured, ocrEvidence);
     }
     long startedAtNanos = System.nanoTime();
     String baselineText = baseline.content() == null ? "" : baseline.content().stripTrailing();
@@ -523,7 +526,7 @@ public final class PolicyDrivenTikaExtractor implements ContentExtractorProvider
     String engineText = ocr.text();
     if (engineText != null && !engineText.isBlank()) {
       ocrEvidence.fallback(OCR_FALLBACK_RENDERED_PDF);
-      ocrEvidence.truncated(ocr.truncated());
+      ocrEvidence.truncated(structured.truncated() || ocr.truncated());
       String merged = baselineText + engineText;
       double mergedQuality =
           TextQualityAnalyzer.computeQualityScore(merged, baselineSummary.pageCount());
@@ -532,11 +535,11 @@ public final class PolicyDrivenTikaExtractor implements ContentExtractorProvider
         ExtractionResult mergedResult =
             new ExtractionResult(
                 merged, baseline.title(), baseline.mimeType(), baseline.author(), baseline.frontmatterMetadata());
-        StructuredDocumentSummary mergedSummary = ocrCoveredPdfSummary(file, baselineSummary, merged, ocr);
+        StructuredDocumentSummary mergedSummary = ocrCoveredPdfSummary(file, baselineSummary, merged, ocr, structured.retainedReadablePages());
         return withVisualEvidence(
             ExtractionArtifact.full(
                 mergedResult, policy, OcrRoutingConfig.PARSER_ID,
-                ocr.truncated() || mergedSummary.pagesMissingReadableText() > 0),
+                structured.truncated() || ocr.truncated() || mergedSummary.pagesMissingReadableText() > 0),
             mergedSummary,
             "ocr_selective",
             true,
@@ -551,13 +554,14 @@ public final class PolicyDrivenTikaExtractor implements ContentExtractorProvider
   }
 
   private static StructuredDocumentSummary ocrCoveredPdfSummary(
-      Path file, StructuredDocumentSummary base, String content, PdfOcrEngine.OcrEngineResult ocr) {
+      Path file, StructuredDocumentSummary base, String content, PdfOcrEngine.OcrEngineResult ocr,
+      java.util.Set<Integer> retainedBaselinePages) {
     StructuredDocumentSummary summary = base == null ? StructuredDocumentSummary.empty() : base;
     PdfVisualAnalyzer.PdfPageEvidence evidence = PdfVisualAnalyzer.analyze(file);
     int pages = Math.max(1, Math.max(summary.pageCount(), evidence == null ? 0 : evidence.pageCount()));
     int imagePages = evidence == null ? summary.imagePageCount() : evidence.imagePages().size();
     java.util.Set<Integer> covered = new java.util.HashSet<>(ocr.coveredPages());
-    if (evidence != null) covered.addAll(evidence.readablePages());
+    covered.addAll(retainedBaselinePages);
     int readablePages = Math.min(pages, covered.size());
     return new StructuredDocumentSummary(
         pages,

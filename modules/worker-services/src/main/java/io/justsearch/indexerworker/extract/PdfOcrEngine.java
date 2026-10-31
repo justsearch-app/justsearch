@@ -306,6 +306,12 @@ final class PdfOcrEngine implements AutoCloseable {
             }
           }
         }
+      } catch (IOException | RuntimeException e) {
+        EngineFutures.rethrowExecutorRefusal(e);
+        rethrowFatal(e);
+        log.debug("PDF OCR rendering failed for {}: {}", pdf.getFileName(), e.getMessage());
+        spawnFailure = OcrSkipReason.UNKNOWN;
+        truncated = true;
       }
 
       for (PageTask task : tasks) {

@@ -109,6 +109,57 @@ class OcrCoverageFidelityTest {
     assertCoverage(result, 2, 2, 0);
   }
 
+  @Test
+  void selectiveOcrKeepsBaselineTruncationAndCountsOnlyRetainedPages() throws Exception {
+    Path source = tempDir.resolve("limited-selective.pdf");
+    String header = "Repeated page header ".repeat(8);
+    try (var document = new PDDocument()) {
+      for (int page = 0; page < 5; page++) {
+        var item = new PDPage(new PDRectangle(1200, 200));
+        document.addPage(item);
+        if (page == 4) continue;
+        try (var content = new PDPageContentStream(document, item)) {
+          content.beginText();
+          content.setFont(new PDType1Font(Standard14Fonts.FontName.HELVETICA), 5);
+          content.newLineAtOffset(5, 150);
+          content.showText(header);
+          content.newLineAtOffset(0, -50);
+          content.showText("Unique digital body for page " + page + " with searchable content retained.");
+          content.endText();
+        }
+      }
+      document.save(source.toFile());
+    }
+    int cap = 3 * (header.length() + 75);
+    try (var baseline = new StructuredContentExtractor(cap)) {
+      var result = baseline.extractWithStatus(source);
+      assertTrue(result.truncated());
+      assertFalse(result.result().content().contains("Unique digital body for page 3"));
+      assertTrue(result.result().content().length() + TEXT.length() + 30 < cap,
+          "header removal must leave room for successful selective OCR");
+    }
+    var result = extract(source, cap, command -> success(command, TEXT));
+    assertTrue(result.result().content().contains(TEXT.strip()));
+    assertEquals(ExtractionStatus.SUCCESS_PARTIAL, result.status());
+    assertTrue(result.truncated());
+    assertCoverage(result, 5, 4, 1);
+    var mapper = JsonMapper.builder().build();
+    var wire = SandboxExtractionResponse.fromArtifact("baseline-cap", result);
+    var restored = mapper.readValue(mapper.writeValueAsBytes(wire), SandboxExtractionResponse.class).toArtifact();
+    assertEquals(result, restored);
+    var policy = TikaExtractionPolicy.fromWorkerLimits(
+        new io.justsearch.configuration.resolved.ResolvedConfig.Worker(cap, 1_000_000L));
+    var doc = io.justsearch.indexerworker.loop.ops.IndexingDocumentOps.buildDocument(
+        source, restored.validate(policy, null), null, null, null, false, null, null,
+        (stage, ms, reason) -> {}, org.slf4j.LoggerFactory.getLogger(getClass()), null, null, "baseline-cap");
+    assertEquals(io.justsearch.indexing.SchemaFields.VDU_STATUS_PENDING,
+        doc.fields().get(io.justsearch.indexing.SchemaFields.VDU_STATUS));
+    var storedEvidence = mapper.readTree((String) doc.fields().get(
+        io.justsearch.indexing.SchemaFields.VISUAL_EXTRACTION_EVIDENCE));
+    assertTrue(storedEvidence.get("contentTruncated").asBoolean());
+    assertEquals(1, storedEvidence.get("pagesMissingReadableText").asInt());
+  }
+
   private ExtractionArtifact extract(Path pdf, int maxChars, PdfOcrEngine.ProcessStarter starter)
       throws Exception {
     var policy = TikaExtractionPolicy.fromWorkerLimits(

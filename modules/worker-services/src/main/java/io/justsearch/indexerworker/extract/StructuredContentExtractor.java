@@ -8,6 +8,7 @@ import java.io.InputStream;
 import java.nio.file.Path;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import org.apache.tika.Tika;
 import org.apache.tika.exception.TikaException;
 import org.apache.tika.metadata.Metadata;
@@ -117,7 +118,7 @@ public final class StructuredContentExtractor implements ContentExtractorProvide
       StructuredExtractionResult result = extractStructured(input, context);
       budget.check();
       return new StructuredExtractionResult(result.result(), result.truncated(), result.summary(),
-          budget.resources(), budget.maxDepth(), result.lossy());
+          budget.resources(), budget.maxDepth(), result.lossy(), result.retainedReadablePages());
     } catch (Exception e) {
       budget.check();
       if (e instanceof ContentExtractor.BudgetExceededException limit) throw limit;
@@ -159,7 +160,13 @@ public final class StructuredContentExtractor implements ContentExtractorProvide
       StructuredDocumentSummary summary,
       int embeddedResourceCount,
       int maxEmbeddedDepth,
-      boolean lossy) {
+      boolean lossy,
+      Set<Integer> retainedReadablePages) {
+    public StructuredExtractionResult(ContentExtractor.ExtractionResult result,
+        boolean truncated, StructuredDocumentSummary summary, int embeddedResourceCount,
+        int maxEmbeddedDepth, boolean lossy) {
+      this(result, truncated, summary, embeddedResourceCount, maxEmbeddedDepth, lossy, Set.of());
+    }
     public StructuredExtractionResult(ContentExtractor.ExtractionResult result,
         boolean truncated, StructuredDocumentSummary summary, int embeddedResourceCount,
         int maxEmbeddedDepth) {
@@ -234,7 +241,10 @@ public final class StructuredContentExtractor implements ContentExtractorProvide
         new ContentExtractor.ExtractionResult(content, title, mimeType, author, frontmatterMeta),
         handler.isLimitReached() || annotated.truncated(),
         StructuredDocumentSummary.fromDocument(doc), 0, 0,
-        DecodingLossAudit.isLossy(input, metadata, parseContext));
+        DecodingLossAudit.isLossy(input, metadata, parseContext),
+        annotated.pageTextChars().entrySet().stream()
+            .filter(entry -> entry.getValue() >= VisualPageEvidencePolicy.READABLE_PAGE_MIN_CHARS)
+            .map(Map.Entry::getKey).collect(java.util.stream.Collectors.toUnmodifiableSet()));
   }
 
   private static ParseContext parseContextWithMarkedPdfContent() {

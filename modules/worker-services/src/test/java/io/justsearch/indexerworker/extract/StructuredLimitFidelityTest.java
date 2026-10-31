@@ -3,6 +3,7 @@ package io.justsearch.indexerworker.extract;
 
 import static org.junit.jupiter.api.Assertions.*;
 import java.util.List;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.xml.sax.helpers.AttributesImpl;
@@ -53,6 +54,27 @@ class StructuredLimitFidelityTest {
       else chars(handler, "ab\uD83D\uDE00later");
       assertEquals("ab", handler.getDocument().toFlatText().strip());
     }
+  }
+
+  @Test
+  void limitInsideBlankBodyCellKeepsCompletedHeader() throws Exception {
+    var handler = new StructuredContentHandler(7);
+    start(handler, "table");
+    start(handler, "tr");
+    start(handler, "td");
+    chars(handler, "Secret");
+    handler.endElement("", "td", "td");
+    handler.endElement("", "tr", "tr");
+    start(handler, "tr");
+    start(handler, "td");
+    chars(handler, " ");
+    assertTrue(handler.isLimitReached());
+    var document = handler.getDocument();
+    assertEquals("Secret", document.toAnnotatedText(7).text());
+    assertEquals(document, handler.getDocument());
+    handler.endElement("", "td", "td");
+    handler.endElement("", "table", "table");
+    assertEquals(document, handler.getDocument());
   }
 
   private static void start(StructuredContentHandler handler, String tag) throws Exception {

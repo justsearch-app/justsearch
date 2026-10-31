@@ -183,6 +183,30 @@ final class PdfOcrEngineTest {
 
   @Test
   @Timeout(30)
+  void laterRenderFailureRetainsCompletedPagesAndPoolCanBeReused() throws Exception {
+    Path pdf = tempDir.resolve("broken-render.pdf");
+    try (var document = new PDDocument()) {
+      document.addPage(new PDPage(new PDRectangle(100, 100)));
+      // PDFRenderer rejects an image whose pixel count exceeds Integer.MAX_VALUE.
+      document.addPage(new PDPage(new PDRectangle(50_000, 50_000)));
+      document.save(pdf.toFile());
+    }
+    try (var engine = engine(CONFIG, 1, command -> succeedStub(command, new long[] {0L}))) {
+      var result = engine.ocrPdf(pdf, Integer.MAX_VALUE);
+      assertTrue(result.text().contains("PAGEWORD0"), result.text());
+      assertEquals(1, result.pagesProcessed());
+      assertEquals(java.util.Set.of(0), result.coveredPages());
+      assertTrue(result.confidence().present());
+      assertTrue(result.truncated());
+      assertNull(result.failureReason());
+      var next = engine.ocrPdf(blankPdf(1), Integer.MAX_VALUE);
+      assertTrue(next.text().contains("PAGEWORD0"));
+      assertFalse(next.truncated());
+    }
+  }
+
+  @Test
+  @Timeout(30)
   void spawnFailureReportsUnknown() throws Exception {
     Path pdf = blankPdf(1);
     PdfOcrEngine engine =
