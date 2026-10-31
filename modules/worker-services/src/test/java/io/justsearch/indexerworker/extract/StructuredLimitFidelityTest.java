@@ -2,6 +2,8 @@
 package io.justsearch.indexerworker.extract;
 
 import static org.junit.jupiter.api.Assertions.*;
+import io.justsearch.indexing.extraction.StructuredDocument;
+import io.justsearch.indexing.extraction.StructuredDocument.Table;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -75,6 +77,40 @@ class StructuredLimitFidelityTest {
     handler.endElement("", "td", "td");
     handler.endElement("", "table", "table");
     assertEquals(document, handler.getDocument());
+  }
+
+  @Test
+  void limitInsideLaterBlankCellKeepsItsHeaderAfterEarlierValue() throws Exception {
+    var complete = new StructuredDocument(List.of(new Table(
+        List.of(List.of("A", "Secret"), List.of("x", "")), 0)), 1);
+    assertEquals("A = x", complete.toAnnotatedText(20).text());
+    for (boolean exact : List.of(true, false)) {
+      var handler = new StructuredContentHandler(20);
+      start(handler, "table");
+      start(handler, "tr");
+      for (String header : List.of("A", "Secret")) {
+        start(handler, "td");
+        chars(handler, header);
+        handler.endElement("", "td", "td");
+      }
+      handler.endElement("", "tr", "tr");
+      start(handler, "tr");
+      start(handler, "td");
+      chars(handler, "x");
+      handler.endElement("", "td", "td");
+      start(handler, "td");
+      chars(handler, " ".repeat(exact ? 12 : 13));
+      assertTrue(handler.isLimitReached());
+      var document = handler.getDocument();
+      assertEquals("A = x\nSecret", document.toAnnotatedText(20).text());
+      assertEquals("A = x\nSecr", document.toAnnotatedText(10).text());
+      assertTrue(document.toAnnotatedText(10).truncated());
+      assertEquals(document, handler.getDocument());
+      handler.endElement("", "td", "td");
+      handler.endElement("", "table", "table");
+      chars(handler, "must never enter");
+      assertEquals(document, handler.getDocument());
+    }
   }
 
   private static void start(StructuredContentHandler handler, String tag) throws Exception {

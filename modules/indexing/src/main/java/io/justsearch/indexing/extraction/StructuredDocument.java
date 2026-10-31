@@ -32,8 +32,14 @@ public record StructuredDocument(List<Element> elements, int pageCount) {
   /**
    * A table with rows of cells. The first row is treated as the header row when {@link
    * #hasHeaders()} is true.
+   *
+   * @param partial whether the character limit cut this table before its closing event
    */
-  public record Table(List<List<String>> rows, int pageIndex) implements Element {
+  public record Table(List<List<String>> rows, int pageIndex, boolean partial) implements Element {
+    public Table(List<List<String>> rows, int pageIndex) {
+      this(rows, pageIndex, false);
+    }
+
     public boolean hasHeaders() {
       return rows.size() > 1;
     }
@@ -240,6 +246,7 @@ public record StructuredDocument(List<Element> elements, int pageCount) {
     if (t.hasHeaders()) {
       List<String> headers = t.rows().getFirst();
       boolean emittedValue = false;
+      boolean[] emittedHeaders = t.partial() ? new boolean[headers.size()] : null;
       for (int r = 1; r < t.rows().size(); r++) {
         List<String> row = t.rows().get(r);
         // Use first column as row identifier if available
@@ -249,6 +256,7 @@ public record StructuredDocument(List<Element> elements, int pageCount) {
           String cellValue = row.get(c).strip();
           if (cellValue.isEmpty()) continue;
           emittedValue = true;
+          if (emittedHeaders != null && c < headers.size()) emittedHeaders[c] = true;
           if (c < headers.size() && !rowId.isEmpty() && c > 0) {
             sb.append(rowId).append(", ");
           }
@@ -259,8 +267,10 @@ public record StructuredDocument(List<Element> elements, int pageCount) {
           sb.append('\n');
         }
       }
-      if (!emittedValue) {
-        for (String header : headers) {
+      if (!emittedValue || t.partial()) {
+        for (int c = 0; c < headers.size(); c++) {
+          if (emittedHeaders != null && emittedHeaders[c]) continue;
+          String header = headers.get(c);
           if (!header.isBlank()) sb.append(header.strip()).append('\n');
         }
       }

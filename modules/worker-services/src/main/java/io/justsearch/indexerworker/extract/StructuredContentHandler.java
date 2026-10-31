@@ -270,7 +270,7 @@ public final class StructuredContentHandler extends DefaultHandler {
         currentRow.add(cellBuffer.toString().strip());
       }
       if (currentRow != null && !currentRow.isEmpty()) tableRows.add(currentRow);
-      if (!tableRows.isEmpty()) elements.add(new Table(List.copyOf(tableRows), currentPageIndex));
+      if (!tableRows.isEmpty()) elements.add(new Table(List.copyOf(tableRows), currentPageIndex, limitReached));
       inTable = false;
       tableNestingDepth = 0;
       tableRows = null;
