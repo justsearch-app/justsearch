@@ -1,0 +1,140 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
+  },
+  "createdAt": "2026-10-31T12:45:51.706Z",
+  "revision": "30ec14d39b1070b1869ae66d52991e33d79bd1a1",
+  "tree": "69bc77fbe6c74ff9da919c513bd102788b568ba6",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": "openjdk version \"25.0.4.1\" 2026-08-18 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "./gradlew :modules:app-inference:test --tests \"io.justsearch.app.inference.LlamaServerStartupHealthPollTest.aServerReadyJustAfterTheFirstPollIsSeenAfterOneShortPause\" --tests \"io.justsearch.app.inference.LlamaServerStartupHealthPollTest.aLongLoadIsPolledSeriallyOnAGrowingPauseCappedAtTheOldInterval\" --tests \"io.justsearch.app.inference.LlamaServerStartupHealthPollTest.aSteppedDownRelaunchStartsAgainAtTheShortestPause\" --tests \"io.justsearch.app.inference.LlamaServerStartupHealthPollTest.aReasoningFlagRetryStartsAgainAtTheShortestPause\" --tests \"io.justsearch.app.inference.LlamaServerStartupHealthPollTest.aLostBindRetryStartsAgainAtTheShortestPause\" --tests \"io.justsearch.app.inference.LlamaServerStartupHealthPollTest.aLaterStartAfterASlowWaitStartsAgainAtTheShortestPause\" --tests \"io.justsearch.app.inference.LlamaServerStartupHealthPollTest.aOneShotRecoverySeesReadinessAfterOneShortPause\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 23955
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaServerStartupHealthPollTest.java#aServerReadyJustAfterTheFirstPollIsSeenAfterOneShortPause",
+      "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaServerStartupHealthPollTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:ee6c259dce447aa2ebd3a14936d4f40d4424ed2a260bd134f337a91ff1f3e949",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aServerReadyJustAfterTheFirstPollIsSeenAfterOneShortPause()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaServerStartupHealthPollTest.java#aLongLoadIsPolledSeriallyOnAGrowingPauseCappedAtTheOldInterval",
+      "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaServerStartupHealthPollTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:ee6c259dce447aa2ebd3a14936d4f40d4424ed2a260bd134f337a91ff1f3e949",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aLongLoadIsPolledSeriallyOnAGrowingPauseCappedAtTheOldInterval()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaServerStartupHealthPollTest.java#aSteppedDownRelaunchStartsAgainAtTheShortestPause",
+      "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaServerStartupHealthPollTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:ee6c259dce447aa2ebd3a14936d4f40d4424ed2a260bd134f337a91ff1f3e949",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aSteppedDownRelaunchStartsAgainAtTheShortestPause()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaServerStartupHealthPollTest.java#aReasoningFlagRetryStartsAgainAtTheShortestPause",
+      "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaServerStartupHealthPollTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:ee6c259dce447aa2ebd3a14936d4f40d4424ed2a260bd134f337a91ff1f3e949",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aReasoningFlagRetryStartsAgainAtTheShortestPause()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaServerStartupHealthPollTest.java#aLostBindRetryStartsAgainAtTheShortestPause",
+      "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaServerStartupHealthPollTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:ee6c259dce447aa2ebd3a14936d4f40d4424ed2a260bd134f337a91ff1f3e949",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aLostBindRetryStartsAgainAtTheShortestPause(boolean) recovery=false",
+          "status": "passed"
+        },
+        {
+          "name": "aLostBindRetryStartsAgainAtTheShortestPause(boolean) recovery=true",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaServerStartupHealthPollTest.java#aLaterStartAfterASlowWaitStartsAgainAtTheShortestPause",
+      "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaServerStartupHealthPollTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:ee6c259dce447aa2ebd3a14936d4f40d4424ed2a260bd134f337a91ff1f3e949",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aLaterStartAfterASlowWaitStartsAgainAtTheShortestPause()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaServerStartupHealthPollTest.java#aOneShotRecoverySeesReadinessAfterOneShortPause",
+      "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaServerStartupHealthPollTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:ee6c259dce447aa2ebd3a14936d4f40d4424ed2a260bd134f337a91ff1f3e949",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aOneShotRecoverySeesReadinessAfterOneShortPause()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:52e85cb70ce83ed5fab947a3052ff71016bfb7775daed8bf7946443e4f8aee5f"
+}

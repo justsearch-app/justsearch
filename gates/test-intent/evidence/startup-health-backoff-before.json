@@ -1,0 +1,202 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
+  },
+  "createdAt": "2026-10-31T12:34:18.445Z",
+  "revision": "30ec14d39b1070b1869ae66d52991e33d79bd1a1",
+  "tree": "008555fa5d9b0c22d28788f8f14bb31c7b60be3b",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": "openjdk version \"25.0.4.1\" 2026-08-18 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "./gradlew :modules:app-inference:test --tests \"io.justsearch.app.inference.LlamaServerStartupHealthPollTest.aServerReadyJustAfterTheFirstPollIsSeenAfterOneShortPause\" --tests \"io.justsearch.app.inference.LlamaServerStartupHealthPollTest.aLongLoadIsPolledSeriallyOnAGrowingPauseCappedAtTheOldInterval\" --tests \"io.justsearch.app.inference.LlamaServerStartupHealthPollTest.aSteppedDownRelaunchStartsAgainAtTheShortestPause\" --tests \"io.justsearch.app.inference.LlamaServerStartupHealthPollTest.aReasoningFlagRetryStartsAgainAtTheShortestPause\" --tests \"io.justsearch.app.inference.LlamaServerStartupHealthPollTest.aLostBindRetryStartsAgainAtTheShortestPause\" --tests \"io.justsearch.app.inference.LlamaServerStartupHealthPollTest.aLaterStartAfterASlowWaitStartsAgainAtTheShortestPause\" --tests \"io.justsearch.app.inference.LlamaServerStartupHealthPollTest.aOneShotRecoverySeesReadinessAfterOneShortPause\" --tests \"io.justsearch.app.inference.LlamaServerStartupHealthPollTest.aServerHealthyOnTheFirstProbeNeedsNoPause\" --tests \"io.justsearch.app.inference.LlamaServerStartupHealthPollTest.anInterruptDuringAPauseEndsTheWaitAsInterrupted\" --tests \"io.justsearch.app.inference.LlamaServerStartupHealthPollTest.aServerThatExitsJustAfterHealthIsReportedExactlyOnce\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
+      "cwd": ".",
+      "exitCode": 1,
+      "durationMs": 33006,
+      "output": "Starting a Gradle Daemon, 1 busy and 4 stopped Daemons could not be reused, use --status for details\nReusing configuration cache.\nProblem found: Configuration Cache warn mode is enabled (id: validation:configuration-cache:configuration-cache-warn-mode)\n  Configuration Cache warn mode is ENABLED. Configuration Cache constraint violations are being ignored. Build outputs may be incorrect and the build may crash unexpectedly. Use this only to discover configuration cache incompatibilities. Do not use this to produce artifacts.\n> Task :modules:api-contract-projection-java:protobufDummy UP-TO-DATE\n> Task :modules:app-inference:processResources NO-SOURCE\n> Task :modules:api-contract-projection-java:extractIncludeProto UP-TO-DATE\n> Task :modules:api-contract-projection-java:extractProto UP-TO-DATE\n> Task :modules:core-contracts:compileJava UP-TO-DATE\n> Task :modules:extension-substrate:compileJava UP-TO-DATE\n> Task :modules:core:compileJava UP-TO-DATE\n> Task :modules:app-agent-api:processResources NO-SOURCE\n> Task :modules:app-api:buildLinuxBoundExec UP-TO-DATE\n> Task :modules:app-api:processResources UP-TO-DATE\n> Task :modules:core:compileTestFixturesJava UP-TO-DATE\n> Task :modules:app-inference:processTestResources NO-SOURCE\n> Task :modules:configuration:processResources UP-TO-DATE\n> Task :modules:configuration:processTestFixturesResources NO-SOURCE\n> Task :modules:core:processResources NO-SOURCE\n> Task :modules:core:classes UP-TO-DATE\n> Task :modules:telemetry:compileJava UP-TO-DATE\n> Task :modules:core:processTestFixturesResources NO-SOURCE\n> Task :modules:core-contracts:processResources NO-SOURCE\n> Task :modules:core:testFixturesClasses UP-TO-DATE\n> Task :modules:core-contracts:classes UP-TO-DATE\n> Task :modules:configuration:compileJava UP-TO-DATE\n> Task :modules:core-contracts:jar UP-TO-DATE\n> Task :modules:core:jar UP-TO-DATE\n> Task :modules:core:testFixturesJar UP-TO-DATE\n> Task :modules:configuration:classes UP-TO-DATE\n> Task :modules:extension-substrate:processResources NO-SOURCE\n> Task :modules:extension-substrate:classes UP-TO-DATE\n> Task :modules:configuration:jar UP-TO-DATE\n> Task :modules:api-contract-projection-java:extractProtovalidateProtos UP-TO-DATE\n> Task :modules:gpu-bridge:processResources NO-SOURCE\n> Task :modules:telemetry:processResources NO-SOURCE\n> Task :modules:telemetry:classes UP-TO-DATE\n> Task :modules:configuration:compileTestFixturesJava UP-TO-DATE\n> Task :modules:configuration:testFixturesClasses UP-TO-DATE\n> Task :modules:extension-substrate:jar UP-TO-DATE\n> Task :modules:configuration:testFixturesJar UP-TO-DATE\n> Task :modules:telemetry:jar UP-TO-DATE\n> Task :modules:api-contract-projection-java:processProtoResources UP-TO-DATE\n> Task :modules:app-agent-api:compileJava UP-TO-DATE\n> Task :modules:api-contract-projection-java:processResources UP-TO-DATE\n> Task :modules:app-agent-api:classes UP-TO-DATE\n> Task :modules:app-agent-api:jar UP-TO-DATE\n> Task :modules:api-contract-projection-java:generateProto UP-TO-DATE\n> Task :modules:api-contract-projection-java:compileJava UP-TO-DATE\n> Task :modules:api-contract-projection-java:classes UP-TO-DATE\n> Task :modules:api-contract-projection-java:jar UP-TO-DATE\n> Task :modules:app-api:compileJava UP-TO-DATE\n> Task :modules:app-api:classes UP-TO-DATE\n> Task :modules:app-api:jar UP-TO-DATE\n> Task :modules:gpu-bridge:compileJava UP-TO-DATE\n> Task :modules:gpu-bridge:classes UP-TO-DATE\n> Task :modules:gpu-bridge:jar UP-TO-DATE\n> Task :modules:app-inference:compileJava UP-TO-DATE\n> Task :modules:app-inference:classes UP-TO-DATE\n> Task :modules:app-inference:jar UP-TO-DATE\n> Task :modules:app-inference:compileTestJava UP-TO-DATE\n> Task :modules:app-inference:testClasses UP-TO-DATE\n\n> Task :modules:app-inference:test\n\nLlamaServerStartupHealthPollTest > aSteppedDownRelaunchStartsAgainAtTheShortestPause() FAILED\n    org.opentest4j.AssertionFailedError at LlamaServerStartupHealthPollTest.java:337\n\nLlamaServerStartupHealthPollTest > aServerReadyJustAfterTheFirstPollIsSeenAfterOneShortPause() FAILED\n    org.opentest4j.AssertionFailedError at LlamaServerStartupHealthPollTest.java:98\n\nLlamaServerStartupHealthPollTest > aLostBindRetryStartsAgainAtTheShortestPause(boolean) > aLostBindRetryStartsAgainAtTheShortestPause(boolean) recovery=false FAILED\n    org.opentest4j.AssertionFailedError at LlamaServerStartupHealthPollTest.java:337\n\nLlamaServerStartupHealthPollTest > aLostBindRetryStartsAgainAtTheShortestPause(boolean) > aLostBindRetryStartsAgainAtTheShortestPause(boolean) recovery=true FAILED\n    org.opentest4j.AssertionFailedError at LlamaServerStartupHealthPollTest.java:337\n\nLlamaServerStartupHealthPollTest > aLongLoadIsPolledSeriallyOnAGrowingPauseCappedAtTheOldInterval() FAILED\n    org.opentest4j.AssertionFailedError at LlamaServerStartupHealthPollTest.java:337\n\nLlamaServerStartupHealthPollTest > aOneShotRecoverySeesReadinessAfterOneShortPause() FAILED\n    org.opentest4j.AssertionFailedError at LlamaServerStartupHealthPollTest.java:337\n\nLlamaServerStartupHealthPollTest > aReasoningFlagRetryStartsAgainAtTheShortestPause() FAILED\n    org.opentest4j.AssertionFailedError at LlamaServerStartupHealthPollTest.java:337\n\nLlamaServerStartupHealthPollTest > aLaterStartAfterASlowWaitStartsAgainAtTheShortestPause() FAILED\n    org.opentest4j.AssertionFailedError at LlamaServerStartupHealthPollTest.java:337\n\n> Task :modules:app-inference:test FAILED\n> Task :modules:app-inference:jacocoTestReport SKIPPED\n\n[Incubating] Problems report is available at: file:///home/elias/.cache/am/fmb04vty/tmp/before/build/reports/problems/problems-report.html\n35 actionable tasks: 1 executed, 34 up-to-date\nConfiguration cache entry reused.\n\nOpenJDK 64-Bit Server VM warning: Sharing is only supported for boot loader classes because bootstrap classpath has been appended\n\n15 tests completed, 8 failed\n\nFAILURE: Build failed with an exception.\n\n* What went wrong:\nExecution failed for task ':modules:app-inference:test'.\n> There were failing tests. See the report at: file:///home/elias/.cache/am/fmb04vty/tmp/before/modules/app-inference/build/reports/tests/test/index.html\n\nBUILD FAILED in 32s\n"
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaServerStartupHealthPollTest.java#aServerReadyJustAfterTheFirstPollIsSeenAfterOneShortPause",
+      "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaServerStartupHealthPollTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:ee6c259dce447aa2ebd3a14936d4f40d4424ed2a260bd134f337a91ff1f3e949",
+      "executed": true,
+      "skipped": false,
+      "outcome": "failed",
+      "cases": [
+        {
+          "name": "aServerReadyJustAfterTheFirstPollIsSeenAfterOneShortPause()",
+          "status": "failed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaServerStartupHealthPollTest.java#aLongLoadIsPolledSeriallyOnAGrowingPauseCappedAtTheOldInterval",
+      "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaServerStartupHealthPollTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:ee6c259dce447aa2ebd3a14936d4f40d4424ed2a260bd134f337a91ff1f3e949",
+      "executed": true,
+      "skipped": false,
+      "outcome": "failed",
+      "cases": [
+        {
+          "name": "aLongLoadIsPolledSeriallyOnAGrowingPauseCappedAtTheOldInterval()",
+          "status": "failed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaServerStartupHealthPollTest.java#aSteppedDownRelaunchStartsAgainAtTheShortestPause",
+      "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaServerStartupHealthPollTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:ee6c259dce447aa2ebd3a14936d4f40d4424ed2a260bd134f337a91ff1f3e949",
+      "executed": true,
+      "skipped": false,
+      "outcome": "failed",
+      "cases": [
+        {
+          "name": "aSteppedDownRelaunchStartsAgainAtTheShortestPause()",
+          "status": "failed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaServerStartupHealthPollTest.java#aReasoningFlagRetryStartsAgainAtTheShortestPause",
+      "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaServerStartupHealthPollTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:ee6c259dce447aa2ebd3a14936d4f40d4424ed2a260bd134f337a91ff1f3e949",
+      "executed": true,
+      "skipped": false,
+      "outcome": "failed",
+      "cases": [
+        {
+          "name": "aReasoningFlagRetryStartsAgainAtTheShortestPause()",
+          "status": "failed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaServerStartupHealthPollTest.java#aLostBindRetryStartsAgainAtTheShortestPause",
+      "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaServerStartupHealthPollTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:ee6c259dce447aa2ebd3a14936d4f40d4424ed2a260bd134f337a91ff1f3e949",
+      "executed": true,
+      "skipped": false,
+      "outcome": "failed",
+      "cases": [
+        {
+          "name": "aLostBindRetryStartsAgainAtTheShortestPause(boolean) recovery=false",
+          "status": "failed"
+        },
+        {
+          "name": "aLostBindRetryStartsAgainAtTheShortestPause(boolean) recovery=true",
+          "status": "failed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaServerStartupHealthPollTest.java#aLaterStartAfterASlowWaitStartsAgainAtTheShortestPause",
+      "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaServerStartupHealthPollTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:ee6c259dce447aa2ebd3a14936d4f40d4424ed2a260bd134f337a91ff1f3e949",
+      "executed": true,
+      "skipped": false,
+      "outcome": "failed",
+      "cases": [
+        {
+          "name": "aLaterStartAfterASlowWaitStartsAgainAtTheShortestPause()",
+          "status": "failed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaServerStartupHealthPollTest.java#aOneShotRecoverySeesReadinessAfterOneShortPause",
+      "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaServerStartupHealthPollTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:ee6c259dce447aa2ebd3a14936d4f40d4424ed2a260bd134f337a91ff1f3e949",
+      "executed": true,
+      "skipped": false,
+      "outcome": "failed",
+      "cases": [
+        {
+          "name": "aOneShotRecoverySeesReadinessAfterOneShortPause()",
+          "status": "failed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaServerStartupHealthPollTest.java#aServerHealthyOnTheFirstProbeNeedsNoPause",
+      "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaServerStartupHealthPollTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:ee6c259dce447aa2ebd3a14936d4f40d4424ed2a260bd134f337a91ff1f3e949",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aServerHealthyOnTheFirstProbeNeedsNoPause()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaServerStartupHealthPollTest.java#anInterruptDuringAPauseEndsTheWaitAsInterrupted",
+      "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaServerStartupHealthPollTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:ee6c259dce447aa2ebd3a14936d4f40d4424ed2a260bd134f337a91ff1f3e949",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "anInterruptDuringAPauseEndsTheWaitAsInterrupted()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaServerStartupHealthPollTest.java#aServerThatExitsJustAfterHealthIsReportedExactlyOnce",
+      "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaServerStartupHealthPollTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:ee6c259dce447aa2ebd3a14936d4f40d4424ed2a260bd134f337a91ff1f3e949",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aServerThatExitsJustAfterHealthIsReportedExactlyOnce(int) exit after 0 ms",
+          "status": "passed"
+        },
+        {
+          "name": "aServerThatExitsJustAfterHealthIsReportedExactlyOnce(int) exit after 5 ms",
+          "status": "passed"
+        },
+        {
+          "name": "aServerThatExitsJustAfterHealthIsReportedExactlyOnce(int) exit after 25 ms",
+          "status": "passed"
+        },
+        {
+          "name": "aServerThatExitsJustAfterHealthIsReportedExactlyOnce(int) exit after 100 ms",
+          "status": "passed"
+        },
+        {
+          "name": "aServerThatExitsJustAfterHealthIsReportedExactlyOnce(int) exit after 400 ms",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:e68a905e2343f85efbe3dfb2b016b390020f3e27fc8fdbc6c02c2f38c854d82d"
+}
