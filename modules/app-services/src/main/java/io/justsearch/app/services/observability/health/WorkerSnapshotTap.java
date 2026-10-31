@@ -128,6 +128,9 @@ public final class WorkerSnapshotTap {
     schema.put(
         "BLOCKED_MISMATCH",
         new ConditionMapping("schema.blocked", "worker.schema", Severity.ERROR));
+    schema.put("BLOCKED_REBUILD_BRAKE", new ConditionMapping("schema.blocked", "worker.schema", Severity.ERROR,
+        Optional.of(io.justsearch.agent.api.registry.OperationInvocation.of(
+            new io.justsearch.agent.api.registry.OperationRef("core.rebuild-index")))));
     SCHEMA_COMPAT_TABLE = Map.copyOf(schema);
 
     Map<String, ConditionMapping> embedding = new HashMap<>();
@@ -337,7 +340,10 @@ public final class WorkerSnapshotTap {
       warnUnmappedSchemaState(state);
       return;
     }
-    swapCondition(target, activeSchemaConditionId, compat.indexSchemaCompatState(), Optional.empty());
+    swapCondition(target, activeSchemaConditionId, compat.indexSchemaCompatState(),
+        "BLOCKED_REBUILD_BRAKE".equals(state)
+            ? Optional.of("Indexing stopped by the rebuild safety brake. Rebuild the index to resume.")
+            : Optional.empty());
     activeSchemaConditionId = target == null ? null : target.conditionId();
   }
 
@@ -521,8 +527,8 @@ public final class WorkerSnapshotTap {
     for (StageCompletenessView stage : enrichment.completeness()) {
       String subject = ENRICHMENT_SUBJECT_PREFIX + stage.stageId();
       OptionalLong pending = pendingCountFor(enrichment, stage.stageId());
-      if (pending.isEmpty()) {
-        warnUnmappedCompletenessStage(stage.stageId());
+      if (pending.isEmpty() || pending.getAsLong() < 0) {
+        if (pending.isEmpty()) warnUnmappedCompletenessStage(stage.stageId());
         if (activeIncompleteSubjects.contains(subject)) {
           stillIncomplete.add(subject); // preserve — quiescence is unknowable for this stage
         }

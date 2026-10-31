@@ -174,6 +174,23 @@ describe('projectAvailability (tempdoc 596)', () => {
     });
   });
 
+  it.each(['enrichment.failed', 'enrichment.missing'])(
+    '%s keeps document availability truthful about incomplete semantic matches',
+    (code) => {
+      const a = projectAvailability('documents', aiState({
+        chat: true, docs: 5, degradedSeverity: 'warn',
+        reasons: [code, 'lambdamart.not_configured'],
+      }));
+      expect(a.kind).toBe('degraded');
+      expect(a.kind === 'degraded' && a.caveat).toBe(
+        "Results may miss some documents' semantic matches; keyword search covers them",
+      );
+      expect(a.kind === 'degraded' && a.remedy).toEqual({
+        kind: 'navigate', target: 'core.health-surface', label: 'Open Health',
+      });
+    },
+  );
+
   it('805 §G.2: a RETRIEVAL-impairing cause → the keyword-fallback caveat (imported, not re-authored)', () => {
     const a = projectAvailability(
       'documents',

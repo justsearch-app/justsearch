@@ -109,6 +109,8 @@ export interface FolderStatusContext {
    * rendered an unqualified green "✓ … Verified just now" at 0% coverage (F1b).
    */
   readonly enrichmentBlocked?: boolean;
+  /** The shared progress explanation when an enabled producer cannot run. */
+  readonly enrichmentBlockedDetail?: string | null;
   /**
    * Tempdoc 914 D3 — the failed count last observed for this root while its queue was SETTLED, from
    * {@link rememberFailedCounts}. Read only when THIS sample reports zero failures, and only in the
@@ -162,6 +164,10 @@ function rootCoverage(
   // exactly this) ⟹ no tier may be claimed, in EITHER direction: "fully searchable" off a
   // surviving chunk count is the §8.1 false-terminal again.
   if (!stages) return null;
+  if ([row.parentDocsTotalEmbedding, row.parentDocsSettledEmbedding,
+    row.parentDocsTotalSplade, row.parentDocsSettledSplade, row.parentDocsTotalNer,
+    row.parentDocsSettledNer, row.chunkDocsTotal, row.chunkDocsSettled].some(value =>
+    typeof value === 'number' && value < 0)) return null;
   let total = 0;
   let settled = 0;
   /**
@@ -388,6 +394,29 @@ export function folderStatus(row: IndexedRootView, ctx: FolderStatusContext): Fo
     //   coverage unknown, backfill pending index-wide → `enriching` + caveat, NO percent (positive
     //                                 evidence withholds the terminal claim; it cannot name a number)
     //   coverage unknown, nothing pending → pre-813 terminal wording (no tier asserted either way)
+    const stages = ctx.enrichmentStages;
+    if (stages && [row.parentDocsTotalEmbedding, row.parentDocsSettledEmbedding,
+      row.parentDocsTotalSplade, row.parentDocsSettledSplade, row.parentDocsTotalNer,
+      row.parentDocsSettledNer, row.chunkDocsTotal, row.chunkDocsSettled].some(value =>
+      typeof value === 'number' && value < 0)) return {
+      state: 'unknown', glyph: 'unverified',
+      metaText: `${collection} · ${fileCountText} · Enrichment status unconfirmed. Keyword search remains available.`,
+      inFlight, failed,
+    };
+    const missingArtifact = stages?.embedding && Object.entries(row.missingArtifactStages ?? {}).some(
+      ([id, missing]) => missing && (id === 'embedding' || id === 'chunkVectors'));
+    if (missingArtifact) return {
+      state: 'keyword-only', glyph: 'unverified',
+      metaText: `${collection} · ${fileCountText} · Some enrichment is incomplete. Keyword search remains available.`,
+      inFlight, failed,
+    };
+    const enrichmentFailed = stages && Object.entries(row.failedStages ?? {}).some(([id, failed]) =>
+      failed && (id === 'chunkVectors' ? stages.embedding : stages[id as keyof EnrichmentApplicability]));
+    if (enrichmentFailed) return {
+      state: 'keyword-only', glyph: 'unverified',
+      metaText: `${collection} · ${fileCountText} · Some enrichment failed. Keyword search remains available.`,
+      inFlight, failed,
+    };
     const coverage = rootCoverage(row, ctx.enrichmentStages);
     if (coverage !== null && !coverage.complete) {
       // Keyword-searchable NOW, semantic layers still catching up. The "indexed <time>" stamp is
@@ -395,7 +424,8 @@ export function folderStatus(row: IndexedRootView, ctx: FolderStatusContext): Fo
       return {
         state: 'enriching',
         glyph: 'pending',
-        metaText: `${collection} · ${fileCountText} · ${ENRICHMENT_CATCHING_UP_CAVEAT}${coverage.percent === null ? '' : ` · ${coverage.percent}%`}${verifiedSuffix}`,
+        metaText: `${collection} · ${fileCountText} · ${ctx.enrichmentBlocked && ctx.enrichmentBlockedDetail
+          ? ctx.enrichmentBlockedDetail : `${ENRICHMENT_CATCHING_UP_CAVEAT}${coverage.percent === null ? '' : ` · ${coverage.percent}%`}`}${verifiedSuffix}`,
         inFlight,
         failed,
       };
@@ -408,7 +438,7 @@ export function folderStatus(row: IndexedRootView, ctx: FolderStatusContext): Fo
       return {
         state: 'keyword-only',
         glyph: 'pending',
-        metaText: `${collection} · ${fileCountText} · ${ENRICHMENT_BLOCKED_CAVEAT}${verifiedSuffix}`,
+        metaText: `${collection} · ${fileCountText} · ${ctx.enrichmentBlockedDetail ?? ENRICHMENT_BLOCKED_CAVEAT}${verifiedSuffix}`,
         inFlight,
         failed,
       };

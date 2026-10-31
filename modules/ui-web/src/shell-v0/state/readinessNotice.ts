@@ -112,6 +112,16 @@ const CAUSE_ROWS: ReadonlyArray<{
     remedy: { kind: 'operation', operationId: 'core.trigger-offline-processing' },
   },
   {
+    code: 'enrichment.failed',
+    wording: 'Some documents could not be enriched',
+    severity: 'warn',
+  },
+  {
+    code: 'enrichment.missing',
+    wording: 'Some documents are missing enrichment data',
+    severity: 'warn',
+  },
+  {
     code: 'chunk_embedding.not_ready',
     wording: 'Passage embeddings are not ready',
     remedy: { kind: 'operation', operationId: 'core.trigger-offline-processing' },
@@ -748,6 +758,7 @@ export type ConsequenceClass =
   | 'search-unavailable'
   | 'retrieval-impaired'
   | 'model-unavailable'
+  | 'enrichment-incomplete'
   | 'passage-reduced'
   | 'ai-unavailable'
   | 'cosmetic'
@@ -756,7 +767,7 @@ export type ConsequenceClass =
 /**
  * Classify a verdict's reason codes into the ONE consequence class that licenses its wording.
  *
- * Precedence: `search-unavailable` > `retrieval-impaired` > `unknown` > `model-unavailable` >
+ * Precedence: `search-unavailable` > `retrieval-impaired` > `unknown` > `model-unavailable` > `enrichment-incomplete` >
  * `passage-reduced` > `ai-unavailable` > `cosmetic`.
  * A positively-known retrieval block is the most specific and most severe, so it wins outright; an
  * unrecognized code outranks every remaining class because those are all calmer claims we could not
@@ -767,6 +778,7 @@ export function classifyConsequence(codes: readonly string[]): ConsequenceClass 
   if (codes.some(isSearchUnavailableCause)) return 'search-unavailable';
   let sawUnrecognized = codes.length === 0;
   let sawModelUnavailable = false;
+  let sawEnrichmentIncomplete = false;
   let sawPassage = false;
   let sawAi = false;
   for (const code of codes) {
@@ -775,12 +787,14 @@ export function classifyConsequence(codes: readonly string[]): ConsequenceClass 
       return 'retrieval-impaired';
     }
     if (code === 'index.model_not_installed') sawModelUnavailable = true;
+    else if (code === 'enrichment.failed' || code === 'enrichment.missing') sawEnrichmentIncomplete = true;
     else if (PASSAGE_REDUCED_CODES.has(code)) sawPassage = true;
     else if (AI_MODEL_UNAVAILABLE_CODES.has(code)) sawAi = true;
     else if (!CAUSE_ROWS.some((row) => row.code === code)) sawUnrecognized = true;
   }
   if (sawUnrecognized) return 'unknown';
   if (sawModelUnavailable) return 'model-unavailable';
+  if (sawEnrichmentIncomplete) return 'enrichment-incomplete';
   if (sawPassage) return 'passage-reduced';
   if (sawAi) return 'ai-unavailable';
   return 'cosmetic';
@@ -803,6 +817,10 @@ export const SEARCH_UNAVAILABLE_CAVEAT =
 /** A missing active-generation model can be an embedding, reranker, or citation role. */
 export const MODEL_UNAVAILABLE_CAVEAT =
   'An index-selected model is missing or changed — text search remains available; model-backed features may be reduced';
+
+/** Failed or missing enrichment leaves some documents without semantic matches. */
+export const ENRICHMENT_INCOMPLETE_CAVEAT =
+  "Results may miss some documents' semantic matches; keyword search covers them";
 
 /** 805 §G.2 — the passage-leg-only caveat: document-level semantic ranking still serves. */
 export const PASSAGE_REDUCED_CAVEAT =
@@ -994,6 +1012,14 @@ export function readinessNotice(
       remedy: OPEN_HEALTH,
     };
   }
+  if (consequence === 'enrichment-incomplete') {
+    return {
+      headline: 'Enrichment incomplete.',
+      body: ENRICHMENT_INCOMPLETE_CAVEAT,
+      causes: wordCauses(codes, activity),
+      remedy: pickRemedy(codes),
+    };
+  }
   if (consequence === 'passage-reduced') {
     const passageCauses = codes.filter(isPassageReduced);
     return {
@@ -1069,7 +1095,7 @@ function pickRemedy(codes: readonly string[]): NoticeRemedy {
 /** Worker-derived readiness and migration observations share the indexing confirmation clock. */
 export function isIndexingObservation(code: string): boolean {
   return code.startsWith('index.') || code.startsWith('migration.') ||
-    code.startsWith('chunk_embedding.') || code.startsWith('encoders.health.') || code === 'encoders.reloading' ||
+    code.startsWith('enrichment.') || code.startsWith('chunk_embedding.') || code.startsWith('encoders.health.') || code === 'encoders.reloading' ||
     code === 'rebuilding' || code === 'generation-switch' || code === 'catching-up' ||
     code === 'inference.gpu_yielded_to_indexing' || code === 'inference.up_for_background';
 }

@@ -997,6 +997,20 @@
             }
           }
         },
+        "countObservations" : {
+          "type" : "object",
+          "additionalProperties" : {
+            "type" : "object",
+            "properties" : {
+              "observedAtMs" : {
+                "type" : "integer"
+              },
+              "state" : {
+                "type" : "string"
+              }
+            }
+          }
+        },
         "enrichment" : {
           "type" : "object",
           "properties" : {
@@ -1035,6 +1049,12 @@
                 "chunkEmbeddingPendingCount" : {
                   "type" : "integer"
                 },
+                "chunkSpladeDocCount" : {
+                  "type" : "integer"
+                },
+                "chunkSpladeFailedCount" : {
+                  "type" : "integer"
+                },
                 "chunkSpladeCompletedCount" : {
                   "type" : "integer"
                 },
@@ -1051,6 +1071,9 @@
                   "type" : "number"
                 },
                 "chunkVectorsReady" : {
+                  "type" : "boolean"
+                },
+                "chunkingNotRequired" : {
                   "type" : "boolean"
                 }
               }
@@ -1184,6 +1207,9 @@
             },
             "vectorReadyPercent" : {
               "type" : "number"
+            },
+            "completenessKnown" : {
+              "type" : [ "boolean", "null" ]
             }
           }
         },
