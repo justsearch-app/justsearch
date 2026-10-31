@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
   },
-  "createdAt": "2026-10-31T16:36:45.176Z",
-  "revision": "6ececc210f0ecb01d40cdd2488e911748d325e8a",
-  "tree": "d8f156329440105e659fec87bfc1d1090424ed67",
+  "createdAt": "2026-10-31T17:35:23.757Z",
+  "revision": "f1cf4f0a2fdac61981788957fcd7606829a54ecc",
+  "tree": "24a0be68c039bc4601edf4926a77c337cad6af8c",
   "environment": {
     "platform": "linux",
     "arch": "x64",
@@ -18,10 +18,10 @@
   },
   "runs": [
     {
-      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/search-v3/SearchV3View.startFresh.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/9z8mojsb/tmp/test-intent-vitest-65-1793464594749.json\"",
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/search-v3/SearchV3View.startFresh.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/yr4leb6t/tmp/test-intent-vitest-64-1793468112685.json\"",
       "cwd": "modules/ui-web",
       "exitCode": 0,
-      "durationMs": 4979
+      "durationMs": 3897
     }
   ],
   "checks": [
@@ -29,7 +29,7 @@
       "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.startFresh.test.ts",
       "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.startFresh.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:37fdef9d65c25cb61ff05742868565cb3cba8894a25e6ae3197d7a250fcf4e23",
+      "contentDigest": "sha256:f36a190773e1f49edc556fc1863d207f64274b6198a988316926f2dadce73bca",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -79,6 +79,14 @@
           "status": "passed"
         },
         {
+          "name": "discarding retained A releases B without losing A deltas, completion or its saved answer",
+          "status": "passed"
+        },
+        {
+          "name": "unfinished B checks its own saved outcome while retained A has a separate checking budget",
+          "status": "passed"
+        },
+        {
           "name": "unfinished saved outcome checking exhausts its budget truthfully and Check again rearms it",
           "status": "passed"
         },
@@ -103,6 +111,14 @@
           "status": "passed"
         },
         {
+          "name": "New latches abandonment during a queued saved-history read, with ABA return=false",
+          "status": "passed"
+        },
+        {
+          "name": "New latches abandonment during a queued saved-history read, with ABA return=true",
+          "status": "passed"
+        },
+        {
           "name": "New retains authored results work as a reviewable results proposal: query",
           "status": "passed"
         },
@@ -118,26 +134,26 @@
     }
   ],
   "failBefore": {
-    "ref": "6ececc210f",
-    "revision": "6ececc210f0ecb01d40cdd2488e911748d325e8a",
+    "ref": "f1cf4f0a2f",
+    "revision": "f1cf4f0a2fdac61981788957fcd7606829a54ecc",
     "overlays": [],
     "patches": [],
     "runs": [
       {
-        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/search-v3/SearchV3View.startFresh.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/9z8mojsb/tmp/test-intent-vitest-65-1793464601701.json\"",
+        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/search-v3/SearchV3View.startFresh.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/yr4leb6t/tmp/test-intent-vitest-64-1793468118768.json\"",
         "cwd": "<before-worktree>",
         "exitCode": 1,
-        "durationMs": 3015,
-        "output": "JSON report written to /home/elias/.cache/am/9z8mojsb/tmp/test-intent-vitest-65-1793464601701.json\n\n"
+        "durationMs": 4320,
+        "output": "JSON report written to /home/elias/.cache/am/yr4leb6t/tmp/test-intent-vitest-64-1793468118768.json\n\n"
       }
     ],
     "checks": [
       {
         "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.startFresh.test.ts",
         "classification": "assertion",
-        "detail": "New preserves the old live Ask and its draft while fresh input stays isolated:  AssertionError: expected '\\n      \\n      \\n      \\n      \\n   …' to contain 'Request in progress'\n    at /home/elias/.cache/am/9z8mojsb/tmp/test-intent-before-wVLo6T/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.startFresh.test.ts:105:38\n    at file:///home/elias/.cache/am/9z8mojsb/tmp/t | New retains ask preparation with empty input and restores it only in its old conversation:  AssertionError: expected "
+        "detail": "discarding retained A releases B without losing A deltas, completion or its saved answer:  AssertionError: expected 'A begins\\n ' to contain 'A begins and finishes'\n    at /home/elias/.cache/am/yr4leb6t/tmp/test-intent-before-4ONtzL/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.startFresh.test.ts:264:40\n    at file:///home/elias/.cache/am/yr4leb6t/tmp/test-intent-before-4ONtzL/ | unfinished B checks its own saved outcome while retained A has a separate checking budget:  AssertionError"
       }
     ]
   },
-  "digest": "sha256:80dd22261c4fa7cafc7d99c18b512e497798a6e8708fb182d9a554bc54b411ee"
+  "digest": "sha256:2709d5ba8f7c75e1deb55d093deb63101ff4baa66f161b1556a128c3ba511d9f"
 }

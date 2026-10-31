@@ -236,6 +236,92 @@ it('return before completion merges the saved dispatch into one authoritative li
   expect(answer(el)).toContain('Live part and end'); expect(dispatches()).toHaveLength(1);
 });
 
+it('discarding retained A releases B without losing A deltas, completion or its saved answer', async () => {
+  const fallback = http.getMockImplementation()!;
+  const records = new Map<string, ThreadEvent[]>();
+  http.mockImplementation((url, init) => {
+    const path = String(url);
+    if (path.includes('/api/thread/')) return Promise.resolve(json({
+      conversationId: decodeURIComponent(path.split('/api/thread/')[1]!),
+      events: records.get(decodeURIComponent(path.split('/api/thread/')[1]!)) ?? [], lifecycles: [],
+    }));
+    return fallback(url, init);
+  });
+  const el = await mount(); await send(el, 'question A');
+  const a = target(); const aDispatch = body().turnId as string; const aStream = stream;
+  aStream.enqueue(new TextEncoder().encode('event: chunk\ndata: {"text":"A begins"}\n\n'));
+  await settle(el); newConversation(el); await settle(el);
+  await send(el, 'question B'); expect(dispatches()).toHaveLength(1);
+  el.shadowRoot!.querySelector<HTMLElement>('[data-testid=sv3-residency-discard]')!.click();
+  await settle(el); await send(el, 'question B');
+  expect(dispatches()).toHaveLength(2);
+  const b = body(1).conversationId as string; const bDispatch = body(1).turnId as string; const bStream = stream;
+  const retainedB = JSON.parse(sessionStorage.getItem(attachmentKey)!).payload.task;
+  expect(retainedB).toMatchObject({ target: b, dispatchTurnId: bDispatch });
+  restoreActiveConversation(a); await settle(el);
+  expect(composer(el).slotKind).toBe('stop'); expect(answer(el)).toContain('A begins');
+  aStream.enqueue(new TextEncoder().encode('event: chunk\ndata: {"text":" and finishes"}\n\n'));
+  await settle(el); expect(answer(el)).toContain('A begins and finishes');
+  records.set(a, [row('qa', 'USER_MESSAGE', 'question A', aDispatch),
+    row('aa', 'ASSISTANT_MESSAGE', 'A begins and finishes', aDispatch)]);
+  const reads = recordReads().filter(c => String(c[0]).endsWith(a)).length;
+  aStream.enqueue(new TextEncoder().encode('event: done\ndata: {}\n\n')); aStream.close(); await settle(el);
+  expect(recordReads().filter(c => String(c[0]).endsWith(a))).toHaveLength(reads + 1);
+  expect(el.sessions.sessions.find(s => s.id === a)!.turns).toEqual([
+    expect.objectContaining({ status: 'complete', answer: 'A begins and finishes', recordId: 'qa',
+      answerMessages: [{ id: 'aa', content: 'A begins and finishes' }], savedOutcome: true }),
+  ]);
+  expect(transcript(el).querySelectorAll('jf-markdown-block')).toHaveLength(1);
+  expect(composer(el).slotKind).not.toBe('stop');
+  expect(JSON.parse(sessionStorage.getItem(attachmentKey)!).payload.task).toEqual(retainedB);
+  restoreActiveConversation(b); await settle(el); expect(composer(el).slotKind).toBe('stop');
+  bStream.enqueue(new TextEncoder().encode('event: chunk\ndata: {"text":"B alone"}\n\n'));
+  await settle(el); expect(answer(el)).toContain('B alone'); expect(answer(el)).not.toContain('A begins');
+  records.set(b, [row('qb', 'USER_MESSAGE', 'question B', bDispatch), row('ab', 'ASSISTANT_MESSAGE', 'B alone', bDispatch)]);
+  bStream.enqueue(new TextEncoder().encode('event: done\ndata: {}\n\n')); bStream.close(); await settle(el);
+  expect(el.sessions.sessions.find(s => s.id === b)!.turns).toEqual([
+    expect.objectContaining({ status: 'complete', answer: 'B alone' }),
+  ]);
+  expect(dispatches().map((_, i) => body(i).question)).toEqual(['question A', 'question B']);
+  expect(JSON.parse(sessionStorage.getItem(attachmentKey)!).payload.task).toBeNull();
+});
+
+it('unfinished B checks its own saved outcome while retained A has a separate checking budget', async () => {
+  vi.useFakeTimers();
+  let el = await mount(); await send(el, 'retained A'); const a = target();
+  const fallback = http.getMockImplementation()!;
+  http.mockImplementation((url, init) => String(url).endsWith(`/api/thread/${a}`)
+    ? Promise.resolve(json({ conversationId: a, events: [], lifecycles: [] })) : fallback(url, init));
+  el.remove(); __resetDraftProvidersForTest(); __resetConversationListForTest();
+  el = await mount(); newConversation(el); await settle(el);
+  await vi.advanceTimersByTimeAsync(20000); await settle(el);
+  rows = [row('qb', 'USER_MESSAGE', 'unfinished B', 'dispatch-b')];
+  restoreActiveConversation('conversation-b'); await settle(el);
+  const readsFor = (id: string) => recordReads().filter(c => String(c[0]).endsWith(id)).length;
+  const bReads = readsFor('conversation-b');
+  await vi.advanceTimersByTimeAsync(500); await settle(el);
+  expect(readsFor('conversation-b')).toBeGreaterThan(bReads);
+  expect(transcript(el).textContent).toContain('Checking the saved conversation');
+  await vi.advanceTimersByTimeAsync(30000); await settle(el);
+  expect(transcript(el).textContent).not.toContain('Checking the saved conversation');
+  const check = transcript(el).querySelector<HTMLElement>('[data-testid=sv3-record-check]');
+  expect(check).not.toBeNull();
+  // Rearming A must not claim B's indicator or hide B's own Check again.
+  el.shadowRoot!.querySelector<HTMLElement>('[data-testid=sv3-residency-check]')!.click(); await settle(el);
+  expect(transcript(el).textContent).not.toContain('Checking the saved conversation');
+  expect(transcript(el).querySelector('[data-testid=sv3-record-check]')).not.toBeNull();
+  const aReads = readsFor(a); const bExhausted = readsFor('conversation-b');
+  check!.click(); await settle(el);
+  expect(readsFor('conversation-b')).toBeGreaterThan(bExhausted);
+  expect(transcript(el).textContent).toContain('Checking the saved conversation');
+  await vi.advanceTimersByTimeAsync(500); await settle(el);
+  expect(readsFor(a)).toBeGreaterThan(aReads);
+  rows.push(row('ab', 'ASSISTANT_MESSAGE', 'B saved later', 'dispatch-b'));
+  await vi.advanceTimersByTimeAsync(500); await settle(el);
+  expect(answer(el)).toContain('B saved later'); expect(dispatches()).toHaveLength(1);
+  expect(JSON.parse(sessionStorage.getItem(attachmentKey)!).payload.task.target).toBe(a);
+});
+
 it('unfinished saved outcome checking exhausts its budget truthfully and Check again rearms it', async () => {
   vi.useFakeTimers(); rows = [row('q', 'USER_MESSAGE', 'pending saved question', 'pending')];
   const el = await mount(); restoreActiveConversation('pending-conversation'); await settle(el);
@@ -307,6 +393,34 @@ it.each([false, true])('New abandons a pending context send even after returning
   for (const release of releases) release(json({ sessionId: 'context-origin', messages: [] }));
   await settle(el); expect(dispatches()).toHaveLength(0); expect(composer(el).slotKind).not.toBe('stop');
   expect(field(el).value).toBe(returnToOwner ? 'question awaiting context' : 'fresh draft');
+});
+
+it.each([false, true])('New latches abandonment during a queued saved-history read, with ABA return=%s', async returnToOwner => {
+  const fallback = http.getMockImplementation()!;
+  const releases: Array<(response: Response) => void> = [];
+  const el = await mount(); restoreActiveConversation('context-origin'); await settle(el);
+  http.mockImplementation((url, init) => String(url).includes('/history')
+    ? new Promise<Response>(resolve => { releases.push(resolve); }) : fallback(url, init));
+  transcript(el).host.dispatchEvent(new CustomEvent('sv3-context-action', {
+    bubbles: true, composed: true, detail: { action: 'restore' },
+  }));
+  await settle(el); expect(releases).toHaveLength(1);
+  await send(el, 'question awaiting queued context'); expect(dispatches()).toHaveLength(0);
+  newConversation(el); await settle(el); await type(el, 'fresh draft');
+  expect(composer(el).slotKind).not.toBe('stop');
+  if (returnToOwner) {
+    restoreActiveConversation('context-origin'); await settle(el);
+    await type(el, 'newer draft at the origin');
+  }
+  // Returning can supersede the write's history read. Also resolve the confirmation
+  // read queued behind that write so a stranded await cannot masquerade as abandonment.
+  for (let i = 0; i < 4 && releases.length > 0; i++) {
+    for (const release of releases.splice(0)) release(json({ sessionId: 'context-origin', messages: [] }));
+    await settle(el);
+  }
+  expect(releases).toHaveLength(0);
+  expect(dispatches()).toHaveLength(0); expect(composer(el).slotKind).not.toBe('stop');
+  expect(field(el).value).toBe(returnToOwner ? 'newer draft at the origin' : 'fresh draft');
 });
 
 it.each(['query', 'chosen-files', 'schema'] as const)('New retains authored results work as a reviewable results proposal: %s', async preparation => {

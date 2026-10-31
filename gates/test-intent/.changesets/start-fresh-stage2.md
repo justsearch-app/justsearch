@@ -36,6 +36,23 @@ its before worktree belongs to that clone. Source and baseline dependencies/buil
 Mutation checks in that clone exercised dropped ownership, abort-on-New, empty-hero capacity,
 lifecycle serialization, retained-to-fresh leakage, dispatch correlation, false failure status,
 missing Summarize handling, absent checking, and accidental unfinished-action authority.
+Follow-up regressions cover A streaming → New → discard retained A → submit B → return to A:
+A keeps its deltas, completes, refreshes its saved record and appears once; B issues once and
+keeps its own retained task until completion. Live dispatch ownership uses the existing
+conversation-local stream handle; discarding still releases only the single retained-task slot.
+Saved-outcome checking now has a separate finite budget for the retained target and any different
+unfinished conversation on screen. Rearming A cannot claim B's indicator or hide B's Check again.
+Both regressions fail against stage-2 candidate f1cf4f0a2f and pass with the repair.
+The queued-context regression drains the saved-history read and any confirmation read it queues,
+then checks no dispatch, no Stop and unchanged authored input, both on the fresh screen and after
+an ABA return. Removing `this.humanTask.abandoned ||= abandonInitial` in a scratch baseline
+produces one unwanted dispatch after the return; the unchanged latch passes. No existing assertion
+is removed or weakened. This extends the durable view checks rather than adding test scaffolding.
+Observed mutation check: `npm run test:unit:run --prefix <scratch-before>/modules/ui-web --
+src/shell-v0/views/search-v3/SearchV3View.startFresh.test.ts -t 'New latches abandonment'
+--maxWorkers=4` failed only the ABA-return case: `AssertionError: expected [ [ …(2) ] ] to have
+a length of +0 but got 1`. The fresh-screen case passed. The full final view file passed all
+24 cases, including both queued-read cases; the regenerated evidence records those executions.
 The verifier must independently accept the final digest.
 
 ```json
@@ -105,7 +122,7 @@ The verifier must independently accept the final digest.
         "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.startFresh.test.ts"
       ],
       "class": "New",
-      "behaviour": "New preserves owned drafts and live streams without filling the fresh composer; two proposals remain the capacity, reload restores owned settings only for review, delayed outcomes remain unfinished without resend or Stop, record checks have a finite budget and manual rearm, and unfinished exchanges cannot authorize Retry/branch/context writes. Results proposals remain accessible through existing explicit review. Pending context sends remain abandoned across New.",
+      "behaviour": "New preserves owned drafts and live streams without filling the fresh composer; discarding retained A frees the one submission slot for B while A keeps arriving, completes and refreshes its own saved record exactly once. Two proposals remain the capacity, reload restores owned settings only for review, delayed outcomes remain unfinished without resend or Stop, record checks have conversation-specific finite budgets and manual rearm, and unfinished exchanges cannot authorize Retry/branch/context writes. Results proposals remain accessible through existing explicit review. Pending context sends remain abandoned across New, including queued saved-history confirmation and an ABA return.",
       "sources": [
         {
           "kind": "owner-words",
