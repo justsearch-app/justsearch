@@ -11,6 +11,30 @@ const read = name => readFileSync(new URL(`../../${name}`, import.meta.url), 'ut
 const workflow = name => yaml.load(read(`.github/workflows/${name}.yml`));
 const privateSecret = /secrets(?:\.JUSTSEARCH_(?:CODESIGN_\w+|TAURI_UPDATER_PRIVATE_KEY\w*|RELEASE_METADATA_PRIVATE_KEY_PEM)|\[['"]JUSTSEARCH_(?:CODESIGN_\w+|TAURI_UPDATER_PRIVATE_KEY\w*|RELEASE_METADATA_PRIVATE_KEY_PEM)['"]\])/;
 
+test('hosted Linux provisions the commands used by the X11 desktop journeys', () => {
+  const provision = workflow('qualify-release-linux').jobs.journeys.steps
+    .find(s => s.name === 'Provision qualification tools').run;
+  const install = provision.replaceAll('\\\n', ' ').match(/sudo apt-get install -y ([^\n]+)/);
+  assert(install, 'hosted Linux must provision the desktop tools');
+  const packages = new Set(install[1].trim().split(/\s+/));
+  for (const [command, pkg] of Object.entries({
+    'gtk-launch': 'libgtk-3-bin',
+    'xdg-mime / xdg-open': 'xdg-utils',
+    'xvfb-run': 'xvfb',
+    xauth: 'xauth',
+    'dbus-run-session / dbus-update-activation-environment': 'dbus-x11',
+    openbox: 'openbox',
+    xdotool: 'xdotool',
+    scrot: 'scrot',
+    mousepad: 'mousepad',
+    tesseract: 'tesseract-ocr',
+    WebKitWebDriver: 'webkit2gtk-driver',
+    coredumpctl: 'systemd-coredump',
+  })) {
+    assert(packages.has(pkg), `${command} needs ${pkg} on the hosted runner`);
+  }
+});
+
 test('hosted Linux enables user namespaces before the full harness self-test', () => {
   const steps = workflow('qualify-release-linux').jobs.journeys.steps;
   const provision = steps.find(s => s.name === 'Provision qualification tools').run;

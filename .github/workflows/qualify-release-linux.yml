@@ -93,7 +93,7 @@ jobs:
         run: |
           set -euo pipefail
           sudo apt-get update
-          sudo apt-get install -y webkit2gtk-driver xvfb openbox xdotool scrot \
+          sudo apt-get install -y webkit2gtk-driver libgtk-3-bin xdg-utils xvfb xauth openbox xdotool scrot \
             mousepad python3-pil fonts-dejavu-core tesseract-ocr dbus-x11 systemd-coredump
           python3 - <<'PY'
           import re, subprocess
