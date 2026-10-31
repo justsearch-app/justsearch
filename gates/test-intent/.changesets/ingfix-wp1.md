@@ -595,3 +595,14 @@ for the orchestrator, and no acceptance record is added.
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a1911b-5c9e-7682-87da-c912bf17a8a2",
+  "verdict": "accept",
+  "digest": "sha256:23e051d7c02952e9aa5f2d1835ccec4c523d890ba449f3e6f5d50eb53fa92a47",
+  "note": "Transcribed by the orchestrator from verifier session 01a1911b-5c9e-7682-87da-c912bf17a8a2 (accept entries 1-6, overall accept; reasons in its evidence intent-acceptance.md); the verifier sandbox does not write records."
+}
+```
