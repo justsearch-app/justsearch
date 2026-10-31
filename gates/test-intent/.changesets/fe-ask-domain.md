@@ -147,3 +147,13 @@ Tests added or rewritten: all four named files are durable product checks. The r
   "digest": "sha256:1081b01232e2cee7ed8614f80bad4bbf6b9227c56dfd1ca1a6610fd1f667dcfb"
 }
 ```
+
+```json
+{
+  "kind": "audit",
+  "role": "reviewer",
+  "session": "nj0686xi-test-intent-audit",
+  "verdict": "accept",
+  "digest": "sha256:1081b01232e2cee7ed8614f80bad4bbf6b9227c56dfd1ca1a6610fd1f667dcfb"
+}
+```
