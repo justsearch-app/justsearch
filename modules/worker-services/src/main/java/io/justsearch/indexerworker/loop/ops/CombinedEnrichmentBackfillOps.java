@@ -1194,7 +1194,48 @@ public final class CombinedEnrichmentBackfillOps {
             if (context.spladeEncoderSupplier().get() != encoder || SpladeBackfillOps.isSystemicFailure(failure)) {
               systemicSpladeFailure = true;
               context.spladeBackfillResult().accept(false);
-            } else if (!preserving) {
+            } else if (preserving) {
+              for (String id : sliceIds) {
+                if (updatesByDocId.get(id).containsKey(SchemaFields.SPLADE)) continue;
+                if (context.hardStopRequestedSupplier().getAsBoolean()
+                    || context.indexingCoordinator().bulkDeleteEpoch() != epochAtSelection) {
+                  aborted = true;
+                  break;
+                }
+                if (!context.spladeAllowedSupplier().getAsBoolean()) break;
+                if (context.spladeEncoderSupplier().get() != encoder) {
+                  systemicSpladeFailure = true;
+                  context.spladeBackfillResult().accept(false);
+                  break;
+                }
+                pacer.beforeUnit(1);
+                try {
+                  List<Map<String, Float>> vectors =
+                      encoder.encodeBatch(List.of(contentByDocId.get(id)));
+                  if (vectors == null || vectors.size() != 1) {
+                    throw new IllegalStateException("SPLADE batch result size mismatch");
+                  }
+                  Map<String, Float> vector = vectors.get(0);
+                  Map<String, Object> updates = updatesByDocId.get(id);
+                  updates.put(SchemaFields.SPLADE, vector);
+                  updates.put(SchemaFields.SPLADE_STATUS, SpladeBackfillOps.spladeStatusFor(vector));
+                  updates.put(SchemaFields.SPLADE_RETRY_COUNT, "0");
+                  stageAdvancedDocIds.add(id);
+                } catch (Exception individualFailure) {
+                  context.log().warn("Combined backfill: SPLADE preservation failed for {}: {}",
+                      id, individualFailure.getMessage());
+                  if (context.spladeEncoderSupplier().get() != encoder
+                      || SpladeBackfillOps.isSystemicFailure(individualFailure)) {
+                    systemicSpladeFailure = true;
+                    context.spladeBackfillResult().accept(false);
+                    break;
+                  }
+                } finally {
+                  pacer.afterUnit(1);
+                  unitsDone++;
+                }
+              }
+            } else {
               for (String id : sliceIds) {
                 if (updatesByDocId.get(id).containsKey(SchemaFields.SPLADE)) continue;
                 var escalation = SpladeBackfillOps.computeSpladeFailureUpdate(
@@ -1208,7 +1249,7 @@ public final class CombinedEnrichmentBackfillOps {
                 spladeFailed++;
               }
             }
-            break;
+            if (systemicSpladeFailure || !preserving) break;
           } finally {
             pacer.afterUnit(sliceIds.size());
             unitsDone++;
@@ -1221,6 +1262,9 @@ public final class CombinedEnrichmentBackfillOps {
         Map<String, Object> updates = updatesByDocId.get(id);
         if (!updates.containsKey(SchemaFields.SPLADE)) {
           updates.clear();
+          // docs/tempdocs/711-rmw-preservation-and-followup-designs.md: defer this parent
+          // until the next idle cycle so it cannot crowd out healthy pending documents.
+          context.publishedDocIds().add(id);
         }
       }
 

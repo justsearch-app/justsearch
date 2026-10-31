@@ -127,6 +127,7 @@ class BackfillSchedulerSlowBatchTest {
   private final AtomicInteger embedCalls = new AtomicInteger();
   private final AtomicLong monotonicNanos = new AtomicLong();
   private long modeledNanosPerEncode;
+  private int combinedBatchDocs = BATCH_DOCS;
   private boolean nerPending;
   private io.justsearch.indexerworker.splade.SpladeEncoder sparseEncoder;
   /** Only synchronous event scenarios remove the artificial stage delay. */
@@ -337,7 +338,7 @@ class BackfillSchedulerSlowBatchTest {
         .thenReturn(
             new ResolvedConfig.Ai.BackfillPacing(
                 defaults.pollBatchSize(),
-                BATCH_DOCS,
+                combinedBatchDocs,
                 defaults.nerBackfillBatchSize(),
                 defaults.disambiguationBackfillBatchSize(),
                 defaults.spladeBackfillBatchSize(),
@@ -683,6 +684,67 @@ class BackfillSchedulerSlowBatchTest {
     });
     lenient().when(nerService.extractEntitiesBatch(anyList())).thenReturn(
         List.of(io.justsearch.indexerworker.ner.NerResult.EMPTY));
+  }
+
+  @Test
+  void persistentlyFailingPreservationDoesNotPoisonHealthyDocumentsAcrossCycles() throws Exception {
+    Map<String, Map<String, Object>> state = new java.util.LinkedHashMap<>();
+    Map<String, Object> failingState = new HashMap<>(Map.of(
+        SchemaFields.EMBEDDING_STATUS, "PENDING", SchemaFields.SPLADE_STATUS, "COMPLETED",
+        SchemaFields.NER_STATUS, "PENDING", SchemaFields.SPLADE, Map.of("original", 1f)));
+    state.put("poison", failingState);
+    wirePopulation(state);
+    combinedBatchDocs = 128; // Two preservation slices, then another combined batch.
+    modeledNanosPerEncode = 10_000_000L;
+    List<List<String>> sparseAttempts = new ArrayList<>();
+    sparseEncoder = mock(io.justsearch.indexerworker.splade.SpladeEncoder.class);
+    when(sparseEncoder.encodeBatch(anyList())).thenAnswer(call -> {
+      List<String> texts = call.getArgument(0);
+      sparseAttempts.add(List.copyOf(texts));
+      monotonicNanos.addAndGet(10_000_000L);
+      if (texts.contains("long content for poison")) {
+        throw new IllegalStateException("this document cannot regenerate its postings");
+      }
+      return java.util.Collections.nCopies(texts.size(), Map.of("preserved", 1f));
+    });
+    when(indexingCoordinator.updateDocumentsBatch(anyList())).thenAnswer(call -> {
+      List<Map.Entry<String, Map<String, Object>>> updates = call.getArgument(0);
+      for (var entry : updates) {
+        assertFalse("poison".equals(entry.getKey()), "only the failing update is withheld");
+        assertEquals(Map.of("preserved", 1f), entry.getValue().get(SchemaFields.SPLADE),
+            "every published outcome must carry regenerated postings");
+        state.get(entry.getKey()).putAll(entry.getValue());
+      }
+      return new LuceneRuntimeTypes.BatchUpdateResult(updates.size(), 0);
+    });
+    BackfillScheduler scheduler = scheduler(monotonicNanos::get);
+    for (int cycle = 1; cycle <= 3; cycle++) {
+      List<String> healthy = new ArrayList<>();
+      for (int i = 0; i < 160; i++) {
+        String id = "healthy-" + cycle + "-" + i;
+        healthy.add(id);
+        state.put(id, new HashMap<>(Map.of(
+            SchemaFields.EMBEDDING_STATUS, "PENDING", SchemaFields.SPLADE_STATUS, "COMPLETED",
+            SchemaFields.NER_STATUS, "PENDING")));
+      }
+      logAppender.list.clear();
+      timeIdleCycle(scheduler);
+      for (String id : healthy) {
+        assertEquals("COMPLETED", state.get(id).get(SchemaFields.EMBEDDING_STATUS),
+            id + " must advance even with a failing document at the head");
+        assertEquals("COMPLETED_EMPTY", state.get(id).get(SchemaFields.NER_STATUS));
+      }
+      assertEquals(Map.of(
+          SchemaFields.EMBEDDING_STATUS, "PENDING", SchemaFields.SPLADE_STATUS, "COMPLETED",
+          SchemaFields.NER_STATUS, "PENDING", SchemaFields.SPLADE, Map.of("original", 1f)),
+          failingState, "the withheld document keeps its postings, statuses and retry counts");
+      assertEquals(2L * cycle, sparseAttempts.stream()
+          .filter(texts -> texts.contains("long content for poison")).count(),
+          "one slice and one individual attempt per cycle; withheld IDs cannot reoccupy the head");
+      assertFalse(loggedAtLevel(ch.qos.logback.classic.Level.WARN, "ZERO stage advancement"));
+    }
+    verify(indexingCoordinator, never()).updateDocumentIf(
+        anyString(), any(DocumentFieldOps.EnrichmentInput.class), any());
   }
 
   @Test

@@ -935,7 +935,7 @@ class CombinedEnrichmentBackfillOpsTest {
 
     CombinedEnrichmentBackfillOps.processCombinedBackfill(context(true, true, false));
 
-    verify(spladeEncoder).encodeBatch(List.of("parent content"));
+    verify(spladeEncoder, times(2)).encodeBatch(List.of("parent content"));
     Map<String, Object> state = fakeIndex.get("parent-failure");
     assertEquals(SchemaFields.EMBEDDING_STATUS_PENDING, state.get(SchemaFields.EMBEDDING_STATUS));
     assertEquals(SchemaFields.SPLADE_STATUS_COMPLETED, state.get(SchemaFields.SPLADE_STATUS));
