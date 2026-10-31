@@ -790,6 +790,12 @@ public interface JobQueue extends Closeable {
         "Typed defer requires an outcome-aware queue implementation");
   }
 
+  /**
+   * Whether an unavailable queue-side authority read fenced work before consulting its owner.
+   * The obligation remains until {@link #recordedClaimAuthorityChanged(String)} acknowledges it.
+   */
+  default boolean recordedClaimNeedsRefresh(String operationKey) { return false; }
+
   /** Reconsider skipped recorded units after their owner's authority changes. */
   default void recordedClaimAuthorityChanged(String operationKey) {}
 

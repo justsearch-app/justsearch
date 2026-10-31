@@ -1192,6 +1192,42 @@ final class RecordedBulkIngestionCoordinatorTest {
   }
 
   @Test
+  void bulkQueueSideWalkReadDenialIsReconsideredDespiteNewArrivals() throws Exception {
+    try (var harness = new BulkHarness(temp.resolve("bulk-recovery"))) {
+      harness.replacePhysical(buildingRuntime(harness.key));
+      harness.coordinator.maintain();
+      assertEquals(JobQueue.RecordedClaimDecision.ALLOW_FORCE, harness.coordinator.recordedClaimDecision(harness.key));
+      harness.queue.enqueue(List.of(harness.directory.resolve("new-0"), harness.directory.resolve("new-1")));
+      try (var connection = java.sql.DriverManager.getConnection("jdbc:sqlite:" + harness.directory.resolve("jobs.db"));
+          var statement = connection.createStatement()) {
+        statement.executeUpdate("UPDATE jobs SET last_updated=CASE WHEN scan_id IS NULL THEN 2 ELSE 1 END");
+      }
+      var field = SqliteJobQueue.class.getDeclaredField("connection");
+      field.setAccessible(true);
+      var actual = (java.sql.Connection) field.get(harness.sqliteQueue);
+      var failed = mock(java.sql.Connection.class, org.mockito.AdditionalAnswers.delegatesTo(actual));
+      var readFailures = new AtomicInteger();
+      doAnswer(call -> {
+        readFailures.incrementAndGet();
+        throw new java.sql.SQLException("transient walk authority read");
+      }).when(failed).prepareStatement("SELECT * FROM ingestion_walk_progress WHERE operation_key = ?");
+      try {
+        field.set(harness.sqliteQueue, failed);
+        assertEquals(harness.directory.resolve("new-0"), harness.queue.pollPending(1).getFirst().path());
+        assertEquals(1, readFailures.get(), "fail only the per-unit walk authority SELECT");
+      } finally { field.set(harness.sqliteQueue, actual); }
+      harness.coordinator.maintain();
+      assertEquals(JobQueue.RecordedClaimDecision.ALLOW_FORCE, harness.coordinator.recordedClaimDecision(harness.key));
+      harness.queue.enqueue(List.of(harness.directory.resolve("new-2")));
+      var claim = harness.queue.pollPending(1).getFirst();
+      try {
+        assertEquals(harness.member, claim.path(),
+            "refreshing retained bulk authority must reconsider the older member on the next poll");
+      } finally { harness.queue.returnUnfinishedClaims(List.of(claim)); }
+    }
+  }
+
+  @Test
   void retainedBulkPermissionRecoversAfterTransientDenialDespiteNewArrivals() throws Exception {
     try (var harness = new BulkHarness(temp.resolve("bulk-recovery"))) {
       harness.replacePhysical(buildingRuntime(harness.key));

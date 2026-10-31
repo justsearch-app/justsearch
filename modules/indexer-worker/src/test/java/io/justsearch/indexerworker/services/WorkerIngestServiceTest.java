@@ -1,5 +1,6 @@
 package io.justsearch.indexerworker.services;
 
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -106,8 +107,8 @@ final class WorkerIngestServiceTest {
                 io.justsearch.indexerworker.ingest.IngestionRetryPolicy.RETRY_WITH_BACKOFF));
       }
       var request = io.justsearch.ipc.CancelIndexingJobRequest.newBuilder().setPathHash(hash).build();
-      assertTrue(service.cancelIndexingJob(request,CallContext.none()).getCancelled());
-      assertTrue(service.cancelIndexingJob(request,CallContext.none()).getCancelled());
+      assertTrue(assertDoesNotThrow(() -> service.cancelIndexingJob(request,CallContext.none())).getCancelled());
+      assertTrue(assertDoesNotThrow(() -> service.cancelIndexingJob(request,CallContext.none())).getCancelled());
       assertEquals(0,jobQueue.queueDepth());
       assertTrue(jobQueue.pollPending(1).isEmpty());
       var events=jobQueue.recentIngestionEvents(100);

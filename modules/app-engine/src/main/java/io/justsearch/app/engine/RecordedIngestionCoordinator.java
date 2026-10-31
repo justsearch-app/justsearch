@@ -1007,17 +1007,8 @@ final class RecordedIngestionCoordinator implements RecordedIngestionService, Re
       }
     }
     if (!allowed && parent.refusal == null) child.retryEnumeration = true;
-    if (allowed) {
-      Permission previous = permissions.get(row.key());
-      var claimDenied = previous == null ? new java.util.concurrent.atomic.AtomicBoolean() : previous.claimDenied;
-      permissions.put(row.key(), new Permission(physical, parent.row, parent.preparation, child.plan, child.fresh, parent, claimDenied));
-      if (previous == null || claimDenied.getAndSet(false)) {
-        physical.queue.recordedClaimAuthorityChanged(row.key());
-        physical.queue.recoverStuckJobs();
-      }
-    }
     if (child.exit != null && !child.exit.isDone()) {
-      checkpointLive(parent, child, row, physical);
+      if (checkpointLive(parent, child, row, physical) && allowed) refreshPermission(parent, child, row, physical);
       return;
     }
     try {
@@ -1050,6 +1041,7 @@ final class RecordedIngestionCoordinator implements RecordedIngestionService, Re
           physical.queue.retireRefusedRecordedWalk(row.key(), planHash(child.plan));
         }
       } else if (allowed) {
+        refreshPermission(parent, child, row, physical);
         if (child.retryEnumeration) {
           child.exit = null;
           child.cancellation = null;
@@ -1119,7 +1111,17 @@ final class RecordedIngestionCoordinator implements RecordedIngestionService, Re
     }
   }
 
-  private void checkpointLive(Parent parent, Child child, OperationRecord row, Attached physical) {
+  private void refreshPermission(Parent parent, Child child, OperationRecord row, Attached physical) {
+    Permission previous = permissions.get(row.key());
+    var claimDenied = previous == null ? new java.util.concurrent.atomic.AtomicBoolean() : previous.claimDenied;
+    permissions.put(row.key(), new Permission(physical, parent.row, parent.preparation, child.plan, child.fresh, parent, claimDenied));
+    if (previous == null || claimDenied.getAndSet(false) || physical.queue.recordedClaimNeedsRefresh(row.key())) {
+      physical.queue.recordedClaimAuthorityChanged(row.key());
+      physical.queue.recoverStuckJobs();
+    }
+  }
+
+  private boolean checkpointLive(Parent parent, Child child, OperationRecord row, Attached physical) {
     try {
       var progress = physical.queue.recordedWalk(row.key()).orElseThrow(
           () -> new JobQueue.RecordedWalkGapException("Live recorded progress disappeared"));
@@ -1137,10 +1139,12 @@ final class RecordedIngestionCoordinator implements RecordedIngestionService, Re
       if (completed >= parentRow.unitsCompleted() && failed >= parentRow.unitsFailed()) {
         parent.handle.checkpoint(parentCursor(parentRow, parent.nextRoot), completed, failed);
       }
+      return true;
     } catch (JobQueue.RecordedWalkGapException unavailable) {
       permissions.remove(row.key());
       parent.refusal = new OperationReceipt(RecordedIngestionSettlement.UNAVAILABLE, null);
       if (child.cancellation != null) child.cancellation.cancel("recorded progress unavailable");
+      return false;
     }
   }
 
@@ -1827,7 +1831,7 @@ final class RecordedIngestionCoordinator implements RecordedIngestionService, Re
         }
         bulk.ready = true;
         Bulk previous = bulkPermissions.put(row.key(), bulk);
-        if (previous == null || bulk.claimDenied.getAndSet(false)) {
+        if (previous == null || bulk.claimDenied.getAndSet(false) || physical.queue.recordedClaimNeedsRefresh(row.key())) {
           physical.queue.recordedClaimAuthorityChanged(row.key());
           physical.queue.recoverStuckJobs();
         }

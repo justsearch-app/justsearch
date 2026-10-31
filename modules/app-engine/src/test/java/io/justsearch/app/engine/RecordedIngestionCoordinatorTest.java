@@ -64,6 +64,62 @@ final class RecordedIngestionCoordinatorTest {
   private static final Clock CLOCK = Clock.systemUTC();
   @TempDir Path temp;
 
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  void queueSideWalkReadDenialIsReconsideredDespiteNewArrivals(boolean live) throws Exception {
+    try (Fixture f = new Fixture(temp, 1)) {
+      var producerExit = new CompletableFuture<JobQueue.WalkEnumerationOutcome>();
+      Path older = temp.resolve("older");
+      var childKey = new AtomicReference<String>();
+      bindProducer(f.coordinator, (plan, key, epoch, context, cancellation) -> {
+        childKey.set(key);
+        f.queue.enqueueRecordedEntries(key, epoch, List.of(new JobQueue.EnqueueEntry(older, 1)), null);
+        return live ? producerExit : CompletableFuture.completedFuture(JobQueue.WalkEnumerationOutcome.COMPLETE);
+      });
+      var request = f.request();
+      var accepted = f.accept(request);
+      try (var work = f.admission.admit(request.context(), false)) {
+        f.runner.start(accepted, handle -> f.coordinator.execute(handle, work.context()));
+        f.coordinator.maintain();
+        assertEquals(JobQueue.RecordedClaimDecision.ALLOW, f.coordinator.recordedClaimDecision(childKey.get()));
+        f.queue.enqueue(List.of(temp.resolve("new-0"), temp.resolve("new-1")));
+        try (var connection = java.sql.DriverManager.getConnection("jdbc:sqlite:" + temp.resolve("jobs.db"));
+            var statement = connection.createStatement()) {
+          statement.executeUpdate("UPDATE jobs SET last_updated=CASE WHEN scan_id IS NULL THEN 2 ELSE 1 END");
+        }
+        var field = SqliteJobQueue.class.getDeclaredField("connection");
+        field.setAccessible(true);
+        var actual = (java.sql.Connection) field.get(f.queue);
+        var failed = org.mockito.Mockito.mock(java.sql.Connection.class,
+            org.mockito.AdditionalAnswers.delegatesTo(actual));
+        var readFailures = new AtomicInteger();
+        org.mockito.Mockito.doAnswer(call -> {
+          readFailures.incrementAndGet();
+          throw new java.sql.SQLException("transient walk authority read");
+        }).when(failed).prepareStatement("SELECT * FROM ingestion_walk_progress WHERE operation_key = ?");
+        try {
+          field.set(f.queue, failed);
+          assertEquals(temp.resolve("new-0"), f.queue.pollPending(1).getFirst().path());
+          assertEquals(1, readFailures.get(), "fail only the per-unit walk authority SELECT");
+        } finally { field.set(f.queue, actual); }
+        f.coordinator.maintain();
+        assertEquals(JobQueue.RecordedClaimDecision.ALLOW, f.coordinator.recordedClaimDecision(childKey.get()));
+        for (int arrival = 2; arrival < 5; arrival++) {
+          f.queue.enqueue(List.of(temp.resolve("new-" + arrival)));
+          f.coordinator.maintain();
+        }
+        var claim = f.queue.pollPending(1).getFirst();
+        try {
+          assertEquals(older, claim.path(),
+              "refreshing retained authority must reconsider the older member on the next poll");
+        } finally {
+          f.queue.returnUnfinishedClaims(List.of(claim));
+          producerExit.complete(JobQueue.WalkEnumerationOutcome.COMPLETE);
+        }
+      }
+    }
+  }
+
   @Test
   void retainedChildPermissionRecoversAfterTransientDenialDespiteNewArrivals() throws Exception {
     try (Fixture f = new Fixture(temp, 1)) {
@@ -152,6 +208,112 @@ final class RecordedIngestionCoordinatorTest {
               "refreshing retained authority must reconsider the older member on the next poll");
         } finally { f.queue.returnUnfinishedClaims(List.of(claim)); }
         producerExit.complete(JobQueue.WalkEnumerationOutcome.COMPLETE);
+      }
+    }
+  }
+
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  void contradictoryReplacementNeverPublishesPermissionOrRecoversOrphans(boolean pollAtPublication) throws Exception {
+    try (Fixture f = new Fixture(temp, 1)) {
+      Path member = temp.resolve("member");
+      var childKey = new AtomicReference<String>();
+      bindProducer(f.coordinator, (plan, key, epoch, context, cancellation) -> {
+        childKey.set(key);
+        f.queue.enqueueRecordedEntries(key, epoch, List.of(new JobQueue.EnqueueEntry(member, 1)), null);
+        return CompletableFuture.completedFuture(JobQueue.WalkEnumerationOutcome.COMPLETE);
+      });
+      var request = f.request();
+      var accepted = f.accept(request);
+      try (var work = f.admission.admit(request.context(), false)) {
+        f.runner.start(accepted, handle -> f.coordinator.execute(handle, work.context()));
+        f.coordinator.maintain();
+        f.attachment.close();
+        try (var connection = java.sql.DriverManager.getConnection("jdbc:sqlite:" + temp.resolve("jobs.db"));
+            var statement = connection.createStatement()) {
+          statement.executeUpdate("UPDATE ingestion_walk_progress SET plan_hash='" + "b".repeat(64) + "'");
+          statement.executeUpdate("UPDATE jobs SET state='PROCESSING',last_updated=1");
+        }
+        var published = new ArrayList<JobQueue.RecordedClaimDecision>();
+        var claims = new ArrayList<JobQueue.IndexJob>();
+        var recoveries = new AtomicInteger();
+        JobQueue observed = org.mockito.Mockito.mock(JobQueue.class,
+            org.mockito.AdditionalAnswers.delegatesTo(f.queue));
+        org.mockito.Mockito.doAnswer(call -> {
+          published.add(f.coordinator.recordedClaimDecision(childKey.get()));
+          f.queue.recordedClaimAuthorityChanged(call.getArgument(0));
+          return null;
+        }).when(observed).recordedClaimAuthorityChanged(org.mockito.ArgumentMatchers.anyString());
+        org.mockito.Mockito.doAnswer(call -> {
+          recoveries.incrementAndGet();
+          int recovered = f.queue.recoverStuckJobs();
+          if (pollAtPublication) claims.addAll(f.queue.pollPending(1));
+          return recovered;
+        }).when(observed).recoverStuckJobs();
+        f.attachment = f.coordinator.attach(observed, () -> Optional.of(GENERATION), () -> true);
+        f.coordinator.maintain();
+        try {
+          if (pollAtPublication) assertTrue(claims.isEmpty(), "a poll during permission publication must stay fenced");
+          assertTrue(published.isEmpty(), "contradictory saved progress must never publish ALLOW");
+          assertEquals(0, recoveries.get(), "contradictory saved progress must not release an orphan");
+          assertTrue(f.queue.pollPending(1).isEmpty());
+          try (var connection = java.sql.DriverManager.getConnection("jdbc:sqlite:" + temp.resolve("jobs.db"));
+              var statement = connection.createStatement();
+              var row = statement.executeQuery("SELECT state FROM jobs")) {
+            assertTrue(row.next());
+            assertEquals("PROCESSING", row.getString(1));
+          }
+        } finally { f.queue.returnUnfinishedClaims(claims); }
+      }
+    }
+  }
+
+  @Test
+  void contradictoryLiveCheckpointNeverRefreshesPermission() throws Exception {
+    try (Fixture f = new Fixture(temp, 1)) {
+      f.attachment.close();
+      var unreadableGeneration = new AtomicBoolean();
+      JobQueue observed = org.mockito.Mockito.mock(JobQueue.class,
+          org.mockito.AdditionalAnswers.delegatesTo(f.queue));
+      f.attachment = f.coordinator.attach(observed, () -> {
+        if (unreadableGeneration.get()) throw new java.io.IOException("transient generation read");
+        return Optional.of(GENERATION);
+      }, () -> true);
+      var producerExit = new CompletableFuture<JobQueue.WalkEnumerationOutcome>();
+      var childKey = new AtomicReference<String>();
+      bindProducer(f.coordinator, (plan, key, epoch, context, cancellation) -> {
+        childKey.set(key);
+        f.queue.enqueueRecordedEntries(key, epoch, List.of(new JobQueue.EnqueueEntry(temp.resolve("member"), 1)), null);
+        return producerExit;
+      });
+      var request = f.request();
+      var accepted = f.accept(request);
+      try (var work = f.admission.admit(request.context(), false)) {
+        f.runner.start(accepted, handle -> f.coordinator.execute(handle, work.context()));
+        f.coordinator.maintain();
+        unreadableGeneration.set(true);
+        assertEquals(JobQueue.RecordedClaimDecision.DENY, f.coordinator.recordedClaimDecision(childKey.get()));
+        unreadableGeneration.set(false);
+        org.mockito.Mockito.clearInvocations(observed);
+        String expectedHash = f.queue.recordedWalk(childKey.get()).orElseThrow().planHash();
+        try (var connection = java.sql.DriverManager.getConnection("jdbc:sqlite:" + temp.resolve("jobs.db"));
+            var statement = connection.createStatement()) {
+          statement.executeUpdate("UPDATE ingestion_walk_progress SET plan_hash='" + "b".repeat(64) + "'");
+        }
+        try {
+          f.coordinator.maintain();
+          org.mockito.Mockito.verify(observed, org.mockito.Mockito.never())
+              .recordedClaimAuthorityChanged(org.mockito.ArgumentMatchers.anyString());
+          org.mockito.Mockito.verify(observed, org.mockito.Mockito.never()).recoverStuckJobs();
+          assertEquals(JobQueue.RecordedClaimDecision.DENY, f.coordinator.recordedClaimDecision(childKey.get()));
+        } finally {
+          try (var connection = java.sql.DriverManager.getConnection("jdbc:sqlite:" + temp.resolve("jobs.db"));
+              var update = connection.prepareStatement("UPDATE ingestion_walk_progress SET plan_hash=?")) {
+            update.setString(1, expectedHash);
+            update.executeUpdate();
+          }
+          producerExit.complete(JobQueue.WalkEnumerationOutcome.COMPLETE);
+        }
       }
     }
   }

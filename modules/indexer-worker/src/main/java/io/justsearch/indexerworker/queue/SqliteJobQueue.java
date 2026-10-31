@@ -648,6 +648,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
   private final MigrationStepHook migrationStepHook;
   private final java.util.function.Function<String, RecordedClaimDecision> recordedClaimPolicy;
   private final SqliteQueueSwitchBufferOps switchBufferOps;
+  private final Set<String> recordedClaimsAwaitingRefresh = new HashSet<>();
 
   private final java.util.function.LongUnaryOperator retryDelay;
 
@@ -4291,11 +4292,21 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
   }
 
   @Override
+  public boolean recordedClaimNeedsRefresh(String operationKey) {
+    lock.lock();
+    try {
+      ensureOpen();
+      return recordedClaimsAwaitingRefresh.contains(operationKey);
+    } finally { unlockAfterChanges(); }
+  }
+
+  @Override
   public void recordedClaimAuthorityChanged(String operationKey) {
     Objects.requireNonNull(operationKey, "operationKey");
     lock.lock();
     try {
       ensureOpen();
+      recordedClaimsAwaitingRefresh.remove(operationKey);
       claimCursor = null;
       claimOrderVersion++;
     } finally { unlockAfterChanges(); }
@@ -5691,6 +5702,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
       }
       return Objects.requireNonNull(recordedClaimPolicy.apply(operationKey), "recorded claim decision");
     } catch (SQLException | RuntimeException unavailableAuthority) {
+      recordedClaimsAwaitingRefresh.add(operationKey);
       log.warn("Recorded claim authority unavailable; keeping the unit fenced", unavailableAuthority);
       return RecordedClaimDecision.DENY;
     }
