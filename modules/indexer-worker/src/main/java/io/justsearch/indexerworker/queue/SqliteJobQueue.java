@@ -5303,7 +5303,8 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
     Runnable delivery = null;
     try {
       if (lock.getHoldCount() == 1 && changeStream != null) {
-        try { deliverOutsideForgetEntry(changeStream::drainCommitted); }
+        try { deliverOutsideForgetEntry(connectionFailure == null
+            ? changeStream::drainCommitted : () -> changeStream.drainCommitted(false)); }
         catch (RuntimeException | Error deliveryFailure) {
           if (connectionFailure == null) throw deliveryFailure;
           if (connectionFailure != deliveryFailure) connectionFailure.addSuppressed(deliveryFailure);

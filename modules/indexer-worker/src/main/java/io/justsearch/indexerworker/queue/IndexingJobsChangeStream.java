@@ -439,10 +439,14 @@ public final class IndexingJobsChangeStream implements IndexingJobChangeFeed, Cl
 
   /** Called under the queue lock after the outermost queue operation's claim bookkeeping. */
   void drainCommitted() {
+    drainCommitted(true);
+  }
+
+  void drainCommitted(boolean allowResync) {
     if (closed || !draining.compareAndSet(false, true)) return;
     try {
       // Idle polls and read-only observations also drain; recovery needs no later mutation.
-      if (resyncRequired) tryResync();
+      if (allowResync && resyncRequired) tryResync();
       while (!committed.isEmpty() && !closed) {
         List<CommittedDelta> batch = List.copyOf(committed);
         committed.clear();
