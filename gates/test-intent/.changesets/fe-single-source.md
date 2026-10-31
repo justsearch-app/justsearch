@@ -133,3 +133,13 @@ Preservation and declaration-generation work for frontend structure step 5. Inde
   "digest": "sha256:a1fc1c0417ee65f72cfc0a2d0c0a147b4ada025955a9cc68b77ca518155af36b"
 }
 ```
+
+```json
+{
+  "kind": "audit",
+  "role": "reviewer",
+  "session": "audit-1075-ulgg318a",
+  "verdict": "accept",
+  "digest": "sha256:a1fc1c0417ee65f72cfc0a2d0c0a147b4ada025955a9cc68b77ca518155af36b"
+}
+```
