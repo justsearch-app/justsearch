@@ -87,6 +87,12 @@ function saveOutcome(dispatch = turnId(), extra = {}, kind: ThreadEvent['kind'] 
 function newConversation(el: SearchV3View): void {
   el.shadowRoot!.querySelector('jf-sv3-sidebar')!.dispatchEvent(new CustomEvent('sv3-session-new', { bubbles: true, composed: true }));
 }
+async function loseStreamToFresh(el: SearchV3View): Promise<SearchV3View> {
+  el.remove();
+  const reloaded = await mount();
+  newConversation(reloaded); await settle(reloaded);
+  return reloaded;
+}
 const recordReads = () => http.mock.calls.filter(c => String(c[0]).includes('/api/thread/'));
 async function waitForRead(el: SearchV3View): Promise<void> {
   await new Promise(r => setTimeout(r, 650)); await settle(el);
@@ -120,16 +126,16 @@ it('addresses progress to the exact live attempt after opening another conversat
   expect(retained().payload.task).toBeNull(); expect(dispatches()).toHaveLength(1);
 });
 
-it.each(['New', 'reload'] as const)('resolves the retained exact saved outcome after %s without sending again', async departure => {
+it.each(['reload then New', 'reload'] as const)('resolves the retained exact saved outcome after %s without sending again', async departure => {
   let el = await mount(); await send(el, 'same words');
   const original = target();
-  if (departure === 'New') { newConversation(el); await settle(el); }
-  else { el.remove(); el = await mount(); }
+  el.remove(); el = await mount();
+  if (departure === 'reload then New') { newConversation(el); await settle(el); }
   await type(el, 'newer B');
   saveOutcome(); await waitForRead(el);
   expect(retained().payload.task).toBeNull();
   expect(field(el).value).toBe('newer B'); expect(dispatches()).toHaveLength(1);
-  if (departure === 'New') expect(composer(el).slotKind).not.toBe('stop');
+  if (departure === 'reload then New') expect(composer(el).slotKind).not.toBe('stop');
   restoreActiveConversation(original); await settle(el);
   expect(answer(el)).toContain('Saved answer');
   expect(dispatches()).toHaveLength(1);
@@ -137,7 +143,7 @@ it.each(['New', 'reload'] as const)('resolves the retained exact saved outcome a
 
 it.each(['question only', 'different dispatch', 'synthetic incomplete', 'empty', 'failed read', 'legacy'] as const)(
   'preserves uncertainty without exact terminal evidence: %s', async evidence => {
-    const el = await mount(); await send(el, 'same words'); newConversation(el); await settle(el);
+    let el = await mount(); await send(el, 'same words'); el = await loseStreamToFresh(el);
     if (evidence === 'question only') rows.push(row('question-1', 'USER_MESSAGE', 'same words', turnId()));
     if (evidence === 'different dispatch') saveOutcome('another-window');
     if (evidence === 'synthetic incomplete') saveOutcome(turnId(), { errorCode: 'INCOMPLETE_TURN' }, 'ERROR');
@@ -154,7 +160,7 @@ it.each(['question only', 'different dispatch', 'synthetic incomplete', 'empty',
   });
 
 it('reads a retained address even before the conversation appears in the list', async () => {
-  const el = await mount(); await send(el, 'same words'); newConversation(el); await settle(el);
+  let el = await mount(); await send(el, 'same words'); el = await loseStreamToFresh(el);
   const count = recordReads().length;
   await waitForRead(el);
   expect(recordReads().length).toBeGreaterThan(count);
@@ -173,8 +179,8 @@ it('reload after a lost terminal shows the saved answer and retires only its att
 });
 
 it.each(['error', 'no evidence', 'stopped'] as const)('a saved %s resolves delivery and shows the actual outcome', async outcome => {
-  const el = await mount(); await send(el, 'same words'); const original = target();
-  newConversation(el); await settle(el);
+  let el = await mount(); await send(el, 'same words'); const original = target();
+  el = await loseStreamToFresh(el);
   if (outcome === 'error') saveOutcome(turnId(), { errorCode: 'LLM_ERROR' }, 'ERROR');
   if (outcome === 'no evidence') saveOutcome(turnId(), { errorCode: 'NO_CONTENT', retrievalScoped: false }, 'ERROR');
   if (outcome === 'stopped') saveOutcome(turnId(), { disposition: 'CANCELLED' });
@@ -198,10 +204,10 @@ it('completion saved before the Stop response wins even when its live terminal i
   let release!: (r: Response) => void;
   http.mockImplementation((url: unknown, init?: RequestInit) => String(url).endsWith('/stop')
     ? new Promise<Response>(r => { release = r; }) : fallback(url, init));
-  const el = await mount(); await send(el, 'same words'); const original = target();
+  let el = await mount(); await send(el, 'same words'); const original = target();
   composer(el).shadowRoot!.querySelector<HTMLElement>('[data-testid=sv3-composer-stop]')!.click();
   await settle(el); saveOutcome();
-  newConversation(el); await settle(el);
+  el = await loseStreamToFresh(el);
   release(json({ status: 'NOT_RUNNING' })); await waitForRead(el);
   expect(retained().payload.task).toBeNull();
   restoreActiveConversation(original); await settle(el);
@@ -211,7 +217,7 @@ it('completion saved before the Stop response wins even when its live terminal i
 });
 
 it('a failed retirement ACK retains recoverable A and companion B until a successful check', async () => {
-  const el = await mount(); await send(el, 'same words'); newConversation(el); await settle(el);
+  let el = await mount(); await send(el, 'same words'); el = await loseStreamToFresh(el);
   await type(el, 'newer B');
   const storage = sessionStorage;
   const original = storage.setItem;
@@ -284,7 +290,7 @@ it('each authorized admission continuation retains a fresh identity before its P
 
 it.each(['manual', 'open', 'reconnect'] as const)('S15 finite checking budget retains uncertainty until %s rearms it', async rearm => {
   vi.useFakeTimers();
-  const el = await mount(); await send(el, 'same words'); newConversation(el); await settle(el);
+  let el = await mount(); await send(el, 'same words'); el = await loseStreamToFresh(el);
   const first = recordReads().length;
   await vi.advanceTimersByTimeAsync(31000); await settle(el);
   const exhausted = recordReads().length;
@@ -312,7 +318,7 @@ it.each(['manual', 'open', 'reconnect'] as const)('S15 finite checking budget re
 
 it('S15 a slow record read survives polling ticks and can settle its own attempt', async () => {
   vi.useFakeTimers();
-  const el = await mount(); await send(el, 'same words'); newConversation(el); await settle(el);
+  let el = await mount(); await send(el, 'same words'); el = await loseStreamToFresh(el);
   const fallback = http.getMockImplementation()!;
   const signals: AbortSignal[] = [];
   let release!: (r: Response) => void;
@@ -371,7 +377,7 @@ it.each(['stalled', 'old snapshot'] as const)('S15 bounds an opening read starte
 
 it('S15 a timed-out abort-ignoring read cannot stop checking or override a newer result', async () => {
   vi.useFakeTimers();
-  const el = await mount(); await send(el, 'same words'); newConversation(el); await settle(el);
+  let el = await mount(); await send(el, 'same words'); el = await loseStreamToFresh(el);
   const fallback = http.getMockImplementation()!;
   let release!: (r: Response) => void;
   let signal!: AbortSignal;
@@ -397,7 +403,7 @@ it('S15 a timed-out abort-ignoring read cannot stop checking or override a newer
 
 it.each(['navigate', 'delete'] as const)('S15 a late retained-address read cannot undo %s', async departure => {
   vi.useFakeTimers();
-  const el = await mount(); await send(el, 'same words'); newConversation(el); await settle(el);
+  let el = await mount(); await send(el, 'same words'); el = await loseStreamToFresh(el);
   const original = target();
   const fallback = http.getMockImplementation()!;
   let release!: (r: Response) => void;
@@ -458,7 +464,7 @@ it('S15 leaves an unrelated opening read unbounded without a retained attempt', 
 });
 
 it('a Retry gets a fresh retained dispatch and resolves only in the fork actually sent to', async () => {
-  const el = await mount(); await send(el, 'same words');
+  let el = await mount(); await send(el, 'same words');
   const originalId = turnId();
   saveOutcome();
   rows = rows.map((r, i) => ({ ...r, id: `11111111-2222-4333-8444-${String(i + 1).padStart(12, '0')}` }));
@@ -483,7 +489,7 @@ it('a Retry gets a fresh retained dispatch and resolves only in the fork actuall
   expect(body(1).conversationId).toBe('child-fork');
   expect(body(1).turnId).not.toBe(originalId);
   expect(retainedAtPost).toEqual([expect.objectContaining({ target: 'child-fork', dispatchTurnId: body(1).turnId })]);
-  newConversation(el); await settle(el);
+  el = await loseStreamToFresh(el);
   // A parent's inherited stamp cannot confirm this new child dispatch.
   forkRows = [...rows]; await waitForRead(el);
   expect(retained().payload.task?.dispatchTurnId).toBe(body(1).turnId);

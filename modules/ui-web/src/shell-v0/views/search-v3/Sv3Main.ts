@@ -1371,6 +1371,7 @@ export class Sv3Main extends JfElement {
     continuationVersions: { attribute: false },
     floorSummary: { attribute: false },
     streaming: { type: Boolean },
+    checkingSavedOutcome: { type: Boolean, attribute: 'checking-saved-outcome' },
     stopping: { attribute: false },
     checkingTurnId: { attribute: false },
     modelAnswerUnavailableReason: { attribute: false },
@@ -1495,6 +1496,7 @@ export class Sv3Main extends JfElement {
    * flight, and a turn that is not itself streaming cannot see that.
    */
   declare streaming: boolean;
+  declare checkingSavedOutcome: boolean;
   /**
    * The reader's Stop on the streaming answer. Only the Engine's terminal says the turn stopped, so
    * until then the turn says "Stopping…", or that the Stop did not reach the Engine.
@@ -1676,6 +1678,7 @@ export class Sv3Main extends JfElement {
     this.continuationVersions = null;
     this.floorSummary = null;
     this.streaming = false;
+    this.checkingSavedOutcome = false;
     this.checkingTurnId = null;
     this.stopping = null;
     this.showFloorSummary = false;
@@ -2064,7 +2067,7 @@ export class Sv3Main extends JfElement {
           : html`
               ${this.rewriteNote(turn)}${this.reasoningBlocks(turn, streaming)}
               <div class="answer" data-testid="sv3-turn-answer" data-item-id=${`${turn.id}:a`}>
-                ${empty && (turn.kind === 'model' || turn.shapeId === 'core.extract') && turn.status !== 'complete' ? nothing : empty && !streaming
+                ${empty && (turn.kind === 'model' || turn.shapeId === 'core.extract') && turn.status !== 'complete' ? nothing : empty && !streaming && turn.status !== 'unfinished'
                   ? html`<span class="answer-empty" data-testid="sv3-turn-answer-empty"
                       >${TURN_EMPTY_ANSWER}</span
                     >`
@@ -3199,6 +3202,11 @@ export class Sv3Main extends JfElement {
    * called stopped until the Engine says it is.
    */
   private turnNote(turn: Sv3Turn): TemplateResult | typeof nothing {
+    if (turn.status === 'unfinished') return html`<span class="tail-note" role="status" data-testid="sv3-turn-unfinished">
+      No saved outcome yet. This answer may still be being written.
+      ${this.checkingSavedOutcome ? 'Checking the saved conversation…' : html`<button type="button" data-testid="sv3-record-check"
+        @click=${() => this.dispatchEvent(new CustomEvent('sv3-record-check', { bubbles: true, composed: true }))}>Check again</button>`}
+    </span>`;
     if (turn.status === 'streaming') {
       const stop = this.stopping?.turnId === turn.id ? this.stopping.state : null;
       if (stop === null) return nothing;

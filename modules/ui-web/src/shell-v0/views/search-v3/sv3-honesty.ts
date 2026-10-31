@@ -413,6 +413,7 @@ export function projectSv3AnswerFrame(
 ): Sv3AnswerFrame | null {
   // Model turns always name their provenance, including while streaming or after a failure.
   // Only a completed Ask gets a grounding frame; its other outcomes have their own notes.
+  if (turn.status === 'unfinished') return null;
   if (turn.kind !== 'model' && (turn.kind !== 'ask' || turn.status !== 'complete')) return null;
   const tail = sv3ReceiptTail(
     turn.durationMs,

@@ -57,7 +57,7 @@ const sv3HistoryOf = (history: ResumedConversation): Sv3SessionHistory => ({
 export class Sv3ContextDomain {
   /** Reads supersede only the same conversation, including Stop reconciliation after navigation. */
   private readonly recordReads = new Map<string, { controller: AbortController; bound(): void }>();
-  private retainedCheck: { target: string; key: string; until: number } | null = null;
+  private readonly retainedChecks = new Map<string, { key: string; until: number }>();
   private retainedTimer: ReturnType<typeof setTimeout> | null = null;
   private readonly forgotten = new Set<string>();
   private readonly historyReads = new Map<string, AbortController>();
@@ -71,6 +71,26 @@ export class Sv3ContextDomain {
   private compactingValue = false;
 
   constructor(private readonly host: ContextHost, private readonly transport: ContextTransport) {}
+
+  get unfinishedConversation(): boolean {
+    return this.activeSession?.turns.some(turn => turn.status === 'unfinished') === true;
+  }
+
+  private retainedAttempts(): { target: string; key: string }[] {
+    const retained = this.host.retainedAttempt?.();
+    const session = this.activeSession;
+    const unfinished = session?.turns.filter(turn => turn.status === 'unfinished') ?? [];
+    const attempts = retained ? [retained] : [];
+    if (session && unfinished.length > 0 && retained?.target !== session.id) {
+      attempts.push({ target: session.id, key: JSON.stringify(['unfinished', session.id, unfinished.map(turn => turn.recordId ?? turn.id)]) });
+    }
+    return attempts;
+  }
+
+  get checkingSavedOutcome(): boolean {
+    const check = this.retainedChecks.get(this.host.activeConversationId() ?? '');
+    return check !== undefined && Date.now() < check.until;
+  }
 
   get recordNotice(): boolean { return this.recordNoticeValue; }
   set recordNotice(value: boolean) {
@@ -101,14 +121,14 @@ export class Sv3ContextDomain {
 
   forgetConversation(id: string): void {
     this.forgotten.add(id);
-    if (this.retainedCheck?.target === id) this.clearRetainedTimer();
+    this.retainedChecks.delete(id);
     this.recordReads.get(id)?.controller.abort();
     this.recordReads.delete(id);
   }
 
   disconnect(): void {
     this.clearRetainedTimer();
-    this.retainedCheck = null;
+    this.retainedChecks.clear();
     for (const read of this.recordReads.values()) read.controller.abort();
     this.recordReads.clear();
     this.host.clearRecordRetry();
@@ -132,11 +152,11 @@ export class Sv3ContextDomain {
    */
   async refreshRecord(conversationId: string, automatic = false): Promise<boolean> {
     if (!this.host.connected() || this.forgotten.has(conversationId)) return false;
-    if (!automatic && this.host.retainedAttempt?.()?.target === conversationId) this.checkRetainedAttempt(true);
+    if (!automatic) this.checkRetainedAttempt(true, conversationId);
     this.recordReads.get(conversationId)?.controller.abort();
     const abort = new AbortController();
     let failed = false;
-    const watching = this.host.retainedAttempt?.()?.target === conversationId;
+    const watching = this.retainedAttempts().some(attempt => attempt.target === conversationId);
     const wait = this.host.recordReadWait(conversationId) ?? (watching ? 10000 : undefined);
     // Race the signal as well as passing it to fetch: a stalled/abort-ignoring transport must not
     // hold the checker forever. Its eventual response has no authority after this read retires.
@@ -173,28 +193,40 @@ export class Sv3ContextDomain {
   }
 
   /** Only read records. A finite budget never changes delivery state or grants sending authority. */
-  checkRetainedAttempt(rearm = false): void {
-    const attempt = this.host.retainedAttempt?.();
-    if (!this.host.connected() || !attempt || this.forgotten.has(attempt.target)) {
-      this.clearRetainedTimer(); this.retainedCheck = null; return;
+  checkRetainedAttempt(rearm = false, target?: string): void {
+    const attempts = this.host.connected()
+      ? this.retainedAttempts().filter(attempt => !this.forgotten.has(attempt.target)) : [];
+    let changed = false;
+    for (const id of this.retainedChecks.keys()) {
+      if (!attempts.some(attempt => attempt.target === id)) {
+        this.retainedChecks.delete(id); changed = true;
+      }
     }
-    if (rearm || this.retainedCheck?.key !== attempt.key) {
-      this.clearRetainedTimer();
-      this.retainedCheck = { ...attempt, until: Date.now() + 30000 };
+    for (const attempt of attempts) {
+      if (rearm && (target === undefined || target === attempt.target)
+        || this.retainedChecks.get(attempt.target)?.key !== attempt.key) {
+        this.retainedChecks.set(attempt.target, { key: attempt.key, until: Date.now() + 30000 });
+        changed = true;
+      }
+      // Opening reads can predate recovery. Adoption bounds only the matching read.
+      this.recordReads.get(attempt.target)?.bound();
     }
-    // Opening reads can predate recovery, or start while the stream still owns the attempt.
-    // Bound them on adoption without extending an existing deadline or timing out other reads.
-    this.recordReads.get(attempt.target)?.bound();
-    if (this.retainedTimer !== null || Date.now() >= this.retainedCheck!.until) return;
+    if (changed) this.host.requestUpdate();
+    const remaining = [...this.retainedChecks.values()].map(check => check.until - Date.now()).filter(wait => wait > 0);
+    if (remaining.length === 0) { this.clearRetainedTimer(); return; }
+    if (this.retainedTimer !== null) return;
     this.retainedTimer = setTimeout(() => {
       this.retainedTimer = null;
-      const pending = this.retainedCheck;
-      if (!pending || this.host.retainedAttempt?.()?.key !== pending.key) { this.checkRetainedAttempt(); return; }
-      if (Date.now() >= pending.until) { this.host.requestUpdate(); return; }
-      // An opening/manual read already in flight gets its bounded wait; ticks never supersede it.
-      if (this.recordReads.has(pending.target)) { this.checkRetainedAttempt(); return; }
-      void this.refreshRecord(pending.target, true);
-    }, Math.min(500, this.retainedCheck!.until - Date.now()));
+      for (const attempt of this.retainedAttempts()) {
+        const pending = this.retainedChecks.get(attempt.target);
+        // An opening/manual read gets its bounded wait; ticks never supersede it.
+        if (pending?.key === attempt.key && Date.now() < pending.until && !this.recordReads.has(attempt.target)) {
+          void this.refreshRecord(attempt.target, true);
+        }
+      }
+      this.host.requestUpdate();
+      this.checkRetainedAttempt();
+    }, Math.min(500, ...remaining));
   }
 
   /** A saved outcome can arrive after cached context. Force a companion history read before send. */
@@ -295,6 +327,7 @@ export class Sv3ContextDomain {
   runContextAction(detail: Sv3ContextAction): Promise<void> {
     const session = this.activeSession;
     if (session === null) return Promise.resolve();
+    if (detail.action !== 'inspect' && session.turns.some(turn => turn.status === 'unfinished')) return Promise.resolve();
     if (detail.action === 'inspect') {
       this.host.openContextInspector();
       return Promise.resolve();
@@ -438,6 +471,7 @@ export class Sv3ContextDomain {
   }
 
   followUpContextOf(sessionId: string): ReturnType<typeof sv3FollowUpContext> | null {
+    if (this.host.session(sessionId)?.turns.some(turn => turn.status === 'unfinished')) return null;
     const session = this.host.session(sessionId);
     if (session?.history == null) return null;
     return sv3FollowUpContext(session.turns, projectSv3TurnContexts(session.turns, session.history), session.history);

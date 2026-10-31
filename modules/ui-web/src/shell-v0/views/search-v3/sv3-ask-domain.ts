@@ -192,7 +192,7 @@ export class Sv3AskDomain {
   async runAsk(rawQuestion: string, scope: Sv3AskScope | null = null, schema?: string, modelAnswer = false,
     options: { task?: HumanTask; continuation?: boolean; turnAction?: boolean; record?: string; authored?: string } = {}): Promise<void> {
     let question = rawQuestion.trim();
-    if (question === '' || this.streaming) return;
+    if (question === '' || this.streaming || this.activeSession?.turns.some(turn => turn.status === 'unfinished')) return;
     if (!options.task && !options.turnAction && !this.draftDomain.draftMayIssue(false)) return;
     const handoff = options.task ? { shapeId: options.task.saved.shape, selection: options.task.selection }
       : modelAnswer ? null : this.draftDomain.preparedHandoff;
@@ -291,19 +291,20 @@ export class Sv3AskDomain {
     // terminal says "stopped" (an error with CANCELLED, saved as stopped) or "finished" (`done`), and
     // every word it sent before the Stop landed, which it saves, reaches the turn. A question still
     // waiting to be sent (for the conversation's settings, or for Engine capacity) is sent all the
-    // same, and the Engine records it as stopped. Only a window that unmounts or starts afresh lets
+    // same, and the Engine records it as stopped. A window that unmounts lets
     // the stream go (`abortAsk`): the Engine finishes and saves the turn, as it does for a closed tab.
     // The id the Stop names is this dispatch's own, never the turn's place in the list, which another
     // window or a reload can hand out again: the Engine ignores a Stop for a turn that finished.
     const reasoning = this.host.createReasoning();
     const stopAttempt = new StopAttempt();
     const stop = (): void => {
-      if (stopAttempt.pending || stopAttempt.outcome === 'accepted') return;
-      stopAttempt.latch();
-      this.draftDomain.revokeHumanTask();
-      this.draftDomain.saveRecovery();
       const ask = this.liveAsks.get(ref.sessionId);
-      if (ask === undefined) return;
+      if (ask?.abort !== abort || stopAttempt.pending || stopAttempt.outcome === 'accepted') return;
+      stopAttempt.latch();
+      if (this.draftDomain.humanTask === task) {
+        this.draftDomain.revokeHumanTask();
+        this.draftDomain.saveRecovery();
+      }
       ask.stopping = { turnId: ref.turnId, state: 'stopping' };
       this.syncActiveAsk();
       void stopAttempt.deliver((signal) => sv3StopAsk(this.host.apiBase(), ref.sessionId, dispatchId, signal)).then(() => {
@@ -364,7 +365,9 @@ export class Sv3AskDomain {
       this.contextDomain.checkRetainedAttempt();
       this.host.requestUpdate();
     };
-    const currentAttempt = (): boolean => this.draftDomain.humanTask === task && task.saved.dispatchTurnId === dispatchId;
+    // Discard releases recovery and the submission slot, not this dispatch's stream or turn.
+    const currentAttempt = (): boolean => this.liveAsks.get(ref.sessionId)?.abort === abort;
+    const retainedTask = (): boolean => this.draftDomain.humanTask === task;
     await sv3Ask(
       {
         apiBase: this.host.apiBase(),
@@ -413,8 +416,8 @@ export class Sv3AskDomain {
         },
         onDone: (usage) => {
           if (!currentAttempt()) { settle('left'); return; }
-          if (schema !== undefined && task.ownsComposer && draft.port.isCurrent(draft) && this.search.pendingScope === task.scopeOwner) this.search.clearScope();
-          if (schema !== undefined && task.ownsComposer && draft.port.isCurrent(draft)) {
+          if (retainedTask() && schema !== undefined && task.ownsComposer && draft.port.isCurrent(draft) && this.search.pendingScope === task.scopeOwner) this.search.clearScope();
+          if (retainedTask() && schema !== undefined && task.ownsComposer && draft.port.isCurrent(draft)) {
             this.draftDomain.assigningHumanDraft = true;
             try { draft.port.clearIf(draft); } finally { this.draftDomain.assigningHumanDraft = false; }
           }
@@ -438,7 +441,7 @@ export class Sv3AskDomain {
           if (!currentAttempt()) { settle('left'); return; }
           task.saved.delivery = 'unaccepted';
           task.revoked = true;
-          this.draftDomain.saveRecovery(task);
+          if (retainedTask()) this.draftDomain.saveRecovery(task);
           settle('refused', reasonFor('conversations.locked').wording);
           // The SERVER just said the store is locked, which is newer than any poll (inventory E4/E5).
           this.host.noteRefusedWhileLocked();
@@ -453,24 +456,27 @@ export class Sv3AskDomain {
           void this.contextDomain.refreshRecord(ref.sessionId);
         },
         onLeft: () => {
-          if (currentAttempt() && this.host.connected()) { task.revoked = true; this.draftDomain.saveRecovery(task); }
+          if (retainedTask() && this.host.connected()) { task.revoked = true; this.draftDomain.saveRecovery(task); }
           settle('left');
         },
         onFailed: (message, code, refusal) => {
           if (!currentAttempt()) { settle('left'); return; }
+          const retained = retainedTask();
           if (refusal !== null && refusal !== undefined) {
             task.saved.delivery = 'unaccepted';
             task.refusal = refusal;
             task.retryAt = Date.now() + (refusal.retryAfterMs ?? 0);
-            this.draftDomain.scheduleHumanRetry(task);
-            this.draftDomain.saveRecovery(task);
+            if (retainedTask()) {
+              this.draftDomain.scheduleHumanRetry(task);
+              this.draftDomain.saveRecovery(task);
+            }
             settle('left');
             return;
           }
           // A terminal Structured turn without accepted output is final, never a retryable
           // delivery uncertainty or an answer for the next turn's context.
           if (code === 'NO_CONTENT') this.draftDomain.retireHumanTask(task);
-          else { task.saved.delivery = 'unknown'; task.revoked = true; this.draftDomain.saveRecovery(task); }
+          else if (retainedTask()) { task.saved.delivery = 'unknown'; task.revoked = true; this.draftDomain.saveRecovery(task); }
           if (code === 'INVALID_REQUEST' && /pathPrefix|modifiedAt|sizeBytes/.test(message)) this.askFilterError = message;
           const restricted = hasActiveFilter(task.filters);
           if (code === 'NO_CONTENT' && restricted) message += ` ${localizeResourceKey('search.filters.no-content')} ${restrictionLabels(task.filters).map(f => f.label).join('; ')}`;
@@ -478,7 +484,7 @@ export class Sv3AskDomain {
           settle(noEvidence ? 'no-evidence' : 'failed', noEvidence ? '' : message);
           void this.transport.loadConversations();
           void this.contextDomain.refreshRecord(ref.sessionId);
-          if (handoff !== null && this.host.activeConversationId() === ref.sessionId && task.ownsComposer && sentDraft.port.isCurrent(sentDraft)) {
+          if (retained && handoff !== null && this.host.activeConversationId() === ref.sessionId && task.ownsComposer && sentDraft.port.isCurrent(sentDraft)) {
             this.draftDomain.preparedHandoff = handoff;
             this.search.prepare(scope);
             this.draftDomain.assigningHumanDraft = true;

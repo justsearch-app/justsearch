@@ -1161,7 +1161,7 @@ export class SearchV3View extends JfElement {
     search: () => this.search,
     sessions: () => this.sessionsDomain,
     connected: () => this.isConnected,
-    streaming: () => this.streaming,
+    streaming: () => this.streaming || this.contextDomain.unfinishedConversation,
     historyLocked: () => this.historyLocked,
     lockedRefusal: () => this.lockedRefusal,
     delegateUnavailableReason: () => this.delegateUnavailableReason,
@@ -1612,7 +1612,7 @@ export class SearchV3View extends JfElement {
     const contexts = this.contextDomain.turnContexts();
     const items = sv3ContextMenuItems(contexts, detail.turnId, {
       compacting: this.contextDomain.compacting,
-      streaming: this.streaming,
+      streaming: this.streaming || this.contextDomain.unfinishedConversation,
       contextFloor: session.history?.contextFloor ?? null,
       hasSummary: (session.history?.contextFloorSummary ?? null) !== null,
     });
@@ -1620,7 +1620,7 @@ export class SearchV3View extends JfElement {
     // ids — a turn can be excludable and not forkable — but a turn has one ⋯, and a second overflow
     // beside the first would be a second place to look for "what can I do with this turn".
     const branch = sv3BranchMenuItems(this.branchDomain.turnLineage(), detail.turnId, {
-      streaming: this.streaming,
+      streaming: this.streaming || this.contextDomain.unfinishedConversation,
     });
     if (items.length === 0 && branch.length === 0) return;
     const turn = session.turns.find(turn => turn.id === detail.turnId);
@@ -2531,6 +2531,7 @@ export class SearchV3View extends JfElement {
    * directive leaves through the ONE `dispatchRunControl` seam (`governance/steering-surfaces.v1.json`).
    */
   private delegate(text: string, turnAction = false): void {
+    if (this.contextDomain.unfinishedConversation) return;
     // Defence in depth, not a second gate: the composer already refuses an unavailable delegate and
     // keeps the draft. This exists because `delegate` is reachable from the window's own routing.
     if (this.delegateUnavailableReason !== '') return;
@@ -2791,6 +2792,9 @@ export class SearchV3View extends JfElement {
         @sv3-palette-request=${this.onPaletteRequest}
         @sv3-remedy=${this.onRemedy}
         @sv3-citation-open=${this.onCitationOpen}
+        @sv3-record-check=${() => {
+          if (this.sessions.activeId !== null) void this.contextDomain.refreshRecord(this.sessions.activeId);
+        }}
         @sv3-context-menu=${this.onContextMenu}
         @sv3-context-action=${(event: CustomEvent<Sv3ContextAction>) => {
           if (event.detail !== undefined) void this.contextDomain.runContextAction(event.detail);
@@ -2839,7 +2843,8 @@ export class SearchV3View extends JfElement {
           .turnLineage=${this.branchDomain.turnLineage()}
           .continuationVersions=${this.branchDomain.continuationVersions()}
           .floorSummary=${session?.history?.contextFloorSummary ?? null}
-          ?streaming=${this.streaming}
+          ?streaming=${this.streaming || this.contextDomain.unfinishedConversation}
+          ?checking-saved-outcome=${this.contextDomain.checkingSavedOutcome}
           .stopping=${this.askStopping ?? this.runDomain.runStopping()}
           .checkingTurnId=${this.askCheckingTurnId}
           data-testid="sv3-main"

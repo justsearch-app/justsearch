@@ -354,8 +354,7 @@ describe('New session parks the conversation and returns the window to the hero'
 
     await newSession(el);
     await settle(el);
-    // Leaving is not a Stop: the Engine finishes and saves the answer, so back on the parked
-    // session nothing reads as stopped, nor as forever-running; the record shows what was saved.
+    // Leaving is not a Stop: reopening the conversation keeps its live stream.
     await clickRow((await rowsOf(el))[0] as Sv3SessionRow);
     await settle(el);
     const main = await region(el, 'jf-sv3-main');
@@ -363,7 +362,7 @@ describe('New session parks the conversation and returns the window to the hero'
       (turn) => turn.dataset.status,
     );
     expect(statuses).not.toContain('halted');
-    expect(statuses).not.toContain('streaming');
+    expect(statuses).toContain('streaming');
   });
 });
 

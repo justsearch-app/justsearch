@@ -752,7 +752,7 @@
     },
     {
       "id": "SW-ASK-06",
-      "behavior": "Leaving the screen sends no Stop request, and starting another conversation does not label the previous answer stopped.",
+      "behavior": "Leaving the screen sends no Stop request. New keeps the previous conversation’s live Ask arriving, with its own Stop on return, and never labels it stopped merely for leaving.",
       "kind": "works-today",
       "races": [
         "second-conversation-or-tab",
@@ -1293,7 +1293,7 @@
     },
     {
       "id": "SW-LIST-01",
-      "behavior": "New conversation opens a fresh composer while keeping earlier conversations reachable.",
+      "behavior": "New conversation opens an empty composer while retaining the previous place’s draft, chosen files, mode and schema; its live Ask continues in its own conversation. A draft without a place owner is retired as before.",
       "kind": "works-today",
       "races": [
         "second-conversation-or-tab"
@@ -2324,7 +2324,7 @@
     },
     {
       "id": "SW-DRFT-08",
-      "behavior": "New search settles its empty address before reload and reports uncertainty if draft retirement cannot be confirmed.",
+      "behavior": "New settles its empty address and clears its reload pointer before reload, retaining authored work at its previous place without filling the fresh composer. If retention or raw-slot/pointer retirement cannot be acknowledged, New is refused visibly without evicting another draft.",
       "kind": "works-today",
       "races": [
         "late-response",
