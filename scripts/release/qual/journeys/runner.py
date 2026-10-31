@@ -111,8 +111,10 @@ def collect_hosted_crashes(out, since):
     """Fold systemd-coredump observations into the completed hosted report."""
     out = Path(out)
     report = json.loads((out / 'summary.json').read_text())
+    collection_errors = []
     try:
         observations = []
+        entries = []
         def collect():
             result = subprocess.run(['sudo', '-n', 'env', 'LC_ALL=C', 'coredumpctl', '--json=short', '--no-pager',
                                      '--since', since, 'list'], capture_output=True, text=True, timeout=30)
@@ -120,20 +122,26 @@ def collect_hosted_crashes(out, since):
             (out / 'coredumpctl.json').write_text(json.dumps(observations, indent=2) + '\n')
             (out / 'coredumpctl.stderr.txt').write_text(result.stderr)
             # systemd appends this notice to stdout even with --json=short.
-            # An empty journal during active collection is not a final result.
-            if re.search(r'(?m)^-- Notice: \d+ systemd-coredump@\.service units? (?:is|are) running, output may be incomplete\.$', result.stdout.strip()):
-                return None
-            return result
-        result = wait_for(collect, 'Hosted coredump collectors finished', seconds=60,
-                          interval=1, error=Infrastructure)
-        # coredumpctl returns 1 for an empty journal, as well as for real errors.
-        if result.returncode and not (result.returncode > 0
-                and result.stderr.strip() == 'No coredumps found.'
-                and result.stdout.strip() in ('', '[]')):
-            raise Infrastructure('coredumpctl collection failed: ' + result.stderr)
-        entries = json.loads(result.stdout) if result.stdout.strip() else []
-        if not isinstance(entries, list):
-            raise Infrastructure('coredumpctl did not return a JSON array')
+            payload, running = re.subn(r'(?m)^-- Notice: \d+ systemd-coredump@\.service units? (?:is|are) running, output may be incomplete\.$', '', result.stdout.strip())
+            observed = json.loads(payload) if payload.strip() else []
+            if not isinstance(observed, list):
+                raise Infrastructure('coredumpctl did not return a JSON array')
+            # Retain every observation: a later empty result or an unfinished
+            # collector must never erase an already observed product crash.
+            for entry in observed:
+                if entry not in entries:
+                    entries.append(entry)
+            return None if running else result
+        try:
+            result = wait_for(collect, 'Hosted coredump collectors finished', seconds=60,
+                              interval=1, error=Infrastructure)
+            # coredumpctl returns 1 for an empty journal, as well as for real errors.
+            if result.returncode and not (result.returncode > 0
+                    and result.stderr.strip() == 'No coredumps found.'
+                    and result.stdout.strip() in ('', '[]')):
+                raise Infrastructure('coredumpctl collection failed: ' + result.stderr)
+        except Exception as exc:
+            collection_errors.append(exc)
         (out / 'coredumps.json').write_text(json.dumps(entries, indent=2) + '\n')
         paths = subprocess.run(['dpkg-query', '-L', 'just-search'], capture_output=True, text=True)
         if paths.returncode not in (0, 1):
@@ -158,6 +166,8 @@ def collect_hosted_crashes(out, since):
                     'name': attribution, 'status': status, 'reason': json.dumps(found),
                     'evidence': ['coredumps.json', 'hosted-crashes.json', 'app-processes.json']}]})
     except Exception as exc:
+        collection_errors.append(exc)
+    for exc in collection_errors:
         report['journeys'].append({'id': 'hosted-crashes', 'checks': [{
             'name': 'collection', 'status': 'failed-infrastructure', 'reason': str(exc),
             'evidence': ['coredumpctl.json', 'coredumpctl.stderr.txt']}]})

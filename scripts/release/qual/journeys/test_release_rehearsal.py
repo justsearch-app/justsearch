@@ -179,6 +179,43 @@ console.log(JSON.stringify(fn(JSON.parse(process.argv[4]))));
             self.assertEqual(report['counts']['failed-infrastructure'], 0)
             self.assertEqual(json.loads((out/'coredumps.json').read_text()), [])
 
+    def test_observed_product_crash_survives_unfinished_collection(self):
+        entry = {'exe': '/opt/JustSearch', 'sig': 11}
+        notice = '-- Notice: 1 systemd-coredump@.service unit is running, output may be incomplete.\n'
+        for finished in (False, True):
+            with self.subTest(finished=finished), tempfile.TemporaryDirectory() as temp:
+                out = Path(temp)
+                (out/'summary.json').write_text(json.dumps({'journeys': [], 'fullSelection': True}))
+                observations = iter([
+                    NS(returncode=0, stdout=json.dumps([entry]) + '\n' + notice, stderr=''),
+                    NS(returncode=0, stdout='[]' if finished else json.dumps([entry]) + '\n' + notice, stderr='')])
+                def command(args, **kw):
+                    if 'coredumpctl' in args:
+                        return next(observations)
+                    self.assertEqual(args, ['dpkg-query', '-L', 'just-search'])
+                    return NS(returncode=0, stdout='/opt/JustSearch\n', stderr='')
+                with patch.object(runner.subprocess, 'run', side_effect=command), \
+                     patch.object(runner.time, 'monotonic', side_effect=[0, 0, 30, 60]), \
+                     patch.object(runner.time, 'sleep'):
+                    code = runner.collect_hosted_crashes(out, '2026-10-31T00:00:00Z')
+                report = json.loads((out/'summary.json').read_text())
+                self.assertEqual(code, 1)
+                self.assertEqual(report['counts']['failed-product'], 1)
+                self.assertEqual(report['counts']['failed-infrastructure'], 0 if finished else 1)
+                checks = [c for j in report['journeys'] for c in j['checks']]
+                product = next(c for c in checks if c['status'] == 'failed-product')
+                self.assertIn('/opt/JustSearch', product['reason'])
+                self.assertIn('"Signal": "11"', product['reason'])
+                for evidence in ('coredumps.json', 'hosted-crashes.json'):
+                    self.assertIn(evidence, product['evidence'])
+                self.assertEqual(json.loads((out/'coredumps.json').read_text()), [entry])
+                self.assertEqual(json.loads((out/'hosted-crashes.json').read_text())[0]['attribution'], 'product')
+                self.assertEqual(len(json.loads((out/'coredumpctl.json').read_text())), 2)
+                if not finished:
+                    collection = next(c for c in checks if c['status'] == 'failed-infrastructure')
+                    self.assertIn('Hosted coredump collectors finished timed out after 60s', collection['reason'])
+                    self.assertIn('coredumpctl.json', collection['evidence'])
+
     def test_shutdown_captures_owned_identities_before_driver_retires_engine(self):
         run = Mock(wd=Mock(), facts={}, target=Mock())
         driver = run.wd
