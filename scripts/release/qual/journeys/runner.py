@@ -719,6 +719,57 @@ class Run:
     def evidence(self, name, value):
         (self.out / (name + '.json')).write_text(json.dumps(redact(value), indent=2) + '\n')
 
+    def collect_app_logs(self, name):
+        """Snapshot logs on the app's target without changing the check verdict."""
+        folder = self.out / name
+        errors = []
+        try:
+            folder.mkdir(parents=True, exist_ok=True)
+            if self.data is None:
+                raise Infrastructure('App data directory is not available')
+            snapshot = self.target.json('''
+import json,os,stat,sys
+from pathlib import Path
+root=Path(json.loads(sys.argv[1]))/'logs'
+files={};errors=[]
+def alias(path):
+ return path.is_symlink() or (hasattr(path,'is_junction') and path.is_junction())
+if alias(root):raise RuntimeError('App logs directory is an alias: '+str(root))
+for directory,folders,names in os.walk(root,onerror=lambda exc:errors.append(str(exc)),followlinks=False):
+ base=Path(directory)
+ folders[:]=[name for name in folders if not alias(base/name)]
+ for name in names:
+  path=base/name
+  try:
+   if not stat.S_ISREG(path.lstat().st_mode):continue
+   with path.open('rb') as stream:
+    stream.seek(0,os.SEEK_END)
+    stream.seek(max(0,stream.tell()-4_000_000))
+    content=stream.read(4_000_000)
+   files[path.relative_to(root).as_posix()]=content.decode('utf-8',errors='replace')
+  except Exception as exc:errors.append(str(path)+': '+str(exc))
+print(json.dumps({'files':files,'errors':errors}))
+''', self.data)
+            errors.extend(snapshot['errors'])
+            for relative, content in snapshot['files'].items():
+                try:
+                    destination = folder / relative
+                    destination.parent.mkdir(parents=True, exist_ok=True)
+                    content = re.sub(r'("sessionToken"\s*:\s*")[^"]+', r'\1<redacted>', content)
+                    destination.write_text(content, encoding='utf-8')
+                except Exception as exc:
+                    errors.append(relative + ': ' + str(exc))
+        except Exception as exc:
+            errors.append(str(exc))
+        if errors:
+            try:
+                folder.mkdir(parents=True, exist_ok=True)
+                content = re.sub(r'("sessionToken"\s*:\s*")[^"]+', r'\1<redacted>', '\n'.join(errors))
+                (folder / 'collection-error.txt').write_text(content + '\n', encoding='utf-8')
+            except Exception:
+                # Even an unwritable evidence directory must not replace the failure.
+                print('App log collection error could not be recorded in ' + str(folder), file=sys.stderr)
+
     def save(self):
         report = {'schemaVersion': 1, 'lane': self.args.lane, 'runId': self.run_id,
                   'scenarios': self.definition['scenarios'], 'assets': self.facts.get('assets', {}),
@@ -742,18 +793,17 @@ class Run:
             row.update(status='passed', reason='assertions completed')
             if value is not None:
                 self.evidence(journey['id'] + '-' + name, value)
-        except OwnerValidation as exc:
-            row.update(status='owner-validation', reason=str(exc))
-        except SkippedByDecision as exc:
-            row.update(status='skipped-by-decision', reason=str(exc))
         except Exception as exc:
-            row.update(status=classify(exc), reason=str(exc))
-            (self.out / f"{journey['id']}-{name}.error.txt").write_text(traceback.format_exc())
-            if not isinstance(exc, Unavailable):
-                try:
-                    self.native.shot(journey['id'] + '-' + name + '-failure')
-                except Exception:
-                    pass
+            row.update(status='owner-validation' if isinstance(exc, OwnerValidation) else classify(exc),
+                       reason=str(exc))
+            self.collect_app_logs(journey['id'] + '-' + name + '-logs')
+            if not isinstance(exc, (OwnerValidation, SkippedByDecision)):
+                (self.out / f"{journey['id']}-{name}.error.txt").write_text(traceback.format_exc())
+                if not isinstance(exc, Unavailable):
+                    try:
+                        self.native.shot(journey['id'] + '-' + name + '-failure')
+                    except Exception:
+                        pass
         row['seconds'] = round(time.monotonic() - start, 3)
         row['evidence'] = sorted(p.name for p in set(self.out.iterdir()) - before if p.name != 'summary.json')
         print(f"{journey['id']} {name}: {row['status']} — {row['reason']}", flush=True)
@@ -942,6 +992,7 @@ print(json.dumps(rows))
             raise ProductFailure('Bundled JVM crash: ' + ', '.join(c['file'] for c in crashes))
 
     def finish(self):
+        self.collect_app_logs('app-logs')
         errors = []
         try:
             logs = [(name, self.work + '/' + name) for name in

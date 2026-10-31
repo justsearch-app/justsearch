@@ -790,6 +790,7 @@ if($events.Count -gt 10000) {throw 'Crash event collection exceeds 10000 records
         return {'eventRecords': 0, 'werReports': 0, 'jvmLogs': 0}
 
     def finish(self):
+        self.collect_app_logs('app-logs')
         row = {'id': 'windows-crashes', 'checks': []}
         self.results.append(row)
         errors = []

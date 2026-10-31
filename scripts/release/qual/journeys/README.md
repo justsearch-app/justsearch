@@ -674,7 +674,14 @@ check fails); it cannot qualify the full release. Empty reports cannot pass.
 
 `summary.json` includes asset hashes, exact scenario wording, scope and all
 check outcomes. JSON observations redact credentials. Logs, source/corpus
-hashes, screenshots and exception traces remain alongside it. The VM wrapper
+hashes, screenshots and exception traces remain alongside it. Every check that
+raises a non-pass result immediately snapshots all regular files under the app's
+data-directory `logs/` into `<journey-id>-<check-id>-logs/` (for example,
+`J3-cpu-ai-logs/`), preserving nested paths before later journeys can restart the
+app. At finish, `app-logs/` retains the same complete log tree; the existing
+top-level `engine.log` copy remains available. Each snapshot file keeps its last
+4 MB and redacts `sessionToken` values. Collection failures are recorded in that
+folder's `collection-error.txt` without changing the check's status. The VM wrapper
 also retains provisioning logs and hosted evidence as `evidence.tar`. A green
 Linux lane does not qualify Windows, GPU or J9 work.
 
