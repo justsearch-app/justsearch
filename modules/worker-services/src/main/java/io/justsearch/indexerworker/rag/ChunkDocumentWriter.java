@@ -230,6 +230,7 @@ public final class ChunkDocumentWriter {
     // an RMW that re-slices chunk_content out of a LATER parent revision is detectable instead of
     // silently producing wrong text. Hashed once per parent, not once per chunk.
     String parentContentRevision = plan.revision();
+    var metadata = new ChunkOffsetMath.MetadataIndex(content);
     // Publish the intended total before the first child can reach an unrelated commit.
     // A partial replacement then fails the count/ordinal check, even after a process crash.
     // A parent written with its declaration (replaceDeclaredChunks) already did so.
@@ -257,8 +258,8 @@ public final class ChunkDocumentWriter {
 
       // F8 Tier 2: Line numbers (1-based)
       // endChar is exclusive [startChar, endChar), so use endChar-1 for the inclusive end line
-      int startLine = ChunkOffsetMath.calculateLineNumber(content, absoluteStartChar);
-      int endLine = ChunkOffsetMath.calculateLineNumber(content, Math.max(0, absoluteEndChar - 1));
+      int startLine = metadata.lineNumber(absoluteStartChar);
+      int endLine = metadata.lineNumber(Math.max(0, absoluteEndChar - 1));
       fields.put(SchemaFields.CHUNK_START_LINE, String.valueOf(startLine));
       fields.put(SchemaFields.CHUNK_END_LINE, String.valueOf(endLine));
 
@@ -272,7 +273,7 @@ public final class ChunkDocumentWriter {
                   || "office".equalsIgnoreCase(meta.fileKind)));
       if (hasHeadingMarkers) {
         ChunkOffsetMath.HeadingInfo heading =
-            ChunkOffsetMath.findPrecedingHeading(content, absoluteStartChar);
+            metadata.precedingHeading(absoluteStartChar);
         fields.put(SchemaFields.CHUNK_HEADING_TEXT, heading.text());
         fields.put(SchemaFields.CHUNK_HEADING_LEVEL, String.valueOf(heading.level()));
       } else {

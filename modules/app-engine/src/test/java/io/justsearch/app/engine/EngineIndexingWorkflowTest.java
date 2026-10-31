@@ -80,6 +80,7 @@ final class EngineIndexingWorkflowTest {
   @TempDir static Path tempDir;
 
   private static EngineTestHarness harness;
+  private static AutoCloseable volumeEvidence;
 
   /**
    * The corpus the tests create files in. Deliberately a <em>sibling</em> of the Engine's data
@@ -92,6 +93,7 @@ final class EngineIndexingWorkflowTest {
 
   @BeforeAll
   static void startEngine() throws Exception {
+    volumeEvidence = EngineTestHarness.knownVolume();
     corpus = tempDir.resolve("corpus");
     Files.createDirectories(corpus);
     harness = EngineTestHarness.start(tempDir.resolve("data"));
@@ -99,10 +101,14 @@ final class EngineIndexingWorkflowTest {
   }
 
   @AfterAll
-  static void stopEngine() {
-    if (harness != null) {
-      harness.close();
-      harness = null;
+  static void stopEngine() throws Exception {
+    try {
+      if (harness != null) {
+        harness.close();
+        harness = null;
+      }
+    } finally {
+      if (volumeEvidence != null) volumeEvidence.close();
     }
   }
 

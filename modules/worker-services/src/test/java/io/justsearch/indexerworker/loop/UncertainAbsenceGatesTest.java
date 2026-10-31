@@ -7,6 +7,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockingDetails;
@@ -55,6 +56,7 @@ import org.mockito.ArgumentCaptor;
  * with its collaborators mocked so the deletion and the queue transition are observable.
  */
 @Tag("cross-platform")
+@org.junit.jupiter.api.extension.ExtendWith(io.justsearch.indexerworker.services.NoVolumeIdentityExtension.class)
 final class UncertainAbsenceGatesTest {
   private static final boolean WINDOWS =
       System.getProperty("os.name", "").toLowerCase(Locale.ROOT).contains("win");
@@ -105,7 +107,9 @@ final class UncertainAbsenceGatesTest {
     Path file = Files.writeString(root.resolve("gone.txt"), "obsolete");
     Files.delete(file);
 
-    SourceAdmission admission = new WorkerIngestionAuthority().admit(rooted(file, root));
+    var authority = new WorkerIngestionAuthority();
+    authority.useRootCheck(addedFolder(root));
+    SourceAdmission admission = authority.admit(rooted(file, root));
 
     assertEquals(SourceAdmissionAction.STALE_DONE, admission.action());
     assertEquals("DELETED_OR_MISSING", admission.outcome().reasonCode());
@@ -119,7 +123,9 @@ final class UncertainAbsenceGatesTest {
     Path root = Files.createDirectory(tempDir.resolve("locked-root"));
     Path file = Files.writeString(root.resolve("open-in-word.docx"), "being edited");
     try (FileChannel ignored = openWithoutSharing(file)) {
-      SourceAdmission admission = new WorkerIngestionAuthority().admit(rooted(file, root));
+      var authority = new WorkerIngestionAuthority();
+      authority.useRootCheck(addedFolder(root));
+      SourceAdmission admission = authority.admit(rooted(file, root));
 
       assertEquals(SourceAdmissionAction.RETRYABLE_FAILURE, admission.action());
       assertEquals("RETRY_UNTIL_AVAILABLE", admission.outcome().retryPolicy().name(),
@@ -134,7 +140,9 @@ final class UncertainAbsenceGatesTest {
     Path root = Files.createDirectory(tempDir.resolve("denied-root"));
     Path file = Files.writeString(root.resolve("private.txt"), "not for this user right now");
     try (DenyRead ignored = DenyRead.on(file)) {
-      SourceAdmission admission = new WorkerIngestionAuthority().admit(rooted(file, root));
+      var authority = new WorkerIngestionAuthority();
+      authority.useRootCheck(addedFolder(root));
+      SourceAdmission admission = authority.admit(rooted(file, root));
 
       assertEquals(SourceAdmissionAction.RETRYABLE_FAILURE, admission.action());
       assertEquals("RETRY_UNTIL_AVAILABLE", admission.outcome().retryPolicy().name());
@@ -151,7 +159,9 @@ final class UncertainAbsenceGatesTest {
     Files.delete(file);
     Files.createDirectory(file);
 
-    SourceAdmission admission = new WorkerIngestionAuthority().admit(rooted(file, root));
+    var authority = new WorkerIngestionAuthority();
+    authority.useRootCheck(addedFolder(root));
+    SourceAdmission admission = authority.admit(rooted(file, root));
 
     assertEquals(SourceAdmissionAction.STALE_DONE, admission.action(),
         "the old text must leave the index; SKIP_DONE kept it searchable forever");
@@ -167,7 +177,9 @@ final class UncertainAbsenceGatesTest {
     Path missingTarget = tempDir.resolve("no-such-target");
     createJunction(file, missingTarget);
     try {
-      SourceAdmission admission = new WorkerIngestionAuthority().admit(rooted(file, root));
+      var authority = new WorkerIngestionAuthority();
+      authority.useRootCheck(addedFolder(root));
+      SourceAdmission admission = authority.admit(rooted(file, root));
 
       assertEquals(SourceAdmissionAction.STALE_DONE, admission.action(),
           "a link where the file was is not the indexed source; its old text must leave");
@@ -209,13 +221,14 @@ final class UncertainAbsenceGatesTest {
     Path file = Files.writeString(root.resolve("gone.txt"), "obsolete");
     FileEnvelope envelope = FileEnvelope.fromSnapshot(FileFreshnessSnapshot.capture(file));
     Files.delete(file);
-    Resolver resolver = resolver();
+    Resolver resolver = resolver(addedFolder(root));
 
     assertTrue(resolver.resolver().tryHandleStale(
         file, envelope, "default", null, "before publish", null, rooted(file, root)));
 
     verify(resolver.staleSourceHandler()).deleteMissingSource(file);
-    verify(resolver.jobQueue()).markClaimDone(any(), any(), any());
+    verify(resolver.jobQueue(), never()).markClaimDone(any(), any(), any());
+    verify(resolver.journal()).enqueueTransition(any(), any());
   }
 
   // ---- helpers ------------------------------------------------------------------------------
@@ -228,9 +241,20 @@ final class UncertainAbsenceGatesTest {
   }
 
   private record Resolver(
-      StaleSnapshotResolver resolver, StaleSourceHandler staleSourceHandler, JobQueue jobQueue) {}
+      StaleSnapshotResolver resolver, StaleSourceHandler staleSourceHandler, JobQueue jobQueue,
+      IngestionOutcomeJournal journal) {}
+
+  private static SourcePresence.RootCheck addedFolder(Path root) {
+    var witness = io.justsearch.indexerworker.services.RootWitness.inMemory();
+    assertTrue(witness.admits(root));
+    return witness;
+  }
 
   private static Resolver resolver() {
+    return resolver(io.justsearch.indexerworker.services.RootWitness.inMemory());
+  }
+
+  private static Resolver resolver(SourcePresence.RootCheck check) {
     StaleSourceHandler handler = mock(StaleSourceHandler.class);
     JobQueue jobQueue = mock(JobQueue.class);
     org.mockito.Mockito.doCallRealMethod().when(jobQueue).ownsClaimForPublication(any());
@@ -243,11 +267,13 @@ final class UncertainAbsenceGatesTest {
         .recordOutcomeSafely(any(), anyString(), any());
     TimeboxedContentExtractor extractor = mock(TimeboxedContentExtractor.class);
     when(extractor.extractionPolicy()).thenReturn(TikaExtractionPolicy.defaults());
+    var authority = new WorkerIngestionAuthority();
+    authority.useRootCheck(check);
     return new Resolver(
         new StaleSnapshotResolver(
-            new WorkerIngestionAuthority(), handler, journal, jobQueue, extractor, delta -> {}, new FileMutationFence()),
+            authority, handler, journal, jobQueue, extractor, delta -> {}, new FileMutationFence()),
         handler,
-        jobQueue);
+        jobQueue, journal);
   }
 
   private static JobQueue.IndexJob rooted(Path file, Path root) {

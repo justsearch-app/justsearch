@@ -1828,25 +1828,47 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
     finally { unlockAfterChanges(); }
   }
 
+  @Override
+  public void deleteByCollection(String collection) {
+    if (collection == null || collection.isBlank()) {
+      throw new IllegalArgumentException("Collection is required");
+    }
+    lockTimed();
+    try {
+      ensureOpen();
+      removeRetirementCollection(collection, List.of());
+      // A cancelled issued object cannot block a deliberate later admission of the same path.
+      // Identity-based release also prevents its eventual return from releasing a fresh claim.
+      for (var claim : List.copyOf(activeClaims.values())) {
+        if (Objects.equals(collection, normalizedRetirementCollection(claim.collection()))
+            && !ownsClaim(claim)) releaseClaim(claim);
+      }
+    } catch (SQLException invalid) {
+      throw new IllegalStateException("Collection claim cancellation failed", invalid);
+    } finally { unlockAfterChanges(); }
+  }
+
   public void removeRetirementCollection(String collection, List<String> survivors) {
     lockTimed();
     try {
       ensureOpen();
       var excluded = normalizeSurvivorPaths(survivors);
+      String membership = "CASE WHEN collection IS NULL OR TRIM(collection) = '' THEN ? ELSE collection END = ?";
       String cursor = "";
       while (true) {
         var page = new ArrayList<String>();
         try (var query = connection.prepareStatement(
-            "SELECT path FROM jobs WHERE collection=? AND path>? ORDER BY path LIMIT 256")) {
-          query.setString(1, collection); query.setString(2, cursor);
+            "SELECT path FROM jobs WHERE " + membership + " AND path>? ORDER BY path LIMIT 256")) {
+          query.setString(1, IngestCollectionPolicy.DEFAULT_COLLECTION);
+          query.setString(2, collection); query.setString(3, cursor);
           try (var rows = query.executeQuery()) { while (rows.next()) page.add(rows.getString(1)); }
         }
         if (page.isEmpty()) break;
         String last = page.getLast();
         // The existing owner preserves recorded membership/ledger rules. Each transaction
         // materializes at most this page; an interrupted removal retains its replay receipt.
-        removeJobsAdministratively("collection=? AND path>? AND path<=?",
-            List.of(collection, cursor, last), true, excluded);
+        removeJobsAdministratively(membership + " AND path>? AND path<=?",
+            List.of(IngestCollectionPolicy.DEFAULT_COLLECTION, collection, cursor, last), true, excluded);
         cursor = last;
       }
     } catch (SQLException invalid) {
@@ -4857,8 +4879,12 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
                         connection, normalizedPath, SqliteIngestionWalkOps.Coverage.INDEXED) != null) {
                       throw new SQLException("Recorded index completion requires an issued claim");
                     }
+                    var coverage = switch (outcome.outcomeClass()) {
+                      case SUCCESS_FULL, SUCCESS_PARTIAL, SUCCESS_EMPTY -> SqliteIngestionWalkOps.Coverage.INDEXED;
+                      default -> SqliteIngestionWalkOps.Coverage.SKIPPED;
+                    };
                     var receipt = SqliteIngestionWalkOps.claimReceipt(connection, transition.claim(),
-                        SqliteIngestionWalkOps.Coverage.INDEXED, transition.committedContentHash());
+                        coverage, transition.committedContentHash());
                     int rows = 0;
                     if (transition.claim() == null || ownsClaim(transition.claim())) {
                       stmt.setString(1, transition.committedContentHash());

@@ -53,6 +53,44 @@ final class EngineForgetMovePublicationTest {
   private static final JsonMapper JSON = JsonMapper.builder().build();
   @TempDir Path directory;
 
+  @org.junit.jupiter.params.ParameterizedTest
+  @org.junit.jupiter.params.provider.ValueSource(booleans = {false, true})
+  void C21AcceptedPhysicalMoveReplacesHistoricOrRacingDestinationFamily(boolean race) throws Exception {
+    Path folder = Files.createDirectory(directory.resolve("root"));
+    Path source = Files.writeString(folder.resolve("source.txt"), "source content");
+    Path destination = folder.resolve("destination.txt");
+    try (var f = new EngineForgetInProcessTest.Fixture(directory.resolve("process"), List.of(folder))) {
+      if (f.loop != null) f.loop.close();
+      f.runtime.indexingCoordinator().deleteByIdAndChunks(key(source));
+      f.seed(source, "source content");
+      String sourceUid = f.identities.lookup(DocumentIdentityStore.pathHash(key(source))).orElseThrow().docUid();
+      var sourceChildren = f.runtime.documentFieldOps().queryDocIdsByField(
+          io.justsearch.indexing.SchemaFields.PARENT_DOC_ID, key(source), 10);
+      if (!race) {
+        Files.writeString(destination, "historic destination"); f.seed(destination, "historic destination");
+        Files.delete(destination);
+      }
+      var tool = new FileOperationsTool(context -> List.of(folder), (mappings, context) -> {
+        assertFalse(Files.exists(source)); assertEquals("source content", assertDoesNotThrow(() -> Files.readString(destination)));
+        if (race) f.seed(destination, "competing destination publication");
+        return f.client.updateDocumentPaths(mappings, context);
+      }, new FileOperationLog(directory.resolve("file-operations")));
+      String arguments = JSON.writeValueAsString(Map.of("operations", List.of(Map.of("op", "MOVE",
+          "source", source.toString(), "destination", destination.toString()))));
+      var result = tool.execute(arguments, webview());
+      assertTrue(result.success(), result.message());
+      assertEquals(0, f.runtime.indexCountOps().countByIdAndChunksStrict(key(source)));
+      assertEquals(3, f.runtime.indexCountOps().countByIdAndChunksStrict(key(destination)));
+      assertEquals(sourceUid, f.runtime.documentFieldOps().getDocumentField(key(destination), io.justsearch.indexing.SchemaFields.DOC_UID));
+      assertEquals("source content", f.runtime.documentFieldOps().getDocumentContent(key(destination)));
+      assertEquals(new java.util.HashSet<>(sourceChildren), new java.util.HashSet<>(f.runtime.documentFieldOps().queryDocIdsByField(
+          io.justsearch.indexing.SchemaFields.PARENT_DOC_ID, key(destination), 10)));
+      f.client.updateDocumentPaths(Map.of(source, destination), webview());
+      assertEquals(3, f.runtime.indexCountOps().countByIdAndChunksStrict(key(destination)));
+      assertEquals(sourceUid, f.identities.lookup(DocumentIdentityStore.pathHash(key(destination))).orElseThrow().docUid());
+    }
+  }
+
   @Test void MD55ExpiredMoveCannotRepublishAfterCompletedOutsideFileForget() throws Exception {
     stalePublication("MOVE", false, false);
   }

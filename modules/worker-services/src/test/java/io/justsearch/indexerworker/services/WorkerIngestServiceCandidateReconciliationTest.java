@@ -51,6 +51,7 @@ import org.junit.jupiter.api.io.TempDir;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InOrder;
 
+@org.junit.jupiter.api.extension.ExtendWith(NoVolumeIdentityExtension.class)
 final class WorkerIngestServiceCandidateReconciliationTest {
   @TempDir Path tempDir;
 
@@ -353,7 +354,8 @@ final class WorkerIngestServiceCandidateReconciliationTest {
     order.verify(fixture.queue).deleteByPathPrefix(prefix);
     order.verify(fixture.servingCommit).commitAndTrack(
         io.justsearch.adapters.lucene.runtime.CommitReason.GRPC_DELETE_BY_PATH);
-    verify(fixture.servingCommit, atMostOnce()).maybeRefreshBlocking();
+    verify(fixture.servingCommit, times(2)).maybeRefreshBlocking();
+    order.verify(fixture.queue).deleteByCollection(collection);
     order.verify(fixture.queue).putSwitchBufferForGeneration(
         fixture.buildingGeneration, "collection:" + collection, "DELETE_COLLECTION", collection);
     order.verify(fixture.candidateWriter).deleteByCollection(collection);

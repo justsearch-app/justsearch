@@ -37,6 +37,7 @@ import tools.jackson.databind.ObjectMapper;
 
 /** Real claim, planned-hash rejection, extraction, file fence, writer, commit and replay. */
 @org.junit.jupiter.api.condition.EnabledOnOs(org.junit.jupiter.api.condition.OS.LINUX)
+@org.junit.jupiter.api.extension.ExtendWith(NoVolumeIdentityExtension.class)
 final class ReturnedRootCurrentByteReplayTest extends LuceneExecutorTestBase {
   @TempDir Path temporary;
 
@@ -622,6 +623,7 @@ final class ReturnedRootCurrentByteReplayTest extends LuceneExecutorTestBase {
       assertTrue(registry.watch(root.toString(), "notes").watching());
       publisher.setMutationAdmission(new WorkerMutationAdmission(this), this);
       publisher.setRootWatcherRegistry(registry);
+      assertTrue(((RootWitness) publisher.rootCheck()).recordAdded(root));
       publisher.setDeclaredRootsDirectory(temporary);
       loop.useRootCheck(publisher.rootCheck());
     }

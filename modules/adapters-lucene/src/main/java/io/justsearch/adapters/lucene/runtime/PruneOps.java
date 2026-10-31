@@ -499,7 +499,7 @@ public final class PruneOps {
   private record Candidate(String docId, String filePath, Path file) {}
 
   /** One indexed row, the backing path that decides it, and the stored fields the scan matches. */
-  private record Row(
+  record Row(
       String docId, String filePath, String path, String parentDocId, boolean chunk) {
     /** Whether the scan's query, for {@code prefix}, matches this row. */
     boolean inScan(String prefix) {
@@ -756,6 +756,56 @@ public final class PruneOps {
       }
       return ids;
     }
+  }
+
+  /**
+   * Literal backing-path scope for explicit removal and its completion/ownership proofs.
+   * Stored paths take precedence over legacy filesystem IDs, including on pathless children.
+   */
+  static Query ownedPathPrefixQuery(IndexSearcher searcher, String idField, String prefix,
+      List<String> excludedSubtrees) throws IOException {
+    String normalized = ownershipPrefix(prefix);
+    var excluded = excludedSubtrees.stream().map(PruneOps::ownershipPrefix).toList();
+    var paths = new ArrayList<BytesRef>();
+    var pathlessIds = new ArrayList<BytesRef>();
+    var blankPaths = new ArrayList<BytesRef>();
+    var stored = searcher.storedFields();
+    org.apache.lucene.search.ScoreDoc after = null;
+    while (true) {
+      var page = searcher.searchAfter(after, new org.apache.lucene.search.MatchAllDocsQuery(), 1024);
+      if (page.scoreDocs.length == 0) break;
+      for (var hit : page.scoreDocs) {
+        Row row = Row.read(searcher, stored, hit.doc, idField);
+        if (row == null) continue;
+        String backing = ownershipPrefix(row.filePath());
+        if (backing.startsWith(normalized) && excluded.stream().noneMatch(backing::startsWith)) {
+          if (row.path() == null || row.path().isBlank()) {
+            pathlessIds.add(new BytesRef(row.docId()));
+            if (row.path() != null) blankPaths.add(new BytesRef(row.path()));
+          } else paths.add(new BytesRef(row.path()));
+        }
+      }
+      after = page.scoreDocs[page.scoreDocs.length - 1];
+    }
+    // Bind explicit backing paths to the rows themselves. An older hidden version with the
+    // same ID must not pull a live row at a different backing path into this removal.
+    Query noPath = new BooleanQuery.Builder()
+        .add(new org.apache.lucene.search.MatchAllDocsQuery(), BooleanClause.Occur.FILTER)
+        .add(org.apache.lucene.search.TermRangeQuery.newStringRange(
+            SchemaFields.PATH, null, null, true, true), BooleanClause.Occur.MUST_NOT).build();
+    Query legacyPath = new BooleanQuery.Builder().add(noPath, BooleanClause.Occur.SHOULD)
+        .add(new TermInSetQuery(SchemaFields.PATH, blankPaths), BooleanClause.Occur.SHOULD)
+        .setMinimumNumberShouldMatch(1).build();
+    Query legacyRows = new BooleanQuery.Builder()
+        .add(new TermInSetQuery(idField, pathlessIds), BooleanClause.Occur.FILTER)
+        .add(legacyPath, BooleanClause.Occur.FILTER).build();
+    return new BooleanQuery.Builder()
+        .add(new TermInSetQuery(SchemaFields.PATH, paths), BooleanClause.Occur.SHOULD)
+        .add(legacyRows, BooleanClause.Occur.SHOULD).setMinimumNumberShouldMatch(1).build();
+  }
+
+  private static String ownershipPrefix(String path) {
+    return normalizePathPrefix(path.replace('\\', '/'));
   }
 
   /** Every hit of {@code query}, however many there are. */

@@ -578,6 +578,7 @@ final class RuntimeReloadProducersHttpIntegrationTest {
   private record WatchedFiles(Path root, Path gone, Path kept) {}
 
   final class Fixture implements AutoCloseable {
+    final AutoCloseable volumeEvidence;
     final ConfigStore previous = ConfigStore.globalOrNull();
     final String previousHome = System.getProperty("user.home");
     final String previousDataDir = System.getProperty(EnvRegistry.DATA_DIR.configKey());
@@ -621,6 +622,7 @@ final class RuntimeReloadProducersHttpIntegrationTest {
     Fixture(boolean production,
         io.justsearch.indexerworker.server.MigrationTransitionBarrier.Hook migrationHook,
         long telemetryFlushMs) throws Exception {
+      volumeEvidence = knownVolume();
       System.setProperty("user.home", Files.createDirectories(directory.resolve("home")).toString());
       System.setProperty(EnvRegistry.DATA_DIR.configKey(), directory.resolve("data").toString());
       var builder = ResolvedConfig.builder();
@@ -973,6 +975,8 @@ final class RuntimeReloadProducersHttpIntegrationTest {
           }
         } catch (Exception | AssertionError failure) { failures.add(failure); }
       }
+      try { volumeEvidence.close(); }
+      catch (Exception failure) { failures.add(failure); }
       if (!failures.isEmpty()) {
         var incomplete = new Exception("Fixture cleanup incomplete; owners and backing directory retained");
         failures.forEach(incomplete::addSuppressed);
@@ -986,6 +990,17 @@ final class RuntimeReloadProducersHttpIntegrationTest {
               || registration.spec().name().startsWith("knowledge-client-")) && registration.liveInstances() != 0);
     }
 
+  }
+
+  private static AutoCloseable knownVolume() throws Exception {
+    var lookup = Class.forName("io.justsearch.indexerworker.services.RootIdentity")
+        .getDeclaredField("VOLUME_IDENTITY_LOOKUP");
+    lookup.setAccessible(true);
+    Object previous = lookup.get(null);
+    String volume = System.getProperty("os.name", "").startsWith("Windows")
+        ? "windows-volume:739" : "linux-volume-v1:739:ext4:Lw";
+    lookup.set(null, (java.util.function.Function<Path, String>) ignored -> volume);
+    return () -> lookup.set(null, previous);
   }
 
   private static void assertReloadSuccess(HttpResponse<String> response) {

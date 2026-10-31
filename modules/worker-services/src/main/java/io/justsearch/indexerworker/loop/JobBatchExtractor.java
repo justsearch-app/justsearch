@@ -233,10 +233,8 @@ public final class JobBatchExtractor {
       }
       if (admission.action() == SourceAdmissionAction.STALE_DONE) {
         log.debug("File not found, treating as delete: {}", filePath);
-        journal.recordOutcomeSafely(
-            filePath,
-            "STALE_DONE",
-            () -> jobQueue.markClaimDone(claim, admission.outcome(), ledgerEntry(filePath, collection, provenance)));
+        journal.enqueueTransition(new JobQueue.IngestionLedgerTransition(
+            claim, ledgerEntry(filePath, collection, provenance)), admission.outcome());
         batchStats.recordSkipped();
         return null;
       }

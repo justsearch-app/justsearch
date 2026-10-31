@@ -40,6 +40,7 @@ import org.junit.jupiter.api.io.TempDir;
  * change events into the {@link JobQueue}. Uses a real {@code DirectoryWatcher} against a temp
  * directory; events are async, so the test polls for arrival rather than asserting immediately.
  */
+@org.junit.jupiter.api.extension.ExtendWith(NoVolumeIdentityExtension.class)
 final class WorkerMethvinWatcherTest {
 
   /**
@@ -100,6 +101,9 @@ final class WorkerMethvinWatcherTest {
     RecordingDeleteSink sink = new RecordingDeleteSink();
     try (WorkerMethvinWatcher watcher = new WorkerMethvinWatcher(
         io.justsearch.indexerworker.TestWorkerExecutorRegistrations.watcher(), queue, null, sink)) {
+      var proof = RootWitness.inMemory();
+      assertTrue(proof.recordAdded(root));
+      watcher.useRootCheck(proof);
       RootWatcherRegistry.Subscription registration = subscription(root, null, new Object());
       Path after = Files.move(before, root.resolve("report.TXT"));
       boolean caseInsensitive = Files.exists(root.resolve("Report.txt"));
@@ -176,6 +180,9 @@ final class WorkerMethvinWatcherTest {
     RecordingDeleteSink sink = new RecordingDeleteSink();
     try (WorkerMethvinWatcher watcher = new WorkerMethvinWatcher(
         io.justsearch.indexerworker.TestWorkerExecutorRegistrations.watcher(), queue, null, sink)) {
+      var proof = RootWitness.inMemory();
+      assertTrue(proof.recordAdded(root));
+      watcher.useRootCheck(proof);
       RootWatcherRegistry.Subscription registration = subscription(root, null, new Object());
       Files.delete(doc);
       watcher.dispatchEvent(registration, WorkerMethvinWatcher.Kind.DELETE, doc);
@@ -214,6 +221,9 @@ final class WorkerMethvinWatcherTest {
   private static RootWatcherRegistry.Subscription registerAndActivate(
       WorkerMethvinWatcher watcher, Path root, String collection, Object watcherEpoch)
       throws IOException {
+    var proof = RootWitness.inMemory();
+    assertTrue(proof.recordAdded(root));
+    watcher.useRootCheck(proof);
     RootWatcherRegistry.Subscription registration = subscription(root, collection, watcherEpoch);
     assertTrue(watcher.registerRoot(registration), "registerRoot must report success");
     assertTrue(watcher.activateRoot(registration), "activateRoot must report success");
@@ -596,6 +606,9 @@ final class WorkerMethvinWatcherTest {
     Path root = tempDir; // exists
     Path child = root.resolve("doc.txt");
     try (WorkerMethvinWatcher watcher = new WorkerMethvinWatcher(io.justsearch.indexerworker.TestWorkerExecutorRegistrations.watcher(), queue, null, sink)) {
+      var proof = RootWitness.inMemory();
+      assertTrue(proof.recordAdded(root));
+      watcher.useRootCheck(proof);
       RootWatcherRegistry.Subscription registration =
           subscription(root, null, new Object());
       watcher.dispatchEvent(registration, WorkerMethvinWatcher.Kind.DELETE, child);

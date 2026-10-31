@@ -22,6 +22,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
+@org.junit.jupiter.api.extension.ExtendWith(io.justsearch.indexerworker.services.NoVolumeIdentityExtension.class)
 final class IndexingLoopCutoverPauseTest {
 
   @Test
@@ -36,10 +37,13 @@ final class IndexingLoopCutoverPauseTest {
     doAnswer(ignored -> {
       outcomeWriteEntered.countDown();
       assertTrue(releaseOutcomeWrite.await(5, TimeUnit.SECONDS));
-      return true;
-    }).when(queue).markClaimDone(eq(claim), any(), any());
+      return null;
+    }).when(queue).markDoneTransitions(anyCollection(), any());
 
     IndexingLoop loop = newLoop(queue);
+    var witness = io.justsearch.indexerworker.services.RootWitness.inMemory();
+    assertTrue(witness.admits(tempDir));
+    loop.useRootCheck(witness);
     loop.start();
     AtomicBoolean pauseResult = new AtomicBoolean(false);
     Thread requester = new Thread(
@@ -54,7 +58,7 @@ final class IndexingLoopCutoverPauseTest {
       requester.join(5_000L);
       assertFalse(requester.isAlive());
       assertTrue(pauseResult.get());
-      verify(queue).markClaimDone(eq(claim), any(), any());
+      verify(queue).markDoneTransitions(anyCollection(), any());
     } finally {
       releaseOutcomeWrite.countDown();
       requester.interrupt();

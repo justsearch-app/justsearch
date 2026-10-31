@@ -53,6 +53,8 @@ public final class IngestionOutcomeJournal {
   private final CounterMetric<IngestionOutcomeTags> outcomeWriteFailureCounter;
   private final BooleanSupplier detailedTracingSupplier;
   private final List<JobQueue.IngestionLedgerTransition> pendingMarkDone = new ArrayList<>();
+  private final java.util.Map<JobQueue.IngestionLedgerTransition, IngestionOutcome> explicitOutcomes =
+      new java.util.IdentityHashMap<>();
   private OutcomeWriteException batchReturnFailure;
   private OutcomeWriteException commitWriteFailure;
   private long lastCommitFailureLogNs;
@@ -81,6 +83,12 @@ public final class IngestionOutcomeJournal {
   public void enqueueTransition(JobQueue.IngestionLedgerTransition transition) {
     java.util.Objects.requireNonNull(transition.claim(), "Committed transitions require their processing claim");
     pendingMarkDone.add(transition);
+  }
+
+  /** Missing-source deletion carries its stale outcome through the same commit owner as writes. */
+  public void enqueueTransition(JobQueue.IngestionLedgerTransition transition, IngestionOutcome outcome) {
+    enqueueTransition(transition);
+    explicitOutcomes.put(transition, java.util.Objects.requireNonNull(outcome));
   }
 
   /** Whether this exact claim has handed its written effect to the existing commit owner. */
@@ -134,6 +142,7 @@ public final class IngestionOutcomeJournal {
       if (transition.claim() != null) pendingReturns.add(transition.claim());
     }
     pendingMarkDone.clear();
+    explicitOutcomes.clear();
     // Queue clear removes rows, not issued ownership. The restarted loop must retry these returns.
   }
 
@@ -161,7 +170,13 @@ public final class IngestionOutcomeJournal {
       List<JobQueue.IngestionLedgerTransition> fullSuccess = new ArrayList<>();
       var partialSuccess = new java.util.LinkedHashMap<String, List<JobQueue.IngestionLedgerTransition>>();
       List<JobQueue.IngestionLedgerTransition> emptySuccess = new ArrayList<>();
+      var explicitGroups = new java.util.LinkedHashMap<IngestionOutcome, List<JobQueue.IngestionLedgerTransition>>();
       for (JobQueue.IngestionLedgerTransition transition : pendingMarkDone) {
+        var explicit = explicitOutcomes.get(transition);
+        if (explicit != null) {
+          explicitGroups.computeIfAbsent(explicit, ignored -> new ArrayList<>()).add(transition);
+          continue;
+        }
         switch (classifyTransition(transition)) {
           case PARTIAL -> {
             String reason = transition.entry().artifactReasonCode();
@@ -172,6 +187,7 @@ public final class IngestionOutcomeJournal {
           case FULL -> fullSuccess.add(transition);
         }
       }
+      explicitGroups.forEach((outcome, group) -> drainGroup(group, outcome));
       drainGroup(fullSuccess, fullSuccess());
       for (var group : partialSuccess.entrySet()) {
         drainGroup(group.getValue(), partialSuccess(group.getKey()));
@@ -181,10 +197,12 @@ public final class IngestionOutcomeJournal {
       // removed from their group and retained in pendingMarkDone for the next drain.
       java.util.Set<JobQueue.IngestionLedgerTransition> drained =
           java.util.Collections.newSetFromMap(new java.util.IdentityHashMap<>());
+      explicitGroups.values().forEach(drained::addAll);
       drained.addAll(fullSuccess);
       for (var group : partialSuccess.values()) drained.addAll(group);
       drained.addAll(emptySuccess);
       pendingMarkDone.removeIf(drained::contains);
+      drained.forEach(explicitOutcomes::remove);
     } finally {
       markDoneSpan.end();
     }

@@ -11,6 +11,31 @@ import org.junit.jupiter.api.Test;
  */
 class ChunkDocumentWriterLineFieldsTest {
 
+  @Test
+  void D42IndexedMetadataKeepsPrefixLawsAtEveryOffsetIncludingInsideHeadings() throws Exception {
+    var samples = new java.util.ArrayList<>(java.util.List.of("  leading\n## Heading words  \nbody\n### Next\nmore",
+        "# Title\r\n\r\n## Section\r\ntext", "#\ncontinued heading\nbody", "plain\ntext", "## Page 1\nPDF text\n## Sheet 2\nOffice text"));
+    var random = new java.util.Random(917);
+    String[] pieces = {"#", "##", " ", "\t", "\n", "\r\n", "body", "heading", "### ", "\f", "\r"};
+    for (int document = 0; document < 1000; document++) {
+      var text = new StringBuilder();
+      for (int piece = 0; piece < 12; piece++) text.append(pieces[random.nextInt(pieces.length)]);
+      samples.add(text.toString());
+    }
+    for (String content : samples) {
+      Class<?> type;
+      try { type = Class.forName("io.justsearch.indexerworker.rag.ChunkOffsetMath$MetadataIndex"); }
+      catch (ClassNotFoundException missing) { throw new AssertionError("Publication needs a per-document metadata index", missing); }
+      Object index = type.getConstructor(String.class).newInstance(content);
+      for (int offset = -1; offset <= content.length() + 1; offset++) {
+        assertEquals(ChunkOffsetMath.calculateLineNumber(content, offset),
+            type.getMethod("lineNumber", int.class).invoke(index, offset));
+        assertEquals(ChunkOffsetMath.findPrecedingHeading(content, offset),
+            type.getMethod("precedingHeading", int.class).invoke(index, offset), "offset " + offset + " in " + content);
+      }
+    }
+  }
+
   @Nested
   @DisplayName("calculateLineNumber")
   class CalculateLineNumberTests {

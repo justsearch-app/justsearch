@@ -52,6 +52,7 @@ import tools.jackson.databind.ObjectMapper;
  * queued and the target keeps the file's text. With a listable parent the same folder is a
  * confirmed non-regular source: the receipt settles and the normal policy removes the text.
  */
+@org.junit.jupiter.api.extension.ExtendWith(io.justsearch.indexerworker.services.NoVolumeIdentityExtension.class)
 final class ConditionalDeleteReplayRoutesTest extends LuceneExecutorTestBase {
   @TempDir Path temp;
 

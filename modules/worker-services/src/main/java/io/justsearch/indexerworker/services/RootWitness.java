@@ -28,7 +28,8 @@ import org.slf4j.LoggerFactory;
  * volume recorded for it or for the nearest recorded folder above it ({@link RootVolumeLedger}). A
  * different volume at the same drive letter, a root that cannot be identified, or a record that
  * cannot be read is "cannot tell". Content beneath a folder is admitted only while it is a
- * present, listable folder on that recorded volume.
+ * present, listable folder on that recorded volume. When neither a recorded nor a current volume
+ * identity is available, present files may still be admitted, but absence is never proven.
  *
  * <p>Only a deliberate add records
  * a volume, which is a request carrying the add marker: the person's add of a root, or an explicit
@@ -41,8 +42,9 @@ import org.slf4j.LoggerFactory;
  * answers for a root. A ledger with no base path checks no volume; the in-memory one an unwired
  * owner uses records a folder the first time it is seen.
  *
- * <p>Cost is per root, not per file: each answer for a folder is kept for {@link #VOUCH_TTL_MS}
- * ms. A swap within that second can still be answered from the previous look.
+ * <p>Admission and negative absence answers are cached for {@link #VOUCH_TTL_MS} ms. A positive
+ * absence decision rechecks the folder and volume so cached evidence cannot authorize deletion
+ * after the storage disappears or changes.
  */
 public final class RootWitness implements SourcePresence.RootCheck {
   private static final Logger log = LoggerFactory.getLogger(RootWitness.class);
@@ -116,8 +118,8 @@ public final class RootWitness implements SourcePresence.RootCheck {
     }
     long now = System.nanoTime();
     Answer cached = recent.get(key);
-    if (cached != null && cached.expiresNanos() - now > 0) {
-      return cached.yes();
+    if (cached != null && !cached.yes() && cached.expiresNanos() - now > 0) {
+      return false;
     }
     boolean vouches = PathPresence.isReadableDirectory(key) && sameRoot(key);
     recent.put(key, new Answer(vouches, now + TimeUnit.MILLISECONDS.toNanos(VOUCH_TTL_MS)));
@@ -126,8 +128,9 @@ public final class RootWitness implements SourcePresence.RootCheck {
 
   /**
    * True while content beneath {@code folder} may be added or updated (round 5, S8): a present,
-   * listable folder on the volume recorded for it; a root with nothing recorded is unproven (round
-   * 8). A folder that is itself a link is admitted as before, since no volume is recorded for it.
+   * listable folder on the volume recorded for it. With neither a recorded nor a current volume,
+   * admission is allowed; this never authorizes absence-based deletion. A folder that is itself
+   * a link is admitted as before, since no volume is recorded for it.
    * Unlike {@link #vouches}, a watcher registration's identity is not asked: a folder deleted and
    * made again on the same volume is the person's own, and its new files are indexed.
    */
@@ -165,7 +168,7 @@ public final class RootWitness implements SourcePresence.RootCheck {
     return answerForFileFolder(folder, true);
   }
 
-  /** {@link #admits} for the parent folder of an explicitly ingested file; as {@link #vouchesForFile}. */
+  /** {@link #admits} for the parent folder of an explicitly ingested file. */
   @Override
   public boolean admitsFile(Path folder) {
     return answerForFileFolder(folder, false);
@@ -179,7 +182,8 @@ public final class RootWitness implements SourcePresence.RootCheck {
     }
     long now = System.nanoTime();
     FileFolderAnswer cached = fileFolders.get(key);
-    if (cached != null && cached.vouching() == vouching && cached.answer().expiresNanos() - now > 0) {
+    if (cached != null && cached.vouching() == vouching
+        && (!vouching || !cached.answer().yes()) && cached.answer().expiresNanos() - now > 0) {
       return cached.answer().yes();
     }
     boolean yes;
@@ -195,7 +199,8 @@ public final class RootWitness implements SourcePresence.RootCheck {
           atRegistration.requireSame(current, key);
         }
         // Round 8b (decision 2): nothing here records; only the explicit ingest request does.
-        requireVolume(key, current);
+        if (vouching) requireDeletionVolume(key, current);
+        else requireVolume(key, current);
         yes = true;
       } catch (IOException | RuntimeException cannotTell) {
         log.warn("Folder {} of an explicitly ingested file is not the folder or volume it was ({})",
@@ -377,9 +382,8 @@ public final class RootWitness implements SourcePresence.RootCheck {
    * nothing recorded is unproven, as is one whose volume or record cannot be read. The
    * deferred-root check asks this, so a recovery path never adopts the volume it finds.
    *
-   * <p>Without a platform volume identity and without a previously recorded identity, only the
-   * comparison is skipped. A known recorded identity that cannot now be confirmed is uncertainty
-   * on every platform, even when the replacement filesystem is present and listable.
+   * <p>Missing current or recorded volume evidence is uncertainty, even when the replacement
+   * filesystem is present and listable. Present-file admission uses its own rule.
    */
   @SuppressWarnings("PMD.AvoidCatchingGenericException") // a native identity read may throw unchecked
   boolean provenOnRecordedVolume(Path root) {
@@ -391,8 +395,7 @@ public final class RootWitness implements SourcePresence.RootCheck {
     try {
       String volume = RootIdentity.capture(key).volume();
       Optional<String> recorded = volumes.recordedFor(key);
-      return volume == null ? recorded.isEmpty()
-          : recorded.isPresent() && recorded.get().equals(volume);
+      return volume != null && recorded.isPresent() && recorded.get().equals(volume);
     } catch (IOException | RuntimeException cannotTell) {
       log.debug("Root {} is not proven on its recorded volume ({})", key, cannotTell.getMessage());
       return false;
@@ -430,7 +433,7 @@ public final class RootWitness implements SourcePresence.RootCheck {
       if (atRegistration != null) {
         atRegistration.requireSame(current, folder);
       }
-      requireVolume(folder, current);
+      requireDeletionVolume(folder, current);
       return true;
     } catch (IOException | RuntimeException cannotTell) {
       log.warn(
@@ -471,6 +474,27 @@ public final class RootWitness implements SourcePresence.RootCheck {
     if (!recorded.get().equals(volume)) {
       throw new IOException(
           "folder is on " + volume + ", not on " + recorded.get() + " recorded for it");
+    }
+  }
+
+  /** Absence needs recorded volume evidence even when present-file admission is possible. */
+  private void requireDeletionVolume(Path folder, RootIdentity current) throws IOException {
+    if (declaredRootCovers.test(folder) || volumes.adoptsOnFirstSight() || !volumes.enabled()) {
+      requireDeletionVolume(volumes, folder, current);
+      return;
+    }
+    Optional<String> recorded = volumes.recordedFor(folder);
+    if (recorded.isEmpty()) recorded = volumes.recordedFileFolder(folder);
+    if (current.volume() == null || recorded.isEmpty() || !recorded.get().equals(current.volume())) {
+      throw new IOException("folder has no matching recorded volume evidence for deletion");
+    }
+  }
+
+  static void requireDeletionVolume(RootVolumeLedger volumes, Path folder, RootIdentity current)
+      throws IOException {
+    Optional<String> recorded = volumes.recordedFor(folder);
+    if (current.volume() == null || recorded.isEmpty() || !recorded.get().equals(current.volume())) {
+      throw new IOException("root has no matching recorded volume evidence for deletion");
     }
   }
 

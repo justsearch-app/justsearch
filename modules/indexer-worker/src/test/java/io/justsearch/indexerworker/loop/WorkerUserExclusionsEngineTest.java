@@ -35,6 +35,7 @@ import java.util.Map;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
+@org.junit.jupiter.api.extension.ExtendWith(io.justsearch.indexerworker.services.NoVolumeIdentityExtension.class)
 class WorkerUserExclusionsEngineTest extends LuceneExecutorTestBase {
   private static final String KEY = "01994180-0000-7000-8000-000000003101";
   private static final String PLAN = "b".repeat(64);
@@ -220,7 +221,8 @@ class WorkerUserExclusionsEngineTest extends LuceneExecutorTestBase {
       runtime.commitOps().commitAndTrack();
       runtime.commitOps().maybeRefreshBlocking();
       var service = new WorkerIngestService(mock(JobQueue.class), mock(IndexingLoop.class), null,
-          IndexingPacing.unthrottled(), null, null, runtime, runtime, null, 0L);
+          IndexingPacing.unthrottled(), temp.resolve("service-base"), runtime.openedIndexPath(),
+          runtime, runtime, null, 0L);
       assertTrue(service.watchRoot(WatchRootRequest.newBuilder()
           .setRootPath(root.toString()).setRootAdded(true).build(), CallContext.none()).getWatching());
       Files.delete(file);

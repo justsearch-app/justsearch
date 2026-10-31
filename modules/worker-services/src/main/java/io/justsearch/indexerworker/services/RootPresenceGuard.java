@@ -67,7 +67,7 @@ final class RootPresenceGuard implements PruneOps.PresenceGuard {
       if (registered != null) {
         registered.requireSame(baseline, normalized);
       }
-      RootWitness.requireRecordedVolume(volumes, normalized, baseline);
+      RootWitness.requireDeletionVolume(volumes, normalized, baseline);
       return new RootPresenceGuard(normalized, baseline, registered);
     } catch (IOException unavailableOrChanged) {
       log.warn(

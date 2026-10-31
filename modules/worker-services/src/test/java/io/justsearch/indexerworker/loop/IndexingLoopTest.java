@@ -64,8 +64,14 @@ import org.mockito.junit.jupiter.MockitoExtension;
  * dependencies (metrics, telemetry, content extractor, etc.) and are better suited for integration
  * tests.
  */
-@ExtendWith(MockitoExtension.class)
+@ExtendWith({MockitoExtension.class, io.justsearch.indexerworker.services.NoVolumeIdentityExtension.class})
 class IndexingLoopTest {
+
+  private static SourcePresence.RootCheck addedFolder(Path folder) {
+    var witness = io.justsearch.indexerworker.services.RootWitness.inMemory();
+    assertTrue(witness.admits(folder), "present-folder admission records the fixture's volume");
+    return witness;
+  }
 
   // task a5fbcb round 7, F3: while a Green producer projects text to A, a source A's policy
   // retires leaves A too; a refused candidate leaves A serving, so A must not keep it
@@ -76,8 +82,11 @@ class IndexingLoopTest {
     RecordingQueue queue = new RecordingQueue();
     IndexingLoop loop = outcomes.newLoop(queue, outcomes.providerReturning("unused"));
     IndexingCoordinator activeWrites = wireActive(loop);
+    loop.useRootCheck(addedFolder(file.getParent()));
 
     outcomes.invokeExtractJob(loop, file);
+    assertNull(queue.lastOutcome, "the deletion outcome waits for commit");
+    outcomes.invokeFinishIdleCommit(loop);
 
     assertEquals(IngestionReasonCodes.DELETED_OR_MISSING, queue.lastOutcome.reasonCode());
     assertEquals(List.of(io.justsearch.indexerworker.util.PathNormalizer.normalizePath(
@@ -95,7 +104,10 @@ class IndexingLoopTest {
     IndexingLoop loop = outcomes.newLoop(queue, mock(ContentExtractorProvider.class));
     IndexingCoordinator activeWrites = wireActive(loop);
 
+    loop.useRootCheck(addedFolder(directory.getParent()));
     outcomes.invokeExtractJob(loop, directory);
+    assertNull(queue.lastOutcome, "the retirement outcome waits for commit");
+    outcomes.invokeFinishIdleCommit(loop);
 
     assertEquals(IngestionReasonCodes.NON_REGULAR_SOURCE, queue.lastOutcome.reasonCode());
     assertEquals(List.of(io.justsearch.indexerworker.util.PathNormalizer.normalizePath(
@@ -107,6 +119,7 @@ class IndexingLoopTest {
     RunningRuntime active = mock(RunningRuntime.class);
     IndexingCoordinator activeWrites = mock(IndexingCoordinator.class);
     when(active.indexingCoordinator()).thenReturn(activeWrites);
+    when(active.commitOps()).thenReturn(mock(CommitOps.class));
     loop.wireActiveLexicalSource(active);
     return activeWrites;
   }
@@ -709,9 +722,12 @@ class IndexingLoopTest {
       Path file = Files.createTempDirectory("js-missing").resolve("gone.txt");
       RecordingQueue queue = new RecordingQueue();
       IndexingLoop loop = newLoop(queue, providerReturning("unused"));
+      loop.useRootCheck(addedFolder(file.getParent()));
 
       Object extracted = invokeExtractJob(loop, file);
 
+      assertNull(queue.lastOutcome, "retirement is acknowledged after commit");
+      invokeFinishIdleCommit(loop);
       assertNull(extracted);
       assertEquals(IngestionOutcomeClass.STALE_SOURCE, queue.lastOutcome.outcomeClass());
       assertEquals(IngestionReasonCodes.DELETED_OR_MISSING, queue.lastOutcome.reasonCode());
@@ -726,8 +742,11 @@ class IndexingLoopTest {
       ContentExtractorProvider provider = mock(ContentExtractorProvider.class);
       IndexingLoop loop = newLoop(queue, provider);
 
+      loop.useRootCheck(addedFolder(directory.getParent()));
       Object extracted = invokeExtractJob(loop, directory);
 
+      assertNull(queue.lastOutcome, "retirement is acknowledged after commit");
+      invokeFinishIdleCommit(loop);
       assertNull(extracted);
       assertEquals(IngestionOutcomeClass.SKIPPED_POLICY, queue.lastOutcome.outcomeClass());
       assertEquals(IngestionReasonCodes.NON_REGULAR_SOURCE, queue.lastOutcome.reasonCode());
@@ -840,8 +859,11 @@ class IndexingLoopTest {
                 }
               });
 
+      loop.useRootCheck(addedFolder(file.getParent()));
       Object extracted = invokeExtractJob(loop, file);
 
+      assertNull(queue.lastOutcome, "retirement is acknowledged after commit");
+      invokeFinishIdleCommit(loop);
       assertNull(extracted);
       assertEquals(IngestionOutcomeClass.STALE_SOURCE, queue.lastOutcome.outcomeClass());
       assertEquals(IngestionReasonCodes.DELETED_AFTER_SNAPSHOT, queue.lastOutcome.reasonCode());
@@ -1568,9 +1590,8 @@ class IndexingLoopTest {
 
     @Test
     @DisplayName(
-        "StaleSourceHandler.deleteMissingSource returns 1 on coordinator success + 0 on "
-            + "coordinator exception (W2.6: isolation test for the seam Appendix A.1 named)")
-    void staleSourceHandlerReturnsOneOnSuccessZeroOnException() throws Exception {
+        "StaleSourceHandler returns 1 on success and propagates deletion failure for retry")
+    void staleSourceHandlerReturnsOneOnSuccessAndPropagatesFailure() throws Exception {
       IndexingCoordinator successCoordinator = mock(IndexingCoordinator.class);
       StaleSourceHandler okHandler =
           new StaleSourceHandler(successCoordinator);
@@ -1585,9 +1606,8 @@ class IndexingLoopTest {
           .when(throwingCoordinator).deleteByIdAndChunks(anyString());
       StaleSourceHandler failHandler =
           new StaleSourceHandler(throwingCoordinator);
-      assertEquals(0, failHandler.deleteMissingSource(file),
-          "Coordinator exception must be swallowed and surfaced as 0 so the caller does not "
-              + "bump indexedSinceCommit on a no-op (best-effort delete semantics).");
+      assertThrows(RuntimeException.class, () -> failHandler.deleteMissingSource(file),
+          "A failed delete must retain a recoverable queue obligation");
     }
 
     @Test

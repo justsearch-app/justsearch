@@ -280,9 +280,17 @@ public final class IndexCountOps {
       String prefix, List<String> fileIds, List<String> projectionIds, List<String> excludedSubtrees)
       throws IOException {
     if (prefix == null || prefix.isBlank()) throw new IllegalArgumentException("Empty delete prefix");
-    return countUnexpectedSurvivors(QueryFilterBuilder.excludingSubtrees(
-        new PrefixQuery(new Term(SchemaFields.PATH, QueryFilterBuilder.normalizePathPrefix(prefix))),
-        excludedSubtrees), fileIds, projectionIds);
+    return bridge.withSearcher(searcher -> searcher.count(QueryFilterBuilder.excludingAcceptedSurvivors(
+        PruneOps.ownedPathPrefixQuery(searcher, SchemaFields.DOC_ID, prefix, excludedSubtrees),
+        fileIds, projectionIds)));
+  }
+
+  /** Ownership refusal uses exactly the backing-path membership that prefix removal uses. */
+  public int countOwnedPathPrefixOrThrow(String prefix, Query restriction) throws IOException {
+    return bridge.withSearcher(searcher -> searcher.count(new BooleanQuery.Builder()
+        .add(PruneOps.ownedPathPrefixQuery(searcher, SchemaFields.DOC_ID, prefix, List.of()),
+            BooleanClause.Occur.FILTER)
+        .add(restriction, BooleanClause.Occur.FILTER).build()));
   }
 
   /** Strict final-scope proof for a committed collection delete, including parent and chunk docs. */

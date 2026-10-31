@@ -4,7 +4,6 @@ package io.justsearch.indexerworker.services;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 
@@ -37,13 +36,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
-/**
- * Task t-20261013-ef3c41, round 9 — on a platform that exposes no volume identity (Linux, macOS),
- * a root is never deferred or reported unavailable for lack of a volume record: it is walked,
- * watched and its genuine deletions pruned as on main, and only the identity comparison is
- * skipped. The platform's answer is forced through {@link RootIdentity#VOLUME_IDENTITY_UNAVAILABLE},
- * so this runs on Windows too; the folders, index and queue are real.
- */
+/** Present files remain admissible without a volume identity; absence never authorizes pruning. */
 final class NoVolumeIdentityRootTest
     extends io.justsearch.adapters.lucene.runtime.LuceneExecutorTestBase {
 
@@ -80,7 +73,7 @@ final class NoVolumeIdentityRootTest
   }
 
   @Test
-  void withNoVolumeIdentityARootIsWalkedWatchedAndPrunedAsOnMainAndNeverReadsUnavailable()
+  void withNoVolumeIdentityARootAdmitsPresentFilesAndKeepsUnprovenDeletions()
       throws Exception {
     Path root = Files.createDirectory(tempDir.resolve("documents"));
     Path gone = Files.writeString(root.resolve("gone.txt"), "an obsolete draft");
@@ -93,8 +86,8 @@ final class NoVolumeIdentityRootTest
 
     assertEquals("", service.rootVolumeRefusal(root.toString(), CallContext.none()),
         "the root never reads unavailable for lack of a volume record");
-    assertTrue(service.rootOnRecordedVolume(root.toString()),
-        "the deferred-root check finds the root proven: only the comparison is skipped");
+    assertFalse(service.rootOnRecordedVolume(root.toString()),
+        "present-file admission never supplies missing volume proof");
 
     // A restart: the Head registers its roots again, without the add marker.
     WorkerIngestService restarted = service();
@@ -108,15 +101,15 @@ final class NoVolumeIdentityRootTest
 
     PruneResponse pruned = restarted.pruneMissing(
         PruneRequest.newBuilder().setPathPrefix(root.toString()).build(), CallContext.none());
-    assertEquals("", pruned.getError(), "the prune completes");
-    assertEquals(1, pruned.getPrunedCount(), "the genuinely deleted file is pruned");
+    assertTrue(pruned.getError().startsWith("prune_incomplete"), "the prune reports missing proof");
+    assertEquals(0, pruned.getPrunedCount(), "absence without volume evidence keeps the family");
     runtime.commitOps().maybeRefreshBlocking();
-    assertNull(runtime.documentFieldOps().getDocumentField(goneId, SchemaFields.CONTENT));
+    assertNotNull(runtime.documentFieldOps().getDocumentField(goneId, SchemaFields.CONTENT));
     assertNotNull(runtime.documentFieldOps().getDocumentField(keptId, SchemaFields.CONTENT),
         "the file still on disk keeps its document");
     assertEquals("", restarted.rootVolumeRefusal(root.toString(), CallContext.none()),
         "the root still never reads unavailable");
-    assertTrue(restarted.rootOnRecordedVolume(root.toString()));
+    assertFalse(restarted.rootOnRecordedVolume(root.toString()));
     assertFalse(recordedVolumes().stream().anyMatch(volume -> !volume.isBlank()),
         "no volume is recorded where the platform has none");
   }

@@ -176,4 +176,52 @@ final class ForgetMutationBoundaryTest extends LuceneExecutorTestBase {
       }
     }
   }
+
+  @org.junit.jupiter.api.Test
+  void D38FolderForgetRemovesLegacyParentAndPathlessOwnedChildDurably() throws Exception {
+    Path folder = Files.createDirectory(directory.resolve("b"));
+    String id = PathNormalizer.normalizeKey(folder.resolve("legacy.txt"));
+    Path index = directory.resolve("index");
+    try (var queue = new SqliteJobQueue(directory.resolve("jobs.db"));
+        var runtime = IndexSchema.fromCatalog(FieldCatalogDef.forChunkTesting(0))
+            .atPath(index).withExecutorRegistrations(testLuceneExecutors()).open()) {
+      queue.open(); runtime.commitOps().stopCommitTimer();
+      runtime.indexingCoordinator().indexSingle(new IndexDocument(Map.of(SchemaFields.DOC_ID, id,
+          SchemaFields.DOC_UID, "legacy", SchemaFields.CONTENT, "legacy text")));
+      runtime.indexingCoordinator().indexSingle(new IndexDocument(Map.of(SchemaFields.DOC_ID, "legacy-child",
+          SchemaFields.DOC_UID, "child", SchemaFields.PARENT_DOC_ID, id, SchemaFields.IS_CHUNK, "true")));
+      String sibling = PathNormalizer.normalizeKey(directory.resolve("bc/sibling.txt"));
+      runtime.indexingCoordinator().indexSingle(new IndexDocument(Map.of(SchemaFields.DOC_ID, sibling,
+          SchemaFields.DOC_UID, "sibling", SchemaFields.CONTENT, "sibling")));
+      runtime.commitOps().commitAndTrack(); runtime.commitOps().maybeRefreshBlocking();
+      var fence = new FileMutationFence(); Object owner = new Object();
+      var admission = new WorkerMutationAdmission(owner);
+      var service = service(queue, fence, runtime, admission, owner);
+      var scope = io.justsearch.configuration.excludes.LiteralExclusion.Scope.FOLDER;
+      var literal = io.justsearch.configuration.excludes.LiteralExclusion.create(folder, scope);
+      var plan = Map.of("version", 1, "path", folder.toString(), "scope", "FOLDER", "keepOut", literal,
+          "watchedRoots", List.of(), "source", "FILE_SYSTEM");
+      Class<?> planType = Class.forName("io.justsearch.app.api.operations.ForgetPlan");
+      var accepted = JSON.readValue(JSON.writeValueAsString(plan), planType);
+      Object mutation = null;
+      try {
+        try (var ignoredLease = admission.enter(owner)) {
+          mutation = tryMutation(service).orElseThrow();
+          try {
+            assertTrue((Boolean) call(mutation, mutation.getClass(), "removeAndVerify", new Class<?>[] {planType}, accepted));
+          } finally { call(mutation, mutation.getClass(), "releaseFile", new Class<?>[0]); }
+        }
+      } finally {
+        if (mutation != null) call(mutation, mutation.getClass(), "afterOwnersReleased", new Class<?>[0]);
+      }
+      assertEquals(0, runtime.indexCountOps().countByIdAndChunksStrict(id));
+      assertEquals(1, runtime.indexCountOps().docCount());
+    }
+    try (var runtime = IndexSchema.fromCatalog(FieldCatalogDef.forChunkTesting(0))
+        .atPath(index).withExecutorRegistrations(testLuceneExecutors()).open()) {
+      assertEquals(0, runtime.indexCountOps().countByIdAndChunksStrict(id));
+      assertEquals(1, runtime.indexCountOps().docCount());
+    }
+  }
+
 }

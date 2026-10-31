@@ -1158,6 +1158,11 @@ public interface JobQueue extends Closeable {
     return deleteByPathPrefixExcludingAcceptedSurvivors(pathPrefix, survivorPaths);
   }
 
+  /** Cancels this collection's pending and issued work; fresh subsequent ingestion stays allowed. */
+  default void deleteByCollection(String collection) {
+    throw new UnsupportedOperationException("Collection cancellation is unavailable");
+  }
+
   /**
    * Deletes the job with exactly the given path, regardless of state.
    *

@@ -30,6 +30,7 @@ import org.junit.jupiter.api.io.TempDir;
  * Real conditions only (rename and SUBST); every mapping is removed before the test returns.
  */
 @Tag("cross-platform")
+@org.junit.jupiter.api.extension.ExtendWith(NoVolumeIdentityExtension.class)
 final class RootPresenceGuardTest {
   private static final boolean WINDOWS =
       System.getProperty("os.name", "").toLowerCase(Locale.ROOT).contains("win");
@@ -39,7 +40,7 @@ final class RootPresenceGuardTest {
   @Test
   void aPresentRootVouchesUntilItIsRenamedAway() throws Exception {
     Path root = Files.createDirectory(tempDir.resolve("root"));
-    PruneOps.PresenceGuard guard = RootPresenceGuard.capture(root, RootIdentity.capture(root));
+    PruneOps.PresenceGuard guard = RootPresenceGuard.capture(root, RootIdentity.capture(root), added(root));
     assertTrue(guard.rootCurrent());
 
     Files.move(root, tempDir.resolve("root-renamed"));
@@ -64,14 +65,15 @@ final class RootPresenceGuardTest {
       assertEquals(0, run("subst", letter, original.getParent().toString()));
       Path root = Path.of(letter + "\\music");
       RootIdentity registered = RootIdentity.capture(root);
-      assertTrue(RootPresenceGuard.capture(root, registered).rootCurrent(),
+      RootVolumeLedger volumes = added(root);
+      assertTrue(RootPresenceGuard.capture(root, registered, volumes).rootCurrent(),
           "precondition: the registered volume vouches");
 
       // The original stick is pulled and another one appears at the same letter.
       assertEquals(0, run("subst", letter, "/d"));
       assertEquals(0, run("subst", letter, other.getParent().toString()));
 
-      assertFalse(RootPresenceGuard.capture(root, registered).rootCurrent(),
+      assertFalse(RootPresenceGuard.capture(root, registered, volumes).rootCurrent(),
           "a different volume at the same letter must not vouch for the original's deletions");
     } finally {
       try {
@@ -128,6 +130,12 @@ final class RootPresenceGuardTest {
     assertEquals(java.util.Optional.empty(), volumes.recorded(root.resolve("live")));
     assertEquals(java.util.Optional.of("windows-volume:1"), volumes.recorded(sibling),
         "a folder that merely shares the name prefix is not removed");
+  }
+
+  private RootVolumeLedger added(Path root) throws IOException {
+    var volumes = RootVolumeLedger.under(tempDir);
+    volumes.record(root, RootIdentity.capture(root).volume());
+    return volumes;
   }
 
   /** A letter no drive uses, held for the calling test until it closes the hold. */
