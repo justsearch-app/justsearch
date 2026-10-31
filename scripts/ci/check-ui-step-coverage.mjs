@@ -30,6 +30,7 @@
  */
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { readCorePluginDeclarations } from '../lib/core-surface-declarations.mjs';
 
 const REGISTER = 'governance/ui-step-coverage.v1.json';
 const reg = JSON.parse(readFileSync(REGISTER, 'utf8'));
@@ -70,9 +71,9 @@ for (const row of [...reg.viewCoverage, ...reg.exempt]) {
 // Tempdoc 855 §9.2 — MODAL is a first-class user-reachable placement (Settings opens as a window
 // over the stage). Matching RAIL alone would let a RAIL→MODAL flip silently un-enforce that
 // surface's coverage row, which is exactly the blind spot the settings-window work owned.
-const catalog = readFileSync(reg.surfaceCatalog, 'utf8');
+const catalog = readCorePluginDeclarations(reg.surfaceCatalog);
 // Capture each `id: 'core.X'` whose own object declares `placement: 'RAIL'|'MODAL'` (stop at the next id).
-const reachableRe = /id:\s*'(core\.[^']+)'(?:(?!id:\s*')[\s\S])*?placement:\s*'(?:RAIL|MODAL)'/g;
+const reachableRe = /id:\s*['"](core\.[^'"]+)['"](?:(?!id:\s*['"])[\s\S])*?placement:\s*['"](?:RAIL|MODAL)['"]/g;
 const reachableIds = [...catalog.matchAll(reachableRe)].map((m) => m[1]);
 const covered = new Set([
   ...reg.viewCoverage.map((r) => r.surfaceId),

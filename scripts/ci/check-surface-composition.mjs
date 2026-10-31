@@ -38,6 +38,7 @@
  * Run: `node scripts/ci/check-surface-composition.mjs` (from the repo root).
  */
 import { readFileSync } from 'node:fs';
+import { expandCoreSurfaceMetadata, readCorePluginDeclarations } from '../lib/core-surface-declarations.mjs';
 
 export const REGISTER = 'governance/surface-composition.v1.json';
 
@@ -117,8 +118,8 @@ export function parseJavaSurfaces(javaSource) {
  * entry's own terminator, so a neighbouring contribution's audience cannot be mistaken for this one's
  * (the bounding technique check-window-cutover.mjs uses for the same file).
  */
-export function parseCorePluginSurfaces(pluginSource) {
-  const src = stripComments(pluginSource);
+export function parseCorePluginSurfaces(pluginSource, generatedSource) {
+  const src = expandCoreSurfaceMetadata(pluginSource, generatedSource);
   const byId = new Map();
   for (const part of src.split(/\bid:\s*/).slice(1)) {
     const id = part.match(/^['"]([^'"]+)['"]/)?.[1];
@@ -126,8 +127,8 @@ export function parseCorePluginSurfaces(pluginSource) {
     const end = /\n\s*\},/.exec(part);
     const block = end === null ? part : part.slice(0, end.index);
     byId.set(id, {
-      audience: block.match(/audience:\s*['"]([A-Z]+)['"]/)?.[1] ?? null,
-      placement: block.match(/placement:\s*['"]([A-Z]+)['"]/)?.[1] ?? null,
+      audience: [...block.matchAll(/audience:\s*['"]([A-Z]+)['"]/g)].at(-1)?.[1] ?? null,
+      placement: [...block.matchAll(/placement:\s*['"]([A-Z]+)['"]/g)].at(-1)?.[1] ?? null,
     });
   }
   return byId;
@@ -270,9 +271,9 @@ export function checkComposition(javaSurfaces, corePluginIds) {
 }
 
 /** Both legs over already-read sources. Returns `{ failures, warnings, hostCount, memberCount, compared }`. */
-export function run({ javaSource, pluginSource, paths, ledger = KNOWN_PARITY_DRIFT }) {
+export function run({ javaSource, pluginSource, generatedSource, paths, ledger = KNOWN_PARITY_DRIFT }) {
   const javaSurfaces = parseJavaSurfaces(javaSource);
-  const corePluginSurfaces = pluginSource === null ? new Map() : parseCorePluginSurfaces(pluginSource);
+  const corePluginSurfaces = pluginSource === null ? new Map() : parseCorePluginSurfaces(pluginSource, generatedSource);
   const composition = checkComposition(javaSurfaces, corePluginSurfaces.keys());
   const parity =
     pluginSource === null
@@ -291,7 +292,7 @@ function main() {
   const reg = JSON.parse(readFileSync(REGISTER, 'utf8'));
   const paths = { surfaceCatalog: reg.scan.surfaceCatalog, corePlugin: reg.scan.corePlugin };
   const javaSource = readFileSync(paths.surfaceCatalog, 'utf8');
-  const pluginSource = paths.corePlugin ? readFileSync(paths.corePlugin, 'utf8') : null;
+  const pluginSource = paths.corePlugin ? readCorePluginDeclarations(paths.corePlugin) : null;
 
   const { failures, warnings, hostCount, memberCount, compared } = run({ javaSource, pluginSource, paths });
 

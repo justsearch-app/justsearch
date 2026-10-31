@@ -89,6 +89,13 @@ testing {
 // `:modules:app-api:updateSchemas` pattern — runs with `-DupdateSchemas=true`, switching the test's
 // branch from "verify" to "rewrite baseline." Default `test` runs in verify mode (CI gate).
 tasks.withType<Test>().configureEach {
+  // A committed artifact is an input to comparison: edits/missing files must invalidate cached tests.
+  inputs.files(rootProject.layout.projectDirectory.file(
+    "modules/ui-web/src/api/generated/core-surfaces.generated.ts"))
+  if (gradle.startParameter.projectProperties.containsKey("updateSchemas")) {
+    outputs.file(rootProject.layout.projectDirectory.file(
+      "modules/ui-web/src/api/generated/core-surfaces.generated.ts"))
+  }
   // Tempdoc 696 follow-up: check the actual -P properties, NOT project.hasProperty("updateSchemas"),
   // which is ALWAYS true here because the `updateSchemas` task (registered below) shadows the property
   // name — that silently forced every test run into regenerate mode instead of compare, defeating the
@@ -99,7 +106,7 @@ tasks.withType<Test>().configureEach {
 }
 
 tasks.register<Test>("updateSchemas") {
-  description = "Regenerate schema baselines (HealthEvent)"
+  description = "Regenerate schema baselines (HealthEvent) and core surface metadata"
   group = "verification"
   val testSS = sourceSets["test"]
   testClassesDirs = testSS.output.classesDirs
@@ -107,6 +114,9 @@ tasks.register<Test>("updateSchemas") {
   useJUnitPlatform()
   filter {
     includeTestsMatching("*HealthEventSchemaTest*")
+    includeTestsMatching("*CoreSurfacesTsGenerationTest*")
   }
   systemProperty("updateSchemas", "true")
+  outputs.file(rootProject.layout.projectDirectory.file(
+    "modules/ui-web/src/api/generated/core-surfaces.generated.ts"))
 }

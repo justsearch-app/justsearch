@@ -3,6 +3,7 @@ package io.justsearch.agent.api.registry;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import io.justsearch.agent.api.interaction.InteractionEventKind;
 import io.justsearch.agent.api.conversation.ExecutionMode;
 import io.justsearch.agent.api.conversation.IterationMode;
 import io.justsearch.agent.api.conversation.PersistenceMode;
@@ -61,9 +62,10 @@ class RegistryEnumsTsGenerationTest {
     sb.append("// GENERATED — do not edit by hand.\n");
     sb.append(
         "// Single authority: the Java enums in io.justsearch.agent.api.registry /"
-            + " io.justsearch.agent.api.conversation (see RegistryEnumsTsGenerationTest.sharedEnums()).\n");
+            + " io.justsearch.agent.api.conversation (see RegistryEnumsTsGenerationTest.sharedEnums());\n"
+            + "// io.justsearch.agent.api.interaction.InteractionEventKind owns INTERACTION_EVENT_KINDS.\n");
     sb.append(
-        "// Regenerate: ./gradlew.bat :modules:app-agent-api:test -PupdateSchemas"
+        "// Regenerate: ./gradlew :modules:app-agent-api:test -PupdateSchemas"
             + " --tests '*RegistryEnumsTsGenerationTest'\n");
     sb.append("// Drift-checked by RegistryEnumsTsGenerationTest (tempdoc 560 §4.1/§4.3 anti-drift).\n\n");
     for (Map.Entry<String, Class<? extends Enum<?>>> e : sharedEnums().entrySet()) {
@@ -73,6 +75,12 @@ class RegistryEnumsTsGenerationTest {
               .collect(Collectors.joining(" | "));
       sb.append("export type ").append(e.getKey()).append(" = ").append(union).append(";\n");
     }
+    sb.append("\nexport const INTERACTION_EVENT_KINDS = [\n");
+    for (InteractionEventKind kind : InteractionEventKind.values()) {
+      sb.append("  '").append(kind.name()).append("',\n");
+    }
+    sb.append("] as const;\n");
+    sb.append("export type InteractionEventKind = (typeof INTERACTION_EVENT_KINDS)[number];\n");
     return sb.toString();
   }
 
@@ -90,7 +98,7 @@ class RegistryEnumsTsGenerationTest {
     assertTrue(
         Files.exists(out),
         GENERATED_REL
-            + " is missing — run ./gradlew.bat :modules:app-agent-api:test -PupdateSchemas"
+            + " is missing — run ./gradlew :modules:app-agent-api:test -PupdateSchemas"
             + " --tests '*RegistryEnumsTsGenerationTest' to generate it.");
     String committed = Files.readString(out);
     assertEquals(

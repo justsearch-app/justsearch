@@ -1,0 +1,478 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
+  },
+  "createdAt": "2026-10-31T11:14:39.811Z",
+  "revision": "bc827e04b0b9d5f1649e9d76193859fc6d4a6732",
+  "tree": "e9c20e953ff78d66ef1ca7e28ec66f734d9ed62e",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": "openjdk version \"25.0.4.1\" 2026-08-18 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "./gradlew :modules:app-observability:test --tests \"io.justsearch.app.observability.surface.CoreSurfacesTsGenerationTest\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 40966
+    },
+    {
+      "command": "./gradlew :modules:app-agent-api:test --tests \"io.justsearch.agent.api.registry.RegistryEnumsTsGenerationTest\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 8708
+    },
+    {
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/api/registry/SurfaceCatalogPreservation.test.ts\" \"src/shell-v0/views/unifiedThreadClient.test.ts\" \"src/shell-v0/state/readinessNotice.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/ey_804lz/tmp/test-intent-vitest-3-1793445277043.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 2766
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/api/registry/SurfaceCatalogPreservation.test.ts",
+      "file": "modules/ui-web/src/api/registry/SurfaceCatalogPreservation.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:b43aa214b43d185957d043f75640a97226c0d7001069a93687737fa0ba55f360",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "ordered effective catalog preservation online boot fetches wire before installing frontend contributions and caches only wire",
+          "status": "passed"
+        },
+        {
+          "name": "ordered effective catalog preservation cached 304 sends ETag and installs contributions over the restored wire",
+          "status": "passed"
+        },
+        {
+          "name": "ordered effective catalog preservation cached network failure retains wire and contributions",
+          "status": "passed"
+        },
+        {
+          "name": "ordered effective catalog preservation cached http failure retains wire and contributions",
+          "status": "passed"
+        },
+        {
+          "name": "ordered effective catalog preservation cached rejected-body failure retains wire and contributions",
+          "status": "passed"
+        },
+        {
+          "name": "ordered effective catalog preservation cold failure retains the existing local fallback after capped retries",
+          "status": "passed"
+        },
+        {
+          "name": "ordered effective catalog preservation failure → install → backend-ready attempt → success preserves the observed recovery sequence",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/unifiedThreadClient.test.ts",
+      "file": "modules/ui-web/src/shell-v0/views/unifiedThreadClient.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:b6be84c80e471dd28ccd89dea9db053ff92018ffd21fcce061638cd8455ad378",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "parseThreadEvent (S4a per-event parsing) parses a known-kind event under the unchanged strict schema",
+          "status": "passed"
+        },
+        {
+          "name": "parseThreadEvent (S4a per-event parsing) degrades an unrecognized kind STRING to a generic UNKNOWN event carrying rawKind",
+          "status": "passed"
+        },
+        {
+          "name": "parseThreadEvent (S4a per-event parsing) degrades an unrecognized kind even when originator/content/attributes are absent (loose passthrough)",
+          "status": "passed"
+        },
+        {
+          "name": "parseThreadEvent (S4a per-event parsing) drops a structurally invalid event (missing id) regardless of kind",
+          "status": "passed"
+        },
+        {
+          "name": "parseThreadEvent (S4a per-event parsing) a known kind with a missing required field (content) still fails THAT event, not silently as UNKNOWN",
+          "status": "passed"
+        },
+        {
+          "name": "parseThreadEvent (S4a per-event parsing) a known kind with a wrong-typed required field (content: number) still fails THAT event",
+          "status": "passed"
+        },
+        {
+          "name": "parseThreadEvent (S4b SEARCH-kind strict attributes) parses a well-formed SEARCH event with its typed attributes intact",
+          "status": "passed"
+        },
+        {
+          "name": "parseThreadEvent (S4b SEARCH-kind strict attributes) drops (not UNKNOWN-degrades) a SEARCH event missing a required attribute",
+          "status": "passed"
+        },
+        {
+          "name": "parseThreadEvent (S4b SEARCH-kind strict attributes) drops a SEARCH event with a wrong-typed attribute (matchCount as a string)",
+          "status": "passed"
+        },
+        {
+          "name": "fetchUnifiedThread (S4a forward-tolerant array parsing) a thread with one unrecognized-kind event + two known events parses to 3 events; the thread is NOT empty",
+          "status": "passed"
+        },
+        {
+          "name": "fetchUnifiedThread (S4a forward-tolerant array parsing) drops a structurally invalid event but keeps its siblings, and warns once naming the count",
+          "status": "passed"
+        },
+        {
+          "name": "fetchUnifiedThread (S4a forward-tolerant array parsing) returns EMPTY when the top-level envelope itself is malformed (events not an array)",
+          "status": "passed"
+        },
+        {
+          "name": "fetchUnifiedThread (S4a forward-tolerant array parsing) returns EMPTY on a non-ok response",
+          "status": "passed"
+        },
+        {
+          "name": "thread vocabulary preservation USER_MESSAGE parses valid events and drops malformed known events",
+          "status": "passed"
+        },
+        {
+          "name": "thread vocabulary preservation ASSISTANT_MESSAGE parses valid events and drops malformed known events",
+          "status": "passed"
+        },
+        {
+          "name": "thread vocabulary preservation TOOL_ACTIVITY parses valid events and drops malformed known events",
+          "status": "passed"
+        },
+        {
+          "name": "thread vocabulary preservation PROGRESS parses valid events and drops malformed known events",
+          "status": "passed"
+        },
+        {
+          "name": "thread vocabulary preservation ERROR parses valid events and drops malformed known events",
+          "status": "passed"
+        },
+        {
+          "name": "thread vocabulary preservation HANDOFF parses valid events and drops malformed known events",
+          "status": "passed"
+        },
+        {
+          "name": "thread vocabulary preservation SEARCH parses valid events and drops malformed known events",
+          "status": "passed"
+        },
+        {
+          "name": "thread vocabulary preservation SEARCH requires typed query",
+          "status": "passed"
+        },
+        {
+          "name": "thread vocabulary preservation SEARCH requires typed mode",
+          "status": "passed"
+        },
+        {
+          "name": "thread vocabulary preservation SEARCH requires typed matchCount",
+          "status": "passed"
+        },
+        {
+          "name": "thread vocabulary preservation SEARCH requires typed resultCount",
+          "status": "passed"
+        },
+        {
+          "name": "thread vocabulary preservation SEARCH requires typed docIds",
+          "status": "passed"
+        },
+        {
+          "name": "thread vocabulary preservation SEARCH requires typed executedAt",
+          "status": "passed"
+        },
+        {
+          "name": "mixed thread recovery signaling keeps valid and future events, drops malformed known siblings and marks the response incomplete",
+          "status": "passed"
+        },
+        {
+          "name": "mixed thread recovery signaling drops a non-string kind undefined",
+          "status": "passed"
+        },
+        {
+          "name": "mixed thread recovery signaling drops a non-string kind null",
+          "status": "passed"
+        },
+        {
+          "name": "mixed thread recovery signaling drops a non-string kind 42",
+          "status": "passed"
+        },
+        {
+          "name": "mixed thread recovery signaling drops a non-string kind {}",
+          "status": "passed"
+        },
+        {
+          "name": "mixed thread recovery signaling drops a non-string kind undefined",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/state/readinessNotice.test.ts",
+      "file": "modules/ui-web/src/shell-v0/state/readinessNotice.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:d4b3b05ac8414ef7d7d78c4e0e3af777868d0844027ba51c5a6d82bf1f5f386d",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "readinessNotice (595 §4.2) — projects the ONE verdict into the search banner D1-14: shows a keyword-available notice only for a transition with measured dense unavailability",
+          "status": "passed"
+        },
+        {
+          "name": "readinessNotice (595 §4.2) — projects the ONE verdict into the search banner D1-14: projects the physical encoder reload and prefers it when the legacy code is also present",
+          "status": "passed"
+        },
+        {
+          "name": "readinessNotice (595 §4.2) — projects the ONE verdict into the search banner D1-15: presents activating and parked-candidate transitions while A remains available",
+          "status": "passed"
+        },
+        {
+          "name": "readinessNotice (595 §4.2) — projects the ONE verdict into the search banner keeps paused and overdue migration advice ahead of the physical reload detail",
+          "status": "passed"
+        },
+        {
+          "name": "readinessNotice (595 §4.2) — projects the ONE verdict into the search banner returns null for every non-rendering verdict (the banner does not render)",
+          "status": "passed"
+        },
+        {
+          "name": "readinessNotice (595 §4.2) — projects the ONE verdict into the search banner 637 #1: an UNREACHABLE verdict mints a LOUD disconnected notice (never a silent empty result)",
+          "status": "passed"
+        },
+        {
+          "name": "readinessNotice (595 §4.2) — projects the ONE verdict into the search banner §10.3: a COSMETIC degradation (severity info) is worded CALMLY and accurately — no \"keyword results\"",
+          "status": "passed"
+        },
+        {
+          "name": "readinessNotice (595 §4.2) — projects the ONE verdict into the search banner 600 PART X: gpu.saturated words calmly (no raw code) — the secondary-cause leak is closed",
+          "status": "passed"
+        },
+        {
+          "name": "readinessNotice (595 §4.2) — projects the ONE verdict into the search banner an IMPAIRING degradation (severity warn) keeps the \"Semantic search degraded / keyword results\" wording",
+          "status": "passed"
+        },
+        {
+          "name": "readinessNotice (595 §4.2) — projects the ONE verdict into the search banner compat reason code → reindex headline + rebuild remedy + the SPECIFIC cause worded (600 Design A)",
+          "status": "passed"
+        },
+        {
+          "name": "readinessNotice (595 §4.2) — projects the ONE verdict into the search banner 804 §D1: index.schema_mismatch ALONE is info + honest — never \"keyword-only\" / \"degraded\", rebuild remedy kept",
+          "status": "passed"
+        },
+        {
+          "name": "readinessNotice (595 §4.2) — projects the ONE verdict into the search banner D1-15: fatal schema open refusal has its own error reason, separate from the serving advisory",
+          "status": "passed"
+        },
+        {
+          "name": "readinessNotice (595 §4.2) — projects the ONE verdict into the search banner 804 §D1: the advisory notice still lists OTHER info causes (fresh install: schema + LambdaMART)",
+          "status": "passed"
+        },
+        {
+          "name": "readinessNotice (595 §4.2) — projects the ONE verdict into the search banner 804 §D1: a DEGRADING reindex cause keeps the unchanged \"Reindex required / keyword-only\" wording",
+          "status": "passed"
+        },
+        {
+          "name": "readinessNotice (595 §4.2) — projects the ONE verdict into the search banner 804 §B5: the reindex branch scopes its cause list to REINDEX causes only (no rebuild-proof causes)",
+          "status": "passed"
+        },
+        {
+          "name": "readinessNotice (595 §4.2) — projects the ONE verdict into the search banner 804 §B5: inference.offline ALONE words as AI-features-off — never \"keyword results\"",
+          "status": "passed"
+        },
+        {
+          "name": "readinessNotice (595 §4.2) — projects the ONE verdict into the search banner 804 §B5: the live-observed pair (inference.offline + lambdamart) words as AI-features-off",
+          "status": "passed"
+        },
+        {
+          "name": "readinessNotice (595 §4.2) — projects the ONE verdict into the search banner 804 §B5: a RETRIEVAL-impairing cause alongside the AI cause keeps the \"keyword results\" wording",
+          "status": "passed"
+        },
+        {
+          "name": "readinessNotice (595 §4.2) — projects the ONE verdict into the search banner 804 §B5: an UNCLASSIFIED code never acquires the reassuring \"fully working\" claim",
+          "status": "passed"
+        },
+        {
+          "name": "readinessNotice (595 §4.2) — projects the ONE verdict into the search banner an unknown code words generically and falls back to Open Health — never silence",
+          "status": "passed"
+        },
+        {
+          "name": "readinessNotice (595 §4.2) — projects the ONE verdict into the search banner 805 §G.2: the round-11 pair (chunk_embedding.not_ready + lambdamart) takes the PASSAGE branch",
+          "status": "passed"
+        },
+        {
+          "name": "readinessNotice (595 §4.2) — projects the ONE verdict into the search banner 805 §G.2: chunk_embedding.in_progress is the passage class too (no remedy ⇒ Open Health)",
+          "status": "passed"
+        },
+        {
+          "name": "readinessNotice (595 §4.2) — projects the ONE verdict into the search banner 805 §G.2: a real retrieval block ALONGSIDE the passage gap outranks it (keyword wording returns)",
+          "status": "passed"
+        },
+        {
+          "name": "readinessNotice (595 §4.2) — projects the ONE verdict into the search banner 805 §G.2: an UNCLASSIFIED code alongside the passage gap stays conservative (never the calmer claim)",
+          "status": "passed"
+        },
+        {
+          "name": "readinessNotice (595 §4.2) — projects the ONE verdict into the search banner 805 §G.2: a passage gap alongside an AI cause words as PASSAGE (passage outranks ai-unavailable)",
+          "status": "passed"
+        },
+        {
+          "name": "readinessNotice (595 §4.2) — projects the ONE verdict into the search banner 804 §B5 + 805 §G.2: the AI branch scopes its cause list to AI codes only",
+          "status": "passed"
+        },
+        {
+          "name": "readinessNotice (595 §4.2) — projects the ONE verdict into the search banner 598 reopen (B-3): index.dense_unavailable is severity warn (can never render \"fully semantic\") and words as capability-OFF",
+          "status": "passed"
+        },
+        {
+          "name": "classifyConsequence (805 §G.2) Spec D K3: a standing stuck encoder impairs retrieval and is worded as itself",
+          "status": "passed"
+        },
+        {
+          "name": "classifyConsequence (805 §G.2) retrieval-impaired: a positively-known dense block",
+          "status": "passed"
+        },
+        {
+          "name": "classifyConsequence (805 §G.2) passage-reduced: the chunk-embedding codes, which are NOT a keyword fallback",
+          "status": "passed"
+        },
+        {
+          "name": "classifyConsequence (805 §G.2) D1-15: a missing index-selected model has a role-neutral consequence",
+          "status": "passed"
+        },
+        {
+          "name": "classifyConsequence (805 §G.2) ai-unavailable: the AI-model codes, retrieval untouched",
+          "status": "passed"
+        },
+        {
+          "name": "classifyConsequence (805 §G.2) cosmetic: a recognized cause that touches neither retrieval nor the AI model",
+          "status": "passed"
+        },
+        {
+          "name": "classifyConsequence (805 §G.2) unknown: an unrecognized code, and an EMPTY list, are never evidence of health",
+          "status": "passed"
+        },
+        {
+          "name": "classifyConsequence (805 §G.2) precedence: retrieval-impaired > unknown > passage-reduced > ai-unavailable > cosmetic",
+          "status": "passed"
+        },
+        {
+          "name": "classifyConsequence (805 §G.2) the exported caveats carry the claim wording so no second module re-authors it",
+          "status": "passed"
+        },
+        {
+          "name": "warrantsSearchDegradationBanner (round-14 finding 9) an info-severity-only verdict warrants NO banner-tier warning",
+          "status": "passed"
+        },
+        {
+          "name": "warrantsSearchDegradationBanner (round-14 finding 9) …while its notice still exists, so Health keeps carrying the cause",
+          "status": "passed"
+        },
+        {
+          "name": "warrantsSearchDegradationBanner (round-14 finding 9) warn / error / unreachable keep the banner (the gate is severity, not \"no banner ever\")",
+          "status": "passed"
+        },
+        {
+          "name": "warrantsSearchDegradationBanner (round-14 finding 9) an operational verdict warrants nothing (no notice to show)",
+          "status": "passed"
+        },
+        {
+          "name": "remedy targets resolve to the surface that owns the capability conversations.locked → the surface that defines unlockEncryption(), not Settings",
+          "status": "passed"
+        },
+        {
+          "name": "readinessNotice — index and inference rows index.failed does not claim a start failure or terminal recovery",
+          "status": "passed"
+        },
+        {
+          "name": "readinessNotice — index and inference rows index.corrupt carries no fake one-click remedy — Open Health, like its precedent",
+          "status": "passed"
+        },
+        {
+          "name": "readinessNotice — index and inference rows terminal index failures name search unavailability, while intentional startup/stop remain transient",
+          "status": "passed"
+        },
+        {
+          "name": "readinessNotice — index and inference rows 825: the boot-recovery terminal code is worded apart from the pin it succeeds",
+          "status": "passed"
+        },
+        {
+          "name": "readinessNotice — index and inference rows severity: a lost/corrupt server is error; a shutdown or a not-yet-connected one is calm",
+          "status": "passed"
+        },
+        {
+          "name": "readinessNotice — index and inference rows Lane F new codes have distinct truthful wording and severity",
+          "status": "passed"
+        },
+        {
+          "name": "readinessNotice — index and inference rows S4: the two new inference codes are calm and stay OUT of the banner",
+          "status": "passed"
+        },
+        {
+          "name": "readinessNotice — index and inference rows S4: neither new inference code joins AI_MODEL_UNAVAILABLE_CODES (not \"any inference.*\")",
+          "status": "passed"
+        },
+        {
+          "name": "readinessNotice — index and inference rows S5: a crash and a deactivation word DIFFERENT truths (the collapse this slice removes)",
+          "status": "passed"
+        },
+        {
+          "name": "readinessNotice — index and inference rows S5: inference.crashed MUST join AI_MODEL_UNAVAILABLE_CODES — the `cosmetic` trap",
+          "status": "passed"
+        },
+        {
+          "name": "readinessNotice — index and inference rows S5: inference.deactivated does NOT join it — it is the policy/user-choice case",
+          "status": "passed"
+        },
+        {
+          "name": "readinessNotice — index and inference rows Spec A step 7: each classified chat failure words its own cause and is a warn",
+          "status": "passed"
+        },
+        {
+          "name": "readinessNotice — index and inference rows Spec A step 7: context_reduced is a calm notice that stays out of the banner",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-observability/src/test/java/io/justsearch/app/observability/surface/CoreSurfacesTsGenerationTest.java",
+      "file": "modules/app-observability/src/test/java/io/justsearch/app/observability/surface/CoreSurfacesTsGenerationTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:a2096299818ed874806ed7ef95826b50e9efc72611daac80e91c9a3da8e3df7a",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "generatedMetadataMatchesJavaAuthority()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-agent-api/src/test/java/io/justsearch/agent/api/registry/RegistryEnumsTsGenerationTest.java",
+      "file": "modules/app-agent-api/src/test/java/io/justsearch/agent/api/registry/RegistryEnumsTsGenerationTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:e55ff15951011b97d9de71c6d13c8df18e6e35233de7c650f42b60ce81e2163f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "generatedFeEnumsMatchTheJavaAuthority()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:68f1a631b32a721c78f40d59f0959d6a68ea8afe0aeb161f2977456385e5505d"
+}

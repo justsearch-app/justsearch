@@ -1,27 +1,15 @@
 #!/usr/bin/env node
 /**
- * thread-event-kinds check — tempdoc S4a (Search Thread, risk-review finding #1 follow-up).
- *
- * The unified-thread event-kind vocabulary is ONE closed authority: the backend declares it as the
- * `InteractionEventKind` Java enum, and the FE `unifiedThreadClient.ts` mirrors it as
- * `KNOWN_EVENT_KINDS` (the Zod enum driving strict per-event parsing). Before S4a's forward-tolerant
- * parsing landed, an FE build unaware of a new backend kind (e.g. a not-yet-shipped `SEARCH` kind)
- * would blank the whole thread; S4a fixed that failure mode, but the two vocabularies can still DRIFT
- * silently (a new Java member the FE never mirrors just always degrades to the generic `UNKNOWN` item —
- * legal, but likely unintentional; a stale FE entry with no Java member is dead/typo'd). This check
- * makes that drift visible:
- *
- *  - FORWARD: every `InteractionEventKind` Java enum member appears in the FE's `KNOWN_EVENT_KINDS`.
- *  - BACKWARD: every FE `KNOWN_EVENT_KINDS` entry is a real `InteractionEventKind` member.
- *
- * Not wired into CI yet (registration is deferred to the backend SEARCH-kind follow-up stage) — this
- * script only needs to pass standalone: `node scripts/ci/check-thread-event-kinds.mjs`.
+ * Compare InteractionEventKind with its generated runtime tuple, in both directions, and check that
+ * the client uses that tuple for strict parsing and known-kind rejection. UNKNOWN remains a frontend
+ * fallback. The existing parity check stays in the required ui-web-gates recipe.
  */
 import { readFileSync } from 'node:fs';
 import { stripComments } from '../lib/strip-comments.mjs';
 
 const JAVA_ENUM_FILE =
   'modules/app-agent-api/src/main/java/io/justsearch/agent/api/interaction/InteractionEventKind.java';
+const FE_KINDS_FILE = 'modules/ui-web/src/api/generated/registry-enums.generated.ts';
 const FE_CLIENT_FILE = 'modules/ui-web/src/shell-v0/views/unifiedThreadClient.ts';
 
 /** Strip Java block/line comments so enum-constant extraction can't false-positive on prose. */
@@ -44,9 +32,10 @@ export function extractJavaEnumKinds(javaSrc) {
   return kinds;
 }
 
-/** Extract the FE's `KNOWN_EVENT_KINDS` string-literal array entries from unifiedThreadClient.ts. */
+/** Extract the generated runtime tuple (also accepts the original literal array in fixtures). */
 export function extractFeKnownKinds(tsSrc) {
-  const start = tsSrc.indexOf('KNOWN_EVENT_KINDS');
+  tsSrc = stripComments(tsSrc, { withHtml: false });
+  const start = tsSrc.search(/(?:KNOWN_EVENT_KINDS|INTERACTION_EVENT_KINDS)\s*=/);
   const slice = start >= 0 ? tsSrc.slice(start) : tsSrc;
   const end = slice.indexOf('] as const');
   const region = end >= 0 ? slice.slice(0, end) : slice;
@@ -65,10 +54,9 @@ export function checkCorrespondence({ javaKinds, feKinds }) {
     if (!feKinds.has(kind)) {
       failures.push(
         `forward: InteractionEventKind member \`${kind}\` has no FE KNOWN_EVENT_KINDS entry in ` +
-          `unifiedThreadClient.ts — an FE build unaware of it degrades every \`${kind}\` event to the ` +
+          `registry-enums.generated.ts — an FE build unaware of it degrades every \`${kind}\` event to the ` +
           `generic UNKNOWN item (S4a forward-tolerance, not a crash) but likely needs a real FE render. ` +
-          `Add \`${kind}\` to KNOWN_EVENT_KINDS (and its case in unifiedThreadProjection.ts's KIND_MAP + ` +
-          `UnifiedChatView's renderUnifiedItem), or confirm the generic degrade is intentional for now.`,
+          `Regenerate with -PupdateSchemas and add its case to unifiedThreadProjection.ts's KIND_MAP.`,
       );
     }
   }
@@ -87,7 +75,7 @@ export function checkCorrespondence({ javaKinds, feKinds }) {
 
 function main() {
   const javaKinds = extractJavaEnumKinds(readFileSync(JAVA_ENUM_FILE, 'utf8'));
-  const feKinds = extractFeKnownKinds(readFileSync(FE_CLIENT_FILE, 'utf8'));
+  const feKinds = extractFeKnownKinds(readFileSync(FE_KINDS_FILE, 'utf8'));
 
   if (javaKinds.size === 0 || feKinds.size === 0) {
     console.error(
@@ -98,6 +86,12 @@ function main() {
   }
 
   const failures = checkCorrespondence({ javaKinds, feKinds });
+  const client = stripComments(readFileSync(FE_CLIENT_FILE, 'utf8'), { withHtml: false });
+  if (!/import\s*\{\s*INTERACTION_EVENT_KINDS\s+as\s+KNOWN_EVENT_KINDS\s*\}\s*from\s*['"]\.\.\/\.\.\/api\/generated\/registry-enums\.generated\.js['"]/.test(client)
+      || !client.includes('z.enum(KNOWN_EVENT_KINDS)')
+      || !client.includes('new Set(KNOWN_EVENT_KINDS)')) {
+    failures.push('The thread client must use the generated tuple for strict parsing and known-kind rejection.');
+  }
 
   if (failures.length > 0) {
     console.error(
