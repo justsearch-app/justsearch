@@ -6653,7 +6653,8 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
    * Performs a quick integrity check on the database using PRAGMA quick_check.
    *
    * <p>This method should be called after opening an existing database to detect
-   * corruption early. It also verifies fresh databases and connections recovering from errors.
+   * corruption early. It also verifies fresh databases. A passing check does not clear an
+   * earlier recorded database error: structural integrity does not prove the failed query works.
    *
    * <p>PRAGMA quick_check returns multiple rows; the database is considered healthy
    * only if ALL rows return exactly "ok". Any other result indicates corruption.
@@ -6695,7 +6696,6 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
         }
 
         lastQuickCheckOk = true;
-        dbHealthy = true;
         log.info("Integrity check passed ({} rows checked)", rowCount);
         return true;
       }

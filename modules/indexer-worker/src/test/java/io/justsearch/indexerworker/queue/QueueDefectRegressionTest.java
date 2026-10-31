@@ -106,7 +106,7 @@ final class QueueDefectRegressionTest {
       assertFalse(queue.queueDbHealthSnapshot().healthy());
       fail.set(false);
       assertTrue(queue.performIntegrityCheck());
-      assertTrue(queue.queueDbHealthSnapshot().healthy());
+      assertFalse(queue.queueDbHealthSnapshot().healthy(), "structural integrity does not prove the failed read works");
       assertTrue(queue.queueDbHealthSnapshot().lastDbErrorAtMs() > 0);
       assertNotNull(read(queue, query));
       connection(queue, actual);
@@ -155,7 +155,7 @@ final class QueueDefectRegressionTest {
     assertFalse(queue.queueDbHealthSnapshot().healthy());
   }
 
-  @Test void successfulIntegrityCheckRecoversCurrentHealthWithoutErasingErrorHistory() throws Exception {
+  @Test void successfulIntegrityCheckKeepsRecordedFailureAndErrorHistory() throws Exception {
     try (var queue = new SqliteJobQueue(temp.resolve("health.db"))) {
       queue.open(); queue.enqueue(List.of(temp.resolve("file")));
       queue.close(); queue.open();
@@ -172,13 +172,13 @@ final class QueueDefectRegressionTest {
       assertEquals(1, queue.queueDepth());
       assertFalse(queue.queueDbHealthSnapshot().healthy());
       assertTrue(queue.performIntegrityCheck());
-      assertTrue(queue.queueDbHealthSnapshot().healthy(), "a successful integrity check resolves the transient failure");
+      assertFalse(queue.queueDbHealthSnapshot().healthy(), "structural integrity does not prove the failed read works");
       assertEquals(errorAt, queue.queueDbHealthSnapshot().lastDbErrorAtMs());
     }
   }
 
   @ParameterizedTest @ValueSource(strings={"sql", "corrupt", "empty"})
-  void freshDatabaseIntegrityChecksRunAndOnlySuccessfulIntegrityRestoresHealth(String fault) throws Exception {
+  void freshDatabaseIntegrityChecksRunAndFailuresStayRecorded(String fault) throws Exception {
     try (var queue = new SqliteJobQueue(temp.resolve("integrity.db"))) {
       queue.open();
       Connection actual = JobCountsTest.connection(queue);
@@ -202,7 +202,7 @@ final class QueueDefectRegressionTest {
       assertEquals(0, queue.queueDepth());
       assertFalse(queue.queueDbHealthSnapshot().healthy(), "unrelated successful reads cannot prove integrity");
       assertTrue(queue.performIntegrityCheck());
-      assertTrue(queue.queueDbHealthSnapshot().healthy());
+      assertFalse(queue.queueDbHealthSnapshot().healthy(), "a later passing check does not clear the recorded failure");
       assertEquals(errorAt, queue.queueDbHealthSnapshot().lastDbErrorAtMs());
     }
   }
