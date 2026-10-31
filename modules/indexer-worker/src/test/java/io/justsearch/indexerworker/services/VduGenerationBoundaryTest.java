@@ -137,7 +137,7 @@ final class VduGenerationBoundaryTest {
 
     private void call(String operation) {
       switch (operation) {
-        case "update" -> assertTrue(service.updateVduResult(UpdateVduResultRequest.newBuilder()
+        case "update" -> assertTrue(service.updateVduResult(UpdateVduResultRequest.newBuilder().setSourceSha256("a".repeat(64))
             .setDocId(DOC).setAttemptId(attempt).setOutcome(VduUpdateOutcome.VDU_UPDATE_OUTCOME_SUCCESS_EMPTY).build(),
             ctx).getSuccess());
         case "mark" -> assertTrue(service.markVduProcessing(MarkVduProcessingRequest.newBuilder()

@@ -39,7 +39,7 @@ class VduDeferralDuringChatDrainTest {
   void aDrainingGateDefersTheDocumentInsteadOfFailingIt() throws Exception {
     Path image = tempDir.resolve("scan.png");
     Files.writeString(image, "image");
-    VduProcessor processor = mock(VduProcessor.class);
+    VduProcessor processor = VduAttemptTestSupport.processor();
     KnowledgeClient client = VduAttemptTestSupport.client();
     GpuCapabilitiesService gpu = mock(GpuCapabilitiesService.class);
     EngineContext context = TestEngineContexts.durableInternal();
@@ -49,6 +49,7 @@ class VduDeferralDuringChatDrainTest {
     when(client.markVduProcessing(anyString(), anyInt(), any())).thenReturn(0);
     when(client.updateVduResult(anyString(), any(), any(), any(), anyInt(), any()))
         .thenReturn(true);
+    when(client.releaseVduProcessing(anyString(), any())).thenReturn(true);
     when(processor.process(image, context))
         .thenThrow(new VduProcessor.VduException("vision call failed", drainingGateRefusal()));
     var capability = new VduCapabilityState();

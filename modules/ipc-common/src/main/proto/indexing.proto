@@ -1172,6 +1172,8 @@ message UpdateVduResultRequest {
   int32 page_count = 5;                     // Number of pages processed
   VduUpdateOutcome outcome = 6;             // Explicit outcome (preferred over vdu_status)
   string attempt_id = 7;                   // Exact claim; empty legacy results cannot publish
+  string source_sha256 = 8;                // Hash of the immutable source snapshot actually processed
+  bool incomplete_coverage = 9;            // Append accepted text after baseline instead of replacing it
 }
 
 message UpdateVduResultResponse {

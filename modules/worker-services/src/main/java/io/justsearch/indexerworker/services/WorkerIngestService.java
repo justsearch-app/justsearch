@@ -185,7 +185,7 @@ public final class WorkerIngestService {
 
   private record VduProcessingClaim(
       java.util.UUID owner, String attemptId, Map<String, Object> expectedRevision,
-      int previousRetryCount, int claimedRetryCount) {}
+      int previousRetryCount, int claimedRetryCount, int maxRetries) {}
 
   /**
    * Creates a new WorkerIngestService backed by the specified lifecycle managers.
@@ -2540,8 +2540,18 @@ public final class WorkerIngestService {
                   requireServingVduTarget();
                   return "Source is excluded by the current policy";
                 }
-                if (!vduClaimMatches(docId, claim)
-                    || !VduResultWriter.apply(ingestLifecycle, request, chunkSpladeEnabled(), claim.expectedRevision())) {
+                if (!vduClaimMatches(docId, claim)) {
+                  return "VDU source revision changed: " + docId;
+                }
+                if (request.getOutcome() != io.justsearch.ipc.VduUpdateOutcome.VDU_UPDATE_OUTCOME_FAILED
+                    && !claim.expectedRevision().get(SchemaFields.SOURCE_SHA256).equals(request.getSourceSha256())) {
+                  if (resetVduStatusToPending(docId, claim.owner(), Set.of(claim.attemptId()))) {
+                    ingestLifecycle.commitOps().commitAndTrack(CommitReason.VDU_RECOVERY);
+                    ingestLifecycle.commitOps().maybeRefreshBlocking();
+                  }
+                  return "VDU processed source hash differs from the claimed revision: " + docId;
+                }
+                if (!VduResultWriter.apply(ingestLifecycle, request, chunkSpladeEnabled(), claim.expectedRevision(), claim.maxRetries())) {
                   return "VDU source revision changed: " + docId;
                 }
                 return null;
@@ -3630,7 +3640,7 @@ public final class WorkerIngestService {
     if (updated) {
       Map<String, Object> expected = vduRevision(fields);
       vduProcessingClaims.put(docId,
-          new VduProcessingClaim(procedureOwner, attemptId, expected, currentCount, decision.retryCount()));
+          new VduProcessingClaim(procedureOwner, attemptId, expected, currentCount, decision.retryCount(), maxRetries));
       ingestLifecycle.commitOps().commitAndTrack(CommitReason.VDU_MARK_PROCESSING);
       ingestLifecycle.commitOps().maybeRefreshBlocking();
       requireServingVduTarget();

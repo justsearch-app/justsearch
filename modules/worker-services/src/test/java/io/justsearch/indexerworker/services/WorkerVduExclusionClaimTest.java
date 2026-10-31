@@ -151,7 +151,7 @@ class WorkerVduExclusionClaimTest extends LuceneExecutorTestBase {
   }
 
   private static UpdateVduResultRequest result(String id, String attempt, VduUpdateOutcome outcome) {
-    return UpdateVduResultRequest.newBuilder().setDocId(id).setAttemptId(attempt).setOutcome(outcome)
+    return UpdateVduResultRequest.newBuilder().setSourceSha256("a".repeat(64)).setDocId(id).setAttemptId(attempt).setOutcome(outcome)
         .setExtractedContent("result that must not publish while excluded").build();
   }
 }
