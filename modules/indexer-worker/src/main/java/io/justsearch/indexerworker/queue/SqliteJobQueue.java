@@ -277,8 +277,9 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
   public int enqueueRecordedEntries(String operationKey, long epoch,
       List<EnqueueEntry> entries, String collection) {
     if (!hasSufficientDiskSpace()) throw new IllegalStateException("Recorded queue admission is unavailable");
+    var sources = observeAdmissionSources(entries);
     return accessRecordedWalk(() -> SqliteIngestionWalkOps.enqueueRecorded(
-        connection, operationKey, epoch, entries, collection, System.currentTimeMillis()), true);
+        connection, operationKey, epoch, entries, collection, System.currentTimeMillis(), sources), true);
   }
 
   /**
@@ -313,7 +314,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
     }
     return accessRecordedWalk(() -> {
       int accepted = SqliteIngestionWalkOps.enqueueRecorded(
-          connection, operationKey, epoch, witnessedEntries, collection, System.currentTimeMillis());
+          connection, operationKey, epoch, witnessedEntries, collection, System.currentTimeMillis(), Map.of());
       if (accepted > 0) {
         bufferRecordedFileAdmissionsInTransaction(generation, operationKey, epoch, witnessedEntries);
       }
@@ -3084,8 +3085,8 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
     }
   }
 
-  private record AdmissionSource(long size, long modified, Object fileKey, String sha256) {
-    private boolean stillCurrent(Path path) {
+  record AdmissionSource(long size, long modified, Object fileKey, String sha256) {
+    boolean stillCurrent(Path path) {
       try {
         var current = Files.readAttributes(path, java.nio.file.attribute.BasicFileAttributes.class,
             LinkOption.NOFOLLOW_LINKS);
@@ -3136,14 +3137,18 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
       try (var row = query.executeQuery()) {
         if (!row.next() || STATE_DONE.equals(row.getString(1))) return false;
         String revision = row.getString(5);
-        if (revision != null && (revision.startsWith("release030")
-            || revision.startsWith("root1:") || revision.startsWith("root2:"))) {
-          return preservesMaintenanceRetryWait(entry.path(), now);
-        }
-        if ((exactCollection || collection != null) && !Objects.equals(collection, row.getString(2))) return false;
-        if (!Objects.equals(PathNormalizer.normalizeKey(entry.ingestionRoot()), row.getString(6))) return false;
+        boolean legacyRecovery = revision != null && (revision.startsWith("release030")
+            || revision.startsWith("root1:") || revision.startsWith("root2:"));
+        if ((exactCollection || collection != null)
+            && !Objects.equals(rootOwner(collection), rootOwner(row.getString(2)))) return false;
+        String priorRoot = row.getString(6);
+        if ((!legacyRecovery || priorRoot != null)
+            && !Objects.equals(PathNormalizer.normalizeKey(entry.ingestionRoot()), priorRoot)) return false;
         String prior = row.getString(3) == null ? row.getString(4) : row.getString(3);
-        if (sourceIdentity != null && prior != null) return sourceIdentity.equals(prior);
+        if (sourceIdentity != null && prior != null) {
+          return sourceIdentity.equals(prior)
+              && (!legacyRecovery || preservesMaintenanceRetryWait(entry.path(), now));
+        }
         long priorSize = row.getLong("size_bytes");
         boolean knownSize = !row.wasNull();
         long observedSize = source == null ? entry.sizeBytes() : source.size();
@@ -3153,11 +3158,12 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
           long modified = row.getLong("source_modified_at");
           if (!row.wasNull()) {
             if (modified != source.modified()) return false;
-          } else if (source.modified() > row.getLong("last_updated")) return false;
+          } else if (!legacyRecovery && source.modified() > row.getLong("last_updated")) return false;
         }
         // Missing legacy evidence or an unreadable source cannot establish changed work.
         // Keep the accepted revision and retry history until a change can be proved.
-        return prior == null || sourceIdentity == null;
+        return (prior == null || sourceIdentity == null)
+            && (!legacyRecovery || preservesMaintenanceRetryWait(entry.path(), now));
       }
     }
   }

@@ -7,11 +7,13 @@ import static org.mockito.Mockito.*;
 import io.justsearch.indexerworker.loop.SourceContentHash;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.sql.DriverManager;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
@@ -19,7 +21,7 @@ final class AdmissionHashLivenessTest {
   @TempDir Path temporary;
 
   @ParameterizedTest
-  @ValueSource(strings = {"enqueue", "maintenance", "retry", "reappeared"})
+  @ValueSource(strings = {"enqueue", "maintenance", "retry", "reappeared", "recorded"})
   void blockedSourceReadDoesNotReserveClaimsOrCompletions(String route) throws Exception {
     Path completed = Files.writeString(temporary.resolve("completed.txt"), "complete");
     Path pending = Files.writeString(temporary.resolve("pending.txt"), "claim");
@@ -32,6 +34,8 @@ final class AdmissionHashLivenessTest {
       queue.enqueueEntries(List.of(JobQueue.EnqueueEntry.stat(completed).withinRoot(temporary)));
       var claim = queue.pollPending(1).getFirst();
       queue.enqueueEntries(List.of(JobQueue.EnqueueEntry.stat(pending).withinRoot(temporary)));
+      String walkKey = "01900000-0000-7000-8000-000000000062";
+      var walk = queue.beginRecordedWalk(walkKey, "a".repeat(64), true);
       var admission = executor.submit(() -> {
         try (var hashes = mockStatic(SourceContentHash.class, CALLS_REAL_METHODS)) {
           hashes.when(() -> SourceContentHash.sha256(eq(slow), any())).thenAnswer(call -> {
@@ -41,6 +45,8 @@ final class AdmissionHashLivenessTest {
           });
           var entry = JobQueue.EnqueueEntry.stat(slow).withinRoot(temporary);
           return switch (route) {
+            case "recorded" -> queue.enqueueRecordedEntries(
+                walkKey, walk.enumerationEpoch(), List.of(entry), null);
             case "enqueue" -> queue.enqueueEntries(List.of(entry));
             case "maintenance" -> queue.enqueueMaintenanceScanEntries(List.of(entry), null, null);
             case "retry" -> queue.reenqueue(entry).accepted();
@@ -61,6 +67,32 @@ final class AdmissionHashLivenessTest {
         release.countDown();
       }
       assertEquals(1, admission.get(10, TimeUnit.SECONDS));
+    }
+  }
+
+  @Test
+  void recordedAdmissionRejectsSourceProofInvalidatedBeforeItsTransaction() throws Exception {
+    Path file = Files.writeString(temporary.resolve("changing.txt"), "before");
+    Path db = temporary.resolve("changing.db");
+    try (var queue = new SqliteJobQueue(db);
+        var hashes = mockStatic(SourceContentHash.class, CALLS_REAL_METHODS)) {
+      queue.open();
+      String key = "01900000-0000-7000-8000-000000000063";
+      var walk = queue.beginRecordedWalk(key, "a".repeat(64), true);
+      hashes.when(() -> SourceContentHash.admissionIdentity(file, temporary)).thenAnswer(call -> {
+        String observed = (String) call.callRealMethod();
+        assertNotNull(observed);
+        Files.writeString(file, "changed after the source observation");
+        return observed;
+      });
+      assertEquals(1, queue.enqueueRecordedEntries(key, walk.enumerationEpoch(),
+          List.of(JobQueue.EnqueueEntry.stat(file).withinRoot(temporary)), null));
+      try (var connection = DriverManager.getConnection("jdbc:sqlite:" + db);
+          var query = connection.createStatement();
+          var row = query.executeQuery("SELECT admitted_source_sha256 FROM jobs")) {
+        assertTrue(row.next());
+        assertNull(row.getString(1), "changed metadata must invalidate the earlier source observation");
+      }
     }
   }
 }
