@@ -23,3 +23,10 @@
 # *.onnx.cuda.optimized — the .cuda. infix shifts the suffix)
 *.cuda.optimized
 *.cuda.opt-meta
+
+# Local model identities, incomplete downloads, and working variants
+*.justsearch-identity.v1
+*.partial
+/compact/
+/onnx/*/candidates/
+/onnx/reranker-minilm-backup/
