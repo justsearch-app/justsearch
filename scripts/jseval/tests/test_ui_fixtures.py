@@ -8,6 +8,8 @@ the 502-storm / boot-break / module-load failure.
 from __future__ import annotations
 
 import json
+from datetime import datetime, timedelta, timezone
+from unittest.mock import patch
 
 from jseval import ui_fixtures
 
@@ -27,6 +29,23 @@ class TestApiPathPredicate:
 
 
 class TestFixtureBodies:
+    def test_semantic_pause_observations_are_fresh_on_each_response(self):
+        canonical = json.loads(ui_fixtures._BODY_STATUS)
+        now = datetime(2026, 10, 31, tzinfo=timezone.utc)
+        with patch("jseval.ui_fixtures.datetime") as clock:
+            for observed_at in (now, now + timedelta(minutes=1)):
+                clock.now.return_value = observed_at
+                status = json.loads(ui_fixtures._status_body("semantic-paused"))
+                age_ms = observed_at.timestamp() * 1000 - status["meta"]["workerRpcAtMs"]
+                assert 0 <= age_ms < status["operating"]["freshness"]["staleAfterMs"]
+                assert status["worker"]["core"]["indexState"] == "IDLE"
+                assert status["worker"]["core"]["indexHealthy"] is True
+                assert status["worker"]["core"]["indexedDocuments"] > 0
+                assert status["readiness"]["composites"]["retrieval"]["reasonCodes"] == [
+                    "index.embedding_rebuilding",
+                ]
+        assert json.loads(ui_fixtures._BODY_STATUS) == canonical
+
     def test_chat_capture_variants_report_ready_operating_chat(self):
         for variant in ("degraded", "degraded-detailed", "agent-run", "agent-budget"):
             status = json.loads(ui_fixtures._status_body(variant))
