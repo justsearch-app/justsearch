@@ -82,11 +82,7 @@ import { localizeResourceKey, onCatalogUpdated } from '../../../i18n/resourceCat
 import './Sv3Filters.js';
 import { sv3ComposerReason, type Sv3Degradation } from './sv3-degradation.js';
 
-export interface Sv3RecentItem {
-  readonly kind: 'search' | 'conversation';
-  readonly value: string;
-  readonly label: string;
-}
+import type { Sv3RecentItem } from './sv3-sessions-domain.js';
 
 /** Raised when the composer asks the window for the other state; the window owns the morph. */
 export const SV3_COMPOSER_STATE_REQUEST = 'sv3-composer-state-request';
