@@ -229,9 +229,12 @@ no GPU or shared dev stack is used. The final bf21114de8 rerun, with the R6 retr
           "label": "agent choice"
         },
         {
-          "kind": "owner-words",
-          "quote": "R6 (P1 narrowed) Without a configured and loaded sparse encoder, a SPLADE-COMPLETED parent's other-stage update is published through the baseline reset lane (SPLADE back to PENDING), never withheld.",
-          "location": "task t-20261030-ingfix request"
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed autonomously with designing all of the smallers and critical fixes. then proceed with implementing them accordingly.",
+          "delegationLocation": "task t-20261030-ingfix request",
+          "delegationScope": "fix the defects in the owner-commissioned ingestion defect list, designed by the orchestrator",
+          "choice": "R6 (P1 narrowed) Without a configured and loaded sparse encoder, a SPLADE-COMPLETED parent's other-stage update is published through the baseline reset lane (SPLADE back to PENDING), never withheld.",
+          "label": "agent choice"
         }
       ],
       "evidence": "gates/test-intent/evidence/ingfix-wp1.json",
@@ -406,7 +409,7 @@ no GPU or shared dev stack is used. The final bf21114de8 rerun, with the R6 retr
       "class": "Defect pin",
       "behaviour": [
         "failedPreservationWithholdsEntireUpdateAndKeepsOldPostings replaces failedRederivationResetsStatusAndRemovesOldPostingsWithRetry. The seed, successful embedding result, non-systemic preservation failure, real Lucene processing and refresh stay the same. The expected outcome changes from embedding COMPLETED, SPLADE PENDING, retry 1 and missing old postings to embedding PENDING, SPLADE COMPLETED, absent retry count and surviving searchable old postings (R1/P1). The seed-posting assertion remains; a post-refresh assertion now requires that posting to survive. No other check in this file changes.",
-        "absentSpladeEncoderPublishesEmbeddingAndResetsCompletedSplade: seed a real Lucene parent with embedding PENDING, SPLADE COMPLETED and searchable old sparse postings, then run the combined pass with ready embedding and no sparse encoder. Seed SPLADE retry count 0 and require embedding COMPLETED, SPLADE PENDING, retry count still 0 and removed old postings through the unchanged writer reset lane (R6). This new check must fail on bf21114de8. Existing real-index checks remain unchanged."
+        "absentSpladeEncoderPublishesEmbeddingAndResetsCompletedSplade (preservation check, not a defect pin: it keeps the before-state behaviour, passes on 9eb36cc792 and after, and is run as a supplementary --check in the evidence): seed a real Lucene parent with embedding PENDING, SPLADE COMPLETED and searchable old sparse postings, then run the combined pass with ready embedding and no sparse encoder. Seed SPLADE retry count 0 and require embedding COMPLETED, SPLADE PENDING, retry count still 0 and removed old postings through the unchanged writer reset lane (R6). This new check must fail on bf21114de8. Existing real-index checks remain unchanged."
       ],
       "defectSource": {
         "kind": "defect-source",
@@ -432,15 +435,17 @@ no GPU or shared dev stack is used. The final bf21114de8 rerun, with the R6 retr
           "label": "agent choice"
         },
         {
-          "kind": "owner-words",
-          "quote": "R6 (P1 narrowed) Without a configured and loaded sparse encoder, a SPLADE-COMPLETED parent's other-stage update is published through the baseline reset lane (SPLADE back to PENDING), never withheld.",
-          "location": "task t-20261030-ingfix request"
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed autonomously with designing all of the smallers and critical fixes. then proceed with implementing them accordingly.",
+          "delegationLocation": "task t-20261030-ingfix request",
+          "delegationScope": "fix the defects in the owner-commissioned ingestion defect list, designed by the orchestrator",
+          "choice": "R6 (P1 narrowed) Without a configured and loaded sparse encoder, a SPLADE-COMPLETED parent's other-stage update is published through the baseline reset lane (SPLADE back to PENDING), never withheld.",
+          "label": "agent choice"
         }
       ],
       "evidence": "gates/test-intent/evidence/ingfix-wp1.json",
       "newChecks": [
-        "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/CombinedEnrichmentRmwIntegrationTest.java#failedPreservationWithholdsEntireUpdateAndKeepsOldPostings",
-        "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/CombinedEnrichmentRmwIntegrationTest.java#absentSpladeEncoderPublishesEmbeddingAndResetsCompletedSplade"
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/CombinedEnrichmentRmwIntegrationTest.java#failedPreservationWithholdsEntireUpdateAndKeepsOldPostings"
       ]
     },
     {
@@ -544,23 +549,32 @@ no GPU or shared dev stack is used. The final bf21114de8 rerun, with the R6 retr
       "defectSource": {
         "kind": "defect-source",
         "stronger": {
-          "kind": "owner-words",
-          "quote": "S14 (challenger 8) An embedding or SPLADE provider that becomes unavailable between selection and inference is not charged as a bad-document attempt.",
-          "location": "task t-20261030-ingfix request"
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed autonomously with designing all of the smallers and critical fixes. then proceed with implementing them accordingly.",
+          "delegationLocation": "task t-20261030-ingfix request",
+          "delegationScope": "fix the defects in the owner-commissioned ingestion defect list, designed by the orchestrator",
+          "choice": "S14 (challenger 8) An embedding or SPLADE provider that becomes unavailable between selection and inference is not charged as a bad-document attempt.",
+          "label": "agent choice"
         },
         "reproduction": "Select a real Lucene whitespace-only chunk with retry 0 while the embedding provider is ready. During the real getEnrichmentInputs snapshot read, retire the provider, replace its identity, or forbid writes. In both the combined and individual chunk paths require retry 0, PENDING status and no embedding inference. Ready-provider controls still charge retry 1 (P6). All eight named parameterized variants execute; the six outage variants must fail on bf21114de8 and pass after this repair, while the two controls pass before and after."
       },
       "reproduction": "Select a real Lucene whitespace-only chunk with retry 0 while the embedding provider is ready. During the real getEnrichmentInputs snapshot read, retire the provider, replace its identity, or forbid writes. In both the combined and individual chunk paths require retry 0, PENDING status and no embedding inference. Ready-provider controls still charge retry 1 (P6). All eight named parameterized variants execute; the six outage variants must fail on bf21114de8 and pass after this repair, while the two controls pass before and after.",
       "sources": [
         {
-          "kind": "owner-words",
-          "quote": "S14 (challenger 8) An embedding or SPLADE provider that becomes unavailable between selection and inference is not charged as a bad-document attempt.",
-          "location": "task t-20261030-ingfix request"
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed autonomously with designing all of the smallers and critical fixes. then proceed with implementing them accordingly.",
+          "delegationLocation": "task t-20261030-ingfix request",
+          "delegationScope": "fix the defects in the owner-commissioned ingestion defect list, designed by the orchestrator",
+          "choice": "S14 (challenger 8) An embedding or SPLADE provider that becomes unavailable between selection and inference is not charged as a bad-document attempt.",
+          "label": "agent choice"
         },
         {
-          "kind": "owner-words",
-          "quote": "S4 (D49) While the embedding provider is unavailable, still starting, or embedding writes are forbidden, chunk-embedding backfill does not run and spends no chunk retries; once the provider is ready, those chunks are embedded.",
-          "location": "task t-20261030-ingfix request"
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed autonomously with designing all of the smallers and critical fixes. then proceed with implementing them accordingly.",
+          "delegationLocation": "task t-20261030-ingfix request",
+          "delegationScope": "fix the defects in the owner-commissioned ingestion defect list, designed by the orchestrator",
+          "choice": "S4 (D49) While the embedding provider is unavailable, still starting, or embedding writes are forbidden, chunk-embedding backfill does not run and spends no chunk retries; once the provider is ready, those chunks are embedded.",
+          "label": "agent choice"
         }
       ],
       "evidence": "gates/test-intent/evidence/ingfix-wp1.json",
