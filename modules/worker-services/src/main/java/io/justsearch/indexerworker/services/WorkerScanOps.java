@@ -68,6 +68,13 @@ final class WorkerScanOps {
   private final BooleanSupplier isCancelled;
   private final BackpressureWaiter backpressureWaiter;
   private final ForcedPathSink forcedPathSink;
+  private java.util.function.ToIntFunction<java.util.function.IntSupplier> admissionFence =
+      java.util.function.IntSupplier::getAsInt;
+
+  void setAdmissionFence(java.util.function.ToIntFunction<java.util.function.IntSupplier> fence) {
+    admissionFence = Objects.requireNonNull(fence);
+  }
+
   private final Runnable beforeRecordedAdmission;
   private final Supplier<String> migratingGeneration;
 
@@ -345,11 +352,8 @@ final class WorkerScanOps {
     return terminal;
   }
 
-  private void flushBatch(
-      List<JobQueue.EnqueueEntry> batch, String collection, String scanId, Long recordedEpoch, ScanMode mode,
-      long[] counters, long[] bytes) {
-    String coll = collection == null || collection.isBlank() ? null : collection;
-    if (recordedEpoch != null) beforeRecordedAdmission.run();
+  private int enqueueBatch(List<JobQueue.EnqueueEntry> batch, String coll, String scanId,
+      Long recordedEpoch, ScanMode mode) {
     String candidateGeneration = migratingGeneration.get();
     boolean maintenance = candidateGeneration == null && recordedEpoch == null
         && mode == ScanMode.INITIAL && batch.stream().allMatch(entry ->
@@ -375,6 +379,16 @@ final class WorkerScanOps {
     if (accepted < 0 || accepted > batch.size() || (!maintenance && accepted != batch.size())) {
       throw WorkerServiceException.unavailable("QUEUE_ADMISSION_FAILED");
     }
+    return accepted;
+  }
+
+  private void flushBatch(
+      List<JobQueue.EnqueueEntry> batch, String collection, String scanId, Long recordedEpoch, ScanMode mode,
+      long[] counters, long[] bytes) {
+    String coll = collection == null || collection.isBlank() ? null : collection;
+    if (recordedEpoch != null) beforeRecordedAdmission.run();
+    int accepted = admissionFence.applyAsInt(() -> enqueueBatch(batch, coll, scanId, recordedEpoch, mode));
+    if (accepted == 0 && isCancelled.getAsBoolean()) { batch.clear(); return; }
     counters[1] += accepted;
     for (JobQueue.EnqueueEntry entry : batch) bytes[0] += entry.sizeBytes();
     if (mode == ScanMode.FORCE_REINDEX && recordedEpoch == null && !batch.isEmpty()) {

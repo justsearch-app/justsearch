@@ -13,6 +13,54 @@ import org.junit.jupiter.api.io.TempDir;
 final class RootVolumeUnknownIdentityTest {
   @TempDir Path temp;
 
+  @org.junit.jupiter.params.ParameterizedTest(name = "{displayName} [{index}] {arguments}")
+  @org.junit.jupiter.params.provider.ValueSource(booleans = {false, true})
+  void C10UnrecordedFolderCannotProveAbsenceWithoutVolumeIdentity(boolean declared) throws Exception {
+    Path folder = Files.createDirectory(temp.resolve("ad-hoc"));
+    RootWitness witness = RootWitness.of(RootVolumeLedger.under(temp), ignored -> null, ignored -> declared);
+    try (var ignored = NoVolumeIdentityExtension.withVolumeIdentity(false)) {
+      assertFalse(witness.vouches(folder));
+      assertFalse(witness.vouchesForFile(folder));
+      assertFalse(witness.provenOnRecordedVolume(folder));
+      assertFalse(RootPresenceGuard.capture(folder, null, RootVolumeLedger.under(temp)).rootCurrent());
+      assertEquals(io.justsearch.indexerworker.loop.SourcePresence.Verdict.ROOT_UNAVAILABLE,
+          io.justsearch.indexerworker.loop.SourcePresence.classify(folder.resolve("gone.txt"), null, witness));
+    }
+  }
+
+  @org.junit.jupiter.params.ParameterizedTest(name = "{displayName} [{index}] {arguments}")
+  @org.junit.jupiter.params.provider.ValueSource(booleans = {false, true})
+  void C10PreviouslyPositiveProofCannotSurviveLossOfCurrentVolumeIdentity(boolean declared) throws Exception {
+    Path folder = Files.createDirectory(temp.resolve("previously-proven"));
+    RootWitness witness = RootWitness.of(RootVolumeLedger.under(temp), ignored -> null, ignored -> declared);
+    try (var ignored = NoVolumeIdentityExtension.withVolumeIdentity(true)) {
+      witness.recordDeliberateAdd(folder, false);
+      assertTrue(witness.vouches(folder));
+      assertTrue(witness.vouchesForFile(folder));
+      try (var ignoredLostVolume = NoVolumeIdentityExtension.withVolumeIdentity(false)) {
+        assertEquals(io.justsearch.indexerworker.loop.SourcePresence.Verdict.ROOT_UNAVAILABLE,
+            io.justsearch.indexerworker.loop.SourcePresence.classify(folder.resolve("gone.txt"), null, witness));
+        assertFalse(witness.vouches(folder));
+        assertFalse(witness.vouchesForFile(folder));
+      }
+    }
+  }
+
+  @Test
+  void deliberatelyAddedAdHocFolderStillAdmitsPresentFilesWithoutVolumeIdentity() throws Exception {
+    Path folder = Files.createDirectory(temp.resolve("explicit-folder"));
+    Files.writeString(folder.resolve("present.txt"), "present content");
+    RootVolumeLedger ledger = RootVolumeLedger.under(temp);
+    RootWitness witness = RootWitness.of(ledger, ignored -> null, ignored -> false);
+    try (var ignored = NoVolumeIdentityExtension.withVolumeIdentity(false)) {
+      witness.recordDeliberateAdd(folder, false);
+      assertFalse(witness.refusesRoot(folder), "the explicit folder scan is accepted");
+      assertTrue(witness.admits(folder), "WorkerIngestionAuthority must admit the scan's present files");
+      assertTrue(witness.admitsFile(folder), "explicit present-file admission keeps the same rule");
+      assertFalse(witness.vouches(folder), "admission never grants deletion authority");
+    }
+  }
+
   @Test
   void initiallyUnknownVolumeIsNotDeferredAndFinishesSeeding() throws Exception {
     Path root = Files.createDirectory(temp.resolve("root"));
@@ -23,13 +71,13 @@ final class RootVolumeUnknownIdentityTest {
     try {
       assertTrue(witness.seedAfterUpgrade(root, ignored -> false), "no identity to compare or seed");
       assertFalse(ledger.awaitsSeeding(root));
-      assertTrue(witness.provenOnRecordedVolume(root));
+      assertFalse(witness.provenOnRecordedVolume(root));
       assertFalse(witness.refusesRoot(root));
       assertTrue(witness.admits(root));
-      assertTrue(witness.vouches(root));
+      assertFalse(witness.vouches(root));
       assertTrue(witness.admitsFile(root));
-      assertTrue(witness.vouchesForFile(root));
-      assertTrue(RootPresenceGuard.capture(root, null, ledger).rootCurrent());
+      assertFalse(witness.vouchesForFile(root));
+      assertFalse(RootPresenceGuard.capture(root, null, ledger).rootCurrent());
       assertTrue(ledger.recorded(root).isEmpty(), "no synthetic volume record");
     } finally {
       RootIdentity.VOLUME_IDENTITY_UNAVAILABLE.set(previous);

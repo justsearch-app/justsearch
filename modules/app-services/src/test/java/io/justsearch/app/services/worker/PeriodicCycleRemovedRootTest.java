@@ -89,6 +89,9 @@ final class PeriodicCycleRemovedRootTest {
   private static Object answer(InvocationOnMock call, List<Path> walked, List<Path> asked,
       java.util.function.Consumer<Path> duringWalk) {
     switch (call.getMethod().getName()) {
+      case "reconcileIndexedSources" -> {
+        return io.justsearch.ipc.PruneResponse.getDefaultInstance();
+      }
       case "syncDirectory" -> {
         SyncDirectoryRequest request = call.getArgument(0);
         Path root = Path.of(request.getRootPath()).toAbsolutePath().normalize();

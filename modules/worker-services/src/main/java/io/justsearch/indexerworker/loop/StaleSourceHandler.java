@@ -7,11 +7,9 @@ import io.justsearch.indexerworker.services.ConfirmedDeletionMarker;
 import io.justsearch.indexerworker.util.PathNormalizer;
 import java.nio.file.Path;
 import java.util.function.Supplier;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
- * Best-effort deletion of an index entry whose source disappeared or changed between
+ * Deletion of an index entry whose source disappeared or changed between
  * admission and validation.
  *
  * <p>Tempdoc 516 Slice 3 substrate (Appendix A.1). Lifted from {@code IndexingLoop}'s
@@ -21,8 +19,6 @@ import org.slf4j.LoggerFactory;
  * the return-outcomes contract).
  */
 public final class StaleSourceHandler {
-
-  private static final Logger log = LoggerFactory.getLogger(StaleSourceHandler.class);
 
   private final IndexingCoordinator indexingCoordinator;
   private final ConfirmedDeletionMarker deletionMarker;
@@ -54,22 +50,17 @@ public final class StaleSourceHandler {
    *
    * @return {@code 1} when the delete was issued (the caller should bump its
    *     {@code indexedSinceCommit} counter so the commit driver sees pending work);
-   *     {@code 0} when the delete failed (logged at DEBUG).
+   *     failures propagate so the queue obligation can be retried.
    */
   public int deleteMissingSource(Path filePath) {
-    try {
-      String normalizedPath = PathNormalizer.normalizePath(filePath.toAbsolutePath().toString());
-      IndexingCoordinator active = activeLexicalSource.get();
-      if (active != null) active.deleteByIdAndChunks(normalizedPath); // A before Green, as writes
-      indexingCoordinator.deleteByIdAndChunks(normalizedPath);
-      // Tempdoc 931 §C.6 — a confirmed deletion point: the document left the index because its
-      // source is gone. The marker re-verifies absence, so the DELETED classification that reaches
-      // here from an IOException on stat (unreadable, not absent) records nothing.
-      deletionMarker.markIfAbsent(filePath);
-      return 1;
-    } catch (Exception e) {
-      log.debug("Best-effort delete failed for missing file {}: {}", filePath, e.getMessage());
-      return 0;
-    }
+    String normalizedPath = PathNormalizer.normalizePath(filePath.toAbsolutePath().toString());
+    IndexingCoordinator active = activeLexicalSource.get();
+    if (active != null) active.deleteByIdAndChunks(normalizedPath); // A before Green, as writes
+    indexingCoordinator.deleteByIdAndChunks(normalizedPath);
+    // Tempdoc 931 §C.6 — a confirmed deletion point: the document left the index because its
+    // source is gone. The marker re-verifies absence, so the DELETED classification that reaches
+    // here from an IOException on stat (unreadable, not absent) records nothing.
+    deletionMarker.markIfAbsent(filePath);
+    return 1;
   }
 }

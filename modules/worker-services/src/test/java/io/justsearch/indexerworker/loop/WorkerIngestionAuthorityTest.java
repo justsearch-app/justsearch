@@ -91,6 +91,22 @@ class WorkerIngestionAuthorityTest {
         authority.admit(Files.writeString(root.resolve("public.txt"), "public"), null).action());
   }
 
+  @Test
+  void C10PresentFileAdmissionDoesNotAuthorizeRetirementOfNonregularReplacement() throws Exception {
+    Path root = Files.createDirectory(tempDir.resolve("unproven"));
+    Path file = Files.writeString(root.resolve("source.txt"), "present readable content");
+    var authority = new WorkerIngestionAuthority();
+    authority.useRootCheck(new SourcePresence.RootCheck() {
+      @Override public boolean admits(Path folder) { return true; }
+      @Override public boolean vouches(Path folder) { return false; }
+    });
+    assertEquals(SourceAdmissionAction.ADMIT, authority.admit(rooted(file, root)).action());
+    Files.delete(file); Files.createDirectory(file);
+    var replacement = authority.admit(rooted(file, root));
+    assertEquals(SourceAdmissionAction.RETRYABLE_FAILURE, replacement.action());
+    assertEquals("ROOT_UNAVAILABLE", replacement.outcome().reasonCode());
+  }
+
   private static JobQueue.IndexJob rooted(Path file, Path root) {
     return new JobQueue.IndexJob(file, null, null, null, null, null, false, null, root);
   }

@@ -13,6 +13,8 @@
  * uninstalling individual core plugins.
  */
 
+import { CORE_SURFACE_METADATA } from '../../api/generated/core-surfaces.generated.js';
+
 import {
   PLUGIN_CONTRACT_VERSION,
   type PluginManifest,
@@ -22,12 +24,7 @@ import {
 
 const CORE_SURFACES: PluginSurfaceContribution[] = [
   {
-    id: 'core.library-surface',
-    mountTag: 'jf-library-surface',
-    labelKey: 'registry-surface.library-surface.label',
-    descriptionKey: 'registry-surface.library-surface.description',
-    audience: 'USER',
-    placement: 'RAIL',
+    ...CORE_SURFACE_METADATA['core.library-surface'],
     consumes: {
       operations: ['core.reindex', 'core.add-watched-root', 'core.remove-watched-root', 'core.preview-excludes', 'core.apply-excludes'],
       resources: ['core.indexed-roots'],
@@ -35,74 +32,39 @@ const CORE_SURFACES: PluginSurfaceContribution[] = [
     splitPairing: { secondary: 'core.search-v3-surface' },
   },
   {
-    id: 'core.help-surface',
-    mountTag: 'jf-help-surface',
-    labelKey: 'registry-surface.help-surface.label',
-    descriptionKey: 'registry-surface.help-surface.description',
-    audience: 'USER',
     // Tempdoc 578 §5.6 Phase 4 — Help is reference content, not a rail workspace surface. DEEPLINK here
     // matches the Java catalog (this FE re-declaration would otherwise override the wire's placement);
     // Help is reached via the rail's dedicated "?" affordance + URL/command-palette.
-    placement: 'DEEPLINK',
+    ...CORE_SURFACE_METADATA['core.help-surface'],
   },
   // 569 §19 Phase 4 — the style-variations / skins gallery.
   {
-    id: 'core.presentation-gallery-surface',
-    mountTag: 'jf-presentation-gallery-surface',
-    labelKey: 'registry-surface.presentation-gallery-surface.label',
-    descriptionKey: 'registry-surface.presentation-gallery-surface.description',
-    audience: 'USER',
-    placement: 'DEEPLINK',
+    ...CORE_SURFACE_METADATA['core.presentation-gallery-surface'],
   },
   // 569 §19 Phase 6 — the visual presentation editor.
   {
-    id: 'core.presentation-editor-surface',
-    mountTag: 'jf-presentation-editor-surface',
-    labelKey: 'registry-surface.presentation-editor-surface.label',
-    descriptionKey: 'registry-surface.presentation-editor-surface.description',
-    audience: 'USER',
-    placement: 'DEEPLINK',
+    ...CORE_SURFACE_METADATA['core.presentation-editor-surface'],
   },
   // Tempdoc 930 §19.3 F9(d): `core.governance-surface` is retired — the governance dashboard (its
   // view, controller, route and generator) is removed; the discipline-gate kernel itself stays.
   // Tempdoc 583 §D.3b — the API explorer: read-only projection of GET /api/meta/routes (the
   // self-describing route manifest). DEEPLINK dev/operator tool, off-rail.
   {
-    id: 'core.api-explorer-surface',
-    mountTag: 'jf-api-explorer-view',
-    labelKey: 'registry-surface.api-explorer-surface.label',
-    descriptionKey: 'registry-surface.api-explorer-surface.description',
-    audience: 'DEVELOPER',
-    placement: 'DEEPLINK',
+    ...CORE_SURFACE_METADATA['core.api-explorer-surface'],
   },
   // WP1.5a — the main Search window, keeping its established identity and saved state.
   {
-    id: 'core.search-v3-surface',
-    mountTag: 'jf-sv3-window',
-    labelKey: 'registry-surface.search-v3-surface.label',
-    descriptionKey: 'registry-surface.search-v3-surface.description',
-    audience: 'USER',
-    placement: 'RAIL',
+    ...CORE_SURFACE_METADATA['core.search-v3-surface'],
     splitPairing: { secondary: 'core.library-surface' },
   },
   {
-    id: 'core.brain-surface',
-    mountTag: 'jf-brain-surface',
-    labelKey: 'registry-surface.brain-surface.label',
-    descriptionKey: 'registry-surface.brain-surface.description',
-    audience: 'USER',
-    placement: 'RAIL',
+    ...CORE_SURFACE_METADATA['core.brain-surface'],
   },
   {
     // Tempdoc 855 §9.2 — Settings opens as a centered window over the stage (<jf-settings-window>),
     // not as a rail surface. It keeps a fixed bottom rail affordance; the placement flip must stay in
     // step with CoreSurfaceCatalog.java (the check-surface-composition LEG-2 parity gate).
-    id: 'core.settings-surface',
-    mountTag: 'jf-settings-surface',
-    labelKey: 'registry-surface.settings-surface.label',
-    descriptionKey: 'registry-surface.settings-surface.description',
-    audience: 'USER',
-    placement: 'MODAL',
+    ...CORE_SURFACE_METADATA['core.settings-surface'],
   },
   {
     // Tempdoc 629 (remaining-work) — unified Security & Privacy surface (encryption control + at-rest
@@ -110,12 +72,7 @@ const CORE_SURFACES: PluginSurfaceContribution[] = [
     // Tempdoc 855 §5 item 1 / §9.3 — absorbed into the settings window as a member category (Privacy &
     // Trust). Placement flip must stay in step with CoreSurfaceCatalog.java (check-surface-composition
     // LEG-2 parity gate); deep-links keep working via the member→host alias redirect (§9.4).
-    id: 'core.security-surface',
-    mountTag: 'jf-security-surface',
-    labelKey: 'registry-surface.security-surface.label',
-    descriptionKey: 'registry-surface.security-surface.description',
-    audience: 'USER',
-    placement: 'DEEPLINK',
+    ...CORE_SURFACE_METADATA['core.security-surface'],
   },
   {
     // Tempdoc 561 P-E — learned-memory (inspect / forget): the durable "what it knows" facts half.
@@ -130,20 +87,10 @@ const CORE_SURFACES: PluginSurfaceContribution[] = [
     placement: 'DEEPLINK',
   },
   {
-    id: 'core.browse-surface',
-    mountTag: 'jf-browse-surface',
-    labelKey: 'registry-surface.browse-surface.label',
-    descriptionKey: 'registry-surface.browse-surface.description',
-    audience: 'USER',
-    placement: 'DEEPLINK',
+    ...CORE_SURFACE_METADATA['core.browse-surface'],
   },
   {
-    id: 'core.health-surface',
-    mountTag: 'jf-health-surface',
-    labelKey: 'registry-surface.health-surface.label',
-    descriptionKey: 'registry-surface.health-surface.description',
-    audience: 'USER',
-    placement: 'DEEPLINK',
+    ...CORE_SURFACE_METADATA['core.health-surface'],
     // Tempdoc 571 — altitude (DIAGNOSTIC) flows from the single authority (the wire / Java catalog) and
     // is preserved through mergePluginSurfaceContributions; not re-declared here (no second authority).
     consumes: {
@@ -158,12 +105,7 @@ const CORE_SURFACES: PluginSurfaceContribution[] = [
   // above (Search Thread S1-S5a). A deep-link to core.search-surface aliases to the one window
   // (RETIRED_SURFACE_ALIASES, same treatment as core.agent-surface / core.system-self-view).
   {
-    id: 'core.logs-surface',
-    mountTag: 'jf-log-surface',
-    labelKey: 'registry-surface.logs-surface.label',
-    descriptionKey: 'registry-surface.logs-surface.description',
-    audience: 'OPERATOR',
-    placement: 'DEEPLINK',
+    ...CORE_SURFACE_METADATA['core.logs-surface'],
     // Tempdoc 571 — altitude (DIAGNOSTIC) flows from the wire authority; preserved through the merge.
   },
   // Tempdoc 560 §25/§26 — the core token-editor surface (`core.token-editor-surface` /
@@ -180,12 +122,7 @@ const CORE_SURFACES: PluginSurfaceContribution[] = [
     placement: 'COMMAND',
   },
   {
-    id: 'core.activity-surface',
-    mountTag: 'jf-activity-surface',
-    labelKey: 'registry-surface.activity-surface.label',
-    descriptionKey: 'registry-surface.activity-surface.description',
-    audience: 'USER',
-    placement: 'DEEPLINK',
+    ...CORE_SURFACE_METADATA['core.activity-surface'],
     // Tempdoc 571 — altitude (TRUST) flows from the wire authority; preserved through the merge.
   },
 ];

@@ -26,6 +26,61 @@ public final class ChunkOffsetMath {
     public static final HeadingInfo NONE = new HeadingInfo(0, "");
   }
 
+  /** Immutable per-document offset index; publication never scans a content prefix per child. */
+  public static final class MetadataIndex {
+    private final String content;
+    private final int[] newlines;
+    private final java.util.List<Heading> headings = new java.util.ArrayList<>();
+
+    private record Heading(int level, int start, int end) {}
+
+    public MetadataIndex(String content) {
+      this.content = content == null ? "" : content;
+      newlines = java.util.stream.IntStream.range(0, this.content.length())
+          .filter(i -> this.content.charAt(i) == '\n').toArray();
+      Matcher matcher = MARKDOWN_HEADING_PATTERN.matcher(this.content);
+      while (matcher.find()) {
+        int start = matcher.start(2), end = matcher.end(2);
+        while (start < end && this.content.charAt(start) <= ' ') start++;
+        while (end > start && this.content.charAt(end - 1) <= ' ') end--;
+        if (start == end) continue;
+        // Lucene keyword terms and sorted DocValues accept at most 32766 UTF-8 bytes.
+        int boundedEnd = start, bytes = 0;
+        while (boundedEnd < end) {
+          int cp = this.content.codePointAt(boundedEnd);
+          int width = cp <= 0x7f ? 1 : cp <= 0x7ff ? 2 : cp <= 0xffff ? 3 : 4;
+          if (bytes + width > 32766) break;
+          bytes += width;
+          boundedEnd += Character.charCount(cp);
+        }
+        headings.add(new Heading(matcher.group(1).length(), start, boundedEnd));
+      }
+    }
+
+    public int lineNumber(int offset) {
+      int limit = Math.max(0, Math.min(offset, content.length()));
+      int at = java.util.Arrays.binarySearch(newlines, limit);
+      return 1 + (at >= 0 ? at : -at - 1);
+    }
+
+    public HeadingInfo precedingHeading(int offset) {
+      int limit = Math.max(0, Math.min(offset, content.length()));
+      int low = 0, high = headings.size();
+      while (low < high) {
+        int mid = (low + high) >>> 1;
+        if (headings.get(mid).start() < limit) low = mid + 1;
+        else high = mid;
+      }
+      if (low == 0) return HeadingInfo.NONE;
+      Heading heading = headings.get(low - 1);
+      int end = Math.min(limit, heading.end());
+      if (end > heading.start() && end < content.length()
+          && Character.isLowSurrogate(content.charAt(end))
+          && Character.isHighSurrogate(content.charAt(end - 1))) end--;
+      return new HeadingInfo(heading.level(), content.substring(heading.start(), end).trim());
+    }
+  }
+
   /**
    * Calculates the 1-based line number for a given character offset.
    *

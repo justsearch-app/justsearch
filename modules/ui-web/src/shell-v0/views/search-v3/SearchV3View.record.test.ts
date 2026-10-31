@@ -734,8 +734,8 @@ describe('the transcript projects from the canonical record (D1)', () => {
     backend.threads[id] = {
       conversationId: id,
       events: [
-        wireEvent('r1', 'USER_MESSAGE', 'why did the renewal fail?'),
-        wireEvent('r2', 'ASSISTANT_MESSAGE', 'The record’s answer.'),
+        wireEvent('r1', 'USER_MESSAGE', 'why did the renewal fail?', { turnId: el.sessions.sessions[0]!.turns[0]!.dispatchTurnId }),
+        wireEvent('r2', 'ASSISTANT_MESSAGE', 'The record’s answer.', { turnId: el.sessions.sessions[0]!.turns[0]!.dispatchTurnId }),
       ],
     };
     stream.emit('chunk', { text: 'The live answer.' });
@@ -867,7 +867,7 @@ describe('a cold load re-attaches to a live run (D3)', () => {
   });
 });
 
-describe('New session detaches from everything in flight (A13, abort half)', () => {
+describe('New session parks the live Ask and detaches the run presentation (A13)', () => {
   it('appends NOTHING to the fresh thread when a late delta arrives', async () => {
     const el = await mount();
     await send(el, 'why did the renewal fail?');
@@ -880,15 +880,11 @@ describe('New session detaches from everything in flight (A13, abort half)', () 
     await settle(el);
     expect(el.sessions.activeId).toBeNull();
 
-    // The ABORT is the mechanism, and it is verified as one rather than assumed: the stream is
-    // already torn down and the unsaved live turn left the parked conversation, whose record shows
-    // what the Engine saved when it is opened again. (Dropping `abortAsk()` from `onSessionNew`
-    // fails right here, and then again below.)
+    // The original conversation retains the live turn and owns later stream writes.
     const parkedNow = el.sessions.sessions.find((s) => s.id === firstId);
-    expect(parkedNow?.turns).toEqual([]);
+    expect(parkedNow?.turns).toEqual([expect.objectContaining({ answer: 'early text', status: 'streaming' })]);
 
-    // THE PROBE: emit anyway — a delta AND an evidence event, the two writes an ask makes. Neither
-    // may reach anything: not the parked turn, and not the fresh conversation.
+    // A delta and evidence still reach the parked turn, while the fresh conversation stays empty.
     stream.emit('chunk', { text: ' LATE TEXT' });
     stream.emit('rag.citations', {
       citations: [{ parentDocId: 'f:/late.md', chunkIndex: 0, excerpt: 'late' }],
@@ -898,7 +894,8 @@ describe('New session detaches from everything in flight (A13, abort half)', () 
     await settle(el);
 
     const parked = el.sessions.sessions.find((s) => s.id === firstId);
-    expect(parked?.turns).toEqual([]);
+    expect(parked?.turns).toEqual([expect.objectContaining({ answer: 'early text LATE TEXT', status: 'complete',
+      evidence: expect.objectContaining({ sources: expect.arrayContaining([expect.objectContaining({ parentDocId: 'f:/late.md' })]) }) })]);
     // The fresh conversation is untouched: nothing was created and the window is back at the hero.
     expect(el.sessions.sessions).toHaveLength(1);
     expect(el.getAttribute('composer-state')).toBe('hero');
@@ -924,8 +921,8 @@ describe('New session detaches from everything in flight (A13, abort half)', () 
     backend.threads[id] = {
       conversationId: id,
       events: [
-        wireEvent('r1', 'USER_MESSAGE', 'why did the renewal fail?'),
-        wireEvent('r2', 'ASSISTANT_MESSAGE', 'Half an answer, and the rest of it.'),
+        wireEvent('r1', 'USER_MESSAGE', 'why did the renewal fail?', { turnId: el.sessions.sessions[0]!.turns[0]!.dispatchTurnId }),
+        wireEvent('r2', 'ASSISTANT_MESSAGE', 'Half an answer, and the rest of it.', { turnId: el.sessions.sessions[0]!.turns[0]!.dispatchTurnId }),
       ],
     };
 
@@ -938,6 +935,11 @@ describe('New session detaches from everything in flight (A13, abort half)', () 
     await settle(el);
 
     expect(el.sessions.activeId).toBe(id);
+    expect(el.sessions.sessions.find(s => s.id === id)?.turns).toHaveLength(1);
+    expect(el.sessions.sessions.find(s => s.id === id)?.turns[0]?.answer).toBe('Half an ans');
+    expect(el.sessions.sessions.find(s => s.id === id)?.turns[0]?.status).toBe('streaming');
+    stream.emit('chunk', { text: 'wer, and the rest of it.' });
+    stream.emit('done', {}); stream.end(); await settle(el);
     const turns = el.sessions.sessions.find((s) => s.id === id)?.turns ?? [];
     expect(turns).toHaveLength(1);
     expect(turns[0]?.status).toBe('complete');

@@ -75,7 +75,8 @@ public final class ExcludesServiceImpl implements ExcludesService {
     AtomicInteger visited = new AtomicInteger();
     List<ExcludesResult.UncheckedScope> unchecked = new ArrayList<>();
 
-    for (IndexingService.WatchedRoot root : indexing.getWatchedRoots(engineContext)) {
+    List<IndexingService.WatchedRoot> watched = indexing.getWatchedRoots(engineContext);
+    for (IndexingService.WatchedRoot root : watched) {
       if (root == null || root.path() == null) {
         unchecked.add(new ExcludesResult.UncheckedScope("Unknown watched folder", "not_checked", "Watched path unavailable"));
         continue;
@@ -172,13 +173,62 @@ public final class ExcludesServiceImpl implements ExcludesService {
       }
     }
 
+    List<String> indexedMatches = new ArrayList<>();
+    // Read one immutable ownership view before issuing any deletion from its matches.
+    var indexedSeen = new java.util.HashSet<String>();
+    boolean[] collecting = {true};
+    try {
+      long unknown = indexing.forEachIndexedSource(id -> {
+        synchronized (indexedSeen) {
+          if (!collecting[0]) return;
+          if (visited.incrementAndGet() > maxWalkEntries) {
+            throw new IllegalStateException("Entry cap reached; remaining indexed sources not checked");
+          }
+          Path file;
+          try { file = Path.of(id); }
+          catch (java.nio.file.InvalidPathException nonFile) { return; }
+          if (!file.isAbsolute()) return;
+          file = file.normalize();
+          Path source = file;
+          if (watched.stream().filter(root -> root != null && root.path() != null)
+              .anyMatch(root -> source.startsWith(root.path().toAbsolutePath().normalize()))) return;
+          if (!indexedSeen.add(id)) return;
+          int idx = excludes.matchingPatternIndex(file, file);
+          if (idx < 0) return;
+          matchedFiles.incrementAndGet();
+          perPatternCount[idx]++;
+          indexedMatches.add(id);
+        }
+      }, engineContext);
+      if (unknown > 0) unchecked.add(new ExcludesResult.UncheckedScope(
+          "Indexed sources", "not_checked", "Some indexed rows have no readable source identity"));
+    } catch (RuntimeException failure) {
+      unchecked.add(new ExcludesResult.UncheckedScope("Indexed sources", "not_checked", failureReason(failure)));
+    } finally {
+      // A timed-out in-process read can still exit later; freeze its local report before removal.
+      synchronized (indexedSeen) { collecting[0] = false; }
+    }
+
+    if (!dryRun) for (String id : indexedMatches) {
+      try {
+        var outcome = indexing.deleteDocByIdWithOutcome(id, engineContext);
+        if (outcome != null && outcome.confirmed()) {
+          deletedById.incrementAndGet();
+          confirmedRemovals.incrementAndGet();
+        } else unchecked.add(scope(Path.of(id), "not_removed", outcome == null
+            ? "Worker deletion outcome unavailable" : outcome.error()));
+      } catch (RuntimeException failure) {
+        unchecked.add(scope(Path.of(id), "not_removed", failureReason(failure)));
+      }
+    }
+
     List<ExcludesResult.PatternMatch> perPattern = new ArrayList<>(effectivePatterns.size());
     for (int i = 0; i < effectivePatterns.size(); i++) {
       perPattern.add(new ExcludesResult.PatternMatch(effectivePatterns.get(i), perPatternCount[i]));
     }
     return new ExcludesResult(dryRun, effectivePatterns.size(), rootsProcessed, deletedByPathJobs.get(),
         deletedById.get(), matchedFiles.get(), perPattern, visited.get() > maxWalkEntries,
-        "Disk matches count files; confirmed removals count Worker-confirmed file or folder deletion requests.",
+        "Matches count watched disk files and indexed ad-hoc sources; confirmed removals count Worker-confirmed file or folder deletion requests.",
         confirmedRemovals.get(), unchecked, policy);
   }
 

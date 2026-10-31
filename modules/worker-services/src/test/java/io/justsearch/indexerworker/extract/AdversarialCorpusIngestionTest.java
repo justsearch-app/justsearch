@@ -1,5 +1,6 @@
 package io.justsearch.indexerworker.extract;
 
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -52,6 +53,7 @@ import org.mockito.ArgumentCaptor;
  * mutation case. Windows reparse points and cloud-placeholder simulation remain deferred
  * (require platform-specific test infrastructure).
  */
+@org.junit.jupiter.api.extension.ExtendWith(io.justsearch.indexerworker.services.NoVolumeIdentityExtension.class)
 final class AdversarialCorpusIngestionTest {
 
   @TempDir Path tempDir;
@@ -154,11 +156,16 @@ final class AdversarialCorpusIngestionTest {
   }
 
   @Test
-  @DisplayName("directory (non-regular source) is admission-skipped without parser invocation")
+  // directory (non-regular source) is admission-skipped without parser invocation
   void directoryIsAdmissionSkipped() throws Exception {
     Path dir = Files.createDirectory(tempDir.resolve("a-directory"));
+    var witness = io.justsearch.indexerworker.services.RootWitness.inMemory();
+    assertTrue(witness.admits(tempDir));
+    loop.useRootCheck(witness);
 
     Object extracted = invokeExtractJob(dir);
+    assertNull(queue.lastOutcome, "retirement waits for the commit owner");
+    invokeJournalDrain(loop);
     assertEquals(null, extracted);
     assertEquals(IngestionOutcomeClass.SKIPPED_POLICY, queue.lastOutcome.outcomeClass());
     assertEquals(IngestionReasonCodes.NON_REGULAR_SOURCE, queue.lastOutcome.reasonCode());
@@ -221,6 +228,7 @@ final class AdversarialCorpusIngestionTest {
     Files.createSymbolicLink(target, link);
 
     Object extracted = invokeExtractJob(link);
+    invokeJournalDrain(loop);
     assertEquals(null, extracted, "Symlink loop must short-circuit before extraction");
     assertNotNull(queue.lastOutcome,
         "Symlink loop must produce a typed outcome (not silently disappear)");

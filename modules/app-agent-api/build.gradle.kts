@@ -36,6 +36,13 @@ testing {
 // RegistryEnumsTsGenerationTest emitter (tempdoc 560 §4.1/§4.3 anti-drift) writes the FE
 // registry-enums.generated.ts in update mode (mirrors app-observability's updateSchemas bridge).
 tasks.withType<Test>().configureEach {
+  // A committed artifact is an input to comparison: edits/missing files must invalidate cached tests.
+  inputs.files(rootProject.layout.projectDirectory.file(
+    "modules/ui-web/src/api/generated/registry-enums.generated.ts"))
+  if (gradle.startParameter.projectProperties.containsKey("updateSchemas")) {
+    outputs.file(rootProject.layout.projectDirectory.file(
+      "modules/ui-web/src/api/generated/registry-enums.generated.ts"))
+  }
   if (project.hasProperty("updateSchemas")) {
     systemProperty("updateSchemas", "true")
   }
@@ -50,4 +57,6 @@ tasks.register<Test>("updateRegistryEnums") {
   useJUnitPlatform()
   filter { includeTestsMatching("*RegistryEnumsTsGenerationTest*") }
   systemProperty("updateSchemas", "true")
+  outputs.file(rootProject.layout.projectDirectory.file(
+    "modules/ui-web/src/api/generated/registry-enums.generated.ts"))
 }

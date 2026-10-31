@@ -88,7 +88,7 @@ it.each(['tier', 'schema', 'card scope', 'scope clear'].flatMap(action =>
         : action === 'schema' ? { kind: 'structured', schema: '{"type":"array"}', scope: { kind: 'typed' } }
         : action === 'card scope' ? { kind: 'ask', scope: { kind: 'files', paths: ['/replacement.txt'] } }
         : { kind: 'ask', scope: { kind: 'all' } };
-      const payload = { version: 2, task: null, drafts: [
+      const payload = { version: 3, task: null, drafts: [
         { place: originalPlace, text: 'original A', preparation },
         { place: originalPlace, text: 'companion C', preparation: { kind: 'search' } },
       ] };
@@ -133,7 +133,7 @@ it('an ordinary preparation change writes exactly one attachment with the curren
   try {
     emit(view, 'sv3-tier-change', { tier: 'delegate' });
     await settle(view);
-    const payload = { version: 2, task: null, drafts: [
+    const payload = { version: 3, task: null, drafts: [
       { place: null, text: 'original A', preparation: { kind: 'delegate' } },
       { place: null, text: 'companion C', preparation: { kind: 'search' } },
     ] };

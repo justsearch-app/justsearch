@@ -254,3 +254,53 @@ describe('fetchUnifiedThread (S4a forward-tolerant array parsing)', () => {
     expect(res).toEqual({ events: [], lifecycles: [] });
   });
 });
+
+// Every recognized kind must retain strict required fields after the vocabulary moves.
+describe('thread vocabulary preservation', () => {
+  const kinds = ['USER_MESSAGE', 'ASSISTANT_MESSAGE', 'TOOL_ACTIVITY', 'PROGRESS', 'ERROR', 'HANDOFF', 'SEARCH'];
+  const searchAttributes = {
+    query: 'invoices', mode: 'hybrid', matchCount: 3, resultCount: 1,
+    docIds: ['invoice.pdf'], executedAt: '2026-01-01T00:00:02Z',
+  };
+  it.each(kinds)('%s parses valid events and drops malformed known events', (kind) => {
+    const event = { id: 'event', occurredAt: '2026-01-01T00:00:02Z', kind,
+      originator: 'agent', content: 'hello', attributes: kind === 'SEARCH' ? searchAttributes : {} };
+    expect(parseThreadEvent(event)).toMatchObject(event);
+    for (const field of ['id', 'occurredAt', 'originator', 'content', 'attributes']) {
+      const invalid: Record<string, unknown> = { ...event };
+      delete invalid[field];
+      expect(parseThreadEvent(invalid), `missing ${field}`).toBeNull();
+      invalid[field] = 42;
+      expect(parseThreadEvent(invalid), `wrong type for ${field}`).toBeNull();
+    }
+  });
+  it.each(Object.keys(searchAttributes))('SEARCH requires typed %s', (field) => {
+    const attributes: Record<string, unknown> = { ...searchAttributes };
+    const event = { id: 's', occurredAt: '2026-01-01', kind: 'SEARCH', originator: 'user', content: '' };
+    delete attributes[field];
+    expect(parseThreadEvent({ ...event, attributes })).toBeNull();
+    attributes[field] = field === 'matchCount' || field === 'resultCount' ? '3' : 42;
+    expect(parseThreadEvent({ ...event, attributes })).toBeNull();
+  });
+});
+
+describe('mixed thread recovery signaling', () => {
+  it('keeps valid and future events, drops malformed known siblings and marks the response incomplete', async () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const valid = { id: 'u', occurredAt: '2026-01-01', kind: 'USER_MESSAGE', originator: 'user', content: 'hello', attributes: {} };
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse({
+      conversationId: 'c1', events: [valid,
+        { ...valid, id: 'bad', kind: 'PROGRESS', content: 42 },
+        { id: 'future', occurredAt: '2026-01-02', kind: 'FUTURE_EVENT' },
+      ], lifecycles: [],
+    })));
+    const result = await fetchUnifiedThread('http://thread.test', 'c1');
+    expect(result.events.map((event) => [event.id, event.kind, event.rawKind])).toEqual([
+      ['u', 'USER_MESSAGE', undefined], ['future', 'UNKNOWN', 'FUTURE_EVENT'],
+    ]);
+    expect(result.incomplete).toBe(true);
+  });
+  it.each([undefined, null, 42, {}, []])('drops a non-string kind %j', (kind) => {
+    expect(parseThreadEvent({ id: 'x', occurredAt: '2026-01-01', kind })).toBeNull();
+  });
+});

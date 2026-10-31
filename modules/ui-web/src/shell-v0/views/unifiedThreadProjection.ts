@@ -27,19 +27,13 @@
  * agent loop — carried as the existing `'progress'` {@link UnifiedTurnKind} (not a new render kind) so
  * `UnifiedChatView.renderUnifiedItem`'s exhaustive switch needs no change; see the `KIND_MAP` comment.
  */
+import type { InteractionEventKind } from '../../api/generated/registry-enums.generated.js';
+
 export interface ThreadEvent {
   readonly id: string;
   /** ISO-8601 authoritative order key. */
   readonly occurredAt: string;
-  readonly kind:
-    | 'USER_MESSAGE'
-    | 'ASSISTANT_MESSAGE'
-    | 'TOOL_ACTIVITY'
-    | 'PROGRESS'
-    | 'ERROR'
-    | 'HANDOFF'
-    | 'SEARCH'
-    | 'UNKNOWN';
+  readonly kind: InteractionEventKind | 'UNKNOWN';
   readonly originator: string;
   readonly content: string;
   readonly attributes: Readonly<Record<string, unknown>>;

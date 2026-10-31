@@ -38,3 +38,14 @@ test('Windows smoke requires an available, ready index', () => {
   assert.equal(ready({}), false);
   assert.equal(ready(health, false), false);
 });
+
+test('Windows smoke requires all legal files beside the installed Engine jar', () => {
+  const installed = script.split('$headlessDir = Split-Path -Parent $uiJar.FullName')[1];
+  assert(installed, 'legal checks must use the installed jar directory');
+  const legal = installed.match(/foreach \(\$legalFile in @\(([^)]+)\)\) \{([^}]+)\}/);
+  assert(legal, 'installed payload must check its legal files');
+  assert.deepEqual([...legal[1].matchAll(/"([^"]+)"/g)].map(match => match[1]),
+    ['LICENSE', 'NOTICE', 'THIRD_PARTY_NOTICES', 'T3-CODE-NOTICE.md', 'LUCIDE-LICENSE.txt']);
+  assert.match(legal[2], /Join-Path -Path \$headlessDir -ChildPath "legal\/\$legalFile"/);
+  assert.match(legal[2], /Assert \(Test-Path -LiteralPath \$legalPath -PathType Leaf\) "Installed payload missing legal\/\$legalFile at \$legalPath"/);
+});

@@ -51,7 +51,9 @@ import org.junit.jupiter.api.io.TempDir;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InOrder;
 
-final class WorkerIngestServiceCandidateReconciliationTest {
+@org.junit.jupiter.api.extension.ExtendWith(NoVolumeIdentityExtension.class)
+final class WorkerIngestServiceCandidateReconciliationTest
+    extends io.justsearch.adapters.lucene.runtime.LuceneExecutorTestBase {
   @TempDir Path tempDir;
 
   @AfterEach
@@ -189,6 +191,25 @@ final class WorkerIngestServiceCandidateReconciliationTest {
   }
 
   @Test
+  void candidateReconciliationKeepsAbsentRowsWithoutRecordedOrCurrentVolume() throws Exception {
+    Path root = Files.createDirectory(tempDir.resolve("unproven-candidate"));
+    String deleted = PathNormalizer.normalizeKey(root.resolve("deleted.txt"));
+    try (var ignored = NoVolumeIdentityExtension.withVolumeIdentity(false)) {
+      Fixture fixture = fixture(deleted);
+      RootWatcherRegistry registry = watch(fixture, root);
+      try {
+        assertThrows(WorkerServiceException.class,
+            () -> fixture.service.syncDirectory(request(root), CallContext.none()));
+        verify(fixture.servingWriter, never()).deleteByIdAndChunks(any());
+        verify(fixture.candidateWriter, never()).deleteByIdAndChunks(any());
+        assertFalse(fixture.admission.replayCertain(), "uncertain absence cannot certify cutover");
+      } finally {
+        registry.unwatch(root.toString());
+      }
+    }
+  }
+
+  @Test
   void migratingRootUsesServingDiscoveryAndExactCandidateWatcherRoutes() throws Exception {
     Path root = Files.createDirectory(tempDir.resolve("root"));
     Path added = Files.writeString(root.resolve("added.txt"), "added");
@@ -300,6 +321,7 @@ final class WorkerIngestServiceCandidateReconciliationTest {
 
   @Test
   void sameRuntimePreGreenJournalsBeforeExactlyOneServingEffectForEachDelete() throws Exception {
+    collectionDeletionCountsUnrefreshedRows();
     Fixture fixture = sameRuntimeFixture(true);
     String watched = PathNormalizer.normalizeKey(tempDir.resolve("strict-watcher-delete.txt"));
     String direct = PathNormalizer.normalizeKey(tempDir.resolve("strict-direct-delete.txt"));
@@ -353,7 +375,7 @@ final class WorkerIngestServiceCandidateReconciliationTest {
     order.verify(fixture.queue).deleteByPathPrefix(prefix);
     order.verify(fixture.servingCommit).commitAndTrack(
         io.justsearch.adapters.lucene.runtime.CommitReason.GRPC_DELETE_BY_PATH);
-    verify(fixture.servingCommit, atMostOnce()).maybeRefreshBlocking();
+    order.verify(fixture.queue).deleteByCollection(collection);
     order.verify(fixture.queue).putSwitchBufferForGeneration(
         fixture.buildingGeneration, "collection:" + collection, "DELETE_COLLECTION", collection);
     order.verify(fixture.candidateWriter).deleteByCollection(collection);
@@ -365,7 +387,77 @@ final class WorkerIngestServiceCandidateReconciliationTest {
     verify(fixture.candidateWriter, times(1)).deleteByPathPrefix(prefix);
     verify(fixture.candidateWriter, times(1)).deleteByCollection(collection);
     verify(fixture.servingCommit, times(3)).commitAndTrack(any());
-    verifyNoMoreInteractions(fixture.queue, fixture.candidateWriter, fixture.servingCommit);
+    verifyNoMoreInteractions(fixture.queue, fixture.candidateWriter);
+  }
+
+  private void collectionDeletionCountsUnrefreshedRows() throws Exception {
+    var schema = io.justsearch.adapters.lucene.runtime.IndexSchema.fromCatalog(
+        io.justsearch.configuration.FieldCatalogDef.forChunkTesting(0));
+    for (String route : List.of("serving", "same-runtime-pre-green", "distinct-candidate")) {
+      Path base = tempDir.resolve("collection-count-" + route);
+      var generations = new IndexGenerationManager(base);
+      var initial = generations.initializeOrLoad();
+      String building = route.equals("serving") ? null
+          : generations.startMigration("collection-count-test").building_generation();
+      Path servingPath = generations.resolveGenerationPathStrict(initial.activeGenerationId());
+      Path candidatePath = building == null ? base.resolve("unused-candidate")
+          : generations.resolveGenerationPathStrict(building);
+      try (var serving = schema.atPath(servingPath)
+              .withExecutorRegistrations(testLuceneExecutors()).open();
+          var candidate = schema.atPath(candidatePath)
+              .withExecutorRegistrations(testLuceneExecutors()).open()) {
+        var ingest = route.equals("distinct-candidate") ? candidate : serving;
+        var queue = mock(SwitchBufferCapableQueue.class);
+        when(queue.putSwitchBufferForGeneration(any(), any(), any(), any())).thenReturn(true);
+        var service = new WorkerIngestService(queue, null, null, IndexingPacing.unthrottled(),
+            base, servingPath, ingest, serving, null, 0L);
+        Object owner = new Object();
+        service.setMutationAdmission(new WorkerMutationAdmission(owner), owner);
+        String collection = "fresh-collection";
+        var query = new org.apache.lucene.search.TermQuery(
+            new org.apache.lucene.index.Term(SchemaFields.COLLECTION, collection));
+        for (var runtime : ingest == serving ? List.of(serving) : List.of(serving, ingest)) {
+          runtime.commitOps().stopCommitTimer();
+          runtime.commitOps().suspendNrtRefresh();
+          runtime.commitOps().maybeRefreshBlocking();
+          for (int row = 0; row < 3; row++) {
+            var fields = new java.util.HashMap<String, Object>(Map.of(
+                SchemaFields.DOC_ID, "/fresh-" + row, SchemaFields.DOC_UID, "fresh-uid-" + row,
+                SchemaFields.PATH, "/fresh-parent",
+                SchemaFields.COLLECTION, collection, SchemaFields.CONTENT, "fresh content"));
+            if (row > 0) {
+              fields.put(SchemaFields.IS_CHUNK, "true");
+              fields.put(SchemaFields.PARENT_DOC_ID, "/fresh-0");
+            }
+            runtime.indexingCoordinator().indexSingle(new io.justsearch.indexing.api.IndexDocument(fields));
+          }
+          runtime.commitOps().commitAndTrack();
+          assertEquals(0, runtime.indexCountOps().countQueryOrThrow(query),
+              "precondition: publication has not reached the runtime searcher");
+        }
+        int published;
+        try (var disk = org.apache.lucene.store.FSDirectory.open(servingPath);
+            var reader = org.apache.lucene.index.DirectoryReader.open(disk)) {
+          published = new org.apache.lucene.search.IndexSearcher(reader).count(query);
+        }
+        assertEquals(3, published, "precondition: a parent and two chunks were published");
+        var request = DeleteByCollectionRequest.newBuilder().setCollection(collection).build();
+        var response = service.deleteByCollection(request, CallContext.none());
+        assertEquals("", response.getError());
+        serving.commitOps().maybeRefreshBlocking();
+        int remaining = serving.indexCountOps().countQueryOrThrow(query);
+        assertEquals(0, remaining, "collection rows must actually be removed for " + route);
+        assertEquals(published - remaining, response.getDeletedDocs(),
+            "returned count must equal rows removed after unrefreshed publication for " + route);
+        if (ingest != serving) {
+          ingest.commitOps().maybeRefreshBlocking();
+          assertEquals(0, ingest.indexCountOps().countQueryOrThrow(query));
+        }
+        var repeated = service.deleteByCollection(request, CallContext.none());
+        assertEquals("", repeated.getError());
+        assertEquals(0, repeated.getDeletedDocs(), "repeated deletion removes no rows for " + route);
+      }
+    }
   }
 
   @Test

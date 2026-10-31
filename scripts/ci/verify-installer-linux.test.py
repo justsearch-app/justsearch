@@ -21,13 +21,17 @@ status = json.loads((HERE.parent.parent / "modules/app-api/src/test/resources/co
 
 
 class InstalledEngineReadinessTest(unittest.TestCase):
-    def exercise(self, response, index_available=True):
+    def exercise(self, response, index_available=True, missing_legal=None):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
             (root / "runtime/bin").mkdir(parents=True)
             (root / "runtime/bin/java").touch()
             jar = root / "ui-headless.jar"
             jar.touch()
+            (root / "legal").mkdir()
+            for name in ("LICENSE", "NOTICE", "THIRD_PARTY_NOTICES", "T3-CODE-NOTICE.md", "LUCIDE-LICENSE.txt"):
+                if name != missing_legal:
+                    (root / "legal" / name).touch()
             evidence = root / "smoke.json"
             proc = Mock(pid=12345)
             proc.poll.return_value = None
@@ -57,6 +61,11 @@ class InstalledEngineReadinessTest(unittest.TestCase):
     def test_recorded_current_health_without_worker_becomes_ready(self):
         self.assertNotIn("worker", health["components"])
         self.exercise(health)
+
+    def test_each_legal_file_is_required(self):
+        for name in ("LICENSE", "NOTICE", "THIRD_PARTY_NOTICES", "T3-CODE-NOTICE.md", "LUCIDE-LICENSE.txt"):
+            with self.subTest(name=name), self.assertRaisesRegex(RuntimeError, f"lacks legal/{name}"):
+                self.exercise(health, missing_legal=name)
 
     def test_nonready_or_missing_index_is_not_accepted(self):
         for state in ["STARTING", "ERROR", None]:

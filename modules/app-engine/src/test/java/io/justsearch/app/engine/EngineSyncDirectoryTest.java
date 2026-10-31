@@ -59,6 +59,7 @@ final class EngineSyncDirectoryTest {
   @TempDir static Path tempDir;
 
   private static EngineTestHarness harness;
+  private static AutoCloseable volumeEvidence;
 
   /**
    * The directory the sync tests reconcile. A sibling of the Engine's data directory, never a
@@ -68,6 +69,7 @@ final class EngineSyncDirectoryTest {
 
   @BeforeAll
   static void startEngine() throws Exception {
+    volumeEvidence = EngineTestHarness.knownVolume();
     syncTestDir = tempDir.resolve("sync-test-data");
     Files.createDirectories(syncTestDir);
     harness = EngineTestHarness.start(tempDir.resolve("data"));
@@ -76,10 +78,14 @@ final class EngineSyncDirectoryTest {
   }
 
   @AfterAll
-  static void stopEngine() {
-    if (harness != null) {
-      harness.close();
-      harness = null;
+  static void stopEngine() throws Exception {
+    try {
+      if (harness != null) {
+        harness.close();
+        harness = null;
+      }
+    } finally {
+      if (volumeEvidence != null) volumeEvidence.close();
     }
   }
 

@@ -11,6 +11,7 @@ import java.nio.file.InvalidPathException;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -22,6 +23,7 @@ import org.apache.lucene.search.BooleanQuery;
 import org.apache.lucene.search.IndexSearcher;
 import org.apache.lucene.search.PrefixQuery;
 import org.apache.lucene.search.Query;
+import org.apache.lucene.search.RegexpQuery;
 import org.apache.lucene.search.SearcherManager;
 import org.apache.lucene.search.Sort;
 import org.apache.lucene.search.SortField;
@@ -30,6 +32,8 @@ import org.apache.lucene.search.TermQuery;
 import org.apache.lucene.index.StoredFields;
 import org.apache.lucene.index.Term;
 import org.apache.lucene.util.BytesRef;
+import org.apache.lucene.util.automaton.Operations;
+import org.apache.lucene.util.automaton.RegExp;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -499,7 +503,7 @@ public final class PruneOps {
   private record Candidate(String docId, String filePath, Path file) {}
 
   /** One indexed row, the backing path that decides it, and the stored fields the scan matches. */
-  private record Row(
+  record Row(
       String docId, String filePath, String path, String parentDocId, boolean chunk) {
     /** Whether the scan's query, for {@code prefix}, matches this row. */
     boolean inScan(String prefix) {
@@ -756,6 +760,91 @@ public final class PruneOps {
       }
       return ids;
     }
+  }
+
+  /**
+   * Literal backing-path scope for explicit removal and its completion/ownership proofs.
+   * Stored paths take precedence over legacy filesystem IDs, including on pathless children.
+   */
+  static Query ownedPathPrefixQuery(IndexSearcher searcher, String idField, String prefix,
+      List<String> excludedSubtrees) throws IOException {
+    String normalized = ownershipPrefix(prefix);
+    var excluded = excludedSubtrees.stream().map(PruneOps::ownershipPrefix).toList();
+    var paths = new LinkedHashSet<BytesRef>();
+    var pathlessIds = new LinkedHashSet<BytesRef>();
+    var blankPaths = new LinkedHashSet<BytesRef>();
+    var owners = new LinkedHashSet<BytesRef>();
+    var stored = searcher.storedFields();
+    // Indexed paths find current rows; filesystem IDs and parent IDs find pathless legacy rows,
+    // including children whose parent is no longer indexed. Resolve opaque owners in a second
+    // pass, so unrelated collections and chunks never need their stored fields decoded.
+    Query direct = new BooleanQuery.Builder()
+        .add(ownershipPrefixQuery(SchemaFields.PATH, normalized), BooleanClause.Occur.SHOULD)
+        .add(ownershipPrefixQuery(idField, normalized), BooleanClause.Occur.SHOULD)
+        .add(ownershipPrefixQuery(SchemaFields.PARENT_DOC_ID, normalized), BooleanClause.Occur.SHOULD)
+        .setMinimumNumberShouldMatch(1).build();
+    Query candidates = direct;
+    for (int pass = 0; pass < 2; pass++) {
+      org.apache.lucene.search.ScoreDoc after = null;
+      while (true) {
+        var page = searcher.searchAfter(after, candidates, 1024);
+        if (page.scoreDocs.length == 0) break;
+        for (var hit : page.scoreDocs) {
+          Row row = Row.read(searcher, stored, hit.doc, idField);
+          if (row == null) continue;
+          String backing = ownershipPrefix(row.filePath());
+          if (backing.startsWith(normalized) && excluded.stream().noneMatch(backing::startsWith)) {
+            if (row.path() == null || row.path().isBlank()) {
+              pathlessIds.add(new BytesRef(row.docId()));
+              if (row.path() != null) blankPaths.add(new BytesRef(row.path()));
+            } else {
+              paths.add(new BytesRef(row.path()));
+              if (pass == 0) owners.add(new BytesRef(row.docId()));
+            }
+          }
+        }
+        after = page.scoreDocs[page.scoreDocs.length - 1];
+      }
+      if (owners.isEmpty()) break;
+      candidates = new BooleanQuery.Builder()
+          .add(new TermInSetQuery(SchemaFields.PARENT_DOC_ID, owners), BooleanClause.Occur.FILTER)
+          .add(direct, BooleanClause.Occur.MUST_NOT).build();
+    }
+    // Bind explicit backing paths to the rows themselves. An older hidden version with the
+    // same ID must not pull a live row at a different backing path into this removal.
+    Query noPath = new BooleanQuery.Builder()
+        .add(new org.apache.lucene.search.MatchAllDocsQuery(), BooleanClause.Occur.FILTER)
+        .add(org.apache.lucene.search.TermRangeQuery.newStringRange(
+            SchemaFields.PATH, null, null, true, true), BooleanClause.Occur.MUST_NOT).build();
+    Query legacyPath = new BooleanQuery.Builder().add(noPath, BooleanClause.Occur.SHOULD)
+        .add(new TermInSetQuery(SchemaFields.PATH, blankPaths), BooleanClause.Occur.SHOULD)
+        .setMinimumNumberShouldMatch(1).build();
+    Query legacyRows = new BooleanQuery.Builder()
+        .add(new TermInSetQuery(idField, pathlessIds), BooleanClause.Occur.FILTER)
+        .add(legacyPath, BooleanClause.Occur.FILTER).build();
+    return new BooleanQuery.Builder()
+        .add(new TermInSetQuery(SchemaFields.PATH, paths), BooleanClause.Occur.SHOULD)
+        .add(legacyRows, BooleanClause.Occur.SHOULD).setMinimumNumberShouldMatch(1).build();
+  }
+
+  /** Matches the literal normalized prefix in either separator spelling, using indexed terms. */
+  private static Query ownershipPrefixQuery(String field, String prefix) {
+    var pattern = new StringBuilder();
+    prefix.substring(0, prefix.length() - 1).codePoints().forEach(ch -> {
+      if (ch == '/' || ch == '\\') pattern.append("[/\\\\]");
+      else {
+        if (".?+*|{}[]()\"".indexOf(ch) >= 0) pattern.append('\\');
+        pattern.appendCodePoint(ch);
+      }
+    });
+    pattern.append("([/\\\\].*)?");
+    return new RegexpQuery(new Term(field, pattern.toString()), RegExp.NONE,
+        io.justsearch.configuration.PlatformPaths.isWindows() ? RegExp.CASE_INSENSITIVE : 0,
+        Operations.DEFAULT_DETERMINIZE_WORK_LIMIT);
+  }
+
+  private static String ownershipPrefix(String path) {
+    return normalizePathPrefix(path.replace('\\', '/'));
   }
 
   /** Every hit of {@code query}, however many there are. */

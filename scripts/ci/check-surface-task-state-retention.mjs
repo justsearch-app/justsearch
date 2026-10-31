@@ -30,6 +30,7 @@
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { basename, join } from 'node:path';
 import { stripComments as stripCommentsShared } from '../lib/strip-comments.mjs';
+import { readCorePluginDeclarations } from '../lib/core-surface-declarations.mjs';
 
 const REGISTER = 'governance/surface-task-state.v1.json';
 const reg = JSON.parse(readFileSync(REGISTER, 'utf8'));
@@ -78,7 +79,7 @@ const allowSet = new Set((reg.settleAllowlist ?? []).map((a) => a.field));
 // navigation, so they carry no instance-retention settle obligation.
 const retainedTags = new Set(
   reg.retainedSurfaceManifest
-    ? [...readFileSync(reg.retainedSurfaceManifest, 'utf8').matchAll(/mountTag:\s*'([^']+)'/g)].map(
+    ? [...readCorePluginDeclarations(reg.retainedSurfaceManifest).matchAll(/mountTag:\s*['"]([^'"]+)['"]/g)].map(
         (m) => m[1],
       )
     : [],

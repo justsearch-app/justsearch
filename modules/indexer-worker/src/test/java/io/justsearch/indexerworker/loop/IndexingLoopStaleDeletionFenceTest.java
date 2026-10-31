@@ -39,6 +39,7 @@ import org.junit.jupiter.api.io.TempDir;
 
 /** Real composed extractor, queue and A/B indices; supporting component checks, not Head boot. */
 @Timeout(20)
+@org.junit.jupiter.api.extension.ExtendWith(io.justsearch.indexerworker.services.NoVolumeIdentityExtension.class)
 final class IndexingLoopStaleDeletionFenceTest extends LuceneExecutorTestBase {
   @TempDir Path directory;
   private static final String H1 = "original source bytes";
@@ -327,7 +328,7 @@ final class IndexingLoopStaleDeletionFenceTest extends LuceneExecutorTestBase {
   }
 
   @Test
-  void deletionKeepsAThenBOrderingAndExistingPartialFailureSemantics() throws Exception {
+  void deletionKeepsAThenBOrderingAndPropagatesPartialFailureForRetry() throws Exception {
     assertAll(java.util.stream.Stream.of("A", "B").map(failing -> () -> {
       try (var fixture = new FenceFixture()) {
         Files.delete(fixture.file);
@@ -336,7 +337,7 @@ final class IndexingLoopStaleDeletionFenceTest extends LuceneExecutorTestBase {
         doThrow(new IllegalStateException("owned " + failing + " delete failure"))
             .when(failing.equals("A") ? a : b).deleteByIdAndChunks(fixture.key);
         var handler = new StaleSourceHandler(b, fixture.identities, () -> a);
-        assertEquals(0, handler.deleteMissingSource(fixture.file));
+        assertThrows(IllegalStateException.class, () -> handler.deleteMissingSource(fixture.file));
         var order = inOrder(a, b);
         order.verify(a).deleteByIdAndChunks(fixture.key);
         if (failing.equals("A")) verify(b, never()).deleteByIdAndChunks(anyString());

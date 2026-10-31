@@ -36,6 +36,9 @@ def main():
     if len(jars) != 1:
         raise RuntimeError("installed package has no unique ui-headless.jar")
     root = jars[0].parent
+    for name in ("LICENSE", "NOTICE", "THIRD_PARTY_NOTICES", "T3-CODE-NOTICE.md", "LUCIDE-LICENSE.txt"):
+        if not (root / "legal" / name).is_file():
+            raise RuntimeError(f"installed package lacks legal/{name}")
     java = root / "runtime/bin/java"
     if not java.is_file():
         raise RuntimeError("installed package lacks bundled JVM")

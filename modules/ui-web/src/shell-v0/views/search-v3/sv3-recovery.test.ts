@@ -11,7 +11,8 @@ describe('DS1 session proposal trust boundary', () => {
     expect(isSv3Recovery({ task: null, drafts: [{ place: null, text: 'old draft' }] })).toBe(true);
     expect(isSv3Recovery(payload())).toBe(true);
     expect(isSv3Recovery({ task: null, drafts: [draft()] })).toBe(false);
-    expect(isSv3Recovery({ ...payload(), version: 3 })).toBe(false);
+    expect(isSv3Recovery({ ...payload(), version: 3 })).toBe(true);
+    expect(isSv3Recovery({ ...payload(), version: 4 })).toBe(false);
   });
   it.each([
     { kind: ['search'] },

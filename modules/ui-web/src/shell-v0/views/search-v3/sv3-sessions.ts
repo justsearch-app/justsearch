@@ -103,7 +103,7 @@ export interface Sv3TurnEvidence {
  * be worded as a failure, and `refused` is the session lock declining the send — neither of them is
  * an answer that went wrong (tempdoc 822 Phase F1; the terminals `sv3-ask.ts` reports).
  */
-export type Sv3TurnStatus = 'streaming' | 'complete' | 'halted' | 'refused' | 'failed' | 'no-evidence';
+export type Sv3TurnStatus = 'streaming' | 'unfinished' | 'complete' | 'halted' | 'refused' | 'failed' | 'no-evidence';
 
 /**
  * Which tier produced the turn (tempdoc 822 Phase F2). A `model` turn is free chat without retrieval.
@@ -148,6 +148,10 @@ export interface Sv3Turn {
    * mis-attributed one turn's evidence, status and duration to another on any length skew.
    */
   readonly recordId: string | null;
+  /** Exact request correlation, independent of local and stored message IDs. */
+  readonly dispatchTurnId?: string;
+  /** Positive, nonsynthetic saved outcome for this stamped question. */
+  readonly savedOutcome?: boolean;
   /**
    * The `ConversationStore` id of the turn's TERMINAL assistant message (tempdoc 852 S1), or `null`
    * while the record has not spoken for this turn. {@link recordId} names the turn's USER message —
@@ -502,13 +506,14 @@ export function submitInSession(
   newId: string,
   shapeId?: string,
   selectionKind?: string,
+  dispatchTurnId?: string,
 ): Sv3SessionList {
   const text = question.trim();
   if (text === '') return list;
   const active = list.activeId === null ? null : sessionById(list, list.activeId);
   if (active === null) {
     const opened = openSession(newId, text, now, kind, now);
-    const created = { ...opened, turns: opened.turns.map(turn => ({ ...turn, shapeId, ...(selectionKind === undefined ? {} : { selectionKind }) })) };
+    const created = { ...opened, turns: opened.turns.map(turn => ({ ...turn, shapeId, ...(dispatchTurnId === undefined ? {} : { dispatchTurnId }), ...(selectionKind === undefined ? {} : { selectionKind }) })) };
     return {
       sessions: [created, ...list.sessions],
       activeId: created.id,
@@ -520,7 +525,7 @@ export function submitInSession(
       session.id === active.id
         ? {
             ...session,
-            turns: [...session.turns, { ...openTurn(session.id, session.turns.length, text, now, kind), shapeId, ...(selectionKind === undefined ? {} : { selectionKind }) }],
+            turns: [...session.turns, { ...openTurn(session.id, session.turns.length, text, now, kind), shapeId, ...(dispatchTurnId === undefined ? {} : { dispatchTurnId }), ...(selectionKind === undefined ? {} : { selectionKind }) }],
             updatedAt: now,
             // Asking in a conversation IS visiting it, so a follow-up cannot leave the session
             // holding an unread bit against a reader who is sitting in it.
@@ -1004,6 +1009,7 @@ export function applySv3Record(
   const session = sessionById(list, sessionId);
   if (session === null || recordTurns.length === 0) return list;
   const local = session.turns;
+  const localByDispatchId = new Map(local.flatMap((turn, index) => turn.dispatchTurnId ? [[turn.dispatchTurnId, index] as const] : []));
   const localByRecordId = new Map<string, number>();
   local.forEach((turn, index) => {
     if (turn.recordId !== null && !localByRecordId.has(turn.recordId)) {
@@ -1014,18 +1020,19 @@ export function applySv3Record(
   const pairing = new Map<number, number>();
   recordTurns.forEach((recorded, recordIndex) => {
     const recordId = recorded.recordId ?? recorded.id;
-    const localIndex = localByRecordId.get(recordId);
+    const localIndex = recorded.dispatchTurnId === undefined ? localByRecordId.get(recordId)
+      : localByDispatchId.get(recorded.dispatchTurnId);
     if (localIndex !== undefined && !claimed.has(localIndex)) {
       pairing.set(recordIndex, localIndex);
       claimed.add(localIndex);
     }
   });
   let cursor = 0;
-  recordTurns.forEach((_, recordIndex) => {
-    if (pairing.has(recordIndex)) return;
+  recordTurns.forEach((recorded, recordIndex) => {
+    if (pairing.has(recordIndex) || recorded.dispatchTurnId !== undefined) return;
     while (
       cursor < local.length &&
-      (claimed.has(cursor) || local[cursor]?.recordId != null)
+      (claimed.has(cursor) || local[cursor]?.recordId != null || local[cursor]?.dispatchTurnId !== undefined)
     ) {
       cursor++;
     }
@@ -1048,7 +1055,7 @@ export function applySv3Record(
   };
   const reconcile = (recorded: Sv3Turn, prior: Sv3Turn | undefined): Sv3Turn => {
     if (prior === undefined) return recorded;
-    if (prior.status === 'streaming') return prior;
+    if (prior.status === 'streaming') return { ...prior, recordId: recorded.recordId ?? recorded.id, assistantRecordId: recorded.assistantRecordId };
     return {
       ...recorded,
       id: prior.id,

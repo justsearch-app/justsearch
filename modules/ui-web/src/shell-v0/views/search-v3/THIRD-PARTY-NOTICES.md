@@ -14,9 +14,8 @@ deliberately excluded (the primary is JustSearch's own accent).
 > dependency/model/native manifests (`scripts/codegen/gen-notices.mjs`, banner: "do NOT edit by
 > hand", gated by `regen-all --check`). T3 Code is not a redistributed dependency — it is a
 > derived-source attribution, a category that projection has no input for. Rather than hand-editing
-> a generated file into drift, the notice lives with the code it covers. If this window is promoted
-> into a shipped build, add a derived-source declaration input to `gen-notices.mjs` so this entry is
-> projected into the root notices too.
+> a generated file into drift, the notice lives with the code it covers and now ships with the
+> Engine as `legal/T3-CODE-NOTICE.md`.
 
 ## MIT License
 

@@ -325,6 +325,19 @@ final class SyncOps {
         }
     }
 
+    void reconcileIndexedSources(EngineContext engineContext) {
+        try {
+            PruneResponse response = rpc.execute("reconcileIndexedSources",
+                    KnowledgeClient.RpcDeadlineCategory.LONG_RUNNING,
+                    IngestServiceCalls::reconcileIndexedSources, engineContext);
+            if (response.getAborted() || !response.getError().isEmpty()) {
+                log.warn("Indexed source reconciliation incomplete: {}", response.getError());
+            }
+        } catch (Exception failure) {
+            log.warn("Indexed source reconciliation failed", failure);
+        }
+    }
+
     void startPeriodicSync() {
         EngineContext engineContext = io.justsearch.app.services.intent.EngineProvenance.internal(
             "periodic-root-sync", EngineContext.Survival.DURABLE, EngineContext.Urgency.BACKGROUND);
@@ -345,6 +358,7 @@ final class SyncOps {
                 syncScheduler.scheduleAtFixedRate(
                         () -> {
                             try {
+                                reconcileIndexedSources(engineContext);
                                 List<Path> roots = List.copyOf(watchedRoots.keySet());
                                 if (roots.isEmpty()) {
                                     return;

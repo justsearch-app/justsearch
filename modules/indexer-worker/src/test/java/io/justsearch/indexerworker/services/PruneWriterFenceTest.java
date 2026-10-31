@@ -66,6 +66,7 @@ import org.junit.jupiter.api.io.TempDir;
  * <p>The fence is the indexing loop's; the loop here is a stand-in whose fence is a plain lock, so
  * each test can hold a writer at a chosen point and see who waits for it.
  */
+@org.junit.jupiter.api.extension.ExtendWith(NoVolumeIdentityExtension.class)
 final class PruneWriterFenceTest extends LuceneExecutorTestBase {
 
   @TempDir Path tempDir;

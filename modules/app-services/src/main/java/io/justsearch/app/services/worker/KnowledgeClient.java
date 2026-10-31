@@ -613,6 +613,12 @@ public abstract class KnowledgeClient implements Closeable, SearchPort, Indexing
         return searchRpcOps.listAllDocumentIds(offset, limit, snapshotToken, engineContext);
     }
 
+    @Override
+    public long forEachIndexedSource(java.util.function.Consumer<String> consumer, EngineContext engineContext) {
+        return executeIngestRpc("scanIndexedSources", RpcDeadlineCategory.LONG_RUNNING,
+                stub -> stub.scanIndexedSources(consumer), engineContext);
+    }
+
     // ========== Ingest Service ==========
 
     /** Applies a source-owned no-file document through the composed Worker. */

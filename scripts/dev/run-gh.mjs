@@ -2,59 +2,16 @@
 /**
  * `gh` CLI runner (tempdoc 743 second wave, P-K exec substrate).
  *
- * Two jobs:
+ * Resolves the installed `gh` binary and passes arguments as a vector, without shell
+ * interpolation. Scoop's `current` symlink survives version bumps; plain `gh` on PATH
+ * is the fallback on machines without that layout.
  *
- *  1. **Resolved-path invocation.** Scoop shim junctions have been observed unreachable
- *     from an agent Bash session (symptom: `Shim: Could not create process …`), which is
- *     the birthplace of the hand-typed `& "F:\scoop\apps\gh\2.90.0\bin\gh.exe"` quoting
- *     class. This wrapper resolves the scoop-installed binary itself —
- *     via the `current` symlink so it survives a `gh` version bump — and falls back to
- *     plain `gh` on PATH for portability to a machine without this scoop layout. Args are
- *     passed as a vector (`spawnSync(bin, argv, ...)`), never shell-interpolated, so no
- *     quoting trap exists on either path.
- *
- *  2. **`checks-wait` mode** — mechanizes the "registration race" prose guidance tempdoc 746
- *     shipped as a runnable command instead of a hand-rolled poll loop:
- *
- *     `node scripts/dev/run-gh.mjs checks-wait <pr-number> [--timeout-sec N] [--required-only]`
- *
- *     `gh pr checks <pr>` exit-code contract (cli/cli#7866, verified live on gh 2.90.0 —
- *     tempdoc 743 R3 derisk): the exit code is a BITWISE combination —
- *       - bit 0 (1) set  → at least one check is FAILING
- *       - bit 3 (8) set  → at least one check is PENDING (no failures yet)
- *       - 0              → every check reported and none are failing/pending (PASS)
- *     A fail bit is terminal (a failed check does not un-fail while polling), so any code
- *     with bit 0 set is treated as FAIL even if bit 3 is also set.
- *
- *     The overload that causes cli/cli#7401's spurious failure: right after a push, before
- *     CI has registered any checks, `gh pr checks <pr>` ALSO exits 1 with a distinct
- *     "no checks reported" message — indistinguishable from a real failure by exit code
- *     alone. This wrapper pre-polls (every 15s) until the output stops looking like the
- *     no-checks-yet case before it starts trusting the bitwise contract, which is the fix
- *     #7401 itself never shipped.
- *
- *     `--required-only` (tempdoc 829 R1): passes `--required` through to every underlying
- *     `gh pr checks` call, so the bitwise verdict above is computed over ONLY the contexts
- *     registered in the branch protection rule's `required_status_checks.contexts` — verified
- *     working on gh 2.90.0, filters to exactly the required contexts. Advisory (non-required)
- *     lanes cannot change mergeability, so without this flag a flaky advisory lane (e.g.
- *     continue-on-error integration tests) reads as FAIL and triggers a rerun that cannot
- *     possibly matter: 829 F1 found 12/12 lane reruns on 2026-08-13 were unnecessary because
- *     the one failing lane was never in the required set — every attempt-1 run was already
- *     mergeable. The no-checks-yet pre-poll heuristic (`isUnregistered`) covers both invocation
- *     shapes, but `gh` does NOT emit identical text across them (cli/cli pkg/cmd/pr/checks/checks.go,
- *     gh 2.90.0): without `--required` it emits "no checks reported on the '%s' branch" when
- *     `statusCheckRollup.Nodes` is empty; with `--required` it can instead emit "no required checks
- *     reported on the '%s' branch" — checks ARE registered, but zero of them are in the required
- *     set yet (e.g. one required context, like cla-assistant, reporting from a different workflow
- *     run than the rest — a real staggered-registration window, not a hypothetical). Both variants
- *     are exit 1 and both are treated as not-yet-registered by the same regex. The bitwise exit
- *     contract itself is unchanged by the flag — only which checks feed into it. Omitting the flag
- *     is byte-identical to the pre-829 behavior (all reported checks, required and advisory alike).
- *
- *     The same bounded exit contract is used by `merge-wait` and `run-wait-sha`:
- *     0 = success, 1 = terminal failure, 3 = TIMEOUT, 2 = an unexpected `gh`/JSON error.
- *     Both emit only state transitions, so one long-lived process replaces conversational polls.
+ * `merge-wait` and `run-wait-sha` emit only state transitions and use bounded exits:
+ * 0 = success, 1 = terminal failure, 3 = TIMEOUT, 2 = an unexpected `gh`/JSON error.
+ * Use `shepherd <n>` (or `enqueue` then `merge-wait`) to merge a pull request.
+ * To wait for its CI run, use `run-wait-sha <head-sha> --workflow CI
+ * --branch <pr-branch> --event pull_request`.
+ * See docs/reference/contributing/agent-guide.md for publication guidance.
  */
 
 import path from 'node:path';
@@ -91,7 +48,7 @@ function runGh(bin, args) {
   return spawnSync(bin, args, { stdio: 'inherit' });
 }
 
-/** Run `gh` capturing output (for checks-wait's internal polling, not user-facing stdio). */
+/** Run `gh` capturing output for internal polling and JSON decoding. */
 function runGhCaptured(bin, args) {
   return spawnSync(bin, args, { encoding: 'utf8' });
 }
@@ -109,30 +66,8 @@ export function isUnregistered(result) {
   return false;
 }
 
-/**
- * Decode the cli/cli#7866 bitwise exit contract into a verdict. Pure; unit-tested.
- * Returns one of: 'pass' | 'fail' | 'pending' | 'unknown'.
- */
-export function decodeChecksExit(status) {
-  if (status === 0) return 'pass';
-  if (typeof status !== 'number') return 'unknown';
-  if ((status & 1) !== 0) return 'fail'; // fail bit wins even if pending bit also set
-  if ((status & 8) !== 0) return 'pending';
-  return 'unknown';
-}
-
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-/**
- * Build the `gh pr checks` argument vector. Pure; unit-tested. With `requiredOnly`, appends
- * `--required` so the bitwise verdict only reflects `required_status_checks.contexts` (829 R1).
- */
-export function buildChecksArgs(prNumber, requiredOnly) {
-  const args = ['pr', 'checks', String(prNumber)];
-  if (requiredOnly) args.push('--required');
-  return args;
 }
 
 export function classifyMergeSnapshot(snapshot) {
@@ -217,7 +152,7 @@ export function parseRequiredChecksResult(result) {
   if (typeof result.status !== 'number' || result.signal) {
     return { error: new Error(`gh checks terminated without an exit status${result.signal ? ` (${result.signal})` : ''}`) };
   }
-  // isUnregistered also accepts empty failures for checks-wait; merge-wait requires the message.
+  // Empty failures are errors; only an explicit registration message means pending.
   const text = `${result.stdout || ''}${result.stderr || ''}`;
   if (text.trim() && isUnregistered(result)) return { value: [] };
   try {
@@ -457,64 +392,6 @@ export async function runWaitSha(bin, sha, timeoutSec, { workflow = 'CI', branch
   }
 }
 
-async function checksWait(bin, prNumber, timeoutSec, requiredOnly) {
-  const deadline = Date.now() + timeoutSec * 1000;
-  const checksArgs = buildChecksArgs(prNumber, requiredOnly);
-
-  // Phase 1: pre-poll until checks register (cli/cli#7401 mitigation).
-  let last = runGhCaptured(bin, checksArgs);
-  if (last.error) {
-    // Spawn failure (ENOENT etc.) must fail fast and legibly — never poll a binary that
-    // isn't there until timeout and then report a wrong-cause TIMEOUT (refute-first review
-    // finding 2a, 743 second wave).
-    process.stderr.write(`run-gh checks-wait: failed to spawn \`${bin}\`: ${last.error.message}\n`);
-    return 2;
-  }
-  while (isUnregistered(last)) {
-    if (Date.now() >= deadline) {
-      process.stderr.write(
-        `run-gh checks-wait: TIMEOUT waiting for PR #${prNumber} checks to register after ${timeoutSec}s\n`,
-      );
-      return 3;
-    }
-    await sleep(POLL_INTERVAL_MS);
-    last = runGhCaptured(bin, checksArgs);
-    if (last.error) {
-      process.stderr.write(`run-gh checks-wait: failed to spawn \`${bin}\`: ${last.error.message}\n`);
-      return 2;
-    }
-  }
-
-  // Phase 2: trust the bitwise contract until it resolves to pass/fail.
-  for (;;) {
-    const verdict = decodeChecksExit(last.status);
-    if (verdict === 'pass') {
-      process.stderr.write(`run-gh checks-wait: PASS — PR #${prNumber} all checks green\n`);
-      return 0;
-    }
-    if (verdict === 'fail') {
-      process.stderr.write(`run-gh checks-wait: FAIL — PR #${prNumber} has a failing check\n`);
-      return 1;
-    }
-    if (verdict === 'pending') {
-      if (Date.now() >= deadline) {
-        process.stderr.write(
-          `run-gh checks-wait: TIMEOUT — PR #${prNumber} still pending after ${timeoutSec}s\n`,
-        );
-        return 3;
-      }
-      await sleep(POLL_INTERVAL_MS);
-      last = runGhCaptured(bin, checksArgs);
-      continue;
-    }
-    // 'unknown': an unexpected gh error (auth, network, ...) — surface verbatim, don't loop forever.
-    process.stderr.write(
-      `run-gh checks-wait: unexpected \`gh pr checks\` result (exit ${last.status}) — surfacing verbatim:\n${last.stdout || ''}${last.stderr || ''}\n`,
-    );
-    return 2;
-  }
-}
-
 /** Extract the `--timeout-sec N` flag. Pure; unit-tested. */
 export function parseTimeoutSec(args) {
   const i = args.indexOf('--timeout-sec');
@@ -527,14 +404,6 @@ export function parseTimeoutSec(args) {
     ? [...args.slice(0, i), ...args.slice(i + 2)]
     : [...args.slice(0, i), ...args.slice(i + 1)];
   return { timeoutSec: hasValidValue ? value : DEFAULT_TIMEOUT_SEC, rest };
-}
-
-/** Extract the boolean `--required-only` flag (829 R1). Pure; unit-tested. */
-export function parseRequiredOnly(args) {
-  const i = args.indexOf('--required-only');
-  if (i === -1) return { requiredOnly: false, rest: args };
-  const rest = [...args.slice(0, i), ...args.slice(i + 1)];
-  return { requiredOnly: true, rest };
 }
 
 export function parseValueFlag(args, name, fallback = null) {
@@ -874,15 +743,8 @@ async function main() {
   }
 
   if (argv[0] === 'checks-wait') {
-    const { timeoutSec, rest: afterTimeout } = parseTimeoutSec(argv.slice(1));
-    const { requiredOnly, rest } = parseRequiredOnly(afterTimeout);
-    const prNumber = rest[0];
-    if (!prNumber) {
-      process.stderr.write('run-gh checks-wait: missing <pr-number>\n');
-      process.exit(2);
-    }
-    const code = await checksWait(bin, prNumber, timeoutSec, requiredOnly);
-    process.exit(code);
+    process.stderr.write('run-gh checks-wait: retired; use shepherd <n> (or enqueue then merge-wait) to merge, or run-wait-sha <head-sha> --workflow CI --branch <pr-branch> --event pull_request to wait for PR CI.\n');
+    process.exit(2);
   }
 
   if (argv[0] === 'merge-wait') {

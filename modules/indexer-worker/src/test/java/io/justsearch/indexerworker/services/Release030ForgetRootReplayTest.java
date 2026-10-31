@@ -31,6 +31,7 @@ import org.junit.jupiter.params.provider.ValueSource;
 import tools.jackson.databind.json.JsonMapper;
 
 /** The actual ROOT spool/correction path, with real queue creator, source and serving index. */
+@org.junit.jupiter.api.extension.ExtendWith(NoVolumeIdentityExtension.class)
 final class Release030ForgetRootReplayTest extends LuceneExecutorTestBase {
   @TempDir Path directory;
 
@@ -122,10 +123,13 @@ final class Release030ForgetRootReplayTest extends LuceneExecutorTestBase {
       var publisher = new WorkerIngestService(null, null, null, IndexingPacing.unthrottled(),
           directory.resolve("base"), null, null, null, null, 0L);
       publisher.useExclusionRoots(() -> List.of(directory.resolve("roots")));
+      assertTrue(((RootWitness) publisher.rootCheck()).recordAdded(root));
       // Force=true on main does not acquire the candidate-discovery retained-path budget.
       var ops = new SyncDirectoryOps(runtime.readPathOps(), runtime.pruneOps(), runtime.commitOps(),
           queue, IndexingPacing.unthrottled(), null, 1, 1);
       ops.setUserExclusions(publisher::isUserExcluded);
+      ops.setPruneGuardFactory(path -> RootPresenceGuard.capture(
+          path, null, RootVolumeLedger.under(directory.resolve("base"))));
       // The pre-guard merge has no strict policy setter. The same behavioral checks still
       // execute there and must detect the real content read/admission, rather than fail to compile.
       try {

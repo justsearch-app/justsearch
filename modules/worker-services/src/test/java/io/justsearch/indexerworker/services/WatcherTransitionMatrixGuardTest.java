@@ -23,6 +23,7 @@ import org.junit.jupiter.api.io.TempDir;
  * cells are guarded by {@code SyncOpsReconcileVerificationTest}, {@code IndexDriftHealthTapTest}, and
  * {@code folderStatus.test} in their own modules.
  */
+@org.junit.jupiter.api.extension.ExtendWith(NoVolumeIdentityExtension.class)
 final class WatcherTransitionMatrixGuardTest {
 
   @TempDir Path tempDir;
@@ -64,6 +65,10 @@ final class WatcherTransitionMatrixGuardTest {
       RootWatcherRegistry.Subscription goneRegistration =
           new RootWatcherRegistry.Subscription(
               goneRoot, null, new Object(), RootIdentity.capture(goneRoot));
+      var proof = RootWitness.inMemory();
+      assertTrue(proof.recordAdded(presentRoot));
+      assertTrue(proof.recordAdded(goneRoot));
+      watcher.useRootCheck(proof);
       Files.delete(goneRoot);
 
       // Cell: DELETE while watched root is PRESENT → forwarded to the delete sink.

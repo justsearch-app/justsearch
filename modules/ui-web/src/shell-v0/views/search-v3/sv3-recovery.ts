@@ -3,6 +3,7 @@
 export type RecoveryShape = 'core.rag-ask' | 'core.free-chat' | 'core.extract' | 'core.summarize';
 export interface Sv3RecoveryTask {
   id: string;
+  dispatchTurnId?: string;
   place: string | null;
   target: string | null;
   shape: RecoveryShape;
@@ -26,7 +27,7 @@ type PreparationFiles = { kind: 'files' | 'reselect'; paths: string[] };
 export interface Sv3RecoveryDraft { place: string | null; text: string; preparation?: Sv3Preparation | null }
 export interface Sv3Recovery {
   /** Absent is the strict original text-only payload. The envelope remains version1. */
-  version?: 2;
+  version?: 2 | 3;
   task: Sv3RecoveryTask | null;
   drafts: Sv3RecoveryDraft[];
 }
@@ -51,20 +52,22 @@ export function isSv3Preparation(v: unknown): v is Sv3Preparation {
     && new Set(scope.paths).size === scope.paths.length;
 }
 export function isSv3Recovery(v: unknown): v is Sv3Recovery {
-  if (!object(v) || !(keys(v, 'task,drafts') || keys(v, 'version,task,drafts') && v.version === 2)
+  if (!object(v) || !(keys(v, 'task,drafts') || keys(v, 'version,task,drafts') && (v.version === 2 || v.version === 3))
     || !Array.isArray(v.drafts) || v.drafts.length > 2) return false;
   const snapshots = new Set<string>();
   for (const draft of v.drafts) {
-    if (!object(draft) || !keys(draft, v.version === 2 ? 'place,text,preparation' : 'place,text')
+    if (!object(draft) || !keys(draft, v.version !== undefined ? 'place,text,preparation' : 'place,text')
       || !id(draft.place) || !str(draft.text, 65536)
-      || v.version === 2 && draft.preparation !== null && !isSv3Preparation(draft.preparation)) return false;
+      || v.version !== undefined && draft.preparation !== null && !isSv3Preparation(draft.preparation)) return false;
     const snapshot = JSON.stringify([draft.place, draft.text, draft.preparation ?? null]);
     if (snapshots.has(snapshot)) return false;
     snapshots.add(snapshot);
   }
   const t = v.task;
   if (t === null) return true;
-  return object(t) && keys(t, 'id,place,target,shape,raw,schema,scope,record,needsReselection,effort,delivery')
+  return object(t) && keys(t, 'id,place,target,shape,raw,schema,scope,record,needsReselection,effort,delivery'
+    + (v.version === 3 && Object.hasOwn(t, 'dispatchTurnId') ? ',dispatchTurnId' : ''))
+    && (t.dispatchTurnId === undefined || str(t.dispatchTurnId, 4096) && t.dispatchTurnId.trim() !== '')
     && str(t.id, 4096) && id(t.place) && id(t.target) && id(t.record) && str(t.raw, 65536)
     && (t.schema === null || str(t.schema, 16384)) && typeof t.needsReselection === 'boolean'
     && typeof t.shape === 'string' && ['core.rag-ask', 'core.free-chat', 'core.extract', 'core.summarize'].includes(t.shape)

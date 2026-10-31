@@ -105,6 +105,13 @@ public interface IndexingService {
     return getWatchedPaths(engineContext).stream().map(p -> new WatchedRoot(null, p)).toList();
   }
 
+  /** Visits existing indexed source paths, including surviving children of a partial removal.
+   * Returns the number of rows whose ownership could not be read; enumeration failure throws.
+   */
+  default long forEachIndexedSource(java.util.function.Consumer<String> consumer, EngineContext engineContext) {
+    throw new UnsupportedOperationException("Indexed source enumeration is unavailable");
+  }
+
   /** Add a new watch root (primary collection). */
   void addWatchedPath(Path path, EngineContext engineContext);
 

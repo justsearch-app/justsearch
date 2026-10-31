@@ -311,6 +311,8 @@ interface Building {
   standaloneQuestion: string;
   selectionKind?: string;
   noEvidence: boolean;
+  dispatchTurnId?: string;
+  savedOutcome?: boolean;
 }
 
 const open = (
@@ -368,6 +370,11 @@ export function projectSv3RecordTurns(events: readonly ThreadEvent[]): readonly 
   const items = projectUnifiedThread(events);
   const built: Building[] = [];
   let current: Building | null = null;
+  const byDispatch = new Map<string, Building>();
+  const dispatchOf = (item: UnifiedTurnItem): string | undefined => {
+    const id = item.attributes.turnId;
+    return typeof id === 'string' && id.trim() !== '' && id.length <= 4096 ? id : undefined;
+  };
   const ensure = (item: UnifiedTurnItem): Building => {
     if (current !== null) return current;
     const created = open(item.id, '', item.ts, false);
@@ -380,11 +387,18 @@ export function projectSv3RecordTurns(events: readonly ThreadEvent[]): readonly 
     if (item.kind === 'user') {
       current = open(item.id, item.content, item.ts, true);
       current.declaredShapeId = declaredShapeOf(item);
+      const dispatch = dispatchOf(item);
+      if (dispatch !== undefined) { current.dispatchTurnId = dispatch; byDispatch.set(dispatch, current); }
       if (typeof item.attributes.selectionKind === 'string') current.selectionKind = item.attributes.selectionKind;
       built.push(current);
       continue;
     }
-    const turn = ensure(item);
+    const dispatch = dispatchOf(item);
+    // A stamped outcome never borrows a neighbouring question, including a legacy one.
+    const turn = dispatch === undefined ? ensure(item) : byDispatch.get(dispatch);
+    if (turn === undefined) continue;
+    if (dispatch !== undefined && (item.kind === 'assistant' || item.kind === 'error')
+      && item.attributes.errorCode !== 'INCOMPLETE_TURN') turn.savedOutcome = true;
     // Tempdoc 863 §4.A.5 (F1) — first declaration wins for the turn. Every store row of one turn is
     // written by the one shape that dispatched it, so the first is the answer; a run-plane item
     // declares nothing and cannot overwrite it.
@@ -545,7 +559,7 @@ export function projectSv3RecordTurns(events: readonly ThreadEvent[]): readonly 
     // Extract records hold accepted output only; an empty terminal is no successful result.
     const missingStructuredResult = turn.declaredShapeId === 'core.extract'
       && turn.answers.every(answer => answer === '');
-    const unfinished = !agent && (model || turn.declaredShapeId === 'core.rag-ask')
+    const unfinished = !agent && (model || turn.declaredShapeId === 'core.rag-ask' || turn.declaredShapeId === 'core.summarize')
       && turn.openedByUser && turn.answers.length === 0 && !turn.errored && !turn.noEvidence;
     return {
       id: turn.id,
@@ -554,6 +568,7 @@ export function projectSv3RecordTurns(events: readonly ThreadEvent[]): readonly 
       // overwritten by it, because UI state (expanded sources, the copied-turn flag, the live run's
       // `turnId`) is keyed on that id and a swap silently invalidates it.
       recordId: turn.id,
+      ...(turn.dispatchTurnId === undefined ? {} : { dispatchTurnId: turn.dispatchTurnId, savedOutcome: turn.savedOutcome === true }),
       // Tempdoc 852 §2.3a — the OTHER half of the exchange's identity. An ask turn drops its
       // activity list below, and used to drop every assistant id with it; the id is what edit-retry,
       // branch and floor-setting address, and none of them can be built on a turn that cannot name
@@ -590,11 +605,13 @@ export function projectSv3RecordTurns(events: readonly ThreadEvent[]): readonly 
         ? 'halted'
         : turn.noEvidence
           ? 'no-evidence'
-          : turn.errored || unfinished || missingStructuredResult
+          : unfinished
+          ? 'unfinished'
+          : turn.errored || missingStructuredResult
           ? 'failed'
           : 'complete',
       evidence,
-      detail: missingStructuredResult && !turn.errored ? 'No result was returned.' : unfinished ? 'No answer was saved. This attempt may be unfinished or interrupted; you can try again.' : turn.errorDetail,
+      detail: missingStructuredResult && !turn.errored ? 'No result was returned.' : unfinished ? 'No saved outcome yet. This answer may still be being written.' : turn.errorDetail,
       toolCalls: turn.tools,
       // An ASK turn's whole response is its answer text, which the transcript already renders through
       // the shared markdown block — handing it a one-item activity list would mean two ways to draw

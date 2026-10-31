@@ -223,8 +223,8 @@ final class Release030AdmissionDebtTest {
               java.util.Objects.requireNonNull(volumes.getProperty(key(root.resolve("roots/alpha")))));
           store(ledger, volumes);
         }
-        assertTrue(server.appServices().ingestService().rootCheck().vouchesForFile(root),
-            "the normal explicit-folder rule alone would authorize absence; admission uncertainty must stop it");
+        assertEquals(volumeAvailable, server.appServices().ingestService().rootCheck().vouchesForFile(root),
+            "absence requires matching recorded volume evidence as well as a proven admission revision");
         Files.move(file, root.resolve("held-explicit.txt"));
         var field = SqliteJobQueue.class.getDeclaredField("connection");
         field.setAccessible(true);

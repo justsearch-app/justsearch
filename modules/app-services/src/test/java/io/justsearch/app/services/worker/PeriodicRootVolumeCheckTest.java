@@ -95,6 +95,9 @@ final class PeriodicRootVolumeCheckTest {
   /** The Worker's answers: a root on another volume is refused, every other root is synced. */
   private static Object answer(InvocationOnMock call, Set<Path> onAnotherVolume, List<Path> walked) {
     switch (call.getMethod().getName()) {
+      case "reconcileIndexedSources" -> {
+        return io.justsearch.ipc.PruneResponse.getDefaultInstance();
+      }
       case "syncDirectory" -> {
         SyncDirectoryRequest request = call.getArgument(0);
         Path root = Path.of(request.getRootPath()).toAbsolutePath().normalize();

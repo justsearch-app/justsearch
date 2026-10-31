@@ -12,8 +12,8 @@ Every retrieval-quality number JustSearch publishes traces to one canonical, rep
 corpus set, at one commit, on stated hardware, with cited external baselines shown honestly (not as a "we
 beat X" claim — see the comparison-class notes in
 [`docs/reference/benchmarks/methodology.md`](docs/reference/benchmarks/methodology.md)). The result numbers
-cannot silently drift from that object; every table anywhere in the docs is a generated projection of it,
-never hand-transcribed.
+in the README's benchmark table are hand-written from that object and CI-checked against it by
+`scripts/ci/check-readme-benchmark-numbers.mjs`.
 
 **The one claim we think is genuinely defensible and hard to copy:** multilingual-competitive retrieval
 *without any per-language tuning* — no per-language analyzers, stopwords, stemmers, or synonym lists. That's

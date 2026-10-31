@@ -58,6 +58,5 @@ described below.
   won't add per-language analyzers/stopwords/synonym dictionaries. Multilingual quality comes from the model
   stack, not from per-language tuning.
 
-If you're unsure whether an idea fits, **open a discussion before a PR** — we'd rather shape it together than
+If you're unsure whether an idea fits, **open an issue before a PR** — we'd rather shape it together than
 decline finished work.
-</content>

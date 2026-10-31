@@ -65,6 +65,7 @@ import tools.jackson.databind.ObjectMapper;
  * scan began, inside the fence, before it ends.
  */
 @Timeout(120)
+@org.junit.jupiter.api.extension.ExtendWith(NoVolumeIdentityExtension.class)
 final class PruneLatePublicationTest extends LuceneExecutorTestBase {
 
   @TempDir Path tempDir;

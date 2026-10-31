@@ -12,6 +12,8 @@ import type { Sv3ContextDomain } from './sv3-context-domain.js';
 import type { Sv3SearchController, Sv3AskScope } from './sv3-search.js';
 import type { Sv3Session, Sv3TurnRef, Sv3TurnEvidence, Sv3TurnStatus } from './sv3-sessions.js';
 import { sv3ShouldGenerateTitle } from './sv3-sessions.js';
+import type { ThreadResponse } from '../unifiedThreadClient.js';
+import { projectSv3RecordTurns } from './sv3-record.js';
 import type { RecoveryShape } from './sv3-recovery.js';
 import type { sv3FollowUpContext } from './sv3-context.js';
 import type { Sv3ComposerState } from './fixtures.js';
@@ -23,7 +25,7 @@ type AskDraft = Pick<Sv3DraftDomain, 'draftMayIssue' | 'preparedHandoff' | 'huma
   | 'leaveResultsBySending' | 'placeScopes' | 'assigningHumanDraft' | 'revokeHumanTask' | 'retireHumanTask'
   | 'scheduleHumanRetry'>;
 type AskContext = Pick<Sv3ContextDomain, 'followUpContext' | 'refuseQuestion' | 'clearRefusedQuestion'
-  | 'recordUsage' | 'refreshRecord'>;
+  | 'recordUsage' | 'refreshRecord' | 'checkRetainedAttempt' | 'invalidateContext'>;
 type AskSearch = Pick<Sv3SearchController, 'recordTurnScope' | 'pendingScope' | 'clearScope' | 'prepare'>;
 
 interface AskHost {
@@ -37,7 +39,7 @@ interface AskHost {
   context(): AskContext;
   search(): AskSearch;
   submitTurn(question: string, now: number, kind: 'ask' | 'model', target: string, shape: RecoveryShape,
-    selectionKind: SelectionPayload['kind'] | undefined): Sv3TurnRef | null;
+    selectionKind: SelectionPayload['kind'] | undefined, dispatchTurnId: string): Sv3TurnRef | null;
   dropTurn(ref: Sv3TurnRef): void;
   setReasoning(ref: Sv3TurnRef, blocks: ReasoningBlock[]): void;
   settleTurn(ref: Sv3TurnRef, status: Exclude<Sv3TurnStatus, 'streaming' | 'left'>,
@@ -90,6 +92,30 @@ export class Sv3AskDomain {
   stop(): void { this.askStop?.(); }
   abortAsk(): void { this.askAbort?.abort(); }
 
+  ownsAttempt(task: HumanTask): boolean {
+    const ask = this.liveAsks.get(task.saved.target ?? '');
+    return ask !== undefined && !ask.abort.signal.aborted
+      && ask.dispatchTurnId === task.saved.dispatchTurnId;
+  }
+
+  retainedAttempt(): { target: string; key: string } | null {
+    const task = this.draftDomain.humanTask;
+    return task?.saved.delivery === 'unknown' && task.saved.target !== null
+      && task.saved.dispatchTurnId !== undefined && !this.ownsAttempt(task)
+      ? { target: task.saved.target, key: JSON.stringify([task.saved.id, task.saved.target, task.saved.dispatchTurnId]) } : null;
+  }
+
+  recordArrival(id: string, record: ThreadResponse): void {
+    const task = this.draftDomain.humanTask;
+    if (record.incomplete || task?.saved.delivery !== 'unknown' || task.saved.target !== id
+      || task.saved.dispatchTurnId === undefined || this.ownsAttempt(task)) return;
+    const outcome = projectSv3RecordTurns(record.events).find(turn => turn.kind !== 'agent'
+      && turn.shapeId === task.saved.shape && turn.dispatchTurnId === task.saved.dispatchTurnId && turn.savedOutcome);
+    if (outcome === undefined) return;
+    this.contextDomain.invalidateContext(id);
+    this.draftDomain.retireHumanTask(task);
+  }
+
   disconnect(): void {
     for (const ask of this.liveAsks.values()) { ask.abort.abort(); ask.reasoning.destroy(); }
     this.askReasoning.destroy();
@@ -101,7 +127,7 @@ export class Sv3AskDomain {
   private askStop: (() => void) | null = null;
   private readonly liveAsks = new Map<string, {
     abort: AbortController; stop: () => void; reasoning: ReasoningController;
-    turnId: string; stopping: Sv3StopState | null; checkingTurnId: string | null;
+    dispatchTurnId: string; turnId: string; stopping: Sv3StopState | null; checkingTurnId: string | null;
   }>();
 
   /** The slot belongs to the place on screen; streams keep their own handles until they settle. */
@@ -166,7 +192,7 @@ export class Sv3AskDomain {
   async runAsk(rawQuestion: string, scope: Sv3AskScope | null = null, schema?: string, modelAnswer = false,
     options: { task?: HumanTask; continuation?: boolean; turnAction?: boolean; record?: string; authored?: string } = {}): Promise<void> {
     let question = rawQuestion.trim();
-    if (question === '' || this.streaming) return;
+    if (question === '' || this.streaming || this.activeSession?.turns.some(turn => turn.status === 'unfinished')) return;
     if (!options.task && !options.turnAction && !this.draftDomain.draftMayIssue(false)) return;
     const handoff = options.task ? { shapeId: options.task.saved.shape, selection: options.task.selection }
       : modelAnswer ? null : this.draftDomain.preparedHandoff;
@@ -226,6 +252,8 @@ export class Sv3AskDomain {
     if (this.draftDomain.humanUnavailable(shapeId, options.continuation) !== '') { this.host.requestUpdate(); return; }
     task.context = context.map(m => ({ ...m }));
     task.saved.target = sessionId ?? this.transport.createConversationId();
+    const dispatchId = crypto.randomUUID();
+    task.saved.dispatchTurnId = dispatchId;
     task.saved.delivery = 'unknown';
     task.refusal = null;
     if (!this.draftDomain.saveRecovery(task) || !this.host.connected() || this.host.activeConversationId() !== sessionId
@@ -236,7 +264,7 @@ export class Sv3AskDomain {
       this.draftDomain.handoffNotice = ''; this.draftDomain.handoffBlocked = false;
     }
     this.draftDomain.leaveResultsBySending();
-    const ref = this.host.submitTurn(task.question, Date.now(), modelAnswer ? 'model' : 'ask', task.saved.target!, shapeId, task.selection?.kind);
+    const ref = this.host.submitTurn(task.question, Date.now(), modelAnswer ? 'model' : 'ask', task.saved.target!, shapeId, task.selection?.kind, dispatchId);
     if (ref === null) return;
     if (schema !== undefined) this.structuredInputs.set(ref.turnId, { schema, scope });
     if (shapeId === 'core.summarize') this.summaryInputs.set(ref.turnId, { scope, selection: handoff?.selection ?? null });
@@ -263,20 +291,20 @@ export class Sv3AskDomain {
     // terminal says "stopped" (an error with CANCELLED, saved as stopped) or "finished" (`done`), and
     // every word it sent before the Stop landed, which it saves, reaches the turn. A question still
     // waiting to be sent (for the conversation's settings, or for Engine capacity) is sent all the
-    // same, and the Engine records it as stopped. Only a window that unmounts or starts afresh lets
+    // same, and the Engine records it as stopped. A window that unmounts lets
     // the stream go (`abortAsk`): the Engine finishes and saves the turn, as it does for a closed tab.
     // The id the Stop names is this dispatch's own, never the turn's place in the list, which another
     // window or a reload can hand out again: the Engine ignores a Stop for a turn that finished.
-    const dispatchId = crypto.randomUUID();
     const reasoning = this.host.createReasoning();
     const stopAttempt = new StopAttempt();
     const stop = (): void => {
-      if (stopAttempt.pending || stopAttempt.outcome === 'accepted') return;
-      stopAttempt.latch();
-      this.draftDomain.revokeHumanTask();
-      this.draftDomain.saveRecovery();
       const ask = this.liveAsks.get(ref.sessionId);
-      if (ask === undefined) return;
+      if (ask?.abort !== abort || stopAttempt.pending || stopAttempt.outcome === 'accepted') return;
+      stopAttempt.latch();
+      if (this.draftDomain.humanTask === task) {
+        this.draftDomain.revokeHumanTask();
+        this.draftDomain.saveRecovery();
+      }
       ask.stopping = { turnId: ref.turnId, state: 'stopping' };
       this.syncActiveAsk();
       void stopAttempt.deliver((signal) => sv3StopAsk(this.host.apiBase(), ref.sessionId, dispatchId, signal)).then(() => {
@@ -286,7 +314,7 @@ export class Sv3AskDomain {
         this.syncActiveAsk();
       });
     };
-    this.liveAsks.set(ref.sessionId, { abort, stop, reasoning, turnId: ref.turnId, stopping: null, checkingTurnId: null });
+    this.liveAsks.set(ref.sessionId, { abort, stop, reasoning, dispatchTurnId: dispatchId, turnId: ref.turnId, stopping: null, checkingTurnId: null });
     this.syncActiveAsk();
     // The controller is per-ASK, not per-turn: it accumulates and times one stream's thinking, and
     // the blocks it finalizes are written onto the turn below. Resetting here is what stops the
@@ -334,8 +362,12 @@ export class Sv3AskDomain {
       reasoning.destroy();
       this.syncActiveAsk();
       if (this.liveAsks.size === 0 && !this.host.runInFlight()) this.host.settleAiActivity();
+      this.contextDomain.checkRetainedAttempt();
       this.host.requestUpdate();
     };
+    // Discard releases recovery and the submission slot, not this dispatch's stream or turn.
+    const currentAttempt = (): boolean => this.liveAsks.get(ref.sessionId)?.abort === abort;
+    const retainedTask = (): boolean => this.draftDomain.humanTask === task;
     await sv3Ask(
       {
         apiBase: this.host.apiBase(),
@@ -359,27 +391,33 @@ export class Sv3AskDomain {
       },
       {
         onDelta: (text) => {
+          if (!currentAttempt()) return;
           if (text) this.transport.rememberServerConversation(ref.sessionId);
           this.host.appendDelta(ref, text);
         },
         onChecking: (checking) => {
+          if (!currentAttempt()) return;
           const ask = this.liveAsks.get(ref.sessionId);
           if (ask?.abort !== abort) return;
           ask.checkingTurnId = checking ? ref.turnId : null;
           this.syncActiveAsk();
         },
         onEvidence: (evidence) => {
+          if (!currentAttempt()) return;
           this.host.setEvidence(ref, evidence);
         },
         onReasoning: (payload) => {
+          if (!currentAttempt()) return;
           reasoning.handleReasoningChunk(payload);
         },
         onRewrite: (standalone) => {
+          if (!currentAttempt()) return;
           this.host.setRewrite(ref, standalone);
         },
         onDone: (usage) => {
-          if (schema !== undefined && task.ownsComposer && draft.port.isCurrent(draft) && this.search.pendingScope === task.scopeOwner) this.search.clearScope();
-          if (schema !== undefined && task.ownsComposer && draft.port.isCurrent(draft)) {
+          if (!currentAttempt()) { settle('left'); return; }
+          if (retainedTask() && schema !== undefined && task.ownsComposer && draft.port.isCurrent(draft) && this.search.pendingScope === task.scopeOwner) this.search.clearScope();
+          if (retainedTask() && schema !== undefined && task.ownsComposer && draft.port.isCurrent(draft)) {
             this.draftDomain.assigningHumanDraft = true;
             try { draft.port.clearIf(draft); } finally { this.draftDomain.assigningHumanDraft = false; }
           }
@@ -400,14 +438,16 @@ export class Sv3AskDomain {
         },
         // The lock's refusal is worded by the ONE reason vocabulary, not re-phrased here.
         onRefused: () => {
+          if (!currentAttempt()) { settle('left'); return; }
           task.saved.delivery = 'unaccepted';
           task.revoked = true;
-          this.draftDomain.saveRecovery(task);
+          if (retainedTask()) this.draftDomain.saveRecovery(task);
           settle('refused', reasonFor('conversations.locked').wording);
           // The SERVER just said the store is locked, which is newer than any poll (inventory E4/E5).
           this.host.noteRefusedWhileLocked();
         },
         onHalted: () => {
+          if (!currentAttempt()) { settle('left'); return; }
           this.draftDomain.retireHumanTask(task);
           settle('halted');
           // Saved as stopped: the record gives the turn its store ids (so it can be retried,
@@ -415,21 +455,28 @@ export class Sv3AskDomain {
           void this.transport.loadConversations();
           void this.contextDomain.refreshRecord(ref.sessionId);
         },
-        onLeft: () => { task.revoked = true; this.draftDomain.saveRecovery(task); settle('left'); },
+        onLeft: () => {
+          if (retainedTask() && this.host.connected()) { task.revoked = true; this.draftDomain.saveRecovery(task); }
+          settle('left');
+        },
         onFailed: (message, code, refusal) => {
+          if (!currentAttempt()) { settle('left'); return; }
+          const retained = retainedTask();
           if (refusal !== null && refusal !== undefined) {
             task.saved.delivery = 'unaccepted';
             task.refusal = refusal;
             task.retryAt = Date.now() + (refusal.retryAfterMs ?? 0);
-            this.draftDomain.scheduleHumanRetry(task);
-            this.draftDomain.saveRecovery(task);
+            if (retainedTask()) {
+              this.draftDomain.scheduleHumanRetry(task);
+              this.draftDomain.saveRecovery(task);
+            }
             settle('left');
             return;
           }
           // A terminal Structured turn without accepted output is final, never a retryable
           // delivery uncertainty or an answer for the next turn's context.
           if (code === 'NO_CONTENT') this.draftDomain.retireHumanTask(task);
-          else { task.saved.delivery = 'unknown'; task.revoked = true; this.draftDomain.saveRecovery(task); }
+          else if (retainedTask()) { task.saved.delivery = 'unknown'; task.revoked = true; this.draftDomain.saveRecovery(task); }
           if (code === 'INVALID_REQUEST' && /pathPrefix|modifiedAt|sizeBytes/.test(message)) this.askFilterError = message;
           const restricted = hasActiveFilter(task.filters);
           if (code === 'NO_CONTENT' && restricted) message += ` ${localizeResourceKey('search.filters.no-content')} ${restrictionLabels(task.filters).map(f => f.label).join('; ')}`;
@@ -437,12 +484,12 @@ export class Sv3AskDomain {
           settle(noEvidence ? 'no-evidence' : 'failed', noEvidence ? '' : message);
           void this.transport.loadConversations();
           void this.contextDomain.refreshRecord(ref.sessionId);
-          if (handoff !== null && this.host.activeConversationId() === ref.sessionId && task.ownsComposer && sentDraft.port.isCurrent(sentDraft)) {
+          if (retained && handoff !== null && this.host.activeConversationId() === ref.sessionId && task.ownsComposer && sentDraft.port.isCurrent(sentDraft)) {
             this.draftDomain.preparedHandoff = handoff;
             this.search.prepare(scope);
             this.draftDomain.assigningHumanDraft = true;
             try { this.host.writeDraft(task.saved.raw); } finally { this.draftDomain.assigningHumanDraft = false; }
-            this.draftDomain.saveRecovery(task);
+            this.draftDomain.saveRecovery();
           }
         },
       },

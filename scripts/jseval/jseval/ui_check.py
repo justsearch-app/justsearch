@@ -683,7 +683,17 @@ def _build_steps(ui_url: str, cooldown_ms: int, timeout_ms: int) -> list[Step]:
 
     async def setup_search_semantic_paused(page):
         await _view_setup("search")(page)
-        await page.get_by_text("Semantic search paused; keyword search available.", exact=False).first.wait_for(state="visible", timeout=10_000)
+        headline = page.get_by_text("Semantic search paused; keyword search available.", exact=True)
+        await headline.wait_for(state="visible", timeout=10_000)
+        if await headline.count() != 1:
+            raise AssertionError("semantic-search limitation must be explained exactly once")
+        banner = page.get_by_test_id("sv3-degradation")
+        if await banner.count() != 1:
+            raise AssertionError("semantic-search limitation must have exactly one banner")
+        remedy = banner.get_by_test_id("sv3-degradation-remedy").get_by_role("button", name="Open Health", exact=True)
+        await remedy.wait_for(state="visible", timeout=10_000)
+        if not await remedy.is_enabled():
+            raise AssertionError("semantic-search limitation must offer an enabled Health remedy")
 
     async def setup_command_mode(page):
         inp = page.get_by_test_id(S.TID_SEARCH_INPUT)

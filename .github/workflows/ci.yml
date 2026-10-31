@@ -317,6 +317,9 @@ jobs:
       - name: ui-web gate runner parses the whole recipe
         run: node scripts/ci/run-ui-web-gates.test.mjs
 
+      - name: Test the thread client's use of the generated event kinds
+        run: node scripts/ci/check-thread-event-kinds.test.mjs
+
       # Tempdoc 879. Both gates below existed only as manual pre-merge rows, which is the same
       # defect they check for: a mechanism nothing runs cannot contradict anything. The store
       # register's gate was in fact RED on main for ~90 commits (an unclassified persistence
@@ -894,7 +897,7 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p build/ci/ui-run-flows
-          for step in sv3-run-activity-steering sv3-run-budget sv3-run-approval sv3-run-approval-failure sv3-run-halt sv3-run-halt-failure sv3-run-halt-timeout sv3-ask-stop-late-response; do
+          for step in sv3-run-activity-steering sv3-run-budget sv3-run-approval sv3-run-approval-failure sv3-run-halt sv3-run-halt-failure sv3-run-halt-timeout sv3-ask-stop-late-response search-semantic-paused; do
             python -m jseval ui-shot "$step" --fixtures --no-demo --output-dir build/ci/ui-run-flows 2>&1 \
               | tee "build/ci/ui-run-flows/$step.log"
           done

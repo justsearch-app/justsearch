@@ -25,6 +25,7 @@ import org.junit.jupiter.params.provider.ValueSource;
 import org.slf4j.LoggerFactory;
 import tools.jackson.databind.ObjectMapper;
 
+@org.junit.jupiter.api.extension.ExtendWith(NoVolumeIdentityExtension.class)
 final class NestedWatchedRootTest extends LuceneExecutorTestBase {
   @TempDir Path temp;
 

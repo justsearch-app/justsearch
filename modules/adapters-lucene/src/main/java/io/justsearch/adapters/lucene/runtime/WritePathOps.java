@@ -35,7 +35,6 @@ import org.apache.lucene.index.Term;
 import org.apache.lucene.search.IndexSearcher;
 import org.apache.lucene.search.BooleanClause;
 import org.apache.lucene.search.BooleanQuery;
-import org.apache.lucene.search.PrefixQuery;
 import org.apache.lucene.search.Query;
 import org.apache.lucene.search.TermQuery;
 import org.slf4j.Logger;
@@ -281,14 +280,17 @@ public final class WritePathOps {
       String pathPrefix, List<String> fileIds, List<String> excludedSubtrees) {
     String normalized = normalizePathPrefix(pathPrefix);
     try {
-      // Use 'path' field for prefix matching (works for both parent docs and chunks)
-      Query query = QueryFilterBuilder.excludingAcceptedSurvivors(
-          QueryFilterBuilder.excludingSubtrees(
-              new PrefixQuery(new Term(SchemaFields.PATH, normalized)), excludedSubtrees), fileIds, List.of());
       LifecycleSnapshot snap = session.snapshot;
       IndexWriter w = snap != null ? snap.writer() : null;
       if (w == null || !w.isOpen()) {
         throw new IndexWriterUnavailableException("IndexWriter not available (runtime not started or closed)");
+      }
+      Query query;
+      try (DirectoryReader reader = DirectoryReader.open(w)) {
+        query = QueryFilterBuilder.excludingAcceptedSurvivors(
+            PruneOps.ownedPathPrefixQuery(new IndexSearcher(reader), idField, normalized, excludedSubtrees),
+            fileIds, List.of());
+
       }
       w.deleteDocuments(query);
       // Tempdoc 809 finding 3: publish the bulk-deletion signal AFTER the delete is submitted, so
@@ -326,17 +328,8 @@ public final class WritePathOps {
     }
     Query query = QueryFilterBuilder.excludingAcceptedSurvivors(
         new TermQuery(new Term(SchemaFields.COLLECTION, collection)), fileIds, List.of());
-    int matched = 0;
-    org.apache.lucene.search.SearcherManager mgr = snap.searcherManager();
-    try {
-      if (mgr != null) {
-        IndexSearcher searcher = mgr.acquire();
-        try {
-          matched = searcher.count(query);
-        } finally {
-          mgr.release(searcher);
-        }
-      }
+    try (DirectoryReader reader = DirectoryReader.open(w)) {
+      int matched = new IndexSearcher(reader).count(query);
       w.deleteDocuments(query);
       // Mirrors deleteByPathPrefix (tempdoc 809 finding 3): publish the bulk-deletion signal AFTER
       // the delete is submitted, so a reader observing the new epoch is guaranteed the deletion is
@@ -570,6 +563,26 @@ public final class WritePathOps {
       }
       session.readPathOps.projectDocValues(searcher, globalDocId, DocumentFieldOps.ENRICHMENT_FIELDS, current);
       if (!matchesEnrichmentInput(input.fields(), current, updates)) return false;
+      if (input.content() == null && asBoolean(fields.get(SchemaFields.IS_CHUNK))
+          && !hasReconstructableChunkProof(input, parentCache)) {
+        // Quarantine preserves the captured identity comparison without inventing chunk text.
+        // Only failure bookkeeping may use this lane; successful artifacts still require proof.
+        if (updates.isEmpty() || updates.entrySet().stream().anyMatch(entry ->
+            (!ENRICHMENT_STAGE_FIELDS.containsKey(entry.getKey())
+                && !ENRICHMENT_STAGE_FIELDS.containsValue(entry.getKey()))
+            || (entry.getKey().endsWith("_status") && !"FAILED".equals(entry.getValue())))) return false;
+        updates = new HashMap<>(updates);
+        updates.put(SchemaFields.CHUNK_CONTENT, "");
+        for (String status : List.of(SchemaFields.CHUNK_EMBEDDING_STATUS, SchemaFields.SPLADE_STATUS)) {
+          String retry = ENRICHMENT_STAGE_FIELDS.get(status);
+          if (current.containsKey(status) || updates.containsKey(status) || updates.containsKey(retry)) {
+            if (!java.util.Objects.equals(input.fields().get(status), current.get(status))
+                || !java.util.Objects.equals(input.fields().get(retry), current.get(retry))) return false;
+            updates.put(status, "FAILED");
+            if (current.get(retry) != null) updates.putIfAbsent(retry, current.get(retry));
+          }
+        }
+      }
       // Reuse the RMW fields and the already-compared parent proof: no new index reads.
       var allows = session.sourceProcessingPolicy;
       if (allows != null) {
@@ -577,9 +590,10 @@ public final class WritePathOps {
         String projection = asString(fields.get(SchemaFields.PROJECTION_SOURCE_ID));
         if ((projection == null || projection.isBlank()) && (source == null || source.isBlank())
             && input.parentId() != null && !input.parentId().isBlank()) {
-          source = input.parentFields().get(SchemaFields.PATH);
+          var parentFields = input.parentFields();
+          source = parentFields == null ? null : parentFields.get(SchemaFields.PATH);
           if (source == null || source.isBlank()) source = input.parentId();
-          projection = input.parentFields().get(SchemaFields.PROJECTION_SOURCE_ID);
+          projection = parentFields == null ? null : parentFields.get(SchemaFields.PROJECTION_SOURCE_ID);
         }
         if (projection != null && !projection.isBlank()) source = null;
         else if (source == null || source.isBlank()) source = docId;
@@ -662,6 +676,17 @@ public final class WritePathOps {
     session.pendingDocs.incrementAndGet();
     log.debug("readModifyWrite: updated document: {}", docId);
     return true;
+  }
+
+  private boolean hasReconstructableChunkProof(
+      DocumentFieldOps.EnrichmentInput input, ParentSliceCache parentCache) {
+    var slice = DocumentFieldOps.chunkSliceFrom(input.fields());
+    String content = input.parentFields() == null ? null : input.parentFields().get(SchemaFields.CONTENT);
+    // ChunkReadRevisionGuard also withholds legacy slices that bisect a surrogate pair.
+    // Their matching proof still permits exact RMW preservation without exposing text to models.
+    return slice != null && content != null && slice.endChar() <= content.length()
+        && java.util.Objects.equals(slice.parentContentRevision(),
+            parentCache.revision(slice.parentDocId(), content));
   }
 
   /**
@@ -863,6 +888,11 @@ public final class WritePathOps {
     String retryField = deriveRetryField(statusField);
     boolean callerSuppliedRetry = retryField != null && updates.containsKey(retryField);
     String existingStatus = readKeywordDocValue(searcher, globalDocId, statusField);
+    if (existingStatus == null && SchemaFields.SPLADE_STATUS.equals(statusField)
+        && asBoolean(fields.get(SchemaFields.IS_CHUNK))
+        && !session.resolvedConfig().rag().chunkSpladeEnabled()) {
+      return;
+    }
     if (existingStatus == null || STATUS_COMPLETED.equals(existingStatus)) {
       // Data just dropped (or the doc never carried a status) — force (re-)derivation.
       fields.put(statusField, STATUS_PENDING);
@@ -952,63 +982,44 @@ public final class WritePathOps {
    */
   int updateDocumentPaths(IndexSearcher searcher, String oldPath, String newPath)
       throws IOException {
-    // 1. Update parent document: DOC_ID, PATH, FILENAME. A MOVE/RENAME does not change content, so
-    // the vector, SPLADE, and NER enrichment stay valid; the RMW preservation engine (tempdoc 711)
-    // carries the vector forward and the stored NER fields survive — no re-queue needed.
-    // OS-independent: newPath may carry Windows (\) or POSIX (/) separators regardless of the
-    // host OS. Paths.get() would treat a Windows path as a single segment on Linux (tempdoc 668;
-    // same pattern as LuceneRuntimeUtils).
+    if (oldPath.equals(newPath)) return 0;
     int lastSep = Math.max(newPath.lastIndexOf('/'), newPath.lastIndexOf('\\'));
     String newFilename = lastSep >= 0 ? newPath.substring(lastSep + 1) : newPath;
     ParentSliceCache parentCache = new ParentSliceCache();
-    boolean parentUpdated =
-        readModifyWrite(
-            searcher,
-            oldPath,
-            Map.ofEntries(
-                Map.entry(SchemaFields.DOC_ID, newPath),
-                Map.entry(SchemaFields.PATH, newPath),
-                Map.entry(SchemaFields.FILENAME, newFilename)),
-            parentCache);
-    if (!parentUpdated) {
-      log.debug("updateDocumentPaths: parent document not found: {}", oldPath);
-      return 0;
-    }
-    parentCache.alias(oldPath, newPath);
-
-    // 2. Find all chunks for the old parent path
-    BooleanQuery chunkQuery =
-        new BooleanQuery.Builder()
-            .add(
-                new TermQuery(new Term(SchemaFields.PARENT_DOC_ID, oldPath)),
-                BooleanClause.Occur.FILTER)
-            .add(
-                new TermQuery(new Term(SchemaFields.IS_CHUNK, "true")),
-                BooleanClause.Occur.FILTER)
-            .build();
-    var chunkDocs = searcher.search(chunkQuery, 10_000);
-
-    // 3. Update each chunk's PARENT_DOC_ID and PATH (chunk DOC_ID stays as UUID). The chunk_vector
-    // is carried forward by the RMW preservation engine (tempdoc 711); no re-embed re-queue needed.
-    int count = 1; // parent
-    for (var sd : chunkDocs.scoreDocs) {
-      String chunkId = searcher.storedFields().document(sd.doc).get(SchemaFields.DOC_ID);
-      readModifyWrite(
-          searcher,
-          chunkId,
-          Map.of(
-              SchemaFields.PARENT_DOC_ID, newPath,
-              SchemaFields.PATH, newPath),
-          parentCache);
+    var source = searcher.search(new TermQuery(new Term(idField, oldPath)), 1);
+    var destination = searcher.search(new TermQuery(new Term(idField, newPath)), 1);
+    if (source.scoreDocs.length == 0 && destination.scoreDocs.length == 0) return 0;
+    int count = 0;
+    if (source.scoreDocs.length > 0) {
+      // Delete only before the source parent moves. A retry with only a destination parent
+      // must retain that parent and every child already moved in the previous attempt.
+      if (searcher.count(IndexCountOps.idAndChunksQuery(newPath)) > 0) deleteByIdAndChunks(newPath);
+      readModifyWrite(searcher, oldPath,
+          Map.of(SchemaFields.DOC_ID, newPath, SchemaFields.PATH, newPath,
+              SchemaFields.FILENAME, newFilename), parentCache);
+      parentCache.alias(oldPath, newPath);
       count++;
+    } else {
+      String content = searcher.storedFields().document(destination.scoreDocs[0].doc)
+          .get(SchemaFields.CONTENT);
+      if (content != null) parentCache.putContent(oldPath, content);
+      parentCache.alias(oldPath, newPath);
     }
-
-    log.info(
-        "updateDocumentPaths: {} -> {} ({} parent + {} chunks)",
-        oldPath,
-        newPath,
-        1,
-        chunkDocs.scoreDocs.length);
+    BooleanQuery chunkQuery = new BooleanQuery.Builder()
+        .add(new TermQuery(new Term(SchemaFields.PARENT_DOC_ID, oldPath)), BooleanClause.Occur.FILTER)
+        .add(new TermQuery(new Term(SchemaFields.IS_CHUNK, "true")), BooleanClause.Occur.FILTER)
+        .build();
+    org.apache.lucene.search.ScoreDoc after = null;
+    while (true) {
+      var page = searcher.searchAfter(after, chunkQuery, 1024);
+      if (page.scoreDocs.length == 0) break;
+      for (var hit : page.scoreDocs) {
+        String chunkId = searcher.storedFields().document(hit.doc).get(idField);
+        if (readModifyWrite(searcher, chunkId,
+            Map.of(SchemaFields.PARENT_DOC_ID, newPath, SchemaFields.PATH, newPath), parentCache)) count++;
+      }
+      after = page.scoreDocs[page.scoreDocs.length - 1];
+    }
     return count;
   }
 
@@ -1139,10 +1150,11 @@ public final class WritePathOps {
             }
             // Shared captured proof is compared once per parent, including hashless full text.
             // Different expectations for the same parent retain independent comparisons.
-            if (input.parentFields() == null || !parentComparisons
+            if (!parentComparisons
                 .computeIfAbsent(input.parentId(), ignored -> new java.util.IdentityHashMap<>())
-                .computeIfAbsent(input.parentFields(), expected -> expected.equals(parents.get(input.parentId())))) continue;
-            cache.putContentIfAbsent(input.parentId(), parents.get(input.parentId()).get(SchemaFields.CONTENT));
+                .computeIfAbsent(input.parentFields(), expected -> java.util.Objects.equals(expected, parents.get(input.parentId())))) continue;
+            var parent = parents.get(input.parentId());
+            if (parent != null) cache.putContentIfAbsent(input.parentId(), parent.get(SchemaFields.CONTENT));
           }
           if (readModifyWrite(searcher, update.getKey(), update.getValue(), cache, Map.of(), input)) updated++;
         }

@@ -679,30 +679,26 @@ Four `gh` CLI quirks (tempdoc 695, 930) worth knowing at merge/wait time:
   re-running it is a no-op; `--no-dispatch` reports without acting. This is the
   precondition for the next bullet: waiting on checks only means something once
   you know checks exist for the right commit.
-- **Waiting on a PR's CI completion** fits `node scripts/dev/run-gh.mjs
-  checks-wait <N>` (backgrounded) better than a hand-rolled poll loop — the
-  latter costs hundreds of loop iterations and GitHub API calls on a
-  multi-minute job, and can outlast the Bash tool's own command timeout.
-  `checks-wait` pre-polls
-  until checks register on the branch, then decodes `gh pr checks`'s
-  documented 0=pass/1=fail/8=pending bitwise exit contract instead of
-  guessing at it (tempdoc 743 P-K). For a specific landed commit, use
+- **Waiting on a PR's CI completion** uses `node scripts/dev/run-gh.mjs
+  run-wait-sha <head-sha> --workflow CI --branch <pr-branch> --event pull_request`
+  in the background. It waits for registration of the CI run for that exact
+  head SHA, branch and event, emits only transitions, and has a bounded timeout.
+  It selects a run, not a pull request: it assumes the branch has one open pull
+  request (against `main`). If `ensure-ci-on-sha` had to dispatch the run, wait
+  with `--event workflow_dispatch` instead, since that run is not a
+  `pull_request` run.
+  To merge, use `node scripts/dev/run-gh.mjs shepherd <N>` or `enqueue <N>`
+  followed by its printed `merge-wait` command, as described below.
+  For a specific landed commit, use
   `node scripts/dev/run-gh.mjs run-wait-sha <sha> --workflow CI --branch main
-  --event push`; it owns registration polling, emits only transitions, and
-  has a bounded timeout. Watching
-  immediately after *any* push (not just the batch case further below) can
-  race check registration — `checks-wait`'s pre-poll is exactly that
-  mitigation; see the registration-race bullet in Batch-publishing below and
-  never chain the wait with the merge in one command.
-- **`checks-wait --required-only` can report green with nothing verified**
-  (tempdoc 930 publication, 2026-09-05, three occurrences). While a PR is
-  `CONFLICTING` GitHub builds no merge commit, so no CI registers and "all
-  required checks green" is vacuous; seconds after a push it can read the
-  superseded run's cached state; and a check you are in the middle of
-  *promoting* to required is not yet in the required set, so it is skipped.
-  Before enqueueing, confirm the PR is mergeable, that the checks
-  belong to the current `headRefOid`, and that `gh pr checks <N> --required`
-  lists every context you expect.
+  --event push` in the background.
+- **A partial set of passing checks is insufficient for merging.** A single
+  required check can register before the rest; a conflicting PR may have no
+  CI run, and cached results can belong to a superseded head.
+  `merge-wait` binds observation to the head and requires every required
+  context by name to pass when the required set is available. Before enqueueing,
+  confirm the PR is mergeable, the checks belong to the current `headRefOid`,
+  and `gh pr checks <N> --required` lists every context you expect.
 - **`origin/main` moves under a long task.** Background re-fetches advance the
   remote-tracking ref mid-task, so `git diff origin/main` drifts (a 100k-line
   "leak" that is only base drift), and `git reset --soft origin/main` can

@@ -29,6 +29,7 @@ final class ExcludesOutcomeTest {
   // The existing per-file fake models a completed synchronous deletion, not buffered acceptance.
   // Reflection keeps the same oracles runnable against the before-state's interface.
   private final IndexingService indexing = mock(IndexingService.class, call -> {
+    if (call.getMethod().getName().equals("forEachIndexedSource")) return 0L;
     if (call.getMethod().getName().equals("deleteDocByIdWithOutcome")) {
       boolean completed = ((IndexingService) call.getMock()).deleteDocById(call.getArgument(0), call.getArgument(1));
       return call.getMethod().getReturnType().getConstructor(boolean.class, String.class)

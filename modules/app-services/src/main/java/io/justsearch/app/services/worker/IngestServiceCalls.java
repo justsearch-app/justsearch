@@ -50,6 +50,16 @@ public interface IngestServiceCalls {
   /** {@code IngestService/PruneMissing}. */
   io.justsearch.ipc.PruneResponse pruneMissing(io.justsearch.ipc.PruneRequest request);
 
+  /** Streams source ownership from one index reader, including rows left after a partial delete. */
+  default long scanIndexedSources(java.util.function.Consumer<String> consumer) {
+    throw new UnsupportedOperationException("Indexed source enumeration is unavailable");
+  }
+
+  /** Revisit completed indexed sources outside watched roots using the Worker's presence authority. */
+  default io.justsearch.ipc.PruneResponse reconcileIndexedSources() {
+    throw new UnsupportedOperationException("Indexed source reconciliation is unavailable");
+  }
+
   /** {@code IngestService/SyncDirectory}. */
   io.justsearch.ipc.SyncDirectoryResponse syncDirectory(io.justsearch.ipc.SyncDirectoryRequest request);
 

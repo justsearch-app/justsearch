@@ -1,0 +1,5461 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`ordered effective catalog preservation > cached 304 sends ETag and installs contributions over the restored wire 1`] = `
+[
+  {
+    "altitude": "PRODUCT",
+    "audience": "USER",
+    "consumes": {
+      "conversationShapes": [],
+      "diagnosticChannels": [],
+      "operations": [
+        "core.reindex",
+        "core.add-watched-root",
+        "core.remove-watched-root",
+        "core.preview-excludes",
+        "core.apply-excludes",
+      ],
+      "prompts": [],
+      "resources": [
+        "core.indexed-roots",
+      ],
+    },
+    "id": "core.library-surface",
+    "members": [
+      "core.browse-surface",
+    ],
+    "mountTag": "jf-library-surface",
+    "placement": "RAIL",
+    "presentation": {
+      "descriptionKey": "registry-surface.library-surface.description",
+      "labelKey": "registry-surface.library-surface.label",
+    },
+    "provenance": {
+      "capability": [
+        "surfaces",
+      ],
+      "contributorId": "core",
+      "identity": {
+        "verified": true,
+      },
+      "tier": "TRUSTED_PLUGIN",
+      "version": "1.0.0",
+    },
+    "splitPairing": {
+      "secondary": "core.search-v3-surface",
+    },
+  },
+  {
+    "altitude": "PRODUCT",
+    "audience": "USER",
+    "consumes": {
+      "conversationShapes": [],
+      "diagnosticChannels": [],
+      "operations": [],
+      "prompts": [],
+      "resources": [],
+    },
+    "id": "core.help-surface",
+    "members": [],
+    "mountTag": "jf-help-surface",
+    "placement": "DEEPLINK",
+    "presentation": {
+      "descriptionKey": "registry-surface.help-surface.description",
+      "labelKey": "registry-surface.help-surface.label",
+    },
+    "provenance": {
+      "capability": [
+        "surfaces",
+      ],
+      "contributorId": "core",
+      "identity": {
+        "verified": true,
+      },
+      "tier": "TRUSTED_PLUGIN",
+      "version": "1.0.0",
+    },
+  },
+  {
+    "altitude": "PRODUCT",
+    "audience": "USER",
+    "consumes": {
+      "conversationShapes": [],
+      "diagnosticChannels": [],
+      "operations": [],
+      "prompts": [],
+      "resources": [],
+    },
+    "id": "core.presentation-gallery-surface",
+    "members": [],
+    "mountTag": "jf-presentation-gallery-surface",
+    "placement": "DEEPLINK",
+    "presentation": {
+      "descriptionKey": "registry-surface.presentation-gallery-surface.description",
+      "labelKey": "registry-surface.presentation-gallery-surface.label",
+    },
+    "provenance": {
+      "capability": [
+        "surfaces",
+      ],
+      "contributorId": "core",
+      "identity": {
+        "verified": true,
+      },
+      "tier": "TRUSTED_PLUGIN",
+      "version": "1.0.0",
+    },
+  },
+  {
+    "altitude": "PRODUCT",
+    "audience": "USER",
+    "consumes": {
+      "conversationShapes": [],
+      "diagnosticChannels": [],
+      "operations": [],
+      "prompts": [],
+      "resources": [],
+    },
+    "id": "core.presentation-editor-surface",
+    "members": [],
+    "mountTag": "jf-presentation-editor-surface",
+    "placement": "DEEPLINK",
+    "presentation": {
+      "descriptionKey": "registry-surface.presentation-editor-surface.description",
+      "labelKey": "registry-surface.presentation-editor-surface.label",
+    },
+    "provenance": {
+      "capability": [
+        "surfaces",
+      ],
+      "contributorId": "core",
+      "identity": {
+        "verified": true,
+      },
+      "tier": "TRUSTED_PLUGIN",
+      "version": "1.0.0",
+    },
+  },
+  {
+    "altitude": "PRODUCT",
+    "audience": "DEVELOPER",
+    "consumes": {
+      "conversationShapes": [],
+      "diagnosticChannels": [],
+      "operations": [],
+      "prompts": [],
+      "resources": [],
+    },
+    "id": "core.api-explorer-surface",
+    "members": [],
+    "mountTag": "jf-api-explorer-view",
+    "placement": "DEEPLINK",
+    "presentation": {
+      "descriptionKey": "registry-surface.api-explorer-surface.description",
+      "labelKey": "registry-surface.api-explorer-surface.label",
+    },
+    "provenance": {
+      "capability": [
+        "surfaces",
+      ],
+      "contributorId": "core",
+      "identity": {
+        "verified": true,
+      },
+      "tier": "TRUSTED_PLUGIN",
+      "version": "1.0.0",
+    },
+  },
+  {
+    "altitude": "PRODUCT",
+    "audience": "USER",
+    "consumes": {
+      "conversationShapes": [],
+      "diagnosticChannels": [],
+      "operations": [],
+      "prompts": [],
+      "resources": [],
+    },
+    "id": "core.brain-surface",
+    "members": [
+      "core.memory-surface",
+    ],
+    "mountTag": "jf-brain-surface",
+    "placement": "RAIL",
+    "presentation": {
+      "descriptionKey": "registry-surface.brain-surface.description",
+      "labelKey": "registry-surface.brain-surface.label",
+    },
+    "provenance": {
+      "capability": [
+        "surfaces",
+      ],
+      "contributorId": "core",
+      "identity": {
+        "verified": true,
+      },
+      "tier": "TRUSTED_PLUGIN",
+      "version": "1.0.0",
+    },
+  },
+  {
+    "altitude": "PRODUCT",
+    "audience": "USER",
+    "consumes": {
+      "conversationShapes": [],
+      "diagnosticChannels": [],
+      "operations": [],
+      "prompts": [],
+      "resources": [],
+    },
+    "id": "core.search-v3-surface",
+    "members": [],
+    "mountTag": "jf-sv3-window",
+    "placement": "RAIL",
+    "presentation": {
+      "descriptionKey": "registry-surface.search-v3-surface.description",
+      "labelKey": "registry-surface.search-v3-surface.label",
+    },
+    "provenance": {
+      "capability": [
+        "surfaces",
+      ],
+      "contributorId": "core",
+      "identity": {
+        "verified": true,
+      },
+      "tier": "TRUSTED_PLUGIN",
+      "version": "1.0.0",
+    },
+    "splitPairing": {
+      "secondary": "core.library-surface",
+    },
+  },
+  {
+    "altitude": "PRODUCT",
+    "audience": "USER",
+    "consumes": {
+      "conversationShapes": [
+        "core.rag-ask",
+      ],
+      "diagnosticChannels": [],
+      "operations": [],
+      "prompts": [],
+      "resources": [],
+    },
+    "id": "core.ask-surface",
+    "members": [],
+    "mountTag": "jf-chat-shape-mount",
+    "placement": "DEEPLINK",
+    "presentation": {
+      "category": null,
+      "descriptionKey": "registry-surface.ask-surface.description",
+      "iconHint": null,
+      "labelKey": "registry-surface.ask-surface.label",
+    },
+    "provenance": {
+      "contributorId": "core",
+      "identity": {
+        "signature": null,
+        "verified": true,
+      },
+      "tier": "CORE",
+      "version": "1.0",
+    },
+    "riskTier": "LOW",
+    "stateSchema": {
+      "bindings": [
+        {
+          "schemaPath": "/query",
+          "storeId": "ask",
+          "storeKey": "query",
+        },
+        {
+          "schemaPath": "/docIds",
+          "storeId": "ask",
+          "storeKey": "docIds",
+        },
+      ],
+      "schema": "{
+  "type": "object",
+  "properties": {
+    "query": { "type": "string" },
+    "docIds": { "type": "array", "items": { "type": "string" } }
+  }
+}
+",
+    },
+  },
+  {
+    "altitude": "PRODUCT",
+    "audience": "USER",
+    "consumes": {
+      "conversationShapes": [],
+      "diagnosticChannels": [],
+      "operations": [],
+      "prompts": [],
+      "resources": [],
+    },
+    "id": "core.settings-surface",
+    "members": [
+      "core.presentation-gallery-surface",
+      "core.presentation-editor-surface",
+      "core.security-surface",
+    ],
+    "mountTag": "jf-settings-surface",
+    "placement": "MODAL",
+    "presentation": {
+      "descriptionKey": "registry-surface.settings-surface.description",
+      "labelKey": "registry-surface.settings-surface.label",
+    },
+    "provenance": {
+      "capability": [
+        "surfaces",
+      ],
+      "contributorId": "core",
+      "identity": {
+        "verified": true,
+      },
+      "tier": "TRUSTED_PLUGIN",
+      "version": "1.0.0",
+    },
+  },
+  {
+    "altitude": "PRODUCT",
+    "audience": "USER",
+    "consumes": {
+      "conversationShapes": [],
+      "diagnosticChannels": [],
+      "operations": [],
+      "prompts": [],
+      "resources": [],
+    },
+    "id": "core.security-surface",
+    "members": [],
+    "mountTag": "jf-security-surface",
+    "placement": "DEEPLINK",
+    "presentation": {
+      "descriptionKey": "registry-surface.security-surface.description",
+      "labelKey": "registry-surface.security-surface.label",
+    },
+    "provenance": {
+      "capability": [
+        "surfaces",
+      ],
+      "contributorId": "core",
+      "identity": {
+        "verified": true,
+      },
+      "tier": "TRUSTED_PLUGIN",
+      "version": "1.0.0",
+    },
+  },
+  {
+    "altitude": "PRODUCT",
+    "audience": "USER",
+    "consumes": {
+      "conversationShapes": [],
+      "diagnosticChannels": [],
+      "operations": [],
+      "prompts": [],
+      "resources": [],
+    },
+    "id": "core.browse-surface",
+    "members": [],
+    "mountTag": "jf-browse-surface",
+    "placement": "DEEPLINK",
+    "presentation": {
+      "descriptionKey": "registry-surface.browse-surface.description",
+      "labelKey": "registry-surface.browse-surface.label",
+    },
+    "provenance": {
+      "capability": [
+        "surfaces",
+      ],
+      "contributorId": "core",
+      "identity": {
+        "verified": true,
+      },
+      "tier": "TRUSTED_PLUGIN",
+      "version": "1.0.0",
+    },
+  },
+  {
+    "altitude": "PRODUCT",
+    "audience": "USER",
+    "consumes": {
+      "conversationShapes": [],
+      "diagnosticChannels": [],
+      "operations": [],
+      "prompts": [],
+      "resources": [],
+    },
+    "id": "core.system-surface",
+    "members": [
+      "core.health-surface",
+      "core.logs-surface",
+      "core.activity-surface",
+    ],
+    "mountTag": "jf-system-surface",
+    "placement": "RAIL",
+    "presentation": {
+      "category": null,
+      "descriptionKey": "registry-surface.system-surface.description",
+      "iconHint": null,
+      "labelKey": "registry-surface.system-surface.label",
+    },
+    "provenance": {
+      "contributorId": "core",
+      "identity": {
+        "signature": null,
+        "verified": true,
+      },
+      "tier": "CORE",
+      "version": "1.0",
+    },
+    "riskTier": "LOW",
+    "stateSchema": null,
+  },
+  {
+    "altitude": "DIAGNOSTIC",
+    "audience": "USER",
+    "consumes": {
+      "conversationShapes": [],
+      "diagnosticChannels": [],
+      "operations": [
+        "core.reindex",
+        "core.recover-component",
+        "core.clear-failed-jobs",
+        "core.export-diagnostics",
+        "core.bulk-reindex",
+      ],
+      "prompts": [],
+      "resources": [],
+    },
+    "id": "core.health-surface",
+    "members": [],
+    "mountTag": "jf-health-surface",
+    "placement": "DEEPLINK",
+    "presentation": {
+      "descriptionKey": "registry-surface.health-surface.description",
+      "labelKey": "registry-surface.health-surface.label",
+    },
+    "provenance": {
+      "capability": [
+        "surfaces",
+      ],
+      "contributorId": "core",
+      "identity": {
+        "verified": true,
+      },
+      "tier": "TRUSTED_PLUGIN",
+      "version": "1.0.0",
+    },
+  },
+  {
+    "altitude": "DIAGNOSTIC",
+    "audience": "OPERATOR",
+    "consumes": {
+      "conversationShapes": [],
+      "diagnosticChannels": [],
+      "operations": [],
+      "prompts": [],
+      "resources": [],
+    },
+    "id": "core.logs-surface",
+    "members": [],
+    "mountTag": "jf-log-surface",
+    "placement": "DEEPLINK",
+    "presentation": {
+      "descriptionKey": "registry-surface.logs-surface.description",
+      "labelKey": "registry-surface.logs-surface.label",
+    },
+    "provenance": {
+      "capability": [
+        "surfaces",
+      ],
+      "contributorId": "core",
+      "identity": {
+        "verified": true,
+      },
+      "tier": "TRUSTED_PLUGIN",
+      "version": "1.0.0",
+    },
+  },
+  {
+    "altitude": "TRUST",
+    "audience": "USER",
+    "consumes": {
+      "conversationShapes": [],
+      "diagnosticChannels": [],
+      "operations": [],
+      "prompts": [],
+      "resources": [],
+    },
+    "id": "core.activity-surface",
+    "members": [],
+    "mountTag": "jf-activity-surface",
+    "placement": "DEEPLINK",
+    "presentation": {
+      "descriptionKey": "registry-surface.activity-surface.description",
+      "labelKey": "registry-surface.activity-surface.label",
+    },
+    "provenance": {
+      "capability": [
+        "surfaces",
+      ],
+      "contributorId": "core",
+      "identity": {
+        "verified": true,
+      },
+      "tier": "TRUSTED_PLUGIN",
+      "version": "1.0.0",
+    },
+  },
+  {
+    "altitude": "PRODUCT",
+    "audience": "USER",
+    "consumes": {
+      "conversationShapes": [
+        "core.free-chat",
+      ],
+      "diagnosticChannels": [],
+      "operations": [],
+      "prompts": [],
+      "resources": [],
+    },
+    "id": "core.free-chat-surface",
+    "members": [],
+    "mountTag": "jf-chat-shape-mount",
+    "placement": "DEEPLINK",
+    "presentation": {
+      "category": null,
+      "descriptionKey": "registry-surface.free-chat-surface.description",
+      "iconHint": null,
+      "labelKey": "registry-surface.free-chat-surface.label",
+    },
+    "provenance": {
+      "contributorId": "core",
+      "identity": {
+        "signature": null,
+        "verified": true,
+      },
+      "tier": "CORE",
+      "version": "1.0",
+    },
+    "riskTier": "LOW",
+    "stateSchema": null,
+  },
+  {
+    "altitude": "PRODUCT",
+    "audience": "USER",
+    "consumes": {
+      "conversationShapes": [
+        "core.extract",
+      ],
+      "diagnosticChannels": [],
+      "operations": [],
+      "prompts": [],
+      "resources": [],
+    },
+    "id": "core.extract-surface",
+    "members": [],
+    "mountTag": "jf-chat-shape-mount",
+    "placement": "DEEPLINK",
+    "presentation": {
+      "category": null,
+      "descriptionKey": "registry-surface.extract-surface.description",
+      "iconHint": null,
+      "labelKey": "registry-surface.extract-surface.label",
+    },
+    "provenance": {
+      "contributorId": "core",
+      "identity": {
+        "signature": null,
+        "verified": true,
+      },
+      "tier": "CORE",
+      "version": "1.0",
+    },
+    "riskTier": "LOW",
+    "stateSchema": null,
+  },
+  {
+    "altitude": "PRODUCT",
+    "audience": "USER",
+    "consumes": {
+      "conversationShapes": [],
+      "diagnosticChannels": [],
+      "operations": [],
+      "prompts": [],
+      "resources": [],
+    },
+    "id": "core.memory-surface",
+    "members": [],
+    "mountTag": "jf-memory-surface",
+    "placement": "DEEPLINK",
+    "presentation": {
+      "descriptionKey": "registry-surface.memory-surface.description",
+      "labelKey": "registry-surface.memory-surface.label",
+    },
+    "provenance": {
+      "capability": [
+        "surfaces",
+      ],
+      "contributorId": "core",
+      "identity": {
+        "verified": true,
+      },
+      "tier": "TRUSTED_PLUGIN",
+      "version": "1.0.0",
+    },
+  },
+  {
+    "altitude": "PRODUCT",
+    "audience": "USER",
+    "consumes": {
+      "conversationShapes": [],
+      "diagnosticChannels": [],
+      "operations": [],
+      "prompts": [],
+      "resources": [],
+    },
+    "id": "core.command-palette",
+    "members": [],
+    "mountTag": "jf-command-palette",
+    "placement": "COMMAND",
+    "presentation": {
+      "descriptionKey": "registry-surface.command-palette.description",
+      "labelKey": "registry-surface.command-palette.label",
+    },
+    "provenance": {
+      "capability": [
+        "surfaces",
+      ],
+      "contributorId": "core",
+      "identity": {
+        "verified": true,
+      },
+      "tier": "TRUSTED_PLUGIN",
+      "version": "1.0.0",
+    },
+  },
+]
+`;
+
+exports[`ordered effective catalog preservation > cached http failure retains wire and contributions 1`] = `
+[
+  {
+    "altitude": "PRODUCT",
+    "audience": "USER",
+    "consumes": {
+      "conversationShapes": [],
+      "diagnosticChannels": [],
+      "operations": [
+        "core.reindex",
+        "core.add-watched-root",
+        "core.remove-watched-root",
+        "core.preview-excludes",
+        "core.apply-excludes",
+      ],
+      "prompts": [],
+      "resources": [
+        "core.indexed-roots",
+      ],
+    },
+    "id": "core.library-surface",
+    "members": [
+      "core.browse-surface",
+    ],
+    "mountTag": "jf-library-surface",
+    "placement": "RAIL",
+    "presentation": {
+      "descriptionKey": "registry-surface.library-surface.description",
+      "labelKey": "registry-surface.library-surface.label",
+    },
+    "provenance": {
+      "capability": [
+        "surfaces",
+      ],
+      "contributorId": "core",
+      "identity": {
+        "verified": true,
+      },
+      "tier": "TRUSTED_PLUGIN",
+      "version": "1.0.0",
+    },
+    "splitPairing": {
+      "secondary": "core.search-v3-surface",
+    },
+  },
+  {
+    "altitude": "PRODUCT",
+    "audience": "USER",
+    "consumes": {
+      "conversationShapes": [],
+      "diagnosticChannels": [],
+      "operations": [],
+      "prompts": [],
+      "resources": [],
+    },
+    "id": "core.help-surface",
+    "members": [],
+    "mountTag": "jf-help-surface",
+    "placement": "DEEPLINK",
+    "presentation": {
+      "descriptionKey": "registry-surface.help-surface.description",
+      "labelKey": "registry-surface.help-surface.label",
+    },
+    "provenance": {
+      "capability": [
+        "surfaces",
+      ],
+      "contributorId": "core",
+      "identity": {
+        "verified": true,
+      },
+      "tier": "TRUSTED_PLUGIN",
+      "version": "1.0.0",
+    },
+  },
+  {
+    "altitude": "PRODUCT",
+    "audience": "USER",
+    "consumes": {
+      "conversationShapes": [],
+      "diagnosticChannels": [],
+      "operations": [],
+      "prompts": [],
+      "resources": [],
+    },
+    "id": "core.presentation-gallery-surface",
+    "members": [],
+    "mountTag": "jf-presentation-gallery-surface",
+    "placement": "DEEPLINK",
+    "presentation": {
+      "descriptionKey": "registry-surface.presentation-gallery-surface.description",
+      "labelKey": "registry-surface.presentation-gallery-surface.label",
+    },
+    "provenance": {
+      "capability": [
+        "surfaces",
+      ],
+      "contributorId": "core",
+      "identity": {
+        "verified": true,
+      },
+      "tier": "TRUSTED_PLUGIN",
+      "version": "1.0.0",
+    },
+  },
+  {
+    "altitude": "PRODUCT",
+    "audience": "USER",
+    "consumes": {
+      "conversationShapes": [],
+      "diagnosticChannels": [],
+      "operations": [],
+      "prompts": [],
+      "resources": [],
+    },
+    "id": "core.presentation-editor-surface",
+    "members": [],
+    "mountTag": "jf-presentation-editor-surface",
+    "placement": "DEEPLINK",
+    "presentation": {
+      "descriptionKey": "registry-surface.presentation-editor-surface.description",
+      "labelKey": "registry-surface.presentation-editor-surface.label",
+    },
+    "provenance": {
+      "capability": [
+        "surfaces",
+      ],
+      "contributorId": "core",
+      "identity": {
+        "verified": true,
+      },
+      "tier": "TRUSTED_PLUGIN",
+      "version": "1.0.0",
+    },
+  },
+  {
+    "altitude": "PRODUCT",
+    "audience": "DEVELOPER",
+    "consumes": {
+      "conversationShapes": [],
+      "diagnosticChannels": [],
+      "operations": [],
+      "prompts": [],
+      "resources": [],
+    },
+    "id": "core.api-explorer-surface",
+    "members": [],
+    "mountTag": "jf-api-explorer-view",
+    "placement": "DEEPLINK",
+    "presentation": {
+      "descriptionKey": "registry-surface.api-explorer-surface.description",
+      "labelKey": "registry-surface.api-explorer-surface.label",
+    },
+    "provenance": {
+      "capability": [
+        "surfaces",
+      ],
+      "contributorId": "core",
+      "identity": {
+        "verified": true,
+      },
+      "tier": "TRUSTED_PLUGIN",
+      "version": "1.0.0",
+    },
+  },
+  {
+    "altitude": "PRODUCT",
+    "audience": "USER",
+    "consumes": {
+      "conversationShapes": [],
+      "diagnosticChannels": [],
+      "operations": [],
+      "prompts": [],
+      "resources": [],
+    },
+    "id": "core.brain-surface",
+    "members": [
+      "core.memory-surface",
+    ],
+    "mountTag": "jf-brain-surface",
+    "placement": "RAIL",
+    "presentation": {
+      "descriptionKey": "registry-surface.brain-surface.description",
+      "labelKey": "registry-surface.brain-surface.label",
+    },
+    "provenance": {
+      "capability": [
+        "surfaces",
+      ],
+      "contributorId": "core",
+      "identity": {
+        "verified": true,
+      },
+      "tier": "TRUSTED_PLUGIN",
+      "version": "1.0.0",
+    },
+  },
+  {
+    "altitude": "PRODUCT",
+    "audience": "USER",
+    "consumes": {
+      "conversationShapes": [],
+      "diagnosticChannels": [],
+      "operations": [],
+      "prompts": [],
+      "resources": [],
+    },
+    "id": "core.search-v3-surface",
+    "members": [],
+    "mountTag": "jf-sv3-window",
+    "placement": "RAIL",
+    "presentation": {
+      "descriptionKey": "registry-surface.search-v3-surface.description",
+      "labelKey": "registry-surface.search-v3-surface.label",
+    },
+    "provenance": {
+      "capability": [
+        "surfaces",
+      ],
+      "contributorId": "core",
+      "identity": {
+        "verified": true,
+      },
+      "tier": "TRUSTED_PLUGIN",
+      "version": "1.0.0",
+    },
+    "splitPairing": {
+      "secondary": "core.library-surface",
+    },
+  },
+  {
+    "altitude": "PRODUCT",
+    "audience": "USER",
+    "consumes": {
+      "conversationShapes": [
+        "core.rag-ask",
+      ],
+      "diagnosticChannels": [],
+      "operations": [],
+      "prompts": [],
+      "resources": [],
+    },
+    "id": "core.ask-surface",
+    "members": [],
+    "mountTag": "jf-chat-shape-mount",
+    "placement": "DEEPLINK",
+    "presentation": {
+      "category": null,
+      "descriptionKey": "registry-surface.ask-surface.description",
+      "iconHint": null,
+      "labelKey": "registry-surface.ask-surface.label",
+    },
+    "provenance": {
+      "contributorId": "core",
+      "identity": {
+        "signature": null,
+        "verified": true,
+      },
+      "tier": "CORE",
+      "version": "1.0",
+    },
+    "riskTier": "LOW",
+    "stateSchema": {
+      "bindings": [
+        {
+          "schemaPath": "/query",
+          "storeId": "ask",
+          "storeKey": "query",
+        },
+        {
+          "schemaPath": "/docIds",
+          "storeId": "ask",
+          "storeKey": "docIds",
+        },
+      ],
+      "schema": "{
+  "type": "object",
+  "properties": {
+    "query": { "type": "string" },
+    "docIds": { "type": "array", "items": { "type": "string" } }
+  }
+}
+",
+    },
+  },
+  {
+    "altitude": "PRODUCT",
+    "audience": "USER",
+    "consumes": {
+      "conversationShapes": [],
+      "diagnosticChannels": [],
+      "operations": [],
+      "prompts": [],
+      "resources": [],
+    },
+    "id": "core.settings-surface",
+    "members": [
+      "core.presentation-gallery-surface",
+      "core.presentation-editor-surface",
+      "core.security-surface",
+    ],
+    "mountTag": "jf-settings-surface",
+    "placement": "MODAL",
+    "presentation": {
+      "descriptionKey": "registry-surface.settings-surface.description",
+      "labelKey": "registry-surface.settings-surface.label",
+    },
+    "provenance": {
+      "capability": [
+        "surfaces",
+      ],
+      "contributorId": "core",
+      "identity": {
+        "verified": true,
+      },
+      "tier": "TRUSTED_PLUGIN",
+      "version": "1.0.0",
+    },
+  },
+  {
+    "altitude": "PRODUCT",
+    "audience": "USER",
+    "consumes": {
+      "conversationShapes": [],
+      "diagnosticChannels": [],
+      "operations": [],
+      "prompts": [],
+      "resources": [],
+    },
+    "id": "core.security-surface",
+    "members": [],
+    "mountTag": "jf-security-surface",
+    "placement": "DEEPLINK",
+    "presentation": {
+      "descriptionKey": "registry-surface.security-surface.description",
+      "labelKey": "registry-surface.security-surface.label",
+    },
+    "provenance": {
+      "capability": [
+        "surfaces",
+      ],
+      "contributorId": "core",
+      "identity": {
+        "verified": true,
+      },
+      "tier": "TRUSTED_PLUGIN",
+      "version": "1.0.0",
+    },
+  },
+  {
+    "altitude": "PRODUCT",
+    "audience": "USER",
+    "consumes": {
+      "conversationShapes": [],
+      "diagnosticChannels": [],
+      "operations": [],
+      "prompts": [],
+      "resources": [],
+    },
+    "id": "core.browse-surface",
+    "members": [],
+    "mountTag": "jf-browse-surface",
+    "placement": "DEEPLINK",
+    "presentation": {
+      "descriptionKey": "registry-surface.browse-surface.description",
+      "labelKey": "registry-surface.browse-surface.label",
+    },
+    "provenance": {
+      "capability": [
+        "surfaces",
+      ],
+      "contributorId": "core",
+      "identity": {
+        "verified": true,
+      },
+      "tier": "TRUSTED_PLUGIN",
+      "version": "1.0.0",
+    },
+  },
+  {
+    "altitude": "PRODUCT",
+    "audience": "USER",
+    "consumes": {
+      "conversationShapes": [],
+      "diagnosticChannels": [],
+      "operations": [],
+      "prompts": [],
+      "resources": [],
+    },
+    "id": "core.system-surface",
+    "members": [
+      "core.health-surface",
+      "core.logs-surface",
+      "core.activity-surface",
+    ],
+    "mountTag": "jf-system-surface",
+    "placement": "RAIL",
+    "presentation": {
+      "category": null,
+      "descriptionKey": "registry-surface.system-surface.description",
+      "iconHint": null,
+      "labelKey": "registry-surface.system-surface.label",
+    },
+    "provenance": {
+      "contributorId": "core",
+      "identity": {
+        "signature": null,
+        "verified": true,
+      },
+      "tier": "CORE",
+      "version": "1.0",
+    },
+    "riskTier": "LOW",
+    "stateSchema": null,
+  },
+  {
+    "altitude": "DIAGNOSTIC",
+    "audience": "USER",
+    "consumes": {
+      "conversationShapes": [],
+      "diagnosticChannels": [],
+      "operations": [
+        "core.reindex",
+        "core.recover-component",
+        "core.clear-failed-jobs",
+        "core.export-diagnostics",
+        "core.bulk-reindex",
+      ],
+      "prompts": [],
+      "resources": [],
+    },
+    "id": "core.health-surface",
+    "members": [],
+    "mountTag": "jf-health-surface",
+    "placement": "DEEPLINK",
+    "presentation": {
+      "descriptionKey": "registry-surface.health-surface.description",
+      "labelKey": "registry-surface.health-surface.label",
+    },
+    "provenance": {
+      "capability": [
+        "surfaces",
+      ],
+      "contributorId": "core",
+      "identity": {
+        "verified": true,
+      },
+      "tier": "TRUSTED_PLUGIN",
+      "version": "1.0.0",
+    },
+  },
+  {
+    "altitude": "DIAGNOSTIC",
+    "audience": "OPERATOR",
+    "consumes": {
+      "conversationShapes": [],
+      "diagnosticChannels": [],
+      "operations": [],
+      "prompts": [],
+      "resources": [],
+    },
+    "id": "core.logs-surface",
+    "members": [],
+    "mountTag": "jf-log-surface",
+    "placement": "DEEPLINK",
+    "presentation": {
+      "descriptionKey": "registry-surface.logs-surface.description",
+      "labelKey": "registry-surface.logs-surface.label",
+    },
+    "provenance": {
+      "capability": [
+        "surfaces",
+      ],
+      "contributorId": "core",
+      "identity": {
+        "verified": true,
+      },
+      "tier": "TRUSTED_PLUGIN",
+      "version": "1.0.0",
+    },
+  },
+  {
+    "altitude": "TRUST",
+    "audience": "USER",
+    "consumes": {
+      "conversationShapes": [],
+      "diagnosticChannels": [],
+      "operations": [],
+      "prompts": [],
+      "resources": [],
+    },
+    "id": "core.activity-surface",
+    "members": [],
+    "mountTag": "jf-activity-surface",
+    "placement": "DEEPLINK",
+    "presentation": {
+      "descriptionKey": "registry-surface.activity-surface.description",
+      "labelKey": "registry-surface.activity-surface.label",
+    },
+    "provenance": {
+      "capability": [
+        "surfaces",
+      ],
+      "contributorId": "core",
+      "identity": {
+        "verified": true,
+      },
+      "tier": "TRUSTED_PLUGIN",
+      "version": "1.0.0",
+    },
+  },
+  {
+    "altitude": "PRODUCT",
+    "audience": "USER",
+    "consumes": {
+      "conversationShapes": [
+        "core.free-chat",
+      ],
+      "diagnosticChannels": [],
+      "operations": [],
+      "prompts": [],
+      "resources": [],
+    },
+    "id": "core.free-chat-surface",
+    "members": [],
+    "mountTag": "jf-chat-shape-mount",
+    "placement": "DEEPLINK",
+    "presentation": {
+      "category": null,
+      "descriptionKey": "registry-surface.free-chat-surface.description",
+      "iconHint": null,
+      "labelKey": "registry-surface.free-chat-surface.label",
+    },
+    "provenance": {
+      "contributorId": "core",
+      "identity": {
+        "signature": null,
+        "verified": true,
+      },
+      "tier": "CORE",
+      "version": "1.0",
+    },
+    "riskTier": "LOW",
+    "stateSchema": null,
+  },
+  {
+    "altitude": "PRODUCT",
+    "audience": "USER",
+    "consumes": {
+      "conversationShapes": [
+        "core.extract",
+      ],
+      "diagnosticChannels": [],
+      "operations": [],
+      "prompts": [],
+      "resources": [],
+    },
+    "id": "core.extract-surface",
+    "members": [],
+    "mountTag": "jf-chat-shape-mount",
+    "placement": "DEEPLINK",
+    "presentation": {
+      "category": null,
+      "descriptionKey": "registry-surface.extract-surface.description",
+      "iconHint": null,
+      "labelKey": "registry-surface.extract-surface.label",
+    },
+    "provenance": {
+      "contributorId": "core",
+      "identity": {
+        "signature": null,
+        "verified": true,
+      },
+      "tier": "CORE",
+      "version": "1.0",
+    },
+    "riskTier": "LOW",
+    "stateSchema": null,
+  },
+  {
+    "altitude": "PRODUCT",
+    "audience": "USER",
+    "consumes": {
+      "conversationShapes": [],
+      "diagnosticChannels": [],
+      "operations": [],
+      "prompts": [],
+      "resources": [],
+    },
+    "id": "core.memory-surface",
+    "members": [],
+    "mountTag": "jf-memory-surface",
+    "placement": "DEEPLINK",
+    "presentation": {
+      "descriptionKey": "registry-surface.memory-surface.description",
+      "labelKey": "registry-surface.memory-surface.label",
+    },
+    "provenance": {
+      "capability": [
+        "surfaces",
+      ],
+      "contributorId": "core",
+      "identity": {
+        "verified": true,
+      },
+      "tier": "TRUSTED_PLUGIN",
+      "version": "1.0.0",
+    },
+  },
+  {
+    "altitude": "PRODUCT",
+    "audience": "USER",
+    "consumes": {
+      "conversationShapes": [],
+      "diagnosticChannels": [],
+      "operations": [],
+      "prompts": [],
+      "resources": [],
+    },
+    "id": "core.command-palette",
+    "members": [],
+    "mountTag": "jf-command-palette",
+    "placement": "COMMAND",
+    "presentation": {
+      "descriptionKey": "registry-surface.command-palette.description",
+      "labelKey": "registry-surface.command-palette.label",
+    },
+    "provenance": {
+      "capability": [
+        "surfaces",
+      ],
+      "contributorId": "core",
+      "identity": {
+        "verified": true,
+      },
+      "tier": "TRUSTED_PLUGIN",
+      "version": "1.0.0",
+    },
+  },
+]
+`;
+
+exports[`ordered effective catalog preservation > cached network failure retains wire and contributions 1`] = `
+[
+  {
+    "altitude": "PRODUCT",
+    "audience": "USER",
+    "consumes": {
+      "conversationShapes": [],
+      "diagnosticChannels": [],
+      "operations": [
+        "core.reindex",
+        "core.add-watched-root",
+        "core.remove-watched-root",
+        "core.preview-excludes",
+        "core.apply-excludes",
+      ],
+      "prompts": [],
+      "resources": [
+        "core.indexed-roots",
+      ],
+    },
+    "id": "core.library-surface",
+    "members": [
+      "core.browse-surface",
+    ],
+    "mountTag": "jf-library-surface",
+    "placement": "RAIL",
+    "presentation": {
+      "descriptionKey": "registry-surface.library-surface.description",
+      "labelKey": "registry-surface.library-surface.label",
+    },
+    "provenance": {
+      "capability": [
+        "surfaces",
+      ],
+      "contributorId": "core",
+      "identity": {
+        "verified": true,
+      },
+      "tier": "TRUSTED_PLUGIN",
+      "version": "1.0.0",
+    },
+    "splitPairing": {
+      "secondary": "core.search-v3-surface",
+    },
+  },
+  {
+    "altitude": "PRODUCT",
+    "audience": "USER",
+    "consumes": {
+      "conversationShapes": [],
+      "diagnosticChannels": [],
+      "operations": [],
+      "prompts": [],
+      "resources": [],
+    },
+    "id": "core.help-surface",
+    "members": [],
+    "mountTag": "jf-help-surface",
+    "placement": "DEEPLINK",
+    "presentation": {
+      "descriptionKey": "registry-surface.help-surface.description",
+      "labelKey": "registry-surface.help-surface.label",
+    },
+    "provenance": {
+      "capability": [
+        "surfaces",
+      ],
+      "contributorId": "core",
+      "identity": {
+        "verified": true,
+      },
+      "tier": "TRUSTED_PLUGIN",
+      "version": "1.0.0",
+    },
+  },
+  {
+    "altitude": "PRODUCT",
+    "audience": "USER",
+    "consumes": {
+      "conversationShapes": [],
+      "diagnosticChannels": [],
+      "operations": [],
+      "prompts": [],
+      "resources": [],
+    },
+    "id": "core.presentation-gallery-surface",
+    "members": [],
+    "mountTag": "jf-presentation-gallery-surface",
+    "placement": "DEEPLINK",
+    "presentation": {
+      "descriptionKey": "registry-surface.presentation-gallery-surface.description",
+      "labelKey": "registry-surface.presentation-gallery-surface.label",
+    },
+    "provenance": {
+      "capability": [
+        "surfaces",
+      ],
+      "contributorId": "core",
+      "identity": {
+        "verified": true,
+      },
+      "tier": "TRUSTED_PLUGIN",
+      "version": "1.0.0",
+    },
+  },
+  {
+    "altitude": "PRODUCT",
+    "audience": "USER",
+    "consumes": {
+      "conversationShapes": [],
+      "diagnosticChannels": [],
+      "operations": [],
+      "prompts": [],
+      "resources": [],
+    },
+    "id": "core.presentation-editor-surface",
+    "members": [],
+    "mountTag": "jf-presentation-editor-surface",
+    "placement": "DEEPLINK",
+    "presentation": {
+      "descriptionKey": "registry-surface.presentation-editor-surface.description",
+      "labelKey": "registry-surface.presentation-editor-surface.label",
+    },
+    "provenance": {
+      "capability": [
+        "surfaces",
+      ],
+      "contributorId": "core",
+      "identity": {
+        "verified": true,
+      },
+      "tier": "TRUSTED_PLUGIN",
+      "version": "1.0.0",
+    },
+  },
+  {
+    "altitude": "PRODUCT",
+    "audience": "DEVELOPER",
+    "consumes": {
+      "conversationShapes": [],
+      "diagnosticChannels": [],
+      "operations": [],
+      "prompts": [],
+      "resources": [],
+    },
+    "id": "core.api-explorer-surface",
+    "members": [],
+    "mountTag": "jf-api-explorer-view",
+    "placement": "DEEPLINK",
+    "presentation": {
+      "descriptionKey": "registry-surface.api-explorer-surface.description",
+      "labelKey": "registry-surface.api-explorer-surface.label",
+    },
+    "provenance": {
+      "capability": [
+        "surfaces",
+      ],
+      "contributorId": "core",
+      "identity": {
+        "verified": true,
+      },
+      "tier": "TRUSTED_PLUGIN",
+      "version": "1.0.0",
+    },
+  },
+  {
+    "altitude": "PRODUCT",
+    "audience": "USER",
+    "consumes": {
+      "conversationShapes": [],
+      "diagnosticChannels": [],
+      "operations": [],
+      "prompts": [],
+      "resources": [],
+    },
+    "id": "core.brain-surface",
+    "members": [
+      "core.memory-surface",
+    ],
+    "mountTag": "jf-brain-surface",
+    "placement": "RAIL",
+    "presentation": {
+      "descriptionKey": "registry-surface.brain-surface.description",
+      "labelKey": "registry-surface.brain-surface.label",
+    },
+    "provenance": {
+      "capability": [
+        "surfaces",
+      ],
+      "contributorId": "core",
+      "identity": {
+        "verified": true,
+      },
+      "tier": "TRUSTED_PLUGIN",
+      "version": "1.0.0",
+    },
+  },
+  {
+    "altitude": "PRODUCT",
+    "audience": "USER",
+    "consumes": {
+      "conversationShapes": [],
+      "diagnosticChannels": [],
+      "operations": [],
+      "prompts": [],
+      "resources": [],
+    },
+    "id": "core.search-v3-surface",
+    "members": [],
+    "mountTag": "jf-sv3-window",
+    "placement": "RAIL",
+    "presentation": {
+      "descriptionKey": "registry-surface.search-v3-surface.description",
+      "labelKey": "registry-surface.search-v3-surface.label",
+    },
+    "provenance": {
+      "capability": [
+        "surfaces",
+      ],
+      "contributorId": "core",
+      "identity": {
+        "verified": true,
+      },
+      "tier": "TRUSTED_PLUGIN",
+      "version": "1.0.0",
+    },
+    "splitPairing": {
+      "secondary": "core.library-surface",
+    },
+  },
+  {
+    "altitude": "PRODUCT",
+    "audience": "USER",
+    "consumes": {
+      "conversationShapes": [
+        "core.rag-ask",
+      ],
+      "diagnosticChannels": [],
+      "operations": [],
+      "prompts": [],
+      "resources": [],
+    },
+    "id": "core.ask-surface",
+    "members": [],
+    "mountTag": "jf-chat-shape-mount",
+    "placement": "DEEPLINK",
+    "presentation": {
+      "category": null,
+      "descriptionKey": "registry-surface.ask-surface.description",
+      "iconHint": null,
+      "labelKey": "registry-surface.ask-surface.label",
+    },
+    "provenance": {
+      "contributorId": "core",
+      "identity": {
+        "signature": null,
+        "verified": true,
+      },
+      "tier": "CORE",
+      "version": "1.0",
+    },
+    "riskTier": "LOW",
+    "stateSchema": {
+      "bindings": [
+        {
+          "schemaPath": "/query",
+          "storeId": "ask",
+          "storeKey": "query",
+        },
+        {
+          "schemaPath": "/docIds",
+          "storeId": "ask",
+          "storeKey": "docIds",
+        },
+      ],
+      "schema": "{
+  "type": "object",
+  "properties": {
+    "query": { "type": "string" },
+    "docIds": { "type": "array", "items": { "type": "string" } }
+  }
+}
+",
+    },
+  },
+  {
+    "altitude": "PRODUCT",
+    "audience": "USER",
+    "consumes": {
+      "conversationShapes": [],
+      "diagnosticChannels": [],
+      "operations": [],
+      "prompts": [],
+      "resources": [],
+    },
+    "id": "core.settings-surface",
+    "members": [
+      "core.presentation-gallery-surface",
+      "core.presentation-editor-surface",
+      "core.security-surface",
+    ],
+    "mountTag": "jf-settings-surface",
+    "placement": "MODAL",
+    "presentation": {
+      "descriptionKey": "registry-surface.settings-surface.description",
+      "labelKey": "registry-surface.settings-surface.label",
+    },
+    "provenance": {
+      "capability": [
+        "surfaces",
+      ],
+      "contributorId": "core",
+      "identity": {
+        "verified": true,
+      },
+      "tier": "TRUSTED_PLUGIN",
+      "version": "1.0.0",
+    },
+  },
+  {
+    "altitude": "PRODUCT",
+    "audience": "USER",
+    "consumes": {
+      "conversationShapes": [],
+      "diagnosticChannels": [],
+      "operations": [],
+      "prompts": [],
+      "resources": [],
+    },
+    "id": "core.security-surface",
+    "members": [],
+    "mountTag": "jf-security-surface",
+    "placement": "DEEPLINK",
+    "presentation": {
+      "descriptionKey": "registry-surface.security-surface.description",
+      "labelKey": "registry-surface.security-surface.label",
+    },
+    "provenance": {
+      "capability": [
+        "surfaces",
+      ],
+      "contributorId": "core",
+      "identity": {
+        "verified": true,
+      },
+      "tier": "TRUSTED_PLUGIN",
+      "version": "1.0.0",
+    },
+  },
+  {
+    "altitude": "PRODUCT",
+    "audience": "USER",
+    "consumes": {
+      "conversationShapes": [],
+      "diagnosticChannels": [],
+      "operations": [],
+      "prompts": [],
+      "resources": [],
+    },
+    "id": "core.browse-surface",
+    "members": [],
+    "mountTag": "jf-browse-surface",
+    "placement": "DEEPLINK",
+    "presentation": {
+      "descriptionKey": "registry-surface.browse-surface.description",
+      "labelKey": "registry-surface.browse-surface.label",
+    },
+    "provenance": {
+      "capability": [
+        "surfaces",
+      ],
+      "contributorId": "core",
+      "identity": {
+        "verified": true,
+      },
+      "tier": "TRUSTED_PLUGIN",
+      "version": "1.0.0",
+    },
+  },
+  {
+    "altitude": "PRODUCT",
+    "audience": "USER",
+    "consumes": {
+      "conversationShapes": [],
+      "diagnosticChannels": [],
+      "operations": [],
+      "prompts": [],
+      "resources": [],
+    },
+    "id": "core.system-surface",
+    "members": [
+      "core.health-surface",
+      "core.logs-surface",
+      "core.activity-surface",
+    ],
+    "mountTag": "jf-system-surface",
+    "placement": "RAIL",
+    "presentation": {
+      "category": null,
+      "descriptionKey": "registry-surface.system-surface.description",
+      "iconHint": null,
+      "labelKey": "registry-surface.system-surface.label",
+    },
+    "provenance": {
+      "contributorId": "core",
+      "identity": {
+        "signature": null,
+        "verified": true,
+      },
+      "tier": "CORE",
+      "version": "1.0",
+    },
+    "riskTier": "LOW",
+    "stateSchema": null,
+  },
+  {
+    "altitude": "DIAGNOSTIC",
+    "audience": "USER",
+    "consumes": {
+      "conversationShapes": [],
+      "diagnosticChannels": [],
+      "operations": [
+        "core.reindex",
+        "core.recover-component",
+        "core.clear-failed-jobs",
+        "core.export-diagnostics",
+        "core.bulk-reindex",
+      ],
+      "prompts": [],
+      "resources": [],
+    },
+    "id": "core.health-surface",
+    "members": [],
+    "mountTag": "jf-health-surface",
+    "placement": "DEEPLINK",
+    "presentation": {
+      "descriptionKey": "registry-surface.health-surface.description",
+      "labelKey": "registry-surface.health-surface.label",
+    },
+    "provenance": {
+      "capability": [
+        "surfaces",
+      ],
+      "contributorId": "core",
+      "identity": {
+        "verified": true,
+      },
+      "tier": "TRUSTED_PLUGIN",
+      "version": "1.0.0",
+    },
+  },
+  {
+    "altitude": "DIAGNOSTIC",
+    "audience": "OPERATOR",
+    "consumes": {
+      "conversationShapes": [],
+      "diagnosticChannels": [],
+      "operations": [],
+      "prompts": [],
+      "resources": [],
+    },
+    "id": "core.logs-surface",
+    "members": [],
+    "mountTag": "jf-log-surface",
+    "placement": "DEEPLINK",
+    "presentation": {
+      "descriptionKey": "registry-surface.logs-surface.description",
+      "labelKey": "registry-surface.logs-surface.label",
+    },
+    "provenance": {
+      "capability": [
+        "surfaces",
+      ],
+      "contributorId": "core",
+      "identity": {
+        "verified": true,
+      },
+      "tier": "TRUSTED_PLUGIN",
+      "version": "1.0.0",
+    },
+  },
+  {
+    "altitude": "TRUST",
+    "audience": "USER",
+    "consumes": {
+      "conversationShapes": [],
+      "diagnosticChannels": [],
+      "operations": [],
+      "prompts": [],
+      "resources": [],
+    },
+    "id": "core.activity-surface",
+    "members": [],
+    "mountTag": "jf-activity-surface",
+    "placement": "DEEPLINK",
+    "presentation": {
+      "descriptionKey": "registry-surface.activity-surface.description",
+      "labelKey": "registry-surface.activity-surface.label",
+    },
+    "provenance": {
+      "capability": [
+        "surfaces",
+      ],
+      "contributorId": "core",
+      "identity": {
+        "verified": true,
+      },
+      "tier": "TRUSTED_PLUGIN",
+      "version": "1.0.0",
+    },
+  },
+  {
+    "altitude": "PRODUCT",
+    "audience": "USER",
+    "consumes": {
+      "conversationShapes": [
+        "core.free-chat",
+      ],
+      "diagnosticChannels": [],
+      "operations": [],
+      "prompts": [],
+      "resources": [],
+    },
+    "id": "core.free-chat-surface",
+    "members": [],
+    "mountTag": "jf-chat-shape-mount",
+    "placement": "DEEPLINK",
+    "presentation": {
+      "category": null,
+      "descriptionKey": "registry-surface.free-chat-surface.description",
+      "iconHint": null,
+      "labelKey": "registry-surface.free-chat-surface.label",
+    },
+    "provenance": {
+      "contributorId": "core",
+      "identity": {
+        "signature": null,
+        "verified": true,
+      },
+      "tier": "CORE",
+      "version": "1.0",
+    },
+    "riskTier": "LOW",
+    "stateSchema": null,
+  },
+  {
+    "altitude": "PRODUCT",
+    "audience": "USER",
+    "consumes": {
+      "conversationShapes": [
+        "core.extract",
+      ],
+      "diagnosticChannels": [],
+      "operations": [],
+      "prompts": [],
+      "resources": [],
+    },
+    "id": "core.extract-surface",
+    "members": [],
+    "mountTag": "jf-chat-shape-mount",
+    "placement": "DEEPLINK",
+    "presentation": {
+      "category": null,
+      "descriptionKey": "registry-surface.extract-surface.description",
+      "iconHint": null,
+      "labelKey": "registry-surface.extract-surface.label",
+    },
+    "provenance": {
+      "contributorId": "core",
+      "identity": {
+        "signature": null,
+        "verified": true,
+      },
+      "tier": "CORE",
+      "version": "1.0",
+    },
+    "riskTier": "LOW",
+    "stateSchema": null,
+  },
+  {
+    "altitude": "PRODUCT",
+    "audience": "USER",
+    "consumes": {
+      "conversationShapes": [],
+      "diagnosticChannels": [],
+      "operations": [],
+      "prompts": [],
+      "resources": [],
+    },
+    "id": "core.memory-surface",
+    "members": [],
+    "mountTag": "jf-memory-surface",
+    "placement": "DEEPLINK",
+    "presentation": {
+      "descriptionKey": "registry-surface.memory-surface.description",
+      "labelKey": "registry-surface.memory-surface.label",
+    },
+    "provenance": {
+      "capability": [
+        "surfaces",
+      ],
+      "contributorId": "core",
+      "identity": {
+        "verified": true,
+      },
+      "tier": "TRUSTED_PLUGIN",
+      "version": "1.0.0",
+    },
+  },
+  {
+    "altitude": "PRODUCT",
+    "audience": "USER",
+    "consumes": {
+      "conversationShapes": [],
+      "diagnosticChannels": [],
+      "operations": [],
+      "prompts": [],
+      "resources": [],
+    },
+    "id": "core.command-palette",
+    "members": [],
+    "mountTag": "jf-command-palette",
+    "placement": "COMMAND",
+    "presentation": {
+      "descriptionKey": "registry-surface.command-palette.description",
+      "labelKey": "registry-surface.command-palette.label",
+    },
+    "provenance": {
+      "capability": [
+        "surfaces",
+      ],
+      "contributorId": "core",
+      "identity": {
+        "verified": true,
+      },
+      "tier": "TRUSTED_PLUGIN",
+      "version": "1.0.0",
+    },
+  },
+]
+`;
+
+exports[`ordered effective catalog preservation > cached rejected-body failure retains wire and contributions 1`] = `
+[
+  {
+    "altitude": "PRODUCT",
+    "audience": "USER",
+    "consumes": {
+      "conversationShapes": [],
+      "diagnosticChannels": [],
+      "operations": [
+        "core.reindex",
+        "core.add-watched-root",
+        "core.remove-watched-root",
+        "core.preview-excludes",
+        "core.apply-excludes",
+      ],
+      "prompts": [],
+      "resources": [
+        "core.indexed-roots",
+      ],
+    },
+    "id": "core.library-surface",
+    "members": [
+      "core.browse-surface",
+    ],
+    "mountTag": "jf-library-surface",
+    "placement": "RAIL",
+    "presentation": {
+      "descriptionKey": "registry-surface.library-surface.description",
+      "labelKey": "registry-surface.library-surface.label",
+    },
+    "provenance": {
+      "capability": [
+        "surfaces",
+      ],
+      "contributorId": "core",
+      "identity": {
+        "verified": true,
+      },
+      "tier": "TRUSTED_PLUGIN",
+      "version": "1.0.0",
+    },
+    "splitPairing": {
+      "secondary": "core.search-v3-surface",
+    },
+  },
+  {
+    "altitude": "PRODUCT",
+    "audience": "USER",
+    "consumes": {
+      "conversationShapes": [],
+      "diagnosticChannels": [],
+      "operations": [],
+      "prompts": [],
+      "resources": [],
+    },
+    "id": "core.help-surface",
+    "members": [],
+    "mountTag": "jf-help-surface",
+    "placement": "DEEPLINK",
+    "presentation": {
+      "descriptionKey": "registry-surface.help-surface.description",
+      "labelKey": "registry-surface.help-surface.label",
+    },
+    "provenance": {
+      "capability": [
+        "surfaces",
+      ],
+      "contributorId": "core",
+      "identity": {
+        "verified": true,
+      },
+      "tier": "TRUSTED_PLUGIN",
+      "version": "1.0.0",
+    },
+  },
+  {
+    "altitude": "PRODUCT",
+    "audience": "USER",
+    "consumes": {
+      "conversationShapes": [],
+      "diagnosticChannels": [],
+      "operations": [],
+      "prompts": [],
+      "resources": [],
+    },
+    "id": "core.presentation-gallery-surface",
+    "members": [],
+    "mountTag": "jf-presentation-gallery-surface",
+    "placement": "DEEPLINK",
+    "presentation": {
+      "descriptionKey": "registry-surface.presentation-gallery-surface.description",
+      "labelKey": "registry-surface.presentation-gallery-surface.label",
+    },
+    "provenance": {
+      "capability": [
+        "surfaces",
+      ],
+      "contributorId": "core",
+      "identity": {
+        "verified": true,
+      },
+      "tier": "TRUSTED_PLUGIN",
+      "version": "1.0.0",
+    },
+  },
+  {
+    "altitude": "PRODUCT",
+    "audience": "USER",
+    "consumes": {
+      "conversationShapes": [],
+      "diagnosticChannels": [],
+      "operations": [],
+      "prompts": [],
+      "resources": [],
+    },
+    "id": "core.presentation-editor-surface",
+    "members": [],
+    "mountTag": "jf-presentation-editor-surface",
+    "placement": "DEEPLINK",
+    "presentation": {
+      "descriptionKey": "registry-surface.presentation-editor-surface.description",
+      "labelKey": "registry-surface.presentation-editor-surface.label",
+    },
+    "provenance": {
+      "capability": [
+        "surfaces",
+      ],
+      "contributorId": "core",
+      "identity": {
+        "verified": true,
+      },
+      "tier": "TRUSTED_PLUGIN",
+      "version": "1.0.0",
+    },
+  },
+  {
+    "altitude": "PRODUCT",
+    "audience": "DEVELOPER",
+    "consumes": {
+      "conversationShapes": [],
+      "diagnosticChannels": [],
+      "operations": [],
+      "prompts": [],
+      "resources": [],
+    },
+    "id": "core.api-explorer-surface",
+    "members": [],
+    "mountTag": "jf-api-explorer-view",
+    "placement": "DEEPLINK",
+    "presentation": {
+      "descriptionKey": "registry-surface.api-explorer-surface.description",
+      "labelKey": "registry-surface.api-explorer-surface.label",
+    },
+    "provenance": {
+      "capability": [
+        "surfaces",
+      ],
+      "contributorId": "core",
+      "identity": {
+        "verified": true,
+      },
+      "tier": "TRUSTED_PLUGIN",
+      "version": "1.0.0",
+    },
+  },
+  {
+    "altitude": "PRODUCT",
+    "audience": "USER",
+    "consumes": {
+      "conversationShapes": [],
+      "diagnosticChannels": [],
+      "operations": [],
+      "prompts": [],
+      "resources": [],
+    },
+    "id": "core.brain-surface",
+    "members": [
+      "core.memory-surface",
+    ],
+    "mountTag": "jf-brain-surface",
+    "placement": "RAIL",
+    "presentation": {
+      "descriptionKey": "registry-surface.brain-surface.description",
+      "labelKey": "registry-surface.brain-surface.label",
+    },
+    "provenance": {
+      "capability": [
+        "surfaces",
+      ],
+      "contributorId": "core",
+      "identity": {
+        "verified": true,
+      },
+      "tier": "TRUSTED_PLUGIN",
+      "version": "1.0.0",
+    },
+  },
+  {
+    "altitude": "PRODUCT",
+    "audience": "USER",
+    "consumes": {
+      "conversationShapes": [],
+      "diagnosticChannels": [],
+      "operations": [],
+      "prompts": [],
+      "resources": [],
+    },
+    "id": "core.search-v3-surface",
+    "members": [],
+    "mountTag": "jf-sv3-window",
+    "placement": "RAIL",
+    "presentation": {
+      "descriptionKey": "registry-surface.search-v3-surface.description",
+      "labelKey": "registry-surface.search-v3-surface.label",
+    },
+    "provenance": {
+      "capability": [
+        "surfaces",
+      ],
+      "contributorId": "core",
+      "identity": {
+        "verified": true,
+      },
+      "tier": "TRUSTED_PLUGIN",
+      "version": "1.0.0",
+    },
+    "splitPairing": {
+      "secondary": "core.library-surface",
+    },
+  },
+  {
+    "altitude": "PRODUCT",
+    "audience": "USER",
+    "consumes": {
+      "conversationShapes": [
+        "core.rag-ask",
+      ],
+      "diagnosticChannels": [],
+      "operations": [],
+      "prompts": [],
+      "resources": [],
+    },
+    "id": "core.ask-surface",
+    "members": [],
+    "mountTag": "jf-chat-shape-mount",
+    "placement": "DEEPLINK",
+    "presentation": {
+      "category": null,
+      "descriptionKey": "registry-surface.ask-surface.description",
+      "iconHint": null,
+      "labelKey": "registry-surface.ask-surface.label",
+    },
+    "provenance": {
+      "contributorId": "core",
+      "identity": {
+        "signature": null,
+        "verified": true,
+      },
+      "tier": "CORE",
+      "version": "1.0",
+    },
+    "riskTier": "LOW",
+    "stateSchema": {
+      "bindings": [
+        {
+          "schemaPath": "/query",
+          "storeId": "ask",
+          "storeKey": "query",
+        },
+        {
+          "schemaPath": "/docIds",
+          "storeId": "ask",
+          "storeKey": "docIds",
+        },
+      ],
+      "schema": "{
+  "type": "object",
+  "properties": {
+    "query": { "type": "string" },
+    "docIds": { "type": "array", "items": { "type": "string" } }
+  }
+}
+",
+    },
+  },
+  {
+    "altitude": "PRODUCT",
+    "audience": "USER",
+    "consumes": {
+      "conversationShapes": [],
+      "diagnosticChannels": [],
+      "operations": [],
+      "prompts": [],
+      "resources": [],
+    },
+    "id": "core.settings-surface",
+    "members": [
+      "core.presentation-gallery-surface",
+      "core.presentation-editor-surface",
+      "core.security-surface",
+    ],
+    "mountTag": "jf-settings-surface",
+    "placement": "MODAL",
+    "presentation": {
+      "descriptionKey": "registry-surface.settings-surface.description",
+      "labelKey": "registry-surface.settings-surface.label",
+    },
+    "provenance": {
+      "capability": [
+        "surfaces",
+      ],
+      "contributorId": "core",
+      "identity": {
+        "verified": true,
+      },
+      "tier": "TRUSTED_PLUGIN",
+      "version": "1.0.0",
+    },
+  },
+  {
+    "altitude": "PRODUCT",
+    "audience": "USER",
+    "consumes": {
+      "conversationShapes": [],
+      "diagnosticChannels": [],
+      "operations": [],
+      "prompts": [],
+      "resources": [],
+    },
+    "id": "core.security-surface",
+    "members": [],
+    "mountTag": "jf-security-surface",
+    "placement": "DEEPLINK",
+    "presentation": {
+      "descriptionKey": "registry-surface.security-surface.description",
+      "labelKey": "registry-surface.security-surface.label",
+    },
+    "provenance": {
+      "capability": [
+        "surfaces",
+      ],
+      "contributorId": "core",
+      "identity": {
+        "verified": true,
+      },
+      "tier": "TRUSTED_PLUGIN",
+      "version": "1.0.0",
+    },
+  },
+  {
+    "altitude": "PRODUCT",
+    "audience": "USER",
+    "consumes": {
+      "conversationShapes": [],
+      "diagnosticChannels": [],
+      "operations": [],
+      "prompts": [],
+      "resources": [],
+    },
+    "id": "core.browse-surface",
+    "members": [],
+    "mountTag": "jf-browse-surface",
+    "placement": "DEEPLINK",
+    "presentation": {
+      "descriptionKey": "registry-surface.browse-surface.description",
+      "labelKey": "registry-surface.browse-surface.label",
+    },
+    "provenance": {
+      "capability": [
+        "surfaces",
+      ],
+      "contributorId": "core",
+      "identity": {
+        "verified": true,
+      },
+      "tier": "TRUSTED_PLUGIN",
+      "version": "1.0.0",
+    },
+  },
+  {
+    "altitude": "PRODUCT",
+    "audience": "USER",
+    "consumes": {
+      "conversationShapes": [],
+      "diagnosticChannels": [],
+      "operations": [],
+      "prompts": [],
+      "resources": [],
+    },
+    "id": "core.system-surface",
+    "members": [
+      "core.health-surface",
+      "core.logs-surface",
+      "core.activity-surface",
+    ],
+    "mountTag": "jf-system-surface",
+    "placement": "RAIL",
+    "presentation": {
+      "category": null,
+      "descriptionKey": "registry-surface.system-surface.description",
+      "iconHint": null,
+      "labelKey": "registry-surface.system-surface.label",
+    },
+    "provenance": {
+      "contributorId": "core",
+      "identity": {
+        "signature": null,
+        "verified": true,
+      },
+      "tier": "CORE",
+      "version": "1.0",
+    },
+    "riskTier": "LOW",
+    "stateSchema": null,
+  },
+  {
+    "altitude": "DIAGNOSTIC",
+    "audience": "USER",
+    "consumes": {
+      "conversationShapes": [],
+      "diagnosticChannels": [],
+      "operations": [
+        "core.reindex",
+        "core.recover-component",
+        "core.clear-failed-jobs",
+        "core.export-diagnostics",
+        "core.bulk-reindex",
+      ],
+      "prompts": [],
+      "resources": [],
+    },
+    "id": "core.health-surface",
+    "members": [],
+    "mountTag": "jf-health-surface",
+    "placement": "DEEPLINK",
+    "presentation": {
+      "descriptionKey": "registry-surface.health-surface.description",
+      "labelKey": "registry-surface.health-surface.label",
+    },
+    "provenance": {
+      "capability": [
+        "surfaces",
+      ],
+      "contributorId": "core",
+      "identity": {
+        "verified": true,
+      },
+      "tier": "TRUSTED_PLUGIN",
+      "version": "1.0.0",
+    },
+  },
+  {
+    "altitude": "DIAGNOSTIC",
+    "audience": "OPERATOR",
+    "consumes": {
+      "conversationShapes": [],
+      "diagnosticChannels": [],
+      "operations": [],
+      "prompts": [],
+      "resources": [],
+    },
+    "id": "core.logs-surface",
+    "members": [],
+    "mountTag": "jf-log-surface",
+    "placement": "DEEPLINK",
+    "presentation": {
+      "descriptionKey": "registry-surface.logs-surface.description",
+      "labelKey": "registry-surface.logs-surface.label",
+    },
+    "provenance": {
+      "capability": [
+        "surfaces",
+      ],
+      "contributorId": "core",
+      "identity": {
+        "verified": true,
+      },
+      "tier": "TRUSTED_PLUGIN",
+      "version": "1.0.0",
+    },
+  },
+  {
+    "altitude": "TRUST",
+    "audience": "USER",
+    "consumes": {
+      "conversationShapes": [],
+      "diagnosticChannels": [],
+      "operations": [],
+      "prompts": [],
+      "resources": [],
+    },
+    "id": "core.activity-surface",
+    "members": [],
+    "mountTag": "jf-activity-surface",
+    "placement": "DEEPLINK",
+    "presentation": {
+      "descriptionKey": "registry-surface.activity-surface.description",
+      "labelKey": "registry-surface.activity-surface.label",
+    },
+    "provenance": {
+      "capability": [
+        "surfaces",
+      ],
+      "contributorId": "core",
+      "identity": {
+        "verified": true,
+      },
+      "tier": "TRUSTED_PLUGIN",
+      "version": "1.0.0",
+    },
+  },
+  {
+    "altitude": "PRODUCT",
+    "audience": "USER",
+    "consumes": {
+      "conversationShapes": [
+        "core.free-chat",
+      ],
+      "diagnosticChannels": [],
+      "operations": [],
+      "prompts": [],
+      "resources": [],
+    },
+    "id": "core.free-chat-surface",
+    "members": [],
+    "mountTag": "jf-chat-shape-mount",
+    "placement": "DEEPLINK",
+    "presentation": {
+      "category": null,
+      "descriptionKey": "registry-surface.free-chat-surface.description",
+      "iconHint": null,
+      "labelKey": "registry-surface.free-chat-surface.label",
+    },
+    "provenance": {
+      "contributorId": "core",
+      "identity": {
+        "signature": null,
+        "verified": true,
+      },
+      "tier": "CORE",
+      "version": "1.0",
+    },
+    "riskTier": "LOW",
+    "stateSchema": null,
+  },
+  {
+    "altitude": "PRODUCT",
+    "audience": "USER",
+    "consumes": {
+      "conversationShapes": [
+        "core.extract",
+      ],
+      "diagnosticChannels": [],
+      "operations": [],
+      "prompts": [],
+      "resources": [],
+    },
+    "id": "core.extract-surface",
+    "members": [],
+    "mountTag": "jf-chat-shape-mount",
+    "placement": "DEEPLINK",
+    "presentation": {
+      "category": null,
+      "descriptionKey": "registry-surface.extract-surface.description",
+      "iconHint": null,
+      "labelKey": "registry-surface.extract-surface.label",
+    },
+    "provenance": {
+      "contributorId": "core",
+      "identity": {
+        "signature": null,
+        "verified": true,
+      },
+      "tier": "CORE",
+      "version": "1.0",
+    },
+    "riskTier": "LOW",
+    "stateSchema": null,
+  },
+  {
+    "altitude": "PRODUCT",
+    "audience": "USER",
+    "consumes": {
+      "conversationShapes": [],
+      "diagnosticChannels": [],
+      "operations": [],
+      "prompts": [],
+      "resources": [],
+    },
+    "id": "core.memory-surface",
+    "members": [],
+    "mountTag": "jf-memory-surface",
+    "placement": "DEEPLINK",
+    "presentation": {
+      "descriptionKey": "registry-surface.memory-surface.description",
+      "labelKey": "registry-surface.memory-surface.label",
+    },
+    "provenance": {
+      "capability": [
+        "surfaces",
+      ],
+      "contributorId": "core",
+      "identity": {
+        "verified": true,
+      },
+      "tier": "TRUSTED_PLUGIN",
+      "version": "1.0.0",
+    },
+  },
+  {
+    "altitude": "PRODUCT",
+    "audience": "USER",
+    "consumes": {
+      "conversationShapes": [],
+      "diagnosticChannels": [],
+      "operations": [],
+      "prompts": [],
+      "resources": [],
+    },
+    "id": "core.command-palette",
+    "members": [],
+    "mountTag": "jf-command-palette",
+    "placement": "COMMAND",
+    "presentation": {
+      "descriptionKey": "registry-surface.command-palette.description",
+      "labelKey": "registry-surface.command-palette.label",
+    },
+    "provenance": {
+      "capability": [
+        "surfaces",
+      ],
+      "contributorId": "core",
+      "identity": {
+        "verified": true,
+      },
+      "tier": "TRUSTED_PLUGIN",
+      "version": "1.0.0",
+    },
+  },
+]
+`;
+
+exports[`ordered effective catalog preservation > cold failure retains the existing local fallback after capped retries 1`] = `
+[
+  {
+    "altitude": "PRODUCT",
+    "audience": "USER",
+    "consumes": {
+      "conversationShapes": [],
+      "diagnosticChannels": [],
+      "operations": [
+        "core.reindex",
+        "core.add-watched-root",
+        "core.remove-watched-root",
+        "core.preview-excludes",
+        "core.apply-excludes",
+      ],
+      "prompts": [],
+      "resources": [
+        "core.indexed-roots",
+      ],
+    },
+    "id": "core.library-surface",
+    "members": [],
+    "mountTag": "jf-library-surface",
+    "placement": "RAIL",
+    "presentation": {
+      "descriptionKey": "registry-surface.library-surface.description",
+      "labelKey": "registry-surface.library-surface.label",
+    },
+    "provenance": {
+      "capability": [
+        "surfaces",
+      ],
+      "contributorId": "core",
+      "identity": {
+        "verified": true,
+      },
+      "tier": "TRUSTED_PLUGIN",
+      "version": "1.0.0",
+    },
+    "splitPairing": {
+      "secondary": "core.search-v3-surface",
+    },
+  },
+  {
+    "altitude": "PRODUCT",
+    "audience": "USER",
+    "consumes": {
+      "conversationShapes": [],
+      "diagnosticChannels": [],
+      "operations": [],
+      "prompts": [],
+      "resources": [],
+    },
+    "id": "core.help-surface",
+    "members": [],
+    "mountTag": "jf-help-surface",
+    "placement": "DEEPLINK",
+    "presentation": {
+      "descriptionKey": "registry-surface.help-surface.description",
+      "labelKey": "registry-surface.help-surface.label",
+    },
+    "provenance": {
+      "capability": [
+        "surfaces",
+      ],
+      "contributorId": "core",
+      "identity": {
+        "verified": true,
+      },
+      "tier": "TRUSTED_PLUGIN",
+      "version": "1.0.0",
+    },
+  },
+  {
+    "altitude": "PRODUCT",
+    "audience": "USER",
+    "consumes": {
+      "conversationShapes": [],
+      "diagnosticChannels": [],
+      "operations": [],
+      "prompts": [],
+      "resources": [],
+    },
+    "id": "core.presentation-gallery-surface",
+    "members": [],
+    "mountTag": "jf-presentation-gallery-surface",
+    "placement": "DEEPLINK",
+    "presentation": {
+      "descriptionKey": "registry-surface.presentation-gallery-surface.description",
+      "labelKey": "registry-surface.presentation-gallery-surface.label",
+    },
+    "provenance": {
+      "capability": [
+        "surfaces",
+      ],
+      "contributorId": "core",
+      "identity": {
+        "verified": true,
+      },
+      "tier": "TRUSTED_PLUGIN",
+      "version": "1.0.0",
+    },
+  },
+  {
+    "altitude": "PRODUCT",
+    "audience": "USER",
+    "consumes": {
+      "conversationShapes": [],
+      "diagnosticChannels": [],
+      "operations": [],
+      "prompts": [],
+      "resources": [],
+    },
+    "id": "core.presentation-editor-surface",
+    "members": [],
+    "mountTag": "jf-presentation-editor-surface",
+    "placement": "DEEPLINK",
+    "presentation": {
+      "descriptionKey": "registry-surface.presentation-editor-surface.description",
+      "labelKey": "registry-surface.presentation-editor-surface.label",
+    },
+    "provenance": {
+      "capability": [
+        "surfaces",
+      ],
+      "contributorId": "core",
+      "identity": {
+        "verified": true,
+      },
+      "tier": "TRUSTED_PLUGIN",
+      "version": "1.0.0",
+    },
+  },
+  {
+    "altitude": "PRODUCT",
+    "audience": "DEVELOPER",
+    "consumes": {
+      "conversationShapes": [],
+      "diagnosticChannels": [],
+      "operations": [],
+      "prompts": [],
+      "resources": [],
+    },
+    "id": "core.api-explorer-surface",
+    "members": [],
+    "mountTag": "jf-api-explorer-view",
+    "placement": "DEEPLINK",
+    "presentation": {
+      "descriptionKey": "registry-surface.api-explorer-surface.description",
+      "labelKey": "registry-surface.api-explorer-surface.label",
+    },
+    "provenance": {
+      "capability": [
+        "surfaces",
+      ],
+      "contributorId": "core",
+      "identity": {
+        "verified": true,
+      },
+      "tier": "TRUSTED_PLUGIN",
+      "version": "1.0.0",
+    },
+  },
+  {
+    "altitude": "PRODUCT",
+    "audience": "USER",
+    "consumes": {
+      "conversationShapes": [],
+      "diagnosticChannels": [],
+      "operations": [],
+      "prompts": [],
+      "resources": [],
+    },
+    "id": "core.search-v3-surface",
+    "members": [],
+    "mountTag": "jf-sv3-window",
+    "placement": "RAIL",
+    "presentation": {
+      "descriptionKey": "registry-surface.search-v3-surface.description",
+      "labelKey": "registry-surface.search-v3-surface.label",
+    },
+    "provenance": {
+      "capability": [
+        "surfaces",
+      ],
+      "contributorId": "core",
+      "identity": {
+        "verified": true,
+      },
+      "tier": "TRUSTED_PLUGIN",
+      "version": "1.0.0",
+    },
+    "splitPairing": {
+      "secondary": "core.library-surface",
+    },
+  },
+  {
+    "altitude": "PRODUCT",
+    "audience": "USER",
+    "consumes": {
+      "conversationShapes": [],
+      "diagnosticChannels": [],
+      "operations": [],
+      "prompts": [],
+      "resources": [],
+    },
+    "id": "core.brain-surface",
+    "members": [],
+    "mountTag": "jf-brain-surface",
+    "placement": "RAIL",
+    "presentation": {
+      "descriptionKey": "registry-surface.brain-surface.description",
+      "labelKey": "registry-surface.brain-surface.label",
+    },
+    "provenance": {
+      "capability": [
+        "surfaces",
+      ],
+      "contributorId": "core",
+      "identity": {
+        "verified": true,
+      },
+      "tier": "TRUSTED_PLUGIN",
+      "version": "1.0.0",
+    },
+  },
+  {
+    "altitude": "PRODUCT",
+    "audience": "USER",
+    "consumes": {
+      "conversationShapes": [],
+      "diagnosticChannels": [],
+      "operations": [],
+      "prompts": [],
+      "resources": [],
+    },
+    "id": "core.settings-surface",
+    "members": [],
+    "mountTag": "jf-settings-surface",
+    "placement": "MODAL",
+    "presentation": {
+      "descriptionKey": "registry-surface.settings-surface.description",
+      "labelKey": "registry-surface.settings-surface.label",
+    },
+    "provenance": {
+      "capability": [
+        "surfaces",
+      ],
+      "contributorId": "core",
+      "identity": {
+        "verified": true,
+      },
+      "tier": "TRUSTED_PLUGIN",
+      "version": "1.0.0",
+    },
+  },
+  {
+    "altitude": "PRODUCT",
+    "audience": "USER",
+    "consumes": {
+      "conversationShapes": [],
+      "diagnosticChannels": [],
+      "operations": [],
+      "prompts": [],
+      "resources": [],
+    },
+    "id": "core.security-surface",
+    "members": [],
+    "mountTag": "jf-security-surface",
+    "placement": "DEEPLINK",
+    "presentation": {
+      "descriptionKey": "registry-surface.security-surface.description",
+      "labelKey": "registry-surface.security-surface.label",
+    },
+    "provenance": {
+      "capability": [
+        "surfaces",
+      ],
+      "contributorId": "core",
+      "identity": {
+        "verified": true,
+      },
+      "tier": "TRUSTED_PLUGIN",
+      "version": "1.0.0",
+    },
+  },
+  {
+    "altitude": "PRODUCT",
+    "audience": "USER",
+    "consumes": {
+      "conversationShapes": [],
+      "diagnosticChannels": [],
+      "operations": [],
+      "prompts": [],
+      "resources": [],
+    },
+    "id": "core.memory-surface",
+    "members": [],
+    "mountTag": "jf-memory-surface",
+    "placement": "DEEPLINK",
+    "presentation": {
+      "descriptionKey": "registry-surface.memory-surface.description",
+      "labelKey": "registry-surface.memory-surface.label",
+    },
+    "provenance": {
+      "capability": [
+        "surfaces",
+      ],
+      "contributorId": "core",
+      "identity": {
+        "verified": true,
+      },
+      "tier": "TRUSTED_PLUGIN",
+      "version": "1.0.0",
+    },
+  },
+  {
+    "altitude": "PRODUCT",
+    "audience": "USER",
+    "consumes": {
+      "conversationShapes": [],
+      "diagnosticChannels": [],
+      "operations": [],
+      "prompts": [],
+      "resources": [],
+    },
+    "id": "core.browse-surface",
+    "members": [],
+    "mountTag": "jf-browse-surface",
+    "placement": "DEEPLINK",
+    "presentation": {
+      "descriptionKey": "registry-surface.browse-surface.description",
+      "labelKey": "registry-surface.browse-surface.label",
+    },
+    "provenance": {
+      "capability": [
+        "surfaces",
+      ],
+      "contributorId": "core",
+      "identity": {
+        "verified": true,
+      },
+      "tier": "TRUSTED_PLUGIN",
+      "version": "1.0.0",
+    },
+  },
+  {
+    "altitude": "PRODUCT",
+    "audience": "USER",
+    "consumes": {
+      "conversationShapes": [],
+      "diagnosticChannels": [],
+      "operations": [
+        "core.reindex",
+        "core.recover-component",
+        "core.clear-failed-jobs",
+        "core.export-diagnostics",
+        "core.bulk-reindex",
+      ],
+      "prompts": [],
+      "resources": [],
+    },
+    "id": "core.health-surface",
+    "members": [],
+    "mountTag": "jf-health-surface",
+    "placement": "DEEPLINK",
+    "presentation": {
+      "descriptionKey": "registry-surface.health-surface.description",
+      "labelKey": "registry-surface.health-surface.label",
+    },
+    "provenance": {
+      "capability": [
+        "surfaces",
+      ],
+      "contributorId": "core",
+      "identity": {
+        "verified": true,
+      },
+      "tier": "TRUSTED_PLUGIN",
+      "version": "1.0.0",
+    },
+  },
+  {
+    "altitude": "PRODUCT",
+    "audience": "OPERATOR",
+    "consumes": {
+      "conversationShapes": [],
+      "diagnosticChannels": [],
+      "operations": [],
+      "prompts": [],
+      "resources": [],
+    },
+    "id": "core.logs-surface",
+    "members": [],
+    "mountTag": "jf-log-surface",
+    "placement": "DEEPLINK",
+    "presentation": {
+      "descriptionKey": "registry-surface.logs-surface.description",
+      "labelKey": "registry-surface.logs-surface.label",
+    },
+    "provenance": {
+      "capability": [
+        "surfaces",
+      ],
+      "contributorId": "core",
+      "identity": {
+        "verified": true,
+      },
+      "tier": "TRUSTED_PLUGIN",
+      "version": "1.0.0",
+    },
+  },
+  {
+    "altitude": "PRODUCT",
+    "audience": "USER",
+    "consumes": {
+      "conversationShapes": [],
+      "diagnosticChannels": [],
+      "operations": [],
+      "prompts": [],
+      "resources": [],
+    },
+    "id": "core.command-palette",
+    "members": [],
+    "mountTag": "jf-command-palette",
+    "placement": "COMMAND",
+    "presentation": {
+      "descriptionKey": "registry-surface.command-palette.description",
+      "labelKey": "registry-surface.command-palette.label",
+    },
+    "provenance": {
+      "capability": [
+        "surfaces",
+      ],
+      "contributorId": "core",
+      "identity": {
+        "verified": true,
+      },
+      "tier": "TRUSTED_PLUGIN",
+      "version": "1.0.0",
+    },
+  },
+  {
+    "altitude": "PRODUCT",
+    "audience": "USER",
+    "consumes": {
+      "conversationShapes": [],
+      "diagnosticChannels": [],
+      "operations": [],
+      "prompts": [],
+      "resources": [],
+    },
+    "id": "core.activity-surface",
+    "members": [],
+    "mountTag": "jf-activity-surface",
+    "placement": "DEEPLINK",
+    "presentation": {
+      "descriptionKey": "registry-surface.activity-surface.description",
+      "labelKey": "registry-surface.activity-surface.label",
+    },
+    "provenance": {
+      "capability": [
+        "surfaces",
+      ],
+      "contributorId": "core",
+      "identity": {
+        "verified": true,
+      },
+      "tier": "TRUSTED_PLUGIN",
+      "version": "1.0.0",
+    },
+  },
+]
+`;
+
+exports[`ordered effective catalog preservation > failure → install → backend-ready attempt → success preserves the observed recovery sequence 1`] = `
+{
+  "installed": [
+    {
+      "altitude": "PRODUCT",
+      "audience": "USER",
+      "consumes": {
+        "conversationShapes": [],
+        "diagnosticChannels": [],
+        "operations": [
+          "core.reindex",
+          "core.add-watched-root",
+          "core.remove-watched-root",
+          "core.preview-excludes",
+          "core.apply-excludes",
+        ],
+        "prompts": [],
+        "resources": [
+          "core.indexed-roots",
+        ],
+      },
+      "id": "core.library-surface",
+      "members": [],
+      "mountTag": "jf-library-surface",
+      "placement": "RAIL",
+      "presentation": {
+        "descriptionKey": "registry-surface.library-surface.description",
+        "labelKey": "registry-surface.library-surface.label",
+      },
+      "provenance": {
+        "capability": [
+          "surfaces",
+        ],
+        "contributorId": "core",
+        "identity": {
+          "verified": true,
+        },
+        "tier": "TRUSTED_PLUGIN",
+        "version": "1.0.0",
+      },
+      "splitPairing": {
+        "secondary": "core.search-v3-surface",
+      },
+    },
+    {
+      "altitude": "PRODUCT",
+      "audience": "USER",
+      "consumes": {
+        "conversationShapes": [],
+        "diagnosticChannels": [],
+        "operations": [],
+        "prompts": [],
+        "resources": [],
+      },
+      "id": "core.help-surface",
+      "members": [],
+      "mountTag": "jf-help-surface",
+      "placement": "DEEPLINK",
+      "presentation": {
+        "descriptionKey": "registry-surface.help-surface.description",
+        "labelKey": "registry-surface.help-surface.label",
+      },
+      "provenance": {
+        "capability": [
+          "surfaces",
+        ],
+        "contributorId": "core",
+        "identity": {
+          "verified": true,
+        },
+        "tier": "TRUSTED_PLUGIN",
+        "version": "1.0.0",
+      },
+    },
+    {
+      "altitude": "PRODUCT",
+      "audience": "USER",
+      "consumes": {
+        "conversationShapes": [],
+        "diagnosticChannels": [],
+        "operations": [],
+        "prompts": [],
+        "resources": [],
+      },
+      "id": "core.presentation-gallery-surface",
+      "members": [],
+      "mountTag": "jf-presentation-gallery-surface",
+      "placement": "DEEPLINK",
+      "presentation": {
+        "descriptionKey": "registry-surface.presentation-gallery-surface.description",
+        "labelKey": "registry-surface.presentation-gallery-surface.label",
+      },
+      "provenance": {
+        "capability": [
+          "surfaces",
+        ],
+        "contributorId": "core",
+        "identity": {
+          "verified": true,
+        },
+        "tier": "TRUSTED_PLUGIN",
+        "version": "1.0.0",
+      },
+    },
+    {
+      "altitude": "PRODUCT",
+      "audience": "USER",
+      "consumes": {
+        "conversationShapes": [],
+        "diagnosticChannels": [],
+        "operations": [],
+        "prompts": [],
+        "resources": [],
+      },
+      "id": "core.presentation-editor-surface",
+      "members": [],
+      "mountTag": "jf-presentation-editor-surface",
+      "placement": "DEEPLINK",
+      "presentation": {
+        "descriptionKey": "registry-surface.presentation-editor-surface.description",
+        "labelKey": "registry-surface.presentation-editor-surface.label",
+      },
+      "provenance": {
+        "capability": [
+          "surfaces",
+        ],
+        "contributorId": "core",
+        "identity": {
+          "verified": true,
+        },
+        "tier": "TRUSTED_PLUGIN",
+        "version": "1.0.0",
+      },
+    },
+    {
+      "altitude": "PRODUCT",
+      "audience": "DEVELOPER",
+      "consumes": {
+        "conversationShapes": [],
+        "diagnosticChannels": [],
+        "operations": [],
+        "prompts": [],
+        "resources": [],
+      },
+      "id": "core.api-explorer-surface",
+      "members": [],
+      "mountTag": "jf-api-explorer-view",
+      "placement": "DEEPLINK",
+      "presentation": {
+        "descriptionKey": "registry-surface.api-explorer-surface.description",
+        "labelKey": "registry-surface.api-explorer-surface.label",
+      },
+      "provenance": {
+        "capability": [
+          "surfaces",
+        ],
+        "contributorId": "core",
+        "identity": {
+          "verified": true,
+        },
+        "tier": "TRUSTED_PLUGIN",
+        "version": "1.0.0",
+      },
+    },
+    {
+      "altitude": "PRODUCT",
+      "audience": "USER",
+      "consumes": {
+        "conversationShapes": [],
+        "diagnosticChannels": [],
+        "operations": [],
+        "prompts": [],
+        "resources": [],
+      },
+      "id": "core.search-v3-surface",
+      "members": [],
+      "mountTag": "jf-sv3-window",
+      "placement": "RAIL",
+      "presentation": {
+        "descriptionKey": "registry-surface.search-v3-surface.description",
+        "labelKey": "registry-surface.search-v3-surface.label",
+      },
+      "provenance": {
+        "capability": [
+          "surfaces",
+        ],
+        "contributorId": "core",
+        "identity": {
+          "verified": true,
+        },
+        "tier": "TRUSTED_PLUGIN",
+        "version": "1.0.0",
+      },
+      "splitPairing": {
+        "secondary": "core.library-surface",
+      },
+    },
+    {
+      "altitude": "PRODUCT",
+      "audience": "USER",
+      "consumes": {
+        "conversationShapes": [],
+        "diagnosticChannels": [],
+        "operations": [],
+        "prompts": [],
+        "resources": [],
+      },
+      "id": "core.brain-surface",
+      "members": [],
+      "mountTag": "jf-brain-surface",
+      "placement": "RAIL",
+      "presentation": {
+        "descriptionKey": "registry-surface.brain-surface.description",
+        "labelKey": "registry-surface.brain-surface.label",
+      },
+      "provenance": {
+        "capability": [
+          "surfaces",
+        ],
+        "contributorId": "core",
+        "identity": {
+          "verified": true,
+        },
+        "tier": "TRUSTED_PLUGIN",
+        "version": "1.0.0",
+      },
+    },
+    {
+      "altitude": "PRODUCT",
+      "audience": "USER",
+      "consumes": {
+        "conversationShapes": [],
+        "diagnosticChannels": [],
+        "operations": [],
+        "prompts": [],
+        "resources": [],
+      },
+      "id": "core.settings-surface",
+      "members": [],
+      "mountTag": "jf-settings-surface",
+      "placement": "MODAL",
+      "presentation": {
+        "descriptionKey": "registry-surface.settings-surface.description",
+        "labelKey": "registry-surface.settings-surface.label",
+      },
+      "provenance": {
+        "capability": [
+          "surfaces",
+        ],
+        "contributorId": "core",
+        "identity": {
+          "verified": true,
+        },
+        "tier": "TRUSTED_PLUGIN",
+        "version": "1.0.0",
+      },
+    },
+    {
+      "altitude": "PRODUCT",
+      "audience": "USER",
+      "consumes": {
+        "conversationShapes": [],
+        "diagnosticChannels": [],
+        "operations": [],
+        "prompts": [],
+        "resources": [],
+      },
+      "id": "core.security-surface",
+      "members": [],
+      "mountTag": "jf-security-surface",
+      "placement": "DEEPLINK",
+      "presentation": {
+        "descriptionKey": "registry-surface.security-surface.description",
+        "labelKey": "registry-surface.security-surface.label",
+      },
+      "provenance": {
+        "capability": [
+          "surfaces",
+        ],
+        "contributorId": "core",
+        "identity": {
+          "verified": true,
+        },
+        "tier": "TRUSTED_PLUGIN",
+        "version": "1.0.0",
+      },
+    },
+    {
+      "altitude": "PRODUCT",
+      "audience": "USER",
+      "consumes": {
+        "conversationShapes": [],
+        "diagnosticChannels": [],
+        "operations": [],
+        "prompts": [],
+        "resources": [],
+      },
+      "id": "core.memory-surface",
+      "members": [],
+      "mountTag": "jf-memory-surface",
+      "placement": "DEEPLINK",
+      "presentation": {
+        "descriptionKey": "registry-surface.memory-surface.description",
+        "labelKey": "registry-surface.memory-surface.label",
+      },
+      "provenance": {
+        "capability": [
+          "surfaces",
+        ],
+        "contributorId": "core",
+        "identity": {
+          "verified": true,
+        },
+        "tier": "TRUSTED_PLUGIN",
+        "version": "1.0.0",
+      },
+    },
+    {
+      "altitude": "PRODUCT",
+      "audience": "USER",
+      "consumes": {
+        "conversationShapes": [],
+        "diagnosticChannels": [],
+        "operations": [],
+        "prompts": [],
+        "resources": [],
+      },
+      "id": "core.browse-surface",
+      "members": [],
+      "mountTag": "jf-browse-surface",
+      "placement": "DEEPLINK",
+      "presentation": {
+        "descriptionKey": "registry-surface.browse-surface.description",
+        "labelKey": "registry-surface.browse-surface.label",
+      },
+      "provenance": {
+        "capability": [
+          "surfaces",
+        ],
+        "contributorId": "core",
+        "identity": {
+          "verified": true,
+        },
+        "tier": "TRUSTED_PLUGIN",
+        "version": "1.0.0",
+      },
+    },
+    {
+      "altitude": "PRODUCT",
+      "audience": "USER",
+      "consumes": {
+        "conversationShapes": [],
+        "diagnosticChannels": [],
+        "operations": [
+          "core.reindex",
+          "core.recover-component",
+          "core.clear-failed-jobs",
+          "core.export-diagnostics",
+          "core.bulk-reindex",
+        ],
+        "prompts": [],
+        "resources": [],
+      },
+      "id": "core.health-surface",
+      "members": [],
+      "mountTag": "jf-health-surface",
+      "placement": "DEEPLINK",
+      "presentation": {
+        "descriptionKey": "registry-surface.health-surface.description",
+        "labelKey": "registry-surface.health-surface.label",
+      },
+      "provenance": {
+        "capability": [
+          "surfaces",
+        ],
+        "contributorId": "core",
+        "identity": {
+          "verified": true,
+        },
+        "tier": "TRUSTED_PLUGIN",
+        "version": "1.0.0",
+      },
+    },
+    {
+      "altitude": "PRODUCT",
+      "audience": "OPERATOR",
+      "consumes": {
+        "conversationShapes": [],
+        "diagnosticChannels": [],
+        "operations": [],
+        "prompts": [],
+        "resources": [],
+      },
+      "id": "core.logs-surface",
+      "members": [],
+      "mountTag": "jf-log-surface",
+      "placement": "DEEPLINK",
+      "presentation": {
+        "descriptionKey": "registry-surface.logs-surface.description",
+        "labelKey": "registry-surface.logs-surface.label",
+      },
+      "provenance": {
+        "capability": [
+          "surfaces",
+        ],
+        "contributorId": "core",
+        "identity": {
+          "verified": true,
+        },
+        "tier": "TRUSTED_PLUGIN",
+        "version": "1.0.0",
+      },
+    },
+    {
+      "altitude": "PRODUCT",
+      "audience": "USER",
+      "consumes": {
+        "conversationShapes": [],
+        "diagnosticChannels": [],
+        "operations": [],
+        "prompts": [],
+        "resources": [],
+      },
+      "id": "core.command-palette",
+      "members": [],
+      "mountTag": "jf-command-palette",
+      "placement": "COMMAND",
+      "presentation": {
+        "descriptionKey": "registry-surface.command-palette.description",
+        "labelKey": "registry-surface.command-palette.label",
+      },
+      "provenance": {
+        "capability": [
+          "surfaces",
+        ],
+        "contributorId": "core",
+        "identity": {
+          "verified": true,
+        },
+        "tier": "TRUSTED_PLUGIN",
+        "version": "1.0.0",
+      },
+    },
+    {
+      "altitude": "PRODUCT",
+      "audience": "USER",
+      "consumes": {
+        "conversationShapes": [],
+        "diagnosticChannels": [],
+        "operations": [],
+        "prompts": [],
+        "resources": [],
+      },
+      "id": "core.activity-surface",
+      "members": [],
+      "mountTag": "jf-activity-surface",
+      "placement": "DEEPLINK",
+      "presentation": {
+        "descriptionKey": "registry-surface.activity-surface.description",
+        "labelKey": "registry-surface.activity-surface.label",
+      },
+      "provenance": {
+        "capability": [
+          "surfaces",
+        ],
+        "contributorId": "core",
+        "identity": {
+          "verified": true,
+        },
+        "tier": "TRUSTED_PLUGIN",
+        "version": "1.0.0",
+      },
+    },
+  ],
+  "recovered": [
+    {
+      "altitude": "PRODUCT",
+      "audience": "USER",
+      "consumes": {
+        "conversationShapes": [],
+        "diagnosticChannels": [],
+        "operations": [
+          "core.add-watched-root",
+          "core.preview-excludes",
+          "core.apply-excludes",
+          "core.reindex",
+          "core.remove-watched-root",
+        ],
+        "prompts": [],
+        "resources": [
+          "core.indexed-roots",
+        ],
+      },
+      "id": "core.library-surface",
+      "members": [
+        "core.browse-surface",
+      ],
+      "mountTag": "jf-library-surface",
+      "placement": "RAIL",
+      "presentation": {
+        "category": null,
+        "descriptionKey": "registry-surface.library-surface.description",
+        "iconHint": null,
+        "labelKey": "registry-surface.library-surface.label",
+      },
+      "provenance": {
+        "contributorId": "core",
+        "identity": {
+          "signature": null,
+          "verified": true,
+        },
+        "tier": "CORE",
+        "version": "1.0",
+      },
+      "riskTier": "LOW",
+      "stateSchema": null,
+    },
+    {
+      "altitude": "PRODUCT",
+      "audience": "USER",
+      "consumes": {
+        "conversationShapes": [],
+        "diagnosticChannels": [],
+        "operations": [
+          "core.export-diagnostics",
+          "core.copy-diagnostic-summary",
+        ],
+        "prompts": [],
+        "resources": [],
+      },
+      "id": "core.help-surface",
+      "members": [],
+      "mountTag": "jf-help-surface",
+      "placement": "DEEPLINK",
+      "presentation": {
+        "category": null,
+        "descriptionKey": "registry-surface.help-surface.description",
+        "iconHint": null,
+        "labelKey": "registry-surface.help-surface.label",
+      },
+      "provenance": {
+        "contributorId": "core",
+        "identity": {
+          "signature": null,
+          "verified": true,
+        },
+        "tier": "CORE",
+        "version": "1.0",
+      },
+      "riskTier": "LOW",
+      "stateSchema": null,
+    },
+    {
+      "altitude": "PRODUCT",
+      "audience": "USER",
+      "consumes": {
+        "conversationShapes": [],
+        "diagnosticChannels": [],
+        "operations": [],
+        "prompts": [],
+        "resources": [],
+      },
+      "id": "core.presentation-gallery-surface",
+      "members": [],
+      "mountTag": "jf-presentation-gallery-surface",
+      "placement": "DEEPLINK",
+      "presentation": {
+        "category": null,
+        "descriptionKey": "registry-surface.presentation-gallery-surface.description",
+        "iconHint": null,
+        "labelKey": "registry-surface.presentation-gallery-surface.label",
+      },
+      "provenance": {
+        "contributorId": "core",
+        "identity": {
+          "signature": null,
+          "verified": true,
+        },
+        "tier": "CORE",
+        "version": "1.0",
+      },
+      "riskTier": "LOW",
+      "stateSchema": null,
+    },
+    {
+      "altitude": "PRODUCT",
+      "audience": "USER",
+      "consumes": {
+        "conversationShapes": [],
+        "diagnosticChannels": [],
+        "operations": [],
+        "prompts": [],
+        "resources": [],
+      },
+      "id": "core.presentation-editor-surface",
+      "members": [],
+      "mountTag": "jf-presentation-editor-surface",
+      "placement": "DEEPLINK",
+      "presentation": {
+        "category": null,
+        "descriptionKey": "registry-surface.presentation-editor-surface.description",
+        "iconHint": null,
+        "labelKey": "registry-surface.presentation-editor-surface.label",
+      },
+      "provenance": {
+        "contributorId": "core",
+        "identity": {
+          "signature": null,
+          "verified": true,
+        },
+        "tier": "CORE",
+        "version": "1.0",
+      },
+      "riskTier": "LOW",
+      "stateSchema": null,
+    },
+    {
+      "altitude": "PRODUCT",
+      "audience": "DEVELOPER",
+      "consumes": {
+        "conversationShapes": [],
+        "diagnosticChannels": [],
+        "operations": [],
+        "prompts": [],
+        "resources": [],
+      },
+      "id": "core.api-explorer-surface",
+      "members": [],
+      "mountTag": "jf-api-explorer-view",
+      "placement": "DEEPLINK",
+      "presentation": {
+        "category": null,
+        "descriptionKey": "registry-surface.api-explorer-surface.description",
+        "iconHint": null,
+        "labelKey": "registry-surface.api-explorer-surface.label",
+      },
+      "provenance": {
+        "contributorId": "core",
+        "identity": {
+          "signature": null,
+          "verified": true,
+        },
+        "tier": "CORE",
+        "version": "1.0",
+      },
+      "riskTier": "LOW",
+      "stateSchema": null,
+    },
+    {
+      "altitude": "PRODUCT",
+      "audience": "USER",
+      "consumes": {
+        "conversationShapes": [],
+        "diagnosticChannels": [],
+        "operations": [
+          "core.activate-runtime-variant",
+          "core.repair-ai-install",
+          "core.deactivate-runtime-variant",
+          "core.cancel-ai-install",
+          "core.preflight-ai-pack",
+          "core.reconfigure",
+          "core.import-ai-pack",
+          "core.switch-inference-mode",
+          "core.start-ai-install",
+        ],
+        "prompts": [],
+        "resources": [],
+      },
+      "id": "core.brain-surface",
+      "members": [
+        "core.memory-surface",
+      ],
+      "mountTag": "jf-brain-surface",
+      "placement": "RAIL",
+      "presentation": {
+        "category": null,
+        "descriptionKey": "registry-surface.brain-surface.description",
+        "iconHint": null,
+        "labelKey": "registry-surface.brain-surface.label",
+      },
+      "provenance": {
+        "contributorId": "core",
+        "identity": {
+          "signature": null,
+          "verified": true,
+        },
+        "tier": "CORE",
+        "version": "1.0",
+      },
+      "riskTier": "LOW",
+      "stateSchema": null,
+    },
+    {
+      "altitude": "PRODUCT",
+      "audience": "USER",
+      "consumes": {
+        "conversationShapes": [
+          "core.workflow-run",
+          "core.rag-ask",
+          "core.free-chat",
+          "core.agent-run",
+          "core.extract",
+        ],
+        "diagnosticChannels": [],
+        "operations": [],
+        "prompts": [],
+        "resources": [],
+      },
+      "id": "core.search-v3-surface",
+      "members": [],
+      "mountTag": "jf-sv3-window",
+      "placement": "RAIL",
+      "presentation": {
+        "category": null,
+        "descriptionKey": "registry-surface.search-v3-surface.description",
+        "iconHint": null,
+        "labelKey": "registry-surface.search-v3-surface.label",
+      },
+      "provenance": {
+        "contributorId": "core",
+        "identity": {
+          "signature": null,
+          "verified": true,
+        },
+        "tier": "CORE",
+        "version": "1.0",
+      },
+      "riskTier": "LOW",
+      "stateSchema": {
+        "bindings": [
+          {
+            "schemaPath": "/conversationId",
+            "storeId": "sv3.conversation",
+            "storeKey": "conversationId",
+          },
+        ],
+        "schema": "{
+  "type": "object",
+  "properties": {
+    "conversationId": { "type": "string" }
+  }
+}
+",
+      },
+    },
+    {
+      "altitude": "PRODUCT",
+      "audience": "USER",
+      "consumes": {
+        "conversationShapes": [
+          "core.rag-ask",
+        ],
+        "diagnosticChannels": [],
+        "operations": [],
+        "prompts": [],
+        "resources": [],
+      },
+      "id": "core.ask-surface",
+      "members": [],
+      "mountTag": "jf-chat-shape-mount",
+      "placement": "DEEPLINK",
+      "presentation": {
+        "category": null,
+        "descriptionKey": "registry-surface.ask-surface.description",
+        "iconHint": null,
+        "labelKey": "registry-surface.ask-surface.label",
+      },
+      "provenance": {
+        "contributorId": "core",
+        "identity": {
+          "signature": null,
+          "verified": true,
+        },
+        "tier": "CORE",
+        "version": "1.0",
+      },
+      "riskTier": "LOW",
+      "stateSchema": {
+        "bindings": [
+          {
+            "schemaPath": "/query",
+            "storeId": "ask",
+            "storeKey": "query",
+          },
+          {
+            "schemaPath": "/docIds",
+            "storeId": "ask",
+            "storeKey": "docIds",
+          },
+        ],
+        "schema": "{
+  "type": "object",
+  "properties": {
+    "query": { "type": "string" },
+    "docIds": { "type": "array", "items": { "type": "string" } }
+  }
+}
+",
+      },
+    },
+    {
+      "altitude": "PRODUCT",
+      "audience": "USER",
+      "consumes": {
+        "conversationShapes": [],
+        "diagnosticChannels": [],
+        "operations": [
+          "core.reset-settings",
+        ],
+        "prompts": [],
+        "resources": [],
+      },
+      "id": "core.settings-surface",
+      "members": [
+        "core.presentation-gallery-surface",
+        "core.presentation-editor-surface",
+        "core.security-surface",
+      ],
+      "mountTag": "jf-settings-surface",
+      "placement": "MODAL",
+      "presentation": {
+        "category": null,
+        "descriptionKey": "registry-surface.settings-surface.description",
+        "iconHint": null,
+        "labelKey": "registry-surface.settings-surface.label",
+      },
+      "provenance": {
+        "contributorId": "core",
+        "identity": {
+          "signature": null,
+          "verified": true,
+        },
+        "tier": "CORE",
+        "version": "1.0",
+      },
+      "riskTier": "LOW",
+      "stateSchema": null,
+    },
+    {
+      "altitude": "PRODUCT",
+      "audience": "USER",
+      "consumes": {
+        "conversationShapes": [],
+        "diagnosticChannels": [],
+        "operations": [],
+        "prompts": [],
+        "resources": [],
+      },
+      "id": "core.security-surface",
+      "members": [],
+      "mountTag": "jf-security-surface",
+      "placement": "DEEPLINK",
+      "presentation": {
+        "category": null,
+        "descriptionKey": "registry-surface.security-surface.description",
+        "iconHint": null,
+        "labelKey": "registry-surface.security-surface.label",
+      },
+      "provenance": {
+        "contributorId": "core",
+        "identity": {
+          "signature": null,
+          "verified": true,
+        },
+        "tier": "CORE",
+        "version": "1.0",
+      },
+      "riskTier": "LOW",
+      "stateSchema": null,
+    },
+    {
+      "altitude": "PRODUCT",
+      "audience": "USER",
+      "consumes": {
+        "conversationShapes": [
+          "core.summarize",
+          "core.hierarchical-summarize",
+          "core.batch-summarize",
+        ],
+        "diagnosticChannels": [],
+        "operations": [],
+        "prompts": [],
+        "resources": [],
+      },
+      "id": "core.browse-surface",
+      "members": [],
+      "mountTag": "jf-browse-surface",
+      "placement": "DEEPLINK",
+      "presentation": {
+        "category": null,
+        "descriptionKey": "registry-surface.browse-surface.description",
+        "iconHint": null,
+        "labelKey": "registry-surface.browse-surface.label",
+      },
+      "provenance": {
+        "contributorId": "core",
+        "identity": {
+          "signature": null,
+          "verified": true,
+        },
+        "tier": "CORE",
+        "version": "1.0",
+      },
+      "riskTier": "LOW",
+      "stateSchema": null,
+    },
+    {
+      "altitude": "PRODUCT",
+      "audience": "USER",
+      "consumes": {
+        "conversationShapes": [],
+        "diagnosticChannels": [],
+        "operations": [],
+        "prompts": [],
+        "resources": [],
+      },
+      "id": "core.system-surface",
+      "members": [
+        "core.health-surface",
+        "core.logs-surface",
+        "core.activity-surface",
+      ],
+      "mountTag": "jf-system-surface",
+      "placement": "RAIL",
+      "presentation": {
+        "category": null,
+        "descriptionKey": "registry-surface.system-surface.description",
+        "iconHint": null,
+        "labelKey": "registry-surface.system-surface.label",
+      },
+      "provenance": {
+        "contributorId": "core",
+        "identity": {
+          "signature": null,
+          "verified": true,
+        },
+        "tier": "CORE",
+        "version": "1.0",
+      },
+      "riskTier": "LOW",
+      "stateSchema": null,
+    },
+    {
+      "altitude": "DIAGNOSTIC",
+      "audience": "USER",
+      "consumes": {
+        "conversationShapes": [],
+        "diagnosticChannels": [],
+        "operations": [
+          "core.reindex",
+          "core.clear-failed-jobs",
+          "core.bulk-reindex",
+          "core.index-gc",
+          "core.recover-component",
+          "core.export-diagnostics",
+        ],
+        "prompts": [],
+        "resources": [
+          "core.condition-recovery-index",
+          "core.failed-indexing-jobs",
+          "core.health-events",
+        ],
+      },
+      "id": "core.health-surface",
+      "members": [],
+      "mountTag": "jf-health-surface",
+      "placement": "DEEPLINK",
+      "presentation": {
+        "category": null,
+        "descriptionKey": "registry-surface.health-surface.description",
+        "iconHint": null,
+        "labelKey": "registry-surface.health-surface.label",
+      },
+      "provenance": {
+        "contributorId": "core",
+        "identity": {
+          "signature": null,
+          "verified": true,
+        },
+        "tier": "CORE",
+        "version": "1.0",
+      },
+      "riskTier": "LOW",
+      "stateSchema": null,
+    },
+    {
+      "altitude": "DIAGNOSTIC",
+      "audience": "OPERATOR",
+      "consumes": {
+        "conversationShapes": [],
+        "diagnosticChannels": [
+          "core.engine-log",
+        ],
+        "operations": [],
+        "prompts": [],
+        "resources": [],
+      },
+      "id": "core.logs-surface",
+      "members": [],
+      "mountTag": "jf-log-surface",
+      "placement": "DEEPLINK",
+      "presentation": {
+        "category": null,
+        "descriptionKey": "registry-surface.logs-surface.description",
+        "iconHint": null,
+        "labelKey": "registry-surface.logs-surface.label",
+      },
+      "provenance": {
+        "contributorId": "core",
+        "identity": {
+          "signature": null,
+          "verified": true,
+        },
+        "tier": "CORE",
+        "version": "1.0",
+      },
+      "riskTier": "LOW",
+      "stateSchema": null,
+    },
+    {
+      "altitude": "TRUST",
+      "audience": "USER",
+      "consumes": {
+        "conversationShapes": [],
+        "diagnosticChannels": [],
+        "operations": [],
+        "prompts": [],
+        "resources": [
+          "core.action-ledger",
+        ],
+      },
+      "id": "core.activity-surface",
+      "members": [],
+      "mountTag": "jf-activity-surface",
+      "placement": "DEEPLINK",
+      "presentation": {
+        "category": null,
+        "descriptionKey": "registry-surface.activity-surface.description",
+        "iconHint": null,
+        "labelKey": "registry-surface.activity-surface.label",
+      },
+      "provenance": {
+        "contributorId": "core",
+        "identity": {
+          "signature": null,
+          "verified": true,
+        },
+        "tier": "CORE",
+        "version": "1.0",
+      },
+      "riskTier": "LOW",
+      "stateSchema": null,
+    },
+    {
+      "altitude": "PRODUCT",
+      "audience": "USER",
+      "consumes": {
+        "conversationShapes": [
+          "core.free-chat",
+        ],
+        "diagnosticChannels": [],
+        "operations": [],
+        "prompts": [],
+        "resources": [],
+      },
+      "id": "core.free-chat-surface",
+      "members": [],
+      "mountTag": "jf-chat-shape-mount",
+      "placement": "DEEPLINK",
+      "presentation": {
+        "category": null,
+        "descriptionKey": "registry-surface.free-chat-surface.description",
+        "iconHint": null,
+        "labelKey": "registry-surface.free-chat-surface.label",
+      },
+      "provenance": {
+        "contributorId": "core",
+        "identity": {
+          "signature": null,
+          "verified": true,
+        },
+        "tier": "CORE",
+        "version": "1.0",
+      },
+      "riskTier": "LOW",
+      "stateSchema": null,
+    },
+    {
+      "altitude": "PRODUCT",
+      "audience": "USER",
+      "consumes": {
+        "conversationShapes": [
+          "core.extract",
+        ],
+        "diagnosticChannels": [],
+        "operations": [],
+        "prompts": [],
+        "resources": [],
+      },
+      "id": "core.extract-surface",
+      "members": [],
+      "mountTag": "jf-chat-shape-mount",
+      "placement": "DEEPLINK",
+      "presentation": {
+        "category": null,
+        "descriptionKey": "registry-surface.extract-surface.description",
+        "iconHint": null,
+        "labelKey": "registry-surface.extract-surface.label",
+      },
+      "provenance": {
+        "contributorId": "core",
+        "identity": {
+          "signature": null,
+          "verified": true,
+        },
+        "tier": "CORE",
+        "version": "1.0",
+      },
+      "riskTier": "LOW",
+      "stateSchema": null,
+    },
+  ],
+}
+`;
+
+exports[`ordered effective catalog preservation > online boot fetches wire before installing frontend contributions and caches only wire 1`] = `
+{
+  "beforeInstall": [
+    {
+      "altitude": "PRODUCT",
+      "audience": "USER",
+      "consumes": {
+        "conversationShapes": [],
+        "diagnosticChannels": [],
+        "operations": [
+          "core.add-watched-root",
+          "core.preview-excludes",
+          "core.apply-excludes",
+          "core.reindex",
+          "core.remove-watched-root",
+        ],
+        "prompts": [],
+        "resources": [
+          "core.indexed-roots",
+        ],
+      },
+      "id": "core.library-surface",
+      "members": [
+        "core.browse-surface",
+      ],
+      "mountTag": "jf-library-surface",
+      "placement": "RAIL",
+      "presentation": {
+        "category": null,
+        "descriptionKey": "registry-surface.library-surface.description",
+        "iconHint": null,
+        "labelKey": "registry-surface.library-surface.label",
+      },
+      "provenance": {
+        "contributorId": "core",
+        "identity": {
+          "signature": null,
+          "verified": true,
+        },
+        "tier": "CORE",
+        "version": "1.0",
+      },
+      "riskTier": "LOW",
+      "stateSchema": null,
+    },
+    {
+      "altitude": "PRODUCT",
+      "audience": "USER",
+      "consumes": {
+        "conversationShapes": [],
+        "diagnosticChannels": [],
+        "operations": [
+          "core.export-diagnostics",
+          "core.copy-diagnostic-summary",
+        ],
+        "prompts": [],
+        "resources": [],
+      },
+      "id": "core.help-surface",
+      "members": [],
+      "mountTag": "jf-help-surface",
+      "placement": "DEEPLINK",
+      "presentation": {
+        "category": null,
+        "descriptionKey": "registry-surface.help-surface.description",
+        "iconHint": null,
+        "labelKey": "registry-surface.help-surface.label",
+      },
+      "provenance": {
+        "contributorId": "core",
+        "identity": {
+          "signature": null,
+          "verified": true,
+        },
+        "tier": "CORE",
+        "version": "1.0",
+      },
+      "riskTier": "LOW",
+      "stateSchema": null,
+    },
+    {
+      "altitude": "PRODUCT",
+      "audience": "USER",
+      "consumes": {
+        "conversationShapes": [],
+        "diagnosticChannels": [],
+        "operations": [],
+        "prompts": [],
+        "resources": [],
+      },
+      "id": "core.presentation-gallery-surface",
+      "members": [],
+      "mountTag": "jf-presentation-gallery-surface",
+      "placement": "DEEPLINK",
+      "presentation": {
+        "category": null,
+        "descriptionKey": "registry-surface.presentation-gallery-surface.description",
+        "iconHint": null,
+        "labelKey": "registry-surface.presentation-gallery-surface.label",
+      },
+      "provenance": {
+        "contributorId": "core",
+        "identity": {
+          "signature": null,
+          "verified": true,
+        },
+        "tier": "CORE",
+        "version": "1.0",
+      },
+      "riskTier": "LOW",
+      "stateSchema": null,
+    },
+    {
+      "altitude": "PRODUCT",
+      "audience": "USER",
+      "consumes": {
+        "conversationShapes": [],
+        "diagnosticChannels": [],
+        "operations": [],
+        "prompts": [],
+        "resources": [],
+      },
+      "id": "core.presentation-editor-surface",
+      "members": [],
+      "mountTag": "jf-presentation-editor-surface",
+      "placement": "DEEPLINK",
+      "presentation": {
+        "category": null,
+        "descriptionKey": "registry-surface.presentation-editor-surface.description",
+        "iconHint": null,
+        "labelKey": "registry-surface.presentation-editor-surface.label",
+      },
+      "provenance": {
+        "contributorId": "core",
+        "identity": {
+          "signature": null,
+          "verified": true,
+        },
+        "tier": "CORE",
+        "version": "1.0",
+      },
+      "riskTier": "LOW",
+      "stateSchema": null,
+    },
+    {
+      "altitude": "PRODUCT",
+      "audience": "DEVELOPER",
+      "consumes": {
+        "conversationShapes": [],
+        "diagnosticChannels": [],
+        "operations": [],
+        "prompts": [],
+        "resources": [],
+      },
+      "id": "core.api-explorer-surface",
+      "members": [],
+      "mountTag": "jf-api-explorer-view",
+      "placement": "DEEPLINK",
+      "presentation": {
+        "category": null,
+        "descriptionKey": "registry-surface.api-explorer-surface.description",
+        "iconHint": null,
+        "labelKey": "registry-surface.api-explorer-surface.label",
+      },
+      "provenance": {
+        "contributorId": "core",
+        "identity": {
+          "signature": null,
+          "verified": true,
+        },
+        "tier": "CORE",
+        "version": "1.0",
+      },
+      "riskTier": "LOW",
+      "stateSchema": null,
+    },
+    {
+      "altitude": "PRODUCT",
+      "audience": "USER",
+      "consumes": {
+        "conversationShapes": [],
+        "diagnosticChannels": [],
+        "operations": [
+          "core.activate-runtime-variant",
+          "core.repair-ai-install",
+          "core.deactivate-runtime-variant",
+          "core.cancel-ai-install",
+          "core.preflight-ai-pack",
+          "core.reconfigure",
+          "core.import-ai-pack",
+          "core.switch-inference-mode",
+          "core.start-ai-install",
+        ],
+        "prompts": [],
+        "resources": [],
+      },
+      "id": "core.brain-surface",
+      "members": [
+        "core.memory-surface",
+      ],
+      "mountTag": "jf-brain-surface",
+      "placement": "RAIL",
+      "presentation": {
+        "category": null,
+        "descriptionKey": "registry-surface.brain-surface.description",
+        "iconHint": null,
+        "labelKey": "registry-surface.brain-surface.label",
+      },
+      "provenance": {
+        "contributorId": "core",
+        "identity": {
+          "signature": null,
+          "verified": true,
+        },
+        "tier": "CORE",
+        "version": "1.0",
+      },
+      "riskTier": "LOW",
+      "stateSchema": null,
+    },
+    {
+      "altitude": "PRODUCT",
+      "audience": "USER",
+      "consumes": {
+        "conversationShapes": [
+          "core.workflow-run",
+          "core.rag-ask",
+          "core.free-chat",
+          "core.agent-run",
+          "core.extract",
+        ],
+        "diagnosticChannels": [],
+        "operations": [],
+        "prompts": [],
+        "resources": [],
+      },
+      "id": "core.search-v3-surface",
+      "members": [],
+      "mountTag": "jf-sv3-window",
+      "placement": "RAIL",
+      "presentation": {
+        "category": null,
+        "descriptionKey": "registry-surface.search-v3-surface.description",
+        "iconHint": null,
+        "labelKey": "registry-surface.search-v3-surface.label",
+      },
+      "provenance": {
+        "contributorId": "core",
+        "identity": {
+          "signature": null,
+          "verified": true,
+        },
+        "tier": "CORE",
+        "version": "1.0",
+      },
+      "riskTier": "LOW",
+      "stateSchema": {
+        "bindings": [
+          {
+            "schemaPath": "/conversationId",
+            "storeId": "sv3.conversation",
+            "storeKey": "conversationId",
+          },
+        ],
+        "schema": "{
+  "type": "object",
+  "properties": {
+    "conversationId": { "type": "string" }
+  }
+}
+",
+      },
+    },
+    {
+      "altitude": "PRODUCT",
+      "audience": "USER",
+      "consumes": {
+        "conversationShapes": [
+          "core.rag-ask",
+        ],
+        "diagnosticChannels": [],
+        "operations": [],
+        "prompts": [],
+        "resources": [],
+      },
+      "id": "core.ask-surface",
+      "members": [],
+      "mountTag": "jf-chat-shape-mount",
+      "placement": "DEEPLINK",
+      "presentation": {
+        "category": null,
+        "descriptionKey": "registry-surface.ask-surface.description",
+        "iconHint": null,
+        "labelKey": "registry-surface.ask-surface.label",
+      },
+      "provenance": {
+        "contributorId": "core",
+        "identity": {
+          "signature": null,
+          "verified": true,
+        },
+        "tier": "CORE",
+        "version": "1.0",
+      },
+      "riskTier": "LOW",
+      "stateSchema": {
+        "bindings": [
+          {
+            "schemaPath": "/query",
+            "storeId": "ask",
+            "storeKey": "query",
+          },
+          {
+            "schemaPath": "/docIds",
+            "storeId": "ask",
+            "storeKey": "docIds",
+          },
+        ],
+        "schema": "{
+  "type": "object",
+  "properties": {
+    "query": { "type": "string" },
+    "docIds": { "type": "array", "items": { "type": "string" } }
+  }
+}
+",
+      },
+    },
+    {
+      "altitude": "PRODUCT",
+      "audience": "USER",
+      "consumes": {
+        "conversationShapes": [],
+        "diagnosticChannels": [],
+        "operations": [
+          "core.reset-settings",
+        ],
+        "prompts": [],
+        "resources": [],
+      },
+      "id": "core.settings-surface",
+      "members": [
+        "core.presentation-gallery-surface",
+        "core.presentation-editor-surface",
+        "core.security-surface",
+      ],
+      "mountTag": "jf-settings-surface",
+      "placement": "MODAL",
+      "presentation": {
+        "category": null,
+        "descriptionKey": "registry-surface.settings-surface.description",
+        "iconHint": null,
+        "labelKey": "registry-surface.settings-surface.label",
+      },
+      "provenance": {
+        "contributorId": "core",
+        "identity": {
+          "signature": null,
+          "verified": true,
+        },
+        "tier": "CORE",
+        "version": "1.0",
+      },
+      "riskTier": "LOW",
+      "stateSchema": null,
+    },
+    {
+      "altitude": "PRODUCT",
+      "audience": "USER",
+      "consumes": {
+        "conversationShapes": [],
+        "diagnosticChannels": [],
+        "operations": [],
+        "prompts": [],
+        "resources": [],
+      },
+      "id": "core.security-surface",
+      "members": [],
+      "mountTag": "jf-security-surface",
+      "placement": "DEEPLINK",
+      "presentation": {
+        "category": null,
+        "descriptionKey": "registry-surface.security-surface.description",
+        "iconHint": null,
+        "labelKey": "registry-surface.security-surface.label",
+      },
+      "provenance": {
+        "contributorId": "core",
+        "identity": {
+          "signature": null,
+          "verified": true,
+        },
+        "tier": "CORE",
+        "version": "1.0",
+      },
+      "riskTier": "LOW",
+      "stateSchema": null,
+    },
+    {
+      "altitude": "PRODUCT",
+      "audience": "USER",
+      "consumes": {
+        "conversationShapes": [
+          "core.summarize",
+          "core.hierarchical-summarize",
+          "core.batch-summarize",
+        ],
+        "diagnosticChannels": [],
+        "operations": [],
+        "prompts": [],
+        "resources": [],
+      },
+      "id": "core.browse-surface",
+      "members": [],
+      "mountTag": "jf-browse-surface",
+      "placement": "DEEPLINK",
+      "presentation": {
+        "category": null,
+        "descriptionKey": "registry-surface.browse-surface.description",
+        "iconHint": null,
+        "labelKey": "registry-surface.browse-surface.label",
+      },
+      "provenance": {
+        "contributorId": "core",
+        "identity": {
+          "signature": null,
+          "verified": true,
+        },
+        "tier": "CORE",
+        "version": "1.0",
+      },
+      "riskTier": "LOW",
+      "stateSchema": null,
+    },
+    {
+      "altitude": "PRODUCT",
+      "audience": "USER",
+      "consumes": {
+        "conversationShapes": [],
+        "diagnosticChannels": [],
+        "operations": [],
+        "prompts": [],
+        "resources": [],
+      },
+      "id": "core.system-surface",
+      "members": [
+        "core.health-surface",
+        "core.logs-surface",
+        "core.activity-surface",
+      ],
+      "mountTag": "jf-system-surface",
+      "placement": "RAIL",
+      "presentation": {
+        "category": null,
+        "descriptionKey": "registry-surface.system-surface.description",
+        "iconHint": null,
+        "labelKey": "registry-surface.system-surface.label",
+      },
+      "provenance": {
+        "contributorId": "core",
+        "identity": {
+          "signature": null,
+          "verified": true,
+        },
+        "tier": "CORE",
+        "version": "1.0",
+      },
+      "riskTier": "LOW",
+      "stateSchema": null,
+    },
+    {
+      "altitude": "DIAGNOSTIC",
+      "audience": "USER",
+      "consumes": {
+        "conversationShapes": [],
+        "diagnosticChannels": [],
+        "operations": [
+          "core.reindex",
+          "core.clear-failed-jobs",
+          "core.bulk-reindex",
+          "core.index-gc",
+          "core.recover-component",
+          "core.export-diagnostics",
+        ],
+        "prompts": [],
+        "resources": [
+          "core.condition-recovery-index",
+          "core.failed-indexing-jobs",
+          "core.health-events",
+        ],
+      },
+      "id": "core.health-surface",
+      "members": [],
+      "mountTag": "jf-health-surface",
+      "placement": "DEEPLINK",
+      "presentation": {
+        "category": null,
+        "descriptionKey": "registry-surface.health-surface.description",
+        "iconHint": null,
+        "labelKey": "registry-surface.health-surface.label",
+      },
+      "provenance": {
+        "contributorId": "core",
+        "identity": {
+          "signature": null,
+          "verified": true,
+        },
+        "tier": "CORE",
+        "version": "1.0",
+      },
+      "riskTier": "LOW",
+      "stateSchema": null,
+    },
+    {
+      "altitude": "DIAGNOSTIC",
+      "audience": "OPERATOR",
+      "consumes": {
+        "conversationShapes": [],
+        "diagnosticChannels": [
+          "core.engine-log",
+        ],
+        "operations": [],
+        "prompts": [],
+        "resources": [],
+      },
+      "id": "core.logs-surface",
+      "members": [],
+      "mountTag": "jf-log-surface",
+      "placement": "DEEPLINK",
+      "presentation": {
+        "category": null,
+        "descriptionKey": "registry-surface.logs-surface.description",
+        "iconHint": null,
+        "labelKey": "registry-surface.logs-surface.label",
+      },
+      "provenance": {
+        "contributorId": "core",
+        "identity": {
+          "signature": null,
+          "verified": true,
+        },
+        "tier": "CORE",
+        "version": "1.0",
+      },
+      "riskTier": "LOW",
+      "stateSchema": null,
+    },
+    {
+      "altitude": "TRUST",
+      "audience": "USER",
+      "consumes": {
+        "conversationShapes": [],
+        "diagnosticChannels": [],
+        "operations": [],
+        "prompts": [],
+        "resources": [
+          "core.action-ledger",
+        ],
+      },
+      "id": "core.activity-surface",
+      "members": [],
+      "mountTag": "jf-activity-surface",
+      "placement": "DEEPLINK",
+      "presentation": {
+        "category": null,
+        "descriptionKey": "registry-surface.activity-surface.description",
+        "iconHint": null,
+        "labelKey": "registry-surface.activity-surface.label",
+      },
+      "provenance": {
+        "contributorId": "core",
+        "identity": {
+          "signature": null,
+          "verified": true,
+        },
+        "tier": "CORE",
+        "version": "1.0",
+      },
+      "riskTier": "LOW",
+      "stateSchema": null,
+    },
+    {
+      "altitude": "PRODUCT",
+      "audience": "USER",
+      "consumes": {
+        "conversationShapes": [
+          "core.free-chat",
+        ],
+        "diagnosticChannels": [],
+        "operations": [],
+        "prompts": [],
+        "resources": [],
+      },
+      "id": "core.free-chat-surface",
+      "members": [],
+      "mountTag": "jf-chat-shape-mount",
+      "placement": "DEEPLINK",
+      "presentation": {
+        "category": null,
+        "descriptionKey": "registry-surface.free-chat-surface.description",
+        "iconHint": null,
+        "labelKey": "registry-surface.free-chat-surface.label",
+      },
+      "provenance": {
+        "contributorId": "core",
+        "identity": {
+          "signature": null,
+          "verified": true,
+        },
+        "tier": "CORE",
+        "version": "1.0",
+      },
+      "riskTier": "LOW",
+      "stateSchema": null,
+    },
+    {
+      "altitude": "PRODUCT",
+      "audience": "USER",
+      "consumes": {
+        "conversationShapes": [
+          "core.extract",
+        ],
+        "diagnosticChannels": [],
+        "operations": [],
+        "prompts": [],
+        "resources": [],
+      },
+      "id": "core.extract-surface",
+      "members": [],
+      "mountTag": "jf-chat-shape-mount",
+      "placement": "DEEPLINK",
+      "presentation": {
+        "category": null,
+        "descriptionKey": "registry-surface.extract-surface.description",
+        "iconHint": null,
+        "labelKey": "registry-surface.extract-surface.label",
+      },
+      "provenance": {
+        "contributorId": "core",
+        "identity": {
+          "signature": null,
+          "verified": true,
+        },
+        "tier": "CORE",
+        "version": "1.0",
+      },
+      "riskTier": "LOW",
+      "stateSchema": null,
+    },
+  ],
+  "installed": [
+    {
+      "altitude": "PRODUCT",
+      "audience": "USER",
+      "consumes": {
+        "conversationShapes": [],
+        "diagnosticChannels": [],
+        "operations": [
+          "core.reindex",
+          "core.add-watched-root",
+          "core.remove-watched-root",
+          "core.preview-excludes",
+          "core.apply-excludes",
+        ],
+        "prompts": [],
+        "resources": [
+          "core.indexed-roots",
+        ],
+      },
+      "id": "core.library-surface",
+      "members": [
+        "core.browse-surface",
+      ],
+      "mountTag": "jf-library-surface",
+      "placement": "RAIL",
+      "presentation": {
+        "descriptionKey": "registry-surface.library-surface.description",
+        "labelKey": "registry-surface.library-surface.label",
+      },
+      "provenance": {
+        "capability": [
+          "surfaces",
+        ],
+        "contributorId": "core",
+        "identity": {
+          "verified": true,
+        },
+        "tier": "TRUSTED_PLUGIN",
+        "version": "1.0.0",
+      },
+      "splitPairing": {
+        "secondary": "core.search-v3-surface",
+      },
+    },
+    {
+      "altitude": "PRODUCT",
+      "audience": "USER",
+      "consumes": {
+        "conversationShapes": [],
+        "diagnosticChannels": [],
+        "operations": [],
+        "prompts": [],
+        "resources": [],
+      },
+      "id": "core.help-surface",
+      "members": [],
+      "mountTag": "jf-help-surface",
+      "placement": "DEEPLINK",
+      "presentation": {
+        "descriptionKey": "registry-surface.help-surface.description",
+        "labelKey": "registry-surface.help-surface.label",
+      },
+      "provenance": {
+        "capability": [
+          "surfaces",
+        ],
+        "contributorId": "core",
+        "identity": {
+          "verified": true,
+        },
+        "tier": "TRUSTED_PLUGIN",
+        "version": "1.0.0",
+      },
+    },
+    {
+      "altitude": "PRODUCT",
+      "audience": "USER",
+      "consumes": {
+        "conversationShapes": [],
+        "diagnosticChannels": [],
+        "operations": [],
+        "prompts": [],
+        "resources": [],
+      },
+      "id": "core.presentation-gallery-surface",
+      "members": [],
+      "mountTag": "jf-presentation-gallery-surface",
+      "placement": "DEEPLINK",
+      "presentation": {
+        "descriptionKey": "registry-surface.presentation-gallery-surface.description",
+        "labelKey": "registry-surface.presentation-gallery-surface.label",
+      },
+      "provenance": {
+        "capability": [
+          "surfaces",
+        ],
+        "contributorId": "core",
+        "identity": {
+          "verified": true,
+        },
+        "tier": "TRUSTED_PLUGIN",
+        "version": "1.0.0",
+      },
+    },
+    {
+      "altitude": "PRODUCT",
+      "audience": "USER",
+      "consumes": {
+        "conversationShapes": [],
+        "diagnosticChannels": [],
+        "operations": [],
+        "prompts": [],
+        "resources": [],
+      },
+      "id": "core.presentation-editor-surface",
+      "members": [],
+      "mountTag": "jf-presentation-editor-surface",
+      "placement": "DEEPLINK",
+      "presentation": {
+        "descriptionKey": "registry-surface.presentation-editor-surface.description",
+        "labelKey": "registry-surface.presentation-editor-surface.label",
+      },
+      "provenance": {
+        "capability": [
+          "surfaces",
+        ],
+        "contributorId": "core",
+        "identity": {
+          "verified": true,
+        },
+        "tier": "TRUSTED_PLUGIN",
+        "version": "1.0.0",
+      },
+    },
+    {
+      "altitude": "PRODUCT",
+      "audience": "DEVELOPER",
+      "consumes": {
+        "conversationShapes": [],
+        "diagnosticChannels": [],
+        "operations": [],
+        "prompts": [],
+        "resources": [],
+      },
+      "id": "core.api-explorer-surface",
+      "members": [],
+      "mountTag": "jf-api-explorer-view",
+      "placement": "DEEPLINK",
+      "presentation": {
+        "descriptionKey": "registry-surface.api-explorer-surface.description",
+        "labelKey": "registry-surface.api-explorer-surface.label",
+      },
+      "provenance": {
+        "capability": [
+          "surfaces",
+        ],
+        "contributorId": "core",
+        "identity": {
+          "verified": true,
+        },
+        "tier": "TRUSTED_PLUGIN",
+        "version": "1.0.0",
+      },
+    },
+    {
+      "altitude": "PRODUCT",
+      "audience": "USER",
+      "consumes": {
+        "conversationShapes": [],
+        "diagnosticChannels": [],
+        "operations": [],
+        "prompts": [],
+        "resources": [],
+      },
+      "id": "core.brain-surface",
+      "members": [
+        "core.memory-surface",
+      ],
+      "mountTag": "jf-brain-surface",
+      "placement": "RAIL",
+      "presentation": {
+        "descriptionKey": "registry-surface.brain-surface.description",
+        "labelKey": "registry-surface.brain-surface.label",
+      },
+      "provenance": {
+        "capability": [
+          "surfaces",
+        ],
+        "contributorId": "core",
+        "identity": {
+          "verified": true,
+        },
+        "tier": "TRUSTED_PLUGIN",
+        "version": "1.0.0",
+      },
+    },
+    {
+      "altitude": "PRODUCT",
+      "audience": "USER",
+      "consumes": {
+        "conversationShapes": [],
+        "diagnosticChannels": [],
+        "operations": [],
+        "prompts": [],
+        "resources": [],
+      },
+      "id": "core.search-v3-surface",
+      "members": [],
+      "mountTag": "jf-sv3-window",
+      "placement": "RAIL",
+      "presentation": {
+        "descriptionKey": "registry-surface.search-v3-surface.description",
+        "labelKey": "registry-surface.search-v3-surface.label",
+      },
+      "provenance": {
+        "capability": [
+          "surfaces",
+        ],
+        "contributorId": "core",
+        "identity": {
+          "verified": true,
+        },
+        "tier": "TRUSTED_PLUGIN",
+        "version": "1.0.0",
+      },
+      "splitPairing": {
+        "secondary": "core.library-surface",
+      },
+    },
+    {
+      "altitude": "PRODUCT",
+      "audience": "USER",
+      "consumes": {
+        "conversationShapes": [
+          "core.rag-ask",
+        ],
+        "diagnosticChannels": [],
+        "operations": [],
+        "prompts": [],
+        "resources": [],
+      },
+      "id": "core.ask-surface",
+      "members": [],
+      "mountTag": "jf-chat-shape-mount",
+      "placement": "DEEPLINK",
+      "presentation": {
+        "category": null,
+        "descriptionKey": "registry-surface.ask-surface.description",
+        "iconHint": null,
+        "labelKey": "registry-surface.ask-surface.label",
+      },
+      "provenance": {
+        "contributorId": "core",
+        "identity": {
+          "signature": null,
+          "verified": true,
+        },
+        "tier": "CORE",
+        "version": "1.0",
+      },
+      "riskTier": "LOW",
+      "stateSchema": {
+        "bindings": [
+          {
+            "schemaPath": "/query",
+            "storeId": "ask",
+            "storeKey": "query",
+          },
+          {
+            "schemaPath": "/docIds",
+            "storeId": "ask",
+            "storeKey": "docIds",
+          },
+        ],
+        "schema": "{
+  "type": "object",
+  "properties": {
+    "query": { "type": "string" },
+    "docIds": { "type": "array", "items": { "type": "string" } }
+  }
+}
+",
+      },
+    },
+    {
+      "altitude": "PRODUCT",
+      "audience": "USER",
+      "consumes": {
+        "conversationShapes": [],
+        "diagnosticChannels": [],
+        "operations": [],
+        "prompts": [],
+        "resources": [],
+      },
+      "id": "core.settings-surface",
+      "members": [
+        "core.presentation-gallery-surface",
+        "core.presentation-editor-surface",
+        "core.security-surface",
+      ],
+      "mountTag": "jf-settings-surface",
+      "placement": "MODAL",
+      "presentation": {
+        "descriptionKey": "registry-surface.settings-surface.description",
+        "labelKey": "registry-surface.settings-surface.label",
+      },
+      "provenance": {
+        "capability": [
+          "surfaces",
+        ],
+        "contributorId": "core",
+        "identity": {
+          "verified": true,
+        },
+        "tier": "TRUSTED_PLUGIN",
+        "version": "1.0.0",
+      },
+    },
+    {
+      "altitude": "PRODUCT",
+      "audience": "USER",
+      "consumes": {
+        "conversationShapes": [],
+        "diagnosticChannels": [],
+        "operations": [],
+        "prompts": [],
+        "resources": [],
+      },
+      "id": "core.security-surface",
+      "members": [],
+      "mountTag": "jf-security-surface",
+      "placement": "DEEPLINK",
+      "presentation": {
+        "descriptionKey": "registry-surface.security-surface.description",
+        "labelKey": "registry-surface.security-surface.label",
+      },
+      "provenance": {
+        "capability": [
+          "surfaces",
+        ],
+        "contributorId": "core",
+        "identity": {
+          "verified": true,
+        },
+        "tier": "TRUSTED_PLUGIN",
+        "version": "1.0.0",
+      },
+    },
+    {
+      "altitude": "PRODUCT",
+      "audience": "USER",
+      "consumes": {
+        "conversationShapes": [],
+        "diagnosticChannels": [],
+        "operations": [],
+        "prompts": [],
+        "resources": [],
+      },
+      "id": "core.browse-surface",
+      "members": [],
+      "mountTag": "jf-browse-surface",
+      "placement": "DEEPLINK",
+      "presentation": {
+        "descriptionKey": "registry-surface.browse-surface.description",
+        "labelKey": "registry-surface.browse-surface.label",
+      },
+      "provenance": {
+        "capability": [
+          "surfaces",
+        ],
+        "contributorId": "core",
+        "identity": {
+          "verified": true,
+        },
+        "tier": "TRUSTED_PLUGIN",
+        "version": "1.0.0",
+      },
+    },
+    {
+      "altitude": "PRODUCT",
+      "audience": "USER",
+      "consumes": {
+        "conversationShapes": [],
+        "diagnosticChannels": [],
+        "operations": [],
+        "prompts": [],
+        "resources": [],
+      },
+      "id": "core.system-surface",
+      "members": [
+        "core.health-surface",
+        "core.logs-surface",
+        "core.activity-surface",
+      ],
+      "mountTag": "jf-system-surface",
+      "placement": "RAIL",
+      "presentation": {
+        "category": null,
+        "descriptionKey": "registry-surface.system-surface.description",
+        "iconHint": null,
+        "labelKey": "registry-surface.system-surface.label",
+      },
+      "provenance": {
+        "contributorId": "core",
+        "identity": {
+          "signature": null,
+          "verified": true,
+        },
+        "tier": "CORE",
+        "version": "1.0",
+      },
+      "riskTier": "LOW",
+      "stateSchema": null,
+    },
+    {
+      "altitude": "DIAGNOSTIC",
+      "audience": "USER",
+      "consumes": {
+        "conversationShapes": [],
+        "diagnosticChannels": [],
+        "operations": [
+          "core.reindex",
+          "core.recover-component",
+          "core.clear-failed-jobs",
+          "core.export-diagnostics",
+          "core.bulk-reindex",
+        ],
+        "prompts": [],
+        "resources": [],
+      },
+      "id": "core.health-surface",
+      "members": [],
+      "mountTag": "jf-health-surface",
+      "placement": "DEEPLINK",
+      "presentation": {
+        "descriptionKey": "registry-surface.health-surface.description",
+        "labelKey": "registry-surface.health-surface.label",
+      },
+      "provenance": {
+        "capability": [
+          "surfaces",
+        ],
+        "contributorId": "core",
+        "identity": {
+          "verified": true,
+        },
+        "tier": "TRUSTED_PLUGIN",
+        "version": "1.0.0",
+      },
+    },
+    {
+      "altitude": "DIAGNOSTIC",
+      "audience": "OPERATOR",
+      "consumes": {
+        "conversationShapes": [],
+        "diagnosticChannels": [],
+        "operations": [],
+        "prompts": [],
+        "resources": [],
+      },
+      "id": "core.logs-surface",
+      "members": [],
+      "mountTag": "jf-log-surface",
+      "placement": "DEEPLINK",
+      "presentation": {
+        "descriptionKey": "registry-surface.logs-surface.description",
+        "labelKey": "registry-surface.logs-surface.label",
+      },
+      "provenance": {
+        "capability": [
+          "surfaces",
+        ],
+        "contributorId": "core",
+        "identity": {
+          "verified": true,
+        },
+        "tier": "TRUSTED_PLUGIN",
+        "version": "1.0.0",
+      },
+    },
+    {
+      "altitude": "TRUST",
+      "audience": "USER",
+      "consumes": {
+        "conversationShapes": [],
+        "diagnosticChannels": [],
+        "operations": [],
+        "prompts": [],
+        "resources": [],
+      },
+      "id": "core.activity-surface",
+      "members": [],
+      "mountTag": "jf-activity-surface",
+      "placement": "DEEPLINK",
+      "presentation": {
+        "descriptionKey": "registry-surface.activity-surface.description",
+        "labelKey": "registry-surface.activity-surface.label",
+      },
+      "provenance": {
+        "capability": [
+          "surfaces",
+        ],
+        "contributorId": "core",
+        "identity": {
+          "verified": true,
+        },
+        "tier": "TRUSTED_PLUGIN",
+        "version": "1.0.0",
+      },
+    },
+    {
+      "altitude": "PRODUCT",
+      "audience": "USER",
+      "consumes": {
+        "conversationShapes": [
+          "core.free-chat",
+        ],
+        "diagnosticChannels": [],
+        "operations": [],
+        "prompts": [],
+        "resources": [],
+      },
+      "id": "core.free-chat-surface",
+      "members": [],
+      "mountTag": "jf-chat-shape-mount",
+      "placement": "DEEPLINK",
+      "presentation": {
+        "category": null,
+        "descriptionKey": "registry-surface.free-chat-surface.description",
+        "iconHint": null,
+        "labelKey": "registry-surface.free-chat-surface.label",
+      },
+      "provenance": {
+        "contributorId": "core",
+        "identity": {
+          "signature": null,
+          "verified": true,
+        },
+        "tier": "CORE",
+        "version": "1.0",
+      },
+      "riskTier": "LOW",
+      "stateSchema": null,
+    },
+    {
+      "altitude": "PRODUCT",
+      "audience": "USER",
+      "consumes": {
+        "conversationShapes": [
+          "core.extract",
+        ],
+        "diagnosticChannels": [],
+        "operations": [],
+        "prompts": [],
+        "resources": [],
+      },
+      "id": "core.extract-surface",
+      "members": [],
+      "mountTag": "jf-chat-shape-mount",
+      "placement": "DEEPLINK",
+      "presentation": {
+        "category": null,
+        "descriptionKey": "registry-surface.extract-surface.description",
+        "iconHint": null,
+        "labelKey": "registry-surface.extract-surface.label",
+      },
+      "provenance": {
+        "contributorId": "core",
+        "identity": {
+          "signature": null,
+          "verified": true,
+        },
+        "tier": "CORE",
+        "version": "1.0",
+      },
+      "riskTier": "LOW",
+      "stateSchema": null,
+    },
+    {
+      "altitude": "PRODUCT",
+      "audience": "USER",
+      "consumes": {
+        "conversationShapes": [],
+        "diagnosticChannels": [],
+        "operations": [],
+        "prompts": [],
+        "resources": [],
+      },
+      "id": "core.memory-surface",
+      "members": [],
+      "mountTag": "jf-memory-surface",
+      "placement": "DEEPLINK",
+      "presentation": {
+        "descriptionKey": "registry-surface.memory-surface.description",
+        "labelKey": "registry-surface.memory-surface.label",
+      },
+      "provenance": {
+        "capability": [
+          "surfaces",
+        ],
+        "contributorId": "core",
+        "identity": {
+          "verified": true,
+        },
+        "tier": "TRUSTED_PLUGIN",
+        "version": "1.0.0",
+      },
+    },
+    {
+      "altitude": "PRODUCT",
+      "audience": "USER",
+      "consumes": {
+        "conversationShapes": [],
+        "diagnosticChannels": [],
+        "operations": [],
+        "prompts": [],
+        "resources": [],
+      },
+      "id": "core.command-palette",
+      "members": [],
+      "mountTag": "jf-command-palette",
+      "placement": "COMMAND",
+      "presentation": {
+        "descriptionKey": "registry-surface.command-palette.description",
+        "labelKey": "registry-surface.command-palette.label",
+      },
+      "provenance": {
+        "capability": [
+          "surfaces",
+        ],
+        "contributorId": "core",
+        "identity": {
+          "verified": true,
+        },
+        "tier": "TRUSTED_PLUGIN",
+        "version": "1.0.0",
+      },
+    },
+  ],
+}
+`;
