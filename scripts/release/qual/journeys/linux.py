@@ -275,6 +275,61 @@ def cpu_install_ready(run, status):
                 p.get('state') == 'skipped' and p.get('skipCause') == 'hardware') for p in packages))
 
 
+
+DIAG_DUMP = r"""
+import glob,json,os,subprocess,sys,time
+from pathlib import Path
+a=json.loads(sys.argv[1]); out=Path(a['out']); out.mkdir(parents=True,exist_ok=True)
+pid=json.loads((Path(a['data'])/'runtime/manifest.json').read_text())['pid']
+tag=a['label']
+jcmds=sorted(glob.glob('/usr/lib/jvm/*/bin/jcmd'),key=lambda x:[int(n) for n in __import__('re').findall(r'\d+',x)[:1] or [0]])
+res={'pid':pid,'jcmd':None}
+for j in reversed(jcmds):
+ r=subprocess.run([j,str(pid),'Thread.print','-l'],capture_output=True,text=True,timeout=60)
+ res.setdefault('attempts',[]).append({'jcmd':j,'rc':r.returncode,'err':r.stderr[-500:]})
+ if r.returncode==0 and 'Full thread dump' in r.stdout:
+  (out/(tag+'-threads.txt')).write_text(r.stdout); res['jcmd']=j; break
+rows=[]
+for t in Path('/proc/%d/task'%pid).iterdir():
+ try:
+  st=(t/'stat').read_text().split(') ',1)[1].split()
+  rows.append({'tid':t.name,'comm':(t/'comm').read_text().strip(),'state':st[0],'utime':int(st[11]),'stime':int(st[12]),'wchan':(t/'wchan').read_text()})
+ except OSError: pass
+(out/(tag+'-proc-threads.json')).write_text(json.dumps(rows,indent=1))
+ps=subprocess.run(['ps','-eo','pid,ppid,stat,etimes,pcpu,rss,args','--sort=-pcpu'],capture_output=True,text=True).stdout
+(out/(tag+'-ps.txt')).write_text(ps)
+res['epoch']=time.time(); print(json.dumps(res))
+"""
+
+
+def diag_capture(run, label, operations=()):
+    # Diagnostic branch only (t-20261027-4e4d6b J3 stall): never merged.
+    out = str(run.out / 'J3-diag')
+    try:
+        res = run.target.json(DIAG_DUMP, {'data': run.data, 'out': out, 'label': label}, timeout=180, desktop=False)
+    except Exception as exc:
+        res = {'error': repr(exc)}
+    apis = {}
+    for endpoint in ['/api/status', '/api/knowledge/status', '/api/diagnostics/ingestion/summary?since=0',
+                     '/api/diagnostics/ingestion/recent?limit=200', '/api/ai/runtime/status',
+                     *('/api/operation-history/' + k for k in operations)]:
+        try:
+            apis[endpoint] = run.api(endpoint)
+        except Exception as exc:
+            apis[endpoint] = {'error': repr(exc)}
+    (run.out / 'J3-diag').mkdir(exist_ok=True)
+    (run.out / 'J3-diag' / (label + '-api.json')).write_text(json.dumps({'dump': res, 'api': apis}, indent=1))
+
+
+def diag_follow(run):
+    out = run.out / 'J3-diag'
+    out.mkdir(exist_ok=True)
+    proc = subprocess.Popen(['tail', '-F', '-n', '+1', run.data + '/logs/engine.log'],
+                            stdout=open(out / 'engine-follow.log', 'w'), stderr=subprocess.DEVNULL,
+                            start_new_session=True)
+    return proc
+
+
 def install_ai(run):
     run.require('ui')
     run.require('folder')
@@ -326,6 +381,9 @@ print(json.dumps(dict(m,epochSeconds=time.time(),usedKiB=m['MemTotal']-m['MemAva
         memory_samples.append(sample)
         run.evidence('J3-activation-memory', memory_samples)
     sample_memory()
+    follower = diag_follow(run)
+    diag_capture(run, 'pre-activation')
+    activated_at = time.time()
     if not resumed or status.get('phase') == 'activation_required':
         activate_downloaded(run)
     else:
@@ -343,13 +401,24 @@ print(json.dumps(dict(m,epochSeconds=time.time(),usedKiB=m['MemTotal']-m['MemAva
         history = [run.api('/api/operation-history/' + key) for key in outcomes]
         activation_samples.append({'install': install, 'runtime': runtime, 'ui': ui, 'operations': history})
         run.evidence('J3-activation-observations', activation_samples)
+        elapsed = time.time() - activated_at
+        due = [m for m in (60, 240, 480, 840) if elapsed >= m and m not in diag_done]
+        if due:
+            diag_done.update(due)
+            diag_capture(run, 'at-%ds' % max(due), outcomes)
         for operation in history:
             if operation.get('state') in ('failed', 'cancelled'):
                 raise ProductFailure('Model activation failed: ' + json.dumps(operation))
         features = {f['id']: f for f in runtime.get('onnxFeatures', [])}
         return {'install': install, 'runtime': runtime} if cpu_install_ready(run, install) and all(
             features.get(name, {}).get('modelActive') is True for name in ('embed', 'splade')) else None
-    active = wait_for(activated, 'Downloaded default CPU search encoders activated', seconds=900, interval=5)
+    diag_done = set()
+    try:
+        active = wait_for(activated, 'Downloaded default CPU search encoders activated', seconds=900, interval=5)
+        diag_capture(run, 'activated')
+    finally:
+        time.sleep(5)
+        follower.terminate()
     status = active['install']
     # Acquisition stages belong to this download session, not rebooted caches.
     if not resumed:
@@ -1017,8 +1086,12 @@ def mcp(run):
     for name, args in [('list', ['--method', 'tools/list']),
                        ('status', ['--method', 'tools/call', '--tool-name', 'justsearch_status']),
                        ('search', ['--method', 'tools/call', '--tool-name', 'justsearch_search', '--tool-arg', 'query=' + QUERY])]:
+        wrapper = Path(run.work) / 'mcpb' / ('diag-bridge-' + name + '.sh')
+        wrapper.write_text('#!/bin/sh\nexec node %s "$@" 2>>%s\n' % (
+            shlex.quote(run.work + '/mcpb/server/index.js'), shlex.quote(str(run.out / ('J8-bridge-' + name + '.stderr.log')))))
+        wrapper.chmod(0o755)
         result = run.target.run(['npx', '--yes', '@modelcontextprotocol/inspector@0.21.1', '--cli',
-                                 'node', run.work + '/mcpb/server/index.js', *args], timeout=180, check=False)
+                                 str(wrapper), *args], timeout=180, check=False)
         (run.out / ('J8-inspector-' + name + '.log')).write_text(result.stdout + result.stderr)
         if result.returncode:
             if any(v in result.stderr for v in ('npm ERR', 'npm error', 'ENOTFOUND', 'ECONNRESET')):

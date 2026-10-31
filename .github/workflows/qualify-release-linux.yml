@@ -11,7 +11,7 @@ on:
 permissions: {}
 
 concurrency:
-  group: qualify-linux-${{ inputs.tag }}
+  group: qualify-linux-${{ inputs.tag }}-${{ github.run_id }}
   cancel-in-progress: false
 
 jobs:
