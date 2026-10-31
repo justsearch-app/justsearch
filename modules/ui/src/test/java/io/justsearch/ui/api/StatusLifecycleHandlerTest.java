@@ -409,6 +409,138 @@ final class StatusLifecycleHandlerTest {
         after.composites().get("retrieval").reasonCodes());
   }
 
+  @ParameterizedTest
+  @org.junit.jupiter.params.provider.ValueSource(strings = {
+      "rebuild_brake_exhausted", "rebuild_brake_unreadable", "rebuild_brake_state_lost"})
+  void servingBrakeTransitionsThroughHandlerAndHealthTap(String brakeReason) throws Exception {
+    var conditions = new io.justsearch.app.observability.health.ConditionStore();
+    try (var executor = java.util.concurrent.Executors.newVirtualThreadPerTaskExecutor()) {
+      var tap = new io.justsearch.app.services.observability.health.LifecycleSnapshotTap(
+          conditions, new io.justsearch.app.observability.health.HealthEventChangeRegistry(executor),
+          io.justsearch.app.observability.health.Source.forProcess("head", "test", "1"),
+          java.time.Clock.systemUTC());
+      var handler = newHandler();
+      readyProjection();
+      COMPONENTS.transition("index", ComponentState.STARTING, "index.starting", "starting");
+      var base = compatWorkerView(CompatibilityStatusView.empty(), true);
+      tap.accept(readinessEnvelope(handler, base, COMPONENTS.projection(), freshContact(), false));
+      assertTrue(conditions.find("index.unavailable", "worker").isPresent());
+      var blocked = WorkerOperationalViewBuilder.builder(base).compatibility(
+          new CompatibilityStatusView("COMPATIBLE", "", "", "", "", "",
+              "BLOCKED_REBUILD_BRAKE", true, brakeReason)).build();
+      var envelope = readinessEnvelope(handler, blocked, readyProjection(), freshContact(), false);
+      assertEquals("DEGRADED", envelope.components().get("indexServing").state());
+      tap.accept(envelope);
+      tap.accept(envelope);
+      assertTrue(conditions.find("index.unavailable", "worker").isEmpty(),
+          "keyword serving must remain discoverable");
+      var condition = (io.justsearch.app.observability.health.AssertedCondition)
+          conditions.find("schema.reindex-required", "worker").orElseThrow().body();
+      assertEquals("core.rebuild-index", condition.recovery().orElseThrow().target().value());
+      assertEquals(io.justsearch.app.services.observability.health.LifecycleSnapshotTap.toPascalReason(
+          envelope.components().get("indexServing").reasonCode()), condition.reason());
+      tap.accept(readinessEnvelope(handler, base, readyProjection(), freshContact(), false));
+      assertTrue(conditions.find("schema.reindex-required", "worker").isEmpty());
+    }
+  }
+
+  @ParameterizedTest
+  @org.junit.jupiter.params.provider.CsvSource({
+      "audit,true", "embedding,true", "splade,true", "ner,true", "chunkSplade,true",
+      "audit,false", "embedding,false", "splade,false", "ner,false", "chunkSplade,false"})
+  void independentUnreadableEnrichmentSurvivesMapperAndReadiness(String failedRead, boolean enabled) throws Exception {
+    var enrichment = io.justsearch.ipc.EnrichmentCoverage.newBuilder()
+        .setCompletenessKnown(true).setEmbeddingEnabled(enabled).setSpladeEnabled(enabled)
+        .setNerEnabled(enabled)
+        .setEmbedding(io.justsearch.ipc.FeatureCoverage.newBuilder()
+            .setDocCount(1).setCompletedCount(1).setCoveragePercent(100))
+        .setSplade(io.justsearch.ipc.FeatureCoverage.newBuilder()
+            .setDocCount(1).setCompletedCount(1).setCoveragePercent(100))
+        .setCompletedNerCount(1)
+        .setChunk(io.justsearch.ipc.ChunkCoverage.newBuilder().setDocCount(100)
+            .setCompletedCount(100).setCoveragePercent(100).setVectorsReady(true)
+            .setSpladeEnabled(enabled).setSpladeDocCount(100)
+            .setSpladeCompletedCount(100).setSpladeCoveragePercent(100));
+    switch (failedRead) {
+      case "audit" -> enrichment.setCompletenessKnown(false);
+      case "embedding" -> enrichment.getEmbeddingBuilder().setDocCount(-1)
+          .setCompletedCount(-1).setPendingCount(-1).setFailedCount(-1).setCoveragePercent(-1);
+      case "splade" -> enrichment.getSpladeBuilder().setDocCount(-1)
+          .setCompletedCount(-1).setPendingCount(-1).setFailedCount(-1).setCoveragePercent(-1);
+      case "ner" -> enrichment.setPendingNerCount(-1).setCompletedNerCount(-1).setFailedNerCount(-1);
+      case "chunkSplade" -> enrichment.getChunkBuilder().setSpladeDocCount(-1)
+          .setSpladeCompletedCount(-1).setSpladePendingCount(-1).setSpladeFailedCount(-1)
+          .setSpladeCoveragePercent(-1);
+      default -> throw new AssertionError(failedRead);
+    }
+    var mapper = Class.forName("io.justsearch.app.services.worker.WorkerStatusMapper")
+        .getDeclaredMethod("toUiStatusMap", io.justsearch.ipc.StatusResponse.class);
+    mapper.setAccessible(true);
+    var mapped = (WorkerOperationalView) mapper.invoke(null,
+        io.justsearch.ipc.StatusResponse.newBuilder().setEnrichment(enrichment).build());
+    var view = WorkerOperationalViewBuilder.builder(
+        compatWorkerView(CompatibilityStatusView.empty(), true)).enrichment(mapped.enrichment()).build();
+    var handler = newHandler();
+    var envelope = readinessEnvelope(handler, view, readyProjection(), freshContact(), false);
+    assertEquals(enabled ? "UNKNOWN" : "READY", envelope.components().get("indexServing").state(), failedRead);
+    assertEquals("READY", envelope.components().get("embedding").state(),
+        "the successful encoder probe is independent of enrichment counts");
+    var conditions = new io.justsearch.app.observability.health.ConditionStore();
+    try (var executor = java.util.concurrent.Executors.newVirtualThreadPerTaskExecutor()) {
+      var tap = new io.justsearch.app.services.observability.health.LifecycleSnapshotTap(
+          conditions, new io.justsearch.app.observability.health.HealthEventChangeRegistry(executor),
+          io.justsearch.app.observability.health.Source.forProcess("head", "test", "1"),
+          java.time.Clock.systemUTC());
+      tap.accept(new ReadinessEnvelopeView(2, Instant.now().toString(), java.util.Map.of(),
+          java.util.Map.of("indexServing", new io.justsearch.app.api.status.ReadinessComponentView(
+              "NOT_READY", "index.starting", "worker_status", Instant.now().toString(), false, 0)),
+          java.util.Map.of()));
+      assertTrue(conditions.find("index.unavailable", "worker").isPresent());
+      tap.accept(envelope);
+      assertTrue(conditions.find("index.unavailable", "worker").isEmpty(),
+          "keyword serving must remain discoverable even when enrichment counts are unreadable");
+      assertEquals(enabled, conditions.find("embedding.readiness-unknown", "worker.enrichment").isPresent());
+    }
+    assertEquals(enabled ? "UNKNOWN" : "READY", envelope.composites().get("retrieval").state(), failedRead);
+    // A successful retry on the same handler clears the uncertainty.
+    view = WorkerOperationalViewBuilder.builder(view).enrichment(
+        EnrichmentProgressViewBuilder.builder(view.enrichment()).completenessKnown(true)
+            .embeddingDocCount(1).embeddingCompletedCount(1).embeddingPendingCount(0)
+            .embeddingFailedCount(0).embeddingCoveragePercent(100)
+            .spladeDocCount(1).spladeCompletedCount(1).spladePendingCount(0)
+            .spladeFailedCount(0).spladeCoveragePercent(100)
+            .pendingNerCount(0).completedNerCount(1).failedNerCount(0)
+            .chunk(new ChunkCoverageView(100, 100, 0, 0, 100, true, enabled, 100, 0, 100))
+            .build()).build();
+    envelope = readinessEnvelope(handler, view, readyProjection(), freshContact(), false);
+    assertEquals("READY", envelope.composites().get("retrieval").state());
+  }
+
+  @ParameterizedTest
+  @org.junit.jupiter.params.provider.ValueSource(doubles = {0, 94, 95, 99.9, 99.99, 100})
+  void incompleteVectorsHaveAHealthConditionRegardlessOfRetrievalEligibility(double coverage) throws Exception {
+    var conditions = new io.justsearch.app.observability.health.ConditionStore();
+    try (var executor = java.util.concurrent.Executors.newVirtualThreadPerTaskExecutor()) {
+      var tap = new io.justsearch.app.services.observability.health.LifecycleSnapshotTap(
+          conditions, new io.justsearch.app.observability.health.HealthEventChangeRegistry(executor),
+          io.justsearch.app.observability.health.Source.forProcess("head", "test", "1"),
+          java.time.Clock.systemUTC());
+      var view = withChunkCoverage(compatWorkerView(CompatibilityStatusView.empty(), true), 100,
+          new ChunkCoverageView(10000, (long) (coverage * 100), (long) (10000 - coverage * 100),
+              0, coverage, coverage >= 95, false, 0, 0, 0));
+      var envelope = readinessEnvelope(newHandler(), view, readyProjection(), freshContact(), false);
+      assertEquals(coverage == 100 ? "READY" : "DEGRADED",
+          envelope.components().get("chunkEmbedding").state());
+      assertEquals(coverage >= 95, view.enrichment().chunk().chunkVectorsReady());
+      tap.accept(envelope);
+      assertEquals(coverage < 100, conditions.find("embedding.not-ready", "worker.chunk-embedding").isPresent());
+      view = withChunkCoverage(view, 100,
+          new ChunkCoverageView(10000, 10000, 0, 0, 100, true, false, 0, 0, 0));
+      tap.accept(readinessEnvelope(newHandler(), view, readyProjection(), freshContact(), false));
+      assertTrue(conditions.find("embedding.not-ready", "worker.chunk-embedding").isEmpty());
+    }
+  }
+
   // ===== Tempdoc 804 §D1: an EMPTY corpus is not a chunk-embedding degradation =====
 
   @Test
@@ -495,6 +627,12 @@ final class StatusLifecycleHandlerTest {
     var env = readinessEnvelope(newHandler(), view, readyProjection(), freshContact(), false);
     assertEquals("READY", env.components().get("chunkEmbedding").state());
     assertFalse(env.composites().get("retrieval").reasonCodes().contains("chunk_embedding.not_ready"));
+    view = WorkerOperationalViewBuilder.builder(view).embeddingReady(true).enrichment(
+        EnrichmentProgressViewBuilder.builder(view.enrichment()).completenessKnown(false).build()).build();
+    env = readinessEnvelope(newHandler(), view, readyProjection(), freshContact(), false);
+    assertEquals("READY", env.components().get("chunkEmbedding").state(),
+        "the successful zero-chunk declaration still proves no passage work applies");
+    assertEquals("UNKNOWN", env.composites().get("retrieval").state());
   }
 
   @Test

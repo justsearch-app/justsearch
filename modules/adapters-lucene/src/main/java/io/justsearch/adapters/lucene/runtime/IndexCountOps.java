@@ -128,6 +128,16 @@ public final class IndexCountOps {
     return bridge.withSearcher(searcher -> (long) searcher.getIndexReader().numDocs());
   }
 
+  /** Merge counters from one reader; an unreadable index must not look fully merged. */
+  public record MergeCounts(long maxDoc, long numDocs) {}
+
+  public MergeCounts mergeCountsOrThrow() throws IOException {
+    return bridge.withSearcher(searcher -> {
+      var reader = searcher.getIndexReader();
+      return new MergeCounts(reader.maxDoc(), reader.numDocs());
+    });
+  }
+
   /** Counts live non-chunk documents within a single acquired reader. */
   public long parentDocCountOrThrow() throws IOException {
     return bridge.withSearcher(searcher -> searcher.getIndexReader().numDocs()

@@ -1911,6 +1911,31 @@ final class StatusLifecycleHandler implements io.justsearch.app.api.StatusSnapsh
     return null;
   }
 
+  /** Unknown reads cannot certify completion, even when a different coverage read succeeded. */
+  private static boolean enrichmentCountsUnknown(
+      io.justsearch.app.api.status.EnrichmentProgressView enrichment) {
+    boolean anyEnabled = enrichment.embeddingEnabled() || enrichment.spladeEnabled()
+        || enrichment.nerEnabled() || enrichment.chunk().chunkSpladeEnabled();
+    return (anyEnabled && Boolean.FALSE.equals(enrichment.completenessKnown()))
+        || (enrichment.embeddingEnabled()
+            && (enrichment.embeddingDocCount() < 0 || enrichment.embeddingCompletedCount() < 0
+                || enrichment.embeddingPendingCount() < 0
+                || enrichment.embeddingFailedCount() < 0 || enrichment.embeddingCoveragePercent() < 0))
+        || (enrichment.spladeEnabled()
+            && (enrichment.spladeDocCount() < 0 || enrichment.spladeCompletedCount() < 0
+                || enrichment.spladePendingCount() < 0
+                || enrichment.spladeFailedCount() < 0 || enrichment.spladeCoveragePercent() < 0))
+        || (enrichment.nerEnabled()
+            && (enrichment.pendingNerCount() < 0 || enrichment.completedNerCount() < 0
+                || enrichment.failedNerCount() < 0))
+        || (enrichment.chunk().chunkSpladeEnabled()
+            && (enrichment.chunk().chunkSpladeDocCount() < 0
+                || enrichment.chunk().chunkSpladeCompletedCount() < 0
+                || enrichment.chunk().chunkSpladePendingCount() < 0
+                || enrichment.chunk().chunkSpladeFailedCount() < 0
+                || enrichment.chunk().chunkSpladeCoveragePercent() < 0));
+  }
+
   /**
    * Computes a single readiness component. The switch expression is exhaustive — adding a new
    * {@link ReadinessDimension} constant without a corresponding case arm is a compile error.
@@ -1989,6 +2014,9 @@ final class StatusLifecycleHandler implements io.justsearch.app.api.StatusSnapsh
           // below compatBlockedReason (a rebuild-fixable block is the more actionable cause).
           state = READINESS_DEGRADED;
           reason = denseUnavailableReason;
+        } else if (enrichmentCountsUnknown(workerView.enrichment())) {
+          state = READINESS_UNKNOWN;
+          reason = null;
         } else if (throughputReason != null) {
           state = READINESS_DEGRADED;
           reason = throughputReason;
@@ -2060,6 +2088,9 @@ final class StatusLifecycleHandler implements io.justsearch.app.api.StatusSnapsh
         // DEGRADED-capped: emit DEGRADED (not NOT_CONFIGURED) so the retrieval
         // composite stays DEGRADED rather than NOT_CONFIGURED, which would block consumers.
         if (workerView.enrichment().chunk().chunkDocCount() < 0
+            || workerView.enrichment().chunk().chunkEmbeddingCompletedCount() < 0
+            || workerView.enrichment().chunk().chunkEmbeddingPendingCount() < 0
+            || workerView.enrichment().chunk().chunkEmbeddingFailedCount() < 0
             || workerView.enrichment().chunk().chunkVectorCoveragePercent() < 0) {
           yield readinessComponent(READINESS_UNKNOWN, null, dim.source(), observedAt);
         }
@@ -2071,7 +2102,7 @@ final class StatusLifecycleHandler implements io.justsearch.app.api.StatusSnapsh
                 || activeCount != null && !"fresh".equals(activeCount.state()))) {
           yield readinessComponent(READINESS_UNKNOWN, null, dim.source(), observedAt);
         }
-        boolean chunkReady = workerView.enrichment().chunk().chunkVectorsReady();
+        var chunk = workerView.enrichment().chunk();
         double chunkCoverage = workerView.enrichment().chunk().chunkVectorCoveragePercent();
         String state;
         String reason;
@@ -2090,7 +2121,12 @@ final class StatusLifecycleHandler implements io.justsearch.app.api.StatusSnapsh
                     && !workerView.core().indexedDocumentsUnknown())) {
           state = READINESS_READY;
           reason = null;
-        } else if (chunkReady) {
+        } else if (Boolean.FALSE.equals(workerView.enrichment().completenessKnown())) {
+          state = READINESS_UNKNOWN;
+          reason = null;
+        } else if (chunkCoverage >= 100.0
+            && chunk.chunkEmbeddingPendingCount() == 0
+            && chunk.chunkEmbeddingFailedCount() == 0) {
           state = READINESS_READY;
           reason = null;
         } else {

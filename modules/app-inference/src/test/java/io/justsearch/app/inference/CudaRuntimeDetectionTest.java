@@ -75,8 +75,11 @@ class CudaRuntimeDetectionTest {
     String warning = CudaRuntimeDetection.detectCudaRuntimeWarning(fakeExe, io.justsearch.configuration.NativeTargets.forTarget("windows-x86_64"));
     assertTrue(warning != null && warning.contains("CUDA Toolkit runtime not found"));
   }
-  @Test
-  void linuxRuntimeDoesNotLogMissingWindowsDll(@TempDir Path dir) throws IOException {
+  @org.junit.jupiter.params.ParameterizedTest
+  @org.junit.jupiter.params.provider.ValueSource(strings = {"Linux", "Windows 11"})
+  @org.junit.jupiter.api.parallel.ResourceLock(org.junit.jupiter.api.parallel.Resources.SYSTEM_PROPERTIES)
+  void linuxRuntimeDoesNotLogMissingWindowsDll(String hostOs, @TempDir Path dir) throws IOException {
+    String previousOs = System.getProperty("os.name");
     Path executable = Files.createFile(dir.resolve("llama-server"));
     Files.createFile(dir.resolve("libggml-cuda.so"));
     Files.createFile(dir.resolve("libcudart.so.12"));
@@ -87,9 +90,13 @@ class CudaRuntimeDetectionTest {
     messages.start();
     logger.addAppender(messages);
     try {
-      assertNull(CudaRuntimeDetection.detectCudaRuntimeWarning(executable));
+      System.setProperty("os.name", hostOs);
+      assertNull(CudaRuntimeDetection.detectCudaRuntimeWarning(executable,
+          io.justsearch.configuration.NativeTargets.forTarget("linux-x86_64")));
       assertTrue(messages.list.stream().noneMatch(event -> event.getFormattedMessage().contains("ggml-cuda.dll")));
     } finally {
+      if (previousOs == null) System.clearProperty("os.name");
+      else System.setProperty("os.name", previousOs);
       logger.detachAppender(messages);
       logger.setLevel(previousLevel);
       messages.stop();

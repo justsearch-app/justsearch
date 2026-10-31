@@ -19,6 +19,52 @@ import org.apache.lucene.store.ByteBuffersDirectory;
 import org.junit.jupiter.api.Test;
 
 class CountSnapshotTest {
+  @Test
+  void mergeCountersUseOneAcquiredReaderAndPropagateIoFailures() throws Exception {
+    SearcherBridge bridge = mock(SearcherBridge.class);
+    try (var directory = new ByteBuffersDirectory();
+        var writer = new IndexWriter(directory, new IndexWriterConfig(new StandardAnalyzer())
+            .setMergePolicy(org.apache.lucene.index.NoMergePolicy.INSTANCE))) {
+      Document deleted = new Document();
+      deleted.add(new StringField("doc_id", "deleted", Field.Store.NO));
+      writer.addDocument(deleted);
+      writer.addDocument(new Document());
+      writer.flush();
+      writer.deleteDocuments(new org.apache.lucene.index.Term("doc_id", "deleted"));
+      try (var reader = DirectoryReader.open(writer)) {
+        var searcher = new IndexSearcher(reader);
+        when(bridge.withSearcher(any())).thenAnswer(invocation ->
+            ((ReadPathOps.SearcherOperation<?>) invocation.getArgument(0)).execute(searcher));
+        var counts = new IndexCountOps(bridge);
+        var result = mergeCounts(counts);
+        assertArrayEquals(new long[] {2, 1}, result);
+        verify(bridge, times(1)).withSearcher(any());
+        doThrow(new IOException("reader acquisition failed")).when(bridge).withSearcher(any());
+        assertThrows(IOException.class, () -> mergeCounts(counts),
+            "unreadable merge debt must not be a zero measurement");
+        doAnswer(invocation -> ((ReadPathOps.SearcherOperation<?>) invocation.getArgument(0)).execute(searcher))
+            .when(bridge).withSearcher(any());
+        assertArrayEquals(new long[] {2, 1}, mergeCounts(counts));
+      }
+    }
+  }
+
+  /** The before-state reads each counter separately and swallows IO failures. */
+  private static long[] mergeCounts(IndexCountOps counts) throws Exception {
+    try {
+      var method = IndexCountOps.class.getMethod("mergeCountsOrThrow");
+      var result = method.invoke(counts);
+      return new long[] {
+          (Long) result.getClass().getMethod("maxDoc").invoke(result),
+          (Long) result.getClass().getMethod("numDocs").invoke(result)};
+    } catch (NoSuchMethodException baseline) {
+      return new long[] {counts.maxDoc(), counts.docCount()};
+    } catch (java.lang.reflect.InvocationTargetException failure) {
+      if (failure.getCause() instanceof Exception cause) throw cause;
+      throw failure;
+    }
+  }
+
   @org.junit.jupiter.params.ParameterizedTest
   @org.junit.jupiter.params.provider.ValueSource(strings = {"embedding", "splade", "chunkEmbedding", "chunkSplade", "joint"})
   void individualCountFailureIsUnknown(String stage) throws Exception {

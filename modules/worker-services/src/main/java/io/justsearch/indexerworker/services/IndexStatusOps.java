@@ -560,8 +560,9 @@ final class IndexStatusOps {
     IndexCountOps activeCountOps = searchCountOps != null ? searchCountOps : ingestCountOps;
     if (activeCountOps != null) {
       try {
-        b.setIndexMaxDoc(activeCountOps.maxDoc()).setIndexNumDocs(activeCountOps.docCount());
-      } catch (RuntimeException unreadable) {
+        var mergeCounts = activeCountOps.mergeCountsOrThrow();
+        b.setIndexMaxDoc(mergeCounts.maxDoc()).setIndexNumDocs(mergeCounts.numDocs());
+      } catch (IOException | RuntimeException unreadable) {
         b.setIndexMaxDoc(-1L).setIndexNumDocs(-1L);
         log.debug("Merge counters unreadable: {}", unreadable.getMessage());
       }

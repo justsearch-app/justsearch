@@ -146,12 +146,19 @@ class IndexStatusReadFailureTest {
     assertEquals(0L, observation(unknown, "building").get("observed_at_ms"));
   }
 
-  @Test
-  void unavailableRawCountTelemetryDoesNotDiscardCountProvenance() throws Exception {
-    IndexCountOps counts = mock(IndexCountOps.class);
+  @org.junit.jupiter.params.ParameterizedTest
+  @org.junit.jupiter.params.provider.ValueSource(booleans = {false, true})
+  void unavailableRawCountTelemetryDoesNotDiscardCountProvenance(boolean ioFailure) throws Exception {
+    IndexCountOps counts = mock(IndexCountOps.class, invocation -> {
+      if (invocation.getMethod().getName().equals("mergeCountsOrThrow")) {
+        if (ioFailure) throw new IOException("reader acquisition failed");
+        throw new IllegalStateException("reader closed");
+      }
+      return RETURNS_DEFAULTS.answer(invocation);
+    });
     stubParents(counts, 7);
     when(counts.countQueryOrThrow(any())).thenReturn(5);
-    when(counts.maxDoc()).thenThrow(new IllegalStateException("reader closed"));
+    if (!ioFailure) when(counts.maxDoc()).thenThrow(new IllegalStateException("reader closed"));
     var status = ops(counts).buildStatusResponse();
     assertEquals("IDLE", status.getCore().getState());
     assertEquals(7, status.getCore().getDocCount());

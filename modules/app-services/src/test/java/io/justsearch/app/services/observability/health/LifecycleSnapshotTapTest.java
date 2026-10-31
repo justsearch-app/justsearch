@@ -56,15 +56,30 @@ final class LifecycleSnapshotTapTest {
   void rebuildBrakeTransitionsCarryRecoveryAndClearOnRecovery() {
     tap.accept(singleDim(ReadinessDimension.INDEX_SERVING, component("NOT_READY", "index.starting")));
     for (String reason : List.of("index.rebuild_brake_exhausted", "index.rebuild_brake_unreadable")) {
-      var snapshot = singleDim(ReadinessDimension.INDEX_SERVING, component("NOT_READY", reason));
+      var snapshot = singleDim(ReadinessDimension.INDEX_SERVING, component("DEGRADED", reason));
       tap.accept(snapshot);
       tap.accept(snapshot);
-      var condition = (AssertedCondition) conditions.find("index.unavailable", "worker").orElseThrow().body();
+      assertTrue(conditions.find("index.unavailable", "worker").isEmpty());
+      var condition = (AssertedCondition) conditions.find("schema.reindex-required", "worker").orElseThrow().body();
       assertEquals(LifecycleSnapshotTap.toPascalReason(reason), condition.reason());
       assertEquals("core.rebuild-index", condition.recovery().orElseThrow().target().value());
     }
     tap.accept(singleDim(ReadinessDimension.INDEX_SERVING, ready()));
     assertTrue(conditions.find("index.unavailable", "worker").isEmpty());
+    assertTrue(conditions.find("schema.reindex-required", "worker").isEmpty());
+  }
+
+  @Test
+  void unreadableEnrichmentClearsTheServingGateOnlyWithFreshEvidence() {
+    tap.accept(singleDim(ReadinessDimension.INDEX_SERVING, component("NOT_READY", "index.starting")));
+    tap.accept(singleDim(ReadinessDimension.INDEX_SERVING, new ReadinessComponentView(
+        "UNKNOWN", null, "worker_status", T0.toString(), true, 1000)));
+    assertTrue(conditions.find("index.unavailable", "worker").isPresent());
+    tap.accept(singleDim(ReadinessDimension.INDEX_SERVING, component("UNKNOWN", null)));
+    assertTrue(conditions.find("index.unavailable", "worker").isEmpty());
+    assertTrue(conditions.find("embedding.readiness-unknown", "worker.enrichment").isPresent());
+    tap.accept(singleDim(ReadinessDimension.INDEX_SERVING, ready()));
+    assertTrue(conditions.find("embedding.readiness-unknown", "worker.enrichment").isEmpty());
   }
 
   @Test
