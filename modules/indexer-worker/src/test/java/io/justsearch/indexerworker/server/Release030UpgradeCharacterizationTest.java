@@ -75,7 +75,8 @@ final class Release030UpgradeCharacterizationTest {
         + " WHERE last_outcome_class IN ('PARSER_TIMEOUT','IO_FAILED')");
     // Copy the authentic terminal row under a watched root too: automatic startup scans must
     // not turn an unchanged terminal failure into new work. Its outside-root original stays too.
-    java.nio.file.Files.copy(root.resolve("orphan/failed.bin"), root.resolve("roots/alpha/failed.bin"));
+    java.nio.file.Files.copy(root.resolve("orphan/failed.bin"), root.resolve("roots/alpha/failed.bin"),
+        java.nio.file.StandardCopyOption.COPY_ATTRIBUTES);
     sql(root, "INSERT INTO jobs(path,state,attempts,last_updated,collection,last_outcome_class,"
         + "last_reason_code,last_retry_policy,first_failed_at,last_outcome_at) SELECT '"
         + key(root.resolve("roots/alpha/failed.bin")) + "',state,attempts,last_updated,collection,"

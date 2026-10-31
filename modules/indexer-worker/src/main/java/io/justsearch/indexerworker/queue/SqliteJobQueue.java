@@ -3085,14 +3085,31 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
     }
   }
 
-  record AdmissionSource(long size, long modified, Object fileKey, String sha256) {
+  record AdmissionWitness(long size, java.nio.file.attribute.FileTime modified, Object fileKey,
+      java.nio.file.attribute.FileTime changed) {
+    static AdmissionWitness capture(Path path) throws IOException {
+      var attrs = Files.readAttributes(path, java.nio.file.attribute.BasicFileAttributes.class,
+          LinkOption.NOFOLLOW_LINKS);
+      return attrs.isRegularFile()
+          ? new AdmissionWitness(attrs.size(), attrs.lastModifiedTime(), attrs.fileKey(), admissionChangeTime(path)) : null;
+    }
+  }
+
+  private static java.nio.file.attribute.FileTime admissionChangeTime(Path path) throws IOException {
+    try {
+      return (java.nio.file.attribute.FileTime) Files.getAttribute(path, "unix:ctime", LinkOption.NOFOLLOW_LINKS);
+    } catch (UnsupportedOperationException | IllegalArgumentException unsupported) {
+      return null;
+    }
+  }
+
+  record AdmissionSource(AdmissionWitness witness, String sha256) {
+    long size() { return witness.size(); }
+    long modified() { return witness.modified().toMillis(); }
+
     boolean stillCurrent(Path path) {
       try {
-        var current = Files.readAttributes(path, java.nio.file.attribute.BasicFileAttributes.class,
-            LinkOption.NOFOLLOW_LINKS);
-        return current.isRegularFile() && size == current.size()
-            && modified == current.lastModifiedTime().toMillis()
-            && Objects.equals(fileKey, current.fileKey());
+        return witness.equals(AdmissionWitness.capture(path));
       } catch (IOException | SecurityException unavailable) {
         return false;
       }
@@ -3102,13 +3119,12 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
   private static AdmissionSource observeAdmissionSource(JobQueue.EnqueueEntry entry) {
     if (entry == null || entry.path() == null || entry.plannedSourceSha256() != null) return null;
     try {
-      var attrs = Files.readAttributes(entry.path(), java.nio.file.attribute.BasicFileAttributes.class,
-          LinkOption.NOFOLLOW_LINKS);
-      if (!attrs.isRegularFile()) return null;
+      var before = AdmissionWitness.capture(entry.path());
+      if (before == null) return null;
       String hash = io.justsearch.indexerworker.loop.SourceContentHash.admissionIdentity(
           entry.path(), entry.ingestionRoot());
-      var source = new AdmissionSource(attrs.size(), attrs.lastModifiedTime().toMillis(), attrs.fileKey(), hash);
-      return source;
+      var source = new AdmissionSource(before, hash);
+      return source.stillCurrent(entry.path()) ? source : null;
     } catch (IOException | SecurityException unavailable) {
       return null;
     }
@@ -3126,6 +3142,8 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
 
   private boolean preservesMaintenanceWork(JobQueue.EnqueueEntry entry, String collection, boolean exactCollection,
       String sourceIdentity, AdmissionSource source, long now) throws SQLException {
+    if (source == null && entry.plannedSourceSha256() == null) return false;
+    if (source != null && !source.stillCurrent(entry.path())) return false;
     try (var query = connection.prepareStatement(
         "SELECT state,collection,admitted_source_sha256,planned_source_sha256,unit_revision,ingestion_root,"
             + "size_bytes,last_updated,CASE WHEN admitted_source_sha256 IS NULL AND planned_source_sha256 IS NULL "
@@ -3149,6 +3167,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
           return sourceIdentity.equals(prior)
               && (!legacyRecovery || preservesMaintenanceRetryWait(entry.path(), now));
         }
+        if (prior != null && sourceIdentity == null) return false;
         long priorSize = row.getLong("size_bytes");
         boolean knownSize = !row.wasNull();
         long observedSize = source == null ? entry.sizeBytes() : source.size();
@@ -3158,10 +3177,9 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
           long modified = row.getLong("source_modified_at");
           if (!row.wasNull()) {
             if (modified != source.modified()) return false;
-          } else if (!legacyRecovery && source.modified() > row.getLong("last_updated")) return false;
+          } else if (source.modified() > row.getLong("last_updated")) return false;
         }
-        // Missing legacy evidence or an unreadable source cannot establish changed work.
-        // Keep the accepted revision and retry history until a change can be proved.
+        // A stable observation without legacy hash evidence still uses the saved metadata.
         return (prior == null || sourceIdentity == null)
             && (!legacyRecovery || preservesMaintenanceRetryWait(entry.path(), now));
       }
@@ -3217,8 +3235,9 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
             && (releaseRecovery == null || !releaseRecovery.retiringBuild());
         var source = sources.get(entry);
         String sourceIdentity = !ordinaryAdmission ? null
-            : entry.plannedSourceSha256() != null ? entry.plannedSourceSha256()
-                : source != null && source.stillCurrent(entry.path()) ? source.sha256() : null;
+            : sources.containsKey(entry)
+                ? source != null && source.stillCurrent(entry.path()) ? source.sha256() : null
+                : entry.plannedSourceSha256();
         sealBeforeMaintenance(normalizedPath);
         var membership =
             SqliteIngestionWalkOps.maintenanceMembership(connection, normalizedPath, scanId);
@@ -3333,18 +3352,35 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
 
     List<IngestCollectionPolicy.RootBinding> declared;
     List<JobQueue.EnqueueEntry> witnessedEntries = new ArrayList<>(entries.size());
+    Map<JobQueue.EnqueueEntry, AdmissionSource> sources = new HashMap<>();
     try {
       declared = !enumeration && (collection == null || collection.isBlank())
           ? declaredCollectionRoots.get() : List.of();
       for (JobQueue.EnqueueEntry entry : entries) {
-        String hash = entry.plannedSourceSha256() == null
-            ? io.justsearch.indexerworker.loop.SourceContentHash.sha256(entry.path())
-            : entry.plannedSourceSha256();
+        AdmissionWitness before = null;
+        try {
+          before = AdmissionWitness.capture(entry.path());
+        } catch (IOException | SecurityException unavailable) {
+          // A supplied plan still admits retryable work without certifying current source bytes.
+        }
+        String observedHash = null;
+        try {
+          observedHash = entry.plannedSourceSha256() == null
+              ? io.justsearch.indexerworker.loop.SourceContentHash.sha256(entry.path())
+              : io.justsearch.indexerworker.loop.SourceContentHash.admissionIdentity(entry.path(), entry.ingestionRoot());
+        } catch (IOException unavailable) {
+          if (entry.plannedSourceSha256() == null) throw unavailable;
+        }
+        String hash = entry.plannedSourceSha256() == null ? observedHash : entry.plannedSourceSha256();
         JobQueue.EnqueueProvenance provenance = enumeration
             ? new JobQueue.EnqueueProvenance("system", "MIGRATION_ENUMERATOR")
             : entry.provenance();
-        witnessedEntries.add(new JobQueue.EnqueueEntry(
-            entry.path(), entry.sizeBytes(), provenance, hash, entry.ingestionRoot(), entry.forceReindex()));
+        var witnessed = new JobQueue.EnqueueEntry(
+            entry.path(), entry.sizeBytes(), provenance, hash, entry.ingestionRoot(), entry.forceReindex());
+        witnessedEntries.add(witnessed);
+        var source = before == null || observedHash == null || !observedHash.equals(hash)
+            ? null : new AdmissionSource(before, observedHash);
+        sources.put(witnessed, source != null && source.stillCurrent(entry.path()) ? source : null);
       }
     } catch (IOException | RuntimeException unreadable) {
       log.warn("Refusing candidate file admission without source or declaration evidence", unreadable);
@@ -3362,9 +3398,12 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
         if (enumeration || maintenance) {
           admitted = new ArrayList<>(witnessedEntries.size());
           for (JobQueue.EnqueueEntry entry : witnessedEntries) {
+            var source = sources.get(entry);
+            boolean current = source != null && source.sha256().equals(entry.plannedSourceSha256())
+                && source.stillCurrent(entry.path());
             if ((enumeration && enumerationSupersededByAcceptedMutation(
-                generation, normalizePath(entry.path()), entry.plannedSourceSha256(), normalizedCollection))
-                || (!entry.forceReindex() && identicalCandidateAdmission(generation, entry, normalizedCollection))) {
+                generation, normalizePath(entry.path()), entry.plannedSourceSha256(), normalizedCollection, current))
+                || (current && !entry.forceReindex() && identicalCandidateAdmission(generation, entry, normalizedCollection))) {
               superseded++;
             } else {
               admitted.add(entry);
@@ -3372,7 +3411,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
           }
         }
         CandidateFileBatch result = enqueueEntriesInTransaction(
-            admitted, normalizedCollection, normalizedScan, System.currentTimeMillis(), enumeration, null, false, declared);
+            admitted, normalizedCollection, normalizedScan, System.currentTimeMillis(), enumeration, null, false, declared, sources);
         int accepted = result.covered();
         if (accepted != admitted.size()) {
           throw new SQLException("Atomic file batch did not accept every entry");
@@ -3421,7 +3460,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
 
   /** The baseline walk cannot replace an accepted foreground mutation. */
   private boolean enumerationSupersededByAcceptedMutation(
-      String generation, String path, String sourceSha256, String sourceCollection)
+      String generation, String path, String sourceSha256, String sourceCollection, boolean current)
       throws SQLException {
     List<String> deletedCollections = new ArrayList<>();
     try (PreparedStatement query = connection.prepareStatement(
@@ -3447,20 +3486,13 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
             if (!"UPSERT".equals(op)) return true;
             var prior = SwitchBufferUpsert.decode(payload);
             if (prior.sourceSha256() != null && !prior.sourceSha256().equals(sourceSha256)) {
-              // Hashing the batch precedes the admission lock. A foreground writer may have
-              // accepted newer bytes in that interval. Only replace a stale receipt when the
-              // enumerator still witnesses the current source; otherwise retain the accepted work.
-              try {
-                if (!sourceSha256.equals(
-                    io.justsearch.indexerworker.loop.SourceContentHash.sha256(Path.of(path)))) return true;
-              } catch (IOException unreadable) {
-                throw new SQLException("Cannot establish current enumeration source", unreadable);
-              }
+              // Foreground mutations retain ownership when enumeration's source witness expired.
+              if (!current) return true;
             }
             if ((prior.provenance() == null
                 || !"MIGRATION_ENUMERATOR".equals(prior.provenance().transport()))
                 && (prior.sourceSha256() == null
-                    || (prior.sourceSha256().equals(sourceSha256)
+                    || (current && prior.sourceSha256().equals(sourceSha256)
                         && Objects.equals(prior.collection(), sourceCollection)))) return true;
           }
         }

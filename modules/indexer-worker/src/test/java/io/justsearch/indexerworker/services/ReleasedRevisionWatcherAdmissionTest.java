@@ -23,7 +23,8 @@ final class ReleasedRevisionWatcherAdmissionTest {
   @ParameterizedTest
   @CsvSource({"release030/job/123/abc,unchanged", "release030/job/123/abc,size",
       "release030/job/123/abc,hash", "release030/job/123/abc,collection",
-      "release030/job/123/abc,root", "root1:receipt:1:abc,size", "root2:receipt:1:abc,size"})
+      "release030/job/123/abc,root", "root1:receipt:1:abc,size", "root2:receipt:1:abc,size",
+      "release030/job/123/abc,mtime", "root1:receipt:1:abc,mtime", "root2:receipt:1:abc,mtime"})
   void watcherRevivesChangedReleasedFailureAfterV25Upgrade(String revision, String change) throws Exception {
     Path root = Files.createDirectory(temporary.resolve("sources"));
     Path file = Files.writeString(root.resolve("source.txt"), "old!");
@@ -47,6 +48,11 @@ final class ReleasedRevisionWatcherAdmissionTest {
       var before = row(db);
       switch (change) {
         case "size" -> Files.writeString(file, "repaired source of a different size");
+        case "mtime" -> {
+          Files.writeString(file, "new!");
+          Files.setLastModifiedTime(file, java.nio.file.attribute.FileTime.fromMillis(
+              System.currentTimeMillis() + 10_000));
+        }
         case "hash" -> {
           Files.writeString(file, "new!");
           Files.setLastModifiedTime(file, stamp);
