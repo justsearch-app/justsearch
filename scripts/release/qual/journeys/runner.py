@@ -731,32 +731,104 @@ class Run:
 import json,os,stat,sys
 from pathlib import Path
 root=Path(json.loads(sys.argv[1]))/'logs'
-files={};errors=[]
+files=[];errors=[];pending=[root];visited=0
 def alias(path):
  return path.is_symlink() or (hasattr(path,'is_junction') and path.is_junction())
 if alias(root):raise RuntimeError('App logs directory is an alias: '+str(root))
-for directory,folders,names in os.walk(root,onerror=lambda exc:errors.append(str(exc)),followlinks=False):
- base=Path(directory)
- folders[:]=[name for name in folders if not alias(base/name)]
- for name in names:
-  path=base/name
-  try:
-   if not stat.S_ISREG(path.lstat().st_mode):continue
-   with path.open('rb') as stream:
-    stream.seek(0,os.SEEK_END)
-    stream.seek(max(0,stream.tell()-4_000_000))
-    content=stream.read(4_000_000)
-   files[path.relative_to(root).as_posix()]=content.decode('utf-8',errors='replace')
-  except Exception as exc:errors.append(str(path)+': '+str(exc))
-print(json.dumps({'files':files,'errors':errors}))
-''', self.data)
+while pending and visited<4096:
+ base=pending.pop()
+ try:
+  if alias(base):raise RuntimeError('App log directory became an alias: '+str(base))
+  with os.scandir(base) as entries:
+   for entry in entries:
+    if visited>=4096:
+     errors.append('Traversal limit 4096 entries reached; remaining entries omitted')
+     break
+    visited+=1
+    path=Path(entry.path)
+    if alias(path):
+     errors.append(str(path)+': alias omitted');continue
+    info=entry.stat(follow_symlinks=False)
+    if stat.S_ISDIR(info.st_mode):pending.append(path)
+    elif stat.S_ISREG(info.st_mode):
+     files.append((info.st_mtime_ns,path.relative_to(root).as_posix()))
+ except Exception as exc:errors.append(str(base)+': '+str(exc))
+if pending:errors.append('Traversal limit 4096 entries reached; remaining directories omitted')
+files.sort(key=lambda item:(-item[0],item[1]))
+if len(files)>64:errors.append('File limit 64 reached; '+str(len(files)-64)+' older files omitted')
+print(json.dumps({'files':[name for _,name in files[:64]],'errors':errors}))
+''', self.data, timeout=30)
             errors.extend(snapshot['errors'])
-            for relative, content in snapshot['files'].items():
+            # Reserve space for omission diagnostics within the collection's 32 MB.
+            remaining = 32_000_000 - 64_000
+            for relative in snapshot['files']:
+                if remaining <= 0:
+                    errors.append('Collection limit 32 MB reached; remaining older files omitted')
+                    break
                 try:
-                    destination = folder / relative
+                    result = self.target.json(r'''
+import codecs,gzip,json,re,stat,sys
+from collections import deque
+from pathlib import Path
+a=json.loads(sys.argv[1]);root=Path(a['data'])/'logs';path=root/a['relative']
+# Recheck every component: a directory may have rotated since enumeration.
+for part in [path,*path.parents]:
+ if part.is_symlink() or (hasattr(part,'is_junction') and part.is_junction()):
+  raise RuntimeError('App log path is an alias: '+str(part))
+ if part==root:break
+if not stat.S_ISREG(path.lstat().st_mode):raise RuntimeError('App log is not a regular file')
+cap=a['cap'];blocks=deque();size=0;pending='';redacting=False
+key='"sessionToken"';header=re.compile(re.escape(key)+r'\s*:\s*"')
+incomplete=re.compile(re.escape(key)+r'\s*(?::\s*)?$')
+def emit(text):
+ global size
+ if not text:return
+ block=text.encode('utf-8');blocks.append(block);size+=len(block)
+ # A little lookbehind lets the final cut avoid a partial redaction marker.
+ while blocks and size-len(blocks[0])>=cap+16:size-=len(blocks.popleft())
+def consume(text,final=False):
+ global pending,redacting
+ pending+=text
+ while pending:
+  if redacting:
+   end=pending.find('"')
+   if end<0:pending='';break
+   pending=pending[end:];redacting=False
+  start=pending.find(key)
+  if start<0:
+   keep=0 if final else min(len(pending),len(key)-1)
+   emit(pending[:len(pending)-keep]);pending=pending[len(pending)-keep:];break
+  emit(pending[:start]);pending=pending[start:]
+  match=header.match(pending)
+  if match:
+   emit(match.group()+'<redacted>');pending=pending[match.end():];redacting=True
+  elif not final and incomplete.fullmatch(pending):
+   if len(pending)>65536:raise RuntimeError('Oversized sessionToken header; file omitted')
+   break
+  else:emit(pending[:1]);pending=pending[1:]
+decoder=codecs.getincrementaldecoder('utf-8')(errors='replace')
+with path.open('rb') as raw:
+ with (gzip.GzipFile(fileobj=raw) if path.suffix=='.gz' else raw) as stream:
+  while True:
+   chunk=stream.read(65536)
+   if not chunk:break
+   consume(decoder.decode(chunk))
+consume(decoder.decode(b'',final=True),final=True)
+content=b''.join(blocks);offset=max(0,len(content)-cap)
+marker=content.find(b'<redacted>',max(0,offset-9),offset+9)
+if 0<=marker<offset<marker+10:offset=marker+10
+content=content[offset:].decode('utf-8',errors='ignore')
+print(json.dumps({'content':content,'truncated':offset>0}))
+''', {'data': self.data, 'relative': relative, 'cap': min(4_000_000, remaining)}, timeout=60)
+                    content = result['content']
+                    if result['truncated']:
+                        errors.append(relative + ': text tail truncated to saved-byte limit')
+                    destination = folder / (relative + '.txt' if relative.endswith('.gz') else relative)
+                    if destination.exists():
+                        raise Infrastructure('Evidence path already exists; file omitted: ' + relative)
                     destination.parent.mkdir(parents=True, exist_ok=True)
-                    content = re.sub(r'("sessionToken"\s*:\s*")[^"]+', r'\1<redacted>', content)
-                    destination.write_text(content, encoding='utf-8')
+                    destination.write_text(content, encoding='utf-8', newline='')
+                    remaining -= len(content.encode('utf-8'))
                 except Exception as exc:
                     errors.append(relative + ': ' + str(exc))
         except Exception as exc:
@@ -765,7 +837,10 @@ print(json.dumps({'files':files,'errors':errors}))
             try:
                 folder.mkdir(parents=True, exist_ok=True)
                 content = re.sub(r'("sessionToken"\s*:\s*")[^"]+', r'\1<redacted>', '\n'.join(errors))
-                (folder / 'collection-error.txt').write_text(content + '\n', encoding='utf-8')
+                content = (content + '\n').encode('utf-8')
+                if len(content) > 64_000:
+                    content = content[:63_900].decode('utf-8', errors='ignore').encode('utf-8') + b'\nFurther collection diagnostics omitted\n'
+                (folder / 'collection-error.txt').write_bytes(content)
             except Exception:
                 # Even an unwritable evidence directory must not replace the failure.
                 print('App log collection error could not be recorded in ' + str(folder), file=sys.stderr)

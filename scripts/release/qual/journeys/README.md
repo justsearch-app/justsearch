@@ -675,13 +675,19 @@ check fails); it cannot qualify the full release. Empty reports cannot pass.
 `summary.json` includes asset hashes, exact scenario wording, scope and all
 check outcomes. JSON observations redact credentials. Logs, source/corpus
 hashes, screenshots and exception traces remain alongside it. Every check that
-raises a non-pass result immediately snapshots all regular files under the app's
+raises a non-pass result immediately snapshots regular files under the app's
 data-directory `logs/` into `<journey-id>-<check-id>-logs/` (for example,
 `J3-cpu-ai-logs/`), preserving nested paths before later journeys can restart the
-app. At finish, `app-logs/` retains the same complete log tree; the existing
-top-level `engine.log` copy remains available. Each snapshot file keeps its last
-4 MB and redacts `sessionToken` values. Collection failures are recorded in that
-folder's `collection-error.txt` without changing the check's status. The VM wrapper
+app. At finish, `app-logs/` retains the same bounded log tree; the existing
+top-level `engine.log` copy remains available. Each collection scans at most 4096
+entries without following symlinks or junctions, selects at most 64 files newest
+first, and transfers one file at a time. Gzip archives are stream-decompressed on
+the target and saved as readable text with `.txt` appended to the archive name.
+Each snapshot file keeps at most 4 MB of UTF-8 text after decoding and redacting
+`sessionToken` values; a tail cut never splits a character or redaction marker.
+The total collection is capped at 32 MB, including 64 KB reserved for diagnostics.
+Omissions, truncation and collection failures are recorded in that folder's
+`collection-error.txt` without changing the check's status. The VM wrapper
 also retains provisioning logs and hosted evidence as `evidence.tar`. A green
 Linux lane does not qualify Windows, GPU or J9 work.
 
