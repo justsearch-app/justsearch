@@ -92,5 +92,8 @@ if((Resolve-Path $Driver).Path -ine 'C:\Qual\tauri-driver.exe') {Copy-Item -Lite
 
 if($hosted){
  & $python (Join-Path $PSScriptRoot 'windows-association.py') --evidence C:/Qual/viewer-setup
- if($LASTEXITCODE){throw 'Native default viewer setup failed; see C:/Qual/viewer-setup/configure.json'}
+ if($LASTEXITCODE){
+  Get-Content -LiteralPath C:/Qual/viewer-setup/configure.json -Raw
+  throw 'Native default viewer setup failed; see C:/Qual/viewer-setup/configure.json'
+ }
 }

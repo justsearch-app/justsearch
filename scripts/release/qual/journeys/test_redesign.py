@@ -5,6 +5,7 @@ import inspect
 import json
 import os
 from pathlib import Path
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -115,6 +116,10 @@ class EvidenceTests(unittest.TestCase):
         self.assertIsNone(app_window(native))
 
     def test_one_gnome_query_observes_mapped_windows_without_modal_or_banner_guards(self):
+        # The fake guest clears PATH below; setup-node's host tool cache is not
+        # in subprocess's fallback search path on the hosted runner.
+        node = shutil.which('node')
+        self.assertIsNotNone(node, 'The harness self-test requires Node on the parent PATH')
         target=Mock()
         def guest(source,*args,**kw):
             def evaluate(method,variant,*unused):
@@ -125,7 +130,7 @@ global.display={focus_window:app};
 global.get_window_actors=()=>[{is_mapped:()=>true,meta_window:app},{is_mapped:()=>false,meta_window:app}];
 console.log(JSON.stringify([true,JSON.stringify(eval(process.argv[1]))]));
 '''
-                raw=subprocess.check_output(['node','-e',js,variant[0]],text=True)
+                raw=subprocess.check_output([node,'-e',js,variant[0]],text=True)
                 return NS(unpack=lambda:json.loads(raw))
             query=Mock(side_effect=evaluate)
             repository=NS(Gio=NS(DBusProxy=NS(new_for_bus_sync=lambda *a:NS(call_sync=query)),BusType=NS(SESSION=0)),
@@ -140,6 +145,11 @@ console.log(JSON.stringify([true,JSON.stringify(eval(process.argv[1]))]));
         native=runner.Native(target,Path('/tmp/unused'))
         self.assertEqual(app_window(native),WINDOW)
         target.json.assert_called_once()
+
+    def test_gnome_query_resolves_node_before_entering_the_guest_environment(self):
+        # Reproduce setup-node without a distro node in the fallback search path.
+        with tempfile.TemporaryDirectory() as fallback, patch.object(os, 'defpath', fallback):
+            self.test_one_gnome_query_observes_mapped_windows_without_modal_or_banner_guards()
 
     def test_shortcut_miss_uses_one_compositor_observation_and_keeps_foreground_evidence(self):
         target=Mock();target.owned.return_value=[SHELL]

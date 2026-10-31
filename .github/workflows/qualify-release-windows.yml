@@ -8,15 +8,58 @@ on:
         required: true
         type: string
 
-permissions:
-  contents: read
+permissions: {}
 
 concurrency:
   group: qualify-windows-${{ inputs.tag }}
   cancel-in-progress: false
 
 jobs:
+  fetch:
+    permissions:
+      contents: write
+    runs-on: windows-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - name: Require a disposable GitHub-hosted runner
+        run: |
+          if ($env:RUNNER_ENVIRONMENT -cne 'github-hosted') { throw 'Refusing a non-hosted runner' }
+      - name: Fetch draft bytes and tagged registry metadata
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ inputs.tag }}
+        run: |
+          if ($env:RELEASE_TAG -cnotmatch '^v[0-9]+\.[0-9]+\.[0-9]+(-[A-Za-z0-9.-]+)?$') { throw 'Invalid release tag' }
+          $assets=Join-Path $env:RUNNER_TEMP release-assets
+          New-Item -ItemType Directory -Path $assets | Out-Null
+          $draft=& gh release view $env:RELEASE_TAG --json isDraft,tagName,targetCommitish
+          if ($LASTEXITCODE) { throw 'Draft lookup failed' }
+          $draft | Set-Content (Join-Path $env:RUNNER_TEMP draft.json)
+          if (($draft | ConvertFrom-Json).isDraft -ne $true) { throw 'An existing draft release is required' }
+          & gh release download $env:RELEASE_TAG --dir $assets --pattern '*-setup.exe' --pattern justsearch-mcp.mcpb --pattern SHA256SUMS
+          if ($LASTEXITCODE) { throw 'Draft download failed' }
+          $content=& gh api "repos/$env:GITHUB_REPOSITORY/contents/packaging/mcpb/server.json?ref=$env:RELEASE_TAG" --jq .content
+          if ($LASTEXITCODE) { throw 'Tagged registry fetch failed' }
+          [IO.File]::WriteAllBytes((Join-Path $env:RUNNER_TEMP server.json),[Convert]::FromBase64String(($content -join '')))
+      - name: Transfer draft bytes
+        uses: actions/upload-artifact@v7
+        with:
+          name: windows-release-draft-${{ inputs.tag }}
+          path: |
+            ${{ runner.temp }}/release-assets/
+            ${{ runner.temp }}/server.json
+            ${{ runner.temp }}/draft.json
+          if-no-files-found: error
+          retention-days: 1
   journeys:
+    needs: fetch
+    if: always()
+    permissions:
+      contents: read
     runs-on: windows-latest
     timeout-minutes: 120
     env:
@@ -39,23 +82,17 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22.20.0'
-      - name: Fetch and verify exact draft bytes and tagged registry
+      - name: Require successful draft fetch
         env:
-          GH_TOKEN: ${{ github.token }}
-          RELEASE_TAG: ${{ inputs.tag }}
+          FETCH_RESULT: ${{ needs.fetch.result }}
+        run: "if ($env:FETCH_RESULT -cne 'success') { throw 'Draft fetch did not succeed' }"
+      - name: Download verified draft bytes
+        uses: actions/download-artifact@v8
+        with:
+          name: windows-release-draft-${{ inputs.tag }}
+          path: ${{ runner.temp }}
+      - name: Verify downloaded draft bytes
         run: |
-          if ($env:RELEASE_TAG -cnotmatch '^v[0-9]+\.[0-9]+\.[0-9]+(-[A-Za-z0-9.-]+)?$') { throw 'Invalid release tag' }
-          $assets=Join-Path $env:RUNNER_TEMP release-assets
-          New-Item -ItemType Directory -Path $assets | Out-Null
-          $draft=& gh release view $env:RELEASE_TAG --json isDraft,tagName,targetCommitish
-          if ($LASTEXITCODE) { throw 'Draft lookup failed' }
-          $draft | Set-Content (Join-Path $env:RUNNER_TEMP draft.json)
-          if (($draft | ConvertFrom-Json).isDraft -ne $true) { throw 'An existing draft release is required' }
-          & gh release download $env:RELEASE_TAG --dir $assets --pattern '*-setup.exe' --pattern justsearch-mcp.mcpb --pattern SHA256SUMS
-          if ($LASTEXITCODE) { throw 'Draft download failed' }
-          $content=& gh api "repos/$env:GITHUB_REPOSITORY/contents/packaging/mcpb/server.json?ref=$env:RELEASE_TAG" --jq .content
-          if ($LASTEXITCODE) { throw 'Tagged registry fetch failed' }
-          [IO.File]::WriteAllBytes((Join-Path $env:RUNNER_TEMP server.json),[Convert]::FromBase64String(($content -join '')))
           @'
           import os, sys
           from pathlib import Path
@@ -113,4 +150,13 @@ jobs:
             ${{ runner.temp }}/journey-evidence/
             ${{ runner.temp }}/draft.json
           if-no-files-found: error
+          retention-days: 30
+      # A separate artifact: C:/Qual and RUNNER_TEMP may be on different drives.
+      - name: Upload viewer setup diagnostics on every outcome
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-viewer-setup-${{ inputs.tag }}
+          path: C:/Qual/viewer-setup/
+          if-no-files-found: ignore
           retention-days: 30
