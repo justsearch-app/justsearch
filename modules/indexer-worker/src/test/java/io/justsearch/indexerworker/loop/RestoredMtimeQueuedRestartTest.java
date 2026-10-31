@@ -119,6 +119,39 @@ final class RestoredMtimeQueuedRestartTest extends LuceneExecutorTestBase {
   }
 
   @Test
+  void acceptedOrdinaryForceRunsOnceAfterUnforcedRecordedWalkSeals() throws Exception {
+    Path file = seed("unchangedpanda ".repeat(300), false);
+    String key = "01900000-0000-7000-8000-000000000099";
+    try (var queue = new SqliteJobQueue(temporary.resolve("queue.db"),
+        ignored -> JobQueue.RecordedClaimDecision.ALLOW)) {
+      queue.open();
+      var progress = queue.beginRecordedWalk(key, "a".repeat(64), true);
+      assertEquals(1, queue.enqueueRecordedEntries(key, progress.enumerationEpoch(),
+          List.of(JobQueue.EnqueueEntry.stat(file).withinRoot(file.getParent())), null));
+      Set<String> marks = new HashSet<>();
+      var service = new io.justsearch.indexerworker.services.WorkerIngestService(queue,
+          null, null, IndexingPacing.unthrottled(), null, null, null, null, null, 0L);
+      service.setForcedPathSink(marks::addAll);
+      assertEquals(1, service.submitBatch(io.justsearch.ipc.BatchRequest.newBuilder()
+          .addFilePaths(file.toString()).setForceReindex(true).build(),
+          io.justsearch.indexerworker.services.CallContext.none()).getAcceptedCount());
+      assertEquals(0, processAccepted(queue, false, true, marks),
+          "ordinary force cannot alter the recorded owner's unforced authority");
+      queue.closeRecordedWalkEnumeration(key, progress.enumerationEpoch(),
+          JobQueue.WalkEnumerationOutcome.COMPLETE);
+      assertNotNull(queue.trySealRecordedWalk(key).sealedAt());
+      for (int expectedExtractions : List.of(1, 0)) {
+        assertEquals(1, service.submitBatch(io.justsearch.ipc.BatchRequest.newBuilder()
+            .addFilePaths(file.toString()).build(),
+            io.justsearch.indexerworker.services.CallContext.none()).getAcceptedCount());
+        assertEquals(expectedExtractions, processAccepted(queue, false, true, marks),
+            "the accepted ordinary force must run exactly once after sealing");
+        assertEquals(0, queue.queueDepth());
+      }
+    }
+  }
+
+  @Test
   void unchangedQueuedFileSkipsExtractionAcrossRestarts() throws Exception {
     Path file = seed("unchangedpanda ".repeat(300), false);
     assertEquals(0, process(file));

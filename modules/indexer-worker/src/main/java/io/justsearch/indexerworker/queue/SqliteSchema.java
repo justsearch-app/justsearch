@@ -59,7 +59,7 @@ public final class SqliteSchema {
           AND excluded.ingestion_root IS NULL AND excluded.unit_revision NOT LIKE 'release030-unscoped/%'
           THEN 'release030-unscoped/' || excluded.unit_revision ELSE excluded.unit_revision END,
         walk_seen_epoch=excluded.walk_seen_epoch, planned_source_sha256=excluded.planned_source_sha256,
-        force_reindex=MAX(excluded.force_reindex, CASE WHEN jobs.state='DONE' THEN 0 ELSE jobs.force_reindex END),
+        force_reindex=MAX(excluded.force_reindex, jobs.force_reindex),
         admitted_source_sha256=excluded.admitted_source_sha256,
         ingestion_root=excluded.ingestion_root, error_message=NULL, retry_after=NULL, first_failed_at=NULL,
         content_hash=NULL, last_outcome_class=NULL, last_reason_code=NULL, last_retry_policy=NULL,

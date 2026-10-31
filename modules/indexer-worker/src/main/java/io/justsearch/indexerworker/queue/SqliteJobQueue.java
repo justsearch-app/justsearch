@@ -3143,7 +3143,6 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
 
   private boolean preservesMaintenanceWork(JobQueue.EnqueueEntry entry, String collection, boolean exactCollection,
       String sourceIdentity, AdmissionSource source, long now) throws SQLException {
-    if (source == null && entry.plannedSourceSha256() == null) return false;
     if (source != null && !source.stillCurrent(entry.path())) return false;
     try (var query = connection.prepareStatement(
         "SELECT state,collection,admitted_source_sha256,planned_source_sha256,unit_revision,ingestion_root,"
@@ -3155,6 +3154,9 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
       query.setString(1, normalizePath(entry.path()));
       try (var row = query.executeQuery()) {
         if (!row.next() || STATE_DONE.equals(row.getString(1))) return false;
+        if (source == null && entry.plannedSourceSha256() == null) {
+          return STATE_PENDING.equals(row.getString(1)) && preservesMaintenanceRetryWait(entry.path(), now);
+        }
         String revision = row.getString(5);
         boolean legacyRecovery = revision != null && (revision.startsWith("release030")
             || revision.startsWith("root1:") || revision.startsWith("root2:"));
