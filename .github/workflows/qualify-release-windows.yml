@@ -73,7 +73,7 @@ jobs:
       - name: Require a disposable GitHub-hosted runner
         run: |
           if ($env:RUNNER_ENVIRONMENT -cne 'github-hosted') { throw 'Refusing a non-hosted runner' }
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           persist-credentials: false
       - uses: actions/setup-python@v5
