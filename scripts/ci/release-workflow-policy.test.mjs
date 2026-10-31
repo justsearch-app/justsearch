@@ -11,6 +11,21 @@ const read = name => readFileSync(new URL(`../../${name}`, import.meta.url), 'ut
 const workflow = name => yaml.load(read(`.github/workflows/${name}.yml`));
 const privateSecret = /secrets(?:\.JUSTSEARCH_(?:CODESIGN_\w+|TAURI_UPDATER_PRIVATE_KEY\w*|RELEASE_METADATA_PRIVATE_KEY_PEM)|\[['"]JUSTSEARCH_(?:CODESIGN_\w+|TAURI_UPDATER_PRIVATE_KEY\w*|RELEASE_METADATA_PRIVATE_KEY_PEM)['"]\])/;
 
+test('hosted Linux enables user namespaces before the full harness self-test', () => {
+  const steps = workflow('qualify-release-linux').jobs.journeys.steps;
+  const provision = steps.find(s => s.name === 'Provision qualification tools').run;
+  const namespaces = provision.indexOf('sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0');
+  const selfTest = provision.indexOf("python3 -m unittest discover -s scripts/release/qual/journeys -p 'test_*.py' -v");
+  assert(namespaces >= 0 && selfTest > namespaces, 'the GPU sandbox fixtures need user namespaces before discovery');
+});
+
+test('Windows uploads native viewer setup diagnostics on every outcome', () => {
+  const upload = workflow('qualify-release-windows').jobs.journeys.steps
+    .find(s => s.name === 'Upload viewer setup diagnostics on every outcome');
+  assert.equal(upload.if, 'always()');
+  assert.equal(upload.with.path, 'C:/Qual/viewer-setup/');
+});
+
 // Keep the write-enabled scripts closed to additional commands, including in the
 // runner guard and embedded Python. Only line endings and outer whitespace vary.
 const normalizeScript = script => script.replaceAll('\r\n', '\n').trim();
@@ -120,7 +135,7 @@ for (const platform of ['linux', 'windows']) {
     assert.match(job.steps[guardIndex].run, /success/);
     const record = job.steps.find(s => s.run?.includes('preparation_failure('));
     assert.equal(record.if, 'always()');
-    const upload = job.steps.at(-1);
+    const upload = job.steps.find(s => s.name === 'Upload observations on every outcome');
     assert.equal(upload.if, 'always()');
     assert.equal(upload.with.name, `${platform}-release-journeys-\${{ inputs.tag }}`);
     assert.equal(upload.with['retention-days'], 30);

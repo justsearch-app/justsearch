@@ -106,6 +106,9 @@ jobs:
               subprocess.run(['sudo', 'apt-get', 'purge', '-y', *packages], check=True)
           PY
           cargo install tauri-driver --version 2.0.4 --locked
+          # Ubuntu 24.04's AppArmor restriction blocks the GPU sandbox fixtures.
+          # This job has already required a disposable GitHub-hosted runner.
+          sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
           python3 -m unittest discover -s scripts/release/qual/journeys -p 'test_*.py' -v
       - name: Run the shared journeys under X11
         run: |
