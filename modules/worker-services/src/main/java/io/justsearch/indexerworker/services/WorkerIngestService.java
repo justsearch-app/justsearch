@@ -3404,6 +3404,12 @@ public final class WorkerIngestService {
         && guard.rootCurrent();
   }
 
+  /** Called by the watcher callback under its existing file-mutation and admission fences. */
+  public void retireWatcherFile(io.justsearch.adapters.lucene.runtime.RunningRuntime target,
+      String path) {
+    retireReconciledFile(target, path, pruneRootFor(path));
+  }
+
   /** The caller holds the file-mutation fence and the candidate journal's admission lease. */
   void retireReconciledFile(io.justsearch.adapters.lucene.runtime.RunningRuntime target,
       String path, Path root) {

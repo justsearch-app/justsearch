@@ -167,6 +167,51 @@ final class WatcherDeleteSafetyTest extends LuceneExecutorTestBase {
     }
   }
 
+  @org.junit.jupiter.params.ParameterizedTest
+  @org.junit.jupiter.params.provider.ValueSource(booleans = {false, true})
+  void liveDeleteCallbacksPreserveChunksBackedByAnotherFile(boolean witnessed) throws Exception {
+    Path gone = indexed("live-gone.txt");
+    Path kept = indexed("live-kept.txt");
+    for (String id : List.of("own-chunk", "legacy-chunk", "cross-file-chunk")) {
+      var fields = new java.util.HashMap<String, Object>(Map.of(
+          SchemaFields.DOC_ID, id, SchemaFields.DOC_UID, id,
+          SchemaFields.PARENT_DOC_ID, gone.toString(), SchemaFields.IS_CHUNK, "true",
+          SchemaFields.CONTENT, id));
+      if (!id.equals("legacy-chunk")) fields.put(SchemaFields.PATH,
+          id.equals("cross-file-chunk") ? kept.toString() : gone.toString());
+      runtime.indexingCoordinator().indexSingle(new IndexDocument(fields));
+    }
+    runtime.commitOps().commitAndTrack(CommitReason.DRAIN);
+    var registry = new RootWatcherRegistry();
+    service.setRootWatcherRegistry(registry);
+    watch(service, root);
+    var marker = org.mockito.Mockito.mock(ConfirmedDeletionMarker.class);
+    Class<?> callbacks = Class.forName(
+        "io.justsearch.indexerworker.server.DefaultWorkerAppServices$WatcherCallbacks");
+    Class<?> targetType = Class.forName(callbacks.getName() + "$Target");
+    var constructor = targetType.getDeclaredConstructors()[0];
+    constructor.setAccessible(true);
+    Object owner = new Object();
+    var target = constructor.newInstance(runtime, service, marker,
+        new WorkerMutationAdmission(owner), owner);
+    Files.delete(gone);
+    var callback = witnessed
+        ? callbacks.getDeclaredMethod("deleteAt", targetType, RootWatcherRegistry.Subscription.class, String.class)
+        : callbacks.getDeclaredMethod("deleteAt", targetType, String.class);
+    callback.setAccessible(true);
+    if (witnessed) callback.invoke(null, target, registry.subscription(root), gone.toString());
+    else callback.invoke(null, target, gone.toString());
+    runtime.commitOps().maybeRefreshBlocking();
+    assertEquals("cross-file-chunk", runtime.documentFieldOps()
+        .getDocumentField("cross-file-chunk", SchemaFields.CONTENT));
+    assertEquals("original live-kept.txt", runtime.documentFieldOps()
+        .getDocumentField(kept.toString(), SchemaFields.CONTENT));
+    assertNull(runtime.documentFieldOps().getDocumentField(gone.toString(), SchemaFields.CONTENT));
+    assertNull(runtime.documentFieldOps().getDocumentField("own-chunk", SchemaFields.CONTENT));
+    assertNull(runtime.documentFieldOps().getDocumentField("legacy-chunk", SchemaFields.CONTENT));
+    org.mockito.Mockito.verify(marker).markIfAbsent(gone.toString());
+  }
+
   @Test void recreatedBeforeSwitchingAdmissionPreservesExactUpsertReceipt() throws Exception {
     Path file = indexed("recreated.txt");
     switching();

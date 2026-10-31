@@ -736,6 +736,109 @@ class IndexingLoopTest {
     }
 
     @Test
+    void unavailableChildStorageDefersDifferentUnderlyingBytesBeforeContentAccess(
+        @org.junit.jupiter.api.io.TempDir Path temp) throws Exception {
+      Path root = Files.createDirectory(temp.resolve("root"));
+      Path file = Files.writeString(Files.createDirectory(root.resolve("child")).resolve("notes.txt"),
+          "original mounted bytes");
+      RecordingQueue queue = new RecordingQueue();
+      ContentExtractorProvider provider = mock(ContentExtractorProvider.class);
+      IndexingLoop loop = newLoop(queue, provider);
+      var available = new AtomicBoolean(true);
+      loop.useRootCheck(new SourcePresence.RootCheck() {
+        @Override public boolean admits(Path folder) { return true; }
+        @Override public boolean vouches(Path folder) { return true; }
+        @Override public boolean sourceStorageAvailable(Path source, Path boundary) {
+          return available.get();
+        }
+      });
+      available.set(false);
+      Files.writeString(file, "different underlying filesystem bytes");
+      try (var hashes = mockStatic(SourceContentHash.class, CALLS_REAL_METHODS)) {
+        assertNull(invokeExtractJob(loop, new JobQueue.IndexJob(
+            file, null, null, null, null, null, false, null, root)));
+        assertEquals(IngestionReasonCodes.ROOT_UNAVAILABLE, queue.lastOutcome.reasonCode());
+        hashes.verifyNoInteractions();
+      }
+      verifyNoInteractions(provider, queue.indexingCoordinator);
+      assertFalse(queue.done, "uncertain storage cannot retire the indexed original");
+    }
+
+    @Test
+    void storageDiscoveryRunsOncePerRootInEachExtractionBatch(
+        @org.junit.jupiter.api.io.TempDir Path temp) throws Exception {
+      Path root = Files.createDirectory(temp.resolve("root"));
+      Path first = Files.writeString(root.resolve("first.txt"), "first");
+      Path second = Files.writeString(root.resolve("second.txt"), "second");
+      RecordingQueue queue = new RecordingQueue();
+      IndexingLoop loop = newLoop(queue, providerReturning("content"));
+      var observations = new java.util.concurrent.atomic.AtomicInteger();
+      loop.useRootCheck(new SourcePresence.RootCheck() {
+        @Override public boolean admits(Path folder) { return true; }
+        @Override public boolean vouches(Path folder) { return true; }
+        @Override public boolean observeSourceStorage(Path boundary) {
+          observations.incrementAndGet();
+          return true;
+        }
+      });
+      setRunning(loop, true);
+      var jobs = List.of(new JobQueue.IndexJob(first, null, null, null, null, null, false, null, root),
+          new JobQueue.IndexJob(second, null, null, null, null, null, false, null, root));
+      assertEquals(2, loop.getExtractor().extractAll(jobs).size());
+      assertEquals(1, observations.get());
+      assertEquals(2, loop.getExtractor().extractAll(jobs).size());
+      assertEquals(2, observations.get(), "each pass refreshes its root observation");
+    }
+
+    @Test
+    void storageObservationIsBatchedButAvailabilityChangesBetweenFilesAndPassesAreSeen(
+        @org.junit.jupiter.api.io.TempDir Path temp) throws Exception {
+      Path root = Files.createDirectory(temp.resolve("root"));
+      Path first = Files.writeString(root.resolve("first.txt"), "first");
+      Path second = Files.writeString(root.resolve("second.txt"), "mounted bytes");
+      RecordingQueue queue = new RecordingQueue();
+      var available = new AtomicBoolean(true);
+      var observations = new java.util.concurrent.atomic.AtomicInteger();
+      var reads = new java.util.ArrayList<Path>();
+      IndexingLoop loop = newLoop(queue, new ContentExtractorProvider() {
+        @Override public ExtractionResult extract(Path path) throws IOException {
+          reads.add(path);
+          if (path.equals(first)) {
+            Files.writeString(second, "different underlying bytes");
+            available.set(false);
+          }
+          return new ExtractionResult(Files.readString(path), null, "text/plain");
+        }
+        @Override public String detectMimeType(Path path) { return "text/plain"; }
+      });
+      loop.useRootCheck(new SourcePresence.RootCheck() {
+        @Override public boolean admits(Path folder) { return true; }
+        @Override public boolean vouches(Path folder) { return true; }
+        @Override public boolean observeSourceStorage(Path boundary) {
+          observations.incrementAndGet();
+          return true;
+        }
+        @Override public boolean sourceStorageAvailable(Path source, Path boundary) {
+          return source.equals(first) || available.get();
+        }
+      });
+      setRunning(loop, true);
+      var jobs = List.of(new JobQueue.IndexJob(first, null, null, null, null, null, false, null, root),
+          new JobQueue.IndexJob(second, null, null, null, null, null, false, null, root));
+      assertEquals(1, loop.getExtractor().extractAll(jobs).size());
+      assertEquals(List.of(first), reads, "the second file lost storage before its content was opened");
+      assertEquals(IngestionReasonCodes.ROOT_UNAVAILABLE, queue.lastOutcome.reasonCode());
+      assertEquals(1, observations.get(), "one mount discovery per root in this batch");
+      available.set(true);
+      assertEquals(1, loop.getExtractor().extractAll(List.of(jobs.get(1))).size());
+      assertEquals(2, observations.get(), "the next pass must refresh storage evidence");
+      available.set(false);
+      assertTrue(loop.getExtractor().extractAll(List.of(jobs.get(1))).isEmpty());
+      assertEquals(3, observations.get());
+      assertEquals(List.of(first, second), reads);
+    }
+
+    @Test
     void nonRegularSourceIsSkippedBeforeExtraction() throws Exception {
       Path directory = Files.createTempDirectory("js-non-regular");
       RecordingQueue queue = new RecordingQueue();

@@ -39,6 +39,11 @@ public final class SourcePresence {
 
     default boolean observeSourceStorage(Path root) { return true; }
 
+    /** Discover storage once per batch/root; the returned check still probes each source now. */
+    default java.util.function.Predicate<Path> sourceStorageCheck(Path root) {
+      return observeSourceStorage(root) ? source -> sourceStorageAvailable(source, root) : source -> false;
+    }
+
     /**
      * True while content beneath {@code folder} may be added or updated: a present, listable folder
      * on the volume recorded for it; a root with nothing recorded is unproven (round 8). A folder

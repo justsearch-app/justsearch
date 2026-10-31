@@ -2705,9 +2705,9 @@ public final class KnowledgeServerMigrationOps {
   private static final String SOURCE_GONE = "gone";
 
   /** The file's SHA-256 now, {@link #SOURCE_GONE} when it is absent, or null when unreadable. */
-  private static String currentSource(String path) {
+  private static String currentSource(String path, Path root) {
     try {
-      return io.justsearch.indexerworker.loop.SourceContentHash.sha256(Path.of(path));
+      return io.justsearch.indexerworker.loop.SourceContentHash.sha256WithinRoot(Path.of(path), root);
     } catch (NoSuchFileException absent) {
       return SOURCE_GONE;
     } catch (IOException | RuntimeException unreadable) {
@@ -2929,6 +2929,11 @@ public final class KnowledgeServerMigrationOps {
     var rootCheck = publisher.rootCheck();
     if (rootCheck == null) return CleanupPathState.UNCERTAIN;
     Path file = path.toAbsolutePath().normalize();
+    try {
+      io.justsearch.indexerworker.loop.SourceAccess.requireSafeAncestors(file, root);
+    } catch (IOException | SecurityException unsafeAncestor) {
+      return CleanupPathState.UNCERTAIN;
+    }
     String before = observedKind(file);
     if (before == null) return CleanupPathState.UNCERTAIN;
     boolean asRoot = io.justsearch.indexerworker.loop.SourcePresence.answersAsRoot(file, root);
@@ -2960,7 +2965,7 @@ public final class KnowledgeServerMigrationOps {
           ? new CleanupPathState(CleanupPathKind.NON_REGULAR, before, null)
           : CleanupPathState.UNCERTAIN;
     }
-    String sha = currentSource(file.toString());
+    String sha = currentSource(file.toString(), root);
     if (SOURCE_GONE.equals(sha) || !before.equals(observedKind(file))) {
       return CleanupPathState.UNCERTAIN; // It changed while it was being read.
     }

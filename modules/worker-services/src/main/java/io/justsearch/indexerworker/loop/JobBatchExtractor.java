@@ -149,15 +149,20 @@ public final class JobBatchExtractor {
     identityFailures.begin();
     extractionFailures.begin();
     indexEmptyForBatch = indexKnownEmpty();
-    List<ExtractedJob> extracted = new ArrayList<>(jobs.size());
-    for (JobQueue.IndexJob job : jobs) {
-      if (!running.get()) break;
-      ExtractedJob ex = extractJob(job);
-      if (ex != null) extracted.add(ex);
-      // Pace extraction per file while keeping the remaining claims owned by this batch.
-      indexingPacing.pace();
+    ingestionAuthority.beginBatch();
+    try {
+      List<ExtractedJob> extracted = new ArrayList<>(jobs.size());
+      for (JobQueue.IndexJob job : jobs) {
+        if (!running.get()) break;
+        ExtractedJob ex = extractJob(job);
+        if (ex != null) extracted.add(ex);
+        // Pace extraction per file while keeping the remaining claims owned by this batch.
+        indexingPacing.pace();
+      }
+      return extracted;
+    } finally {
+      ingestionAuthority.endBatch();
     }
-    return extracted;
   }
 
   void pipelineSucceeded() {

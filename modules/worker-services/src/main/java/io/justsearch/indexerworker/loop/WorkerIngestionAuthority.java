@@ -73,6 +73,24 @@ final class WorkerIngestionAuthority {
     return IngestionSkipPolicy.shouldSkipWithinRoot(file, root) || userExclusions.test(file, root);
   }
 
+  // Owned by the single extraction batch; never retained between passes.
+  private java.util.Map<Path, java.util.function.Predicate<Path>> batchStorageChecks;
+
+  void beginBatch() {
+    batchStorageChecks = new java.util.HashMap<>();
+  }
+
+  void endBatch() {
+    batchStorageChecks = null;
+  }
+
+  private boolean sourceStorageAvailable(Path source, Path root) {
+    Path boundary = root == null ? source.getParent() : root.toAbsolutePath().normalize();
+    var checks = batchStorageChecks;
+    return (checks == null ? rootCheck.sourceStorageCheck(boundary)
+        : checks.computeIfAbsent(boundary, rootCheck::sourceStorageCheck)).test(source);
+  }
+
   SourceAdmission admit(Path filePath, Path root) throws IOException {
     if (excludes(filePath, root)) {
       return SourceAdmission.terminal(
@@ -123,7 +141,7 @@ final class WorkerIngestionAuthority {
     boolean rooted = SourcePresence.answersAsRoot(normalizedFile, root);
     boolean exactRecovery = !rooted && rootCheck.isRelease030ExactFile(normalizedFile);
     boolean admitted = exactRecovery || (rooted ? rootCheck.admits(answering) : rootCheck.admitsFile(answering));
-    if (!admitted || !rootCheck.observeSourceStorage(root)) {
+    if (!admitted || !sourceStorageAvailable(normalizedFile, root)) {
       return SourceAdmission.terminal(SourceAdmissionAction.RETRYABLE_FAILURE, rootUnavailable());
     }
 
@@ -133,7 +151,7 @@ final class WorkerIngestionAuthority {
             sourceUnreadable(filePath, null));
       }
       boolean canRetire = rooted ? rootCheck.vouches(answering) : rootCheck.vouchesForFile(answering);
-      if (!canRetire || !rootCheck.sourceStorageAvailable(normalizedFile, root) || io.justsearch.adapters.lucene.runtime.PathPresence.absentBeneathListableFolder(
+      if (!canRetire || io.justsearch.adapters.lucene.runtime.PathPresence.absentBeneathListableFolder(
           normalizedFile, answering, null) == io.justsearch.adapters.lucene.runtime.PathPresence.UNKNOWN) {
         return SourceAdmission.terminal(SourceAdmissionAction.RETRYABLE_FAILURE, rootUnavailable());
       }

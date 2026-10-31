@@ -61,6 +61,33 @@ final class Release030ForgetSourceObservationTest extends LuceneExecutorTestBase
     exercise(true, false, false, true, true);
   }
 
+  @Test void cleanupReplayRejectsOutsideAncestorBeforeObservationOrHashing() throws Exception {
+    Path root = Files.createDirectory(directory.resolve("root"));
+    Path parent = Files.createDirectory(root.resolve("parent"));
+    Path file = Files.writeString(parent.resolve("accepted.txt"), "accepted bytes");
+    var publisher = spy(new WorkerIngestService(null, null, null, IndexingPacing.unthrottled(),
+        directory.resolve("base"), null, null, null, null, 0L));
+    var authority = mock(SourcePresence.RootCheck.class);
+    when(authority.vouches(root)).thenReturn(true);
+    doReturn(authority).when(publisher).rootCheck();
+    assertEquals(KnowledgeServerMigrationOps.CleanupPathKind.REGULAR,
+        KnowledgeServerMigrationOps.observeForCleanup(publisher, file, root).kind());
+    Path outside = Files.createDirectory(directory.resolve("outside"));
+    Files.writeString(outside.resolve("accepted.txt"), "outside bytes");
+    Files.delete(file);
+    Files.delete(parent);
+    Files.createSymbolicLink(parent, outside);
+    try (var hashes = mockStatic(SourceContentHash.class, CALLS_REAL_METHODS)) {
+      assertEquals(KnowledgeServerMigrationOps.CleanupPathKind.UNCERTAIN,
+          KnowledgeServerMigrationOps.observeForCleanup(publisher, file, root).kind());
+      hashes.verifyNoInteractions();
+      Files.delete(outside.resolve("accepted.txt"));
+      assertEquals(KnowledgeServerMigrationOps.CleanupPathKind.UNCERTAIN,
+          KnowledgeServerMigrationOps.observeForCleanup(publisher, file, root).kind());
+      hashes.verifyNoInteractions();
+    }
+  }
+
   private static FieldCatalogDef retirementCatalog() {
     var fields = new java.util.ArrayList<>(FieldCatalogDef.forChunkTesting(0).fields());
     fields.add(new FieldCatalogDef.FieldDef(SchemaFields.SOURCE_SHA256,
@@ -133,7 +160,7 @@ final class Release030ForgetSourceObservationTest extends LuceneExecutorTestBase
           }
         }
         if (excluded || unknown) assertDoesNotThrow(hashes::verifyNoInteractions, "retirement must not hash excluded or unknown-policy sources");
-        else hashes.verify(() -> SourceContentHash.sha256(file), times(2));
+        else hashes.verify(() -> SourceContentHash.sha256WithinRoot(file, file), times(2));
       }
       assertEquals(row, queue.watcherReconciliationRow(key), "no replacement admission");
       assertEquals(admissions, queue.switchBufferAdmissions(), "no new journal order");

@@ -122,6 +122,17 @@ public final class RootWitness implements SourcePresence.RootCheck {
   }
 
   @Override
+  public java.util.function.Predicate<Path> sourceStorageCheck(Path root) {
+    if (!observeSourceStorage(root)) return source -> false;
+    try {
+      var descendants = volumes.descendantVolumes(root);
+      return source -> RootVolumeLedger.sourceStorageAvailable(source, descendants);
+    } catch (IOException | RuntimeException unavailable) {
+      return source -> false;
+    }
+  }
+
+  @Override
   public boolean sourceStorageAvailable(Path source, Path root) {
     return volumes.sourceStorageAvailable(source, root == null ? source.getParent() : root);
   }
