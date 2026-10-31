@@ -23,7 +23,9 @@ public record SandboxExtractionResponse(
     int maxEmbeddedDepth,
     String visualExtractionEvidenceJson,
     String errorMessage,
-    String reasonCode) {
+    String reasonCode,
+    List<OcrMetricCatalog.Event> ocrMetrics) {
+  static final String SOURCE_IO = "SOURCE_IO";
   static final String SERVICE_UNAVAILABLE = "SERVICE_UNAVAILABLE";
   public static final int CURRENT_SCHEMA_VERSION = SandboxExtractionRequest.CURRENT_SCHEMA_VERSION;
   static final int MAX_IDENTIFIER_CHARS = 96;
@@ -31,6 +33,8 @@ public record SandboxExtractionResponse(
   static final int MAX_REASON_CODE_CHARS = 512;
 
   public SandboxExtractionResponse {
+    ocrMetrics = ocrMetrics == null ? List.of() : List.copyOf(ocrMetrics);
+    if (ocrMetrics.size() > 8) throw new IllegalArgumentException("Too many OCR metric events");
     SandboxExtractionRequest.requireRequestId(requestId);
     requireBounded("policyId", policyId, MAX_IDENTIFIER_CHARS);
     requireBounded("parserId", parserId, MAX_IDENTIFIER_CHARS);
@@ -57,7 +61,8 @@ public record SandboxExtractionResponse(
         artifact.maxEmbeddedDepth(),
         artifact.visualExtractionEvidenceJson(),
         null,
-        null);
+        null,
+        List.of());
   }
 
   public static SandboxExtractionResponse failed(
@@ -80,7 +85,14 @@ public record SandboxExtractionResponse(
         0,
         null,
         errorMessage,
-        reasonCode);
+        reasonCode,
+        List.of());
+  }
+
+  SandboxExtractionResponse withOcrMetrics(List<OcrMetricCatalog.Event> events) {
+    return new SandboxExtractionResponse(schemaVersion, requestId, status, content, title, mimeType,
+        author, frontmatterMetadata, policyId, parserId, truncated, warnings, embeddedResourceCount,
+        maxEmbeddedDepth, visualExtractionEvidenceJson, errorMessage, reasonCode, events);
   }
 
   public ExtractionArtifact toArtifact() {

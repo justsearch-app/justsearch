@@ -65,12 +65,53 @@ public final class OcrMetricCatalog implements MetricCatalog {
   public final CounterMetric<OcrFailureTags> failedTotal;
   public final CounterMetric<OcrSkipTags> skippedTotal;
 
+  private final java.util.function.Consumer<Event> events;
+
   public OcrMetricCatalog(MetricRegistry registry) {
+    this(registry, ignored -> {});
+  }
+
+  private OcrMetricCatalog(MetricRegistry registry, java.util.function.Consumer<Event> events) {
+    this.events = events;
     Objects.requireNonNull(registry, "registry");
     this.succeededTotal = registry.buildCounter(SUCCEEDED_TOTAL);
     this.timeMs = registry.buildHistogram(TIME_MS);
     this.failedTotal = registry.buildCounter(FAILED_TOTAL);
     this.skippedTotal = registry.buildCounter(SKIPPED_TOTAL);
+  }
+
+  static OcrMetricCatalog recording(java.util.function.Consumer<Event> events) {
+    return new OcrMetricCatalog(new NoopMetricRegistry(DEFINITIONS), events);
+  }
+
+  void succeeded() { publish(new Event(SUCCEEDED_TOTAL, 1, null)); }
+  void time(long millis) { publish(new Event(TIME_MS, millis, null)); }
+  void failed(String error) { publish(new Event(FAILED_TOTAL, 1, error)); }
+  void skipped(OcrSkipReason reason) { publish(new Event(SKIPPED_TOTAL, 1, reason.name())); }
+
+  void publish(Event event) {
+    switch (event.name()) {
+      case SUCCEEDED_TOTAL -> succeededTotal.add(event.value(), OcrEngineTags.of(OcrRoutingConfig.ENGINE));
+      case TIME_MS -> timeMs.record(event.value(), OcrEngineTags.of(OcrRoutingConfig.ENGINE));
+      case FAILED_TOTAL -> failedTotal.add(event.value(), OcrFailureTags.of(OcrRoutingConfig.ENGINE, event.detail()));
+      case SKIPPED_TOTAL -> skippedTotal.add(event.value(), OcrSkipTags.of(OcrSkipReason.valueOf(event.detail())));
+      default -> throw new IllegalArgumentException("Unknown OCR metric");
+    }
+    events.accept(event);
+  }
+
+  /** Bounded, request-local instrument events returned by the sandbox. */
+  public record Event(String name, long value, String detail) {
+    public Event {
+      if (!List.of(SUCCEEDED_TOTAL, TIME_MS, FAILED_TOTAL, SKIPPED_TOTAL).contains(name)
+          || value < 0 || (detail != null && detail.length() > 96)) {
+        throw new IllegalArgumentException("Invalid OCR metric event");
+      }
+      if (SKIPPED_TOTAL.equals(name)) OcrSkipReason.valueOf(detail);
+      if (FAILED_TOTAL.equals(name) && (detail == null || detail.isBlank())) {
+        throw new IllegalArgumentException("Missing OCR error tag");
+      }
+    }
   }
 
   private static final OcrMetricCatalog NOOP =

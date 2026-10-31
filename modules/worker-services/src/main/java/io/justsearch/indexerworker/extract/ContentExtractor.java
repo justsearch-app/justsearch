@@ -34,19 +34,11 @@ public final class ContentExtractor implements ContentExtractorProvider, AutoClo
   /** Default maximum content length (10MB of text). */
   private static final int DEFAULT_MAX_CONTENT_LENGTH = 10 * 1024 * 1024;
 
-  /** Maximum file size to attempt extraction (100MB). */
-  private static final long MAX_FILE_SIZE = 100 * 1024 * 1024;
-
-  /**
-   * Maximum file size for Office documents (30MB). POI requires 10-20x the file size in heap
-   * memory during parsing. With a 512MB Worker heap, files above this threshold risk OOM. See
-   * TIKA-2109, TIKA-4474.
-   */
-  private static final long MAX_OFFICE_FILE_SIZE = 30 * 1024 * 1024;
 
   private final PreparedExtractionInput.Factory inputFactory;
   private final Tika tika;
   private final int maxContentLength;
+  private final TikaExtractionPolicy policy;
 
   /** Creates a new ContentExtractor with default settings. */
   public ContentExtractor() {
@@ -63,6 +55,12 @@ public final class ContentExtractor implements ContentExtractorProvider, AutoClo
   }
 
   ContentExtractor(int maxContentLength, PreparedExtractionInput.Factory inputFactory) {
+    this(maxContentLength, TikaExtractionPolicy.defaults(), inputFactory);
+  }
+
+  ContentExtractor(int maxContentLength, TikaExtractionPolicy policy,
+      PreparedExtractionInput.Factory inputFactory) {
+    this.policy = policy;
     this.inputFactory = inputFactory;
     // Same detector as the structured extractor, so this flat fallback cannot disagree with it
     // about what is text (tempdoc 803).
@@ -88,7 +86,6 @@ public final class ContentExtractor implements ContentExtractorProvider, AutoClo
   @Override
   public ExtractionResult extract(Path file) throws IOException, ExtractionException {
     Objects.requireNonNull(file, "file");
-    TikaExtractionPolicy policy = TikaExtractionPolicy.defaults();
     try (PreparedExtractionInput input = inputFactory.prepare(file, policy)) {
       org.apache.tika.parser.ParseContext context = new org.apache.tika.parser.ParseContext();
       EmbeddedResourceBudget budget = new EmbeddedResourceBudget(
@@ -111,22 +108,22 @@ public final class ContentExtractor implements ContentExtractorProvider, AutoClo
       EmbeddedResourceBudget budget, Metadata metadata) throws IOException, ExtractionException {
     Path file = input.source();
     long fileSize = input.size();
-    if (fileSize > MAX_FILE_SIZE) {
+    if (fileSize > policy.maxInputBytes()) {
       log.warn("File too large for extraction: {} ({} bytes)", file, fileSize);
       throw new BudgetExceededException(
-          "File too large: " + fileSize + " bytes (max: " + MAX_FILE_SIZE + ")",
+          "File too large: " + fileSize + " bytes (max: " + policy.maxInputBytes() + ")",
           "INPUT_TOO_LARGE");
     }
 
     // Stricter limit for Office documents — POI expands them 10-20x in memory.
     // Only pay the tika.detect() cost for files that exceed the Office threshold.
-    if (fileSize > MAX_OFFICE_FILE_SIZE && input.isOfficeForLimits(tika)) {
+    if (fileSize > policy.maxOfficeInputBytes() && input.isOfficeForLimits(tika)) {
       log.warn("Office file too large for extraction: {} ({} bytes)", file, fileSize);
       throw new BudgetExceededException(
           "Office file too large: "
               + fileSize
               + " bytes (max: "
-              + MAX_OFFICE_FILE_SIZE
+              + policy.maxOfficeInputBytes()
               + ")",
           "OFFICE_INPUT_TOO_LARGE");
     }

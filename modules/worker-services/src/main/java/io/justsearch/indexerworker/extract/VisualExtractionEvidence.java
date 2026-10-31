@@ -102,7 +102,7 @@ public record VisualExtractionEvidence(
         confidence.present() ? confidence.wordCount() : null,
         s.pagesWithReadableText(),
         s.pagesMissingReadableText(),
-        mixedPdfOverride || s.mixedPdf(),
+        mixedPdfOverride || (!ocrRoute && s.mixedPdf()),
         s.tableCount(),
         s.headingCount(),
         s.listCount(),

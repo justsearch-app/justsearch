@@ -4,7 +4,7 @@ package io.justsearch.indexerworker.extract;
 /** Versioned request sent from the Worker extraction parent to a sandbox child process. */
 public record SandboxExtractionRequest(
     int schemaVersion, String requestId, String path, TikaExtractionPolicy policy, OcrRoutingConfig ocrConfig) {
-  public static final int CURRENT_SCHEMA_VERSION = 2;
+  public static final int CURRENT_SCHEMA_VERSION = 3;
   static final int MAX_REQUEST_ID_CHARS = 96;
 
   public SandboxExtractionRequest {

@@ -220,7 +220,11 @@ public final class StructuredContentHandler extends DefaultHandler {
   public void characters(char[] ch, int start, int length) throws SAXException {
     if (limitReached) return;
 
-    String text = new String(ch, start, length);
+    int retained = Math.min(length, Math.max(0, maxContentLength - totalChars));
+    if (retained > 0 && Character.isHighSurrogate(ch[start + retained - 1])
+        && ((retained < length && Character.isLowSurrogate(ch[start + retained]))
+            || totalChars + retained >= maxContentLength)) retained--;
+    String text = new String(ch, start, retained);
 
     if (headingLevel > 0 && headingBuffer != null) {
       headingBuffer.append(text);
@@ -232,8 +236,8 @@ public final class StructuredContentHandler extends DefaultHandler {
       textBuffer.append(text);
     }
 
-    totalChars += length;
-    if (totalChars >= maxContentLength) {
+    totalChars += retained;
+    if (retained < length || totalChars >= maxContentLength) {
       limitReached = true;
     }
   }
@@ -254,7 +258,37 @@ public final class StructuredContentHandler extends DefaultHandler {
    * <p>Call this after parsing is complete.
    */
   public StructuredDocument getDocument() {
-    // Final flush — always emit remaining text even if limit was reached mid-buffer
+    // Finalize unfinished structures as well as body text; clear each buffer after emitting it.
+    if (headingBuffer != null) {
+      String text = headingBuffer.toString().strip();
+      if (!text.isEmpty()) elements.add(new Heading(headingLevel, text, currentPageIndex));
+      headingBuffer = null;
+      headingLevel = 0;
+    }
+    if (inTable) {
+      if (inCell && cellBuffer != null && currentRow != null) {
+        currentRow.add(cellBuffer.toString().strip());
+      }
+      if (currentRow != null && !currentRow.isEmpty()) tableRows.add(currentRow);
+      if (!tableRows.isEmpty()) elements.add(new Table(List.copyOf(tableRows), currentPageIndex, limitReached));
+      inTable = false;
+      tableNestingDepth = 0;
+      tableRows = null;
+      currentRow = null;
+      cellBuffer = null;
+      inCell = false;
+    }
+    if (inList) {
+      if (itemBuffer != null && !itemBuffer.toString().isBlank()) {
+        listItems.add(itemBuffer.toString().strip());
+      }
+      if (!listItems.isEmpty()) elements.add(new ListBlock(List.copyOf(listItems), orderedList, currentPageIndex));
+      inList = false;
+      listNestingDepth = 0;
+      listItems = null;
+      itemBuffer = null;
+      inListItem = false;
+    }
     flushTextBufferFinal();
     int pages = hasPageWrappers ? currentPageIndex + 1 : 0;
     return new StructuredDocument(List.copyOf(elements), pages);

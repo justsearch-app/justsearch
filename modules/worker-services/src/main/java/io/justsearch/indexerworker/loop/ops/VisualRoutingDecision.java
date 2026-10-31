@@ -18,7 +18,7 @@ import tools.jackson.databind.json.JsonMapper;
 record VisualRoutingDecision(String status, String demandKind, String reason) {
   private static final ObjectMapper JSON = JsonMapper.builder().build();
   private static final Set<String> VDU_ELIGIBLE_EXTENSIONS =
-      Set.of(".pdf", ".png", ".jpg", ".jpeg", ".tiff", ".bmp", ".gif");
+      Set.of(".pdf", ".png", ".jpg", ".jpeg", ".tif", ".tiff", ".bmp", ".gif");
 
   static VisualRoutingDecision decide(
       Path filePath,
@@ -68,6 +68,11 @@ record VisualRoutingDecision(String status, String demandKind, String reason) {
 
     Map<String, Object> evidence = parseEvidence(visualExtractionEvidenceJson);
     if (SchemaFields.EXTRACTION_METHOD_OCR_TIKA.equals(extractionMethod)) {
+      if (pagesMissingReadableText(evidence) > 0 || booleanValue(evidence.get("contentTruncated"))) {
+        if (!budget.permitsTier(2)) return notNeeded("fallback_budget_spent");
+        return new VisualRoutingDecision(SchemaFields.VDU_STATUS_PENDING,
+            SchemaFields.VDU_DEMAND_KIND_BASELINE_TEXT, "baseline_text_missing");
+      }
       if (hasVisualEnrichmentDemand(evidence)) {
         if (!budget.permitsTier(2)) {
           return notNeeded("fallback_budget_spent");

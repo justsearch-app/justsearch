@@ -32,8 +32,14 @@ public record StructuredDocument(List<Element> elements, int pageCount) {
   /**
    * A table with rows of cells. The first row is treated as the header row when {@link
    * #hasHeaders()} is true.
+   *
+   * @param partial whether the character limit cut this table before its closing event
    */
-  public record Table(List<List<String>> rows, int pageIndex) implements Element {
+  public record Table(List<List<String>> rows, int pageIndex, boolean partial) implements Element {
+    public Table(List<List<String>> rows, int pageIndex) {
+      this(rows, pageIndex, false);
+    }
+
     public boolean hasHeaders() {
       return rows.size() > 1;
     }
@@ -64,8 +70,11 @@ public record StructuredDocument(List<Element> elements, int pageCount) {
   public AnnotatedText toAnnotatedText(int maxChars) {
     if (maxChars < 0) throw new IllegalArgumentException("maxChars must not be negative");
     BoundedText sb = new BoundedText(maxChars);
-    try {
-      for (Element el : elements) {
+    Map<Integer, Integer> pageTextChars = new HashMap<>();
+    boolean truncated = false;
+    for (Element el : elements) {
+      int before = sb.length();
+      try {
         switch (el) {
           case Heading h -> appendHeading(sb, h);
           case Paragraph p -> appendParagraph(sb, p);
@@ -73,14 +82,20 @@ public record StructuredDocument(List<Element> elements, int pageCount) {
           case PageBreak ignored -> appendPageBreak(sb);
           case ListBlock lb -> appendListBlock(sb, lb);
         }
+      } catch (OutputLimitReached ignored) {
+        truncated = true;
       }
-    } catch (OutputLimitReached ignored) {
-      return new AnnotatedText(sb.text(), true);
+      if (!(el instanceof PageBreak)) {
+        int retained = sb.buffer.substring(before).strip().length();
+        if (retained > 0) pageTextChars.merge(el.pageIndex(), retained, Integer::sum);
+      }
+      if (truncated) break;
     }
-    return new AnnotatedText(sb.text(), false);
+    return new AnnotatedText(sb.text(), truncated, Map.copyOf(pageTextChars));
   }
 
-  public record AnnotatedText(String text, boolean truncated) {}
+  /** Character counts include only serialized text retained within the output budget. */
+  public record AnnotatedText(String text, boolean truncated, Map<Integer, Integer> pageTextChars) {}
 
   /**
    * Serialize to flat text (backward-compatible with parseToString output). Simple concatenation
@@ -230,15 +245,17 @@ public record StructuredDocument(List<Element> elements, int pageCount) {
 
     if (t.hasHeaders()) {
       List<String> headers = t.rows().getFirst();
+      boolean[] emittedHeaders = t.partial() ? new boolean[headers.size()] : null;
       for (int r = 1; r < t.rows().size(); r++) {
         List<String> row = t.rows().get(r);
         // Use first column as row identifier if available
         String rowId = !row.isEmpty() ? row.getFirst().strip() : "";
-        for (int c = 0; c < headers.size() && c < row.size(); c++) {
-          String colHeader = headers.get(c).strip();
+        for (int c = 0; c < row.size(); c++) {
+          String colHeader = c < headers.size() ? headers.get(c).strip() : "";
           String cellValue = row.get(c).strip();
           if (cellValue.isEmpty()) continue;
-          if (!rowId.isEmpty() && c > 0) {
+          if (emittedHeaders != null && c < headers.size()) emittedHeaders[c] = true;
+          if (c < headers.size() && !rowId.isEmpty() && c > 0) {
             sb.append(rowId).append(", ");
           }
           if (!colHeader.isEmpty()) {
@@ -246,6 +263,13 @@ public record StructuredDocument(List<Element> elements, int pageCount) {
           }
           sb.append(cellValue);
           sb.append('\n');
+        }
+      }
+      if (t.partial()) {
+        for (int c = 0; c < headers.size(); c++) {
+          if (emittedHeaders[c]) continue;
+          String header = headers.get(c);
+          if (!header.isBlank()) sb.append(header.strip()).append('\n');
         }
       }
     } else {
@@ -365,6 +389,6 @@ public record StructuredDocument(List<Element> elements, int pageCount) {
   private static String normalizeForComparison(String text) {
     if (text == null) return null;
     String trimmed = text.strip().toLowerCase(java.util.Locale.ROOT);
-    return trimmed.length() > 200 ? trimmed.substring(0, 200) : trimmed;
+    return trimmed;
   }
 }

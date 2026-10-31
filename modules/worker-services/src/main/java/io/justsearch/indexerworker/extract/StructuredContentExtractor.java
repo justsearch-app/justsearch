@@ -8,6 +8,7 @@ import java.io.InputStream;
 import java.nio.file.Path;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import org.apache.tika.Tika;
 import org.apache.tika.exception.TikaException;
 import org.apache.tika.metadata.Metadata;
@@ -38,12 +39,6 @@ public final class StructuredContentExtractor implements ContentExtractorProvide
 
   /** Default maximum content length (10MB of text). */
   private static final int DEFAULT_MAX_CONTENT_LENGTH = 10 * 1024 * 1024;
-
-  /** Maximum file size to attempt extraction (100MB). */
-  private static final long MAX_FILE_SIZE = 100 * 1024 * 1024;
-
-  /** Maximum file size for Office documents (30MB). POI OOM risk. */
-  private static final long MAX_OFFICE_FILE_SIZE = 30 * 1024 * 1024;
 
   private final PreparedExtractionInput.Factory inputFactory;
   private final AutoDetectParser parser;
@@ -123,7 +118,7 @@ public final class StructuredContentExtractor implements ContentExtractorProvide
       StructuredExtractionResult result = extractStructured(input, context);
       budget.check();
       return new StructuredExtractionResult(result.result(), result.truncated(), result.summary(),
-          budget.resources(), budget.maxDepth(), result.lossy());
+          budget.resources(), budget.maxDepth(), result.lossy(), result.retainedReadablePages());
     } catch (Exception e) {
       budget.check();
       if (e instanceof ContentExtractor.BudgetExceededException limit) throw limit;
@@ -132,7 +127,7 @@ public final class StructuredContentExtractor implements ContentExtractorProvide
           file.getFileName(),
           e);
       Metadata metadata = input.metadata();
-      try (var flat = new ContentExtractor(maxContentLength)) {
+      try (var flat = new ContentExtractor(maxContentLength, policy, new PreparedExtractionInput.Factory())) {
         var result = flat.extract(input, context, budget, metadata);
         return new StructuredExtractionResult(result, context.get(ParseRecord.class).isWriteLimitReached(),
             StructuredDocumentSummary.empty(), budget.resources(), budget.maxDepth(),
@@ -145,16 +140,16 @@ public final class StructuredContentExtractor implements ContentExtractorProvide
       throws IOException, ContentExtractor.ExtractionException {
     Path file = input.source();
     long fileSize = input.size();
-    if (fileSize > MAX_FILE_SIZE) {
+    if (fileSize > policy.maxInputBytes()) {
       log.warn("File too large for extraction: {} ({} bytes)", file, fileSize);
-      throw new ContentExtractor.ExtractionException(
-          "File too large: " + fileSize + " bytes (max: " + MAX_FILE_SIZE + ")");
+      throw new ContentExtractor.BudgetExceededException(
+          "File too large: " + fileSize + " bytes (max: " + policy.maxInputBytes() + ")", "INPUT_TOO_LARGE");
     }
 
-    if (fileSize > MAX_OFFICE_FILE_SIZE && input.isOfficeForLimits(tika)) {
+    if (fileSize > policy.maxOfficeInputBytes() && input.isOfficeForLimits(tika)) {
       log.warn("Office file too large for extraction: {} ({} bytes)", file, fileSize);
-      throw new ContentExtractor.ExtractionException(
-          "Office file too large: " + fileSize + " bytes (max: " + MAX_OFFICE_FILE_SIZE + ")");
+      throw new ContentExtractor.BudgetExceededException(
+          "Office file too large: " + fileSize + " bytes (max: " + policy.maxOfficeInputBytes() + ")", "OFFICE_INPUT_TOO_LARGE");
     }
   }
 
@@ -165,7 +160,13 @@ public final class StructuredContentExtractor implements ContentExtractorProvide
       StructuredDocumentSummary summary,
       int embeddedResourceCount,
       int maxEmbeddedDepth,
-      boolean lossy) {
+      boolean lossy,
+      Set<Integer> retainedReadablePages) {
+    public StructuredExtractionResult(ContentExtractor.ExtractionResult result,
+        boolean truncated, StructuredDocumentSummary summary, int embeddedResourceCount,
+        int maxEmbeddedDepth, boolean lossy) {
+      this(result, truncated, summary, embeddedResourceCount, maxEmbeddedDepth, lossy, Set.of());
+    }
     public StructuredExtractionResult(ContentExtractor.ExtractionResult result,
         boolean truncated, StructuredDocumentSummary summary, int embeddedResourceCount,
         int maxEmbeddedDepth) {
@@ -240,7 +241,10 @@ public final class StructuredContentExtractor implements ContentExtractorProvide
         new ContentExtractor.ExtractionResult(content, title, mimeType, author, frontmatterMeta),
         handler.isLimitReached() || annotated.truncated(),
         StructuredDocumentSummary.fromDocument(doc), 0, 0,
-        DecodingLossAudit.isLossy(input, metadata, parseContext));
+        DecodingLossAudit.isLossy(input, metadata, parseContext),
+        annotated.pageTextChars().entrySet().stream()
+            .filter(entry -> entry.getValue() >= VisualPageEvidencePolicy.READABLE_PAGE_MIN_CHARS)
+            .map(Map.Entry::getKey).collect(java.util.stream.Collectors.toUnmodifiableSet()));
   }
 
   private static ParseContext parseContextWithMarkedPdfContent() {

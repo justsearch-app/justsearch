@@ -70,7 +70,7 @@ final class StructuredPageWrapperTest {
   void truncationStillIgnoresLaterPageWrappers() throws Exception {
     var document = parse("<div class='page'>Enough text</div><div class='page'>Later</div>", 5);
     assertEquals(1, document.pageCount());
-    assertEquals(List.of(new Paragraph("Enough text", 0)), document.elements());
+    assertEquals(List.of(new Paragraph("Enoug", 0)), document.elements());
   }
 
   private static StructuredDocument parse(String body, int maxChars) throws Exception {

@@ -127,7 +127,9 @@ public final class OwnedTextEncodingDetector extends CompositeEncodingDetector {
     if (bytes.position() > chars.position()) return StandardCharsets.UTF_8;
     // Only these inconclusive windows may consult the complete top-level snapshot. BOMs,
     // malformed windows and read failures returned above; existing UTF-8 window wins unchanged.
-    if (!PreparedExtractionInput.isNonAsciiUtf8(metadata)) return null;
+    boolean nonAsciiUtf8 = PreparedExtractionInput.hasUtf8Fact(metadata)
+        ? PreparedExtractionInput.isNonAsciiUtf8(metadata) : inspectUtf8(input);
+    if (!nonAsciiUtf8) return null;
     // A declaration still valid but unfinished at a fully decoded window edge keeps the
     // existing path, whatever it names. An undecoded multi-byte prefix makes it malformed.
     // A complete UTF-8 declaration (including aliases) agrees with the fact.
@@ -142,6 +144,20 @@ public final class OwnedTextEncodingDetector extends CompositeEncodingDetector {
       return null;
     }
     return StandardCharsets.UTF_8;
+  }
+
+  private static boolean inspectUtf8(InputStream input) throws IOException {
+    // Embedded parsers have their own bytes. Never reuse the container's snapshot fact.
+    input.mark(Integer.MAX_VALUE);
+    try {
+      var utf8 = new PreparedExtractionInput.Utf8Validator();
+      byte[] buffer = new byte[8192];
+      int read;
+      while ((read = input.read(buffer)) != -1) utf8.accept(buffer, read);
+      return utf8.isNonAsciiUtf8();
+    } finally {
+      input.reset();
+    }
   }
 
   private static Charset detectBomlessUtf16(InputStream input) throws IOException {

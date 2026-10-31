@@ -39,7 +39,7 @@ class OcrComponentOwnershipTest {
     Files.writeString(input, "Structured extraction survives the child loop.");
     var engine = mock(PdfOcrEngine.class);
     var framed = new ByteArrayOutputStream();
-    var request = new SandboxExtractionRequest(2, "eof-request", input.toString(),
+    var request = new SandboxExtractionRequest(SandboxExtractionRequest.CURRENT_SCHEMA_VERSION, "eof-request", input.toString(),
         TikaExtractionPolicy.defaults(), OcrRoutingConfig.disabled());
     SandboxFrames.write(framed, JsonMapper.builder().build().writeValueAsBytes(request));
     try (var factory = mockStatic(PdfOcrEngine.class)) {

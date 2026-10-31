@@ -53,7 +53,7 @@ class AsciiFirstUtf8ExtractionTest extends io.justsearch.adapters.lucene.runtime
                 .map(text -> Arguments.of(format, prefix, text))));
   }
 
-  @ParameterizedTest(name = "asciiFirstTextAcrossFormatsAndRoutes({0}, prefix {1}, {2})")
+  @ParameterizedTest(name = "{displayName} [{index}] {arguments}")
   @MethodSource("formatsAndPrefixes")
   @Timeout(180)
   void asciiFirstTextAcrossFormatsAndRoutes(String format, int prefix, String text) throws Exception {
@@ -123,7 +123,7 @@ class AsciiFirstUtf8ExtractionTest extends io.justsearch.adapters.lucene.runtime
           () -> assertEquals(ExtractionStatus.SUCCESS_FULL, artifact.status()),
           () -> assertExactText(tableOrText, child.result().content().strip(), format + " child"),
           () -> assertEquals(ExtractionStatus.SUCCESS_FULL, child.status()),
-          () -> assertEquals("tika-default-v7", child.policyId()),
+          () -> assertEquals("tika-default-v8", child.policyId()),
           () -> assertEquals(1L, sandbox.spawnCount(), "all cases must reuse one child"),
           () -> assertEquals(0L, sandbox.restartCount()));
     }
