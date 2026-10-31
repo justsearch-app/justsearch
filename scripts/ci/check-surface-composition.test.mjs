@@ -11,6 +11,7 @@
  * Run: `node scripts/ci/check-surface-composition.test.mjs` (exits non-zero on failure)
  */
 import assert from 'node:assert/strict';
+import { expandCoreSurfaceMetadata } from '../lib/core-surface-declarations.mjs';
 
 import { run, parseJavaSurfaces, parseCorePluginSurfaces } from './check-surface-composition.mjs';
 
@@ -306,6 +307,42 @@ const LEDGER = [
   ]);
   const r = run({ javaSource, pluginSource: null, paths: PATHS, ledger: [] });
   ok('a member hosted by two hosts fails', r.failures.length === 1 && r.failures[0].includes('2 hosts'));
+}
+
+
+// The generated file supplies fields, while the plugin still selects its own contribution set.
+{
+  const metadata = {
+    'core.a': { id: 'core.a', audience: 'DEVELOPER', placement: 'DEEPLINK', mountTag: 'jf-a' },
+    'core.java-only': { id: 'core.java-only', audience: 'USER', placement: 'RAIL', mountTag: 'jf-only' },
+  };
+  const generatedSource = `export const CORE_SURFACE_METADATA = ${JSON.stringify(metadata)} as const;`;
+  const pluginSource = "const CORE_SURFACES = [{ ...CORE_SURFACE_METADATA['core.a'],\n  },];";
+  const fe = parseCorePluginSurfaces(pluginSource, generatedSource);
+  ok('projection resolves selected metadata without contributing Java-only surfaces',
+    fe.size === 1 && fe.get('core.a').audience === 'DEVELOPER' && fe.get('core.a').placement === 'DEEPLINK');
+  const expanded = expandCoreSurfaceMetadata('import { CORE_SURFACE_METADATA } from "generated";\n' + pluginSource, generatedSource);
+  ok('expanded declarations can pass through the pure parser again', parseCorePluginSurfaces(expanded).size === 1);
+  const javaSource = javaCatalog(AGREE_JAVA);
+  const good = run({ javaSource, pluginSource, generatedSource, paths: PATHS });
+  ok('generated declarations still enter the parity leg', good.compared === 1 && good.failures.length === 0);
+  const bad = run({ javaSource, pluginSource,
+    generatedSource: generatedSource.replace('DEVELOPER', 'USER'), paths: PATHS });
+  ok('a changed generated audience still fails parity', bad.failures.some((f) => f.includes('audience')));
+  const overridden = run({ javaSource,
+    pluginSource: pluginSource.replace("['core.a'],", "['core.a'], audience: 'USER',"),
+    generatedSource, paths: PATHS });
+  ok('a local override cannot hide behind the generated audience', overridden.failures.length === 1);
+  for (const [label, source, generated] of [
+    ['missing projection', pluginSource, undefined],
+    ['missing metadata entry', pluginSource.replace('core.a', 'core.missing'), generatedSource],
+    ['moved reference', pluginSource.replace('...CORE_SURFACE_METADATA[', '...OTHER_METADATA[') +
+      ' import { CORE_SURFACE_METADATA } from "generated";', generatedSource],
+  ]) {
+    let rejected = false;
+    try { parseCorePluginSurfaces(source, generated); } catch { rejected = true; }
+    ok(`${label} fails instead of silently reducing coverage`, rejected);
+  }
 }
 
 if (failures.length > 0) {

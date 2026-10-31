@@ -1,3 +1,4 @@
+import { createCorePluginManifest } from '../plugin-api/CorePlugin.js';
 /**
  * Tempdoc 595 §4.2 — the verdict→notice projection (was 577 Ext III's
  * readiness→notice). Pins the contract: the search banner CONSUMES the one
@@ -532,20 +533,10 @@ describe('remedy targets resolve to the surface that owns the capability', () =>
   const read = (rel: string) => readFileSync(resolve(here, rel), 'utf8');
 
   /** The surface id whose `mountTag` is `tag`, per CorePlugin's registration table. */
-  function surfaceIdForMountTag(corePluginSrc: string, tag: string): string | null {
-    // Registration blocks are `{ id: 'core.x-surface', mountTag: 'jf-x-surface', ... }`; scan for
-    // the id that precedes the given mountTag within the same block.
-    const re = /id:\s*'(core\.[^']+)'(?:(?!id:\s*')[\s\S])*?mountTag:\s*'([^']+)'/g;
-    for (const m of corePluginSrc.matchAll(re)) {
-      if (m[2] === tag) return m[1]!;
-    }
-    return null;
-  }
-
   it('conversations.locked → the surface that defines unlockEncryption(), not Settings', () => {
     const securitySrc = read('../views/SecuritySurface.ts');
     const settingsSrc = read('../views/SettingsSurface.ts');
-    const corePluginSrc = read('../plugin-api/CorePlugin.ts');
+    const surfaces = createCorePluginManifest().capabilities.surfaces ?? [];
 
     // 1. Establish the capability owner from source, not from memory.
     expect(securitySrc).toMatch(/unlockEncryption\s*\(/);
@@ -554,7 +545,7 @@ describe('remedy targets resolve to the surface that owns the capability', () =>
     // 2. Resolve that module's registered element tag to its surface id.
     const tagMatch = /customElements\.define\('([^']+)',\s*SecuritySurface\)/.exec(securitySrc);
     expect(tagMatch, 'SecuritySurface must register a custom element').not.toBeNull();
-    const ownerSurfaceId = surfaceIdForMountTag(corePluginSrc, tagMatch![1]!);
+    const ownerSurfaceId = surfaces.find((surface) => surface.mountTag === tagMatch![1])?.id ?? null;
     expect(ownerSurfaceId, `no CorePlugin surface mounts <${tagMatch![1]}>`).not.toBeNull();
 
     // 3. The remedy the locked-chat affordance offers must navigate THERE.

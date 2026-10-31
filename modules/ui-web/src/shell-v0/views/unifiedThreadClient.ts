@@ -9,23 +9,7 @@ import { rememberServerConversation } from '../state/conversationListStore.js';
 import type { ThreadEvent } from './unifiedThreadProjection.js';
 import { authorizedFetch } from '../api/authorizedFetch.js';
 
-/**
- * Tempdoc S4a (risk-review finding #1) — the closed vocabulary of backend event kinds THIS build
- * recognizes. Kept as its own named array (not inlined in the Zod enum call) so
- * `scripts/ci/check-thread-event-kinds.mjs` can regex-extract it and cross-check it against the
- * backend's `InteractionEventKind` Java enum (FORWARD: every Java member appears here; BACKWARD: every
- * member here is a real Java member) — the sync check the sibling gates (`check-message-classes.mjs`,
- * `check-readiness-reason-codes.mjs`) already establish the house pattern for.
- */
-const KNOWN_EVENT_KINDS = [
-  'USER_MESSAGE',
-  'ASSISTANT_MESSAGE',
-  'TOOL_ACTIVITY',
-  'PROGRESS',
-  'ERROR',
-  'HANDOFF',
-  'SEARCH',
-] as const;
+import { INTERACTION_EVENT_KINDS as KNOWN_EVENT_KINDS } from '../../api/generated/registry-enums.generated.js';
 
 /** Tempdoc 561 P-A/P-A2 — the typed loop object summary (state + Turn/Iteration counts + budget). */
 interface ThreadLifecycle {

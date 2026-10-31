@@ -38,6 +38,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import process from 'node:process';
+import { readCorePluginDeclarations, expandCoreSurfaceMetadata } from '../lib/core-surface-declarations.mjs';
 
 /** The retired window's directory. Its reappearance is always a failure. */
 export const RETIRED_WINDOW_DIR = 'modules/ui-web/src/shell-v0/views/search-v2';
@@ -74,16 +75,16 @@ export function stripComments(source) {
  * Reads the object literal that carries the id, bounded by that entry's own terminator, so a
  * neighbouring surface's audience cannot be mistaken for this one's.
  */
-export function registeredAudience(pluginSource, surfaceId) {
-  const source = stripComments(pluginSource);
+export function registeredAudience(pluginSource, surfaceId, generatedSource) {
+  const source = expandCoreSurfaceMetadata(pluginSource, generatedSource);
   const escapedId = surfaceId.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  const idIndex = source.search(new RegExp(`\\bid:\\s*'${escapedId}'`));
+  const idIndex = source.search(new RegExp(`\\bid:\\s*['"]${escapedId}['"]`));
   if (idIndex === -1) return null;
   const rest = source.slice(idIndex);
   const end = /\n\s*\},/.exec(rest);
   const block = end === null ? rest : rest.slice(0, end.index);
-  const audience = /audience:\s*'([A-Z]+)'/.exec(block);
-  return audience === null ? null : audience[1];
+  const audience = [...block.matchAll(/audience:\s*['"]([A-Z]+)['"]/g)].at(-1);
+  return audience?.[1] ?? null;
 }
 
 /** Today, as YYYY-MM-DD, honouring the `--now` / env override. */
@@ -125,7 +126,7 @@ export function run(repoRoot, now) {
     return { errors, warnings };
   }
 
-  const audience = registeredAudience(fs.readFileSync(pluginPath, 'utf8'), SUCCESSOR_SURFACE_ID);
+  const audience = registeredAudience(readCorePluginDeclarations(CORE_PLUGIN_FILE, repoRoot), SUCCESSOR_SURFACE_ID);
   if (audience === null) {
     errors.push(
       `${CORE_PLUGIN_FILE} has a missing or unparseable registration for ${SUCCESSOR_SURFACE_ID}`
