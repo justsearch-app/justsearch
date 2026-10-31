@@ -70,11 +70,11 @@ The archived change is adapted to main's managed API-key verification (#838), re
 
 ## Baseline execution
 
-The baseline is a shared clone at `30ec14d39b`, with only the new test class and the fake's
-additive exit and per-port startup signal options overlaid. It uses its own build directory. Run-evidence runs there
-without `--before` because the sandbox cannot create Git worktree metadata in the parent repository.
-The baseline evidence is `gates/test-intent/evidence/startup-health-backoff-before.json`.
+The baseline evidence `gates/test-intent/evidence/startup-health-backoff-before.json` is a
+run-evidence fail-before run at `30ec14d39b` (`--before`), with only the new test class and the
+fake's additive exit and per-port startup signal options overlaid.
 Only R3 and D5/P1/P2 run on the baseline: R1/R2 require the candidate's observation seam.
+On the baseline R3 fails (3 probes in the 1500 ms window); D5/P1/P2 pass.
 
 ## R3 loading-window margin
 

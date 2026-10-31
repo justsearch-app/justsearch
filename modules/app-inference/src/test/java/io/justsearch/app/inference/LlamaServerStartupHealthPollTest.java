@@ -328,7 +328,13 @@ final class LlamaServerStartupHealthPollTest {
     long pid = Long.parseLong(Files.readAllLines(tmp.resolve("fake-llama").resolve("identities.txt"))
         .getFirst().split(" ")[0]);
     ProcessHandle.of(pid).ifPresent(server -> server.onExit().join());
-    Thread.sleep(1_000); // room for the exit watcher to report, and to report twice were it to
+    // The exit watcher reports asynchronously: wait (bounded) for a first report, then leave room
+    // for a second one were it to come.
+    long reportDeadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(20);
+    while (startFailures + crashes.get() == 0 && System.nanoTime() < reportDeadline) {
+      Thread.sleep(10);
+    }
+    Thread.sleep(1_000);
 
     assertEquals(1, windows().size(), "one launch");
     assertEquals(1, startFailures + crashes.get(),
