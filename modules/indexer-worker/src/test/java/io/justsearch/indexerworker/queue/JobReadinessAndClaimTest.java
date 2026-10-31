@@ -16,6 +16,43 @@ import org.junit.jupiter.api.io.TempDir;
 final class JobReadinessAndClaimTest {
   @TempDir Path temp;
 
+  @Test void authorityGrantReconsidersBehindDeniedPrefixWithinThreeBudgetedPolls() throws Exception {
+    var permitted = new AtomicBoolean();
+    try (var queue = new SqliteJobQueue(temp.resolve("bounded-grant.db"), key ->
+        key.equals("granted") && permitted.get() ? JobQueue.RecordedClaimDecision.ALLOW : JobQueue.RecordedClaimDecision.DENY)) {
+      queue.open();
+      var denied = queue.beginRecordedWalk("denied", "a".repeat(64), true);
+      queue.enqueueRecordedEntries("denied", denied.enumerationEpoch(),
+          IntStream.range(0, 600).mapToObj(i -> new JobQueue.EnqueueEntry(temp.resolve(String.format("a%04d", i)), 1)).toList(), null);
+      var granted = queue.beginRecordedWalk("granted", "b".repeat(64), true);
+      Path older = temp.resolve("older");
+      queue.enqueueRecordedEntries("granted", granted.enumerationEpoch(), List.of(new JobQueue.EnqueueEntry(older, 1)), null);
+      queue.enqueue(List.of(temp.resolve("new-0"), temp.resolve("new-1")));
+      try (var stmt = JobCountsTest.connection(queue).createStatement()) {
+        stmt.executeUpdate("UPDATE jobs SET last_updated=0 WHERE scan_id='denied'");
+        stmt.executeUpdate("UPDATE jobs SET last_updated=1 WHERE scan_id='granted'");
+        stmt.executeUpdate("UPDATE jobs SET last_updated=2 WHERE scan_id IS NULL");
+      }
+      assertTrue(queue.pollPending(1).isEmpty());
+      assertTrue(queue.pollPending(1).isEmpty());
+      assertEquals(temp.resolve("new-0"), queue.pollPending(1).getFirst().path());
+      permitted.set(true);
+      try { queue.getClass().getMethod("recordedClaimAuthorityChanged", String.class).invoke(queue, "granted"); }
+      catch (NoSuchMethodException expected) { /* The baseline has no notification and must still meet the poll bound. */ }
+      boolean claimed = false;
+      for (int poll = 0; poll < 3 && !claimed; poll++) {
+        queue.enqueue(List.of(temp.resolve("arrival-" + poll)));
+        claimed = queue.pollPending(1).stream().anyMatch(job -> job.path().equals(older));
+      }
+      assertTrue(claimed, "600 denied rows fit within three polls of 257 candidates, even with continuous arrivals");
+      try (var stmt = JobCountsTest.connection(queue).createStatement();
+          var rows = stmt.executeQuery("SELECT COUNT(*) FROM jobs WHERE scan_id='denied' AND state='PENDING'")) {
+        assertTrue(rows.next());
+        assertEquals(600, rows.getInt(1));
+      }
+    }
+  }
+
   @Test void elapsedRetryDeadlineChangesCountsProbeAndClaimsWithoutAWrite() throws Exception {
     try(var queue=new SqliteJobQueue(temp.resolve("deadline.db"))) {
       queue.open();queue.enqueue(List.of(temp.resolve("a"),temp.resolve("b"),temp.resolve("c")));

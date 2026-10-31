@@ -49,6 +49,27 @@ final class WorkerIngestServiceDocumentIdentityTest extends io.justsearch.adapte
   private RunningRuntime runtime;
 
   @Test
+  void uncertainIdentityRekeyStopsRenamePublication() throws Exception {
+    openStoresAndRuntime();
+    String oldPath=PathNormalizer.normalizeKey(tempDir.resolve("before.txt"));
+    String newPath=PathNormalizer.normalizeKey(tempDir.resolve("after.txt"));
+    Files.writeString(Path.of(newPath),"content");
+    runtime.indexingCoordinator().indexSingle(new IndexDocument(Map.of(
+        SchemaFields.DOC_ID,oldPath,SchemaFields.DOC_UID,"uid",SchemaFields.PATH,oldPath,SchemaFields.CONTENT,"content")));
+    runtime.commitOps().commitAndTrack();runtime.commitOps().maybeRefreshBlocking();
+    var service=new WorkerIngestService(jobQueue,null,null,IndexingPacing.unthrottled(),tempDir.resolve("index-base"),
+        tempDir.resolve("index"),runtime,runtime,null,0L);
+    DocumentIdentityStore failed=org.mockito.Mockito.mock(DocumentIdentityStore.class);
+    org.mockito.Mockito.when(failed.rekey(org.mockito.ArgumentMatchers.anyString(),org.mockito.ArgumentMatchers.anyString(),org.mockito.ArgumentMatchers.anyLong()))
+        .thenThrow(new io.justsearch.indexerworker.ingest.IngestionServiceUnavailableException("uncertain rekey"));
+    service.setDocumentIdentityStore(failed);
+    assertThrows(WorkerServiceException.class,()->rename(service,oldPath,newPath));
+    runtime.commitOps().maybeRefreshBlocking();
+    assertEquals(1,runtime.indexCountOps().countByIdAndChunksStrict(oldPath));
+    assertEquals(0,runtime.indexCountOps().countByIdAndChunksStrict(newPath));
+  }
+
+  @Test
   @DisplayName("watched and direct deletions during a build remove serving documents")
   void deletionsDuringMigrationRemoveServingDocuments() throws Exception {
     Path base = tempDir.resolve("generation-base");

@@ -48,6 +48,94 @@ final class Release030CorrectionHistoryTest {
         "test-file/"+hash,hash,Files.size(file),false);
   }
 
+  @org.junit.jupiter.params.ParameterizedTest(name = "{displayName} [{index}] {arguments}")
+  @org.junit.jupiter.params.provider.ValueSource(booleans={false,true})
+  void checkpointWriteBytesScaleLinearlyWithinAndAcrossCorrectionCalls(boolean batched) throws Exception {
+    Path root=Files.createDirectories(temporary.resolve("linear"));
+    var files=new java.util.ArrayList<Path>();
+    for(int i=0;i<52;i++) files.add(Files.writeString(root.resolve("file-"+i+".txt"),"old"));
+    try(var q=queue()) {
+      String key="sync_root:"+root+"/";
+      assertTrue(q.putSyncRootForGeneration("building",key,new SwitchBufferSyncRoot(root.toString(),true,null),"C"));
+      var owner=q.retirementRootReceipt("building",key);
+      assertEquals(files.size(),q.enqueueRetirementRootEntries(owner,files.stream().map(file->JobQueue.EnqueueEntry.stat(file).withinRoot(root)).toList(),"C",false,false,()->false));
+      var claims=q.pollPending(files.size());
+      assertEquals(files.size(),claims.size());
+      var transitions=new java.util.ArrayList<JobQueue.IngestionLedgerTransition>();
+      for(var claim:claims) transitions.add(new JobQueue.IngestionLedgerTransition(claim,null,
+          io.justsearch.indexerworker.loop.SourceContentHash.sha256(claim.path())));
+      q.markDoneTransitions(transitions,IngestionOutcome.of(IngestionOutcomeClass.SUCCESS_FULL,"SUCCESS",IngestionRetryPolicy.NONE));
+      var observations=new java.util.ArrayList<SwitchBufferCapableQueue.RetirementSourceObservation>();
+      for(Path file:files) {
+        var scope=q.retirementRootFileScope(owner,file.toString());Files.writeString(file,"new");
+        observations.add(observe(q,owner,scope,file));
+      }
+      // A pre-existing history prevents an empty-checkpoint special case hiding repeated rewrites.
+      correct(q,observations.subList(0,16),batched);
+      long small=checkpointBytes(()->correct(q,observations.subList(16,20),batched));
+      long large=checkpointBytes(()->correct(q,observations.subList(20,52),batched));
+      assertTrue(small>0,"JFR must observe checkpoint writes");
+      assertTrue(large<=small*10,"eight times the corrections must cost approximately eight times the bytes: "+small+" -> "+large);
+      assertEquals(52,q.release030RecoveryState().corrections().size());
+      var retained=q.release030RecoveryState().corrections();
+      assertEquals(new java.util.HashSet<>(retained),new java.util.HashSet<>(Release030RecoveryState.load(temporary.resolve("jobs.db")).corrections()));
+      q.release030RecoveryState().finishRetirement();
+      var finished=Release030RecoveryState.load(temporary.resolve("jobs.db"));
+      assertTrue(finished.corrections().isEmpty());
+      finished.beginRetirement("later-active","later-building",Map.of());
+      assertTrue(Release030RecoveryState.load(temporary.resolve("jobs.db")).corrections().isEmpty());
+    }
+  }
+
+  private static void correct(SqliteJobQueue queue,List<SwitchBufferCapableQueue.RetirementSourceObservation> observations,boolean batch) {
+    if(batch) assertTrue(queue.correctRetirementSources(observations,()->false).stream().allMatch(count->count==1));
+    else for(var observation:observations)assertEquals(List.of(1),queue.correctRetirementSources(List.of(observation),()->false));
+  }
+
+  @Test void legacyPropertiesHistoryLoadsAndRetainsNewVersionsUntilRetirementEnds() throws Exception {
+    try (var q = queue()) {
+      assertTrue(q.release030RecoveryState().corrections().isEmpty());
+      Path db = temporary.resolve("jobs.db"), path = temporary.resolve("source.txt");
+      var scope = new SwitchBufferUpsert(path.toString(), "C", null, null, null, temporary);
+      var first = new Release030RecoveryState.Correction(null, "active", "building", scope,
+          Map.of("state", "DONE"), "DONE",
+          new SwitchBufferUpsert(path.toString(), "C", null, "first", "a".repeat(64), temporary));
+      Path checkpoint = Release030RecoveryState.path(db);
+      var properties = new java.util.Properties();
+      try (var input = Files.newInputStream(checkpoint)) { properties.load(input); }
+      properties.setProperty("retire|correction|first",
+          tools.jackson.databind.json.JsonMapper.builder().build().writeValueAsString(first));
+      try (var output = Files.newOutputStream(checkpoint)) { properties.store(output, "legacy history"); }
+      var loaded = Release030RecoveryState.load(db);
+      assertEquals(List.of(first), loaded.corrections());
+      var second = new Release030RecoveryState.Correction(null, "active", "building", scope,
+          Map.of("state", "PENDING", "retry_after", "12345"), "PENDING",
+          new SwitchBufferUpsert(path.toString(), "C", null, "second", "b".repeat(64), temporary));
+      loaded.retainCorrection(second);
+      assertEquals(java.util.Set.of(first, second), java.util.Set.copyOf(Release030RecoveryState.load(db).corrections()));
+      loaded.finishRetirement();
+      assertTrue(Release030RecoveryState.load(db).corrections().isEmpty());
+      loaded.beginRetirement("later-active", "later-building", Map.of());
+      assertTrue(Release030RecoveryState.load(db).corrections().isEmpty());
+    }
+  }
+
+  @FunctionalInterface private interface CheckedAction {void run() throws Exception;}
+
+  private long checkpointBytes(CheckedAction action) throws Exception {
+    Path recording=temporary.resolve(java.util.UUID.randomUUID()+".jfr");
+    try(var capture=new jdk.jfr.Recording()) {
+      capture.enable("jdk.FileWrite").withThreshold(java.time.Duration.ZERO).withoutStackTrace();
+      capture.start();action.run();capture.stop();capture.dump(recording);
+    }
+    long total=0;
+    for(var event:jdk.jfr.consumer.RecordingFile.readAllEvents(recording)) {
+      if(event.getEventType().getName().equals("jdk.FileWrite")
+          && event.getString("path").contains("upgrade-030-recovery.properties"))total+=event.getLong("bytesWritten");
+    }
+    return total;
+  }
+
   @Test void sameIntentResumesAfterRollbackWithActualMutableRetryPreserved() throws Exception {
     Path root=Files.createDirectories(temporary.resolve("root")),file=Files.writeString(root.resolve("file.txt"),"old");
     try(var q=queue()) {
@@ -59,6 +147,8 @@ final class Release030CorrectionHistoryTest {
       assertThrows(IllegalStateException.class,()->q.correctRetirementSources(List.of(observation),()->calls.incrementAndGet()==2));
       var intent=q.release030RecoveryState().corrections().getFirst();
       assertEquals(intent.predecessor(),q.watcherReconciliationRow(file.toString()),"SQL rolled back after durable intent");
+      q.close(); q.open();
+      assertEquals(List.of(intent), q.release030RecoveryState().corrections());
       q.markFailed(file,IngestionOutcome.of(IngestionOutcomeClass.IO_FAILED,"SOURCE_UNREADABLE",IngestionRetryPolicy.RETRY_UNTIL_AVAILABLE));
       var waiting=q.watcherReconciliationRow(file.toString());
       assertEquals("PENDING",waiting.get("state"));assertTrue(Long.parseLong(waiting.get("retry_after"))>System.currentTimeMillis());

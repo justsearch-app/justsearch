@@ -115,6 +115,16 @@ final class DocumentIdentityBootImportGuardTest {
   }
 
   @Test
+  void failedStoreImportNeverRecordsCompletion() {
+    DocumentIdentityStore store=org.mockito.Mockito.mock(DocumentIdentityStore.class);
+    org.mockito.Mockito.when(store.importExisting(org.mockito.ArgumentMatchers.anyCollection(),org.mockito.ArgumentMatchers.anyLong()))
+        .thenThrow(new io.justsearch.indexerworker.ingest.IngestionServiceUnavailableException("uncertain identity transaction"));
+    CountingScanner scanner=new CountingScanner(parents(1),0);
+    org.junit.jupiter.api.Assertions.assertThrows(IllegalStateException.class,()->DocumentIdentityBootImport.run(scanner,store,"generation",1));
+    org.mockito.Mockito.verify(store,org.mockito.Mockito.never()).recordImport(org.mockito.ArgumentMatchers.any());
+  }
+
+  @Test
   @DisplayName("a second boot over the same generation does not scan the index again")
   void secondBootOverTheSameGenerationSkipsTheScan() {
     RecordingStore store = new RecordingStore();

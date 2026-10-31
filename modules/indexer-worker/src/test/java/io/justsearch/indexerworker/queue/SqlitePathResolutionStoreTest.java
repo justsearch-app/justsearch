@@ -42,6 +42,24 @@ final class SqlitePathResolutionStoreTest {
     if (jobQueue != null) jobQueue.close();
   }
 
+  @org.junit.jupiter.params.ParameterizedTest(name = "{displayName} [{index}] {arguments}")
+  @org.junit.jupiter.params.provider.ValueSource(strings={"proj_a", "proj%a", "proj\\a"})
+  void pruningUsesLiteralCaseSensitivePathBoundaries(String name) {
+    String root = "/workspace/" + name;
+    store.record("child", root + "/child", 1);
+    store.record("nested", root + "/nested/file", 1);
+    store.record("sibling", root + "-other/file", 1);
+    store.record("wildcard", "/workspace/projXa/file", 1);
+    store.record("case", "/Workspace/" + name + "/file", 1);
+    assertEquals(2, store.pruneByRootPrefix(root + "/"));
+    assertTrue(store.lookup("child").isEmpty());
+    assertTrue(store.lookup("nested").isEmpty());
+    assertTrue(store.lookup("sibling").isPresent());
+    assertTrue(store.lookup("wildcard").isPresent());
+    assertTrue(store.lookup("case").isPresent());
+    assertEquals(0, store.pruneByRootPrefix(root));
+  }
+
   @Test
   @DisplayName("Lookup of an unknown hash returns empty")
   void unknownHashReturnsEmpty() {

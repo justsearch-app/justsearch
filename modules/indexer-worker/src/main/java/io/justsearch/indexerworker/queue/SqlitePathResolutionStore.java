@@ -224,9 +224,12 @@ public final class SqlitePathResolutionStore implements PathResolutionStore, Clo
     String prefix = rootPrefix.endsWith("/") ? rootPrefix : rootPrefix + "/";
     lock.lock();
     try {
-      String sql = "DELETE FROM path_resolution WHERE normalized_path LIKE ?";
+      String sql = "DELETE FROM path_resolution WHERE normalized_path LIKE ? ESCAPE '\\'"
+          + " AND substr(normalized_path, 1, length(?)) = ? COLLATE BINARY";
       try (PreparedStatement stmt = openConnection().prepareStatement(sql)) {
-        stmt.setString(1, prefix + "%");
+        stmt.setString(1, prefix.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%");
+        stmt.setString(2, prefix);
+        stmt.setString(3, prefix);
         return stmt.executeUpdate();
       }
     } catch (SQLException e) {

@@ -15,6 +15,23 @@ import org.junit.jupiter.api.Test;
 class BackoffPolicyTest {
 
   @Test
+  void saturatesAcrossMultiplicationOverflowShiftWrappingAndExtremeCounts() {
+    for (long base : new long[]{0, -100, 1, 1000, 60_000, Long.MAX_VALUE}) {
+      for (long cap : new long[]{0, 60_000, Long.MAX_VALUE}) {
+        long previous = -1;
+        for (int count : new int[]{-1, 0, 1, 2, 15, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 1000, Integer.MAX_VALUE}) {
+          long expected = count >= 63 && base > 0 ? cap : java.math.BigInteger.valueOf(Math.max(0, base))
+              .shiftLeft(Math.max(0, Math.min(count, 63))).min(java.math.BigInteger.valueOf(cap)).longValueExact();
+          long actual = BackoffPolicy.backoffMs(base, count, cap);
+          assertEquals(expected, actual, "base=" + base + " cap=" + cap + " failures=" + count);
+          assertTrue(actual >= previous && actual >= 0 && actual <= cap);
+          previous = actual;
+        }
+      }
+    }
+  }
+
+  @Test
   @DisplayName("law: delay = min(base * 2^failures, cap), exact below the cap")
   void exactExponentialBelowCap() {
     long base = 100L;

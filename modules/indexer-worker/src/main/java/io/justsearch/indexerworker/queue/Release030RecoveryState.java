@@ -37,6 +37,9 @@ public final class Release030RecoveryState {
   private final long retryDelayMs;
   private final Path file;
   private final Properties state;
+  private static final String CORRECTION_JOURNAL = RETIRE + "correction-journal";
+  private final java.util.Set<String> journalCorrections = new java.util.HashSet<>();
+  private long correctionJournalLength;
 
   private Release030RecoveryState(Path file, Properties state) {
     this(file, state, 60_000L);
@@ -111,6 +114,7 @@ public final class Release030RecoveryState {
       state.setProperty("uncertain", "true");
     }
     var recovery = new Release030RecoveryState(file, state, retryDelayMs);
+    recovery.loadCorrectionJournal();
     int invalidKeys = 0;
     for (String key : List.copyOf(state.stringPropertyNames())) {
       if (!key.startsWith(ROOT)) continue;
@@ -224,13 +228,66 @@ public final class Release030RecoveryState {
       if (!previous.equals(encoded)) throw new IOException("Correction version changed");
       return;
     }
-    try {
-      state.setProperty(key, encoded);
-      save();
-    } catch (IOException | RuntimeException failed) {
-      state.remove(key);
-      throw failed;
+    if (!state.containsKey(CORRECTION_JOURNAL)) {
+      String id = java.util.UUID.randomUUID().toString();
+      Path journal = file.resolveSibling(file.getFileName() + ".corrections-" + id);
+      AtomicFileWrites.replaceStrict(journal, new byte[0]);
+      state.setProperty(CORRECTION_JOURNAL, id);
+      try { save(); }
+      catch (IOException | RuntimeException failure) {
+        state.remove(CORRECTION_JOURNAL);
+        throw failure;
+      }
     }
+    byte[] record = (java.util.Base64.getEncoder().encodeToString(
+        encoded.getBytes(java.nio.charset.StandardCharsets.UTF_8)) + "\n")
+        .getBytes(java.nio.charset.StandardCharsets.US_ASCII);
+    try (var channel = java.nio.channels.FileChannel.open(correctionJournal(),
+        java.nio.file.StandardOpenOption.WRITE)) {
+      // A crash before the newline leaves no retained intent and SQL was not installed.
+      channel.truncate(correctionJournalLength);
+      channel.position(correctionJournalLength);
+      var buffer = java.nio.ByteBuffer.wrap(record);
+      while (buffer.hasRemaining()) channel.write(buffer);
+      channel.force(true);
+    }
+    correctionJournalLength += record.length;
+    journalCorrections.add(key);
+    state.setProperty(key, encoded);
+  }
+
+  private Path correctionJournal() throws IOException {
+    String id = state.getProperty(CORRECTION_JOURNAL);
+    try {
+      if (!java.util.UUID.fromString(id).toString().equals(id)) throw new IllegalArgumentException("Noncanonical journal identity");
+    } catch (IllegalArgumentException | NullPointerException invalid) {
+      throw new IOException("Invalid correction journal identity", invalid);
+    }
+    return file.resolveSibling(file.getFileName() + ".corrections-" + id);
+  }
+
+  private void loadCorrectionJournal() throws IOException {
+    if (!state.containsKey(CORRECTION_JOURNAL)) return;
+    byte[] bytes = Files.readAllBytes(correctionJournal());
+    int start = 0;
+    for (int end = 0; end < bytes.length; end++) {
+      if (bytes[end] != '\n') continue;
+      try {
+        String encoded = new String(java.util.Base64.getDecoder().decode(
+            java.util.Arrays.copyOfRange(bytes, start, end)), java.nio.charset.StandardCharsets.UTF_8);
+        var version = JSON.readValue(encoded, Correction.class);
+        String key = CORRECTION + version.replacement().unitRevision();
+        String previous = state.getProperty(key);
+        if (previous != null && !previous.equals(encoded)) throw new IOException("Conflicting retained correction");
+        state.setProperty(key, encoded);
+        journalCorrections.add(key);
+      } catch (RuntimeException invalid) {
+        throw new IOException("Invalid retained correction record", invalid);
+      }
+      start = end + 1;
+    }
+    correctionJournalLength = start;
+    corrections();
   }
 
   /** One atomic sidecar replacement precedes SQL removal; a packet is never an ACK-won bit. */
@@ -735,15 +792,22 @@ public final class Release030RecoveryState {
   }
 
   public synchronized void finishRetirement() throws IOException {
+    Path journal = state.containsKey(CORRECTION_JOURNAL) ? correctionJournal() : null;
     for (String key : List.copyOf(state.stringPropertyNames())) {
       if (key.startsWith(RETIRE) || key.startsWith(RETIRE_PATH)) state.remove(key);
     }
     save();
+    journalCorrections.clear();
+    correctionJournalLength = 0;
+    if (journal != null) Files.deleteIfExists(journal);
   }
 
   private void save() throws IOException {
     var bytes = new ByteArrayOutputStream();
-    state.store(bytes, "0.3.0 queued-work recovery; incomplete roots resume after restart");
+    var checkpoint = new Properties();
+    checkpoint.putAll(state);
+    for (String key : journalCorrections) checkpoint.remove(key);
+    checkpoint.store(bytes, "0.3.0 queued-work recovery; incomplete roots resume after restart");
     AtomicFileWrites.replaceStrict(file, bytes.toByteArray());
   }
 

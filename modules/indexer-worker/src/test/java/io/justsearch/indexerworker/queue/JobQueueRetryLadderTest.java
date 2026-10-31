@@ -396,7 +396,7 @@ final class JobQueueRetryLadderTest {
   }
 
   @Test
-  @DisplayName("the per-outcome observer is notified with the outcome class name")
+  // the per-outcome observer is notified with the outcome class name
   void outcomeObserverSeesTheOutcomeClass() throws Exception {
     Path file = tempDir.resolve("observed.txt");
     Files.writeString(file, "content");
@@ -407,6 +407,9 @@ final class JobQueueRetryLadderTest {
     jobQueue.pollPending(1);
     jobQueue.markFailed(file, ioFailure("boom"));
 
+    assertTrue(seen.isEmpty(), "a retryable attempt is not a terminal outcome");
+    jobQueue.markFailed(file, IngestionOutcome.of(IngestionOutcomeClass.IO_FAILED,
+        IngestionReasonCodes.IO_ERROR, IngestionRetryPolicy.NONE));
     assertEquals(List.of("IO_FAILED"), seen);
   }
 

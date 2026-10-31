@@ -28,7 +28,11 @@ final class BackoffPolicy {
   static long backoffMs(long baseMs, int consecutiveFailures, long capMs) {
     long base = Math.max(0L, baseMs);
     int failures = Math.max(0, consecutiveFailures);
-    return Math.min(base * (1L << failures), capMs);
+    if (base == 0) return Math.min(0L, capMs);
+    if (base >= capMs || failures >= Long.SIZE - 1 || base > (capMs >> failures)) {
+      return capMs;
+    }
+    return base << failures;
   }
 
   /** SPLADE retry backoff: exponential on {@code baseMs}, capped at {@link #SPLADE_BACKOFF_CAP_MS}. */

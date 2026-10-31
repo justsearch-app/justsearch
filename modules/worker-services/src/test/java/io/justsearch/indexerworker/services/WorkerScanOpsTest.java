@@ -1,5 +1,6 @@
 package io.justsearch.indexerworker.services;
 
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -37,6 +38,34 @@ import org.junit.jupiter.api.io.TempDir;
 final class WorkerScanOpsTest {
 
   @TempDir Path tempDir;
+
+  @org.junit.jupiter.params.ParameterizedTest(name = "{displayName} [{index}] {arguments}")
+  @org.junit.jupiter.params.provider.ValueSource(ints={0,1,2})
+  void maintenanceScanAcceptsNoopsAndReportsOnlyActualAdmissions(int changed) throws Exception {
+    Path root=Files.createDirectories(tempDir.resolve("maintenance"));
+    Files.writeString(root.resolve("a.txt"),"a"); Files.writeString(root.resolve("b.txt"),"b");
+    JobQueue queue=org.mockito.Mockito.mock(JobQueue.class);
+    org.mockito.Mockito.when(queue.enqueueMaintenanceScanEntries(org.mockito.ArgumentMatchers.anyList(),
+        org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.any())).thenReturn(changed);
+    var progress=assertDoesNotThrow(() -> new WorkerScanOps(queue).scan(new WorkerScanOps.ScanRequest(root,null,
+        WorkerScanOps.ScanMode.INITIAL,List.of()), ignored -> {}));
+    assertTrue(progress.getComplete());
+    assertEquals("",progress.getTerminalReasonCode());
+    assertEquals(changed,progress.getFilesAdmitted());
+    org.mockito.Mockito.verify(queue).enqueueMaintenanceScanEntries(org.mockito.ArgumentMatchers.anyList(),
+        org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.any());
+  }
+
+  @Test void failedMaintenanceAdmissionStillFailsTheScan() throws Exception {
+    Path root=Files.createDirectories(tempDir.resolve("maintenance-failure"));
+    Files.writeString(root.resolve("a.txt"),"a");
+    JobQueue queue=org.mockito.Mockito.mock(JobQueue.class);
+    org.mockito.Mockito.when(queue.enqueueMaintenanceScanEntries(org.mockito.ArgumentMatchers.anyList(),
+        org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.any())).thenThrow(new IllegalStateException("unavailable"));
+    var failure=assertThrows(IllegalStateException.class,()->new WorkerScanOps(queue).scan(
+        new WorkerScanOps.ScanRequest(root,null,WorkerScanOps.ScanMode.INITIAL,List.of()),ignored -> {}));
+    assertEquals("unavailable",failure.getMessage());
+  }
 
   @Test
   void scansRootAndEnqueuesRegularFiles() throws Exception {
@@ -668,7 +697,8 @@ final class WorkerScanOpsTest {
     JobQueue refused = org.mockito.Mockito.mock(JobQueue.class);
     List<ScanRootProgress> progress = new ArrayList<>();
     var failure = assertThrows(WorkerServiceException.class, () -> new WorkerScanOps(refused).scan(
-        new WorkerScanOps.ScanRequest(root, null, WorkerScanOps.ScanMode.INITIAL, List.of()),
+        new WorkerScanOps.ScanRequest(root, null, WorkerScanOps.ScanMode.INITIAL, List.of(), "explicit",
+            new JobQueue.EnqueueProvenance("user", "rpc")),
         progress::add));
     assertEquals(WorkerServiceException.Status.UNAVAILABLE, failure.status());
     assertTrue(progress.stream().noneMatch(ScanRootProgress::getComplete));
