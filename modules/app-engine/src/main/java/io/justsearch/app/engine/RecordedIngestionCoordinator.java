@@ -1007,6 +1007,15 @@ final class RecordedIngestionCoordinator implements RecordedIngestionService, Re
       }
     }
     if (!allowed && parent.refusal == null) child.retryEnumeration = true;
+    if (allowed) {
+      Permission previous = permissions.get(row.key());
+      var claimDenied = previous == null ? new java.util.concurrent.atomic.AtomicBoolean() : previous.claimDenied;
+      permissions.put(row.key(), new Permission(physical, parent.row, parent.preparation, child.plan, child.fresh, parent, claimDenied));
+      if (previous == null || claimDenied.getAndSet(false)) {
+        physical.queue.recordedClaimAuthorityChanged(row.key());
+        physical.queue.recoverStuckJobs();
+      }
+    }
     if (child.exit != null && !child.exit.isDone()) {
       checkpointLive(parent, child, row, physical);
       return;
@@ -1045,13 +1054,6 @@ final class RecordedIngestionCoordinator implements RecordedIngestionService, Re
           child.exit = null;
           child.cancellation = null;
           child.retryEnumeration = false;
-        }
-        Permission previous = permissions.get(row.key());
-        var claimDenied = previous == null ? new java.util.concurrent.atomic.AtomicBoolean() : previous.claimDenied;
-        permissions.put(row.key(), new Permission(physical, parent.row, parent.preparation, child.plan, child.fresh, parent, claimDenied));
-        if (previous == null || claimDenied.getAndSet(false)) {
-          physical.queue.recordedClaimAuthorityChanged(row.key());
-          physical.queue.recoverStuckJobs();
         }
         if (observed.isEmpty() || observed.orElseThrow().enumerationClosedAt() == null) {
           if (child.exit == null) {
