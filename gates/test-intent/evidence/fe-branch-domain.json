@@ -1,0 +1,441 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
+  },
+  "createdAt": "2026-10-31T06:57:34.632Z",
+  "revision": "11600e464d05a5480e662cefbea75ed9c833fcb5",
+  "tree": "4a51961c18ff204a78dfcee6f7638cff90c8fbe9",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/search-v3/SearchV3View.branch.test.ts\" \"src/shell-v0/views/search-v3/SearchV3View.acceptedOutputCompatibility.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/ueqlh51u/tmp/test-intent-vitest-3-1793429844192.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 10438
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.branch.test.ts",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.branch.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:94151b1e9549acd5f0d54c56f0ebbbbc61e2e04b5eda01cdd97308efb06ef354",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "branching a conversation from a turn forks at the turn’s OWN answer, opens the branch, and loads both of its records",
+          "status": "passed"
+        },
+        {
+          "name": "branching a conversation from a turn says so and changes nothing when the store refuses the branch",
+          "status": "passed"
+        },
+        {
+          "name": "branching a conversation closes a citation pane open on the parent closes the pane once \"Branch\" claims the child conversation (route #4 -> openBranch)",
+          "status": "passed"
+        },
+        {
+          "name": "the version pager shows the base as version 1 of the fork and pages forward into the branch",
+          "status": "passed"
+        },
+        {
+          "name": "the version pager shows a branch as version 2 once it has a turn of its own",
+          "status": "passed"
+        },
+        {
+          "name": "the version pager re-edits a branch’s own question as a THIRD version of the base, not a branch of the branch",
+          "status": "passed"
+        },
+        {
+          "name": "the version pager renders NO pager on a root conversation nothing forked from",
+          "status": "passed"
+        },
+        {
+          "name": "the version pager refuses to step past the first version",
+          "status": "passed"
+        },
+        {
+          "name": "editing a question re-asks it in a branch forks BEFORE the question, not after its answer, and re-sends into the branch",
+          "status": "passed"
+        },
+        {
+          "name": "editing a question re-asks it in a branch forks a THIRD turn at the turn before it, not at the conversation’s first answer",
+          "status": "passed"
+        },
+        {
+          "name": "editing a question re-asks it in a branch forks the FIRST question at the empty-prefix sentinel",
+          "status": "passed"
+        },
+        {
+          "name": "editing a question re-asks it in a branch keeps the rewrite in the editor when the branch is refused",
+          "status": "passed"
+        },
+        {
+          "name": "editing a question re-asks it in a branch holds the rewrite and says why when a stream starts under the open editor",
+          "status": "passed"
+        },
+        {
+          "name": "editing a question re-asks it in a branch retries a turn by re-sending its ORIGINAL question from the same fork point",
+          "status": "passed"
+        },
+        {
+          "name": "a turn that names no store message offers no branch affordance offers neither Edit nor Retry on a turn whose fork point is a run-plane id",
+          "status": "passed"
+        },
+        {
+          "name": "Retry and Edit on a Delegate turn run the agent again, in a new version retries a tool-less Delegate turn as a Delegate, after reload, while the composer shows Ask",
+          "status": "passed"
+        },
+        {
+          "name": "Retry and Edit on a Delegate turn run the agent again, in a new version edits the FIRST question of a Delegate conversation at the empty-prefix sentinel",
+          "status": "passed"
+        },
+        {
+          "name": "Retry and Edit on a Delegate turn run the agent again, in a new version runs even when no documents are indexed — the Ask-only gate does not apply",
+          "status": "passed"
+        },
+        {
+          "name": "Retry and Edit on a Delegate turn run the agent again, in a new version re-edits a branch’s own Delegate turn as a SIBLING of that branch",
+          "status": "passed"
+        },
+        {
+          "name": "Retry and Edit on a Delegate turn run the agent again, in a new version re-edits a retry’s own first turn as a third version of the original, not a branch of the retry",
+          "status": "passed"
+        },
+        {
+          "name": "Retry and Edit on a Delegate turn run the agent again, in a new version DS1 unknown saved Ask refuses before fork even when the composer shows Delegate, preserving B",
+          "status": "passed"
+        },
+        {
+          "name": "Retry and Edit on a Delegate turn run the agent again, in a new version branches from a Delegate turn without running anything, and leaves the composer in Delegate",
+          "status": "passed"
+        },
+        {
+          "name": "when the agent cannot run, a Delegate Retry/Edit says why and never asks instead refuses while the model is unavailable, keeps the edited text, and forks nothing",
+          "status": "passed"
+        },
+        {
+          "name": "when the agent cannot run, a Delegate Retry/Edit says why and never asks instead keeps the edited text and says why when the agent becomes unavailable during the fork",
+          "status": "passed"
+        },
+        {
+          "name": "when the agent cannot run, a Delegate Retry/Edit says why and never asks instead refuses while another run is active, and says so",
+          "status": "passed"
+        },
+        {
+          "name": "when the agent cannot run, a Delegate Retry/Edit says why and never asks instead says the branch failed and runs nothing when the store refuses the fork",
+          "status": "passed"
+        },
+        {
+          "name": "when the agent cannot run, a Delegate Retry/Edit says why and never asks instead gives an INHERITED Delegate turn no Retry or Edit — it belongs to the parent",
+          "status": "passed"
+        },
+        {
+          "name": "deleting a conversation that has branches asks about the branches, names them, and deletes them with it on consent",
+          "status": "passed"
+        },
+        {
+          "name": "deleting a conversation that has branches TD1 TD2 TD9 confirms distinguishing facts and the complete nested tree",
+          "status": "passed"
+        },
+        {
+          "name": "deleting a conversation that has branches TD1 TD7 does not invent a creation date for an incomplete deletion record",
+          "status": "passed"
+        },
+        {
+          "name": "deleting a conversation that has branches leaves everything when the reader declines, and says nothing",
+          "status": "passed"
+        },
+        {
+          "name": "deleting a conversation that has branches reports which branch failed after a partially completed cascade",
+          "status": "passed"
+        },
+        {
+          "name": "deleting a conversation that has branches displays a refusal from another client without asking to delete branches",
+          "status": "passed"
+        },
+        {
+          "name": "deleting a conversation that has branches says so when the store refuses the delete outright",
+          "status": "passed"
+        },
+        {
+          "name": "two reloads of the same conversation cannot land out of order discards the SUPERSEDED /history answer however late it arrives",
+          "status": "passed"
+        },
+        {
+          "name": "CD3 confirmed conversation deletion forgets the open deleted child and cached turns when the next cascade child fails",
+          "status": "passed"
+        },
+        {
+          "name": "CD3 confirmed conversation deletion forgets a cached open conversation when a refreshed list confirms its deletion",
+          "status": "passed"
+        },
+        {
+          "name": "a deletion refresh clears this window without claiming another windows active conversation",
+          "status": "passed"
+        },
+        {
+          "name": "forgets cached turns after restart when the missing server row is confirmed absent",
+          "status": "passed"
+        },
+        {
+          "name": "WP1.4a branch discovery S16.1 discovers every old version on both sides after reload without enlarging recents",
+          "status": "passed"
+        },
+        {
+          "name": "WP1.4a branch discovery BF2a refreshes base and branch versions after existing list reads without typing reads",
+          "status": "passed"
+        },
+        {
+          "name": "WP1.4a branch discovery S16.2 hides counts while pending and failed and preserves typing",
+          "status": "passed"
+        },
+        {
+          "name": "WP1.4a branch discovery S16.2 refreshes old fork membership on creation and deletion",
+          "status": "passed"
+        },
+        {
+          "name": "WP1.4a branch discovery S16.3 S16.4 names the immediate parent and opens it through an accessible native control",
+          "status": "passed"
+        },
+        {
+          "name": "WP1.4a branch discovery S16.3 restores the neutral immediate-parent control for an old locked branch",
+          "status": "passed"
+        },
+        {
+          "name": "WP1.4a branch discovery S16.3 uses a neutral name for a hidden parent on an empty branch",
+          "status": "passed"
+        },
+        {
+          "name": "WP1.4a continuation and lineage boundaries S16.1 pages an empty continuation at the last answer from base and branch",
+          "status": "passed"
+        },
+        {
+          "name": "WP1.4a continuation and lineage boundaries S16.1 keeps the parent fork on the first own turn and own forks on later turns",
+          "status": "passed"
+        },
+        {
+          "name": "WP1.4a continuation and lineage boundaries S16.2 ignores a stale successful read after a newer deletion refresh",
+          "status": "passed"
+        },
+        {
+          "name": "S16.2 never labels a removed open branch as the base version while absence is unconfirmed",
+          "status": "passed"
+        },
+        {
+          "name": "BN1 S16.2 Retry sends while complete fork reads are still pending",
+          "status": "passed"
+        },
+        {
+          "name": "S16.1 S16.2 waits for branch lineage before presenting a fork count",
+          "status": "passed"
+        },
+        {
+          "name": "reserves and saves the rerun before POST and waits for the claimed child history before dispatch",
+          "status": "passed"
+        },
+        {
+          "name": "a unavailable rerun reservation leaves the rewrite and makes no branch POST",
+          "status": "passed"
+        },
+        {
+          "name": "a unacknowledged rerun reservation leaves the rewrite and makes no branch POST",
+          "status": "passed"
+        },
+        {
+          "name": "one reserved rerun excludes a concurrent Retry while its branch response is pending",
+          "status": "passed"
+        },
+        {
+          "name": "a rerun abandoned by leaving the screen cannot claim or resend its late fork after reload",
+          "status": "passed"
+        },
+        {
+          "name": "a unavailable first rerun save refuses the fork even when subsequent writes succeed",
+          "status": "passed"
+        },
+        {
+          "name": "a unacknowledged first rerun save refuses the fork even when subsequent writes succeed",
+          "status": "passed"
+        },
+        {
+          "name": "a rerun abandoned by disconnecting and reconnecting the same view cannot claim its late fork",
+          "status": "passed"
+        },
+        {
+          "name": "a rerun waits for the child thread response even after the child history response completes",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.acceptedOutputCompatibility.test.ts",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.acceptedOutputCompatibility.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:c4967ff7ec34bd6dd87e3198bddae1e9649336ebcfd869101880e370e39312c2",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "XT3 accepted terminal JSON replaces rejected streamed attempts in mounted Search",
+          "status": "passed"
+        },
+        {
+          "name": "D-T43 missing terminal output fails honestly live",
+          "status": "passed"
+        },
+        {
+          "name": "D-T43 explicitly empty terminal output fails honestly live",
+          "status": "passed"
+        },
+        {
+          "name": "D-T43 non-string terminal output fails honestly live",
+          "status": "passed"
+        },
+        {
+          "name": "D-T43 missing terminal output fails honestly reloaded",
+          "status": "passed"
+        },
+        {
+          "name": "D-T43 explicitly empty terminal output fails honestly reloaded",
+          "status": "passed"
+        },
+        {
+          "name": "D-T43 non-string terminal output fails honestly reloaded",
+          "status": "passed"
+        },
+        {
+          "name": "XT10 accepted output alone enters {bad} follow-up context in structured",
+          "status": "passed"
+        },
+        {
+          "name": "XT10 accepted output alone enters {bad} follow-up context in ask",
+          "status": "passed"
+        },
+        {
+          "name": "XT10 accepted output alone enters {\"city\":42,\"fact\":\"REJECTED_ROME_OLD\"} follow-up context in structured",
+          "status": "passed"
+        },
+        {
+          "name": "XT10 accepted output alone enters {\"city\":42,\"fact\":\"REJECTED_ROME_OLD\"} follow-up context in ask",
+          "status": "passed"
+        },
+        {
+          "name": "D-T43 failed output contributes nothing to follow-up context (undefined)",
+          "status": "passed"
+        },
+        {
+          "name": "D-T43 failed output contributes nothing to follow-up context ()",
+          "status": "passed"
+        },
+        {
+          "name": "XT3 interrupted/exhausted Structured output accepts no attempt: connection lost",
+          "status": "passed"
+        },
+        {
+          "name": "XT3 interrupted/exhausted Structured output accepts no attempt: Extraction validation exhausted",
+          "status": "passed"
+        },
+        {
+          "name": "XT3 terminal-only ephemeral Structured output renders accepted JSON without a store record",
+          "status": "passed"
+        },
+        {
+          "name": "XT3 recorded accepted Structured output renders identically after remount",
+          "status": "passed"
+        },
+        {
+          "name": "XT3 ordinary core.rag-ask retains streamed partial text on an empty terminal",
+          "status": "passed"
+        },
+        {
+          "name": "XT3 ordinary core.free-chat retains streamed partial text on an empty terminal",
+          "status": "passed"
+        },
+        {
+          "name": "XT3 ordinary core.summarize retains streamed partial text on an empty terminal",
+          "status": "passed"
+        },
+        {
+          "name": "XT7 Structured connection discards partial attempts through the real stream reader",
+          "status": "passed"
+        },
+        {
+          "name": "XT7 Structured eof discards partial attempts through the real stream reader",
+          "status": "passed"
+        },
+        {
+          "name": "XT7 Structured timeout discards partial attempts through the real stream reader",
+          "status": "passed"
+        },
+        {
+          "name": "XN1 ordinary partial answer survives connection loss (model=false)",
+          "status": "passed"
+        },
+        {
+          "name": "XN1 ordinary partial answer survives connection loss (model=true)",
+          "status": "passed"
+        },
+        {
+          "name": "XN1 branch inherits only the accepted output after {bad}",
+          "status": "passed"
+        },
+        {
+          "name": "XN1 branch inherits only the accepted output after {\"city\":42}",
+          "status": "passed"
+        },
+        {
+          "name": "XN1 model follow-up keeps the persistent conversation without injecting rejected client context",
+          "status": "passed"
+        },
+        {
+          "name": "XT3 an existing conversation keeps prior prose and terminal-only recorded JSON",
+          "status": "passed"
+        },
+        {
+          "name": "XT3 an existing conversation keeps prior prose and terminal-only ephemeral JSON",
+          "status": "passed"
+        },
+        {
+          "name": "XT3 a terminal-only answer counts as server content before enumeration catches up",
+          "status": "passed"
+        },
+        {
+          "name": "XT3 mounted Search follows a new result unless the reader scrolled back (reader=false)",
+          "status": "passed"
+        },
+        {
+          "name": "XT3 mounted Search follows a new result unless the reader scrolled back (reader=true)",
+          "status": "passed"
+        },
+        {
+          "name": "XT3 a Structured dispatch with no chunks and no terminal output shows a failure",
+          "status": "passed"
+        },
+        {
+          "name": "D-T43 failed saved output contributes nothing after branching (undefined)",
+          "status": "passed"
+        },
+        {
+          "name": "D-T43 failed saved output contributes nothing after branching ()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:9cf362cc86dca2fdf970fdcf1f9172f2dfaaa0c604ab37400343b87e3f5739e3"
+}

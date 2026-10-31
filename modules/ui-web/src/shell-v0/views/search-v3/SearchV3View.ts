@@ -49,10 +49,12 @@ import { Sv3RunDomain } from './sv3-run-domain.js';
 import { Sv3RunController } from './sv3-run-controller.js';
 import { Sv3ContextDomain } from './sv3-context-domain.js';
 import { Sv3ContextController } from './sv3-context-controller.js';
-import { Sv3DraftDomain, type HumanTask } from './sv3-draft-domain.js';
+import { Sv3DraftDomain } from './sv3-draft-domain.js';
 import { Sv3DraftController } from './sv3-draft-controller.js';
 import { Sv3AskDomain } from './sv3-ask-domain.js';
 import { Sv3AskController } from './sv3-ask-controller.js';
+import { Sv3BranchDomain } from './sv3-branch-domain.js';
+import { Sv3BranchController } from './sv3-branch-controller.js';
 import { Sv3ComposerPort } from './Sv3ComposerPort.js';
 import { flushPendingNavigationWrite, refreshProjection } from '../../router/URLProjector.js';
 import { registerViewFactory, getViewFactory } from '../../router/viewFactoryRegistry.js';
@@ -62,7 +64,6 @@ import type { DocumentLineRange } from '../../components/documentPane/DocumentPa
 import { peekSearchV3Handoff, takeSearchV3Handoff } from '../../utils/compose.js';
 import { html, css, nothing, type TemplateResult } from 'lit';
 import { keyed } from 'lit/directives/keyed.js';
-import { EMPTY_PREFIX_SENTINEL } from '../unifiedChatRequest.js';
 import { JfElement } from '../../primitives/JfElement.js';
 import { FrameLatch } from '../../primitives/frameLatch.js';
 import { sv3Tokens } from './sv3-tokens.css.js';
@@ -88,7 +89,6 @@ import {
   sv3ResendScopeNote,
   sv3ScopeFromPath,
   sv3ScopeLabel,
-  type Sv3AskScope,
 } from './sv3-search.js';
 import { withoutRestriction } from './sv3-filter-input.js';
 import { localizeResourceKey } from '../../../i18n/resourceCatalog.js';
@@ -123,7 +123,6 @@ import {
 } from './sv3-boundaries.js';
 import {
   activeTurns,
-  sv3TurnMessageIds,
   adoptRunSession,
   appendTurnDelta,
   applySv3History,
@@ -163,14 +162,9 @@ import {
 // id each of them names, and which conversations are the versions of a turn.
 import {
   isSv3BranchActionId,
-  projectSv3TurnLineage,
   sv3BranchMenuItems,
-  sv3FirstOwnTurnIndex,
-  sv3LineageFor,
   type Sv3BranchAction,
-  type Sv3TurnLineage,
   type Sv3VersionSelect,
-  type Sv3VersionSet,
 } from './sv3-branch.js';
 // The window's honesty derivations (tempdoc 822 Phase F7): the lock, the corpus, and the ONE remedy
 // channel every region's fix-it control leaves through.
@@ -208,7 +202,6 @@ import {
   getConversationListState,
   loadConversations,
   loadForkConversations,
-  siblingSessionsAt,
   restoreActiveConversation,
   resumeConversation,
   setActiveConversation,
@@ -217,7 +210,6 @@ import {
   setConversationTitle,
   setMessageExcluded,
   subscribeConversationList,
-  type Conversation,
 } from '../../state/conversationListStore.js';
 // The product's ONE confirm dialog. Cascade-delete asks a second question — "and its branches?" —
 // and asking it in a second dialect would be a second dismiss rule for the same gesture.
@@ -254,7 +246,6 @@ import {
 import { authorizedFetch } from '../../api/authorizedFetch.js';
 import { DraftPersistence } from '../../controllers/draftPersistence.js';
 import { requestLoadAnyway, retryWording } from '../../state/chatResidency.js';
-import type { RecoveryShape } from './sv3-recovery.js';
 import { notifyDraftKeptOnce } from '../../controllers/draftKeptHint.js';
 // Tempdoc 834 §15.3 — the backend's live-run enumeration, asked on a cold load.
 import { discoverLiveAgentRun } from '../../controllers/liveRuns.js';
@@ -308,8 +299,6 @@ import type { CardForgetDetail, ResultsCard } from '../../components/searchResul
 import { describeExactPath } from '../../../api/exclusionPolicy.js';
 import { projectSv3Degradation, type Sv3Degradation } from './sv3-degradation.js';
 import {
-  BRANCH_FAILED,
-  BRANCH_RERUN_BUSY,
   PANE_LABEL,
   SV3_COMMAND_SEARCH,
   SV3_DRAFT_KEY,
@@ -906,18 +895,6 @@ export class SearchV3View extends JfElement {
   private uiModeUnsubscribe: (() => void) | null = null;
   private appearanceUnsubscribe: (() => void) | null = null;
   private chatWidthUnsubscribe: (() => void) | null = null;
-  private readonly forkReads = new Map<string, {
-    abort: AbortController;
-    rows: readonly Conversation[] | null;
-    versions: readonly string[] | null;
-  }>();
-  private forkListLoading = false;
-
-  private clearForkReads(): void {
-    for (const read of this.forkReads.values()) read.abort.abort();
-    this.forkReads.clear();
-  }
-
   private onRecentSelect(event: Event): void {
     this.sessionsDomain.selectRecent((event as CustomEvent<Sv3RecentItem>).detail);
   }
@@ -1157,7 +1134,7 @@ export class SearchV3View extends JfElement {
     setComposerState: state => this.setComposerState(state),
     focusComposer: () => this.focusComposer(),
     revealRecoveryOutcome: () => this.revealRecoveryOutcome(),
-    invalidateForkReads: (loading, changed) => { if (changed) this.clearForkReads(); this.forkListLoading = loading; },
+    invalidateForkReads: (loading, changed) => this.branchDomain.invalidateForkReads(loading, changed),
     resetProfilePresentation: () => {
       this.composer?.closeRecents();
       resetSearchState();
@@ -1176,6 +1153,26 @@ export class SearchV3View extends JfElement {
     clearLastViewed: clearLastViewedConversation, hasFreshHandoff: () => peekSearchV3Handoff()?.origin === 'fresh',
   }, this.composerDraft);
   private readonly sessionsController = new Sv3SessionsController(this, this.sessionsDomain);
+
+  private readonly branchDomain = new Sv3BranchDomain({
+    activeSession: () => this.activeSession,
+    activeConversationId: () => this.sessions.activeId,
+    conversations: () => this.sessionsDomain.conversations,
+    draft: () => this.draftDomain,
+    ask: () => this.askDomain,
+    search: () => this.search,
+    sessions: () => this.sessionsDomain,
+    connected: () => this.isConnected,
+    streaming: () => this.streaming,
+    historyLocked: () => this.historyLocked,
+    lockedRefusal: () => this.lockedRefusal,
+    delegateUnavailableReason: () => this.delegateUnavailableReason,
+    runInFlight: () => this.agentController()?.runInFlight === true,
+    delegate: (text, turnAction) => this.delegate(text, turnAction),
+    announceWarning: message => emitEphemeralToast({ message, severity: 'warning' }),
+    requestUpdate: () => this.requestUpdate(),
+  }, { branchConversation, loadForkConversations }, { replace: text => this.writeDraft(text) });
+  private readonly branchController = new Sv3BranchController(this, this.branchDomain);
 
   constructor() {
     super();
@@ -1377,7 +1374,7 @@ export class SearchV3View extends JfElement {
     this.inspectorUnsubscribe?.();
     this.inspectorUnsubscribe = null;
     this.sessionsController.disconnect();
-    this.clearForkReads();
+    this.branchController.disconnect();
     this.contextDomain.disconnect();
     this.aiUnsubscribe?.();
     this.aiUnsubscribe = null;
@@ -1557,7 +1554,7 @@ export class SearchV3View extends JfElement {
     const previousSessions = changed.get('sessions') as Sv3SessionList | undefined;
     if (previousSessions && previousSessions.activeId !== this.sessions.activeId) this.leaveForgetPlacement();
     if (changed.has('sessions')) { this.upgradeOpenPaneAnchor(); }
-    this.syncForkReads();
+    this.branchController.update();
     if (changed.has('sidebarWidthPx') || changed.has('paneWidthPx') || changed.has('paneDocPath')) {
       this.reflowSidebar();
     }
@@ -1633,7 +1630,7 @@ export class SearchV3View extends JfElement {
     // ONE menu for both sets (852 S3). They are two derivations because they are gated on different
     // ids — a turn can be excludable and not forkable — but a turn has one ⋯, and a second overflow
     // beside the first would be a second place to look for "what can I do with this turn".
-    const branch = sv3BranchMenuItems(this.turnLineage(), detail.turnId, {
+    const branch = sv3BranchMenuItems(this.branchDomain.turnLineage(), detail.turnId, {
       streaming: this.streaming,
     });
     if (items.length === 0 && branch.length === 0) return;
@@ -1673,342 +1670,31 @@ export class SearchV3View extends JfElement {
     });
     if (chosen === null) return;
     if (isSv3BranchActionId(chosen)) {
-      await this.runBranchAction({ action: chosen, turnId: detail.turnId });
+      await this.branchDomain.runBranchAction({ action: chosen, turnId: detail.turnId });
       return;
     }
     await this.contextDomain.runContextAction({ action: chosen as Sv3ContextActionId, turnId: detail.turnId });
   }
 
-  /* ── Branch, edit / retry and the version pager (852 S3) ──────────────────────────────────── */
-
-  /**
-   * What each turn can do about branching, derived once per render from the SAME three inputs the
-   * acts below read: the turns on screen, the conversation's `/history`, and complete fork reads.
-   * The trigger's gate and the act's target are therefore one derivation, which is what stops a menu
-   * offering a fork the window would then compute differently.
-   */
-  private turnLineage(): readonly Sv3TurnLineage[] {
-    const session = this.activeSession;
-    if (session === null) return [];
-    return projectSv3TurnLineage(session.turns, session.history, session.id, [],
-      (base, point) => this.forkReads.get(JSON.stringify([base, point]))?.versions ?? null);
-  }
-
-  /** A continuation with no question yet still has a fork point, including on an empty branch. */
-  private continuationFork(): { base: string; point: string } | null {
-    const session = this.activeSession;
-    if (this.historyLocked || session === null || session.history === null) return null;
-    const parent = session.history?.parentSessionId;
-    const point = session.history?.branchPointMessageId;
-    if (parent && point && sv3FirstOwnTurnIndex(session.turns, session.history) >= session.turns.length) {
-      return { base: parent, point };
-    }
-    const last = session.turns.at(-1);
-    const answer = last === undefined ? null : sv3TurnMessageIds(last).assistantMsgId;
-    return answer === null ? null : { base: session.id, point: answer };
-  }
-
-  private continuationVersions(): Sv3VersionSet | null {
-    const fork = this.continuationFork();
-    if (fork === null) return null;
-    const versions = this.forkReads.get(JSON.stringify([fork.base, fork.point]))?.versions;
-    const index = versions?.indexOf(this.activeSession?.id ?? '') ?? -1;
-    return versions && versions.length > 1 && index >= 0 ? { sessions: versions, index } : null;
-  }
-
-  /** Only fork points on the open transcript are read. Requests are parallel and never gate sends. */
-  private syncForkReads(): void {
-    const session = this.activeSession;
-    const needed = new Map<string, { base: string; point: string }>();
-    if (!this.historyLocked && session !== null && session.history !== null) {
-      for (const turn of projectSv3TurnLineage(session.turns, session.history, session.id, [])) {
-        if (turn.forkKey !== null) needed.set(JSON.stringify([turn.forkFromId, turn.forkKey]),
-          { base: turn.forkFromId, point: turn.forkKey });
-      }
-      const parent = session.history?.parentSessionId;
-      const point = session.history?.branchPointMessageId;
-      // Empty branches still need their origin, even before they have a divergent turn.
-      if (parent && point) needed.set(JSON.stringify([parent, point]), { base: parent, point });
-    }
-    // A locked history returns 423 without lineage. The base row of this same lock-safe filter
-    // supplies structural parent pointers without opening content or growing the sidebar.
-    if (this.historyLocked && session !== null && session.history === null
-      && !this.sessionsDomain.conversations.some(row => row.id === session.id)) {
-      needed.set(JSON.stringify([session.id, EMPTY_PREFIX_SENTINEL]),
-        { base: session.id, point: EMPTY_PREFIX_SENTINEL });
-    }
-    const continuation = this.continuationFork();
-    if (continuation !== null) needed.set(JSON.stringify([continuation.base, continuation.point]), continuation);
-    for (const [key, read] of this.forkReads) {
-      if (!needed.has(key)) {
-        read.abort.abort();
-        this.forkReads.delete(key);
-      }
-    }
-    if (this.forkListLoading || !this.isConnected) return;
-    for (const [key, { base, point }] of needed) {
-      if (this.forkReads.has(key)) continue;
-      const read = { abort: new AbortController(), rows: null as readonly Conversation[] | null,
-        versions: null as readonly string[] | null };
-      this.forkReads.set(key, read);
-      void loadForkConversations(base, point, read.abort.signal).then(rows => {
-        if (!this.isConnected || this.forkReads.get(key) !== read) return;
-        read.rows = rows;
-        read.versions = rows === null ? null : siblingSessionsAt(rows, base, point);
-        this.requestUpdate();
-      });
-    }
-  }
-
   private renderBranchOrigin(): TemplateResult | typeof nothing {
-    const session = this.activeSession;
-    if (session === null) return nothing;
-    const ownRead = this.forkReads.get(JSON.stringify([session.id, EMPTY_PREFIX_SENTINEL]));
-    const metadata = session.history ?? this.sessionsDomain.conversations.find(row => row.id === session.id)
-      ?? ownRead?.rows?.find(row => row.id === session.id);
-    const parent = metadata?.parentSessionId;
-    const point = metadata?.branchPointMessageId;
-    if (!parent || !point) return nothing;
-    const read = this.forkReads.get(JSON.stringify([parent, point]));
-    const name = (!this.historyLocked && !this.lockedRefusal
-      ? read?.rows?.find(row => row.id === parent)?.firstUserMessage?.trim() : '') || 'Original conversation';
+    const origin = this.branchDomain.branchOrigin();
+    if (origin === null) return nothing;
+    const { parent, name } = origin;
     return html`<div class="branch-origin" data-testid="sv3-branch-origin">
       <span>Branched from: ${name}</span>
       <button type="button" aria-label=${`Open original: ${name}`}
-        @click=${() => { void this.openBranch(parent); }}>Open original</button>
+        @click=${() => { void this.branchDomain.openBranch(parent); }}>Open original</button>
     </div>`;
   }
 
   private onBranchAction(event: Event): void {
     const detail = (event as CustomEvent<Sv3BranchAction>).detail;
     if (detail === undefined) return;
-    void this.runBranchAction(detail);
+    void this.branchDomain.runBranchAction(detail);
   }
 
-  /**
-   * The three acts, all of them ONE backend act with a different `fromMsgId` and a different thing
-   * to do afterwards (`views/UnifiedChatView.ts:1471-1497` — there is no edit endpoint and no retry
-   * endpoint, and inventing one here would be inventing a contract the backend does not hold).
-   *
-   *  - **Branch** forks after this turn's ANSWER and continues there; nothing is re-sent.
-   *  - **Retry** forks before this turn's QUESTION and re-sends it unchanged.
-   *  - **Edit** forks at the same point and sends the rewrite, so the new text is the first
-   *    divergent message rather than a second one appended below the old exchange.
-   *
-   * The ids come from {@link projectSv3TurnLineage} and nowhere else, so an act can never be pointed
-   * at a message `?fromMsgId=` would reject — and a turn that names none renders no affordance to
-   * press in the first place.
-   *
-   * A turn re-runs in ITS OWN tier (WP1.2 S2.5): an agent turn's Retry/Edit runs the agent again, an
-   * ask turn's asks again, whatever tier the composer happens to show — the reader is repeating that
-   * turn, not composing a new one. When the agent cannot run, the act is refused BEFORE anything is
-   * forked and says why (S2.6): there is no falling back to an ask, and the editor keeps the text.
-   */
-  private async runBranchAction(detail: Sv3BranchAction): Promise<void> {
-    const session = this.activeSession;
-    if (session === null || this.streaming) return;
-    const lineage = sv3LineageFor(this.turnLineage(), detail.turnId);
-    if (lineage === null) return;
-    const turn = session.turns.find((t) => t.id === detail.turnId) ?? null;
-    const tier: Sv3ComposerTier | 'model' = turn?.shapeId === 'core.extract' ? 'structured' : turn?.kind === 'agent' ? 'delegate' : turn?.kind === 'model' ? 'model' : 'ask';
-    const summary = turn?.shapeId === 'core.summarize';
-    const text = detail.action === 'edit' ? (detail.text ?? '').trim() : turn?.question ?? '';
-    if (detail.action !== 'branch' && tier === 'ask' && !summary && !this.search.hasTurnScope(detail.turnId)) {
-      this.draftDomain.recoveryError = 'The original Ask inputs are not known after reload. Prepare a new Ask and choose or review its files before sending.';
-      this.requestUpdate();
-      emitEphemeralToast({ message: this.draftDomain.recoveryError, severity: 'warning' });
-      return;
-    }
-    if (detail.action !== 'branch' && (summary && this.askDomain.summaryInput(detail.turnId) === undefined
-      || tier === 'structured' && this.askDomain.structuredInput(detail.turnId) === undefined)) {
-      this.draftDomain.recoveryError = summary && turn && sv3ExplainsRankingTrace(turn)
-        ? 'Retry/Edit cannot restore the original Explain input after reload. Start Explain from the result again.'
-        : 'The original schema or summary input is not available. Prepare a new task and review its inputs before sending.';
-      this.requestUpdate();
-      emitEphemeralToast({ message: this.draftDomain.recoveryError, severity: 'warning' });
-      return;
-    }
-    if (!this.draftDomain.mayForkDraft()) return;
-    let humanTask: HumanTask | undefined;
-    if (detail.action !== 'branch' && tier !== 'delegate') {
-      const shape: RecoveryShape = summary ? 'core.summarize' : tier === 'structured' ? 'core.extract' : tier === 'model' ? SV3_MODEL_SHAPE_ID : SV3_ASK_SHAPE_ID;
-      const reason = this.draftDomain.humanUnavailable(shape);
-      if (reason) { emitEphemeralToast({ message: reason, severity: 'warning' }); return; }
-      if (lineage.forkKey === null || text === '' || (detail.action === 'edit' && !lineage.canEdit)) return;
-      const inputs = summary ? this.askDomain.summaryInput(detail.turnId) : this.askDomain.structuredInput(detail.turnId);
-      // Missing schema/passage already has an explicit review path below, with no dispatch.
-      if ((!summary && tier !== 'structured') || inputs !== undefined) {
-        const task = this.draftDomain.reserveHumanTask(text,
-          summary ? this.askDomain.summaryInput(detail.turnId)?.scope ?? null
-            : tier === 'structured' ? this.askDomain.structuredInput(detail.turnId)?.scope ?? null : this.search.scopeOfTurn(detail.turnId),
-          tier === 'structured' ? this.askDomain.structuredInput(detail.turnId)?.schema : undefined,
-          shape, summary ? this.askDomain.summaryInput(detail.turnId)?.selection ?? null : null,
-          false, lineage.forkKey, detail.action === 'edit' ? detail.text : undefined, this.search.filtersOfTurn(detail.turnId));
-        if (task === null) return;
-        humanTask = task;
-      }
-    }
-    if (turn?.shapeId === 'core.summarize' && detail.action !== 'branch') {
-      const text = detail.action === 'edit' ? (detail.text ?? '').trim() : turn.question;
-      if (lineage.forkKey === null || text === '' || !lineage.canEdit) return;
-      const inputs = this.askDomain.summaryInput(turn.id);
-      if (!await this.branchInto(lineage.forkFromId, lineage.forkKey, null, 'ask', null, humanTask)) return;
-      this.tier = 'ask';
-      this.draftDomain.preparedHandoff = { shapeId: 'core.summarize', selection: inputs?.selection ?? null };
-      if (inputs === undefined) {
-        this.draftDomain.handoffBlocked = true;
-        this.draftDomain.handoffNotice = sv3ExplainsRankingTrace(turn)
-          ? 'Retry/Edit cannot restore the original Explain input after reload. Start Explain from the result again.'
-          : 'No readable summary input is saved. Choose the original files or passage before sending.';
-        this.writeDraft(text);
-        this.requestUpdate();
-      } else {
-        await this.askDomain.runAsk(text, inputs.scope, undefined, false, { task: humanTask, turnAction: true });
-      }
-      return;
-    }
-    if (tier === 'structured' && detail.action !== 'branch') {
-      const text = detail.action === 'edit' ? (detail.text ?? '').trim() : turn?.question ?? '';
-      if (lineage.forkKey === null || text === '' || !lineage.canEdit) return;
-      const inputs = this.askDomain.structuredInput(detail.turnId);
-      if (!await this.branchInto(lineage.forkFromId, lineage.forkKey, null, tier, null, humanTask)) return;
-      this.tier = 'structured';
-      this.draftDomain.tierFollowsPlace = false;
-      if (inputs === undefined) {
-        this.writeDraft(text);
-        this.requestUpdate();
-      } else {
-        await this.askDomain.runAsk(text, inputs.scope, inputs.schema, false, { task: humanTask, turnAction: true });
-      }
-      return;
-    }
-    switch (detail.action) {
-      case 'branch':
-        if (lineage.branchFromId === null) return;
-        // A branch re-sends nothing; it continues the conversation in the tier of the turn it forked
-        // after, so the next send from a Delegate turn's branch is a delegation.
-        if ((await this.branchInto(session.id, lineage.branchFromId, null, tier)) && (tier === 'delegate' || tier === 'structured')) {
-          this.tier = tier;
-          this.draftDomain.tierFollowsPlace = false;
-        }
-        return;
-      case 'retry': {
-        const question = turn?.question ?? '';
-        if (lineage.forkKey === null || question === '') return;
-        if (!this.canRerun(tier)) return;
-        await this.branchInto(
-          lineage.forkFromId,
-          lineage.forkKey,
-          question,
-          tier,
-          this.search.scopeOfTurn(detail.turnId),
-          humanTask,
-        );
-        return;
-      }
-      case 'edit': {
-        const text = (detail.text ?? '').trim();
-        if (lineage.forkKey === null || text === '' || !lineage.canEdit) return;
-        if (!this.canRerun(tier)) return;
-        await this.branchInto(
-          lineage.forkFromId,
-          lineage.forkKey,
-          text,
-          tier,
-          this.search.scopeOfTurn(detail.turnId),
-          humanTask,
-        );
-        return;
-      }
-      default:
-        return;
-    }
-  }
-
-  /**
-   * Whether a re-run in `tier` can start now, saying why not when it cannot (S2.6). Model and
-   * delegate reruns check availability here; an Ask rerun keeps its existing path. Both need
-   * the model (their own availability gates, which do not require indexed documents)
-   * and no other run in flight on the one shared controller.
-   */
-  private canRerun(tier: Sv3ComposerTier | 'model'): boolean {
-    const unavailable = tier === 'delegate' ? this.delegateUnavailableReason
-      : this.draftDomain.humanUnavailable(tier === 'model' ? SV3_MODEL_SHAPE_ID : tier === 'structured' ? 'core.extract' : SV3_ASK_SHAPE_ID);
-    if (unavailable !== '') {
-      emitEphemeralToast({ message: unavailable, severity: 'warning' });
-      return false;
-    }
-    if (this.agentController()?.runInFlight === true) {
-      emitEphemeralToast({ message: BRANCH_RERUN_BUSY, severity: 'warning' });
-      return false;
-    }
-    return true;
-  }
-
-  /**
-   * Fork, open the fork, and — for the two acts that re-send — ask again IN it.
-   *
-   * ORDER IS THE WHOLE THING. The branch is opened and CLAIMED before the re-send, because
-   * {@link runAsk} appends to whatever conversation is active: sending first would append the
-   * rewritten question to the conversation the reader was replacing, which is the failure this act
-   * exists to avoid and would look entirely plausible on screen.
-   *
-   * A refused branch changes nothing and says so. There is no local fallback — a window that
-   * appended the re-send to the current conversation "because the branch failed" would silently do
-   * the one thing the reader did not ask for.
-   */
-  private async branchInto(
-    sessionId: string,
-    fromMsgId: string,
-    resend: string | null,
-    tier: Sv3ComposerTier | 'model',
-    scope: Sv3AskScope | null = null,
-    task?: HumanTask,
-  ): Promise<boolean> {
-    if (!this.draftDomain.mayForkDraft()) return false;
-    // The preview is the conversation's OPENING question, the same thing the shipped window sends
-    // (`:1485`): it is what makes the new session surface as a recent one with a name.
-    const preview = this.activeSession?.turns.find((t) => t.question !== '')?.question ?? '';
-    const branched = await branchConversation(sessionId, fromMsgId, preview);
-    if (branched === null) {
-      emitEphemeralToast({ message: BRANCH_FAILED, severity: 'warning' });
-      return false;
-    }
-    if (task !== undefined && !this.draftDomain.humanOwned(task)) return false;
-    if (!await this.openBranch(branched, task)) return false;
-    if (resend === null) return true;
-    // The same ORDER for both tiers: the branch is claimed first, so the re-run lands in it.
-    // An ask re-send keeps the files its turn was limited to (WP1.1 S1.7) — or, for a turn this
-    // window did not limit, asks all files, which is what its Retry/Edit said it would do.
-    if (tier === 'delegate') {
-      // The agent can stop being able to run while the fork is in flight (S2.6). The fork stands —
-      // it is the new version — and the text waits in its composer, in Delegate, saying why; it is
-      // never run as an Ask and never dropped.
-      if (!this.canRerun(tier)) {
-        this.tier = 'delegate';
-        this.writeDraft(resend);
-        return true;
-      }
-      this.delegate(resend, true);
-    } else {
-      if (!this.canRerun(tier)) return true;
-      await this.askDomain.runAsk(resend, scope, undefined, tier === 'model', { task, turnAction: true });
-    }
-    return true;
-  }
-
-  private openBranch(id: string, task?: HumanTask): Promise<boolean> {
-    return this.sessionsDomain.openConversation(id, task);
-  }
-  /**
-   * The reader paged to another version of a turn. It is an OPEN, not a write: the target is a real
-   * conversation and claiming it is what claiming any conversation does, so this routes through the
-   * one open path rather than a second, branch-flavoured one.
-   */
   private onVersionSelect(event: Event): void {
-    const id = (event as CustomEvent<Sv3VersionSelect>).detail?.sessionId ?? '';
-    if (id === '' || id === this.sessions.activeId) return;
-    void this.openBranch(id);
+    this.branchDomain.selectVersion((event as CustomEvent<Sv3VersionSelect>).detail?.sessionId ?? '');
   }
 
   /**
@@ -3278,8 +2964,8 @@ export class SearchV3View extends JfElement {
           .currentModelLabel=${this.currentModelLabel}
           ?detailed=${isAdvancedMode()}
           .turnContexts=${contexts}
-          .turnLineage=${this.turnLineage()}
-          .continuationVersions=${this.continuationVersions()}
+          .turnLineage=${this.branchDomain.turnLineage()}
+          .continuationVersions=${this.branchDomain.continuationVersions()}
           .floorSummary=${session?.history?.contextFloorSummary ?? null}
           ?streaming=${this.streaming}
           .stopping=${this.askStopping ?? this.runDomain.runStopping()}
