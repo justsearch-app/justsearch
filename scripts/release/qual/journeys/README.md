@@ -92,6 +92,33 @@ the predecessor. Each overlay retains its own summary; the wrapper combines the
 candidate observations and predecessor update/retention observations into one
 Wayland summary. Predecessor preparation remains separately recorded.
 
+When no valid signed predecessor and matching authenticated mirror are available,
+omit `--predecessor` and `--mirror`. Wayland runs the candidate journeys, including
+J6 retention, and records J5 as **unavailable** with that reason. This also applies
+to explicit subsets: missing J5 coverage remains visible, and the subset is not
+complete qualification. A supplied predecessor/mirror still selects the fresh
+predecessor preparation and mandatory J5 update path in a default run. No older
+package or fabricated predecessor substitutes for the missing signed release.
+Explicitly requested journeys outside the active phase appear as unavailable
+(or a documented applicability skip), rather than disappearing from the summary.
+
+J2 Linux selects the fixture by its exact path in the settled result card, after
+quick results and semantic refinement finish; ranking cannot choose another file.
+Windows already selects the exact fixture path. Ubuntu provisioning overrides the
+delayed `update-notifier` desktop autostart, disables release-upgrade prompts, and
+restarts the login session to remove dialogs already started before provisioning.
+The crash reporter remains enabled. Every Linux SCP input is rehashed in the guest
+and compared with the host file before use.
+
+Hosted crash collection waits up to 60 seconds when systemd reports collectors
+still running. `coredumpctl.json` retains each raw exit code, stdout and stderr;
+the exact empty-journal response is not an infrastructure failure. Collection
+errors or a collector that does not finish still fail. The existing requirement
+for owner validation of crash collection remains in force. Process discovery
+captures owned identities before WebDriver shutdown and rechecks a process that
+loses environment access during exit; a live owned process with persistently
+unreadable identity evidence remains an infrastructure failure.
+
 Fresh qualification (`--mode fresh`, the default) starts from the clean OS
 base and uses production downloads. After J1–J3 (J1–J4 for the predecessor),
 the wrapper stops the guest cleanly and renames its overlay into a setup

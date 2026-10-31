@@ -23,10 +23,7 @@ STATUSES = ('passed', 'failed-product', 'failed-infrastructure', 'skipped-by-dec
 
 
 def phase_journeys(phase, lane=None):
-    selected = {'J1', 'J2', 'J3', 'J4', 'J5', 'J6'} if phase == 'predecessor' else {'J1', 'J2', 'J3', 'J4', 'J7', 'J8'}
-    if lane == 'vm-windows':
-        selected.add('J6') # Also develop retention against the installed candidate.
-    return selected
+    return {'J1', 'J2', 'J3', 'J4', 'J5', 'J6'} if phase == 'predecessor' else {'J1', 'J2', 'J3', 'J4', 'J6', 'J7', 'J8'}
 
 
 class Infrastructure(Exception):
@@ -115,11 +112,22 @@ def collect_hosted_crashes(out, since):
     out = Path(out)
     report = json.loads((out / 'summary.json').read_text())
     try:
-        result = subprocess.run(['sudo', '-n', 'coredumpctl', '--json=short', '--no-pager',
-                                 '--since', since, 'list'], capture_output=True, text=True)
-        (out / 'coredumpctl.stderr.txt').write_text(result.stderr)
+        observations = []
+        def collect():
+            result = subprocess.run(['sudo', '-n', 'env', 'LC_ALL=C', 'coredumpctl', '--json=short', '--no-pager',
+                                     '--since', since, 'list'], capture_output=True, text=True, timeout=30)
+            observations.append({'returncode': result.returncode, 'stdout': result.stdout, 'stderr': result.stderr})
+            (out / 'coredumpctl.json').write_text(json.dumps(observations, indent=2) + '\n')
+            (out / 'coredumpctl.stderr.txt').write_text(result.stderr)
+            # systemd appends this notice to stdout even with --json=short.
+            # An empty journal during active collection is not a final result.
+            if re.search(r'(?m)^-- Notice: \d+ systemd-coredump@\.service units? (?:is|are) running, output may be incomplete\.$', result.stdout.strip()):
+                return None
+            return result
+        result = wait_for(collect, 'Hosted coredump collectors finished', seconds=60,
+                          interval=1, error=Infrastructure)
         # coredumpctl returns 1 for an empty journal, as well as for real errors.
-        if result.returncode and not (result.returncode == 1
+        if result.returncode and not (result.returncode > 0
                 and result.stderr.strip() == 'No coredumps found.'
                 and result.stdout.strip() in ('', '[]')):
             raise Infrastructure('coredumpctl collection failed: ' + result.stderr)
@@ -152,7 +160,7 @@ def collect_hosted_crashes(out, since):
     except Exception as exc:
         report['journeys'].append({'id': 'hosted-crashes', 'checks': [{
             'name': 'collection', 'status': 'failed-infrastructure', 'reason': str(exc),
-            'evidence': ['coredumpctl.stderr.txt']}]})
+            'evidence': ['coredumpctl.json', 'coredumpctl.stderr.txt']}]})
     report['journeys'].append({'id': 'hosted-crashes', 'checks': [{
         'name': 'hosted crash collection unproven', 'status': 'owner-validation',
         'reason': 'Hosted crash collection is not proven armed or finished; owner validation is required',
@@ -411,7 +419,15 @@ for path in Path('/proc').glob('[0-9]*/environ'):
                 'exe':str(path.with_name('exe').resolve()),
                 'ppid':int(path.with_name('stat').read_text().split(') ',1)[1].split()[1])})
  except PermissionError:
-  if identity in known:raise RuntimeError('Cannot read owned process '+str(identity[0]))
+  if identity in known:
+   # The process can enter exit/zombie state after the first stat read. Its
+   # environment then becomes unreadable; that is retirement, not lost access
+   # to a live owned process. Keep persistent permission failures fail-closed.
+   try:
+    current=path.with_name('stat').read_text().rsplit(') ',1)[1].split()
+    if current[0] == 'Z' or current[19] != identity[1]:continue
+   except (FileNotFoundError,ProcessLookupError):continue
+   raise RuntimeError('Cannot read owned process '+str(identity[0]))
  except (OSError,IndexError): pass
 print(json.dumps(rows))
 """, {'runId': self.env['QUAL_JOURNEY_RUN'], 'known': list(self.app_processes)}, desktop=False)
@@ -799,6 +815,10 @@ except (TimeoutError,PermissionError) as exc:
     def stop_app(self):
         self.facts.pop('ui', None)
         self.facts.pop('ready', None)
+        # Closing WebDriver retires its Engine. Capture marked identities while
+        # /proc/environ is still readable; stop() rechecks PID/start ticks and
+        # excludes zombies, so shutdown cannot turn into a discovery failure.
+        identities = self.target.owned()
         if self.wd:
             try:
                 self.wd.close()
@@ -806,7 +826,6 @@ except (TimeoutError,PermissionError) as exc:
                 pass
             self.wd = None
         # Only identities observed with our inherited marker are eligible.
-        identities = self.target.owned()
         self.facts['preLaunchProcesses'] = identities
         paths = self.target.run(['dpkg-query', '-L', 'just-search']).stdout.splitlines()
         self.target.stop([row for row in identities if row['exe'].removesuffix(' (deleted)') in paths
@@ -1005,7 +1024,9 @@ def main():
         for journey in definition['journeys']:
             if args.journeys and journey['id'] not in args.journeys:
                 continue
-            if journey['id'] not in phase_journeys(args.phase, args.lane) and (args.vm or args.lane == 'vm-windows') and args.lane != 'vm-linux-x11':
+            outside_phase = (journey['id'] not in phase_journeys(args.phase, args.lane)
+                             and (args.vm or args.lane == 'vm-windows') and args.lane != 'vm-linux-x11')
+            if outside_phase and not args.journeys:
                 continue
             row = {'id': journey['id'], 'title': journey['title'], 'scenarioIds': journey['scenarioIds'], 'checks': []}
             run.results.append(row)
@@ -1019,6 +1040,14 @@ def main():
                 if args.lane not in check['lanes']:
                     row['checks'].append({'name': check['id'], 'status': 'skipped-by-decision',
                                           'reason': check['applicability'], 'evidence': []})
+                elif outside_phase:
+                    reason = (f"{journey['id']} cannot run in the {args.phase} phase; requires the candidate phase")
+                    if journey['id'] == 'J5':
+                        reason = ("J5 requires a fresh valid signed predecessor and authenticated --mirror; "
+                                  + ('none supplied' if not args.predecessor or not args.mirror else
+                                     'run the predecessor phase to exercise the update'))
+                    row['checks'].append({'name': check['id'], 'status': 'unavailable',
+                                          'reason': reason, 'evidence': []})
                 elif setup_error:
                     row['checks'].append({'name': check['id'], 'status': classify(setup_error),
                                           'reason': 'setup: ' + str(setup_error), 'evidence': []})

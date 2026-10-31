@@ -225,6 +225,7 @@ class ClassificationReviewTests(unittest.TestCase):
 
     def test_context_menu_missing_open_file_is_product_after_secondary_click(self):
         run = Mock(facts={})
+        run.require.return_value = '/tmp/isolated/corpus'
         wd = runner.WebDriver(Mock(), 4444); wd.session = 'isolated'
         run.wd = wd
         wd.keys = Mock(); wd.element = Mock(return_value={'element-6066-11e4-a52e-4f735466cecf':'hit'})
@@ -236,7 +237,7 @@ class ClassificationReviewTests(unittest.TestCase):
                      patch.object(wd,'execute',return_value=None), patch.object(runner,'wait_for',immediate):
                     runner.WebDriver.click(wd,selector,text,**kw)
         wd.click = Mock(side_effect=click)
-        with patch.object(linux,'search_api',return_value={}),patch.object(linux,'wait_for',return_value=True):
+        with patch.object(linux,'search_api',return_value={}),patch.object(linux,'wait_for',return_value={'element-6066-11e4-a52e-4f735466cecf':'hit'}):
             try: linux.search_open(run)
             except Exception as exc:
                 self.assertEqual(runner.classify(exc),'failed-product')

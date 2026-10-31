@@ -313,7 +313,7 @@ class RunnerTests(unittest.TestCase):
         run.work = '/tmp/own-run'
         run.require.return_value = '/tmp/own-corpus'
         run.wd.text.return_value = linux.OPEN_FILE
-        run.wd.element.return_value = {'element-6066-11e4-a52e-4f735466cecf': 'fixture'}
+        run.wd.element.return_value = run.wd.execute.return_value = {'element-6066-11e4-a52e-4f735466cecf': 'fixture'}
         run.native.screen_text.return_value = 'File Edit Document ' + linux.OPEN_FILE
         viewer = {'pid': 123, 'ticks': '456', 'exe': '/usr/bin/mousepad'}
         with patch.object(linux, 'search_api', return_value={}), \
@@ -372,8 +372,8 @@ class RunnerTests(unittest.TestCase):
             self.assertEqual(result['secondsSinceWindowShown'], 2.5)
             self.assertIs(result['indexingRunning'], expected)
 
-    def test_candidate_overlay_excludes_update_and_retention(self):
-        self.assertEqual(self.r.phase_journeys('candidate'), {'J1', 'J2', 'J3', 'J4', 'J7', 'J8'})
+    def test_candidate_overlay_includes_retention_and_excludes_update(self):
+        self.assertEqual(self.r.phase_journeys('candidate'), {'J1', 'J2', 'J3', 'J4', 'J6', 'J7', 'J8'})
 
     def test_fresh_predecessor_overlay_prepares_state_before_update(self):
         self.assertEqual(self.r.phase_journeys('predecessor'), {'J1', 'J2', 'J3', 'J4', 'J5', 'J6'})

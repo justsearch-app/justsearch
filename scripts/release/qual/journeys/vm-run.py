@@ -79,8 +79,6 @@ def parse_args():
         parser.error('Fresh qualification cannot inherit a setup snapshot')
     if args.memory_mib != vm.MEMORY_MIB and not args.memory_reason:
         parser.error('Nondefault memory requires --memory-reason with journey evidence')
-    if args.session == 'wayland' and args.mode == 'fresh' and (not args.predecessor or not args.mirror):
-        parser.error('VM desktop lanes require --predecessor and --mirror for J5')
     return args
 
 
@@ -140,6 +138,14 @@ def provision(args, out):
     vm.guest_root('ubuntu', 'systemctl mask --now snapd.service snapd.socket '
                   'fwupd.service fwupd-refresh.timer apt-daily.service apt-daily.timer '
                   'apt-daily-upgrade.service apt-daily-upgrade.timer unattended-upgrades.service')
+    # update-notifier is a delayed XDG desktop autostart, not an apt service.
+    # Its user override survives package installs; release checking is separately
+    # disabled. Restart GDM below to retire dialogs already started at login.
+    vm.guest_root('ubuntu', "set -eu; install -d -o qual -g qual /home/qual/.config/autostart; "
+                  "printf '[Desktop Entry]\\nType=Application\\nName=Update Notifier\\nHidden=true\\n' "
+                  "> /home/qual/.config/autostart/update-notifier.desktop; "
+                  "chown qual:qual /home/qual/.config/autostart/update-notifier.desktop; "
+                  "sed -i 's/^Prompt=.*/Prompt=never/' /etc/update-manager/release-upgrades")
     with (out / 'provision.log').open('wb') as log:
         command = ('env DEBIAN_FRONTEND=noninteractive apt-get update && '
                    'env DEBIAN_FRONTEND=noninteractive apt-get install -y '
@@ -163,8 +169,8 @@ def provision(args, out):
                   + node + '/bin/npm /usr/local/bin/npm; ln -s ' + node + '/bin/npx /usr/local/bin/npx')
     if args.session == 'x11':
         vm.guest_root('ubuntu', r"sed -i '/^\[daemon\]/a WaylandEnable=false' /etc/gdm3/custom.conf; "
-                      "sed -i 's/^Session=.*/Session=ubuntu-xorg/;s/^XSession=.*/XSession=ubuntu-xorg/' /var/lib/AccountsService/users/qual; "
-                      'systemctl restart gdm3')
+                      "sed -i 's/^Session=.*/Session=ubuntu-xorg/;s/^XSession=.*/XSession=ubuntu-xorg/' /var/lib/AccountsService/users/qual")
+    vm.guest_root('ubuntu', 'systemctl restart gdm3')
 
 
 def crash_evidence(out, *, before_install=False):
@@ -504,17 +510,23 @@ def main():
             raise Infrastructure('J1/J2 require fresh setup; use --mode fresh --journeys with explicit prerequisites')
         stage('rerun', manifest['pins']['phase'], args.journeys, args.snapshot)
     elif args.journeys:
-        stage('selected', 'candidate', args.journeys, seal=True)
+        selected = list(args.journeys)
+        if args.session == 'wayland' and (not args.predecessor or not args.mirror) and 'J5' not in selected:
+            selected.append('J5')  # Record missing update coverage even for diagnostic subsets.
+        stage('selected', 'candidate', selected, seal=True)
     elif args.session == 'x11':
         stage('candidate', 'candidate', ['J1'])
     else:
-        phases = ['candidate', 'predecessor'] if args.session == 'wayland' else ['candidate']
+        update_available = args.session == 'wayland' and args.predecessor and args.mirror
+        phases = ['candidate', 'predecessor'] if update_available else ['candidate']
         for phase in phases:
             setup = ['J1', 'J2', 'J3'] + (['J4'] if phase == 'predecessor' else [])
             name = phase + '-setup'
             stage(name, phase, setup, seal=True)
             snapshot = out / name / 'snapshot'
             remaining = ['J5', 'J6'] if phase == 'predecessor' else ['J4', 'J7', 'J8']
+            if args.session == 'wayland' and not update_available:
+                remaining = ['J4', 'J5', 'J6', 'J7', 'J8']
             if args.session == 'hosted':
                 remaining = ['J4', 'J5', 'J6', 'J7', 'J8']  # Retain explicit VM-only decision skips.
             if snapshot.exists():
