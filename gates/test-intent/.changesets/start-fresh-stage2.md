@@ -154,3 +154,13 @@ The verifier must independently accept the final digest.
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verifier-7_qhulqz-round2",
+  "verdict": "accept",
+  "digest": "sha256:cea95e3b78a7d9d197636ade2f5e6c16757c5e1c13fe0ab93160691b324b09ec"
+}
+```
