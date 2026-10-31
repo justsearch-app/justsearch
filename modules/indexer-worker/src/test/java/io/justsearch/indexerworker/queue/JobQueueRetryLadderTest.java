@@ -396,7 +396,7 @@ final class JobQueueRetryLadderTest {
   }
 
   @Test
-  @DisplayName("the per-outcome observer is notified with the outcome class name")
+  // the per-outcome observer is notified with the outcome class name
   void outcomeObserverSeesTheOutcomeClass() throws Exception {
     Path file = tempDir.resolve("observed.txt");
     Files.writeString(file, "content");

@@ -42,7 +42,7 @@ final class SqlitePathResolutionStoreTest {
     if (jobQueue != null) jobQueue.close();
   }
 
-  @org.junit.jupiter.params.ParameterizedTest
+  @org.junit.jupiter.params.ParameterizedTest(name = "{displayName} [{index}] {arguments}")
   @org.junit.jupiter.params.provider.ValueSource(strings={"proj_a", "proj%a", "proj\\a"})
   void pruningUsesLiteralCaseSensitivePathBoundaries(String name) {
     String root = "/workspace/" + name;

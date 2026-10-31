@@ -1,5 +1,6 @@
 package io.justsearch.indexerworker.services;
 
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -38,7 +39,7 @@ final class WorkerScanOpsTest {
 
   @TempDir Path tempDir;
 
-  @org.junit.jupiter.params.ParameterizedTest
+  @org.junit.jupiter.params.ParameterizedTest(name = "{displayName} [{index}] {arguments}")
   @org.junit.jupiter.params.provider.ValueSource(ints={0,1,2})
   void maintenanceScanAcceptsNoopsAndReportsOnlyActualAdmissions(int changed) throws Exception {
     Path root=Files.createDirectories(tempDir.resolve("maintenance"));
@@ -46,8 +47,8 @@ final class WorkerScanOpsTest {
     JobQueue queue=org.mockito.Mockito.mock(JobQueue.class);
     org.mockito.Mockito.when(queue.enqueueMaintenanceScanEntries(org.mockito.ArgumentMatchers.anyList(),
         org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.any())).thenReturn(changed);
-    var progress=new WorkerScanOps(queue).scan(new WorkerScanOps.ScanRequest(root,null,
-        WorkerScanOps.ScanMode.INITIAL,List.of()), ignored -> {});
+    var progress=assertDoesNotThrow(() -> new WorkerScanOps(queue).scan(new WorkerScanOps.ScanRequest(root,null,
+        WorkerScanOps.ScanMode.INITIAL,List.of()), ignored -> {}));
     assertTrue(progress.getComplete());
     assertEquals("",progress.getTerminalReasonCode());
     assertEquals(changed,progress.getFilesAdmitted());

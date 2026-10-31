@@ -88,7 +88,7 @@ final class WorkerIngestServiceTest {
     }
   }
 
-  @org.junit.jupiter.params.ParameterizedTest
+  @org.junit.jupiter.params.ParameterizedTest(name = "{displayName} [{index}] {arguments}")
   @org.junit.jupiter.params.provider.ValueSource(strings={"pending", "retry", "recorded"})
   void cancelThroughServiceRecordsSkippedOutcomeAndStopsPendingWork(String kind) throws Exception {
     Path path = tempDir.resolve("cancel.txt");

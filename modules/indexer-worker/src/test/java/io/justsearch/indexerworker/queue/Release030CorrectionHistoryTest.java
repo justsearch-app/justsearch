@@ -48,7 +48,7 @@ final class Release030CorrectionHistoryTest {
         "test-file/"+hash,hash,Files.size(file),false);
   }
 
-  @org.junit.jupiter.params.ParameterizedTest
+  @org.junit.jupiter.params.ParameterizedTest(name = "{displayName} [{index}] {arguments}")
   @org.junit.jupiter.params.provider.ValueSource(booleans={false,true})
   void checkpointWriteBytesScaleLinearlyWithinAndAcrossCorrectionCalls(boolean batched) throws Exception {
     Path root=Files.createDirectories(temporary.resolve("linear"));

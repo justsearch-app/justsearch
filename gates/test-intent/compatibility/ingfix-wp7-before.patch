@@ -1,0 +1,13 @@
+diff --git a/modules/worker-core/src/main/java/io/justsearch/indexerworker/queue/JobQueue.java b/modules/worker-core/src/main/java/io/justsearch/indexerworker/queue/JobQueue.java
+--- a/modules/worker-core/src/main/java/io/justsearch/indexerworker/queue/JobQueue.java
++++ b/modules/worker-core/src/main/java/io/justsearch/indexerworker/queue/JobQueue.java
+@@ -786,6 +786,9 @@
+     throw new UnsupportedOperationException(
+         "Typed defer requires an outcome-aware queue implementation");
+   }
++
++  /** Compatibility signature only: the before-state has no authority invalidation hook. */
++  default void recordedClaimAuthorityChanged(String operationKey) {}
+ 
+   /**
+    * Recovers any jobs that were stuck in PROCESSING state (e.g., after a crash).
