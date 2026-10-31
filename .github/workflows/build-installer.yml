@@ -154,7 +154,7 @@ jobs:
       - name: Attest the candidate and all payloads
         if: steps.cached.outputs.exists != 'true'
         id: provenance
-        uses: actions/attest-build-provenance@v3
+        uses: actions/attest-build-provenance@v4
         with:
           subject-path: dist/candidate/*
       - name: Preserve provenance and checksum every asset
