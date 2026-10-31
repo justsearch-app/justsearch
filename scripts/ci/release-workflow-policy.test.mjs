@@ -11,6 +11,82 @@ const read = name => readFileSync(new URL(`../../${name}`, import.meta.url), 'ut
 const workflow = name => yaml.load(read(`.github/workflows/${name}.yml`));
 const privateSecret = /secrets(?:\.JUSTSEARCH_(?:CODESIGN_\w+|TAURI_UPDATER_PRIVATE_KEY\w*|RELEASE_METADATA_PRIVATE_KEY_PEM)|\[['"]JUSTSEARCH_(?:CODESIGN_\w+|TAURI_UPDATER_PRIVATE_KEY\w*|RELEASE_METADATA_PRIVATE_KEY_PEM)['"]\])/;
 
+for (const platform of ['linux', 'windows']) {
+  const name = `qualify-release-${platform}`;
+  const fetchJob = w => Object.entries(w.jobs).find(([, job]) => job.steps.some(s => /gh release (view|download)/.test(s.run)));
+
+  test(`${name}: only the draft fetch job has write access and cannot run candidate code`, () => {
+    const w = workflow(name);
+    const [id, job] = fetchJob(w);
+    assert.deepEqual(job.permissions, { contents: 'write' }, 'draft lookup needs push access');
+    assert.notEqual(id, 'journeys');
+    assert.deepEqual(w.permissions, {});
+    for (const [otherId, other] of Object.entries(w.jobs)) {
+      if (otherId !== id) assert.deepEqual(other.permissions, { contents: 'read' });
+    }
+    assert.deepEqual(job.steps.filter(s => s.uses).map(s => s.uses), ['actions/checkout@v4', 'actions/upload-artifact@v7']);
+    assert.equal(job.steps.find(s => s.uses?.startsWith('actions/checkout@')).with['persist-credentials'], false);
+    const runs = job.steps.filter(s => s.run);
+    assert.equal(runs.length, 2, 'only the hosted guard and fetch/verify may run with write access');
+    assert.match(runs[0].run, /RUNNER_ENVIRONMENT/);
+    const fetch = runs[1];
+    assert.match(fetch.run, /gh release view/);
+    assert.match(fetch.run, /gh release download/);
+    assert.match(fetch.run, /isDraft/);
+    assert.match(fetch.run, /server\.json\?ref=/);
+    assert.match(fetch.run, /verify_assets\(root/);
+    assert.doesNotMatch(fetch.run, /cargo |unittest|hosted\.py|windows-tools|sudo |npm /);
+    assert.equal(fetch.env.GH_TOKEN, '${{ github.token }}');
+  });
+
+  test(`${name}: journeys reverify transferred bytes before provisioning with a read-only token`, () => {
+    const w = workflow(name);
+    const [id, fetch] = fetchJob(w);
+    const job = w.jobs.journeys;
+    assert.deepEqual(job.permissions, { contents: 'read' });
+    assert.doesNotMatch(JSON.stringify(job.permissions), /write/);
+    assert.equal(job.needs, id);
+    const upload = fetch.steps.find(s => s.uses?.startsWith('actions/upload-artifact@'));
+    const downloadIndex = job.steps.findIndex(s => s.uses === 'actions/download-artifact@v8');
+    assert(downloadIndex >= 0, 'journeys must download the verified artifact');
+    const download = job.steps[downloadIndex];
+    assert.equal(download.with.name, upload.with.name);
+    assert.equal(download.with.path, '${{ runner.temp }}');
+    assert.deepEqual(upload.with.path.trim().split('\n'), [
+      '${{ runner.temp }}/release-assets/', '${{ runner.temp }}/server.json', '${{ runner.temp }}/draft.json',
+    ]);
+    assert.equal(upload.with['if-no-files-found'], 'error');
+    assert.equal(upload.with['retention-days'], 1);
+    const verifyIndex = job.steps.findIndex(s => /verify_assets\(root/.test(s.run));
+    const provisionIndex = job.steps.findIndex(s => s.name === 'Provision qualification tools');
+    assert(verifyIndex > downloadIndex && verifyIndex < provisionIndex, 'downloaded bytes must be verified before provisioning');
+    const packagePattern = platform === 'linux' ? '*.deb' : '*-setup.exe';
+    assert(job.steps[verifyIndex].run.includes(packagePattern));
+    assert.match(job.steps[verifyIndex].run, /justsearch-mcp\.mcpb/);
+    assert(!job.steps.some(s => /gh release (view|download)/.test(s.run)), 'journeys cannot fetch private drafts');
+  });
+
+  test(`${name}: failed or skipped draft fetch still records unavailable journeys`, () => {
+    const w = workflow(name);
+    const [id] = fetchJob(w);
+    const job = w.jobs.journeys;
+    assert.equal(job.if, 'always()');
+    const guardIndex = job.steps.findIndex(s => s.env?.FETCH_RESULT === `\${{ needs.${id}.result }}`);
+    const downloadIndex = job.steps.findIndex(s => s.uses?.startsWith('actions/download-artifact@'));
+    assert(guardIndex >= 0 && guardIndex < downloadIndex, 'fetch failure must stop candidate preparation');
+    assert.match(job.steps[guardIndex].run, /FETCH_RESULT/);
+    assert.match(job.steps[guardIndex].run, /success/);
+    const record = job.steps.find(s => s.run?.includes('preparation_failure('));
+    assert.equal(record.if, 'always()');
+    const upload = job.steps.at(-1);
+    assert.equal(upload.if, 'always()');
+    assert.equal(upload.with.name, `${platform}-release-journeys-\${{ inputs.tag }}`);
+    assert.equal(upload.with['retention-days'], 30);
+    assert.match(upload.with.path, /journey-evidence/);
+    assert.match(upload.with.path, /draft\.json/);
+  });
+}
+
 test('production secrets belong only to release-signing jobs; unsigned builds have no secret references', () => {
   for (const name of ['build-installer', 'build-installer-windows', 'build-installer-linux', 'sign-vendored-mirrors']) {
     const w = workflow(name);
