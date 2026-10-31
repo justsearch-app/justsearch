@@ -352,11 +352,10 @@ public final class CombinedEnrichmentBackfillOps {
       // Phase 0: Query pending docs. Uses caches from tight loop — first call queries all
       // pending IDs (no limit), subsequent calls pop from cache. Eliminates 4 Lucene queries
       // per iteration after the first (334 Phase 10).
-      boolean embedAvailable =
-          context.allowEmbeddingWritesSupplier().getAsBoolean()
-              && context.embeddingProviderSupplier().get() != null
-              && context.embeddingProviderSupplier().get().isAvailable();
-      boolean spladeAvailable = context.spladeEncoderSupplier().get() != null
+      EmbeddingProvider selectedEmbeddingProvider = context.embeddingProviderSupplier().get();
+      boolean embedAvailable = embeddingReady(context, selectedEmbeddingProvider);
+      boolean spladeConfigured = context.spladeEncoderSupplier().get() != null;
+      boolean spladeAvailable = spladeConfigured
           && context.spladeAllowedSupplier().getAsBoolean();
       boolean nerAvailable =
           context.nerServiceSupplier().get() != null
@@ -525,7 +524,8 @@ public final class CombinedEnrichmentBackfillOps {
             // max — never COMPLETED-without-data.
             Map<String, Object> updates = updatesByDocId.get(docId);
             if (embedAvailable && context.chunkVectorsEnabled()
-                && SchemaFields.EMBEDDING_STATUS_PENDING.equals(chunkEmbeddingStatus)) {
+                && SchemaFields.EMBEDDING_STATUS_PENDING.equals(chunkEmbeddingStatus)
+                && embeddingReady(context, selectedEmbeddingProvider)) {
               Map<String, Object> escalation =
                   EmbeddingBackfillOps.computeChunkEmbeddingFailureUpdate(
                       parseRetryCountOrZero(
@@ -1145,7 +1145,7 @@ public final class CombinedEnrichmentBackfillOps {
       // The write depends on preservation, so its deadline cannot discard an earned stage outcome.
       List<String> preservationIds = new ArrayList<>();
       for (String docId : pendingIds) {
-        if (completedSpladeIds.contains(docId)
+        if (spladeConfigured && completedSpladeIds.contains(docId)
             && !updatesByDocId.get(docId).isEmpty()) {
           preservationIds.add(docId);
         }

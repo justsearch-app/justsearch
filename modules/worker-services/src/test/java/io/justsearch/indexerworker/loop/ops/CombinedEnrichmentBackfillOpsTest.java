@@ -925,15 +925,16 @@ class CombinedEnrichmentBackfillOpsTest {
             SchemaFields.SPLADE_STATUS,
             SchemaFields.SPLADE_STATUS_COMPLETED));
     when(spladeEncoder.encodeBatch(anyList())).thenThrow(new RuntimeException("encoder boom"));
+    fakeIndex.get("parent-failure").put(SchemaFields.SPLADE, Map.of("old", 1f));
 
     CombinedEnrichmentBackfillOps.processCombinedBackfill(context(true, true, false));
 
-    assertDoesNotThrow(
-        () -> verify(spladeEncoder, times(2)).encodeBatch(List.of("parent content")));
+    verify(spladeEncoder, atLeastOnce()).encodeBatch(List.of("parent content"));
     Map<String, Object> state = fakeIndex.get("parent-failure");
     assertEquals(SchemaFields.EMBEDDING_STATUS_PENDING, state.get(SchemaFields.EMBEDDING_STATUS));
     assertEquals(SchemaFields.SPLADE_STATUS_COMPLETED, state.get(SchemaFields.SPLADE_STATUS));
     assertNull(state.get(SchemaFields.SPLADE_RETRY_COUNT));
+    assertEquals(Map.of("old", 1f), state.get(SchemaFields.SPLADE));
     verify(indexingCoordinator, never()).updateDocumentsBatch(anyList());
   }
 

@@ -361,6 +361,7 @@ public final class EmbeddingBackfillOps {
         try {
           String chunkContent = contentByChunkId.get(chunkId);
           if (chunkContent == null || chunkContent.isBlank()) {
+            if (checkInterrupt(context, embeddingProvider, "Chunk backfill")) break;
             context.log().warn("Chunk backfill: Content missing for {}", chunkId);
             markedFailed +=
                 batch.failure(chunkId, SchemaFields.CHUNK_EMBEDDING_RETRY_COUNT, EmbeddingBackfillOps::computeChunkEmbeddingFailureUpdate);
