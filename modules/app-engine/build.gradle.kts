@@ -99,7 +99,7 @@ testing {
         // test, and the field names it asserts on come from the schema module.
         implementation(testFixtures(project(":modules:worker-services")))
         implementation(project(":modules:indexing"))
-        implementation("org.junit.jupiter:junit-jupiter-params:5.14.3")
+        implementation("org.junit.jupiter:junit-jupiter-params:6.1.3")
 
         // Item A4's ForegroundLoadGateTest pins the gate's nine foreground operations against
         // ForegroundLoadInterceptor.foregroundMethods(), the live producer until item A9 deletes
