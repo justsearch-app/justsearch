@@ -1911,6 +1911,43 @@ final class StatusLifecycleHandler implements io.justsearch.app.api.StatusSnapsh
     return null;
   }
 
+  /** A successful encoder probe cannot erase unsuccessful applicable enrichment. */
+  private static String enrichmentDefectReason(
+      io.justsearch.app.api.status.EnrichmentProgressView enrichment) {
+    var chunk = enrichment.chunk();
+    if (enrichment.embeddingEnabled()
+            && (enrichment.embeddingFailedCount() > 0 || chunk.chunkEmbeddingFailedCount() > 0)
+        || enrichment.spladeEnabled() && enrichment.spladeFailedCount() > 0
+        || enrichment.nerEnabled() && enrichment.failedNerCount() > 0
+        || chunk.chunkSpladeEnabled() && chunk.chunkSpladeFailedCount() > 0) {
+      return LifecycleReasonCode.ENRICHMENT_FAILED.code();
+    }
+    boolean missing = false;
+    for (var stage : enrichment.completeness()) {
+      boolean applicable = switch (stage.stageId()) {
+        case "embed", "chunk_embed" -> enrichment.embeddingEnabled();
+        case "splade" -> enrichment.spladeEnabled();
+        case "ner" -> enrichment.nerEnabled();
+        case "chunk_splade" -> chunk.chunkSpladeEnabled();
+        default -> false;
+      };
+      if (!applicable) continue;
+      if (stage.failed() > 0) {
+        return LifecycleReasonCode.ENRICHMENT_FAILED.code();
+      }
+      long pending = switch (stage.stageId()) {
+        case "embed" -> enrichment.embeddingPendingCount();
+        case "chunk_embed" -> chunk.chunkEmbeddingPendingCount();
+        case "splade" -> enrichment.spladePendingCount();
+        case "ner" -> enrichment.pendingNerCount();
+        case "chunk_splade" -> chunk.chunkSpladePendingCount();
+        default -> -1;
+      };
+      missing |= pending == 0 && stage.missing() > 0;
+    }
+    return missing ? LifecycleReasonCode.ENRICHMENT_MISSING.code() : null;
+  }
+
   /** Unknown reads cannot certify completion, even when a different coverage read succeeded. */
   private static boolean enrichmentCountsUnknown(
       io.justsearch.app.api.status.EnrichmentProgressView enrichment) {
@@ -1964,6 +2001,7 @@ final class StatusLifecycleHandler implements io.justsearch.app.api.StatusSnapsh
         boolean indexModelMissing = LifecycleReasonCode.INDEX_MODEL_NOT_INSTALLED.code().equals(
             lifecycleSnapshot.components().encoders().reason_code());
         String denseUnavailableReason = denseUnavailableReason(workerView);
+        String enrichmentDefectReason = enrichmentDefectReason(workerView.enrichment());
         String state;
         String reason;
 
@@ -2014,6 +2052,9 @@ final class StatusLifecycleHandler implements io.justsearch.app.api.StatusSnapsh
           // below compatBlockedReason (a rebuild-fixable block is the more actionable cause).
           state = READINESS_DEGRADED;
           reason = denseUnavailableReason;
+        } else if (enrichmentDefectReason != null) {
+          state = READINESS_DEGRADED;
+          reason = enrichmentDefectReason;
         } else if (enrichmentCountsUnknown(workerView.enrichment())) {
           state = READINESS_UNKNOWN;
           reason = null;

@@ -112,6 +112,16 @@ const CAUSE_ROWS: ReadonlyArray<{
     remedy: { kind: 'operation', operationId: 'core.trigger-offline-processing' },
   },
   {
+    code: 'enrichment.failed',
+    wording: 'Some documents could not be enriched',
+    severity: 'warn',
+  },
+  {
+    code: 'enrichment.missing',
+    wording: 'Some documents are missing enrichment data',
+    severity: 'warn',
+  },
+  {
     code: 'chunk_embedding.not_ready',
     wording: 'Passage embeddings are not ready',
     remedy: { kind: 'operation', operationId: 'core.trigger-offline-processing' },
@@ -994,6 +1004,15 @@ export function readinessNotice(
       remedy: OPEN_HEALTH,
     };
   }
+  if (consequence !== 'retrieval-impaired' && consequence !== 'unknown' &&
+      (codes.includes('enrichment.failed') || codes.includes('enrichment.missing'))) {
+    return {
+      headline: 'Enrichment incomplete.',
+      body: 'Some documents have incomplete enrichment. Keyword search remains available.',
+      causes: wordCauses(codes, activity),
+      remedy: pickRemedy(codes),
+    };
+  }
   if (consequence === 'passage-reduced') {
     const passageCauses = codes.filter(isPassageReduced);
     return {
@@ -1069,7 +1088,7 @@ function pickRemedy(codes: readonly string[]): NoticeRemedy {
 /** Worker-derived readiness and migration observations share the indexing confirmation clock. */
 export function isIndexingObservation(code: string): boolean {
   return code.startsWith('index.') || code.startsWith('migration.') ||
-    code.startsWith('chunk_embedding.') || code.startsWith('encoders.health.') || code === 'encoders.reloading' ||
+    code.startsWith('enrichment.') || code.startsWith('chunk_embedding.') || code.startsWith('encoders.health.') || code === 'encoders.reloading' ||
     code === 'rebuilding' || code === 'generation-switch' || code === 'catching-up' ||
     code === 'inference.gpu_yielded_to_indexing' || code === 'inference.up_for_background';
 }

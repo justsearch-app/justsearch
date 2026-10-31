@@ -144,6 +144,10 @@ public final class LifecycleSnapshotTap {
     MAPPING_TABLE.put(
         new MappingKey(ReadinessDimension.INDEX_SERVING, "UNKNOWN", null),
         new ConditionMapping("embedding.readiness-unknown", "worker.enrichment", Severity.WARNING));
+    for (String reason : List.of("enrichment.failed", "enrichment.missing")) {
+      MAPPING_TABLE.put(new MappingKey(ReadinessDimension.INDEX_SERVING, "DEGRADED", reason),
+          new ConditionMapping("enrichment.incomplete", "worker.enrichment", Severity.WARNING));
+    }
     for (String reason : List.of("chunk_embedding.not_ready", "chunk_embedding.in_progress")) {
       MAPPING_TABLE.put(new MappingKey(ReadinessDimension.CHUNK_EMBEDDING, "DEGRADED", reason),
           new ConditionMapping("embedding.not-ready", "worker.chunk-embedding", Severity.WARNING));

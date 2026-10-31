@@ -160,7 +160,8 @@ final class WorkerStatusMapper {
                                 enrichment.getChunk().getSpladePendingCount(),
                                 enrichment.getChunk().getSpladeCoveragePercent(),
                                 enrichment.getChunk().getChunkingNotRequired(),
-                                enrichment.getChunk().getSpladeDocCount(),
+                                enrichment.getChunk().hasSpladeDocCount() ? enrichment.getChunk().getSpladeDocCount()
+                                    : enrichment.getChunk().getSpladeEnabled() ? -1 : 0,
                                 enrichment.getChunk().getSpladeFailedCount()))
                         .embeddingDocCount(enrichment.getEmbedding().getDocCount())
                         .embeddingCompletedCount(enrichment.getEmbedding().getCompletedCount())

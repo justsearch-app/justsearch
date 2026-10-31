@@ -21,6 +21,21 @@ import org.junit.jupiter.api.Test;
 final class WorkerStatusMapperTest {
 
   @Test
+  void olderWorkerCannotPublishAnAbsentApplicableSpladeTotalAsZero() {
+    var chunk = io.justsearch.ipc.ChunkCoverage.newBuilder().setDocCount(100)
+        .setSpladeEnabled(true).setSpladeCompletedCount(3).setSpladePendingCount(1);
+    var status = StatusResponse.newBuilder().setEnrichment(
+        EnrichmentCoverage.newBuilder().setChunk(chunk)).build();
+    assertEquals(-1, WorkerStatusMapper.toUiStatusMap(status).enrichment().chunk().chunkSpladeDocCount());
+    chunk.setSpladeDocCount(0).setSpladePendingCount(0);
+    status = status.toBuilder().setEnrichment(EnrichmentCoverage.newBuilder().setChunk(chunk)).build();
+    assertEquals(0, WorkerStatusMapper.toUiStatusMap(status).enrichment().chunk().chunkSpladeDocCount());
+    chunk.clearSpladeDocCount().setSpladeEnabled(false);
+    status = status.toBuilder().setEnrichment(EnrichmentCoverage.newBuilder().setChunk(chunk)).build();
+    assertEquals(0, WorkerStatusMapper.toUiStatusMap(status).enrichment().chunk().chunkSpladeDocCount());
+  }
+
+  @Test
   void unknownEnrichmentAndCountAgeReachTheStatusView() {
     var status = StatusResponse.newBuilder()
         .putCountObservations("active", io.justsearch.ipc.CountObservation.newBuilder()

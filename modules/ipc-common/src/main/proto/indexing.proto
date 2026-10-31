@@ -861,7 +861,7 @@ message ChunkCoverage {
   int64 splade_pending_count = 9;
   double splade_coverage_percent = 10;
   bool chunking_not_required = 11; // All live parents declare zero chunks for their current revision.
-  int64 splade_doc_count = 12; // Only chunks carrying splade_status.
+  optional int64 splade_doc_count = 12; // Only chunks carrying splade_status; absent on older workers.
   int64 splade_failed_count = 13;
   // Next available field number: 14
 }

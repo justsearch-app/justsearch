@@ -610,7 +610,8 @@ def test_readiness_poll_caps_request_and_sleep_to_remaining_deadline(monkeypatch
     assert len(sleeps) == 1 and clock[0] == 0.5
 
 
-@pytest.mark.parametrize("field", ["embeddingPendingCount", "spladePendingCount", "pendingNerCount", "chunkDocCount"])
+@pytest.mark.parametrize("field", ["embeddingPendingCount", "spladePendingCount", "pendingNerCount", "chunkDocCount",
+    "embeddingFailedCount", "spladeFailedCount", "failedNerCount", "chunkEmbeddingFailedCount"])
 def test_unknown_enrichment_cannot_qualify_as_pipeline_or_search_ready(field):
     snapshot = _pipeline_good_snapshot()
     snapshot[field] = -1
@@ -685,3 +686,50 @@ def test_count_provenance_is_preserved_as_a_map_through_the_real_status_flatten(
     assert snapshot["countObservations"] == readings
     assert "active" not in snapshot
     assert "index_count_stale(active)" in _check_index_idle_conditions(snapshot, 1)
+
+
+@pytest.mark.parametrize("total", [None, -1, 0, 4])
+def test_sparse_pending_work_blocks_both_gates_through_flatten(total):
+    enrichment = {"embeddingEnabled": False, "spladeEnabled": False, "nerEnabled": False,
+                  "chunk": {"chunkSpladeEnabled": True, "chunkDocCount": 100,
+                            "chunkSpladePendingCount": 1, "chunkSpladeCoveragePercent": 100}}
+    if total is not None:
+        enrichment["chunk"]["chunkSpladeDocCount"] = total
+    snapshot = flatten_status({**_good_snapshot(), "worker": {"enrichment": enrichment}})
+    assert "chunk_splade_not_complete" in _check_pipeline_complete_conditions(snapshot, -1)
+    assert "chunk_splade_not_complete" in _check_search_conditions(snapshot, False, False, False, "")
+
+
+def test_older_sparse_worker_retains_conservative_population_fallback():
+    snapshot = flatten_status({**_good_snapshot(), "worker": {"enrichment": {
+        "embeddingEnabled": False, "spladeEnabled": False, "nerEnabled": False,
+        "chunk": {"chunkSpladeEnabled": True, "chunkDocCount": 100,
+                  "chunkSpladePendingCount": 0, "chunkSpladeCoveragePercent": 75}}}})
+    assert "chunk_splade_not_complete" in _check_pipeline_complete_conditions(snapshot, -1)
+    assert "chunk_splade_not_complete" in _check_search_conditions(snapshot, False, False, False, "")
+
+
+@pytest.mark.parametrize("stage,field", [("embed", "embeddingFailedCount"),
+    ("splade", "spladeFailedCount"), ("ner", "failedNerCount"),
+    ("chunk_embed", "chunkEmbeddingFailedCount"), ("chunk_splade", "chunkSpladeFailedCount")])
+@pytest.mark.parametrize("defect", ["failed", "missing", "audit_failed"])
+def test_unsuccessful_work_blocks_both_gates_through_flatten(stage, field, defect):
+    enrichment = {"embeddingEnabled": True, "spladeEnabled": True, "nerEnabled": True,
+                  "completedNerCount": 1, "pendingNerCount": 0, "completenessKnown": True,
+                  "chunk": {"chunkDocCount": 10000, "chunkSpladeEnabled": True,
+                            "chunkSpladeDocCount": 10000, "chunkSpladeCoveragePercent": 100}}
+    if defect == "failed":
+        (enrichment["chunk"] if stage.startswith("chunk_") else enrichment)[field] = 1
+    else:
+        enrichment["completeness"] = [{"stageId": stage, "tier": "ARTIFACT", "expected": 10000,
+                                       "present": 9999, "missing": int(defect == "missing"),
+                                       "failed": int(defect == "audit_failed")}]
+    def flatten():
+        return flatten_status({**{k: v for k, v in _good_snapshot().items() if k != field},
+                               "worker": {"enrichment": enrichment}})
+    assert _check_pipeline_complete_conditions(flatten(), -1)
+    assert _check_search_conditions(flatten(), False, False, False, "")
+    enrichment.update(embeddingEnabled=False, spladeEnabled=False, nerEnabled=False)
+    enrichment["chunk"]["chunkSpladeEnabled"] = False
+    assert _check_pipeline_complete_conditions(flatten(), -1) == []
+    assert _check_search_conditions(flatten(), False, False, False, "") == []

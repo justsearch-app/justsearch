@@ -187,7 +187,9 @@ private static final Logger log = LoggerFactory.getLogger(WorkerStatusCache.clas
     // Tempdoc 931 §E item 8: chunk-SPLADE coverage (chunk documents only — the spladeCoveragePercent
     // below counts parents) plus the flag that says whether zero coverage means "off" or "behind".
     extras.put("chunkSpladeEnabled", s.getEnrichment().getChunk().getSpladeEnabled());
-    extras.put("chunkSpladeDocCount", s.getEnrichment().getChunk().getSpladeDocCount());
+    extras.put("chunkSpladeDocCount", s.getEnrichment().getChunk().hasSpladeDocCount()
+        ? s.getEnrichment().getChunk().getSpladeDocCount()
+        : s.getEnrichment().getChunk().getSpladeEnabled() ? -1L : 0L);
     extras.put("chunkSpladeFailedCount", s.getEnrichment().getChunk().getSpladeFailedCount());
     extras.put(
         "chunkSpladeCompletedCount", s.getEnrichment().getChunk().getSpladeCompletedCount());

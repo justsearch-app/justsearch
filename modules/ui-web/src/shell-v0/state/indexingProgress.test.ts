@@ -1194,3 +1194,15 @@ it.each(['unknown', 'stale'] as const)('does not infer zero passage work from a 
   status.worker!.enrichment!.chunk!.chunkingNotRequired = true;
   expect(selectIndexingPhase(status)).toBe('ready');
 });
+
+
+it.each([undefined, -1, 0])('shows older-worker chunk SPLADE backlog with total %s', total => {
+  const status = snapshot({ enrichment: { embeddingEnabled: false, spladeEnabled: false, nerEnabled: false,
+    chunk: { chunkSpladeEnabled: true, chunkSpladeDocCount: total,
+      chunkSpladeCompletedCount: 3, chunkSpladePendingCount: 1, chunkSpladeCoveragePercent: 75 },
+  } });
+  const progress = select(status, true);
+  expect(progress.phase).not.toBe('ready');
+  expect(progress.enrichingStages).toContainEqual({ id: 'chunkSplade', total: 4, pending: 1 });
+  expect(progress.activity.summary).not.toContain('fully searchable');
+});

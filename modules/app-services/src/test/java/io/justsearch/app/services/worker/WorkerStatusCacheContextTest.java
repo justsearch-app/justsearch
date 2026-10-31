@@ -22,6 +22,25 @@ import org.mockito.ArgumentCaptor;
 final class WorkerStatusCacheContextTest {
 
   @Test
+  void alternateStatusPreservesAnOlderWorkersAbsentSpladeTotal() {
+    try (var readyCapability = ReadyCapability.create()) {
+      KnowledgeClient client = mock(KnowledgeClient.class);
+      var chunk = io.justsearch.ipc.ChunkCoverage.newBuilder().setDocCount(100)
+          .setSpladeEnabled(true).setSpladeCompletedCount(3).setSpladePendingCount(1);
+      when(client.getStatus(org.mockito.ArgumentMatchers.any())).thenAnswer(invocation ->
+          StatusResponse.newBuilder().setEnrichment(
+              io.justsearch.ipc.EnrichmentCoverage.newBuilder().setChunk(chunk)).build());
+      var cache = new WorkerStatusCache(readyBootstrap(client));
+      cache.setWorkerCapability(readyCapability.view());
+      org.junit.jupiter.api.Assertions.assertEquals(-1L,
+          cache.status(TestEngineContexts.mcp()).extras().get("chunkSpladeDocCount"));
+      chunk.setSpladeDocCount(0).setSpladePendingCount(0);
+      org.junit.jupiter.api.Assertions.assertEquals(0L,
+          cache.status(TestEngineContexts.mcp()).extras().get("chunkSpladeDocCount"));
+    }
+  }
+
+  @Test
   void alternateStatusKeepsUnknownEnrichmentAndTheOriginalCountAge() {
     try (var readyCapability = ReadyCapability.create()) {
       KnowledgeClient client = mock(KnowledgeClient.class);

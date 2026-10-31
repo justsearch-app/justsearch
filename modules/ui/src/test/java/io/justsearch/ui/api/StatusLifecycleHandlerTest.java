@@ -517,6 +517,81 @@ final class StatusLifecycleHandlerTest {
   }
 
   @ParameterizedTest
+  @org.junit.jupiter.params.provider.CsvSource({
+      "embed,failed,false", "splade,failed,false", "ner,failed,false", "chunk_embed,failed,false",
+      "embed,missing,false", "splade,missing,false", "ner,missing,false", "chunk_embed,missing,false",
+      "embed,failed,true", "splade,failed,true", "ner,failed,true",
+      "embed,missing,true", "splade,missing,true", "ner,missing,true",
+      "embed,audit_failed,false", "splade,audit_failed,false", "ner,audit_failed,false"})
+  void unsuccessfulEnrichmentDegradesRetrievalThroughMapperAndHealth(
+      String stage, String defect, boolean zeroChunks) throws Exception {
+    var enrichment = io.justsearch.ipc.EnrichmentCoverage.newBuilder()
+        .setCompletenessKnown(true).setEmbeddingEnabled(true).setSpladeEnabled(true).setNerEnabled(true)
+        .setEmbedding(io.justsearch.ipc.FeatureCoverage.newBuilder()
+            .setDocCount(10000).setCompletedCount(10000).setCoveragePercent(100))
+        .setSplade(io.justsearch.ipc.FeatureCoverage.newBuilder()
+            .setDocCount(10000).setCompletedCount(10000).setCoveragePercent(100))
+        .setCompletedNerCount(10000)
+        .setChunk(io.justsearch.ipc.ChunkCoverage.newBuilder()
+            .setDocCount(zeroChunks ? 0 : 10000).setCompletedCount(zeroChunks ? 0 : 10000)
+            .setCoveragePercent(zeroChunks ? 0 : 100).setVectorsReady(!zeroChunks)
+            .setChunkingNotRequired(zeroChunks));
+    if (defect.equals("failed")) {
+      switch (stage) {
+        case "embed" -> enrichment.getEmbeddingBuilder().setFailedCount(1);
+        case "splade" -> enrichment.getSpladeBuilder().setFailedCount(1);
+        case "ner" -> enrichment.setFailedNerCount(1);
+        case "chunk_embed" -> enrichment.getChunkBuilder().setFailedCount(1);
+        default -> throw new AssertionError(stage);
+      }
+    } else {
+      enrichment.addCompleteness(io.justsearch.ipc.StageCompleteness.newBuilder()
+          .setStageId(stage).setTier("ARTIFACT").setExpected(10000).setPresent(9999)
+          .setMissing(defect.equals("missing") ? 1 : 0).setFailed(defect.equals("audit_failed") ? 1 : 0));
+    }
+    var mapper = Class.forName("io.justsearch.app.services.worker.WorkerStatusMapper")
+        .getDeclaredMethod("toUiStatusMap", io.justsearch.ipc.StatusResponse.class);
+    mapper.setAccessible(true);
+    var mapped = (WorkerOperationalView) mapper.invoke(null,
+        io.justsearch.ipc.StatusResponse.newBuilder().setEnrichment(enrichment).build());
+    var view = WorkerOperationalViewBuilder.builder(
+        compatWorkerView(CompatibilityStatusView.empty(), true)).enrichment(mapped.enrichment()).build();
+    var handler = newHandler();
+    var envelope = readinessEnvelope(handler, view, readyProjection(), freshContact(), false);
+    assertEquals("DEGRADED", envelope.components().get("indexServing").state());
+    assertEquals("DEGRADED", envelope.composites().get("retrieval").state());
+    assertTrue(envelope.composites().get("retrieval").reasonCodes().contains("enrichment." + (defect.equals("missing") ? "missing" : "failed")));
+    var conditions = new io.justsearch.app.observability.health.ConditionStore();
+    try (var executor = java.util.concurrent.Executors.newVirtualThreadPerTaskExecutor()) {
+      var tap = new io.justsearch.app.services.observability.health.LifecycleSnapshotTap(
+          conditions, new io.justsearch.app.observability.health.HealthEventChangeRegistry(executor),
+          io.justsearch.app.observability.health.Source.forProcess("head", "test", "1"),
+          java.time.Clock.systemUTC());
+      tap.accept(envelope);
+      assertTrue(conditions.find("enrichment.incomplete", "worker.enrichment").isPresent());
+      assertTrue(conditions.find("index.unavailable", "worker").isEmpty());
+      // Disabled stages and recovered stages must not leave a standing warning.
+      var recovered = WorkerOperationalViewBuilder.builder(view).enrichment(
+          EnrichmentProgressViewBuilder.builder(view.enrichment())
+              .embeddingEnabled(false).spladeEnabled(false).nerEnabled(false).build()).build();
+      var ready = readinessEnvelope(handler, recovered, readyProjection(), freshContact(), false);
+      assertEquals("READY", ready.composites().get("retrieval").state());
+      tap.accept(ready);
+      assertTrue(conditions.find("enrichment.incomplete", "worker.enrichment").isEmpty());
+      enrichment.getEmbeddingBuilder().setFailedCount(0);
+      enrichment.getSpladeBuilder().setFailedCount(0);
+      enrichment.getChunkBuilder().setFailedCount(0);
+      enrichment.setFailedNerCount(0).clearCompleteness();
+      var repaired = (WorkerOperationalView) mapper.invoke(null,
+          io.justsearch.ipc.StatusResponse.newBuilder().setEnrichment(enrichment).build());
+      ready = readinessEnvelope(handler,
+          WorkerOperationalViewBuilder.builder(view).enrichment(repaired.enrichment()).build(),
+          readyProjection(), freshContact(), false);
+      assertEquals("READY", ready.composites().get("retrieval").state());
+    }
+  }
+
+  @ParameterizedTest
   @org.junit.jupiter.params.provider.ValueSource(doubles = {0, 94, 95, 99.9, 99.99, 100})
   void incompleteVectorsHaveAHealthConditionRegardlessOfRetrievalEligibility(double coverage) throws Exception {
     var conditions = new io.justsearch.app.observability.health.ConditionStore();

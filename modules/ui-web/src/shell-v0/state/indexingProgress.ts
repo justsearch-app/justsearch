@@ -349,8 +349,8 @@ function readEnrichmentWork(status: StatusResponse | null | undefined): Enrichme
       count(chunk?.chunkEmbeddingPendingCount),
       applicable.embedding,
     ),
-    stage('chunkSplade', typeof chunk?.chunkSpladeDocCount === 'number' ? count(chunk.chunkSpladeDocCount)
-      : count(chunk?.chunkSpladeCompletedCount) + count(chunk?.chunkSpladePendingCount) + count(chunk?.chunkSpladeFailedCount),
+    stage('chunkSplade', Math.max(count(chunk?.chunkSpladeDocCount),
+      count(chunk?.chunkSpladeCompletedCount) + count(chunk?.chunkSpladePendingCount) + count(chunk?.chunkSpladeFailedCount)),
       count(chunk?.chunkSpladePendingCount), chunk?.chunkSpladeEnabled === true),
   ].filter((s): s is EnrichingStageRow => s !== null).map(row => {
     const stageId = row.id === 'embedding' ? 'embed' : row.id === 'chunkVectors' ? 'chunk_embed' : row.id;
