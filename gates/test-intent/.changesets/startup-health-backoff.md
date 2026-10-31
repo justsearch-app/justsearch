@@ -93,3 +93,16 @@ loads of 2.5-3.5 s. The dedicated 100 ms startup cap keeps later polls one short
 D6 (at most approximately 100 ms from llama-server's `main: model loaded` to JustSearch's
 `Server healthy`) is checked live by the orchestrator's verifier; the builder does not run
 real models or use the GPU. The 10 s progress-log interval remains unchanged.
+
+## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a192d5-8ef7-7981-990f-931fd69b033a",
+  "verdict": "accept",
+  "digest": "sha256:a180ffba66660bcab92d67885d4711c5aebb0ed0b7549613a9f9911cbd9a740a",
+  "note": "Startup-only expectations and execution evidence accepted; blind review order was missed and is disclosed."
+}
+```
