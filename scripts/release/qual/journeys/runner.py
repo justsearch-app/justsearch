@@ -145,7 +145,8 @@ def collect_hosted_crashes(out, since):
         (out / 'coredumps.json').write_text(json.dumps(entries, indent=2) + '\n')
         paths = subprocess.run(['dpkg-query', '-L', 'just-search'], capture_output=True, text=True)
         if paths.returncode not in (0, 1):
-            raise Infrastructure('Installed package paths unavailable for crash attribution')
+            # Attribution still uses package and process evidence without the paths.
+            collection_errors.append(Infrastructure('Installed package paths unavailable for crash attribution'))
         process_record = out / 'app-processes.json'
         processes = json.loads(process_record.read_text()) if process_record.exists() else []
         crashes = []

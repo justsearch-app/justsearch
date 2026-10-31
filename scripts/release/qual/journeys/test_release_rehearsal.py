@@ -216,6 +216,25 @@ console.log(JSON.stringify(fn(JSON.parse(process.argv[4]))));
                     self.assertIn('Hosted coredump collectors finished timed out after 60s', collection['reason'])
                     self.assertIn('coredumpctl.json', collection['evidence'])
 
+    def test_package_lookup_failure_keeps_packaged_product_crash(self):
+        entry = {'exe': '/opt/JustSearch', 'sig': 11, 'package': 'just-search'}
+        with tempfile.TemporaryDirectory() as temp:
+            out = Path(temp)
+            (out/'summary.json').write_text(json.dumps({'journeys': [], 'fullSelection': True}))
+            def command(args, **kw):
+                if 'coredumpctl' in args:
+                    return NS(returncode=0, stdout=json.dumps([entry]), stderr='')
+                return NS(returncode=2, stdout='', stderr='dpkg-query: database unavailable\n')
+            with patch.object(runner.subprocess, 'run', side_effect=command):
+                code = runner.collect_hosted_crashes(out, '2026-10-31T00:00:00Z')
+            report = json.loads((out/'summary.json').read_text())
+            self.assertEqual(code, 1)
+            self.assertEqual(report['counts']['failed-product'], 1)
+            self.assertEqual(report['counts']['failed-infrastructure'], 1)
+            checks = [c for j in report['journeys'] for c in j['checks']]
+            self.assertIn('package paths unavailable', next(
+                c for c in checks if c['status'] == 'failed-infrastructure')['reason'])
+
     def test_shutdown_captures_owned_identities_before_driver_retires_engine(self):
         run = Mock(wd=Mock(), facts={}, target=Mock())
         driver = run.wd
