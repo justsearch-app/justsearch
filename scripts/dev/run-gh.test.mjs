@@ -1,8 +1,8 @@
 /**
  * Tempdoc 743 second wave, P-K — unit tests for run-gh.mjs's pure logic.
  *
- * Covers: the cli/cli#7866 bitwise exit decode, the cli/cli#7401 "not registered yet"
- * detection, and gh-binary resolution. Live smoke tests (real `gh pr checks` against a
+ * Covers: publication waits, the cli/cli#7401 "not registered yet" detection,
+ * retired-mode refusal, and gh-binary resolution. Live smoke tests (real `gh pr checks` against a
  * merged/nonexistent PR) are run manually and reported separately — a unit test cannot
  * safely depend on live GitHub state or wall-clock polling.
  *
@@ -17,17 +17,14 @@ import os from 'node:os';
 import { spawnSync } from 'node:child_process';
 import { buildSquashMessagePreview } from '../ci/preview-squash-message.mjs';
 import {
-  decodeChecksExit,
   isUnregistered,
   resolveGhBin,
-  buildChecksArgs,
   classifyMergeSnapshot,
   classifyWorkflowRun,
   enqueuePullRequest,
   mergeWait,
   parseEnqueueArgs,
   parseValueFlag,
-  parseRequiredOnly,
   parseTimeoutSec,
   selectWorkflowRun,
   runWaitSha,
@@ -53,25 +50,40 @@ async function runAsync(label, fn) {
   }
 }
 
-// --- decodeChecksExit: the cli/cli#7866 bitwise contract ---
-run('exit 0 decodes to pass', () => {
-  assert.equal(decodeChecksExit(0), 'pass');
-});
-run('exit 1 (fail bit only) decodes to fail', () => {
-  assert.equal(decodeChecksExit(1), 'fail');
-});
-run('exit 8 (pending bit only) decodes to pending', () => {
-  assert.equal(decodeChecksExit(8), 'pending');
-});
-run('exit 9 (fail + pending bits) decodes to fail — fail bit is terminal', () => {
-  assert.equal(decodeChecksExit(9), 'fail');
-});
-run('exit 2 (neither bit) decodes to unknown', () => {
-  assert.equal(decodeChecksExit(2), 'unknown');
-});
-run('null status decodes to unknown', () => {
-  assert.equal(decodeChecksExit(null), 'unknown');
-});
+for (const args of [['7'], ['7', '--required-only', '--timeout-sec', '60'], []]) {
+  run(`C1 checks-wait refuses without calling gh: ${JSON.stringify(args)}`, () => {
+    const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'run-gh-retired-'));
+    const callsPath = path.join(directory, 'gh-calls');
+    const preload = `
+      import childProcess from 'node:child_process';
+      import fs from 'node:fs';
+      import { syncBuiltinESMExports } from 'node:module';
+      childProcess.spawn = childProcess.spawnSync = () => {
+        fs.appendFileSync(${JSON.stringify(callsPath)}, 'gh called\\n');
+        return { status: 0, stdout: 'required pass\\n', stderr: '' };
+      };
+      syncBuiltinESMExports();
+    `;
+    try {
+      const result = spawnSync(process.execPath, [
+        '--import', `data:text/javascript,${encodeURIComponent(preload)}`,
+        path.join(import.meta.dirname, 'run-gh.mjs'), 'checks-wait', ...args,
+      ], { encoding: 'utf8', timeout: 2000 });
+      assert.ifError(result.error);
+      assert.equal(fs.existsSync(callsPath), false, 'retired mode called gh');
+      assert.equal(result.signal, null);
+      assert.equal(result.status, 2);
+      assert.equal(result.stdout, '');
+      assert.equal(result.stderr.trimEnd().split('\n').length, 1);
+      assert.match(result.stderr, /checks-wait.*retired/);
+      assert.ok(result.stderr.includes('shepherd <n>'));
+      assert.match(result.stderr, /enqueue.*merge-wait/);
+      assert.ok(result.stderr.includes('run-wait-sha <head-sha> --workflow CI --branch <pr-branch> --event pull_request'));
+    } finally {
+      fs.rmSync(directory, { recursive: true, force: true });
+    }
+  });
+}
 
 // --- isUnregistered: the cli/cli#7401 pre-registration ambiguity ---
 run('exit 1 with "no checks reported" text is unregistered, not a failure', () => {
@@ -131,49 +143,17 @@ if (process.platform === 'win32' && fs.existsSync('F:\\scoop\\apps\\gh')) {
   });
 }
 
-// --- buildChecksArgs / parseRequiredOnly: 829 R1 required-only gating ---
-run('buildChecksArgs without requiredOnly omits --required (backward-compat)', () => {
-  assert.deepEqual(buildChecksArgs(443, false), ['pr', 'checks', '443']);
-});
-run('buildChecksArgs without requiredOnly arg (undefined) also omits --required', () => {
-  assert.deepEqual(buildChecksArgs(443), ['pr', 'checks', '443']);
-});
-run('buildChecksArgs with requiredOnly appends --required', () => {
-  assert.deepEqual(buildChecksArgs(443, true), ['pr', 'checks', '443', '--required']);
-});
-run('parseRequiredOnly detects --required-only and strips it from rest', () => {
-  const { requiredOnly, rest } = parseRequiredOnly(['443', '--required-only', '--timeout-sec', '60']);
-  assert.equal(requiredOnly, true);
-  assert.deepEqual(rest, ['443', '--timeout-sec', '60']);
-});
-run('parseRequiredOnly is false and rest is unchanged when flag absent', () => {
-  const { requiredOnly, rest } = parseRequiredOnly(['443', '--timeout-sec', '60']);
-  assert.equal(requiredOnly, false);
-  assert.deepEqual(rest, ['443', '--timeout-sec', '60']);
-});
-
 // --- parseTimeoutSec: --timeout-sec with a missing/non-numeric value must not swallow the
 // following flag (review fix, PR #445) ---
 run('parseTimeoutSec with --timeout-sec immediately followed by another flag keeps default and does not eat the next token', () => {
-  const { timeoutSec, rest } = parseTimeoutSec(['445', '--timeout-sec', '--required-only']);
+  const { timeoutSec, rest } = parseTimeoutSec(['445', '--timeout-sec', '--repo']);
   assert.equal(timeoutSec, 1800);
-  assert.deepEqual(rest, ['445', '--required-only']);
-});
-run('full checks-wait argv with a valueless --timeout-sec still yields requiredOnly=true and default timeout', () => {
-  const { timeoutSec, rest: afterTimeout } = parseTimeoutSec([
-    '445',
-    '--timeout-sec',
-    '--required-only',
-  ]);
-  const { requiredOnly, rest } = parseRequiredOnly(afterTimeout);
-  assert.equal(timeoutSec, 1800);
-  assert.equal(requiredOnly, true);
-  assert.deepEqual(rest, ['445']);
+  assert.deepEqual(rest, ['445', '--repo']);
 });
 run('parseTimeoutSec with a valid numeric value still parses normally', () => {
-  const { timeoutSec, rest } = parseTimeoutSec(['445', '--timeout-sec', '60', '--required-only']);
+  const { timeoutSec, rest } = parseTimeoutSec(['445', '--timeout-sec', '60', '--repo']);
   assert.equal(timeoutSec, 60);
-  assert.deepEqual(rest, ['445', '--required-only']);
+  assert.deepEqual(rest, ['445', '--repo']);
 });
 
 // --- publication transition waits ---
@@ -495,7 +475,7 @@ for (const status of [0, 1, 8, 9]) run(`M11 JSON buckets decide independently of
   const row = requiredRow('PENDING', 'pending');
   assert.deepEqual(runGh.parseRequiredChecksResult({ status, stdout: JSON.stringify([row]) }), { value: [row] });
 });
-run('M11 explicit unregistered message is pending, preserving checks-wait heuristic', () => {
+run('M11 explicit unregistered message is pending', () => {
   assert.deepEqual(runGh.parseRequiredChecksResult({ status: 1, stderr: "no required checks reported on the 'branch' branch" }), { value: [] });
 });
 await runAsync('M12 identical polls emit once and changed check counts emit a transition', async () => {
