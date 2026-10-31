@@ -789,7 +789,29 @@ public final class WorkerIngestService {
           return BufferedDeleteReplay.UNCERTAIN;
         }
       }
-      var verdict = io.justsearch.indexerworker.loop.SourcePresence.classify(file, root, rootWitness);
+      // #910: a receipt records its own root volume; replay need not have a ledger record too.
+      io.justsearch.indexerworker.loop.SourcePresence.RootCheck deletionProof =
+          deletion.rootIdentity() == null ? rootWitness
+              : new io.justsearch.indexerworker.loop.SourcePresence.RootCheck() {
+                @Override
+                public boolean vouches(Path folder) {
+                  if (!io.justsearch.adapters.lucene.runtime.PathPresence.isReadableDirectory(folder)) {
+                    return false;
+                  }
+                  try {
+                    RootIdentity current = RootIdentity.capture(folder);
+                    return current.volume() != null && current.matchesReceipt(deletion.rootIdentity());
+                  } catch (IOException unavailable) {
+                    return false;
+                  }
+                }
+
+                @Override
+                public boolean admits(Path folder) {
+                  return rootWitness.admits(folder);
+                }
+              };
+      var verdict = io.justsearch.indexerworker.loop.SourcePresence.classify(file, root, deletionProof);
       if (verdict == io.justsearch.indexerworker.loop.SourcePresence.Verdict.PRESENT) {
         if (deletion.origin() == io.justsearch.indexerworker.queue.SwitchBufferDelete.Origin.LEGACY) {
           log.warn("Legacy buffered DELETE skipped because its source exists: {}", file);
@@ -798,7 +820,7 @@ public final class WorkerIngestService {
         // A nonregular replacement queues retirement of the indexed file, so present-file
         // admission alone cannot authorize it when deletion evidence is unavailable.
         if (!Files.isRegularFile(file, java.nio.file.LinkOption.NOFOLLOW_LINKS)
-            && (!rootWitness.vouches(root)
+            && (!deletionProof.vouches(root)
                 || io.justsearch.adapters.lucene.runtime.PathPresence.absentBeneathListableFolder(
                     file, root, null) == io.justsearch.adapters.lucene.runtime.PathPresence.UNKNOWN)) {
           return BufferedDeleteReplay.UNCERTAIN;
@@ -830,7 +852,8 @@ public final class WorkerIngestService {
         return jobQueue.enqueueReappearedFile(entry, collection)
             ? BufferedDeleteReplay.SETTLED : BufferedDeleteReplay.FAILED;
       }
-      return confirmedAbsent(deletion.path(), root)
+      return io.justsearch.indexerworker.loop.SourcePresence.classify(file, root, deletionProof)
+              == io.justsearch.indexerworker.loop.SourcePresence.Verdict.ABSENT
           ? BufferedDeleteReplay.SETTLED : BufferedDeleteReplay.FAILED;
     });
   }
