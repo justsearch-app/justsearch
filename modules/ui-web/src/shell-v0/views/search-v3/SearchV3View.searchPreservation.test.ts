@@ -27,6 +27,16 @@ async function mount(): Promise<SearchV3View> {
   document.body.append(view); await settle(view); return view;
 }
 const searches = () => http.mock.calls.filter(call => String(call[0]).includes('/api/knowledge/search'));
+function runSearch(view: SearchV3View, action: string): void {
+  if (action === 'Enter') emit(view, 'sv3-composer-submit', { tier: 'search', query: 'current draft' });
+  if (action === 'typing') emit(view, 'sv3-composer-draft', { previous: 'previous draft', text: 'current draft' });
+  if (action === 'palette') view.shadowRoot!.querySelector('jf-sv3-palette')!.dispatchEvent(
+    new CustomEvent('sv3-palette-run', { detail: { id: 'cmd-everything' } }));
+}
+function prepareAsk(view: SearchV3View, action: 'card' | 'chosen'): void {
+  if (action === 'card') emit(view, 'card-scope-file', { path: '/chosen.txt' });
+  else emit(view, 'sv3-results-ask');
+}
 async function card(view: SearchV3View): Promise<ResultsCard> {
   const main = view.shadowRoot!.querySelector('jf-sv3-main')!;
   await main.updateComplete;
@@ -42,15 +52,20 @@ async function refuseStorage(fault: 'write' | 'stale' | 'readback', run: () => P
     Object.getOwnPropertyDescriptor(storage, 'getItem') ?? { configurable: true, value: get },
     Object.getOwnPropertyDescriptor(storage, 'setItem') ?? { configurable: true, value: set },
   ];
-  let written = false;
+  let written = false, interceptions = 0;
   if (fault === 'stale') set(key, 'another owner keeps these bytes');
   Object.defineProperty(storage, 'setItem', { configurable: true, value: (candidate: string, value: string) => {
-    if (candidate === key && fault === 'write') throw new Error('storage refused');
+    if (candidate === key && fault === 'write') { interceptions++; throw new Error('storage refused'); }
     set(candidate, value); if (candidate === key) written = true;
   } });
-  Object.defineProperty(storage, 'getItem', { configurable: true, value: (candidate: string) =>
-    candidate === key && written && fault === 'readback' ? 'unconfirmed readback' : get(candidate) });
-  try { await run(); } finally {
+  Object.defineProperty(storage, 'getItem', { configurable: true, value: (candidate: string) => {
+    if (candidate === key && (fault === 'stale' || (written && fault === 'readback'))) {
+      interceptions++;
+      if (fault === 'readback') return 'unconfirmed readback';
+    }
+    return get(candidate);
+  } });
+  try { await run(); expect(interceptions).toBe(1); } finally {
     ['getItem', 'setItem'].forEach((name, i) => {
       Object.defineProperty(storage, name, descriptors[i]!);
     });
@@ -81,20 +96,25 @@ it.each(['Enter', 'typing', 'palette'].flatMap(action =>
     const view = await mount(); composer(view).draft = 'current draft'; await settle(view);
     const place = view.sessions.activeId;
     await refuseStorage(fault, async () => {
-      if (action === 'Enter') emit(view, 'sv3-composer-submit', { tier: 'search', query: 'current draft' });
-      if (action === 'typing') emit(view, 'sv3-composer-draft', { previous: 'previous draft', text: 'current draft' });
-      if (action === 'palette') view.shadowRoot!.querySelector('jf-sv3-palette')!.dispatchEvent(
-        new CustomEvent('sv3-palette-run', { detail: { id: 'cmd-everything' } }));
+      runSearch(view, action);
       await settle(view); await new Promise(resolve => setTimeout(resolve, 230));
-      expect(view.sessions.activeId).toBe(place);
-      expect(composer(view).draft).toBe('current draft');
-      expect(view.shadowRoot!.querySelector('jf-sv3-main')!.shadowRoot!.querySelector('jf-sv3-results')).toBeNull();
-      expect(searches()).toHaveLength(0);
-      expect(http.mock.calls.filter(call => String(call[0]).includes('/dispatch'))).toHaveLength(0);
-      if (fault === 'stale') expect(sessionStorage.getItem(key)).toBe('another owner keeps these bytes');
     });
+    expect(view.sessions.activeId).toBe(place);
+    expect(composer(view).draft).toBe('current draft');
+    expect(view.shadowRoot!.querySelector('jf-sv3-main')!.shadowRoot!.querySelector('jf-sv3-results')).toBeNull();
+    expect(searches()).toHaveLength(0);
+    expect(http.mock.calls.filter(call => String(call[0]).includes('/dispatch'))).toHaveLength(0);
+    if (fault === 'stale') expect(sessionStorage.getItem(key)).toBe('another owner keeps these bytes');
   });
 
+it.each(['Enter', 'typing', 'palette'])('%s searches when attachment storage is writable', async action => {
+  const view = await mount(); composer(view).draft = 'current draft'; await settle(view);
+  runSearch(view, action);
+  await settle(view); await new Promise(resolve => setTimeout(resolve, 230));
+  expect(searches()).toHaveLength(1);
+  expect((await card(view)).snapshot!.results).toHaveLength(1);
+  expect(composer(view).draft).toBe('current draft');
+});
 
 it.each(['Enter', 'typing'] as const)('entering results from %s refuses a failed second attachment acknowledgement', async action => {
   const view = await mount(); composer(view).draft = 'current draft'; await settle(view);
@@ -107,8 +127,7 @@ it.each(['Enter', 'typing'] as const)('entering results from %s refuses a failed
     set(candidate, value);
   } });
   try {
-    if (action === 'Enter') emit(view, 'sv3-composer-submit', { tier: 'search', query: 'current draft' });
-    else emit(view, 'sv3-composer-draft', { previous: 'previous draft', text: 'current draft' });
+    runSearch(view, action);
     await settle(view); await new Promise(resolve => setTimeout(resolve, 230));
     expect(attempts).toBe(2);
     expect(JSON.parse(storage.getItem(key)!).payload.drafts[0]).toMatchObject({ place, text: 'current draft' });
@@ -123,13 +142,22 @@ it.each(['card', 'chosen'] as const)('preparing %s-file Ask keeps Search prepara
   emit(view, 'sv3-composer-submit', { tier: 'search', query: 'find files' }); await settle(view);
   emit(view, 'card-selection', { ids: ['chosen'] }); await settle(view);
   await refuseStorage('write', async () => {
-    if (action === 'card') emit(view, 'card-scope-file', { path: '/chosen.txt' });
-    else emit(view, 'sv3-results-ask');
+    prepareAsk(view, action);
     await settle(view);
-    expect(composer(view).tier).toBe('search'); expect(composer(view).scopeLabel).toBe('');
-    expect(composer(view).draft).toBe('find files');
-    expect(http.mock.calls.filter(call => String(call[0]).includes('/dispatch'))).toHaveLength(0);
   });
+  expect(composer(view).tier).toBe('search'); expect(composer(view).scopeLabel).toBe('');
+  expect(composer(view).draft).toBe('find files');
+  expect(http.mock.calls.filter(call => String(call[0]).includes('/dispatch'))).toHaveLength(0);
+});
+
+it.each(['card', 'chosen'] as const)('preparing %s-file Ask succeeds when attachment storage is writable', async action => {
+  const view = await mount(); composer(view).draft = 'find files';
+  emit(view, 'sv3-composer-submit', { tier: 'search', query: 'find files' }); await settle(view);
+  emit(view, 'card-selection', { ids: ['chosen'] }); await settle(view);
+  prepareAsk(view, action); await settle(view);
+  expect(composer(view).tier).toBe('ask'); expect(composer(view).scopeLabel).toBe('chosen.txt');
+  expect(composer(view).draft).toBe('find files');
+  expect(http.mock.calls.filter(call => String(call[0]).includes('/dispatch'))).toHaveLength(0);
 });
 
 it('blank palette Search changes preparation without submitting', async () => {

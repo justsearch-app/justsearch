@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
   },
-  "createdAt": "2026-10-31T07:54:37.766Z",
-  "revision": "f88714bfaf92ee04b4fa3adfe1e3febb4c89f895",
-  "tree": "94b23de1505a78f42dd26aea760de3cf96307c77",
+  "createdAt": "2026-10-31T09:12:51.783Z",
+  "revision": "c732647cf0937f594ff50aa08cb9eea018a8d342",
+  "tree": "b98c6c7173d1c334509797a78a29352cadca645a",
   "environment": {
     "platform": "linux",
     "arch": "x64",
@@ -18,10 +18,10 @@
   },
   "runs": [
     {
-      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/search-v3/SearchV3View.searchPreservation.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/e4fkw1rd/tmp/test-intent-vitest-3-1793433271488.json\"",
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/search-v3/SearchV3View.searchPreservation.test.ts\" \"src/shell-v0/views/search-v3/Sv3ComposerPort.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/5yd8_7ek/tmp/test-intent-vitest-3-1793437964365.json\"",
       "cwd": "modules/ui-web",
       "exitCode": 0,
-      "durationMs": 6275
+      "durationMs": 7412
     }
   ],
   "checks": [
@@ -29,7 +29,7 @@
       "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchPreservation.test.ts",
       "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchPreservation.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:79cb50f3861d2b1e7418d29ea02c77c6ae9d00305dd1b4c695fdb4df2a2fac53",
+      "contentDigest": "sha256:9993250b4dca05544a16a79da9806236d9cf33afc23b4d75e08aa1ebbb0a8a14",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -71,6 +71,18 @@
           "status": "passed"
         },
         {
+          "name": "Enter searches when attachment storage is writable",
+          "status": "passed"
+        },
+        {
+          "name": "typing searches when attachment storage is writable",
+          "status": "passed"
+        },
+        {
+          "name": "palette searches when attachment storage is writable",
+          "status": "passed"
+        },
+        {
           "name": "entering results from Enter refuses a failed second attachment acknowledgement",
           "status": "passed"
         },
@@ -84,6 +96,14 @@
         },
         {
           "name": "preparing chosen-file Ask keeps Search preparation when storage refuses",
+          "status": "passed"
+        },
+        {
+          "name": "preparing card-file Ask succeeds when attachment storage is writable",
+          "status": "passed"
+        },
+        {
+          "name": "preparing chosen-file Ask succeeds when attachment storage is writable",
           "status": "passed"
         },
         {
@@ -115,8 +135,35 @@
           "status": "passed"
         }
       ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/Sv3ComposerPort.test.ts",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/Sv3ComposerPort.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:e1cd3dde1760795274445383605dfb714bce50bc8610e2a1488f951968fdc0d4",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "composer element binding readMounted ignores a pending pre-render seed and follows the mounted composer draft",
+          "status": "passed"
+        },
+        {
+          "name": "composer element binding CP4 a replacement element with equal text and draftVersion makes the old capture stale",
+          "status": "passed"
+        },
+        {
+          "name": "composer element binding CP4 reconnecting the same unedited element reuses its port and restores capture validity",
+          "status": "passed"
+        },
+        {
+          "name": "composer element binding CP8 a pre-render capture can clear only as a no-op on the pending seed and becomes stale on first render",
+          "status": "passed"
+        }
+      ]
     }
   ],
   "failBefore": null,
-  "digest": "sha256:9c0dfa7bd551790b14b7e0115469a4945c18cea5faeb4c8d9c21644f91483ad6"
+  "digest": "sha256:d163aba764a9747c8b4d09a7b246c4f47f72bdc2d9e648d743a6f4091164c1bb"
 }

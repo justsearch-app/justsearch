@@ -6,6 +6,24 @@ import { Sv3ComposerPort } from './Sv3ComposerPort.js';
 afterEach(() => { document.body.replaceChildren(); });
 
 describe('composer element binding', () => {
+  it('readMounted ignores a pending pre-render seed and follows the mounted composer draft', async () => {
+    let current: Sv3Composer | null = null;
+    const adapter = new Sv3ComposerPort(() => current);
+    adapter.replace('pending seed');
+    expect(adapter.read()).toBe('pending seed');
+    expect(adapter.readMounted()).toBe('');
+
+    current = new Sv3Composer();
+    document.body.append(current);
+    await current.updateComplete;
+    current.draft = 'mounted draft';
+    expect(adapter.readMounted()).toBe('mounted draft');
+    adapter.flushSeed();
+    expect(adapter.readMounted()).toBe('pending seed');
+    current.draft = 'reader edit';
+    expect(adapter.readMounted()).toBe('reader edit');
+  });
+
   it('CP4 a replacement element with equal text and draftVersion makes the old capture stale', async () => {
     const original = new Sv3Composer();
     original.draft = 'A';
