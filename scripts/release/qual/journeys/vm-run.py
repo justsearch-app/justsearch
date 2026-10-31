@@ -232,9 +232,11 @@ with tarfile.open(fileobj=sys.stdout.buffer,mode='w|') as archive:
                         row['fields'][key] = value.strip()
                 fields.append(row)
         # Resolve attribution while the original reports are still present.
+        collection_errors = []
         installed = vm.ssh('ubuntu', 'dpkg-query -L just-search', capture_output=True, text=True, timeout=30)
         if installed.returncode not in (0, 1):
-            raise Infrastructure('Installed package paths unavailable for crash attribution; reports retained in place')
+            # Package and process evidence can still identify a product crash.
+            collection_errors.append(Infrastructure('Installed package paths unavailable for crash attribution'))
         paths = set(installed.stdout.splitlines()) if installed.returncode == 0 else set()
         process_record = out / ('evidence' if (out / 'evidence').is_dir() else 'run') / 'app-processes.json'
         processes = json.loads(process_record.read_text()) if process_record.exists() else []
@@ -251,7 +253,11 @@ with tarfile.open(fileobj=sys.stdout.buffer,mode='w|') as archive:
                       + shlex.join('/var/crash/' + n for n in names) + ' ' + shlex.quote(recorded) + '/')
         product = [r for r in fields if r['attribution'] == 'product']
         if product:
-            raise AssertionError('Product crash in guest: ' + json.dumps(product))
+            failure = AssertionError('Product crash in guest: ' + json.dumps(product))
+            failure.collection_errors = collection_errors
+            raise failure
+        if collection_errors:
+            raise collection_errors[0]
 
 
 def record_unattributed_crashes(report, out):
@@ -421,7 +427,11 @@ def run_overlay(args, out, phase, journeys, snapshot=None, seal=False):
         if isinstance(exc, AssertionError):
             report['journeys'][0]['checks'][0].update(status='failed-product',
                 evidence=['../guest-crashes.json', '../guest-crashes.tar'])
-            report.update(summarize(report['journeys'], report.get('fullSelection', False)))
+        for error in getattr(exc, 'collection_errors', []):
+            report['journeys'].append({'id': 'guest-crashes', 'checks': [{
+                'name': 'collection', 'status': 'failed-infrastructure', 'reason': str(error),
+                'evidence': ['../guest-crashes.json', '../guest-crashes.tar']}]})
+        report.update(summarize(report['journeys'], report.get('fullSelection', False)))
         (out / 'summary.json').write_text(json.dumps(report, indent=2) + '\n')
         (out / 'wrapper-error.txt').write_text(repr(exc) + '\n')
         return 1
@@ -431,10 +441,11 @@ def run_overlay(args, out, phase, journeys, snapshot=None, seal=False):
                 crash_evidence(out)
             except Exception as exc:
                 report = json.loads((out / 'summary.json').read_text())
-                report['journeys'].append({'id': 'guest-crashes', 'checks': [{
-                    'name': 'guest-crashes', 'status': 'failed-product' if isinstance(exc, AssertionError)
-                    else 'failed-infrastructure', 'reason': str(exc),
-                    'evidence': ['../guest-crashes.json', '../guest-crashes.tar']}]})
+                for error in [exc, *getattr(exc, 'collection_errors', [])]:
+                    report['journeys'].append({'id': 'guest-crashes', 'checks': [{
+                        'name': 'guest-crashes', 'status': 'failed-product' if isinstance(error, AssertionError)
+                        else 'failed-infrastructure', 'reason': str(error),
+                        'evidence': ['../guest-crashes.json', '../guest-crashes.tar']}]})
                 report.update(summarize(report['journeys'], report.get('fullSelection', False)))
                 (out / 'summary.json').write_text(json.dumps(report, indent=2) + '\n')
             report = json.loads((out / 'summary.json').read_text())
