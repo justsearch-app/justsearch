@@ -1401,3 +1401,16 @@ The following durable checks received selection naming or assertion wrappers:
 - Tests added or rewritten: `SearchableDocCountReaderSelectionTest.java` — S-D112 / S-D130 — durable; method display descriptions moved to comments.
 
 Production code was not edited. All assignment changes remain uncommitted.
+
+## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a19329-329e-7762-af25-4fb4620080ca",
+  "verdict": "accept",
+  "digest": "sha256:a2c11be01fbc4cdfd95d9153e660f65a84fa564c5179f07f08b5c5214b7c5da0",
+  "note": "Independent verifier (codex gpt-6.1-sol) on 1c2b6a0bfd: entries 1-24 accepted; JVM repair checks fail before on the compatible overlay and pass on the candidate; frontend 52 named repair failures before, 434/434 after; preservation controls pass on both. Accepts the test oracles and evidence; product verdict recorded separately."
+}
+```
