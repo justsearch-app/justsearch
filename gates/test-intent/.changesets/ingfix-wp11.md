@@ -1414,3 +1414,14 @@ Production code was not edited. All assignment changes remain uncommitted.
   "note": "Independent verifier (codex gpt-6.1-sol) on 1c2b6a0bfd: entries 1-24 accepted; JVM repair checks fail before on the compatible overlay and pass on the candidate; frontend 52 named repair failures before, 434/434 after; preservation controls pass on both. Accepts the test oracles and evidence; product verdict recorded separately."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "orchestrator",
+  "session": "36cedc77-c806-45bd-af3b-93bd126c9108",
+  "verdict": "accept",
+  "digest": "sha256:ad67f8a01c096b0e4c90708b3858eca68ba1e018c6c1afdf2e493a1f7006d673",
+  "note": "Carries verifier 01a19329-329e-7762-af25-4fb4620080ca's acceptance across merging main ca446cc085: main's #1075 changed flagged readinessNotice.test.ts (surface lookup only); evidence re-run on the merged tree, 73/73 pass, 73 assertion fail-before vs ca446cc085 with the same compat patch and overlays; entries unchanged."
+}
+```
