@@ -192,7 +192,7 @@ export class Sv3AskDomain {
   async runAsk(rawQuestion: string, scope: Sv3AskScope | null = null, schema?: string, modelAnswer = false,
     options: { task?: HumanTask; continuation?: boolean; turnAction?: boolean; record?: string; authored?: string } = {}): Promise<void> {
     let question = rawQuestion.trim();
-    if (question === '' || this.streaming) return;
+    if (question === '' || this.streaming || this.activeSession?.turns.some(turn => turn.status === 'unfinished')) return;
     if (!options.task && !options.turnAction && !this.draftDomain.draftMayIssue(false)) return;
     const handoff = options.task ? { shapeId: options.task.saved.shape, selection: options.task.selection }
       : modelAnswer ? null : this.draftDomain.preparedHandoff;

@@ -72,6 +72,24 @@ export class Sv3ContextDomain {
 
   constructor(private readonly host: ContextHost, private readonly transport: ContextTransport) {}
 
+  get unfinishedConversation(): boolean {
+    return this.activeSession?.turns.some(turn => turn.status === 'unfinished') === true;
+  }
+
+  private retainedAttempt(): { target: string; key: string } | null {
+    const retained = this.host.retainedAttempt?.();
+    if (retained) return retained;
+    const session = this.activeSession;
+    const unfinished = session?.turns.filter(turn => turn.status === 'unfinished') ?? [];
+    return session && unfinished.length > 0
+      ? { target: session.id, key: JSON.stringify(['unfinished', session.id, unfinished.map(turn => turn.recordId ?? turn.id)]) }
+      : null;
+  }
+
+  get checkingSavedOutcome(): boolean {
+    return this.retainedCheck !== null && Date.now() < this.retainedCheck.until;
+  }
+
   get recordNotice(): boolean { return this.recordNoticeValue; }
   set recordNotice(value: boolean) {
     if (this.recordNoticeValue === value) return;
@@ -132,11 +150,11 @@ export class Sv3ContextDomain {
    */
   async refreshRecord(conversationId: string, automatic = false): Promise<boolean> {
     if (!this.host.connected() || this.forgotten.has(conversationId)) return false;
-    if (!automatic && this.host.retainedAttempt?.()?.target === conversationId) this.checkRetainedAttempt(true);
+    if (!automatic && this.retainedAttempt()?.target === conversationId) this.checkRetainedAttempt(true);
     this.recordReads.get(conversationId)?.controller.abort();
     const abort = new AbortController();
     let failed = false;
-    const watching = this.host.retainedAttempt?.()?.target === conversationId;
+    const watching = this.retainedAttempt()?.target === conversationId;
     const wait = this.host.recordReadWait(conversationId) ?? (watching ? 10000 : undefined);
     // Race the signal as well as passing it to fetch: a stalled/abort-ignoring transport must not
     // hold the checker forever. Its eventual response has no authority after this read retires.
@@ -174,7 +192,7 @@ export class Sv3ContextDomain {
 
   /** Only read records. A finite budget never changes delivery state or grants sending authority. */
   checkRetainedAttempt(rearm = false): void {
-    const attempt = this.host.retainedAttempt?.();
+    const attempt = this.retainedAttempt();
     if (!this.host.connected() || !attempt || this.forgotten.has(attempt.target)) {
       this.clearRetainedTimer(); this.retainedCheck = null; return;
     }
@@ -189,7 +207,7 @@ export class Sv3ContextDomain {
     this.retainedTimer = setTimeout(() => {
       this.retainedTimer = null;
       const pending = this.retainedCheck;
-      if (!pending || this.host.retainedAttempt?.()?.key !== pending.key) { this.checkRetainedAttempt(); return; }
+      if (!pending || this.retainedAttempt()?.key !== pending.key) { this.checkRetainedAttempt(); return; }
       if (Date.now() >= pending.until) { this.host.requestUpdate(); return; }
       // An opening/manual read already in flight gets its bounded wait; ticks never supersede it.
       if (this.recordReads.has(pending.target)) { this.checkRetainedAttempt(); return; }
@@ -295,6 +313,7 @@ export class Sv3ContextDomain {
   runContextAction(detail: Sv3ContextAction): Promise<void> {
     const session = this.activeSession;
     if (session === null) return Promise.resolve();
+    if (detail.action !== 'inspect' && session.turns.some(turn => turn.status === 'unfinished')) return Promise.resolve();
     if (detail.action === 'inspect') {
       this.host.openContextInspector();
       return Promise.resolve();
@@ -438,6 +457,7 @@ export class Sv3ContextDomain {
   }
 
   followUpContextOf(sessionId: string): ReturnType<typeof sv3FollowUpContext> | null {
+    if (this.host.session(sessionId)?.turns.some(turn => turn.status === 'unfinished')) return null;
     const session = this.host.session(sessionId);
     if (session?.history == null) return null;
     return sv3FollowUpContext(session.turns, projectSv3TurnContexts(session.turns, session.history), session.history);

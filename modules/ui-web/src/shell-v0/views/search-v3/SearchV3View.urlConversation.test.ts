@@ -302,7 +302,7 @@ describe('a popstate landing on the hero writes no history (F1)', () => {
 });
 
 /** New is a completed departure only after all existing owners acknowledge it. */
-describe('New retirement at the public boundary', () => {
+describe('New retention at the public boundary', () => {
   const rawKey = 'justsearch.draft.search-v3.composer';
   const pointerKey = 'justsearch.lastViewedConversation.v1';
   let el: Mounted;
@@ -416,7 +416,8 @@ describe('New retirement at the public boundary', () => {
       expect(readLastViewedConversation()).toBe('conv-a'); expect(getConversationListState().activeId).toBe('conv-a');
       const notice = el.shadowRoot!.querySelector('[data-testid="sv3-residency-notice"]')?.textContent ?? '';
       if (phase === 'before-write') { expect(get(key)).toBe(before); expect(notice).not.toContain('Partial'); }
-      else { expect(get(key)).not.toBe(before); expect(notice).toMatch(/Partial, unconfirmed retirement/); expect(notice).toMatch(/saved settings may already have been retired/); }
+      else { expect(get(key)).not.toBe(before); expect(notice).toMatch(/New was not confirmed/); expect(notice).toMatch(/could not be read back/);
+        expect(JSON.parse(get(key)!).payload.drafts).toEqual(expect.arrayContaining([expect.objectContaining({ place: 'conv-a', text: phase === 'schema-only' ? '' : 'current prepared B' })])); }
       expect(localStorage.getItem(rawKey)).toBe(phase === 'schema-only' ? null : 'current prepared B');
     } finally {
       Object.defineProperty(sessionStorage, 'getItem', getDescriptor ?? { configurable: true, writable: true, value: get });
@@ -445,8 +446,8 @@ describe('New retirement at the public boundary', () => {
       Object.defineProperty(sessionStorage, 'setItem', { configurable: true, writable: true, value: (candidate: string, value: string) => { set(candidate, value); if (candidate === key) applied = true; } });
       Object.defineProperty(sessionStorage, 'getItem', { configurable: true, writable: true, value: (candidate: string) => { if (candidate === key && applied) throw new DOMException('owned ACK read failure', 'SecurityError'); return get(candidate); } });
       newButton().click(); await settle(el);
-      const partial = [...el.shadowRoot!.querySelectorAll('[role="alert"]')].find(n => n.textContent?.includes('Partial, unconfirmed retirement'))?.textContent;
-      expect(partial).toContain('saved settings may already have been retired');
+      const partial = [...el.shadowRoot!.querySelectorAll('[role="alert"]')].find(n => n.textContent?.includes('New was not confirmed'))?.textContent;
+      expect(partial).toContain('could not be read back');
       expect(field().value).toBe('current prepared B');
       restore(); restoreActiveConversation('conv-a'); await settle(el);
       expect(el.shadowRoot!.querySelector('[data-testid="sv3-departure-notice"]')).toBeNull();

@@ -7,7 +7,7 @@ it.each(['core.rag-ask', 'core.free-chat'])('an unanswered saved %s question sta
     occurredAt: '2026-10-19T00:00:00Z', kind: 'USER_MESSAGE', originator: 'user',
     content: 'Keep my question when the Engine is lost', attributes: { shapeId } }]);
   expect(turn?.question).toBe('Keep my question when the Engine is lost');
-  expect(turn?.status).toBe('failed');
-  expect(turn?.detail).toMatch(/no answer.*saved|unfinished|interrupted/i);
+  expect(turn?.status).toBe('unfinished');
+  expect(turn?.detail).toMatch(/no saved outcome|still.*written/i);
   expect(turn?.answer).toBe('');
 });

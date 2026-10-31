@@ -119,8 +119,8 @@ describe('WP4.2b record classification (NE1, NE3, NE4, NE8, F2)', () => {
   });
   it('an unanswered saved model question is unfinished, never completed empty (F2)', () => {
     const [turn] = projectSv3RecordTurns([{ ...records({})[0]!, attributes: { shapeId: 'core.free-chat' } }]);
-    expect(turn?.kind).toBe('model'); expect(turn?.status).toBe('failed');
-    expect(turn?.detail).toMatch(/no answer.*saved|unfinished|interrupted/i);
+    expect(turn?.kind).toBe('model'); expect(turn?.status).toBe('unfinished');
+    expect(turn?.detail).toMatch(/no saved outcome|still.*written/i);
   });
 });
 

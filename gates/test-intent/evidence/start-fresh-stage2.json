@@ -1,0 +1,143 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
+  },
+  "createdAt": "2026-10-31T16:36:45.176Z",
+  "revision": "6ececc210f0ecb01d40cdd2488e911748d325e8a",
+  "tree": "d8f156329440105e659fec87bfc1d1090424ed67",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/search-v3/SearchV3View.startFresh.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/9z8mojsb/tmp/test-intent-vitest-65-1793464594749.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 4979
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.startFresh.test.ts",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.startFresh.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:37fdef9d65c25cb61ff05742868565cb3cba8894a25e6ae3197d7a250fcf4e23",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "New preserves the old live Ask and its draft while fresh input stays isolated",
+          "status": "passed"
+        },
+        {
+          "name": "New retains ask preparation with empty input and restores it only in its old conversation",
+          "status": "passed"
+        },
+        {
+          "name": "New retains structured preparation with empty input and restores it only in its old conversation",
+          "status": "passed"
+        },
+        {
+          "name": "an unanswered saved core.rag-ask remains unfinished and checks for the saved outcome without issuing",
+          "status": "passed"
+        },
+        {
+          "name": "an unanswered saved core.free-chat remains unfinished and checks for the saved outcome without issuing",
+          "status": "passed"
+        },
+        {
+          "name": "an unanswered saved core.summarize remains unfinished and checks for the saved outcome without issuing",
+          "status": "passed"
+        },
+        {
+          "name": "New then immediate reload keeps the draft at its owner, with lifecycle flush=false",
+          "status": "passed"
+        },
+        {
+          "name": "New then immediate reload keeps the draft at its owner, with lifecycle flush=true",
+          "status": "passed"
+        },
+        {
+          "name": "New retains two owned drafts and refuses the third without eviction",
+          "status": "passed"
+        },
+        {
+          "name": "two immediate New presses and another on the hero never duplicate the owned draft",
+          "status": "passed"
+        },
+        {
+          "name": "return before completion merges the saved dispatch into one authoritative live turn",
+          "status": "passed"
+        },
+        {
+          "name": "unfinished saved outcome checking exhausts its budget truthfully and Check again rearms it",
+          "status": "passed"
+        },
+        {
+          "name": "New keeps Model preparation at its owner and returns with Model selected",
+          "status": "passed"
+        },
+        {
+          "name": "New preserves a schema-only draft without consuming an empty hero recovery slot",
+          "status": "passed"
+        },
+        {
+          "name": "unfinished snapshots reject Retry, branch and context writes while preserving authored input",
+          "status": "passed"
+        },
+        {
+          "name": "New abandons a pending context send even after returning to its owner=false",
+          "status": "passed"
+        },
+        {
+          "name": "New abandons a pending context send even after returning to its owner=true",
+          "status": "passed"
+        },
+        {
+          "name": "New retains authored results work as a reviewable results proposal: query",
+          "status": "passed"
+        },
+        {
+          "name": "New retains authored results work as a reviewable results proposal: chosen-files",
+          "status": "passed"
+        },
+        {
+          "name": "New retains authored results work as a reviewable results proposal: schema",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "6ececc210f",
+    "revision": "6ececc210f0ecb01d40cdd2488e911748d325e8a",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/search-v3/SearchV3View.startFresh.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/9z8mojsb/tmp/test-intent-vitest-65-1793464601701.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 3015,
+        "output": "JSON report written to /home/elias/.cache/am/9z8mojsb/tmp/test-intent-vitest-65-1793464601701.json\n\n"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.startFresh.test.ts",
+        "classification": "assertion",
+        "detail": "New preserves the old live Ask and its draft while fresh input stays isolated:  AssertionError: expected '\\n      \\n      \\n      \\n      \\n   …' to contain 'Request in progress'\n    at /home/elias/.cache/am/9z8mojsb/tmp/test-intent-before-wVLo6T/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.startFresh.test.ts:105:38\n    at file:///home/elias/.cache/am/9z8mojsb/tmp/t | New retains ask preparation with empty input and restores it only in its old conversation:  AssertionError: expected "
+      }
+    ]
+  },
+  "digest": "sha256:80dd22261c4fa7cafc7d99c18b512e497798a6e8708fb182d9a554bc54b411ee"
+}

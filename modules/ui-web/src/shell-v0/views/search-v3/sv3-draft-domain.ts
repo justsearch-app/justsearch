@@ -276,7 +276,7 @@ export class Sv3DraftDomain {
   }
 
   /** ACK the next current snapshot before replacement/retirement; never grow a third slot. */
-  persistDraft(next: Sv3RecoveryDraft, keepCurrent = false, leaving?: Sv3RecoveryDraft, retired?: Sv3RecoveryDraft): boolean {
+  persistDraft(next: Sv3RecoveryDraft, keepCurrent = false, leaving?: Sv3RecoveryDraft, retired?: Sv3RecoveryDraft, freshConversation = false): boolean {
     if (!this.recoveryOpened) this.openRecovery();
     const draft = this.composer.snapshot();
     const revision = this.preparationRevision, place = this.humanPlace(), text = this.composer.read();
@@ -289,7 +289,7 @@ export class Sv3DraftDomain {
         && !drafts.some(d => this.sameDraft(d, snapshot))) drafts.push(snapshot);
     }
     const payload: Sv3Recovery = { version: 3, task: previous.task, drafts };
-    if (!this.saveRecoveryPayload(payload)) return false;
+    if (!this.saveRecoveryPayload(payload, freshConversation)) return false;
     if (!this.host.connected() || !draft.port.isCurrent(draft)
       || this.preparationRevision !== revision || this.humanPlace() !== place || this.composer.read() !== text) {
       this.recoveryError = 'The draft or its settings changed while recovery was being saved. Current text is kept; review again.';
@@ -370,7 +370,7 @@ export class Sv3DraftDomain {
       ? text.replaceAll(`\n\nRanking trace:\n${selection.summary}`, '') : text;
   }
 
-  private recoveryPayload(task = this.humanTask): Sv3Recovery {
+  private recoveryPayload(task = this.humanTask, omitEmptyHero = false): Sv3Recovery {
     const place = this.humanPlace();
     const drafts: Sv3RecoveryDraft[] = [{ place,
       text: this.recoveryText(this.composer.read(), task?.selection ?? this.preparedHandoff?.selection),
@@ -387,17 +387,20 @@ export class Sv3DraftDomain {
       const snapshot = { ...draft, preparation: draft.preparation ?? null };
       if (this.draftHasInputs(snapshot) && !drafts.some(d => this.sameDraft(d, snapshot))) drafts.push(snapshot);
     }
-    return { version: 3, task: task?.saved ?? null, drafts };
+    return { version: 3, task: task?.saved ?? null,
+      drafts: omitEmptyHero && place === null && !this.draftHasInputs(drafts[0]!) ? drafts.slice(1) : drafts };
   }
 
-  private saveRecoveryPayload(payload: Sv3Recovery): boolean {
+  private saveRecoveryPayload(payload: Sv3Recovery, omitEmptyHero = true): boolean {
     this.recoveryWriteUnconfirmed = false;
     // The live payload keeps the current composer first, even when it is empty.
-    // Returning to that place needs no third persisted slot beside two retained inputs.
+    // An empty fresh composer reloads from the cleared raw slot, not the attachment.
+    // Traversal still budgets its empty hero snapshot before accepting a departure.
+    // Returning to an empty conversation needs no third slot beside two retained inputs.
     // Keep the live ordering so callers still retain every companion after this ACK.
     const current = payload.drafts[0];
-    if (payload.drafts.length > 2 && current?.place != null && current.place !== RESULTS_PLACE
-      && !this.draftHasInputs(current)) {
+    if (current && !this.draftHasInputs(current)
+      && (omitEmptyHero && current.place === null || payload.drafts.length > 2 && current.place !== null && current.place !== RESULTS_PLACE)) {
       payload = { ...payload, drafts: payload.drafts.slice(1) };
     }
     const drafts = payload.drafts;
@@ -427,7 +430,7 @@ export class Sv3DraftDomain {
   saveRecovery(task = this.humanTask): boolean {
     if (!this.recoveryOpened) return false;
     const payload = this.recoveryPayload(task);
-    if (!this.saveRecoveryPayload(payload)) return false;
+    if (!this.saveRecoveryPayload(payload, true)) return false;
     this.recoveryDraftsValue = payload.drafts.slice(1);
     return true;
   }
@@ -438,7 +441,7 @@ export class Sv3DraftDomain {
     const supported = ['core.rag-ask', 'core.free-chat', 'core.extract', 'core.summarize'];
     const owner = this.host.shapeId() && supported.includes(this.host.shapeId()!) ? this.host.shapeId() : 'main';
     const payload = this.draftPersistence.openSessionAttachment(`search-v3.${owner}`, isSv3Recovery,
-      () => this.recoveryPayload(), () => {
+      () => this.recoveryPayload(this.humanTask, true), () => {
         this.recoveryError ||= 'Recovery could not be saved safely. Keep or copy your text and settings before leaving. No new question will be sent.';
         this.host.requestUpdate();
       });
@@ -453,7 +456,10 @@ export class Sv3DraftDomain {
     const current = payload.drafts[0];
     if (current !== undefined && current.place === this.humanPlace()) {
       const hadRaw = this.composer.read() !== '';
-      if (!this.mountHasIncoming && (this.composer.read() || this.draftHasInputs(current))) {
+      // Current-format null-place copies are proposals. After New the cleared raw slot
+      // alone supplies the fresh composer; keep older format adoption compatible.
+      const retainedHero = current.place === null && !hadRaw && payload.version === 3;
+      if (!this.mountHasIncoming && !retainedHero && (this.composer.read() || this.draftHasInputs(current))) {
         this.markDraftReview(current.preparation ?? null);
         if (!hadRaw) {
           this.reviewConfigured = current.preparation != null;
@@ -462,7 +468,7 @@ export class Sv3DraftDomain {
       }
       // A typed snapshot remains a separate proposal even when an old raw writer returned
       // to identical bytes. Only a person's review can apply it to the current text.
-      if (this.draftHasInputs(current) && (hadRaw && current.preparation != null || current.text !== this.composer.read() || this.mountHasIncoming)
+      if (this.draftHasInputs(current) && (retainedHero || hadRaw && current.preparation != null || current.text !== this.composer.read() || this.mountHasIncoming)
         && !this.recoveryDrafts.some(d => this.sameDraft(d, current))) this.recoveryDraftsValue.push(current);
     } else if (current !== undefined && this.draftHasInputs(current)) {
       if (!this.recoveryDrafts.some(d => this.sameDraft(d, current))) this.recoveryDraftsValue.push(current);
@@ -1017,7 +1023,7 @@ export class Sv3DraftDomain {
   get schemaDraft(): string { return this.schemaDraftValue; }
 
   /**
-   * The STATE half of a new session, without the focus move — the form a DISCARD reaches it in.
+   * Start a fresh conversation after acknowledging the leaving work and clearing the reload pointer.
    *
    * After a discard the sidebar owns where the keyboard goes: the successor's row button, falling
    * back to the new-session control when nothing survives (`Sv3Sidebar.placeFocusAfterDiscard`,
@@ -1028,7 +1034,7 @@ export class Sv3DraftDomain {
    * INDICATOR instead, which is a later PR's presentation work.
    */
   startFreshSession(): void {
-    if (!this.resetToHero(true)) return;
+    if (!this.resetToHero(true, this.humanPlace() !== null, true)) return;
     // New conversation means "do not restore the one I just left" (tempdoc 609 Phase 3).
     this.host.setActiveConversation(null);
     this.departureBlocked = false;
@@ -1038,7 +1044,8 @@ export class Sv3DraftDomain {
 
   /**
    * The hero teardown without clearing the composer's unsent draft or making a claim.
-   * Explicit New/navigation callers clear the draft; confirmed deletion only retires the transcript.
+   * Explicit New/navigation callers clear the visible composer; confirmed deletion retires the transcript.
+   * Only explicit New keeps the old conversation's live Ask; traversal and deletion keep their rules.
    * Tempdoc 864 PR C — the claim split matters more than it looks.
    *
    * {@link startFreshSession} is the reader STARTING a new session, so it claims: it writes the
@@ -1054,23 +1061,23 @@ export class Sv3DraftDomain {
    * listener only after its dynamic import) and the `isCurrentUrl` downgrade. Neither is a
    * guarantee, so the fix is to not make the write at all.
    */
-  resetToHero(clearDraft = false, retainLeaving = false): boolean {
+  resetToHero(clearDraft = false, retainLeaving = false, freshConversation = false): boolean {
     this.host.leaveForgetPlacement();
     this.host.abortRemovalConfirmation();
     this.revokeHumanTask(true);
     const preparation = clearDraft ? { kind: 'search' as const } : this.currentPreparation();
     const text = clearDraft ? '' : this.composer.read();
     const leaving = this.humanPlace();
-    if (!this.persistDraft({ place: null, text: this.recoveryText(text), preparation }, retainLeaving)) {
-      if (clearDraft && !retainLeaving) {
+    if (!this.persistDraft({ place: null, text: this.recoveryText(text), preparation }, retainLeaving, undefined, undefined, freshConversation)) {
+      if (clearDraft && (!retainLeaving || freshConversation)) {
         this.recoveryError = this.recoveryWriteUnconfirmed
-          ? 'Partial, unconfirmed retirement: New could not be confirmed. This draft’s saved settings may already have been retired and exact settings may not survive closing or reloading. Current text and settings are still visible here; raw draft and reload pointer have not been retired. Keep or copy current text and settings before leaving.'
+          ? 'New was not confirmed: saved recovery could not be read back. Current text and settings are still visible here; raw draft and reload pointer have not been retired. Keep or copy current text and settings before leaving.'
           : `New was not confirmed. ${this.recoveryError || 'Recovery could not be acknowledged. Current text and settings are kept here.'}`;
         this.host.revealRecoveryOutcome();
       }
       return false;
     }
-    if (clearDraft && !retainLeaving
+    if (clearDraft && (!retainLeaving || freshConversation)
       && (!this.draftPersistence.retireRawDraft() || !this.host.clearLastViewed())) {
       // Independent stores are not transactional: keep the live owner and its recoverable proposal.
       this.saveRecovery();
@@ -1089,7 +1096,7 @@ export class Sv3DraftDomain {
     }
     this.preparedHandoff = null;
     this.handoffNotice = ''; this.handoffBlocked = false;
-    this.host.abortAsk();
+    if (!freshConversation) this.host.abortAsk();
     this.clearRetiredHandoff();
     // DETACHED, not halted (Slice 516 FIX-T1's rule, applied to the run half). A delegated run is
     // hosted by the product-wide controller and may be watched elsewhere, so this window stops

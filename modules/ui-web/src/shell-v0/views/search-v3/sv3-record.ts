@@ -559,7 +559,7 @@ export function projectSv3RecordTurns(events: readonly ThreadEvent[]): readonly 
     // Extract records hold accepted output only; an empty terminal is no successful result.
     const missingStructuredResult = turn.declaredShapeId === 'core.extract'
       && turn.answers.every(answer => answer === '');
-    const unfinished = !agent && (model || turn.declaredShapeId === 'core.rag-ask')
+    const unfinished = !agent && (model || turn.declaredShapeId === 'core.rag-ask' || turn.declaredShapeId === 'core.summarize')
       && turn.openedByUser && turn.answers.length === 0 && !turn.errored && !turn.noEvidence;
     return {
       id: turn.id,
@@ -605,11 +605,13 @@ export function projectSv3RecordTurns(events: readonly ThreadEvent[]): readonly 
         ? 'halted'
         : turn.noEvidence
           ? 'no-evidence'
-          : turn.errored || unfinished || missingStructuredResult
+          : unfinished
+          ? 'unfinished'
+          : turn.errored || missingStructuredResult
           ? 'failed'
           : 'complete',
       evidence,
-      detail: missingStructuredResult && !turn.errored ? 'No result was returned.' : unfinished ? 'No answer was saved. This attempt may be unfinished or interrupted; you can try again.' : turn.errorDetail,
+      detail: missingStructuredResult && !turn.errored ? 'No result was returned.' : unfinished ? 'No saved outcome yet. This answer may still be being written.' : turn.errorDetail,
       toolCalls: turn.tools,
       // An ASK turn's whole response is its answer text, which the transcript already renders through
       // the shared markdown block — handing it a one-item activity list would mean two ways to draw

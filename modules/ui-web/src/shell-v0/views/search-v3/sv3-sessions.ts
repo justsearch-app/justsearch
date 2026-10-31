@@ -103,7 +103,7 @@ export interface Sv3TurnEvidence {
  * be worded as a failure, and `refused` is the session lock declining the send — neither of them is
  * an answer that went wrong (tempdoc 822 Phase F1; the terminals `sv3-ask.ts` reports).
  */
-export type Sv3TurnStatus = 'streaming' | 'complete' | 'halted' | 'refused' | 'failed' | 'no-evidence';
+export type Sv3TurnStatus = 'streaming' | 'unfinished' | 'complete' | 'halted' | 'refused' | 'failed' | 'no-evidence';
 
 /**
  * Which tier produced the turn (tempdoc 822 Phase F2). A `model` turn is free chat without retrieval.

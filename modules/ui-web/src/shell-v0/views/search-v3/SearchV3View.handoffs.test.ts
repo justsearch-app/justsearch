@@ -776,7 +776,7 @@ it.each(['live', 'review'])('DS1 bare history restoration cannot retire %s B whe
 });
 
 
-it('DS1 one-slot automatic hero navigation retains B at its origin while explicit New retires current B', async () => {
+it('DS1 one-slot automatic hero navigation retains B at its origin while explicit New retains current B', async () => {
   const view = await mount(); await navigate({ conversationId: 'previous' }); await drain(view);
   const input = q<HTMLTextAreaElement>(await composer(view), 'sv3-composer-input')!;
   input.value = 'origin B'; input.dispatchEvent(new Event('input')); await drain(view);
@@ -789,7 +789,7 @@ it('DS1 one-slot automatic hero navigation retains B at its origin while explici
   sidebar.dispatchEvent(new CustomEvent('sv3-session-select', { bubbles: true, composed: true, detail: { id: 'previous' } })); await drain(view);
   expect(input.value).toBe('origin B');
   sidebar.dispatchEvent(new CustomEvent('sv3-session-new', { bubbles: true, composed: true })); await drain(view);
-  expect(input.value).toBe(''); expect(sessionStorage.getItem(key)).not.toContain('origin B');
+  expect(input.value).toBe(''); expect(sessionStorage.getItem(key)).toContain('origin B');
   sidebar.dispatchEvent(new CustomEvent('sv3-session-select', { bubbles: true, composed: true, detail: { id: 'previous' } })); await drain(view);
-  expect(input.value).toBe(''); expect(dispatches()).toHaveLength(0);
+  expect(input.value).toBe('origin B'); expect(dispatches()).toHaveLength(0);
 });
