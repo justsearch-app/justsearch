@@ -47,6 +47,7 @@ import {
   SEARCH_UNAVAILABLE_CAVEAT,
   MODEL_UNAVAILABLE_CAVEAT,
   PASSAGE_REDUCED_CAVEAT,
+  ENRICHMENT_INCOMPLETE_CAVEAT,
   OPTIONAL_CAPABILITY_CAVEAT,
   AI_UNAVAILABLE_CAVEAT,
   OPEN_HEALTH,
@@ -194,6 +195,8 @@ export function projectAvailability(
             ? SEARCH_UNAVAILABLE_CAVEAT
             : consequence === 'model-unavailable'
             ? MODEL_UNAVAILABLE_CAVEAT
+            : consequence === 'enrichment-incomplete'
+            ? ENRICHMENT_INCOMPLETE_CAVEAT
             : consequence === 'passage-reduced'
             ? PASSAGE_REDUCED_CAVEAT
             : consequence === 'ai-unavailable'

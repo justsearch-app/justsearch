@@ -716,7 +716,8 @@ def test_older_sparse_worker_retains_conservative_population_fallback():
 def test_unsuccessful_work_blocks_both_gates_through_flatten(stage, field, defect):
     enrichment = {"embeddingEnabled": True, "spladeEnabled": True, "nerEnabled": True,
                   "completedNerCount": 1, "pendingNerCount": 0, "completenessKnown": True,
-                  "chunk": {"chunkDocCount": 10000, "chunkSpladeEnabled": True,
+                  "chunk": {"chunkDocCount": 10000, "chunkVectorCoveragePercent": 100,
+                            "chunkSpladeEnabled": True,
                             "chunkSpladeDocCount": 10000, "chunkSpladeCoveragePercent": 100}}
     if defect == "failed":
         (enrichment["chunk"] if stage.startswith("chunk_") else enrichment)[field] = 1
@@ -727,9 +728,18 @@ def test_unsuccessful_work_blocks_both_gates_through_flatten(stage, field, defec
     def flatten():
         return flatten_status({**{k: v for k, v in _good_snapshot().items() if k != field},
                                "worker": {"enrichment": enrichment}})
-    assert _check_pipeline_complete_conditions(flatten(), -1)
-    assert _check_search_conditions(flatten(), False, False, False, "")
+    reason = f"enrichment_{'missing' if defect == 'missing' else 'failed'}({stage})"
+    assert _check_pipeline_complete_conditions(flatten(), -1) == [reason]
+    assert _check_search_conditions(flatten(), False, False, False, "") == [reason]
     enrichment.update(embeddingEnabled=False, spladeEnabled=False, nerEnabled=False)
     enrichment["chunk"]["chunkSpladeEnabled"] = False
+    assert _check_pipeline_complete_conditions(flatten(), -1) == []
+    assert _check_search_conditions(flatten(), False, False, False, "") == []
+    enrichment.update(embeddingEnabled=True, spladeEnabled=True, nerEnabled=True)
+    enrichment["chunk"]["chunkSpladeEnabled"] = True
+    if defect == "failed":
+        (enrichment["chunk"] if stage.startswith("chunk_") else enrichment)[field] = 0
+    else:
+        enrichment["completeness"][0].update(present=10000, missing=0, failed=0)
     assert _check_pipeline_complete_conditions(flatten(), -1) == []
     assert _check_search_conditions(flatten(), False, False, False, "") == []

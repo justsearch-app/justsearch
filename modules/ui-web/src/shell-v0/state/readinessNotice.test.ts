@@ -750,7 +750,8 @@ it.each([
   const notice = readinessNotice(verdict);
   expect(notice?.causes).toEqual([wording]);
   expect(notice?.headline).toBe('Enrichment incomplete.');
-  expect(notice?.body).toContain('Keyword search remains available');
+  expect(classifyConsequence([code])).toBe('enrichment-incomplete');
+  expect(notice?.body).toBe("Results may miss some documents' semantic matches; keyword search covers them");
   expect(notice?.body).not.toContain('fully');
   expect(warrantsSearchDegradationBanner(degraded('warn', [code]))).toBe(true);
 });
