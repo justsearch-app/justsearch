@@ -31,6 +31,7 @@ excluded from newChecks):
 - `modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerIngestServiceForceReindexWiringTest.java#submitBatchWithoutForceReindexMarksNothing`
 - `modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerIngestServiceForceReindexWiringTest.java#initialScanDoesNotMarkAnything`
 - `modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/QueueDefectRegressionTest.java#maintenanceNoopPreservesEverySavedFieldAndActualEnqueueCounters`
+- `modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/RestoredMtimeQueuedRestartTest.java#acceptedOrdinaryForceRunsOnceAfterUnforcedRecordedWalkSeals` (P3/C15: an ordinary force accepted during an unforced recorded walk runs exactly once after the walk seals; it passes on main and after, and failed on the earlier candidate e1d3e0e218, which lost the force)
 
 ```json
 {
@@ -61,7 +62,7 @@ excluded from newChecks):
           "delegationQuote": "proceed autonomously with designing all of the smallers and critical fixes. then proceed with implementing them accordingly.",
           "delegationLocation": "task t-20261030-ingfix request",
           "delegationScope": "fix the defects in the owner-commissioned ingestion defect list, designed by the orchestrator",
-          "choice": "C7. Preserve \u2014 truly unchanged, current-policy documents: stronger freshness checks must retain the existing skip benefit; check matching source, policy, collection, and complete chunks avoids extraction on repeated ingestion and after reopening.",
+          "choice": "C7. Preserve — truly unchanged, current-policy documents: stronger freshness checks must retain the existing skip benefit; check matching source, policy, collection, and complete chunks avoids extraction on repeated ingestion and after reopening.",
           "label": "agent choice"
         },
         {
@@ -69,7 +70,7 @@ excluded from newChecks):
           "delegationQuote": "proceed autonomously with designing all of the smallers and critical fixes. then proceed with implementing them accordingly.",
           "delegationLocation": "task t-20261030-ingfix request",
           "delegationScope": "fix the defects in the owner-commissioned ingestion defect list, designed by the orchestrator",
-          "choice": "C9. Preserve \u2014 mutation and unreadability during freshness checking: hashing introduces another source-read interval, while extraction already checks source changes before and after parsing; inject mutation, deletion, and read failure and require retry/stale handling rather than a false unchanged acknowledgment.",
+          "choice": "C9. Preserve — mutation and unreadability during freshness checking: hashing introduces another source-read interval, while extraction already checks source changes before and after parsing; inject mutation, deletion, and read failure and require retry/stale handling rather than a false unchanged acknowledgment.",
           "label": "agent choice"
         },
         {
@@ -77,7 +78,7 @@ excluded from newChecks):
           "delegationQuote": "proceed autonomously with designing all of the smallers and critical fixes. then proceed with implementing them accordingly.",
           "delegationLocation": "task t-20261030-ingfix request",
           "delegationScope": "fix the defects in the owner-commissioned ingestion defect list, designed by the orchestrator",
-          "choice": "C15. Preserve \u2014 force authority and lifecycle boundaries: recorded force is frozen in the issued claim, planned-source work already bypasses unchanged detection, and exclusions still precede extraction; check these paths alongside deletion/recreation and successful completion so force neither escapes its owner nor persists forever.",
+          "choice": "C15. Preserve — force authority and lifecycle boundaries: recorded force is frozen in the issued claim, planned-source work already bypasses unchanged detection, and exclusions still precede extraction; check these paths alongside deletion/recreation and successful completion so force neither escapes its owner nor persists forever.",
           "label": "agent choice"
         }
       ]
@@ -101,7 +102,7 @@ excluded from newChecks):
           "delegationQuote": "proceed autonomously with designing all of the smallers and critical fixes. then proceed with implementing them accordingly.",
           "delegationLocation": "task t-20261030-ingfix request",
           "delegationScope": "fix the defects in the owner-commissioned ingestion defect list, designed by the orchestrator",
-          "choice": "C7. Preserve \u2014 truly unchanged, current-policy documents: stronger freshness checks must retain the existing skip benefit; check matching source, policy, collection, and complete chunks avoids extraction on repeated ingestion and after reopening.",
+          "choice": "C7. Preserve — truly unchanged, current-policy documents: stronger freshness checks must retain the existing skip benefit; check matching source, policy, collection, and complete chunks avoids extraction on repeated ingestion and after reopening.",
           "label": "agent choice"
         },
         {
@@ -109,7 +110,7 @@ excluded from newChecks):
           "delegationQuote": "proceed autonomously with designing all of the smallers and critical fixes. then proceed with implementing them accordingly.",
           "delegationLocation": "task t-20261030-ingfix request",
           "delegationScope": "fix the defects in the owner-commissioned ingestion defect list, designed by the orchestrator",
-          "choice": "C8. Preserve \u2014 existing reasons to repair unchanged bytes: collection changes, missing stored size, incomplete chunks, and committed deletion/replacement already invalidate admission; check stronger source proof does not bypass these checks, including null/blank default collection equivalence.",
+          "choice": "C8. Preserve — existing reasons to repair unchanged bytes: collection changes, missing stored size, incomplete chunks, and committed deletion/replacement already invalidate admission; check stronger source proof does not bypass these checks, including null/blank default collection equivalence.",
           "label": "agent choice"
         }
       ]
@@ -125,7 +126,7 @@ excluded from newChecks):
           "delegationQuote": "proceed autonomously with designing all of the smallers and critical fixes. then proceed with implementing them accordingly.",
           "delegationLocation": "task t-20261030-ingfix request",
           "delegationScope": "fix the defects in the owner-commissioned ingestion defect list, designed by the orchestrator",
-          "choice": "C20. Implied, partly broken \u2014 changed sources and deliberate retries remain admissible: unchanged-work preservation must distinguish changed content from duplicate discovery; the current maintenance predicate does not inspect source identity at all. Check changed bytes\u2014including equal metadata\u2014can be admitted, and explicit retry/force still resets the intended failure run.",
+          "choice": "C20. Implied, partly broken — changed sources and deliberate retries remain admissible: unchanged-work preservation must distinguish changed content from duplicate discovery; the current maintenance predicate does not inspect source identity at all. Check changed bytes—including equal metadata—can be admitted, and explicit retry/force still resets the intended failure run.",
           "label": "agent choice"
         },
         {
@@ -133,7 +134,7 @@ excluded from newChecks):
           "delegationQuote": "proceed autonomously with designing all of the smallers and critical fixes. then proceed with implementing them accordingly.",
           "delegationLocation": "task t-20261030-ingfix request",
           "delegationScope": "fix the defects in the owner-commissioned ingestion defect list, designed by the orchestrator",
-          "choice": "S-D23 (Automatic rediscovery resets unchanged files\u2019 retry ladders) Maintenance-admit an unchanged SANDBOX_FAILED job and require its revision, attempts, deadline and origin to survive.",
+          "choice": "S-D23 (Automatic rediscovery resets unchanged files’ retry ladders) Maintenance-admit an unchanged SANDBOX_FAILED job and require its revision, attempts, deadline and origin to survive.",
           "label": "agent choice"
         }
       ],
@@ -157,7 +158,7 @@ excluded from newChecks):
           "delegationQuote": "proceed autonomously with designing all of the smallers and critical fixes. then proceed with implementing them accordingly.",
           "delegationLocation": "task t-20261030-ingfix request",
           "delegationScope": "fix the defects in the owner-commissioned ingestion defect list, designed by the orchestrator",
-          "choice": "C20. Implied, partly broken \u2014 changed sources and deliberate retries remain admissible: unchanged-work preservation must distinguish changed content from duplicate discovery; the current maintenance predicate does not inspect source identity at all. Check changed bytes\u2014including equal metadata\u2014can be admitted, and explicit retry/force still resets the intended failure run.",
+          "choice": "C20. Implied, partly broken — changed sources and deliberate retries remain admissible: unchanged-work preservation must distinguish changed content from duplicate discovery; the current maintenance predicate does not inspect source identity at all. Check changed bytes—including equal metadata—can be admitted, and explicit retry/force still resets the intended failure run.",
           "label": "agent choice"
         },
         {
@@ -193,7 +194,7 @@ excluded from newChecks):
           "delegationQuote": "proceed autonomously with designing all of the smallers and critical fixes. then proceed with implementing them accordingly.",
           "delegationLocation": "task t-20261030-ingfix request",
           "delegationScope": "fix the defects in the owner-commissioned ingestion defect list, designed by the orchestrator",
-          "choice": "C15. Preserve \u2014 force authority and lifecycle boundaries: recorded force is frozen in the issued claim, planned-source work already bypasses unchanged detection, and exclusions still precede extraction; check these paths alongside deletion/recreation and successful completion so force neither escapes its owner nor persists forever.",
+          "choice": "C15. Preserve — force authority and lifecycle boundaries: recorded force is frozen in the issued claim, planned-source work already bypasses unchanged detection, and exclusions still precede extraction; check these paths alongside deletion/recreation and successful completion so force neither escapes its owner nor persists forever.",
           "label": "agent choice"
         }
       ]
@@ -222,7 +223,7 @@ excluded from newChecks):
           "delegationQuote": "proceed autonomously with designing all of the smallers and critical fixes. then proceed with implementing them accordingly.",
           "delegationLocation": "task t-20261030-ingfix request",
           "delegationScope": "fix the defects in the owner-commissioned ingestion defect list, designed by the orchestrator",
-          "choice": "C23. Preserve \u2014 admission accounting: callers require accepted counts to match batch size even when work is already covered; check mixed new/preserved batches report coverage correctly without inflating queue depth, pending bytes, or newly-enqueued metrics.",
+          "choice": "C23. Preserve — admission accounting: callers require accepted counts to match batch size even when work is already covered; check mixed new/preserved batches report coverage correctly without inflating queue depth, pending bytes, or newly-enqueued metrics.",
           "label": "agent choice"
         }
       ]
@@ -242,7 +243,7 @@ excluded from newChecks):
           "delegationQuote": "proceed autonomously with designing all of the smallers and critical fixes. then proceed with implementing them accordingly.",
           "delegationLocation": "task t-20261030-ingfix request",
           "delegationScope": "fix the defects in the owner-commissioned ingestion defect list, designed by the orchestrator",
-          "choice": "C15. Preserve \u2014 force authority and lifecycle boundaries: recorded force is frozen in the issued claim, planned-source work already bypasses unchanged detection, and exclusions still precede extraction; check these paths alongside deletion/recreation and successful completion so force neither escapes its owner nor persists forever.",
+          "choice": "C15. Preserve — force authority and lifecycle boundaries: recorded force is frozen in the issued claim, planned-source work already bypasses unchanged detection, and exclusions still precede extraction; check these paths alongside deletion/recreation and successful completion so force neither escapes its owner nor persists forever.",
           "label": "agent choice"
         }
       ]
@@ -267,7 +268,7 @@ excluded from newChecks):
           "delegationQuote": "proceed autonomously with designing all of the smallers and critical fixes. then proceed with implementing them accordingly.",
           "delegationLocation": "task t-20261030-ingfix request",
           "delegationScope": "fix the defects in the owner-commissioned ingestion defect list, designed by the orchestrator",
-          "choice": "C8. Preserve \u2014 existing reasons to repair unchanged bytes: collection changes, missing stored size, incomplete chunks, and committed deletion/replacement already invalidate admission; check stronger source proof does not bypass these checks, including null/blank default collection equivalence.",
+          "choice": "C8. Preserve — existing reasons to repair unchanged bytes: collection changes, missing stored size, incomplete chunks, and committed deletion/replacement already invalidate admission; check stronger source proof does not bypass these checks, including null/blank default collection equivalence.",
           "label": "agent choice"
         }
       ],
@@ -325,7 +326,7 @@ excluded from newChecks):
           "delegationQuote": "proceed autonomously with designing all of the smallers and critical fixes. then proceed with implementing them accordingly.",
           "delegationLocation": "task t-20261030-ingfix request",
           "delegationScope": "fix the defects in the owner-commissioned ingestion defect list, designed by the orchestrator",
-          "choice": "C9. Preserve \u2014 mutation and unreadability during freshness checking: hashing introduces another source-read interval, while extraction already checks source changes before and after parsing; inject mutation, deletion, and read failure and require retry/stale handling rather than a false unchanged acknowledgment.",
+          "choice": "C9. Preserve — mutation and unreadability during freshness checking: hashing introduces another source-read interval, while extraction already checks source changes before and after parsing; inject mutation, deletion, and read failure and require retry/stale handling rather than a false unchanged acknowledgment.",
           "label": "agent choice"
         },
         {
@@ -341,7 +342,7 @@ excluded from newChecks):
           "delegationQuote": "proceed autonomously with designing all of the smallers and critical fixes. then proceed with implementing them accordingly.",
           "delegationLocation": "task t-20261030-ingfix request",
           "delegationScope": "fix the defects in the owner-commissioned ingestion defect list, designed by the orchestrator",
-          "choice": "C13. Implied \u2014 force survives commit and completion-record failures: publication and queue completion have separate owners; interrupt before commit and after Lucene commit but before durable queue completion, then verify recovery neither loses the obligation nor falsely completes a newer admission.",
+          "choice": "C13. Implied — force survives commit and completion-record failures: publication and queue completion have separate owners; interrupt before commit and after Lucene commit but before durable queue completion, then verify recovery neither loses the obligation nor falsely completes a newer admission.",
           "label": "agent choice"
         },
         {
@@ -349,7 +350,7 @@ excluded from newChecks):
           "delegationQuote": "proceed autonomously with designing all of the smallers and critical fixes. then proceed with implementing them accordingly.",
           "delegationLocation": "task t-20261030-ingfix request",
           "delegationScope": "fix the defects in the owner-commissioned ingestion defect list, designed by the orchestrator",
-          "choice": "C14. Implied \u2014 overlapping force and routine admissions: accepted force must not disappear when routine rediscovery follows, and an older callback must not consume a later force request; interleave both orders around claim, publication, and completion and verify the final accepted revision.",
+          "choice": "C14. Implied — overlapping force and routine admissions: accepted force must not disappear when routine rediscovery follows, and an older callback must not consume a later force request; interleave both orders around claim, publication, and completion and verify the final accepted revision.",
           "label": "agent choice"
         },
         {
@@ -357,7 +358,7 @@ excluded from newChecks):
           "delegationQuote": "proceed autonomously with designing all of the smallers and critical fixes. then proceed with implementing them accordingly.",
           "delegationLocation": "task t-20261030-ingfix request",
           "delegationScope": "fix the defects in the owner-commissioned ingestion defect list, designed by the orchestrator",
-          "choice": "C20. Implied, partly broken \u2014 changed sources and deliberate retries remain admissible: unchanged-work preservation must distinguish changed content from duplicate discovery; the current maintenance predicate does not inspect source identity at all. Check changed bytes\u2014including equal metadata\u2014can be admitted, and explicit retry/force still resets the intended failure run.",
+          "choice": "C20. Implied, partly broken — changed sources and deliberate retries remain admissible: unchanged-work preservation must distinguish changed content from duplicate discovery; the current maintenance predicate does not inspect source identity at all. Check changed bytes—including equal metadata—can be admitted, and explicit retry/force still resets the intended failure run.",
           "label": "agent choice"
         },
         {
@@ -365,7 +366,7 @@ excluded from newChecks):
           "delegationQuote": "proceed autonomously with designing all of the smallers and critical fixes. then proceed with implementing them accordingly.",
           "delegationLocation": "task t-20261030-ingfix request",
           "delegationScope": "fix the defects in the owner-commissioned ingestion defect list, designed by the orchestrator",
-          "choice": "C7. Preserve \u2014 truly unchanged, current-policy documents: stronger freshness checks must retain the existing skip benefit; check matching source, policy, collection, and complete chunks avoids extraction on repeated ingestion and after reopening.",
+          "choice": "C7. Preserve — truly unchanged, current-policy documents: stronger freshness checks must retain the existing skip benefit; check matching source, policy, collection, and complete chunks avoids extraction on repeated ingestion and after reopening.",
           "label": "agent choice"
         },
         {
@@ -373,7 +374,7 @@ excluded from newChecks):
           "delegationQuote": "proceed autonomously with designing all of the smallers and critical fixes. then proceed with implementing them accordingly.",
           "delegationLocation": "task t-20261030-ingfix request",
           "delegationScope": "fix the defects in the owner-commissioned ingestion defect list, designed by the orchestrator",
-          "choice": "C8. Preserve \u2014 existing reasons to repair unchanged bytes: collection changes, missing stored size, incomplete chunks, and committed deletion/replacement already invalidate admission; check stronger source proof does not bypass these checks, including null/blank default collection equivalence.",
+          "choice": "C8. Preserve — existing reasons to repair unchanged bytes: collection changes, missing stored size, incomplete chunks, and committed deletion/replacement already invalidate admission; check stronger source proof does not bypass these checks, including null/blank default collection equivalence.",
           "label": "agent choice"
         }
       ],
@@ -424,7 +425,7 @@ excluded from newChecks):
           "delegationQuote": "proceed autonomously with designing all of the smallers and critical fixes. then proceed with implementing them accordingly.",
           "delegationLocation": "task t-20261030-ingfix request",
           "delegationScope": "fix the defects in the owner-commissioned ingestion defect list, designed by the orchestrator",
-          "choice": "C28. Preserve \u2014 migration coverage is not extraction count: covered files may be retained rather than newly queued, but enumeration must still close correctly; check empty roots, single-file roots, mixed retained/new files, unreadable sources, short admission, and restart through promotion.",
+          "choice": "C28. Preserve — migration coverage is not extraction count: covered files may be retained rather than newly queued, but enumeration must still close correctly; check empty roots, single-file roots, mixed retained/new files, unreadable sources, short admission, and restart through promotion.",
           "label": "agent choice"
         }
       ],
@@ -466,7 +467,7 @@ excluded from newChecks):
           "delegationQuote": "proceed autonomously with designing all of the smallers and critical fixes. then proceed with implementing them accordingly.",
           "delegationLocation": "task t-20261030-ingfix request",
           "delegationScope": "fix the defects in the owner-commissioned ingestion defect list, designed by the orchestrator",
-          "choice": "C17. Preserve \u2014 sync force retains its existing meaning: the narrowed D22 claim concerns traversal/pacing, and forced sync deliberately relies on the extractor\u2019s unchanged shortcut; verify forced replay traverses the root while genuinely unchanged files can still skip extraction.",
+          "choice": "C17. Preserve — sync force retains its existing meaning: the narrowed D22 claim concerns traversal/pacing, and forced sync deliberately relies on the extractor’s unchanged shortcut; verify forced replay traverses the root while genuinely unchanged files can still skip extraction.",
           "label": "agent choice"
         }
       ],
@@ -508,7 +509,7 @@ excluded from newChecks):
           "delegationQuote": "proceed autonomously with designing all of the smallers and critical fixes. then proceed with implementing them accordingly.",
           "delegationLocation": "task t-20261030-ingfix request",
           "delegationScope": "fix the defects in the owner-commissioned ingestion defect list, designed by the orchestrator",
-          "choice": "C15. Preserve \u2014 force authority and lifecycle boundaries: recorded force is frozen in the issued claim, planned-source work already bypasses unchanged detection, and exclusions still precede extraction; check these paths alongside deletion/recreation and successful completion so force neither escapes its owner nor persists forever.",
+          "choice": "C15. Preserve — force authority and lifecycle boundaries: recorded force is frozen in the issued claim, planned-source work already bypasses unchanged detection, and exclusions still precede extraction; check these paths alongside deletion/recreation and successful completion so force neither escapes its owner nor persists forever.",
           "label": "agent choice"
         }
       ],
@@ -585,7 +586,7 @@ excluded from newChecks):
           "delegationQuote": "proceed autonomously with designing all of the smallers and critical fixes. then proceed with implementing them accordingly.",
           "delegationLocation": "task t-20261030-ingfix request",
           "delegationScope": "fix the defects in the owner-commissioned ingestion defect list, designed by the orchestrator",
-          "choice": "C15. Preserve \u2014 force authority and lifecycle boundaries: recorded force is frozen in the issued claim, planned-source work already bypasses unchanged detection, and exclusions still precede extraction; check these paths alongside deletion/recreation and successful completion so force neither escapes its owner nor persists forever.",
+          "choice": "C15. Preserve — force authority and lifecycle boundaries: recorded force is frozen in the issued claim, planned-source work already bypasses unchanged detection, and exclusions still precede extraction; check these paths alongside deletion/recreation and successful completion so force neither escapes its owner nor persists forever.",
           "label": "agent choice"
         }
       ],
@@ -635,7 +636,7 @@ excluded from newChecks):
           "delegationQuote": "proceed autonomously with designing all of the smallers and critical fixes. then proceed with implementing them accordingly.",
           "delegationLocation": "task t-20261030-ingfix request",
           "delegationScope": "fix the defects in the owner-commissioned ingestion defect list, designed by the orchestrator",
-          "choice": "C9. Preserve \u2014 mutation and unreadability during freshness checking: hashing introduces another source-read interval, while extraction already checks source changes before and after parsing; inject mutation, deletion, and read failure and require retry/stale handling rather than a false unchanged acknowledgment.",
+          "choice": "C9. Preserve — mutation and unreadability during freshness checking: hashing introduces another source-read interval, while extraction already checks source changes before and after parsing; inject mutation, deletion, and read failure and require retry/stale handling rather than a false unchanged acknowledgment.",
           "label": "agent choice"
         }
       ],
@@ -703,7 +704,7 @@ excluded from newChecks):
           "delegationQuote": "proceed autonomously with designing all of the smallers and critical fixes. then proceed with implementing them accordingly.",
           "delegationLocation": "task t-20261030-ingfix request",
           "delegationScope": "fix the defects in the owner-commissioned ingestion defect list, designed by the orchestrator",
-          "choice": "C9. Preserve \u2014 mutation and unreadability during freshness checking: hashing introduces another source-read interval, while extraction already checks source changes before and after parsing; inject mutation, deletion, and read failure and require retry/stale handling rather than a false unchanged acknowledgment.",
+          "choice": "C9. Preserve — mutation and unreadability during freshness checking: hashing introduces another source-read interval, while extraction already checks source changes before and after parsing; inject mutation, deletion, and read failure and require retry/stale handling rather than a false unchanged acknowledgment.",
           "label": "agent choice"
         },
         {
@@ -711,7 +712,7 @@ excluded from newChecks):
           "delegationQuote": "proceed autonomously with designing all of the smallers and critical fixes. then proceed with implementing them accordingly.",
           "delegationLocation": "task t-20261030-ingfix request",
           "delegationScope": "fix the defects in the owner-commissioned ingestion defect list, designed by the orchestrator",
-          "choice": "C20. Implied, partly broken \u2014 changed sources and deliberate retries remain admissible: unchanged-work preservation must distinguish changed content from duplicate discovery; the current maintenance predicate does not inspect source identity at all. Check changed bytes\u2014including equal metadata\u2014can be admitted, and explicit retry/force still resets the intended failure run.",
+          "choice": "C20. Implied, partly broken — changed sources and deliberate retries remain admissible: unchanged-work preservation must distinguish changed content from duplicate discovery; the current maintenance predicate does not inspect source identity at all. Check changed bytes—including equal metadata—can be admitted, and explicit retry/force still resets the intended failure run.",
           "label": "agent choice"
         }
       ],
@@ -722,7 +723,7 @@ excluded from newChecks):
           "delegationQuote": "proceed autonomously with designing all of the smallers and critical fixes. then proceed with implementing them accordingly.",
           "delegationLocation": "task t-20261030-ingfix request",
           "delegationScope": "fix the defects in the owner-commissioned ingestion defect list, designed by the orchestrator",
-          "choice": "C9. Preserve \u2014 mutation and unreadability during freshness checking: hashing introduces another source-read interval, while extraction already checks source changes before and after parsing; inject mutation, deletion, and read failure and require retry/stale handling rather than a false unchanged acknowledgment.",
+          "choice": "C9. Preserve — mutation and unreadability during freshness checking: hashing introduces another source-read interval, while extraction already checks source changes before and after parsing; inject mutation, deletion, and read failure and require retry/stale handling rather than a false unchanged acknowledgment.",
           "label": "agent choice"
         },
         "reproduction": "Seed a released-format FAILED revision with no stored source hash and matching metadata, make admissionIdentity return null, and call the real maintenance admission API used by the watcher. d5c51c128c preserves FAILED from the metadata witness alone."
@@ -731,6 +732,27 @@ excluded from newChecks):
       "evidence": "gates/test-intent/evidence/ingfix-wp6.json",
       "newChecks": [
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/ReleasedRevisionWatcherAdmissionTest.java#failedAdmissionHashCannotCertifyUnchangedReleasedFailure"
+      ]
+    },
+    {
+      "items": [
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/UnreadableSourceRetryTest.java"
+      ],
+      "class": "New",
+      "behaviour": "Rediscovering an unreadable source (a real permission-denied hash read) keeps an existing future I/O retry wait: attempts, retry_after, revision and every other saved field survive repeated maintenance admission, and the job stays unclaimable until its retry time. Main preserves this today; the earlier candidate e1d3e0e218 reset it.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed autonomously with designing all of the smallers and critical fixes. then proceed with implementing them accordingly.",
+          "delegationLocation": "task t-20261030-ingfix request",
+          "delegationScope": "fix the defects in the owner-commissioned ingestion defect list, designed by the orchestrator",
+          "choice": "P4 Genuinely failing files still follow the retry ladder and seven-day bound; maintenance admission still preserves terminal failures and future failure waits that it preserves today.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/ingfix-wp6.json",
+      "newChecks": [
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/UnreadableSourceRetryTest.java#unreadableRediscoveryPreservesExistingFutureIoRetryWait"
       ]
     }
   ]
