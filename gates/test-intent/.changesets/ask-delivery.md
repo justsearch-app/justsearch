@@ -177,3 +177,13 @@ message allowlist fail independently of the original pre-stage-1 failure evidenc
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verifier-hutobpr1-round2",
+  "verdict": "accept",
+  "digest": "sha256:a839a7d73e76bce1f26a12612106fcfe02cdcedc0ac50fe27a871a746dd0736d"
+}
+```
