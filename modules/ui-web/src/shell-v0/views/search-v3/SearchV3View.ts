@@ -33,9 +33,9 @@
  *     F1; on the record since F6). A session IS a conversation: its identity and its listing come
  *     from `state/conversationListStore.ts`, and its transcript from the canonical
  *     `GET /api/thread/{id}` record via `sv3-record.ts`. The host holds the projected list and routes
- *     everything that changes it (a send, a row click, New session, every stream event, and each
- *     record refresh) through the funnels above; the sidebar and the content surface render
- *     projections and issue nothing. What is still window-local — the pin and the unread bit — and
+ *     record and stream transforms through the funnels above. `Sv3SessionsDomain` owns roster,
+ *     selection, navigation and row actions through that same projection; the sidebar and content
+ *     render it and issue nothing. What is still window-local — the pin and the unread bit — and
  *     why, is stated in `sv3-sessions.ts`'s persistence-boundary note.
  *
  * Mounted as the main USER/RAIL Search surface, keeping its established address:
@@ -43,9 +43,8 @@
  *
  * Side-effect registers <jf-sv3-window> and its four regions.
  */
-import { subscribeProfileSwitch } from '../../state/UserStateDocument.js';
-import { subscribeProfiles, getActiveProfileId as getWorkspaceProfileId } from '../../substrates/profiles/index.js';
-import type { Sv3RecentItem } from './Sv3Composer.js';
+import { Sv3SessionsDomain, type Sv3RecentItem } from './sv3-sessions-domain.js';
+import { Sv3SessionsController } from './sv3-sessions-controller.js';
 import { Sv3RunDomain } from './sv3-run-domain.js';
 import { Sv3RunController } from './sv3-run-controller.js';
 import { Sv3ContextDomain } from './sv3-context-domain.js';
@@ -55,7 +54,6 @@ import { Sv3DraftController } from './sv3-draft-controller.js';
 import { Sv3AskDomain } from './sv3-ask-domain.js';
 import { Sv3AskController } from './sv3-ask-controller.js';
 import { Sv3ComposerPort } from './Sv3ComposerPort.js';
-import type { ComposerCapture } from '../../state/composerPort.js';
 import { flushPendingNavigationWrite, refreshProjection } from '../../router/URLProjector.js';
 import { registerViewFactory, getViewFactory } from '../../router/viewFactoryRegistry.js';
 import { CORE_INTERACTION_SHAPES, ONE_WINDOW_MOUNT_TAG } from '../../plugin-api/coreInteractionShapes.js';
@@ -130,14 +128,9 @@ import {
   appendTurnDelta,
   applySv3History,
   applySv3Record,
-  focusSession,
   mergeStoreConversations,
-  renameSession,
-  toggleSessionPin,
   latestTurnRef,
   projectSv3Sessions,
-  removeSession,
-  restoreSessionTitle,
   sessionById,
   setSessionContextUsage,
   dropTurn,
@@ -225,7 +218,6 @@ import {
   setMessageExcluded,
   subscribeConversationList,
   type Conversation,
-  type DeleteCascadeResult,
 } from '../../state/conversationListStore.js';
 // The product's ONE confirm dialog. Cascade-delete asks a second question — "and its branches?" —
 // and asking it in a second dialect would be a second dismiss rule for the same gesture.
@@ -307,7 +299,6 @@ import {
   type AppearanceMode,
 } from '../../state/themeState.js';
 import { confirmConversationTree, conversationDeleteOutcome } from '../../components/chat/conversationDelete.js';
-import type { DeleteTreeEntry } from '../../state/conversationListStore.js';
 import { emitEphemeralToast } from '../../components/advisory/ephemeralToast.js';
 import { completedForget, createForgetAttempt, executeForget, forgetContainsPath, forgetObservationText,
   forgetParentFolder, publishForgetCompletion, readUnfinishedForgets,
@@ -323,7 +314,6 @@ import {
   SV3_COMMAND_SEARCH,
   SV3_DRAFT_KEY,
   SV3_RESULT_NO_DOCUMENT,
-  SV3_RENAME_FAILED,
   SV3_SURFACE_KEY,
 } from './fixtures.js';
 import { type Sv3PaletteRun } from './Sv3Palette.js';
@@ -778,13 +768,9 @@ export class SearchV3View extends JfElement {
     paneOverlay: { type: Boolean, reflect: true, attribute: 'pane-overlay' },
     renamingId: { state: true },
     historyLocked: { state: true },
-    recentSearches: { state: true },
-    recentClearTime: { state: true },
-    recentConversationsReady: { state: true },
     lockedRefusal: { state: true },
     effort: { state: true },
     tier: { state: true },
-    conversations: { state: true },
     initialNavigationPending: { type: Boolean, attribute: false },
   };
 
@@ -909,8 +895,6 @@ export class SearchV3View extends JfElement {
    */
   get tier(): Sv3ComposerTier { return this.draftDomain.tier; }
   set tier(value: Sv3ComposerTier) { this.draftDomain.tier = value; }
-  /** Recent sidebar rows, retained for row actions. Complete fork reads never enlarge this list. */
-  declare conversations: readonly Conversation[];
 
   /** Watches the window box so the pane's presentation follows it (Phase F8). */
   private boxObserver: ResizeObserver | null = null;
@@ -934,44 +918,9 @@ export class SearchV3View extends JfElement {
     this.forkReads.clear();
   }
 
-  declare private recentSearches: readonly string[];
-  declare private recentClearTime: number;
-  declare private recentConversationsReady: boolean;
-  private recentEpoch = 0;
-  private recentProfileUnsubscribe: (() => void) | null = null;
-
-  private get recentItems(): readonly Sv3RecentItem[] {
-    const searches: Sv3RecentItem[] = this.recentSearches.map(value => ({ kind: 'search', value, label: value }));
-    if (this.historyLocked || !this.recentConversationsReady) return searches;
-    return [...searches, ...this.conversations.filter(c => c.lastActiveAt > this.recentClearTime)
-      .sort((a, b) => b.lastActiveAt - a.lastActiveAt).slice(0, 5)
-      .map(c => ({ kind: 'conversation' as const, value: c.id,
-        label: c.title || '' }))];
-  }
-
   private onRecentSelect(event: Event): void {
-    const item = (event as CustomEvent<Sv3RecentItem>).detail;
-    if (item.kind === 'search') {
-      // Do not replace a retained preparation before its existing guards accept the move.
-      if (this.searchNow(item.value)) this.writeDraft(item.value);
-    } else {
-      this.onSessionSelect(new CustomEvent('sv3-session-select', { detail: { id: item.value } }));
-    }
+    this.sessionsDomain.selectRecent((event as CustomEvent<Sv3RecentItem>).detail);
   }
-
-  private async refreshRecents(): Promise<void> {
-    const epoch = this.recentEpoch;
-    const loaded = await loadConversations();
-    if (loaded && epoch === this.recentEpoch && !this.historyLocked) this.recentConversationsReady = true;
-  }
-
-  private clearRecents(): void {
-    this.recentSearches = [];
-    this.recentClearTime = Date.now();
-  }
-
-  private convListUnsubscribe: (() => void) | null = null;
-
 
   private recoveryNotice(): TemplateResult | typeof nothing {
     const task = this.draftDomain.humanTask;
@@ -1033,8 +982,8 @@ export class SearchV3View extends JfElement {
         { id, title: 'Unsent draft', firstUserMessage: text, createdAt: now, lastActiveAt: now },
       ]);
     },
-    releaseDraftOwnership: () => { this.liveDraftOwner = null; this.removalDraft = null; },
-    abortRemovalConfirmation: () => this.removalConfirmation?.abort(),
+    releaseDraftOwnership: () => this.sessionsDomain.releaseDraftOwnership(),
+    abortRemovalConfirmation: () => this.sessionsDomain.abortRemovalConfirmation(),
     clearRenaming: () => { this.renamingId = null; },
     clearRecordNotice: () => { this.contextDomain.recordNotice = false; },
     detachRun: () => this.runDomain.detach(),
@@ -1054,7 +1003,7 @@ export class SearchV3View extends JfElement {
     writeDraft: text => this.writeDraft(text),
     closePane: () => this.closePane(),
     leaveForgetPlacement: () => this.leaveForgetPlacement(),
-    restoreLastViewed: () => this.restoreLastViewed(),
+    restoreLastViewed: () => this.sessionsDomain.restoreLastViewed(),
     revealRecoveryOutcome: () => this.revealRecoveryOutcome(),
     focusComposer: () => this.focusComposer(),
     abortAsk: () => this.askDomain.abortAsk(),
@@ -1174,7 +1123,7 @@ export class SearchV3View extends JfElement {
     runInFlight: () => this.agentController()?.runInFlight === true,
     modelAnswerUnavailableReason: () => this.modelAnswerUnavailableReason,
     currentModelLabel: () => this.currentModelLabel,
-    claimConversation: id => this.claimConversation(id),
+    claimConversation: id => this.sessionsDomain.claimConversation(id),
     setComposerState: state => this.setComposerState(state),
     focusComposer: () => this.focusComposer(),
     writeDraft: text => this.writeDraft(text),
@@ -1191,12 +1140,42 @@ export class SearchV3View extends JfElement {
    */
   private readonly search = new Sv3SearchController(this, () => this.onRestrictionsCommitted());
 
-  /** Only a live edit establishes ownership; restored text and equal strings do not. */
-  private liveDraftOwner: { id: string; draft: ComposerCapture } | null = null;
-  private removalDraft: { id: string; draft: ComposerCapture } | null = null;
-  private removalConfirmation: AbortController | null = null;
-  private removing = false;
-  private readonly onOtherWindowStorage = () => { this.removalDraft = null; this.liveDraftOwner = null; };
+  private readonly sessionsDomain = new Sv3SessionsDomain({
+    sessions: () => this.sessions,
+    setSessions: sessions => { this.sessions = sessions; },
+    draft: () => this.draftDomain,
+    context: () => this.contextDomain,
+    run: () => this.runDomain,
+    search: () => this.search,
+    renamingId: () => this.renamingId,
+    setRenamingId: id => { this.renamingId = id; },
+    connected: () => this.isConnected,
+    historyLocked: () => this.historyLocked,
+    apiBase: () => this.apiBase,
+    runGate: () => this.runGate(),
+    closePane: () => this.closePane(),
+    setComposerState: state => this.setComposerState(state),
+    focusComposer: () => this.focusComposer(),
+    revealRecoveryOutcome: () => this.revealRecoveryOutcome(),
+    invalidateForkReads: (loading, changed) => { if (changed) this.clearForkReads(); this.forkListLoading = loading; },
+    resetProfilePresentation: () => {
+      this.composer?.closeRecents();
+      resetSearchState();
+      clearFilters();
+      this.composer?.shadowRoot?.querySelector('jf-sv3-filters')?.resetInputs();
+    },
+    searchNow: text => this.searchNow(text),
+    writeDraft: text => this.writeDraft(text),
+    confirmTree: confirmConversationTree,
+    deletionOutcome: conversationDeleteOutcome,
+    announce: (message, severity) => emitEphemeralToast({ message, severity }),
+    requestUpdate: () => this.requestUpdate(),
+  }, { setConversationApiBase, subscribeConversationList, loadConversations, getConversationListState,
+    restoreActiveConversation, setActiveConversation, setConversationTitle, deleteConversationWithCascade,
+    readLastViewed: readLastViewedConversation, setLastViewed: setLastViewedConversation,
+    clearLastViewed: clearLastViewedConversation, hasFreshHandoff: () => peekSearchV3Handoff()?.origin === 'fresh',
+  }, this.composerDraft);
+  private readonly sessionsController = new Sv3SessionsController(this, this.sessionsDomain);
 
   constructor() {
     super();
@@ -1231,13 +1210,9 @@ export class SearchV3View extends JfElement {
     this.renamingId = null;
     this.contextDomain.recordNotice = false;
     this.historyLocked = false;
-    this.recentSearches = [];
-    this.recentClearTime = -Infinity;
-    this.recentConversationsReady = true;
     this.lockedRefusal = false;
     this.effort = SV3_EFFORT_DEFAULT;
     this.tier = SV3_TIER_DEFAULT;
-    this.conversations = [];
     // Constructed HERE rather than on connect: a Lit controller added before connection still gets
     // its `hostConnected`, and adding it inside `connectedCallback` would add a second one on every
     // re-attach of this retained instance.
@@ -1261,7 +1236,7 @@ export class SearchV3View extends JfElement {
   override connectedCallback(): void {
     super.connectedCallback();
     void this.loadForgetCapability();
-    window.addEventListener('storage', this.onOtherWindowStorage);
+    this.sessionsController.connectDraft();
     this.draftDomain.mountDraftPending = !this.draftDomain.recoveryOpened;
     this.draftDomain.mountHasIncoming = false;
     adoptSv3MorphSheet();
@@ -1291,47 +1266,7 @@ export class SearchV3View extends JfElement {
     // ── The conversation record (tempdoc 822 Phase F6) ─────────────────────────────────────────
     // A session is a conversation, so the app-wide store is where the list comes from. The
     // subscription fires immediately with whatever is already loaded; the fetch refreshes it.
-    setConversationApiBase(this.apiBase || '');
-    this.convListUnsubscribe = subscribeConversationList((state, change) => {
-      if (state.loading || this.conversations !== state.conversations) this.clearForkReads();
-      this.forkListLoading = state.loading;
-      this.requestUpdate();
-      this.forgetDeletedConversations(state.deletedIds);
-      this.sessions = mergeStoreConversations(this.sessions, state.conversations);
-      // Retain the recent rows separately from the transcript projection for sidebar actions.
-      this.conversations = state.conversations;
-
-      // Tempdoc 864 PR C — a REHYDRATION is the ADDRESS being applied (a Back press, a deep link,
-      // this tab's own reload pointer), and the address is where this window is. A `claim` is not:
-      // the active-conversation pointer is app-wide and another window claiming it is that
-      // window's business, which is exactly what `SearchV3View.record.test.ts`'s companion-load
-      // case asserts. Following only restores keeps that line where it was.
-      if (change === 'restore') {
-        if (state.activeId !== null) this.draftDomain.mountHasIncoming = true;
-        this.followStoreConversation(state.activeId);
-      }
-    });
-    const resetProfileRecents = (): void => {
-      this.recentEpoch += 1;
-      this.recentSearches = [];
-      this.recentClearTime = -Infinity;
-      this.recentConversationsReady = false;
-      this.composer?.closeRecents();
-      resetSearchState();
-      clearFilters();
-      this.composer?.shadowRoot?.querySelector('jf-sv3-filters')?.resetInputs();
-      void this.refreshRecents();
-    };
-    const stopUserProfile = subscribeProfileSwitch(resetProfileRecents);
-    let workspaceProfile = getWorkspaceProfileId();
-    const stopWorkspaceProfile = subscribeProfiles(() => {
-      const next = getWorkspaceProfileId();
-      if (next === workspaceProfile) return;
-      workspaceProfile = next;
-      resetProfileRecents();
-    });
-    this.recentProfileUnsubscribe = () => { stopUserProfile(); stopWorkspaceProfile(); };
-    void loadConversations();
+    this.sessionsController.connect();
     window.addEventListener('sv3-handoff', this.draftDomain.receiveHandoff);
     if (!this.draftDomain.receiveHandoff()) {
       if (this.shapeId) this.draftDomain.prepareCompatibilityShape();
@@ -1425,10 +1360,7 @@ export class SearchV3View extends JfElement {
     this.forgetCapabilityRead?.abort();
     this.forgetCapabilityRead = null;
     this.forgetAvailable = false;
-    this.removalConfirmation?.abort();
-    this.removalDraft = null;
-    this.liveDraftOwner = null;
-    window.removeEventListener('storage', this.onOtherWindowStorage);
+    this.sessionsDomain.disconnectDraft();
     this.draftDomain.retireRefusedHandoff();
     this.draftDomain.revokeHumanTask(true);
     this.draftDomain.saveRecovery();
@@ -1444,10 +1376,7 @@ export class SearchV3View extends JfElement {
     releaseSv3MorphSheet();
     this.inspectorUnsubscribe?.();
     this.inspectorUnsubscribe = null;
-    this.recentProfileUnsubscribe?.();
-    this.recentProfileUnsubscribe = null;
-    this.convListUnsubscribe?.();
-    this.convListUnsubscribe = null;
+    this.sessionsController.disconnect();
     this.clearForkReads();
     this.contextDomain.disconnect();
     this.aiUnsubscribe?.();
@@ -1667,113 +1596,6 @@ export class SearchV3View extends JfElement {
     if (isContextInspectorOpen()) setContextInspectorView(this.contextDomain.buildContextInspectorView());
   }
 
-  /**
-   * A3 (tempdoc 609 Phase 3) — restore the conversation THIS TAB was reading. The pointer is per-tab
-   * `sessionStorage`, deliberately not the globally-most-recent conversation: a second tab must land
-   * cold rather than adopt what another tab had open.
-   *
-   * The session is created from the pointer alone, before the store list arrives, so the claim can
-   * happen in this tick; {@link mergeStoreConversations} fills its real title when the list lands and
-   * the record fetch fills its transcript. A pointer to a conversation that no longer exists resolves
-   * to an empty record, which leaves the placeholder row and says nothing false.
-   */
-  private restoreLastViewed(): void {
-    // Tempdoc 864 PR C — THE URL OUTRANKS THE POINTER. A deep link or a reload carrying
-    // `?conversationId=` has already been distributed to the store by the NavigationHandler, and
-    // the subscription above has already opened it; re-reading this tab's pointer here would
-    // second-guess the address the reader actually arrived on.
-    if (getConversationListState().activeId !== null) return;
-    const id = readLastViewedConversation();
-    if (id === null || sessionById(this.sessions, id) !== null) return;
-    const now = Date.now();
-    this.sessions = mergeStoreConversations(this.sessions, [
-      { id, title: null, firstUserMessage: '', createdAt: now, lastActiveAt: now },
-    ]);
-    this.sessions = focusSession(this.sessions, id, now);
-    // A conversation is open, so Enter continues it (WP1.1: only a window with none starts in Search).
-    this.draftDomain.askInConversation();
-    // A REHYDRATION, not a claim (tempdoc 864 PR C): this is the position the tab already had, so
-    // it corrects the URL in place. Pushing here would leave a history entry for the bare surface
-    // address behind the one the reader is on, and Back would look broken on the very first press.
-    restoreActiveConversation(id);
-    void this.setComposerState('docked');
-    void this.contextDomain.refreshRecord(id);
-    void this.contextDomain.refreshHistory(id);
-  }
-
-  /**
-   * Tempdoc 864 Layer 3(a) — FOLLOW THE STORE. The conversation this window is reading is part of
-   * the address now, so the store can be moved by something other than this window: a Back or
-   * Forward press, a deep link, a pasted URL. Each of those lands in the NavigationHandler, which
-   * writes the store; this is the half that puts the transcript on screen to match.
-   *
-   * It is deliberately NOT `onSessionSelect`: this path must not re-write the store (it is obeying
-   * it, and a write here would push a history entry for a move the browser already made) and it
-   * must not move focus. Everything else a claim does — project the row, close the previous
-   * conversation's evidence, dock the composer, load both records — it does, because the reader is
-   * being shown a different conversation either way.
-   */
-  private followStoreConversation(storeActiveId: string | null): void {
-    if (storeActiveId === this.sessions.activeId) {
-      if (peekSearchV3Handoff()?.origin !== 'fresh') this.draftDomain.retireRefusedHandoff();
-      this.draftDomain.departureBlocked = false; return;
-    }
-    this.removalConfirmation?.abort();
-    if (storeActiveId === null && this.draftDomain.draftReview && this.currentDraft().trim()) {
-      const leaving = this.draftDomain.humanPlace();
-      if (!this.draftDomain.persistDraft({ place: null, text: this.draftDomain.recoveryText(this.currentDraft()), preparation: this.draftDomain.currentPreparation() }, true)) { this.blockDeparture(); return; }
-      if (leaving !== null) this.draftDomain.rememberPlace(leaving, this.currentDraft());
-      this.draftDomain.revokeHumanTask(true);
-      this.search.hide();
-      this.sessions = startNewSession(this.sessions);
-      this.draftDomain.departureBlocked = false;
-      clearLastViewedConversation();
-      this.requestUpdate();
-      return;
-    }
-    if (storeActiveId === null && this.search.hasPlace) {
-      // WP1.1 S1.13 — the bare address is the result list when this window has one: Back/Forward
-      // between results and a conversation returns to the list, its query and its chosen files.
-      if (!this.draftDomain.returnToResults()) { this.blockDeparture(); return; }
-      this.draftDomain.departureBlocked = false;
-      clearLastViewedConversation();
-      return;
-    }
-    if (storeActiveId === null) {
-      // The hero is a real address (the bare surface URL), so arriving back at it is the teardown
-      // New session does — minus the focus move, which belongs to the affordance, and minus the
-      // CLAIM, which would push a history entry for a move the browser already made and truncate
-      // the forward tail with it. See {@link resetToHero}.
-      if (!this.draftDomain.resetToHero(true, true)) { this.blockDeparture(); return; }
-      this.draftDomain.departureBlocked = false;
-      // The pointer still follows: the tab is on the hero now, so a reload must not resurrect the
-      // conversation the reader just left. This one is a browser-local write with no emission, so
-      // it cannot reach the projector.
-      clearLastViewedConversation();
-      return;
-    }
-    // An edit in another row is DROPPED rather than committed, the same rule every other move
-    // between conversations applies.
-    this.renamingId = null;
-    if (!this.draftDomain.swapPlace(storeActiveId)) { this.blockDeparture(); return; }
-    this.draftDomain.departureBlocked = false;
-    const now = Date.now();
-    if (sessionById(this.sessions, storeActiveId) === null) {
-      this.sessions = mergeStoreConversations(this.sessions, [
-        { id: storeActiveId, title: null, firstUserMessage: '', createdAt: now, lastActiveAt: now },
-      ]);
-    }
-    this.sessions = focusSession(this.sessions, storeActiveId, now);
-    // The tab is reading this conversation now, so a reload must land on it — the pointer follows
-    // the address rather than competing with it.
-    setLastViewedConversation(storeActiveId);
-    this.contextDomain.recordNotice = false;
-    this.closePane();
-    void this.setComposerState('docked');
-    void this.contextDomain.refreshRecord(storeActiveId);
-    void this.contextDomain.refreshHistory(storeActiveId);
-  }
-
   private revealRecoveryOutcome(): void {
     const warning = this.draftDomain.recoveryError, departure = this.draftDomain.departureBlocked;
     this.requestUpdate();
@@ -1782,12 +1604,6 @@ export class SearchV3View extends JfElement {
       const row = this.shadowRoot?.querySelector<HTMLElement>('[data-testid="sv3-residency-notice"]');
       if (row) row.scrollTop = 0;
     });
-  }
-
-  private blockDeparture(): void {
-    this.draftDomain.departureBlocked = true;
-    this.draftDomain.revokeHumanTask(true);
-    this.revealRecoveryOutcome();
   }
 
   /* ── The effective context (tempdoc 610, ported by 852 S2) ────────────────────────────────── */
@@ -1917,7 +1733,7 @@ export class SearchV3View extends JfElement {
     // A locked history returns 423 without lineage. The base row of this same lock-safe filter
     // supplies structural parent pointers without opening content or growing the sidebar.
     if (this.historyLocked && session !== null && session.history === null
-      && !this.conversations.some(row => row.id === session.id)) {
+      && !this.sessionsDomain.conversations.some(row => row.id === session.id)) {
       needed.set(JSON.stringify([session.id, EMPTY_PREFIX_SENTINEL]),
         { base: session.id, point: EMPTY_PREFIX_SENTINEL });
     }
@@ -1948,7 +1764,7 @@ export class SearchV3View extends JfElement {
     const session = this.activeSession;
     if (session === null) return nothing;
     const ownRead = this.forkReads.get(JSON.stringify([session.id, EMPTY_PREFIX_SENTINEL]));
-    const metadata = session.history ?? this.conversations.find(row => row.id === session.id)
+    const metadata = session.history ?? this.sessionsDomain.conversations.find(row => row.id === session.id)
       ?? ownRead?.rows?.find(row => row.id === session.id);
     const parent = metadata?.parentSessionId;
     const point = metadata?.branchPointMessageId;
@@ -2181,42 +1997,9 @@ export class SearchV3View extends JfElement {
     return true;
   }
 
-  /**
-   * Open a conversation this window has just created. The same four moves a row click makes
-   * ({@link onSessionSelect}) — project the row, focus it, claim it, load both records — plus the
-   * one a row click does not need: RE-LIST.
-   *
-   * Re-listing updates recents and invalidates complete fork reads, including older versions
-   * outside the sidebar window. The fork reads finish independently of opening or sending.
-   */
-  private async openBranch(id: string, task?: HumanTask): Promise<boolean> {
-    const prevId = this.sessions.activeId;
-    if (!this.draftDomain.swapPlace(id, task)) return false;
-    const now = Date.now();
-    this.sessions = mergeStoreConversations(this.sessions, [
-      { id, title: null, firstUserMessage: '', createdAt: now, lastActiveAt: now },
-    ]);
-    this.sessions = focusSession(this.sessions, id, now);
-    if (task !== undefined) {
-      task.saved.target = id;
-      task.draft = { ...task.draft, edit: this.composerDraft.snapshot().edit };
-      this.draftDomain.saveRecovery(task);
-    }
-    this.claimConversation(id);
-    this.contextDomain.recordNotice = false;
-    // The same rule `onSessionSelect` applies: an edit in another row is DROPPED rather than
-    // committed, because navigating away must not write text the reader walked away from.
-    this.renamingId = null;
-    // 857 D4 (drafted as 854) — same guard as `onSessionSelect`: close only on a real switch, using the id captured
-    // before the claim above (`this.sessions === before` identity is not this method's guard — its
-    // callers already establish it is a real switch or a branch that's always new, but comparing ids
-    // directly here keeps the two sites' close logic identical rather than relying on caller proofs).
-    if (prevId !== id) this.closePane();
-    void this.setComposerState('docked');
-    await Promise.all([this.contextDomain.refreshRecord(id), this.contextDomain.refreshHistory(id), loadConversations()]);
-    return true;
+  private openBranch(id: string, task?: HumanTask): Promise<boolean> {
+    return this.sessionsDomain.openConversation(id, task);
   }
-
   /**
    * The reader paged to another version of a turn. It is an OPEN, not a write: the target is a real
    * conversation and claiming it is what claiming any conversation does, so this routes through the
@@ -2270,11 +2053,10 @@ export class SearchV3View extends JfElement {
     const locked = deriveSv3HistoryLocked(this.historyLocked, snapshot);
     if (locked === this.historyLocked) return;
     this.historyLocked = locked;
-    this.recentEpoch += 1;
+    this.sessionsDomain.invalidateRecentEpoch();
     if (!locked) {
       this.lockedRefusal = false;
-      this.recentConversationsReady = false;
-      void this.refreshRecents();
+      this.sessionsDomain.refreshUnlockedRecents();
     }
   }
 
@@ -2284,7 +2066,7 @@ export class SearchV3View extends JfElement {
    * transcript readable until the next poll agrees.
    */
   private noteRefusedWhileLocked(): void {
-    this.recentEpoch += 1;
+    this.sessionsDomain.invalidateRecentEpoch();
     this.historyLocked = true;
     this.lockedRefusal = true;
   }
@@ -2902,7 +2684,7 @@ export class SearchV3View extends JfElement {
     const composer = this.composer;
     if (composer !== null) {
       const id = this.search.showing ? null : this.sessions.activeId;
-      this.liveDraftOwner = id === null ? null : { id, draft: this.composerDraft.snapshot() };
+      this.sessionsDomain.noteLiveDraft(id);
     }
     if (this.draftDomain.retiredHandoffText !== null && detail.text !== this.draftDomain.retiredHandoffText) {
       this.draftDomain.clearRetiredHandoff();
@@ -2926,7 +2708,7 @@ export class SearchV3View extends JfElement {
     if (!this.draftDomain.draftMayIssue()) return false;
     if (!this.draftDomain.enterResults(this.currentDraft(), text)) return false;
     const query = text.trim();
-    this.recentSearches = [query, ...this.recentSearches.filter(value => value !== query)].slice(0, 8);
+    this.sessionsDomain.recordSearch(query);
     this.composer?.closeRecents();
     this.search.submit(query);
     return true;
@@ -3160,7 +2942,6 @@ export class SearchV3View extends JfElement {
     this.draftDomain.changeTier((event as CustomEvent<Sv3TierChange>).detail?.tier);
   }
 
-
   /** Pin the session before the export's independent reads can yield to navigation. */
   private exportActiveConversation(): void {
     const session = this.activeSession;
@@ -3204,7 +2985,7 @@ export class SearchV3View extends JfElement {
     this.sessions = submitInSession(this.sessions, text, Date.now(), 'agent', target);
     const ref = latestTurnRef(this.sessions);
     if (ref === null) return;
-    this.claimConversation(ref.sessionId);
+    this.sessionsDomain.claimConversation(ref.sessionId);
     this.runDomain.dispatch(ref, text, this.effort);
   }
 
@@ -3272,115 +3053,21 @@ export class SearchV3View extends JfElement {
     return this.aiSnapshot?.runtime.modelLabel ?? null;
   }
 
-  /**
-   * A row click CLAIMS that conversation and shows its transcript. It re-runs nothing: a session is
-   * a thread now, and re-issuing its opening question on a click would append a turn the reader
-   * never asked for (Phase F1 — A2's row click re-ran the search, which was right for a search list
-   * and is wrong for a conversation).
-   */
   private onSessionSelect(event: Event): void {
-    const id = (event as CustomEvent<Sv3SessionSelect>).detail?.id ?? '';
-    // An edit in another row is DROPPED rather than committed, the spec's rule:
-    // navigating away must not write text the reader walked away from.
-    this.renamingId = null;
-    const before = this.sessions;
-    const prevId = before.activeId;
-    if (sessionById(before, id) === null) return; // unknown id — nothing was claimed, so nothing to record
-    if (!this.draftDomain.swapPlace(id)) return;
-    this.sessions = focusSession(this.sessions, id, Date.now());
-    if (this.sessions === before) return;
-    this.claimConversation(id);
-    // 857 D4 (drafted as 854) — the evidence pane belongs to the conversation it was opened against; a real switch
-    // closes it. Guarded on the id captured BEFORE the claim, not object identity: focusSession
-    // returns a NEW list even when id === prevId (it stamps lastVisitedAt on the row), so an
-    // unguarded closePane() here would also fire on a re-click of the already-active row.
-    if (prevId !== id) this.closePane();
-    // The RECORD is what the reader is being shown, so it is fetched on the claim rather than trusted
-    // from whatever this window happened to still hold (inventory D1).
-    void this.contextDomain.refreshRecord(id);
-    void this.contextDomain.refreshHistory(id);
-    void this.setComposerState('docked');
-    // Tempdoc 864 Layer 1(a) — a claim leaves the reader at a ready composer, so the caret goes there.
-    // This is also what takes focus OFF the row button the click parked it on: that control swaps the
-    // conversation on a bare `Space`, and a reader who believes they are typing is one keystroke from
-    // swapping the thread they just opened (§2.7b).
-    void this.focusComposer();
+    this.sessionsDomain.selectSession((event as CustomEvent<Sv3SessionSelect>).detail?.id ?? '');
   }
 
-  /**
-   * The two pointers a claim moves, both shared authorities: the store's active conversation (what
-   * the product thinks is open) and the per-tab reload pointer (what THIS tab was reading — 609
-   * Phase 3, and per-tab on purpose, so a second tab lands cold rather than adopting this one's thread).
-   */
-  private claimConversation(id: string): void {
-    this.draftDomain.departureBlocked = false;
-    setActiveConversation(id);
-    setLastViewedConversation(id);
-  }
-
-  /**
-   * The reader names a conversation (tempdoc 822 Phase F5). The three phases meet here because the
-   * window owns the list: the row raises intent, the panel says which row, and only this decides.
-   * `commit` routes through `renameSession`, so an empty title reverts by the pure module's rule
-   * rather than by a check duplicated at the view.
-   */
   private onSessionRename(event: Event): void {
     const detail = (event as CustomEvent<Sv3SessionRename>).detail;
     if (detail === undefined) return;
-    if (detail.phase === 'start') {
-      this.renamingId = detail.id;
-      return;
-    }
+    if (detail.phase === 'start') { this.renamingId = detail.id; return; }
     this.renamingId = null;
-    if (detail.phase !== 'commit') return;
-    const previous = sessionById(this.sessions, detail.id);
-    const before = previous?.title ?? '';
-    const wasRenamed = previous?.renamed ?? false;
-    this.sessions = renameSession(this.sessions, detail.id, detail.title ?? '');
-    const after = sessionById(this.sessions, detail.id)?.title ?? '';
-    // WRITTEN THROUGH to the conversation store, which is where a name now LIVES (tempdoc 838: a
-    // sealed `title` on the conversation's own record, not a browser-local map) — so it survives the
-    // process, a cleared site-data and a second client, and every surface listing this conversation
-    // shows the one the reader chose. Derived from the pure module's OUTCOME rather than re-deciding
-    // here: `resolveSv3Rename` stays the one place an empty or unchanged title is judged.
-    if (after !== before) void this.writeTitleThrough(detail.id, after, before, wasRenamed);
+    if (detail.phase === 'commit') this.sessionsDomain.renameSession(detail.id, detail.title ?? '');
   }
 
-  /**
-   * The write half of a rename, and the one thing the optimistic update owes the reader: a name the
-   * store REFUSED is put back and said out loud (tempdoc 838). The store reverts the row itself; this
-   * reverts the window's own list, which is a separate copy, and words the two cases the same way
-   * every other mutation in this product words them — a `423` is the lock, in the ONE reason
-   * vocabulary, and anything else is a plain failure that names the status rather than hiding it.
-   */
-  private async writeTitleThrough(
-    id: string,
-    title: string,
-    before: string,
-    wasRenamed: boolean,
-  ): Promise<void> {
-    const written = await setConversationTitle(id, title, 'user');
-    if (written.ok) return;
-    this.sessions = restoreSessionTitle(this.sessions, id, before, wasRenamed);
-    emitEphemeralToast({
-      message:
-        written.status === 423
-          ? `${reasonFor('conversations.locked').wording} — that name was not saved.`
-          : SV3_RENAME_FAILED,
-      severity: 'warning',
-    });
-  }
-
-  /**
-   * The reader parks a conversation on the Pinned shelf, or takes it off. It is a list write and
-   * nothing else — pinning does not claim the conversation, does not reorder anything, and does not
-   * move a run off the Active shelf (a blocked run cannot be hidden; `projectSv3Sessions` owns that).
-   */
   private onSessionPin(event: Event): void {
-    const id = (event as CustomEvent<Sv3SessionPin>).detail?.id ?? '';
-    this.sessions = toggleSessionPin(this.sessions, id);
+    this.sessionsDomain.pinSession((event as CustomEvent<Sv3SessionPin>).detail?.id ?? '');
   }
-
   /**
    * What the window knows about work in flight (tempdoc 831), read in ONE place and handed to both
    * the projection that paints the rows and the removal that refuses a live one. Two callers of one
@@ -3404,100 +3091,11 @@ export class SearchV3View extends JfElement {
     };
   }
 
-  /**
-   * The reader discards a conversation (tempdoc 831). `removeSession` DECIDES — including the
-   * refusal for a conversation with work in flight — and the deletion is WRITTEN THROUGH to the
-   * conversation store, the authority for a conversation's existence.
-   *
-   * THE ROW LEAVES WHEN THE STORE SAYS IT LEFT (852 S3), not on the press. This used to be
-   * optimistic, which the cascade port made untenable: the delete can now stop and ASK ("this has 2
-   * branches — delete those too?"), and asking about a row that has already vanished from the list
-   * behind the dialog is asking about something the reader can no longer see. Removing on the answer
-   * also retires the restore-by-re-list dance the optimistic version needed for every refusal.
-   */
   private onSessionRemove(event: Event): void {
-    if (this.removing) return;
-    const id = (event as CustomEvent<Sv3SessionRemove>).detail?.id ?? '';
-    const gate = this.runGate();
-    // The DECISION, taken now and carried into the write: an unchanged list is the refusal (work in
-    // flight), and nothing else may happen on a refusal. The gate travels with it rather than being
-    // re-derived after the await — the reader's press is what is being answered, and by the time the
-    // store answers it has already deleted the conversation regardless of what has started since.
-    if (removeSession(this.sessions, id, gate) === this.sessions) return;
-    void this.deleteThroughStore(id);
+    this.sessionsDomain.removeSession((event as CustomEvent<Sv3SessionRemove>).detail?.id ?? '');
   }
 
-  /** Discover, confirm once, and remove only identities the Engine confirms are gone. */
-  private async deleteThroughStore(id: string): Promise<void> {
-    this.removing = true;
-    const consent = new AbortController();
-    this.removalConfirmation = consent;
-    // Capture before discovery, not when its reads eventually return.
-    const owner = this.liveDraftOwner;
-    const originalDraft = owner !== null && owner.id === this.sessions.activeId
-      && owner.draft.port.isCurrent(owner.draft) ? owner : null;
-    this.removalDraft = null;
-    let tree: DeleteTreeEntry[] = [];
-    const report = (result: DeleteCascadeResult) => {
-      this.forgetDeletedConversations(result.deletedIds ?? []);
-      if (!result.ok && !result.cancelled) {
-        emitEphemeralToast({ message: conversationDeleteOutcome(result, tree), severity: 'warning' });
-      }
-    };
-    try {
-      const result = await deleteConversationWithCascade(id, async (children, preview) => {
-        tree = preview;
-        const confirmed = await confirmConversationTree(children, preview, this.apiBase || '', consent.signal);
-        if (!confirmed || consent.signal.aborted) return false;
-        if (originalDraft !== null && this.liveDraftOwner === originalDraft
-          && preview.some(row => row.id === originalDraft.id)) this.removalDraft = originalDraft;
-        // Once accepted, navigation cancels neither the Engine write nor its truthful reports.
-        this.removalConfirmation = null;
-        return true;
-      }, report);
-      report(result);
-      // Only an unresolved identity can still be confirmed by this operation's later reconciliation.
-      if (originalDraft === null || !result.unconfirmedIds?.includes(originalDraft.id)) this.removalDraft = null;
-    } finally {
-      if (this.removalConfirmation === consent) this.removalConfirmation = null;
-      this.removing = false;
-    }
-  }
-
-  /** A server-confirmed deletion also retires this window's transcript and restore pointer. */
-  private forgetDeletedConversations(ids: readonly string[]): void {
-    for (const gone of ids) {
-      const owned = this.removalDraft;
-      if (owned?.id === gone) {
-        if (this.isConnected && this.sessions.activeId === gone && owned.draft.port.isCurrent(owned.draft)) owned.draft.port.clearIf(owned.draft);
-        this.removalDraft = null;
-      }
-      this.draftDomain.placeScopes.delete(gone);
-      this.draftDomain.placeTiers.delete(gone);
-      this.contextDomain.forgetConversation(gone);
-      this.runDomain.forgetConversation(gone);
-      if (this.sessions.activeId === gone) this.draftDomain.resetToHero();
-      if (readLastViewedConversation() === gone) clearLastViewedConversation();
-      if (this.renamingId === gone) this.renamingId = null;
-      // Server confirmation wins even over stale local run state: the content is already gone.
-      this.sessions = { ...this.sessions, sessions: this.sessions.sessions.filter(s => s.id !== gone) };
-    }
-  }
-
-  /**
-   * New session: back to the hero with an empty draft and nothing claimed about the corpus. The
-   * sessions so far stay in the list — starting one is not ending the others. An in-flight response
-   * IS ended, because its own session is no longer the one on screen and a stream nobody is watching
-   * still spends a connection.
-   */
-  private onSessionNew(): void {
-    this.draftDomain.startFreshSession();
-    // Tempdoc 864 Layer 1(a) — a fresh hero exists to be typed into, and the affordance that asked
-    // for it is a control the reader's focus is now parked on (the sidebar's new-session button, or
-    // the palette's command) — the §2.7b state where a bare `Space` re-activates it.
-    void this.focusComposer();
-  }
-
+  private onSessionNew(): void { this.sessionsDomain.newSession(); }
   /**
    * The Stop slot serves BOTH streams, because there is one slot. Which one it halts is decided here,
    * by which one is actually running — the composer says the reader pressed Stop and nothing more.
@@ -3719,10 +3317,10 @@ export class SearchV3View extends JfElement {
           .schemaDraft=${this.draftDomain.schemaDraft}
           .filterNote=${this.filterNote}
           .filterError=${this.askDomain.askFilterError || (this.search.snapshot?.errorInfo?.status === 400 && this.search.snapshot.errorInfo.code !== 'SEARCH_SYNTAX_INVALID' ? this.search.snapshot.errorInfo.message : '')}
-          .recentItems=${this.recentItems}
+          .recentItems=${this.sessionsDomain.recentItems}
           .recentLocked=${this.historyLocked}
-          @sv3-recents-refresh=${() => { void this.refreshRecents(); }}
-          @sv3-recents-clear=${this.clearRecents}
+          @sv3-recents-refresh=${() => { void this.sessionsDomain.refreshRecents(); }}
+          @sv3-recents-clear=${() => this.sessionsDomain.clearRecents()}
           @sv3-recent-select=${this.onRecentSelect}
           .structuredError=${this.askDomain.structuredError}
           task-notice=${this.draftDomain.retiredHandoffNotice || this.draftDomain.handoffNotice || (this.draftDomain.preparedHandoff?.shapeId === 'core.summarize' ? 'Summarize prepared. Edit the instruction and send.' : '')}

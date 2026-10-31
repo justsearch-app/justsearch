@@ -1,0 +1,98 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
+  },
+  "createdAt": "2026-10-31T04:16:40.135Z",
+  "revision": "c678e421e9c51436a658085f4e9aed6777f18987",
+  "tree": "01459a09373ac0b95c35e8cc6ec37983ae5262b9",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/search-v3/SearchV3View.sessionNavigation.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/9k_6o1yo/tmp/test-intent-vitest-2-1793420196477.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 3657
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.sessionNavigation.test.ts",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.sessionNavigation.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:b7627d124e4841798a8c636a04b0bc945fd4aeaba01cdeb632c84e7ce83b6d3f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "'row' opening keeps the shown conversation when draft acknowledgement fails ('unavailable')",
+          "status": "passed"
+        },
+        {
+          "name": "'row' opening keeps the shown conversation when draft acknowledgement fails ('nonack')",
+          "status": "passed"
+        },
+        {
+          "name": "'row' opening keeps the shown conversation when draft acknowledgement fails ('stale')",
+          "status": "passed"
+        },
+        {
+          "name": "'row' opening keeps the shown conversation when draft acknowledgement fails ('capacity')",
+          "status": "passed"
+        },
+        {
+          "name": "'version' opening keeps the shown conversation when draft acknowledgement fails ('unavailable')",
+          "status": "passed"
+        },
+        {
+          "name": "'version' opening keeps the shown conversation when draft acknowledgement fails ('nonack')",
+          "status": "passed"
+        },
+        {
+          "name": "'version' opening keeps the shown conversation when draft acknowledgement fails ('stale')",
+          "status": "passed"
+        },
+        {
+          "name": "'version' opening keeps the shown conversation when draft acknowledgement fails ('capacity')",
+          "status": "passed"
+        },
+        {
+          "name": "'address' opening keeps the shown conversation when draft acknowledgement fails ('unavailable')",
+          "status": "passed"
+        },
+        {
+          "name": "'address' opening keeps the shown conversation when draft acknowledgement fails ('nonack')",
+          "status": "passed"
+        },
+        {
+          "name": "'address' opening keeps the shown conversation when draft acknowledgement fails ('stale')",
+          "status": "passed"
+        },
+        {
+          "name": "'address' opening keeps the shown conversation when draft acknowledgement fails ('capacity')",
+          "status": "passed"
+        },
+        {
+          "name": "unknown rows do nothing; reselecting the active row refreshes both records without closing evidence",
+          "status": "passed"
+        },
+        {
+          "name": "A to B to A restores each conversation draft, tier, schema and file scope without sending",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:419bbe1dba94c9036a9d4fdb0a6462ab1aa0f7196ce3697a5e46ba0df2ab5a7e"
+}
