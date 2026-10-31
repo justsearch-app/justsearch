@@ -17,17 +17,17 @@ The archived change is adapted to main's managed API-key verification (#838), re
         "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaServerStartupHealthPollTest.java"
       ],
       "class": "New",
-      "behaviour": "D1-D4: Startup health polls pause 25, 50, 100, 200, 400, then 500 ms, serially and capped. Each context step-down, reasoning retry, initial/recovery lost-bind retry and later start resets the pause; waitForServerHealthOnce shares it. Actual request timing fails on baseline 30ec14d39b with a flat 500 ms first pause, independent of the observation seam.",
+      "behaviour": "D1-D4: Startup health polls pause 25, 50, then 100 ms for every later pause, serially and with a dedicated startup cap. Each context step-down, reasoning retry, initial/recovery lost-bind retry and later start resets the pause; waitForServerHealthOnce shares it. Actual request timing fails on baseline 30ec14d39b with a flat 500 ms first pause, independent of the observation seam.",
       "sources": [
         {
           "kind": "owner-words",
-          "quote": "in LlamaServerOps' startup health wait only, the pause between /health polls starts at 25 ms and doubles to the existing 500 ms cap (25, 50, 100, 200, 400, then 500 ms), local to each call of the wait (so each physical launch attempt starts again at 25 ms).",
+          "quote": "in LlamaServerOps' startup health wait only, the pause between /health polls is 25 ms, then 50 ms, then 100 ms for every later pause (a 100 ms cap of its own, separate from any other interval), local to each call of the wait. Probes stay serial. Nothing else changes.",
           "location": "task startup-health-backoff request"
         }
       ],
       "newChecks": [
         "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaServerStartupHealthPollTest.java#aServerReadyJustAfterTheFirstPollIsSeenAfterOneShortPause",
-        "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaServerStartupHealthPollTest.java#aLongLoadIsPolledSeriallyOnAGrowingPauseCappedAtTheOldInterval",
+        "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaServerStartupHealthPollTest.java#aLongLoadIsPolledSeriallyOnAGrowingPauseCappedAt100Ms",
         "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaServerStartupHealthPollTest.java#aSteppedDownRelaunchStartsAgainAtTheShortestPause",
         "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaServerStartupHealthPollTest.java#aReasoningFlagRetryStartsAgainAtTheShortestPause",
         "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaServerStartupHealthPollTest.java#aLostBindRetryStartsAgainAtTheShortestPause",
@@ -77,5 +77,13 @@ The baseline is a shared clone at `30ec14d39b`, with only the new test class and
 additive exit option overlaid. It uses its own build directory. Run-evidence runs there
 without `--before` because the sandbox cannot create Git worktree metadata in the parent repository.
 The baseline evidence is `gates/test-intent/evidence/startup-health-backoff-before.json`.
+
+## Live acceptance (D6)
+
+The former 25-to-500 ms schedule missed readiness by 267-420 ms on real compact-model
+loads of 2.5-3.5 s. The dedicated 100 ms startup cap keeps later polls one short pause apart.
+D6 (at most approximately 100 ms from llama-server's `main: model loaded` to JustSearch's
+`Server healthy`) is checked live by the orchestrator's verifier; the builder does not run
+real models or use the GPU. The 10 s progress-log interval remains unchanged.
 
 ## Acceptance records

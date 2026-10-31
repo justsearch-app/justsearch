@@ -46,17 +46,17 @@ import tools.jackson.databind.ObjectMapper;
 
 /**
  * The startup health wait of {@link LlamaServerOps}: it polls {@code /health} soon after a launch
- * and backs off to the old 500 ms interval (25, 50, 100, 200, 400, then 500 ms), anew for every
+ * and backs off to a dedicated 100 ms cap (25, 50, then 100 ms), anew for every
  * physical launch attempt. A server that is healthy within milliseconds is seen within
- * milliseconds; a long load is polled serially and, once capped, no more often than before.
+ * milliseconds; a long load is polled serially with a 100 ms pause once capped.
  *
  * <p>The pauses are read through the launcher's {@code startupHealthPauses} seam where the tree has
  * it; on a tree without it nothing is recorded. The probes are also timed where they arrive, at the
  * server, which needs no seam.
  */
 final class LlamaServerStartupHealthPollTest {
-  /** The pauses a wait that never sees health takes: it doubles from 25 ms to the 500 ms cap. */
-  private static final List<Long> LADDER = List.of(25L, 50L, 100L, 200L, 400L, 500L);
+  /** The pauses a wait that never sees health takes: it doubles from 25 ms to the 100 ms cap. */
+  private static final List<Long> LADDER = List.of(25L, 50L, 100L);
 
   @TempDir Path tmp;
   private LlamaServerOps ops;
@@ -103,10 +103,10 @@ final class LlamaServerStartupHealthPollTest {
 
   /**
    * A long load: nine loading answers, then healthy. The pauses double from 25 ms and stop at the
-   * 500 ms cap; the polls never overlap; once capped, they come no more often than every 500 ms.
+   * 100 ms cap; the polls never overlap or come closer than their scheduled pause.
    */
   @Test
-  void aLongLoadIsPolledSeriallyOnAGrowingPauseCappedAtTheOldInterval() throws Exception {
+  void aLongLoadIsPolledSeriallyOnAGrowingPauseCappedAt100Ms() throws Exception {
     ScriptedHealth health = scriptedServer();
     ops = ops(new AtomicInteger());
     List<Long> pauses = recordPauses(ops);
@@ -116,15 +116,18 @@ final class LlamaServerStartupHealthPollTest {
     ops.waitForServerHealth(start);
 
     assertFastFirstPolls();
-    assertEquals(List.of(25L, 50L, 100L, 200L, 400L, 500L, 500L, 500L, 500L), pauses,
-        "a doubling pause from 25 ms that stops at the 500 ms cap");
+    assertEquals(List.of(25L, 50L, 100L, 100L, 100L, 100L, 100L, 100L, 100L), pauses,
+        "a doubling pause from 25 ms that stops at the dedicated 100 ms startup cap");
     List<Long> arrivals = health.waitArrivals();
     assertEquals(10, arrivals.size(), "one poll per pause, plus the first: " + arrivals);
     assertEquals(1, health.mostInFlight(), "the polls are serial");
-    for (int i = 6; i < arrivals.size(); i++) {
+    for (int i = 1; i < arrivals.size(); i++) {
       long gapMs = TimeUnit.NANOSECONDS.toMillis(arrivals.get(i) - arrivals.get(i - 1));
-      assertTrue(gapMs >= 490, "capped: never more often than every 500 ms; gap " + i + "=" + gapMs);
-      assertTrue(gapMs < 1_000, "capped: the pause stops growing at 500 ms; gap " + i + "=" + gapMs);
+      long scheduledMs = LADDER.get(Math.min(i - 1, LADDER.size() - 1));
+      assertTrue(gapMs >= scheduledMs,
+          "never closer than the scheduled " + scheduledMs + " ms pause; gap " + i + "=" + gapMs);
+      assertTrue(gapMs < 300,
+          "the pause stops growing at 100 ms; gap " + i + "=" + gapMs);
     }
   }
 

@@ -96,9 +96,9 @@ final class LlamaServerOps {
   private static final long HEALTH_CHECK_TIMEOUT_MS =
       SUPERVISION_POLICY.healthCheckTimeoutMs(); // SYS-PROP-LEGACY-COMPAT: read in policy defaults() at static init
   // Startup polling (gates/test-intent/.changesets/startup-health-backoff.md): a server that is
-  // healthy within milliseconds is seen within milliseconds, and a long model load is polled no
-  // more often than before once the cap is reached (25, 50, 100, 200, 400, then 500 ms).
-  private static final long HEALTH_CHECK_INTERVAL_MS = 500;
+  // healthy within milliseconds is seen within milliseconds, including after a long model load
+  // (25, 50, then 100 ms for every later pause). This cap belongs only to the startup wait.
+  private static final long STARTUP_HEALTH_MAX_INTERVAL_MS = 100;
   private static final long HEALTH_CHECK_FIRST_INTERVAL_MS = 25;
   private static final long HEALTH_CHECK_PROGRESS_LOG_INTERVAL_MS = 10_000;
   private static final String PATH_HEALTH = "/health";
@@ -1307,7 +1307,7 @@ final class LlamaServerOps {
             "Health check interrupted",
             e);
       }
-      pollIntervalMs = Math.min(pollIntervalMs * 2, HEALTH_CHECK_INTERVAL_MS);
+      pollIntervalMs = Math.min(pollIntervalMs * 2, STARTUP_HEALTH_MAX_INTERVAL_MS);
     }
 
     throw new ModeTransitionException(
