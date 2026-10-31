@@ -518,3 +518,14 @@ The behavioural replacements were selected by method name and run on both states
   "note": "Independent verifier (codex gpt-6.1-sol) on 86b1bb73be: entries 1-12 accepted; 20 repair checks reproduced as assertion failures at 9eb36cc792 with the compatibility patch and pass on the candidate; 4 preservation checks pass on both."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "orchestrator",
+  "session": "36cedc77-c806-45bd-af3b-93bd126c9108",
+  "verdict": "accept",
+  "digest": "sha256:ff9598acd46cf36049847d46c6a5f30b55a5d06e3de908d879f78b0fd3e87a6b",
+  "note": "Rebase onto 6ececc210f: the only flagged item whose before content changed is WorkerIngestServiceDocumentIdentityTest (main #1072 added uncertainIdentityRekeyStopsRenamePublication); this branch's diff to that file is byte-identical to the one the verifier accepted (01a19281-7bd8-7071-b23d-246fc2d1152e), it is not cited by this changeset's evidence, and all other entries' patches are identical (git range-diff). Verifier's entries 1-12 acceptance carried forward."
+}
+```
