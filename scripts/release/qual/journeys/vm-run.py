@@ -233,11 +233,16 @@ with tarfile.open(fileobj=sys.stdout.buffer,mode='w|') as archive:
                 fields.append(row)
         # Resolve attribution while the original reports are still present.
         collection_errors = []
-        installed = vm.ssh('ubuntu', 'dpkg-query -L just-search', capture_output=True, text=True, timeout=30)
-        if installed.returncode not in (0, 1):
+        paths = set()
+        try:
+            installed = vm.ssh('ubuntu', 'dpkg-query -L just-search', capture_output=True, text=True, timeout=30)
+            if installed.returncode not in (0, 1):
+                raise Infrastructure('Installed package paths unavailable for crash attribution')
+            if installed.returncode == 0:
+                paths = set(installed.stdout.splitlines())
+        except Exception as exc:
             # Package and process evidence can still identify a product crash.
-            collection_errors.append(Infrastructure('Installed package paths unavailable for crash attribution'))
-        paths = set(installed.stdout.splitlines()) if installed.returncode == 0 else set()
+            collection_errors.append(exc)
         process_record = out / ('evidence' if (out / 'evidence').is_dir() else 'run') / 'app-processes.json'
         processes = json.loads(process_record.read_text()) if process_record.exists() else []
         if before_install:
@@ -249,8 +254,11 @@ with tarfile.open(fileobj=sys.stdout.buffer,mode='w|') as archive:
         previous = json.loads(record.read_text()) if record.exists() else []
         record.write_text(json.dumps(previous + fields, indent=2) + '\n')
         recorded = '/var/crash/qualification-recorded-' + str(time.time_ns())
-        vm.guest_root('ubuntu', 'mkdir ' + shlex.quote(recorded) + '; mv -- '
-                      + shlex.join('/var/crash/' + n for n in names) + ' ' + shlex.quote(recorded) + '/')
+        try:
+            vm.guest_root('ubuntu', 'mkdir ' + shlex.quote(recorded) + '; mv -- '
+                          + shlex.join('/var/crash/' + n for n in names) + ' ' + shlex.quote(recorded) + '/')
+        except Exception as exc:
+            collection_errors.append(exc)
         product = [r for r in fields if r['attribution'] == 'product']
         if product:
             failure = AssertionError('Product crash in guest: ' + json.dumps(product))

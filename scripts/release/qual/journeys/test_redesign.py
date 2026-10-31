@@ -372,6 +372,20 @@ class PollingTests(unittest.TestCase):
 
 class CrashTests(unittest.TestCase):
     def test_failed_path_lookup_preserves_product_and_infrastructure_verdicts(self):
+        self.assert_collection_verdicts(lookup='failed')
+
+    def test_path_lookup_timeout_preserves_product_and_infrastructure_verdicts(self):
+        self.assert_collection_verdicts(lookup='timeout')
+
+    def test_report_move_failure_preserves_product_and_infrastructure_verdicts(self):
+        self.assert_collection_verdicts(lookup='ok', move_fails=True)
+
+    def test_report_move_and_lookup_failures_preserve_all_verdicts(self):
+        for lookup in ('failed', 'timeout'):
+            with self.subTest(lookup=lookup):
+                self.assert_collection_verdicts(lookup=lookup, move_fails=True)
+
+    def assert_collection_verdicts(self, *, lookup, move_fails=False):
         from test_repair5 import Round2Tests
         for during_setup in (False, True):
             for attribution in ('package', 'process'):
@@ -386,12 +400,17 @@ class CrashTests(unittest.TestCase):
                     original = Round2Tests().crash_ssh(root)
                     def ssh(_, command, **kw):
                         if command == 'dpkg-query -L just-search':
+                            if lookup == 'timeout':
+                                raise subprocess.TimeoutExpired(command, 30, output='/tmp/unknown\n')
                             # Partial stdout from a failed lookup must not be trusted.
-                            return NS(returncode=2, stdout='/tmp/unknown\n')
+                            return NS(returncode=0 if lookup == 'ok' else 2,
+                                      stdout='' if lookup == 'ok' else '/tmp/unknown\n')
                         return original(_, command, **kw)
                     def guest_root(_, command):
                         if command.startswith('mkdir '):
                             self.assertTrue((out / 'guest-crashes.json').is_file())
+                            if move_fails:
+                                raise subprocess.CalledProcessError(1, command, stderr='mv: Permission denied')
                             subprocess.run(['sh', '-c', command.replace('/var/crash', str(root))], check=True)
                     def prepare(args, out):
                         (out / 'run').mkdir()
@@ -414,17 +433,27 @@ class CrashTests(unittest.TestCase):
                         target.return_value.json.side_effect = runner.Infrastructure('No VM counters in this test')
                         wrapper.run_overlay(args, out, 'candidate', ['J7'])
                     report = json.loads((out / 'summary.json').read_text())
-                    self.assertEqual(report['counts']['failed-product'], 1)
-                    self.assertEqual(report['counts']['failed-infrastructure'], 1)
+                    # A failed move leaves the report for the final sweep to collect again.
+                    sweeps = 2 if during_setup and move_fails else 1
+                    self.assertEqual(report['counts']['failed-product'], sweeps)
+                    self.assertEqual(report['counts']['failed-infrastructure'],
+                                     sweeps * ((lookup != 'ok') + move_fails))
                     checks = [c for j in report['journeys'] for c in j['checks']]
-                    self.assertIn('package paths unavailable', next(
-                        c for c in checks if c['status'] == 'failed-infrastructure')['reason'])
+                    reasons = [c['reason'] for c in checks if c['status'] == 'failed-infrastructure']
+                    if lookup != 'ok':
+                        lookup_reason = 'timed out' if lookup == 'timeout' else 'package paths unavailable'
+                        self.assertEqual(sum(lookup_reason in r for r in reasons), sweeps)
+                    if move_fails:
+                        self.assertEqual(sum('mv --' in r for r in reasons), sweeps)
                     crashes = json.loads((out / 'guest-crashes.json').read_text())
-                    self.assertEqual(crashes[0]['attribution'], 'product')
-                    self.assertEqual(crashes[0]['fields']['Signal'], '11')
+                    self.assertEqual(len(crashes), sweeps)
+                    for crash in crashes:
+                        self.assertEqual(crash['attribution'], 'product')
+                        self.assertEqual(crash['fields']['Signal'], '11')
                     self.assertEqual(report['guestCrashes'], crashes)
-                    self.assertFalse((root / 'app.crash').exists())
-                    self.assertEqual(len(list(root.glob('qualification-recorded-*/app.crash'))), 1)
+                    self.assertEqual((root / 'app.crash').exists(), move_fails)
+                    self.assertEqual(len(list(root.glob('qualification-recorded-*/app.crash'))),
+                                     0 if move_fails else 1)
 
     def test_attribution_is_completed_before_reports_move(self):
         from test_repair5 import Round2Tests
