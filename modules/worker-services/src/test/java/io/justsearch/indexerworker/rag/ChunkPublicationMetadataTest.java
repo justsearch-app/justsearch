@@ -76,9 +76,16 @@ final class ChunkPublicationMetadataTest extends LuceneExecutorTestBase {
     bean.setThreadAllocatedMemoryEnabled(true);
     String small = "## Heading\nparagraph words go here\n".repeat(6000);
     String large = small + small;
-    allocated(bean, small); allocated(bean, large);
-    long a = allocated(bean, small), b = allocated(bean, large);
-    assertTrue(b < a * 3.0, "doubling content allocated " + a + " -> " + b + " bytes");
+    for (int warmup = 0; warmup < 3; warmup++) {
+      allocated(bean, small);
+      allocated(bean, large);
+    }
+    long a = Long.MAX_VALUE, b = Long.MAX_VALUE;
+    for (int sample = 0; sample < 3; sample++) {
+      a = Math.min(a, allocated(bean, small));
+      b = Math.min(b, allocated(bean, large));
+    }
+    assertTrue(b <= a * 2.6, "doubling content allocated " + a + " -> " + b + " bytes");
   }
 
   private long allocated(com.sun.management.ThreadMXBean bean, String text) {

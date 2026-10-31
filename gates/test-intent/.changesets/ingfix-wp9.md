@@ -9,7 +9,10 @@ author-session: 01a19138-440e-7410-b519-33d274de04ae
 
 The gate flags 48 existing files between 9eb36cc7923b530624f7ced8ea0bc678f0011b31 and this branch. The eight isolated new test sources remain exempt. Apply Excludes root-relative matching for completed ad-hoc imports (C14 partly) is open and is not claimed here.
 
-Named newChecks are assertion fail-before checks only; supplementary preservation checks are recorded in prose. No test-support overlays are needed: both NoVolumeIdentityExtension helpers already exist unchanged at the before-state. Before-state compilation uses gates/test-intent/compatibility/ingfix-wp9-before.patch, which adds only a no-op collection cancellation signature and a journal overload forwarding to the old method. Two Mockito verifications are wrapped in assertDoesNotThrow so the evidence classifier recognizes their unchanged assertions. No acceptance record is authored here.
+Named newChecks are assertion fail-before checks only; supplementary preservation checks are recorded in prose. No test-support overlays are needed: both NoVolumeIdentityExtension helpers already exist unchanged at the before-state. Before-state compilation uses gates/test-intent/compatibility/ingfix-wp9-before.patch, which adds only a no-op collection cancellation signature and a journal overload forwarding to the old method. One Mockito verification is wrapped in assertDoesNotThrow so the evidence classifier recognizes its unchanged assertion. No acceptance record is authored here.
+
+
+The behavioural replacements were selected by method name and run on both states. The before-state was a shared clone at 9eb36cc7923b530624f7ced8ea0bc678f0011b31 with only the compatibility patch and candidate check files applied. D42 measured 51,056,016 -> 197,689,680 allocated bytes (3.87x) before and 3,405,904 -> 6,817,088 bytes (2.00x) on the candidate; the 2.6x bound has margin on both sides. C36 failed before with “returned count must equal rows removed after unrefreshed publication for serving: expected 3 but was 0” and passed on the candidate across all three routes. The published metadata equality comparisons passed on both states as preservation checks.
 
 ```json
 {
@@ -219,10 +222,11 @@ Named newChecks are assertion fail-before checks only; supplementary preservatio
     },
     {
       "items": [
-        "modules/worker-services/src/test/java/io/justsearch/indexerworker/rag/ChunkDocumentWriterLineFieldsTest.java"
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/rag/ChunkDocumentWriterLineFieldsTest.java",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/rag/ChunkPublicationMetadataTest.java"
       ],
       "class": "Defect pin",
-      "behaviour": "Per-document metadata indexing preserves prefix line/heading laws at every offset, including inside headings, CRLF and PDF/Office markers; fixed-seed generated inputs exercise whitespace and heading boundaries.",
+      "behaviour": "Doubling similarly chunked content requires near-linear publication allocation under the shared mutation fence. Preservation check ChunkDocumentWriterLineFieldsTest#D42PublishedMetadataKeepsPrefixLawsIncludingInsideHeadings compares published line/heading metadata with prefix laws across overlapping chunks, offsets inside headings, CRLF, PDF/Office markers and fixed-seed generated whitespace and heading boundaries; it passes on both states and is not a repair pin.",
       "sources": [
         {
           "kind": "delegated-choice",
@@ -251,12 +255,12 @@ Named newChecks are assertion fail-before checks only; supplementary preservatio
           "choice": "C29. D42 — metadata work must scale with content plus chunk count: each child scans prefixes for lines and headings while publication holds the shared fence; compare similarly chunked sizes and heading densities, checking scan/allocation work and fence duration.",
           "label": "agent choice"
         },
-        "reproduction": "Build the per-document metadata index and compare its public lineNumber and precedingHeading observations with the existing prefix laws at every offset of representative and generated documents."
+        "reproduction": "Publish similarly chunked Markdown documents of N and 2N characters under FileMutationFence; after warmup, compare the minimum thread-allocated bytes from three paired samples and require doubled content to allocate at most 2.6 times as much. Metadata equality against the prefix laws is a preservation check."
       },
-      "reproduction": "Build the per-document metadata index and compare its public lineNumber and precedingHeading observations with the existing prefix laws at every offset of representative and generated documents.",
+      "reproduction": "Publish similarly chunked Markdown documents of N and 2N characters under FileMutationFence; after warmup, compare the minimum thread-allocated bytes from three paired samples and require doubled content to allocate at most 2.6 times as much. Metadata equality against the prefix laws is a preservation check.",
       "evidence": "gates/test-intent/evidence/ingfix-wp9.json",
       "newChecks": [
-        "modules/worker-services/src/test/java/io/justsearch/indexerworker/rag/ChunkDocumentWriterLineFieldsTest.java#D42IndexedMetadataKeepsPrefixLawsAtEveryOffsetIncludingInsideHeadings"
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/rag/ChunkPublicationMetadataTest.java#D42DoublingSimilarlyChunkedContentHasNearLinearPublicationAllocation"
       ]
     },
     {
@@ -264,7 +268,7 @@ Named newChecks are assertion fail-before checks only; supplementary preservatio
         "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerIngestServiceCandidateReconciliationTest.java"
       ],
       "class": "Defect pin",
-      "behaviour": "Candidate reconciliation cannot delete without recorded/current volume proof; collection removal cancels its queued work and refreshes the snapshot used for deletion counts before committing.",
+      "behaviour": "Candidate reconciliation cannot delete without recorded/current volume proof; collection removal cancels its queued work and reports the actual number of removed parent/chunk rows, including just-published unrefreshed rows and repeated deletion through serving, same-runtime pre-Green and distinct-candidate routes. Existing journal ordering and exactly-one mutation obligations remain.",
       "sources": [
         {
           "kind": "delegated-choice",
@@ -293,7 +297,7 @@ Named newChecks are assertion fail-before checks only; supplementary preservatio
       ],
       "defectSource": {
         "kind": "defect-source",
-        "reproduction": "Reconcile a missing candidate source under unknown volume and require refusal without deletes. Exercise pre-Green path and collection deletion and require collection queue cancellation and the refreshes needed for current-snapshot counts.",
+        "reproduction": "Reconcile a missing candidate source under unknown volume and require refusal without deletes. Through real runtimes, publish and commit one parent plus two chunks without refreshing the runtime searcher, independently count the committed rows, delete the collection and assert the returned count equals rows actually removed; repeat and require zero. Exercise serving, same-runtime pre-Green and distinct-candidate routing. Preserve journal-before-effect ordering, collection queue cancellation and exactly one effect per request without asserting refresh call counts.",
         "stronger": {
           "kind": "delegated-choice",
           "delegationQuote": "proceed autonomously with designing all of the smallers and critical fixes. then proceed with implementing them accordingly.",
@@ -303,7 +307,7 @@ Named newChecks are assertion fail-before checks only; supplementary preservatio
           "label": "agent choice"
         }
       },
-      "reproduction": "Reconcile a missing candidate source under unknown volume and require refusal without deletes. Exercise pre-Green path and collection deletion and require collection queue cancellation and the refreshes needed for current-snapshot counts.",
+      "reproduction": "Reconcile a missing candidate source under unknown volume and require refusal without deletes. Through real runtimes, publish and commit one parent plus two chunks without refreshing the runtime searcher, independently count the committed rows, delete the collection and assert the returned count equals rows actually removed; repeat and require zero. Exercise serving, same-runtime pre-Green and distinct-candidate routing. Preserve journal-before-effect ordering, collection queue cancellation and exactly one effect per request without asserting refresh call counts.",
       "evidence": "gates/test-intent/evidence/ingfix-wp9.json",
       "newChecks": [
         "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerIngestServiceCandidateReconciliationTest.java#candidateReconciliationKeepsAbsentRowsWithoutRecordedOrCurrentVolume",

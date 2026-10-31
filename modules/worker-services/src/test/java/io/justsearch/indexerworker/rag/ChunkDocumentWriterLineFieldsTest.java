@@ -2,6 +2,11 @@ package io.justsearch.indexerworker.rag;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
+import io.justsearch.adapters.lucene.runtime.IndexingCoordinator;
+import io.justsearch.indexing.SchemaFields;
+import io.justsearch.indexing.api.IndexDocument;
+import io.justsearch.indexing.chunking.ChunkParentRevision;
+import io.justsearch.indexing.chunking.ChunkSplitter;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -12,7 +17,7 @@ import org.junit.jupiter.api.Test;
 class ChunkDocumentWriterLineFieldsTest {
 
   @Test
-  void D42IndexedMetadataKeepsPrefixLawsAtEveryOffsetIncludingInsideHeadings() throws Exception {
+  void D42PublishedMetadataKeepsPrefixLawsIncludingInsideHeadings() {
     var samples = new java.util.ArrayList<>(java.util.List.of("  leading\n## Heading words  \nbody\n### Next\nmore",
         "# Title\r\n\r\n## Section\r\ntext", "#\ncontinued heading\nbody", "plain\ntext", "## Page 1\nPDF text\n## Sheet 2\nOffice text"));
     var random = new java.util.Random(917);
@@ -23,15 +28,34 @@ class ChunkDocumentWriterLineFieldsTest {
       samples.add(text.toString());
     }
     for (String content : samples) {
-      Class<?> type;
-      try { type = Class.forName("io.justsearch.indexerworker.rag.ChunkOffsetMath$MetadataIndex"); }
-      catch (ClassNotFoundException missing) { throw new AssertionError("Publication needs a per-document metadata index", missing); }
-      Object index = type.getConstructor(String.class).newInstance(content);
-      for (int offset = -1; offset <= content.length() + 1; offset++) {
-        assertEquals(ChunkOffsetMath.calculateLineNumber(content, offset),
-            type.getMethod("lineNumber", int.class).invoke(index, offset));
-        assertEquals(ChunkOffsetMath.findPrecedingHeading(content, offset),
-            type.getMethod("precedingHeading", int.class).invoke(index, offset), "offset " + offset + " in " + content);
+      var chunks = new java.util.ArrayList<ChunkSplitter.Chunk>();
+      for (int offset = 0; offset < content.length(); offset++) {
+        int end = offset + 1;
+        while (end < content.length() && content.substring(offset, end).isBlank()) end++;
+        if (!content.substring(offset, end).isBlank()) {
+          chunks.add(ChunkSplitter.Chunk.of(chunks.size(), content.substring(offset, end), offset, end));
+        }
+      }
+      var writer = org.mockito.Mockito.mock(IndexingCoordinator.class);
+      org.mockito.Mockito.doAnswer(invocation -> {
+        var fields = invocation.getArgument(0, IndexDocument.class).fields();
+        int start = Integer.parseInt((String) fields.get(SchemaFields.CHUNK_START_CHAR));
+        int end = Integer.parseInt((String) fields.get(SchemaFields.CHUNK_END_CHAR));
+        assertEquals(String.valueOf(ChunkOffsetMath.calculateLineNumber(content, start)),
+            fields.get(SchemaFields.CHUNK_START_LINE));
+        assertEquals(String.valueOf(ChunkOffsetMath.calculateLineNumber(content, end - 1)),
+            fields.get(SchemaFields.CHUNK_END_LINE));
+        var heading = ChunkOffsetMath.findPrecedingHeading(content, start);
+        assertEquals(heading.text(), fields.get(SchemaFields.CHUNK_HEADING_TEXT),
+            "offset " + start + " in " + content);
+        assertEquals(String.valueOf(heading.level()), fields.get(SchemaFields.CHUNK_HEADING_LEVEL));
+        return null;
+      }).when(writer).indexSingle(org.mockito.ArgumentMatchers.any(IndexDocument.class));
+      var plan = new ChunkDocumentWriter.ChunkPlan(ChunkParentRevision.sha256Hex(content), chunks);
+      for (String kind : java.util.List.of("markdown", "pdf", "office")) {
+        assertEquals(chunks.size(), ChunkDocumentWriter.replaceDeclaredChunks(writer, "/parent", content,
+            new ChunkDocumentWriter.ParentChunkMetadata(null, null, kind, null, null, null, "uid"),
+            plan, false));
       }
     }
   }
