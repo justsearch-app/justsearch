@@ -89,8 +89,11 @@ def cancel_result(observation):
 
 def powershell(source, *, timeout=60):
     encoded = base64.b64encode(('$ErrorActionPreference="Stop"; ' + source).encode('utf-16-le')).decode()
+    # A pwsh parent supplies its own modules, which Windows PowerShell 5.1 cannot
+    # load. With no inherited PSModulePath, powershell.exe builds its own defaults.
+    environment = {k: v for k, v in os.environ.items() if k.lower() != 'psmodulepath'}
     result = subprocess.run(['powershell.exe', '-NoProfile', '-NonInteractive', '-EncodedCommand', encoded],
-                            capture_output=True, text=True, timeout=timeout)
+                            capture_output=True, text=True, timeout=timeout, env=environment)
     if result.returncode:
         raise Infrastructure(f'PowerShell observation failed (exit={result.returncode}): ' + result.stderr[-3000:] + result.stdout[-1000:])
     return result.stdout.strip().lstrip('\ufeff')

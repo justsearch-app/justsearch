@@ -12,6 +12,39 @@ import windows
 
 
 class WindowsEvidenceTests(unittest.TestCase):
+    def test_powershell_child_rebuilds_its_module_path_without_mutating_the_parent(self):
+        from unittest.mock import Mock, patch
+        for module_key in ('PSModulePath', 'PSMODULEPATH', 'psmodulepath', None):
+            environment = {'SystemRoot': r'C:\Windows', 'PATH': r'C:\Windows\System32'}
+            if module_key:
+                environment[module_key] = r'C:\Program Files\PowerShell\7\Modules'
+            with self.subTest(module_key=module_key), \
+                    patch.dict(windows.os.environ, environment, clear=True), \
+                    patch.object(windows.subprocess, 'run', return_value=Mock(
+                        returncode=0, stdout='\ufeffobserved\n', stderr='')) as child:
+                parent = dict(windows.os.environ)
+                self.assertEqual(windows.powershell('Get-FileHash fixture.txt', timeout=12), 'observed')
+                self.assertEqual(child.call_args.args[0][0], 'powershell.exe')
+                self.assertEqual(child.call_args.kwargs.get('env') or parent,
+                                 {k: v for k, v in parent.items() if k.lower() != 'psmodulepath'})
+                self.assertEqual(child.call_args.kwargs['timeout'], 12)
+                self.assertEqual(dict(windows.os.environ), parent)
+
+    def test_settings_powershell_spawn_also_has_no_inherited_module_path(self):
+        import tempfile
+        from pathlib import Path
+        from unittest.mock import Mock, patch
+        target = windows.Target()
+        target.env = windows.clean_environment({
+            'SystemRoot': r'C:\Windows', 'PSModulePath': r'C:\Program Files\PowerShell\7\Modules'}, 'setup')
+        with tempfile.TemporaryDirectory() as temp, \
+                patch.object(windows.subprocess, 'Popen', return_value=Mock(pid=123)) as child, \
+                patch.object(windows, 'spawned_identity', return_value={'pid': 123}):
+            target.spawn(['powershell.exe', '-NoProfile', '-Command',
+                          "Start-Process 'ms-settings:defaultapps'"], Path(temp) / 'settings.log')
+        self.assertFalse(any(k.lower() == 'psmodulepath' for k in child.call_args.kwargs['env']))
+        self.assertEqual(child.call_args.kwargs['env']['SYSTEMROOT'], r'C:\Windows')
+
     def test_j5_requires_prepared_models_and_authored_records_on_both_platforms(self):
         from unittest.mock import Mock, patch
         from contextlib import ExitStack
