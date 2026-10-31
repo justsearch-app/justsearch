@@ -520,7 +520,7 @@ it('merge model action after a no-match hand-off preserves the prepared draft an
   expect(body.shapeId).toBe('core.free-chat');expect(body).not.toHaveProperty('selection');
   expect(body).not.toHaveProperty('context');expect(body).not.toHaveProperty('docIds');
   expect(q<HTMLTextAreaElement>(await composer(view), 'sv3-composer-input')!.value).toBe(draft);
-  expect((view as unknown as {preparedHandoff: unknown}).preparedHandoff).toEqual({shapeId: 'core.rag-ask', selection: selected});
+  expect((view as unknown as { draftDomain: {preparedHandoff: unknown} }).draftDomain.preparedHandoff).toEqual({shapeId: 'core.rag-ask', selection: selected});
 });
 
 
@@ -543,7 +543,7 @@ it.each([{label:'inline trace',instruction:'Explain in one sentence. Trace: spar
   input.value=instruction;input.dispatchEvent(new Event('input',{bubbles:true,composed:true}));await drain(view);
   if(instruction==='') {
     q<HTMLButtonElement>(c,'sv3-composer-send')!.click();await drain(view);
-    expect(dispatches()).toHaveLength(0);expect((view as unknown as {preparedHandoff:{selection:unknown}}).preparedHandoff.selection).toEqual(selection);
+    expect(dispatches()).toHaveLength(0);expect((view as unknown as { draftDomain: {preparedHandoff:{selection:unknown}} }).draftDomain.preparedHandoff.selection).toEqual(selection);
   } else {
     const body=await send(view);expect(body).toMatchObject({shapeId:'core.summarize',selection});
     const main=view.shadowRoot!.querySelector('jf-sv3-main') as HTMLElement & {turns: readonly {selectionKind?:string}[]};
