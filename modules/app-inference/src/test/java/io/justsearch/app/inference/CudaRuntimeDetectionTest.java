@@ -14,20 +14,34 @@ import org.junit.jupiter.api.io.TempDir;
 class CudaRuntimeDetectionTest {
 
   @Test
-  @DisplayName("Null executable returns null")
+  // Null executable returns null
   void nullExecutable() {
     assertNull(CudaRuntimeDetection.detectCudaRuntimeWarning(null));
   }
 
   @Test
-  @DisplayName("No ggml-cuda.dll returns null (no warning)")
+  // Missing Windows CUDA library retains its diagnostic and returns null
   void noGgmlCudaDll(@TempDir Path dir) {
     Path fakeExe = dir.resolve("llama-server.exe");
-    assertNull(CudaRuntimeDetection.detectCudaRuntimeWarning(fakeExe));
+    var logger = (ch.qos.logback.classic.Logger) org.slf4j.LoggerFactory.getLogger(CudaRuntimeDetection.class);
+    var previousLevel = logger.getLevel();
+    logger.setLevel(ch.qos.logback.classic.Level.WARN);
+    var messages = new ch.qos.logback.core.read.ListAppender<ch.qos.logback.classic.spi.ILoggingEvent>();
+    messages.start();
+    logger.addAppender(messages);
+    try {
+      assertNull(CudaRuntimeDetection.detectCudaRuntimeWarning(fakeExe,
+          io.justsearch.configuration.NativeTargets.forTarget("windows-x86_64")));
+      assertTrue(messages.list.stream().anyMatch(event -> event.getFormattedMessage().contains("ggml-cuda.dll not found")));
+    } finally {
+      logger.detachAppender(messages);
+      logger.setLevel(previousLevel);
+      messages.stop();
+    }
   }
 
   @Test
-  @DisplayName("Large statically-linked ggml-cuda.dll returns null")
+  // Large statically-linked ggml-cuda.dll returns null
   void largeStaticDll(@TempDir Path dir) throws IOException {
     Path fakeExe = dir.resolve("llama-server.exe");
     Files.createFile(fakeExe);
@@ -36,11 +50,11 @@ class CudaRuntimeDetectionTest {
     try (RandomAccessFile raf = new RandomAccessFile(ggmlCuda.toFile(), "rw")) {
       raf.setLength(250_000_000L);
     }
-    assertNull(CudaRuntimeDetection.detectCudaRuntimeWarning(fakeExe));
+    assertNull(CudaRuntimeDetection.detectCudaRuntimeWarning(fakeExe, io.justsearch.configuration.NativeTargets.forTarget("windows-x86_64")));
   }
 
   @Test
-  @DisplayName("Small dynamically-linked dll with cudart present returns null")
+  // Small dynamically-linked dll with cudart present returns null
   void smallDllWithCudart(@TempDir Path dir) throws IOException {
     Path fakeExe = dir.resolve("llama-server.exe");
     Files.createFile(fakeExe);
@@ -48,17 +62,45 @@ class CudaRuntimeDetectionTest {
     Files.write(dir.resolve("ggml-cuda.dll"), new byte[1024]);
     // CUDA runtime present
     Files.createFile(dir.resolve("cudart64_12.dll"));
-    assertNull(CudaRuntimeDetection.detectCudaRuntimeWarning(fakeExe));
+    assertNull(CudaRuntimeDetection.detectCudaRuntimeWarning(fakeExe, io.justsearch.configuration.NativeTargets.forTarget("windows-x86_64")));
   }
 
   @Test
-  @DisplayName("Small dynamically-linked dll without cudart returns warning")
+  // Small dynamically-linked dll without cudart returns warning
   void smallDllWithoutCudart(@TempDir Path dir) throws IOException {
     Path fakeExe = dir.resolve("llama-server.exe");
     Files.createFile(fakeExe);
     // Small ggml-cuda.dll (dynamically linked) without any cudart
     Files.write(dir.resolve("ggml-cuda.dll"), new byte[1024]);
-    String warning = CudaRuntimeDetection.detectCudaRuntimeWarning(fakeExe);
+    String warning = CudaRuntimeDetection.detectCudaRuntimeWarning(fakeExe, io.justsearch.configuration.NativeTargets.forTarget("windows-x86_64"));
     assertTrue(warning != null && warning.contains("CUDA Toolkit runtime not found"));
   }
+  @org.junit.jupiter.params.ParameterizedTest(name = "{displayName} [{index}] {arguments}")
+  @org.junit.jupiter.params.provider.ValueSource(strings = {"Linux", "Windows 11"})
+  @org.junit.jupiter.api.parallel.ResourceLock(org.junit.jupiter.api.parallel.Resources.SYSTEM_PROPERTIES)
+  void linuxRuntimeDoesNotLogMissingWindowsDll(String hostOs, @TempDir Path dir) throws IOException {
+    String previousOs = System.getProperty("os.name");
+    Path executable = Files.createFile(dir.resolve("llama-server"));
+    Files.createFile(dir.resolve("libggml-cuda.so"));
+    Files.createFile(dir.resolve("libcudart.so.12"));
+    var logger = (ch.qos.logback.classic.Logger) org.slf4j.LoggerFactory.getLogger(CudaRuntimeDetection.class);
+    var previousLevel = logger.getLevel();
+    logger.setLevel(ch.qos.logback.classic.Level.WARN);
+    var messages = new ch.qos.logback.core.read.ListAppender<ch.qos.logback.classic.spi.ILoggingEvent>();
+    messages.start();
+    logger.addAppender(messages);
+    try {
+      System.setProperty("os.name", hostOs);
+      assertNull(CudaRuntimeDetection.detectCudaRuntimeWarning(executable,
+          io.justsearch.configuration.NativeTargets.forTarget("linux-x86_64")));
+      assertTrue(messages.list.stream().noneMatch(event -> event.getFormattedMessage().contains("ggml-cuda.dll")));
+    } finally {
+      if (previousOs == null) System.clearProperty("os.name");
+      else System.setProperty("os.name", previousOs);
+      logger.detachAppender(messages);
+      logger.setLevel(previousLevel);
+      messages.stop();
+    }
+  }
+
 }

@@ -49,6 +49,7 @@ final class IndexedRootViewSchemaTest {
     SchemaGeneratorConfig config =
         new SchemaGeneratorConfigBuilder(SchemaVersion.DRAFT_2020_12, OptionPreset.PLAIN_JSON)
             .with(jacksonModule)
+            .with(com.github.victools.jsonschema.generator.Option.MAP_VALUES_AS_ADDITIONAL_PROPERTIES)
             .build();
     schemaGenerator = new SchemaGenerator(config);
     Path cursor = Path.of("").toAbsolutePath();
@@ -62,13 +63,13 @@ final class IndexedRootViewSchemaTest {
   }
 
   @Test
-  @DisplayName("IndexedRootView schema matches the committed SSOT baseline")
+  // IndexedRootView schema matches the committed SSOT baseline
   void indexedRootViewSchema() throws Exception {
     captureOrVerify(IndexedRootView.class, "indexed-root.v1.json");
   }
 
   @Test
-  @DisplayName("baseline carries the tempdoc 813 per-root coverage fields")
+  // baseline carries the tempdoc 813 per-root coverage fields
   void baselineCarriesCoverageFields() throws Exception {
     JsonNode properties =
         MAPPER.readTree(Files.readString(schemasDir.resolve("indexed-root.v1.json")))

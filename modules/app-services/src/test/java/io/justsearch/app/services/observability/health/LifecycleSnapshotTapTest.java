@@ -1,5 +1,6 @@
 package io.justsearch.app.services.observability.health;
 
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
@@ -50,6 +51,53 @@ final class LifecycleSnapshotTapTest {
     changes.subscribeTyped(listener);
     clock = new MutableClock(T0);
     tap = new LifecycleSnapshotTap(conditions, changes, HEAD_SRC, clock);
+  }
+
+  @Test
+  void rebuildBrakeTransitionsCarryRecoveryAndClearOnRecovery() {
+    tap.accept(singleDim(ReadinessDimension.INDEX_SERVING, component("NOT_READY", "index.starting")));
+    for (String reason : List.of("index.rebuild_brake_exhausted", "index.rebuild_brake_unreadable")) {
+      var snapshot = singleDim(ReadinessDimension.INDEX_SERVING, component("DEGRADED", reason));
+      tap.accept(snapshot);
+      tap.accept(snapshot);
+      assertTrue(conditions.find("index.unavailable", "worker").isEmpty());
+      var condition = (AssertedCondition) conditions.find("schema.reindex-required", "worker").orElseThrow().body();
+      assertEquals(LifecycleSnapshotTap.toPascalReason(reason), condition.reason());
+      assertEquals("core.rebuild-index", condition.recovery().orElseThrow().target().value());
+    }
+    tap.accept(singleDim(ReadinessDimension.INDEX_SERVING, ready()));
+    assertTrue(conditions.find("index.unavailable", "worker").isEmpty());
+    assertTrue(conditions.find("schema.reindex-required", "worker").isEmpty());
+  }
+
+  @Test
+  void unreadableEnrichmentClearsTheServingGateOnlyWithFreshEvidence() {
+    tap.accept(singleDim(ReadinessDimension.INDEX_SERVING, component("NOT_READY", "index.starting")));
+    tap.accept(singleDim(ReadinessDimension.INDEX_SERVING, new ReadinessComponentView(
+        "UNKNOWN", null, "worker_status", T0.toString(), true, 1000)));
+    assertTrue(conditions.find("index.unavailable", "worker").isPresent());
+    tap.accept(singleDim(ReadinessDimension.INDEX_SERVING, component("UNKNOWN", null)));
+    assertTrue(conditions.find("index.unavailable", "worker").isEmpty());
+    assertTrue(conditions.find("embedding.readiness-unknown", "worker.enrichment").isPresent());
+    tap.accept(singleDim(ReadinessDimension.INDEX_SERVING, ready()));
+    assertTrue(conditions.find("embedding.readiness-unknown", "worker.enrichment").isEmpty());
+  }
+
+  @Test
+  void chunkDegradationUpdatesAndClearsItsOwnCondition() {
+    for (String reason : List.of("chunk_embedding.not_ready", "chunk_embedding.in_progress")) {
+      tap.accept(singleDim(ReadinessDimension.CHUNK_EMBEDDING, component("DEGRADED", reason)));
+      var condition = (AssertedCondition) assertDoesNotThrow(() ->
+          conditions.find("embedding.not-ready", "worker.chunk-embedding").orElseThrow().body());
+      assertEquals(LifecycleSnapshotTap.toPascalReason(reason), condition.reason());
+    }
+    tap.accept(singleDim(ReadinessDimension.CHUNK_EMBEDDING, component("UNKNOWN", null)));
+    assertTrue(conditions.find("embedding.not-ready", "worker.chunk-embedding").isPresent());
+    tap.accept(singleDim(ReadinessDimension.CHUNK_EMBEDDING, new ReadinessComponentView(
+        "READY", null, "worker_status", T0.toString(), true, 1000)));
+    assertTrue(conditions.find("embedding.not-ready", "worker.chunk-embedding").isPresent());
+    tap.accept(singleDim(ReadinessDimension.CHUNK_EMBEDDING, ready()));
+    assertTrue(conditions.find("embedding.not-ready", "worker.chunk-embedding").isEmpty());
   }
 
   // ----- helpers -----
@@ -608,8 +656,8 @@ final class LifecycleSnapshotTapTest {
   }
 
   @Test
-  @DisplayName("CHUNK_EMBEDDING + LAMBDAMART_MODEL non-healthy states are unmapped (no emit)")
-  void unmappedDimsAreSilent() {
+  // Chunk degradation emits a condition while an unconfigured model remains silent
+  void chunkDegradationDoesNotChangeTheUnconfiguredModelMapping() {
     Map<ReadinessDimension, ReadinessComponentView> dims = new LinkedHashMap<>();
     dims.put(
         ReadinessDimension.CHUNK_EMBEDDING, component("DEGRADED", "chunk_embedding.not_ready"));
@@ -618,8 +666,10 @@ final class LifecycleSnapshotTapTest {
 
     tap.accept(envelope(dims));
 
-    assertEquals(0, listener.size(), "Unmapped dims must produce no broadcasts");
-    assertTrue(conditions.currentSnapshot().isEmpty());
+    assertEquals(1, listener.size(), "Only the applicable unfinished chunk stage emits a condition");
+    assertEquals("embedding.not-ready", listener.events.getFirst().event().id());
+    assertEquals(1, conditions.currentSnapshot().size());
+    assertTrue(conditions.find("embedding.not-ready", "worker.chunk-embedding").isPresent());
   }
 
   // ----- support -----

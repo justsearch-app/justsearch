@@ -47,6 +47,7 @@ import {
   SEARCH_UNAVAILABLE_CAVEAT,
   MODEL_UNAVAILABLE_CAVEAT,
   PASSAGE_REDUCED_CAVEAT,
+  ENRICHMENT_INCOMPLETE_CAVEAT,
   OPTIONAL_CAPABILITY_CAVEAT,
   AI_UNAVAILABLE_CAVEAT,
   OPEN_HEALTH,
@@ -149,7 +150,8 @@ export function projectAvailability(
   // is `chat && docs>0`; here chat is already true, so the only remaining gap is zero docs.
   if (affordance === 'documents') {
     const docs = s.index?.documentCount;
-    if (docs !== undefined && isKnown(docs) && docs.value === 0) {
+    if (docs !== undefined && isKnown(docs) && docs.value === 0
+        && s.status?.worker?.countObservations?.active?.state !== 'stale') {
       // Tempdoc 596 §16.4 — condition-based `availableWhen`. If indexing is in flight the documents
       // WILL appear, so this is a TRANSIENT, forward-looking gap ("available once indexing finishes"),
       // not the settled "No documents indexed yet" dead-end. The resolving condition is known to the FE
@@ -193,6 +195,8 @@ export function projectAvailability(
             ? SEARCH_UNAVAILABLE_CAVEAT
             : consequence === 'model-unavailable'
             ? MODEL_UNAVAILABLE_CAVEAT
+            : consequence === 'enrichment-incomplete'
+            ? ENRICHMENT_INCOMPLETE_CAVEAT
             : consequence === 'passage-reduced'
             ? PASSAGE_REDUCED_CAVEAT
             : consequence === 'ai-unavailable'

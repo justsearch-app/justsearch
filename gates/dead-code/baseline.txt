@@ -26,6 +26,7 @@ src/api/generated/schema-types/folder-browse-response.ts 2 2026-07-16
 src/api/generated/schema-types/folder-files-response.ts 2 2026-07-16
 src/api/generated/schema-types/health-event.ts 3 2026-07-16
 src/api/generated/schema-types/index.ts 55 2026-10-28
+src/api/generated/schema-types/indexed-root-view.ts 2 2026-10-31
 src/api/generated/schema-types/inference-status-response.ts 2 2026-07-16
 src/api/generated/schema-types/knowledge-search-response.ts 8 2026-09-02
 src/api/generated/schema-types/live-runs-response.ts 2 2026-09-02

@@ -520,7 +520,16 @@ public interface IndexingService {
       long parentDocsTotalNer,
       long parentDocsSettledNer,
       long chunkDocsTotal,
-      long chunkDocsSettled) {
+      long chunkDocsSettled,
+      java.util.Map<String, Boolean> failedStages,
+      java.util.Map<String, Boolean> missingArtifactStages) {
+    public RootCoverage(long parentDocsTotalEmbedding, long parentDocsSettledEmbedding,
+        long parentDocsTotalSplade, long parentDocsSettledSplade, long parentDocsTotalNer,
+        long parentDocsSettledNer, long chunkDocsTotal, long chunkDocsSettled) {
+      this(parentDocsTotalEmbedding, parentDocsSettledEmbedding, parentDocsTotalSplade,
+          parentDocsSettledSplade, parentDocsTotalNer, parentDocsSettledNer,
+          chunkDocsTotal, chunkDocsSettled, java.util.Map.of(), java.util.Map.of());
+    }
 
     private static final RootCoverage ZERO = new RootCoverage(0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L);
 

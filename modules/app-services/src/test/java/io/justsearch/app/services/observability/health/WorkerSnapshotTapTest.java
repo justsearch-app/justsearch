@@ -197,6 +197,18 @@ final class WorkerSnapshotTapTest {
   // ============================================================
 
   @Test
+  void rebuildBrakeHasActionableStoppedIngestionCondition() {
+    tap.accept(schemaBlocked("BLOCKED_LEGACY"), false);
+    tap.accept(schemaBlocked("BLOCKED_REBUILD_BRAKE"), false);
+    var condition = (AssertedCondition) conditions.find("schema.blocked", "worker.schema").orElseThrow().body();
+    assertEquals("BlockedRebuildBrake", condition.reason());
+    assertEquals("core.rebuild-index", condition.recovery().orElseThrow().target().value());
+    assertTrue(condition.message().orElseThrow().contains("Indexing stopped"));
+    tap.accept(healthyView(), false);
+    assertTrue(conditions.find("schema.blocked", "worker.schema").isEmpty());
+  }
+
+  @Test
   @DisplayName("schema BLOCKED_LEGACY → schema.blocked ADDED on worker.schema (ERROR)")
   void schemaBlockedLegacy() {
     tap.accept(schemaBlocked("BLOCKED_LEGACY"), false);

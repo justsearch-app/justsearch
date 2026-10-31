@@ -174,6 +174,42 @@ def wait_embed_compat_settled(
             time.sleep(poll_interval_sec)
 
 
+def _unknown_enrichment(s: dict) -> list[str]:
+    stages = [
+        (s.get("embeddingEnabled", True), ("embeddingDocCount", "embeddingPendingCount", "embeddingFailedCount", "embeddingCoveragePercent", "chunkDocCount", "chunkEmbeddingFailedCount", "chunkVectorCoveragePercent")),
+        (s.get("spladeEnabled", True), ("spladeDocCount", "spladePendingCount", "spladeFailedCount", "spladeCoveragePercent")),
+        (s.get("nerEnabled", True), ("completedNerCount", "pendingNerCount", "failedNerCount")),
+        (s.get("chunkSpladeEnabled", False), ("chunkSpladeDocCount", "chunkSpladePendingCount", "chunkSpladeFailedCount", "chunkSpladeCoveragePercent")),
+    ]
+    reasons = (["enrichment_unknown(completeness)"]
+               if s.get("completenessKnown") is False and any(enabled for enabled, _ in stages)
+               else [])
+    reasons.extend(f"enrichment_unknown({field})" for enabled, fields in stages if enabled
+                   for field in fields if isinstance(s.get(field), (int, float)) and s[field] < 0)
+    return reasons
+
+
+def _unsuccessful_enrichment(s: dict) -> list[str]:
+    stages = {
+        "embed": (s.get("embeddingEnabled", True), "embeddingFailedCount", "embeddingPendingCount"),
+        "splade": (s.get("spladeEnabled", True), "spladeFailedCount", "spladePendingCount"),
+        "ner": (s.get("nerEnabled", True), "failedNerCount", "pendingNerCount"),
+        "chunk_embed": (s.get("embeddingEnabled", True), "chunkEmbeddingFailedCount", "chunkEmbeddingPendingCount"),
+        "chunk_splade": (s.get("chunkSpladeEnabled", False), "chunkSpladeFailedCount", "chunkSpladePendingCount"),
+    }
+    reasons = [f"enrichment_failed({stage})" for stage, (enabled, failed, _) in stages.items()
+               if enabled and s.get(failed, 0) > 0]
+    for audit in s.get("completeness", []):
+        stage = audit.get("stageId")
+        enabled, _, pending = stages.get(stage, (False, "", ""))
+        if enabled:
+            if audit.get("failed", 0) > 0 and f"enrichment_failed({stage})" not in reasons:
+                reasons.append(f"enrichment_failed({stage})")
+            if audit.get("missing", 0) > 0 and s.get(pending, 0) == 0:
+                reasons.append(f"enrichment_missing({stage})")
+    return reasons
+
+
 def _check_pipeline_complete_conditions(
     snapshot: dict,
     expected_doc_count_min: int,
@@ -183,7 +219,7 @@ def _check_pipeline_complete_conditions(
     itself — stages reporting ``*Enabled=false`` have their coverage/completion
     checks skipped, because a disabled stage's coverage stays at 0 forever and
     would otherwise hang the poll indefinitely."""
-    reasons: list[str] = []
+    reasons = _unknown_enrichment(snapshot) + _unsuccessful_enrichment(snapshot)
 
     if snapshot.get("indexState") != "IDLE":
         reasons.append("index_not_idle")
@@ -214,7 +250,10 @@ def _check_pipeline_complete_conditions(
     # embedding pipeline — disabling embed disables chunk vector coverage too.
     if embedding_enabled:
         chunk_doc_count = snapshot.get("chunkDocCount", 0)
-        if chunk_doc_count > 0 and snapshot.get("chunkVectorCoveragePercent", 0) < 99.9:
+        if (chunk_doc_count > 0 and snapshot.get("chunkVectorCoveragePercent", 0) < 99.9) or (
+            chunk_doc_count == 0 and snapshot.get("indexedDocuments", 0) > 0
+            and snapshot.get("chunkingNotRequired") is False
+        ):
             reasons.append("chunk_vectors_not_complete")
 
     # Chunk SPLADE: parallel to chunk vectors above, but gated on its own
@@ -226,8 +265,10 @@ def _check_pipeline_complete_conditions(
     # when the field is absent, not gate on a coverage percent it never
     # populates.
     if snapshot.get("chunkSpladeEnabled", False):
-        chunk_splade_doc_count = snapshot.get("chunkDocCount", 0)
-        if chunk_splade_doc_count > 0 and snapshot.get("chunkSpladeCoveragePercent", 0) < 99.9:
+        chunk_splade_doc_count = snapshot.get("chunkSpladeDocCount", snapshot.get("chunkDocCount", 0))
+        if snapshot.get("chunkSpladePendingCount", 0) > 0 or (
+            chunk_splade_doc_count > 0 and snapshot.get("chunkSpladeCoveragePercent", 0) < 99.9
+        ):
             reasons.append("chunk_splade_not_complete")
 
     if ner_enabled:
@@ -477,7 +518,7 @@ def _check_search_conditions(
     lambdamart: bool,
     base_url: str,
 ) -> list[str]:
-    reasons: list[str] = []
+    reasons = _unknown_enrichment(s) + _unsuccessful_enrichment(s)
 
     if s.get("indexState") != "IDLE":
         reasons.append("index_not_idle")
@@ -487,7 +528,9 @@ def _check_search_conditions(
         reasons.append("index_queue_not_quiescent")
 
     if dense:
-        if not s.get("chunkVectorsReady"):
+        if not s.get("chunkVectorsReady") and not (
+            s.get("chunkDocCount") == 0 and s.get("chunkingNotRequired") is True
+        ):
             reasons.append("dense_requested_but_chunk_vectors_not_ready")
         compat = s.get("embeddingCompatState", "")
         if compat not in _VALID_EMBEDDING_COMPAT:
@@ -506,8 +549,10 @@ def _check_search_conditions(
     # _check_pipeline_complete_conditions (tempdoc 931 §E item 9). Absent/false
     # (older backend) adds nothing.
     if s.get("chunkSpladeEnabled", False):
-        chunk_splade_doc_count = s.get("chunkDocCount", 0)
-        if chunk_splade_doc_count > 0 and s.get("chunkSpladeCoveragePercent", 0) < 99.9:
+        chunk_splade_doc_count = s.get("chunkSpladeDocCount", s.get("chunkDocCount", 0))
+        if s.get("chunkSpladePendingCount", 0) > 0 or (
+            chunk_splade_doc_count > 0 and s.get("chunkSpladeCoveragePercent", 0) < 99.9
+        ):
             reasons.append("chunk_splade_not_complete")
 
     if lambdamart:
@@ -526,6 +571,18 @@ def _check_index_idle_conditions(s: dict, expected_doc_count_min: int) -> list[s
 
     if s.get("buildingIndexedDocuments", 0) != 0:
         reasons.append("index_still_building")
+
+    observations = s.get("countObservations") or s.get("worker", {}).get("countObservations", {})
+    rebuilding = s.get("migrationState") in ("MIGRATING", "SWITCHING") or bool(s.get("buildingGenerationId"))
+    for name in ("active", "building", "searchable"):
+        if name == "building" and not rebuilding:
+            continue
+        reading = observations.get(name, {})
+        if reading.get("state") in ("unknown", "stale"):
+            reasons.append(f"index_count_{reading['state']}({name})")
+
+    if s.get("indexedDocumentsUnknown", False):
+        reasons.append("indexed_doc_count_unknown")
 
     if expected_doc_count_min >= 0:
         count = s.get("indexedDocuments", 0)
@@ -572,6 +629,9 @@ def flatten_status(data: dict) -> dict:
 
     contributed: dict = {}  # child-key -> the sub-record that first contributed it
     for sub_key, sub in worker.items():
+        if sub_key == "countObservations":
+            data.setdefault(sub_key, sub)
+            continue
         if not isinstance(sub, dict):
             # Direct worker field (e.g. buildStamp) — copy the leaf.
             if sub_key not in data:

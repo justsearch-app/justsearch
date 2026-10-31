@@ -532,7 +532,7 @@ final class RuntimeSession implements AutoCloseable {
     // Layer 1: base ops (no inter-ops dependencies).
     this.readPathOps = new ReadPathOps(this, components.idField());
     this.writePathOps = new WritePathOps(this, components.idField(), bridge);
-    this.indexCountOps = new IndexCountOps(bridge);
+    this.indexCountOps = new IndexCountOps(bridge, chunkCompleteness);
     this.suggestOps = new SuggestOps(bridge);
     this.facetingEngine = new FacetingEngine(bridge, fieldMapper::fieldDef);
     this.folderBrowseEngine = new FolderBrowseEngine(bridge, fieldMapper::fieldDef);

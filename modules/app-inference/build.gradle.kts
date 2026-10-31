@@ -39,6 +39,7 @@ testing {
         runtimeOnly(libs.junit.platform.launcher)
 
         // Mockito for unit tests
+        implementation(libs.logback.classic)
         implementation(libs.mockito.core)
         implementation(libs.mockito.junit.jupiter)
 

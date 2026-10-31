@@ -608,3 +608,138 @@ def test_readiness_poll_caps_request_and_sleep_to_remaining_deadline(monkeypatch
     result = readiness._poll_until_stable("http://127.0.0.1:33221", lambda s: ["pending"], 0.5, 2, 2)
     assert not result.passed
     assert len(sleeps) == 1 and clock[0] == 0.5
+
+
+@pytest.mark.parametrize("field", ["embeddingPendingCount", "spladePendingCount", "pendingNerCount", "chunkDocCount",
+    "embeddingFailedCount", "spladeFailedCount", "failedNerCount", "chunkEmbeddingFailedCount"])
+def test_unknown_enrichment_cannot_qualify_as_pipeline_or_search_ready(field):
+    snapshot = _pipeline_good_snapshot()
+    snapshot[field] = -1
+    assert any("enrichment_unknown" in reason for reason in _check_pipeline_complete_conditions(snapshot, -1))
+    assert any("enrichment_unknown" in reason for reason in _check_search_conditions(snapshot, False, False, False, ""))
+
+
+def test_unreadable_document_count_is_not_a_known_empty_index():
+    assert "indexed_doc_count_unknown" in _check_index_idle_conditions({"indexedDocumentsUnknown": True}, -1)
+
+
+def test_dense_short_only_library_qualifies_only_with_declaration():
+    snapshot = _good_snapshot(chunkVectorsReady=False, chunkDocCount=0, chunkingNotRequired=True)
+    assert _check_search_conditions(snapshot, True, False, False, "unused") == []
+    for overrides in ({"chunkingNotRequired": False}, {"chunkDocCount": -1}, {"chunkDocCount": 1}):
+        assert "dense_requested_but_chunk_vectors_not_ready" in _check_search_conditions(
+            {**snapshot, **overrides}, True, False, False, "unused")
+
+
+def test_completeness_read_failure_prevents_readiness():
+    snapshot = _good_snapshot(completenessKnown=False)
+    assert "enrichment_unknown(completeness)" in _check_search_conditions(snapshot, True, False, False, "unused")
+
+
+def test_sparse_chunks_use_their_own_applicable_population():
+    snapshot = _good_snapshot(embeddingEnabled=False, spladeEnabled=False, nerEnabled=False,
+                              chunkSpladeEnabled=True, chunkDocCount=200,
+                              chunkSpladeDocCount=4, chunkSpladeCoveragePercent=75)
+    assert "chunk_splade_not_complete" in _check_pipeline_complete_conditions(snapshot, -1)
+    snapshot["chunkSpladeCoveragePercent"] = 100
+    assert _check_pipeline_complete_conditions(snapshot, -1) == []
+    snapshot.update(chunkSpladeDocCount=0, chunkSpladeCoveragePercent=0)
+    assert _check_pipeline_complete_conditions(snapshot, -1) == []
+
+
+def test_stale_count_does_not_qualify_as_a_current_observation():
+    snapshot = _good_snapshot(countObservations={"active": {"state": "stale", "observedAtMs": 1234}})
+    assert "index_count_stale(active)" in _check_index_idle_conditions(snapshot, 1)
+    snapshot["countObservations"]["active"]["state"] = "fresh"
+    assert _check_index_idle_conditions(snapshot, 1) == []
+
+
+def test_zero_chunks_require_an_explicit_non_applicability_proof_when_reported():
+    snapshot = _good_snapshot(embeddingEnabled=True, spladeEnabled=False, nerEnabled=False,
+                              chunkDocCount=0, chunkingNotRequired=False)
+    assert "chunk_vectors_not_complete" in _check_pipeline_complete_conditions(snapshot, -1)
+    snapshot["chunkingNotRequired"] = True
+    assert _check_pipeline_complete_conditions(snapshot, -1) == []
+
+
+@pytest.mark.parametrize("coverage,ready", [(99.89, False), (99.9, True), (99.91, True)])
+def test_evaluation_keeps_its_distinct_completion_threshold(coverage, ready):
+    snapshot = _good_snapshot(embeddingEnabled=True, spladeEnabled=False, nerEnabled=False,
+                              chunkDocCount=10000, chunkVectorCoveragePercent=coverage)
+    reasons = _check_pipeline_complete_conditions(snapshot, -1)
+    assert ("chunk_vectors_not_complete" not in reasons) is ready
+
+
+def test_unreadable_building_count_is_only_required_during_a_rebuild():
+    snapshot = _good_snapshot(countObservations={"building": {"state": "unknown", "observedAtMs": 0}},
+                              migrationState="MIGRATING")
+    assert "index_count_unknown(building)" in _check_index_idle_conditions(snapshot, -1)
+    snapshot["migrationState"] = "IDLE"
+    assert _check_index_idle_conditions(snapshot, -1) == []
+
+
+def test_count_provenance_is_preserved_as_a_map_through_the_real_status_flatten():
+    from jseval.readiness import flatten_status
+    readings = {"active": {"state": "stale", "observedAtMs": 1234},
+                "searchable": {"state": "fresh", "observedAtMs": 5678}}
+    snapshot = flatten_status({"worker": {"core": {"indexedDocuments": 12}, "countObservations": readings}})
+    assert snapshot["countObservations"] == readings
+    assert "active" not in snapshot
+    assert "index_count_stale(active)" in _check_index_idle_conditions(snapshot, 1)
+
+
+@pytest.mark.parametrize("total", [None, -1, 0, 4])
+def test_sparse_pending_work_blocks_both_gates_through_flatten(total):
+    enrichment = {"embeddingEnabled": False, "spladeEnabled": False, "nerEnabled": False,
+                  "chunk": {"chunkSpladeEnabled": True, "chunkDocCount": 100,
+                            "chunkSpladePendingCount": 1, "chunkSpladeCoveragePercent": 100}}
+    if total is not None:
+        enrichment["chunk"]["chunkSpladeDocCount"] = total
+    snapshot = flatten_status({**_good_snapshot(), "worker": {"enrichment": enrichment}})
+    assert "chunk_splade_not_complete" in _check_pipeline_complete_conditions(snapshot, -1)
+    assert "chunk_splade_not_complete" in _check_search_conditions(snapshot, False, False, False, "")
+
+
+def test_older_sparse_worker_retains_conservative_population_fallback():
+    snapshot = flatten_status({**_good_snapshot(), "worker": {"enrichment": {
+        "embeddingEnabled": False, "spladeEnabled": False, "nerEnabled": False,
+        "chunk": {"chunkSpladeEnabled": True, "chunkDocCount": 100,
+                  "chunkSpladePendingCount": 0, "chunkSpladeCoveragePercent": 75}}}})
+    assert "chunk_splade_not_complete" in _check_pipeline_complete_conditions(snapshot, -1)
+    assert "chunk_splade_not_complete" in _check_search_conditions(snapshot, False, False, False, "")
+
+
+@pytest.mark.parametrize("stage,field", [("embed", "embeddingFailedCount"),
+    ("splade", "spladeFailedCount"), ("ner", "failedNerCount"),
+    ("chunk_embed", "chunkEmbeddingFailedCount"), ("chunk_splade", "chunkSpladeFailedCount")])
+@pytest.mark.parametrize("defect", ["failed", "missing", "audit_failed"])
+def test_unsuccessful_work_blocks_both_gates_through_flatten(stage, field, defect):
+    enrichment = {"embeddingEnabled": True, "spladeEnabled": True, "nerEnabled": True,
+                  "completedNerCount": 1, "pendingNerCount": 0, "completenessKnown": True,
+                  "chunk": {"chunkDocCount": 10000, "chunkVectorCoveragePercent": 100,
+                            "chunkSpladeEnabled": True,
+                            "chunkSpladeDocCount": 10000, "chunkSpladeCoveragePercent": 100}}
+    if defect == "failed":
+        (enrichment["chunk"] if stage.startswith("chunk_") else enrichment)[field] = 1
+    else:
+        enrichment["completeness"] = [{"stageId": stage, "tier": "ARTIFACT", "expected": 10000,
+                                       "present": 9999, "missing": int(defect == "missing"),
+                                       "failed": int(defect == "audit_failed")}]
+    def flatten():
+        return flatten_status({**{k: v for k, v in _good_snapshot().items() if k != field},
+                               "worker": {"enrichment": enrichment}})
+    reason = f"enrichment_{'missing' if defect == 'missing' else 'failed'}({stage})"
+    assert _check_pipeline_complete_conditions(flatten(), -1) == [reason]
+    assert _check_search_conditions(flatten(), False, False, False, "") == [reason]
+    enrichment.update(embeddingEnabled=False, spladeEnabled=False, nerEnabled=False)
+    enrichment["chunk"]["chunkSpladeEnabled"] = False
+    assert _check_pipeline_complete_conditions(flatten(), -1) == []
+    assert _check_search_conditions(flatten(), False, False, False, "") == []
+    enrichment.update(embeddingEnabled=True, spladeEnabled=True, nerEnabled=True)
+    enrichment["chunk"]["chunkSpladeEnabled"] = True
+    if defect == "failed":
+        (enrichment["chunk"] if stage.startswith("chunk_") else enrichment)[field] = 0
+    else:
+        enrichment["completeness"][0].update(present=10000, missing=0, failed=0)
+    assert _check_pipeline_complete_conditions(flatten(), -1) == []
+    assert _check_search_conditions(flatten(), False, False, False, "") == []
