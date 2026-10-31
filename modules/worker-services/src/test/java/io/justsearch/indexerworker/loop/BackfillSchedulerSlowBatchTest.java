@@ -747,6 +747,66 @@ class BackfillSchedulerSlowBatchTest {
         anyString(), any(DocumentFieldOps.EnrichmentInput.class), any());
   }
 
+  @ParameterizedTest
+  @ValueSource(ints = {0, BATCH_DOCS})
+  void wholeBatchOfFailingPreservationDoesNotStarveFollowingHealthyParents(int leadingHealthy)
+      throws Exception {
+    Map<String, Map<String, Object>> state = new java.util.LinkedHashMap<>();
+    List<String> healthy = new ArrayList<>();
+    for (int i = 0; i < leadingHealthy + 2 * BATCH_DOCS; i++) {
+      boolean failing = i >= leadingHealthy && i < leadingHealthy + BATCH_DOCS;
+      String id = (failing ? "poison-" : "healthy-") + i;
+      if (!failing) healthy.add(id);
+      state.put(id, new HashMap<>(Map.of(
+          SchemaFields.EMBEDDING_STATUS, "PENDING", SchemaFields.SPLADE_STATUS, "COMPLETED",
+          SchemaFields.NER_STATUS, "PENDING", SchemaFields.SPLADE, Map.of("original", 1f))));
+    }
+    wirePopulation(state);
+    modeledNanosPerEncode = 1_000_000L;
+    List<List<String>> sparseAttempts = new ArrayList<>();
+    sparseEncoder = mock(io.justsearch.indexerworker.splade.SpladeEncoder.class);
+    when(sparseEncoder.encodeBatch(anyList())).thenAnswer(call -> {
+      List<String> texts = call.getArgument(0);
+      sparseAttempts.add(List.copyOf(texts));
+      monotonicNanos.addAndGet(1_000_000L);
+      if (texts.stream().anyMatch(text -> text.contains("poison-"))) {
+        throw new IllegalStateException("this document cannot regenerate its postings");
+      }
+      return java.util.Collections.nCopies(texts.size(), Map.of("preserved", 1f));
+    });
+    when(indexingCoordinator.updateDocumentsBatch(anyList())).thenAnswer(call -> {
+      List<Map.Entry<String, Map<String, Object>>> updates = call.getArgument(0);
+      for (var entry : updates) {
+        assertTrue(healthy.contains(entry.getKey()), "failing parents must remain withheld");
+        assertEquals(Map.of("preserved", 1f), entry.getValue().get(SchemaFields.SPLADE));
+        state.get(entry.getKey()).putAll(entry.getValue());
+      }
+      return new LuceneRuntimeTypes.BatchUpdateResult(updates.size(), 0);
+    });
+
+    timeIdleCycle(scheduler(monotonicNanos::get));
+
+    for (String id : healthy) {
+      assertEquals("COMPLETED", state.get(id).get(SchemaFields.EMBEDDING_STATUS),
+          id + " must advance in the same idle cycle despite a fully withheld batch");
+      assertEquals("COMPLETED_EMPTY", state.get(id).get(SchemaFields.NER_STATUS));
+    }
+    for (var entry : state.entrySet()) {
+      if (!entry.getKey().startsWith("poison-")) continue;
+      assertEquals(Map.of(
+          SchemaFields.EMBEDDING_STATUS, "PENDING", SchemaFields.SPLADE_STATUS, "COMPLETED",
+          SchemaFields.NER_STATUS, "PENDING", SchemaFields.SPLADE, Map.of("original", 1f)),
+          entry.getValue(), "withheld parents retain their fields without retry charges");
+      assertEquals(2L, sparseAttempts.stream()
+          .filter(texts -> texts.contains("long content for " + entry.getKey())).count(),
+          "each failing parent is attempted once in its slice and once individually this cycle");
+    }
+    assertTrue(monotonicNanos.get() < CYCLE_BUDGET_MS * 1_000_000L);
+    assertFalse(loggedAtLevel(ch.qos.logback.classic.Level.WARN, "ZERO stage advancement"));
+    verify(indexingCoordinator, never()).updateDocumentIf(
+        anyString(), any(DocumentFieldOps.EnrichmentInput.class), any());
+  }
+
   @Test
   void costlyCompletedSpladePreservationCannotStarveNerOrDiscardEarnedVectors() throws Exception {
     Map<String, Map<String, Object>> state = new java.util.LinkedHashMap<>();

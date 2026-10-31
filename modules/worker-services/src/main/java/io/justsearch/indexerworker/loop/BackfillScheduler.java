@@ -287,7 +287,8 @@ public final class BackfillScheduler {
         // that same condition, which is how the mid-batch signal ended up costing a further ~5s of
         // GPU instead of returning control. Mode selection itself is unchanged: this cycle still
         // used the combined pass, and the next idle cycle picks the enrichment up where it stopped.
-        final boolean[] useCombinedRef = {outcome.wroteAnything() && !outcome.aborted()};
+        final boolean[] useCombinedRef = {
+            (outcome.wroteAnything() || outcome.excludedDocuments()) && !outcome.aborted()};
         final int[] tightLoopBatches = {1};
         // Tempdoc 809 finding 3: the mode-selection probe above is a full batch and is now
         // interruptible too, so it can be the call that spends the budget. Seeding from it keeps
@@ -325,9 +326,12 @@ public final class BackfillScheduler {
                 recordCombinedOutcome(tightLoopOutcome);
                 // Tempdoc 798: PROGRESS, not activity. `wroteAnything()` stays true forever for a
                 // document that is rewritten every batch without ever advancing a stage.
-                useCombinedRef[0] = tightLoopOutcome.progressed();
+                // docs/tempdocs/711-rmw-preservation-and-followup-designs.md: newly excluded
+                // parents free the pending head for this cycle without claiming published progress.
+                useCombinedRef[0] =
+                    tightLoopOutcome.progressed() || tightLoopOutcome.excludedDocuments();
+                if (tightLoopOutcome.progressed()) anyProgressThisCycle[0] = true;
                 if (useCombinedRef[0]) {
-                  anyProgressThisCycle[0] = true;
                   tightLoopBatches[0]++;
                 }
                 // Tempdoc 809 finding 3: the batch left its own document set unfinished because a
