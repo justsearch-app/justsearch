@@ -65,6 +65,49 @@ final class RecordedIngestionCoordinatorTest {
   @TempDir Path temp;
 
   @Test
+  void retainedChildPermissionRecoversAfterTransientDenialDespiteNewArrivals() throws Exception {
+    try (Fixture f = new Fixture(temp, 1)) {
+      var unreadableGeneration = new AtomicBoolean();
+      f.attachment.close();
+      f.attachment = f.coordinator.attach(f.queue, () -> {
+        if (unreadableGeneration.get()) throw new java.io.IOException("transient generation read");
+        return Optional.of(GENERATION);
+      }, () -> true);
+      Path older = temp.resolve("older");
+      var childKey = new AtomicReference<String>();
+      bindProducer(f.coordinator, (plan, key, epoch, context, cancellation) -> {
+        childKey.set(key);
+        f.queue.enqueueRecordedEntries(key, epoch, List.of(new JobQueue.EnqueueEntry(older, 1)), null);
+        return CompletableFuture.completedFuture(JobQueue.WalkEnumerationOutcome.COMPLETE);
+      });
+      var request = f.request();
+      var accepted = f.accept(request);
+      try (var work = f.admission.admit(request.context(), false)) {
+        f.runner.start(accepted, handle -> f.coordinator.execute(handle, work.context()));
+        f.coordinator.maintain();
+        assertEquals(JobQueue.RecordedClaimDecision.ALLOW, f.coordinator.recordedClaimDecision(childKey.get()));
+        f.queue.enqueue(List.of(temp.resolve("new-0"), temp.resolve("new-1")));
+        try (var connection = java.sql.DriverManager.getConnection("jdbc:sqlite:" + temp.resolve("jobs.db"));
+            var statement = connection.createStatement()) {
+          statement.executeUpdate("UPDATE jobs SET last_updated=CASE WHEN scan_id IS NULL THEN 2 ELSE 1 END");
+        }
+        unreadableGeneration.set(true);
+        assertEquals(JobQueue.RecordedClaimDecision.DENY, f.coordinator.recordedClaimDecision(childKey.get()));
+        assertEquals(temp.resolve("new-0"), f.queue.pollPending(1).getFirst().path());
+        unreadableGeneration.set(false);
+        f.coordinator.maintain();
+        assertEquals(JobQueue.RecordedClaimDecision.ALLOW, f.coordinator.recordedClaimDecision(childKey.get()));
+        f.queue.enqueue(List.of(temp.resolve("new-2")));
+        var claim = f.queue.pollPending(1).getFirst();
+        try {
+          assertEquals(older, claim.path(),
+              "refreshing retained authority must reconsider the older member on the next poll");
+        } finally { f.queue.returnUnfinishedClaims(List.of(claim)); }
+      }
+    }
+  }
+
+  @Test
   void childPermissionGrantInvalidatesClaimsBeforeAttemptingOrphanRecovery() throws Exception {
     try (Fixture f = new Fixture(temp, 1)) {
       f.attachment.close();

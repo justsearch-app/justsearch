@@ -1192,6 +1192,32 @@ final class RecordedBulkIngestionCoordinatorTest {
   }
 
   @Test
+  void retainedBulkPermissionRecoversAfterTransientDenialDespiteNewArrivals() throws Exception {
+    try (var harness = new BulkHarness(temp.resolve("bulk-recovery"))) {
+      harness.replacePhysical(buildingRuntime(harness.key));
+      harness.coordinator.maintain();
+      assertEquals(JobQueue.RecordedClaimDecision.ALLOW_FORCE, harness.coordinator.recordedClaimDecision(harness.key));
+      harness.queue.enqueue(List.of(harness.directory.resolve("new-0"), harness.directory.resolve("new-1")));
+      try (var connection = java.sql.DriverManager.getConnection("jdbc:sqlite:" + harness.directory.resolve("jobs.db"));
+          var statement = connection.createStatement()) {
+        statement.executeUpdate("UPDATE jobs SET last_updated=CASE WHEN scan_id IS NULL THEN 2 ELSE 1 END");
+      }
+      harness.unreadableRuntime.set(true);
+      assertEquals(JobQueue.RecordedClaimDecision.DENY, harness.coordinator.recordedClaimDecision(harness.key));
+      assertEquals(harness.directory.resolve("new-0"), harness.queue.pollPending(1).getFirst().path());
+      harness.unreadableRuntime.set(false);
+      harness.coordinator.maintain();
+      assertEquals(JobQueue.RecordedClaimDecision.ALLOW_FORCE, harness.coordinator.recordedClaimDecision(harness.key));
+      harness.queue.enqueue(List.of(harness.directory.resolve("new-2")));
+      var claim = harness.queue.pollPending(1).getFirst();
+      try {
+        assertEquals(harness.member, claim.path(),
+            "refreshing retained bulk authority must reconsider the older member on the next poll");
+      } finally { harness.queue.returnUnfinishedClaims(List.of(claim)); }
+    }
+  }
+
+  @Test
   void bulkPermissionGrantInvalidatesClaimsBeforeAttemptingOrphanRecovery() throws Exception {
     try (var harness = new BulkHarness(temp.resolve("bulk-grant"))) {
       JobQueue observed = mock(JobQueue.class, org.mockito.AdditionalAnswers.delegatesTo(harness.queue));
@@ -1235,6 +1261,7 @@ final class RecordedBulkIngestionCoordinatorTest {
     final AtomicBoolean failInitialRestartOnce = new AtomicBoolean();
     final AtomicBoolean initialRestartPending = new AtomicBoolean(true);
     final AtomicBoolean suppressWalkNotifications = new AtomicBoolean();
+    final AtomicBoolean unreadableRuntime = new AtomicBoolean();
     final AtomicInteger producerStarts = new AtomicInteger();
     final AtomicInteger migrationStarts = new AtomicInteger();
     final AtomicInteger restartCalls = new AtomicInteger();
@@ -1498,7 +1525,8 @@ final class RecordedBulkIngestionCoordinatorTest {
 
     private RecordedIngestionLifecycle.CheckedBulkRuntime checkedRuntime() {
       return new RecordedIngestionLifecycle.CheckedBulkRuntime() {
-        @Override public Optional<RecordedIngestionLifecycle.BulkRuntime> current() {
+        @Override public Optional<RecordedIngestionLifecycle.BulkRuntime> current() throws java.io.IOException {
+          if (unreadableRuntime.get()) throw new java.io.IOException("transient bulk runtime read");
           return Optional.of(runtime.get());
         }
 

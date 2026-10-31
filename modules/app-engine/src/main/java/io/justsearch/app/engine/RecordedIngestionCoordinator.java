@@ -390,25 +390,29 @@ final class RecordedIngestionCoordinator implements RecordedIngestionService, Re
   @Override
   public JobQueue.RecordedClaimDecision recordedClaimDecision(String key) {
     Bulk bulk = bulkPermissions.get(key);
-    if (bulk != null) return bulkClaimAllowed(bulk) ? JobQueue.RecordedClaimDecision.ALLOW_FORCE
-        : JobQueue.RecordedClaimDecision.DENY;
+    if (bulk != null) {
+      if (bulkClaimAllowed(bulk)) return JobQueue.RecordedClaimDecision.ALLOW_FORCE;
+      bulk.claimDenied.set(true);
+      return JobQueue.RecordedClaimDecision.DENY;
+    }
     Permission permission = permissions.get(key);
+    if (permission == null) return JobQueue.RecordedClaimDecision.DENY;
     Attached physical = attached;
-    if (permission == null || physical == null || physical != permission.physical || physical.stopping
-        || permission.owner.cancelled || permission.plan.roots().size() != 1) return JobQueue.RecordedClaimDecision.DENY;
+    if (physical == null || physical != permission.physical || physical.stopping
+        || permission.owner.cancelled || permission.plan.roots().size() != 1) return permission.deny();
     try {
       if (!physical.online.getAsBoolean()
-          || !physical.generation.current().filter(permission.plan.generation()::equals).isPresent()) return JobQueue.RecordedClaimDecision.DENY;
+          || !physical.generation.current().filter(permission.plan.generation()::equals).isPresent()) return permission.deny();
       boolean authorized = permission.fresh
           ? authority.allowsFreshRecordedIngest(permission.parent, permission.plan)
           : authority.evaluateRecordedIngest(permission.parent, permission.preparation,
               Optional.of(permission.plan.generation()), required -> required instanceof RequiredCapability.WorkerOnline)
               instanceof RecordedIngestRecoveryDecision.Authorized;
-      if (!authorized) return JobQueue.RecordedClaimDecision.DENY;
+      if (!authorized) return permission.deny();
       return permission.plan.roots().getFirst().force()
           ? JobQueue.RecordedClaimDecision.ALLOW_FORCE : JobQueue.RecordedClaimDecision.ALLOW;
     } catch (IOException unavailableGeneration) {
-      return JobQueue.RecordedClaimDecision.DENY;
+      return permission.deny();
     }
   }
 
@@ -1042,8 +1046,10 @@ final class RecordedIngestionCoordinator implements RecordedIngestionService, Re
           child.cancellation = null;
           child.retryEnumeration = false;
         }
-        Permission previous = permissions.put(row.key(), new Permission(physical, parent.row, parent.preparation, child.plan, child.fresh, parent));
-        if (previous == null) {
+        Permission previous = permissions.get(row.key());
+        var claimDenied = previous == null ? new java.util.concurrent.atomic.AtomicBoolean() : previous.claimDenied;
+        permissions.put(row.key(), new Permission(physical, parent.row, parent.preparation, child.plan, child.fresh, parent, claimDenied));
+        if (previous == null || claimDenied.getAndSet(false)) {
           physical.queue.recordedClaimAuthorityChanged(row.key());
           physical.queue.recoverStuckJobs();
         }
@@ -1819,7 +1825,7 @@ final class RecordedIngestionCoordinator implements RecordedIngestionService, Re
         }
         bulk.ready = true;
         Bulk previous = bulkPermissions.put(row.key(), bulk);
-        if (previous == null) {
+        if (previous == null || bulk.claimDenied.getAndSet(false)) {
           physical.queue.recordedClaimAuthorityChanged(row.key());
           physical.queue.recoverStuckJobs();
         }
@@ -2144,6 +2150,7 @@ final class RecordedIngestionCoordinator implements RecordedIngestionService, Re
     final RecordedGenerationPlan plan;
     final OperationRecordHandle handle;
     final CompletableFuture<OperationResult> completion = new CompletableFuture<>();
+    final java.util.concurrent.atomic.AtomicBoolean claimDenied = new java.util.concurrent.atomic.AtomicBoolean();
     volatile Attached physical;
     EngineWorkHandle work;
     EngineWorkHandle.Registration cancellationSubscription;
@@ -2207,7 +2214,12 @@ final class RecordedIngestionCoordinator implements RecordedIngestionService, Re
   }
 
   private record Permission(Attached physical, OperationRecord parent, OperationStore.Preparation preparation,
-      RecordedRootPlan plan, boolean fresh, Parent owner) {}
+      RecordedRootPlan plan, boolean fresh, Parent owner, java.util.concurrent.atomic.AtomicBoolean claimDenied) {
+    JobQueue.RecordedClaimDecision deny() {
+      claimDenied.set(true);
+      return JobQueue.RecordedClaimDecision.DENY;
+    }
+  }
 
   private final class Attached implements Attachment {
     final JobQueue queue;
