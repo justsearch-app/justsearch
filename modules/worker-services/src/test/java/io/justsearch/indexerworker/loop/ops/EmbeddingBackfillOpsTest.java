@@ -39,6 +39,11 @@ class EmbeddingBackfillOpsTest {
   @Mock WorkerSignalBus signalBus;
   @Mock EmbeddingProvider embeddingProvider;
 
+  @org.junit.jupiter.api.BeforeEach
+  void availableProvider() {
+    lenient().when(embeddingProvider.isAvailable()).thenReturn(true);
+  }
+
   private EmbeddingBackfillOps.BackfillContext context() {
     return new EmbeddingBackfillOps.BackfillContext(
         documentFieldOps,
@@ -51,6 +56,65 @@ class EmbeddingBackfillOpsTest {
         () -> true,
         100,
         LoggerFactory.getLogger(EmbeddingBackfillOpsTest.class));
+  }
+
+  static java.util.stream.Stream<org.junit.jupiter.params.provider.Arguments> fallbackOutages() {
+    return java.util.stream.Stream.of(false, true).flatMap(chunk ->
+        java.util.stream.Stream.of("retired", "replaced", "writesBlocked", "sessionUnavailable")
+            .map(outage -> org.junit.jupiter.params.provider.Arguments.of(chunk, outage)));
+  }
+
+  @org.junit.jupiter.params.ParameterizedTest(name = "{displayName} [{index}] {arguments}")
+  @org.junit.jupiter.params.provider.MethodSource("fallbackOutages")
+  void fallbackOutageDoesNotChargeDocumentsAndRecovers(boolean chunk, String outage) throws Exception {
+    BackfillSnapshotTestSupport.install(documentFieldOps, indexingCoordinator, !chunk, java.util.Set.of());
+    String status = chunk ? SchemaFields.CHUNK_EMBEDDING_STATUS : SchemaFields.EMBEDDING_STATUS;
+    when(documentFieldOps.queryDocIdsByField(eq(status), eq("PENDING"), anyInt()))
+        .thenReturn(List.of("first", "later"));
+    if (chunk) {
+      when(documentFieldOps.getDocumentContentBatch(anyList()))
+          .thenReturn(Map.of("first", "first content", "later", "later content"));
+    } else {
+      when(documentFieldOps.getDocumentContent("first")).thenReturn("first content");
+      when(documentFieldOps.getDocumentContent("later")).thenReturn("later content");
+    }
+    var ready = new java.util.concurrent.atomic.AtomicBoolean(true);
+    var writesAllowed = new java.util.concurrent.atomic.AtomicBoolean(true);
+    var selected = new java.util.concurrent.atomic.AtomicReference<>(embeddingProvider);
+    var failing = new java.util.concurrent.atomic.AtomicBoolean(true);
+    when(embeddingProvider.isAvailable()).thenAnswer(call -> ready.get());
+    when(embeddingProvider.embedDocumentBatch(anyList())).thenReturn(List.of());
+    when(embeddingProvider.embedDocument(anyString(), any(InferenceRequest.class))).thenAnswer(call -> {
+      if (!failing.get()) return new float[] {1f, 2f};
+      switch (outage) {
+        case "retired" -> ready.set(false);
+        case "replaced" -> selected.set(mock(EmbeddingProvider.class));
+        case "writesBlocked" -> writesAllowed.set(false);
+        case "sessionUnavailable" -> throw new io.justsearch.ort.SessionTemporarilyUnavailableException("retired session");
+        default -> throw new AssertionError(outage);
+      }
+      return null;
+    });
+    var ctx = new EmbeddingBackfillOps.BackfillContext(documentFieldOps, indexingCoordinator,
+        commitOps, signalBus, IndexingPacing.unthrottled(), selected::get, () -> true,
+        writesAllowed::get, 100, LoggerFactory.getLogger(EmbeddingBackfillOpsTest.class));
+    if (chunk) EmbeddingBackfillOps.processChunkEmbeddingBackfill(ctx);
+    else EmbeddingBackfillOps.processEmbeddingBackfill(ctx);
+    assertDoesNotThrow(() -> verify(indexingCoordinator, never()).updateDocumentIf(
+        anyString(), any(DocumentFieldOps.EnrichmentInput.class), anyMap()));
+    verify(embeddingProvider, never()).embedDocument(eq("later content"), any(InferenceRequest.class));
+
+    failing.set(false);
+    ready.set(true);
+    writesAllowed.set(true);
+    selected.set(embeddingProvider);
+    StageOutcome recovered = chunk ? EmbeddingBackfillOps.processChunkEmbeddingBackfill(ctx)
+        : EmbeddingBackfillOps.processEmbeddingBackfill(ctx);
+    assertEquals(2, recovered.docsProcessed());
+    verify(indexingCoordinator).updateDocumentIf(eq("first"), any(DocumentFieldOps.EnrichmentInput.class), argThat(update ->
+        "COMPLETED".equals(update.get(status))));
+    verify(indexingCoordinator).updateDocumentIf(eq("later"), any(DocumentFieldOps.EnrichmentInput.class), argThat(update ->
+        "COMPLETED".equals(update.get(status))));
   }
 
   @Nested

@@ -124,7 +124,36 @@ class CombinedEnrichmentRmwIntegrationTest extends io.justsearch.adapters.lucene
   }
 
   @Test
-  void failedRederivationResetsStatusAndRemovesOldPostingsWithRetry() throws Exception {
+  void absentSpladeEncoderPublishesEmbeddingAndResetsCompletedSplade() throws Exception {
+    EmbeddingProvider embedding = mock(EmbeddingProvider.class);
+    when(embedding.isAvailable()).thenReturn(true);
+    when(embedding.embedDocumentBatch(anyList())).thenReturn(List.of(new float[] {1f, 2f}));
+    String docId = "parent-without-encoder";
+    index(Map.of(
+        SchemaFields.DOC_ID, docId,
+        SchemaFields.DOC_UID, docId,
+        SchemaFields.PATH, docId + ".txt",
+        SchemaFields.CONTENT, "content for embedding",
+        SchemaFields.EMBEDDING_STATUS, SchemaFields.EMBEDDING_STATUS_PENDING,
+        SchemaFields.SPLADE_STATUS, SchemaFields.SPLADE_STATUS_COMPLETED,
+        SchemaFields.SPLADE_RETRY_COUNT, "0",
+        SchemaFields.SPLADE, Map.of("old", 2.0f)));
+    assertTrue(hasSparseHit("old", docId), "the seed must contain real sparse postings");
+
+    CombinedEnrichmentBackfillOps.processCombinedBackfill(context(embedding, null, null));
+    refresh();
+
+    assertEquals(SchemaFields.EMBEDDING_STATUS_COMPLETED,
+        runtime.documentFieldOps().getDocumentField(docId, SchemaFields.EMBEDDING_STATUS));
+    assertEquals(SchemaFields.SPLADE_STATUS_PENDING,
+        runtime.documentFieldOps().getDocumentField(docId, SchemaFields.SPLADE_STATUS));
+    assertEquals("0",
+        runtime.documentFieldOps().getDocumentField(docId, SchemaFields.SPLADE_RETRY_COUNT));
+    assertFalse(hasSparseHit("old", docId), "the baseline reset lane removes unavailable postings");
+  }
+
+  @Test
+  void failedPreservationPublishesEmbeddingAndResetsSplade() throws Exception {
     EmbeddingProvider embedding = mock(EmbeddingProvider.class);
     SpladeEncoder splade = mock(SpladeEncoder.class);
     when(embedding.isAvailable()).thenReturn(true);
@@ -144,6 +173,7 @@ class CombinedEnrichmentRmwIntegrationTest extends io.justsearch.adapters.lucene
     CombinedEnrichmentBackfillOps.processCombinedBackfill(context(embedding, splade, null));
     refresh();
 
+    assertFalse(hasSparseHit("old", docId), "failed preservation uses the baseline reset lane");
     assertEquals(
         SchemaFields.EMBEDDING_STATUS_COMPLETED,
         runtime.documentFieldOps().getDocumentField(docId, SchemaFields.EMBEDDING_STATUS));
@@ -153,9 +183,6 @@ class CombinedEnrichmentRmwIntegrationTest extends io.justsearch.adapters.lucene
     assertEquals(
         "1",
         runtime.documentFieldOps().getDocumentField(docId, SchemaFields.SPLADE_RETRY_COUNT));
-    assertFalse(
-        hasSparseHit("old", docId),
-        "failed re-derivation must not claim stale postings survived");
   }
 
   @Test

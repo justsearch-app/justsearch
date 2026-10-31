@@ -1,17 +1,23 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.indexerworker.loop;
 
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTimeoutPreemptively;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anySet;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.spi.ILoggingEvent;
@@ -124,7 +130,9 @@ class BackfillSchedulerSlowBatchTest {
   private final AtomicInteger embedCalls = new AtomicInteger();
   private final AtomicLong monotonicNanos = new AtomicLong();
   private long modeledNanosPerEncode;
+  private int combinedBatchDocs = BATCH_DOCS;
   private boolean nerPending;
+  private io.justsearch.indexerworker.splade.SpladeEncoder sparseEncoder;
   /** Only synchronous event scenarios remove the artificial stage delay. */
   private volatile long embedMsPerDoc = EMBED_MS_PER_DOC;
   private final List<Integer> eventSlices = new ArrayList<>();
@@ -300,7 +308,7 @@ class BackfillSchedulerSlowBatchTest {
         embeddingLifecycle,
         new AtomicBoolean(true),
         this::resolvedConfig,
-        () -> null,
+        () -> sparseEncoder,
         () -> null,
         () -> nerService,
         () -> null);
@@ -314,7 +322,7 @@ class BackfillSchedulerSlowBatchTest {
         documentFieldOps, indexingCoordinator, indexCountOps, commitOps, signalBus,
         io.justsearch.indexerworker.loop.pacing.IndexingPacing.unthrottled(),
         embeddingLifecycle, new AtomicBoolean(true), this::resolvedConfig,
-        () -> null, () -> null, () -> nerService, () -> null, clock);
+        () -> sparseEncoder, () -> null, () -> nerService, () -> null, clock);
   }
 
   private ResolvedConfig resolvedConfig() {
@@ -333,7 +341,7 @@ class BackfillSchedulerSlowBatchTest {
         .thenReturn(
             new ResolvedConfig.Ai.BackfillPacing(
                 defaults.pollBatchSize(),
-                BATCH_DOCS,
+                combinedBatchDocs,
                 defaults.nerBackfillBatchSize(),
                 defaults.disambiguationBackfillBatchSize(),
                 defaults.spladeBackfillBatchSize(),
@@ -579,6 +587,10 @@ class BackfillSchedulerSlowBatchTest {
     blankContentDocs = EMBED_SLICE; // write-but-never-advance documents
     embedReturnsNull = true; // the encoder runs but serves nothing usable
 
+    lenient().when(indexingCoordinator.updateDocumentsBatch(anyList())).thenAnswer(call -> {
+      List<?> updates = call.getArgument(0);
+      return new LuceneRuntimeTypes.BatchUpdateResult(1, updates.size() - 1);
+    });
     timeIdleCycle(scheduler(monotonicNanos::get));
     assertTrue(monotonicNanos.get() >= CYCLE_BUDGET_MS * 1_000_000L);
 
@@ -639,6 +651,346 @@ class BackfillSchedulerSlowBatchTest {
     assertEquals(1, nerCalls.get(), "the soft reservation must leave the later stage runnable");
     assertTrue(monotonicNanos.get() < 5_000_000_000L,
         "pending ingest, rather than the cycle budget, ends the tight loop");
+  }
+
+  private void wirePopulation(Map<String, Map<String, Object>> state) {
+    embedMsPerDoc = 0;
+    lenient().when(documentFieldOps.queryDocIdsByField(anyString(), anyString(), anyInt()))
+        .thenAnswer(call -> state.entrySet().stream()
+            .filter(entry -> call.getArgument(1).equals(entry.getValue().get(call.getArgument(0))))
+            .map(Map.Entry::getKey).toList());
+    lenient().when(documentFieldOps.queryNonChunkDocIdsByField(anyString(), anyString(), anyInt()))
+        .thenAnswer(call -> state.entrySet().stream()
+            .filter(entry -> call.getArgument(1).equals(entry.getValue().get(call.getArgument(0))))
+            .map(Map.Entry::getKey).toList());
+    lenient().when(documentFieldOps.getDocumentContentBatch(anyList())).thenAnswer(call -> {
+      Map<String, String> texts = new HashMap<>();
+      for (String id : (List<String>) call.getArgument(0)) texts.put(id, "long content for " + id);
+      return texts;
+    });
+    lenient().when(documentFieldOps.getDocumentFieldsBatch(anyList(), anySet())).thenAnswer(call -> {
+      Map<String, Map<String, String>> metadata = new HashMap<>();
+      for (String id : (List<String>) call.getArgument(0)) {
+        Map<String, String> values = new HashMap<>();
+        for (String field : (Set<String>) call.getArgument(1)) {
+          Object value = state.get(id).get(field);
+          if (value != null) values.put(field, value.toString());
+        }
+        metadata.put(id, values);
+      }
+      return metadata;
+    });
+    lenient().when(indexingCoordinator.updateDocumentsBatch(anyList())).thenAnswer(call -> {
+      List<Map.Entry<String, Map<String, Object>>> updates = call.getArgument(0);
+      updates.forEach(entry -> state.get(entry.getKey()).putAll(entry.getValue()));
+      return new LuceneRuntimeTypes.BatchUpdateResult(updates.size(), 0);
+    });
+    lenient().when(nerService.extractEntitiesBatch(anyList())).thenReturn(
+        List.of(io.justsearch.indexerworker.ner.NerResult.EMPTY));
+  }
+
+  @Test
+  void persistentlyFailingPreservationDoesNotPoisonHealthyDocumentsAcrossCycles() throws Exception {
+    Map<String, Map<String, Object>> state = new java.util.LinkedHashMap<>();
+    Map<String, Object> failingState = new HashMap<>();
+    state.put("poison", failingState);
+    wirePopulation(state);
+    combinedBatchDocs = 128; // Two preservation slices, then another combined batch.
+    modeledNanosPerEncode = 10_000_000L;
+    List<List<String>> sparseAttempts = new ArrayList<>();
+    Set<String> failedSliceIds = new java.util.HashSet<>();
+    sparseEncoder = mock(io.justsearch.indexerworker.splade.SpladeEncoder.class);
+    when(sparseEncoder.encodeBatch(anyList())).thenAnswer(call -> {
+      List<String> texts = call.getArgument(0);
+      sparseAttempts.add(List.copyOf(texts));
+      monotonicNanos.addAndGet(10_000_000L);
+      if (texts.contains("long content for poison")) {
+        throw new IllegalStateException("this document cannot regenerate its postings");
+      }
+      return java.util.Collections.nCopies(texts.size(), Map.of("preserved", 1f));
+    });
+    when(indexingCoordinator.updateDocumentsBatch(anyList())).thenAnswer(call -> {
+      List<Map.Entry<String, Map<String, Object>>> updates = call.getArgument(0);
+      for (var entry : updates) {
+        Map<String, Object> fields = entry.getValue();
+        Map<String, Object> current = state.get(entry.getKey());
+        if ("1".equals(fields.get(SchemaFields.SPLADE_RETRY_COUNT))) {
+          assertFalse(fields.containsKey(SchemaFields.SPLADE));
+          failedSliceIds.add(entry.getKey());
+          current.remove(SchemaFields.SPLADE);
+          current.put(SchemaFields.SPLADE_STATUS, "PENDING");
+        } else {
+          assertEquals(Map.of("preserved", 1f), fields.get(SchemaFields.SPLADE),
+              "documents outside the failing slice retain regenerated postings");
+        }
+        current.putAll(fields);
+      }
+      return new LuceneRuntimeTypes.BatchUpdateResult(updates.size(), 0);
+    });
+    BackfillScheduler scheduler = scheduler(monotonicNanos::get);
+    for (int cycle = 1; cycle <= 3; cycle++) {
+      sparseAttempts.clear();
+      failedSliceIds.clear();
+      failingState.clear();
+      failingState.putAll(Map.of(
+          SchemaFields.EMBEDDING_STATUS, "PENDING", SchemaFields.SPLADE_STATUS, "COMPLETED",
+          SchemaFields.NER_STATUS, "PENDING", SchemaFields.SPLADE, Map.of("original", 1f)));
+      List<String> healthy = new ArrayList<>();
+      for (int i = 0; i < 160; i++) {
+        String id = "healthy-" + cycle + "-" + i;
+        healthy.add(id);
+        state.put(id, new HashMap<>(Map.of(
+            SchemaFields.EMBEDDING_STATUS, "PENDING", SchemaFields.SPLADE_STATUS, "COMPLETED",
+            SchemaFields.NER_STATUS, "PENDING")));
+      }
+      logAppender.list.clear();
+      timeIdleCycle(scheduler);
+      for (String id : healthy) {
+        assertEquals("COMPLETED", state.get(id).get(SchemaFields.EMBEDDING_STATUS),
+            id + " must advance even with a failing document at the head");
+        assertEquals("COMPLETED_EMPTY", state.get(id).get(SchemaFields.NER_STATUS));
+      }
+      assertEquals("COMPLETED", failingState.get(SchemaFields.EMBEDDING_STATUS));
+      assertEquals("COMPLETED_EMPTY", failingState.get(SchemaFields.NER_STATUS));
+      assertEquals("PENDING", failingState.get(SchemaFields.SPLADE_STATUS));
+      assertEquals("1", failingState.get(SchemaFields.SPLADE_RETRY_COUNT));
+      assertFalse(failingState.containsKey(SchemaFields.SPLADE));
+      List<String> failedTexts = sparseAttempts.stream()
+          .filter(texts -> texts.contains("long content for poison")).findFirst().orElseThrow();
+      assertEquals(failedTexts.size(), failedSliceIds.size(),
+          "only the attempted failing slice uses the reset lane, with no individual retry");
+      for (String id : failedSliceIds) assertTrue(failedTexts.contains("long content for " + id));
+      assertFalse(loggedAtLevel(ch.qos.logback.classic.Level.WARN, "ZERO stage advancement"));
+    }
+    verify(indexingCoordinator, never()).updateDocumentIf(
+        anyString(), any(DocumentFieldOps.EnrichmentInput.class), any());
+  }
+
+  @ParameterizedTest(name = "{displayName} [{index}] {arguments}")
+  @ValueSource(ints = {0, BATCH_DOCS})
+  void wholeBatchOfFailingPreservationDoesNotStarveFollowingHealthyParents(int leadingHealthy)
+      throws Exception {
+    Map<String, Map<String, Object>> state =
+        runFailedPreservationWithFollowingHealthyParents(leadingHealthy, 1L);
+    for (var entry : state.entrySet()) {
+      if (!entry.getKey().startsWith("poison-")) continue;
+      Map<String, Object> current = entry.getValue();
+      assertEquals("COMPLETED", current.get(SchemaFields.EMBEDDING_STATUS));
+      assertEquals("0", current.get(SchemaFields.EMBEDDING_RETRY_COUNT));
+      assertArrayEquals(new float[] {0.1f, 0.2f}, (float[]) current.get(SchemaFields.VECTOR));
+      assertEquals("PENDING", current.get(SchemaFields.SPLADE_STATUS));
+      assertEquals("1", current.get(SchemaFields.SPLADE_RETRY_COUNT));
+      assertFalse(current.containsKey(SchemaFields.SPLADE));
+      assertEquals("COMPLETED_EMPTY", current.get(SchemaFields.NER_STATUS));
+      assertEquals("0", current.get(SchemaFields.NER_RETRY_COUNT));
+    }
+    verify(sparseEncoder, never()).encodeBatch(argThat(texts -> texts.size() == 1));
+  }
+
+  @ParameterizedTest(name = "{displayName} [{index}] {arguments}")
+  @ValueSource(ints = {0, BATCH_DOCS})
+  void slowFailedPreservationDoesNotStarveFollowingHealthyParents(int leadingHealthy)
+      throws Exception {
+    runFailedPreservationWithFollowingHealthyParents(leadingHealthy, 150L);
+  }
+
+  private Map<String, Map<String, Object>> runFailedPreservationWithFollowingHealthyParents(
+      int leadingHealthy, long sparseCallMillis) throws Exception {
+    Map<String, Map<String, Object>> state = new java.util.LinkedHashMap<>();
+    List<String> healthy = new ArrayList<>();
+    for (int i = 0; i < leadingHealthy + 2 * BATCH_DOCS; i++) {
+      boolean failing = i >= leadingHealthy && i < leadingHealthy + BATCH_DOCS;
+      String id = (failing ? "poison-" : "healthy-") + i;
+      if (!failing) healthy.add(id);
+      state.put(id, new HashMap<>(Map.of(
+          SchemaFields.EMBEDDING_STATUS, "PENDING", SchemaFields.SPLADE_STATUS, "COMPLETED",
+          SchemaFields.NER_STATUS, "PENDING", SchemaFields.SPLADE, Map.of("original", 1f))));
+    }
+    wirePopulation(state);
+    modeledNanosPerEncode = 1_000_000L;
+    List<List<String>> sparseAttempts = new ArrayList<>();
+    sparseEncoder = mock(io.justsearch.indexerworker.splade.SpladeEncoder.class);
+    when(sparseEncoder.encodeBatch(anyList())).thenAnswer(call -> {
+      List<String> texts = call.getArgument(0);
+      sparseAttempts.add(List.copyOf(texts));
+      monotonicNanos.addAndGet(sparseCallMillis * 1_000_000L);
+      if (texts.stream().anyMatch(text -> text.contains("poison-"))) {
+        throw new IllegalStateException("this document cannot regenerate its postings");
+      }
+      return java.util.Collections.nCopies(texts.size(), Map.of("preserved", 1f));
+    });
+    when(indexingCoordinator.updateDocumentsBatch(anyList())).thenAnswer(call -> {
+      List<Map.Entry<String, Map<String, Object>>> updates = call.getArgument(0);
+      for (var entry : updates) {
+        Map<String, Object> fields = entry.getValue();
+        Map<String, Object> current = state.get(entry.getKey());
+        if (healthy.contains(entry.getKey())) {
+          assertEquals(Map.of("preserved", 1f), fields.get(SchemaFields.SPLADE));
+        } else {
+          assertFalse(fields.containsKey(SchemaFields.SPLADE));
+          current.remove(SchemaFields.SPLADE);
+          current.put(SchemaFields.SPLADE_STATUS, "PENDING");
+        }
+        current.putAll(fields);
+      }
+      return new LuceneRuntimeTypes.BatchUpdateResult(updates.size(), 0);
+    });
+
+    timeIdleCycle(scheduler(monotonicNanos::get));
+
+    for (String id : healthy) {
+      assertEquals("COMPLETED", state.get(id).get(SchemaFields.EMBEDDING_STATUS),
+          id + " must advance in the same idle cycle despite a failing preservation batch");
+      assertEquals("COMPLETED_EMPTY", state.get(id).get(SchemaFields.NER_STATUS));
+    }
+    assertTrue(sparseAttempts.stream()
+        .anyMatch(texts -> texts.stream().anyMatch(text -> text.contains("poison-"))),
+        "the failing head must actually reach sparse inference");
+    assertTrue(monotonicNanos.get() < CYCLE_BUDGET_MS * 1_000_000L);
+    assertFalse(loggedAtLevel(ch.qos.logback.classic.Level.WARN, "ZERO stage advancement"));
+    verify(indexingCoordinator, never()).updateDocumentIf(
+        anyString(), any(DocumentFieldOps.EnrichmentInput.class), any());
+    return state;
+  }
+
+  @Test
+  void costlyCompletedSpladePreservationCannotStarveNerOrDiscardEarnedVectors() throws Exception {
+    Map<String, Map<String, Object>> state = new java.util.LinkedHashMap<>();
+    for (int i = 0; i < 100; i++) state.put("long-" + i, new HashMap<>(Map.of(
+        SchemaFields.EMBEDDING_STATUS, "PENDING", SchemaFields.SPLADE_STATUS, "COMPLETED",
+        SchemaFields.NER_STATUS, "PENDING")));
+    wirePopulation(state);
+    sparseEncoder = mock(io.justsearch.indexerworker.splade.SpladeEncoder.class);
+    AtomicInteger sparseEncodes = new AtomicInteger();
+    lenient().when(sparseEncoder.encodeBatch(anyList())).thenAnswer(call -> {
+      List<String> texts = call.getArgument(0);
+      sparseEncodes.addAndGet(texts.size());
+      monotonicNanos.addAndGet(texts.size() * 3_000_000_000L);
+      return java.util.Collections.nCopies(texts.size(), Map.of("preserved", 1f));
+    });
+    lenient().when(embeddingProvider.documentWindowCount(anyString())).thenReturn(64);
+    lenient().when(embeddingProvider.embedDocumentWindows(anyString(), anyInt(), anyInt()))
+        .thenAnswer(call -> {
+          monotonicNanos.addAndGet(1_600_000_000L);
+          return new EmbeddingProvider.WindowSlice(
+              java.util.Collections.nCopies(32, new float[] {1, 0}), call.getArgument(1), 64);
+        });
+    lenient().when(nerService.extractEntitiesBatch(anyList())).thenAnswer(call -> {
+      monotonicNanos.addAndGet(100_000_000L);
+      return List.of(io.justsearch.indexerworker.ner.NerResult.EMPTY);
+    });
+    BackfillScheduler scheduler = scheduler(monotonicNanos::get);
+    long previousNer = 0;
+    long previousEmbed = 0;
+    for (int cycle = 0; cycle < 4; cycle++) {
+      logAppender.list.clear();
+      timeIdleCycle(scheduler);
+      long nerDone = state.values().stream().filter(doc -> "COMPLETED_EMPTY".equals(doc.get(SchemaFields.NER_STATUS))).count();
+      long embedDone = state.values().stream().filter(doc -> "COMPLETED".equals(doc.get(SchemaFields.EMBEDDING_STATUS))).count();
+      assertTrue(nerDone > previousNer, "every cycle must publish NER outcomes despite expensive preservation");
+      assertTrue(embedDone > previousEmbed, "every cycle must publish its earned vector");
+      assertFalse(loggedAtLevel(ch.qos.logback.classic.Level.WARN, "ZERO stage advancement"));
+      previousNer = nerDone;
+      previousEmbed = embedDone;
+    }
+    assertTrue(sparseEncodes.get() > 0);
+  }
+
+  @Test
+  void stageOnlyDocumentsBeyondEmbeddingHeadAdvanceWithinTwoCycles() throws Exception {
+    Map<String, Map<String, Object>> state = new java.util.LinkedHashMap<>();
+    for (int i = 0; i < 200; i++) state.put("head-" + i, new HashMap<>(Map.of(
+        SchemaFields.EMBEDDING_STATUS, "PENDING", SchemaFields.NER_STATUS, "COMPLETED_EMPTY")));
+    state.put("sparse-only", new HashMap<>(Map.of(SchemaFields.SPLADE_STATUS, "PENDING",
+        SchemaFields.NER_STATUS, "COMPLETED_EMPTY")));
+    state.put("ner-only", new HashMap<>(Map.of(SchemaFields.NER_STATUS, "PENDING")));
+    wirePopulation(state);
+    modeledNanosPerEncode = 3_000_000_000L;
+    sparseEncoder = mock(io.justsearch.indexerworker.splade.SpladeEncoder.class);
+    lenient().when(sparseEncoder.encodeBatch(anyList())).thenAnswer(call ->
+        java.util.Collections.nCopies(((List<?>) call.getArgument(0)).size(), Map.of("sparse", 1f)));
+    BackfillScheduler scheduler = scheduler(monotonicNanos::get);
+    for (int cycle = 0; cycle < 2; cycle++) timeIdleCycle(scheduler);
+    assertEquals("COMPLETED", state.get("sparse-only").get(SchemaFields.SPLADE_STATUS));
+    assertEquals("COMPLETED_EMPTY", state.get("ner-only").get(SchemaFields.NER_STATUS));
+  }
+
+  @ParameterizedTest(name = "{displayName} [{index}] {arguments}")
+  @ValueSource(booleans = {false, true})
+  void deferredPreservationNeverFallsThroughToIndividualEmbeddingIncludingBackoff(boolean encoderRetires) throws Exception {
+    Map<String, Map<String, Object>> state = new java.util.LinkedHashMap<>();
+    state.put("doc", new HashMap<>(Map.of(
+        SchemaFields.SPLADE_STATUS, "COMPLETED",
+        SchemaFields.NER_STATUS, "COMPLETED_EMPTY",
+        SchemaFields.EMBEDDING_STATUS, "PENDING")));
+    wirePopulation(state);
+    lenient().when(nerService.isAvailable()).thenReturn(false);
+    lenient().when(documentFieldOps.getDocumentContent("doc")).thenReturn("long content for doc");
+    sparseEncoder = mock(io.justsearch.indexerworker.splade.SpladeEncoder.class);
+    when(sparseEncoder.encodeBatch(anyList()))
+        .thenThrow(new io.justsearch.ort.SessionTemporarilyUnavailableException("encoder unavailable"))
+        .thenReturn(List.of(Map.of("preserved", 1f)));
+    BackfillScheduler scheduler = scheduler(monotonicNanos::get);
+    timeIdleCycle(scheduler);
+    assertEquals("PENDING", state.get("doc").get(SchemaFields.EMBEDDING_STATUS));
+    verify(indexingCoordinator, never()).updateDocumentsBatch(anyList());
+    var recoveringEncoder = sparseEncoder;
+    if (encoderRetires) sparseEncoder = null;
+    timeIdleCycle(scheduler);
+    sparseEncoder = recoveringEncoder;
+    if (encoderRetires) {
+      assertEquals("COMPLETED", state.get("doc").get(SchemaFields.EMBEDDING_STATUS),
+          "an absent sparse encoder must not withhold another stage's outcome");
+      verify(indexingCoordinator, atLeastOnce()).updateDocumentsBatch(anyList());
+    } else {
+      assertEquals("PENDING", state.get("doc").get(SchemaFields.EMBEDDING_STATUS));
+      verify(indexingCoordinator, never()).updateDocumentsBatch(anyList());
+    }
+    verify(sparseEncoder).encodeBatch(anyList());
+    var retryTime = BackfillScheduler.class.getDeclaredField("nextSpladeRetryTime");
+    retryTime.setAccessible(true);
+    retryTime.setLong(scheduler, 0);
+    timeIdleCycle(scheduler);
+    assertEquals("COMPLETED", state.get("doc").get(SchemaFields.EMBEDDING_STATUS));
+    assertEquals("COMPLETED", state.get("doc").get(SchemaFields.SPLADE_STATUS));
+  }
+
+  @ParameterizedTest(name = "{displayName} [{index}] {arguments}")
+  @ValueSource(booleans = {false, true})
+  void systemicSpladeFailureBacksOffBothPathsWithoutDocumentRetries(boolean arenaOom) throws Exception {
+    Map<String, Map<String, Object>> state = new java.util.LinkedHashMap<>();
+    state.put("doc", new HashMap<>(Map.of(SchemaFields.SPLADE_STATUS, "PENDING",
+        SchemaFields.NER_STATUS, "PENDING", SchemaFields.EMBEDDING_STATUS, "PENDING")));
+    wirePopulation(state);
+    sparseEncoder = mock(io.justsearch.indexerworker.splade.SpladeEncoder.class);
+    AtomicBoolean failing = new AtomicBoolean(true);
+    AtomicInteger calls = new AtomicInteger();
+    lenient().when(sparseEncoder.encodeBatch(anyList())).thenAnswer(call -> {
+      calls.incrementAndGet();
+      if (failing.get()) {
+        if (arenaOom) throw new ai.onnxruntime.OrtException("BFCArena::AllocateRawInternal Failed to allocate memory for requested buffer of size 1234");
+        throw new io.justsearch.ort.SessionTemporarilyUnavailableException("encoder unavailable");
+      }
+      return List.of(Map.of("recovered", 1f));
+    });
+    BackfillScheduler scheduler = scheduler(monotonicNanos::get);
+    timeIdleCycle(scheduler);
+    assertFalse(state.get("doc").containsKey(SchemaFields.SPLADE_RETRY_COUNT));
+    int callsBeforeBackoff = calls.get();
+    assertTrue(callsBeforeBackoff > 0);
+    scheduler.runInterleavedSplade(System.currentTimeMillis());
+    timeIdleCycle(scheduler);
+    assertEquals(callsBeforeBackoff, calls.get(), "combined and interleaved paths share backoff");
+    assertFalse(state.get("doc").containsKey(SchemaFields.SPLADE_RETRY_COUNT));
+    failing.set(false);
+    var retryTime = BackfillScheduler.class.getDeclaredField("nextSpladeRetryTime");
+    retryTime.setAccessible(true);
+    retryTime.setLong(scheduler, 0);
+    timeIdleCycle(scheduler);
+    assertEquals("COMPLETED", state.get("doc").get(SchemaFields.SPLADE_STATUS));
+    var failureCount = BackfillScheduler.class.getDeclaredField("consecutiveSpladeFailures");
+    failureCount.setAccessible(true);
+    assertEquals(0, failureCount.getInt(scheduler));
   }
 
 }

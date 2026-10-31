@@ -60,6 +60,7 @@ final class EnrichmentPreservationTest extends LuceneExecutorTestBase {
       }
       commit(runtime);
       var provider=mock(EmbeddingProvider.class);
+      when(provider.isAvailable()).thenReturn(true);
       when(provider.embedDocumentBatch(List.of(large))).thenReturn(List.of(new float[]{1,0,0,0}));
       var result=EmbeddingBackfillOps.processEmbeddingBackfill(new EmbeddingBackfillOps.BackfillContext(
           runtime.documentFieldOps(),runtime.indexingCoordinator(),runtime.commitOps(),mock(WorkerSignalBus.class),

@@ -105,12 +105,17 @@ public final class EmbeddingBackfillOps {
       long t1 = System.nanoTime();
 
       // Re-check interruption after content collection
-      if (checkInterrupt(context, context.embeddingProviderSupplier().get(), "Backfill")) {
+      if (checkInterrupt(context, embeddingProvider, "Backfill")) {
         return new StageOutcome(true, processed, (System.nanoTime() - methodStart) / 1_000_000);
       }
 
       // Phase 2: Batch embed all collected content
       List<float[]> vectors = embeddingProvider.embedDocumentBatch(batchContents);
+      if (!embeddingProvider.isAvailable()
+          || embeddingProvider != context.embeddingProviderSupplier().get()
+          || !context.allowEmbeddingWritesSupplier().getAsBoolean()) {
+        return StageOutcome.elapsedSince(methodStart);
+      }
       // 312 E3: Force full result materialization + brief yield to let GPU resources release.
       // Testing whether GPU memory holding interferes with Lucene mmap writes.
       if (vectors != null) {
@@ -135,9 +140,11 @@ public final class EmbeddingBackfillOps {
               vectors.size());
         }
         for (int i = 0; i < batchDocIds.size(); i++) {
+          if (checkInterrupt(context, embeddingProvider, "Backfill")) break;
           int[] counts =
               embedAndUpdateSingle(
                   context, batch, embeddingProvider, batchDocIds.get(i), batchContents.get(i));
+          if (counts == null) break;
           processed += counts[0];
           failed += counts[1];
           markedFailed += counts[2];
@@ -198,6 +205,11 @@ public final class EmbeddingBackfillOps {
       BackfillContext context, EmbeddingProvider embeddingProvider, String label) {
     // Tempdoc 885 item 3: foreground load paces this stage boundary instead of interrupting it.
     context.pacing().pace();
+    if (embeddingProvider == null || !embeddingProvider.isAvailable()
+        || embeddingProvider != context.embeddingProviderSupplier().get()
+        || !context.allowEmbeddingWritesSupplier().getAsBoolean()) {
+      return true;
+    }
     // Tempdoc 630: defer backfill when Main claims the GPU (VRAM conflict, GPU only) OR the OS wants
     // reduced background work (energy saver, GPU+CPU). The two reasons are kept distinct so energy
     // throttles CPU backfill too.
@@ -252,6 +264,7 @@ public final class EmbeddingBackfillOps {
     int markedFailed = 0;
     try {
       float[] vector = embeddingProvider.embedDocument(content, InferenceRequest.background());
+      if (checkInterrupt(context, embeddingProvider, "Backfill")) return null;
       if (vector != null && vector.length > 0) {
         Map<String, Object> updates = new HashMap<>();
         updates.put(SchemaFields.VECTOR, vector);
@@ -264,6 +277,8 @@ public final class EmbeddingBackfillOps {
         failed = 1;
       }
     } catch (Exception e) {
+      if (checkInterrupt(context, embeddingProvider, "Backfill")
+          || SpladeBackfillOps.isSystemicFailure(e)) return null;
       context.log().error("Backfill failed for doc {}: {}", docId, e.getMessage());
       markedFailed =
           batch.failure(docId, SchemaFields.EMBEDDING_RETRY_COUNT, EmbeddingBackfillOps::computeEmbeddingFailureUpdate);
@@ -309,6 +324,11 @@ public final class EmbeddingBackfillOps {
       return new StageOutcome(false, 0, (System.nanoTime() - methodStart) / 1_000_000);
     }
 
+    EmbeddingProvider selectedProvider = context.embeddingProviderSupplier().get();
+    if (selectedProvider == null || !selectedProvider.isAvailable()) {
+      return StageOutcome.none();
+    }
+
     try {
       List<String> pendingChunkIds =
           context.documentFieldOps().queryDocIdsByField(
@@ -341,6 +361,7 @@ public final class EmbeddingBackfillOps {
         try {
           String chunkContent = contentByChunkId.get(chunkId);
           if (chunkContent == null || chunkContent.isBlank()) {
+            if (checkInterrupt(context, embeddingProvider, "Chunk backfill")) break;
             context.log().warn("Chunk backfill: Content missing for {}", chunkId);
             markedFailed +=
                 batch.failure(chunkId, SchemaFields.CHUNK_EMBEDDING_RETRY_COUNT, EmbeddingBackfillOps::computeChunkEmbeddingFailureUpdate);
@@ -363,12 +384,17 @@ public final class EmbeddingBackfillOps {
             failed > 0, processed, (System.nanoTime() - methodStart) / 1_000_000);
       }
 
-      if (checkInterrupt(context, context.embeddingProviderSupplier().get(), "Chunk backfill")) {
+      if (checkInterrupt(context, embeddingProvider, "Chunk backfill")) {
         return new StageOutcome(false, 0, (System.nanoTime() - methodStart) / 1_000_000);
       }
 
       // Phase 2: Batch embed
       List<float[]> vectors = embeddingProvider.embedDocumentBatch(batchContents);
+      if (!embeddingProvider.isAvailable()
+          || embeddingProvider != context.embeddingProviderSupplier().get()
+          || !context.allowEmbeddingWritesSupplier().getAsBoolean()) {
+        return StageOutcome.elapsedSince(methodStart);
+      }
 
       // Phase 3: Update chunks with results (fallback to sequential if batch failed or
       // misaligned — a null-only guard here let a short/empty `vectors` result reach the
@@ -385,10 +411,12 @@ public final class EmbeddingBackfillOps {
               vectors.size());
         }
         for (int i = 0; i < batchChunkIds.size(); i++) {
+          if (checkInterrupt(context, embeddingProvider, "Chunk backfill")) break;
           String chunkId = batchChunkIds.get(i);
           try {
             float[] vector =
                 embeddingProvider.embedDocument(batchContents.get(i), InferenceRequest.background());
+            if (checkInterrupt(context, embeddingProvider, "Chunk backfill")) break;
             if (vector != null && vector.length > 0) {
               Map<String, Object> updates = new HashMap<>();
               updates.put(SchemaFields.CHUNK_VECTOR, vector);
@@ -401,6 +429,8 @@ public final class EmbeddingBackfillOps {
               failed++;
             }
           } catch (Exception e) {
+            if (checkInterrupt(context, embeddingProvider, "Chunk backfill")
+                || SpladeBackfillOps.isSystemicFailure(e)) break;
             context.log().error("Chunk backfill failed for {}: {}", chunkId, e.getMessage());
             markedFailed +=
                 batch.failure(chunkId, SchemaFields.CHUNK_EMBEDDING_RETRY_COUNT, EmbeddingBackfillOps::computeChunkEmbeddingFailureUpdate);

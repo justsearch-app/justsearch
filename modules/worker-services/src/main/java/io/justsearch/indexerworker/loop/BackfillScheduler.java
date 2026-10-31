@@ -25,6 +25,8 @@ import io.justsearch.indexerworker.ner.NerService;
 import io.justsearch.indexerworker.splade.SpladeEncoder;
 import io.justsearch.indexing.SchemaFields;
 import java.util.ArrayDeque;
+import java.util.HashSet;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.LongSupplier;
 import java.util.function.Supplier;
@@ -258,17 +260,18 @@ public final class BackfillScheduler {
             embeddingLifecycle.embeddingProvider());
     if (runBackfill) {
       var batchCommitCounter = new int[] {0};
+      Set<String> publishedDocIds = new HashSet<>();
       CombinedEnrichmentBackfillOps.CombinedOutcome outcome =
           processCombinedBackfillIfApplicable(
-              null, null, batchCommitCounter, cycleDeadlineNanos, embedShareDeadlineNanos);
+              null, null, batchCommitCounter, cycleDeadlineNanos, embedShareDeadlineNanos,
+              publishedDocIds);
       recordCombinedOutcome(outcome);
       // The mode-selection probe is the batch that re-selects the head of the pending queue each
       // cycle — the one whose signature repeated byte-identically for 12+ minutes in the field.
       noteWorkSet(outcome);
-      // Mode selection reads ACTIVITY (did the combined pass touch anything at all); the tight
-      // loop below reads PROGRESS. Tempdoc 798: these are different questions and conflating
-      // them is what livelocked ingest.
-      boolean useCombined = outcome.wroteAnything();
+      // docs/tempdocs/711-rmw-preservation-and-followup-designs.md: deferred combined work
+      // must not fall through to individual writes that omit non-stored SPLADE postings.
+      boolean useCombined = outcome.wroteAnything() || outcome.recordTiming();
       if (useCombined) {
         // Tempdoc 710 Move 2 item 4: this cycle used the combined pass — the only path taken
         // between here and the next runIdleCycle() call (the tight loop below stays combined
@@ -284,7 +287,8 @@ public final class BackfillScheduler {
         // that same condition, which is how the mid-batch signal ended up costing a further ~5s of
         // GPU instead of returning control. Mode selection itself is unchanged: this cycle still
         // used the combined pass, and the next idle cycle picks the enrichment up where it stopped.
-        final boolean[] useCombinedRef = {!outcome.aborted()};
+        final boolean[] useCombinedRef = {
+            outcome.wroteAnything() && !outcome.aborted()};
         final int[] tightLoopBatches = {1};
         // Tempdoc 809 finding 3: the mode-selection probe above is a full batch and is now
         // interruptible too, so it can be the call that spends the budget. Seeding from it keeps
@@ -317,13 +321,14 @@ public final class BackfillScheduler {
                         chunkIdCache,
                         batchCommitCounter,
                         cycleDeadlineNanos,
-                        embedShareDeadlineNanos);
+                        embedShareDeadlineNanos,
+                        publishedDocIds);
                 recordCombinedOutcome(tightLoopOutcome);
                 // Tempdoc 798: PROGRESS, not activity. `wroteAnything()` stays true forever for a
                 // document that is rewritten every batch without ever advancing a stage.
                 useCombinedRef[0] = tightLoopOutcome.progressed();
+                if (tightLoopOutcome.progressed()) anyProgressThisCycle[0] = true;
                 if (useCombinedRef[0]) {
-                  anyProgressThisCycle[0] = true;
                   tightLoopBatches[0]++;
                 }
                 // Tempdoc 809 finding 3: the batch left its own document set unfinished because a
@@ -488,13 +493,15 @@ public final class BackfillScheduler {
   private IndividualOutcome runIndividualBackfills(long cycleDeadlineNanos) {
     boolean backfillDidWork = false;
     boolean anyActivity = false;
-    if (embeddingLifecycle.embeddingProvider().isAvailable()) {
+    boolean embeddingCanProgress = embeddingLifecycle.embeddingProvider().isAvailable()
+        && embeddingLifecycle.allowEmbeddingWrites();
+    if (embeddingCanProgress) {
       StageOutcome outcome = processEmbeddingBackfill();
       recordStageOutcome(BatchTimingKeys.EMBED, outcome);
       anyActivity |= outcome.docsProcessed() > 0;
     }
     // Chunk vectors after parent embedding completes. 334 Phase 8 tight loop.
-    if (resolvedConfigSupplier.get().rag().chunkVectorsEnabled()) {
+    if (embeddingCanProgress && resolvedConfigSupplier.get().rag().chunkVectorsEnabled()) {
       int pendingDocEmbeddings =
           indexCountOps.countByField(
               SchemaFields.EMBEDDING_STATUS, SchemaFields.EMBEDDING_STATUS_PENDING);
@@ -540,7 +547,7 @@ public final class BackfillScheduler {
     NerService nerService = nerServiceSupplier.get();
     if (nerService != null && nerService.isAvailable()) {
       boolean embeddingsReady;
-      if (!embeddingLifecycle.embeddingProvider().isAvailable()) {
+      if (!embeddingCanProgress) {
         embeddingsReady = true;
       } else {
         int pendingEmbeddings =
@@ -565,7 +572,7 @@ public final class BackfillScheduler {
     if ((spladeEncoderSupplier.get() != null || bgeM3EncoderSupplier.get() != null)
         && System.currentTimeMillis() >= nextSpladeRetryTime) {
       int pendingEmbedForSplade =
-          embeddingLifecycle.embeddingProvider().isAvailable()
+          embeddingCanProgress
               ? indexCountOps.countByField(
                   SchemaFields.EMBEDDING_STATUS, SchemaFields.EMBEDDING_STATUS_PENDING)
               : 0;
@@ -705,11 +712,14 @@ public final class BackfillScheduler {
       ArrayDeque<String> chunkIdCache,
       int[] batchesSinceCommit,
       long cycleDeadlineNanos,
-      long embedShareDeadlineNanos) {
+      long embedShareDeadlineNanos,
+      Set<String> publishedDocIds) {
     StageAvailability available = stageAvailability();
     int availCount = (available.embedding() ? 1 : 0) + (available.sparse() ? 1 : 0)
         + (available.ner() ? 1 : 0);
-    if (availCount < 2) {
+    // docs/tempdocs/711-rmw-preservation-and-followup-designs.md: retain combined publication
+    // protection through sparse recovery, even if encoder retirement reduces stage availability.
+    if (availCount < 2 && consecutiveSpladeFailures == 0) {
       return CombinedEnrichmentBackfillOps.CombinedOutcome.none();
     }
 
@@ -737,7 +747,10 @@ public final class BackfillScheduler {
             () -> paceAndCheckStopBackfillWork(cycleDeadlineNanos),
             this::hardStopBackfillWork,
             () -> monotonicNanos.getAsLong() >= embedShareDeadlineNanos,
-            windowedEmbedProgress));
+            windowedEmbedProgress,
+            publishedDocIds,
+            () -> System.currentTimeMillis() >= nextSpladeRetryTime,
+            this::recordSpladeBackfillResult));
   }
 
   private StageOutcome processEmbeddingBackfill() {

@@ -240,6 +240,13 @@ class BackfillSchedulerTightLoopTest {
       "a population that advances every batch but never drains: the cycle budget returns control")
   void advancingButNeverDrainingPopulation_budgetReturnsControl() throws Exception {
     wireAdvancingButNeverDraining();
+    lenient().when(documentFieldOps.queryDocIdsByField(anyString(), anyString(), anyInt()))
+        .thenAnswer(call -> List.of("fresh-" + batchWrites.get() + "-a", "fresh-" + batchWrites.get() + "-b"));
+    lenient().when(documentFieldOps.getDocumentContentBatch(anyList())).thenAnswer(call -> {
+      Map<String, String> contents = new HashMap<>();
+      for (String id : (List<String>) call.getArgument(0)) contents.put(id, "enrichable content for " + id);
+      return contents;
+    });
     BackfillScheduler scheduler = scheduler();
 
     long startNanos = monotonicNanos.get();
