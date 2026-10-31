@@ -36,9 +36,10 @@
  * Exit codes: 0 = a run exists for the sha (pre-existing or newly dispatched and confirmed);
  *             1 = no run and none could be created/confirmed; 2 = usage or `gh` error.
  *
- * This does NOT wait for the run to finish — that is `node scripts/dev/run-gh.mjs checks-wait <pr>`,
- * which this is the missing precondition for: waiting on checks is only meaningful once you know
- * checks exist for the right commit.
+ * To wait for a PR's CI run to finish, use `node scripts/dev/run-gh.mjs run-wait-sha <head-sha>
+ * --workflow CI --branch <pr-branch> --event pull_request`. To merge, use `shepherd <n>`
+ * (or `enqueue` then `merge-wait`) through the same runner. Waiting is only meaningful once
+ * checks exist for the right commit; a dispatched run needs `--event workflow_dispatch` instead.
  */
 import { spawnSync } from 'node:child_process';
 import { pathToFileURL } from 'node:url';
