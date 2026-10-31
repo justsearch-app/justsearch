@@ -58,7 +58,8 @@ final class IndexingLoopCutoverPauseTest {
       requester.join(5_000L);
       assertFalse(requester.isAlive());
       assertTrue(pauseResult.get());
-      verify(queue).markDoneTransitions(anyCollection(), any());
+      verify(queue).markDoneTransitions(argThat(transitions -> transitions.stream()
+          .anyMatch(transition -> transition.claim() == claim)), any());
     } finally {
       releaseOutcomeWrite.countDown();
       requester.interrupt();

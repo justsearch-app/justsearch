@@ -137,7 +137,8 @@ final class EngineLinuxRootVolumeLiveTest {
       Files.writeString(root.resolve("extra.txt"), "ibis is a real change on the UUID-less filesystem");
       engine.client().syncDirectory(root.toString(), false, TestEngineContexts.BACKGROUND);
       assertTrue(engine.awaitSearchable("ibis", 90_000), "UUID-less root works after restart");
-      assertTrue(engine.awaitNotSearchable("pangolin", 1_000));
+      assertTrue(engine.awaitSearchable("pangolin", 10_000),
+          "unknown volume still preserves indexed content after restart");
       assertTrue(rootState().walkError() == null);
       report("initially-unknown-tmpfs-restarted-cleanly");
     } finally {

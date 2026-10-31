@@ -9,10 +9,10 @@ author-session: 01a19138-440e-7410-b519-33d274de04ae
 
 The gate flags 48 existing files between 9eb36cc7923b530624f7ced8ea0bc678f0011b31 and this branch. The eight isolated new test sources remain exempt. Apply Excludes root-relative matching for completed ad-hoc imports (C14 partly) is open and is not claimed here.
 
-Named newChecks are assertion fail-before checks only; supplementary preservation checks are recorded in prose. No test-support overlays are needed: both NoVolumeIdentityExtension helpers already exist unchanged at the before-state. Before-state compilation uses gates/test-intent/compatibility/ingfix-wp9-before.patch, which adds only a no-op collection cancellation signature and a journal overload forwarding to the old method. One Mockito verification is wrapped in assertDoesNotThrow so the evidence classifier recognizes its unchanged assertion. No acceptance record is authored here.
+Named newChecks are assertion fail-before checks only; supplementary preservation checks are recorded in prose. No test-support overlays are needed: both NoVolumeIdentityExtension helpers already exist unchanged at the before-state. Before-state compilation uses gates/test-intent/compatibility/ingfix-wp9-before.patch, which adds only a no-op collection cancellation signature and a journal overload forwarding to the old method. The D40 publication-completion check and one Mockito verification use assertDoesNotThrow so the evidence classifier recognizes their assertions. No acceptance record is authored here.
 
 
-The behavioural replacements were selected by method name and run on both states. The before-state was a shared clone at 9eb36cc7923b530624f7ced8ea0bc678f0011b31 with only the compatibility patch and candidate check files applied. D42 measured 51,056,016 -> 197,689,680 allocated bytes (3.87x) before and 3,405,904 -> 6,817,088 bytes (2.00x) on the candidate; the 2.6x bound has margin on both sides. C36 failed before with “returned count must equal rows removed after unrefreshed publication for serving: expected 3 but was 0” and passed on the candidate across all three routes. The published metadata equality comparisons passed on both states as preservation checks.
+The behavioural replacements were selected by method name and run on both states. The before-state was a shared clone at 9eb36cc7923b530624f7ced8ea0bc678f0011b31 with only the compatibility patch and candidate check files applied. D42 measured 51,056,016 -> 197,689,680 allocated bytes (3.87x) before and 3,405,904 -> 6,817,088 bytes (2.00x) on the candidate; the 2.6x bound has margin on both sides. C36 failed before with “returned count must equal rows removed after unrefreshed publication for serving: expected 3 but was 0” and passed on the candidate across all three routes. The published metadata equality comparisons passed on both states as preservation checks. The D40 completion assertion also fails on the compatibility-patched before-clone with `DocValuesField "chunk_heading_text" is too large, must be <= 32766` and passes on the candidate. C11 retains its recorded assertion fail-before (`expected: <2> but was: <0>`) and candidate pass; its own Defect pin entry accounts for the added oracle.
 
 ```json
 {
@@ -226,7 +226,7 @@ The behavioural replacements were selected by method name and run on both states
         "modules/worker-services/src/test/java/io/justsearch/indexerworker/rag/ChunkPublicationMetadataTest.java"
       ],
       "class": "Defect pin",
-      "behaviour": "Doubling similarly chunked content requires near-linear publication allocation under the shared mutation fence. Preservation check ChunkDocumentWriterLineFieldsTest#D42PublishedMetadataKeepsPrefixLawsIncludingInsideHeadings compares published line/heading metadata with prefix laws across overlapping chunks, offsets inside headings, CRLF, PDF/Office markers and fixed-seed generated whitespace and heading boundaries; it passes on both states and is not a repair pin.",
+      "behaviour": "Oversized ASCII, multibyte and supplementary-character headings must complete initial chunk publication, VDU regeneration and replacement replay, retain readable bounded metadata and survive reopen (S-D40, C27/C28). Doubling similarly chunked content requires near-linear publication allocation under the shared mutation fence. Preservation check ChunkDocumentWriterLineFieldsTest#D42PublishedMetadataKeepsPrefixLawsIncludingInsideHeadings compares published line/heading metadata with prefix laws across overlapping chunks, offsets inside headings, CRLF, PDF/Office markers and fixed-seed generated whitespace and heading boundaries; it passes on both states and is not a repair pin.",
       "sources": [
         {
           "kind": "delegated-choice",
@@ -243,6 +243,30 @@ The behavioural replacements were selected by method name and run on both states
           "delegationScope": "fix the defects in the owner-commissioned ingestion defect list, designed by the orchestrator",
           "choice": "C30. D42 — optimization must preserve metadata semantics: test overlapping chunks, leading whitespace, newline boundaries, CRLF, heading levels, no-heading documents, structured PDF/Office markers and offsets inside heading lines; compare line/citation metadata with the existing laws.",
           "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed autonomously with designing all of the smallers and critical fixes. then proceed with implementing them accordingly.",
+          "delegationLocation": "task t-20261030-ingfix request",
+          "delegationScope": "fix the defects in the owner-commissioned ingestion defect list, designed by the orchestrator",
+          "choice": "S-D40 (An oversized heading poisons chunk publication after writes begin) Ingest a 40,000-character ASCII heading and require bounded metadata or complete publication.",
+          "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed autonomously with designing all of the smallers and critical fixes. then proceed with implementing them accordingly.",
+          "delegationLocation": "task t-20261030-ingfix request",
+          "delegationScope": "fix the defects in the owner-commissioned ingestion defect list, designed by the orchestrator",
+          "choice": "C27. D40 — heading bounds must cover encoded bytes and every publication path: keyword DocValues receive the unbounded heading; test oversized ASCII, multibyte and supplementary-character headings through initial ingest, VDU update and replay, then verify complete publication and readable metadata.",
+          "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed autonomously with designing all of the smallers and critical fixes. then proceed with implementing them accordingly.",
+          "delegationLocation": "task t-20261030-ingfix request",
+          "delegationScope": "fix the defects in the owner-commissioned ingestion defect list, designed by the orchestrator",
+          "choice": "C28. D40 — a later poisonous heading must not trap replacement in repeatable partial publication: place it after several valid children and replace an existing family; repeat processing and reopen, requiring complete recovery rather than repeated identical failure.",
+          "label": "agent choice"
         }
       ],
       "defectSource": {
@@ -255,12 +279,13 @@ The behavioural replacements were selected by method name and run on both states
           "choice": "C29. D42 — metadata work must scale with content plus chunk count: each child scans prefixes for lines and headings while publication holds the shared fence; compare similarly chunked sizes and heading densities, checking scan/allocation work and fence duration.",
           "label": "agent choice"
         },
-        "reproduction": "Publish similarly chunked Markdown documents of N and 2N characters under FileMutationFence; after warmup, compare the minimum thread-allocated bytes from three paired samples and require doubled content to allocate at most 2.6 times as much. Metadata equality against the prefix laws is a preservation check."
+        "reproduction": "Publish a document with several valid children before a 40,000-character ASCII, multibyte or supplementary-character heading; require publication without an exception, complete child counts, bounded UTF-8 metadata, repeated replacement and VDU regeneration, then reopen. Publish similarly chunked Markdown documents of N and 2N characters under FileMutationFence; after warmup, compare the minimum thread-allocated bytes from three paired samples and require doubled content to allocate at most 2.6 times as much. Metadata equality against the prefix laws is a preservation check."
       },
-      "reproduction": "Publish similarly chunked Markdown documents of N and 2N characters under FileMutationFence; after warmup, compare the minimum thread-allocated bytes from three paired samples and require doubled content to allocate at most 2.6 times as much. Metadata equality against the prefix laws is a preservation check.",
+      "reproduction": "Publish a document with several valid children before a 40,000-character ASCII, multibyte or supplementary-character heading; require publication without an exception, complete child counts, bounded UTF-8 metadata, repeated replacement and VDU regeneration, then reopen. Publish similarly chunked Markdown documents of N and 2N characters under FileMutationFence; after warmup, compare the minimum thread-allocated bytes from three paired samples and require doubled content to allocate at most 2.6 times as much. Metadata equality against the prefix laws is a preservation check.",
       "evidence": "gates/test-intent/evidence/ingfix-wp9.json",
       "newChecks": [
-        "modules/worker-services/src/test/java/io/justsearch/indexerworker/rag/ChunkPublicationMetadataTest.java#D42DoublingSimilarlyChunkedContentHasNearLinearPublicationAllocation"
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/rag/ChunkPublicationMetadataTest.java#D42DoublingSimilarlyChunkedContentHasNearLinearPublicationAllocation",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/rag/ChunkPublicationMetadataTest.java#D40OversizedUtf8HeadingsCompleteReplacementAndReplayAfterReopen"
       ]
     },
     {
@@ -384,7 +409,7 @@ The behavioural replacements were selected by method name and run on both states
         "instrumentation",
         "input re-encoding"
       ],
-      "whatMoved": "Move the outcome-write latch and verification from immediate markClaimDone to markDoneTransitions, the journal drain used by the commit owner. The in-flight pause/wait/resume oracle remains. Supplementary preservation check: modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/IndexingLoopCutoverPauseTest.java#successfulPauseStopsPollingAndResumeReusesTheSameThread.",
+      "whatMoved": "Move the outcome-write latch and verification from immediate markClaimDone to markDoneTransitions, the journal drain used by the commit owner. The transition verification requires the same supplied claim object; the in-flight pause/wait/resume oracle and latch remain. Preservation check: modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/IndexingLoopCutoverPauseTest.java#pauseWaitsForAnAlreadyClaimedBatch. Supplementary preservation check: modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/IndexingLoopCutoverPauseTest.java#successfulPauseStopsPollingAndResumeReusesTheSameThread.",
       "sources": [
         {
           "kind": "delegated-choice",
@@ -421,7 +446,6 @@ The behavioural replacements were selected by method name and run on both states
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/PruneWriterFenceTest.java",
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/RefusedCleanupConditionalDeleteTest.java",
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/Release030ForgetRootReplayTest.java",
-        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/ReturnedRootCurrentByteReplayTest.java",
         "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/RootPresenceGuardTest.java",
         "modules/ui/src/integrationTest/java/io/justsearch/app/engine/RuntimeReloadProducersHttpIntegrationTest.java",
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/UnreadableAndReplacedSourceQueueTest.java",
@@ -440,18 +464,42 @@ The behavioural replacements were selected by method name and run on both states
         "input re-encoding"
       ],
       "whatMoved": "Supply stable volume identity for deletion fixtures and record roots/explicit folders as a person's deliberate add does (RootWitness.recordAdded or the existing in-memory admission path), including restart/crash drivers. Persist the service base path where the fixture needs its recorded ledger. Share the existing scoped known-volume seam in EngineTestHarness and restore it on cleanup. RootPresenceGuard receives the recorded ledger explicitly. Assertions, fault injection and guarded outcomes remain unchanged. These are adaptations to the volume rule: deleting fixture content needs matching recorded/current volume evidence, whereas present-file admission remains independent. Supplementary preservation checks: modules/worker-services/src/test/java/io/justsearch/indexerworker/services/RootPresenceGuardTest.java#aPresentRootVouchesUntilItIsRenamedAway; modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/UncertainAbsenceGatesTest.java#theFreshnessCheckKeepsTheDocumentWhenTheRootWasRenamedAway.",
-      "newChecks": [
-        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/ReturnedRootCurrentByteReplayTest.java#C11ReturnedRootRechecksAbsenceUnderThePublicationFence"
-      ],
       "sources": [
         {
           "kind": "delegated-choice",
           "delegationQuote": "proceed autonomously with designing all of the smallers and critical fixes. then proceed with implementing them accordingly.",
           "delegationLocation": "task t-20261030-ingfix request",
           "delegationScope": "fix the defects in the owner-commissioned ingestion defect list, designed by the orchestrator",
-          "choice": "Admission of files that are present and readable (adding, ingesting, re-ingesting) keeps today's rule: a folder with no recorded volume and no current volume identity is admitted. Any decision that infers absence and removes or prunes indexed content requires proof: a recorded volume equal to the current identity, or a declared root's recorded volume; no record, no current identity, or a different volume means unproven, and the rows stay (retry later). C11. D15/D33 — a returning or republished source must defeat an obsolete deletion: pause maintenance before application, recreate or publish the source, and verify the current family survives.",
+          "choice": "Admission of files that are present and readable (adding, ingesting, re-ingesting) keeps today's rule: a folder with no recorded volume and no current volume identity is admitted. Any decision that infers absence and removes or prunes indexed content requires proof: a recorded volume equal to the current identity, or a declared root's recorded volume; no record, no current identity, or a different volume means unproven, and the rows stay (retry later).",
           "label": "agent choice"
         }
+      ]
+    },
+    {
+      "items": [
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/ReturnedRootCurrentByteReplayTest.java"
+      ],
+      "class": "Defect pin",
+      "behaviour": "C11: a returning or republished source defeats obsolete deletion; returned-root reconciliation rechecks absence under the publication fence and preserves the current parent and child.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed autonomously with designing all of the smallers and critical fixes. then proceed with implementing them accordingly.",
+          "delegationLocation": "task t-20261030-ingfix request",
+          "delegationScope": "fix the defects in the owner-commissioned ingestion defect list, designed by the orchestrator",
+          "choice": "C11. D15/D33 — a returning or republished source must defeat an obsolete deletion: pause maintenance before application, recreate or publish the source, and verify the current family survives.",
+          "label": "agent choice"
+        }
+      ],
+      "defectSource": {
+        "kind": "defect-source",
+        "safeguard": "no data loss",
+        "reproduction": "Pause returned-root reconciliation after observing absence and before applying deletion; republish the current parent and child under the real file-mutation fence, resume, and require both current rows to survive commit and reopen."
+      },
+      "reproduction": "Pause returned-root reconciliation after observing absence and before applying deletion; republish the current parent and child under the real file-mutation fence, resume, and require both current rows to survive commit and reopen.",
+      "evidence": "gates/test-intent/evidence/ingfix-wp9.json",
+      "newChecks": [
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/ReturnedRootCurrentByteReplayTest.java#C11ReturnedRootRechecksAbsenceUnderThePublicationFence"
       ]
     }
   ]

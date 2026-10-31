@@ -45,9 +45,12 @@ final class ChunkPublicationMetadataTest extends LuceneExecutorTestBase {
               SchemaFields.MIME_BASE, "text/markdown", SchemaFields.FILE_KIND, "markdown"));
           ChunkDocumentWriter.declare(parent, plan);
           runtime.indexingCoordinator().indexSingle(new IndexDocument(parent));
-          total = pass == 1 ? ChunkDocumentWriter.regenerateChunksFromExistingParent(runtime.documentFieldOps(),
-              runtime.indexingCoordinator(), "/parent", content, false)
-              : ChunkDocumentWriter.replaceDeclaredChunks(runtime.indexingCoordinator(), "/parent", content, META, plan, false);
+          boolean update = pass == 1;
+          total = assertDoesNotThrow(() -> update
+              ? ChunkDocumentWriter.regenerateChunksFromExistingParent(runtime.documentFieldOps(),
+                  runtime.indexingCoordinator(), "/parent", content, false)
+              : ChunkDocumentWriter.replaceDeclaredChunks(runtime.indexingCoordinator(), "/parent", content, META, plan, false),
+              "oversized UTF-8 headings must allow complete publication on ingest, update and replay");
           assertEquals(plan.total(), total);
           runtime.commitOps().commitAndTrack(); runtime.commitOps().maybeRefreshBlocking();
           assertEquals(total, runtime.indexCountOps().countQueryOrThrow(new TermQuery(new Term(SchemaFields.PARENT_DOC_ID, "/parent"))));
