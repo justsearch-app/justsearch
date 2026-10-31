@@ -208,3 +208,13 @@ message allowlist fail independently of the original pre-stage-1 failure evidenc
   "digest": "sha256:a839a7d73e76bce1f26a12612106fcfe02cdcedc0ac50fe27a871a746dd0736d"
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verifier-bwiax0sv-round3",
+  "verdict": "accept",
+  "digest": "sha256:a92306734f8ff7c10783573bef80436618df21ad0172410fc4bdbaf3aef4c4d6"
+}
+```
