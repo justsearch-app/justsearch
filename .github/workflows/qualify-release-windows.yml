@@ -27,12 +27,10 @@ jobs:
       - name: Require a disposable GitHub-hosted runner
         run: |
           if ($env:RUNNER_ENVIRONMENT -cne 'github-hosted') { throw 'Refusing a non-hosted runner' }
-      - uses: actions/checkout@v4
-        with:
-          persist-credentials: false
-      - name: Fetch and verify exact draft bytes and tagged registry
+      - name: Fetch draft bytes and tagged registry metadata
         env:
           GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
           RELEASE_TAG: ${{ inputs.tag }}
         run: |
           if ($env:RELEASE_TAG -cnotmatch '^v[0-9]+\.[0-9]+\.[0-9]+(-[A-Za-z0-9.-]+)?$') { throw 'Invalid release tag' }
@@ -47,18 +45,7 @@ jobs:
           $content=& gh api "repos/$env:GITHUB_REPOSITORY/contents/packaging/mcpb/server.json?ref=$env:RELEASE_TAG" --jq .content
           if ($LASTEXITCODE) { throw 'Tagged registry fetch failed' }
           [IO.File]::WriteAllBytes((Join-Path $env:RUNNER_TEMP server.json),[Convert]::FromBase64String(($content -join '')))
-          @'
-          import os, sys
-          from pathlib import Path
-          sys.path.insert(0, 'scripts/release/qual/journeys')
-          from runner import verify_assets
-          root=Path(os.environ['RUNNER_TEMP'])/'release-assets'
-          packages=list(root.glob('*-setup.exe'))
-          assert len(packages)==1, 'Expected exactly one Windows NSIS draft asset'
-          verify_assets(root,[packages[0].name,'justsearch-mcp.mcpb'])
-          '@ | python -
-          if ($LASTEXITCODE) { throw 'SHA256SUMS verification failed' }
-      - name: Transfer verified draft bytes
+      - name: Transfer draft bytes
         uses: actions/upload-artifact@v7
         with:
           name: windows-release-draft-${{ inputs.tag }}

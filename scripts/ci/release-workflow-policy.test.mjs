@@ -28,17 +28,7 @@ jq -e '.isDraft == true' "$RUNNER_TEMP/draft.json"
 gh release download "$RELEASE_TAG" --dir "$RUNNER_TEMP/release-assets" \
   --pattern '*.deb' --pattern justsearch-mcp.mcpb --pattern SHA256SUMS
 gh api "repos/$GITHUB_REPOSITORY/contents/packaging/mcpb/server.json?ref=$RELEASE_TAG" \
-  --jq .content | base64 --decode > "$RUNNER_TEMP/server.json"
-python3 - "$RUNNER_TEMP/release-assets" <<'PY'
-import sys
-from pathlib import Path
-sys.path.insert(0, 'scripts/release/qual/journeys')
-from runner import verify_assets
-root = Path(sys.argv[1])
-packages = list(root.glob('*.deb'))
-assert len(packages) == 1, 'Expected one Linux draft package'
-verify_assets(root, [packages[0].name, 'justsearch-mcp.mcpb'])
-PY`,
+  --jq .content | base64 --decode > "$RUNNER_TEMP/server.json"`,
   windows: String.raw`
 if ($env:RELEASE_TAG -cnotmatch '^v[0-9]+\.[0-9]+\.[0-9]+(-[A-Za-z0-9.-]+)?$') { throw 'Invalid release tag' }
 $assets=Join-Path $env:RUNNER_TEMP release-assets
@@ -51,18 +41,7 @@ if (($draft | ConvertFrom-Json).isDraft -ne $true) { throw 'An existing draft re
 if ($LASTEXITCODE) { throw 'Draft download failed' }
 $content=& gh api "repos/$env:GITHUB_REPOSITORY/contents/packaging/mcpb/server.json?ref=$env:RELEASE_TAG" --jq .content
 if ($LASTEXITCODE) { throw 'Tagged registry fetch failed' }
-[IO.File]::WriteAllBytes((Join-Path $env:RUNNER_TEMP server.json),[Convert]::FromBase64String(($content -join '')))
-@'
-import os, sys
-from pathlib import Path
-sys.path.insert(0, 'scripts/release/qual/journeys')
-from runner import verify_assets
-root=Path(os.environ['RUNNER_TEMP'])/'release-assets'
-packages=list(root.glob('*-setup.exe'))
-assert len(packages)==1, 'Expected exactly one Windows NSIS draft asset'
-verify_assets(root,[packages[0].name,'justsearch-mcp.mcpb'])
-'@ | python -
-if ($LASTEXITCODE) { throw 'SHA256SUMS verification failed' }`,
+[IO.File]::WriteAllBytes((Join-Path $env:RUNNER_TEMP server.json),[Convert]::FromBase64String(($content -join '')))`,
 };
 
 function assertRequiredBeforeProvision(job, index) {
@@ -85,20 +64,19 @@ for (const platform of ['linux', 'windows']) {
     for (const [otherId, other] of Object.entries(w.jobs)) {
       if (otherId !== id) assert.deepEqual(other.permissions, { contents: 'read' });
     }
-    assert.deepEqual(job.steps.filter(s => s.uses).map(s => s.uses), ['actions/checkout@v4', 'actions/upload-artifact@v7']);
+    // No checkout: repository code from the dispatched ref never runs with the write token.
     assert.deepEqual(job.steps.map(s => s.uses ?? s.name), [
       'Require a disposable GitHub-hosted runner',
-      'actions/checkout@v4',
-      platform === 'linux' ? 'Fetch draft bytes and tagged registry metadata' : 'Fetch and verify exact draft bytes and tagged registry',
+      'Fetch draft bytes and tagged registry metadata',
       'actions/upload-artifact@v7',
-    ], 'the write-enabled job may contain only the guard, checkout, fetch/verify and upload');
-    assert.equal(job.steps.find(s => s.uses?.startsWith('actions/checkout@')).with['persist-credentials'], false);
+    ], 'the write-enabled job may contain only the guard, fetch and upload');
     const runs = job.steps.filter(s => s.run);
-    assert.equal(runs.length, 2, 'only the hosted guard and fetch/verify may run with write access');
+    assert.equal(runs.length, 2, 'only the hosted guard and fetch may run with write access');
     assert.equal(normalizeScript(runs[0].run), allowedRunnerGuard[platform], 'runner guard may run only the allowed command');
     const fetch = runs[1];
     assert.equal(normalizeScript(fetch.run), normalizeScript(allowedDraftFetch[platform]), 'draft fetch may run only the allowed commands');
     assert.equal(fetch.env.GH_TOKEN, '${{ github.token }}');
+    assert.equal(fetch.env.GH_REPO, '${{ github.repository }}', 'gh needs the repository without a checkout');
   };
   test(`${name}: only the draft fetch job has write access and cannot run candidate code`, () => assertFetchPolicy(workflow(name)));
 
@@ -151,14 +129,14 @@ for (const platform of ['linux', 'windows']) {
   };
   test(`${name}: failed or skipped draft fetch still records unavailable journeys`, () => assertFetchFailurePolicy(workflow(name)));
 
-  for (const [index, label] of [[0, 'runner guard'], [2, 'draft fetch']]) {
+  for (const [index, label] of [[0, 'runner guard'], [1, 'draft fetch']]) {
     test(`${name}: policy rejects a candidate command appended to the ${label}`, () => {
       const w = workflow(name);
       w.jobs.fetch.steps[index].run += '\npython candidate.py\n';
       assert.throws(() => assertFetchPolicy(w), { code: 'ERR_ASSERTION', message: /may run only the allowed command/ });
     });
   }
-  for (const step of [{ run: 'python candidate.py' }, { uses: 'actions/setup-python@v5' }, { name: 'Unexpected step' }]) {
+  for (const step of [{ run: 'python candidate.py' }, { uses: 'actions/checkout@v4' }, { uses: 'actions/setup-python@v5' }, { name: 'Unexpected step' }]) {
     test(`${name}: policy rejects an extra fetch step ${JSON.stringify(step)}`, () => {
       const w = workflow(name);
       w.jobs.fetch.steps.push(step);
