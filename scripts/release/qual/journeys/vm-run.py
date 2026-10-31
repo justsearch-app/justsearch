@@ -265,6 +265,7 @@ with tarfile.open(fileobj=sys.stdout.buffer,mode='w|') as archive:
             failure.collection_errors = collection_errors
             raise failure
         if collection_errors:
+            collection_errors[0].collection_errors = collection_errors[1:]
             raise collection_errors[0]
 
 

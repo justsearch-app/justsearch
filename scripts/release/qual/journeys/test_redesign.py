@@ -493,6 +493,26 @@ class CrashTests(unittest.TestCase):
             self.assertFalse((root/'app.crash').exists())
             self.assertEqual(len(list(root.glob('qualification-recorded-*/app.crash'))),1)
 
+    def test_failed_lookup_and_move_both_reach_unattributed_or_before_install_errors(self):
+        from test_repair5 import Round2Tests
+        for before_install in (False, True):
+            with self.subTest(before_install=before_install), tempfile.TemporaryDirectory() as temp:
+                root=Path(temp)/'crash';root.mkdir();out=Path(temp)/'out';out.mkdir()
+                (root/'app.crash').write_text('ExecutablePath: /tmp/unknown\n')
+                original=Round2Tests().crash_ssh(root)
+                def ssh(_,command,**kw):
+                    return NS(returncode=2,stdout='') if command=='dpkg-query -L just-search' else original(_,command,**kw)
+                def move(_,command):
+                    raise subprocess.CalledProcessError(1,command,stderr='mv: Permission denied')
+                with patch.object(wrapper.vm,'ssh',ssh),patch.object(wrapper.vm,'guest_root',side_effect=move), \
+                     patch.object(wrapper.vm,'config',return_value={'password':'guest'}), \
+                     self.assertRaises(runner.Infrastructure) as raised:
+                    wrapper.crash_evidence(out,before_install=before_install)
+                self.assertIn('package paths unavailable',str(raised.exception))
+                secondary=getattr(raised.exception,'collection_errors',[])
+                self.assertEqual(len(secondary),1)
+                self.assertIn('mv --',str(secondary[0]))
+
     def test_unattributed_crash_is_listed_in_combined_summary_without_product_failure(self):
         crash={'file':'/var/crash/helper.crash','attribution':'unattributed','fields':{'ExecutablePath':'/tmp/helper'}}
         with tempfile.TemporaryDirectory() as temp:
