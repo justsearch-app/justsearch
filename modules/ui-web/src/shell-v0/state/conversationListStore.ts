@@ -993,6 +993,7 @@ function autoTitleAnswered(sessionId: string, body: Record<string, unknown> | nu
 }
 
 export interface ResumedMessage {
+  turnId?: string;
   role: 'user' | 'assistant';
   content: string;
   // Slice 513 — stable message id from the backend (real UUID for post-513
@@ -1117,6 +1118,7 @@ export async function resumeConversation(
         content?: string;
         id?: string;
         shapeId?: unknown;
+        turnId?: unknown;
         standaloneQuestion?: unknown;
         attributes?: Record<string, unknown>;
       }>;
@@ -1137,6 +1139,8 @@ export async function resumeConversation(
         // `UnifiedChatView.recordShapeId` reads it). Accept either so the two transports of one
         // fact cannot disagree about whether this reader sees it.
         const shapeId = firstString(m.shapeId, m.attributes?.['shapeId']);
+        const dispatch = firstString(m.turnId, m.attributes?.['turnId']);
+        const turnId = dispatch !== undefined && dispatch.length <= 4096 ? dispatch : undefined;
         const standaloneQuestion = firstString(
           m.attributes?.['rag.standaloneQuestion'],
           m.attributes?.['standaloneQuestion'],
@@ -1147,6 +1151,7 @@ export async function resumeConversation(
           content: m.content as string,
           id: typeof m.id === 'string' ? m.id : undefined,
           ...(shapeId !== undefined ? { shapeId } : {}),
+          ...(turnId !== undefined ? { turnId } : {}),
           ...(standaloneQuestion !== undefined ? { standaloneQuestion } : {}),
         };
       });

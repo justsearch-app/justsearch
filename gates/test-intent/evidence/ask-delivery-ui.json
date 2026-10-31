@@ -1,0 +1,251 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
+  },
+  "createdAt": "2026-10-31T11:59:35.672Z",
+  "revision": "bc827e04b0b9d5f1649e9d76193859fc6d4a6732",
+  "tree": "6188c11a06732cd701eb4d0011fc8bc6e26578db",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/search-v3/SearchV3View.delivery.test.ts\" \"src/shell-v0/views/search-v3/sv3-dispatch-record.test.ts\" \"src/shell-v0/views/search-v3/sv3-recovery.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/lnql29un/tmp/test-intent-vitest-4-1793447931207.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 22873
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.delivery.test.ts",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.delivery.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:6acc005507f8cadec6727414b2059b295018794191b3fc95f95c55e64ca5d36a",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "addresses progress to the exact live attempt after opening another conversation",
+          "status": "passed"
+        },
+        {
+          "name": "resolves the retained exact saved outcome after New without sending again",
+          "status": "passed"
+        },
+        {
+          "name": "resolves the retained exact saved outcome after reload without sending again",
+          "status": "passed"
+        },
+        {
+          "name": "preserves uncertainty without exact terminal evidence: question only",
+          "status": "passed"
+        },
+        {
+          "name": "preserves uncertainty without exact terminal evidence: different dispatch",
+          "status": "passed"
+        },
+        {
+          "name": "preserves uncertainty without exact terminal evidence: synthetic incomplete",
+          "status": "passed"
+        },
+        {
+          "name": "preserves uncertainty without exact terminal evidence: empty",
+          "status": "passed"
+        },
+        {
+          "name": "preserves uncertainty without exact terminal evidence: failed read",
+          "status": "passed"
+        },
+        {
+          "name": "preserves uncertainty without exact terminal evidence: legacy",
+          "status": "passed"
+        },
+        {
+          "name": "reads a retained address even before the conversation appears in the list",
+          "status": "passed"
+        },
+        {
+          "name": "reload after a lost terminal shows the saved answer and retires only its attempt",
+          "status": "passed"
+        },
+        {
+          "name": "a saved error resolves delivery and shows the actual outcome",
+          "status": "passed"
+        },
+        {
+          "name": "a saved no evidence resolves delivery and shows the actual outcome",
+          "status": "passed"
+        },
+        {
+          "name": "a saved stopped resolves delivery and shows the actual outcome",
+          "status": "passed"
+        },
+        {
+          "name": "completion saved before the Stop response wins even when its live terminal is lost",
+          "status": "passed"
+        },
+        {
+          "name": "a failed retirement ACK retains recoverable A and companion B until a successful check",
+          "status": "passed"
+        },
+        {
+          "name": "resolving saved A after reload never authorizes restored B to send before review",
+          "status": "passed"
+        },
+        {
+          "name": "each authorized admission continuation retains a fresh identity before its POST",
+          "status": "passed"
+        },
+        {
+          "name": "S15 finite checking budget retains uncertainty until manual rearms it",
+          "status": "passed"
+        },
+        {
+          "name": "S15 finite checking budget retains uncertainty until open rearms it",
+          "status": "passed"
+        },
+        {
+          "name": "S15 finite checking budget retains uncertainty until reconnect rearms it",
+          "status": "passed"
+        },
+        {
+          "name": "S15 a slow record read survives polling ticks and can settle its own attempt",
+          "status": "passed"
+        },
+        {
+          "name": "S15 a timed-out abort-ignoring read cannot stop checking or override a newer result",
+          "status": "passed"
+        },
+        {
+          "name": "S15 a late retained-address read cannot undo navigate",
+          "status": "passed"
+        },
+        {
+          "name": "S15 a late retained-address read cannot undo delete",
+          "status": "passed"
+        },
+        {
+          "name": "S15 an empty view without a retained attempt never starts automatic record reads",
+          "status": "passed"
+        },
+        {
+          "name": "a Retry gets a fresh retained dispatch and resolves only in the fork actually sent to",
+          "status": "passed"
+        },
+        {
+          "name": "saved completion invalidates cached companion history before a follow-up consumes context",
+          "status": "passed"
+        },
+        {
+          "name": "a stale admission refusal cannot overwrite the replacement attempt after explicit discard",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/sv3-dispatch-record.test.ts",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/sv3-dispatch-record.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:5118d318c28963fa22a09a6175ad0e5ae660de8d1a4a946b2f55b2e68022d89e",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "interleaved dispatches retain their own answers, errors and reasoning (reversed=false)",
+          "status": "passed"
+        },
+        {
+          "name": "interleaved dispatches retain their own answers, errors and reasoning (reversed=true)",
+          "status": "passed"
+        },
+        {
+          "name": "an unmatched stamped outcome cannot become the answer to a legacy question",
+          "status": "passed"
+        },
+        {
+          "name": "legacy records retain ordered projection",
+          "status": "passed"
+        },
+        {
+          "name": "the first live merge uses the dispatch identity without borrowing another writer’s row",
+          "status": "passed"
+        },
+        {
+          "name": "the history reader retains valid dispatch metadata and drops malformed values",
+          "status": "passed"
+        },
+        {
+          "name": "export uses a saved exact outcome over a stale local transport failure without pairing identical prompts",
+          "status": "passed"
+        },
+        {
+          "name": "recovery v3 admits only bounded nonblank dispatch identity while v1 and v2 keep their strict shape",
+          "status": "passed"
+        },
+        {
+          "name": "a synthetic incomplete stamped error is never terminal evidence, including when persisted by backup",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/sv3-recovery.test.ts#reads the strict original text-only payload and strict new data-only proposal",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/sv3-recovery.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:06178e0b1c4f37651873f8a7ba2eead98b30d703dfb8c15a550286b564b6e6f6",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "DS1 session proposal trust boundary reads the strict original text-only payload and strict new data-only proposal",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "bc827e04b0",
+    "revision": "bc827e04b0b9d5f1649e9d76193859fc6d4a6732",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/search-v3/SearchV3View.delivery.test.ts\" \"src/shell-v0/views/search-v3/sv3-dispatch-record.test.ts\" \"src/shell-v0/views/search-v3/sv3-recovery.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/lnql29un/tmp/test-intent-vitest-4-1793447956854.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 18003,
+        "output": "JSON report written to /home/elias/.cache/am/lnql29un/tmp/test-intent-vitest-4-1793447956854.json\n\n"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.delivery.test.ts",
+        "classification": "assertion",
+        "detail": "addresses progress to the exact live attempt after opening another conversation:  AssertionError: expected '\\n      \\n      \\n      \\n      \\n   …' not to contain 'Delivery unknown'\n    at /home/elias/.cache/am/lnql29un/tmp/test-intent-before-RhbrXX/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.delivery.test.ts:112:42\n    at file:///home/elias/.cache/am/lnql29un/tmp/te | resolves the retained exact saved outcome after New without sending again:  AssertionError: expected { …(11) } to b"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/sv3-dispatch-record.test.ts",
+        "classification": "assertion",
+        "detail": "interleaved dispatches retain their own answers, errors and reasoning (reversed=false):  AssertionError: expected [ [ 'identical', '', 'failed' ], …(1) ] to deeply equal [ …(2) ]\n    at /home/elias/.cache/am/lnql29un/tmp/test-intent-before-RhbrXX/modules/ui-web/src/shell-v0/views/search-v3/sv3-dispatch-record.test.ts:22:60\n    at file:///home/elias/.cache/am/lnql29un/tmp/test-intent-bef | interleaved dispatches retain their own answers, errors and reasoning (reversed=true):  AssertionError: expe"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/sv3-recovery.test.ts#reads the strict original text-only payload and strict new data-only proposal",
+        "classification": "assertion",
+        "detail": "DS1 session proposal trust boundary reads the strict original text-only payload and strict new data-only proposal:  AssertionError: expected false to be true // Object.is equality\n    at /home/elias/.cache/am/lnql29un/tmp/test-intent-before-RhbrXX/modules/ui-web/src/shell-v0/views/search-v3/sv3-recovery.test.ts:14:57\n    at file:///home/elias/.cache/am/lnql29un/tmp/test-intent-before-RhbrXX/modules/ui-web/node_mo"
+      }
+    ]
+  },
+  "digest": "sha256:9085fd16023fb3a28116f77c1523fd5342944a4826b870cce1cb819aa5e1e890"
+}

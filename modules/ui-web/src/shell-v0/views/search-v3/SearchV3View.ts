@@ -178,6 +178,7 @@ import {
 import { ReasoningController } from '../../controllers/ReasoningController.js';
 // Tempdoc 596 §11.4 — the shared remedy navigation, reached from exactly one place in this window.
 import { requestSurfaceNavigation } from '../../controllers/navigateRequest.js';
+import { retainedTaskNotice } from './sv3-recovery-notice.js';
 import { projectSv3RecordTurns } from './sv3-record.js';
 import {
   SV3_ASK_SHAPE_ID,
@@ -243,7 +244,7 @@ import {
 // Tempdoc 609 §R — the shared reload-durable draft controller (T2.1) and its one-shot leave hint (T1.4).
 import { authorizedFetch } from '../../api/authorizedFetch.js';
 import { DraftPersistence } from '../../controllers/draftPersistence.js';
-import { requestLoadAnyway, retryWording } from '../../state/chatResidency.js';
+import { requestLoadAnyway } from '../../state/chatResidency.js';
 import { notifyDraftKeptOnce } from '../../controllers/draftKeptHint.js';
 // Tempdoc 834 §15.3 — the backend's live-run enumeration, asked on a cold load.
 import { discoverLiveAgentRun } from '../../controllers/liveRuns.js';
@@ -888,7 +889,6 @@ export class SearchV3View extends JfElement {
     const current = { place: this.draftDomain.humanPlace(), text: this.currentDraft(), preparation: this.draftDomain.currentPreparation() };
     const companions = this.draftDomain.recoveryDrafts.filter(d => this.draftDomain.draftHasInputs(d) && !this.draftDomain.sameDraft(d, current));
     if (!this.draftDomain.departureBlocked && !this.draftPersistence.restoreUnavailable && !this.draftDomain.draftReview && task === null && !this.draftDomain.recoveryError && this.draftDomain.refusedHandoff === null && companions.length === 0 && this.aiSnapshot?.chatUnloadedReason == null) return nothing;
-    const eligible = task !== null && this.draftDomain.humanOwned(task) && task.saved.delivery === 'unaccepted' && task.refusal !== null;
     return html`<div class="notice recovery-notice" role="status" data-testid="sv3-residency-notice">
       ${this.draftDomain.recoveryError ? html`<p role="alert">${this.draftDomain.recoveryError}</p>` : nothing}
       ${this.draftDomain.refusedHandoff === null ? nothing : html`<section data-testid="sv3-refused-handoff" aria-label="Incoming task not prepared">
@@ -908,19 +908,9 @@ export class SearchV3View extends JfElement {
         <button type="button" data-testid="sv3-draft-review-search" @click=${() => this.draftDomain.reviewDraft(true)}>Use Search with current filters</button>
         <p>Choose a valid mode, schema and inputs before confirming. Confirmation does not search or send. Extra task details last only for this tab session; your current text uses normal draft saving when storage is available.</p>
       </section>` : nothing}
-      ${task === null ? nothing : html`<p>${task.saved.delivery === 'unknown'
-        ? 'Delivery unknown—check the saved conversation before making a new submission.'
-        : task.saved.delivery === 'unaccepted' ? 'Question not sent.' : 'Review the retained question before a new submission.'}</p>
-        <pre>${task.saved.raw || (task.saved.record ? 'Saved question: ' + task.saved.record : '')}</pre>
-        <p>${task.refusal?.message ?? ''} ${task.refusal ? retryWording(task.refusal) : ''}</p>
-        ${task.saved.needsReselection || task.restored ? html`<p>Review the original mode, schema and files. Reselect any passage before sending. Restored copies never send automatically.</p>` : nothing}
-        ${eligible ? html`<button type="button" data-testid="sv3-residency-retry" ?disabled=${this.draftDomain.humanLoad !== null || this.streaming || Date.now() < task.retryAt}
-          @click=${() => { void this.draftDomain.continueHumanTask(false); }}>Retry</button>
-          ${task.refusal?.forceAllowed === true ? html`<button type="button" data-testid="sv3-residency-force" ?disabled=${this.draftDomain.humanLoad !== null || this.streaming}
-            @click=${() => { void this.draftDomain.continueHumanTask(true); }}>Load anyway</button>` : nothing}` : nothing}
-        ${this.draftDomain.humanLoad !== null ? html`<button type="button" data-testid="sv3-residency-stop" @click=${() => { this.draftDomain.revokeHumanTask(); this.draftDomain.saveRecovery(); }}>Stop waiting</button>` : nothing}
-        <button type="button" data-testid="sv3-residency-discard" ?disabled=${this.streaming}
-          @click=${() => this.draftDomain.discardHumanTask()}>Discard retained task; allow a new submission</button>`}
+      ${retainedTaskNotice(task, this.draftDomain, task !== null && this.askDomain.ownsAttempt(task), this.streaming, () => {
+        if (task?.saved.target != null) void this.contextDomain.refreshRecord(task.saved.target);
+      })}
       ${companions.map(draft => html`<p>Recovered draft (${draft.place ?? 'new conversation'}):</p><pre>${draft.text}</pre>
         <p>${this.draftDomain.preparationSummary(draft.preparation ?? null)}</p>
         <button type="button" data-testid="sv3-recovery-review-copy" @click=${() => this.draftDomain.reviewRecoveryDraft(draft)}>Review this draft</button>
@@ -994,7 +984,11 @@ export class SearchV3View extends JfElement {
     setContextUsage: (id, usage) => { this.sessions = setSessionContextUsage(this.sessions, id, usage); },
     contextWindow: () => this.aiSnapshot?.runtime.contextWindow ?? null,
     recordReadWait: id => this.runDomain.recordReadWait(id),
-    recordArrival: (id, record) => this.runDomain.recordArrival(id, record),
+    retainedAttempt: () => this.askDomain.retainedAttempt(),
+    recordArrival: (id, record) => {
+      this.runDomain.recordArrival(id, record);
+      this.askDomain.recordArrival(id, record);
+    },
     scheduleRecordRetry: () => this.runDomain.scheduleRecordRetry(),
     clearRecordRetry: () => this.runDomain.clearRecordRetry(),
     retryRecords: () => this.runDomain.retryRecords(),
@@ -1065,8 +1059,8 @@ export class SearchV3View extends JfElement {
     draft: () => this.draftDomain,
     context: () => this.contextDomain,
     search: () => this.search,
-    submitTurn: (question, now, kind, target, shape, selectionKind) => {
-      this.sessions = submitInSession(this.sessions, question, now, kind, target, shape, selectionKind);
+    submitTurn: (question, now, kind, target, shape, selectionKind, dispatchTurnId) => {
+      this.sessions = submitInSession(this.sessions, question, now, kind, target, shape, selectionKind, dispatchTurnId);
       return latestTurnRef(this.sessions);
     },
     dropTurn: ref => { this.sessions = dropTurn(this.sessions, ref); },

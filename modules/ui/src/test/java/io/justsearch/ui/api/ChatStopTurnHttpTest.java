@@ -431,6 +431,45 @@ final class ChatStopTurnHttpTest {
     }
   }
 
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  void savedHistoryOverHttpNamesTheDispatchForCompletedAndStoppedTurns(boolean halt) throws Exception {
+    start(List.of("Ada owns"));
+    try (Dispatch turn = dispatch("correlated", "dispatch-A", "And who owns it?")) {
+      turn.awaitEvent("chunk");
+      if (halt) stop("correlated", "dispatch-A");
+      else ai.release.countDown();
+      turn.awaitEnd();
+    }
+    var saved = awaitOutcome("correlated");
+    assertEquals("dispatch-A", saved.get(0).get("turnId"));
+    assertEquals("dispatch-A", saved.get(1).get("turnId"));
+    var response = client.send(HttpRequest.newBuilder(URI.create("http://127.0.0.1:" + app.port()
+        + "/api/chat/conversations/correlated/history")).timeout(Duration.ofSeconds(5)).GET().build(),
+        HttpResponse.BodyHandlers.ofString());
+    assertEquals(200, response.statusCode(), response.body());
+    var messages = MAPPER.readTree(response.body()).get("messages");
+    assertEquals("dispatch-A", messages.get(0).path("turnId").asString());
+    assertEquals("dispatch-A", messages.get(1).path("turnId").asString());
+    assertEquals(halt ? "CANCELLED" : "", messages.get(1).path("disposition").asString(""));
+  }
+
+  @Test void aSavedRetrievalFailureNamesItsDispatch() throws Exception {
+    var retrieval = heldStep();
+    start(List.of(), List.of(retrieval.injector()), List.of());
+    try (Dispatch turn = dispatch("failed-correlation", "dispatch-error", "And who owns it?")) {
+      assertTrue(retrieval.reached.await(5, TimeUnit.SECONDS));
+      retrieval.step.countDown();
+      turn.awaitEnd();
+    }
+    var history = awaitOutcome("failed-correlation");
+    assertEquals("dispatch-error", history.get(0).get("turnId"));
+    assertEquals("dispatch-error", history.get(1).get("turnId"));
+    assertEquals(true, history.get(1).get("terminalError"));
+    assertEquals("RETRIEVAL_FAILED", history.get(1).get("errorCode"));
+    assertEquals(0, ai.streams.get());
+  }
+
   // ── harness ──────────────────────────────────────────────────────────────────────────────────
 
   private HeldStep heldStep() {

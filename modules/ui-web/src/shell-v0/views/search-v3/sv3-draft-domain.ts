@@ -288,7 +288,7 @@ export class Sv3DraftDomain {
       if (this.draftHasInputs(snapshot) && !(retired && this.sameDraft(snapshot, retired))
         && !drafts.some(d => this.sameDraft(d, snapshot))) drafts.push(snapshot);
     }
-    const payload: Sv3Recovery = { version: 2, task: previous.task, drafts };
+    const payload: Sv3Recovery = { version: 3, task: previous.task, drafts };
     if (!this.saveRecoveryPayload(payload)) return false;
     if (!this.host.connected() || !draft.port.isCurrent(draft)
       || this.preparationRevision !== revision || this.humanPlace() !== place || this.composer.read() !== text) {
@@ -387,7 +387,7 @@ export class Sv3DraftDomain {
       const snapshot = { ...draft, preparation: draft.preparation ?? null };
       if (this.draftHasInputs(snapshot) && !drafts.some(d => this.sameDraft(d, snapshot))) drafts.push(snapshot);
     }
-    return { version: 2, task: task?.saved ?? null, drafts };
+    return { version: 3, task: task?.saved ?? null, drafts };
   }
 
   private saveRecoveryPayload(payload: Sv3Recovery): boolean {
