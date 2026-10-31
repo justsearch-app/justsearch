@@ -4038,6 +4038,8 @@ public final class WorkerIngestService {
           .setParentDocsSettledNer(c.parentDocsSettledNer())
           .setChunkDocsTotal(c.chunkDocsTotal())
           .setChunkDocsSettled(c.chunkDocsSettled())
+          .putAllFailedStages(c.failedStages())
+          .putAllMissingArtifactStages(c.missingArtifactStages())
           .build();
     } catch (RuntimeException e) {
       log.warn("countJobsByPathPrefix: root coverage unavailable: {}", e.getMessage());

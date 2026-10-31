@@ -91,6 +91,8 @@ export const SV3_CORPUS_UNKNOWN: Sv3Corpus = { kind: 'unknown' };
  * that does not report it. A reported `0` is real and gets the remedy.
  */
 export function projectSv3Corpus(snapshot: AiState | null): Sv3Corpus {
+  const observation = snapshot?.status?.worker?.countObservations?.searchable;
+  if (observation?.state === 'unknown' || observation?.state === 'stale') return SV3_CORPUS_UNKNOWN;
   const index = snapshot?.lastSettledIndex;
   if (index == null) return SV3_CORPUS_UNKNOWN;
   const count = index.searchableDocumentCount ?? index.documentCount;

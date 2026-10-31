@@ -51,6 +51,36 @@ final class ChunkDocumentWriterTest extends io.justsearch.adapters.lucene.runtim
   }
 
   @Test
+  void canonicalZeroChunkDeclarationsQualifyFreshAndReopenedLibraries() throws Exception {
+    for (String content : new String[] {"short source", " ".repeat(ChunkDocumentWriter.CHUNK_THRESHOLD_CHARS) + "one source"}) {
+      var plan = ChunkDocumentWriter.plan(content, "text/plain", "txt");
+      assertEquals(0, plan.total(), "below threshold or one split needs no passage documents");
+      String id = "d:/docs/short-" + content.length() + ".txt";
+      var fields = new java.util.HashMap<String, Object>(Map.of(SchemaFields.DOC_ID, id,
+          SchemaFields.DOC_UID, id, SchemaFields.PATH, id, SchemaFields.CONTENT, content,
+          SchemaFields.CONTENT_SHA256, plan.revision()));
+      ChunkDocumentWriter.declare(fields, plan);
+      lifecycle.indexingCoordinator().indexSingle(new IndexDocument(fields));
+    }
+    lifecycle.commitOps().commitAndTrack();
+    lifecycle.commitOps().maybeRefreshBlocking();
+    for (int reopen = 0; reopen < 2; reopen++) {
+      var presence = lifecycle.indexCountOps().queryChunkVectorPresenceCount();
+      assertEquals(0, presence.totalChunks());
+      boolean exempt = false;
+      for (var field : presence.getClass().getRecordComponents()) {
+        if (field.getName().equals("chunkingNotRequired")) exempt = (Boolean) field.getAccessor().invoke(presence);
+      }
+      assertTrue(exempt, "canonical zero declarations must survive reopen");
+      if (reopen == 0) {
+        lifecycle.close();
+        lifecycle = io.justsearch.adapters.lucene.runtime.IndexSchema.fromCatalog(FieldCatalogDef.forChunkTesting(0))
+            .atPath(tempDir).withExecutorRegistrations(testLuceneExecutors()).open();
+      }
+    }
+  }
+
+  @Test
   @DisplayName("regenerateChunksFromExistingParent writes offsets and inherits metadata")
   void regenerateChunksFromExistingParentWritesOffsetsAndInheritsMetadata() throws Exception {
     String parentDocId = "d:/docs/report.pdf";

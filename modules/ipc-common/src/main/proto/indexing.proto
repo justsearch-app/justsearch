@@ -860,7 +860,10 @@ message ChunkCoverage {
   int64 splade_completed_count = 8;
   int64 splade_pending_count = 9;
   double splade_coverage_percent = 10;
-  // Next available field number: 11
+  bool chunking_not_required = 11; // All live parents declare zero chunks for their current revision.
+  optional int64 splade_doc_count = 12; // Only chunks carrying splade_status; absent on older workers.
+  int64 splade_failed_count = 13;
+  // Next available field number: 14
 }
 
 // Map-based accumulated per-batch timing for enrichment phases (354).
@@ -935,7 +938,8 @@ message EnrichmentCoverage {
   bool embedding_available = 21;
   bool splade_available = 22;
   bool ner_available = 23;
-  // Next available field number: 24
+  optional bool completeness_known = 24;
+  // Next available field number: 25
 }
 
 // One enrichment stage's completeness audit (tempdoc 821 §3-C3).
@@ -1039,6 +1043,12 @@ message VisualExtractionStatus {
 
 // 341: Decomposed into nested sub-messages. Each sub-message owns its own
 // field number space, eliminating collision risk as subsystems grow.
+// Count provenance: unknown has no observation; stale retains its original observation time.
+message CountObservation {
+  string state = 1; // fresh | stale | unknown
+  int64 observed_at_ms = 2;
+}
+
 message StatusResponse {
   CoreStatus core = 1;
   FailureStatus failure = 2;
@@ -1056,7 +1066,8 @@ message StatusResponse {
   // 371: Content hash of the Worker distribution (stale-JVM detection).
   string build_stamp = 12;
   VisualExtractionStatus visual_extraction = 13;
-  // Next available field number: 14
+  map<string, CountObservation> count_observations = 14; // active | building | searchable
+  // Next available field number: 15
 }
 
 // === Delete by Path (Prefix) ===
@@ -1430,6 +1441,8 @@ message RootCoverageCounts {
   int64 parent_docs_settled_ner = 4;        // ner_status terminal (+COMPLETED_EMPTY)
   int64 chunk_docs_total = 5;               // chunk docs carrying chunk_embedding_status
   int64 chunk_docs_settled = 6;             // chunk_embedding_status terminal (COMPLETED|FAILED)
+  map<string, bool> failed_stages = 9; // Terminal failure is settled, but cannot certify searchability.
+  map<string, bool> missing_artifact_stages = 10; // Completed dense work missing its artifact.
 }
 
 message CountJobsByPathPrefixResponse {
