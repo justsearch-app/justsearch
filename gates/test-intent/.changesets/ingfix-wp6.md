@@ -760,3 +760,14 @@ excluded from newChecks):
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a1945b-4e81-7132-8447-ac903e095a06",
+  "verdict": "accept",
+  "digest": "sha256:4ac6544c5e23a2a49417874217a363b9feeb4ce91f9dc7b91ab9821c21b132d3",
+  "note": "verifier-2 on 52bdfb6741: all 18 entries accepted with per-entry reasons (WP6/results/verifier-2-evidence/test-intent-review.json)"
+}
+```
