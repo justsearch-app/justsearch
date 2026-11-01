@@ -3,6 +3,7 @@ import importlib.util
 import json
 import os
 from pathlib import Path
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -21,6 +22,7 @@ windows = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(windows)
 
 
+@unittest.skipUnless(shutil.which('qemu-img'), 'qemu-img not installed')
 class GrowthLaneTests(unittest.TestCase):
     def setUp(self):
         temp = tempfile.TemporaryDirectory(prefix='qual-lane-growth-')

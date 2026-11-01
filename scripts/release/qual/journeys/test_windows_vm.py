@@ -69,7 +69,8 @@ class WindowsVMTests(unittest.TestCase):
                 argv = ['vm-windows.py', '--assets', 'assets', '--package', 'candidate.exe',
                         '--registry', 'registry.json', '--driver', 'driver.exe', '--predecessor', 'parent.exe',
                         '--mirror', 'mirror', '--setup-snapshot', 'tools', '--evidence', str(out)]
-                with patch.object(wrapper.vm, 'ROOT', Path(temp)), patch.object(sys, 'argv', argv), patch.object(wrapper.vm, 'owner'), \
+                self.enterContext(patch.object(wrapper.vm, 'ROOT', Path(temp)))
+                with patch.object(sys, 'argv', argv), patch.object(wrapper.vm, 'owner'), \
                      patch.object(wrapper, 'run_overlay', side_effect=run), patch.object(wrapper, 'combine', return_value=1):
                     wrapper.main()
                 expected = [('candidate', ['J1', 'J2']), ('candidate', ['J3'])]
@@ -121,7 +122,8 @@ class WindowsVMTests(unittest.TestCase):
                 events.append(mode)
                 (out/('quiet-'+mode.lower()+'.json')).write_text(json.dumps({'verified':mode=='Verify'}))
             def stop():events.append('stop');return True
-            with patch.object(wrapper.vm,'ROOT',root),patch.object(wrapper.vm,'wait_free'),patch.object(wrapper,'wait_for',return_value=True), \
+            self.enterContext(patch.object(wrapper.vm, 'ROOT', root))
+            with patch.object(wrapper.vm,'wait_free'),patch.object(wrapper,'wait_for',return_value=True), \
                  patch.object(wrapper,'start_snapshot'),patch.object(wrapper.vm,'require_owner',return_value=started), \
                  patch.object(wrapper.vm,'wait_ssh'),patch.object(wrapper,'WriteBudget') as budget, \
                  patch.object(wrapper,'stage_inputs'),patch.object(wrapper,'guest_ps',side_effect=guest), \
@@ -171,7 +173,8 @@ class WindowsVMTests(unittest.TestCase):
                     (out/'checkpoint.json').write_text('{}')
                     return 0
                 def stop():current[0]=None;return True
-                with patch.object(wrapper.vm,'ROOT',root),patch.object(wrapper,'pins',return_value={}),patch.object(wrapper.vm,'wait_free'), \
+                self.enterContext(patch.object(wrapper.vm, 'ROOT', root))
+                with patch.object(wrapper,'pins',return_value={}),patch.object(wrapper.vm,'wait_free'), \
                      patch.object(wrapper,'wait_for',return_value=True),patch.object(wrapper,'start_snapshot'), \
                      patch.object(wrapper.vm,'require_owner',return_value=started),patch.object(wrapper.vm,'wait_ssh'), \
                      patch.object(wrapper.vm,'read_state',side_effect=lambda:current[0]), \
@@ -259,7 +262,8 @@ class WindowsVMTests(unittest.TestCase):
             (root/'run-vars.fd').write_bytes(b'firmware');(out/'checkpoint.json').write_text('{}')
             (out/'summary.json').write_text('{}')
             (out/'quiet-verify.json').write_text(json.dumps({'verified':True}))
-            with patch.object(wrapper.vm,'ROOT',root),patch.object(wrapper.vm,'locked',return_value=contextlib.nullcontext()),patch.object(wrapper.vm,'ensure_free'),patch.object(wrapper,'pins',return_value={'sha':'exact'}):
+            self.enterContext(patch.object(wrapper.vm, 'ROOT', root))
+            with patch.object(wrapper.vm,'locked',return_value=contextlib.nullcontext()),patch.object(wrapper.vm,'ensure_free'),patch.object(wrapper,'pins',return_value={'sha':'exact'}):
                 wrapper.seal_snapshot(out,{'disk':str(disk)},inode,None,'candidate')
             self.assertFalse(disk.exists())
             self.assertEqual((out/'snapshot/disk.qcow2').stat().st_ino,inode)
@@ -276,7 +280,8 @@ class WindowsVMTests(unittest.TestCase):
             for same in (True,False):
                 disk.write_bytes(b'disk')
                 out=root/str(same)
-                with patch.object(wrapper.vm,'ROOT',root),patch.object(wrapper,'pins',return_value={}),patch.object(wrapper.vm,'wait_free'),patch.object(wrapper,'wait_for',return_value=True),patch.object(wrapper,'start_snapshot'),patch.object(wrapper.vm,'require_owner',return_value=started),patch.object(wrapper.vm,'wait_ssh',side_effect=Infrastructure('SSH failed')),patch.object(wrapper.vm,'read_state',return_value=started if same else dict(started,pid=1)),patch.object(wrapper,'guest_ps',return_value='{}'),patch.object(wrapper,'WriteBudget') as budget,patch.object(wrapper.vm,'locked',return_value=contextlib.nullcontext()),patch.object(wrapper.vm,'ensure_free'),patch.object(wrapper.vm,'stop',return_value=True) as stop:
+                self.enterContext(patch.object(wrapper.vm, 'ROOT', root))
+                with patch.object(wrapper,'pins',return_value={}),patch.object(wrapper.vm,'wait_free'),patch.object(wrapper,'wait_for',return_value=True),patch.object(wrapper,'start_snapshot'),patch.object(wrapper.vm,'require_owner',return_value=started),patch.object(wrapper.vm,'wait_ssh',side_effect=Infrastructure('SSH failed')),patch.object(wrapper.vm,'read_state',return_value=started if same else dict(started,pid=1)),patch.object(wrapper,'guest_ps',return_value='{}'),patch.object(wrapper,'WriteBudget') as budget,patch.object(wrapper.vm,'locked',return_value=contextlib.nullcontext()),patch.object(wrapper.vm,'ensure_free'),patch.object(wrapper.vm,'stop',return_value=True) as stop:
                     budget.return_value.finish.return_value={};budget.return_value.initial=0;budget.return_value.error=None
                     self.assertEqual(wrapper.run_overlay(args,out,'candidate',['J1'],snapshot),1)
                 self.assertEqual(stop.call_count,1 if same else 0)
