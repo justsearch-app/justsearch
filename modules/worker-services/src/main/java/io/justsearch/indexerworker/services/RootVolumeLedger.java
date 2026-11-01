@@ -27,9 +27,9 @@ import org.slf4j.LoggerFactory;
  * at the same letter, a reformatted disk. Its folder of the same name is present and listable, so
  * without a record every file of the original would read as deleted. Only a deliberate add records
  * a volume: the person's add of a root, or an explicit ingest
- * request ({@link #record}, replacing what its own key held). Walks never establish a declared
- * root's volume. Observed child mount points retain their own volume under the same folder keys,
- * so an unmounted child cannot borrow its ancestor's deletion authority. The record is dropped when the person removes the root (its unwatch). A folder is
+ * request ({@link #record}, replacing what its own key held). No walk ever records: every other
+ * path refuses a root with nothing recorded as unproven and records
+ * nothing. The record is dropped when the person removes the root (its unwatch). A folder is
  * judged by the record of the nearest recorded folder at or above it.
  *
  * <p>Upgrade seeding: when neither this record nor its pending file exists yet (an upgrade from a
@@ -148,60 +148,6 @@ final class RootVolumeLedger {
       }
     }
     return Optional.empty();
-  }
-
-  /** Child mount boundaries use the existing folder-to-volume records and survive restart. */
-  void observeDescendantMounts(Path root) throws IOException {
-    if (!enabled() || !PlatformPaths.isLinux()) return;
-    for (Path mount : LinuxRootIdentityLease.descendantMountPoints(root.toAbsolutePath().normalize())) {
-      if (!Files.isDirectory(mount, java.nio.file.LinkOption.NOFOLLOW_LINKS)) continue;
-      String volume;
-      try {
-        volume = RootIdentity.capture(mount).volume();
-      } catch (IOException | SecurityException unavailable) {
-        volume = null;
-      }
-      recordIfAbsent(mount, volume == null ? "unconfirmed:0" : volume);
-    }
-  }
-
-  /** Descendants and the nearest recorded ancestor keep explicit-file storage checks scoped. */
-  java.util.Map<Path, String> sourceVolumes(Path root) throws IOException {
-    if (!enabled()) return java.util.Map.of();
-    synchronized (lock) {
-      var result = new java.util.HashMap<Path, String>();
-      Path boundary = root.toAbsolutePath().normalize();
-      Properties entries = load();
-      Path nearest = null;
-      for (String name : entries.stringPropertyNames()) {
-        if (name.startsWith(FILE_FOLDER_PREFIX)) continue;
-        Path path = Path.of(name);
-        if (!path.equals(boundary) && path.startsWith(boundary)) result.put(path, entries.getProperty(name));
-        else if (boundary.startsWith(path) && (nearest == null || path.getNameCount() > nearest.getNameCount())) nearest = path;
-      }
-      if (nearest != null) result.put(nearest, entries.getProperty(key(nearest)));
-      return java.util.Map.copyOf(result);
-    }
-  }
-
-  boolean sourceStorageAvailable(Path file, Path root) {
-    try {
-      return sourceStorageAvailable(file, sourceVolumes(root));
-    } catch (IOException | RuntimeException unavailable) {
-      return false;
-    }
-  }
-
-  static boolean sourceStorageAvailable(Path file, java.util.Map<Path, String> descendants) {
-    try {
-      for (Path ancestor = file.toAbsolutePath().normalize(); ancestor != null; ancestor = ancestor.getParent()) {
-        String recorded = descendants.get(ancestor);
-        if (recorded != null && !recorded.equals(RootIdentity.capture(ancestor).volume())) return false;
-      }
-      return true;
-    } catch (IOException | RuntimeException unavailable) {
-      return false;
-    }
   }
 
   /** Records {@code volume} for {@code root} unless a volume is already recorded. */

@@ -2940,7 +2940,6 @@ public final class KnowledgeServerMigrationOps {
     } catch (IOException | SecurityException unsafeAncestor) {
       return CleanupPathState.UNCERTAIN;
     }
-    if (!rootCheck.sourceStorageAvailable(file, root)) return CleanupPathState.UNCERTAIN;
     String before = observedKind(file);
     if (before == null) return CleanupPathState.UNCERTAIN;
     boolean asRoot = io.justsearch.indexerworker.loop.SourcePresence.answersAsRoot(file, root);
@@ -3717,8 +3716,6 @@ public final class KnowledgeServerMigrationOps {
       }
       requireEnumerationRunning(context);
       requireMigrationRoot(root);
-      var storage = publisher == null ? (java.util.function.Predicate<Path>) path -> true
-          : publisher.rootCheck().sourceStorageCheck(root);
       context.log().info("Migration enumerator scanning root: {}", root);
       Files.walkFileTree(root, java.util.EnumSet.noneOf(java.nio.file.FileVisitOption.class),
           help ? 1 : Integer.MAX_VALUE, new java.nio.file.SimpleFileVisitor<Path>() {
@@ -3736,7 +3733,6 @@ public final class KnowledgeServerMigrationOps {
             throws IOException {
           requireEnumerationRunning(context);
           if (scope.excludes(path.toAbsolutePath().normalize().toString())) return java.nio.file.FileVisitResult.CONTINUE;
-          if (!storage.test(path)) throw new IOException("Migration source storage is unavailable: " + path);
           if (!attributes.isRegularFile()) return java.nio.file.FileVisitResult.CONTINUE;
           if (io.justsearch.indexerworker.ingest.IngestionSkipPolicy.shouldSkipWithinRoot(path, root)
               || excludes.isExcludedPath(root, path)

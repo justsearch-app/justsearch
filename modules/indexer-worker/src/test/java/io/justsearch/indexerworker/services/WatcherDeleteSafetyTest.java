@@ -412,45 +412,6 @@ final class WatcherDeleteSafetyTest extends LuceneExecutorTestBase {
   }
 
   @Test
-  void undeclaredChildVolumeOutageRetainsDocumentsAcrossRestart() throws Exception {
-    Path child = Files.createDirectory(root.resolve("child"));
-    Path file = indexed("child/document.txt");
-    var originalLookup = RootIdentity.VOLUME_IDENTITY_LOOKUP;
-    String ancestorVolume = RootIdentity.capture(root).volume();
-    try {
-      var available = new java.util.concurrent.atomic.AtomicBoolean(true);
-      RootIdentity.VOLUME_IDENTITY_LOOKUP = path ->
-          path.equals(child) && available.get() ? "test-volume:2" : ancestorVolume;
-      RootVolumeLedger.under(base).record(child, "test-volume:2");
-      Files.delete(file);
-      available.set(false);
-      for (int restart = 0; restart < 2; restart++) {
-        if (restart > 0) {
-          runtime.close();
-          runtime = null;
-          reopenRuntime();
-          watch(service, root);
-        }
-        var result = service.syncDirectory(SyncDirectoryRequest.newBuilder()
-            .setRootPath(root.toString()).build(), CallContext.none());
-        assertEquals("", result.getError());
-        assertTrue(result.getDeleteDetectionUnverified());
-        runtime.commitOps().maybeRefreshBlocking();
-        assertEquals(1, runtime.indexCountOps().countByIdAndChunksStrict(file.toString()));
-      }
-      Files.writeString(file, "original child/document.txt");
-      available.set(true);
-      var returned = service.syncDirectory(SyncDirectoryRequest.newBuilder()
-          .setRootPath(root.toString()).build(), CallContext.none());
-      assertEquals("", returned.getError());
-      assertFalse(returned.getDeleteDetectionUnverified());
-      assertEquals(1, runtime.indexCountOps().countByIdAndChunksStrict(file.toString()));
-    } finally {
-      RootIdentity.VOLUME_IDENTITY_LOOKUP = originalLookup;
-    }
-  }
-
-  @Test
   void recreatedRootRecoveryFindsMissedFilesAndRetiresObsoleteText() throws Exception {
     Path obsolete = indexed("obsolete.txt");
     var active = new java.util.concurrent.atomic.AtomicBoolean();

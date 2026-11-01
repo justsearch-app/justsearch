@@ -53,37 +53,9 @@ final class RootPresenceGuardTest {
       var guard = RootPresenceGuard.capture(nested, null, volumes);
       assertTrue(guard.rootCurrent(), "the nested root has its own matching volume record");
       assertEquals(io.justsearch.adapters.lucene.runtime.PathPresence.PRESENT, guard.presence(file));
-      assertTrue(RootWitness.of(volumes, ignored -> null, ignored -> false)
-          .sourceStorageCheck(nested).test(file));
     } finally {
       RootIdentity.VOLUME_IDENTITY_LOOKUP = previous;
       RootIdentity.VOLUME_IDENTITY_UNAVAILABLE.set(unavailable);
-    }
-  }
-
-  @Test
-  void unavailableRecordedChildVolumeIsNotDeletionEvenAfterRestart() throws Exception {
-    Path root = Files.createDirectory(tempDir.resolve("ancestor"));
-    Path child = Files.createDirectory(root.resolve("child-mount"));
-    Path missing = child.resolve("document.txt");
-    var previous = RootIdentity.VOLUME_IDENTITY_LOOKUP;
-    boolean previousUnavailable = RootIdentity.VOLUME_IDENTITY_UNAVAILABLE.getAndSet(false);
-    try {
-      RootIdentity.VOLUME_IDENTITY_LOOKUP = ignored -> "test-volume:1";
-      var volumes = RootVolumeLedger.under(tempDir.resolve("ledger"));
-      volumes.record(root, "test-volume:1");
-      volumes.record(child, "test-volume:2");
-      var guard = RootPresenceGuard.capture(root, null, volumes);
-      assertTrue(guard.rootCurrent(), "The ancestor and empty mountpoint are still listable");
-      assertEquals(io.justsearch.adapters.lucene.runtime.PathPresence.UNKNOWN, guard.presence(missing));
-      var restarted = RootPresenceGuard.capture(root, null, RootVolumeLedger.under(tempDir.resolve("ledger")));
-      assertEquals(io.justsearch.adapters.lucene.runtime.PathPresence.UNKNOWN, restarted.presence(missing));
-      RootIdentity.VOLUME_IDENTITY_LOOKUP = path -> path.equals(child) ? "test-volume:2" : "test-volume:1";
-      assertEquals(io.justsearch.adapters.lucene.runtime.PathPresence.ABSENT,
-          RootPresenceGuard.capture(root, null, volumes).presence(missing));
-    } finally {
-      RootIdentity.VOLUME_IDENTITY_LOOKUP = previous;
-      RootIdentity.VOLUME_IDENTITY_UNAVAILABLE.set(previousUnavailable);
     }
   }
 

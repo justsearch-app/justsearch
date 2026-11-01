@@ -62,25 +62,6 @@ final class MigrationEnumerationCompletenessTest {
   }
 
   @Test
-  void enumerationDefersUnavailableSourceStorageBeforeQueueAdmission(@TempDir Path directory) throws Exception {
-    Path root = Files.createDirectory(directory.resolve("root"));
-    Path file = Files.writeString(root.resolve("notes.txt"), "underlying replacement");
-    Counters counters = new Counters();
-    JobQueue queue = acceptingQueue();
-    var publisher = org.mockito.Mockito.spy(new io.justsearch.indexerworker.services.WorkerIngestService(
-        null, null, null, io.justsearch.indexerworker.loop.pacing.IndexingPacing.unthrottled(),
-        null, null, null, null, null, 0L));
-    var authority = mock(io.justsearch.indexerworker.loop.SourcePresence.RootCheck.class, org.mockito.Mockito.CALLS_REAL_METHODS);
-    when(authority.sourceStorageAvailable(file, root)).thenReturn(false);
-    org.mockito.Mockito.doReturn(authority).when(publisher).rootCheck();
-    assertThrows(IOException.class, () -> KnowledgeServerMigrationOps.enqueueAllFilesUnderRoots(
-        context(List.of(root), queue, counters, () -> true), publisher));
-    assertEquals(0, counters.rootsDone.get());
-    assertEquals(0, counters.filesSeen.get());
-    verify(queue, never()).enqueueEntries(anyList());
-  }
-
-  @Test
   void absentRegistryAndEmptyConfigurationAreAnEmptyMigration(@TempDir Path dataDir)
       throws Exception {
     assertTrue(KnowledgeServerMigrationOps.loadMigrationRoots(dataDir, new ResolvedConfig.Collections(List.of()), JSON).isEmpty());

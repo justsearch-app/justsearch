@@ -41,25 +41,6 @@ import tools.jackson.databind.ObjectMapper;
 final class WatcherMigrationReplayTest extends LuceneExecutorTestBase {
   @TempDir Path temporary;
 
-  @ParameterizedTest(name = "{displayName} [{index}] {arguments}")
-  @ValueSource(strings = {"regular", "directory"})
-  void standaloneReplayRetainsUnavailableChildStorageBeforeReadOrRetirement(String replacement) throws Exception {
-    try (var f = new Fixture()) {
-      Path child = Files.createDirectory(f.root.resolve("child"));
-      Path file = f.file("child/notes.txt", "original text");
-      f.index(file, "notes");
-      f.debt();
-      RootVolumeLedger.under(temporary).recordIfAbsent(child, "linux-volume-v1:740:ext4:Lw");
-      if (replacement.equals("directory")) { Files.delete(file); Files.createDirectory(file); }
-      try (var hashes = org.mockito.Mockito.mockStatic(SourceContentHash.class, org.mockito.Mockito.CALLS_REAL_METHODS)) {
-        assertTrue(f.prepare().isEmpty(), "standalone replay also needs recorded descendant storage evidence");
-        hashes.verifyNoInteractions();
-      }
-      assertEquals("original text", f.content(file));
-      assertFalse(f.queue.listSwitchBufferOpsStrict().isEmpty());
-    }
-  }
-
   @Test
   void reconciliationReceiptIsAppliedInsteadOfRejectedAsUnsupported() throws Exception {
     try (var f = new Fixture()) {

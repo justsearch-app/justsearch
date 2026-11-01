@@ -65,7 +65,6 @@ public final class StaleSourceHandler {
       @Override public PathPresence presence(Path source) {
         try {
           SourceAccess.requireSafeAncestors(source, boundary);
-          if (!rootCheck.sourceStorageAvailable(source, root)) return PathPresence.UNKNOWN;
           PathPresence presence = PathPresence.probeSource(source, boundary);
           return presence == PathPresence.ABSENT
               ? PathPresence.absentBeneathListableFolder(source, boundary, null) : presence;

@@ -53,22 +53,6 @@ final class NativePolicyReadmissionCallerTest extends LuceneExecutorTestBase {
       "SKIPPED_TEMP_OR_SYSTEM", IngestionRetryPolicy.NONE);
 
   @Test
-  void readmissionDefersUnavailableDescendantStorageBeforeHashing() throws Exception {
-    try (var f = new Fixture()) {
-      Path child = Files.createDirectory(f.root.resolve("child"));
-      Path file = Files.writeString(child.resolve("private.txt"), "original bytes");
-      f.skipped(file);
-      assertTrue(f.registry.watch(f.root.toString(), null).watching());
-      RootVolumeLedger.under(f.base).recordIfAbsent(child, "linux-volume-v1:740:ext4:Lw");
-      var policy = f.policy(f.configuration("[]"), false);
-      try (var hashes = mockStatic(SourceContentHash.class, CALLS_REAL_METHODS)) {
-        assertFalse(f.readmit(policy));
-        hashes.verifyNoInteractions();
-      }
-    }
-  }
-
-  @Test
   void liveNoRootDebtCertifiesOnlyItsExactCurrentUiSkipAndFinalPublicationSnapshot() throws Exception {
     try (var f = new Fixture()) {
       Path file = f.source("private.txt"); var op = f.skipped(file);
@@ -413,20 +397,18 @@ final class NativePolicyReadmissionCallerTest extends LuceneExecutorTestBase {
 
   @Test
   void unknownRecordedVolumeNeverCreatesReplacementOrAdoptsARecord() throws Exception {
-    try (var f = new Fixture()) {
+    try (var f = new Fixture(); var ignoredUnavailable = NoVolumeIdentityExtension.withVolumeIdentity(false)) {
       Path file = f.source("private.txt"); var old = f.skipped(file);
-      try (var ignoredUnavailable = NoVolumeIdentityExtension.withVolumeIdentity(false)) {
-        var ledger = RootVolumeLedger.under(f.base);
-        var recorded = ledger.recordedFor(f.root);
-        assertTrue(recorded.isPresent(), "SETUP: the fixture recorded its actual previously known volume");
-        assertNull(RootIdentity.capture(f.root).volume(), "SETUP: the current volume lookup is actually unknown");
-        var records = Files.readAllBytes(f.base.resolve(RootVolumeLedger.FILE_NAME));
-        assertThrows(java.io.IOException.class, () -> f.readmit(f.policy(f.configuration("[]"), true)));
-        assertEquals(List.of(old), f.queue.listSwitchBufferOpsStrict());
-        assertEquals("DONE", f.queue.watcherReconciliationRow(file.toString()).get("state"));
-        assertEquals(recorded, ledger.recordedFor(f.root), "unknown current identity cannot adopt or replace a record");
-        assertArrayEquals(records, Files.readAllBytes(f.base.resolve(RootVolumeLedger.FILE_NAME)));
-      }
+      var ledger = RootVolumeLedger.under(f.base);
+      var recorded = ledger.recordedFor(f.root);
+      assertTrue(recorded.isPresent(), "SETUP: the fixture recorded its actual previously known volume");
+      assertNull(RootIdentity.capture(f.root).volume(), "SETUP: the current volume lookup is actually unknown");
+      var records = Files.readAllBytes(f.base.resolve(RootVolumeLedger.FILE_NAME));
+      assertThrows(java.io.IOException.class, () -> f.readmit(f.policy(f.configuration("[]"), true)));
+      assertEquals(List.of(old), f.queue.listSwitchBufferOpsStrict());
+      assertEquals("DONE", f.queue.watcherReconciliationRow(file.toString()).get("state"));
+      assertEquals(recorded, ledger.recordedFor(f.root), "unknown current identity cannot adopt or replace a record");
+      assertArrayEquals(records, Files.readAllBytes(f.base.resolve(RootVolumeLedger.FILE_NAME)));
     }
   }
 

@@ -91,16 +91,10 @@ final class Release030ForgetSourceObservationTest extends LuceneExecutorTestBase
   @org.junit.jupiter.params.ParameterizedTest(name = "{displayName} [{index}] {arguments}")
   @org.junit.jupiter.params.provider.ValueSource(strings = {"directory", "link", "dangling"})
   void releaseRetirementCorrectionPreservesForeignBackedChunks(String replacement) throws Exception {
-    replacementCleanup(replacement, true);
+    replacementCleanup(replacement);
   }
 
-  @org.junit.jupiter.params.ParameterizedTest(name = "{displayName} [{index}] {arguments}")
-  @org.junit.jupiter.params.provider.ValueSource(strings = {"directory", "regular"})
-  void releaseRefusalCleanupDefersUnavailableChildStorageBeforeClassification(String replacement) throws Exception {
-    replacementCleanup(replacement, false);
-  }
-
-  private void replacementCleanup(String replacement, boolean storageAvailable) throws Exception {
+  private void replacementCleanup(String replacement) throws Exception {
     Release030Fixture.unpack("switching", directory);
     Path root = directory.resolve("roots/alpha");
     Path file = root.resolve("file-01.txt");
@@ -148,36 +142,28 @@ final class Release030ForgetSourceObservationTest extends LuceneExecutorTestBase
       var authority = mock(SourcePresence.RootCheck.class, CALLS_REAL_METHODS);
       when(authority.vouches(root)).thenReturn(true);
       when(authority.vouchesForFile(root)).thenReturn(true);
-      when(authority.sourceStorageAvailable(eq(file), any())).thenReturn(storageAvailable);
       doReturn(authority).when(publisher).rootCheck();
       Files.delete(file);
       if (replacement.equals("directory")) Files.createDirectory(file);
-      else if (replacement.equals("regular")) Files.writeString(file, "underlying unrelated bytes");
       else Files.createSymbolicLink(file, replacement.equals("link") ? live : root.resolve("missing"));
       var context = new KnowledgeServerMigrationOps.DrainSwitchBufferContext(
           queue, runtime, null, IndexingPacing.unthrottled(), directory.resolve("base"),
           directory.resolve("active"), json, () -> false, () -> true, mock(Logger.class),
           Long.MAX_VALUE, building).withPublisher(publisher);
-      var row = queue.watcherReconciliationRow(key);
       try (var hashes = mockStatic(SourceContentHash.class, CALLS_REAL_METHODS)) {
         assertFalse(KnowledgeServerMigrationOps.reconcileRelease030Path(context, file, root, "default"));
         runtime.commitOps().commitAndTrack();
         runtime.commitOps().maybeRefreshBlocking();
         assertNotNull(runtime.documentFieldOps().getDocumentFieldOrThrow("foreign-chunk", SchemaFields.CONTENT),
             "retirement must preserve the chunk explicitly backed by another live file");
-        assertEquals(storageAvailable ? 0 : 3, runtime.indexCountOps().countOwnedFileStrict(key));
-        assertEquals(storageAvailable,
+        assertEquals(0, runtime.indexCountOps().countOwnedFileStrict(key));
+        assertTrue(
             KnowledgeServerMigrationOps.reconcileRelease030Path(context, file, root, "default"),
             "owned-file absence settles even while a foreign chunk keeps the parent ID");
         hashes.verifyNoInteractions();
       }
-      if (!storageAvailable) {
-        assertEquals(row, queue.watcherReconciliationRow(key), "uncertain storage cannot replace an admission");
-        assertEquals("retained text", runtime.documentFieldOps().getDocumentFieldOrThrow(key, SchemaFields.CONTENT));
-      } else {
-        verify(publisher).underFileMutationFence(any());
-        verify(loop).withFileMutationFence(any());
-      }
+      verify(publisher).underFileMutationFence(any());
+      verify(loop).withFileMutationFence(any());
     } finally { ConfigStore.restoreGlobal(installed, previous); }
   }
 

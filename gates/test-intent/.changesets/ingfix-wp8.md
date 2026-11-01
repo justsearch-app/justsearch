@@ -2,12 +2,12 @@
 schema: test-intent.v1
 task: t-20261030-ingfix
 author-role: builder
-author-session: 01a194f1-8ed0-78f3-891c-a695c8ab9255
+author-session: 01a1983a-2327-7182-ad8c-6db284629e3e
 ---
 
 # Test-intent entries
 
-This record covers WP8 against merged main 09c246ae15. Parameterized check names preserve their descriptions and expose method names for exact evidence selection. Assertion wrappers preserve the original expectations while making unexpected before-state exceptions assertion failures. Windows placeholder fixtures are synthetic; actual Windows cloud-placeholder watcher events remain unverified in this Linux environment. Supplementary check, not in newChecks: RootLifecycleOpsConcurrencyTest#staleSecondRemovalCannotDeleteAReaddedRoot guards a race that only this branch's unblocked producer drain (S-D41) could introduce: two removals of one root waiting on the same drain while the root is re-added. Merged main 09c246ae15 holds the lifecycle monitor across the producer, so the race has no before-state equivalent and the check cannot fail there for its reason; it passes on the candidate (P6).
+This record covers narrowed WP8 against merged main 58ff43faa8. S-D10 source-storage evidence is withdrawn on every route; watcher create/modify admission restores main’s behavior, with containment retained before content reads (S-D1). Parameterized check names preserve their descriptions and expose method names for exact evidence selection. Assertion wrappers preserve the original expectations while making unexpected before-state exceptions assertion failures. Windows placeholder fixtures are synthetic; actual Windows cloud-placeholder watcher events remain unverified in this Linux environment. Supplementary check, not in newChecks: RootLifecycleOpsConcurrencyTest#staleSecondRemovalCannotDeleteAReaddedRoot guards a race that only this branch's unblocked producer drain (S-D41) could introduce: two removals of one root waiting on the same drain while the root is re-added. Merged main 58ff43faa8 holds the lifecycle monitor across the producer, so the race has no before-state equivalent and the check cannot fail there for its reason; it passes on the candidate (P6).
 
 ```json
 {
@@ -215,7 +215,7 @@ This record covers WP8 against merged main 09c246ae15. Parameterized check names
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/OriginBoundaryAdmissionTest.java"
       ],
       "class": "New",
-      "behaviour": "The running ingestion loop must reject an ancestor replacement before extraction, retain retry ownership and record SOURCE_UNREADABLE.",
+      "behaviour": "A watcher event through an outside-root ancestor link is admitted as retryable work, then the running ingestion loop rejects it before hashing or extraction, retains retry ownership and records SOURCE_UNREADABLE.",
       "sources": [
         {
           "kind": "delegated-choice",
@@ -333,7 +333,7 @@ This record covers WP8 against merged main 09c246ae15. Parameterized check names
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/ops/MigrationEnumerationCompletenessTest.java"
       ],
       "class": "New",
-      "behaviour": "Migration skips harmless links, built-in and user-excluded trees without hashing them; unavailable child storage prevents completion and admission.",
+      "behaviour": "Migration skips harmless links, built-in and user-excluded trees without hashing them.",
       "sources": [
         {
           "kind": "delegated-choice",
@@ -341,14 +341,6 @@ This record covers WP8 against merged main 09c246ae15. Parameterized check names
           "delegationLocation": "task t-20261030-ingfix request",
           "delegationScope": "fix the defects in the owner-commissioned ingestion defect list, designed by the orchestrator",
           "choice": "S-D4 (Migration enumeration rejects normally skipped entries) Migrate a root containing a document, symlink and excluded subtree; require skipping without hashing excluded files.",
-          "label": "agent choice"
-        },
-        {
-          "kind": "delegated-choice",
-          "delegationQuote": "proceed autonomously with designing all of the smallers and critical fixes. then proceed with implementing them accordingly.",
-          "delegationLocation": "task t-20261030-ingfix request",
-          "delegationScope": "fix the defects in the owner-commissioned ingestion defect list, designed by the orchestrator",
-          "choice": "S-D10 (Unmounting a child volume can prune its documents) Index a child mount, unmount it and reconcile its watched ancestor without deleting its documents.",
           "label": "agent choice"
         },
         {
@@ -364,7 +356,6 @@ This record covers WP8 against merged main 09c246ae15. Parameterized check names
       "evidence": "gates/test-intent/evidence/ingfix-wp8.json",
       "newChecks": [
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/ops/MigrationEnumerationCompletenessTest.java#enumerationSkipsLinksAndPrunesExcludedSubtrees",
-        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/ops/MigrationEnumerationCompletenessTest.java#enumerationDefersUnavailableSourceStorageBeforeQueueAdmission",
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/ops/MigrationEnumerationCompletenessTest.java#nestedSymbolicFileCannotEscapeNoFollowCoverage"
       ]
     },
@@ -373,7 +364,7 @@ This record covers WP8 against merged main 09c246ae15. Parameterized check names
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/ops/Release030ForgetSourceObservationTest.java"
       ],
       "class": "New",
-      "behaviour": "Release cleanup rejects outside ancestors before observation/hash, defers unavailable child storage, and retires only rows owned by a nonregular replacement.",
+      "behaviour": "Release cleanup rejects outside ancestors before observation/hash and retires only rows owned by a nonregular replacement.",
       "sources": [
         {
           "kind": "delegated-choice",
@@ -381,14 +372,6 @@ This record covers WP8 against merged main 09c246ae15. Parameterized check names
           "delegationLocation": "task t-20261030-ingfix request",
           "delegationScope": "fix the defects in the owner-commissioned ingestion defect list, designed by the orchestrator",
           "choice": "S-D1 (An ancestor symlink replacement escapes the admitted root) Replace a queued file’s parent with an outside-root symlink and require rejection before content access.",
-          "label": "agent choice"
-        },
-        {
-          "kind": "delegated-choice",
-          "delegationQuote": "proceed autonomously with designing all of the smallers and critical fixes. then proceed with implementing them accordingly.",
-          "delegationLocation": "task t-20261030-ingfix request",
-          "delegationScope": "fix the defects in the owner-commissioned ingestion defect list, designed by the orchestrator",
-          "choice": "S-D10 (Unmounting a child volume can prune its documents) Index a child mount, unmount it and reconcile its watched ancestor without deleting its documents.",
           "label": "agent choice"
         },
         {
@@ -412,8 +395,7 @@ This record covers WP8 against merged main 09c246ae15. Parameterized check names
       "evidence": "gates/test-intent/evidence/ingfix-wp8.json",
       "newChecks": [
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/ops/Release030ForgetSourceObservationTest.java#cleanupReplayRejectsOutsideAncestorBeforeObservationOrHashing",
-        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/ops/Release030ForgetSourceObservationTest.java#releaseRetirementCorrectionPreservesForeignBackedChunks",
-        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/ops/Release030ForgetSourceObservationTest.java#releaseRefusalCleanupDefersUnavailableChildStorageBeforeClassification"
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/ops/Release030ForgetSourceObservationTest.java#releaseRetirementCorrectionPreservesForeignBackedChunks"
       ]
     },
     {
@@ -421,7 +403,7 @@ This record covers WP8 against merged main 09c246ae15. Parameterized check names
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/LegacyVduSourceRefreshTest.java"
       ],
       "class": "New",
-      "behaviour": "Legacy hashless refresh retains its ingestion root across restart and defers unsafe ancestry, unknown roots, placeholders and unavailable storage without hashing or charging attempts.",
+      "behaviour": "Legacy hashless refresh retains its ingestion root across restart and defers unsafe ancestry, unknown roots and placeholders without hashing or charging attempts.",
       "sources": [
         {
           "kind": "delegated-choice",
@@ -438,14 +420,6 @@ This record covers WP8 against merged main 09c246ae15. Parameterized check names
           "delegationScope": "fix the defects in the owner-commissioned ingestion defect list, designed by the orchestrator",
           "choice": "S-D2 (Watcher events bypass cloud-placeholder deferral) Deliver a real Windows placeholder event and require deferral without content access.",
           "label": "agent choice"
-        },
-        {
-          "kind": "delegated-choice",
-          "delegationQuote": "proceed autonomously with designing all of the smallers and critical fixes. then proceed with implementing them accordingly.",
-          "delegationLocation": "task t-20261030-ingfix request",
-          "delegationScope": "fix the defects in the owner-commissioned ingestion defect list, designed by the orchestrator",
-          "choice": "S-D10 (Unmounting a child volume can prune its documents) Index a child mount, unmount it and reconcile its watched ancestor without deleting its documents.",
-          "label": "agent choice"
         }
       ],
       "repaired": true,
@@ -453,36 +427,6 @@ This record covers WP8 against merged main 09c246ae15. Parameterized check names
       "newChecks": [
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/LegacyVduSourceRefreshTest.java#legacyVduProcessingDefersBeforeAnyHash",
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/LegacyVduSourceRefreshTest.java#hashlessSourceRefreshIsTargetedDurableAndEventuallyProvesItsRevision"
-      ]
-    },
-    {
-      "items": [
-        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/NativePolicyReadmissionCallerTest.java"
-      ],
-      "class": "New",
-      "behaviour": "Readmission with an unavailable descendant volume performs no content hashing and cannot certify replay.",
-      "sources": [
-        {
-          "kind": "delegated-choice",
-          "delegationQuote": "proceed autonomously with designing all of the smallers and critical fixes. then proceed with implementing them accordingly.",
-          "delegationLocation": "task t-20261030-ingfix request",
-          "delegationScope": "fix the defects in the owner-commissioned ingestion defect list, designed by the orchestrator",
-          "choice": "S-D10 (Unmounting a child volume can prune its documents) Index a child mount, unmount it and reconcile its watched ancestor without deleting its documents.",
-          "label": "agent choice"
-        },
-        {
-          "kind": "delegated-choice",
-          "delegationQuote": "proceed autonomously with designing all of the smallers and critical fixes. then proceed with implementing them accordingly.",
-          "delegationLocation": "task t-20261030-ingfix request",
-          "delegationScope": "fix the defects in the owner-commissioned ingestion defect list, designed by the orchestrator",
-          "choice": "P1 Product rule: indexed content is never deleted on uncertainty (unreadable source, unknown count, missing or different volume leaves the index as it is).",
-          "label": "agent choice"
-        }
-      ],
-      "repaired": true,
-      "evidence": "gates/test-intent/evidence/ingfix-wp8.json",
-      "newChecks": [
-        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/NativePolicyReadmissionCallerTest.java#readmissionDefersUnavailableDescendantStorageBeforeHashing"
       ]
     },
     {
@@ -518,16 +462,8 @@ This record covers WP8 against merged main 09c246ae15. Parameterized check names
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/WatcherDeleteSafetyTest.java"
       ],
       "class": "New",
-      "behaviour": "Live, buffered and candidate retirement preserve chunks backed by another file; restart retains unavailable child documents, discovers nonregular replacement descendants, recovers recreated roots and retries failed watcher registration.",
+      "behaviour": "Live, buffered and candidate retirement preserve chunks backed by another file; restart discovers nonregular replacement descendants, recovers recreated roots and retries failed watcher registration.",
       "sources": [
-        {
-          "kind": "delegated-choice",
-          "delegationQuote": "proceed autonomously with designing all of the smallers and critical fixes. then proceed with implementing them accordingly.",
-          "delegationLocation": "task t-20261030-ingfix request",
-          "delegationScope": "fix the defects in the owner-commissioned ingestion defect list, designed by the orchestrator",
-          "choice": "S-D10 (Unmounting a child volume can prune its documents) Index a child mount, unmount it and reconcile its watched ancestor without deleting its documents.",
-          "label": "agent choice"
-        },
         {
           "kind": "delegated-choice",
           "delegationQuote": "proceed autonomously with designing all of the smallers and critical fixes. then proceed with implementing them accordingly.",
@@ -567,7 +503,6 @@ This record covers WP8 against merged main 09c246ae15. Parameterized check names
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/WatcherDeleteSafetyTest.java#candidateRetirementPreservesCrossFileChunksInBothGenerations",
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/WatcherDeleteSafetyTest.java#liveDeleteCallbacksPreserveChunksBackedByAnotherFile",
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/WatcherDeleteSafetyTest.java#bufferedRetirementPreservesChunksBackedByAnotherFile",
-        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/WatcherDeleteSafetyTest.java#undeclaredChildVolumeOutageRetainsDocumentsAcrossRestart",
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/WatcherDeleteSafetyTest.java#recreatedRootRecoveryFindsMissedFilesAndRetiresObsoleteText",
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/WatcherDeleteSafetyTest.java#failedInitialWatcherRegistrationIsRecoveredByTheWorkerTick",
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/WatcherDeleteSafetyTest.java#restartReconciliationRetiresNonregularReplacements"
@@ -578,16 +513,8 @@ This record covers WP8 against merged main 09c246ae15. Parameterized check names
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/WatcherMigrationReplayTest.java"
       ],
       "class": "New",
-      "behaviour": "Standalone replay retains unavailable child storage and its debt before read/retirement; scoped retirement removes owned parent/chunks, preserves foreign chunks and discovers directory descendants.",
+      "behaviour": "Scoped replay retirement removes owned parent/chunks, preserves foreign chunks and discovers directory descendants.",
       "sources": [
-        {
-          "kind": "delegated-choice",
-          "delegationQuote": "proceed autonomously with designing all of the smallers and critical fixes. then proceed with implementing them accordingly.",
-          "delegationLocation": "task t-20261030-ingfix request",
-          "delegationScope": "fix the defects in the owner-commissioned ingestion defect list, designed by the orchestrator",
-          "choice": "S-D10 (Unmounting a child volume can prune its documents) Index a child mount, unmount it and reconcile its watched ancestor without deleting its documents.",
-          "label": "agent choice"
-        },
         {
           "kind": "delegated-choice",
           "delegationQuote": "proceed autonomously with designing all of the smallers and critical fixes. then proceed with implementing them accordingly.",
@@ -608,7 +535,6 @@ This record covers WP8 against merged main 09c246ae15. Parameterized check names
       "repaired": true,
       "evidence": "gates/test-intent/evidence/ingfix-wp8.json",
       "newChecks": [
-        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/WatcherMigrationReplayTest.java#standaloneReplayRetainsUnavailableChildStorageBeforeReadOrRetirement",
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/WatcherMigrationReplayTest.java#retiredSourcePreservesChunksBackedByAnotherLiveFile"
       ]
     },
@@ -617,16 +543,8 @@ This record covers WP8 against merged main 09c246ae15. Parameterized check names
         "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/IndexingLoopTest.java"
       ],
       "class": "New",
-      "behaviour": "Storage is checked before content and after admission, discovery is batched once per root per pass, and availability changes between files/passes remain visible; stale-source removal uses rooted, scoped retirement.",
+      "behaviour": "Stale-source removal requires verified absence and rooted, scoped retirement.",
       "sources": [
-        {
-          "kind": "delegated-choice",
-          "delegationQuote": "proceed autonomously with designing all of the smallers and critical fixes. then proceed with implementing them accordingly.",
-          "delegationLocation": "task t-20261030-ingfix request",
-          "delegationScope": "fix the defects in the owner-commissioned ingestion defect list, designed by the orchestrator",
-          "choice": "S-D10 (Unmounting a child volume can prune its documents) Index a child mount, unmount it and reconcile its watched ancestor without deleting its documents.",
-          "label": "agent choice"
-        },
         {
           "kind": "delegated-choice",
           "delegationQuote": "proceed autonomously with designing all of the smallers and critical fixes. then proceed with implementing them accordingly.",
@@ -647,10 +565,6 @@ This record covers WP8 against merged main 09c246ae15. Parameterized check names
       "repaired": true,
       "evidence": "gates/test-intent/evidence/ingfix-wp8.json",
       "newChecks": [
-        "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/IndexingLoopTest.java#unavailableChildStorageDefersDifferentUnderlyingBytesBeforeContentAccess",
-        "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/IndexingLoopTest.java#storageLostAfterAdmissionDefersBeforeHashingOrExtraction",
-        "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/IndexingLoopTest.java#storageDiscoveryRunsOncePerRootInEachExtractionBatch",
-        "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/IndexingLoopTest.java#storageObservationIsBatchedButAvailabilityChangesBetweenFilesAndPassesAreSeen",
         "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/IndexingLoopTest.java#staleSourceHandlerMarksIdentityOnlyForAVerifiedAbsentSource"
       ]
     },
@@ -719,7 +633,7 @@ This record covers WP8 against merged main 09c246ae15. Parameterized check names
         "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/WorkerIngestionAuthorityTest.java"
       ],
       "class": "New",
-      "behaviour": "Unavailable descendant storage is not classified from underlying replacement bytes; unsafe ancestors cannot admit outside content or prove deletion.",
+      "behaviour": "Unsafe ancestors cannot admit outside content or prove deletion.",
       "sources": [
         {
           "kind": "delegated-choice",
@@ -728,20 +642,11 @@ This record covers WP8 against merged main 09c246ae15. Parameterized check names
           "delegationScope": "fix the defects in the owner-commissioned ingestion defect list, designed by the orchestrator",
           "choice": "S-D1 (An ancestor symlink replacement escapes the admitted root) Replace a queued file’s parent with an outside-root symlink and require rejection before content access.",
           "label": "agent choice"
-        },
-        {
-          "kind": "delegated-choice",
-          "delegationQuote": "proceed autonomously with designing all of the smallers and critical fixes. then proceed with implementing them accordingly.",
-          "delegationLocation": "task t-20261030-ingfix request",
-          "delegationScope": "fix the defects in the owner-commissioned ingestion defect list, designed by the orchestrator",
-          "choice": "S-D10 (Unmounting a child volume can prune its documents) Index a child mount, unmount it and reconcile its watched ancestor without deleting its documents.",
-          "label": "agent choice"
         }
       ],
       "repaired": true,
       "evidence": "gates/test-intent/evidence/ingfix-wp8.json",
       "newChecks": [
-        "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/WorkerIngestionAuthorityTest.java#unavailableStorageIsNotClassifiedFromItsUnderlyingPresentReplacement",
         "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/WorkerIngestionAuthorityTest.java#ancestorReplacementNeverAdmitsOutsideContentOrProvesDeletion"
       ]
     },
@@ -836,7 +741,7 @@ This record covers WP8 against merged main 09c246ae15. Parameterized check names
         "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/RootPresenceGuardTest.java"
       ],
       "class": "New",
-      "behaviour": "Unavailable recorded child volumes remain uncertain across restart and recover when the recorded volume returns; dangling ancestors cannot prove deletion. Supplementary preservation check: modules/worker-services/src/test/java/io/justsearch/indexerworker/services/RootPresenceGuardTest.java#separatelyRecordedNestedRootUsesItsOwnVolumeEvidence.",
+      "behaviour": "Dangling ancestors cannot prove deletion. Supplementary preservation check: RootPresenceGuardTest#separatelyRecordedNestedRootUsesItsOwnVolumeEvidence.",
       "sources": [
         {
           "kind": "delegated-choice",
@@ -851,14 +756,6 @@ This record covers WP8 against merged main 09c246ae15. Parameterized check names
           "delegationQuote": "proceed autonomously with designing all of the smallers and critical fixes. then proceed with implementing them accordingly.",
           "delegationLocation": "task t-20261030-ingfix request",
           "delegationScope": "fix the defects in the owner-commissioned ingestion defect list, designed by the orchestrator",
-          "choice": "S-D10 (Unmounting a child volume can prune its documents) Index a child mount, unmount it and reconcile its watched ancestor without deleting its documents.",
-          "label": "agent choice"
-        },
-        {
-          "kind": "delegated-choice",
-          "delegationQuote": "proceed autonomously with designing all of the smallers and critical fixes. then proceed with implementing them accordingly.",
-          "delegationLocation": "task t-20261030-ingfix request",
-          "delegationScope": "fix the defects in the owner-commissioned ingestion defect list, designed by the orchestrator",
           "choice": "P1 Product rule: indexed content is never deleted on uncertainty (unreadable source, unknown count, missing or different volume leaves the index as it is).",
           "label": "agent choice"
         }
@@ -866,7 +763,6 @@ This record covers WP8 against merged main 09c246ae15. Parameterized check names
       "repaired": true,
       "evidence": "gates/test-intent/evidence/ingfix-wp8.json",
       "newChecks": [
-        "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/RootPresenceGuardTest.java#unavailableRecordedChildVolumeIsNotDeletionEvenAfterRestart",
         "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/RootPresenceGuardTest.java#danglingAncestorDoesNotProveAnIndexedSourceWasDeleted"
       ]
     },
@@ -1110,14 +1006,6 @@ This record covers WP8 against merged main 09c246ae15. Parameterized check names
           "delegationQuote": "proceed autonomously with designing all of the smallers and critical fixes. then proceed with implementing them accordingly.",
           "delegationLocation": "task t-20261030-ingfix request",
           "delegationScope": "fix the defects in the owner-commissioned ingestion defect list, designed by the orchestrator",
-          "choice": "S-D10 (Unmounting a child volume can prune its documents) Index a child mount, unmount it and reconcile its watched ancestor without deleting its documents.",
-          "label": "agent choice"
-        },
-        {
-          "kind": "delegated-choice",
-          "delegationQuote": "proceed autonomously with designing all of the smallers and critical fixes. then proceed with implementing them accordingly.",
-          "delegationLocation": "task t-20261030-ingfix request",
-          "delegationScope": "fix the defects in the owner-commissioned ingestion defect list, designed by the orchestrator",
           "choice": "P1 Product rule: indexed content is never deleted on uncertainty (unreadable source, unknown count, missing or different volume leaves the index as it is).",
           "label": "agent choice"
         }
@@ -1237,41 +1125,13 @@ This record covers WP8 against merged main 09c246ae15. Parameterized check names
     },
     {
       "items": [
-        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/NativePolicyReadmissionCallerTest.java"
-      ],
-      "class": "Adaptation",
-      "moved": [
-        "input re-encoding"
-      ],
-      "whatMoved": "Construct the fixture with a known volume before injecting an unknown current lookup; keep the existing recorded-volume, pending-admission and unchanged-ledger oracles.",
-      "sources": [
-        {
-          "kind": "delegated-choice",
-          "delegationQuote": "proceed autonomously with designing all of the smallers and critical fixes. then proceed with implementing them accordingly.",
-          "delegationLocation": "task t-20261030-ingfix request",
-          "delegationScope": "fix the defects in the owner-commissioned ingestion defect list, designed by the orchestrator",
-          "choice": "S-D10 (Unmounting a child volume can prune its documents) Index a child mount, unmount it and reconcile its watched ancestor without deleting its documents.",
-          "label": "agent choice"
-        },
-        {
-          "kind": "delegated-choice",
-          "delegationQuote": "proceed autonomously with designing all of the smallers and critical fixes. then proceed with implementing them accordingly.",
-          "delegationLocation": "task t-20261030-ingfix request",
-          "delegationScope": "fix the defects in the owner-commissioned ingestion defect list, designed by the orchestrator",
-          "choice": "P1 Product rule: indexed content is never deleted on uncertainty (unreadable source, unknown count, missing or different volume leaves the index as it is).",
-          "label": "agent choice"
-        }
-      ]
-    },
-    {
-      "items": [
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/WatcherMigrationReplayTest.java"
       ],
       "class": "Adaptation",
       "moved": [
         "input re-encoding"
       ],
-      "whatMoved": "Replace a formerly uncertainty-producing symlink fixture with an unreadable eligible subtree: deliberate symlink omission is now successful; genuine incomplete coverage must still fence cutover. Reflection accepts the new storage-authority constructor while retaining the before-state constructor fallback.",
+      "whatMoved": "Replace a formerly uncertainty-producing symlink fixture with an unreadable eligible subtree: deliberate symlink omission is now successful; genuine incomplete coverage must still fence cutover. Reflection accepts the explicit root-authority constructor used by guarded retirement while retaining the before-state constructor fallback.",
       "sources": [
         {
           "kind": "delegated-choice",
@@ -1348,7 +1208,7 @@ This record covers WP8 against merged main 09c246ae15. Parameterized check names
         "input re-encoding",
         "instrumentation"
       ],
-      "whatMoved": "Give successful stale-source deletion fixtures a missing source and rooted witness; observe scoped pruneFile rather than broad deletion, retaining deletion counters, retry propagation and confirmed identity marking. Move the five newChecks methods from TypedIngestionOutcomeTests to the top-level test class with their unchanged fixtures and shared helpers so method filters and the outer-class XML expose them to the evidence runner. All other nested tests and all assertions remain unchanged.",
+      "whatMoved": "Give successful stale-source deletion fixtures a missing source and rooted witness; observe scoped pruneFile rather than broad deletion, retaining deletion counters, retry propagation and confirmed identity marking. The retained new check is top-level for method evidence selection; existing nested tests retain their assertions. Remove the unused storage-only afterIdentity fault-injection overload and no-op delegator; retained fixture callers receive the same identity values.",
       "sources": [
         {
           "kind": "delegated-choice",
@@ -1427,6 +1287,79 @@ This record covers WP8 against merged main 09c246ae15. Parameterized check names
           "label": "agent choice"
         }
       ]
+    },
+    {
+      "items": [
+        "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineRootRetirementTest.java"
+      ],
+      "class": "Adaptation",
+      "moved": [
+        "instrumentation"
+      ],
+      "whatMoved": "The same removal-waits observation accepts WAITING as well as BLOCKED after drainRootProducers releases the lifecycle monitor. Inputs, producer hold, completion/drain and timeout assertions are retained.",
+      "sources": [
+        {
+          "kind": "owner-words",
+          "quote": "Block A’s scan and require B’s removal to complete independently.",
+          "location": "task t-20261030-ingfix agreement S-D41"
+        }
+      ]
+    },
+    {
+      "items": [
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/LinuxReturnedRootTest.java"
+      ],
+      "class": "Obsolete",
+      "sources": [
+        {
+          "kind": "owner-words",
+          "quote": "Recreate the root and require watching and obsolete-document cleanup to recover.",
+          "location": "task t-20261030-ingfix agreement S-D13"
+        },
+        {
+          "kind": "owner-words",
+          "quote": "Recreate a Linux watched root on its recorded volume with a new inode while the registry retains its old identity; require automatic watcher restoration, missed-file discovery and obsolete-document cleanup.",
+          "location": "task t-20261030-ingfix agreement C10"
+        }
+      ],
+      "conflictSearch": "Searched docs/decisions and docs/ for RootWatcherRegistry, RootPresenceGuard, watched-root recreation, root inode and retained identities. ADR-0028 concerns resolver retention on explicit unwatch, not watcher reincarnation. docs/explanation/11-index-schema-migration.md (#758) says deletion requires the same folder/volume; those held-operation guards remain and a successful same-volume recovery establishes a new watcher witness before reconciliation. docs/tempdocs/418 and 626 describe watcher ownership/deletion safety; no decision requires permanently refusing same-volume recreated roots. Removed replacedFolderBeforeRecoveryNeverBecomesTheNewIdentity and handoverRetainsTheFolderWitnessEvenWhileItsPathIsMissing because their refusal-to-adopt oracle directly contradicts S-D13/C10. Different-volume/symlink/mid-operation replacement guards remain."
+    },
+    {
+      "items": [
+        "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineForgetInProcessTest.java"
+      ],
+      "class": "Obsolete",
+      "sources": [
+        {
+          "kind": "owner-words",
+          "quote": "Migrate a root containing a document, symlink and excluded subtree; require skipping without hashing excluded files.",
+          "location": "task t-20261030-ingfix agreement S-D4"
+        },
+        {
+          "kind": "owner-words",
+          "quote": "Exclusions keep the same matching semantics; excluded files are never admitted.",
+          "location": "task t-20261030-ingfix agreement P4"
+        },
+        {
+          "kind": "owner-words",
+          "quote": "Migration must skip symlinks, special files, built-in skipped trees and user-excluded trees before queue hashing or subtree traversal.",
+          "location": "task t-20261030-ingfix agreement C27"
+        }
+      ],
+      "conflictSearch": "Searched docs/decisions and docs/ for migration exclusion, excluded-file admission and native policy skip. No decision requires admitting an excluded file just to create a skipped candidate receipt. R9HotPublicSaveAfterNativePolicySkipReadmitsCurrentBytesAndKeepsCompletedForgetReceipt requires that forbidden receipt in its setup, so remove R9 and its exclusively used helper branches; keep the native migration control and completed-forget preservation checks."
+    },
+    {
+      "items": [
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WatcherUpsertCompatibilityTest.java"
+      ],
+      "class": "Incidental",
+      "assessment": {
+        "purpose": "Preserve main watcher create/modify admission for folders, in-root symlinks, vanished sources, atomic-save temporary files and ordinary files after withdrawing eager containment.",
+        "callersAndStateOwners": "WorkerIngestService.acceptWatcherUpsert routes callbacks to the durable job queue; content admission remains guarded in the consumer and candidate hash routes.",
+        "indirectBehaviours": "An event-only source shape must not throw into WatcherCallbacks.failure and latch runtime replay uncertainty. The queue still receives the same eligible entry or built-in policy omission.",
+        "evidence": "WatcherUpsertCompatibilityTest#watcherSourcesKeepMainAdmissionBehaviour runs the same five cases against 58ff43faa8 and the candidate; the assertions check no boundary exception and the actual enqueue path/root for each event, including an atomic-save temporary path already moved into place. The standalone WP8WatcherProbe also runs the five cases through real SQLite on both trees and observes one queued job with root/collection preserved and replayCertain=true. Results recorded in tmp/wp8-builder-7-report.txt.",
+        "unresolvedRisks": "No Windows placeholder provider is available; these five preservation fixtures use real local filesystem paths and a mocked queue."
+      }
     }
   ]
 }

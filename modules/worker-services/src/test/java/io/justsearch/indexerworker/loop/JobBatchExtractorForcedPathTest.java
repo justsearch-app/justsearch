@@ -72,18 +72,22 @@ final class JobBatchExtractorForcedPathTest {
     try (var detector = org.mockito.Mockito.mockStatic(
         io.justsearch.indexerworker.ingest.CloudPlaceholderDetector.class);
         var hashes = org.mockito.Mockito.mockStatic(SourceContentHash.class, org.mockito.Mockito.CALLS_REAL_METHODS)) {
+      hashes.when(() -> SourceContentHash.isCloudPlaceholder(file)).thenReturn(true);
       detector.when(() -> io.justsearch.indexerworker.ingest.CloudPlaceholderDetector.isCloudPlaceholder(file))
-          .thenReturn(true);
+          .thenAnswer(ignored -> SourceContentHash.isCloudPlaceholder(file));
       assertEquals(List.of(), h.extractor().extractAll(List.of(claim)));
       assertDoesNotThrow(() -> {
         verify(h.contentExtractor(), never()).extractArtifact(any());
       });
-      hashes.verifyNoInteractions();
-      verify(h.jobQueue()).deferClaim(eq(claim),
+      hashes.verify(() -> SourceContentHash.sha256(file), never());
+      hashes.verify(() -> SourceContentHash.sha256WithinRoot(file, tempDir), never());
+      assertDoesNotThrow(() -> {
+        verify(h.jobQueue()).deferClaim(eq(claim),
           org.mockito.ArgumentMatchers.argThat(outcome ->
               io.justsearch.indexerworker.ingest.IngestionReasonCodes.CLOUD_PLACEHOLDER.equals(outcome.reasonCode())
                   && outcome.retryPolicy() == io.justsearch.indexerworker.ingest.IngestionRetryPolicy.DEFER_WITHOUT_ATTEMPT),
           any());
+      });
       verify(h.jobQueue(), never()).markClaimFailed(any(), any(), any());
     }
   }

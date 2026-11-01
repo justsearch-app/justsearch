@@ -88,12 +88,6 @@ final class SyncDirectoryOps {
   private final ReadPathOps readPathOps;
   private final PruneOps pruneOps;
   private final CommitOps commitOps;
-  private java.util.function.Function<Path, java.util.function.Predicate<Path>> sourceStorageChecks =
-      root -> source -> true;
-
-  void setSourceStorageChecks(java.util.function.Function<Path, java.util.function.Predicate<Path>> checks) {
-    sourceStorageChecks = java.util.Objects.requireNonNull(checks);
-  }
 
   private final JobQueue jobQueue;
   private final IndexingPacing indexingPacing;
@@ -280,7 +274,6 @@ final class SyncDirectoryOps {
       throw new IOException("Invalid reconciliation root", invalid);
     }
     var scope = prefixScopeFactory.apply(root);
-    var storage = sourceStorageChecks.apply(root);
     RootIdentityLease identityLease = RootIdentity.hold(root);
     try {
       identityLease.requireCurrent();
@@ -322,7 +315,6 @@ final class SyncDirectoryOps {
                 throws IOException {
               checkCancelled(cancelled);
               if (scope.excludes(file.toString())) return FileVisitResult.CONTINUE;
-              if (!storage.test(file)) throw new UnreadableWalkMemberException("Source storage is unavailable: " + file, null);
               if (!attrs.isRegularFile()) return FileVisitResult.CONTINUE;
               String normalized = PathNormalizer.normalizeKey(file);
               if (!seenDiskPaths.add(normalized)) return FileVisitResult.CONTINUE;
@@ -956,7 +948,6 @@ final class SyncDirectoryOps {
     try (var spool = new ReconciliationSpool()) {
       int[] counters = {0}; // [0]=fileCount (for throttle)
       boolean[] walkInterrupted = {false};
-      var storage = sourceStorageChecks.apply(root);
       boolean[] walkIncomplete = {false};
       final Map<String, IndexedFileStamp> indexedPathsFinal = indexedPaths;
       var declared = new CollectionSnapshot();
@@ -981,10 +972,6 @@ final class SyncDirectoryOps {
             public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
               if (stopped()) return FileVisitResult.TERMINATE;
               if (prefixScopeFactory.apply(root).excludes(file.toString())) return FileVisitResult.CONTINUE;
-              if (!storage.test(file)) {
-                walkIncomplete[0] = true;
-                return FileVisitResult.CONTINUE;
-              }
               if (!attrs.isRegularFile()) return FileVisitResult.CONTINUE;
               if (originalRoot != null && retirementExclusions.test(file, root)) {
                 return FileVisitResult.CONTINUE;
@@ -1078,12 +1065,6 @@ final class SyncDirectoryOps {
       int filesAdded = spool.drain(SYNC_ENQUEUE_BATCH_SIZE, provenance,
           () -> cancelled.getAsBoolean() || walkInterrupted[0]
               || Thread.currentThread().isInterrupted(), entries -> {
-            for (var entry : entries) {
-              if (!storage.test(entry.path())) {
-                walkIncomplete[0] = true;
-                throw new java.io.UncheckedIOException(new IOException("Sync source storage is unavailable"));
-              }
-            }
             // Recheck scoped policy at admission while retaining the spool's bounded batches.
             var admissionScope = prefixScopeFactory.apply(root);
             var admitted = entries.stream()

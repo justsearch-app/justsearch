@@ -71,7 +71,7 @@ final class LegacyVduSourceRefreshTest extends LuceneExecutorTestBase {
     }
   }
   @org.junit.jupiter.params.ParameterizedTest(name = "{displayName} [{index}] {arguments}")
-  @org.junit.jupiter.params.provider.ValueSource(strings = {"outside-ancestor", "unknown-root", "unavailable-storage", "placeholder"})
+  @org.junit.jupiter.params.provider.ValueSource(strings = {"outside-ancestor", "unknown-root", "placeholder"})
   void legacyVduProcessingDefersBeforeAnyHash(String condition) throws Exception {
     Path root = Files.createDirectory(directory.resolve("root"));
     Path parent = Files.createDirectory(root.resolve("parent"));
@@ -90,8 +90,6 @@ final class LegacyVduSourceRefreshTest extends LuceneExecutorTestBase {
         Path outside = Files.createDirectory(directory.resolve("outside"));
         Files.writeString(outside.resolve("image.png"), "outside secret");
         Files.delete(file); Files.delete(parent); Files.createSymbolicLink(parent, outside);
-      } else if (condition.equals("unavailable-storage")) {
-        RootVolumeLedger.under(base).recordIfAbsent(parent, "linux-volume-v1:740:ext4:Lw");
       }
       try (var hashes = org.mockito.Mockito.mockStatic(SourceContentHash.class, org.mockito.Mockito.CALLS_REAL_METHODS);
           var detector = org.mockito.Mockito.mockStatic(SyncDirectoryOps.class, org.mockito.Mockito.CALLS_REAL_METHODS)) {

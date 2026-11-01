@@ -95,8 +95,6 @@ public final class WatcherReplay implements AutoCloseable {
     if (publisher != null) {
       discovery.setPruneGuardFactory(publisher::pruneGuard);
     }
-    discovery.setSourceStorageChecks(rootPath -> sourceAuthority == null ? source -> false
-        : sourceAuthority.sourceStorageCheck(rootPath));
     difference = discovery.discoverCandidateDifference(debt.root(), true, cancelled, nativePolicy, debt.collection());
     try {
       requireIdentity();
@@ -287,9 +285,6 @@ public final class WatcherReplay implements AutoCloseable {
     requireIdentity();
     Path file = Path.of(path);
     io.justsearch.indexerworker.loop.SourceAccess.requireSafeAncestors(file, Path.of(debt.root()));
-    if (sourceAuthority == null || !sourceAuthority.sourceStorageAvailable(file, Path.of(debt.root()))) {
-      throw new IOException("Watcher reconciliation source storage is unavailable: " + path);
-    }
     if (io.justsearch.adapters.lucene.runtime.PathPresence.probeSource(file, Path.of(debt.root()))
         == io.justsearch.adapters.lucene.runtime.PathPresence.ABSENT && io.justsearch.adapters.lucene.runtime.PathPresence
         .absentBeneathListableFolder(file, Path.of(debt.root()), null)
@@ -317,9 +312,7 @@ public final class WatcherReplay implements AutoCloseable {
         catch (IOException | RuntimeException unknown) { return false; }
       }
       @Override public io.justsearch.adapters.lucene.runtime.PathPresence presence(Path file) {
-        return sourceAuthority != null && sourceAuthority.sourceStorageAvailable(file, Path.of(debt.root()))
-            ? io.justsearch.adapters.lucene.runtime.PathPresence.probeSource(file, Path.of(debt.root()))
-            : io.justsearch.adapters.lucene.runtime.PathPresence.UNKNOWN;
+        return io.justsearch.adapters.lucene.runtime.PathPresence.probeSource(file, Path.of(debt.root()));
       }
     };
     target.indexingCoordinator().pruneFile(path, Path.of(debt.root()), guard);

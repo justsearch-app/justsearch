@@ -43,42 +43,6 @@ final class LinuxReturnedRootTest {
   }
 
   @Test
-  void replacedFolderBeforeRecoveryNeverBecomesTheNewIdentity() throws Exception {
-    Path root = Files.createDirectory(temp.resolve("watched"));
-    var active = new AtomicBoolean();
-    var registry = new RootWatcherRegistry(watcher(active));
-    assertTrue(registry.watch(root.toString(), "documents").watching());
-    active.set(false);
-    Files.move(root, temp.resolve("original"));
-    Files.createDirectory(root);
-
-    assertFalse(registry.resumeAwaitingVolume(root));
-    assertNull(registry.subscription(root));
-    assertTrue(registry.awaitsVolume(root), "uncertainty must keep the root held");
-    assertFalse(registry.resumeAwaitingVolume(root));
-    assertTrue(registry.unwatch(root.toString()));
-    assertFalse(registry.resumeAwaitingVolume(root), "removal cancels recovery");
-  }
-
-  @Test
-  void handoverRetainsTheFolderWitnessEvenWhileItsPathIsMissing() throws Exception {
-    Path root = Files.createDirectory(temp.resolve("handover"));
-    var prior = new RootWatcherRegistry();
-    assertTrue(prior.watch(root.toString(), "notes").watching());
-    Files.move(root, temp.resolve("absent"));
-    var next = new RootWatcherRegistry();
-    prior.handOverTo(next, (registry, path, collection) -> registry.watch(path.toString(), collection));
-    Files.createDirectory(root);
-    assertFalse(next.resumeAwaitingVolume(root), "a reload must not adopt a replacement folder");
-    Files.delete(root);
-    Files.move(temp.resolve("absent"), root);
-    assertTrue(next.resumeAwaitingVolume(root));
-    assertEquals("notes", next.subscription(root).collection());
-    assertTrue(prior.unwatch(root.toString()));
-    assertFalse(next.resumeAwaitingVolume(root));
-  }
-
-  @Test
   void handoverOfADeadWatcherKeepsRecoveryWhenTheRootIsAlreadyBack() throws Exception {
     var active = new AtomicBoolean();
     var prior = new RootWatcherRegistry(watcher(active));

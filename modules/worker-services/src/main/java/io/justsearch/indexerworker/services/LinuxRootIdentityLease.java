@@ -124,11 +124,6 @@ final class LinuxRootIdentityLease implements RootIdentityLease {
   record Mount(String id, String parent, String device, Path filesystemRoot, Path point,
       String type, String source) {}
 
-  static List<Path> descendantMountPoints(Path root) throws IOException {
-    List<Path> points = readMounts().stream().map(Mount::point).toList();
-    return points.stream().filter(path -> !path.equals(root) && path.startsWith(root)).toList();
-  }
-
   private static List<Mount> readMounts() throws IOException {
     return parseMounts(Files.readAllLines(MOUNTINFO));
   }

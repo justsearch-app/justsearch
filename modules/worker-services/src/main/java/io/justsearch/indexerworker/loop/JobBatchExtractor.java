@@ -149,20 +149,15 @@ public final class JobBatchExtractor {
     identityFailures.begin();
     extractionFailures.begin();
     indexEmptyForBatch = indexKnownEmpty();
-    ingestionAuthority.beginBatch();
-    try {
-      List<ExtractedJob> extracted = new ArrayList<>(jobs.size());
-      for (JobQueue.IndexJob job : jobs) {
-        if (!running.get()) break;
-        ExtractedJob ex = extractJob(job);
-        if (ex != null) extracted.add(ex);
-        // Pace extraction per file while keeping the remaining claims owned by this batch.
-        indexingPacing.pace();
-      }
-      return extracted;
-    } finally {
-      ingestionAuthority.endBatch();
+    List<ExtractedJob> extracted = new ArrayList<>(jobs.size());
+    for (JobQueue.IndexJob job : jobs) {
+      if (!running.get()) break;
+      ExtractedJob ex = extractJob(job);
+      if (ex != null) extracted.add(ex);
+      // Pace extraction per file while keeping the remaining claims owned by this batch.
+      indexingPacing.pace();
     }
+    return extracted;
   }
 
   void pipelineSucceeded() {
@@ -542,9 +537,8 @@ public final class JobBatchExtractor {
   }
 
   private void requireReadableSource(JobQueue.IndexJob claim) throws IOException {
-    if (!ingestionAuthority.sourceStorageAvailable(claim.path(), claim.ingestionRoot())
-        || io.justsearch.indexerworker.ingest.CloudPlaceholderDetector.isCloudPlaceholder(claim.path())) {
-      throw new IOException("Source storage is unavailable for content access");
+    if (io.justsearch.indexerworker.ingest.CloudPlaceholderDetector.isCloudPlaceholder(claim.path())) {
+      throw new IOException("Cloud-only placeholder is unavailable for content access");
     }
     SourceAccess.requireContained(claim.path(), claim.ingestionRoot());
   }

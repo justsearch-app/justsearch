@@ -53,12 +53,28 @@ final class OriginBoundaryAdmissionTest {
       Path root = Files.createDirectory(tempDir.resolve("root"));
       Path parent = Files.createDirectory(root.resolve("parent"));
       Path file = Files.writeString(parent.resolve("notes.txt"), "inside");
-      assertEquals(1, fixture.queue.enqueueEntries(List.of(JobQueue.EnqueueEntry.stat(file).withinRoot(root))));
       Path outside = Files.createDirectory(tempDir.resolve("outside"));
       Files.writeString(outside.resolve("notes.txt"), "outside content");
       Files.delete(file);
       Files.delete(parent);
       Files.createSymbolicLink(parent, outside);
+      var service = new WorkerIngestService(fixture.queue, null, null, IndexingPacing.unthrottled(),
+          null, null, null, null, null, 0L);
+      var registry = new io.justsearch.indexerworker.services.RootWatcherRegistry();
+      service.setRootWatcherRegistry(registry);
+      var watch = registry.getClass().getDeclaredMethod("watch", String.class, String.class);
+      watch.setAccessible(true);
+      watch.invoke(registry, root.toString(), "docs");
+      var subscription = registry.getClass().getDeclaredMethod("subscription", Path.class);
+      subscription.setAccessible(true);
+      var witness = (io.justsearch.indexerworker.services.RootWatcherRegistry.Subscription)
+          subscription.invoke(registry, root);
+      org.junit.jupiter.api.Assertions.assertNotNull(witness);
+      try (var hashes = org.mockito.Mockito.mockStatic(SourceContentHash.class, org.mockito.Mockito.CALLS_REAL_METHODS)) {
+        assertDoesNotThrow(() -> service.acceptWatcherUpsert(witness, "docs", file));
+        assertDoesNotThrow(() -> hashes.verify(() -> SourceContentHash.sha256(file), org.mockito.Mockito.never()));
+      }
+      assertEquals(1, fixture.queue.queueDepth(), "watcher work is retained for safe consumer admission");
       var content = mock(TimeboxedContentExtractor.class);
       when(content.extractionPolicy()).thenReturn(TikaExtractionPolicy.defaults());
       when(content.extractArtifact(org.mockito.ArgumentMatchers.any())).thenAnswer(call ->

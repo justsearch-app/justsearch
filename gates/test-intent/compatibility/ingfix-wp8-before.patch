@@ -42,23 +42,6 @@ index 2e19ddae57..1c4771e26f 100644
 +    return sha256(path);
 +  }
  }
-diff --git a/modules/worker-services/src/main/java/io/justsearch/indexerworker/loop/SourcePresence.java b/modules/worker-services/src/main/java/io/justsearch/indexerworker/loop/SourcePresence.java
-index 90dff26b23..40371588ab 100644
---- a/modules/worker-services/src/main/java/io/justsearch/indexerworker/loop/SourcePresence.java
-+++ b/modules/worker-services/src/main/java/io/justsearch/indexerworker/loop/SourcePresence.java
-@@ -35,6 +35,12 @@ public final class SourcePresence {
-      */
-     boolean vouches(Path folder);
- 
-+    // Compatibility signatures only: the before-state does not consult storage witnesses.
-+    default boolean sourceStorageAvailable(Path source, Path root) { return true; }
-+    default boolean observeSourceStorage(Path root) { return true; }
-+    default java.util.function.Predicate<Path> sourceStorageCheck(Path root) { return source -> true; }
-+
-+
-     /**
-      * True while content beneath {@code folder} may be added or updated: a present, listable folder
-      * on the volume recorded for it; a root with nothing recorded is unproven (round 8). A folder
 diff --git a/modules/worker-services/src/main/java/io/justsearch/indexerworker/loop/StaleSourceHandler.java b/modules/worker-services/src/main/java/io/justsearch/indexerworker/loop/StaleSourceHandler.java
 index 0022b35b15..1633ce81b0 100644
 --- a/modules/worker-services/src/main/java/io/justsearch/indexerworker/loop/StaleSourceHandler.java
@@ -79,7 +62,7 @@ new file mode 100644
 index 0000000000..e9d306133a
 --- /dev/null
 +++ b/modules/worker-core/src/main/java/io/justsearch/indexerworker/ingest/CloudPlaceholderDetector.java
-@@ -0,0 +1,10 @@
+@@ -0,0 +1,17 @@
 +/* SPDX-License-Identifier: Apache-2.0 */
 +package io.justsearch.indexerworker.ingest;
 +
@@ -88,7 +71,14 @@ index 0000000000..e9d306133a
 +/** Compatibility signature only; this class is absent from the before-state. */
 +public final class CloudPlaceholderDetector {
 +  private CloudPlaceholderDetector() {}
-+  public static boolean isCloudPlaceholder(Path file) { return false; }
++  public static boolean isCloudPlaceholder(Path file) {
++    try {
++      return (boolean) Class.forName("io.justsearch.indexerworker.loop.SourceContentHash")
++          .getMethod("isCloudPlaceholder", Path.class).invoke(null, file);
++    } catch (ReflectiveOperationException unavailable) {
++      throw new IllegalStateException(unavailable);
++    }
++  }
 +}
 diff --git a/modules/app-services/src/main/java/io/justsearch/app/services/worker/WatchedRootsState.java b/modules/app-services/src/main/java/io/justsearch/app/services/worker/WatchedRootsState.java
 index 1e75218c51..f15cef07e1 100644

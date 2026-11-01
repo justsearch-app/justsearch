@@ -27,9 +27,6 @@ public interface JobQueue extends Closeable {
   default void useDeclaredCollectionRoots(
       java.util.function.Supplier<List<io.justsearch.app.api.knowledge.IngestCollectionPolicy.RootBinding>> roots) {}
 
-  /** Current storage authority for admissions that witness source content, captured per root/batch. */
-  default void useSourceStorageChecks(
-      java.util.function.Function<Path, java.util.function.Predicate<Path>> checks) {}
 
   /**
    * Batch-exit return of exact issued claims that have no pending commit owner. Implementations

@@ -111,33 +111,6 @@ public final class RootWitness implements SourcePresence.RootCheck {
   }
 
   @Override
-  public boolean observeSourceStorage(Path root) {
-    if (root == null) return true;
-    try {
-      volumes.observeDescendantMounts(root);
-      return true;
-    } catch (IOException | RuntimeException unavailable) {
-      return false;
-    }
-  }
-
-  @Override
-  public java.util.function.Predicate<Path> sourceStorageCheck(Path root) {
-    if (!observeSourceStorage(root)) return source -> false;
-    try {
-      var descendants = volumes.sourceVolumes(root);
-      return source -> RootVolumeLedger.sourceStorageAvailable(source, descendants);
-    } catch (IOException | RuntimeException unavailable) {
-      return source -> false;
-    }
-  }
-
-  @Override
-  public boolean sourceStorageAvailable(Path source, Path root) {
-    return volumes.sourceStorageAvailable(source, root == null ? source.getParent() : root);
-  }
-
-  @Override
   public boolean vouches(Path folder) {
     Path key = normalize(folder);
     if (key == null) {
@@ -177,13 +150,6 @@ public final class RootWitness implements SourcePresence.RootCheck {
       admits = PathPresence.isReadableDirectory(key) && folderVolumeHolds(key);
     } else {
       admits = Files.isDirectory(key);
-    }
-    if (admits) {
-      try {
-        volumes.observeDescendantMounts(key);
-      } catch (IOException | RuntimeException unavailable) {
-        admits = false;
-      }
     }
     admitted.put(key, new Answer(admits, now + TimeUnit.MILLISECONDS.toNanos(VOUCH_TTL_MS)));
     return admits;
@@ -311,7 +277,6 @@ public final class RootWitness implements SourcePresence.RootCheck {
         return false;
       }
       volumes.record(key, volume);
-      volumes.observeDescendantMounts(key);
       return true;
     } catch (IOException | RuntimeException notRecorded) {
       log.warn("Could not record the volume of the added root {}: {}", key,
@@ -585,7 +550,6 @@ public final class RootWitness implements SourcePresence.RootCheck {
     String volume = current.volume();
     Optional<String> recorded = volumes.recordedFor(folder);
     if (recorded.isPresent()) {
-      if (recorded.get().equals("unconfirmed:0")) return;
       if (!recorded.get().equals(volume)) {
         throw new IOException(
             "folder is on " + volume + ", not on " + recorded.get() + " recorded for it");
