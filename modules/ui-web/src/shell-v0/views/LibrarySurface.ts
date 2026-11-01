@@ -232,6 +232,7 @@ const LIVE_REFRESH_MIN_MS = 4000;
 
 export class LibrarySurface extends JfElement {
   private expandedFolders = new Set<string>();
+  private contactUnconfirmed = false;
   private indexProgress = selectIndexingProgress(null, false, 0, []);
   static properties = {
     apiBase: { attribute: 'api-base', type: String },
@@ -776,6 +777,8 @@ export class LibrarySurface extends JfElement {
     // transition renders as "Rebuilding…", not "No watched folders".
     this.aiUnsub = subscribeAiState((s) => {
       this.provisional = s.stability.kind === 'provisional';
+      this.contactUnconfirmed = s.stability.kind === 'provisional' &&
+        ['initial-load', 'updating', 'channel-stale'].includes(s.stability.cause);
       this.observeGapDecision(s.status?.worker?.migration);
       // Tempdoc 813 §4 — the per-root second tier needs to know which stages apply; take it from the
       // ONE index-wide progress derivation rather than re-reading the enrichment wire flags here.
@@ -2048,7 +2051,7 @@ export class LibrarySurface extends JfElement {
   private renderHeader(): TemplateResult {
     const count = this.attentionItems().length;
     const headline = this.loading ? 'Loading your Library…'
-      : !this.indexProgress.live ? 'Indexing status unconfirmed'
+      : !this.indexProgress.live || this.contactUnconfirmed ? 'Indexing status unconfirmed'
         : count ? `${count} ${count === 1 ? 'thing needs' : 'things need'} your attention`
           : !this.indexingActivity.confirmed ? this.indexingActivity.summary
           : this.provisional ? 'Rebuilding your Library'
@@ -2241,8 +2244,8 @@ export class LibrarySurface extends JfElement {
       ${this.loading
         ? html`<div class="empty">Loading…</div>`
         : this.roots.length === 0
-          ? !this.indexingActivity.confirmed
-            ? html`<div class="empty">${this.indexingActivity.summary}. Folder details are last known; current status is unconfirmed.</div>`
+          ? !this.indexingActivity.confirmed || this.contactUnconfirmed
+            ? html`<div class="empty">${this.contactUnconfirmed ? 'Indexing status unconfirmed' : this.indexingActivity.summary}. Folder details are last known; current status is unconfirmed.</div>`
             : this.provisional
             ? html`<div class="empty">
                 Rebuilding index… your watched folders will reappear when it finishes.

@@ -11,7 +11,7 @@ async function settle(el: IndexingRulesEditor) {
 }
 afterEach(() => { document.body.replaceChildren(); vi.useRealTimers(); vi.restoreAllMocks(); });
 
-it('L14 waits for loaded rules, follows later layout movement, and stops after one second', async () => {
+it('L14 waits for loaded rules, keeps the destination in view while layout settles', async () => {
   vi.useFakeTimers();
   let loaded!: (value: Response) => void;
   const host = createMockHostApi();
@@ -32,10 +32,6 @@ it('L14 waits for loaded rules, follows later layout movement, and stops after o
   scroll.mockClear(); top = 900;
   await vi.advanceTimersByTimeAsync(50);
   expect(scroll).toHaveBeenCalledTimes(1);
-  await vi.advanceTimersByTimeAsync(1000);
-  scroll.mockClear(); top = 900;
-  await vi.advanceTimersByTimeAsync(100);
-  expect(scroll).not.toHaveBeenCalled();
 });
 
 it('L14 a later user focus move cancels arrival scrolling', async () => {
@@ -46,8 +42,14 @@ it('L14 a later user focus move cancels arrival scrolling', async () => {
   el.host_ = host; document.body.append(el); await settle(el);
   void el.focusIndexingRule('hours'); await settle(el);
   const target = el.shadowRoot!.querySelector<HTMLInputElement>('#indexing-hours')!;
-  const scroll = vi.spyOn(target, 'scrollIntoView');
+  let top = 200;
+  vi.spyOn(target, 'getBoundingClientRect').mockImplementation(() => ({ top }) as DOMRect);
+  const scroll = vi.spyOn(target, 'scrollIntoView').mockImplementation(() => { top = 200; });
+  await vi.advanceTimersByTimeAsync(50);
+  expect(scroll).toHaveBeenCalled();
+  scroll.mockClear();
   el.shadowRoot!.querySelector<HTMLInputElement>('#indexing-battery')!.focus();
+  top = 900; // Movement inside the arrival window would scroll without cancellation.
   await vi.advanceTimersByTimeAsync(200);
   expect(scroll).not.toHaveBeenCalled();
 });

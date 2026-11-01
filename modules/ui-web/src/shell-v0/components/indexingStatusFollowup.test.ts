@@ -33,7 +33,7 @@ function observe(which: Case, migrationState = 'IDLE'): AiState {
     inference: { mode: 'online', available: true, activeModelId: 'test' } as AiState['inference'],
   });
   if (which === 'age' || which === 'Engine gone') {
-    vi.setSystemTime(now + (which === 'age' ? 30_001 : 120_001));
+    vi.setSystemTime(now + (which === 'age' ? 40_001 : 120_001));
     if (which === 'age') __feedForTest({ inference: { mode: 'online', available: true } as AiState['inference'] });
   }
   __tickClockForTest();

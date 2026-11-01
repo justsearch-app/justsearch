@@ -34,7 +34,7 @@ let lastSnapshot: StatusSnapshot | null = null;
 let apiBase = '';
 let unbindRefresh: (() => void) | null = null;
 
-const INTERVAL_MS = 10000;
+export const INTERVAL_MS = 10000;
 /**
  * A status read the server has not answered within one poll interval is abandoned: aborted, so it
  * holds no connection, and its slot released, so the poll schedule goes on (a fresh read queued

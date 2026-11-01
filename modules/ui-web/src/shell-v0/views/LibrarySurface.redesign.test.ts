@@ -235,7 +235,7 @@ it('D1 keeps attention and retried files through 25 alternating unconfirmed poll
     expect(el.shadowRoot!.querySelector('jf-failed-jobs-drawer[inline]')).not.toBeNull();
     if (second % 2) expect(el.shadowRoot!.querySelector('.attention')!.textContent).toContain('last known');
   }
-  now.mockReturnValue(receivedAt + 31000); __tickClockForTest(); await settle(el);
+  now.mockReturnValue(receivedAt + 41000); __tickClockForTest(); await settle(el);
   expect(el.shadowRoot!.querySelector('h2')!.textContent).toBe('Indexing status unconfirmed');
   expect(el.shadowRoot!.querySelector('.attention')!.textContent).toContain('Indexing paused');
   observe(20); el.roots = [root('a')]; await settle(el);
@@ -258,4 +258,32 @@ it('D1 never claims searchable during unconfirmed polls, including 42 seconds pa
   }
   observe(20); await settle(el);
   expect(el.shadowRoot!.querySelector('h2')!.textContent).toBe('Your files are searchable');
+});
+
+
+it.each([false, true])('L2 lost status contact never describes a rebuild (empty roots: %s)', async empty => {
+  vi.useFakeTimers();
+  try {
+    observe(20); const { el } = await mount();
+    if (empty) el.roots = [];
+    await vi.advanceTimersByTimeAsync(15_001);
+    __tickClockForTest(); await settle(el);
+    expect(el.shadowRoot!.querySelector('h2')!.textContent).toBe('Indexing status unconfirmed');
+    expect(el.shadowRoot!.querySelector('.empty')?.textContent ?? '').not.toContain('Rebuilding');
+    await vi.advanceTimersByTimeAsync(10_000);
+    __tickClockForTest(); await settle(el);
+    expect(el.shadowRoot!.querySelector('h2')!.textContent).toBe('Indexing status unconfirmed');
+    observe(20); await settle(el);
+    expect(el.shadowRoot!.querySelector('h2')!.textContent).toBe(empty ? 'Add a folder to start searching' : 'Your files are searchable');
+  } finally { vi.useRealTimers(); }
+});
+
+it('L2 a confirmed migration still describes rebuilding', async () => {
+  observe(20); const { el } = await mount();
+  __feedForTest({ status: { worker: { core: { indexedDocuments: 20, indexState: 'IDLE', indexHealthy: true },
+    migration: { migrationState: 'MIGRATING' } } } as unknown as StatusSnapshot });
+  await settle(el);
+  expect(el.shadowRoot!.querySelector('h2')!.textContent).toBe('Rebuilding your Library');
+  el.roots = []; await settle(el);
+  expect(el.shadowRoot!.querySelector('.empty')!.textContent).toContain('your watched folders will reappear');
 });

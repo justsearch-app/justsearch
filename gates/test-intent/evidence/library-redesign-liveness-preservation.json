@@ -1,0 +1,504 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
+  },
+  "createdAt": "2026-11-01T21:46:34.440Z",
+  "revision": "7c124c7c228707305855589b4e151c97cabb277a",
+  "tree": "e1ee0b21b9e6bb3839469a41daceaaba35e03178",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/state/indexingFreshness.test.ts\" \"src/shell-v0/components/indexingStatusSurfaces.test.ts\" \"src/shell-v0/components/indexingStatusFollowup.test.ts\" \"src/shell-v0/components/indexingSurfaceSweep.test.ts\" \"src/shell-v0/components/indexingMissedSurfaces.test.ts\" \"src/shell-v0/views/LibrarySurface.redesign.test.ts\" \"src/shell-v0/views/SettingsSurface.settingsRecovery.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/5iqrcnfb/tmp/test-intent-vitest-318-1793569585652.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 8784
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/state/indexingFreshness.test.ts",
+      "file": "modules/ui-web/src/shell-v0/state/indexingFreshness.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:52831b26ebdc47fc20c6d342b7bcfe6da849f3c5bdcc109ff9d1d38b6fb33383",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "S33.4 the store timer expires the worker observation while SSE alone keeps the Engine reachable and fresh status restores it",
+          "status": "passed"
+        },
+        {
+          "name": "S33.4 a status without a worker timestamp expires by receipt age using its reported freshness window",
+          "status": "passed"
+        },
+        {
+          "name": "L2 fresh 6-second worker samples remain confirmed between 10-second reads for 40 seconds",
+          "status": "passed"
+        },
+        {
+          "name": "L2 a frozen worker sample expires after 6 seconds plus one read interval despite successful reads",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/indexingStatusSurfaces.test.ts",
+      "file": "modules/ui-web/src/shell-v0/components/indexingStatusSurfaces.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:d4c3e3fcc282ecfc4b4c8256609cc66af14d294d57e9d98794c1069e1a556e3c",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "WP3.3 shared status surfaces S33.1 S33.6 every surface says text indexing continues and enrichment waits for energy",
+          "status": "passed"
+        },
+        {
+          "name": "WP3.3 shared status surfaces S33.2 S33.4 all surfaces replace and clear the reason after a fresh observation",
+          "status": "passed"
+        },
+        {
+          "name": "WP3.3 shared status surfaces S33.4 retained stale observations are unconfirmed on every surface",
+          "status": "passed"
+        },
+        {
+          "name": "WP3.3 shared status surfaces S33.4 aged observations with 4 queued files expire on every surface while inference stays live and recover on fresh status",
+          "status": "passed"
+        },
+        {
+          "name": "WP3.3 shared status surfaces S33.4 aged observations with 0 queued files expire on every surface while inference stays live and recover on fresh status",
+          "status": "passed"
+        },
+        {
+          "name": "WP3.3 shared status surfaces S33.1 empty file queues still describe energy-deferred enrichment on every surface",
+          "status": "passed"
+        },
+        {
+          "name": "WP3.3 shared status surfaces S33.2 every surface distinguishes CPU enrichment under game and external GPU holds",
+          "status": "passed"
+        },
+        {
+          "name": "WP3.3 shared status surfaces S33.3 every surface names chat only while that reason is observed",
+          "status": "passed"
+        },
+        {
+          "name": "WP3.3 shared status surfaces N33.3 deferred enrichment retains the measured aggregate without an active progress bar",
+          "status": "passed"
+        },
+        {
+          "name": "WP3.3 shared status surfaces S33.5 Library with no settled documents stays enriching without inventing a percentage",
+          "status": "passed"
+        },
+        {
+          "name": "WP3.3 shared status surfaces S33.6 announces one semantic change once across identical polls",
+          "status": "passed"
+        },
+        {
+          "name": "C distinct energy_saver summary reaches the status chip",
+          "status": "passed"
+        },
+        {
+          "name": "C distinct game_mode summary reaches the status chip",
+          "status": "passed"
+        },
+        {
+          "name": "C distinct gpu_busy_external summary reaches the status chip",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/indexingStatusFollowup.test.ts",
+      "file": "modules/ui-web/src/shell-v0/components/indexingStatusFollowup.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:d3ad1ea0f98dd90b3869037ed3cd4ae96bea697e8690bf8dfab4b089d44bb3c0",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "WP3.3 sixth verifier regressions S33.4 S33.6 Library empty roots qualify retained migration and recover on fresh observations",
+          "status": "passed"
+        },
+        {
+          "name": "WP3.3 sixth verifier regressions S33.4 Library rebuild controls qualify retained build and activation observations",
+          "status": "passed"
+        },
+        {
+          "name": "WP3.3 sixth verifier regressions S33.6 Search v3 Ask and deck announce indexing changes once and repeat polls silently",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/indexingSurfaceSweep.test.ts",
+      "file": "modules/ui-web/src/shell-v0/components/indexingSurfaceSweep.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:7d7ef171c9f66cc27ba6aa5d19a8b9285a712842c465b3e2625839a5c2d6d22c",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "WP3.3 complete surface sweep S33.1 S33.4 S33.6 Health index-state row uses confirmation and scoped reasons in every case",
+          "status": "passed"
+        },
+        {
+          "name": "WP3.3 complete surface sweep S33.4 Health header and summary withhold operational claims for all unconfirmed observations",
+          "status": "passed"
+        },
+        {
+          "name": "WP3.3 complete surface sweep S33.4 Health rebuild bar never asserts current progress without confirmation",
+          "status": "passed"
+        },
+        {
+          "name": "WP3.3 complete surface sweep S33.1 S33.2 S33.3 S33.4 S33.6 Brain cards explain holds and never animate deferred or unconfirmed enrichment",
+          "status": "passed"
+        },
+        {
+          "name": "WP3.3 complete surface sweep S33.1 S33.4 S33.6 Brain simple panel describes observed work rather than inferring activity from runtime mode",
+          "status": "passed"
+        },
+        {
+          "name": "WP3.3 complete surface sweep S33.4 Library row cannot show a completion glyph from an unconfirmed index observation",
+          "status": "passed"
+        },
+        {
+          "name": "WP3.3 complete surface sweep S33.4 Tasks and System self-view qualify retained indexing rows while preserving independent agent tasks",
+          "status": "passed"
+        },
+        {
+          "name": "WP3.3 complete surface sweep S33.4 status-deck running-job chip marks retained indexing activity as last observed",
+          "status": "passed"
+        },
+        {
+          "name": "WP3.3 complete surface sweep S33.1 S33.4 Health AI queue rows use the status observation and its hold reasons instead of inference residue",
+          "status": "passed"
+        },
+        {
+          "name": "WP3.3 complete surface sweep S33.4 Health queue health qualifies its retained diagnostic when indexing is unconfirmed",
+          "status": "passed"
+        },
+        {
+          "name": "WP3.3 complete surface sweep S33.4 declared Library cards consume the same confirmation verdict as fallback cards",
+          "status": "passed"
+        },
+        {
+          "name": "WP3.3 complete surface sweep S33.4 Tasks label the entire stale stage disclosure as last observed",
+          "status": "passed"
+        },
+        {
+          "name": "WP3.3 complete surface sweep S33.1 S33.4 mode pills cannot assert indexing from the parked AI runtime alone",
+          "status": "passed"
+        },
+        {
+          "name": "WP3.3 complete surface sweep S33.1 S33.4 Search composer and chat-off explanations use observed indexing activity and scoped reasons",
+          "status": "passed"
+        },
+        {
+          "name": "WP3.3 complete surface sweep S33.4 Search v3 diagnostic causes cannot assert stale indexing activity",
+          "status": "passed"
+        },
+        {
+          "name": "WP3.3 complete surface sweep S33.1 S33.4 a parked indexing runtime with no observed work does not promise active indexing to the Search composer",
+          "status": "passed"
+        },
+        {
+          "name": "WP3.3 complete surface sweep S33.5 an unfinished rebuild never presents a completion figure when the old generation count is reached",
+          "status": "passed"
+        },
+        {
+          "name": "WP3.3 complete surface sweep S33.1 S33.4 S33.6 declared liveness readouts share indexing confirmation and hold wording",
+          "status": "passed"
+        },
+        {
+          "name": "WP3.3 complete surface sweep S33.6 the deck has one indexing announcement even while the AI runtime is in indexing mode",
+          "status": "passed"
+        },
+        {
+          "name": "WP3.3 complete surface sweep S33.4 Brain compatibility diagnostics qualify retained indexing readiness",
+          "status": "passed"
+        },
+        {
+          "name": "WP3.3 complete surface sweep S33.4 shipped Search banner qualifies index diagnostics on the real renderer",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/indexingMissedSurfaces.test.ts",
+      "file": "modules/ui-web/src/shell-v0/components/indexingMissedSurfaces.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:763a7454cb7a5d978b8527820c69e3d4a9a85b401f75cdfaee6799c47b5f6c29",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "WP3.3 independent inventory regressions S33.4 S33.6 encoder and passage readiness observations are qualified on mounted Search",
+          "status": "passed"
+        },
+        {
+          "name": "WP3.3 independent inventory regressions S33.4 S33.6 Browse empty roots never infer a current rebuild from unconfirmed migration",
+          "status": "passed"
+        },
+        {
+          "name": "WP3.3 independent inventory regressions S33.4 S33.6 migration mode pills qualify retained rebuilding while preserving fresh migration",
+          "status": "passed"
+        },
+        {
+          "name": "WP3.3 independent inventory regressions S33.4 S33.6 declared liveness readouts qualify retained migration and its accessible name",
+          "status": "passed"
+        },
+        {
+          "name": "WP3.3 independent inventory regressions S33.1 S33.4 overlay activity animation stops during deferred work and uncertainty, then resumes",
+          "status": "passed"
+        },
+        {
+          "name": "WP3.3 independent inventory regressions S33.4 S33.6 migration announcements use one region and withdraw stale rebuild claims",
+          "status": "passed"
+        },
+        {
+          "name": "WP3.3 independent inventory regressions S33.4 Brain runtime queues use worker counts and confirmation even with fresh inference contact",
+          "status": "passed"
+        },
+        {
+          "name": "WP3.3 independent inventory regressions S33.4 Health fallback queue dot cannot animate an unconfirmed observation",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/LibrarySurface.redesign.test.ts",
+      "file": "modules/ui-web/src/shell-v0/views/LibrarySurface.redesign.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:7694021ebe709affacc1e12975eeace5780d4e1d6ef12359cd8aeb512efadd41",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "the headline uses observed searchable documents (undefined)",
+          "status": "passed"
+        },
+        {
+          "name": "the headline uses observed searchable documents (0)",
+          "status": "passed"
+        },
+        {
+          "name": "the headline uses observed searchable documents (20)",
+          "status": "passed"
+        },
+        {
+          "name": "counts a rebuild decision during recovery and counts a terminal outcome only once",
+          "status": "passed"
+        },
+        {
+          "name": "retains named last-known failures while a missing folder returns and jobs requeue, until settled",
+          "status": "passed"
+        },
+        {
+          "name": "fallback rows keep several disclosures open through status updates and expose full paths",
+          "status": "passed"
+        },
+        {
+          "name": "themed rows keep several disclosures open through status updates and expose full paths",
+          "status": "passed"
+        },
+        {
+          "name": "Explorer actions are absent in browsers and use each resolved path on desktop",
+          "status": "passed"
+        },
+        {
+          "name": "Explorer explains unresolved including changes after rendering",
+          "status": "passed"
+        },
+        {
+          "name": "Explorer explains removed including changes after rendering",
+          "status": "passed"
+        },
+        {
+          "name": "Explorer explains disconnected including changes after rendering",
+          "status": "passed"
+        },
+        {
+          "name": "Explorer explains native refusal including changes after rendering",
+          "status": "passed"
+        },
+        {
+          "name": "uses the existing native reveal bridge and surfaces its network/device refusal",
+          "status": "passed"
+        },
+        {
+          "name": "a second window receives live folder holds without overwriting a skip-rules draft",
+          "status": "passed"
+        },
+        {
+          "name": "A2 expanded facts replace the old metadata line",
+          "status": "passed"
+        },
+        {
+          "name": "A3 unconfirmed status is stated once through the real projection",
+          "status": "passed"
+        },
+        {
+          "name": "A5 energy_saver waits are stated once through the real projection",
+          "status": "passed"
+        },
+        {
+          "name": "A5 gpu_busy_external waits are stated once through the real projection",
+          "status": "passed"
+        },
+        {
+          "name": "V1 fallback disclosure retains focus on toggle and live refresh",
+          "status": "passed"
+        },
+        {
+          "name": "V1 themed disclosure retains focus on toggle and live refresh",
+          "status": "passed"
+        },
+        {
+          "name": "D1 keeps attention and retried files through 25 alternating unconfirmed polls and clears on a settled observation",
+          "status": "passed"
+        },
+        {
+          "name": "D1 never claims searchable during unconfirmed polls, including 42 seconds past the shared threshold",
+          "status": "passed"
+        },
+        {
+          "name": "L2 lost status contact never describes a rebuild (empty roots: false)",
+          "status": "passed"
+        },
+        {
+          "name": "L2 lost status contact never describes a rebuild (empty roots: true)",
+          "status": "passed"
+        },
+        {
+          "name": "L2 a confirmed migration still describes rebuilding",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/SettingsSurface.settingsRecovery.test.ts",
+      "file": "modules/ui-web/src/shell-v0/views/SettingsSurface.settingsRecovery.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:520acd1ef0569288148122c7674d433e0d55508e15c68f770400c2f15784058f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "CR37c settings recovery R2 retains recovery route focus until the first status reveals the hold",
+          "status": "passed"
+        },
+        {
+          "name": "CR37c settings recovery R2 retains the pending hand-off across app focus moves inside shadow roots",
+          "status": "passed"
+        },
+        {
+          "name": "CR37c settings recovery R2 drops pending recovery focus when the user moves focus, even if they return",
+          "status": "passed"
+        },
+        {
+          "name": "CR37c settings recovery R2 drops pending recovery focus after pointerdown outside the Settings dialog",
+          "status": "passed"
+        },
+        {
+          "name": "CR37c settings recovery R2 drops pending recovery focus after keydown outside the Settings dialog",
+          "status": "passed"
+        },
+        {
+          "name": "CR37c settings recovery R2 drops pending recovery focus after blur outside the Settings dialog",
+          "status": "passed"
+        },
+        {
+          "name": "CR37c settings recovery R2 cancels user keydown focus movement inside a shadow root",
+          "status": "passed"
+        },
+        {
+          "name": "CR37c settings recovery R2 cancels user pointerdown focus movement inside a shadow root",
+          "status": "passed"
+        },
+        {
+          "name": "CR37c settings recovery R2 drops pending recovery focus when Settings closes and is reopened normally",
+          "status": "passed"
+        },
+        {
+          "name": "CR37c settings recovery R2 drops pending recovery focus when the first status reports no recovery hold",
+          "status": "passed"
+        },
+        {
+          "name": "CR37c settings recovery R2 fulfills pending recovery focus from a stale reported recovery hold",
+          "status": "passed"
+        },
+        {
+          "name": "CR37c settings recovery R2 never steals focus moved during the existing asynchronous focus walk",
+          "status": "passed"
+        },
+        {
+          "name": "CR37c settings recovery R2 cancels a repeated recovery route when the user moves focus before the window updates",
+          "status": "passed"
+        },
+        {
+          "name": "CR37c settings recovery R1 R4 preserves confirmation and Yes focus through stale polling and a status gap (USER)",
+          "status": "passed"
+        },
+        {
+          "name": "CR37c settings recovery R1 R4 preserves confirmation and Yes focus through stale polling and a status gap (OPERATOR)",
+          "status": "passed"
+        },
+        {
+          "name": "CR37c settings recovery R1 R4 preserves confirmation and Yes focus through stale polling and a status gap (DEVELOPER)",
+          "status": "passed"
+        },
+        {
+          "name": "CR37c settings recovery R1 exposes the existing reset in every tier only for the observed recovery hold",
+          "status": "passed"
+        },
+        {
+          "name": "CR37c settings recovery R1 preserves confirmation, cancellation, errors and successful reset handling in User tier",
+          "status": "passed"
+        },
+        {
+          "name": "CR37c settings recovery R2 focuses the actual reset control in every tier without a View-tier detour",
+          "status": "passed"
+        },
+        {
+          "name": "CR37c settings recovery R3 preserves normal audience visibility outside recovery (null)",
+          "status": "passed"
+        },
+        {
+          "name": "CR37c settings recovery R3 preserves normal audience visibility outside recovery (user_paused)",
+          "status": "passed"
+        },
+        {
+          "name": "CR37c settings recovery R3 preserves normal audience visibility outside recovery (game_mode)",
+          "status": "passed"
+        },
+        {
+          "name": "CR37c settings recovery R1 R3 removes the exception on a remote clear and restores focus only when Reset had focus",
+          "status": "passed"
+        },
+        {
+          "name": "CR37c settings recovery R1 R3 restores focus when pending confirmation blurs before the recovery hold clears",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:83cbe82f4605a29a49990c48cea247be5eb03610ee0b304347074dac2ab80b99"
+}

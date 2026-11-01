@@ -55,7 +55,7 @@ function observe(which: Case, jobs = 0, pending = 80, rebuilding = false): AiSta
     readiness: { composites: { retrieval: { state: 'READY', reasonCodes: [] } } },
   } as unknown as StatusSnapshot;
   __feedForTest({ status, inference: { mode: 'indexing', starting: false } });
-  if (which === 'age' || which === 'Engine gone') vi.setSystemTime(now + (which === 'Engine gone' ? 120_001 : 30_001));
+  if (which === 'age' || which === 'Engine gone') vi.setSystemTime(now + (which === 'Engine gone' ? 120_001 : 40_001));
   if (which === 'age') __feedForTest({ inference: { mode: 'indexing', starting: false } });
   __tickClockForTest();
   return getAiState();

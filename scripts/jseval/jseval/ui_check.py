@@ -1539,6 +1539,61 @@ def _build_steps(ui_url: str, cooldown_ms: int, timeout_ms: int) -> list[Step]:
             print(f"Library liveness {mode}: {len(samples)} one-second samples; confirmed clear restored searchable")
         return setup
 
+    def setup_library_poll_cadence(mode):
+        async def setup(page):
+            polls = 0
+            fail_reads = False
+            sampled_at = int(time.time() * 1000)
+
+            async def status_reply(route):
+                nonlocal polls, sampled_at
+                polls += 1
+                if fail_reads:
+                    await route.fulfill(status=503, body="Status unavailable")
+                    return
+                body = json.loads(ui_fixtures._status_body("enriching"))
+                if mode != "frozen" or polls == 1:
+                    sampled_at = int(time.time() * 1000) - 2000
+                body["meta"].update({"workerRpcAtMs": sampled_at, "workerRpcStale": False})
+                body["operating"]["freshness"].update({"staleAfterMs": 6000, "staleSources": []})
+                body["worker"]["core"].update({"searchableDocuments": 400,
+                    "indexState": "WAITING" if mode == "fresh" else "IDLE", "pendingJobs": 1 if mode == "fresh" else 0})
+                body["operating"]["indexing"].update({"state": "PAUSED" if mode == "fresh" else "IDLE",
+                    "reasons": ["user_paused"] if mode == "fresh" else [], "untilEpochMs": None,
+                    "waitingForResume": mode == "fresh"})
+                await route.fulfill(status=200, content_type="application/json", body=json.dumps(body))
+
+            await page.route("**/api/status", status_reply)
+            await page.reload(wait_until="domcontentloaded")
+            await _await_app_ready(page)
+            await _view_setup("library")(page)
+            heading = page.locator('jf-library-surface h2')
+            await heading.wait_for(state="visible")
+            expected = "1 thing needs your attention" if mode == "fresh" else "Your files are searchable"
+            for _ in range(100):
+                if await heading.inner_text() == expected:
+                    break
+                await page.wait_for_timeout(100)
+            assert await heading.inner_text() == expected
+            if mode == "failed":
+                fail_reads = True
+            samples = []
+            # Chromium real timers, no clock replacement or action-triggered refresh.
+            for _ in range(40 if mode == "fresh" else 25):
+                text = await heading.inner_text()
+                deck = await page.locator('jf-status-deck').evaluate("el => el.shadowRoot.textContent")
+                samples.append({"ageMs": int(time.time() * 1000) - sampled_at, "headline": text, "deck": deck})
+                assert "Rebuilding" not in text, samples
+                if mode == "fresh":
+                    assert text == expected and "Indexing status unconfirmed" not in deck, samples
+                elif samples[-1]["ageMs"] > 21000:
+                    assert text == "Indexing status unconfirmed" and "Indexing status unconfirmed" in deck, samples
+                await page.wait_for_timeout(1000)
+            assert polls >= (4 if mode == "fresh" else 3), polls
+            print(f"Library poll cadence {mode}: {len(samples)} real one-second samples, {polls} reads; "
+                  f"headlines: {sorted(set(sample['headline'] for sample in samples))}")
+        return setup
+
     def setup_library_size(width, height):
         async def setup(page):
             await page.set_viewport_size({"width": width, "height": height})
@@ -2336,6 +2391,8 @@ def _build_steps(ui_url: str, cooldown_ms: int, timeout_ms: int) -> list[Step]:
           for width, height in ((1280, 720), (600, 400))],
         *[Step(f"library-liveness-{mode}", setup=setup_library_liveness(mode), isolated=True,
                fixtures_variant="enriching") for mode in ("pause", "alternating", "expiry")],
+        *[Step(f"library-poll-cadence-{mode}", setup=setup_library_poll_cadence(mode), isolated=True,
+               fixtures_variant="enriching") for mode in ("fresh", "frozen", "failed")],
         Step("library-idle-headline", setup=setup_library_idle_headline, isolated=True, fixtures_variant="enriching"),
         Step("library-medium", setup=setup_library_size(760, 720), isolated=True,
              fixtures_variant="enriching"),

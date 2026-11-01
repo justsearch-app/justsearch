@@ -44,6 +44,23 @@ Test ledger (all entries are durable product checks):
 - Tests added or rewritten: modules/ui-web/src/shell-v0/views/LibrarySurface.slice2.test.ts — L12, L14, L19, B, V3 — focus requests, witnessed saves, external conflicts — durable
 - Tests added or rewritten: modules/ui-web/src/shell-v0/views/SettingsSurface.indexingRules.test.ts — L8, L14, L15 — moved editor and remedies — durable
 
+Continuation at 7c124c7c22 (all durable):
+
+- Tests added or rewritten: modules/ui-web/src/shell-v0/state/indexingFreshness.test.ts — L2 shared read-cadence bound, frozen samples, receipt-age fallback — durable
+- Tests added or rewritten: modules/ui-web/src/shell-v0/components/indexingStatusSurfaces.test.ts — liveness expiry on every shared surface — durable
+- Tests added or rewritten: modules/ui-web/src/shell-v0/components/indexingStatusFollowup.test.ts — retained migration and unknown-state liveness matrix — durable
+- Tests added or rewritten: modules/ui-web/src/shell-v0/components/indexingSurfaceSweep.test.ts — cross-surface liveness matrix — durable
+- Tests added or rewritten: modules/ui-web/src/shell-v0/components/indexingMissedSurfaces.test.ts — remaining surface liveness matrix — durable
+- Tests added or rewritten: modules/ui-web/src/shell-v0/views/LibrarySurface.redesign.test.ts — L2 lost-contact versus real rebuild, L16 retained-failure expiry — durable
+- Tests added or rewritten: modules/ui-web/src/shell-v0/views/SettingsSurface.settingsRecovery.test.ts — recovery confirmation and focus survive expired status — durable
+- Tests added or rewritten: modules/ui-web/src/shell-v0/components/IndexingRulesEditor.arrival.test.ts — L14 in view after layout settles and nonvacuous focus cancellation — durable
+
+The continuation's evidence runs use a separate shared clone under the session temporary directory.
+Its runner-owned before-worktrees and copied dependencies never modify the source repository.
+Entry 17's mutant removes only the arrival scroll's active-element guard; the strengthened check
+fails on the extra scroll call while it passes with the guard. Entry 16 asserts layout settling,
+not an exact one-second product requirement. No test is skipped or deleted.
+
 Execution evidence was produced by the repository's unmodified run-evidence.mjs in a shared clone
 inside the session temporary directory, with its own copied dependencies. Its detached before
 checkouts belong to that clone and do not write into the source repository. VITEST_MAX_WORKERS=4.
@@ -392,7 +409,7 @@ Browser viewport and actual native-shell verification are independent of these u
           "label": "agent-drafted, owner-adopted"
         }
       ],
-      "evidence": "gates/test-intent/evidence/library-redesign-new.json",
+      "evidence": "gates/test-intent/evidence/library-redesign-liveness-preservation.json",
       "newChecks": [
         "modules/ui-web/src/shell-v0/components/indexingStatusFollowup.test.ts"
       ]
@@ -550,7 +567,7 @@ Browser viewport and actual native-shell verification are independent of these u
           "label": "agent-drafted, owner-adopted"
         }
       ],
-      "evidence": "gates/test-intent/evidence/library-redesign-new.json",
+      "evidence": "gates/test-intent/evidence/library-redesign-liveness-preservation.json",
       "newChecks": [
         "modules/ui-web/src/shell-v0/views/LibrarySurface.redesign.test.ts"
       ]
@@ -759,7 +776,7 @@ Browser viewport and actual native-shell verification are independent of these u
           "label": "agent-drafted, owner-adopted"
         }
       ],
-      "evidence": "gates/test-intent/evidence/library-redesign-d1.json",
+      "evidence": "gates/test-intent/evidence/library-redesign-d1-liveness-refresh.json",
       "newChecks": [
         "modules/ui-web/src/shell-v0/views/LibrarySurface.redesign.test.ts#D1 keeps attention and retried files through 25 alternating unconfirmed polls and clears on a settled observation",
         "modules/ui-web/src/shell-v0/views/LibrarySurface.redesign.test.ts#D1 never claims searchable during unconfirmed polls, including 42 seconds past the shared threshold",
@@ -773,7 +790,7 @@ Browser viewport and actual native-shell verification are independent of these u
         "modules/ui-web/src/shell-v0/components/IndexingRulesEditor.arrival.test.ts"
       ],
       "class": "New",
-      "behaviour": "Arrival focus waits for loaded indexing rules, follows late layout movement for a bounded second, and stops scrolling after user focus moves. Real geometry remains checked by the jseval arrival steps, including never-mounted palette navigation and a previously mounted warm route.",
+      "behaviour": "Arrival focus waits for loaded indexing rules and keeps the destination in view while layout settles. Real geometry remains checked by the jseval arrival steps, including never-mounted palette navigation and a previously mounted warm route. No exact one-second contract is asserted.",
       "sources": [
         {
           "kind": "owner-adopted-scenario",
@@ -783,9 +800,9 @@ Browser viewport and actual native-shell verification are independent of these u
           "label": "agent-drafted, owner-adopted"
         }
       ],
-      "evidence": "gates/test-intent/evidence/library-redesign-d2.json",
+      "evidence": "gates/test-intent/evidence/library-redesign-arrival-settling.json",
       "newChecks": [
-        "modules/ui-web/src/shell-v0/components/IndexingRulesEditor.arrival.test.ts#L14 waits for loaded rules, follows later layout movement, and stops after one second"
+        "modules/ui-web/src/shell-v0/components/IndexingRulesEditor.arrival.test.ts#L14 waits for loaded rules, keeps the destination in view while layout settles"
       ],
       "repaired": true
     },
@@ -794,7 +811,7 @@ Browser viewport and actual native-shell verification are independent of these u
         "modules/ui-web/src/shell-v0/components/IndexingRulesEditor.arrival.test.ts"
       ],
       "class": "New",
-      "behaviour": "A later user focus move cancels the bounded arrival scroll, preserving keyboard control.",
+      "behaviour": "A later user focus move cancels arrival scrolling, preserving keyboard control. The check first witnesses active arrival scrolling, then moves the target within the arrival window after focus moves. Removing the focus guard produces an assertion failure; unchanged geometry can no longer make this check pass vacuously.",
       "sources": [
         {
           "kind": "owner-adopted-scenario",
@@ -804,14 +821,94 @@ Browser viewport and actual native-shell verification are independent of these u
           "label": "agent-drafted, owner-adopted"
         }
       ],
-      "evidence": "gates/test-intent/evidence/library-redesign-new.json",
+      "evidence": "gates/test-intent/evidence/library-redesign-arrival-cancellation.json",
       "newChecks": [
         "modules/ui-web/src/shell-v0/components/IndexingRulesEditor.arrival.test.ts#L14 a later user focus move cancels arrival scrolling"
       ],
       "repaired": false
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/state/indexingFreshness.test.ts",
+        "modules/ui-web/src/shell-v0/components/indexingStatusSurfaces.test.ts",
+        "modules/ui-web/src/shell-v0/components/indexingStatusFollowup.test.ts",
+        "modules/ui-web/src/shell-v0/components/indexingSurfaceSweep.test.ts",
+        "modules/ui-web/src/shell-v0/components/indexingMissedSurfaces.test.ts",
+        "modules/ui-web/src/shell-v0/views/LibrarySurface.redesign.test.ts",
+        "modules/ui-web/src/shell-v0/views/SettingsSurface.settingsRecovery.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "Shared-authority bound change, preserving every liveness oracle: indexingFreshness worker-age test moves the confirmed wait from 20s to 30s and expiry from 25s to 35s (sample starts 7s old, bound 30s + 10s); no-worker-timestamp receipt-age test moves the inclusive confirmation check from 10s to 20s, then expires at 25s (10s + 10s). indexingStatusSurfaces moves 23,001ms to 33,001ms because the sample starts 7s old and the bound is now 40s. indexingStatusFollowup, indexingSurfaceSweep and indexingMissedSurfaces move age inputs 30,001ms to 40,001ms, preserving every cross-surface unconfirmed-state assertion. LibrarySurface.redesign moves the D1 retained-failure expiry observation from 31s to 41s, keeping its attention and file reachability checks. SettingsSurface.settingsRecovery moves 31s to 41s for USER, OPERATOR and DEVELOPER, preserving confirmation, Yes focus, retained hold and explicit clear behavior. No check is skipped or removed.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "L2",
+          "quote": "Headline: \"Your files are searchable\" when nothing needs attention; \"N things need your attention\" counting distinct actionable items, deduplicated; while status is unconfirmed or loading it says so and never claims searchable. Summary line: searchable documents and folder count from status, plus what is running now.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "L16",
+          "quote": "Failure evidence during retry: when failed counts drop to zero only because jobs requeue, the problem stays listed as last known with its files reachable until a settled observation clears it.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-words",
+          "quote": "an observation is stale only when the client has missed an expected refresh, i.e. now - observedAt > staleAfterMs + the client's read interval (statusPoll INTERVAL_MS, which already bounds a read). It still can never stay confirmed indefinitely.",
+          "location": "task t-20261101-uiimpl request"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/library-redesign-liveness-preservation.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/state/indexingFreshness.test.ts",
+        "modules/ui-web/src/shell-v0/components/indexingStatusSurfaces.test.ts",
+        "modules/ui-web/src/shell-v0/components/indexingStatusFollowup.test.ts",
+        "modules/ui-web/src/shell-v0/components/indexingSurfaceSweep.test.ts",
+        "modules/ui-web/src/shell-v0/components/indexingMissedSurfaces.test.ts",
+        "modules/ui-web/src/shell-v0/views/LibrarySurface.redesign.test.ts",
+        "modules/ui-web/src/shell-v0/views/SettingsSurface.settingsRecovery.test.ts"
+      ],
+      "repaired": false
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/state/indexingFreshness.test.ts",
+        "modules/ui-web/src/shell-v0/views/LibrarySurface.redesign.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "Fresh six-second worker observations stay confirmed between ten-second client reads over 40 seconds. Frozen worker timestamps still expire despite successful HTTP reads. Lost status contact is unconfirmed rather than a rebuild, with and without roots; a real confirmed migration still shows rebuilding. Fake timers exercise the authority; jseval library-poll-cadence-fresh/frozen/failed exercise real Chromium timers and status transport, including the status bar.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "L2",
+          "quote": "Headline: \"Your files are searchable\" when nothing needs attention; \"N things need your attention\" counting distinct actionable items, deduplicated; while status is unconfirmed or loading it says so and never claims searchable. Summary line: searchable documents and folder count from status, plus what is running now.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "L16",
+          "quote": "Failure evidence during retry: when failed counts drop to zero only because jobs requeue, the problem stays listed as last known with its files reachable until a settled observation clears it.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-words",
+          "quote": "an observation is stale only when the client has missed an expected refresh, i.e. now - observedAt > staleAfterMs + the client's read interval (statusPoll INTERVAL_MS, which already bounds a read). It still can never stay confirmed indefinitely.",
+          "location": "task t-20261101-uiimpl request"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/library-redesign-liveness.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/state/indexingFreshness.test.ts#L2 fresh 6-second worker samples remain confirmed between 10-second reads for 40 seconds",
+        "modules/ui-web/src/shell-v0/state/indexingFreshness.test.ts#L2 a frozen worker sample expires after 6 seconds plus one read interval despite successful reads",
+        "modules/ui-web/src/shell-v0/views/LibrarySurface.redesign.test.ts#L2 lost status contact never describes a rebuild (empty roots: false)",
+        "modules/ui-web/src/shell-v0/views/LibrarySurface.redesign.test.ts#L2 lost status contact never describes a rebuild (empty roots: true)"
+      ],
+      "repaired": true
     }
   ]
 }
 ```
-
-## Acceptance records

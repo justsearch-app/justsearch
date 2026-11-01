@@ -36,6 +36,7 @@ import {
 } from '../utils/inferencePoll.js';
 import {
   subscribeStatus,
+  INTERVAL_MS,
   setStatusApiBase,
   refreshStatusNow as refreshStatusPollNow,
   type StatusSnapshot,
@@ -564,7 +565,10 @@ function computeIndexingStatusLive(snapshotLive: boolean): boolean {
   // and future timestamps, so an observation cannot remain confirmed indefinitely.
   const observedAt = Math.min(receivedAt, status.meta?.workerRpcAtMs ?? receivedAt);
   const freshnessWindow = status.operating?.freshness?.staleAfterMs ?? 30_000;
-  return Date.now() - observedAt <= freshnessWindow;
+  // The client cannot observe the next worker sample until its next bounded status read.
+  // Only a missed expected refresh makes this sample stale; successful reads of a frozen
+  // sample still expire because observedAt remains the worker timestamp.
+  return Date.now() - observedAt <= freshnessWindow + INTERVAL_MS;
 }
 
 /**

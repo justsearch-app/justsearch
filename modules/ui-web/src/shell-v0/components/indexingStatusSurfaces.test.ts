@@ -127,7 +127,7 @@ describe('WP3.3 shared status surfaces', () => {
     await mountAll();
     for (const text of texts()) expect(text).toContain('saves energy');
 
-    vi.setSystemTime(observedAt + 23_001);
+    vi.setSystemTime(observedAt + 33_001);
     __feedForTest({ inference: { mode: 'indexing', starting: false } });
     await flush();
     expect(getAiState().snapshotLive, 'inference still confirms Engine reachability').toBe(true);
