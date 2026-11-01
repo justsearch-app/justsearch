@@ -38,6 +38,17 @@ final class VduOpsAttemptOwnershipTest {
         "a failed cancellation must retain the exact attempts for retry");
   }
 
+  @Test void refusedReleaseRetainsAttemptForOwnedRecovery() throws Exception {
+    var calls = mock(IngestServiceCalls.class); var ops = ops(calls);
+    var context = TestEngineContexts.internal().withWorkId(UUID.randomUUID());
+    when(calls.markVduProcessing(any())).thenReturn(MarkVduProcessingResponse.newBuilder().setSuccess(true).setRetryCount(1).build());
+    claim(ops, "first", "attempt-A", context);
+    when(calls.releaseVduProcessing("first", "attempt-A")).thenReturn(false);
+    assertFalse(ops.releaseVduProcessing("first", "attempt-A", context));
+    assertEquals(Set.of("attempt-A"), attempts(recoveryRequest(ops, context)),
+        "C17: a refused release cannot forget recoverable authority");
+  }
+
   private static VduOps ops(IngestServiceCalls calls) {
     return new VduOps(new IngestRpcExecutor() {
       @Override public <T> T execute(String operation,KnowledgeClient.RpcDeadlineCategory category,

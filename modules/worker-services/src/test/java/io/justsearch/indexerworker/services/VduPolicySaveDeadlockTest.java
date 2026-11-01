@@ -95,7 +95,7 @@ final class VduPolicySaveDeadlockTest extends LuceneExecutorTestBase {
       var vdu = start("vdu-rpc", () -> markClaim
           ? service.markVduProcessing(MarkVduProcessingRequest.newBuilder()
               .setDocId(id).setAttemptId("attempt").setMaxRetries(3).build(), context).getSuccess()
-          : service.updateVduResult(UpdateVduResultRequest.newBuilder()
+          : service.updateVduResult(UpdateVduResultRequest.newBuilder().setSourceSha256("a".repeat(64))
               .setDocId(id).setAttemptId("attempt").setOutcome(VduUpdateOutcome.VDU_UPDATE_OUTCOME_SUCCESS_TEXT)
               .setExtractedContent("vdu text ".repeat(50)).setVduEnrichment("vdu marker").build(), context)
               .getSuccess(), vduThread);
