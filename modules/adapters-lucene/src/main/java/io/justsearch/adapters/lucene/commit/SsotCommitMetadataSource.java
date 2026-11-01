@@ -111,6 +111,20 @@ public final class SsotCommitMetadataSource implements CommitMetadataSource {
         inputs.embeddingModel(), inputs.spladeModel(), inputs.nerModel());
   }
 
+  /** Includes runtime knobs that change persisted encoder output, independently of the graph SHA. */
+  public static String modelAssetsIdentity(String role, String assets, ResolvedConfig config) {
+    if (assets == null || config == null) return null;
+    String settings = switch (role) {
+      case "embedding" -> config.ai().embedding().contextLength() + ":"
+          + config.ai().embedding().lateChunkingEnabled() + ":"
+          + config.ai().embedding().lateChunkingContextLength();
+      case "splade" -> config.ai().splade().maxSeqLen() + ":" + config.ai().splade().activation();
+      case "ner" -> config.ai().ner().maxSeqLen() + ":" + config.ai().ner().confidenceThreshold();
+      default -> "";
+    };
+    return sha256Bytes((assets + ":" + settings).getBytes(java.nio.charset.StandardCharsets.UTF_8));
+  }
+
   private static File resolveRepoRoot() {
     java.nio.file.Path root = JustSearchConfigurationLoader.repoRootStatic();
     if (root == null) {
@@ -148,6 +162,14 @@ public final class SsotCommitMetadataSource implements CommitMetadataSource {
       // (tempdoc 931 §C.5). It is the same statement as the digest, not a second one — see
       // IndexFingerprint.COMMIT_META_INPUTS_KEY on why it is not a parity key.
       IndexFingerprint.Inputs inputs = fingerprintInputs(resolved);
+      List<IndexFingerprint.ModelFingerprint> models = List.of(
+          inputs.embeddingModel(), inputs.spladeModel(), inputs.nerModel());
+      List<String> roles = List.of("embedding", "splade", "ner");
+      for (int i = 0; i < roles.size(); i++) {
+        String identity = modelAssetsIdentity(roles.get(i), models.get(i).assetsSha(), resolved);
+        if (identity != null) out.put(roles.get(i) + "_model_assets_sha256", identity);
+      }
+
       IndexFingerprint.compute(inputs).ifPresent(fp -> out.put(IndexFingerprint.COMMIT_META_KEY, fp));
       out.put(
           IndexFingerprint.COMMIT_META_INPUTS_KEY,

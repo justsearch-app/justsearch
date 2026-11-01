@@ -138,7 +138,7 @@ public final class NerService implements Closeable {
           }
         }
       } catch (OrtException e) {
-        log.warn("NER inference failed for chunk (length={})", chunk.length(), e);
+        throw new IllegalStateException("NER inference failed for chunk (length=" + chunk.length() + ")", e);
       }
     }
 

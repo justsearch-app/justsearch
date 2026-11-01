@@ -34,6 +34,34 @@ final class EmbeddingCompatibilityControllerTest {
   }
 
   @Test
+  void successfulCommitReadbackClearsAnAbsentStampWithoutDiscardingRepairEvidence() {
+    EmbeddingFingerprint.setForTesting("current");
+    var persisted = new java.util.concurrent.atomic.AtomicReference<Map<String, String>>(
+        Map.of(EmbeddingCompatibilityController.COMMIT_META_KEY, "current"));
+    var controller = new EmbeddingCompatibilityController(persisted::get, () -> 1L, () -> 0);
+    controller.refresh();
+    persisted.set(Map.of());
+    controller.refreshStoredFingerprintAfterCommit();
+    assertNull(controller.storedFingerprint());
+    assertEquals(java.util.Optional.of("current"), controller.fingerprintToStamp());
+  }
+
+  @Test
+  void preparingMetadataDoesNotClaimDurableFingerprint() {
+    EmbeddingFingerprint.setForTesting("current");
+    var persisted = new java.util.concurrent.atomic.AtomicReference<Map<String, String>>(Map.of());
+    var controller = new EmbeddingCompatibilityController(persisted::get, () -> 0L, () -> 1);
+    controller.refresh();
+    controller.noteSuccessfulEmbeddingObserved();
+    assertEquals(java.util.Optional.of("current"), controller.fingerprintToStamp());
+    assertNull(controller.storedFingerprint(), "preparation is not a successful commit");
+    assertEquals(java.util.Optional.of("current"), controller.fingerprintToStamp());
+    persisted.set(Map.of(EmbeddingCompatibilityController.COMMIT_META_KEY, "current"));
+    controller.refreshStoredFingerprintAfterCommit();
+    assertEquals("current", controller.storedFingerprint());
+  }
+
+  @Test
   void maybeAutoStartRebuildForBlockedLegacyTransitionsToRebuilding() throws Exception {
     // Inject a fake fingerprint so the controller sees embedding as "available" without
     // needing a real model file on disk. Without this, EmbeddingFingerprint.get() returns

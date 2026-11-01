@@ -59,6 +59,33 @@ class EmbeddingProviderLifecycleTest {
   }
 
   @Test
+  void failedCommitAfterSupplierInvocationRetainsDedicatedStampRetry() throws Exception {
+    var ecc = new EmbeddingCompatibilityController(Map::of, () -> 0L, () -> 1);
+    ecc.refresh(); ecc.noteSuccessfulEmbeddingObserved();
+    var counts = mock(IndexCountOps.class);
+    when(counts.docCount()).thenReturn(1L);
+    var commits = mock(CommitOps.class);
+    var attempts = new java.util.concurrent.atomic.AtomicInteger();
+    org.mockito.Mockito.doAnswer(call -> {
+      assertTrue(ecc.fingerprintToStamp().isPresent());
+      if (attempts.incrementAndGet() == 1) throw new IllegalStateException("commit failed after preparation");
+      ecc.onFingerprintStamped();
+      return null;
+    }).when(commits).commitAndTrack(CommitReason.INDEXING_LOOP_FRESH_STAMP);
+    var lifecycle = newLifecycle(mock(JobQueue.class), counts, commits);
+    lifecycle.setEmbeddingCompatController(ecc);
+    assertFalse(lifecycle.tryFinalizeFreshCompatibleStamp());
+    org.junit.jupiter.api.Assertions.assertNull(ecc.storedFingerprint());
+    assertFalse(lifecycle.tryFinalizeFreshCompatibleStamp(), "failure keeps the retry backoff");
+    var backoff = EmbeddingProviderLifecycle.class.getDeclaredField("freshStampBackoffUntilMs");
+    backoff.setAccessible(true);
+    ((java.util.concurrent.atomic.AtomicLong) backoff.get(lifecycle)).set(0L);
+    assertTrue(lifecycle.tryFinalizeFreshCompatibleStamp());
+    assertEquals(2, attempts.get());
+    assertEquals(LIVE_FP, ecc.storedFingerprint());
+  }
+
+  @Test
   void firesForcedCommitWhenCompatibleWithDocsAndNoStoredFingerprint() {
     CommitOps commitOps = mock(CommitOps.class);
     IndexCountOps indexCountOps = mock(IndexCountOps.class);

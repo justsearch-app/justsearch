@@ -505,8 +505,8 @@ public final class IndexingCoordinator {
     }
   }
 
-  /** Indexes a single document with backpressure enforcement and queue accounting. */
-  public void indexSingle(IndexDocument document) {
+  /** Indexes a document, returning whether the write accepted a completed dense embedding. */
+  public boolean indexSingle(IndexDocument document) {
     acquireReadLockTimed();
     try {
       guardBackpressure();
@@ -517,14 +517,16 @@ public final class IndexingCoordinator {
           throw new IllegalArgumentException("IndexDocument.fields() must not be null");
         }
         FieldMapper.DroppedVectorReport droppedVectors = new FieldMapper.DroppedVectorReport();
+        boolean acceptedEmbedding;
         dispatchLock.lock();
         try {
-          writeOps.get().indexDocument(fields, droppedVectors);
+          acceptedEmbedding = writeOps.get().indexDocument(fields, droppedVectors);
         } finally {
           dispatchLock.unlock();
         }
         session.pendingDocs.incrementAndGet();
         reportDroppedVectors(droppedVectors, 1);
+        return acceptedEmbedding;
       } finally {
         session.queueDepth.decrementAndGet();
       }

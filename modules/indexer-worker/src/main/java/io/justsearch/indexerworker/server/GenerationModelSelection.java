@@ -69,7 +69,9 @@ final class GenerationModelSelection {
   IndexFingerprint.ModelFingerprint fingerprint(String packageId) {
     ModelArtifact artifact = models.get(packageId);
     return artifact == null ? IndexFingerprint.ModelFingerprint.notConfigured()
-        : IndexFingerprint.ModelFingerprint.present(artifact.sha256());
+        : IndexFingerprint.ModelFingerprint.present(artifact.sha256()).withAssets(
+            io.justsearch.indexerworker.embed.ModelAssetFingerprint.compute(
+                Path.of(artifact.id()).getParent(), packageId));
   }
 
   Optional<String> availableFingerprint(String packageId) {

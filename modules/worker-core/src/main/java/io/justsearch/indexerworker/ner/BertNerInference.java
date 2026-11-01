@@ -232,16 +232,47 @@ public final class BertNerInference implements Closeable {
     String[] tokens = encoding.getTokens();
     long[] wordIds = encoding.getWordIds();
 
-    // Truncate to maxSequenceLength if needed
-    int seqLen = Math.min(inputIds.length, maxSequenceLength);
-    if (seqLen < inputIds.length) {
-      inputIds = truncate(inputIds, seqLen);
-      attentionMask = truncate(attentionMask, seqLen);
-      tokens = truncateStr(tokens, seqLen);
-      wordIds = truncate(wordIds, seqLen);
+    if (inputIds.length <= maxSequenceLength) {
+      return inferTokens(inputIds, attentionMask, tokens, wordIds, t0, System.nanoTime());
     }
-    long t1 = System.nanoTime();
+    var windows = new io.justsearch.indexerworker.embed.onnx.TokenWindows(
+        inputIds, attentionMask, new long[inputIds.length], maxSequenceLength,
+        Math.min(50, (maxSequenceLength - 2) / 4), maxSequenceLength);
+    float[][] logits = new float[inputIds.length][];
+    int[] context = new int[inputIds.length];
+    java.util.Arrays.fill(context, -1);
+    long tokenizedAt = System.nanoTime();
+    for (int w = 0; w < windows.size(); w++) {
+      long[][] window = windows.get(w);
+      int start = windows.start(w);
+      int end = windows.end(w);
+      String[] windowTokens = new String[window[0].length];
+      long[] windowWords = new long[window[0].length];
+      windowTokens[0] = tokens[0];
+      windowTokens[windowTokens.length - 1] = tokens[tokens.length - 1];
+      windowWords[0] = wordIds[0];
+      windowWords[windowWords.length - 1] = wordIds[wordIds.length - 1];
+      System.arraycopy(tokens, start, windowTokens, 1, end - start);
+      System.arraycopy(wordIds, start, windowWords, 1, end - start);
+      long windowStartedAt = System.nanoTime();
+      var output = inferTokens(window[0], window[1], windowTokens, windowWords,
+          w == 0 ? t0 : windowStartedAt, w == 0 ? tokenizedAt : windowStartedAt);
+      logits[0] = output.logits()[0];
+      logits[logits.length - 1] = output.logits()[windowTokens.length - 1];
+      for (int token = start; token < end; token++) {
+        int distance = Math.min(token - start, end - token - 1);
+        if (distance > context[token]) {
+          logits[token] = output.logits()[token - start + 1];
+          context[token] = distance;
+        }
+      }
+    }
+    return new InferenceOutput(logits, tokens, wordIds);
+  }
 
+  private InferenceOutput inferTokens(long[] inputIds, long[] attentionMask,
+      String[] tokens, long[] wordIds, long t0, long t1) throws OrtException {
+    int seqLen = inputIds.length;
     long[] shape = {1, seqLen};
 
     // Every caller is bulk enrichment (NerService per-document and single-chunk batches), so the
@@ -336,9 +367,9 @@ public final class BertNerInference implements Closeable {
   /** SeqLen buckets for consistent tensor shapes — avoids ORT dynamic shape cache invalidation. */
   private static final int[] NER_SEQ_LEN_BUCKETS = {64, 128, 256, 512};
 
-  private static int bucketSeqLen(int seqLen) {
+  private int bucketSeqLen(int seqLen) {
     for (int bucket : NER_SEQ_LEN_BUCKETS) {
-      if (seqLen <= bucket) return bucket;
+      if (seqLen <= bucket) return Math.min(bucket, maxSequenceLength);
     }
     return seqLen;
   }
@@ -375,6 +406,7 @@ public final class BertNerInference implements Closeable {
     String[][] allTokens = new String[n][];
     long[][] allWordIds = new long[n][];
     int[] tokenCounts = new int[n];
+    InferenceOutput[] resultsByIdx = new InferenceOutput[n];
 
     for (var group : BoundedTokenizeGroups.ranges(texts, charBudget)) {
       int groupStart = group.startInclusive();
@@ -383,7 +415,11 @@ public final class BertNerInference implements Closeable {
       for (int j = 0; j < groupEncodings.length; j++) {
         int idx = groupStart + j;
         Encoding enc = groupEncodings[j];
-        int seqLen = Math.min(enc.getIds().length, maxSequenceLength);
+        if (enc.getIds().length > maxSequenceLength) {
+          resultsByIdx[idx] = infer(texts.get(idx));
+          continue;
+        }
+        int seqLen = enc.getIds().length;
         allInputIds[idx] = truncate(enc.getIds(), seqLen);
         allAttentionMask[idx] = truncate(enc.getAttentionMask(), seqLen);
         allTokens[idx] = truncateStr(enc.getTokens(), seqLen);
@@ -393,14 +429,14 @@ public final class BertNerInference implements Closeable {
     }
 
     // Sort by token count (ascending) to group similar-length sequences
-    Integer[] sortedIndices = new Integer[n];
-    for (int i = 0; i < n; i++) sortedIndices[i] = i;
+    Integer[] sortedIndices = java.util.stream.IntStream.range(0, n)
+        .filter(i -> resultsByIdx[i] == null).boxed().toArray(Integer[]::new);
+    int fittingCount = sortedIndices.length;
     java.util.Arrays.sort(sortedIndices, java.util.Comparator.comparingInt(i -> tokenCounts[i]));
 
     // Process in sub-batches, grouped by bucket
-    InferenceOutput[] resultsByIdx = new InferenceOutput[n];
     int pos = 0;
-    while (pos < n) {
+    while (pos < fittingCount) {
       int batchStart = pos;
       int batchBucket = bucketSeqLen(tokenCounts[sortedIndices[pos]]);
       // Spec E §2.2: a call pads to its bucket; the plan read for this call may take fewer items
@@ -410,13 +446,13 @@ public final class BertNerInference implements Closeable {
               sessions.arenaPlan(),
               EncoderRole.NER,
               MAX_NER_BATCH_SIZE,
-              n - pos,
+              fittingCount - pos,
               i -> batchBucket,
               length -> length,
               count -> count);
 
       // Collect docs that fit in this bucket (up to MAX_NER_BATCH_SIZE)
-      while (pos < n
+      while (pos < fittingCount
           && (pos - batchStart) < callItems
           && bucketSeqLen(tokenCounts[sortedIndices[pos]]) == batchBucket) {
         pos++;

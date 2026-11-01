@@ -306,6 +306,7 @@ public final class EmbeddingBackfillOps {
     updates.put(SchemaFields.EMBEDDING_RETRY_COUNT, String.valueOf(retryCount));
     if (retryCount >= SchemaFields.EMBEDDING_MAX_RETRIES) {
       updates.put(SchemaFields.EMBEDDING_STATUS, SchemaFields.EMBEDDING_STATUS_FAILED);
+      updates.put(SchemaFields.VECTOR, null);
     }
     return updates;
   }
@@ -508,6 +509,7 @@ public final class EmbeddingBackfillOps {
     updates.put(SchemaFields.CHUNK_EMBEDDING_RETRY_COUNT, String.valueOf(retryCount));
     if (retryCount >= SchemaFields.EMBEDDING_MAX_RETRIES) {
       updates.put(SchemaFields.CHUNK_EMBEDDING_STATUS, SchemaFields.EMBEDDING_STATUS_FAILED);
+      updates.put(SchemaFields.CHUNK_VECTOR, null);
     }
     return updates;
   }

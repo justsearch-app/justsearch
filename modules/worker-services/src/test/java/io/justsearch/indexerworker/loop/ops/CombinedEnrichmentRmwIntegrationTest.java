@@ -124,7 +124,7 @@ class CombinedEnrichmentRmwIntegrationTest extends io.justsearch.adapters.lucene
   }
 
   @Test
-  void absentSpladeEncoderPublishesEmbeddingAndResetsCompletedSplade() throws Exception {
+  void absentSpladeEncoderPublishesEmbeddingAndRetainsCompletedSplade() throws Exception {
     EmbeddingProvider embedding = mock(EmbeddingProvider.class);
     when(embedding.isAvailable()).thenReturn(true);
     when(embedding.embedDocumentBatch(anyList())).thenReturn(List.of(new float[] {1f, 2f}));
@@ -145,11 +145,11 @@ class CombinedEnrichmentRmwIntegrationTest extends io.justsearch.adapters.lucene
 
     assertEquals(SchemaFields.EMBEDDING_STATUS_COMPLETED,
         runtime.documentFieldOps().getDocumentField(docId, SchemaFields.EMBEDDING_STATUS));
-    assertEquals(SchemaFields.SPLADE_STATUS_PENDING,
+    assertEquals(SchemaFields.SPLADE_STATUS_COMPLETED,
         runtime.documentFieldOps().getDocumentField(docId, SchemaFields.SPLADE_STATUS));
     assertEquals("0",
         runtime.documentFieldOps().getDocumentField(docId, SchemaFields.SPLADE_RETRY_COUNT));
-    assertFalse(hasSparseHit("old", docId), "the baseline reset lane removes unavailable postings");
+    assertTrue(hasSparseHit("old", docId), "embedding-only work retains independent sparse postings");
   }
 
   @Test
@@ -186,8 +186,8 @@ class CombinedEnrichmentRmwIntegrationTest extends io.justsearch.adapters.lucene
   }
 
   @Test
-  @DisplayName("blank content does not encode and the real RMW truthfully resets sparse state")
-  void blankContent_skipsEncoderAndRealRmwResetsCompletedSplade() throws Exception {
+  @DisplayName("blank content does not encode and embedding bookkeeping retains sparse state")
+  void blankContent_skipsEncoderAndRetainsIndependentCompletedSplade() throws Exception {
     EmbeddingProvider embedding = mock(EmbeddingProvider.class);
     SpladeEncoder splade = mock(SpladeEncoder.class);
     when(embedding.isAvailable()).thenReturn(true);
@@ -222,9 +222,9 @@ class CombinedEnrichmentRmwIntegrationTest extends io.justsearch.adapters.lucene
         "1",
         runtime.documentFieldOps().getDocumentField(docId, SchemaFields.EMBEDDING_RETRY_COUNT));
     assertEquals(
-        SchemaFields.SPLADE_STATUS_PENDING,
+        SchemaFields.SPLADE_STATUS_COMPLETED,
         runtime.documentFieldOps().getDocumentField(docId, SchemaFields.SPLADE_STATUS));
-    assertFalse(hasSparseHit("old", docId), "the reset-status RMW must remove stale postings");
+    assertTrue(hasSparseHit("old", docId), "embedding retry bookkeeping must retain sparse postings");
   }
 
   private CombinedEnrichmentBackfillOps.BackfillContext context(

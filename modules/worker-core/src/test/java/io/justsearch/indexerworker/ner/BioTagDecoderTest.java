@@ -32,6 +32,22 @@ class BioTagDecoderTest {
     return logits;
   }
 
+  @Test
+  void highConfidenceShortNamesSurvive() {
+    for (String name : List.of("Li", "Bo", "An", "吴", "京")) {
+      for (int label : new int[] {B_PER, B_LOC}) {
+        var entities = BioTagDecoder.decode(new float[][] {logitsFor(label)},
+            new String[] {name}, new long[] {0});
+        assertEquals(1, entities.size(), name);
+        assertEquals(name, entities.get(0).text());
+      }
+    }
+    var cjk = BioTagDecoder.decode(new float[][] {logitsFor(B_PER), logitsFor(I_PER)},
+        new String[] {"吴", "京"}, new long[] {0, 1});
+    assertEquals(1, cjk.size());
+    assertEquals("吴 京", cjk.get(0).text());
+  }
+
   @Nested
   @DisplayName("Basic entity extraction")
   class BasicExtraction {

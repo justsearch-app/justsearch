@@ -96,6 +96,7 @@ public final class EmbeddingCompatibilityController {
   private final LongSupplier docCountSupplier;
   private final java.util.function.IntSupplier completedEmbeddingCountSupplier;
   private final Supplier<Optional<String>> currentFingerprintSupplier;
+  private final Supplier<Optional<String>> currentAssetsSupplier;
   private final AtomicReference<State> state = new AtomicReference<>(State.UNAVAILABLE);
   private final AtomicReference<String> currentFingerprint = new AtomicReference<>();
   private final AtomicReference<String> storedFingerprint = new AtomicReference<>();
@@ -180,6 +181,17 @@ public final class EmbeddingCompatibilityController {
       LongSupplier docCountSupplier,
       java.util.function.IntSupplier completedEmbeddingCountSupplier,
       Supplier<Optional<String>> currentFingerprintSupplier) {
+    this(storedMetadataSupplier, docCountSupplier, completedEmbeddingCountSupplier,
+        currentFingerprintSupplier, Optional::empty);
+  }
+
+  /** Uses the generation's separately versioned output-determining companion identity. */
+  public EmbeddingCompatibilityController(
+      Supplier<Map<String, String>> storedMetadataSupplier, LongSupplier docCountSupplier,
+      java.util.function.IntSupplier completedEmbeddingCountSupplier,
+      Supplier<Optional<String>> currentFingerprintSupplier,
+      Supplier<Optional<String>> currentAssetsSupplier) {
+    this.currentAssetsSupplier = Objects.requireNonNull(currentAssetsSupplier, "currentAssetsSupplier");
     this.storedMetadataSupplier = Objects.requireNonNull(storedMetadataSupplier, "storedMetadataSupplier");
     this.docCountSupplier = Objects.requireNonNull(docCountSupplier, "docCountSupplier");
     this.completedEmbeddingCountSupplier =
@@ -249,7 +261,15 @@ public final class EmbeddingCompatibilityController {
       return;
     }
 
-    if (storedFp.equals(current.get())) {
+    String storedAssets = stored == null ? null : stored.get("embedding_model_assets_sha256");
+    Optional<String> currentAssets = currentAssetsSupplier.get();
+    boolean assetsMatch = storedAssets == null || currentAssets.isEmpty()
+        || storedAssets.equals(currentAssets.get());
+    if (storedFp.equals(current.get()) && assetsMatch) {
+      if (storedAssets == null && currentAssets.isPresent()) {
+        log.info("Adopting companion identity for graph-only index; pre-adoption companion provenance is unverified");
+      }
+
       // The attestation is already persisted for THIS model. Later commits must keep offering it —
       // withholding it would strip the fingerprint from the next commit and re-flag the index
       // BLOCKED_LEGACY on the following boot (tempdoc 819 defect B: the gate governs the FIRST
@@ -267,10 +287,10 @@ public final class EmbeddingCompatibilityController {
     state.set(State.BLOCKED_MISMATCH);
     reasonCode.set("FINGERPRINT_MISMATCH");
     log.warn("Embedding compatibility: BLOCKED_MISMATCH. "
-        + "Stored: {}..., Current: {}... "
+        + "Stored graph: {}..., Current graph: {}..., companionsMatch={} "
         + "Embedding writes and vector/hybrid queries require a full-generation rebuild.",
         storedFp.substring(0, Math.min(16, storedFp.length())),
-        current.get().substring(0, Math.min(16, current.get().length())));
+        current.get().substring(0, Math.min(16, current.get().length())), assetsMatch);
   }
 
   /**
@@ -505,6 +525,7 @@ public final class EmbeddingCompatibilityController {
   public void onFingerprintStamped() {
     String fp = currentFingerprint.get();
     storedFingerprint.set(fp);
+    attestationAlreadyOnDisk = fp != null;
     state.set(State.COMPATIBLE);
     reasonCode.set("FINGERPRINT_MATCH");
     log.info("Embedding compatibility: fingerprint stamped, now COMPATIBLE ({}...)",
@@ -568,10 +589,6 @@ public final class EmbeddingCompatibilityController {
         return Optional.empty();
       }
       String fp = currentFingerprint.get();
-      if (fp != null) {
-        storedFingerprint.set(fp);
-        reasonCode.compareAndSet("NEW_INDEX_NO_FINGERPRINT", "FINGERPRINT_MATCH");
-      }
       return Optional.ofNullable(fp);
     }
     return Optional.empty();
@@ -642,6 +659,10 @@ public final class EmbeddingCompatibilityController {
     try {
       Map<String, String> stored = storedMetadataSupplier.get();
       String fp = stored == null ? null : stored.get(COMMIT_META_KEY);
+      if (stored != null && (fp == null || fp.isBlank())) {
+        storedFingerprint.set(null);
+        return;
+      }
       if (fp != null && !fp.isBlank()) {
         String prev = storedFingerprint.get();
         if (!fp.equals(prev)) {
@@ -654,6 +675,7 @@ public final class EmbeddingCompatibilityController {
         // governs first persistence, not preservation).
         if (fp.equals(currentFingerprint.get())) {
           attestationAlreadyOnDisk = true;
+          reasonCode.compareAndSet("NEW_INDEX_NO_FINGERPRINT", "FINGERPRINT_MATCH");
         }
       }
     } catch (Exception e) {

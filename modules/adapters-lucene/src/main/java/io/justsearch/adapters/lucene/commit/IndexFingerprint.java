@@ -140,7 +140,16 @@ public final class IndexFingerprint {
   }
 
   /** Tri-state identity of one model that contributes content to the index. */
-  public record ModelFingerprint(ModelState state, String sha) {
+  public record ModelFingerprint(ModelState state, String sha, String assetsSha) {
+    public ModelFingerprint(ModelState state, String sha) { this(state, sha, null); }
+
+    /** Companion identity is separate so pre-upgrade graph-only attestations remain graph-only. */
+    public ModelFingerprint withAssets(Optional<String> assets) {
+      if (state != ModelState.PRESENT) return this;
+      return assets.map(value -> new ModelFingerprint(state, sha, value))
+          .orElseGet(ModelFingerprint::indeterminate);
+    }
+
     public ModelFingerprint {
       Objects.requireNonNull(state, "state");
     }

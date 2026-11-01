@@ -80,7 +80,7 @@ final class SystemicBatchDeferralTest {
     doThrow(new IndexRuntimeIOException(IndexRuntimeIOException.Reason.DISK_IO,
         "writer unavailable", null)).when(writer).indexSingle(any());
     assertShortDeferral(files);
-    doNothing().when(writer).indexSingle(any());
+    doAnswer(invocation -> null).when(writer).indexSingle(any());
     infrastructureDown.set(false);
     recover(files);
   }
@@ -110,7 +110,7 @@ final class SystemicBatchDeferralTest {
       assertShortDeferral(files);
       waitUntilDue(files);
     }
-    doNothing().when(writer).indexSingle(any());
+    doAnswer(invocation -> null).when(writer).indexSingle(any());
     infrastructureDown.set(false);
     recover(files);
     // A later outage starts with the same short bound, independent of earlier failures.
@@ -276,7 +276,7 @@ final class SystemicBatchDeferralTest {
     process(queue.pollPending(10));
     for (Path file : files) assertEquals("RETRY_EXHAUSTED", row(file).state());
     var healthy = enqueue("healthy-after-poison.txt");
-    doNothing().when(writer).indexSingle(any());
+    doAnswer(invocation -> null).when(writer).indexSingle(any());
     doAnswer(call -> new DocumentIdentityStore.Identity(call.getArgument(0), "healthy-uid",
         call.getArgument(1), call.getArgument(1))).when(identities).resolve(anyString(), anyLong());
     process(queue.pollPending(10));
@@ -291,7 +291,7 @@ final class SystemicBatchDeferralTest {
     process(queue.pollPending(10));
     assertEquals(1, row(poison.getFirst()).attempts(), "a passing canary charges the first poison batch");
     var healthy = enqueue("healthy.txt");
-    doNothing().when(writer).indexSingle(any());
+    doAnswer(invocation -> null).when(writer).indexSingle(any());
     process(queue.pollPending(10));
     commit();
     assertEquals("DONE", row(healthy.getFirst()).state());

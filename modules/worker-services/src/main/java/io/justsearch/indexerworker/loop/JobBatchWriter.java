@@ -218,13 +218,13 @@ public final class JobBatchWriter {
             lexicalSource.indexingCoordinator(), lexicalMetadata, ex.collection(), ex.docUid(),
             false, chunkPlan);
       }
-      indexingCoordinator.indexSingle(doc);
+      boolean acceptedEmbedding = indexingCoordinator.indexSingle(doc);
       // Tempdoc 819 / 821 §O.1 (+ #470 D2): when the document carries a completed embedding (the
       // migration/blue-green inline-embed path), that IS the success evidence the attestation must
       // be earned from — feed it to the ECC. (The empty-index stamp permit this call once revoked
       // was deleted outright: a document-less commit could spend it first, granting a permanent
       // unearned attestation.)
-      notifyEmbeddingCompatibility(doc);
+      notifyEmbeddingCompatibility(acceptedEmbedding);
       indexedDelta.accept(1L);
       batchStats.recordIndexed(1);
 
@@ -322,13 +322,10 @@ public final class JobBatchWriter {
    * embedding really succeeded — the fact the stamp must be earned from. Null-safe: the controller
    * is wired after the runtime opens and may not exist yet.
    */
-  private void notifyEmbeddingCompatibility(IndexDocument doc) {
+  private void notifyEmbeddingCompatibility(boolean acceptedEmbedding) {
     var controller = embeddingLifecycle.embeddingCompatController();
     if (controller == null) return;
-    var fields = doc.fields();
-    if (fields != null
-        && SchemaFields.EMBEDDING_STATUS_COMPLETED.equals(
-            fields.get(SchemaFields.EMBEDDING_STATUS))) {
+    if (acceptedEmbedding) {
       controller.noteSuccessfulEmbeddingObserved();
     }
   }

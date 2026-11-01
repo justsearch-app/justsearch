@@ -18,12 +18,12 @@ class SpladeTruncationEvidenceTest {
   void deriveWindowCountUsesOverlapAwareStride() {
     assertEquals(1, SpladeTruncationEvidence.deriveWindowCount(256, 256, 64));
     assertEquals(2, SpladeTruncationEvidence.deriveWindowCount(257, 256, 64));
-    assertEquals(2, SpladeTruncationEvidence.deriveWindowCount(448, 256, 64));
-    assertEquals(3, SpladeTruncationEvidence.deriveWindowCount(449, 256, 64));
+    assertEquals(2, SpladeTruncationEvidence.deriveWindowCount(446, 256, 64));
+    assertEquals(3, SpladeTruncationEvidence.deriveWindowCount(447, 256, 64));
   }
 
   @Test
-  @DisplayName("snapshot reports truncation and window histograms")
+  @DisplayName("snapshot reports complete window coverage without truncation")
   @SuppressWarnings("unchecked")
   void snapshotReportsTruncationAndWindowHistograms() {
     SpladeTruncationEvidence evidence = new SpladeTruncationEvidence(256, 64);
@@ -34,7 +34,7 @@ class SpladeTruncationEvidenceTest {
     Map<String, Object> summary = evidence.snapshot(Path.of("models", "splade", "naver-splade-v3"));
 
     assertEquals(3L, summary.get("documentsEncoded"));
-    assertEquals(2L, summary.get("documentsTruncated"));
+    assertEquals(0L, summary.get("documentsTruncated"));
     assertEquals(700, summary.get("maxObservedTokens"));
 
     Map<String, Long> windowHistogram = (Map<String, Long>) summary.get("derivedWindowCountHistogram");
@@ -66,6 +66,6 @@ class SpladeTruncationEvidenceTest {
     Map<String, Object> summary =
         new tools.jackson.databind.ObjectMapper().readValue(outputPath.toFile(), Map.class);
     assertEquals(2, summary.get("documentsEncoded"));
-    assertEquals(1, summary.get("documentsTruncated"));
+    assertEquals(0, summary.get("documentsTruncated"));
   }
 }

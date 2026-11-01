@@ -131,5 +131,11 @@ public final class EmbeddingFingerprint {
     return Files.isRegularFile(onnxModel) ? onnxModel : null;
   }
 
+  /** Companion identity; a resolved model with an empty answer is indeterminate. */
+  public static Optional<String> assets() {
+    return modelPath().flatMap(path ->
+        ModelAssetFingerprint.compute(path.getParent(), "embedding"));
+  }
+
   private record CachedResult(Optional<Path> modelPath, Optional<String> fingerprint) {}
 }

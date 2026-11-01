@@ -65,6 +65,96 @@ class InPlaceEmbeddingRebuildRecoveryTest extends io.justsearch.adapters.lucene.
   }
 
   @Test
+  void rescueReplacesOldChunkVectorsAndTerminalFailureRemovesOldParentVector() throws Exception {
+    EmbeddingFingerprint.setForTesting(FP);
+    Path dir = Files.createTempDirectory("chunk-parent-recovery");
+    AtomicReference<Supplier<Optional<String>>> holder = new AtomicReference<>(Optional::empty);
+    var metadata = EmbeddingMetadataOverlay.createSupplier(() -> holder.get().get());
+    try (var runtime = openSparseRuntime(dir, metadata)) {
+      for (String id : List.of("good", "bad")) {
+        runtime.indexingCoordinator().indexSingle(new IndexDocument(Map.of(
+            SchemaFields.DOC_ID, id, SchemaFields.DOC_UID, id + "#0",
+            SchemaFields.CONTENT, "retained lexical content",
+            SchemaFields.CONTENT_SHA256, io.justsearch.indexing.chunking.ChunkParentRevision.sha256Hex("retained lexical content"),
+            SchemaFields.VECTOR, VEC,
+            SchemaFields.EMBEDDING_STATUS, SchemaFields.EMBEDDING_STATUS_COMPLETED,
+            SchemaFields.SPLADE, Map.of("retained_sparse", 2f),
+            SchemaFields.SPLADE_STATUS, "COMPLETED", SchemaFields.SPLADE_RETRY_COUNT, 2)));
+      }
+      float[] oldChunkVector = new float[768]; oldChunkVector[1] = 1f;
+      var chunkFields = new java.util.HashMap<String, Object>(Map.of(
+          SchemaFields.DOC_ID, "chunk", SchemaFields.DOC_UID, "chunk#0",
+          SchemaFields.IS_CHUNK, true, SchemaFields.PARENT_DOC_ID, "good",
+          SchemaFields.CHUNK_CONTENT, "retained lexical content",
+          SchemaFields.CHUNK_VECTOR, oldChunkVector,
+          SchemaFields.CHUNK_EMBEDDING_STATUS, SchemaFields.EMBEDDING_STATUS_COMPLETED,
+          SchemaFields.SPLADE, Map.of("retained_sparse", 3f),
+          SchemaFields.SPLADE_STATUS, "COMPLETED", SchemaFields.SPLADE_RETRY_COUNT, 2));
+      chunkFields.put(SchemaFields.CHUNK_START_CHAR, 0);
+      chunkFields.put(SchemaFields.CHUNK_END_CHAR, "retained lexical content".length());
+      chunkFields.put(SchemaFields.CHUNK_PARENT_CONTENT_SHA256,
+          io.justsearch.indexing.chunking.ChunkParentRevision.sha256Hex("retained lexical content"));
+      runtime.indexingCoordinator().indexSingle(new IndexDocument(chunkFields));
+      runtime.commitOps().commitAndTrack();
+      runtime.commitOps().maybeRefreshBlocking();
+      var ecc = new EmbeddingCompatibilityController(runtime::latestCommitUserDataBestEffort,
+          () -> docCountOrThrow(runtime), () -> completedEmbeddingsOrThrow(runtime));
+      ecc.refresh(); holder.set(ecc::fingerprintForCommit);
+      assertTrue(EmbeddingRecoveryOps.rescueBlockedLegacyIndex(ecc, runtime, 20, LOG).rebuildStarted());
+      assertEquals("PENDING", runtime.documentFieldOps().getDocumentField("chunk", SchemaFields.CHUNK_EMBEDDING_STATUS));
+      assertEquals(3, runtime.readPathOps().search(new org.apache.lucene.search.TermQuery(
+          new org.apache.lucene.index.Term(SchemaFields.SPLADE, "retained_sparse")), 10, java.util.Set.of(), null, null).hits().size());
+      for (String id : List.of("good", "bad", "chunk")) {
+        assertEquals("COMPLETED", runtime.documentFieldOps().getDocumentField(id, SchemaFields.SPLADE_STATUS));
+        assertEquals("2", runtime.documentFieldOps().getDocumentField(id, SchemaFields.SPLADE_RETRY_COUNT));
+      }
+
+      assertEquals(0, runtime.chunkSearchOps().searchChunkVector(VEC, null, 10, null).hits().size(),
+          "no old chunk vector may survive recovery preparation");
+      runtime.indexingCoordinator().updateDocument("good", Map.of(
+          SchemaFields.VECTOR, VEC, SchemaFields.EMBEDDING_STATUS, "COMPLETED"));
+      runtime.indexingCoordinator().updateDocument("bad",
+          io.justsearch.indexerworker.loop.ops.EmbeddingBackfillOps.computeEmbeddingFailureUpdate(
+              SchemaFields.EMBEDDING_MAX_RETRIES - 1));
+      runtime.commitOps().commitAndTrack(); runtime.commitOps().maybeRefreshBlocking();
+      var waiting = new EmbeddingProviderLifecycle(null, org.mockito.Mockito.mock(io.justsearch.indexerworker.queue.JobQueue.class),
+          runtime.indexCountOps(), runtime.commitOps());
+      waiting.setEmbeddingCompatController(ecc);
+      assertFalse(waiting.tryFinalizeRebuild());
+      assertFalse(waiting.tryFinalizeRebuild(), "completed parents cannot certify pending chunk vectors");
+      assertEquals(EmbeddingCompatibilityController.State.REBUILDING, ecc.state());
+      runtime.indexingCoordinator().updateDocument("chunk", Map.of(
+          SchemaFields.CHUNK_VECTOR, VEC, SchemaFields.CHUNK_EMBEDDING_STATUS, "COMPLETED"));
+      runtime.commitOps().commitAndTrack(); runtime.commitOps().maybeRefreshBlocking();
+      var lifecycle = new EmbeddingProviderLifecycle(null, org.mockito.Mockito.mock(io.justsearch.indexerworker.queue.JobQueue.class),
+          runtime.indexCountOps(), runtime.commitOps());
+      lifecycle.setEmbeddingCompatController(ecc);
+      assertTrue(lifecycle.tryFinalizeRebuildAtShutdown());
+      assertEquals(1, runtime.readPathOps().searchVector(VEC, 10).hits().size(),
+          "only the successfully re-embedded parent is searchable");
+      assertEquals("FAILED", runtime.documentFieldOps().getDocumentField("bad", SchemaFields.EMBEDDING_STATUS));
+    }
+    try (var reopened = openSparseRuntime(dir, metadata)) {
+      assertEquals(1, reopened.readPathOps().searchVector(VEC, 10).hits().size());
+      assertEquals(3, reopened.readPathOps().search(new org.apache.lucene.search.TermQuery(
+          new org.apache.lucene.index.Term(SchemaFields.SPLADE, "retained_sparse")), 10, java.util.Set.of(), null, null).hits().size());
+
+      assertEquals(1, reopened.chunkSearchOps().searchChunkVector(VEC, null, 10, null).hits().size());
+      try (var directory = org.apache.lucene.store.FSDirectory.open(dir);
+          var reader = org.apache.lucene.index.DirectoryReader.open(directory)) {
+        int doc = new org.apache.lucene.search.IndexSearcher(reader).search(
+            new org.apache.lucene.search.TermQuery(new org.apache.lucene.index.Term(SchemaFields.DOC_ID, "chunk")), 1).scoreDocs[0].doc;
+        var leaf = reader.leaves().get(org.apache.lucene.index.ReaderUtil.subIndex(doc, reader.leaves()));
+        var vectors = leaf.reader().getFloatVectorValues(SchemaFields.CHUNK_VECTOR);
+        var iterator = vectors.iterator();
+        assertEquals(doc - leaf.docBase, iterator.advance(doc - leaf.docBase));
+        assertTrue(vectors.vectorValue(iterator.index())[0] > 0, "replacement differs from the old axis-only vector");
+      }
+
+    }
+  }
+
+  @Test
   @DisplayName(
       "in-place backfill path: BLOCKED_LEGACY (no fingerprint) recovers to COMPATIBLE across restart"
           + " even with a job stuck in PROCESSING")
@@ -317,6 +407,20 @@ class InPlaceEmbeddingRebuildRecoveryTest extends io.justsearch.adapters.lucene.
     float[] v = new float[768];
     java.util.Arrays.fill(v, 0.05f);
     return v;
+  }
+
+  private io.justsearch.adapters.lucene.runtime.RunningRuntime openSparseRuntime(
+      Path dir, Supplier<CommitMetadataSource> metadata) {
+    var fields = new ArrayList<>(FieldCatalogDef.forChunkTesting(768).fields());
+    fields.add(new FieldCatalogDef.FieldDef(SchemaFields.SPLADE, "splade", false, false,
+        List.of(), null, null, false, "reset-status:splade_status"));
+    fields.add(new FieldCatalogDef.FieldDef(SchemaFields.SPLADE_STATUS, "keyword", false, true,
+        List.of("filter"), null, null, false));
+    fields.add(new FieldCatalogDef.FieldDef(SchemaFields.SPLADE_RETRY_COUNT, "long", false, true,
+        List.of(), null, null, false));
+    return io.justsearch.adapters.lucene.runtime.IndexSchema.fromCatalog(
+        new FieldCatalogDef("recovery", fields), metadata, PERMISSIVE)
+        .atPath(dir).withExecutorRegistrations(testLuceneExecutors()).withForegroundActive(() -> false).open();
   }
 
   private io.justsearch.adapters.lucene.runtime.RunningRuntime openRuntime(
