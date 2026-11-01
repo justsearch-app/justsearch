@@ -885,6 +885,18 @@ def _build_steps(ui_url: str, cooldown_ms: int, timeout_ms: int) -> list[Step]:
 
     # === Isolated steps (own browser each) ===
 
+    async def _library_appearance(page):
+        # The archived settings fixture opts into high contrast. These cameras compare the
+        # normal Library design; OS forced colors has its own explicit camera below.
+        if "high-contrast" not in (await page.locator("html").get_attribute("class") or ""):
+            return
+        await page.locator(S.rail_css(S.RAIL_SURFACE_SETTINGS)).click()
+        await page.get_by_text('Accessibility', exact=True).first.click()
+        await page.get_by_role("switch", name="High contrast", exact=True).click()
+        await page.wait_for_function("!document.documentElement.classList.contains('high-contrast')")
+        await page.keyboard.press("Escape")
+
+
     def _view_setup(view_name: str, theme: str = "dark"):
         async def setup(page):
             # tempdoc 840 Phase 5: a view step may drill INTO a surface (advanced mode, the component
@@ -937,6 +949,8 @@ def _build_steps(ui_url: str, cooldown_ms: int, timeout_ms: int) -> list[Step]:
                         )
                 if cooldown_ms > 0:
                     await asyncio.sleep(cooldown_ms / 1000)
+            if base == "library":
+                await _library_appearance(page)
             if view_name == "ai-brain-advanced":
                 await _set_detail_level_in_settings(page, "Detailed")
             if view_name in ("ai-brain-components", "ai-brain-consent"):
@@ -1112,6 +1126,8 @@ def _build_steps(ui_url: str, cooldown_ms: int, timeout_ms: int) -> list[Step]:
             }))
         await page.route("**/api/diagnostics/ingestion/summary*", summary)
         await _goto_surface(page, S.RAIL_SURFACE_LIBRARY)
+        await _library_appearance(page)
+        await page.locator("jf-ingestion-summary summary").click()
         panel = page.locator('[data-testid="ingestion-summary"]')
         await panel.get_by_text("16 recorded indexing outcomes.", exact=True).wait_for(timeout=15_000)
         for label in ("Content indexed", "File unchanged since its last index",
@@ -1121,13 +1137,23 @@ def _build_steps(ui_url: str, cooldown_ms: int, timeout_ms: int) -> list[Step]:
         await panel.scroll_into_view_if_needed()
 
     async def setup_library_gap_decision(page):
+        # The archived gap fixture predates freshness reporting. This camera needs a current
+        # observation to exercise the confirmed decision and its exact gap list.
+        async def current_status(route):
+            body = json.loads(ui_fixtures.fixture_body(route.request.url, variant="gap-decision"))
+            body["meta"]["workerRpcAtMs"] = int(time.time() * 1000)
+            body["worker"]["core"]["indexState"] = "IDLE"
+            await route.fulfill(status=200, content_type="application/json", body=json.dumps(body))
+        await page.route("**/api/status", current_status)
+        await page.reload(wait_until="domcontentloaded")
         await _goto_surface(page, S.RAIL_SURFACE_LIBRARY)
+        await _library_appearance(page)
         decision = page.locator(".gap-decision")
-        await decision.get_by_role("heading", name="New index — activation requires your decision").wait_for(
+        await decision.get_by_role("heading", name="The new index is ready, but 2 documents couldn't be included").wait_for(
             timeout=15_000)
-        await decision.get_by_text("notes/old-draft.txt: CANDIDATE_PROJECTION_MISSING").wait_for()
-        await decision.get_by_text("notes/deleted-draft.txt: DELETE_NOT_APPLIED").wait_for()
-        await decision.get_by_role("button", name="Accept gaps and activate").wait_for()
+        await decision.get_by_text("notes/old-draft.txt: The document was not added to the new index.").wait_for()
+        await decision.get_by_text("notes/deleted-draft.txt: The document could not be removed from the new index.").wait_for()
+        await decision.get_by_role("button", name="Use the new index without them").wait_for()
         await decision.scroll_into_view_if_needed()
 
     def _density_setup(density: str):
@@ -1347,18 +1373,26 @@ def _build_steps(ui_url: str, cooldown_ms: int, timeout_ms: int) -> list[Step]:
 
     _settings_setup = _view_setup("settings")
 
-    def setup_indexing_rules(surface="settings", narrow=False):
+    def setup_indexing_rules(narrow=False, focus_rules=True):
         async def setup(page):
             if narrow:
                 await page.set_viewport_size({"width": 600, "height": 400})
-            await _view_setup(surface)(page)
-            if surface == "settings":
-                await page.locator('[data-settings-category="indexing"]').click()
+            await _view_setup("library")(page)
+            if focus_rules:
+                # Clear transient overlays and hover tips before focusing the rules camera.
+                await page.mouse.move(300, 100)
+                await page.keyboard.press("Escape")
                 await page.locator('#indexing-hours').wait_for(state="visible")
                 await page.locator('#indexing-hours').focus()
             else:
-                await page.get_by_role("button", name="Change hours", exact=True).first.wait_for(state="visible")
+                await page.get_by_role("button", name="Change when to index", exact=True).first.wait_for(state="visible")
             await _settle_focus_marks(page)
+        return setup
+
+    def setup_library_size(width, height):
+        async def setup(page):
+            await page.set_viewport_size({"width": width, "height": height})
+            await _view_setup("library")(page)
         return setup
 
     async def setup_settings_forced_colors(page):
@@ -1536,14 +1570,16 @@ def _build_steps(ui_url: str, cooldown_ms: int, timeout_ms: int) -> list[Step]:
             await page.evaluate(
                 "(id) => { location.hash = `justsearch://surface/${id}`; }", S.RAIL_SURFACE_LIBRARY
             )
-        # BOTH rows, not just the first: a one-row wait would pass on a truncated list and the
-        # capture would silently be about a single arm. `.card-meta` (the meta LINE, which is what
-        # the tier is about) rather than a testid: the row is rendered by the DECLARED path
-        # (FolderCardRenderer, active by default via LIBRARY_CARDS_REGION) whose markup carries no
-        # testid — `library-folder-name` exists only on LibrarySurface's own quarantine fallback, so
-        # waiting on it would time out on the path that actually renders here. Both renderers project
-        # the same `folderStatus` meta text and both use this class.
-        await page.locator(".card-meta").nth(1).wait_for(state="visible", timeout=15_000)
+        await page.mouse.move(600, 120)
+        await page.keyboard.press("Escape")
+        # Confirm both per-folder verdicts, then open only the in-progress folder as in the
+        # agreed everyday design. Collapsed rows expose their status without duplicating details.
+        await _library_appearance(page)
+        await page.locator('.folder-state').nth(1).wait_for(state="visible", timeout=15_000)
+        await page.locator(S.CSS_LIBRARY_FOLDER_TOGGLE).first.click()
+        await page.locator('.folder-details').first.wait_for(state="visible", timeout=15_000)
+        await page.mouse.move(600, 120)
+        await page.keyboard.press("Escape")
         # The aggregate card (not the `jf-task-list` host, which exists whenever the shell is mounted
         # and self-hides via [data-empty]) — the same non-vacuity reasoning as `tasks-occlusion`.
         await page.locator('[data-testid="task-aggregate"]').first.wait_for(
@@ -2136,14 +2172,20 @@ def _build_steps(ui_url: str, cooldown_ms: int, timeout_ms: int) -> list[Step]:
              fixtures_variant="sv3-sources", forced_colors="active"),
         Step("sv3-palette-forced-colors", setup=setup_sv3_palette_forced_colors, isolated=True,
              forced_colors="active"),
-        *[Step(f"settings-indexing-{theme}", setup=setup_indexing_rules(), isolated=True,
+        *[Step(f"library-indexing-rules-{theme}", setup=setup_indexing_rules(), isolated=True,
                fixtures_variant="indexing-rules", color_scheme="light" if theme == "light" else "dark",
                forced_colors="active" if theme == "forced" else None)
           for theme in ("dark", "light", "forced")],
-        Step("settings-indexing-minimum", setup=setup_indexing_rules(narrow=True), isolated=True,
+        Step("library-indexing-rules-minimum", setup=setup_indexing_rules(narrow=True), isolated=True,
              fixtures_variant="indexing-rules"),
-        Step("library-indexing-held", setup=setup_indexing_rules("library"), isolated=True,
+        Step("library-indexing-held", setup=setup_indexing_rules(focus_rules=False), isolated=True,
              fixtures_variant="indexing-rules"),
+        Step("library-medium", setup=setup_library_size(760, 720), isolated=True,
+             fixtures_variant="enriching"),
+        Step("library-minimum", setup=setup_library_size(600, 400), isolated=True,
+             fixtures_variant="enriching"),
+        Step("library-forced-colors", setup=setup_library_size(1280, 720), isolated=True,
+             fixtures_variant="enriching", forced_colors="active"),
         Step("settings-forced-colors", setup=setup_settings_forced_colors, isolated=True,
              forced_colors="active"),
         *[Step(f"sv3-recents-{state}-{width}-{theme}",

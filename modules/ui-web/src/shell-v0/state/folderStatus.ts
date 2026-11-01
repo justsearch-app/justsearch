@@ -156,7 +156,7 @@ interface RootCoverage {
   readonly complete: boolean;
 }
 
-function rootCoverage(
+export function rootCoverage(
   row: IndexedRootView,
   stages: EnrichmentApplicability | null | undefined,
 ): RootCoverage | null {

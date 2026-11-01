@@ -80,7 +80,7 @@ function dom(tpl: TemplateResult): HTMLDivElement {
   return container;
 }
 function expectedReason(which: Case): string {
-  return which === 'energy' ? 'Idle enrichment deferred to save energy.'
+  return which === 'energy' ? 'Meaning search is waiting while the computer saves energy.'
     : which === 'game' ? 'GPU-bound idle enrichment deferred while a game is running.'
       : which === 'external GPU' ? 'GPU-bound idle enrichment deferred while another app is using the GPU.'
         : which === 'chat' ? 'Indexing shares time with chat.' : UNCONFIRMED;
@@ -155,7 +155,8 @@ describe('WP3.3 complete surface sweep', () => {
       el.host_ = { utilities: { formatRelativeTime: () => 'just now' } };
       const root = { pathHash: 'folder', status: 'indexed', walkCompleted: true, fileCount: 10,
         inFlightCount: 0, failedCount: 0 } as IndexedRootView;
-      const row = dom(el.renderCard(root));
+      Object.assign(el, { roots: [root] });
+      const row = dom(el.renderCardsRegion());
       if (unconfirmed(which)) {
         expect(row.textContent, which).toContain(UNCONFIRMED);
         expect(row.querySelector('.status-icon.indexed'), which).toBeNull();
@@ -250,7 +251,7 @@ describe('WP3.3 complete surface sweep', () => {
       const el = harness('jf-status-deck', state);
       el.aiState = { ...state, statusLabel: 'Indexing', aiEngine: { kind: 'indexing', stability: { kind: 'settled' }, installFailure: null } };
       expect(el.inferenceChipReadout().label, which).toBe(unconfirmed(which) ? UNCONFIRMED
-        : which === 'energy' ? 'Enrichment deferred' : which === 'chat' ? 'Search is ready — still improving' : 'Enrichment pending');
+        : which === 'energy' ? 'Meaning processing is waiting' : which === 'chat' ? 'Search is ready — still improving' : 'Meaning processing is waiting');
     }
   });
   it('S33.1 S33.4 Search composer and chat-off explanations use observed indexing activity and scoped reasons', () => {

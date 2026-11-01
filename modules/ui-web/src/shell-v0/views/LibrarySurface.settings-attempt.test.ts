@@ -129,7 +129,7 @@ describe('Library retained-base exclusions', () => {
     await library.loadExcludes();
     document.body.appendChild(library);
     await library.updateComplete;
-    expect(library.shadowRoot?.querySelector('textarea')?.value).toBe(patterns.join('\n'));
+    expect(Array.from(library.shadowRoot?.querySelectorAll<HTMLInputElement>('.skip-rule input') ?? [], field => field.value)).toEqual(patterns);
     const warnings = library.shadowRoot?.querySelectorAll('[role="status"] li');
     expect(Array.from(warnings ?? [], (node) => node.textContent)).toEqual([
       '“[legacy” has invalid pattern syntax and is matched as a literal name. Correct or remove it.',
@@ -279,17 +279,17 @@ describe('Library retained-base exclusions', () => {
     await library.handleSaveExcludes();
     document.body.appendChild(library);
     await library.updateComplete;
-    const textarea = library.shadowRoot?.querySelector('textarea');
+    const textarea = library.shadowRoot?.querySelector<HTMLInputElement>('.skip-rule input');
     expect(textarea?.disabled).toBe(true);
     expect(textarea?.value).toBe('my unsaved draft');
     expect((library.shadowRoot?.querySelector('jf-button[label="Apply"]') as HTMLElement & { disabled: boolean }).disabled).toBe(true);
     expect((library.shadowRoot?.querySelector('jf-button[label="Reload saved patterns"]') as HTMLElement & { disabled: boolean }).disabled).toBe(false);
-    expect(send.mock.calls.filter(([path]) => path === '/api/settings/v2')).toHaveLength(2);
+    expect(send.mock.calls.filter(([path, init]) => path === '/api/settings/v2' && init?.signal)).toHaveLength(2);
     library.remove();
     document.body.appendChild(library);
     await library.updateComplete;
     expect(library.excludesText).toBe('my unsaved draft');
-    expect(send.mock.calls.filter(([path]) => path === '/api/settings/v2')).toHaveLength(2);
+    expect(send.mock.calls.filter(([path, init]) => path === '/api/settings/v2' && init?.signal)).toHaveLength(2);
   });
 
   it('unblocks reload after a stalled GET and ignores its late result after a newer observation', async () => {

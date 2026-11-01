@@ -11,6 +11,8 @@ it('exposes removal progress and blocks all actions only on the affected card', 
     { pathHash: 'b', displayPath: '/other', metaText: 'No indexable files' }];
   const remove = vi.fn(); el.addEventListener('jf-folder-card-remove', remove);
   document.body.append(el); await el.updateComplete;
+  for (const toggle of el.shadowRoot!.querySelectorAll<HTMLButtonElement>('.folder-toggle')) toggle.click();
+  await el.updateComplete;
   const cards = el.shadowRoot!.querySelectorAll('.card');
   expect(cards[0]!.getAttribute('aria-busy')).toBe('true');
   const controls = cards[0]!.querySelectorAll<HTMLElement & { disabled: boolean; onActivate: () => void }>('jf-button');

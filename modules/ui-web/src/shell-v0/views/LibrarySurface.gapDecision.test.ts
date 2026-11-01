@@ -74,9 +74,9 @@ describe('Library recorded migration gap decision', () => {
     document.body.appendChild(el);
     await pump(el);
 
-    expect(el.shadowRoot?.textContent).toContain('document-7: PARSER_FAILED');
+    expect(el.shadowRoot?.textContent).toContain('document-7: The file could not be read by its parser.');
     const buttons = Array.from(el.shadowRoot?.querySelectorAll('jf-button') ?? []);
-    const accept = buttons.find((button) => button.getAttribute('label') === 'Accept gaps and activate') as (Element & { onActivate?: () => void }) | undefined;
+    const accept = buttons.find((button) => button.getAttribute('label') === 'Use the new index without them') as (Element & { onActivate?: () => void }) | undefined;
     expect(accept).toBeDefined();
     accept?.onActivate?.();
     await pump(el);
@@ -84,7 +84,7 @@ describe('Library recorded migration gap decision', () => {
     expect(invoke).toHaveBeenCalledTimes(1);
     expect(invoke).toHaveBeenCalledWith('core.accept-gaps',
       { reindexKey: key, gapListHash: hash }, { consented: true });
-    expect(el.shadowRoot?.textContent).not.toContain('document-7: PARSER_FAILED');
+    expect(el.shadowRoot?.textContent).not.toContain('document-7: The file could not be read by its parser.');
     el.remove();
   });
 
@@ -140,10 +140,10 @@ describe('Library recorded migration gap decision', () => {
     finishNext(outcome('current-gap'));
     await pump(el);
     expect(el.gapDecision?.reindexKey).toBe(nextKey);
-    expect(el.shadowRoot?.textContent).toContain('current-gap: PARSER_FAILED');
+    expect(el.shadowRoot?.textContent).toContain('current-gap: The file could not be read by its parser.');
     expect(el.shadowRoot?.textContent).not.toContain('obsolete-gap');
     expect(Array.from(el.shadowRoot?.querySelectorAll('jf-button') ?? [])
-      .some((button) => button.getAttribute('label') === 'Accept gaps and activate')).toBe(true);
+      .some((button) => button.getAttribute('label') === 'Use the new index without them')).toBe(true);
     el.remove();
   });
 
@@ -166,7 +166,7 @@ describe('Library recorded migration gap decision', () => {
     await pump(el);
 
     const accept = Array.from(el.shadowRoot?.querySelectorAll('jf-button') ?? [])
-      .find((button) => button.getAttribute('label') === 'Accept gaps and activate') as (Element & { onActivate?: () => void }) | undefined;
+      .find((button) => button.getAttribute('label') === 'Use the new index without them') as (Element & { onActivate?: () => void }) | undefined;
     expect(accept).toBeDefined();
     accept?.onActivate?.();
     await pump(el);

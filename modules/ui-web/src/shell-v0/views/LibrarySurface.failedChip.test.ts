@@ -95,7 +95,7 @@ describe("LibrarySurface — the failed chip on the surface's own card (914 D3)"
       // WCAG 2.5.3: the accessible name contains the visible text.
       expect((chip.getAttribute('label') ?? '').startsWith('2 failed · last known')).toBe(true);
       // The row's own state line stays truthful about what the queue is doing.
-      const meta = el.shadowRoot?.querySelector('.card-meta')?.textContent ?? '';
+      const meta = el.shadowRoot?.querySelector('.folder-state')?.textContent ?? '';
       expect(meta).toContain('Rebuilding');
     } finally {
       el.remove();

@@ -266,8 +266,8 @@ it.each(['cancel', 'accept-gaps'] as const)('Library %s keeps an immediate decis
   gapDecision = action === 'accept-gaps'; feed(gapDecision ? 'AWAITING_ACCEPTANCE' : 'MIGRATING');
   const el = document.createElement('jf-library-surface') as LibrarySurface;
   el.apiBase = base; el.host_ = host(); document.body.append(el);
-  await vi.waitFor(() => expect(el.shadowRoot!.querySelector(`jf-button[label="${gapDecision ? 'Accept gaps and activate' : 'Cancel rebuild'}"]`)).not.toBeNull());
-  const button = el.shadowRoot!.querySelector(`jf-button[label="${gapDecision ? 'Accept gaps and activate' : 'Cancel rebuild'}"]`) as JfButton;
+  await vi.waitFor(() => expect(el.shadowRoot!.querySelector(`jf-button[label="${gapDecision ? 'Use the new index without them' : 'Cancel rebuild'}"]`)).not.toBeNull());
+  const button = el.shadowRoot!.querySelector(`jf-button[label="${gapDecision ? 'Use the new index without them' : 'Cancel rebuild'}"]`) as JfButton;
   await clickButton(button);
   await vi.waitFor(() => expect(invocations).toBe(1));
   await vi.waitFor(() => expect(gapDecision ? el.gapDecisionBusy : el.reindexCancelBusy).toBe(false));

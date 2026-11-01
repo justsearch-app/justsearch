@@ -67,7 +67,7 @@ describe('WP3.3 sixth verifier regressions', () => {
       expect(text.includes('your watched folders will reappear when it finishes'), `${migration}: ${which}`).toBe(which === 'fresh');
       expect(text).not.toContain('No watched folders');
     }
-    expect(dom(library(observe('fresh')).render()).querySelector('.empty')!.textContent).toContain('No watched folders');
+    expect(dom(library(observe('fresh')).render()).querySelector('h2')!.textContent).toBe('Add a folder to start searching');
   });
 
   it('S33.4 Library rebuild controls qualify retained build and activation observations', () => {
@@ -77,6 +77,8 @@ describe('WP3.3 sixth verifier regressions', () => {
       Object.assign(el, { reindexCancelKey: 'g2', observedGapKey: migration === 'AWAITING_ACCEPTANCE' ? 'g2' : null,
         gapDecision: migration === 'AWAITING_ACCEPTANCE' ? { gaps: [{ unitId: 'a.pdf', reason: 'unreadable' }] } : null });
       const control = dom(el.render()).querySelector('.gap-decision')!;
+      const title = control.querySelector('h3')!.textContent!;
+      expect(title.includes(UNKNOWN), `${migration}: ${which}: headline`).toBe(which !== 'fresh');
       expect(control.textContent!.includes(UNKNOWN), `${migration}: ${which}`).toBe(which !== 'fresh');
       if (which !== 'fresh') {
         expect(control.textContent).not.toContain('New index is being built');

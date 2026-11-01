@@ -1541,76 +1541,72 @@
       ]
     },
     {
-      "uiShotStep": "settings-indexing-dark",
+      "$comment": "indexing rules moved from Settings to Library (Library redesign L8)",
+      "uiShotStep": "library-indexing-rules-dark",
       "requiredSelectors": [
-        "[data-testid=\"settings-indexing\"] input[type=\"time\"]",
-        "[data-testid=\"settings-indexing\"] #indexing-hours"
+        "form[aria-label=\"Indexing rules\"] input[type=\"time\"]",
+        "#indexing-hours"
       ],
       "elements": [
         {
-          "selector": "dialog[aria-label=\"Settings\"][open]",
-          "minWidthPx": 540,
-          "maxWidthPx": 1200,
-          "maxHeightPx": 614
+          "selector": "form[aria-label=\"Indexing rules\"] input[type=\"time\"]",
+          "maxHeightPx": 28
         }
       ]
     },
     {
-      "uiShotStep": "settings-indexing-light",
+      "$comment": "indexing rules moved from Settings to Library (Library redesign L8)",
+      "uiShotStep": "library-indexing-rules-light",
       "requiredSelectors": [
-        "[data-testid=\"settings-indexing\"] input[type=\"time\"]",
-        "[data-testid=\"settings-indexing\"] #indexing-hours"
+        "form[aria-label=\"Indexing rules\"] input[type=\"time\"]",
+        "#indexing-hours"
       ],
       "elements": [
         {
-          "selector": "dialog[aria-label=\"Settings\"][open]",
-          "minWidthPx": 540,
-          "maxWidthPx": 1200,
-          "maxHeightPx": 614
+          "selector": "form[aria-label=\"Indexing rules\"] input[type=\"time\"]",
+          "maxHeightPx": 28
         }
       ]
     },
     {
-      "uiShotStep": "settings-indexing-forced",
+      "$comment": "indexing rules moved from Settings to Library (Library redesign L8)",
+      "uiShotStep": "library-indexing-rules-forced",
       "requiredSelectors": [
-        "[data-testid=\"settings-indexing\"] input[type=\"time\"]",
-        "[data-testid=\"settings-indexing\"] #indexing-hours"
+        "form[aria-label=\"Indexing rules\"] input[type=\"time\"]",
+        "#indexing-hours"
       ],
       "elements": [
         {
-          "selector": "dialog[aria-label=\"Settings\"][open]",
-          "minWidthPx": 540,
-          "maxWidthPx": 1200,
-          "maxHeightPx": 614
+          "selector": "form[aria-label=\"Indexing rules\"] input[type=\"time\"]",
+          "maxHeightPx": 28
         }
       ]
     },
     {
-      "uiShotStep": "settings-indexing-minimum",
+      "$comment": "indexing rules moved from Settings to Library (Library redesign L8)",
+      "uiShotStep": "library-indexing-rules-minimum",
       "requiredSelectors": [
-        "[data-testid=\"settings-indexing\"] input[type=\"time\"]",
-        "[data-testid=\"settings-indexing\"] #indexing-hours"
+        "form[aria-label=\"Indexing rules\"] input[type=\"time\"]",
+        "#indexing-hours"
       ],
       "elements": [
         {
-          "selector": "dialog[aria-label=\"Settings\"][open]",
-          "minWidthPx": 540,
-          "maxWidthPx": 1200,
-          "maxHeightPx": 342
+          "selector": "form[aria-label=\"Indexing rules\"] input[type=\"time\"]",
+          "maxHeightPx": 28
         }
       ]
     },
     {
       "uiShotStep": "library-indexing-held",
       "requiredSelectors": [
-        "[data-testid=\"library-indexing-pause\"] jf-indexing-controls"
+        "jf-indexing-controls[data-testid=\"library-indexing-pause\"]"
       ],
       "forbiddenVisibleText": [
         "Work is waiting for Resume."
       ],
       "elements": [
         {
-          "selector": "[data-testid=\"library-indexing-pause\"] jf-indexing-controls",
+          "selector": "jf-indexing-controls[data-testid=\"library-indexing-pause\"]",
           "maxHeightPx": 28
         }
       ]

@@ -86,7 +86,7 @@ it('S32.2 Save is explicit and unsaved drafts disable Preview and Apply', async 
     expect((root.querySelector(`jf-button[label="${label}"]`) as HTMLElement & { disabled: boolean }).disabled).toBe(true);
   }
   await el.handlePreviewExcludes(); await el.handleApplyExcludes();
-  expect(send.mock.calls.filter(([path]) => path === '/api/settings/v2')).toHaveLength(1);
+  expect(send.mock.calls.filter(([path, init]) => path === '/api/settings/v2' && init?.signal)).toHaveLength(1);
   expect(invoke).not.toHaveBeenCalled();
 });
 
@@ -137,7 +137,7 @@ it('S32.6 invalid saves keep the draft editable with an inline announced error',
   expect(el.handleSaveExcludes).toBeTypeOf('function');
   await el.handleSaveExcludes?.();
   document.body.appendChild(el); await el.updateComplete;
-  const field = el.shadowRoot?.querySelector('textarea');
+  const field = el.shadowRoot?.querySelector<HTMLInputElement>('.skip-rule input');
   expect(field?.value).toBe('[broken'); expect(field?.disabled).toBe(false);
   expect(field?.getAttribute('aria-invalid')).toBe('true');
   expect(el.shadowRoot?.querySelector('#excludes-error[role="alert"]')?.textContent).toContain('Invalid settings request');
@@ -157,7 +157,7 @@ it('S32.5 keeps the conflicting draft while reviewing latest settings before a f
   review.onActivate?.();
   for (let i = 0; i < 12; i++) { await Promise.resolve(); await el.updateComplete; }
   expect(el.excludesText).toBe('my draft');
-  expect(el.shadowRoot?.querySelector('details')?.textContent).toContain('elsewhere');
+  expect(el.shadowRoot?.querySelector('.excludes-section details.saved-patterns')?.textContent).toContain('elsewhere');
   send.mockImplementationOnce(async (_, init) => {
     const attempt = JSON.parse(String(init?.body));
     return json({ state: 'COMPLETE', operationKey: attempt.operationKey,

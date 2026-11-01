@@ -71,6 +71,10 @@ function toRow(raw: FailedRow): FailedRow {
 
 export class FailedJobsDrawer extends JfElement {
   static properties = {
+    inline: { type: Boolean, reflect: true },
+    folderPathHash: { type: String, attribute: 'folder-path-hash' },
+    observedCount: { type: Number },
+    lastKnown: { type: Boolean },
     open: { type: Boolean, reflect: true },
     apiBase: { attribute: 'api-base', type: String },
     host_: { attribute: false },
@@ -80,6 +84,10 @@ export class FailedJobsDrawer extends JfElement {
     resolved: { state: true },
   };
 
+  declare inline: boolean;
+  declare folderPathHash: string;
+  declare observedCount: number;
+  declare lastKnown: boolean;
   declare open: boolean;
   declare apiBase: string;
   declare host_: PluginHostApi | undefined;
@@ -89,6 +97,9 @@ export class FailedJobsDrawer extends JfElement {
   /** pathHash → resolved display path (lazy). */
   declare resolved: Record<string, string>;
 
+  private targetFolder: string | null = null;
+  private requestSerial = 0;
+  private retrying = false;
   private unsub: (() => void) | null = null;
 
   // 574 §23.B — single-open arbitration by construction; the panel reflects the failedJobsDrawer store.
@@ -100,6 +111,10 @@ export class FailedJobsDrawer extends JfElement {
 
   constructor() {
     super();
+    this.inline = false;
+    this.folderPathHash = '';
+    this.observedCount = 0;
+    this.lastKnown = false;
     this.open = isFailedJobsOpen();
     this.apiBase = '';
     this.rows = [];
@@ -110,22 +125,48 @@ export class FailedJobsDrawer extends JfElement {
 
   override connectedCallback(): void {
     super.connectedCallback();
-    this.unsub = subscribeFailedJobs(() => {
-      const next = isFailedJobsOpen();
-      const opening = next && !this.open;
-      this.open = next;
-      if (opening) void this.refresh();
-      this.requestUpdate();
-    });
+    if (!this.inline) {
+      this.unsub = subscribeFailedJobs(() => this.syncTarget());
+      this.syncTarget();
+    }
+  }
+
+  private syncTarget(): void {
+    const next = isFailedJobsOpen();
+    const folder = next ? failedJobsFolderPathHash() : null;
+    const changed = folder !== this.targetFolder || next && !this.open;
+    this.open = next;
+    if (changed || !next) {
+      this.requestSerial++;
+      this.targetFolder = folder;
+      this.rows = [];
+      this.resolved = {};
+      this.error = null;
+      this.loading = false;
+      this.retrying = false;
+      if (next) void this.refresh();
+    }
+    this.requestUpdate();
   }
 
   override disconnectedCallback(): void {
     super.disconnectedCallback();
     this.unsub?.();
     this.unsub = null;
+    this.requestSerial++;
+    this.targetFolder = null;
   }
 
   override updated(changed: Map<string, unknown>): void {
+    if (this.inline) {
+      this.open = true;
+      if (changed.has('folderPathHash') || changed.has('observedCount') && !this.lastKnown) {
+        if (this.targetFolder !== this.folderPathHash) { this.rows = []; this.resolved = {}; }
+        this.targetFolder = this.folderPathHash;
+        void this.refresh();
+      }
+      return;
+    }
     if (changed.has('open')) {
       if (this.open) this.transient.open();
       else this.transient.close();
@@ -133,8 +174,10 @@ export class FailedJobsDrawer extends JfElement {
   }
 
   private async refresh(): Promise<void> {
-    const folder = failedJobsFolderPathHash();
+    const folder = this.targetFolder;
     if (!folder) return;
+    const serial = ++this.requestSerial;
+    const current = () => this.isConnected && this.open && serial === this.requestSerial && folder === this.targetFolder;
     this.loading = true;
     this.error = null;
     try {
@@ -147,6 +190,7 @@ export class FailedJobsDrawer extends JfElement {
         await res.json(),
         'GET /api/indexing-jobs/failed/by-prefix',
       );
+      if (!current()) return;
       // PROD-POSTURE DEFENCE. `parseWireContract` throws in dev but RETURNS THE RAW BODY in prod
       // (api/schemas.ts) — its own doc says it degrades "so the downstream mapper is defensive".
       // That mapper is this line: without it, a drifted row reaches render, and `r.state.toUpperCase()`
@@ -154,19 +198,21 @@ export class FailedJobsDrawer extends JfElement {
       // would never be set and the drawer would freeze rather than degrade. Normalizing at the ONE
       // parse site (not at each render site) also covers `retryAll` and `onRowActionSuccess`, which
       // key on `pathHash`. Mirrors api/domains/indexing.ts's defensive `(parsed.jobs ?? [])`.
-      this.rows = (Array.isArray(parsed?.jobs) ? parsed.jobs : []).map(toRow);
+      const rows = (Array.isArray(parsed?.jobs) ? parsed.jobs : []).map(toRow);
+      if (!this.inline || rows.length > 0 || !this.rows.length) this.rows = rows;
       // Lazy-resolve hashes → display paths (best-effort; deleted files resolve to null → show hash).
       for (const r of this.rows) {
         if (r.pathHash && !this.resolved[r.pathHash]) {
           void resolvePathLazy(RESOURCE_ID, r.pathHash, { apiBase: this.apiBase }).then((path) => {
-            if (path) this.resolved = { ...this.resolved, [r.pathHash]: path };
+            if (path && current()) this.resolved = { ...this.resolved, [r.pathHash]: path };
           });
         }
       }
     } catch (err) {
+      if (!current()) return;
       this.error = err instanceof Error ? err.message : String(err);
     } finally {
-      this.loading = false;
+      if (current()) this.loading = false;
     }
   }
 
@@ -182,27 +228,39 @@ export class FailedJobsDrawer extends JfElement {
    */
   private onRowActionSuccess(e: Event): void {
     const key = (e as CustomEvent<{ rowKey?: string }>).detail?.rowKey;
-    if (key) this.rows = this.rows.filter((r) => r.pathHash !== key);
+    if (key && !this.inline) this.rows = this.rows.filter((r) => r.pathHash !== key);
   }
 
   /** Header bulk action: invoke the existing retry Operation for each listed file, dropping each on
    * success (the "Retry all" analogue of the Advisories drawer's "Mark all read"). */
   private async retryAll(): Promise<void> {
+    if (this.retrying || this.loading) return;
+    this.retrying = true;
+    this.requestUpdate();
+    const serial = this.requestSerial;
     const client = getOperationClient(this.apiBase || '');
     for (const r of [...this.rows]) {
+      if (serial !== this.requestSerial || !this.open) break;
       try {
         await client.invoke(RETRY_OP, { args: { pathHash: r.pathHash } });
-        this.rows = this.rows.filter((x) => x.pathHash !== r.pathHash);
+        if (serial !== this.requestSerial || !this.open) break;
+        if (!this.inline) this.rows = this.rows.filter((x) => x.pathHash !== r.pathHash);
       } catch {
         // Leave the failed row; its error stays visible. (Surfacing a toast is the message channel's job.)
       }
     }
+    if (serial === this.requestSerial) { this.retrying = false; this.requestUpdate(); }
   }
 
   static styles = css`
-    :host(:not([open])) {
+    :host(:not([inline]):not([open])) {
       display: none;
     }
+    :host([inline]) { display: block; margin: .5rem 0 0 1.7rem; }
+    :host([inline]) .row { padding: .4rem 0; border: 0; }
+    :host([inline]) .row-path { font-size: 13px; }
+    :host([inline]) .row-error { color: var(--text-secondary); }
+    :host([inline]) .loading, :host([inline]) .empty { padding: .5rem 0; text-align: start; }
     .panel {
       position: relative;
       height: 100%;
@@ -305,6 +363,12 @@ export class FailedJobsDrawer extends JfElement {
   `;
 
   override render(): TemplateResult {
+    if (this.inline) return html`<div aria-label="Files needing review" @row-action-success=${(e: Event) => this.onRowActionSuccess(e)}>
+      ${this.lastKnown ? html`<p>Last-known failures; retries are in progress.</p>` : nothing}
+      ${this.renderBody()}
+      ${this.rows.length ? html`<jf-button variant="ghost" label="Try again" .disabled=${this.loading || this.retrying}
+        .onActivate=${() => this.retryAll()}>${icon({ name: 'refresh-cw', size: 14 })} Try again</jf-button>` : nothing}
+    </div>`;
     if (!this.open) return html``;
     return html`
       <div class="panel" role="dialog" aria-label="Failed files">

@@ -87,6 +87,7 @@ CSS_TOAST = '.toast'
 # on exactly the states this step exists to distinguish itself from. "Loading" appears once in
 # the whole surface.
 CSS_LIBRARY_SURFACE_HOST = 'jf-library-surface'
+CSS_LIBRARY_FOLDER_TOGGLE = '.folder-toggle'
 TEXT_LIBRARY_LOADING = 'Loading'
 # Content witnesses run immediately before each Search screenshot AND axe measurement.
 # Presence of Shell or the rail alone cannot establish any of these states.

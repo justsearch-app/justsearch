@@ -563,3 +563,43 @@ describe('FailedJobsDrawer — PROD posture (drift degrades, it does not freeze 
     }
   });
 });
+
+// L13: replacing a visible target must replace both evidence and retry identities.
+it('switches an open drawer from A to B and ignores A arriving late', async () => {
+  let answerA!: (response: Response) => void;
+  const oldFetch = globalThis.fetch;
+  globalThis.fetch = vi.fn(async (url: unknown) => {
+    const path = String(url);
+    if (path.includes('by-prefix?pathHash=A')) return new Promise<Response>(resolve => { answerA = resolve; });
+    if (path.includes('by-prefix?pathHash=B')) return new Response(byPrefixBody([job({ pathHash: 'B-file', errorMessage: 'B reason' })]));
+    return new Response('{}');
+  }) as typeof fetch;
+  const el = document.createElement('jf-failed-jobs-drawer') as FailedJobsDrawer;
+  try {
+    document.body.append(el); await pump(el);
+    openFailedJobs('A'); await pump(el);
+    openFailedJobs('B'); await pump(el);
+    expect(el.rows.map(row => row.pathHash)).toEqual(['B-file']);
+    expect(el.shadowRoot?.textContent).toContain('B reason');
+    expect(el.shadowRoot?.querySelector('jf-row-actions')?.getAttribute('row-key')).toBe('B-file');
+    answerA(new Response(byPrefixBody([job({ pathHash: 'A-file', errorMessage: 'obsolete A' })])));
+    await pump(el);
+    expect(el.rows.map(row => row.pathHash)).toEqual(['B-file']);
+    expect(el.shadowRoot?.textContent).not.toContain('obsolete A');
+    closeFailedJobs(); openFailedJobs('B'); await pump(el);
+    expect(el.rows.map(row => row.pathHash)).toEqual(['B-file']);
+  } finally { el.remove(); globalThis.fetch = oldFetch; }
+});
+
+it('loads the current target after a drawer is remounted while its store is open', async () => {
+  const oldFetch = globalThis.fetch;
+  globalThis.fetch = vi.fn(async () => new Response(byPrefixBody([job({ pathHash: 'current-file' })]))) as typeof fetch;
+  openFailedJobs('current');
+  const el = document.createElement('jf-failed-jobs-drawer') as FailedJobsDrawer;
+  try {
+    document.body.append(el); await pump(el);
+    expect(el.rows.map(row => row.pathHash)).toEqual(['current-file']);
+    el.remove(); document.body.append(el); await pump(el);
+    expect(el.rows.map(row => row.pathHash)).toEqual(['current-file']);
+  } finally { el.remove(); globalThis.fetch = oldFetch; }
+});

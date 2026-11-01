@@ -811,7 +811,7 @@ describe('HealthSurface — Queue card status vocabulary (630 D1)', () => {
     try {
       const subs = queueSubs(el);
       expect(subs.some((s) => s.includes('Text indexing continues'))).toBe(true);
-      expect(subs.some((s) => s.includes('Idle enrichment deferred to save energy.'))).toBe(true);
+      expect(subs.some((s) => s.includes('Meaning search is waiting while the computer saves energy.'))).toBe(true);
       expect(subs).not.toContain('Paused — saving energy');
       expect(subs).not.toContain('Indexing');
     } finally {
