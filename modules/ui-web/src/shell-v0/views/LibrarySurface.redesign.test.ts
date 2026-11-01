@@ -171,17 +171,24 @@ it('A2 expanded facts replace the old metadata line', async () => {
   expect(details.querySelector('.card-meta')).toBeNull();
 });
 
-it('A3 A5 unconfirmed status and automatic waits are stated once in the page heading and summary', async () => {
+it('A3 unconfirmed status is stated once through the real projection', async () => {
   observe(20); const { el } = await mount();
-  Object.assign(el, { headlineStatusLive: false, indexingActivity: { confirmed: false, summary: 'Indexing status unconfirmed', detail: null } });
+  __feedForTest({ status: { meta: { workerRpcStale: true }, worker: { core: { indexedDocuments: 20, indexState: 'IDLE' } } } as unknown as StatusSnapshot });
   await settle(el);
   expect(el.shadowRoot!.querySelector('h2')!.textContent).toContain('unconfirmed');
   expect(el.shadowRoot!.querySelector('.subtitle')!.textContent).not.toContain('Indexing status unconfirmed');
-  Object.assign(el, { indexingActivity: { confirmed: true, summary: 'Meaning processing is waiting',
-    detail: 'Meaning search is waiting while the computer saves energy.', enrichmentDeferred: true } });
+});
+
+it.each(['energy_saver', 'gpu_busy_external'])('A5 %s waits are stated once through the real projection', async reason => {
+  observe(20); const { el } = await mount();
+  __feedForTest({ status: { operating: { indexing: { reasons: [reason] } },
+    worker: { core: { indexedDocuments: 20, indexState: 'IDLE', indexHealthy: true },
+      enrichment: { embeddingEnabled: true, embeddingPendingCount: 2 } } } as unknown as StatusSnapshot });
   await settle(el);
-  expect(el.shadowRoot!.querySelector('.subtitle')!.textContent).toContain('Meaning search is waiting while the computer saves energy.');
-  expect(el.shadowRoot!.querySelector('.subtitle')!.textContent).not.toContain('Meaning processing is waiting');
+  const summary = el.shadowRoot!.querySelector('.subtitle')!.textContent!;
+  expect(summary).toContain(reason === 'energy_saver' ? 'Meaning search is waiting while the computer saves energy.'
+    : 'GPU-bound idle enrichment deferred while another app is using the GPU.');
+  expect(summary).not.toContain('Meaning processing is waiting');
 });
 
 it.each(['fallback', 'themed'])('V1 %s disclosure retains focus on toggle and live refresh', async mode => {
@@ -207,20 +214,48 @@ it.each(['fallback', 'themed'])('V1 %s disclosure retains focus on toggle and li
   expect(find(el.shadowRoot!)!.getAttribute('aria-expanded')).toBe('false');
 });
 
-it('D keeps the last confirmed headline during transient stale samples, expires at the shared liveness threshold', async () => {
+it('D1 keeps attention and retried files through 25 alternating unconfirmed polls and clears on a settled observation', async () => {
   observe(20); const { el } = await mount();
+  el.roots = [{ ...root('a'), failedCount: 1 }];
   const receivedAt = Date.now();
-  const headline = el.shadowRoot!.querySelector('h2')!.textContent;
   const now = vi.spyOn(Date, 'now');
   for (let second = 0; second < 25; second++) {
     now.mockReturnValue(receivedAt + second * 1000);
-    __feedForTest({ status: { meta: { workerRpcAtMs: receivedAt },
-      operating: { freshness: { staleAfterMs: 30000, staleSources: second % 2 ? ['indexing'] : [] } },
-      worker: { core: { indexedDocuments: 20, indexState: 'IDLE', indexHealthy: true } }
+    __feedForTest({ status: { meta: { workerRpcAtMs: receivedAt, workerRpcStale: second % 2 === 1 },
+      operating: { indexing: { state: 'PAUSED', reasons: ['user_paused'] } },
+      worker: { core: { indexedDocuments: 20, indexState: 'WAITING', pendingJobs: 1, indexHealthy: true } }
     } as unknown as StatusSnapshot });
+    if (second === 1) {
+      Object.assign(el, { lastKnownFailed: { a: 1 } });
+      el.roots = [{ ...root('a'), inFlightCount: 1 }];
+    }
     await settle(el);
-    expect(el.shadowRoot!.querySelector('h2')!.textContent).toBe(headline);
+    expect(el.shadowRoot!.querySelector('h2')!.textContent).toBe('2 things need your attention');
+    expect(el.shadowRoot!.querySelector('.attention')!.textContent).toContain('Indexing paused');
+    expect(el.shadowRoot!.querySelector('jf-failed-jobs-drawer[inline]')).not.toBeNull();
+    if (second % 2) expect(el.shadowRoot!.querySelector('.attention')!.textContent).toContain('last known');
   }
   now.mockReturnValue(receivedAt + 31000); __tickClockForTest(); await settle(el);
   expect(el.shadowRoot!.querySelector('h2')!.textContent).toBe('Indexing status unconfirmed');
+  expect(el.shadowRoot!.querySelector('.attention')!.textContent).toContain('Indexing paused');
+  observe(20); el.roots = [root('a')]; await settle(el);
+  expect(el.shadowRoot!.querySelector('.attention-item')).toBeNull();
+  expect(el.shadowRoot!.querySelector('h2')!.textContent).toBe('Your files are searchable');
+});
+
+it('D1 never claims searchable during unconfirmed polls, including 42 seconds past the shared threshold', async () => {
+  observe(20); const { el } = await mount();
+  expect(el.shadowRoot!.querySelector('h2')!.textContent).toBe('Your files are searchable');
+  const receivedAt = Date.now();
+  const now = vi.spyOn(Date, 'now');
+  for (let second = 1; second <= 42; second++) {
+    now.mockReturnValue(receivedAt + second * 1000);
+    __feedForTest({ status: { meta: { workerRpcAtMs: receivedAt, workerRpcStale: true },
+      worker: { core: { indexedDocuments: 20, indexState: 'IDLE', indexHealthy: true } }
+    } as unknown as StatusSnapshot });
+    await settle(el);
+    expect(el.shadowRoot!.querySelector('h2')!.textContent).toBe('Indexing status unconfirmed');
+  }
+  observe(20); await settle(el);
+  expect(el.shadowRoot!.querySelector('h2')!.textContent).toBe('Your files are searchable');
 });

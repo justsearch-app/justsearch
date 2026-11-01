@@ -37,16 +37,17 @@ Test ledger (all entries are durable product checks):
 - Tests added or rewritten: modules/ui-web/src/shell-v0/views/LibrarySurface.failedChip.test.ts — L16 — last-known failure state selector — durable
 - Tests added or rewritten: modules/ui-web/src/shell-v0/views/LibrarySurface.folderActions.test.ts — L12, P1, P2 — pending Add across member tabs — durable
 - Tests added or rewritten: modules/ui-web/src/shell-v0/views/LibrarySurface.gapDecision.test.ts — P6 — readable gap reasons and accept label — durable
-- Tests added or rewritten: modules/ui-web/src/shell-v0/views/LibrarySurface.redesign.test.ts — L2, L5, L20, D, V1 — headline stability, disclosure focus and shared row parity — durable
+- Tests added or rewritten: modules/ui-web/src/shell-v0/views/LibrarySurface.redesign.test.ts — L2, L5, L16, L20, D1, V1 — headline honesty and stability, disclosure focus and shared row parity — durable
 - Tests added or rewritten: modules/ui-web/src/shell-v0/views/LibrarySurface.render.test.ts — L2, L4, L5, L10 — moved heading and row facts — durable
 - Tests added or rewritten: modules/ui-web/src/shell-v0/views/LibrarySurface.settings-attempt.test.ts — L7 — retained-base settings transport and line inputs — durable
+- Tests added or rewritten: modules/ui-web/src/shell-v0/components/IndexingRulesEditor.arrival.test.ts — L14 — delayed load, layout settling and user focus — durable
 - Tests added or rewritten: modules/ui-web/src/shell-v0/views/LibrarySurface.slice2.test.ts — L12, L14, L19, B, V3 — focus requests, witnessed saves, external conflicts — durable
 - Tests added or rewritten: modules/ui-web/src/shell-v0/views/SettingsSurface.indexingRules.test.ts — L8, L14, L15 — moved editor and remedies — durable
 
 Execution evidence was produced by the repository's unmodified run-evidence.mjs in a shared clone
 inside the session temporary directory, with its own copied dependencies. Its detached before
 checkouts belong to that clone and do not write into the source repository. VITEST_MAX_WORKERS=4.
-Failed-files repair compares with 08a63452b2; the verifier's V1/V3 repairs compare with 7c9a5fe9ce. Round-3 B/C/D checks compare with d19aa236c7. V2 geometry is exercised in real Chromium by jseval arrival steps; happy-dom only checks focus intent delivery.
+Failed-files repair compares with 08a63452b2; the verifier's V1/V3 repairs compare with 7c9a5fe9ce. Round-3 B/C checks compare with d19aa236c7. D1 repairs compare with 9e08da1084. V2 geometry is exercised in real Chromium by jseval arrival steps; happy-dom only checks focus intent delivery.
 Browser viewport and actual native-shell verification are independent of these unit checks.
 
 ```json
@@ -161,7 +162,7 @@ Browser viewport and actual native-shell verification are independent of these u
         "split",
         "input re-encoding"
       ],
-      "whatMoved": "The distinct energy and GPU summary labels are preserved as Meaning processing is waiting to save energy / Meaning processing is waiting for the GPU; exact status-deck chip and selector expectations keep those causes separate; save energy becomes saves energy; sparse enrichment becomes some meaning processing. The same reason matrices, freshness transitions, no-active-progress, aggregate, announcements and ready-versus-enriching outcomes remain. The Library sweep calls renderCardsRegion after renderCard was retired, with the original root as its single input. Inputs, preconditions, observation, fault injection, expected outcome, tags and conditions are kept; only presentation selectors, control encoding and wording moved.",
+      "whatMoved": "The distinct energy and GPU summary labels are preserved as Meaning processing is waiting to save energy / Meaning processing is waiting for the GPU; exact status-deck chip and selector expectations keep those causes separate; save energy becomes saves energy; sparse enrichment becomes some meaning processing. The same reason matrices, freshness transitions, no-active-progress, aggregate, announcements and ready-versus-enriching outcomes remain. The Library sweep calls renderCardsRegion after renderCard was retired, with the original root as its single input. Inputs, preconditions, observation, fault injection, expected outcome, tags and conditions are kept; only presentation selectors, control encoding and wording moved. Library alone states the energy cause once using the detail sentence, replacing the duplicate short summary; the cross-surface check retains the cause and adds an exact once-only assertion.",
       "sources": [
         {
           "kind": "owner-adopted-scenario",
@@ -360,7 +361,7 @@ Browser viewport and actual native-shell verification are independent of these u
         "modules/ui-web/src/shell-v0/components/indexingStatusFollowup.test.ts"
       ],
       "class": "New",
-      "behaviour": "Existing retained migration checks keep inputs and outcomes; the empty observation moves to the add-a-folder headline. The rebuild decision heading itself must carry the existing unknown qualifier, as well as the panel body, for retained/nonfresh observations.",
+      "behaviour": "Existing retained migration checks keep inputs and outcomes; the empty observation moves to the add-a-folder headline. The rebuild decision heading itself must carry the existing unknown qualifier, as well as the panel body, for retained/nonfresh observations. Its detached Library harness now passes the same complete progress projection as the live subscription, including the existing liveness verdict; every empty/rebuilding/freshness expectation is unchanged.",
       "sources": [
         {
           "kind": "owner-adopted-scenario",
@@ -681,38 +682,43 @@ Browser viewport and actual native-shell verification are independent of these u
     },
     {
       "items": [
-        "modules/ui-web/src/shell-v0/views/LibrarySurface.redesign.test.ts",
         "modules/ui-web/src/shell-v0/views/LibrarySurface.slice2.test.ts",
         "modules/ui-web/src/shell-v0/components/indexingStatusSurfaces.test.ts"
       ],
       "class": "New",
-      "behaviour": "Round-3 repairs B/C/D: own Pause/Resume/time-save receipts advance only a directly succeeding held witness; missing, gapped and mismatched receipts cannot refresh a skip-rule draft. External settings writes keep skip-rule conflicts until explicit reload/review; the baseline absolute indexing-times write still succeeds after an unrelated external write. The headline remains stable for 25 transient stale samples, then expires at the shared liveness threshold. Exact distinct energy/GPU labels reach the status-deck chip.",
+      "behaviour": "Own Pause/Resume/time-save receipts advance only a directly succeeding held witness; missing, gapped and mismatched receipts cannot refresh a skip-rule draft. External settings writes keep skip-rule conflicts until explicit reload/review; the baseline absolute indexing-times write still succeeds after an unrelated external write. Exact distinct energy/GPU labels reach the status-deck chip. Headline and retained failure evidence checks are recorded separately against L2/L16 below.",
       "sources": [
         {
           "kind": "owner-adopted-scenario",
           "task": "t-20261101-uiimpl",
           "scenario": "L19",
-          "quote": "Existing contract (LibrarySurface.settings-attempt.test.ts, main): the exclusion save carries the witness read with the draft, never refreshes it before saving, advances it only from its own committed result, and after any version conflict requires an explicit reload with the draft kept. That contract is kept (data safety).",
+          "quote": "Exclusion saves and indexing-rule saves never overwrite each other, in either order, including quick successive saves and version conflicts; both read back intact after reload.",
           "label": "agent-drafted, owner-adopted"
         },
         {
           "kind": "owner-adopted-scenario",
           "task": "t-20261101-uiimpl",
           "scenario": "L2",
-          "quote": "The new headline must not alternate between \"N things need your attention\" and \"Indexing status unconfirmed\" at idle; switch to the unconfirmed wording only when status stays unconfirmed past the existing liveness threshold, otherwise keep the last confirmed headline (with its last-known qualifier where the existing rules require one).",
+          "quote": "Headline: \"Your files are searchable\" when nothing needs attention; \"N things need your attention\" counting distinct actionable items, deduplicated; while status is unconfirmed or loading it says so and never claims searchable. Summary line: searchable documents and folder count from status, plus what is running now.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "L16",
+          "quote": "Failure evidence during retry: when failed counts drop to zero only because jobs requeue, the problem stays listed as last known with its files reachable until a settled observation clears it.",
           "label": "agent-drafted, owner-adopted"
         },
         {
           "kind": "owner-adopted-scenario",
           "task": "t-20261101-uiimpl",
           "scenario": "P10",
-          "quote": "Restore distinct plain-language labels for the energy hold and the GPU hold everywhere they were distinct before (status deck chip included); tests assert the exact distinct strings again, not substrings.",
+          "quote": "Existing Library behaviour tests keep asserting the same behaviour after selector and wording updates; none is weakened or dropped without a recorded reason.",
           "label": "agent-drafted, owner-adopted"
         }
       ],
       "evidence": "gates/test-intent/evidence/library-redesign-round3.json",
       "newChecks": [
-        "modules/ui-web/src/shell-v0/views/LibrarySurface.redesign.test.ts#D keeps the last confirmed headline during transient stale samples, expires at the shared liveness threshold",
         "modules/ui-web/src/shell-v0/views/LibrarySurface.slice2.test.ts#B own Pause then Resume then time save, and time save then Pause then skip save, chain committed witnesses",
         "modules/ui-web/src/shell-v0/views/LibrarySurface.slice2.test.ts#B unrelated external write conflicts with skip rules, keeps the draft until explicit review, and permits the baseline absolute time save",
         "modules/ui-web/src/shell-v0/views/LibrarySurface.slice2.test.ts#B missing operation witness never refreshes a skip-rule draft",
@@ -723,6 +729,86 @@ Browser viewport and actual native-shell verification are independent of these u
         "modules/ui-web/src/shell-v0/components/indexingStatusSurfaces.test.ts#C distinct gpu_busy_external summary reaches the status chip"
       ],
       "repaired": true
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/views/LibrarySurface.redesign.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "Unconfirmed observations never claim searchable. Manual pause and retried-file attention remain reachable across 25 alternating-confirmation samples, become explicitly unconfirmed after the shared freshness threshold and clear only on a confirmed settled observation. Energy/GPU summary suppression is driven by real status projection inputs rather than an obsolete injected label.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "L2",
+          "quote": "Headline: \"Your files are searchable\" when nothing needs attention; \"N things need your attention\" counting distinct actionable items, deduplicated; while status is unconfirmed or loading it says so and never claims searchable. Summary line: searchable documents and folder count from status, plus what is running now.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "L3",
+          "quote": "Each attention item appears once above the list with what it means and its actions: folder can't be found (worded \"reconnect the drive or remove it\", no drive-vs-folder claim) with Check again (core.reconcile-root) and Remove; unreadable files named with reasons and Try again; indexing held: manual pause with Resume, schedule or battery hold with \"Change when to index\" (no Resume-now override, none exists), settings recovery with Open Settings; rebuild running or needing a decision with the existing accept-gaps / cancel and exact gap list; unfinished removals with retry / withdraw and their consent; deletions not verified with Reindex; bulk reindex failed or unknown with Check outcome.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "L16",
+          "quote": "Failure evidence during retry: when failed counts drop to zero only because jobs requeue, the problem stays listed as last known with its files reachable until a settled observation clears it.",
+          "label": "agent-drafted, owner-adopted"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/library-redesign-d1.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/views/LibrarySurface.redesign.test.ts#D1 keeps attention and retried files through 25 alternating unconfirmed polls and clears on a settled observation",
+        "modules/ui-web/src/shell-v0/views/LibrarySurface.redesign.test.ts#D1 never claims searchable during unconfirmed polls, including 42 seconds past the shared threshold",
+        "modules/ui-web/src/shell-v0/views/LibrarySurface.redesign.test.ts#A5 energy_saver waits are stated once through the real projection",
+        "modules/ui-web/src/shell-v0/views/LibrarySurface.redesign.test.ts#A5 gpu_busy_external waits are stated once through the real projection"
+      ],
+      "repaired": true
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/components/IndexingRulesEditor.arrival.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "Arrival focus waits for loaded indexing rules, follows late layout movement for a bounded second, and stops scrolling after user focus moves. Real geometry remains checked by the jseval arrival steps, including never-mounted palette navigation and a previously mounted warm route.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "L14",
+          "quote": "Every route to the moved controls lands on the Library's When-to-index section with keyboard focus: Change hours / Change battery from the Tasks panel and shared indexing controls, the command palette, including when the Browse tab is selected. Settings recovery still leads to Settings, Reset to defaults, and a rule save never clears that hold.",
+          "label": "agent-drafted, owner-adopted"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/library-redesign-d2.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/components/IndexingRulesEditor.arrival.test.ts#L14 waits for loaded rules, follows later layout movement, and stops after one second"
+      ],
+      "repaired": true
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/components/IndexingRulesEditor.arrival.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "A later user focus move cancels the bounded arrival scroll, preserving keyboard control.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "L14",
+          "quote": "Every route to the moved controls lands on the Library's When-to-index section with keyboard focus: Change hours / Change battery from the Tasks panel and shared indexing controls, the command palette, including when the Browse tab is selected. Settings recovery still leads to Settings, Reset to defaults, and a rule save never clears that hold.",
+          "label": "agent-drafted, owner-adopted"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/library-redesign-new.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/components/IndexingRulesEditor.arrival.test.ts#L14 a later user focus move cancels arrival scrolling"
+      ],
+      "repaired": false
     }
   ]
 }

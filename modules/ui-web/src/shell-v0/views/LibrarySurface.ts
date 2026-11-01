@@ -73,6 +73,7 @@ import {
 import {
   selectIndexingProgress,
   type EnrichmentApplicability,
+  type IndexingProgress,
 } from '../state/indexingProgress.js';
 // Tempdoc 811 C-2a — the non-root (ad-hoc / MCP) sources the folder rows cannot describe.
 import {
@@ -737,8 +738,8 @@ export class LibrarySurface extends JfElement {
   private indexingRuleUnsub: (() => void) | undefined;
   private indexingFocusSerial = 0;
   private pendingIndexingFocus: IndexingRuleControl | undefined;
-  private headlineStatusLive = false;
-  private lastConfirmedHeadline: string | undefined;
+  private lastKnownAttention = new Map<string, { key: string; title: string; detail?: string; actions?: TemplateResult }>();
+  private lastKnownHold: IndexingProgress | undefined;
 
   private requestIndexingFocus(control: IndexingRuleControl): void {
     const serial = ++this.indexingFocusSerial;
@@ -784,7 +785,7 @@ export class LibrarySurface extends JfElement {
         s.episodeMaxPendingJobs,
         s.enrichSettleSamples,
       );
-      this.headlineStatusLive = s.indexingStatusLive;
+      if (progress.activity.confirmed) this.lastKnownHold = progress.pause ? progress : undefined;
       this.indexingActivity = progress.activity;
       this.indexProgress = progress;
       this.retryWaiting = progress.activity.confirmed && progress.phase === 'waiting';
@@ -1989,15 +1990,26 @@ export class LibrarySurface extends JfElement {
         detail: 'Some stale entries may remain searchable.', actions: html`<jf-button variant="ghost" label="Reindex to verify"
           .disabled=${this.removingHashes.has(hash)} .onActivate=${() => this.handleReindexToVerify()}>Reindex to verify</jf-button>` });
     }
-    if (this.indexProgress.pause) items.push({ key: 'hold', title: this.indexingActivity.summary,
-      detail: this.indexingActivity.detail ?? undefined,
-      actions: html`<jf-indexing-controls compact .progress=${this.indexProgress} api-base=${this.apiBase}
+    const hold = this.indexingActivity.confirmed ? this.indexProgress : this.lastKnownHold;
+    if (hold?.pause) items.push({ key: 'hold', title: hold.activity.summary,
+      detail: hold.activity.detail ?? undefined,
+      actions: html`<jf-indexing-controls compact .progress=${this.indexingActivity.confirmed ? hold
+        : { ...hold, live: this.indexProgress.live, activity: { ...hold.activity, confirmed: false } }} api-base=${this.apiBase}
         .saveWithSettings=${this.saveSettingsOperation}></jf-indexing-controls>` });
     if (this.reindexCancelKey && !['complete', 'failed', 'unknown', 'expired'].includes(this.bulkOutcome?.state ?? '')) items.push({ key: 'rebuild', title: 'Rebuild in progress' });
     for (const item of this.unfinishedForgets?.items ?? []) items.push({ key: `forget:${item.operationKey}`, title: 'Unfinished removal' });
     if (this.bulkOutcome && ['failed', 'unknown', 'expired'].includes(this.bulkOutcome.state)) items.push({ key: 'bulk', title: 'Rebuild outcome needs checking',
       detail: this.bulkOutcome.message ?? undefined, actions: html`<jf-button variant="ghost" .onActivate=${() => this.bulkOutcomeKey ? this.loadGapDecision(this.bulkOutcomeKey) : undefined}>Check outcome</jf-button>` });
-    return items;
+    // An unconfirmed poll cannot clear an observed problem. Replace the retained
+    // causes only when the shared progress authority confirms an observation.
+    if (this.indexingActivity.confirmed) {
+      this.lastKnownAttention = new Map(items.map(item => [item.key, item]));
+      return items;
+    }
+    for (const item of items) this.lastKnownAttention.set(item.key, item);
+    return [...this.lastKnownAttention.values()].map(item => ({ ...item,
+      title: item.title.includes('last known') ? item.title : `${item.title} · last known`,
+    }));
   }
 
   private renderAttention(): TemplateResult {
@@ -2015,9 +2027,10 @@ export class LibrarySurface extends JfElement {
 
   private get activitySentence(): string {
     const activity = this.indexingActivity;
-    if (!activity.confirmed) return this.headlineStatusLive && this.lastConfirmedHeadline ? 'Indexing status unconfirmed — details last known' : '';
+    if (!activity.confirmed) return this.indexProgress.live && this.attentionItems().length ? 'Indexing status unconfirmed — details last known' : '';
     // The detail already names this wait and its cause; announce it once.
-    if (activity.summary === 'Meaning processing is waiting' && activity.detail) return activity.detail;
+    if (['Meaning processing is waiting to save energy', 'Meaning processing is waiting for the GPU'].includes(activity.summary)
+      && activity.detail) return activity.detail;
     return [activity.summary, activity.detail].filter(Boolean).join(' — ');
   }
 
@@ -2035,13 +2048,13 @@ export class LibrarySurface extends JfElement {
   private renderHeader(): TemplateResult {
     const count = this.attentionItems().length;
     const headline = this.loading ? 'Loading your Library…'
-      : !this.indexingActivity.confirmed ? this.headlineStatusLive && this.lastConfirmedHeadline ? this.lastConfirmedHeadline : this.indexingActivity.summary
+      : !this.indexProgress.live ? 'Indexing status unconfirmed'
         : count ? `${count} ${count === 1 ? 'thing needs' : 'things need'} your attention`
+          : !this.indexingActivity.confirmed ? this.indexingActivity.summary
           : this.provisional ? 'Rebuilding your Library'
             : !this.roots.length ? 'Add a folder to start searching'
               : !this.defaultScopeDocuments.known ? 'Checking your folders'
                 : this.defaultScopeDocuments.value === 0 ? 'Indexing your files' : 'Your files are searchable';
-    if (!this.loading && this.indexingActivity.confirmed) this.lastConfirmedHeadline = headline;
     return html`<div class="header"><div class="header-left"><h2>${headline}</h2>
       <p class="subtitle">${this.defaultScopeDocuments.known ? `${this.defaultScopeDocuments.value.toLocaleString()} searchable documents` : 'Searchable document count unconfirmed'}
         · ${this.roots.length} ${this.roots.length === 1 ? 'folder' : 'folders'}${this.activitySentence ? ` · ${this.activitySentence}` : ''}</p>

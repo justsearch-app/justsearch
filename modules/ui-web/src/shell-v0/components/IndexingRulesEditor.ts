@@ -40,13 +40,18 @@ export class IndexingRulesEditor extends JfElement {
   declare indexingRulesMessage: string;
 
   private indexingRuleFocus: 'hours' | 'battery' | null = null;
+  private arrivalScroll: ReturnType<typeof setTimeout> | undefined;
 
   async focusIndexingRule(control: 'hours' | 'battery'): Promise<void> {
+    this.cancelIndexingRuleFocus();
     this.indexingRuleFocus = control;
     await this.focusPendingIndexingRule();
   }
 
-  cancelIndexingRuleFocus(): void { this.indexingRuleFocus = null; }
+  cancelIndexingRuleFocus(): void {
+    this.indexingRuleFocus = null;
+    clearTimeout(this.arrivalScroll);
+  }
 
   private async focusPendingIndexingRule(): Promise<void> {
     await this.updateComplete;
@@ -61,7 +66,21 @@ export class IndexingRulesEditor extends JfElement {
     const target = this.shadowRoot?.getElementById(control === 'hours' ? 'indexing-hours' : 'indexing-battery');
     const focusTarget = this.readOnly ? this.shadowRoot?.getElementById('when-to-index') : target;
     focusTarget?.focus({ preventScroll: true });
-    focusTarget?.scrollIntoView?.({ block: 'center', behavior: 'instant' });
+    if (!focusTarget) return;
+    // Loading roots, tabs and finite view transitions can still move the section
+    // after focus. Keep the control in view for their bounded settling interval.
+    // Instant scrolling also respects reduced motion. Timers keep navigation free
+    // to finish even while a view transition suspends animation frames.
+    const deadline = Date.now() + 1000;
+    let previousTop: number | undefined;
+    const keepInView = () => {
+      if (!this.isConnected || this.shadowRoot?.activeElement !== focusTarget) return;
+      const top = focusTarget.getBoundingClientRect().top;
+      if (top !== previousTop) focusTarget.scrollIntoView?.({ block: 'center', behavior: 'instant' });
+      previousTop = focusTarget.getBoundingClientRect().top;
+      if (Date.now() < deadline) this.arrivalScroll = setTimeout(keepInView, 50);
+    };
+    keepInView();
   }
 
   private editIndexingRules(patch: Partial<typeof this.indexingRules>): void {

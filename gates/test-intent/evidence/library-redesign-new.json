@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
   },
-  "createdAt": "2026-11-01T19:13:29.562Z",
-  "revision": "d19aa236c7fc9359cae03201eb6a1d7d21b53c01",
-  "tree": "856d3f98d784d8f96382b6370fd65e308aa8d315",
+  "createdAt": "2026-11-01T20:28:59.704Z",
+  "revision": "9e08da1084b4ed3f335b712592d57fae64a459e7",
+  "tree": "2c9853dd5d08b93be28c6a7c8366d0fee49d1b61",
   "environment": {
     "platform": "linux",
     "arch": "x64",
@@ -18,10 +18,10 @@
   },
   "runs": [
     {
-      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/chrome/Shell.test.ts\" \"src/shell-v0/commands/CommandPaletteProjection.test.ts\" \"src/shell-v0/components/SurfaceTabs.test.ts\" \"src/shell-v0/components/IndexingControls.toolbar.test.ts\" \"src/shell-v0/components/indexingStatusFollowup.test.ts\" \"src/shell-v0/views/LibrarySurface.excludes-override.test.ts\" \"src/shell-v0/views/LibrarySurface.folderActions.test.ts\" \"src/shell-v0/views/LibrarySurface.redesign.test.ts\" \"src/shell-v0/views/LibrarySurface.slice2.test.ts\" \"src/shell-v0/views/SettingsSurface.indexingRules.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/dl6eky4a/tmp/test-intent-vitest-428-1793560397913.json\"",
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/chrome/Shell.test.ts\" \"src/shell-v0/commands/CommandPaletteProjection.test.ts\" \"src/shell-v0/views/SettingsSurface.indexingRules.test.ts\" \"src/shell-v0/components/SurfaceTabs.test.ts\" \"src/shell-v0/components/IndexingControls.toolbar.test.ts\" \"src/shell-v0/components/indexingStatusFollowup.test.ts\" \"src/shell-v0/views/LibrarySurface.excludes-override.test.ts\" \"src/shell-v0/views/LibrarySurface.folderActions.test.ts\" \"src/shell-v0/views/LibrarySurface.redesign.test.ts\" \"src/shell-v0/views/LibrarySurface.slice2.test.ts\" \"src/shell-v0/components/IndexingRulesEditor.arrival.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/6h90meu0/tmp/test-intent-vitest-5-1793564924808.json\"",
       "cwd": "modules/ui-web",
       "exitCode": 0,
-      "durationMs": 11648
+      "durationMs": 14894
     }
   ],
   "checks": [
@@ -280,6 +280,121 @@
       ]
     },
     {
+      "id": "modules/ui-web/src/shell-v0/views/SettingsSurface.indexingRules.test.ts",
+      "file": "modules/ui-web/src/shell-v0/views/SettingsSurface.indexingRules.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:2f73b03f1e3031263f55ec79716464f076f7fa10376c207eaabc085295f3c31b",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "WP3.8b rules editor S38.1 S38.7 loads labelled days and native locale times and saves both rules retaining disabled hours",
+          "status": "passed"
+        },
+        {
+          "name": "WP3.8b rules editor S38.2 announces equal endpoints and retains the refused draft",
+          "status": "passed"
+        },
+        {
+          "name": "WP3.8b rules editor S38.2 announces missing time and retains the refused draft",
+          "status": "passed"
+        },
+        {
+          "name": "WP3.8b rules editor S38.2 refuses enabled hours without days and accepts the retained empty set when off",
+          "status": "passed"
+        },
+        {
+          "name": "WP3.8b rules editor S38.2 retains the draft and announces Engine 400 without stale replay",
+          "status": "passed"
+        },
+        {
+          "name": "WP3.8b rules editor S38.2 retains the draft and announces Engine 409 without stale replay",
+          "status": "passed"
+        },
+        {
+          "name": "WP3.8b rules editor S38.2 retains the draft and announces Engine 200 without stale replay",
+          "status": "passed"
+        },
+        {
+          "name": "WP3.8b rules editor S38.7 waits for saved rules before editing or applying deferred rule focus",
+          "status": "passed"
+        },
+        {
+          "name": "WP3.8b rules editor S38.7 keeps read-only rules readable without issuing a save",
+          "status": "passed"
+        },
+        {
+          "name": "WP3.8b rules editor S38.7 preserves Save focus while pending and sends one unchanged rule pair",
+          "status": "passed"
+        },
+        {
+          "name": "WP3.8b rules editor D4 preserves both rules through approval and uses the approved preparation key",
+          "status": "passed"
+        },
+        {
+          "name": "WP3.8b rules editor D4 changing battery preserves an absent schedule until the hours are edited",
+          "status": "passed"
+        },
+        {
+          "name": "WP3.8b rules editor D6 keeps battery available with unknown power and explains the rule",
+          "status": "passed"
+        },
+        {
+          "name": "WP3.8b rules editor S38.7 focuses hours on Library even from Browse",
+          "status": "passed"
+        },
+        {
+          "name": "WP3.8b rules editor S38.7 focuses battery on Library even from Browse",
+          "status": "passed"
+        },
+        {
+          "name": "WP3.8b policy status and actions D5 PAUSING schedule names the rule with an empty queue and offers its Library action",
+          "status": "passed"
+        },
+        {
+          "name": "WP3.8b policy status and actions D5 PAUSED schedule names the rule with an empty queue and offers its Library action",
+          "status": "passed"
+        },
+        {
+          "name": "WP3.8b policy status and actions D5 PAUSING on_battery names the rule with an empty queue and offers its Library action",
+          "status": "passed"
+        },
+        {
+          "name": "WP3.8b policy status and actions D5 PAUSED on_battery names the rule with an empty queue and offers its Library action",
+          "status": "passed"
+        },
+        {
+          "name": "WP3.8b policy status and actions D5 orders combined reasons and restricts recovery actions",
+          "status": "passed"
+        },
+        {
+          "name": "WP3.8b policy status and actions D5 names every folder rule without Waiting for Resume and preserves failure evidence",
+          "status": "passed"
+        },
+        {
+          "name": "WP3.8b policy status and actions S38.5 Resume clears manual only and announces both remaining rules after confirmed status",
+          "status": "passed"
+        },
+        {
+          "name": "WP3.8b policy status and actions S38.5 waits for manual-pause removal before announcing it cleared",
+          "status": "passed"
+        },
+        {
+          "name": "WP3.8b policy status and actions D5 does not invoke a focused Resume when manual pause clears leaving hours",
+          "status": "passed"
+        },
+        {
+          "name": "WP3.8b policy status and actions D5 jf-library-surface names schedule holds for queued work",
+          "status": "passed"
+        },
+        {
+          "name": "WP3.8b policy status and actions D5 jf-task-list names schedule holds for queued work",
+          "status": "passed"
+        }
+      ]
+    },
+    {
       "id": "modules/ui-web/src/shell-v0/components/SurfaceTabs.test.ts",
       "file": "modules/ui-web/src/shell-v0/components/SurfaceTabs.test.ts",
       "runner": "vitest",
@@ -369,7 +484,7 @@
       "id": "modules/ui-web/src/shell-v0/components/indexingStatusFollowup.test.ts",
       "file": "modules/ui-web/src/shell-v0/components/indexingStatusFollowup.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:2d72afb8fc9bbd537446657617b667930d0c53d59b20cdd08d23c23f0ee25e75",
+      "contentDigest": "sha256:7ad4da6cc85cd6ecadfa9385ca9e15da944d5242af24412561b1f1e7dc36cc2e",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -498,7 +613,7 @@
       "id": "modules/ui-web/src/shell-v0/views/LibrarySurface.redesign.test.ts",
       "file": "modules/ui-web/src/shell-v0/views/LibrarySurface.redesign.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:27dec2dac83ad807653c8fe84ce086b33cce15bb24a376bb30420bb21f45b934",
+      "contentDigest": "sha256:e8206069ad01ae01ddd70dee11a8f748c1b250f3fb58d8b41b15515878c15d97",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -564,7 +679,15 @@
           "status": "passed"
         },
         {
-          "name": "A3 A5 unconfirmed status and automatic waits are stated once in the page heading and summary",
+          "name": "A3 unconfirmed status is stated once through the real projection",
+          "status": "passed"
+        },
+        {
+          "name": "A5 energy_saver waits are stated once through the real projection",
+          "status": "passed"
+        },
+        {
+          "name": "A5 gpu_busy_external waits are stated once through the real projection",
           "status": "passed"
         },
         {
@@ -576,7 +699,11 @@
           "status": "passed"
         },
         {
-          "name": "D keeps the last confirmed headline during transient stale samples, expires at the shared liveness threshold",
+          "name": "D1 keeps attention and retried files through 25 alternating unconfirmed polls and clears on a settled observation",
+          "status": "passed"
+        },
+        {
+          "name": "D1 never claims searchable during unconfirmed polls, including 42 seconds past the shared threshold",
           "status": "passed"
         }
       ]
@@ -669,121 +796,21 @@
       ]
     },
     {
-      "id": "modules/ui-web/src/shell-v0/views/SettingsSurface.indexingRules.test.ts",
-      "file": "modules/ui-web/src/shell-v0/views/SettingsSurface.indexingRules.test.ts",
+      "id": "modules/ui-web/src/shell-v0/components/IndexingRulesEditor.arrival.test.ts#L14 a later user focus move cancels arrival scrolling",
+      "file": "modules/ui-web/src/shell-v0/components/IndexingRulesEditor.arrival.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:2f73b03f1e3031263f55ec79716464f076f7fa10376c207eaabc085295f3c31b",
+      "contentDigest": "sha256:7fdeef1f017c3b92646b89e8a5c275bdafb918e52152bff4be09141691e11de9",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
       "cases": [
         {
-          "name": "WP3.8b rules editor S38.1 S38.7 loads labelled days and native locale times and saves both rules retaining disabled hours",
-          "status": "passed"
-        },
-        {
-          "name": "WP3.8b rules editor S38.2 announces equal endpoints and retains the refused draft",
-          "status": "passed"
-        },
-        {
-          "name": "WP3.8b rules editor S38.2 announces missing time and retains the refused draft",
-          "status": "passed"
-        },
-        {
-          "name": "WP3.8b rules editor S38.2 refuses enabled hours without days and accepts the retained empty set when off",
-          "status": "passed"
-        },
-        {
-          "name": "WP3.8b rules editor S38.2 retains the draft and announces Engine 400 without stale replay",
-          "status": "passed"
-        },
-        {
-          "name": "WP3.8b rules editor S38.2 retains the draft and announces Engine 409 without stale replay",
-          "status": "passed"
-        },
-        {
-          "name": "WP3.8b rules editor S38.2 retains the draft and announces Engine 200 without stale replay",
-          "status": "passed"
-        },
-        {
-          "name": "WP3.8b rules editor S38.7 waits for saved rules before editing or applying deferred rule focus",
-          "status": "passed"
-        },
-        {
-          "name": "WP3.8b rules editor S38.7 keeps read-only rules readable without issuing a save",
-          "status": "passed"
-        },
-        {
-          "name": "WP3.8b rules editor S38.7 preserves Save focus while pending and sends one unchanged rule pair",
-          "status": "passed"
-        },
-        {
-          "name": "WP3.8b rules editor D4 preserves both rules through approval and uses the approved preparation key",
-          "status": "passed"
-        },
-        {
-          "name": "WP3.8b rules editor D4 changing battery preserves an absent schedule until the hours are edited",
-          "status": "passed"
-        },
-        {
-          "name": "WP3.8b rules editor D6 keeps battery available with unknown power and explains the rule",
-          "status": "passed"
-        },
-        {
-          "name": "WP3.8b rules editor S38.7 focuses hours on Library even from Browse",
-          "status": "passed"
-        },
-        {
-          "name": "WP3.8b rules editor S38.7 focuses battery on Library even from Browse",
-          "status": "passed"
-        },
-        {
-          "name": "WP3.8b policy status and actions D5 PAUSING schedule names the rule with an empty queue and offers its Library action",
-          "status": "passed"
-        },
-        {
-          "name": "WP3.8b policy status and actions D5 PAUSED schedule names the rule with an empty queue and offers its Library action",
-          "status": "passed"
-        },
-        {
-          "name": "WP3.8b policy status and actions D5 PAUSING on_battery names the rule with an empty queue and offers its Library action",
-          "status": "passed"
-        },
-        {
-          "name": "WP3.8b policy status and actions D5 PAUSED on_battery names the rule with an empty queue and offers its Library action",
-          "status": "passed"
-        },
-        {
-          "name": "WP3.8b policy status and actions D5 orders combined reasons and restricts recovery actions",
-          "status": "passed"
-        },
-        {
-          "name": "WP3.8b policy status and actions D5 names every folder rule without Waiting for Resume and preserves failure evidence",
-          "status": "passed"
-        },
-        {
-          "name": "WP3.8b policy status and actions S38.5 Resume clears manual only and announces both remaining rules after confirmed status",
-          "status": "passed"
-        },
-        {
-          "name": "WP3.8b policy status and actions S38.5 waits for manual-pause removal before announcing it cleared",
-          "status": "passed"
-        },
-        {
-          "name": "WP3.8b policy status and actions D5 does not invoke a focused Resume when manual pause clears leaving hours",
-          "status": "passed"
-        },
-        {
-          "name": "WP3.8b policy status and actions D5 jf-library-surface names schedule holds for queued work",
-          "status": "passed"
-        },
-        {
-          "name": "WP3.8b policy status and actions D5 jf-task-list names schedule holds for queued work",
+          "name": "L14 a later user focus move cancels arrival scrolling",
           "status": "passed"
         }
       ]
     }
   ],
   "failBefore": null,
-  "digest": "sha256:15364beb98c09177d971163b608ddcb58242523afbee367ee30184b130bd5964"
+  "digest": "sha256:6806c7146bff10ff15b9d50b666f7725b6fe5cf0de8e1dc021d0ed19a014f599"
 }

@@ -151,7 +151,9 @@ describe('WP3.3 shared status surfaces', () => {
     feed(status(0));
     await mountAll();
     for (const [i, text] of texts().entries()) {
-      expect(text, surfaces[i]!.localName).toContain('Meaning processing is waiting to save energy');
+      expect(text, surfaces[i]!.localName).toContain(i === 4
+        ? 'Meaning search is waiting while the computer saves energy.' : 'Meaning processing is waiting to save energy');
+      if (i === 4) expect(text.match(/saves energy/g)).toHaveLength(1);
       expect(text, surfaces[i]!.localName).toContain('saves energy');
       expect(text, surfaces[i]!.localName).not.toMatch(/Ready — fully searchable|Up to date|System idle|Batch Processing Active/);
     }

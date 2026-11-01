@@ -43,7 +43,9 @@ function library(state: AiState): LibrarySurface {
   const el = document.createElement('jf-library-surface') as LibrarySurface;
   el.loading = false;
   el.provisional = state.stability.kind === 'provisional';
-  el.indexingActivity = selectIndexingProgress(state.status, state.indexingStatusLive, state.episodeMaxPendingJobs, state.enrichSettleSamples).activity;
+  const progress = selectIndexingProgress(state.status, state.indexingStatusLive, state.episodeMaxPendingJobs, state.enrichSettleSamples);
+  el.indexingActivity = progress.activity;
+  Object.assign(el, { indexProgress: progress });
   return el;
 }
 function dom(template: TemplateResult): HTMLDivElement {

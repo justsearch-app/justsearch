@@ -1408,7 +1408,7 @@ def _build_steps(ui_url: str, cooldown_ms: int, timeout_ms: int) -> list[Step]:
             await page.set_viewport_size({"width": width, "height": height})
             if route == "reduced":
                 await page.emulate_media(reduced_motion="reduce")
-            if route in ("palette", "browse", "attention"):
+            if route in ("warm", "browse", "attention"):
                 await _view_setup("library")(page)
             if route == "settings":
                 await _view_setup("settings")(page)
@@ -1425,7 +1425,7 @@ def _build_steps(ui_url: str, cooldown_ms: int, timeout_ms: int) -> list[Step]:
                 if not await control.is_visible():
                     await page.get_by_role("button", name=re.compile(r"more status item")).click()
                 await control.click()
-            elif route in ("tasks", "reduced"):
+            elif route in ("tasks", "warm", "reduced"):
                 await page.locator('jf-task-list').get_by_role("button", name="Change hours", exact=True).click()
             elif route == "settings":
                 await page.locator('jf-settings-surface').get_by_role("button", name="Change when to index", exact=True).click()
@@ -1463,6 +1463,81 @@ def _build_steps(ui_url: str, cooldown_ms: int, timeout_ms: int) -> list[Step]:
             await page.wait_for_timeout(1000)
         assert len(set(samples)) == 1 and "unconfirmed" not in samples[0], samples
         print(f"Library idle headline: 25 one-second samples, one headline: {samples[0]}")
+
+    def setup_library_liveness(mode):
+        async def setup(page):
+            polls = 0
+            root_reads = 0
+            clear = False
+            unconfirmed = False
+            last_confirmed_at = int(time.time() * 1000)
+
+            async def status_reply(route):
+                nonlocal polls, last_confirmed_at
+                polls += 1
+                body = json.loads(ui_fixtures._status_body("enriching"))
+                stale = unconfirmed or mode in ("pause", "alternating") and polls % 2 == 0 and not clear
+                # A producer may renew its RPC timestamp even while returning an
+                # unconfirmed worker observation. Successful HTTP/RPC reads must
+                # never keep the searchable headline alive through that case.
+                if not stale or mode == "expiry":
+                    last_confirmed_at = int(time.time() * 1000)
+                body["meta"].update({"workerRpcAtMs": last_confirmed_at, "workerRpcStale": stale and mode != "alternating"})
+                body["operating"]["freshness"].update({"staleAfterMs": 30000,
+                                                       "staleSources": ["indexing"] if stale and mode != "pause" else []})
+                body["worker"]["core"]["searchableDocuments"] = 400
+                if mode in ("pause", "alternating") and not clear:
+                    body["operating"]["indexing"].update({"state": "PAUSED", "reasons": ["user_paused"],
+                        "untilEpochMs": None, "waitingForResume": True})
+                    body["worker"]["core"].update({"indexState": "WAITING", "pendingJobs": 1})
+                await route.fulfill(status=200, content_type="application/json", body=json.dumps(body))
+
+            async def roots_reply(route):
+                nonlocal root_reads
+                root_reads += 1
+                body = json.loads(ui_fixtures._indexed_roots_body("enriching"))
+                if mode in ("pause", "alternating") and not clear:
+                    body["items"][0].update({"failedCount": 1 if root_reads == 1 else 0,
+                                             "inFlightCount": 0 if root_reads == 1 else 1})
+                await route.fulfill(status=200, content_type="application/json", body=json.dumps(body))
+
+            await page.route("**/api/status", status_reply)
+            await page.route("**/api/indexing-roots/substrate*", roots_reply)
+            await page.reload(wait_until="domcontentloaded")
+            await _await_app_ready(page)
+            await _view_setup("library")(page)
+            heading = page.locator('jf-library-surface h2')
+            await heading.wait_for(state="visible")
+            expected = "2 things need your attention" if mode != "expiry" else "Your files are searchable"
+            # Poll only text; focus/click must not change the observed state.
+            for _ in range(100):
+                if await heading.inner_text() == expected:
+                    break
+                await page.wait_for_timeout(100)
+            assert await heading.inner_text() == expected
+            unconfirmed = mode == "expiry"
+            samples = []
+            for second in range(42 if mode == "expiry" else 25):
+                text = await heading.inner_text()
+                samples.append(text)
+                if mode != "expiry":
+                    assert text == expected, samples
+                    attention = await page.locator('jf-library-surface .attention').inner_text()
+                    assert "Indexing paused" in attention and "file needs review" in attention, attention
+                elif second >= 31:
+                    assert text == "Indexing status unconfirmed", samples
+                await page.wait_for_timeout(1000)
+            assert polls >= 4, f"Expected real status polling, observed {polls} reads"
+            clear = True
+            unconfirmed = False
+            for _ in range(150):
+                if await heading.inner_text() == "Your files are searchable":
+                    break
+                await page.wait_for_timeout(100)
+            assert await heading.inner_text() == "Your files are searchable"
+            assert "Indexing paused" not in await page.locator('jf-library-surface .attention').inner_text()
+            print(f"Library liveness {mode}: {len(samples)} one-second samples; confirmed clear restored searchable")
+        return setup
 
     def setup_library_size(width, height):
         async def setup(page):
@@ -2257,8 +2332,10 @@ def _build_steps(ui_url: str, cooldown_ms: int, timeout_ms: int) -> list[Step]:
              fixtures_variant="indexing-rules"),
         *[Step(f"library-arrival-{route}-{width}x{height}", setup=setup_library_arrival(route, width, height),
                isolated=True, fixtures_variant="indexing-rules")
-          for route in ("tasks", "palette", "status", "browse", "attention", "settings", "reduced")
+          for route in ("tasks", "palette", "status", "browse", "attention", "settings", "reduced", "warm")
           for width, height in ((1280, 720), (600, 400))],
+        *[Step(f"library-liveness-{mode}", setup=setup_library_liveness(mode), isolated=True,
+               fixtures_variant="enriching") for mode in ("pause", "alternating", "expiry")],
         Step("library-idle-headline", setup=setup_library_idle_headline, isolated=True, fixtures_variant="enriching"),
         Step("library-medium", setup=setup_library_size(760, 720), isolated=True,
              fixtures_variant="enriching"),
