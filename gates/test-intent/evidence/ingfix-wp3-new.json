@@ -1,0 +1,187 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
+  },
+  "createdAt": "2026-11-01T17:49:34.762Z",
+  "revision": "409869eb5d9fcf3f7ee32207d440c4ea3fb779c5",
+  "tree": "cba365bd35b4fda904d300cdfe2592230db66657",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": "openjdk version \"25.0.4.1\" 2026-08-18 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "./gradlew :modules:worker-core:test --tests \"io.justsearch.indexerworker.disambiguation.DisambiguationReconciliationTest.failedFinalPublicationRetriesRetirementWithZeroNewForms\" --tests \"io.justsearch.indexerworker.disambiguation.DisambiguationReconciliationTest.failedResetRestartsFromTheBeginningAndCanBeRetried\" --tests \"io.justsearch.indexerworker.disambiguation.DisambiguationReconciliationTest.establishedMultiPageLibraryThenOneAdditionHasBoundedWork\" --tests \"io.justsearch.indexerworker.disambiguation.DisambiguationReconciliationTest.newMultiPageLibraryPublishesOnlyAtCompletion\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 4149
+    },
+    {
+      "command": "./gradlew :modules:worker-services:test --tests \"io.justsearch.indexerworker.loop.ops.DisambiguationBackfillOpsTest.absentServiceDoesNotReadCorpus\" --tests \"io.justsearch.indexerworker.loop.ops.DisambiguationBackfillOpsTest.unavailableServiceDoesNotReadCorpus\" --tests \"io.justsearch.indexerworker.loop.ops.DisambiguationBackfillOpsTest.newlyVisiblePendingNerDefersReconciliation\" --tests \"io.justsearch.indexerworker.loop.ops.DisambiguationBackfillOpsTest.failedSelectionDoesNotAcknowledgeCursor\" --tests \"io.justsearch.indexerworker.loop.ops.DisambiguationBackfillOpsTest.processesAllDocsUnderForegroundLoad\" --tests \"io.justsearch.indexerworker.loop.ops.DisambiguationBackfillOpsTest.changedReaderDoesNotAcknowledgeMixedPass\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 3787
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/worker-core/src/test/java/io/justsearch/indexerworker/disambiguation/DisambiguationReconciliationTest.java#failedFinalPublicationRetriesRetirementWithZeroNewForms",
+      "file": "modules/worker-core/src/test/java/io/justsearch/indexerworker/disambiguation/DisambiguationReconciliationTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:4ee867b47eedbd889aead2e0fb5fb358d82d16df7c4c1c8e2e8686ece05ccae2",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "failedFinalPublicationRetriesRetirementWithZeroNewForms()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-core/src/test/java/io/justsearch/indexerworker/disambiguation/DisambiguationReconciliationTest.java#failedResetRestartsFromTheBeginningAndCanBeRetried",
+      "file": "modules/worker-core/src/test/java/io/justsearch/indexerworker/disambiguation/DisambiguationReconciliationTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:4ee867b47eedbd889aead2e0fb5fb358d82d16df7c4c1c8e2e8686ece05ccae2",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "failedResetRestartsFromTheBeginningAndCanBeRetried()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-core/src/test/java/io/justsearch/indexerworker/disambiguation/DisambiguationReconciliationTest.java#establishedMultiPageLibraryThenOneAdditionHasBoundedWork",
+      "file": "modules/worker-core/src/test/java/io/justsearch/indexerworker/disambiguation/DisambiguationReconciliationTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:4ee867b47eedbd889aead2e0fb5fb358d82d16df7c4c1c8e2e8686ece05ccae2",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "establishedMultiPageLibraryThenOneAdditionHasBoundedWork()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-core/src/test/java/io/justsearch/indexerworker/disambiguation/DisambiguationReconciliationTest.java#newMultiPageLibraryPublishesOnlyAtCompletion",
+      "file": "modules/worker-core/src/test/java/io/justsearch/indexerworker/disambiguation/DisambiguationReconciliationTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:4ee867b47eedbd889aead2e0fb5fb358d82d16df7c4c1c8e2e8686ece05ccae2",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "newMultiPageLibraryPublishesOnlyAtCompletion()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/DisambiguationBackfillOpsTest.java#absentServiceDoesNotReadCorpus",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/DisambiguationBackfillOpsTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:4665dd87ac608cd831eea98b9c5ac142f6d2d11f3b87e573b55a5362144422b9",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "absentServiceDoesNotReadCorpus()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/DisambiguationBackfillOpsTest.java#unavailableServiceDoesNotReadCorpus",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/DisambiguationBackfillOpsTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:4665dd87ac608cd831eea98b9c5ac142f6d2d11f3b87e573b55a5362144422b9",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "unavailableServiceDoesNotReadCorpus()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/DisambiguationBackfillOpsTest.java#newlyVisiblePendingNerDefersReconciliation",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/DisambiguationBackfillOpsTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:4665dd87ac608cd831eea98b9c5ac142f6d2d11f3b87e573b55a5362144422b9",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "newlyVisiblePendingNerDefersReconciliation()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/DisambiguationBackfillOpsTest.java#failedSelectionDoesNotAcknowledgeCursor",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/DisambiguationBackfillOpsTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:4665dd87ac608cd831eea98b9c5ac142f6d2d11f3b87e573b55a5362144422b9",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "failedSelectionDoesNotAcknowledgeCursor()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/DisambiguationBackfillOpsTest.java#processesAllDocsUnderForegroundLoad",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/DisambiguationBackfillOpsTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:4665dd87ac608cd831eea98b9c5ac142f6d2d11f3b87e573b55a5362144422b9",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "processesAllDocsUnderForegroundLoad()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/DisambiguationBackfillOpsTest.java#changedReaderDoesNotAcknowledgeMixedPass",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/DisambiguationBackfillOpsTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:4665dd87ac608cd831eea98b9c5ac142f6d2d11f3b87e573b55a5362144422b9",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "changedReaderDoesNotAcknowledgeMixedPass()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:2bec153e0666bb9a3eee97f23dd21b6e685c8bfe76746a081465915dccc1c931"
+}
