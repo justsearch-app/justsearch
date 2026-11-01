@@ -705,7 +705,9 @@ public final class CombinedEnrichmentBackfillOps {
       // whole-document forward pass per chunked parent. A null result (content over the raised
       // single-pass limit) or a GPU BFC-arena OOM folds the doc INLINE into the ordinary windowed
       // batch below (embedDocIds/embedContents) rather than deferring to a different RMW pass —
-      // every doc still resolves within this pass's single bundled write. A non-arena-OOM failure
+      // classification stops at the first fallback so the remaining budget reaches actual
+      // window/chunk inference. Unclassified parents remain pending for a later cycle.
+      // Every outcome still resolves within this pass's single bundled write. A non-arena-OOM failure
       // escalates the parent directly through the same retry-count/FAILED-at-max helper the
       // windowed batch failure path below uses.
       if (!lateChunkingDocIds.isEmpty() && embedAvailable) {
@@ -725,6 +727,7 @@ public final class CombinedEnrichmentBackfillOps {
           if (!embeddingReady(context, lateChunkingProvider)) break;
           String lcDocId = lateChunkingDocIds.get(i);
           String lcContent = lateChunkingContents.get(i);
+          boolean fellBackToWindows = false;
           pacer.beforeUnit(1);
           try {
             EmbeddingService.ChunkedEmbedding result =
@@ -742,6 +745,7 @@ public final class CombinedEnrichmentBackfillOps {
               embedContents.add(lcContent);
               directWindowedDocIds.add(lcDocId);
               longDocWindowed++;
+              fellBackToWindows = true;
             }
           } catch (Exception e) {
             if (!embeddingReady(context, lateChunkingProvider)
@@ -763,6 +767,7 @@ public final class CombinedEnrichmentBackfillOps {
               embedContents.add(lcContent);
               directWindowedDocIds.add(lcDocId);
               arenaOomWindowed++;
+              fellBackToWindows = true;
             } else {
               context
                   .log()
@@ -782,6 +787,7 @@ public final class CombinedEnrichmentBackfillOps {
           }
           pacer.afterUnit(1);
           unitsDone++;
+          if (fellBackToWindows) break;
         }
       }
 
@@ -790,15 +796,17 @@ public final class CombinedEnrichmentBackfillOps {
       // finish: the late-chunking fallback above appends them at the TAIL of embedDocIds, behind
       // every short parent and every chunk doc, so an 8-DOCUMENT slice loop under a 5 s budget
       // reached them last or not at all — and when it did, all of a document's windows ran inside
-      // one uninterruptible call whose partial results were discarded on interruption. Here they go
-      // FIRST, one window slice at a time, and every embedded window is folded into the cross-cycle
-      // accumulator, so an interrupted document resumes at its next window instead of window 0.
+      // one uninterruptible call whose partial results were discarded on interruption. A bounded
+      // chunk batch now precedes the windows, then parent windows run before the ordinary remainder.
+      // Resuming parents were enrolled before this cycle's fallback. Every embedded window is folded
+      // into the cross-cycle accumulator, so an interrupted document resumes at its next window.
       //
       // Documents whose provider reports a single window (every short document, every chunk doc,
       // and EVERY document when the provider does not expose window granularity — the interface
       // default) stay on the historical whole-document batch path below, unchanged.
       List<String> windowedDocIds = new ArrayList<>();
       List<String> windowedContents = new ArrayList<>();
+      int priorityChunkEnd = 0;
       if (!embedDocIds.isEmpty() && embedAvailable) {
         EmbeddingProvider windowProbe = context.embeddingProviderSupplier().get();
         List<String> singleWindowDocIds = new ArrayList<>(embedDocIds.size());
@@ -809,6 +817,10 @@ public final class CombinedEnrichmentBackfillOps {
               || windowProbe.documentWindowCount(embedContents.get(i)) > 1) {
             windowedDocIds.add(embedDocIds.get(i));
             windowedContents.add(embedContents.get(i));
+          } else if (chunkIdsInBatch.contains(embedDocIds.get(i))) {
+            singleWindowDocIds.add(priorityChunkEnd, embedDocIds.get(i));
+            singleWindowContents.add(priorityChunkEnd, embedContents.get(i));
+            priorityChunkEnd++;
           } else {
             singleWindowDocIds.add(embedDocIds.get(i));
             singleWindowContents.add(embedContents.get(i));
@@ -820,242 +832,251 @@ public final class CombinedEnrichmentBackfillOps {
         }
       }
 
-      if (!windowedDocIds.isEmpty() && embedAvailable) {
-        EmbeddingProvider provider = context.embeddingProviderSupplier().get();
-        WindowedEmbedProgress progress = context.windowedEmbedProgress();
-        for (int i = 0; i < windowedDocIds.size(); i++) {
-          String docId = windowedDocIds.get(i);
-          boolean directFallback = directWindowedDocIds.contains(docId);
-          // A null/OOM classification is not resumable progress. Ignore only the deadline it may
-          // have spent until one real window is recorded; hard preemption and deletion still win.
-          if (directFallback
-              && windowUnitsDone == 0
-              && (context.hardStopRequestedSupplier().getAsBoolean()
-                  || context.indexingCoordinator().bulkDeleteEpoch() != epochAtSelection)) {
-            aborted = true;
-            docsSkipped += windowedDocIds.size() - i;
-            break;
-          }
-          int schedulingUnitsDone = directFallback ? windowUnitsDone : unitsDone;
-          if (stopRequested(context, schedulingUnitsDone, epochAtSelection)) {
-            aborted = true;
-            docsSkipped += windowedDocIds.size() - i;
-            break;
-          }
-          if (embedShareSpent(context, schedulingUnitsDone, otherStagesHaveWork)) {
-            embedDeferredForOtherStages += windowedDocIds.size() - i;
-            break;
-          }
-          if (!embeddingReady(context, provider)) break;
-          String content = windowedContents.get(i);
-          boolean isChunk = chunkIdsInBatch.contains(docId);
-          // Scoped to THIS document, deliberately: `aborted` is sticky across phases (Phase 3a-i
-          // may already have set it), so reading it to decide whether the windowed lane stopped
-          // would end the lane on a stale flag and mis-report every remaining document as skipped.
-          boolean stoppedOnThisDocument = false;
-          boolean abortedOnThisDocument = false;
-          try {
-            int nextWindow = progress.nextWindow(docId, content);
-            while (!progress.isComplete(docId)) {
-              if (!embeddingReady(context, provider)) {
-                stoppedOnThisDocument = true;
-                break;
-              }
-              // A window is one encoder forward pass of at most a document's length, so the
-              // embedding slice counts windows here; counted whether or not the call succeeds.
-              pacer.beforeUnit(EMBED_WINDOW_SLICE);
-              EmbeddingProvider.WindowSlice slice;
-              try {
-                slice = provider.embedDocumentWindows(content, nextWindow, EMBED_WINDOW_SLICE);
-              } finally {
-                pacer.afterUnit(EMBED_WINDOW_SLICE);
-              }
-              if (slice == null || slice.vectors().isEmpty()) {
-                // Either the provider stopped exposing windows mid-batch or it has no window at
-                // this index — neither can produce a vector, so escalate through the same retry
-                // seam every other embed failure uses rather than looping.
-                throw new IllegalStateException(
-                    "windowed embed returned no vectors at window " + nextWindow);
-              }
-              unitsDone++;
-              windowUnitsDone++;
-              int advancedTo =
-                  progress.record(
-                      docId, content, slice.totalWindows(), nextWindow, slice.vectors());
-              if (advancedTo <= nextWindow) {
-                // The accumulator did not advance (every returned window was unusable, or the
-                // provider answered a different range than it was asked for). Looping would spin
-                // the GPU forever on a document that can never complete — the exact non-termination
-                // class this work exists to remove — so escalate through the retry seam instead.
-                throw new IllegalStateException(
-                    "windowed embed made no progress at window " + nextWindow);
-              }
-              nextWindow = advancedTo;
-              if (nextWindow >= slice.totalWindows()) {
-                break;
-              }
-              if (stopRequested(context, unitsDone, epochAtSelection)) {
-                aborted = true;
-                abortedOnThisDocument = true;
-                stoppedOnThisDocument = true;
-                break;
-              }
-              if (embedShareSpent(context, unitsDone, otherStagesHaveWork)) {
-                stoppedOnThisDocument = true;
-                break;
-              }
+      // docs/tempdocs/809-human-validation-0.2.0-findings.md: keep the encoder unit as the scheduling
+      // boundary. One chunk batch gets a turn before parent windows; remaining ordinary work
+      // follows them. Without window work the ordinary batch path retains its original order.
+      priorityChunkEnd = windowedDocIds.isEmpty() ? 0 : Math.min(priorityChunkEnd, EMBED_ENCODE_SLICE);
+      int sliceStart = 0;
+      for (int embedTurn = 0; embedTurn < 2; embedTurn++) {
+        if (embedTurn == 1 && !windowedDocIds.isEmpty() && embedAvailable) {
+          EmbeddingProvider provider = context.embeddingProviderSupplier().get();
+          WindowedEmbedProgress progress = context.windowedEmbedProgress();
+          for (int i = 0; i < windowedDocIds.size(); i++) {
+            String docId = windowedDocIds.get(i);
+            boolean directFallback = directWindowedDocIds.contains(docId);
+            // A null/OOM classification is not resumable progress. Ignore only the deadline it may
+            // have spent until one real window is recorded; hard preemption and deletion still win.
+            if (directFallback
+                && windowUnitsDone == 0
+                && (context.hardStopRequestedSupplier().getAsBoolean()
+                    || context.indexingCoordinator().bulkDeleteEpoch() != epochAtSelection)) {
+              aborted = true;
+              docsSkipped += windowedDocIds.size() - i;
+              break;
             }
-            if (progress.isComplete(docId)) {
-              float[] vector = progress.complete(docId);
-              Map<String, Object> updates = updatesByDocId.get(docId);
-              updates.put(isChunk ? SchemaFields.CHUNK_VECTOR : SchemaFields.VECTOR, vector);
-              updates.put(
-                  isChunk ? SchemaFields.CHUNK_EMBEDDING_STATUS : SchemaFields.EMBEDDING_STATUS,
-                  SchemaFields.EMBEDDING_STATUS_COMPLETED);
-              updates.put(
-                  isChunk
-                      ? SchemaFields.CHUNK_EMBEDDING_RETRY_COUNT
-                      : SchemaFields.EMBEDDING_RETRY_COUNT,
-                  "0");
-              windowDocsCompleted++;
-              stageAdvancedDocIds.add(docId);
-              completedWindowDocIds.add(docId);
-            } else {
-              // Interrupted part-way. The document stays PENDING with no update of any kind — a
-              // partial mean-pool is NOT this document's embedding and must never be written — but
-              // its windows are now held in the accumulator, so the next cycle continues instead of
-              // starting over. This is the whole fix.
-              windowDocsResumable++;
+            int schedulingUnitsDone = directFallback ? windowUnitsDone : unitsDone;
+            if (stopRequested(context, schedulingUnitsDone, epochAtSelection)) {
+              aborted = true;
+              docsSkipped += windowedDocIds.size() - i;
+              break;
             }
-          } catch (Exception e) {
-            context
-                .log()
-                .warn(
-                    "Combined backfill: windowed embed failed for {}: {}", docId, e.getMessage());
-            if (!embeddingReady(context, provider) || SpladeBackfillOps.isSystemicFailure(e)) break;
-            progress.forget(docId);
-            Map<String, String> docFields = batchedFields.getOrDefault(docId, Map.of());
-            int currentRetryCount =
-                parseRetryCountOrZero(
-                    docFields.get(
-                        isChunk
-                            ? SchemaFields.CHUNK_EMBEDDING_RETRY_COUNT
-                            : SchemaFields.EMBEDDING_RETRY_COUNT));
-            updatesByDocId
-                .get(docId)
-                .putAll(
-                    isChunk
-                        ? EmbeddingBackfillOps.computeChunkEmbeddingFailureUpdate(currentRetryCount)
-                        : EmbeddingBackfillOps.computeEmbeddingFailureUpdate(currentRetryCount));
-            embedFailed++;
-            stageAdvancedDocIds.add(docId);
-          }
-          if (stoppedOnThisDocument) {
-            int remaining = windowedDocIds.size() - i - 1;
-            if (abortedOnThisDocument) {
-              docsSkipped += remaining;
-            } else {
-              embedDeferredForOtherStages += remaining;
+            if (embedShareSpent(context, schedulingUnitsDone, otherStagesHaveWork)) {
+              embedDeferredForOtherStages += windowedDocIds.size() - i;
+              break;
             }
-            break;
-          }
-        }
-      }
-
-      if (!embedDocIds.isEmpty() && embedAvailable) {
-        EmbeddingProvider provider = context.embeddingProviderSupplier().get();
-        // Tempdoc 809 finding 3: encode in EMBED_ENCODE_SLICE-document slices instead of one call
-        // over the whole batch. Same native forward passes (the encoder sub-batches at exactly this
-        // size anyway), but the loop can now be left between them — which is what makes the
-        // scheduler's cycle budget, ingest preemption and root-removal cancellation enforceable
-        // rather than aspirational.
-        for (int sliceStart = 0; sliceStart < embedDocIds.size(); sliceStart += EMBED_ENCODE_SLICE) {
-          if (stopRequested(context, unitsDone, epochAtSelection)) {
-            aborted = true;
-            docsSkipped += embedDocIds.size() - sliceStart;
-            break;
-          }
-          if (embedShareSpent(context, unitsDone, otherStagesHaveWork)) {
-            embedDeferredForOtherStages += embedDocIds.size() - sliceStart;
-            break;
-          }
-          int sliceEnd = Math.min(sliceStart + EMBED_ENCODE_SLICE, embedDocIds.size());
-          List<String> sliceDocIds = embedDocIds.subList(sliceStart, sliceEnd);
-          pacer.beforeUnit(sliceDocIds.size());
-          if (!embeddingReady(context, provider)) break;
-          List<float[]> vectors;
-          try {
-            vectors = provider.embedDocumentBatch(embedContents.subList(sliceStart, sliceEnd));
-          } catch (Exception failure) {
-            if (!embeddingReady(context, provider) || SpladeBackfillOps.isSystemicFailure(failure)) break;
-            vectors = null;
-          } finally {
-            pacer.afterUnit(sliceDocIds.size());
-          }
-          unitsDone++;
-          if (!embeddingReady(context, provider)) break;
-          boolean fallback = vectors == null || vectors.size() != sliceDocIds.size();
-          if (fallback) vectors = new ArrayList<>(java.util.Collections.nCopies(sliceDocIds.size(), null));
-          for (int i = 0; i < sliceDocIds.size(); i++) {
             if (!embeddingReady(context, provider)) break;
-            if (fallback) {
-              // The failed batch is not a document attempt. Reach at least one individual call,
-              // even when it consumed the deadline; hard stops still pre-empt immediately.
-              if (context.hardStopRequestedSupplier().getAsBoolean()
-                  || context.indexingCoordinator().bulkDeleteEpoch() != epochAtSelection
-                  || (i > 0 && stopRequested(context, unitsDone, epochAtSelection))) {
-                aborted = true;
-                docsSkipped += sliceDocIds.size() - i;
-                break;
+            String content = windowedContents.get(i);
+            boolean isChunk = chunkIdsInBatch.contains(docId);
+            // Scoped to THIS document, deliberately: `aborted` is sticky across phases (Phase 3a-i
+            // may already have set it), so reading it to decide whether the windowed lane stopped
+            // would end the lane on a stale flag and mis-report every remaining document as skipped.
+            boolean stoppedOnThisDocument = false;
+            boolean abortedOnThisDocument = false;
+            try {
+              int nextWindow = progress.nextWindow(docId, content);
+              while (!progress.isComplete(docId)) {
+                if (!embeddingReady(context, provider)) {
+                  stoppedOnThisDocument = true;
+                  break;
+                }
+                // A window is one encoder forward pass of at most a document's length, so the
+                // embedding slice counts windows here; counted whether or not the call succeeds.
+                pacer.beforeUnit(EMBED_WINDOW_SLICE);
+                EmbeddingProvider.WindowSlice slice;
+                try {
+                  slice = provider.embedDocumentWindows(content, nextWindow, EMBED_WINDOW_SLICE);
+                } finally {
+                  pacer.afterUnit(EMBED_WINDOW_SLICE);
+                }
+                if (slice == null || slice.vectors().isEmpty()) {
+                  // Either the provider stopped exposing windows mid-batch or it has no window at
+                  // this index — neither can produce a vector, so escalate through the same retry
+                  // seam every other embed failure uses rather than looping.
+                  throw new IllegalStateException(
+                      "windowed embed returned no vectors at window " + nextWindow);
+                }
+                unitsDone++;
+                windowUnitsDone++;
+                int advancedTo =
+                    progress.record(
+                        docId, content, slice.totalWindows(), nextWindow, slice.vectors());
+                if (advancedTo <= nextWindow) {
+                  // The accumulator did not advance (every returned window was unusable, or the
+                  // provider answered a different range than it was asked for). Looping would spin
+                  // the GPU forever on a document that can never complete — the exact non-termination
+                  // class this work exists to remove — so escalate through the retry seam instead.
+                  throw new IllegalStateException(
+                      "windowed embed made no progress at window " + nextWindow);
+                }
+                nextWindow = advancedTo;
+                if (nextWindow >= slice.totalWindows()) {
+                  break;
+                }
+                if (stopRequested(context, unitsDone, epochAtSelection)) {
+                  aborted = true;
+                  abortedOnThisDocument = true;
+                  stoppedOnThisDocument = true;
+                  break;
+                }
+                if (embedShareSpent(context, unitsDone, otherStagesHaveWork)) {
+                  stoppedOnThisDocument = true;
+                  break;
+                }
               }
-              pacer.beforeUnit(1);
-              try {
-                vectors.set(i, provider.embedDocument(embedContents.get(sliceStart + i),
-                    InferenceRequest.background()));
-              } catch (Exception failure) {
-                if (!embeddingReady(context, provider) || SpladeBackfillOps.isSystemicFailure(failure)) break;
-              } finally {
-                pacer.afterUnit(1);
+              if (progress.isComplete(docId)) {
+                float[] vector = progress.complete(docId);
+                Map<String, Object> updates = updatesByDocId.get(docId);
+                updates.put(isChunk ? SchemaFields.CHUNK_VECTOR : SchemaFields.VECTOR, vector);
+                updates.put(
+                    isChunk ? SchemaFields.CHUNK_EMBEDDING_STATUS : SchemaFields.EMBEDDING_STATUS,
+                    SchemaFields.EMBEDDING_STATUS_COMPLETED);
+                updates.put(
+                    isChunk
+                        ? SchemaFields.CHUNK_EMBEDDING_RETRY_COUNT
+                        : SchemaFields.EMBEDDING_RETRY_COUNT,
+                    "0");
+                windowDocsCompleted++;
+                stageAdvancedDocIds.add(docId);
+                completedWindowDocIds.add(docId);
+              } else {
+                // Interrupted part-way. The document stays PENDING with no update of any kind — a
+                // partial mean-pool is NOT this document's embedding and must never be written — but
+                // its windows are now held in the accumulator, so the next cycle continues instead of
+                // starting over. This is the whole fix.
+                windowDocsResumable++;
               }
-              if (!embeddingReady(context, provider)) break;
-            }
-            float[] vector = vectors.get(i);
-            String eid = sliceDocIds.get(i);
-            Map<String, Object> updates = updatesByDocId.get(eid);
-            boolean isChunk = chunkIdsInBatch.contains(eid);
-            if (vector != null && vector.length > 0) {
-              // Chunk docs use CHUNK_VECTOR/CHUNK_EMBEDDING_STATUS; parents use
-              // VECTOR/EMBEDDING_STATUS
-              updates.put(isChunk ? SchemaFields.CHUNK_VECTOR : SchemaFields.VECTOR, vector);
-              updates.put(
-                  isChunk ? SchemaFields.CHUNK_EMBEDDING_STATUS : SchemaFields.EMBEDDING_STATUS,
-                  SchemaFields.EMBEDDING_STATUS_COMPLETED);
-              updates.put(
-                  isChunk
-                      ? SchemaFields.CHUNK_EMBEDDING_RETRY_COUNT
-                      : SchemaFields.EMBEDDING_RETRY_COUNT,
-                  "0");
-              stageAdvancedDocIds.add(eid);
-            } else {
-              // Tempdoc 700: escalate instead of silently resetting to PENDING forever. Look up
-              // the retry count already fetched in the batched pre-fetch, delegate the
-              // increment/FAILED-at-max decision to the same pure helper the individual
-              // EmbeddingBackfillOps siblings use, and merge the result into this doc's entry in
-              // updatesByDocId — never a direct updateDocument call (preserves the
-              // single-batched-write invariant, tempdoc 312 BUG-1).
-              Map<String, String> eidFields = batchedFields.getOrDefault(eid, Map.of());
+            } catch (Exception e) {
+              context
+                  .log()
+                  .warn(
+                      "Combined backfill: windowed embed failed for {}: {}", docId, e.getMessage());
+              if (!embeddingReady(context, provider) || SpladeBackfillOps.isSystemicFailure(e)) break;
+              progress.forget(docId);
+              Map<String, String> docFields = batchedFields.getOrDefault(docId, Map.of());
               int currentRetryCount =
                   parseRetryCountOrZero(
-                      eidFields.get(
+                      docFields.get(
                           isChunk
                               ? SchemaFields.CHUNK_EMBEDDING_RETRY_COUNT
                               : SchemaFields.EMBEDDING_RETRY_COUNT));
-              updates.putAll(
-                  isChunk
-                      ? EmbeddingBackfillOps.computeChunkEmbeddingFailureUpdate(currentRetryCount)
-                      : EmbeddingBackfillOps.computeEmbeddingFailureUpdate(currentRetryCount));
+              updatesByDocId
+                  .get(docId)
+                  .putAll(
+                      isChunk
+                          ? EmbeddingBackfillOps.computeChunkEmbeddingFailureUpdate(currentRetryCount)
+                          : EmbeddingBackfillOps.computeEmbeddingFailureUpdate(currentRetryCount));
               embedFailed++;
-              stageAdvancedDocIds.add(eid);
+              stageAdvancedDocIds.add(docId);
+            }
+            if (stoppedOnThisDocument) {
+              int remaining = windowedDocIds.size() - i - 1;
+              if (abortedOnThisDocument) {
+                docsSkipped += remaining;
+              } else {
+                embedDeferredForOtherStages += remaining;
+              }
+              break;
+            }
+          }
+        }
+
+        if (!embedDocIds.isEmpty() && embedAvailable) {
+          EmbeddingProvider provider = context.embeddingProviderSupplier().get();
+          // Tempdoc 809 finding 3: encode in EMBED_ENCODE_SLICE-document slices instead of one call
+          // over the whole batch. Same native forward passes (the encoder sub-batches at exactly this
+          // size anyway), but the loop can now be left between them — which is what makes the
+          // scheduler's cycle budget, ingest preemption and root-removal cancellation enforceable
+          // rather than aspirational.
+          int sliceLimit = embedTurn == 0 ? priorityChunkEnd : embedDocIds.size();
+          for (; sliceStart < sliceLimit;
+              sliceStart = Math.min(sliceStart + EMBED_ENCODE_SLICE, sliceLimit)) {
+            if (stopRequested(context, unitsDone, epochAtSelection)) {
+              aborted = true;
+              if (embedTurn == 1) docsSkipped += embedDocIds.size() - sliceStart;
+              break;
+            }
+            if (embedShareSpent(context, unitsDone, otherStagesHaveWork)) {
+              if (embedTurn == 1) embedDeferredForOtherStages += embedDocIds.size() - sliceStart;
+              break;
+            }
+            int sliceEnd = Math.min(sliceStart + EMBED_ENCODE_SLICE, sliceLimit);
+            List<String> sliceDocIds = embedDocIds.subList(sliceStart, sliceEnd);
+            pacer.beforeUnit(sliceDocIds.size());
+            if (!embeddingReady(context, provider)) break;
+            List<float[]> vectors;
+            try {
+              vectors = provider.embedDocumentBatch(embedContents.subList(sliceStart, sliceEnd));
+            } catch (Exception failure) {
+              if (!embeddingReady(context, provider) || SpladeBackfillOps.isSystemicFailure(failure)) break;
+              vectors = null;
+            } finally {
+              pacer.afterUnit(sliceDocIds.size());
+            }
+            unitsDone++;
+            if (!embeddingReady(context, provider)) break;
+            boolean fallback = vectors == null || vectors.size() != sliceDocIds.size();
+            if (fallback) vectors = new ArrayList<>(java.util.Collections.nCopies(sliceDocIds.size(), null));
+            for (int i = 0; i < sliceDocIds.size(); i++) {
+              if (!embeddingReady(context, provider)) break;
+              if (fallback) {
+                // The failed batch is not a document attempt. Reach at least one individual call,
+                // even when it consumed the deadline; hard stops still pre-empt immediately.
+                if (context.hardStopRequestedSupplier().getAsBoolean()
+                    || context.indexingCoordinator().bulkDeleteEpoch() != epochAtSelection
+                    || (i > 0 && stopRequested(context, unitsDone, epochAtSelection))) {
+                  aborted = true;
+                  docsSkipped += sliceDocIds.size() - i;
+                  break;
+                }
+                pacer.beforeUnit(1);
+                try {
+                  vectors.set(i, provider.embedDocument(embedContents.get(sliceStart + i),
+                      InferenceRequest.background()));
+                } catch (Exception failure) {
+                  if (!embeddingReady(context, provider) || SpladeBackfillOps.isSystemicFailure(failure)) break;
+                } finally {
+                  pacer.afterUnit(1);
+                }
+                if (!embeddingReady(context, provider)) break;
+              }
+              float[] vector = vectors.get(i);
+              String eid = sliceDocIds.get(i);
+              Map<String, Object> updates = updatesByDocId.get(eid);
+              boolean isChunk = chunkIdsInBatch.contains(eid);
+              if (vector != null && vector.length > 0) {
+                // Chunk docs use CHUNK_VECTOR/CHUNK_EMBEDDING_STATUS; parents use
+                // VECTOR/EMBEDDING_STATUS
+                updates.put(isChunk ? SchemaFields.CHUNK_VECTOR : SchemaFields.VECTOR, vector);
+                updates.put(
+                    isChunk ? SchemaFields.CHUNK_EMBEDDING_STATUS : SchemaFields.EMBEDDING_STATUS,
+                    SchemaFields.EMBEDDING_STATUS_COMPLETED);
+                updates.put(
+                    isChunk
+                        ? SchemaFields.CHUNK_EMBEDDING_RETRY_COUNT
+                        : SchemaFields.EMBEDDING_RETRY_COUNT,
+                    "0");
+                stageAdvancedDocIds.add(eid);
+              } else {
+                // Tempdoc 700: escalate instead of silently resetting to PENDING forever. Look up
+                // the retry count already fetched in the batched pre-fetch, delegate the
+                // increment/FAILED-at-max decision to the same pure helper the individual
+                // EmbeddingBackfillOps siblings use, and merge the result into this doc's entry in
+                // updatesByDocId — never a direct updateDocument call (preserves the
+                // single-batched-write invariant, tempdoc 312 BUG-1).
+                Map<String, String> eidFields = batchedFields.getOrDefault(eid, Map.of());
+                int currentRetryCount =
+                    parseRetryCountOrZero(
+                        eidFields.get(
+                            isChunk
+                                ? SchemaFields.CHUNK_EMBEDDING_RETRY_COUNT
+                                : SchemaFields.EMBEDDING_RETRY_COUNT));
+                updates.putAll(
+                    isChunk
+                        ? EmbeddingBackfillOps.computeChunkEmbeddingFailureUpdate(currentRetryCount)
+                        : EmbeddingBackfillOps.computeEmbeddingFailureUpdate(currentRetryCount));
+                embedFailed++;
+                stageAdvancedDocIds.add(eid);
+              }
             }
           }
         }

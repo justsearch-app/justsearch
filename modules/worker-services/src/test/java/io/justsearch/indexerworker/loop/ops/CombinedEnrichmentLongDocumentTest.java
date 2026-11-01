@@ -11,11 +11,13 @@ import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
+import ai.onnxruntime.OrtException;
 import io.justsearch.adapters.lucene.runtime.CommitOps;
 import io.justsearch.adapters.lucene.runtime.DocumentFieldOps;
 import io.justsearch.adapters.lucene.runtime.IndexingCoordinator;
 import io.justsearch.adapters.lucene.runtime.LuceneRuntimeTypes;
 import io.justsearch.indexerworker.embed.EmbeddingProvider;
+import io.justsearch.indexerworker.embed.EmbeddingService;
 import io.justsearch.indexerworker.loop.pacing.IndexingPacing;
 import io.justsearch.indexerworker.ner.NerResult;
 import io.justsearch.indexerworker.ner.NerService;
@@ -34,6 +36,9 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.slf4j.LoggerFactory;
@@ -107,6 +112,12 @@ class CombinedEnrichmentLongDocumentTest {
   /** Encoder units spent since the last {@link #newCycle()} — the simulated cycle budget. */
   private final AtomicInteger unitsThisCycle = new AtomicInteger();
   private final AtomicInteger singlePassRequests = new AtomicInteger();
+  private final AtomicInteger elapsedMs = new AtomicInteger();
+  private int probeCostMs;
+  private int windowCostMs;
+  private int batchCostMs;
+  private int windowsPerLongDoc = WINDOWS_PER_LONG_DOC;
+  private final List<List<String>> batchRequests = new ArrayList<>();
 
   /** Every {@code (docId, fromWindow)} the encoder was asked for, in order. */
   private final List<String> windowRequests = new ArrayList<>();
@@ -185,7 +196,7 @@ class CombinedEnrichmentLongDocumentTest {
         .thenAnswer(
             inv -> {
               String text = inv.getArgument(0);
-              return text.startsWith("LONG:") ? WINDOWS_PER_LONG_DOC : 1;
+              return text.startsWith("LONG:") ? windowsPerLongDoc : 1;
             });
 
     lenient()
@@ -195,14 +206,15 @@ class CombinedEnrichmentLongDocumentTest {
               String text = inv.getArgument(0);
               int from = inv.getArgument(1);
               int max = inv.getArgument(2);
+              elapsedMs.addAndGet(windowCostMs);
               windowRequests.add(docIdOf(text) + "@" + from);
               unitsThisCycle.incrementAndGet();
-              int count = Math.max(0, Math.min(max, WINDOWS_PER_LONG_DOC - from));
+              int count = Math.max(0, Math.min(max, windowsPerLongDoc - from));
               List<float[]> vectors = new ArrayList<>(count);
               for (int i = 0; i < count; i++) {
                 vectors.add(new float[] {1f, 0f});
               }
-              return new EmbeddingProvider.WindowSlice(vectors, from, WINDOWS_PER_LONG_DOC);
+              return new EmbeddingProvider.WindowSlice(vectors, from, windowsPerLongDoc);
             });
 
     lenient()
@@ -210,6 +222,8 @@ class CombinedEnrichmentLongDocumentTest {
         .thenAnswer(
             inv -> {
               List<String> texts = inv.getArgument(0);
+              batchRequests.add(List.copyOf(texts));
+              elapsedMs.addAndGet(batchCostMs);
               unitsThisCycle.incrementAndGet();
               List<float[]> out = new ArrayList<>(texts.size());
               for (int i = 0; i < texts.size(); i++) out.add(new float[] {1f, 0f});
@@ -220,6 +234,7 @@ class CombinedEnrichmentLongDocumentTest {
         .when(embeddingProvider.embedWithSpans(anyString(), org.mockito.ArgumentMatchers.any(int[][].class)))
         .thenAnswer(
             inv -> {
+              elapsedMs.addAndGet(probeCostMs);
               singlePassRequests.incrementAndGet();
               unitsThisCycle.incrementAndGet();
               return null;
@@ -271,6 +286,7 @@ class CombinedEnrichmentLongDocumentTest {
 
   private void newCycle() {
     unitsThisCycle.set(0);
+    elapsedMs.set(0);
   }
 
   private int pendingEmbedDocs() {
@@ -337,6 +353,187 @@ class CombinedEnrichmentLongDocumentTest {
         hardStop,
         embedShare,
         progress);
+  }
+
+  private void seedChunks(int count) {
+    for (int i = 0; i < count; i++) {
+      String id = "chunk-" + i;
+      contentByDoc.put(id, "CHUNK:" + id);
+      fakeIndex.put(id, new HashMap<>(Map.of(
+          SchemaFields.IS_CHUNK, "true",
+          SchemaFields.CHUNK_EMBEDDING_STATUS, SchemaFields.EMBEDDING_STATUS_PENDING)));
+    }
+  }
+
+  private long completed(String statusField) {
+    return fakeIndex.values().stream()
+        .filter(state -> SchemaFields.EMBEDDING_STATUS_COMPLETED.equals(state.get(statusField)))
+        .count();
+  }
+
+  private CombinedEnrichmentBackfillOps.BackfillContext timedContext(
+      WindowedEmbedProgress progress, BooleanSupplier hardStop) {
+    probeCostMs = 80;
+    windowCostMs = 270;
+    batchCostMs = 70;
+    return new CombinedEnrichmentBackfillOps.BackfillContext(
+        documentFieldOps, indexingCoordinator, commitOps, IndexingPacing.unthrottled(),
+        () -> embeddingProvider, () -> null, () -> null, () -> true, () -> true,
+        100, LoggerFactory.getLogger(CombinedEnrichmentLongDocumentTest.class),
+        true, false, true, 50, new ArrayDeque<>(), new ArrayDeque<>(), new int[] {0},
+        () -> elapsedMs.get() >= 5_000 || hardStop.getAsBoolean(), hardStop,
+        () -> elapsedMs.get() >= 3_000, progress);
+  }
+
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  @DisplayName("S2/S3/S6: one costly fallback probe leaves time for parents and chunks")
+  void manyLateChunkedParentsDoNotSpendTheCycleOnClassification(boolean arenaOom) {
+    windowsPerLongDoc = 42;
+    for (int i = 0; i < 100; i++) seedLateChunkedLongParent("long-" + i);
+    seedChunks(50);
+    if (arenaOom) {
+      lenient().when(embeddingProvider.embedWithSpans(
+          anyString(), org.mockito.ArgumentMatchers.any(int[][].class))).thenAnswer(inv -> {
+            singlePassRequests.incrementAndGet();
+            unitsThisCycle.incrementAndGet();
+            elapsedMs.addAndGet(probeCostMs);
+            throw new RuntimeException(new OrtException(
+                "BFCArena::AllocateRawInternal: Failed to allocate memory"));
+          });
+    }
+    WindowedEmbedProgress progress = new WindowedEmbedProgress();
+    for (int cycle = 0; cycle < 4; cycle++) {
+      newCycle();
+      int probesBefore = singlePassRequests.get();
+      int windowsBefore = windowRequests.size();
+      var outcome = CombinedEnrichmentBackfillOps.processCombinedBackfill(
+          timedContext(progress, () -> false));
+      assertTrue(outcome.wroteAnything(), "each cycle must publish or advance windows");
+      assertTrue(windowRequests.size() > windowsBefore, "every cycle must embed real windows");
+      assertEquals(1, singlePassRequests.get() - probesBefore,
+          "at most one over-limit/OOM classification may consume a cycle");
+      assertTrue(completed(SchemaFields.EMBEDDING_STATUS) >= cycle + 1,
+          "parents must complete steadily with 100 parents pending");
+      assertTrue(completed(SchemaFields.CHUNK_EMBEDDING_STATUS) > 0,
+          "chunks must publish while parents are pending");
+      for (var state : fakeIndex.values()) {
+        assertTrue(!state.containsKey(SchemaFields.EMBEDDING_RETRY_COUNT)
+                || "0".equals(state.get(SchemaFields.EMBEDDING_RETRY_COUNT)),
+            "null/OOM fallback and unclassified deferral must never charge retries");
+      }
+    }
+    assertTrue(pendingEmbedDocs() > 90, "the test must retain a large parent backlog");
+    assertEquals(50, completed(SchemaFields.CHUNK_EMBEDDING_STATUS));
+  }
+
+  @Test
+  @DisplayName("S2/S3: resumable parents use the whole budget but give chunks a bounded turn")
+  void chunksAdvanceDuringResumableParentBacklogAndThroughTheChunkOnlyTail() {
+    WindowedEmbedProgress progress = new WindowedEmbedProgress();
+    for (int i = 0; i < 100; i++) {
+      String id = "long-" + i;
+      seedLateChunkedLongParent(id);
+      progress.record(id, contentByDoc.get(id), WINDOWS_PER_LONG_DOC, 0,
+          java.util.Collections.nCopies(WINDOW_SLICE, new float[] {1f, 0f}));
+    }
+    seedChunks(50);
+    long chunksBefore = 0;
+    for (int cycle = 0; cycle < 6; cycle++) {
+      newCycle();
+      int batchesBefore = batchRequests.size();
+      CombinedEnrichmentBackfillOps.processCombinedBackfill(timedContext(progress, () -> false));
+      long chunksAfter = completed(SchemaFields.CHUNK_EMBEDDING_STATUS);
+      assertTrue(chunksAfter > chunksBefore,
+          "chunks must publish each cycle (stronger than once per three cycles)");
+      assertEquals(1, batchRequests.size() - batchesBefore,
+          "chunk work ahead of the parent windows is bounded to one encoder batch");
+      assertTrue(elapsedMs.get() >= 5_000,
+          "an embedding-only backlog must use the full cycle, ignoring the 3s stage share");
+      chunksBefore = chunksAfter;
+    }
+    assertTrue(pendingEmbedDocs() > 0);
+    assertEquals(0, singlePassRequests.get(), "resuming parents bypass classification");
+    fakeIndex.entrySet().removeIf(e -> e.getValue().containsKey(SchemaFields.EMBEDDING_STATUS));
+    newCycle();
+    int windowsBefore = windowRequests.size();
+    CombinedEnrichmentBackfillOps.processCombinedBackfill(timedContext(progress, () -> false));
+    assertEquals(50, completed(SchemaFields.CHUNK_EMBEDDING_STATUS),
+        "the chunk-only tail must finish on the ordinary batch path");
+    assertEquals(windowsBefore, windowRequests.size());
+  }
+
+  @ParameterizedTest
+  @CsvSource({"1,false", "2,false", "3,false", "1,true", "2,true", "3,true"})
+  @DisplayName("P1/P4: hard preemption at classification, chunk and window boundaries")
+  void hardPreemptionStopsAtEachEmbeddingBoundary(int stopAfterUnits, boolean bulkDelete) {
+    if (bulkDelete) {
+      lenient().when(indexingCoordinator.bulkDeleteEpoch()).thenAnswer(
+          inv -> unitsThisCycle.get() >= stopAfterUnits ? 1L : 0L);
+    }
+    for (int i = 0; i < 100; i++) seedLateChunkedLongParent("long-" + i);
+    seedChunks(50);
+    WindowedEmbedProgress progress = new WindowedEmbedProgress();
+    newCycle();
+    var outcome = CombinedEnrichmentBackfillOps.processCombinedBackfill(
+        timedContext(progress, () -> !bulkDelete && unitsThisCycle.get() >= stopAfterUnits));
+    assertTrue(outcome.aborted());
+    assertEquals(stopAfterUnits, unitsThisCycle.get());
+    assertTrue(windowRequests.size() <= 1, "preemption permits at most one window slice");
+    assertTrue(windowRequests.stream().allMatch(r -> r.equals("long-0@0")),
+        "preemption must stop before another window or parent starts");
+    assertEquals(0, completed(SchemaFields.EMBEDDING_STATUS), "no partial parent publication");
+    for (var state : fakeIndex.values()) {
+      assertTrue(!state.containsKey(SchemaFields.VECTOR));
+      assertTrue(!state.containsKey(SchemaFields.EMBEDDING_RETRY_COUNT));
+    }
+  }
+
+  @Test
+  @DisplayName("P13: unclassified short parents keep their single-pass vector on a later cycle")
+  void classificationDeferralDoesNotDowngradeShortParentsToWindows() {
+    seedLateChunkedLongParent("short-first");
+    seedLateChunkedLongParent("long-middle");
+    seedLateChunkedLongParent("short-last");
+    lenient().when(embeddingProvider.embedWithSpans(
+        anyString(), org.mockito.ArgumentMatchers.any(int[][].class))).thenAnswer(inv -> {
+          singlePassRequests.incrementAndGet();
+          unitsThisCycle.incrementAndGet();
+          if (inv.<String>getArgument(0).contains("long-middle")) return null;
+          return new EmbeddingService.ChunkedEmbedding(new float[] {0f, 1f}, List.of(), 1);
+        });
+    WindowedEmbedProgress progress = new WindowedEmbedProgress();
+    newCycle();
+    CombinedEnrichmentBackfillOps.processCombinedBackfill(timedContext(progress, () -> false));
+    newCycle();
+    CombinedEnrichmentBackfillOps.processCombinedBackfill(timedContext(progress, () -> false));
+    assertEquals(0f, ((float[]) fakeIndex.get("short-last").get(SchemaFields.VECTOR))[0]);
+    assertEquals(1f, ((float[]) fakeIndex.get("short-last").get(SchemaFields.VECTOR))[1]);
+    assertTrue(windowRequests.stream().allMatch(r -> r.startsWith("long-middle@")));
+  }
+
+  @Test
+  @DisplayName("P4: real window failures still consume one retry and reach FAILED")
+  void realWindowFailureStillReachesTheRetryLimit() {
+    seedLateChunkedLongParent("bad-window");
+    lenient().when(embeddingProvider.embedDocumentWindows(anyString(), anyInt(), anyInt()))
+        .thenThrow(new IllegalArgumentException("bad window input"));
+    WindowedEmbedProgress progress = new WindowedEmbedProgress();
+    for (int attempt = 1; attempt <= SchemaFields.EMBEDDING_MAX_RETRIES; attempt++) {
+      newCycle();
+      CombinedEnrichmentBackfillOps.processCombinedBackfill(timedContext(progress, () -> false));
+      assertEquals(Integer.toString(attempt),
+          fakeIndex.get("bad-window").get(SchemaFields.EMBEDDING_RETRY_COUNT));
+      assertEquals(attempt == SchemaFields.EMBEDDING_MAX_RETRIES
+              ? SchemaFields.EMBEDDING_STATUS_FAILED : SchemaFields.EMBEDDING_STATUS_PENDING,
+          fakeIndex.get("bad-window").get(SchemaFields.EMBEDDING_STATUS));
+      assertEquals(0, progress.trackedDocuments());
+    }
+    assertEquals(SchemaFields.EMBEDDING_MAX_RETRIES, singlePassRequests.get());
+    newCycle();
+    var outcome = CombinedEnrichmentBackfillOps.processCombinedBackfill(
+        timedContext(progress, () -> false));
+    assertTrue(!outcome.recordTiming(), "a terminal failure leaves the pending population");
   }
 
   @Test
