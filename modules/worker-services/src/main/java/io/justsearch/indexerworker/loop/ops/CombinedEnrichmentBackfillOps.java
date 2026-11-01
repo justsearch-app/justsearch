@@ -749,8 +749,23 @@ public final class CombinedEnrichmentBackfillOps {
       priorityChunkEnd = windowedDocIds.isEmpty() && lateChunkingDocIds.isEmpty()
           ? 0 : Math.min(priorityChunkEnd, EMBED_ENCODE_SLICE);
       int sliceStart = 0;
-      embeddingTurns:
+      boolean priorityTurnEndedNormally = true;
       for (int embedTurn = 0; embedTurn < 2; embedTurn++) {
+        if (embedTurn == 1 && priorityChunkEnd > 0) {
+          // docs/tempdocs/809-human-validation-0.2.0-findings.md: a chunk turn may yield
+          // only to a normal parent turn; cancellation must retain the batch's stop accounting.
+          boolean stopped = context.hardStopRequestedSupplier().getAsBoolean()
+              || stopRequested(context, unitsDone, epochAtSelection);
+          if (!priorityTurnEndedNormally || stopped
+              || !embeddingReady(context, selectedEmbeddingProvider)) {
+            docsSkipped = lateChunkingDocIds.size() + windowedDocIds.size();
+            for (String docId : embedDocIds) {
+              if (!stageAdvancedDocIds.contains(docId)) docsSkipped++;
+            }
+            aborted |= stopped;
+            break;
+          }
+        }
         // Phase 3a-i: Late-chunking single-pass embed (tempdoc 691 forensics fold-in). Tries one
         // whole-document forward pass per chunked parent. A null result (content over the raised
         // single-pass limit) or a GPU BFC-arena OOM folds the doc INLINE into the window list below
@@ -999,33 +1014,44 @@ public final class CombinedEnrichmentBackfillOps {
             if (stopRequested(context, unitsDone, epochAtSelection)) {
               aborted = true;
               docsSkipped += embedDocIds.size() - sliceStart;
-              break embeddingTurns;
+              break;
             }
             if (embedShareSpent(context, unitsDone, otherStagesHaveWork)) {
               embedDeferredForOtherStages += embedDocIds.size() - sliceStart;
-              break embeddingTurns;
+              break;
             }
             int sliceEnd = Math.min(sliceStart + EMBED_ENCODE_SLICE, sliceLimit);
             List<String> sliceDocIds = embedDocIds.subList(sliceStart, sliceEnd);
             pacer.beforeUnit(sliceDocIds.size());
-            if (!embeddingReady(context, provider)) break embeddingTurns;
+            if (!embeddingReady(context, provider)) {
+              priorityTurnEndedNormally = false;
+              break;
+            }
             List<float[]> vectors;
             try {
               vectors = provider.embedDocumentBatch(embedContents.subList(sliceStart, sliceEnd));
             } catch (Exception failure) {
               if (!embeddingReady(context, provider) || SpladeBackfillOps.isSystemicFailure(failure)) {
-                break embeddingTurns;
+                priorityTurnEndedNormally = false;
+                break;
               }
               vectors = null;
             } finally {
               pacer.afterUnit(sliceDocIds.size());
-              unitsDone++;
+              if (embedTurn == 0) unitsDone++;
             }
-            if (!embeddingReady(context, provider)) break embeddingTurns;
+            if (embedTurn == 1) unitsDone++;
+            if (!embeddingReady(context, provider)) {
+              priorityTurnEndedNormally = false;
+              break;
+            }
             boolean fallback = vectors == null || vectors.size() != sliceDocIds.size();
             if (fallback) vectors = new ArrayList<>(java.util.Collections.nCopies(sliceDocIds.size(), null));
             for (int i = 0; i < sliceDocIds.size(); i++) {
-              if (!embeddingReady(context, provider)) break embeddingTurns;
+              if (!embeddingReady(context, provider)) {
+                priorityTurnEndedNormally = false;
+                break;
+              }
               if (fallback) {
                 // The failed batch is not a document attempt. Reach at least one individual call,
                 // even when it consumed the deadline; hard stops still pre-empt immediately.
@@ -1033,8 +1059,8 @@ public final class CombinedEnrichmentBackfillOps {
                     || context.indexingCoordinator().bulkDeleteEpoch() != epochAtSelection
                     || (i > 0 && stopRequested(context, unitsDone, epochAtSelection))) {
                   aborted = true;
-                  docsSkipped += embedDocIds.size() - sliceStart - i;
-                  break embeddingTurns;
+                  docsSkipped += sliceDocIds.size() - i;
+                  break;
                 }
                 pacer.beforeUnit(1);
                 try {
@@ -1042,12 +1068,16 @@ public final class CombinedEnrichmentBackfillOps {
                       InferenceRequest.background()));
                 } catch (Exception failure) {
                   if (!embeddingReady(context, provider) || SpladeBackfillOps.isSystemicFailure(failure)) {
-                    break embeddingTurns;
+                    priorityTurnEndedNormally = false;
+                    break;
                   }
                 } finally {
                   pacer.afterUnit(1);
                 }
-                if (!embeddingReady(context, provider)) break embeddingTurns;
+                if (!embeddingReady(context, provider)) {
+                  priorityTurnEndedNormally = false;
+                  break;
+                }
               }
               float[] vector = vectors.get(i);
               String eid = sliceDocIds.get(i);
