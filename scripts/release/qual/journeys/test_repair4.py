@@ -249,7 +249,8 @@ class Repair4Tests(unittest.TestCase):
             actual = Path.stat
             def stat(path, **kw):
                 value = actual(path, **kw)
-                return SimpleNamespace(st_dev=value.st_dev + 1, st_ino=value.st_ino) if path == out else value
+                fields = tuple(value)
+                return os.stat_result(fields[:2] + (value.st_dev + 1,) + fields[3:]) if path == out else value
             with patch.object(wrapper.vm, 'ROOT', root), patch.object(wrapper.vm, 'ensure_free'), \
                  patch.object(Path, 'stat', stat), patch.object(Path, 'rename', side_effect=OSError(errno.EXDEV, 'Invalid cross-device link')), self.assertRaisesRegex(runner.Infrastructure, 'same filesystem'):
                 wrapper.seal_snapshot(out, {'disk': str(disk)}, disk.stat().st_ino, None, 'candidate')
