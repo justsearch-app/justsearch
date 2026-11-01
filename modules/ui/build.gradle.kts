@@ -56,7 +56,7 @@ dependencies {
   // so core-contracts classes must be on the installed-distribution runtime classpath.
   implementation(project(":modules:core-contracts"))
   implementation("org.eclipse.jetty.toolchain:jetty-jakarta-servlet-api:5.0.2")
-  implementation("org.jetbrains.kotlin:kotlin-stdlib:2.4.0")
+  implementation("org.jetbrains.kotlin:kotlin-stdlib:2.4.21")
   implementation(libs.jackson.databind)
   implementation(libs.jackson.core)
   implementation(libs.slf4j.api)
@@ -103,7 +103,7 @@ testing {
         implementation(testFixtures(project(":modules:configuration")))
         implementation(platform(libs.junit.bom))
         implementation(libs.junit.jupiter.api)
-        implementation("org.junit.jupiter:junit-jupiter-params:5.14.3")
+        implementation("org.junit.jupiter:junit-jupiter-params:6.1.3")
         implementation(libs.archunit.junit5)
         implementation(libs.mockito.core)
         implementation(libs.assertj.core)

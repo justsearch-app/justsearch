@@ -47,7 +47,7 @@ dependencies {
   implementation(libs.tika.core)
   // The owned text parser reuses Tika's CSV sniffing and table implementation.
   implementation("org.apache.tika:tika-parser-text-module:${libs.versions.tika.get()}")
-  implementation("org.apache.pdfbox:pdfbox:3.0.6")
+  implementation("org.apache.pdfbox:pdfbox:3.0.8")
   // Tempdoc 632 — exclude junrar (UnRar License, field-of-use restricted, non-OSI). RAR content
   // extraction is dropped; Tika core still detects the RAR MIME from magic bytes (used only as a
   // classifier at IndexingDocumentOps.java). This removes the product's only non-OSI dependency.
@@ -65,12 +65,12 @@ dependencies {
   testFixturesApi(project(":modules:worker-core"))
   // Construct a valid owned PPTX-with-speaker-notes package, then rewrite it through the fixture
   // factory's deterministic ZIP serializer before capability assertions.
-  testFixturesImplementation("org.apache.poi:poi-ooxml:5.4.1") {
+  testFixturesImplementation("org.apache.poi:poi-ooxml:6.0.0") {
     // The complete POI graph is already the Tika parser runtime. Keep this compile-time handle
     // non-transitive so adding the fixture recipe does not create a second dependency authority.
     isTransitive = false
   }
-  testFixturesImplementation("org.apache.poi:poi:5.4.1") {
+  testFixturesImplementation("org.apache.poi:poi:6.0.0") {
     isTransitive = false
   }
   // Lane F stage A item A12 closure: ChaosExtractionSandboxChild speaks the sandbox's own
@@ -78,7 +78,7 @@ dependencies {
   // test fixtures do not inherit, so the fixture declares it for itself.
   testFixturesImplementation(libs.jackson.databind)
 
-  testImplementation("io.opentelemetry:opentelemetry-sdk-common:1.60.1")
+  testImplementation("io.opentelemetry:opentelemetry-sdk-common:1.67.0")
   testRuntimeOnly(libs.opentelemetry.sdk.testing)
 
   // Tempdoc 809 finding 3: BackfillSchedulerSlowBatchTest asserts the tempdoc-798 budget-trip WARN
@@ -197,7 +197,7 @@ testing {
         implementation(project(":modules:ai-backend"))
         implementation(platform(libs.junit.bom))
         implementation(libs.junit.jupiter.api)
-        implementation("org.junit.jupiter:junit-jupiter-params:5.14.3")
+        implementation("org.junit.jupiter:junit-jupiter-params:6.1.3")
         implementation(libs.mockito.core)
         implementation(libs.mockito.junit.jupiter)
         // Tempdoc 517 — OTel SDK testing for span-topology assertions
