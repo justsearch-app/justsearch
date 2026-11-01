@@ -7,7 +7,7 @@ author-session: wp5-ti2-builder
 
 # Test-intent entries
 
-The CLI inventory against 09c246ae15 contains 29 flagged files. Fixture adaptations keep their oracles under the new publication rules. The isolated new processor test is exempt; the exempt publication test has its within-candidate module move classified explicitly below. Five named checks pass on the candidate and fail by assertion on the before-state; the end-to-end check and script-produced evidence remain pending. This record is not an acceptance. Supplementary preservation cases in resultAcknowledgementCoversParentAndReplacementChunks are SUCCESS_TEXT, SUCCESS_EMPTY and REJECTED_SUSPECT_TEXT; in vcn1NonReplacingResultsPreserveCountsChunksAndBaselineDescriptors they are empty, rejected and blank. All six parameter cases pass on both states; they are supplementary cases within the selected methods, rather than separate newChecks ids.
+The CLI inventory against 09c246ae15 contains 29 flagged files. Fixture adaptations keep their oracles under the new publication rules. The isolated new processor test and the publication test (new relative to the base, moved between modules within this branch) are exempt as isolated new test sources. Five named checks pass on the candidate and fail by assertion on the before-state (gates/test-intent/evidence/ingfix-wp5.json); the end-to-end check needs the real vision model and has its own script-produced evidence (gates/test-intent/evidence/ingfix-wp5-e2e.json). This record is not an acceptance. Supplementary preservation cases in resultAcknowledgementCoversParentAndReplacementChunks are SUCCESS_TEXT, SUCCESS_EMPTY and REJECTED_SUSPECT_TEXT; in vcn1NonReplacingResultsPreserveCountsChunksAndBaselineDescriptors they are empty, rejected and blank. All six parameter cases pass on both states; they are supplementary cases within the selected methods, rather than separate newChecks ids.
 
 ```json
 {
@@ -714,38 +714,20 @@ The CLI inventory against 09c246ae15 contains 29 flagged files. Fixture adaptati
           "label": "agent choice"
         }
       ]
-    },
-    {
-      "items": [
-        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/VduFallbackPublicationTest.java"
-      ],
-      "class": "Adaptation",
-      "moved": [
-        "split",
-        "signature"
-      ],
-      "whatMoved": "This one publication test was moved from worker-services to indexer-worker in repair 52b19b0cca (R090), beside its real worker dependencies; source-hash fixtures were adapted. The move retains the checks and assertions. It is new relative to 09c246ae15 and reported exempt by this gate; this entry classifies the within-candidate move, rather than claiming these checks predate the branch.",
-      "sources": [
-        {
-          "kind": "delegated-choice",
-          "delegationQuote": "proceed autonomously with designing all of the smallers and critical fixes. then proceed with implementing them accordingly.",
-          "delegationLocation": "task t-20261030-ingfix request",
-          "delegationScope": "fix the defects in the owner-commissioned ingestion defect list, designed by the orchestrator",
-          "choice": "C10: Complete, accepted transcription must still replace content and regenerate coherent chunks, counts, hashes, preview, language and downstream enrichment work; check both short-to-long and long-to-short replacement after reopen.",
-          "label": "agent choice"
-        },
-        {
-          "kind": "delegated-choice",
-          "delegationQuote": "proceed autonomously with designing all of the smallers and critical fixes. then proceed with implementing them accordingly.",
-          "delegationLocation": "task t-20261030-ingfix request",
-          "delegationScope": "fix the defects in the owner-commissioned ingestion defect list, designed by the orchestrator",
-          "choice": "S-D19: Change disk bytes after claiming A without updating the index and require VDU publication refusal. C3: Existing publication fences: newer indexed content, recreated document identity, deletion, exclusion, another owner or another attempt must still defeat an old result; exercise success, empty and failure updates and inspect parent/chunks after reopening.",
-          "label": "agent choice"
-        }
-      ]
     }
   ]
 }
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a19582-1022-7853-8b54-41423cbdf92e",
+  "verdict": "accept",
+  "digest": "sha256:1ba760ca960a5dd369a2c5dbaf29273078c9a0d8f2b83e84b431b72271a1c76e",
+  "note": "Verifier verifier-1 (WP5, candidate 2e7eae37d3) accepted entries 1-29 and rejected only entry 30, prescribing its removal (isolated new test source, exempt). Entry 30 removed exactly as prescribed and the summary prose updated to match; entries 1-29 unchanged. All 65 paired VDU cases pass after; 50 fail before by assertion."
+}
+```
