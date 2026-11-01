@@ -180,17 +180,25 @@ final class CandidateIndexTargetCaptureTest extends io.justsearch.adapters.lucen
   private static void createModel(Path directory, String modelBytes, boolean splade)
       throws IOException {
     Files.createDirectories(directory);
-    Files.writeString(directory.resolve("model.onnx"), modelBytes, StandardCharsets.UTF_8);
+    Files.write(directory.resolve("model.onnx"), graphBytes(modelBytes));
     Files.writeString(directory.resolve("tokenizer.json"), "{}", StandardCharsets.UTF_8);
     if (splade) {
       Files.writeString(directory.resolve("vocab.txt"), "token", StandardCharsets.UTF_8);
     }
   }
 
+  private static byte[] graphBytes(String value) {
+    byte[] label = value.getBytes(StandardCharsets.UTF_8);
+    var model = new java.io.ByteArrayOutputStream();
+    model.writeBytes(new byte[] {58, 0, 18, (byte) label.length});
+    model.writeBytes(label);
+    return model.toByteArray();
+  }
+
   private static String sha256(String value) throws NoSuchAlgorithmException {
     return HexFormat.of()
         .formatHex(
             MessageDigest.getInstance("SHA-256")
-                .digest(value.getBytes(StandardCharsets.UTF_8)));
+                .digest(graphBytes(value)));
   }
 }

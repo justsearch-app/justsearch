@@ -134,7 +134,7 @@ public final class EmbeddingFingerprint {
   /** Companion identity; a resolved model with an empty answer is indeterminate. */
   public static Optional<String> assets() {
     return modelPath().flatMap(path ->
-        ModelAssetFingerprint.compute(path.getParent(), "embedding"));
+        ModelAssetFingerprint.compute(path.getParent(), "embedding", path));
   }
 
   private record CachedResult(Optional<Path> modelPath, Optional<String> fingerprint) {}

@@ -7,7 +7,6 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import io.justsearch.indexerworker.index.IndexGenerationManager.GenerationManifest;
 import io.justsearch.indexerworker.index.IndexGenerationManager.ModelArtifact;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.security.MessageDigest;
@@ -28,7 +27,7 @@ final class GenerationModelSelectionTest {
   void companionChangesRejectCompatibilityWithoutChangingGraphIntegrity(String role, String companion) throws Exception {
     Path graph = temp.resolve("A/model.onnx");
     Files.createDirectories(graph.getParent());
-    Files.writeString(graph, "unchanged graph");
+    Files.write(graph, new byte[] {58, 0});
     var selection = GenerationModelSelection.from(new GenerationManifest(2, "A", "installed_models", 1L,
         "f".repeat(64), Map.of(role, new ModelArtifact(graph.toString(), sha256(graph))), "splade", 768)).orElseThrow();
     var config = io.justsearch.configuration.resolved.TestResolvedConfigHelper.withDefaults();
@@ -71,10 +70,65 @@ final class GenerationModelSelectionTest {
     assertTrue(selection.verify(role).isEmpty());
   }
 
+  @org.junit.jupiter.params.ParameterizedTest
+  @org.junit.jupiter.params.provider.ValueSource(strings = {"embedding", "splade", "ner"})
+  void externalWeightsChangeRejectsCompatibilityAfterCommitAndReopen(String role) throws Exception {
+    Path graph = temp.resolve("external/model.onnx");
+    Files.createDirectories(graph.getParent());
+    Files.write(graph, externalGraph("weights.bin"));
+    Path weights = Files.writeString(graph.resolveSibling("weights.bin"), "weights A");
+    Files.writeString(graph.resolveSibling("tokenizer.json"), "unchanged tokenizer");
+    var selection = GenerationModelSelection.accepted(Map.of(role,
+        new ModelArtifact(graph.toString(), sha256(graph))), "splade", 768);
+    var config = io.justsearch.configuration.resolved.TestResolvedConfigHelper.withDefaults();
+    var first = new io.justsearch.adapters.lucene.commit.SsotCommitMetadataSource(
+        config, selection.runtimeFingerprintInputs()).build();
+    Path index = temp.resolve("external-index");
+    writeMetadata(index, first);
+    assertTrue(io.justsearch.adapters.lucene.runtime.IndexMetadataParityGuard.inspectCommittedParity(index, () -> first).isEmpty());
+    Files.writeString(weights, "weights B");
+    var next = new io.justsearch.adapters.lucene.commit.SsotCommitMetadataSource(
+        config, selection.runtimeFingerprintInputs()).build();
+    assertTrue(selection.verify(role).isPresent(), "graph bytes and raw integrity remain unchanged");
+    assertTrue(io.justsearch.adapters.lucene.runtime.ParityDiagnostics.requiresRebuild(
+        io.justsearch.adapters.lucene.runtime.IndexMetadataParityGuard.inspectCommittedParity(index, () -> next)),
+        "changed external inference weights must reject the committed identity on reopen");
+  }
+
+  @Test
+  void externalReferencesUseExactGenerationGraphRatherThanSiblingVariant() throws Exception {
+    Path graph = temp.resolve("exact/model.onnx");
+    Files.createDirectories(graph.getParent());
+    Files.write(graph, externalGraph("selected.bin"));
+    Files.write(graph.resolveSibling("model_fp16.onnx"), externalGraph("other.bin"));
+    Files.writeString(graph.resolveSibling("selected.bin"), "selected weights");
+    Path other = Files.writeString(graph.resolveSibling("other.bin"), "other weights");
+    var selection = GenerationModelSelection.accepted(Map.of("embedding",
+        new ModelArtifact(graph.toString(), sha256(graph))), "splade", 768);
+    var first = selection.fingerprint("embedding");
+    Files.writeString(other, "changed other weights");
+    assertEquals(first, selection.fingerprint("embedding"));
+    Files.writeString(graph.resolveSibling("selected.bin"), "changed selected weights");
+    org.junit.jupiter.api.Assertions.assertNotEquals(first, selection.fingerprint("embedding"));
+  }
+
+  private static byte[] externalGraph(String location) {
+    var entry = new java.io.ByteArrayOutputStream();
+    entry.writeBytes(new byte[] {10, 8});
+    entry.writeBytes("location".getBytes(java.nio.charset.StandardCharsets.UTF_8));
+    byte[] name = location.getBytes(java.nio.charset.StandardCharsets.UTF_8);
+    entry.write(18); entry.write(name.length); entry.writeBytes(name);
+    var model = new java.io.ByteArrayOutputStream();
+    model.writeBytes(new byte[] {58, (byte) (entry.size() + 6), 42,
+        (byte) (entry.size() + 4), 106, (byte) entry.size()});
+    model.writeBytes(entry.toByteArray()); model.writeBytes(new byte[] {112, 1});
+    return model.toByteArray();
+  }
+
   @Test
   void graphOnlyGenerationAdoptsWithoutClaimingCommittedCompanionProof() throws Exception {
     Path graph = temp.resolve("legacy-model/model.onnx");
-    Files.createDirectories(graph.getParent()); Files.writeString(graph, "unchanged graph");
+    Files.createDirectories(graph.getParent()); Files.write(graph, new byte[] {58, 0});
     var selection = GenerationModelSelection.accepted(Map.of("embedding",
         new ModelArtifact(graph.toString(), sha256(graph))), "splade", 768);
     var expected = new java.util.HashMap<String, Object>(new io.justsearch.adapters.lucene.commit.SsotCommitMetadataSource(
@@ -110,7 +164,7 @@ final class GenerationModelSelectionTest {
   void companionReadFailureIsIndeterminateAndGenerationsKeepIndependentAssets() throws Exception {
     Path a = temp.resolve("A/model.onnx"); Path b = temp.resolve("B/model.onnx");
     Files.createDirectories(a.getParent()); Files.createDirectories(b.getParent());
-    Files.writeString(a, "same graph"); Files.writeString(b, "same graph");
+    Files.write(a, new byte[] {58, 0}); Files.write(b, new byte[] {58, 0});
     Files.writeString(a.getParent().resolve("tokenizer.json"), "vocabulary A");
     Files.writeString(b.getParent().resolve("tokenizer.json"), "vocabulary B");
     var first = GenerationModelSelection.accepted(Map.of("embedding", new ModelArtifact(a.toString(), sha256(a))), "splade", 768);
@@ -183,6 +237,6 @@ final class GenerationModelSelectionTest {
 
   private static String sha256(Path file) throws Exception {
     return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256")
-        .digest(Files.readString(file).getBytes(StandardCharsets.UTF_8)));
+        .digest(Files.readAllBytes(file)));
   }
 }

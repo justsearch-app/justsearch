@@ -46,12 +46,24 @@ public final class OnnxExternalData {
     }
   }
 
+  /** All TensorProto external-data locations; malformed or incomplete references throw. */
+  public static Set<String> externalDataLocations(Path model) throws IOException {
+    try (InputStream input = new BufferedInputStream(Files.newInputStream(model))) {
+      Inspector inspector = new Inspector(input);
+      inspector.collectExternal = true;
+      inspector.message(Kind.MODEL, Files.size(model), 0);
+      if (!inspector.graph) throw new IOException("ONNX graph missing");
+      return Set.copyOf(inspector.locations);
+    }
+  }
+
   private enum Kind { MODEL, GRAPH, NODE, ATTRIBUTE, TENSOR, SPARSE, TRAINING, FUNCTION }
 
   private static final class Inspector {
     private final InputStream input;
     private long position;
     private boolean metadata;
+    private boolean collectExternal;
     private boolean graph;
     private long metadataBytes;
     private int fields;
@@ -59,6 +71,7 @@ public final class OnnxExternalData {
     private final Set<String> outputs = new LinkedHashSet<>();
     private final Set<String> initializers = new LinkedHashSet<>();
     private final Map<String, String> properties = new LinkedHashMap<>();
+    private final Set<String> locations = new LinkedHashSet<>();
 
     private Inspector(InputStream input) {
       this.input = input;
@@ -66,6 +79,8 @@ public final class OnnxExternalData {
 
     private boolean message(Kind kind, long end, int depth) throws IOException {
       if (depth > 100) throw new IOException("ONNX nesting limit exceeded");
+      boolean externalTensor = false;
+      boolean locatedTensor = false;
       while (position < end) {
         long tag = tag(end);
         int field = (int) (tag >>> 3);
@@ -73,13 +88,28 @@ public final class OnnxExternalData {
         if (field == 0) throw new IOException("Invalid ONNX field");
         if (wire == 0) {
           long value = varint(end);
-          if (!metadata && kind == Kind.TENSOR && field == 14 && value != 0) return true;
+          if (!metadata && kind == Kind.TENSOR && field == 14 && value != 0) {
+            if (!collectExternal) return true;
+            externalTensor = true;
+          }
         } else if (wire == 2) {
           long length = varint(end);
           if (length < 0 || length > end - position) throw new IOException("Invalid ONNX length");
-          if (!metadata && kind == Kind.TENSOR && field == 13) return true;
+          if (!metadata && !collectExternal && kind == Kind.TENSOR && field == 13) return true;
           long childEnd = position + length;
-          if (metadata && kind == Kind.MODEL && field == 7) {
+          if (collectExternal && kind == Kind.TENSOR && field == 13) {
+            externalTensor = true;
+            Map.Entry<String, String> entry = readEntry(childEnd);
+            if ("location".equals(entry.getKey())) {
+              if (entry.getValue().isBlank() || locatedTensor) {
+                throw new IOException("Invalid ONNX external-data location");
+              }
+              locations.add(entry.getValue());
+              locatedTensor = true;
+            }
+            continue;
+          }
+          if ((metadata || collectExternal) && kind == Kind.MODEL && field == 7) {
             if (graph) throw new IOException("Multiple ONNX graphs");
             graph = true;
           }
@@ -113,10 +143,16 @@ public final class OnnxExternalData {
           throw new IOException("Unsupported ONNX protobuf wire type");
         }
       }
+      if (externalTensor && !locatedTensor) throw new IOException("ONNX external-data location missing");
       return false;
     }
 
     private void readProperty(long end) throws IOException {
+      Map.Entry<String, String> entry = readEntry(end);
+      properties.put(entry.getKey(), entry.getValue());
+    }
+
+    private Map.Entry<String, String> readEntry(long end) throws IOException {
       String key = "";
       String value = "";
       while (position < end) {
@@ -125,7 +161,7 @@ public final class OnnxExternalData {
         else if (tag == 18) value = string(end);
         else skipField(tag, end);
       }
-      properties.put(key, value);
+      return Map.entry(key, value);
     }
 
     private void readValue(long end, boolean inputValue) throws IOException {
@@ -222,7 +258,7 @@ public final class OnnxExternalData {
     private long tag(long end) throws IOException {
       long tag = varint(end);
       if (tag >>> 3 == 0 || tag >>> 3 > 0x1fffffffL) throw new IOException("Invalid ONNX field");
-      if (metadata && ++fields > 1_000_000) throw new IOException("ONNX field limit exceeded");
+      if ((metadata || collectExternal) && ++fields > 1_000_000) throw new IOException("ONNX field limit exceeded");
       return tag;
     }
 

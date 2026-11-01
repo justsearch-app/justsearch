@@ -167,7 +167,7 @@ public final class CandidateIndexTargetCapture {
     String modelRole = role.toLowerCase(java.util.Locale.ROOT);
     if (List.of("embedding", "splade", "ner").contains(modelRole)) {
       fingerprint = fingerprint.withAssets(
-          io.justsearch.indexerworker.embed.ModelAssetFingerprint.compute(modelDir, modelRole));
+          io.justsearch.indexerworker.embed.ModelAssetFingerprint.compute(modelDir, modelRole, modelFile));
     }
     return new CapturedModel(fingerprint, modelFile);
   }

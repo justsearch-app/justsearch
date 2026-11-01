@@ -182,7 +182,7 @@ class KnowledgeServerTest {
             .thenThrow(new IOException("green reader unavailable"));
       }
       Path graph = Files.createDirectories(base.resolve("model")).resolve("model.onnx");
-      Files.writeString(graph, "test graph");
+      Files.write(graph, new byte[] {58, 0});
       Files.writeString(graph.getParent().resolve("tokenizer.json"), "{}");
       var identity = GenerationModelSelection.captureIdentity(graph);
       setField(server, "initialModelSelection", GenerationModelSelection.accepted(

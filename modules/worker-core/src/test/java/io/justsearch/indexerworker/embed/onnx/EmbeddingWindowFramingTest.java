@@ -18,6 +18,20 @@ final class EmbeddingWindowFramingTest {
   @ParameterizedTest
   @ValueSource(ints = {512, 513, 895, 896, 1024, 1703})
   void allEntryPointsFrameTheSameOrderedWindows(int count) throws Exception {
+    checkEntryPoints(count, OnnxEmbeddingEncoder.PoolingStrategy.CLS, null);
+  }
+
+  @ParameterizedTest
+  @org.junit.jupiter.params.provider.CsvSource({
+      "4,CLS,1062591973,-1089686613", "37,CLS,1061768233,-1088542322", "512,CLS,1061814863,-1088601946",
+      "4,MEAN_POOL,1062018539,-1088869067", "37,MEAN_POOL,1062301069,-1089258945", "512,MEAN_POOL,1063657129,-1092594618"})
+  void shortAndSingleWindowVectorsMatchBaselineBits(
+      int count, OnnxEmbeddingEncoder.PoolingStrategy pooling, int first, int second) throws Exception {
+    checkEntryPoints(count, pooling, new int[] {first, second});
+  }
+
+  private static void checkEntryPoints(int count, OnnxEmbeddingEncoder.PoolingStrategy pooling,
+      int[] expectedBits) throws Exception {
     var sessions = mock(SessionHandle.class);
     var lease = mock(SessionHandle.Lease.class);
     when(sessions.acquire(any())).thenReturn(lease);
@@ -53,7 +67,13 @@ final class EmbeddingWindowFramingTest {
         var window = new ArrayList<Long>();
         for (int i = 0; i < real; i++) window.add(ids[row][i]);
         observed.add(window);
-        for (float[] token : hidden[row]) { token[0] = 3; token[1] = 4; }
+        long signature = 0;
+        for (int i = 0; i < real; i++) signature += ids[row][i] * (i + 1);
+        signature %= 113;
+        for (int i = 0; i < ids[row].length; i++) {
+          hidden[row][i][0] = (ids[row][i] % 97) + i * .125f + signature * .25f;
+          hidden[row][i][1] = (ids[row][i] % 31) - i * .0625f - signature * .5f;
+        }
       }
       var result = mock(OrtSession.Result.class);
       var value = mock(OnnxTensor.class);
@@ -63,7 +83,7 @@ final class EmbeddingWindowFramingTest {
     });
     try (var tensors = mockStatic(OnnxTensor.class);
         var encoder = new OnnxEmbeddingEncoder(sessions,
-            new EmbeddingShape(512, true, OnnxEmbeddingEncoder.PoolingStrategy.CLS, 0, 2), tokenizer)) {
+            new EmbeddingShape(512, true, pooling, 0, 2), tokenizer)) {
       tensors.when(() -> OnnxTensor.createTensor(any(), any(LongBuffer.class), any(long[].class)))
           .thenAnswer(call -> {
             LongBuffer flat = call.getArgument(1); long[] shape = call.getArgument(2);
@@ -77,13 +97,27 @@ final class EmbeddingWindowFramingTest {
       var single = encoder.embed(text);
       var ordered = List.copyOf(observed); observed.clear();
       assertEquals(ordered.size(), encoder.windowCount(text));
-      assertArrayEquals(new float[] {.6f, .8f}, single.vector(), 1e-6f);
-      encoder.embedBatchWithChunking(List.of(text));
+      if (expectedBits != null) {
+        int[] actualBits = bits(single.vector());
+        assertArrayEquals(expectedBits, actualBits);
+      }
+      var retained = encoder.embedBatchWithChunking(List.of(text));
+      assertArrayEquals(bits(single.vector()), bits(retained.get(0).vector()));
       assertEquals(ordered, observed); observed.clear();
-      encoder.embedBatchPooled(List.of(text));
+      var pooled = encoder.embedBatchPooled(List.of(text));
+      assertArrayEquals(bits(single.vector()), bits(pooled.get(0).vector()));
       assertEquals(ordered, observed); observed.clear();
-      for (int offset = 0; offset < ordered.size(); offset++) encoder.embedWindows(text, offset, 1);
+      for (int offset = 0; offset < ordered.size(); offset++) {
+        var slice = encoder.embedWindows(text, offset, 1);
+        float[] expected = ordered.size() == 1 ? single.vector() : single.chunkVectors().get(offset);
+        assertArrayEquals(bits(expected), bits(slice.vectors().get(0)));
+      }
       assertEquals(ordered, observed);
     }
+  }
+  private static int[] bits(float[] vector) {
+    int[] bits = new int[vector.length];
+    for (int i = 0; i < vector.length; i++) bits[i] = Float.floatToRawIntBits(vector[i]);
+    return bits;
   }
 }

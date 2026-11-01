@@ -102,7 +102,7 @@ public final class SpladeFingerprint {
   /** Companion identity; a resolved model with an empty answer is indeterminate. */
   public static Optional<String> assets() {
     return modelPath().flatMap(path ->
-        io.justsearch.indexerworker.embed.ModelAssetFingerprint.compute(path.getParent(), "splade"));
+        io.justsearch.indexerworker.embed.ModelAssetFingerprint.compute(path.getParent(), "splade", path));
   }
 
   private record CachedResult(Optional<Path> modelPath, Optional<String> fingerprint) {}
