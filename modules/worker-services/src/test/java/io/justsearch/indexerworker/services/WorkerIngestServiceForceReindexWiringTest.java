@@ -89,7 +89,7 @@ final class WorkerIngestServiceForceReindexWiringTest {
   }
 
 
-  @org.junit.jupiter.params.ParameterizedTest
+  @org.junit.jupiter.params.ParameterizedTest(name = "{displayName} [{index}] {arguments}")
   @org.junit.jupiter.params.provider.ValueSource(booleans = {false, true})
   void consecutiveDotsInsideNamesAreAdmitted(boolean force) throws Exception {
     Path folder = Files.createDirectory(tempDir.resolve("version..notes"));
@@ -98,7 +98,8 @@ final class WorkerIngestServiceForceReindexWiringTest {
     RecordingQueue queue = new RecordingQueue();
     submit(serviceWith(queue, loop), file, force);
     assertEquals(List.of(file), queue.enqueuedPaths);
-    if (force) verify(loop).markForced(List.of(PathNormalizer.normalizeKey(file)));
+    assertEquals(force, queue.entries.getFirst().forceReindex());
+    verify(loop, never()).markForced(any());
   }
 
   @Test

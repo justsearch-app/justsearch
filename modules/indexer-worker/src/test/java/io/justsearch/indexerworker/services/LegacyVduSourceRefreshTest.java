@@ -70,7 +70,7 @@ final class LegacyVduSourceRefreshTest extends LuceneExecutorTestBase {
       }
     }
   }
-  @org.junit.jupiter.params.ParameterizedTest
+  @org.junit.jupiter.params.ParameterizedTest(name = "{displayName} [{index}] {arguments}")
   @org.junit.jupiter.params.provider.ValueSource(strings = {"outside-ancestor", "unknown-root", "unavailable-storage", "placeholder"})
   void legacyVduProcessingDefersBeforeAnyHash(String condition) throws Exception {
     Path root = Files.createDirectory(directory.resolve("root"));

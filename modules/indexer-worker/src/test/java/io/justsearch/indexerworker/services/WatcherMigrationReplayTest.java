@@ -41,7 +41,7 @@ import tools.jackson.databind.ObjectMapper;
 final class WatcherMigrationReplayTest extends LuceneExecutorTestBase {
   @TempDir Path temporary;
 
-  @ParameterizedTest
+  @ParameterizedTest(name = "{displayName} [{index}] {arguments}")
   @ValueSource(strings = {"regular", "directory"})
   void standaloneReplayRetainsUnavailableChildStorageBeforeReadOrRetirement(String replacement) throws Exception {
     try (var f = new Fixture()) {
@@ -91,7 +91,7 @@ final class WatcherMigrationReplayTest extends LuceneExecutorTestBase {
     }
   }
 
-  @ParameterizedTest
+  @ParameterizedTest(name = "{displayName} [{index}] {arguments}")
   @ValueSource(strings = {"missing", "directory", "link", "dangling"})
   void retiredSourcePreservesChunksBackedByAnotherLiveFile(String replacement) throws Exception {
     try (var f = new Fixture()) {

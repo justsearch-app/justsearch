@@ -110,7 +110,7 @@ final class AdmissionHashLivenessTest {
           try (var hashes = mockStatic(SourceContentHash.class, CALLS_REAL_METHODS)) {
             if (interval.equals("hash")) {
               if (candidate) {
-                hashes.when(() -> SourceContentHash.sha256(file)).thenAnswer(call -> {
+                hashes.when(() -> SourceContentHash.sha256WithinRoot(file, temporary)).thenAnswer(call -> {
                   String hash = (String) call.callRealMethod();
                   rewrite(file, stamp);
                   return hash;
@@ -123,7 +123,8 @@ final class AdmissionHashLivenessTest {
                 });
               }
             }
-            return switch (route) {
+            hashes.clearInvocations();
+            int accepted = switch (route) {
               case "recorded" -> queue.enqueueRecordedEntries("01900000-0000-7000-8000-000000000064", walk.enumerationEpoch(), List.of(entry), null);
               case "maintenance" -> queue.enqueueMaintenanceScanEntries(List.of(entry), null, null);
               case "enqueue" -> queue.enqueueEntries(List.of(entry));
@@ -131,6 +132,10 @@ final class AdmissionHashLivenessTest {
               case "watcher", "watcher-planned" -> queue.enqueueMaintenanceFileForGeneration("green", entry, null) ? 1 : 0;
               default -> throw new AssertionError(route);
             };
+            if (candidate && interval.equals("hash")) {
+              hashes.verify(() -> SourceContentHash.sha256WithinRoot(file, temporary), atLeastOnce());
+            }
+            return accepted;
           }
         });
         long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10);
@@ -138,6 +143,9 @@ final class AdmissionHashLivenessTest {
             && !admission.isDone() && System.nanoTime() < deadline) Thread.sleep(5);
         assertFalse(admission.isDone(), "admission must reach the held queue lock");
         assertTrue(lock.hasQueuedThread(admissionThread.get()), "hashing must finish before admission locks");
+        if (candidate && interval.equals("hash")) {
+          assertEquals("after!", Files.readString(file), "the rewrite must follow hashing and precede admission locking");
+        }
         if (interval.equals("lock")) rewrite(file, stamp);
       } finally {
         lock.unlock();

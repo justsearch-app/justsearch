@@ -53,8 +53,9 @@ final class MigrationEnumerationCompletenessTest {
     try (var policy = org.mockito.Mockito.mockStatic(
         io.justsearch.configuration.excludes.ExclusionPatterns.class, org.mockito.Mockito.CALLS_REAL_METHODS)) {
       policy.when(io.justsearch.configuration.excludes.ExclusionPatterns::current).thenReturn(excludes);
-      assertEquals(1, KnowledgeServerMigrationOps.enqueueAllFilesUnderRoots(
-          context(List.of(root), queue, counters, () -> true)));
+      assertEquals(1, assertDoesNotThrow(
+          () -> KnowledgeServerMigrationOps.enqueueAllFilesUnderRoots(
+              context(List.of(root), queue, counters, () -> true))));
     }
     assertEquals(1, counters.rootsDone.get());
     assertEquals(1, counters.filesSeen.get());
@@ -605,8 +606,9 @@ final class MigrationEnumerationCompletenessTest {
     createSymbolicLinkOrSkip(root.resolve("link.txt"), target);
     Counters counters = new Counters();
     JobQueue queue = acceptingQueue();
-    assertEquals(0, KnowledgeServerMigrationOps.enqueueAllFilesUnderRoots(
-        context(List.of(root), queue, counters, () -> true)));
+    assertEquals(0, assertDoesNotThrow(
+        () -> KnowledgeServerMigrationOps.enqueueAllFilesUnderRoots(
+            context(List.of(root), queue, counters, () -> true))));
     assertEquals(1, counters.rootsDone.get());
     verify(queue, never()).enqueueEntries(anyList());
   }

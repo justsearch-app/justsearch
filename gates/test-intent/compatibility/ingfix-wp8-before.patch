@@ -1,0 +1,92 @@
+diff --git a/modules/adapters-lucene/src/main/java/io/justsearch/adapters/lucene/runtime/IndexCountOps.java b/modules/adapters-lucene/src/main/java/io/justsearch/adapters/lucene/runtime/IndexCountOps.java
+index 45fd7db1b9..6ecf614e58 100644
+--- a/modules/adapters-lucene/src/main/java/io/justsearch/adapters/lucene/runtime/IndexCountOps.java
++++ b/modules/adapters-lucene/src/main/java/io/justsearch/adapters/lucene/runtime/IndexCountOps.java
+@@ -997,4 +997,10 @@ public final class IndexCountOps {
+ 
+     return new CorpusProfile(parentCount, chunkCount, totalTokens, docsWithTokens, buckets);
+   }
++
++  // Compatibility signature: retain the before-state's parent/chunk census.
++  public int countOwnedFileStrict(String filePath) throws IOException {
++    return countByIdAndChunksStrict(filePath);
++  }
++
+ }
+diff --git a/modules/adapters-lucene/src/main/java/io/justsearch/adapters/lucene/runtime/IndexingCoordinator.java b/modules/adapters-lucene/src/main/java/io/justsearch/adapters/lucene/runtime/IndexingCoordinator.java
+index 4d1ea6d5cc..2bbd874b40 100644
+--- a/modules/adapters-lucene/src/main/java/io/justsearch/adapters/lucene/runtime/IndexingCoordinator.java
++++ b/modules/adapters-lucene/src/main/java/io/justsearch/adapters/lucene/runtime/IndexingCoordinator.java
+@@ -712,4 +712,11 @@ public final class IndexingCoordinator {
+       events.onVectorFieldDropped(report.count());
+     }
+   }
++
++  // Compatibility signature: retain the before-state's broad deletion behaviour.
++  public int pruneFile(String filePath, java.nio.file.Path boundary, PruneOps.PresenceGuard guard) {
++    deleteByIdAndChunks(filePath);
++    return 1;
++  }
++
+ }
+diff --git a/modules/worker-services/src/main/java/io/justsearch/indexerworker/loop/SourceContentHash.java b/modules/worker-services/src/main/java/io/justsearch/indexerworker/loop/SourceContentHash.java
+index 2e19ddae57..1c4771e26f 100644
+--- a/modules/worker-services/src/main/java/io/justsearch/indexerworker/loop/SourceContentHash.java
++++ b/modules/worker-services/src/main/java/io/justsearch/indexerworker/loop/SourceContentHash.java
+@@ -73,4 +73,8 @@ public final class SourceContentHash {
+     }
+     return HexFormat.of().formatHex(digest.digest());
+   }
++  // Compatibility signature: retain the before-state's unguarded content read.
++  public static String sha256WithinRoot(Path path, Path root) throws IOException {
++    return sha256(path);
++  }
+ }
+diff --git a/modules/worker-services/src/main/java/io/justsearch/indexerworker/loop/SourcePresence.java b/modules/worker-services/src/main/java/io/justsearch/indexerworker/loop/SourcePresence.java
+index 90dff26b23..40371588ab 100644
+--- a/modules/worker-services/src/main/java/io/justsearch/indexerworker/loop/SourcePresence.java
++++ b/modules/worker-services/src/main/java/io/justsearch/indexerworker/loop/SourcePresence.java
+@@ -35,6 +35,12 @@ public final class SourcePresence {
+      */
+     boolean vouches(Path folder);
+ 
++    // Compatibility signatures only: the before-state does not consult storage witnesses.
++    default boolean sourceStorageAvailable(Path source, Path root) { return true; }
++    default boolean observeSourceStorage(Path root) { return true; }
++    default java.util.function.Predicate<Path> sourceStorageCheck(Path root) { return source -> true; }
++
++
+     /**
+      * True while content beneath {@code folder} may be added or updated: a present, listable folder
+      * on the volume recorded for it; a root with nothing recorded is unproven (round 8). A folder
+diff --git a/modules/worker-services/src/main/java/io/justsearch/indexerworker/loop/StaleSourceHandler.java b/modules/worker-services/src/main/java/io/justsearch/indexerworker/loop/StaleSourceHandler.java
+index 0022b35b15..1633ce81b0 100644
+--- a/modules/worker-services/src/main/java/io/justsearch/indexerworker/loop/StaleSourceHandler.java
++++ b/modules/worker-services/src/main/java/io/justsearch/indexerworker/loop/StaleSourceHandler.java
+@@ -63,4 +63,10 @@ public final class StaleSourceHandler {
+     deletionMarker.markIfAbsent(filePath);
+     return 1;
+   }
++
++  // Compatibility signature: retain the before-state's source retirement.
++  public int deleteMissingSource(Path file, Path root, SourcePresence.RootCheck rootCheck) {
++    return deleteMissingSource(file);
++  }
++
+ }
+diff --git a/modules/worker-core/src/main/java/io/justsearch/indexerworker/ingest/CloudPlaceholderDetector.java b/modules/worker-core/src/main/java/io/justsearch/indexerworker/ingest/CloudPlaceholderDetector.java
+new file mode 100644
+index 0000000000..e9d306133a
+--- /dev/null
++++ b/modules/worker-core/src/main/java/io/justsearch/indexerworker/ingest/CloudPlaceholderDetector.java
+@@ -0,0 +1,10 @@
++/* SPDX-License-Identifier: Apache-2.0 */
++package io.justsearch.indexerworker.ingest;
++
++import java.nio.file.Path;
++
++/** Compatibility signature only; this class is absent from the before-state. */
++public final class CloudPlaceholderDetector {
++  private CloudPlaceholderDetector() {}
++  public static boolean isCloudPlaceholder(Path file) { return false; }
++}

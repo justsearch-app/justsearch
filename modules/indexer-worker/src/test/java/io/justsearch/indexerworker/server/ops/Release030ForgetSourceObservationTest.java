@@ -88,13 +88,13 @@ final class Release030ForgetSourceObservationTest extends LuceneExecutorTestBase
     }
   }
 
-  @org.junit.jupiter.params.ParameterizedTest
+  @org.junit.jupiter.params.ParameterizedTest(name = "{displayName} [{index}] {arguments}")
   @org.junit.jupiter.params.provider.ValueSource(strings = {"directory", "link", "dangling"})
   void releaseRetirementCorrectionPreservesForeignBackedChunks(String replacement) throws Exception {
     replacementCleanup(replacement, true);
   }
 
-  @org.junit.jupiter.params.ParameterizedTest
+  @org.junit.jupiter.params.ParameterizedTest(name = "{displayName} [{index}] {arguments}")
   @org.junit.jupiter.params.provider.ValueSource(strings = {"directory", "regular"})
   void releaseRefusalCleanupDefersUnavailableChildStorageBeforeClassification(String replacement) throws Exception {
     replacementCleanup(replacement, false);

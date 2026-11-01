@@ -103,7 +103,7 @@ final class WorkerScanOpsTest {
         throw new java.io.UncheckedIOException(failure);
       }
       return false;
-    }, () -> 0L, () -> false, millis -> true, paths -> {}, () -> {});
+    }, () -> 0L, () -> false, millis -> true, () -> {});
     try (var hashes = org.mockito.Mockito.mockStatic(
         io.justsearch.indexerworker.loop.SourceContentHash.class, org.mockito.Mockito.CALLS_REAL_METHODS)) {
       assertThrows(IOException.class,
@@ -114,7 +114,7 @@ final class WorkerScanOpsTest {
     }
   }
 
-  @org.junit.jupiter.params.ParameterizedTest
+  @org.junit.jupiter.params.ParameterizedTest(name = "{displayName} [{index}] {arguments}")
   @org.junit.jupiter.params.provider.ValueSource(strings = {"vendor/**", "vendor", "**/vendor/**"})
   void excludedDirectoryIsPrunedWithoutCountingDescendants(String pattern) throws Exception {
     Path root = Files.createDirectory(tempDir.resolve("pruned"));

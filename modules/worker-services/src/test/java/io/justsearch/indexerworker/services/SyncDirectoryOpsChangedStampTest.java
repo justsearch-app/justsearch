@@ -41,7 +41,7 @@ final class SyncDirectoryOpsChangedStampTest {
     verify(queue).enqueueEntries(argThat(entries -> entries.size() == 1 && entries.getFirst().path().equals(added)));
   }
 
-  @ParameterizedTest
+  @ParameterizedTest(name = "{displayName} [{index}] {arguments}")
   @ValueSource(strings = {"paths", "characters"})
   void censusCapsStillAllowPeriodicRecoveryOfAdditionsAndEdits(String cap) throws Exception {
     Path changed = Files.writeString(temporary.resolve("changed.txt"), "changed bytes");

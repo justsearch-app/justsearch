@@ -70,7 +70,7 @@ final class WorkerIngestServiceCandidateReconciliationTest
     Fixture fixture = fixtureBeforeMigration();
     watch(fixture, root);
     fixture.generations.startMigration("harmless-link-reconcile");
-    when(fixture.queue.enqueueAndBufferFileForGeneration(anyString(), any(), nullable(String.class)))
+    when(fixture.queue.enqueueMaintenanceFileForGeneration(anyString(), any(), nullable(String.class)))
         .thenReturn(true);
     assertTrue(fixture.admission.replayCertain());
     var result = fixture.service.syncDirectory(SyncDirectoryRequest.newBuilder()

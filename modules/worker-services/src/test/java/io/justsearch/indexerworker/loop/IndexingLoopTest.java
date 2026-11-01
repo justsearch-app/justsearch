@@ -1740,9 +1740,8 @@ class IndexingLoopTest {
     }
 
     @Test
-    @DisplayName(
-        "StaleSourceHandler marks identity deleted only when the source is really gone "
-            + "(tempdoc 931 §C.6 — the DELETED classification also fires on an IOException)")
+    // StaleSourceHandler marks identity deleted only when the source is really gone
+    // (tempdoc 931 §C.6 — the DELETED classification also fires on an IOException).
     void staleSourceHandlerMarksIdentityOnlyForAVerifiedAbsentSource() throws Exception {
       List<String> marked = new java.util.ArrayList<>();
       DocumentIdentityStore recorder =

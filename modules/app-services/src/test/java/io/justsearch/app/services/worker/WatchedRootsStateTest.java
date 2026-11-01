@@ -49,7 +49,8 @@ final class WatchedRootsStateTest {
           return state.register(tempDir.resolve("b"), null, false);
         }
       });
-      assertTrue(mutation.get(2, java.util.concurrent.TimeUnit.SECONDS));
+      assertTrue(org.junit.jupiter.api.Assertions.assertDoesNotThrow(
+          () -> mutation.get(2, java.util.concurrent.TimeUnit.SECONDS)));
       release.countDown();
       assertTrue(scan.get(5, java.util.concurrent.TimeUnit.SECONDS));
     } finally {

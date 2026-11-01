@@ -77,7 +77,8 @@ final class RootLifecycleOpsConcurrencyTest {
       assertTrue(entered.await(2, TimeUnit.SECONDS));
       Path unrelated = observedRoot.get().equals(a) ? b : a;
       var removal = executor.submit(() -> removing.removeWatchedPath(unrelated, context));
-      assertEquals(1, removal.get(2, TimeUnit.SECONDS).intValue());
+      assertEquals(1, org.junit.jupiter.api.Assertions.assertDoesNotThrow(
+          () -> removal.get(2, TimeUnit.SECONDS)).intValue());
       release.countDown();
       scan.get(2, TimeUnit.SECONDS);
     } finally {

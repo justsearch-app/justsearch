@@ -23,7 +23,7 @@ import org.junit.jupiter.params.provider.ValueSource;
 final class SourceStorageRoutesTest extends LuceneExecutorTestBase {
   @TempDir Path temporary;
 
-  @ParameterizedTest
+  @ParameterizedTest(name = "{displayName} [{index}] {arguments}")
   @ValueSource(strings = {"scan", "forced-scan", "captured-scan", "sync", "forced-sync", "watcher", "candidate", "explicit-candidate", "recorded-candidate", "boot", "candidate-reconcile"})
   void unavailableDescendantStorageNeverAdmitsUnderlyingFile(String route) throws Exception {
     Path root = Files.createDirectory(temporary.resolve("root"));

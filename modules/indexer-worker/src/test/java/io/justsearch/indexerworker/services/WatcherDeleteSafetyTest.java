@@ -112,7 +112,7 @@ final class WatcherDeleteSafetyTest extends LuceneExecutorTestBase {
         "root_identity", RootIdentity.capture(root).toString(), "collection", "docs"));
   }
 
-  @org.junit.jupiter.params.ParameterizedTest
+  @org.junit.jupiter.params.ParameterizedTest(name = "{displayName} [{index}] {arguments}")
   @org.junit.jupiter.params.provider.ValueSource(strings = {"missing", "directory", "link", "dangling"})
   void candidateRetirementPreservesCrossFileChunksInBothGenerations(String replacement) throws Exception {
     Path gone = indexed("candidate-gone.txt");
@@ -167,7 +167,7 @@ final class WatcherDeleteSafetyTest extends LuceneExecutorTestBase {
     }
   }
 
-  @org.junit.jupiter.params.ParameterizedTest
+  @org.junit.jupiter.params.ParameterizedTest(name = "{displayName} [{index}] {arguments}")
   @org.junit.jupiter.params.provider.ValueSource(booleans = {false, true})
   void liveDeleteCallbacksPreserveChunksBackedByAnotherFile(boolean witnessed) throws Exception {
     Path gone = indexed("live-gone.txt");
@@ -246,7 +246,7 @@ final class WatcherDeleteSafetyTest extends LuceneExecutorTestBase {
     assertTrue(queue.listSwitchBufferOpsStrict().isEmpty());
   }
 
-  @org.junit.jupiter.params.ParameterizedTest
+  @org.junit.jupiter.params.ParameterizedTest(name = "{displayName} [{index}] {arguments}")
   @org.junit.jupiter.params.provider.ValueSource(strings = {"missing", "directory", "link", "dangling"})
   void bufferedRetirementPreservesChunksBackedByAnotherFile(String replacement) throws Exception {
     Path gone = indexed("buffered-gone.txt");
@@ -501,7 +501,7 @@ final class WatcherDeleteSafetyTest extends LuceneExecutorTestBase {
         job.path().equals(missed) && "docs".equals(job.collection())));
   }
 
-  @org.junit.jupiter.params.ParameterizedTest
+  @org.junit.jupiter.params.ParameterizedTest(name = "{displayName} [{index}] {arguments}")
   @org.junit.jupiter.params.provider.ValueSource(strings = {"directory", "link", "dangling"})
   void restartReconciliationRetiresNonregularReplacements(String replacement) throws Exception {
     Path file = indexed("replaced.txt");

@@ -23,7 +23,7 @@ import org.junit.jupiter.params.provider.ValueSource;
  * plus byte-readable sources under identical shared writer failure (negative control). */
 final class PersistentByteIoSourceTest extends LuceneExecutorTestBase {
  @TempDir Path temp;
- @ParameterizedTest(name="own-javaio-{0}")
+ @ParameterizedTest(name = "{displayName} [{index}] {arguments}")
  @ValueSource(strings={"persistent-byte-eio","captured-byte-eio","readable","readable-empty","submitted-fifo","captured-fifo","submitted-regular","captured-regular"})
  @org.junit.jupiter.api.condition.EnabledOnOs(org.junit.jupiter.api.condition.OS.LINUX)
  @Timeout(35) void sourcePolicyDependsOnActualAccessAndPreservesHealthyOutage(String mode) throws Exception {

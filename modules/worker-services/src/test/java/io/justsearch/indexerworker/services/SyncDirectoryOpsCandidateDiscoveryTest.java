@@ -86,13 +86,14 @@ final class SyncDirectoryOpsCandidateDiscoveryTest {
     Files.createSymbolicLink(tempDir.resolve("link"), eligible);
     Files.createSymbolicLink(tempDir.resolve("dangling"), tempDir.resolve("absent"));
     var ops = new SyncDirectoryOps(paths(), null, null, null, IndexingPacing.unthrottled());
-    try (var result = ops.discoverCandidateDifference(tempDir.toString(), false, () -> false)) {
+    try (var result = org.junit.jupiter.api.Assertions.assertDoesNotThrow(
+        () -> ops.discoverCandidateDifference(tempDir.toString(), false, () -> false))) {
       assertEquals(List.of(eligible), result.additions());
       assertTrue(result.deletions().isEmpty());
     }
   }
 
-  @org.junit.jupiter.params.ParameterizedTest
+  @org.junit.jupiter.params.ParameterizedTest(name = "{displayName} [{index}] {arguments}")
   @org.junit.jupiter.params.provider.ValueSource(strings = {"directory", "link", "dangling"})
   void replacementOfIndexedFileRetiresItsOldSource(String replacement) throws Exception {
     Path source = tempDir.resolve("old.txt");
@@ -102,7 +103,8 @@ final class SyncDirectoryOpsCandidateDiscoveryTest {
         replacement.equals("link") ? Files.writeString(tempDir.resolve("target.txt"), "target")
             : tempDir.resolve("absent"));
     var ops = new SyncDirectoryOps(reads, null, null, null, IndexingPacing.unthrottled());
-    try (var result = ops.discoverCandidateDifference(tempDir.toString(), false, () -> false)) {
+    try (var result = org.junit.jupiter.api.Assertions.assertDoesNotThrow(
+        () -> ops.discoverCandidateDifference(tempDir.toString(), false, () -> false))) {
       assertEquals(List.of(PathNormalizer.normalizeKey(source)), result.deletions());
     }
   }
