@@ -55,8 +55,8 @@ public final class ModelAssetFingerprint {
         for (Path file : files) externalPaths.add(file);
       }
       for (Path path : externalPaths) {
-        if (!path.startsWith(root)
-            || (Files.exists(path) && !path.toRealPath().startsWith(root.toRealPath()))) {
+        if (!path.startsWith(root) || !Files.isRegularFile(path) || !Files.isReadable(path)
+            || !path.toRealPath().startsWith(root.toRealPath())) {
           return Optional.empty();
         }
       }

@@ -466,11 +466,7 @@ Evidence is intentionally left for the orchestrator to generate using run-eviden
       "items": [
         "modules/worker-core/src/test/java/io/justsearch/indexerworker/embed/onnx/TokenWindowsHeapProbe.java"
       ],
-      "class": "Adaptation",
-      "moved": [
-        "input re-encoding"
-      ],
-      "whatMoved": "Input re-encoding: the independent eager geometry oracle now repeats framing tokens with content capacity reduced by two. The same bounded-heap lazy-vs-eager obligation and traversal checks survive. Supplementary preservation check (excluded from newChecks): TokenWindowsTest#threeMillionTokensFitWithEightLazyWindowsButEagerCopiesExhaust128MiB.",
+      "class": "Defect pin",
       "sources": [
         {
           "kind": "delegated-choice",
@@ -485,10 +481,46 @@ Evidence is intentionally left for the orchestrator to generate using run-eviden
           "delegationQuote": "proceed autonomously with designing all of the smallers and critical fixes. then proceed with implementing them accordingly.",
           "delegationLocation": "task t-20261030-ingfix request",
           "delegationScope": "fix the defects in the owner-commissioned ingestion defect list, designed by the orchestrator",
-          "choice": "C13. D71 \u2014 preserve: Short-document behavior, mean pooling, model-specific special-token IDs and bounded lazy window allocation must remain valid; existing tests cover geometry and heap usage; check those contracts against the corrected framing rather than preserving the defective raw-slice oracle.",
+          "choice": "C11 Every long-document window, including first and final windows, needs the model\u2019s framing and aligned masks/type IDs within its capacity; `TokenWindows.get` returns raw slices; capture actual inference inputs at boundary lengths.",
+          "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed autonomously with designing all of the smallers and critical fixes. then proceed with implementing them accordingly.",
+          "delegationLocation": "task t-20261030-ingfix request",
+          "delegationScope": "fix the defects in the owner-commissioned ingestion defect list, designed by the orchestrator",
+          "choice": "C12 Single-document, pooled batch, retained-chunk batch and resumable window calls must use consistent window geometry; these paths share `createChunks`, and callers also use `windowCount`; compare counts, ordered windows and pooled outputs.",
+          "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed autonomously with designing all of the smallers and critical fixes. then proceed with implementing them accordingly.",
+          "delegationLocation": "task t-20261030-ingfix request",
+          "delegationScope": "fix the defects in the owner-commissioned ingestion defect list, designed by the orchestrator",
+          "choice": "C13 Short-document behavior, mean pooling, model-specific special-token IDs and bounded lazy window allocation must remain valid; existing tests cover geometry and heap usage; check those contracts against the corrected framing rather than preserving the defective raw-slice oracle.",
           "label": "agent choice"
         }
-      ]
+      ],
+      "reproduction": "Overlay the independent framed eager oracle on main and compare TokenWindows arrays/counts at small shapes, tails, nested sublists and integer-limit capacity three. Main uses raw-slice stride, endpoints and tiny-tail geometry, so the three geometry/count checks fail assertions.",
+      "defectSource": {
+        "kind": "defect-source",
+        "stronger": {
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed autonomously with designing all of the smallers and critical fixes. then proceed with implementing them accordingly.",
+          "delegationLocation": "task t-20261030-ingfix request",
+          "delegationScope": "fix the defects in the owner-commissioned ingestion defect list, designed by the orchestrator",
+          "choice": "S-D71 (Sliding embedding windows omit model framing) Capture every CLS-pooled window and require the proper CLS token at its start.",
+          "label": "agent choice"
+        },
+        "reproduction": "Overlay the independent framed eager oracle on main and compare TokenWindows arrays/counts at small shapes, tails, nested sublists and integer-limit capacity three. Main uses raw-slice stride, endpoints and tiny-tail geometry, so the three geometry/count checks fail assertions."
+      },
+      "evidence": "gates/test-intent/evidence/ingfix-wp2.json",
+      "newChecks": [
+        "modules/worker-core/src/test/java/io/justsearch/indexerworker/embed/onnx/TokenWindowsTest.java#matchesFramedGeometryAcrossSmallShapesAndTailBoundaries",
+        "modules/worker-core/src/test/java/io/justsearch/indexerworker/embed/onnx/TokenWindowsTest.java#sublistsPreserveOrderAndEachGetReturnsIndependentFieldCopies",
+        "modules/worker-core/src/test/java/io/justsearch/indexerworker/embed/onnx/TokenWindowsTest.java#countHandlesIntegerLimitWithoutTokenArraysOrWindowMetadata"
+      ],
+      "behaviour": "The eager oracle reserves two framing positions, repeats model-specific framing across all fields, and uses content capacity for stride and final-window boundaries. These are changed outcomes under S-D71/C11-C13, not an unchanged oracle. Supplementary preservation check (excluded from newChecks): modules/worker-core/src/test/java/io/justsearch/indexerworker/embed/onnx/TokenWindowsTest.java#threeMillionTokensFitWithEightLazyWindowsButEagerCopiesExhaust128MiB, which retains bounded lazy allocation versus eager exhaustion."
     },
     {
       "items": [
@@ -578,13 +610,16 @@ Evidence is intentionally left for the orchestrator to generate using run-eviden
       "items": [
         "modules/worker-core/src/test/java/io/justsearch/indexerworker/splade/SpladeTruncationEvidenceTest.java"
       ],
-      "class": "Adaptation",
-      "moved": [
-        "input re-encoding",
-        "instrumentation"
-      ],
-      "whatMoved": "Input re-encoding/instrumentation: window thresholds reserve two framing tokens, and truncation telemetry reports zero dropped documents now that overlapping tokenizer windows cover the complete input. Histogram and persistence assertions still observe the same counters through the corrected window design.",
+      "class": "Defect pin",
       "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed autonomously with designing all of the smallers and critical fixes. then proceed with implementing them accordingly.",
+          "delegationLocation": "task t-20261030-ingfix request",
+          "delegationScope": "fix the defects in the owner-commissioned ingestion defect list, designed by the orchestrator",
+          "choice": "S-D71 (Sliding embedding windows omit model framing) Capture every CLS-pooled window and require the proper CLS token at its start.",
+          "label": "agent choice"
+        },
         {
           "kind": "delegated-choice",
           "delegationQuote": "proceed autonomously with designing all of the smallers and critical fixes. then proceed with implementing them accordingly.",
@@ -598,10 +633,54 @@ Evidence is intentionally left for the orchestrator to generate using run-eviden
           "delegationQuote": "proceed autonomously with designing all of the smallers and critical fixes. then proceed with implementing them accordingly.",
           "delegationLocation": "task t-20261030-ingfix request",
           "delegationScope": "fix the defects in the owner-commissioned ingestion defect list, designed by the orchestrator",
-          "choice": "C14. D72 \u2014 already broken: Token-dense input must reach NER and chunk SPLADE inference completely, including tails beyond estimated character overlap; ChunkSplitter estimates characters while both encoders truncate actual tokens; project retained token offsets back to source.",
+          "choice": "C11 Every long-document window, including first and final windows, needs the model\u2019s framing and aligned masks/type IDs within its capacity; `TokenWindows.get` returns raw slices; capture actual inference inputs at boundary lengths.",
+          "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed autonomously with designing all of the smallers and critical fixes. then proceed with implementing them accordingly.",
+          "delegationLocation": "task t-20261030-ingfix request",
+          "delegationScope": "fix the defects in the owner-commissioned ingestion defect list, designed by the orchestrator",
+          "choice": "C12 Single-document, pooled batch, retained-chunk batch and resumable window calls must use consistent window geometry; these paths share `createChunks`, and callers also use `windowCount`; compare counts, ordered windows and pooled outputs.",
+          "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed autonomously with designing all of the smallers and critical fixes. then proceed with implementing them accordingly.",
+          "delegationLocation": "task t-20261030-ingfix request",
+          "delegationScope": "fix the defects in the owner-commissioned ingestion defect list, designed by the orchestrator",
+          "choice": "C13 Short-document behavior, mean pooling, model-specific special-token IDs and bounded lazy window allocation must remain valid; existing tests cover geometry and heap usage; check those contracts against the corrected framing rather than preserving the defective raw-slice oracle.",
+          "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed autonomously with designing all of the smallers and critical fixes. then proceed with implementing them accordingly.",
+          "delegationLocation": "task t-20261030-ingfix request",
+          "delegationScope": "fix the defects in the owner-commissioned ingestion defect list, designed by the orchestrator",
+          "choice": "C14 Token-dense input must reach NER and chunk SPLADE inference completely, including tails beyond estimated character overlap; `ChunkSplitter` estimates characters while both encoders truncate actual tokens; project retained token offsets back to source.",
           "label": "agent choice"
         }
-      ]
+      ],
+      "reproduction": "Record 120/300/700 tokens and flush 120/600 tokens through SPLADE coverage telemetry; main reports two/one truncated documents despite the required full-window coverage. At 447 tokens with capacity 256 and overlap 64, main reports two windows instead of three because it omits framing capacity.",
+      "defectSource": {
+        "kind": "defect-source",
+        "stronger": {
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed autonomously with designing all of the smallers and critical fixes. then proceed with implementing them accordingly.",
+          "delegationLocation": "task t-20261030-ingfix request",
+          "delegationScope": "fix the defects in the owner-commissioned ingestion defect list, designed by the orchestrator",
+          "choice": "S-D72 (Character-estimated chunks leave tokenizer coverage gaps) Project retained token offsets for punctuation-dense input and require complete source coverage.",
+          "label": "agent choice"
+        },
+        "reproduction": "Record 120/300/700 tokens and flush 120/600 tokens through SPLADE coverage telemetry; main reports two/one truncated documents despite the required full-window coverage. At 447 tokens with capacity 256 and overlap 64, main reports two windows instead of three because it omits framing capacity."
+      },
+      "evidence": "gates/test-intent/evidence/ingfix-wp2.json",
+      "newChecks": [
+        "modules/worker-core/src/test/java/io/justsearch/indexerworker/splade/SpladeTruncationEvidenceTest.java#deriveWindowCountUsesOverlapAwareStride",
+        "modules/worker-core/src/test/java/io/justsearch/indexerworker/splade/SpladeTruncationEvidenceTest.java#snapshotReportsTruncationAndWindowHistograms",
+        "modules/worker-core/src/test/java/io/justsearch/indexerworker/splade/SpladeTruncationEvidenceTest.java#flushIfNeededWritesEvidenceIncrementally"
+      ],
+      "behaviour": "Full overlapping tokenizer coverage reports zero dropped documents, including persisted telemetry, and the window count reserves two framing tokens. Histogram totals and incremental file publication remain assertions in these repair checks."
     },
     {
       "items": [
@@ -853,19 +932,14 @@ Evidence is intentionally left for the orchestrator to generate using run-eviden
       "items": [
         "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/EnrichmentRevisionRaceTest.java"
       ],
-      "class": "Adaptation",
-      "moved": [
-        "rename",
-        "instrumentation"
-      ],
-      "whatMoved": "Adapt recovery invalidation expectations: keep dense vectors during retry, remove them at terminal failure, and retain completed independent SPLADE postings across bookkeeping, rename and reopen. Lexical postings, positions, norms and chunk coordinates/proofs keep their prior obligations. The renamed test states the terminal-vector retirement contract.",
+      "class": "Defect pin",
       "sources": [
         {
           "kind": "delegated-choice",
           "delegationQuote": "proceed autonomously with designing all of the smallers and critical fixes. then proceed with implementing them accordingly.",
           "delegationLocation": "task t-20261030-ingfix request",
           "delegationScope": "fix the defects in the owner-commissioned ingestion defect list, designed by the orchestrator",
-          "choice": "C19. D91 \u2014 existing unsafe path; runtime trigger unverified: A permanently failed recovered parent or chunk must not expose its old-model vector once compatibility is granted; failure updates omit vectors, RMW preserves them, and dense reads lack status filtering; recover mixed success/failure documents and query both dense interfaces.",
+          "choice": "S-D91 (Failed re-embedding leaves old parent vectors certified and searchable) Recover two old-vector parents, fail one permanently and require no old vector exposed after certification.",
           "label": "agent choice"
         },
         {
@@ -873,10 +947,36 @@ Evidence is intentionally left for the orchestrator to generate using run-eviden
           "delegationQuote": "proceed autonomously with designing all of the smallers and critical fixes. then proceed with implementing them accordingly.",
           "delegationLocation": "task t-20261030-ingfix request",
           "delegationScope": "fix the defects in the owner-commissioned ingestion defect list, designed by the orchestrator",
-          "choice": "C21. D90/D91 \u2014 preserve: Recovery must retain lexical content, chunk coordinates/revision witnesses and unrelated enrichment; chunk RMW reconstructs non-stored text from its parent; compare keyword/chunk search and stored metadata before and after recovery.",
+          "choice": "C19 A permanently failed recovered parent or chunk must not expose its old-model vector once compatibility is granted; failure updates omit vectors, RMW preserves them, and dense reads lack status filtering; recover mixed success/failure documents and query both dense interfaces.",
+          "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed autonomously with designing all of the smallers and critical fixes. then proceed with implementing them accordingly.",
+          "delegationLocation": "task t-20261030-ingfix request",
+          "delegationScope": "fix the defects in the owner-commissioned ingestion defect list, designed by the orchestrator",
+          "choice": "C21 Recovery must retain lexical content, chunk coordinates/revision witnesses and unrelated enrichment; chunk RMW reconstructs non-stored text from its parent; compare keyword/chunk search and stored metadata before and after recovery.",
           "label": "agent choice"
         }
-      ]
+      ],
+      "reproduction": "Seed a legacy chunk with a dense vector and completed independent SPLADE postings, then apply retry bookkeeping. Main resets independent SPLADE status from COMPLETED to PENDING on the first retry, failing the C21 preservation assertion before the later terminal-vector, rename and reopen assertions.",
+      "defectSource": {
+        "kind": "defect-source",
+        "stronger": {
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed autonomously with designing all of the smallers and critical fixes. then proceed with implementing them accordingly.",
+          "delegationLocation": "task t-20261030-ingfix request",
+          "delegationScope": "fix the defects in the owner-commissioned ingestion defect list, designed by the orchestrator",
+          "choice": "C21 Recovery must retain lexical content, chunk coordinates/revision witnesses and unrelated enrichment; chunk RMW reconstructs non-stored text from its parent; compare keyword/chunk search and stored metadata before and after recovery.",
+          "label": "agent choice"
+        },
+        "reproduction": "Seed a legacy chunk with a dense vector and completed independent SPLADE postings, then apply retry bookkeeping. Main resets independent SPLADE status from COMPLETED to PENDING on the first retry, failing the C21 preservation assertion before the later terminal-vector, rename and reopen assertions."
+      },
+      "evidence": "gates/test-intent/evidence/ingfix-wp2.json",
+      "newChecks": [
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/EnrichmentRevisionRaceTest.java#legacyMatchingProofRmwAndRenamePreservePostingsAndRetireFailedDenseVector"
+      ],
+      "behaviour": "Retryable failures retain the dense vector; terminal failure removes it through rename and reopen. Independent completed SPLADE status and postings survive every failure update under C21. Lexical postings, positions, norms, parent content and chunk revision/coordinate obligations remain asserted within the repaired check."
     },
     {
       "items": [

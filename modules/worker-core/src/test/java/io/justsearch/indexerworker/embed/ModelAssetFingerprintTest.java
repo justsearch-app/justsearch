@@ -55,13 +55,26 @@ final class ModelAssetFingerprintTest {
       assertEquals(original, ModelAssetFingerprint.compute(temp, role));
       Files.delete(weights);
       Optional<String> absent = ModelAssetFingerprint.compute(temp, role);
-      assertTrue(absent.isPresent(), "missing weights must be recorded as absent");
-      assertNotEquals(original, absent);
+      if ("unlisted.onnx_data".equals(name)) {
+        assertTrue(absent.isPresent(), "an unreferenced removed sidecar is no longer selected");
+        assertNotEquals(original, absent);
+      } else {
+        assertTrue(absent.isEmpty(), "missing referenced weights are unresolved");
+      }
       Files.writeString(weights, old);
     }
     Files.delete(conventional);
     Files.createDirectory(conventional);
     assertTrue(ModelAssetFingerprint.compute(temp, role).isEmpty(), "unreadable weights are unresolved");
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"embedding", "splade", "ner"})
+  void optionalTokenizerAppearingLaterChangesIdentity(String role) throws Exception {
+    Files.write(temp.resolve("model.onnx"), new byte[] {58, 0});
+    String absent = ModelAssetFingerprint.compute(temp, role).orElseThrow();
+    Files.writeString(temp.resolve("tokenizer.json"), "new fallback tokenizer");
+    assertNotEquals(absent, ModelAssetFingerprint.compute(temp, role).orElseThrow());
   }
 
   @ParameterizedTest

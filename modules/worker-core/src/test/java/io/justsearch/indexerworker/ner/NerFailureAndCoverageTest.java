@@ -19,6 +19,26 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
 final class NerFailureAndCoverageTest {
+  private Map<String, io.justsearch.indexerworker.metrics.EncoderProfileAccumulator> encoderRegistry;
+  private Map<String, io.justsearch.indexerworker.metrics.EncoderProfileAccumulator> priorEncoders;
+
+  @org.junit.jupiter.api.BeforeEach
+  @SuppressWarnings("unchecked")
+  void saveEncoderRegistry() throws Exception {
+    var field = io.justsearch.indexerworker.metrics.OperationalMetrics.class
+        .getDeclaredField("encoderAccumulators");
+    field.setAccessible(true);
+    encoderRegistry = (Map<String, io.justsearch.indexerworker.metrics.EncoderProfileAccumulator>)
+        field.get(io.justsearch.indexerworker.metrics.OperationalMetrics.getInstance());
+    priorEncoders = new HashMap<>(encoderRegistry);
+  }
+
+  @org.junit.jupiter.api.AfterEach
+  void restoreEncoderRegistry() {
+    encoderRegistry.clear();
+    encoderRegistry.putAll(priorEncoders);
+  }
+
   @Test
   void conflictingOverlapPredictionsSelectContextAndStitchCompleteBioEntity() throws Exception {
     var sessions = mock(SessionHandle.class);
