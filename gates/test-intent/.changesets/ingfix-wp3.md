@@ -175,3 +175,14 @@ case names change to make all cases selectable from the outer-class XML.
   "note": "Verifier verifier-1 (WP3, candidate 48ab1fcb32) accepted all three entries (DisambiguationServiceTest defect pin; EntityClusterStoreTest and DisambiguationBackfillOpsTest adaptations); overall accept."
 }
 ```
+
+```json
+{
+  "kind": "audit",
+  "role": "reviewer",
+  "session": "01a19706-7f73-7e01-b664-bd51f647db37",
+  "verdict": "reject",
+  "digest": "sha256:46717d2138c96080e35d3c64358f4cf5b5e1141f9f15947ee802f23315c8eae6",
+  "note": "Audit for PR #1090: entries 1-2 accept; entry 3 reject (Adaptation also displaces the early-return expectation and adds new guard checks with new preconditions, fault injection and observations; classify them and supply evidence); exempt-file verification evidence not in the repository. Transcribed by the orchestrator from the auditor's report."
+}
+```
