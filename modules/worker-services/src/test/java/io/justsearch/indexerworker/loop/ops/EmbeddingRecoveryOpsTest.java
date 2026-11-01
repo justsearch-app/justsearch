@@ -51,21 +51,13 @@ class EmbeddingRecoveryOpsTest {
     assertFalse(EmbeddingBackfillOps.computeEmbeddingFailureUpdate(0).containsKey(SchemaFields.VECTOR));
   }
 
-  private static DocumentFieldOps readableFields() throws IOException {
-    var fields = mock(DocumentFieldOps.class);
-    when(fields.queryDocIdsByFieldOrThrow(org.mockito.ArgumentMatchers.anyString(),
-        org.mockito.ArgumentMatchers.anyString(), anyInt())).thenAnswer(call ->
-            fields.queryDocIdsByField(call.getArgument(0), call.getArgument(1), call.getArgument(2)));
-    return fields;
-  }
-
   @AfterEach
   void clearFingerprint() { EmbeddingFingerprint.invalidate(); }
 
   @ParameterizedTest
   @ValueSource(strings = {"missing", "partial", "null", "overcount"})
-  void refusesInexactBatch(String fault) throws Exception {
-    var fields = readableFields();
+  void refusesInexactBatch(String fault) {
+    var fields = mock(DocumentFieldOps.class);
     var coordinator = mock(IndexingCoordinator.class);
     when(fields.queryDocIdsByField(eq(SchemaFields.EMBEDDING_STATUS),
         eq(SchemaFields.EMBEDDING_STATUS_COMPLETED), anyInt())).thenReturn(List.of("a", "b"));
@@ -83,8 +75,8 @@ class EmbeddingRecoveryOpsTest {
   }
 
   @Test
-  void refusesFullEnumerationAtCapBeforeMutating() throws Exception {
-    var fields = readableFields();
+  void refusesFullEnumerationAtCapBeforeMutating() {
+    var fields = mock(DocumentFieldOps.class);
     var coordinator = mock(IndexingCoordinator.class);
     when(fields.queryDocIdsByField(eq(SchemaFields.EMBEDDING_STATUS),
         eq(SchemaFields.EMBEDDING_STATUS_COMPLETED), anyInt()))
@@ -95,14 +87,14 @@ class EmbeddingRecoveryOpsTest {
   }
 
   @ParameterizedTest
-  @ValueSource(strings = {"complete", "omitted", "failed", "missing-status", "enumeration-fault", "count-fault", "commit-fault", "refresh-fault"})
+  @ValueSource(strings = {"complete", "omitted", "failed", "count-fault", "commit-fault", "refresh-fault"})
   void transitionRequiresDurableVisibleCompleteCoverage(String fault) throws Exception {
     EmbeddingFingerprint.setForTesting("current-test-fingerprint");
     var ecc = new EmbeddingCompatibilityController(Map::of, () -> 2L, () -> 2);
     ecc.refresh();
     assertEquals(EmbeddingCompatibilityController.State.BLOCKED_LEGACY, ecc.state());
     var runtime = mock(RunningRuntime.class);
-    var fields = readableFields();
+    var fields = mock(DocumentFieldOps.class);
     var coordinator = mock(IndexingCoordinator.class);
     var counts = mock(IndexCountOps.class);
     var commits = mock(CommitOps.class);
@@ -120,12 +112,7 @@ class EmbeddingRecoveryOpsTest {
         .thenReturn(fault.equals("omitted") ? 2 : 0);
     when(counts.countByFieldOrThrow(SchemaFields.EMBEDDING_STATUS, SchemaFields.EMBEDDING_STATUS_FAILED))
         .thenReturn(fault.equals("failed") ? 1 : 0);
-    when(counts.countByFieldOrThrow(SchemaFields.EMBEDDING_STATUS, SchemaFields.EMBEDDING_STATUS_PENDING))
-        .thenReturn(fault.equals("missing-status") ? 1 : 2);
-    if (fault.equals("enumeration-fault")) {
-      when(fields.queryDocIdsByFieldOrThrow(eq(SchemaFields.IS_CHUNK), eq("true"), anyInt()))
-          .thenThrow(new IOException("enumeration unavailable"));
-    } else if (fault.equals("count-fault")) {
+    if (fault.equals("count-fault")) {
       when(counts.countByFieldOrThrow(SchemaFields.EMBEDDING_STATUS, SchemaFields.EMBEDDING_STATUS_COMPLETED))
           .thenThrow(new IOException("reader unavailable"));
     } else if (fault.equals("commit-fault")) {

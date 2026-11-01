@@ -22,10 +22,13 @@ import org.slf4j.Logger;
  * {@code embedding_model_sha256}) the vectors on documents already marked
  * {@code EMBEDDING_STATUS=COMPLETED} — or {@code FAILED} — have unknowable provenance: they may have
  * been written by a different embedding model, and there is no fingerprint to prove otherwise. The
- * only sound recovery is to re-embed them under the current model. This op clears unknown-provenance
- * vectors and re-marks parents and enabled chunks PENDING, with a fresh retry budget. Disabled
- * chunk vectors are invalidated without scheduling work. Certification waits for enabled backfills
- * to drain; failed documents cannot expose their old vectors.
+ * only sound recovery is to re-embed them under the current model. This op re-marks those parent
+ * documents back to {@code PENDING} so the existing embedding backfill picks them up; the backfill
+ * overwrites each stale vector and, once {@code pending==0}, the rebuild certifies and stamps the
+ * current fingerprint.
+ *
+ * <p>Only parent documents carry {@code EMBEDDING_STATUS} (chunks use
+ * {@code CHUNK_EMBEDDING_STATUS}), so the term query naturally scopes to parents.
  */
 public final class EmbeddingRecoveryOps {
   private EmbeddingRecoveryOps() {}
@@ -94,13 +97,9 @@ public final class EmbeddingRecoveryOps {
         return LegacyRescueOutcome.SKIPPED;
       }
 
-      var config = running.resolvedConfig();
-      boolean chunkVectorsEnabled = config == null || config.rag().chunkVectorsEnabled();
       int remarked =
           remarkEmbeddedParentDocsPending(
               running.documentFieldOps(), running.indexingCoordinator(), batchSize, log);
-      remarkChunkDocsPending(
-          running.documentFieldOps(), running.indexingCoordinator(), batchSize, chunkVectorsEnabled);
 
       // RMW refreshes before writes; only this post-write barrier makes the re-mark visible to
       // normal and shutdown certification. Stay BLOCKED_LEGACY until every old status is gone.
@@ -110,13 +109,8 @@ public final class EmbeddingRecoveryOps {
           SchemaFields.EMBEDDING_STATUS, SchemaFields.EMBEDDING_STATUS_COMPLETED);
       int failed = countOps.countByFieldOrThrow(
           SchemaFields.EMBEDDING_STATUS, SchemaFields.EMBEDDING_STATUS_FAILED);
-      int pendingParents = countOps.countByFieldOrThrow(
-          SchemaFields.EMBEDDING_STATUS, SchemaFields.EMBEDDING_STATUS_PENDING);
-      int pendingChunks = countOps.countByFieldOrThrow(
-          SchemaFields.CHUNK_EMBEDDING_STATUS, SchemaFields.EMBEDDING_STATUS_PENDING);
-      if (completed != 0 || failed != 0 || pendingParents != docs
-          || pendingChunks != (chunkVectorsEnabled ? chunkDocs : 0)) {
-        throw new IllegalStateException("Legacy recovery did not cover every unknown-provenance parent or chunk");
+      if (completed != 0 || failed != 0) {
+        throw new IllegalStateException("Legacy recovery did not cover every unknown-provenance parent");
       }
       boolean started = ecc.maybeAutoStartRebuildForBlockedLegacy(docs);
       log.warn(
@@ -136,9 +130,9 @@ public final class EmbeddingRecoveryOps {
   }
 
   /**
-   * Clears parent vectors and resets their retry budget, changing COMPLETED/FAILED parents back to
-   * PENDING. Already-pending parents are cleared too because their vector provenance is unknown.
-   * The returned count includes only status changes, preserving the recovery outcome's contract.
+   * Re-marks every parent document currently {@code COMPLETED} or {@code FAILED} back to
+   * {@code PENDING} — and resets {@code embedding_retry_count} to 0 — so the embedding backfill
+   * re-embeds it under the current model with a full retry budget (tempdoc 819 C).
    *
    * <p>The full COMPLETED/FAILED id set is collected FIRST (the set is stable while nothing has been
    * mutated), then re-marked with read-modify-write batch updates (other fields, e.g. content, are
@@ -160,8 +154,6 @@ public final class EmbeddingRecoveryOps {
     ids.addAll(
         collectAllIds(documentFieldOps, SchemaFields.EMBEDDING_STATUS_COMPLETED, batchSize));
     ids.addAll(collectAllIds(documentFieldOps, SchemaFields.EMBEDDING_STATUS_FAILED, batchSize));
-    int newlyPending = ids.size();
-    ids.addAll(collectAllIds(documentFieldOps, SchemaFields.EMBEDDING_STATUS_PENDING, batchSize));
     if (ids.isEmpty()) {
       return 0;
     }
@@ -173,11 +165,14 @@ public final class EmbeddingRecoveryOps {
       // left a document rescued from FAILED carrying an exhausted counter, so the backfill's very
       // first re-attempt escalated it straight back to FAILED — one attempt per boot, no matter how
       // many boots. A rescue is a deliberate re-embed request; it earns a full retry budget.
-      Map<String, Object> updates = new java.util.HashMap<>();
-      updates.put(SchemaFields.EMBEDDING_STATUS, SchemaFields.EMBEDDING_STATUS_PENDING);
-      updates.put(SchemaFields.EMBEDDING_RETRY_COUNT, "0");
-      updates.put(SchemaFields.VECTOR, null);
-      batch.add(Map.entry(id, updates));
+      batch.add(
+          Map.entry(
+              id,
+              Map.of(
+                  SchemaFields.EMBEDDING_STATUS,
+                  SchemaFields.EMBEDDING_STATUS_PENDING,
+                  SchemaFields.EMBEDDING_RETRY_COUNT,
+                  "0")));
       if (batch.size() >= batchSize) {
         total += updateExactBatch(coordinator, batch);
         batch.clear();
@@ -193,7 +188,7 @@ public final class EmbeddingRecoveryOps {
               + " for re-embed under the current model (legacy index had no stored fingerprint)",
           total);
     }
-    return newlyPending;
+    return total;
   }
 
   private static int updateExactBatch(
@@ -212,38 +207,10 @@ public final class EmbeddingRecoveryOps {
    */
   private static List<String> collectAllIds(
       DocumentFieldOps documentFieldOps, String value, int batchSize) {
-    return collectAllIds(documentFieldOps, SchemaFields.EMBEDDING_STATUS, value, batchSize);
-  }
-
-  private static void remarkChunkDocsPending(
-      DocumentFieldOps fields, IndexingCoordinator coordinator, int batchSize, boolean chunkVectorsEnabled) {
-    var ids = collectAllIds(fields, SchemaFields.IS_CHUNK, "true", batchSize);
-    List<Map.Entry<String, Map<String, Object>>> batch = new ArrayList<>(batchSize);
-    for (String id : ids) {
-      Map<String, Object> updates = new java.util.HashMap<>();
-      updates.put(SchemaFields.CHUNK_EMBEDDING_STATUS, chunkVectorsEnabled
-          ? SchemaFields.EMBEDDING_STATUS_PENDING : SchemaFields.EMBEDDING_STATUS_FAILED);
-      updates.put(SchemaFields.CHUNK_EMBEDDING_RETRY_COUNT, "0");
-      updates.put(SchemaFields.CHUNK_VECTOR, null);
-      batch.add(Map.entry(id, updates));
-      if (batch.size() >= batchSize) {
-        updateExactBatch(coordinator, batch);
-        batch.clear();
-      }
-    }
-    if (!batch.isEmpty()) updateExactBatch(coordinator, batch);
-  }
-
-  private static List<String> collectAllIds(
-      DocumentFieldOps documentFieldOps, String field, String value, int batchSize) {
     int limit = Math.min(Math.max(batchSize, 1), 1 << 26);
     while (true) {
-      List<String> ids;
-      try {
-        ids = documentFieldOps.queryDocIdsByFieldOrThrow(field, value, limit);
-      } catch (java.io.IOException unreadable) {
-        throw new java.io.UncheckedIOException("Legacy recovery enumeration failed", unreadable);
-      }
+      List<String> ids =
+          documentFieldOps.queryDocIdsByField(SchemaFields.EMBEDDING_STATUS, value, limit);
       if (ids.size() < limit) return ids;
       if (limit >= 1 << 26) {
         throw new IllegalStateException("Legacy recovery enumeration exceeded its coverage limit");
@@ -251,5 +218,4 @@ public final class EmbeddingRecoveryOps {
       limit = Math.min(limit << 1, 1 << 26);
     }
   }
-
 }

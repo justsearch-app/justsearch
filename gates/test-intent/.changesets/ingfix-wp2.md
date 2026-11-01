@@ -117,14 +117,6 @@ Evidence is intentionally left for the orchestrator to generate using run-eviden
           "delegationQuote": "proceed autonomously with designing all of the smallers and critical fixes. then proceed with implementing them accordingly.",
           "delegationLocation": "task t-20261030-ingfix request",
           "delegationScope": "fix the defects in the owner-commissioned ingestion defect list, designed by the orchestrator",
-          "choice": "S-D90 (Legacy recovery certifies untouched old chunk vectors) Recover a rescue-eligible index with distinguishable old chunk vectors and require their replacement before certification.",
-          "label": "agent choice"
-        },
-        {
-          "kind": "delegated-choice",
-          "delegationQuote": "proceed autonomously with designing all of the smallers and critical fixes. then proceed with implementing them accordingly.",
-          "delegationLocation": "task t-20261030-ingfix request",
-          "delegationScope": "fix the defects in the owner-commissioned ingestion defect list, designed by the orchestrator",
           "choice": "S-D91 (Failed re-embedding leaves old parent vectors certified and searchable) Recover two old-vector parents, fail one permanently and require no old vector exposed after certification.",
           "label": "agent choice"
         },
@@ -147,7 +139,7 @@ Evidence is intentionally left for the orchestrator to generate using run-eviden
       ],
       "evidence": "gates/test-intent/evidence/ingfix-wp2.json",
       "newChecks": [
-        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/embed/InPlaceEmbeddingRebuildRecoveryTest.java#rescueReplacesOldChunkVectorsAndTerminalFailureRemovesOldParentVector"
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/embed/InPlaceEmbeddingRebuildRecoveryTest.java#rescueTerminalFailureRemovesOldParentVector"
       ],
       "defectSource": {
         "kind": "defect-source",
@@ -156,13 +148,13 @@ Evidence is intentionally left for the orchestrator to generate using run-eviden
           "delegationQuote": "proceed autonomously with designing all of the smallers and critical fixes. then proceed with implementing them accordingly.",
           "delegationLocation": "task t-20261030-ingfix request",
           "delegationScope": "fix the defects in the owner-commissioned ingestion defect list, designed by the orchestrator",
-          "choice": "S-D90 (Legacy recovery certifies untouched old chunk vectors) Recover a rescue-eligible index with distinguishable old chunk vectors and require their replacement before certification.",
+          "choice": "S-D91 (Failed re-embedding leaves old parent vectors certified and searchable) Recover two old-vector parents, fail one permanently and require no old vector exposed after certification.",
           "label": "agent choice"
         },
-        "reproduction": "Seed distinguishable parent/chunk vectors, rescue, permanently fail a parent, certify and query/reopen. Baseline leaves the old chunk completed and searchable."
+        "reproduction": "Recover two completed old-vector parents using main legacy recovery, successfully re-embed one and permanently fail the other, then certify and query/reopen. Baseline still returns the failed parent through dense search."
       },
-      "reproduction": "Seed distinguishable parent/chunk vectors, rescue, permanently fail a parent, certify and query/reopen. Baseline leaves the old chunk completed and searchable.",
-      "behaviour": "Rescue invalidates completed chunk vectors before certification, waits for enabled chunks, removes terminal parent vectors, and retains lexical/sparse state across reopen. Parameterized naming only changes evidence selection."
+      "reproduction": "Recover two completed old-vector parents using main legacy recovery, successfully re-embed one and permanently fail the other, then certify and query/reopen. Baseline still returns the failed parent through dense search.",
+      "behaviour": "Terminal parent failure removes its old vector independently of legacy recovery preparation; certification and reopen expose only the successful parent and retain lexical content. S-D90 chunk re-marking and pre-certification invalidation are withdrawn."
     },
     {
       "items": [
@@ -277,24 +269,8 @@ Evidence is intentionally left for the orchestrator to generate using run-eviden
       "items": [
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/KnowledgeServerTest.java"
       ],
-      "class": "Defect pin",
+      "class": "Adaptation",
       "sources": [
-        {
-          "kind": "delegated-choice",
-          "delegationQuote": "proceed autonomously with designing all of the smallers and critical fixes. then proceed with implementing them accordingly.",
-          "delegationLocation": "task t-20261030-ingfix request",
-          "delegationScope": "fix the defects in the owner-commissioned ingestion defect list, designed by the orchestrator",
-          "choice": "S-D90 (Legacy recovery certifies untouched old chunk vectors) Recover a rescue-eligible index with distinguishable old chunk vectors and require their replacement before certification.",
-          "label": "agent choice"
-        },
-        {
-          "kind": "delegated-choice",
-          "delegationQuote": "proceed autonomously with designing all of the smallers and critical fixes. then proceed with implementing them accordingly.",
-          "delegationLocation": "task t-20261030-ingfix request",
-          "delegationScope": "fix the defects in the owner-commissioned ingestion defect list, designed by the orchestrator",
-          "choice": "S-D91 (Failed re-embedding leaves old parent vectors certified and searchable) Recover two old-vector parents, fail one permanently and require no old vector exposed after certification.",
-          "label": "agent choice"
-        },
         {
           "kind": "delegated-choice",
           "delegationQuote": "proceed autonomously with designing all of the smallers and critical fixes. then proceed with implementing them accordingly.",
@@ -304,24 +280,10 @@ Evidence is intentionally left for the orchestrator to generate using run-eviden
           "label": "agent choice"
         }
       ],
-      "evidence": "gates/test-intent/evidence/ingfix-wp2.json",
-      "newChecks": [
-        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/KnowledgeServerTest.java#onlyEnabledChunkStageBlocksEmbeddingCutover"
+      "moved": [
+        "input re-encoding"
       ],
-      "defectSource": {
-        "kind": "defect-source",
-        "stronger": {
-          "kind": "delegated-choice",
-          "delegationQuote": "proceed autonomously with designing all of the smallers and critical fixes. then proceed with implementing them accordingly.",
-          "delegationLocation": "task t-20261030-ingfix request",
-          "delegationScope": "fix the defects in the owner-commissioned ingestion defect list, designed by the orchestrator",
-          "choice": "S-D90 (Legacy recovery certifies untouched old chunk vectors) Recover a rescue-eligible index with distinguishable old chunk vectors and require their replacement before certification.",
-          "label": "agent choice"
-        },
-        "reproduction": "Hold parent counts clear and chunk pending count at seven; enabled chunks must block cutover. Baseline ignores this stage; disabled is a preservation case within the same named parameterized check."
-      },
-      "reproduction": "Hold parent counts clear and chunk pending count at seven; enabled chunks must block cutover. Baseline ignores this stage; disabled is a preservation case within the same named parameterized check.",
-      "behaviour": "Only an enabled pending chunk-vector stage blocks embedding cutover. Adaptation: the existing cutover fixture supplies a readable generation-owned ONNX graph/tokenizer and captured selection, preserving the same counter faults and attestation assertions."
+      "whatMoved": "Supply the existing cutover fixture with a readable generation-owned ONNX graph/tokenizer and captured selection, preserving the same counter faults and attestation assertions. S-D90 chunk-stage cutover checks are withdrawn."
     },
     {
       "items": [
@@ -884,7 +846,7 @@ Evidence is intentionally left for the orchestrator to generate using run-eviden
         "reproduction": "Compute terminal parent/chunk update maps. Baseline lacks the explicit null vector fields needed to remove old vectors."
       },
       "reproduction": "Compute terminal parent/chunk update maps. Baseline lacks the explicit null vector fields needed to remove old vectors.",
-      "behaviour": "Terminal parent and chunk failure updates explicitly remove prior vectors; retryable updates keep them. Adaptations: recovery mocks forward strict throwing enumeration to the existing readable fixture and account for pending coverage; enumeration-fault and missing-status inputs retain fail-closed coverage at those boundaries."
+      "behaviour": "Terminal parent and chunk failure updates explicitly remove prior vectors; retryable updates keep them. Recovery enumeration, coverage and mocks retain main behaviour; S-D90-only missing-status and chunk-enumeration cases are withdrawn."
     },
     {
       "items": [

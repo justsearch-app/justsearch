@@ -57,7 +57,6 @@ public final class EmbeddingProviderLifecycle {
   private final JobQueue jobQueue;
   private final IndexCountOps indexCountOps;
   private final CommitOps commitOps;
-  private final java.util.function.BooleanSupplier chunkVectorsEnabled;
 
   private volatile EmbeddingProvider embeddingProvider = NoOpEmbeddingProvider.INSTANCE;
   private volatile EmbeddingService embeddingServiceForLifecycle;
@@ -108,13 +107,6 @@ public final class EmbeddingProviderLifecycle {
       JobQueue jobQueue,
       IndexCountOps indexCountOps,
       CommitOps commitOps) {
-    this(signalBus, jobQueue, indexCountOps, commitOps, () -> true);
-  }
-
-  public EmbeddingProviderLifecycle(
-      WorkerSignalBus signalBus, JobQueue jobQueue, IndexCountOps indexCountOps,
-      CommitOps commitOps, java.util.function.BooleanSupplier chunkVectorsEnabled) {
-    this.chunkVectorsEnabled = chunkVectorsEnabled;
     this.signalBus = signalBus;
     this.jobQueue = jobQueue;
     this.indexCountOps = indexCountOps;
@@ -337,9 +329,7 @@ public final class EmbeddingProviderLifecycle {
     try {
       pendingEmbeddings =
           indexCountOps.countByFieldOrThrow(
-              SchemaFields.EMBEDDING_STATUS, SchemaFields.EMBEDDING_STATUS_PENDING)
-          + (chunkVectorsEnabled.getAsBoolean() ? indexCountOps.countByFieldOrThrow(
-              SchemaFields.CHUNK_EMBEDDING_STATUS, SchemaFields.EMBEDDING_STATUS_PENDING) : 0);
+              SchemaFields.EMBEDDING_STATUS, SchemaFields.EMBEDDING_STATUS_PENDING);
     } catch (Exception e) {
       pendingZeroStreak = 0;
       log.warn(
