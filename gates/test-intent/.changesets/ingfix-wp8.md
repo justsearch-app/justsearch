@@ -1304,7 +1304,7 @@ R9 builder-8 status: the restored check reaches a real admitted-while-eligible t
           "kind": "owner-adopted-scenario",
           "quote": "Block A’s scan and require B’s removal to complete independently.",
           "task": "t-20261030-ingfix",
-          "scenario": "S-D41",
+          "scenario": "SD41",
           "label": "agent-drafted, owner-adopted"
         }
       ]
@@ -1319,7 +1319,7 @@ R9 builder-8 status: the restored check reaches a real admitted-while-eligible t
           "kind": "owner-adopted-scenario",
           "quote": "Recreate the root and require watching and obsolete-document cleanup to recover.",
           "task": "t-20261030-ingfix",
-          "scenario": "S-D13",
+          "scenario": "SD13",
           "label": "agent-drafted, owner-adopted"
         },
         {
@@ -1342,7 +1342,7 @@ R9 builder-8 status: the restored check reaches a real admitted-while-eligible t
           "kind": "owner-adopted-scenario",
           "quote": "Migrate a root containing a document, symlink and excluded subtree; require skipping without hashing excluded files.",
           "task": "t-20261030-ingfix",
-          "scenario": "S-D4",
+          "scenario": "SD4",
           "label": "agent-drafted, owner-adopted"
         },
         {
@@ -1358,11 +1358,6 @@ R9 builder-8 status: the restored check reaches a real admitted-while-eligible t
           "task": "t-20261030-ingfix",
           "scenario": "C27",
           "label": "agent-drafted, owner-adopted"
-        },
-        {
-          "kind": "owner-words",
-          "quote": "its \"readmit after exclusion removed\" outcome then has no coverage: give that outcome a setup that P4 allows (for example admit the file before the exclusion is added) with the same observation and expected outcome, and classify the change by the class table.",
-          "location": "task t-20261030-ingfix builder-8 request"
         }
       ],
       "behaviour": "Restore R9 readmission after HOT public exclusion removal, keeping its observed new receipt/revision, current bytes, collection/root, completed Forget operation and successor-reopen assertions. Its changed precondition admits the source while eligible, then installs exclusion before consumption; no excluded file is admitted. This is New because the setup/precondition changes, not Adaptation. R2 controls remain.",
@@ -1392,9 +1387,12 @@ R9 builder-8 status: the restored check reaches a real admitted-while-eligible t
       "behaviour": "Migration watcher CREATE/MODIFY of an in-root file symlink retains main admission, preserves its event identity and receipt, and never enters the watcher failure handler or latches replay uncertainty. Compared with d8b8db0158: the regression is introduced by WP8; main 58ff43faa8 passes this preservation check. This does not attempt replay/cutover, whose symlink stall is pre-existing on main.",
       "sources": [
         {
-          "kind": "owner-words",
-          "quote": "On the migration watcher route, restore main's behaviour for in-root symlink create and modify events (no refusal, no exception into the watcher failure handler, no replay-uncertain latch)",
-          "location": "task t-20261030-ingfix builder-8 request"
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed autonomously with designing all of the smallers and critical fixes. then proceed with implementing them accordingly.",
+          "delegationLocation": "task t-20261030-ingfix request",
+          "delegationScope": "designing and implementing the smaller and critical ingestion-pipeline fixes",
+          "choice": "After an independent verification found regressions, narrow the discovery change so the watcher routes behave as on main: on the migration (candidate-generation) watcher route an in-root symlink create or modify event is admitted as main admits it, without a boundary refusal or a replay-uncertain latch; containment is still enforced where content is read.",
+          "label": "agent choice"
         }
       ],
       "repaired": true,
@@ -1413,7 +1411,7 @@ R9 builder-8 status: the restored check reaches a real admitted-while-eligible t
         {
           "kind": "owner-adopted-scenario",
           "task": "t-20261030-ingfix",
-          "scenario": "S-D1",
+          "scenario": "SD1",
           "quote": "Replace a queued file’s parent with an outside-root symlink and require rejection before content access.",
           "label": "agent-drafted, owner-adopted"
         },

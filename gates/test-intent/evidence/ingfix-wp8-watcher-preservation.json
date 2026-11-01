@@ -1,0 +1,87 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
+  },
+  "createdAt": "2026-11-01T20:32:19.909Z",
+  "revision": "ace5ea15969ffec6d7e615a2e46494b3e846d77c",
+  "tree": "a22fb72725be5775e78f6cf7aa71ad92353701d7",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": "openjdk version \"25.0.4.1\" 2026-08-18 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "./gradlew :modules:indexer-worker:test --tests \"io.justsearch.indexerworker.services.WatcherMigrationAdmissionTest.inRootLinkKeepsMainAdmissionWithoutReplayLatch\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 3920
+    },
+    {
+      "command": "./gradlew :modules:worker-services:test --tests \"io.justsearch.indexerworker.services.WatcherUpsertCompatibilityTest.watcherSourcesKeepMainAdmissionBehaviour\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 4602
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/WatcherMigrationAdmissionTest.java#inRootLinkKeepsMainAdmissionWithoutReplayLatch",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/WatcherMigrationAdmissionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:0b048503f09d2717f57cbfdaf4e3272b8c164b6e625fa04f3d29d7f7b3db7933",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "inRootLinkKeepsMainAdmissionWithoutReplayLatch(String) [1] CREATE",
+          "status": "passed"
+        },
+        {
+          "name": "inRootLinkKeepsMainAdmissionWithoutReplayLatch(String) [2] MODIFY",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WatcherUpsertCompatibilityTest.java#watcherSourcesKeepMainAdmissionBehaviour",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WatcherUpsertCompatibilityTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:375ec0a35d502019e238c64e54779d56ff3d87afcde758e3c6021d3926e4eb27",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "watcherSourcesKeepMainAdmissionBehaviour(String) [1] folder",
+          "status": "passed"
+        },
+        {
+          "name": "watcherSourcesKeepMainAdmissionBehaviour(String) [2] in-root-link",
+          "status": "passed"
+        },
+        {
+          "name": "watcherSourcesKeepMainAdmissionBehaviour(String) [3] vanished",
+          "status": "passed"
+        },
+        {
+          "name": "watcherSourcesKeepMainAdmissionBehaviour(String) [4] atomic-temp",
+          "status": "passed"
+        },
+        {
+          "name": "watcherSourcesKeepMainAdmissionBehaviour(String) [5] ordinary",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:9a974d11785b06df2f0d1940f8c5f3b3ea995e6c62eef169718a8957c4fe6bf9"
+}
