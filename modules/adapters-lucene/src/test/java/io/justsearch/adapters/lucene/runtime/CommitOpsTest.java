@@ -73,18 +73,36 @@ class CommitOpsTest extends LuceneExecutorTestBase {
       runtime.commitOps().commitAndTrack();
       saved = runtime.latestCommitUserDataBestEffort().get(key);
       assertNotNull(saved);
-      current.set(io.justsearch.adapters.lucene.commit.IndexFingerprint.ModelFingerprint.indeterminate());
+      current.set(original.withAssets(java.util.Optional.empty()));
       runtime.indexingCoordinator().updateDocument("parent", Map.of(SchemaFields.CONTENT, "changed lexical"));
       runtime.commitOps().commitAndTrack();
       assertEquals(saved, runtime.latestCommitUserDataBestEffort().get(key));
       assertFalse(runtime.latestCommitUserDataBestEffort().containsKey("index_fingerprint"));
     }
-    // Restoring the same assets must not turn the saved null graph into a false mismatch.
+    var unresolved = sources.get();
+    assertTrue(IndexMetadataParityGuard.inspectCommittedParity(tempDir, unresolved::build,
+        unresolved::indeterminateFingerprintInputs).isEmpty());
+    assertFalse(IndexMetadataParityGuard.certifiesCommittedCompatibility(tempDir, unresolved.build(),
+        unresolved.indeterminateFingerprintInputs()), "unavailable companions cannot certify compatibility");
+    // Restoring identical assets with the original graph remains compatible.
     current.set(original);
     assertTrue(IndexMetadataParityGuard.inspectCommittedParity(tempDir, sources.get()::build).isEmpty());
+    current.set(io.justsearch.adapters.lucene.commit.IndexFingerprint.ModelFingerprint.present("d".repeat(64))
+        .withAssets(java.util.Optional.of("b".repeat(64))));
+    var graphDiffs = IndexMetadataParityGuard.inspectCommittedParity(tempDir, sources.get()::build);
+    assertTrue(ParityDiagnostics.requiresRebuild(graphDiffs),
+        "a readable graph identity must survive a companion outage and reject a swapped graph");
     current.set(original.withAssets(java.util.Optional.of("c".repeat(64))));
     var diffs = IndexMetadataParityGuard.inspectCommittedParity(tempDir, sources.get()::build);
     assertTrue(diffs.stream().anyMatch(diff -> diff.key().equals(key)));
+    current.set(io.justsearch.adapters.lucene.commit.IndexFingerprint.ModelFingerprint.indeterminate()
+        .withAssets(java.util.Optional.of("c".repeat(64))));
+    var graphUnavailable = sources.get();
+    assertTrue(IndexMetadataParityGuard.inspectCommittedParity(tempDir, graphUnavailable::build,
+        graphUnavailable::indeterminateFingerprintInputs).stream().anyMatch(diff -> diff.key().equals(key)),
+        "known companions must still be compared while the graph cannot be read");
+    assertFalse(IndexMetadataParityGuard.certifiesCommittedCompatibility(tempDir, graphUnavailable.build(),
+        graphUnavailable.indeterminateFingerprintInputs()));
   }
 
   // -- buildMetadataSnapshot tests --

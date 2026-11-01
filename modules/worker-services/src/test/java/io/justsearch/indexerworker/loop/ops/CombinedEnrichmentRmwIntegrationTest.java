@@ -227,6 +227,66 @@ class CombinedEnrichmentRmwIntegrationTest extends io.justsearch.adapters.lucene
     assertTrue(hasSparseHit("old", docId), "embedding retry bookkeeping must retain sparse postings");
   }
 
+  @org.junit.jupiter.params.ParameterizedTest
+  @org.junit.jupiter.params.provider.ValueSource(strings = {"success", "retry", "terminal", "blank", "fallback"})
+  void embeddingBatchReadsSparseDictionaryOnce(String outcome) throws Exception {
+    int count = 8;
+    var features = new java.util.HashMap<String, Float>();
+    for (int term = 0; term < 64; term++) features.put("term" + term, 2f);
+    for (int doc = 0; doc < count; doc++) {
+      var fields = new java.util.HashMap<String, Object>();
+      String id = "sparse-parent-" + doc;
+      fields.put(SchemaFields.DOC_ID, id);
+      fields.put(SchemaFields.DOC_UID, id);
+      fields.put(SchemaFields.CONTENT, outcome.equals("blank") ? "" : "parent text " + doc);
+      fields.put(SchemaFields.EMBEDDING_STATUS, "PENDING");
+      fields.put(SchemaFields.EMBEDDING_RETRY_COUNT,
+          outcome.equals("terminal") ? SchemaFields.EMBEDDING_MAX_RETRIES - 1 : 0);
+      fields.put(SchemaFields.SPLADE_STATUS, "COMPLETED");
+      fields.put(SchemaFields.SPLADE_RETRY_COUNT, 0);
+      fields.put(SchemaFields.SPLADE, features);
+      runtime.indexingCoordinator().indexSingle(new IndexDocument(fields));
+    }
+    refresh();
+    var embedding = mock(EmbeddingProvider.class);
+    when(embedding.isAvailable()).thenReturn(true);
+    if (!outcome.equals("blank")) {
+      when(embedding.embedDocumentBatch(anyList())).thenAnswer(call -> outcome.equals("fallback")
+          ? List.of() : java.util.Collections.nCopies(count,
+              outcome.equals("success") ? new float[] {1f, 2f} : null));
+    }
+    var context = new EmbeddingBackfillOps.BackfillContext(runtime.documentFieldOps(),
+        runtime.indexingCoordinator(), runtime.commitOps(), mock(io.justsearch.indexerworker.coordination.WorkerSignalBus.class),
+        IndexingPacing.unthrottled(), () -> embedding, () -> true, () -> true, count,
+        LoggerFactory.getLogger(getClass()));
+    var logger = (ch.qos.logback.classic.Logger) LoggerFactory.getLogger(
+        io.justsearch.adapters.lucene.runtime.WritePathOps.class);
+    var events = new ch.qos.logback.core.read.ListAppender<ch.qos.logback.classic.spi.ILoggingEvent>();
+    var oldLevel = logger.getLevel();
+    events.start(); logger.addAppender(events); logger.setLevel(ch.qos.logback.classic.Level.DEBUG);
+    try {
+      var result = EmbeddingBackfillOps.processEmbeddingBackfill(context);
+      assertTrue(result.success());
+      long scans = events.list.stream().filter(event -> event.getFormattedMessage()
+          .startsWith("Prepared legacy sparse preservation:")).count();
+      System.out.println("Sparse preservation scans: " + outcome + "=" + scans + ", docs=" + count + ", terms=64");
+      assertEquals(1, scans, "one populated sparse dictionary scan per embedding outcome batch");
+    } finally {
+      logger.detachAppender(events); events.stop(); logger.setLevel(oldLevel);
+    }
+    refresh();
+    for (int doc = 0; doc < count; doc++) {
+      String id = "sparse-parent-" + doc;
+      assertEquals(outcome.equals("success") ? "COMPLETED" : outcome.equals("terminal") ? "FAILED" : "PENDING",
+          runtime.documentFieldOps().getDocumentField(id, SchemaFields.EMBEDDING_STATUS));
+      assertEquals(outcome.equals("success") ? "0" : outcome.equals("terminal")
+          ? Integer.toString(SchemaFields.EMBEDDING_MAX_RETRIES) : "1",
+          runtime.documentFieldOps().getDocumentField(id, SchemaFields.EMBEDDING_RETRY_COUNT));
+      assertEquals("COMPLETED", runtime.documentFieldOps().getDocumentField(id, SchemaFields.SPLADE_STATUS));
+      assertTrue(hasSparseHit("term63", id));
+    }
+  }
+
   private CombinedEnrichmentBackfillOps.BackfillContext context(
       EmbeddingProvider embedding, SpladeEncoder splade, NerService ner) {
     return new CombinedEnrichmentBackfillOps.BackfillContext(
