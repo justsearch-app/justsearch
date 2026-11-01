@@ -30,7 +30,7 @@ import org.slf4j.LoggerFactory;
 public final class EntityClusterStore implements Closeable {
   private static final Logger log = LoggerFactory.getLogger(EntityClusterStore.class);
   private static final int BUSY_TIMEOUT_MS = 5000;
-  public static final int CURRENT_SCHEMA_VERSION = 1;
+  public static final int CURRENT_SCHEMA_VERSION = 2;
 
   private final Path dbPath;
   private final ConnectionFactory connectionFactory;
@@ -107,6 +107,9 @@ public final class EntityClusterStore implements Closeable {
       stmt.execute(EntityClusterSchema.CREATE_CLUSTER_ID_INDEX);
       stmt.execute(EntityClusterSchema.CREATE_CANONICAL_INDEX);
       stmt.execute(EntityClusterSchema.CREATE_OVERRIDES_TABLE);
+      stmt.execute(EntityClusterSchema.CREATE_MENTIONS_TABLE);
+      stmt.execute(EntityClusterSchema.CREATE_MENTION_FORM_INDEX);
+      if (version < 2) stmt.executeUpdate("DELETE FROM entity_clusters");
       stmt.execute("PRAGMA user_version = " + CURRENT_SCHEMA_VERSION);
       connection.commit();
     } catch (SQLException failure) {
@@ -190,6 +193,78 @@ public final class EntityClusterStore implements Closeable {
       ensureOpen();
       try (Statement stmt = connection.createStatement()) {
         stmt.executeUpdate("DELETE FROM entity_clusters");
+        stmt.executeUpdate("DELETE FROM entity_mentions");
+      }
+    } finally {
+      lock.unlock();
+    }
+  }
+
+  /** Replaces a source's ownership atomically; repeated writes are idempotent. */
+  public void replaceSource(String sourceId, Map<String, List<String>> mentions) throws SQLException {
+    lock.lock();
+    try {
+      ensureOpen();
+      connection.setAutoCommit(false);
+      try (PreparedStatement delete = connection.prepareStatement(
+              "DELETE FROM entity_mentions WHERE source_id = ?");
+          PreparedStatement insert = connection.prepareStatement(
+              "INSERT OR IGNORE INTO entity_mentions(source_id, raw_form, entity_type) VALUES (?, ?, ?)")) {
+        delete.setString(1, sourceId);
+        delete.executeUpdate();
+        for (var type : mentions.entrySet()) {
+          for (String raw : type.getValue()) {
+            if (raw == null || raw.isBlank()) continue;
+            insert.setString(1, sourceId);
+            insert.setString(2, raw.trim());
+            insert.setString(3, type.getKey());
+            insert.addBatch();
+          }
+        }
+        insert.executeBatch();
+        connection.commit();
+      } catch (SQLException | RuntimeException failure) {
+        connection.rollback();
+        throw failure;
+      } finally {
+        connection.setAutoCommit(true);
+      }
+    } finally {
+      lock.unlock();
+    }
+  }
+
+  /** Retires unseen sources only after an uninterrupted scan of the whole corpus. */
+  public void retainSources(java.util.Set<String> liveSources) throws SQLException {
+    lock.lock();
+    try {
+      ensureOpen();
+      connection.setAutoCommit(false);
+      try (Statement statement = connection.createStatement();
+          PreparedStatement delete = connection.prepareStatement(
+              "DELETE FROM entity_mentions WHERE source_id = ?")) {
+        List<String> obsolete = new ArrayList<>();
+        try (ResultSet rows = statement.executeQuery("SELECT DISTINCT source_id FROM entity_mentions")) {
+          while (rows.next()) if (!liveSources.contains(rows.getString(1))) obsolete.add(rows.getString(1));
+        }
+        for (String source : obsolete) {
+          delete.setString(1, source);
+          delete.addBatch();
+        }
+        delete.executeBatch();
+        statement.executeUpdate("DELETE FROM entity_clusters WHERE NOT EXISTS (SELECT 1 FROM entity_mentions m"
+            + " WHERE m.raw_form = entity_clusters.raw_form AND m.entity_type = entity_clusters.entity_type)");
+        statement.executeUpdate("UPDATE entity_clusters SET canonical_form = (SELECT MIN(c.raw_form)"
+            + " FROM entity_clusters c WHERE c.cluster_id = entity_clusters.cluster_id"
+            + " AND c.entity_type = entity_clusters.entity_type) WHERE NOT EXISTS"
+            + " (SELECT 1 FROM entity_clusters c WHERE c.cluster_id = entity_clusters.cluster_id"
+            + " AND c.entity_type = entity_clusters.entity_type AND c.raw_form = entity_clusters.canonical_form)");
+        connection.commit();
+      } catch (SQLException | RuntimeException failure) {
+        connection.rollback();
+        throw failure;
+      } finally {
+        connection.setAutoCommit(true);
       }
     } finally {
       lock.unlock();

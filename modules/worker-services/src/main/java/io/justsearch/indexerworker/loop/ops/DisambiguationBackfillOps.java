@@ -4,9 +4,7 @@ package io.justsearch.indexerworker.loop.ops;
 import io.justsearch.adapters.lucene.runtime.DocumentFieldOps;
 import io.justsearch.indexerworker.loop.pacing.IndexingPacing;
 import io.justsearch.indexerworker.disambiguation.DisambiguationService;
-import io.justsearch.indexing.SchemaFields;
-import java.util.ArrayList;
-import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.function.BooleanSupplier;
@@ -32,95 +30,34 @@ public final class DisambiguationBackfillOps {
       Logger log) {}
 
   /**
-   * Processes a batch of NER-completed documents through disambiguation.
+   * Processes one resumable page of NER-completed documents.
    *
-   * <p>Collects all unique raw entity mentions from recently NER-completed documents and
-   * feeds them to the disambiguation service for clustering.
+   * <p>Acknowledges progress only after coherent reads, source replacement, and snapshot
+   * publication succeed. The final page retires sources absent from the completed scan.
    */
   public static void processDisambiguationBackfill(BackfillContext context) {
     try {
       DisambiguationService service = context.serviceSupplier().get();
-      if (service == null || !service.isAvailable()) {
-        return;
-      }
-
-      // Query documents with completed NER. NER_STATUS_COMPLETED_EMPTY is deliberately excluded:
-      // it is terminal too, but it means zero entities were extracted, so those docs carry no
-      // ENTITY_*_RAW fields for collectEntityMentions to harvest.
-      List<String> completedIds =
-          context
-              .documentFieldOps()
-              .queryDocIdsByField(
-                  SchemaFields.NER_STATUS,
-                  SchemaFields.NER_STATUS_COMPLETED,
-                  context.batchSize());
-
-      if (completedIds.isEmpty()) {
-        return;
-      }
-
-      // Harvest raw entity mentions from these documents
-      Map<String, List<String>> mentionsByType = new HashMap<>();
-      int docsScanned = 0;
-
-      for (String docId : completedIds) {
-        // Tempdoc 885 item 3: pace against foreground load; only shutdown stops the scan.
+      if (service == null || !service.isAvailable() || !context.runningSupplier().getAsBoolean()) return;
+      var state = context.documentFieldOps().entityCorpusState();
+      if (state.pendingNer() != 0) return;
+      if (!service.prepareReconciliation(state.revision(), state.readerKey())) return;
+      var page = context.documentFieldOps().entityPage(
+          state.readerKey(), service.reconciliationCursor(), context.batchSize());
+      Map<String, Map<String, List<String>>> sources = new LinkedHashMap<>();
+      for (var document : page.documents()) {
         context.pacing().pace();
-        if (!context.runningSupplier().getAsBoolean()) {
-          context.log().debug("Disambiguation backfill interrupted: loop stopping");
-          break;
-        }
-
-        try {
-          collectEntityMentions(context.documentFieldOps(), docId, mentionsByType);
-          docsScanned++;
-        } catch (Exception e) {
-          context
-              .log()
-              .warn("Failed to collect entity mentions from doc {}: {}", docId, e.getMessage());
-        }
+        if (!context.runningSupplier().getAsBoolean() || Thread.currentThread().isInterrupted()) return;
+        sources.put(document.id(), document.mentions());
       }
-
-      if (mentionsByType.isEmpty()) {
-        return;
-      }
-
-      // Feed to disambiguation service
-      int created = service.processBatch(mentionsByType);
-      if (created > 0 || docsScanned > 0) {
-        context
-            .log()
-            .info(
-                "Disambiguation backfill: scanned {} docs, {} new cluster entries",
-                docsScanned,
-                created);
-      }
-
-    } catch (Exception e) {
-      context.log().error("Error during disambiguation backfill", e);
-    }
-  }
-
-  private static void collectEntityMentions(
-      DocumentFieldOps documentFieldOps, String docId, Map<String, List<String>> mentionsByType) {
-    collectField(documentFieldOps, docId, SchemaFields.ENTITY_PERSONS_RAW, "PERSON", mentionsByType);
-    collectField(
-        documentFieldOps, docId, SchemaFields.ENTITY_ORGANIZATIONS_RAW, "ORGANIZATION", mentionsByType);
-    collectField(documentFieldOps, docId, SchemaFields.ENTITY_LOCATIONS_RAW, "LOCATION", mentionsByType);
-  }
-
-  private static void collectField(
-      DocumentFieldOps documentFieldOps,
-      String docId,
-      String field,
-      String typeName,
-      Map<String, List<String>> mentionsByType) {
-    List<String> values = documentFieldOps.getDocumentFieldValues(docId, field);
-    for (String mention : values) {
-      String trimmed = mention.trim();
-      if (!trimmed.isEmpty()) {
-        mentionsByType.computeIfAbsent(typeName, k -> new ArrayList<>()).add(trimmed);
-      }
+      if (!context.runningSupplier().getAsBoolean() || Thread.currentThread().isInterrupted()) return;
+      service.replaceSources(sources);
+      if (!context.runningSupplier().getAsBoolean() || Thread.currentThread().isInterrupted()) return;
+      var current = context.documentFieldOps().entityCorpusState();
+      if (!state.equals(current)) return;
+      service.acknowledgeReconciliation(page.cursor(), page.exhausted());
+    } catch (Exception failure) {
+      context.log().warn("Disambiguation batch incomplete; retrying next idle cycle", failure);
     }
   }
 }

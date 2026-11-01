@@ -69,14 +69,14 @@ class EntityClusterStoreTest {
       store.close();
       try (var connection = DriverManager.getConnection("jdbc:sqlite:" + db.toAbsolutePath());
           var statement = connection.createStatement()) {
-        statement.execute("PRAGMA user_version = 2");
+        statement.execute("PRAGMA user_version = " + (EntityClusterStore.CURRENT_SCHEMA_VERSION + 1));
       }
 
       Connection acquired = DriverManager.getConnection("jdbc:sqlite:" + db.toAbsolutePath());
       store = new EntityClusterStore(db, ignored -> acquired);
       try {
         SQLException failure = assertThrows(SQLException.class, store::open);
-        assertTrue(failure.getMessage().contains("schema version 2"));
+        assertTrue(failure.getMessage().contains("schema version " + (EntityClusterStore.CURRENT_SCHEMA_VERSION + 1)));
         assertTrue(acquired.isClosed(), "failed initialization must close before returning");
         assertThrows(SQLException.class, store::loadAll);
       } finally {

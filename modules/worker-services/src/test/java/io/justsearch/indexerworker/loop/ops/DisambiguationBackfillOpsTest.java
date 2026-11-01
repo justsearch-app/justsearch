@@ -1,164 +1,88 @@
+/* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.indexerworker.loop.ops;
 
-import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyInt;
-import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.*;
+import static org.mockito.ArgumentMatchers.*;
 
 import io.justsearch.adapters.lucene.runtime.DocumentFieldOps;
+import io.justsearch.adapters.lucene.runtime.DocumentFieldOps.EntityCorpusRevision;
+import io.justsearch.adapters.lucene.runtime.DocumentFieldOps.EntityCorpusState;
+import io.justsearch.adapters.lucene.runtime.DocumentFieldOps.EntityDocument;
+import io.justsearch.adapters.lucene.runtime.DocumentFieldOps.EntityPage;
 import io.justsearch.indexerworker.disambiguation.DisambiguationService;
 import io.justsearch.indexerworker.loop.pacing.ForegroundLoad;
 import io.justsearch.indexerworker.loop.pacing.IndexingPacing;
-import io.justsearch.indexing.SchemaFields;
+import java.io.IOException;
 import java.util.List;
 import java.util.Map;
-import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.ArgumentCaptor;
-import org.mockito.Mock;
-import org.mockito.junit.jupiter.MockitoExtension;
 import org.slf4j.LoggerFactory;
 
-@DisplayName("DisambiguationBackfillOps")
-@ExtendWith(MockitoExtension.class)
 class DisambiguationBackfillOpsTest {
+  final DocumentFieldOps fields = mock(DocumentFieldOps.class);
+  final DisambiguationService service = mock(DisambiguationService.class);
 
-  @Mock DocumentFieldOps documentFieldOps;
-  @Mock DisambiguationService disambiguationService;
-
-  private DisambiguationBackfillOps.BackfillContext context() {
-    return context(IndexingPacing.unthrottled());
+  DisambiguationBackfillOps.BackfillContext context(IndexingPacing pacing) {
+    return new DisambiguationBackfillOps.BackfillContext(fields, pacing, () -> service,
+        () -> true, 100, LoggerFactory.getLogger(getClass()));
   }
 
-  private DisambiguationBackfillOps.BackfillContext context(IndexingPacing pacing) {
-    return new DisambiguationBackfillOps.BackfillContext(
-        documentFieldOps,
-        pacing,
-        () -> disambiguationService,
-        () -> true,
-        100,
-        LoggerFactory.getLogger(DisambiguationBackfillOpsTest.class));
+  @Test void absentServiceDoesNotReadCorpus() {
+    var context = new DisambiguationBackfillOps.BackfillContext(fields, IndexingPacing.unthrottled(),
+        () -> null, () -> true, 100, LoggerFactory.getLogger(getClass()));
+    DisambiguationBackfillOps.processDisambiguationBackfill(context);
+    verifyNoInteractions(fields, service);
   }
 
-  @Nested
-  @DisplayName("processDisambiguationBackfill()")
-  class ProcessBackfill {
+  @Test void unavailableServiceDoesNotReadCorpus() throws Exception {
+    DisambiguationBackfillOps.processDisambiguationBackfill(context(IndexingPacing.unthrottled()));
+    verifyNoInteractions(fields);
+  }
 
-    @Test
-    @DisplayName("no-op when service is null")
-    void noopWhenServiceNull() {
-      DisambiguationBackfillOps.BackfillContext ctx =
-          new DisambiguationBackfillOps.BackfillContext(
-              documentFieldOps,
-              IndexingPacing.unthrottled(),
-              () -> null,
-              () -> true,
-              100,
-              LoggerFactory.getLogger(DisambiguationBackfillOpsTest.class));
+  @Test void newlyVisiblePendingNerDefersReconciliation() throws Exception {
+    when(service.isAvailable()).thenReturn(true);
+    when(fields.entityCorpusState()).thenReturn(new EntityCorpusState(
+        new EntityCorpusRevision(fields, 0, 1, 0), new Object(), 1));
+    DisambiguationBackfillOps.processDisambiguationBackfill(context(IndexingPacing.unthrottled()));
+    verify(service, never()).prepareReconciliation(any(), any());
+  }
 
-      DisambiguationBackfillOps.processDisambiguationBackfill(ctx);
+  @Test void failedSelectionDoesNotAcknowledgeCursor() throws Exception {
+    when(service.isAvailable()).thenReturn(true);
+    Object reader = new Object();
+    var state = new EntityCorpusState(new EntityCorpusRevision(fields, 0, 1, 0), reader, 0);
+    when(fields.entityCorpusState()).thenReturn(state);
+    when(service.prepareReconciliation(state.revision(), reader)).thenReturn(true);
+    when(fields.entityPage(any(), anyInt(), anyInt())).thenThrow(new IOException("selection failed"));
+    DisambiguationBackfillOps.processDisambiguationBackfill(context(IndexingPacing.unthrottled()));
+    verify(service, never()).acknowledgeReconciliation(anyInt(), anyBoolean());
+  }
 
-      verify(documentFieldOps, never()).queryDocIdsByField(anyString(), anyString(), anyInt());
-    }
+  @Test void processesAllDocsUnderForegroundLoad() throws Exception {
+    when(service.isAvailable()).thenReturn(true);
+    Object reader = new Object();
+    var state = new EntityCorpusState(new EntityCorpusRevision(fields, 0, 2, 0), reader, 0);
+    when(fields.entityCorpusState()).thenReturn(state);
+    when(service.prepareReconciliation(state.revision(), reader)).thenReturn(true);
+    var mentions = Map.of("PERSON", List.of("John Smith"));
+    when(fields.entityPage(any(), anyInt(), anyInt())).thenReturn(new EntityPage(
+        List.of(new EntityDocument("a", mentions), new EntityDocument("b", mentions)), 1, true));
+    ForegroundLoad load = new ForegroundLoad(); load.started();
+    var pacing = new IndexingPacing(load, 20, 500L, () -> 0L, () -> 0L, ms -> {});
+    DisambiguationBackfillOps.processDisambiguationBackfill(context(pacing));
+    verify(service).replaceSources(Map.of("a", mentions, "b", mentions));
+    verify(service).acknowledgeReconciliation(1, true);
+  }
 
-    @Test
-    @DisplayName("no-op when service is not available")
-    void noopWhenServiceUnavailable() {
-      when(disambiguationService.isAvailable()).thenReturn(false);
-
-      DisambiguationBackfillOps.processDisambiguationBackfill(context());
-
-      verify(documentFieldOps, never()).queryDocIdsByField(anyString(), anyString(), anyInt());
-    }
-
-    @Test
-    @DisplayName("no-op when no NER-completed documents")
-    void noopWhenNoCompletedDocs() {
-      when(disambiguationService.isAvailable()).thenReturn(true);
-      when(documentFieldOps.queryDocIdsByField(
-              eq(SchemaFields.NER_STATUS), eq(SchemaFields.NER_STATUS_COMPLETED), anyInt()))
-          .thenReturn(List.of());
-
-      DisambiguationBackfillOps.processDisambiguationBackfill(context());
-
-      // Should query but find nothing
-      verify(documentFieldOps)
-          .queryDocIdsByField(
-              eq(SchemaFields.NER_STATUS), eq(SchemaFields.NER_STATUS_COMPLETED), anyInt());
-    }
-
-    @SuppressWarnings("unchecked")
-    @Test
-    @DisplayName("collects entity mentions and calls processBatch")
-    void happyPathCollectsAndProcesses() throws Exception {
-      when(disambiguationService.isAvailable()).thenReturn(true);
-      when(documentFieldOps.queryDocIdsByField(
-              eq(SchemaFields.NER_STATUS), eq(SchemaFields.NER_STATUS_COMPLETED), anyInt()))
-          .thenReturn(List.of("doc1", "doc2"));
-
-      // doc1 has persons and orgs
-      when(documentFieldOps.getDocumentFieldValues("doc1", SchemaFields.ENTITY_PERSONS_RAW))
-          .thenReturn(List.of("John Smith", "Jane Doe"));
-      when(documentFieldOps.getDocumentFieldValues("doc1", SchemaFields.ENTITY_ORGANIZATIONS_RAW))
-          .thenReturn(List.of("Acme Corp"));
-      when(documentFieldOps.getDocumentFieldValues("doc1", SchemaFields.ENTITY_LOCATIONS_RAW))
-          .thenReturn(List.of());
-
-      // doc2 has locations only
-      when(documentFieldOps.getDocumentFieldValues("doc2", SchemaFields.ENTITY_PERSONS_RAW))
-          .thenReturn(List.of());
-      when(documentFieldOps.getDocumentFieldValues("doc2", SchemaFields.ENTITY_ORGANIZATIONS_RAW))
-          .thenReturn(List.of());
-      when(documentFieldOps.getDocumentFieldValues("doc2", SchemaFields.ENTITY_LOCATIONS_RAW))
-          .thenReturn(List.of("New York"));
-
-      when(disambiguationService.processBatch(any(Map.class))).thenReturn(4);
-
-      DisambiguationBackfillOps.processDisambiguationBackfill(context());
-
-      ArgumentCaptor<Map<String, List<String>>> captor = ArgumentCaptor.forClass(Map.class);
-      verify(disambiguationService).processBatch(captor.capture());
-
-      Map<String, List<String>> mentions = captor.getValue();
-      assertTrue(mentions.containsKey("PERSON"), "Should have PERSON mentions");
-      assertTrue(
-          mentions.get("PERSON").containsAll(List.of("John Smith", "Jane Doe")),
-          "Should contain both person names");
-      assertTrue(mentions.containsKey("ORGANIZATION"), "Should have ORGANIZATION mentions");
-      assertTrue(
-          mentions.get("ORGANIZATION").contains("Acme Corp"), "Should contain org name");
-      assertTrue(mentions.containsKey("LOCATION"), "Should have LOCATION mentions");
-      assertTrue(mentions.get("LOCATION").contains("New York"), "Should contain location name");
-    }
-
-    @Test
-    @DisplayName(
-        "processes every completed doc despite foreground load (tempdoc 885 item 3: a duty"
-            + " cycle paces the scan, it no longer aborts it)")
-    void processesAllDocsUnderForegroundLoad() {
-      when(disambiguationService.isAvailable()).thenReturn(true);
-      when(documentFieldOps.queryDocIdsByField(
-              eq(SchemaFields.NER_STATUS), eq(SchemaFields.NER_STATUS_COMPLETED), anyInt()))
-          .thenReturn(List.of("doc1", "doc2"));
-
-      // Foreground load stays in-flight for the whole scan (never drains) — the old
-      // isUserActive()==true case that used to abort the loop outright.
-      ForegroundLoad load = new ForegroundLoad();
-      load.started();
-      IndexingPacing busyPacing = new IndexingPacing(load, 20, 500L, () -> 0L, () -> 0L, ms -> {});
-
-      DisambiguationBackfillOps.processDisambiguationBackfill(context(busyPacing));
-
-      // Both completed docs are still scanned for entity mentions — the scan is paced, not
-      // interrupted, under sustained foreground contention.
-      verify(documentFieldOps).getDocumentFieldValues("doc1", SchemaFields.ENTITY_PERSONS_RAW);
-      verify(documentFieldOps).getDocumentFieldValues("doc2", SchemaFields.ENTITY_PERSONS_RAW);
-    }
+  @Test void changedReaderDoesNotAcknowledgeMixedPass() throws Exception {
+    when(service.isAvailable()).thenReturn(true);
+    Object reader = new Object();
+    var revision = new EntityCorpusRevision(fields, 0, 1, 0);
+    when(fields.entityCorpusState()).thenReturn(new EntityCorpusState(revision, reader, 0),
+        new EntityCorpusState(revision, new Object(), 0));
+    when(service.prepareReconciliation(revision, reader)).thenReturn(true);
+    when(fields.entityPage(any(), anyInt(), anyInt())).thenReturn(new EntityPage(List.of(), -1, true));
+    DisambiguationBackfillOps.processDisambiguationBackfill(context(IndexingPacing.unthrottled()));
+    verify(service, never()).acknowledgeReconciliation(anyInt(), anyBoolean());
   }
 }

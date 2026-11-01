@@ -209,6 +209,42 @@ class DisambiguationServiceTest {
     }
   }
 
+  @ParameterizedTest
+  @CsvSource({"2,false", "3,false", "3,true"})
+  void replayRepairsPartialPersistenceAndFailedSnapshot(int failAt, boolean emptyReplay) throws Exception {
+    Path db = tempDir.resolve("publication-failure.db");
+    AtomicInteger reads = new AtomicInteger();
+    AtomicBoolean faults = new AtomicBoolean(false);
+    EntityClusterStore faultingStore = new EntityClusterStore(db, jdbc -> {
+      Connection connection = DriverManager.getConnection(jdbc);
+      return (Connection) Proxy.newProxyInstance(Connection.class.getClassLoader(), new Class<?>[] {Connection.class},
+          (proxy, method, args) -> {
+            Object result = invoke(connection, method, args);
+            if (!method.getName().equals("createStatement")) return result;
+            Statement statement = (Statement) result;
+            return Proxy.newProxyInstance(Statement.class.getClassLoader(), new Class<?>[] {Statement.class},
+                (statementProxy, statementMethod, statementArgs) -> {
+                  if (faults.get() && statementMethod.getName().equals("executeQuery")
+                      && ((String) statementArgs[0]).contains("FROM entity_clusters")
+                      && reads.incrementAndGet() == failAt) throw new SQLException("snapshot/read fault");
+                  return invoke(statement, statementMethod, statementArgs);
+                });
+          });
+    });
+    try (DisambiguationService candidate = new DisambiguationService(faultingStore)) {
+      candidate.open();
+      var input = new java.util.LinkedHashMap<String, List<String>>();
+      input.put("PERSON", List.of("john smith", "JOHN SMITH"));
+      input.put("LOCATION", List.of("New York", "NEW YORK"));
+      faults.set(true);
+      assertThrows(SQLException.class, () -> candidate.processBatch(input));
+      assertTrue(candidate.snapshot().isEmpty(), "failed publication preserves the captured snapshot");
+      candidate.processBatch(emptyReplay ? Map.of() : input);
+      assertEquals(Set.of("john smith", "JOHN SMITH"), candidate.snapshot().expandCanonical("PERSON", "john smith"));
+      assertEquals(Set.of("New York", "NEW YORK"), candidate.snapshot().expandCanonical("LOCATION", "New York"));
+    }
+  }
+
   private static Throwable injectedFailure(String kind, String message) {
     return switch (kind) {
       case "sql" -> new SQLException(message);

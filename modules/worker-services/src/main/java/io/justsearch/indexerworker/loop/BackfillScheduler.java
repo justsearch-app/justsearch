@@ -41,8 +41,7 @@ import org.slf4j.LoggerFactory;
  * backfill orchestration: the combined enrichment tight loop, the per-stage fallback path
  * (embedding / chunk-embed / NER / SPLADE), and disambiguation. Owns the SPLADE retry-backoff
  * state ({@code consecutiveSpladeFailures}, {@code nextSpladeRetryTime},
- * {@code lastSpladeInterleaveTime}) and the disambiguation completion latch
- * ({@code disambiguationPassComplete}, {@code lastKnownNerCompletedCount}).
+ * {@code lastSpladeInterleaveTime}). The disambiguation service owns reconciliation progress.
  *
  * <p>P5 boundary: a concrete final class with three entry points (runIdleCycle,
  * runInterleavedSplade, resetState). No strategy interface.
@@ -120,8 +119,6 @@ public final class BackfillScheduler {
   private long lastSpladeInterleaveTime = 0;
   private int consecutiveSpladeFailures = 0;
   private long nextSpladeRetryTime = 0;
-  private boolean disambiguationPassComplete = false;
-  private int lastKnownNerCompletedCount = 0;
 
   /**
    * Cross-cycle per-window accumulator for long documents (round-15 post-round finding). Lives here
@@ -468,8 +465,6 @@ public final class BackfillScheduler {
     lastSpladeInterleaveTime = 0;
     consecutiveSpladeFailures = 0;
     nextSpladeRetryTime = 0;
-    disambiguationPassComplete = false;
-    lastKnownNerCompletedCount = 0;
     windowedEmbedProgress.clear();
     lastWorkSetSignature = 0;
     repeatedWorkSetCycles = 0;
@@ -599,25 +594,12 @@ public final class BackfillScheduler {
         || !disambiguationService.isAvailable()) {
       return;
     }
-    int pendingNer =
-        indexCountOps.countByField(SchemaFields.NER_STATUS, SchemaFields.NER_STATUS_PENDING);
-    if (pendingNer != 0) return;
-    // Tempdoc 798 review F4: deliberately COMPLETED only, NOT COMPLETED_EMPTY. This counter is a
-    // change-detector for "new entities exist, so the disambiguation pass is stale". A
-    // COMPLETED_EMPTY document is one NER ran on and found no entities — it contributes nothing to
-    // the entity graph, so a batch that finishes entirely as COMPLETED_EMPTY genuinely has nothing
-    // to re-disambiguate and must not re-trigger a full pass. A mixed batch still moves this
-    // counter via its entity-bearing documents, so nothing is missed. (Contrast the coverage
-    // counters in IndexCountOps, which ask "is the stage done?" — there both tokens must sum.)
-    int nerCompleted =
-        indexCountOps.countByField(SchemaFields.NER_STATUS, SchemaFields.NER_STATUS_COMPLETED);
-    if (nerCompleted != lastKnownNerCompletedCount) {
-      disambiguationPassComplete = false;
-      lastKnownNerCompletedCount = nerCompleted;
-    }
-    if (!disambiguationPassComplete) {
+    try {
+      if (indexCountOps.countByFieldOrThrow(
+          SchemaFields.NER_STATUS, SchemaFields.NER_STATUS_PENDING) != 0) return;
       processDisambiguationBackfill();
-      disambiguationPassComplete = true;
+    } catch (java.io.IOException failure) {
+      log.warn("Cannot establish disambiguation readiness; retrying next cycle", failure);
     }
   }
 

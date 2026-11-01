@@ -44,6 +44,52 @@ public final class DisambiguationService implements Closeable {
   private volatile EntityClusterSnapshot snapshot = EntityClusterSnapshot.EMPTY;
   private final AtomicBoolean initialized = new AtomicBoolean(false);
   private boolean needsClose;
+  private Object completedRevision;
+  private Object scanningRevision;
+  private Object scanningReader;
+  private int scanCursor = -1;
+  private final Set<String> scannedSources = new HashSet<>();
+
+  /** Starts or resumes a pass; a reader change makes a physical document cursor invalid. */
+  public synchronized boolean prepareReconciliation(Object revision, Object reader) {
+    if (java.util.Objects.equals(completedRevision, revision)) return false;
+    if (!java.util.Objects.equals(scanningRevision, revision) || scanningReader != reader) {
+      scanningRevision = revision;
+      scanningReader = reader;
+      scanCursor = -1;
+      scannedSources.clear();
+    }
+    return true;
+  }
+
+  public synchronized int reconciliationCursor() {
+    return scanCursor;
+  }
+
+  /** Writes ownership before clusters; retries repair any partially persisted cluster batch. */
+  public synchronized void replaceSources(Map<String, Map<String, List<String>>> documents)
+      throws SQLException {
+    Map<String, List<String>> mentions = new java.util.LinkedHashMap<>();
+    for (var document : documents.entrySet()) {
+      store.replaceSource(document.getKey(), document.getValue());
+      document.getValue().forEach((type, forms) ->
+          mentions.computeIfAbsent(type, ignored -> new ArrayList<>()).addAll(forms));
+    }
+    processBatch(mentions);
+    scannedSources.addAll(documents.keySet());
+  }
+
+  /** A failed snapshot publication leaves both cursor and completion unacknowledged. */
+  public synchronized void acknowledgeReconciliation(int cursor, boolean exhausted) throws SQLException {
+    if (exhausted) {
+      store.retainSources(scannedSources);
+      rebuildSnapshot();
+      completedRevision = scanningRevision;
+      scannedSources.clear();
+    }
+    scanCursor = cursor;
+  }
+
 
   private static final DoubleMetaphone METAPHONE = new DoubleMetaphone();
 
@@ -63,6 +109,9 @@ public final class DisambiguationService implements Closeable {
     needsClose = true;
     try {
       store.open();
+      completedRevision = null;
+      scanningRevision = null;
+      scanningReader = null;
       rebuildSnapshot();
       log.info("DisambiguationService initialized, snapshot has {} types", snapshotTypeCount());
       initialized.set(true);
@@ -97,8 +146,9 @@ public final class DisambiguationService implements Closeable {
    *     list of raw mention forms
    * @return number of new cluster entries created
    */
-  public int processBatch(Map<String, List<String>> newMentionsByType) throws SQLException {
+  public synchronized int processBatch(Map<String, List<String>> newMentionsByType) throws SQLException {
     if (newMentionsByType == null || newMentionsByType.isEmpty()) {
+      rebuildSnapshot();
       return 0;
     }
 
@@ -114,8 +164,8 @@ public final class DisambiguationService implements Closeable {
       created += processTypesBatch(type, typeName, rawForms);
     }
 
+    rebuildSnapshot();
     if (created > 0) {
-      rebuildSnapshot();
       log.info("Disambiguation batch: {} new entries, snapshot rebuilt", created);
     }
 
@@ -308,10 +358,14 @@ public final class DisambiguationService implements Closeable {
   }
 
   /** Clears all cluster data and resets to empty state. Used by profiling reset. */
-  public void reset() throws SQLException {
+  public synchronized void reset() throws SQLException {
+    completedRevision = null;
+    scanningRevision = null;
+    scanningReader = null;
+    scanCursor = -1;
+    scannedSources.clear();
     store.deleteAll();
     snapshot = EntityClusterSnapshot.EMPTY;
-    initialized.set(false);
     log.info("DisambiguationService reset to empty state");
   }
 
