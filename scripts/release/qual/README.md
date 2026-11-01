@@ -55,40 +55,40 @@ allocation refuses with a `storage-budget` infrastructure failure, preserving
 the previous run disk and stopping subsequent journey stages.
 
 After the release session explicitly retires a merged or superseded wave,
-preview its disk retirement (paths are relative to the qualification root):
+report its disk retirement candidates (paths are relative to the qualification root):
 
 ```sh
 python3 vm.py prune-disks evidence/retired-wave \
   --reason 'release reference and retirement decision'
-# Review the plan, then repeat with --apply to delete the planned disks.
 ```
 
-Multiple subtrees may be selected. Retirement is never inferred from age,
-names, reports or GitHub. Stop the VM first. The command inventories regular files
-by their qcow2 header magic (`QFI\xfb`), regardless of filename, without following
-symlinks, and follows their backing chains. Every `base.qcow2` anywhere under the
-root is a base, as is any disk named by any `base.json` receipt under the root,
-including moved-aside OS folders. Bases, retained run disks and other
-kept disks protect their ancestors; protected paths explain why they remain.
+The command writes nothing. It reports candidate disks with allocated bytes,
+protected disks with their reasons, and refusals. Multiple subtrees may be
+selected. Retirement is never inferred from age, names, reports or GitHub.
+Stop the VM and other image-writing tools before generating the report.
+
+**The report recognises qcow2 images only. An image in another format backed
+by a listed disk would be missed.** Discovery uses regular files' qcow2 header
+magic (`QFI\xfb`), regardless of filename, without following symlinks, and
+follows their backing chains. Every `base.qcow2` anywhere under the root is a
+base, as is any disk named by any `base.json` under the root, including
+moved-aside OS folders. Bases, retained run disks and other kept qcow2 disks
+protect their ancestors; protected paths explain why they remain.
 Selections containing a base, OS directory or the root, symlinked/escaping
-paths, corrupt or unreadable images, external data files, non-qcow2 images
-or backing formats, and ambiguous chains refuse deletion.
-A positively missing backing file is reported; its head and existing layers
-before the gap remain protected while independent disks remain eligible.
+paths, corrupt or unreadable qcow2 images, external data files, non-qcow2
+content with the same header magic or backing formats, and ambiguous chains
+refuse a plan. A positively missing backing file is reported; its head and
+existing layers before the gap remain protected while independent disks
+remain eligible.
 
-Only explicitly selected, unreferenced disks are deleted, children first.
-Logs, reports, screenshots, archives and firmware remain. An exclusive,
-timestamped `<subtree>.prune-*.json` receipt beside the first subtree records
-the reason, planned deletions with allocated bytes, protection reasons, and
-actual completed deletions. A receipt must be writable before deletion begins;
-an unlink failure stops immediately. Re-running recomputes the graph and keeps
-earlier receipts. The default dry run writes nothing.
-
-Apply holds the VM lifetime lock for the whole operation and re-inventories the
-root immediately before the first unlink. A changed image set, file identity or
-backing reference refuses all deletions. Harness disk creation, VM lifetimes and
-snapshot sealing share that lock. Only writers taking the VM lock are serialised;
-images written by other tools can race this check. Stop those tools before pruning.
+Deletion under the qualification root is manual and requires the owner's
+approval. Before requesting approval, check the listed disks and all retained
+images, including other formats, with `qemu-img info --backing-chain <image>`
+to confirm no retained image depends on a listed disk. Resolve refusals and
+uncertain references first. With the owner's approval, delete only the disks
+listed in the reviewed report, children first in the reported order. Keep
+logs, reports, screenshots, archives and firmware. If images or references
+change after review, generate and check a fresh report before deletion.
 
 Journey summaries record `storage.snapshotBytes` after a layer and its
 manifest/checkpoint are fully sealed. It counts that layer's allocated bytes,

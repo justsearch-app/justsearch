@@ -28,7 +28,8 @@ class DiskGrowthTests(unittest.TestCase):
             mocked = patch.object(vm, key, value)
             mocked.start(); self.addCleanup(mocked.stop)
         # Isolate liveness probes from the owner's ports; test their refusal
-        # separately below, and use the real flock in every prune invocation.
+        # separately below.
+        self.real_live_reasons = vm.live_reasons
         live = patch.object(vm, 'live_reasons', return_value=[])
         self.live = live.start(); self.addCleanup(live.stop)
         self.base = self.image('ubuntu/base.qcow2')
@@ -41,53 +42,31 @@ class DiskGrowthTests(unittest.TestCase):
         subprocess.run([*args, str(path)], check=True, capture_output=True)
         return path
 
-    def prune(self, *targets, apply=False):
+    def prune(self, *targets):
         with contextlib.redirect_stdout(io.StringIO()):
-            return vm.prune_disks([Path(t) for t in targets], 'retired release / successful retry', apply)
+            return vm.prune_disks([Path(t) for t in targets], 'retired release / successful retry')
 
     def readable(self, path):
         subprocess.run(['qemu-img', 'info', '--output=json', '--backing-chain', str(path)],
                        check=True, capture_output=True)
 
-    def prune_cli(self, *targets, apply=False, publish_child=None, after_plan=''):
+    def prune_cli(self, *targets):
         # Exercise the actual parser and command in a child process, redirecting
         # only its root and host liveness probes to keep all resources private.
-        source = '''
-import fcntl, json, os, sys
+        source = """
+import sys
 from pathlib import Path
 sys.path.insert(0, sys.argv[1])
 import vm
 vm.ROOT = Path(sys.argv[2])
 vm.STATE = vm.ROOT / 'running.json'
 vm.live_reasons = lambda check_lock=True: []
-child = json.loads(sys.argv[3])
-after_plan = sys.argv[4]
-if child or after_plan:
-    original = vm.prune_plan
-    def publish(*args):
-        plan = original(*args)
-        with (vm.ROOT / 'vm.lock').open() as lease:
-            try:
-                fcntl.flock(lease, fcntl.LOCK_EX | fcntl.LOCK_NB)
-            except BlockingIOError:
-                pass
-            else:
-                raise AssertionError('Apply did not hold the VM lifetime lock')
-        if child:
-            path, backing = map(Path, child)
-            path.parent.mkdir(parents=True, exist_ok=True)
-            vm.run('qemu-img', 'create', '-q', '-f', 'qcow2', '-F', 'qcow2', '-b', backing, path)
-        exec(after_plan)
-        return plan
-    vm.prune_plan = publish
-sys.argv = ['vm.py', 'prune-disks', *sys.argv[5:]]
+sys.argv = ['vm.py', 'prune-disks', *sys.argv[3:]]
 vm.main()
-'''
+"""
         harness = os.environ.get('QUAL_HARNESS_DIR', str(Path(__file__).resolve().parent))
         return subprocess.run([sys.executable, '-c', source, harness, str(self.root),
-            json.dumps(list(map(str, publish_child)) if publish_child else None),
-            after_plan,
-            *targets, '--reason', 'regression retirement', *(['--apply'] if apply else [])],
+            *targets, '--reason', 'regression retirement'],
             capture_output=True, text=True, timeout=30)
 
     def test_cli_kept_child_with_img_suffix_protects_selected_parent(self):
@@ -96,86 +75,57 @@ vm.main()
         result = self.prune_cli('evidence/old')
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(json.loads(result.stdout)['planned'], [])
-        applied = self.prune_cli('evidence/old', apply=True)
-        self.assertEqual(applied.returncode, 0, applied.stderr)
-        self.assertEqual(json.loads(applied.stdout)['deleted'], [])
         self.readable(child)
 
     def test_cli_moved_aside_os_base_refuses_selection(self):
         (self.root / 'ubuntu').rename(self.root / 'ubuntu-old')
         base = self.root / 'ubuntu-old/base.qcow2'
-        result = self.prune_cli('ubuntu-old', apply=True)
+        result = self.prune_cli('ubuntu-old')
         self.assertNotEqual(result.returncode, 0, result.stdout)
         self.assertIn('Refusing selection containing a base', result.stderr)
         self.readable(base)
-        self.assertEqual(list(self.root.glob('*.prune-*.json')), [])
 
-    def test_cli_head_published_after_plan_refuses_before_unlink(self):
-        parent = self.image('evidence/old/disk.qcow2', self.base)
-        child = self.root / 'kept/child.qcow2'
-        result = self.prune_cli('evidence/old', apply=True, publish_child=(child, parent))
-        self.assertNotEqual(result.returncode, 0, result.stdout)
-        self.assertIn('inventory changed since prune plan', result.stderr)
-        self.assertTrue(parent.exists())
-        self.readable(child)
-        receipt = next((self.root / 'evidence').glob('old.prune-*.json'))
-        self.assertEqual(json.loads(receipt.read_text())['deleted'], [])
-
-    def test_cli_external_data_file_refuses_before_any_deletion(self):
+    def test_cli_external_data_file_refuses_report(self):
         selected = self.image('evidence/old/data.qcow2')
         kept = self.root / 'kept.img'
-        create = f"vm.run('qemu-img', 'create', '-q', '-f', 'qcow2', '-o', 'data_file={selected}', '{kept}', '1M')"
-        # Creation truncates the external data file. Restore it as a valid qcow2
-        # so the old inventory would mistake it for an independent candidate.
-        create += f"\nvm.run('qemu-img', 'create', '-q', '-f', 'qcow2', '{selected}', '1M')"
-        for late, apply in ((False, False), (False, True), (True, True)):
-            with self.subTest(after_plan=late, apply=apply):
-                if not late:
-                    exec(create, {'vm': vm})
-                result = self.prune_cli('evidence/old', apply=apply, after_plan=create if late else '')
-                self.assertNotEqual(result.returncode, 0, result.stdout)
-                self.assertIn(str(kept), result.stderr)
-                self.assertIn('external data file', result.stderr)
-                self.assertTrue(selected.exists())
-                self.readable(selected)
-                self.readable(kept)
-                kept.unlink()
-        receipt = next((self.root / 'evidence').glob('old.prune-*.json'))
-        self.assertEqual(json.loads(receipt.read_text())['deleted'], [])
+        subprocess.run(['qemu-img', 'create', '-q', '-f', 'qcow2', '-o',
+                        f'data_file={selected}', str(kept), '1M'], check=True)
+        # Restore the external data file as a valid qcow2 so inventory might
+        # otherwise mistake it for an independent candidate.
+        self.image('evidence/old/data.qcow2')
+        result = self.prune_cli('evidence/old')
+        self.assertNotEqual(result.returncode, 0, result.stdout)
+        self.assertIn(str(kept), result.stderr)
+        self.assertIn('external data file', result.stderr)
+        self.readable(selected)
+        self.readable(kept)
 
-    def test_cli_corrupt_mark_refuses_before_any_deletion(self):
+    def test_cli_corrupt_mark_refuses_report(self):
         selected = self.image('evidence/old/disk.qcow2', self.base)
         for name in ('kept.img', 'evidence/old/corrupt.qcow2'):
-            for late, apply in ((False, False), (False, True), (True, True)):
-                with self.subTest(image=name, after_plan=late, apply=apply):
-                    bad = self.image(name)
-                    mark = f"""
-with Path({str(bad)!r}).open('r+b') as out:
-    out.seek(72)  # qcow2 v3 incompatible_features, big endian uint64
-    flags = int.from_bytes(out.read(8), 'big')
-    out.seek(72)
-    out.write((flags | (1 << 1)).to_bytes(8, 'big'))
-"""
-                    if not late:
-                        exec(mark, {'Path': Path})
-                        info = json.loads(subprocess.check_output(['qemu-img', 'info', '--output=json', str(bad)]))
-                        self.assertTrue(info['format-specific']['data']['corrupt'])
-                    result = self.prune_cli('evidence/old', apply=apply, after_plan=mark if late else '')
-                    self.assertNotEqual(result.returncode, 0, result.stdout)
-                    self.assertIn(str(bad), result.stderr)
-                    self.assertIn('marked corrupt', result.stderr)
-                    self.assertTrue(selected.exists())
-                    self.assertTrue(bad.exists())
-                    bad.unlink()
-        for receipt in (self.root / 'evidence').glob('old.prune-*.json'):
-            self.assertEqual(json.loads(receipt.read_text())['deleted'], [])
+            with self.subTest(image=name):
+                bad = self.image(name)
+                with bad.open('r+b') as out:
+                    out.seek(72)  # qcow2 v3 incompatible_features, big endian uint64
+                    flags = int.from_bytes(out.read(8), 'big')
+                    out.seek(72)
+                    out.write((flags | (1 << 1)).to_bytes(8, 'big'))
+                info = json.loads(subprocess.check_output(['qemu-img', 'info', '--output=json', str(bad)]))
+                self.assertTrue(info['format-specific']['data']['corrupt'])
+                result = self.prune_cli('evidence/old')
+                self.assertNotEqual(result.returncode, 0, result.stdout)
+                self.assertIn(str(bad), result.stderr)
+                self.assertIn('marked corrupt', result.stderr)
+                self.assertTrue(selected.exists())
+                self.assertTrue(bad.exists())
+                bad.unlink()
 
     def test_cli_non_qcow2_content_refuses(self):
         selected = self.image('evidence/old/disk.qcow2', self.base)
         bad = self.root / 'kept.img'
         subprocess.run(['qemu-img', 'create', '-q', '-f', 'qcow', str(bad), '1M'], check=True)
         self.assertEqual(bad.read_bytes()[:4], b'QFI\xfb')
-        result = self.prune_cli('evidence/old', apply=True)
+        result = self.prune_cli('evidence/old')
         self.assertNotEqual(result.returncode, 0, result.stdout)
         self.assertIn(str(bad), result.stderr)
         self.assertIn('not qcow2', result.stderr)
@@ -186,7 +136,7 @@ with Path({str(bad)!r}).open('r+b') as out:
         bad = self.root / 'kept.img'
         subprocess.run(['qemu-img', 'create', '-q', '-f', 'qcow2', '-F', 'raw', '-b',
                         str(selected), str(bad)], check=True, capture_output=True)
-        result = self.prune_cli('evidence/old', apply=True)
+        result = self.prune_cli('evidence/old')
         self.assertNotEqual(result.returncode, 0, result.stdout)
         self.assertIn(str(bad), result.stderr)
         self.assertIn('backing format is not qcow2', result.stderr)
@@ -202,49 +152,71 @@ with Path({str(bad)!r}).open('r+b') as out:
                 info['format-specific']['data']['data-file-raw'] = True
                 result.stdout = json.dumps(info)
             return result
-        for apply in (False, True):
-            with self.subTest(apply=apply), patch.object(vm, 'run', side_effect=raw_flag), \
-                 self.assertRaisesRegex(RuntimeError, 'base.qcow2: external data file'):
-                self.prune('evidence/old', apply=apply)
-            self.assertTrue(selected.exists())
+        with patch.object(vm, 'run', side_effect=raw_flag), \
+             self.assertRaisesRegex(RuntimeError, 'base.qcow2: external data file'):
+            self.prune('evidence/old')
+        self.assertTrue(selected.exists())
 
     def test_moved_base_receipt_protects_nonstandard_image_name(self):
         disk = self.image('evidence/old/disk.img', self.base)
         record = self.root / 'windows-old/base.json'
         record.parent.mkdir()
         record.write_text(json.dumps({'disk': '../evidence/old/disk.img'}))
-        result = self.prune_cli('evidence/old', apply=True)
+        result = self.prune_cli('evidence/old')
         self.assertNotEqual(result.returncode, 0, result.stdout)
         self.assertIn('Refusing selection containing a base', result.stderr)
         self.readable(disk)
 
-    def test_independent_retirement_preserves_non_disks_and_requires_apply(self):
+    def test_report_writes_nothing_and_requires_explicit_selection(self):
         disk = self.image('evidence/retired/snapshot/disk.qcow2', self.base)
         log = disk.parent / 'run.log'; log.write_bytes(b'unchanged evidence\x00')
-        plan = self.prune('evidence/retired')
-        self.assertEqual([x['path'] for x in plan['planned']], [str(disk)])
-        self.assertTrue(disk.exists())
+        def snapshot():
+            return {str(p.relative_to(self.root)): (p.lstat().st_mtime_ns, p.lstat().st_size,
+                    p.read_bytes() if p.is_file() else None) for p in self.root.rglob('*')}
+        before = snapshot()
+        result = self.prune_cli('evidence/retired')
+        self.assertEqual(result.returncode, 0, result.stderr)
+        plan = json.loads(result.stdout)
+        self.assertEqual(plan['planned'], [{'path': str(disk), 'allocatedBytes': disk.stat().st_blocks * 512}])
+        self.assertEqual(snapshot(), before)
         with patch.object(sys, 'argv', ['vm.py', 'prune-disks', '--reason', 'retired']), \
              contextlib.redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
             vm.main()
-        applied = self.prune('evidence/retired', apply=True)
-        self.assertEqual(applied['deleted'], plan['planned'])
-        self.assertFalse(disk.exists()); self.assertEqual(log.read_bytes(), b'unchanged evidence\x00')
         self.readable(self.base)
+
+    def test_cli_rejects_apply(self):
+        self.image('evidence/old/disk.qcow2', self.base)
+        result = self.prune_cli('evidence/old', '--apply')
+        self.assertEqual(result.returncode, 2, result.stderr)
+        self.assertIn('unrecognized arguments: --apply', result.stderr)
+
+    def test_cli_warns_that_other_formats_backed_by_listed_disks_are_missed(self):
+        parent = self.image('evidence/old/disk.qcow2', self.base)
+        child = self.root / 'kept.qed'
+        subprocess.run(['qemu-img', 'create', '-q', '-f', 'qed', '-F', 'qcow2',
+                        '-b', str(parent), str(child)], check=True, capture_output=True)
+        result = self.prune_cli('evidence/old')
+        self.assertEqual(result.returncode, 0, result.stderr)
+        plan = json.loads(result.stdout)
+        self.assertEqual([p['path'] for p in plan['planned']], [str(parent)])
+        self.assertIn('recognises qcow2 images only', plan['warning'])
+        self.assertIn('image in another format backed by a listed disk would be missed', plan['warning'])
+        self.assertTrue(parent.exists())
+        self.readable(child)
 
     def test_kept_children_runs_and_base_records_protect_all_ancestors(self):
         parent = self.image('evidence/w4b/failed-state/disk.qcow2', self.base)
         child = self.image('evidence/w8/snapshot/disk.qcow2', parent)
         run = self.image('windows/run.qcow2', child)
-        plan = self.prune('evidence/w4b', 'evidence/w8', apply=True)
-        self.assertEqual(plan['deleted'], [])
+        plan = self.prune('evidence/w4b', 'evidence/w8')
+        self.assertEqual(plan['planned'], [])
         self.assertIn('still referenced', ' '.join(plan['protected'][str(parent)]))
         self.readable(run)
         # A disk named by base.json is protected even without a current child.
         extra = self.image('custom/base/disk.qcow2', self.base)
         (self.root / 'ubuntu/base.json').write_text(json.dumps({'disk': str(extra)}))
         with self.assertRaisesRegex(RuntimeError, 'base'):
-            self.prune('custom/base', apply=True)
+            self.prune('custom/base')
         self.assertTrue(extra.exists())
 
     def test_failed_retry_snapshot_referenced_or_independent(self):
@@ -253,37 +225,21 @@ with Path({str(bad)!r}).open('r+b') as out:
         self.assertEqual(self.prune('evidence/failed')['planned'], [])
         retry.unlink()
         retry = self.image('evidence/retry/snapshot/disk.qcow2', self.base)
-        self.assertEqual(self.prune('evidence/failed', apply=True)['deleted'][0]['path'], str(failed))
+        self.assertEqual(self.prune('evidence/failed')['planned'][0]['path'], str(failed))
         self.readable(retry)
 
-    def test_children_first_partial_receipt_and_idempotent_retry(self):
+    def test_report_orders_children_first(self):
         parent = self.image('evidence/old/parent.qcow2', self.base)
         child = self.image('evidence/old/child.qcow2', parent)
-        planned = self.prune('evidence/old')['planned']
-        self.assertEqual([x['path'] for x in planned], [str(child), str(parent)])
-        unlink = Path.unlink
-        def fail_parent(path, *args, **kwargs):
-            if path == parent:
-                raise PermissionError('injected unlink failure')
-            return unlink(path, *args, **kwargs)
-        with patch.object(Path, 'unlink', fail_parent), self.assertRaisesRegex(PermissionError, 'injected'):
-            self.prune('evidence/old', apply=True)
-        receipt = next((self.root / 'evidence').glob('old.prune-*.json'))
-        original = receipt.read_bytes()
-        partial = json.loads(original)
-        self.assertEqual(partial['planned'], planned)
-        self.assertEqual(partial['deleted'], planned[:1])
-        self.readable(parent)
-        self.assertEqual(self.prune('evidence/old', apply=True)['deleted'], planned[1:])
-        self.assertEqual(receipt.read_bytes(), original)
-        self.assertEqual(self.prune('evidence/old', apply=True)['deleted'], [])
-        self.readable(self.base)
+        plan = self.prune('evidence/old')
+        self.assertEqual([x['path'] for x in plan['planned']], [str(child), str(parent)])
+        self.readable(child)
 
-    def test_corrupt_or_unreadable_image_anywhere_aborts_every_deletion(self):
+    def test_corrupt_or_unreadable_image_anywhere_refuses_report(self):
         disk = self.image('evidence/old/disk.qcow2', self.base)
         bad = self.root / 'elsewhere.qcow2'; bad.write_bytes(b'QFI\xfbcorrupt')
         with self.assertRaisesRegex(RuntimeError, 'elsewhere.qcow2'):
-            self.prune('evidence/old', apply=True)
+            self.prune('evidence/old')
         self.assertTrue(disk.exists()); bad.unlink()
         real_run = vm.run
         def unreadable(*args, **kwargs):
@@ -291,7 +247,7 @@ with Path({str(bad)!r}).open('r+b') as out:
                 raise PermissionError('injected unreadable member')
             return real_run(*args, **kwargs)
         with patch.object(vm, 'run', side_effect=unreadable), self.assertRaisesRegex(RuntimeError, 'base.qcow2'):
-            self.prune('evidence/old', apply=True)
+            self.prune('evidence/old')
         self.assertTrue(disk.exists())
 
     def test_missing_backing_keeps_head_and_selected_members_before_gap(self):
@@ -300,8 +256,8 @@ with Path({str(bad)!r}).open('r+b') as out:
         head = self.image('ubuntu/run.qcow2', parent)
         independent = self.image('evidence/old/independent.qcow2', self.base)
         gap.unlink()
-        plan = self.prune('evidence/old', apply=True)
-        self.assertEqual([x['path'] for x in plan['deleted']], [str(independent)])
+        plan = self.prune('evidence/old')
+        self.assertEqual([x['path'] for x in plan['planned']], [str(independent)])
         self.assertEqual(plan['missingBacking'], {str(parent): str(gap)})
         self.assertIn('missing backing', ' '.join(plan['protected'][str(head)]))
         self.assertTrue(parent.exists()); self.assertTrue(head.exists())
@@ -320,11 +276,11 @@ with Path({str(bad)!r}).open('r+b') as out:
     def test_selection_boundaries_symlinks_and_base_refused(self):
         for target in ('.', 'ubuntu', '../outside'):
             with self.subTest(target=target), self.assertRaises(RuntimeError):
-                self.prune(target, apply=True)
+                self.prune(target)
         disk = self.image('evidence/old/disk.qcow2', self.base)
         (self.root / 'alias').symlink_to(disk.parent, target_is_directory=True)
         with self.assertRaisesRegex(RuntimeError, 'Symlinked'):
-            self.prune('alias', apply=True)
+            self.prune('alias')
         self.assertTrue(self.base.exists()); self.assertTrue(disk.exists())
 
     def test_relative_backing_resolves_but_external_and_symlink_backing_refuse(self):
@@ -336,50 +292,28 @@ with Path({str(bad)!r}).open('r+b') as out:
         (self.root / 'alias.qcow2').symlink_to(self.base)
         child = self.image('evidence/kept/child.qcow2', '../../alias.qcow2')
         with self.assertRaisesRegex(RuntimeError, 'Symlinked'):
-            self.prune('evidence/old', apply=True)
+            self.prune('evidence/old')
         child.unlink(); (self.root / 'alias.qcow2').unlink()
         with tempfile.TemporaryDirectory() as external:
             outside = Path(external) / 'base.qcow2'
             subprocess.run(['qemu-img', 'create', '-q', '-f', 'qcow2', str(outside), '1M'], check=True)
             self.image('evidence/kept/child.qcow2', outside)
             with self.assertRaisesRegex(RuntimeError, 'outside qualification root'):
-                self.prune('evidence/old', apply=True)
+                self.prune('evidence/old')
         self.assertTrue(parent.exists())
-
-    def test_identity_change_refuses_before_any_unlink(self):
-        first = self.image('evidence/old/a.qcow2', self.base)
-        second = self.image('evidence/old/b.qcow2', self.base)
-        original = vm.prune_plan
-        def replaced(*args):
-            plan = original(*args)
-            second.rename(second.with_suffix('.saved'))
-            self.image('evidence/old/b.qcow2', self.base)
-            return plan
-        with patch.object(vm, 'prune_plan', side_effect=replaced), self.assertRaisesRegex(RuntimeError, 'changed'):
-            self.prune('evidence/old', apply=True)
-        self.assertTrue(first.exists()); self.readable(second)
-
-    def test_receipt_cannot_be_written_refuses_before_unlink(self):
-        disk = self.image('evidence/old/disk.qcow2', self.base)
-        real_open = Path.open
-        def refuse(path, mode='r', *args, **kwargs):
-            if mode == 'x':
-                raise PermissionError('unwritable receipt')
-            return real_open(path, mode, *args, **kwargs)
-        with patch.object(Path, 'open', refuse), self.assertRaisesRegex(PermissionError, 'receipt'):
-            self.prune('evidence/old', apply=True)
-        self.assertTrue(disk.exists())
 
     def test_lock_or_running_vm_refuses(self):
         disk = self.image('evidence/old/disk.qcow2', self.base)
         with (self.root / 'vm.lock').open('a') as lease:
             fcntl.flock(lease, fcntl.LOCK_EX | fcntl.LOCK_NB)
-            for apply in (False, True):
-                with self.subTest(apply=apply), self.assertRaisesRegex(RuntimeError, 'lock held'):
-                    self.prune('evidence/old', apply=apply)
+            with patch.object(vm, 'live_reasons', self.real_live_reasons), \
+                 patch.object(vm, 'port_open', return_value=False), \
+                 patch.object(vm, 'qmp_open', return_value=False), \
+                 self.assertRaisesRegex(RuntimeError, 'lock held'):
+                self.prune('evidence/old')
         self.live.return_value = ['test VM running']
         with self.assertRaisesRegex(RuntimeError, 'may be running'):
-            self.prune('evidence/old', apply=True)
+            self.prune('evidence/old')
         self.assertTrue(disk.exists())
 
     def test_allocated_tree_counts_sparse_and_hardlinks_once_like_du(self):

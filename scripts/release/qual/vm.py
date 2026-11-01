@@ -116,13 +116,8 @@ def storage_failure(report, exc):
     return report
 
 
-def disk_identity(path):
-    info = path.lstat()
-    return info.st_dev, info.st_ino, info.st_size, info.st_mtime_ns, info.st_ctime_ns
-
-
 def prune_inventory():
-    disks, records = {}, []
+    disks, records = set(), []
     bases = {internal_path(ROOT / name / 'base.qcow2') for name in OS}
     for path, info in tree_entries():
         if path.name == 'base.qcow2':
@@ -140,7 +135,7 @@ def prune_inventory():
         if magic == b'QFI\xfb':
             if info.st_nlink != 1:
                 raise RuntimeError(f'Ambiguous qcow2 disk: {path}')
-            disks[path] = disk_identity(path)
+            disks.add(path)
     # Base receipts may also name a nonstandard base disk.
     def named_disks(value, folder):
         if isinstance(value, str):
@@ -155,7 +150,7 @@ def prune_inventory():
                 named_disks(item, folder)
     for record in records:
         named_disks(json.loads(record.read_text()), record.parent)
-    parents, missing, backings = {}, {}, {}
+    parents, missing = {}, {}
     # Inspect each layer separately: unlike --backing-chain this lets a positive
     # ENOENT end one chain without hiding corrupt/unreadable existing members.
     pending = list(disks)
@@ -173,7 +168,6 @@ def prune_inventory():
             if info.get('backing-filename-format', 'qcow2') != 'qcow2':
                 raise ValueError('backing format is not qcow2')
             backing = info.get('backing-filename')
-            backings[path] = backing
             parent = None
             if backing:
                 if ':' in backing:
@@ -188,12 +182,12 @@ def prune_inventory():
                     if not stat.S_ISREG(entry.st_mode) or entry.st_nlink != 1:
                         raise ValueError(f'not a regular backing file: {parent}')
                     if parent not in disks:
-                        disks[parent] = disk_identity(parent)
+                        disks.add(parent)
                         pending.append(parent)
             parents[path] = parent
         except (OSError, ValueError, KeyError, RuntimeError, subprocess.SubprocessError) as exc:
             raise RuntimeError(f'Cannot inspect qcow2 {path}: {exc}') from exc
-    return disks, parents, missing, backings, bases
+    return disks, parents, missing, bases
 
 
 def prune_plan(targets, reason):
@@ -202,8 +196,7 @@ def prune_plan(targets, reason):
     if not reason.strip():
         raise RuntimeError('Pruning requires a nonempty reason')
     selected = [internal_path(ROOT / target) for target in targets]
-    inventory = prune_inventory()
-    disks, parents, missing, _, bases = inventory
+    disks, parents, missing, bases = prune_inventory()
     for target in selected:
         if not target.is_dir():
             raise RuntimeError(f'Evidence subtree is not a directory: {target}')
@@ -231,56 +224,20 @@ def prune_plan(targets, reason):
             for member in chain:
                 protected.setdefault(member, []).append(why)
     planned = sorted(candidates - protected.keys(), key=lambda p: (-len(chains[p]), str(p)))
-    plan = {'reason': reason, 'subtrees': list(map(str, selected)),
+    return {'warning': 'Report only; recognises qcow2 images only. An image in another format '
+                       'backed by a listed disk would be missed. Manual deletion requires the '
+                       "owner's approval and backing-chain checks.",
+            'reason': reason, 'subtrees': list(map(str, selected)),
             'planned': [{'path': str(p), 'allocatedBytes': p.stat().st_blocks * 512} for p in planned],
             'protected': {str(p): why for p, why in sorted(protected.items())},
-            'missingBacking': {str(p): target for p, target in missing.items()}, 'deleted': []}
-    return plan, inventory
+            'missingBacking': {str(p): target for p, target in missing.items()}}
 
 
-def prune_disks(targets, reason, apply=False):
-    # A dry run must not even create/touch a lock file in the evidence tree.
-    with contextlib.ExitStack() as stack:
-        if apply:
-            stack.enter_context(locked())
-        elif (ROOT / 'vm.lock').exists():
-            lease = stack.enter_context((ROOT / 'vm.lock').open('r'))
-            try:
-                fcntl.flock(lease, fcntl.LOCK_EX | fcntl.LOCK_NB)
-            except BlockingIOError:
-                raise RuntimeError('VM lifetime lock held; refusing prune') from None
-        ensure_free(check_lock=False)
-        plan, inventory = prune_plan(targets, reason)
-        identities = inventory[0]
-        if apply:
-            target = Path(plan['subtrees'][0])
-            receipt = target.parent / (target.name + '.prune-' + str(time.time_ns()) + '.json')
-            # Exclusive publication before the first unlink; never overwrite a receipt.
-            with receipt.open('x') as out:
-                json.dump(plan, out, indent=2)
-                out.write('\n')
-            try:
-                # All harness disk writers share this lifetime lock. Re-scan the
-                # whole graph, including heads published since the first scan.
-                if prune_inventory() != inventory:
-                    raise RuntimeError('Disk inventory changed since prune plan')
-                for path, expected in identities.items():
-                    if disk_identity(internal_path(path)) != expected:
-                        raise RuntimeError(f'Disk changed since prune plan: {path}')
-                for item in plan['planned']:
-                    path = internal_path(item['path'])
-                    if disk_identity(path) != identities[path]:
-                        raise RuntimeError(f'Disk changed since prune plan: {path}')
-                    path.unlink()
-                    plan['deleted'].append(item)
-                    save(receipt, plan)
-            except BaseException as exc:
-                plan['error'] = str(exc)
-                save(receipt, plan)
-                raise
-            plan['receipt'] = str(receipt)
-        print(json.dumps(plan, indent=2))
-        return plan
+def prune_disks(targets, reason):
+    ensure_free()
+    plan = prune_plan(targets, reason)
+    print(json.dumps(plan, indent=2))
+    return plan
 
 
 def wait_host_memory(seconds=900):
@@ -1045,13 +1002,12 @@ def main():
         sub.add_parser(action)
     p = sub.add_parser('wait-free')
     p.add_argument('--timeout', type=float, required=True)
-    p = sub.add_parser('prune-disks', help='Plan retirement of explicitly selected evidence disks')
+    p = sub.add_parser('prune-disks', help='Report retirement candidates among qcow2 images only; writes nothing')
     p.add_argument('subtrees', nargs='+', type=Path)
     p.add_argument('--reason', required=True)
-    p.add_argument('--apply', action='store_true')
     args = parser.parse_args()
     if args.action == 'prune-disks':
-        prune_disks(args.subtrees, args.reason, args.apply)
+        prune_disks(args.subtrees, args.reason)
     elif args.action == 'build-base':
         owner()
         ensure_free()
