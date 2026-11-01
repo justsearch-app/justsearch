@@ -361,3 +361,14 @@ to produce acceptable repair evidence with this runner version.
   "note": "Audit for PR #1090: entries 1-2 accept; entry 3 reject (Adaptation also displaces the early-return expectation and adds new guard checks with new preconditions, fault injection and observations; classify them and supply evidence); exempt-file verification evidence not in the repository. Transcribed by the orchestrator from the auditor's report."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a19871-fd93-7561-842e-244fc983bb47",
+  "verdict": "accept",
+  "digest": "sha256:4138f92cad320ffb01d22f32ad027e1aff98d767d7567b415fe668c12cfd7627",
+  "note": "All 10 entries accepted; exempt-file duties met (32 cases pass unskipped, repair checks fail before by assertion, isolation probes restored)."
+}
+```
