@@ -159,6 +159,33 @@ failure in its source report; using its state cannot certify that assertion.
 The hosted VM uses persistent, isolated XDG directories for these two stages;
 the actual hosted workflow keeps its temporary XDG directories.
 
+After a successful retry, the release session may explicitly retire the failed
+attempt's disks with `python3 scripts/release/qual/vm.py prune-disks
+evidence/failed-attempt --reason 'successful retry reference'`. Preview the
+plan first, then repeat with `--apply`. A retry backed by the failed snapshot
+keeps it as “still referenced”; an independent retry can release it. Non-disk
+evidence remains. The same procedure applies after a wave is explicitly
+retired; see the qualification README for chain protection and receipts.
+
+VM evidence and snapshot destinations must be inside the qualification root
+(`/home/elias/dev/justsearch-qual`); replace example `/path/to/*evidence` paths
+accordingly. This makes all sealed layers visible to disk inventory and the
+150 GiB allocated-storage admission threshold. Before each new disk, the
+lifetime-locked check counts the entire root, shared inodes once, without
+following symlinks. A refusal leaves the old disk intact and emits a dedicated
+`storage-budget` check with `failed-infrastructure` status; later stages stop
+and the combined report cannot pass. The threshold is not a quota: a running
+stage can exceed it, but sealing and relaunching the same preparation disk
+remain allowed. Actual hosted workflows without VM disks are unaffected.
+
+`storage.snapshotBytes` is recorded beside `writeVolume` only after complete
+sealing and manifest/checkpoint publication. It counts the new layer's allocated
+bytes, excluding its backing chain; combined summaries sum newly sealed stages
+once, including only one layer across Windows preparation's reboot. Write
+counter meanings are unchanged. A sealing failure can still leave a visible
+partial snapshot directory before its manifest is published; it has no completed
+snapshot storage measurement and must not be used as a complete checkpoint.
+
 Guest-only provisioning masks Snap refresh, firmware update, APT timers and
 the desktop file indexer, and sets swappiness to 1 to prefer reclaiming file
 cache over writing anonymous pages. At first boot, desktop preparation disables
@@ -901,6 +928,14 @@ never recopied or reinstalled on a rerun; only changed harness source is staged.
 Explicit subsets and development reruns remain incomplete and cannot qualify
 a release. Omit `--journeys` only for final full-suite evidence. Keep backing
 snapshots in place; unused child overlays are deleted after evidence collection.
+
+After a successful independent retry, preview pruning of its failed attempt
+with `python3 scripts/release/qual/vm.py prune-disks evidence/failed-attempt
+--reason 'successful retry reference'`, then repeat with `--apply`. Explicitly
+retired waves use the same procedure. Retries that inherit the failed disk
+protect it and its ancestors; the plan explains the remaining references.
+Logs and reports are retained, and timestamped receipts distinguish planned
+from completed deletions. The qualification README describes all safeguards.
 
 J1 checks shipped per-user NSIS completion, installed version/image, bundled JVM,
 UI Automation window identity and Engine readiness. Normal first-run text needs

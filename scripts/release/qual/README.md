@@ -44,6 +44,48 @@ to replace existing bases. To rebuild, first stop the VM and explicitly move its
 OS folder aside. A failed build keeps `install.qcow2`, firmware, logs and seed
 media for diagnosis. A retry creates a fresh installation disk.
 
+New run disks are admitted only while the whole qualification tree occupies
+less than **150 GiB allocated**. The check runs under the VM lifetime lock,
+before replacing an existing disk, for fresh runs, snapshot children and the
+first Windows preparation boot. Files with shared inodes count once; symlinks
+are not followed, and sparse virtual size is ignored. This is an admission
+threshold, not a quota: an admitted guest can cross it. Its stopped disk can
+still be sealed, and Windows preparation can reboot that same disk. The next
+allocation refuses with a `storage-budget` infrastructure failure, preserving
+the previous run disk and stopping subsequent journey stages.
+
+After the release session explicitly retires a merged or superseded wave,
+preview its disk retirement (paths are relative to the qualification root):
+
+```sh
+python3 scripts/release/qual/vm.py prune-disks evidence/retired-wave \
+  --reason 'release reference and retirement decision'
+# Review the plan, then repeat with --apply to delete the planned disks.
+```
+
+Multiple subtrees may be selected. Retirement is never inferred from age,
+names, reports or GitHub. Stop the VM first. The command inventories all qcow2
+layers and follows their backing chains. Bases, retained run disks and other
+kept disks protect their ancestors; protected paths explain why they remain.
+Selections containing a base, OS directory or the root, symlinked/escaping
+paths, corrupt or unreadable images, and ambiguous chains refuse deletion.
+A positively missing backing file is reported; its head and existing layers
+before the gap remain protected while independent disks remain eligible.
+
+Only explicitly selected, unreferenced disks are deleted, children first.
+Logs, reports, screenshots, archives and firmware remain. An exclusive,
+timestamped `<subtree>.prune-*.json` receipt beside the first subtree records
+the reason, planned deletions with allocated bytes, protection reasons, and
+actual completed deletions. A receipt must be writable before deletion begins;
+an unlink failure stops immediately. Re-running recomputes the graph and keeps
+earlier receipts. The default dry run writes nothing.
+
+Journey summaries record `storage.snapshotBytes` after a layer and its
+manifest/checkpoint are fully sealed. It counts that layer's allocated bytes,
+excluding ancestors; combined summaries sum only their stages' new snapshots.
+Existing write counters retain their meanings. Immutable development ZIPs
+already use hardlinks; mutable inputs and qcow2 layers are never deduplicated.
+
 `start <os> --visible` uses a software QEMU GTK window on the current `DISPLAY`;
 headless is the default. Stop it with `vm.py stop`. For a brief visible check,
 keep the window open no more than ten seconds while the owner uses the desktop.

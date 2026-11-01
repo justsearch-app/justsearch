@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Isolated standard-library tests; no guest or shared VM data is touched."""
 import contextlib
+import fcntl
 import io
 import json
 import os
@@ -15,6 +16,231 @@ from unittest.mock import patch, Mock
 sys.path.insert(0, os.environ.get('QUAL_HARNESS_DIR', str(Path(__file__).resolve().parent)))
 import vm
 import screen
+
+
+class DiskGrowthTests(unittest.TestCase):
+    """Real qcow2 graphs, confined to this test's disposable qualification root."""
+    def setUp(self):
+        temp = tempfile.TemporaryDirectory(prefix='qual-growth-')
+        self.addCleanup(temp.cleanup)
+        self.root = Path(temp.name)
+        for key, value in [('ROOT', self.root), ('STATE', self.root / 'running.json')]:
+            mocked = patch.object(vm, key, value)
+            mocked.start(); self.addCleanup(mocked.stop)
+        # Isolate liveness probes from the owner's ports; test their refusal
+        # separately below, and use the real flock in every prune invocation.
+        live = patch.object(vm, 'live_reasons', return_value=[])
+        self.live = live.start(); self.addCleanup(live.stop)
+        self.base = self.image('ubuntu/base.qcow2')
+
+    def image(self, name, backing=None):
+        path = self.root / name
+        path.parent.mkdir(parents=True, exist_ok=True)
+        args = ['qemu-img', 'create', '-q', '-f', 'qcow2']
+        args += ['-F', 'qcow2', '-b', str(backing)] if backing else ['-o', 'size=1M']
+        subprocess.run([*args, str(path)], check=True, capture_output=True)
+        return path
+
+    def prune(self, *targets, apply=False):
+        with contextlib.redirect_stdout(io.StringIO()):
+            return vm.prune_disks([Path(t) for t in targets], 'retired release / successful retry', apply)
+
+    def readable(self, path):
+        subprocess.run(['qemu-img', 'info', '--output=json', '--backing-chain', str(path)],
+                       check=True, capture_output=True)
+
+    def test_independent_retirement_preserves_non_disks_and_requires_apply(self):
+        disk = self.image('evidence/retired/snapshot/disk.qcow2', self.base)
+        log = disk.parent / 'run.log'; log.write_bytes(b'unchanged evidence\x00')
+        plan = self.prune('evidence/retired')
+        self.assertEqual([x['path'] for x in plan['planned']], [str(disk)])
+        self.assertTrue(disk.exists())
+        with patch.object(sys, 'argv', ['vm.py', 'prune-disks', '--reason', 'retired']), \
+             contextlib.redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
+            vm.main()
+        applied = self.prune('evidence/retired', apply=True)
+        self.assertEqual(applied['deleted'], plan['planned'])
+        self.assertFalse(disk.exists()); self.assertEqual(log.read_bytes(), b'unchanged evidence\x00')
+        self.readable(self.base)
+
+    def test_kept_children_runs_and_base_records_protect_all_ancestors(self):
+        parent = self.image('evidence/w4b/failed-state/disk.qcow2', self.base)
+        child = self.image('evidence/w8/snapshot/disk.qcow2', parent)
+        run = self.image('windows/run.qcow2', child)
+        plan = self.prune('evidence/w4b', 'evidence/w8', apply=True)
+        self.assertEqual(plan['deleted'], [])
+        self.assertIn('still referenced', ' '.join(plan['protected'][str(parent)]))
+        self.readable(run)
+        # A disk named by base.json is protected even without a current child.
+        extra = self.image('custom/base/disk.qcow2', self.base)
+        (self.root / 'ubuntu/base.json').write_text(json.dumps({'disk': str(extra)}))
+        with self.assertRaisesRegex(RuntimeError, 'base'):
+            self.prune('custom/base', apply=True)
+        self.assertTrue(extra.exists())
+
+    def test_failed_retry_snapshot_referenced_or_independent(self):
+        failed = self.image('evidence/failed/snapshot/disk.qcow2', self.base)
+        retry = self.image('evidence/retry/snapshot/disk.qcow2', failed)
+        self.assertEqual(self.prune('evidence/failed')['planned'], [])
+        retry.unlink()
+        retry = self.image('evidence/retry/snapshot/disk.qcow2', self.base)
+        self.assertEqual(self.prune('evidence/failed', apply=True)['deleted'][0]['path'], str(failed))
+        self.readable(retry)
+
+    def test_children_first_partial_receipt_and_idempotent_retry(self):
+        parent = self.image('evidence/old/parent.qcow2', self.base)
+        child = self.image('evidence/old/child.qcow2', parent)
+        planned = self.prune('evidence/old')['planned']
+        self.assertEqual([x['path'] for x in planned], [str(child), str(parent)])
+        unlink = Path.unlink
+        def fail_parent(path, *args, **kwargs):
+            if path == parent:
+                raise PermissionError('injected unlink failure')
+            return unlink(path, *args, **kwargs)
+        with patch.object(Path, 'unlink', fail_parent), self.assertRaisesRegex(PermissionError, 'injected'):
+            self.prune('evidence/old', apply=True)
+        receipt = next((self.root / 'evidence').glob('old.prune-*.json'))
+        original = receipt.read_bytes()
+        partial = json.loads(original)
+        self.assertEqual(partial['planned'], planned)
+        self.assertEqual(partial['deleted'], planned[:1])
+        self.readable(parent)
+        self.assertEqual(self.prune('evidence/old', apply=True)['deleted'], planned[1:])
+        self.assertEqual(receipt.read_bytes(), original)
+        self.assertEqual(self.prune('evidence/old', apply=True)['deleted'], [])
+        self.readable(self.base)
+
+    def test_corrupt_or_unreadable_image_anywhere_aborts_every_deletion(self):
+        disk = self.image('evidence/old/disk.qcow2', self.base)
+        bad = self.root / 'elsewhere.qcow2'; bad.write_bytes(b'corrupt')
+        with self.assertRaisesRegex(RuntimeError, 'elsewhere.qcow2'):
+            self.prune('evidence/old', apply=True)
+        self.assertTrue(disk.exists()); bad.unlink()
+        real_run = vm.run
+        def unreadable(*args, **kwargs):
+            if args[-1] == self.base:
+                raise PermissionError('injected unreadable member')
+            return real_run(*args, **kwargs)
+        with patch.object(vm, 'run', side_effect=unreadable), self.assertRaisesRegex(RuntimeError, 'base.qcow2'):
+            self.prune('evidence/old', apply=True)
+        self.assertTrue(disk.exists())
+
+    def test_missing_backing_keeps_head_and_selected_members_before_gap(self):
+        gap = self.image('gap.qcow2')
+        parent = self.image('evidence/old/parent.qcow2', gap)
+        head = self.image('ubuntu/run.qcow2', parent)
+        independent = self.image('evidence/old/independent.qcow2', self.base)
+        gap.unlink()
+        plan = self.prune('evidence/old', apply=True)
+        self.assertEqual([x['path'] for x in plan['deleted']], [str(independent)])
+        self.assertEqual(plan['missingBacking'], {str(parent): str(gap)})
+        self.assertIn('missing backing', ' '.join(plan['protected'][str(head)]))
+        self.assertTrue(parent.exists()); self.assertTrue(head.exists())
+
+    def test_stale_run_with_missing_backing_is_reported_without_blocking_plan(self):
+        stale = self.image('stale.qcow2')
+        head = self.image('ubuntu/run.qcow2', stale)
+        disk = self.image('evidence/old/disk.qcow2', self.base)
+        stale.unlink()
+        plan = self.prune('evidence/old')
+        self.assertEqual(plan['missingBacking'], {str(head): str(stale)})
+        self.assertIn(str(head), plan['protected'])
+        self.assertEqual([p['path'] for p in plan['planned']], [str(disk)])
+        self.assertTrue(disk.exists())
+
+    def test_selection_boundaries_symlinks_and_base_refused(self):
+        for target in ('.', 'ubuntu', '../outside'):
+            with self.subTest(target=target), self.assertRaises(RuntimeError):
+                self.prune(target, apply=True)
+        disk = self.image('evidence/old/disk.qcow2', self.base)
+        (self.root / 'alias').symlink_to(disk.parent, target_is_directory=True)
+        with self.assertRaisesRegex(RuntimeError, 'Symlinked'):
+            self.prune('alias', apply=True)
+        self.assertTrue(self.base.exists()); self.assertTrue(disk.exists())
+
+    def test_relative_backing_resolves_but_external_and_symlink_backing_refuse(self):
+        parent = self.image('evidence/old/parent.qcow2', self.base)
+        child = self.image('evidence/kept/child.qcow2', '../old/parent.qcow2')
+        self.assertEqual(self.prune('evidence/old')['planned'], [])
+        self.readable(child)
+        child.unlink()
+        (self.root / 'alias.qcow2').symlink_to(self.base)
+        child = self.image('evidence/kept/child.qcow2', '../../alias.qcow2')
+        with self.assertRaisesRegex(RuntimeError, 'Symlinked'):
+            self.prune('evidence/old', apply=True)
+        child.unlink(); (self.root / 'alias.qcow2').unlink()
+        with tempfile.TemporaryDirectory() as external:
+            outside = Path(external) / 'base.qcow2'
+            subprocess.run(['qemu-img', 'create', '-q', '-f', 'qcow2', str(outside), '1M'], check=True)
+            self.image('evidence/kept/child.qcow2', outside)
+            with self.assertRaisesRegex(RuntimeError, 'outside qualification root'):
+                self.prune('evidence/old', apply=True)
+        self.assertTrue(parent.exists())
+
+    def test_identity_change_refuses_before_any_unlink(self):
+        first = self.image('evidence/old/a.qcow2', self.base)
+        second = self.image('evidence/old/b.qcow2', self.base)
+        original = vm.prune_plan
+        def replaced(*args):
+            plan = original(*args)
+            second.rename(second.with_suffix('.saved'))
+            self.image('evidence/old/b.qcow2', self.base)
+            return plan
+        with patch.object(vm, 'prune_plan', side_effect=replaced), self.assertRaisesRegex(RuntimeError, 'changed'):
+            self.prune('evidence/old', apply=True)
+        self.assertTrue(first.exists()); self.readable(second)
+
+    def test_receipt_cannot_be_written_refuses_before_unlink(self):
+        disk = self.image('evidence/old/disk.qcow2', self.base)
+        real_open = Path.open
+        def refuse(path, mode='r', *args, **kwargs):
+            if mode == 'x':
+                raise PermissionError('unwritable receipt')
+            return real_open(path, mode, *args, **kwargs)
+        with patch.object(Path, 'open', refuse), self.assertRaisesRegex(PermissionError, 'receipt'):
+            self.prune('evidence/old', apply=True)
+        self.assertTrue(disk.exists())
+
+    def test_lock_or_running_vm_refuses(self):
+        disk = self.image('evidence/old/disk.qcow2', self.base)
+        with (self.root / 'vm.lock').open('a') as lease:
+            fcntl.flock(lease, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            for apply in (False, True):
+                with self.subTest(apply=apply), self.assertRaisesRegex(RuntimeError, 'lock held'):
+                    self.prune('evidence/old', apply=apply)
+        self.live.return_value = ['test VM running']
+        with self.assertRaisesRegex(RuntimeError, 'may be running'):
+            self.prune('evidence/old', apply=True)
+        self.assertTrue(disk.exists())
+
+    def test_allocated_tree_counts_sparse_and_hardlinks_once_like_du(self):
+        sparse = self.root / 'sparse'
+        with sparse.open('wb') as out:
+            out.truncate(10 * 1024 ** 3)
+            out.write(b'a' * 4096)
+        os.link(sparse, self.root / 'hardlink')
+        (self.root / 'ignored-symlink').symlink_to('/tmp')
+        measured = vm.allocated_bytes()
+        du = int(subprocess.check_output(['du', '-s', '-B1', str(self.root)]).split()[0])
+        self.assertEqual(measured, du)
+        self.assertLess(measured, 1024 ** 2)
+
+    def test_admission_refuses_under_lock_before_replacing_existing_disk(self):
+        disk = self.image('ubuntu/run.qcow2', self.base)
+        before = disk.stat().st_ino, disk.read_bytes()
+        (self.root / 'ubuntu/base.json').write_text('{}')
+        def check():
+            with (self.root / 'vm.lock').open('r') as lock:
+                with self.assertRaises(BlockingIOError):
+                    fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            return 10
+        with patch.dict(os.environ, {'QUAL_OWNER': 'test-growth'}), \
+             patch.object(vm, 'wait_host_memory'), patch.object(vm, 'allocated_bytes', side_effect=check), \
+             patch.object(vm, 'STORAGE_LIMIT', 10), patch.object(vm, 'launch') as launch, \
+             self.assertRaises(vm.StorageBudget):
+            vm.start('ubuntu')
+        launch.assert_not_called()
+        self.assertEqual((disk.stat().st_ino, disk.read_bytes()), before)
 
 
 class HarnessTest(unittest.TestCase):

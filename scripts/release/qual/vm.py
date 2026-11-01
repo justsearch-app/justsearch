@@ -35,6 +35,222 @@ OS = {
 }
 STATE = ROOT / 'running.json'
 MEMORY_MIB = 12288
+STORAGE_LIMIT = 150 * 1024 ** 3
+
+
+class StorageBudget(RuntimeError):
+    pass
+
+
+def tree_entries():
+    def fail(exc):
+        raise exc
+    for folder, dirs, files in os.walk(ROOT, followlinks=False, onerror=fail):
+        for name in dirs + files:
+            path = Path(folder) / name
+            yield path, path.lstat()
+
+
+def allocated_bytes():
+    root = ROOT.lstat()
+    seen = {(root.st_dev, root.st_ino)}
+    total = root.st_blocks * 512
+    # Include directory/symlink allocation, just as du -B1 does.
+    for _, info in tree_entries():
+        key = info.st_dev, info.st_ino
+        if key not in seen:
+            total += info.st_blocks * 512
+            seen.add(key)
+    return total
+
+
+def admit_disk():
+    # Called only by new-disk creators holding the VM lifetime lock.
+    used = allocated_bytes()
+    if used >= STORAGE_LIMIT:
+        raise StorageBudget(f'Qualification storage-budget: {used} allocated bytes >= '
+                            f'{STORAGE_LIMIT} (150 GiB); prune retired disks before starting another stage')
+
+
+def internal_path(path):
+    raw = Path(path)
+    for part in [raw, *raw.parents]:
+        if part.is_symlink():
+            raise RuntimeError(f'Symlinked qualification path: {path} ({part})')
+    path = Path(os.path.abspath(path))
+    root = ROOT.resolve()
+    if not path.is_relative_to(root):
+        raise RuntimeError(f'Path outside qualification root: {path}')
+    for part in [path, *path.parents]:
+        if part.is_symlink():
+            raise RuntimeError(f'Symlinked qualification path: {path} ({part})')
+        if part == root:
+            break
+    return path
+
+
+def snapshot_destination(out):
+    internal_path(out)
+
+
+def record_snapshot(out, disk):
+    report = json.loads((out / 'summary.json').read_text())
+    report['storage'] = {'snapshotBytes': disk.stat().st_blocks * 512}
+    save(out / 'summary.json', report)
+
+
+def combined_storage(sources):
+    return {'snapshotBytes': sum(source.get('storage', {}).get('snapshotBytes', 0)
+                                 for source in sources.values())}
+
+
+def storage_failure(report, exc):
+    if isinstance(exc, StorageBudget):
+        row = {'id': 'storage-budget', 'checks': [{'name': 'storage-budget',
+            'status': 'failed-infrastructure', 'reason': str(exc), 'evidence': []}]}
+        rows = report.setdefault('journeys', [])
+        if rows and rows[0]['id'] == 'preparation':
+            rows[0] = row
+        else:
+            rows.append(row)
+    return report
+
+
+def disk_identity(path):
+    info = path.lstat()
+    return info.st_dev, info.st_ino, info.st_size, info.st_mtime_ns, info.st_ctime_ns
+
+
+def prune_plan(targets, reason):
+    if not targets:
+        raise RuntimeError('Pruning requires an explicitly selected evidence subtree')
+    if not reason.strip():
+        raise RuntimeError('Pruning requires a nonempty reason')
+    selected = [internal_path(ROOT / target) for target in targets]
+    bases = {internal_path(ROOT / name / 'base.qcow2') for name in OS}
+    # Base receipts may also name a nonstandard base disk.
+    def named_disks(value, folder):
+        if isinstance(value, str) and value.endswith('.qcow2'):
+            bases.add(internal_path(folder / value))
+        elif isinstance(value, dict):
+            for item in value.values():
+                named_disks(item, folder)
+        elif isinstance(value, list):
+            for item in value:
+                named_disks(item, folder)
+    for name in OS:
+        record = internal_path(ROOT / name / 'base.json')
+        if record.exists():
+            named_disks(json.loads(record.read_text()), record.parent)
+    for target in selected:
+        if not target.is_dir():
+            raise RuntimeError(f'Evidence subtree is not a directory: {target}')
+        if target == ROOT.resolve() or target in [ROOT / n for n in OS] or any(
+                base.is_relative_to(target) for base in bases):
+            raise RuntimeError(f'Refusing selection containing a base, OS directory or qualification root: {target}')
+    disks = {}
+    for path, info in tree_entries():
+        if path.suffix == '.qcow2':
+            internal_path(path)
+            if not stat.S_ISREG(info.st_mode) or info.st_nlink != 1:
+                raise RuntimeError(f'Ambiguous qcow2 disk: {path}')
+            disks[path] = disk_identity(path)
+    parents, missing = {}, {}
+    # Inspect each layer separately: unlike --backing-chain this lets a positive
+    # ENOENT end one chain without hiding corrupt/unreadable existing members.
+    pending = list(disks)
+    for path in pending:
+        try:
+            result = run('qemu-img', 'info', '--output=json', path, capture_output=True, text=True, timeout=30)
+            info = json.loads(result.stdout)
+            if info['format'] != 'qcow2':
+                raise ValueError('not qcow2')
+            backing = info.get('backing-filename')
+            parent = None
+            if backing:
+                if ':' in backing:
+                    raise ValueError('ambiguous backing filename')
+                parent = internal_path(path.parent / backing)
+                try:
+                    entry = parent.stat()
+                except FileNotFoundError:
+                    missing[path] = str(parent)
+                    parent = None
+                else:
+                    if not stat.S_ISREG(entry.st_mode) or entry.st_nlink != 1:
+                        raise ValueError(f'not a regular backing file: {parent}')
+                    if parent not in disks:
+                        disks[parent] = disk_identity(parent)
+                        pending.append(parent)
+            parents[path] = parent
+        except (OSError, ValueError, KeyError, RuntimeError, subprocess.SubprocessError) as exc:
+            raise RuntimeError(f'Cannot inspect qcow2 {path}: {exc}') from exc
+    chains = {}
+    for head in disks:
+        chain = []
+        member = head
+        while member is not None:
+            if member in chain:
+                raise RuntimeError(f'Ambiguous backing cycle: {head} at {member}')
+            chain.append(member)
+            member = parents[member]
+        chains[head] = chain
+    candidates = {p for p in disks if any(p.is_relative_to(t) for t in selected)}
+    protected = {}
+    for head, chain in chains.items():
+        why = (f'missing backing file {missing[chain[-1]]} through {head}' if chain[-1] in missing
+               else f'still referenced by {head}' if head not in candidates else None)
+        if head in bases:
+            why = f'base disk {head}'
+        if why:
+            for member in chain:
+                protected.setdefault(member, []).append(why)
+    planned = sorted(candidates - protected.keys(), key=lambda p: (-len(chains[p]), str(p)))
+    plan = {'reason': reason, 'subtrees': list(map(str, selected)),
+            'planned': [{'path': str(p), 'allocatedBytes': p.stat().st_blocks * 512} for p in planned],
+            'protected': {str(p): why for p, why in sorted(protected.items())},
+            'missingBacking': {str(p): target for p, target in missing.items()}, 'deleted': []}
+    return plan, disks
+
+
+def prune_disks(targets, reason, apply=False):
+    # A dry run must not even create/touch a lock file in the evidence tree.
+    with contextlib.ExitStack() as stack:
+        if apply:
+            stack.enter_context(locked())
+        elif (ROOT / 'vm.lock').exists():
+            lease = stack.enter_context((ROOT / 'vm.lock').open('r'))
+            try:
+                fcntl.flock(lease, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            except BlockingIOError:
+                raise RuntimeError('VM lifetime lock held; refusing prune') from None
+        ensure_free(check_lock=False)
+        plan, identities = prune_plan(targets, reason)
+        if apply:
+            target = Path(plan['subtrees'][0])
+            receipt = target.parent / (target.name + '.prune-' + str(time.time_ns()) + '.json')
+            # Exclusive publication before the first unlink; never overwrite a receipt.
+            with receipt.open('x') as out:
+                json.dump(plan, out, indent=2)
+                out.write('\n')
+            try:
+                for path, expected in identities.items():
+                    if disk_identity(internal_path(path)) != expected:
+                        raise RuntimeError(f'Disk changed since prune plan: {path}')
+                for item in plan['planned']:
+                    path = internal_path(item['path'])
+                    if disk_identity(path) != identities[path]:
+                        raise RuntimeError(f'Disk changed since prune plan: {path}')
+                    path.unlink()
+                    plan['deleted'].append(item)
+                    save(receipt, plan)
+            except BaseException as exc:
+                plan['error'] = str(exc)
+                save(receipt, plan)
+                raise
+            plan['receipt'] = str(receipt)
+        print(json.dumps(plan, indent=2))
+        return plan
 
 
 def wait_host_memory(seconds=900):
@@ -464,6 +680,7 @@ def start(os_name, visible=False):
         folder = ROOT / os_name
         if not (folder / 'base.json').exists():
             raise RuntimeError(f'Build {os_name} base first')
+        admit_disk()
         config()
         overlay = folder / 'run.qcow2'
         variables = folder / 'run-vars.fd'
@@ -798,8 +1015,14 @@ def main():
         sub.add_parser(action)
     p = sub.add_parser('wait-free')
     p.add_argument('--timeout', type=float, required=True)
+    p = sub.add_parser('prune-disks', help='Plan retirement of explicitly selected evidence disks')
+    p.add_argument('subtrees', nargs='+', type=Path)
+    p.add_argument('--reason', required=True)
+    p.add_argument('--apply', action='store_true')
     args = parser.parse_args()
-    if args.action == 'build-base':
+    if args.action == 'prune-disks':
+        prune_disks(args.subtrees, args.reason, args.apply)
+    elif args.action == 'build-base':
         owner()
         ensure_free()
         with locked('build.lock'):

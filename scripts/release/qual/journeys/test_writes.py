@@ -1,7 +1,10 @@
 """No VM, host services or shared data; exercise snapshot and counter boundaries."""
 import importlib.util
 import json
+import os
 from pathlib import Path
+import subprocess
+import sys
 import tempfile
 from types import SimpleNamespace
 import unittest
@@ -13,6 +16,225 @@ from writes import difference
 spec = importlib.util.spec_from_file_location('journey_vm_run', Path(__file__).with_name('vm-run.py'))
 wrapper = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(wrapper)
+spec = importlib.util.spec_from_file_location('growth_windows', Path(__file__).with_name('vm-windows.py'))
+windows = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(windows)
+
+
+class GrowthLaneTests(unittest.TestCase):
+    def setUp(self):
+        temp = tempfile.TemporaryDirectory(prefix='qual-lane-growth-')
+        self.addCleanup(temp.cleanup)
+        self.root = Path(temp.name)
+        for key, value in [('ROOT', self.root), ('STATE', self.root / 'running.json')]:
+            self.mock(wrapper.vm, key, value)
+        for method in ('ensure_free', 'wait_free', 'wait_host_memory', 'wait_ssh'):
+            self.mock(wrapper.vm, method)
+        self.mock(wrapper, 'wait_for', return_value=True)
+        self.mock(windows, 'wait_for', return_value=True)
+        self.mock(wrapper, 'pins', return_value={})
+        self.mock(windows, 'pins', return_value={})
+        owner = patch.dict(os.environ, {'QUAL_OWNER': 'growth-test'})
+        owner.start(); self.addCleanup(owner.stop)
+        self.snapshot = self.root / 'tools'; self.snapshot.mkdir()
+        self.image(self.snapshot / 'disk.qcow2')
+        (self.snapshot / 'vars.fd').write_bytes(b'firmware')
+        (self.snapshot / 'checkpoint.json').write_text('{}')
+        (self.snapshot / 'manifest.json').write_text(json.dumps({'pins': {}, 'kind': 'tools'}))
+        (self.snapshot / 'quiet-verify.json').write_text('{"verified":true}')
+        for name in ('ubuntu', 'windows'):
+            folder = self.root / name; folder.mkdir()
+            self.image(folder / 'base.qcow2')
+            (folder / 'base.json').write_text('{}')
+            (folder / 'base-vars.fd').write_bytes(b'firmware')
+            self.image(folder / 'run.qcow2', folder / 'base.qcow2')
+            (folder / 'run-vars.fd').write_bytes(b'old firmware')
+
+    def mock(self, obj, key, *args, **kwargs):
+        mocked = patch.object(obj, key, *args, **kwargs)
+        value = mocked.start(); self.addCleanup(mocked.stop)
+        return value
+
+    def image(self, path, backing=None):
+        path.parent.mkdir(parents=True, exist_ok=True)
+        args = ['qemu-img', 'create', '-q', '-f', 'qcow2']
+        args += ['-F', 'qcow2', '-b', str(backing)] if backing else ['-o', 'size=1M']
+        subprocess.run([*args, str(path)], check=True, capture_output=True)
+
+    def args(self, module):
+        return SimpleNamespace(session='vm' if module is windows else 'wayland', mode='fresh',
+            journeys=None, predecessor=Path('predecessor'), mirror=Path('mirror'),
+            memory_mib=12288, memory_reason=None, evidence=self.root / 'out')
+
+    def test_snapshot_admission_preserves_existing_run_disk_on_both_lanes(self):
+        for module, name in ((wrapper, 'ubuntu'), (windows, 'windows')):
+            disk = self.root / name / 'run.qcow2'
+            before = disk.stat().st_ino, disk.read_bytes()
+            with self.subTest(lane=name), patch.object(wrapper.vm, 'STORAGE_LIMIT', 0), \
+                 patch.object(wrapper.vm, 'launch') as launch, self.assertRaises(wrapper.vm.StorageBudget):
+                module.start_snapshot(self.snapshot)
+            self.assertEqual((disk.stat().st_ino, disk.read_bytes()), before)
+            launch.assert_not_called()
+
+    def test_refusal_has_dedicated_failed_infrastructure_row_on_both_lanes(self):
+        for module, name in ((wrapper, 'ubuntu'), (windows, 'windows')):
+            out = self.root / ('refusal-' + name)
+            args = self.args(module)
+            with self.subTest(lane=name), patch.object(wrapper.vm, 'STORAGE_LIMIT', 0), \
+                 patch.object(wrapper.vm, 'launch') as launch:
+                self.assertEqual(module.run_overlay(args, out, 'candidate', ['J1'], self.snapshot, seal=True), 1)
+            launch.assert_not_called()
+            report = json.loads((out / 'summary.json').read_text())
+            row = next(r for r in report['journeys'] if r['id'] == 'storage-budget')
+            self.assertEqual(row['checks'][0]['status'], 'failed-infrastructure')
+            self.assertFalse(report['passed'])
+
+    def test_windows_preparation_refusal_keeps_disk_and_reports_storage_budget(self):
+        disk = self.root / 'windows/run.qcow2'
+        before = disk.stat().st_ino, disk.read_bytes()
+        out = self.root / 'prepare-refused'
+        with patch.object(wrapper.vm, 'STORAGE_LIMIT', 0), patch.object(wrapper.vm, 'launch') as launch:
+            self.assertEqual(windows.prepare_setup(self.args(windows), out), 1)
+        self.assertEqual((disk.stat().st_ino, disk.read_bytes()), before)
+        report = json.loads((out / 'summary.json').read_text())
+        self.assertEqual(report['journeys'][0]['id'], 'storage-budget')
+        launch.assert_not_called()
+
+    def test_external_sealing_destination_refused_before_launch_or_creation(self):
+        with tempfile.TemporaryDirectory() as external:
+            for module in (wrapper, windows):
+                out = Path(external) / module.__name__
+                with self.subTest(lane=module.__name__), patch.object(wrapper.vm, 'launch') as launch, \
+                     self.assertRaisesRegex(RuntimeError, 'outside qualification root'):
+                    module.run_overlay(self.args(module), out, 'candidate', ['J1'], seal=True)
+                self.assertFalse(out.exists()); launch.assert_not_called()
+            out = Path(external) / 'prepare'
+            with self.assertRaisesRegex(RuntimeError, 'outside qualification root'):
+                windows.prepare_setup(self.args(windows), out)
+            self.assertFalse(out.exists())
+
+    def test_sealing_past_threshold_counts_new_layer_only_and_failure_does_not_count(self):
+        for module, name in ((wrapper, 'ubuntu'), (windows, 'windows')):
+            for fail in (False, True):
+                with self.subTest(lane=name, fail=fail):
+                    out = self.root / (name + str(fail)); out.mkdir()
+                    (out / 'summary.json').write_text('{"writeVolume":{"writtenBytes":123}}')
+                    (out / 'checkpoint.json').write_text('{}')
+                    (out / 'quiet-verify.json').write_text('{"verified":true}')
+                    disk = self.root / name / 'run.qcow2'
+                    if not disk.exists():
+                        self.image(disk, self.root / name / 'base.qcow2')
+                        disk.with_name('run-vars.fd').write_bytes(b'firmware')
+                    inode = disk.stat().st_ino
+                    allocation = disk.stat().st_blocks * 512
+                    with patch.object(wrapper.vm, 'STORAGE_LIMIT', 0):
+                        if fail:
+                            with patch.object(module, 'pins', side_effect=OSError('injected seal failure')), \
+                                 self.assertRaisesRegex(OSError, 'seal failure'):
+                                module.seal_snapshot(out, {'disk': str(disk)}, inode, self.args(module), 'candidate')
+                        else:
+                            module.seal_snapshot(out, {'disk': str(disk)}, inode, self.args(module), 'candidate')
+                        with self.assertRaises(wrapper.vm.StorageBudget):
+                            module.start_snapshot(self.snapshot)
+                    report = json.loads((out / 'summary.json').read_text())
+                    self.assertEqual(report['writeVolume']['writtenBytes'], 123)
+                    if fail:
+                        self.assertNotIn('storage', report)
+                        self.assertFalse((out / 'snapshot/manifest.json').exists())
+                    else:
+                        self.assertEqual(report['storage']['snapshotBytes'], allocation)
+                        self.assertEqual((out / 'snapshot/disk.qcow2').stat().st_ino, inode)
+                        destination = out / 'combined'; destination.mkdir()
+                        source = dict(report, journeys=[])
+                        module.combine(self.args(module), destination, {'first': source, 'second': {'journeys': []}})
+                        combined = json.loads((destination / 'summary.json').read_text())
+                        self.assertEqual(combined['storage']['snapshotBytes'], allocation)
+
+    def test_first_or_later_storage_refusal_stops_full_run_and_combination_on_both_lanes(self):
+        for module, name in ((wrapper, 'ubuntu'), (windows, 'windows')):
+            for stop_at in (1, 2):
+                with self.subTest(lane=name, stop_at=stop_at):
+                    args = self.args(module)
+                    args.evidence = self.root / (name + '-stage-' + str(stop_at))
+                    calls = []
+                    real_overlay = module.run_overlay
+                    def stage(args, out, phase, journeys, snapshot=None, seal=False):
+                        calls.append(out.name)
+                        if len(calls) == stop_at:
+                            with patch.object(wrapper.vm, 'STORAGE_LIMIT', 0):
+                                return real_overlay(args, out, phase, journeys, snapshot, seal)
+                        out.mkdir()
+                        (out / 'summary.json').write_text('{"journeys":[]}')
+                        dest = out / 'snapshot'; dest.mkdir()
+                        self.image(dest / 'disk.qcow2', self.snapshot / 'disk.qcow2')
+                        (dest / 'manifest.json').write_text('{"kind":"application","pins":{}}')
+                        (dest / 'quiet-verify.json').write_text('{"verified":true}')
+                        (dest / 'checkpoint.json').write_text('{}')
+                        return 0
+                    with patch.object(module, 'run_overlay', side_effect=stage), \
+                         patch.object(wrapper.vm, 'launch') as launch:
+                        if module is wrapper:
+                            with patch.object(module, 'parse_args', return_value=args):
+                                result = module.main()
+                        else:
+                            argv = ['vm-windows.py', '--assets', 'assets', '--package', 'app.exe',
+                                '--registry', 'registry', '--driver', 'driver', '--predecessor', 'previous',
+                                '--mirror', 'mirror', '--setup-snapshot', str(self.snapshot),
+                                '--evidence', str(args.evidence)]
+                            with patch.object(sys, 'argv', argv):
+                                result = module.main()
+                    self.assertEqual(len(calls), stop_at)
+                    self.assertNotEqual(result, 0); launch.assert_not_called()
+                    report = json.loads((args.evidence / 'summary.json').read_text())
+                    self.assertFalse(report['passed'])
+                    self.assertTrue(any(r['id'] == 'storage-budget' for r in report['journeys']))
+
+    def test_windows_preparation_reboot_and_seal_past_threshold_count_layer_once(self):
+        vm = wrapper.vm
+        out = self.root / 'prepared'
+        allocations = []
+        real_admit = vm.admit_disk
+        admission = self.mock(vm, 'admit_disk', wraps=real_admit)
+        def launch(name, disk, variables, **kwargs):
+            allocations.append(disk.stat().st_ino)
+            data = {'os': name, 'pid': 999999999, 'start_ticks': '1',
+                    'disk': str(disk), 'owner': 'growth-test'}
+            vm.save(vm.STATE, data)
+            return data
+        def stop():
+            vm.STATE.unlink()
+            return True
+        def quiet(mode, folder):
+            if mode == 'Apply':
+                vm.STORAGE_LIMIT = 0  # Allocation during the admitted first boot.
+            (folder / ('quiet-' + mode.lower() + '.json')).write_text('{"verified":true}')
+        def copied(source, destination, **kwargs):
+            destination.write_text('{"webview2":"156.0","msedgedriver":"156.0"}')
+        self.mock(vm, 'launch', side_effect=launch)
+        self.mock(vm, 'stop', side_effect=stop)
+        self.mock(windows, 'stage_inputs')
+        self.mock(windows, 'guest_ps', return_value='')
+        self.mock(windows, 'copy_out', side_effect=copied)
+        self.mock(windows, 'quiet_guest', side_effect=quiet)
+        self.mock(windows, 'prepare_viewer')
+        self.mock(windows, 'verify_crash_access')
+        budget = self.mock(windows, 'WriteBudget')
+        budget.return_value.finish.side_effect = lambda: {'overlayInitialBytes': 0}
+        budget.return_value.error = None
+        args = self.args(windows)
+        args.mirror = None
+        (self.snapshot / 'checkpoint.json').unlink()  # Tools preparation has no app checkpoint.
+        with patch.object(vm, 'STORAGE_LIMIT', 150 * 1024 ** 3):
+            self.assertEqual(windows.prepare_setup(args, out, self.snapshot), 0,
+                             (out / 'summary.json').read_text())
+            self.assertEqual(len(allocations), 2)
+            self.assertEqual(allocations[0], allocations[1])
+            admission.assert_called_once()
+            report = json.loads((out / 'summary.json').read_text())
+            self.assertEqual(len(report['writeVolume']), 2)
+            self.assertEqual(report['storage']['snapshotBytes'], (out / 'disk.qcow2').stat().st_blocks * 512)
+            with self.assertRaises(vm.StorageBudget):
+                windows.start_snapshot(out)
 
 
 class WriteTests(unittest.TestCase):
@@ -34,6 +256,7 @@ class WriteTests(unittest.TestCase):
             disk = root / 'run.qcow2'; disk.write_bytes(b'expensive setup')
             (root / 'run-vars.fd').write_bytes(b'firmware')
             (out / 'checkpoint.json').write_text('{}')
+            (out / 'summary.json').write_text('{}')
             inode = disk.stat().st_ino
             with patch.object(wrapper.vm, 'ROOT', root), patch.object(wrapper.vm, 'ensure_free'), \
                  patch.object(wrapper, 'pins', return_value={'package': 'exact-sha'}):
