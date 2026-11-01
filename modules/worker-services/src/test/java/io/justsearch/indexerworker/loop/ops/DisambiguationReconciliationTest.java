@@ -7,21 +7,28 @@ import static org.mockito.Mockito.*;
 
 import io.justsearch.adapters.lucene.runtime.*;
 import io.justsearch.configuration.FieldCatalogDef;
+import io.justsearch.configuration.excludes.ExclusionPatterns;
 import io.justsearch.indexerworker.coordination.WorkerSignalBus;
 import io.justsearch.indexerworker.disambiguation.DisambiguationService;
 import io.justsearch.indexerworker.disambiguation.EntityNormalizer;
 import io.justsearch.indexerworker.loop.BackfillScheduler;
 import io.justsearch.indexerworker.loop.pacing.ForegroundLoad;
 import io.justsearch.indexerworker.loop.pacing.IndexingPacing;
+import io.justsearch.indexerworker.metrics.EncoderProfileAccumulator;
+import io.justsearch.indexerworker.metrics.OperationalMetrics;
 import io.justsearch.indexerworker.ner.NerResult;
 import io.justsearch.indexerworker.ner.NerService;
 import io.justsearch.indexing.SchemaFields;
 import io.justsearch.indexing.api.IndexDocument;
+import io.opentelemetry.api.GlobalOpenTelemetry;
+import java.lang.reflect.Modifier;
 import java.nio.file.Path;
 import java.sql.SQLException;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.LongAdder;
 import org.junit.jupiter.api.*;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -36,8 +43,14 @@ class DisambiguationReconciliationTest extends LuceneExecutorTestBase {
   BackfillScheduler scheduler;
   AtomicBoolean running = new AtomicBoolean(true);
   IndexingPacing pacing = IndexingPacing.unthrottled();
+  GlobalState globalState;
 
   @BeforeEach void open() throws Exception {
+    globalState = new GlobalState();
+    globalState.captureMetrics(OperationalMetrics.getInstance());
+    // Tracer lookup can install the no-op registration; source exclusion reads cache the policy.
+    globalState.captureStaticFields(GlobalOpenTelemetry.class, "globalOpenTelemetry", "setGlobalCaller");
+    globalState.captureStaticFields(ExclusionPatterns.class, "cached");
     var fields = new ArrayList<>(FieldCatalogDef.forChunkTesting(4).fields());
     fields.add(field(SchemaFields.NER_STATUS, false));
     fields.add(new FieldCatalogDef.FieldDef(SchemaFields.NER_RETRY_COUNT, "long", true, true, List.of(), null, null, false));
@@ -53,8 +66,92 @@ class DisambiguationReconciliationTest extends LuceneExecutorTestBase {
   }
 
   @AfterEach void close() throws Exception {
-    if (service != null) service.close();
-    if (runtime != null) runtime.close();
+    try {
+      try { if (service != null) service.close(); }
+      finally { if (runtime != null) runtime.close(); }
+    } finally {
+      if (globalState != null) globalState.close();
+    }
+  }
+
+  /** Preserve existing metric objects as well as their values, including registered encoders. */
+  private static final class GlobalState implements AutoCloseable {
+    private final List<AutoCloseable> restorers = new ArrayList<>();
+
+    void captureMetrics(Object owner) throws Exception {
+      for (var field : owner.getClass().getDeclaredFields()) {
+        if (Modifier.isStatic(field.getModifiers())) continue;
+        field.setAccessible(true);
+        Object value = field.get(owner);
+        if (value instanceof String) {
+          restorers.add(() -> field.set(owner, value));
+        } else {
+          captureValue(value);
+        }
+      }
+    }
+
+    @SuppressWarnings("unchecked")
+    private void captureValue(Object value) throws Exception {
+      if (value instanceof LongAdder counter) {
+        long previous = counter.sum();
+        restorers.add(() -> { counter.reset(); counter.add(previous); });
+      } else if (value instanceof AtomicLong gauge) {
+        long previous = gauge.get();
+        restorers.add(() -> gauge.set(previous));
+      } else if (value instanceof Map<?, ?> entries) {
+        var map = (Map<Object, Object>) entries;
+        var previous = new LinkedHashMap<>(map);
+        restorers.add(() -> { map.clear(); map.putAll(previous); });
+        for (Object entry : previous.values()) captureValue(entry);
+      } else if (value instanceof OperationalMetrics.ThroughputMonitor monitor) {
+        var field = monitor.getClass().getDeclaredField("samples");
+        field.setAccessible(true);
+        synchronized (monitor) {
+          var samples = (Deque<Object>) field.get(monitor);
+          var previous = new ArrayDeque<>(samples);
+          restorers.add(() -> {
+            synchronized (monitor) { samples.clear(); samples.addAll(previous); }
+          });
+        }
+      } else if (value instanceof EncoderProfileAccumulator encoder) {
+        captureMetrics(encoder);
+      } else if (value.getClass().getName().equals("org.HdrHistogram.Histogram")) {
+        // HdrHistogram is an implementation dependency of worker-core, not a test API here.
+        synchronized (value) {
+          Object previous = value.getClass().getMethod("copy").invoke(value);
+          var copyInto = value.getClass().getMethod("copyInto",
+              Class.forName("org.HdrHistogram.AbstractHistogram"));
+          restorers.add(() -> {
+            synchronized (value) { copyInto.invoke(previous, value); }
+          });
+        }
+      } else {
+        throw new IllegalStateException("Uncaptured metric state: " + value.getClass());
+      }
+    }
+
+    void captureStaticFields(Class<?> owner, String... names) throws Exception {
+      for (String name : names) {
+        var field = owner.getDeclaredField(name);
+        field.setAccessible(true);
+        Object previous = field.get(null);
+        restorers.add(() -> field.set(null, previous));
+      }
+    }
+
+    @Override public void close() throws Exception {
+      Exception failure = null;
+      for (int i = restorers.size() - 1; i >= 0; i--) {
+        try { restorers.get(i).close(); }
+        catch (Exception cleanup) {
+          if (failure == null) failure = cleanup;
+          else failure.addSuppressed(cleanup);
+        }
+      }
+      restorers.clear();
+      if (failure != null) throw failure;
+    }
   }
 
   static FieldCatalogDef.FieldDef field(String name, boolean multi) {

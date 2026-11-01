@@ -7,12 +7,15 @@ import static org.mockito.Mockito.*;
 import io.justsearch.adapters.lucene.runtime.IndexSchema;
 import io.justsearch.adapters.lucene.runtime.LuceneExecutorTestBase;
 import io.justsearch.configuration.FieldCatalogDef;
+import io.justsearch.indexerworker.metrics.OperationalMetrics;
 import io.justsearch.indexerworker.server.EncoderBindings;
 import io.justsearch.indexerworker.services.CallContext;
 import io.justsearch.indexerworker.services.WorkerSearchService;
 import io.justsearch.indexing.SchemaFields;
 import io.justsearch.indexing.api.IndexDocument;
 import io.justsearch.ipc.*;
+import io.opentelemetry.api.GlobalOpenTelemetry;
+import java.lang.reflect.Modifier;
 import java.nio.file.Path;
 import java.sql.SQLException;
 import java.util.ArrayList;
@@ -20,11 +23,46 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.LongAdder;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 class DisambiguationSearchRecoveryTest extends LuceneExecutorTestBase {
   @TempDir Path directory;
+  private final List<AutoCloseable> restorers = new ArrayList<>();
+
+  @BeforeEach void preserveGlobalState() throws Exception {
+    // SearchResponseBuilder records search counters, fallback counters and latency histograms.
+    var metrics = OperationalMetrics.getInstance();
+    for (var field : OperationalMetrics.class.getDeclaredFields()) {
+      if (Modifier.isStatic(field.getModifiers())) continue;
+      field.setAccessible(true);
+      Object value = field.get(metrics);
+      if (value instanceof LongAdder counter) {
+        long previous = counter.sum();
+        restorers.add(() -> { counter.reset(); counter.add(previous); });
+      } else if (value instanceof AtomicLong gauge) {
+        long previous = gauge.get();
+        restorers.add(() -> gauge.set(previous));
+      }
+    }
+    // SearchExecutor's tracer lookup can initialize a previously unset global registration.
+    for (String name : List.of("globalOpenTelemetry", "setGlobalCaller")) {
+      var field = GlobalOpenTelemetry.class.getDeclaredField(name);
+      field.setAccessible(true);
+      Object previous = field.get(null);
+      restorers.add(() -> field.set(null, previous));
+    }
+  }
+
+  @AfterEach void restoreGlobalState() throws Exception {
+    try {
+      for (int i = restorers.size() - 1; i >= 0; i--) restorers.get(i).close();
+    } finally { restorers.clear(); }
+  }
 
   @Test void zeroNewFormReplayRepairsFiltersFacetLabelsCountsAndVariants() throws Exception {
     var fields = new ArrayList<>(FieldCatalogDef.forChunkTesting(4).fields());
