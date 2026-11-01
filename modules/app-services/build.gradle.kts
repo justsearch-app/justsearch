@@ -1,4 +1,4 @@
-﻿plugins {
+plugins {
   `java-library`
   id("jvm-test-suite")
   id("conventions.jvm-base")
@@ -39,12 +39,12 @@ dependencies {
   // input-arg validation. Validates argumentsJson against
   // Operation.interface().inputs() before invoking the handler.
   implementation(libs.json.schema.validator)
-  api("io.github.metarank:lightgbm4j:4.6.0-2")
+  api("io.github.metarank:lightgbm4j:4.7.0-2")
   // PDFBox for VDU (Vision Document Understanding) - rendering PDF pages to images
-  implementation("org.apache.pdfbox:pdfbox:3.0.6")
+  implementation("org.apache.pdfbox:pdfbox:3.0.8")
   // Tempdoc 629: Argon2id KDF for at-rest key derivation (EncryptionEnvelope). Version-aligned with
   // the worker modules' existing transitive bcprov (1.81.1).
-  implementation("org.bouncycastle:bcprov-jdk18on:1.81.1")
+  implementation("org.bouncycastle:bcprov-jdk18on:1.86")
   runtimeOnly(libs.lucene.core)
   runtimeOnly(libs.lucene.analysis.common)
   runtimeOnly(libs.lucene.analysis.icu)
@@ -105,7 +105,7 @@ testing {
         implementation(project())
         implementation(platform(libs.junit.bom))
         implementation(libs.junit.jupiter.api)
-        implementation("org.junit.jupiter:junit-jupiter-params:5.14.3")
+        implementation("org.junit.jupiter:junit-jupiter-params:6.1.3")
         implementation(libs.archunit.junit5)
         runtimeOnly(libs.junit.jupiter.engine)
         runtimeOnly(libs.junit.platform.launcher)
@@ -210,14 +210,14 @@ tasks.register<Test>("loadSensitiveUnitTest") {
 
 dependencies {
 
-  api("dev.cel:common:0.12.0")
-  api("dev.cel:runtime:0.12.0")
+  api("dev.cel:common:0.15.0")
+  api("dev.cel:runtime:0.15.0")
   api(project(":modules:api-contract-projection-java"))
   api(project(":modules:ort-common"))
-  implementation("dev.cel:compiler:0.12.0")
-  add("integrationTestRuntimeOnly", "org.threeten:threeten-extra:1.8.0")
-  runtimeOnly("org.threeten:threeten-extra:1.8.0")
-  add("searchDumpRuntimeOnly", "org.threeten:threeten-extra:1.8.0")
+  implementation("dev.cel:compiler:0.15.0")
+  add("integrationTestRuntimeOnly", "org.threeten:threeten-extra:1.11.0")
+  runtimeOnly("org.threeten:threeten-extra:1.11.0")
+  add("searchDumpRuntimeOnly", "org.threeten:threeten-extra:1.11.0")
 }
 
 tasks.named("check") { dependsOn(tasks.named("integrationTest")) }
