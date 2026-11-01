@@ -9,7 +9,6 @@ import io.justsearch.indexerworker.util.PathNormalizer;
 import io.methvin.watcher.DirectoryChangeEvent;
 import io.methvin.watcher.DirectoryChangeListener;
 import io.methvin.watcher.DirectoryWatcher;
-import io.methvin.watcher.hashing.FileHash;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -333,11 +332,7 @@ public final class WorkerMethvinWatcher implements AutoCloseable {
       DirectoryWatcher watcher =
           DirectoryWatcher.builder()
               .path(normalized)
-              .fileHasher(path -> {
-                var attrs = Files.readAttributes(path, java.nio.file.attribute.BasicFileAttributes.class);
-                return FileHash.fromBytes(java.nio.ByteBuffer.allocate(2 * Long.BYTES)
-                    .putLong(attrs.lastModifiedTime().toMillis()).putLong(attrs.size()).array());
-              })
+              .fileHashing(false)
               .listener(listener)
               .build();
       RootSubscription subscription =
@@ -742,9 +737,6 @@ public final class WorkerMethvinWatcher implements AutoCloseable {
    * event for that path ({@code INSERT OR REPLACE} restates it), not by a later read. Two cases
    * make that window longer than "a moment":
    * <ul>
-   *   <li>The size-and-mtime hasher (see {@code registerRoot}) suppresses a MODIFY
-   *       when both stamps match. If the operating system still exposes the prior size and mtime
-   *       while a copy is open, healing waits for an event exposing the updated metadata.
    *   <li>If no further event ever arrives — a file created empty and left empty, or a create and
    *       write that exposes neither a size nor an mtime change — the row keeps {@code UNKNOWN} for as long as it
    *       stays PENDING/PROCESSING, i.e. until it is indexed and leaves the aggregate entirely.

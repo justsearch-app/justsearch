@@ -25,8 +25,9 @@ import org.junit.jupiter.api.io.TempDir;
 final class WorkerWatcherRestoredMtimeTest {
   @TempDir Path temporary;
 
-  @Test
-  void methvinModifyDeduplicationKeepsSizeChangesWithRestoredMtime() throws Exception {
+  @org.junit.jupiter.params.ParameterizedTest(name = "{displayName} [{index}] {arguments}")
+  @org.junit.jupiter.params.provider.ValueSource(booleans = {false, true})
+  void methvinModifyDeduplicationKeepsEditsWithRestoredMtime(boolean equalSize) throws Exception {
     Path file = Files.writeString(temporary.resolve("file.txt"), "old");
     var stamp = Files.getLastModifiedTime(file);
     FileHasher hasher;
@@ -40,8 +41,8 @@ final class WorkerWatcherRestoredMtimeTest {
       DirectoryWatcher installed = field(subscriptions.get(temporary), "watcher");
       hasher = field(installed, "fileHasher");
     }
-    FileHash before = hasher.hash(file);
-    Files.writeString(file, "new content of a different size");
+    FileHash before = hasher == null ? null : hasher.hash(file);
+    Files.writeString(file, equalSize ? "new" : "new content of a different size");
     Files.setLastModifiedTime(file, stamp);
     var observed = new ArrayList<DirectoryChangeEvent>();
     WatchService events = mock(WatchService.class);
@@ -58,7 +59,7 @@ final class WorkerWatcherRestoredMtimeTest {
     var watcher = new DirectoryWatcher(List.of(), observed::add, events, hasher, null,
         org.slf4j.LoggerFactory.getLogger(getClass()));
     Map<Path, FileHash> hashes = field(watcher, "pathHashes");
-    hashes.put(file, before);
+    if (before != null) hashes.put(file, before);
     Map<WatchKey, Path> roots = field(watcher, "keyRoots");
     roots.put(key, temporary);
     Map<Path, Path> registered = field(watcher, "registeredPathToRootPath");
@@ -66,10 +67,10 @@ final class WorkerWatcherRestoredMtimeTest {
     var loop = DirectoryWatcher.class.getDeclaredMethod("runEventLoop");
     loop.setAccessible(true);
     assertDoesNotThrow(() -> loop.invoke(watcher));
-    assertEquals(1, observed.size(), "size change with equal mtime must survive Methvin's duplicate filter");
+    assertEquals(1, observed.size(), "content change with equal mtime must survive Methvin's duplicate filter");
     assertEquals(DirectoryChangeEvent.EventType.MODIFY, observed.getFirst().eventType());
     assertEquals(file, observed.getFirst().path());
-    assertEquals(hasher.hash(file), hashes.get(file));
+    if (hasher != null) assertEquals(hasher.hash(file), hashes.get(file));
   }
 
   @SuppressWarnings("unchecked")

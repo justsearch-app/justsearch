@@ -53,6 +53,7 @@ class Windows1252QueuedRestartTest extends LuceneExecutorTestBase {
           SchemaFields.DOC_ID, id, SchemaFields.DOC_UID, "stable-uid", SchemaFields.PATH, id,
           SchemaFields.MODIFIED_AT, Files.getLastModifiedTime(file).toMillis(),
           SchemaFields.SIZE_BYTES, Files.size(file),
+          SchemaFields.SOURCE_SHA256, SourceContentHash.sha256(file),
           SchemaFields.CONTENT, "legacy extracted text", SchemaFields.EXTRACTION_POLICY_ID, "tika-default-v1")));
       refresh(runtime);
       assertEquals(1, queue.enqueueEntries(List.of(JobQueue.EnqueueEntry.stat(file).withinRoot(tempDir))));
