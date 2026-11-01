@@ -269,7 +269,7 @@ class DisambiguationReconciliationTest extends LuceneExecutorTestBase {
     // A new source forces a pass with existing sources still required.
     seed("c", "new person", "NEW PERSON"); refresh();
     AtomicInteger paced = new AtomicInteger();
-    var nanos = new java.util.concurrent.atomic.AtomicLong();
+    var nanos = new AtomicLong();
     var load = new ForegroundLoad(); load.started();
     pacing = new IndexingPacing(load, 20, 500L, () -> 0L, () -> nanos.getAndAdd(1_000_000L),
         ms -> { if (paced.incrementAndGet() == 1) running.set(false); });
