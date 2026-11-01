@@ -46,6 +46,7 @@ public final class IngestionReasonCodes {
   public static final String DELETED_OR_MISSING = "DELETED_OR_MISSING";
   public static final String STALE_AFTER_EXTRACTION = "STALE_AFTER_EXTRACTION";
   public static final String DELETED_AFTER_SNAPSHOT = "DELETED_AFTER_SNAPSHOT";
+  public static final String LOST_CLAIM_OWNERSHIP = "LOST_CLAIM_OWNERSHIP";
   public static final String SIZE_CHANGED_AFTER_SNAPSHOT = "SIZE_CHANGED_AFTER_SNAPSHOT";
   public static final String MODIFIED_TIME_CHANGED_AFTER_SNAPSHOT =
       "MODIFIED_TIME_CHANGED_AFTER_SNAPSHOT";

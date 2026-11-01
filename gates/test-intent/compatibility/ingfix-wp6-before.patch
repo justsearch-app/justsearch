@@ -1,0 +1,79 @@
+diff --git a/modules/adapters-lucene/src/main/java/io/justsearch/adapters/lucene/runtime/DocumentFieldOps.java b/modules/adapters-lucene/src/main/java/io/justsearch/adapters/lucene/runtime/DocumentFieldOps.java
+index 3995f120df..25832e272c 100644
+--- a/modules/adapters-lucene/src/main/java/io/justsearch/adapters/lucene/runtime/DocumentFieldOps.java
++++ b/modules/adapters-lucene/src/main/java/io/justsearch/adapters/lucene/runtime/DocumentFieldOps.java
+@@ -598,6 +598,12 @@ public final class DocumentFieldOps {
+     return isUnmodified(docId, currentLastModified, Long.valueOf(currentSizeBytes));
+   }
+ 
++  /** Before-state compatibility: source proof was not consulted. */
++  public boolean isUnmodified(String docId, long currentLastModified, long currentSizeBytes,
++      String sourceSha256) {
++    return isUnmodified(docId, currentLastModified, currentSizeBytes);
++  }
++
+   private boolean isUnmodified(String docId, long currentLastModified, Long currentSizeBytes) {
+     // A complete stale reader is a false positive after committed deletion/replacement. Commit
+     // prepares the reader; retry if another commit overtakes this admission's reader lease.
+diff --git a/modules/worker-core/src/main/java/io/justsearch/indexerworker/queue/JobQueue.java b/modules/worker-core/src/main/java/io/justsearch/indexerworker/queue/JobQueue.java
+index a9ebe960d5..98d5890df6 100644
+--- a/modules/worker-core/src/main/java/io/justsearch/indexerworker/queue/JobQueue.java
++++ b/modules/worker-core/src/main/java/io/justsearch/indexerworker/queue/JobQueue.java
+@@ -210,6 +210,9 @@ public interface JobQueue extends Closeable {
+   record IndexJob(Path path, String collection, EnqueueProvenance provenance,
+       String scanId, String unitRevision, Long walkEpoch, boolean recordedForce,
+       String plannedSourceSha256, Path ingestionRoot) {
++    /** Before-state compatibility: ordinary force had no durable claim field. */
++    public boolean forceReindex() { return false; }
++
+     public IndexJob {
+       if (plannedSourceSha256 != null && !IngestionLedgerTransition.isSha256(plannedSourceSha256)) {
+         throw new IllegalArgumentException("Invalid planned source identity");
+@@ -287,6 +290,9 @@ public interface JobQueue extends Closeable {
+    */
+   record EnqueueEntry(Path path, long sizeBytes, EnqueueProvenance provenance,
+       String plannedSourceSha256, Path ingestionRoot) {
++    /** Before-state compatibility: ordinary admissions carried no force field. */
++    public boolean forceReindex() { return false; }
++
+     public EnqueueEntry {
+       if (plannedSourceSha256 != null && !IngestionLedgerTransition.isSha256(plannedSourceSha256)) {
+         throw new IllegalArgumentException("Invalid captured source identity");
+diff --git a/modules/worker-services/src/main/java/io/justsearch/indexerworker/loop/SourceContentHash.java b/modules/worker-services/src/main/java/io/justsearch/indexerworker/loop/SourceContentHash.java
+index 7e292db453..9788039464 100644
+--- a/modules/worker-services/src/main/java/io/justsearch/indexerworker/loop/SourceContentHash.java
++++ b/modules/worker-services/src/main/java/io/justsearch/indexerworker/loop/SourceContentHash.java
+@@ -15,6 +15,9 @@ public final class SourceContentHash {
+ 
+   private SourceContentHash() {}
+ 
++  /** Before-state compatibility: admission did not collect source proof. */
++  public static String admissionIdentity(Path path, Path root) { return null; }
++
+   public static String sha256(Path path) throws IOException {
+     return sha256(path, () -> false);
+   }
+diff --git a/modules/worker-services/src/main/java/io/justsearch/indexerworker/services/WorkerScanOps.java b/modules/worker-services/src/main/java/io/justsearch/indexerworker/services/WorkerScanOps.java
+index eb086f7e7d..f883768c34 100644
+--- a/modules/worker-services/src/main/java/io/justsearch/indexerworker/services/WorkerScanOps.java
++++ b/modules/worker-services/src/main/java/io/justsearch/indexerworker/services/WorkerScanOps.java
+@@ -75,6 +75,19 @@ final class WorkerScanOps {
+     throw WorkerServiceException.unavailable("RECORDED_GENERATION_GUARD_REQUIRED");
+   }
+ 
++  // Before-state compatibility: the removed force sink receives the old no-op default.
++  WorkerScanOps(JobQueue queue, LongSupplier depth, BooleanSupplier cancelled) {
++    this(queue, depth, cancelled, paths -> {});
++  }
++  WorkerScanOps(JobQueue queue, CloudPlaceholderRecorder recorder, Predicate<Path> placeholder,
++      LongSupplier depth, BooleanSupplier cancelled, BackpressureWaiter waiter) {
++    this(queue, recorder, placeholder, depth, cancelled, waiter, paths -> {});
++  }
++  WorkerScanOps(JobQueue queue, CloudPlaceholderRecorder recorder, Predicate<Path> placeholder,
++      LongSupplier depth, BooleanSupplier cancelled, BackpressureWaiter waiter, Runnable before) {
++    this(queue, recorder, placeholder, depth, cancelled, waiter, paths -> {}, before);
++  }
++
+   /** Production constructor — uses the real cloud-placeholder detector and no-op pacing hooks. */
+   WorkerScanOps(JobQueue jobQueue) {
+     this(

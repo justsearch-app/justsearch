@@ -10,7 +10,6 @@ import static org.mockito.Mockito.verify;
 import io.justsearch.indexerworker.ingest.IngestionOutcome;
 import io.justsearch.indexerworker.loop.IndexingLoop;
 import io.justsearch.indexerworker.queue.JobQueue;
-import io.justsearch.indexerworker.util.PathNormalizer;
 import io.justsearch.ipc.BatchRequest;
 import io.justsearch.ipc.ScanMode;
 import io.justsearch.ipc.ScanRootProgress;
@@ -20,26 +19,12 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
-import java.util.Set;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
-import org.mockito.ArgumentCaptor;
 
-/**
- * Tempdoc 821 §3-C3 — the RPC-entry wiring between a {@code SCAN_MODE_FORCE_REINDEX} request and
- * {@code IndexingLoop.markForced}.
- *
- * <p>{@code WorkerScanOpsTest} pins that a forced scan feeds its {@code ForcedPathSink}, and
- * {@code JobBatchExtractorForcedPathTest} pins that a path in that set bypasses the UNCHANGED
- * branch. Neither sees the one line that connects them ({@code WorkerIngestService#scanRoot}) — a
- * sink wired to a no-op there would leave both green while force-reindex stayed inert.
- *
- * <p>It also pins the reason that line is a lambda rather than {@code indexingLoop::markForced}: a
- * method reference dereferences its receiver when the sink is CREATED, so an ordinary scan would
- * start depending on a field only the forced branch uses.
- */
-@DisplayName("WorkerIngestService.scanRoot — force-reindex marking")
+/** Both public entry points put force in the queue admission before it can be consumed. */
+@DisplayName("WorkerIngestService.scanRoot — durable force admission")
 final class WorkerIngestServiceForceReindexWiringTest {
 
   @TempDir Path tempDir;
@@ -75,46 +60,36 @@ final class WorkerIngestServiceForceReindexWiringTest {
   }
 
   @Test
-  @DisplayName("a FORCE_REINDEX scan marks its admitted paths through IndexingLoop.markForced")
-  void forceReindexScanReachesMarkForced() throws Exception {
+  // "a FORCE_REINDEX scan admits force atomically"
+  void forceReindexScanAdmitsForceAtomically() throws Exception {
     Path root = Files.createDirectories(tempDir.resolve("forced"));
     Path a = Files.writeString(root.resolve("a.txt"), "alpha");
     IndexingLoop loop = mock(IndexingLoop.class);
 
-    scan(serviceWith(new RecordingQueue(), loop), root, ScanMode.SCAN_MODE_FORCE_REINDEX);
+    RecordingQueue queue = new RecordingQueue();
+    scan(serviceWith(queue, loop), root, ScanMode.SCAN_MODE_FORCE_REINDEX);
 
-    @SuppressWarnings("unchecked")
-    ArgumentCaptor<Collection<String>> captor = ArgumentCaptor.forClass(Collection.class);
-    verify(loop).markForced(captor.capture());
-    assertEquals(
-        Set.of(PathNormalizer.normalizeKey(a)),
-        Set.copyOf(captor.getValue()),
-        "the key must be the one JobBatchExtractor looks the path up by");
+    assertEquals(List.of(a), queue.enqueuedPaths);
+    org.junit.jupiter.api.Assertions.assertTrue(queue.entries.getFirst().forceReindex());
+    verify(loop, never()).markForced(any());
   }
 
   @Test
-  @DisplayName("submitBatch(force_reindex) marks the envelope's key, not a hand-rolled variant")
-  void submitBatchForceReindexMarksTheEnvelopeKey() throws Exception {
+  // "submitBatch(force_reindex) admits force atomically"
+  void submitBatchAdmitsForceAtomically() throws Exception {
     Path file = Files.writeString(tempDir.resolve("b.txt"), "beta");
     IndexingLoop loop = mock(IndexingLoop.class);
 
-    submit(serviceWith(new RecordingQueue(), loop), file, true);
+    RecordingQueue queue = new RecordingQueue();
+    submit(serviceWith(queue, loop), file, true);
 
-    @SuppressWarnings("unchecked")
-    ArgumentCaptor<Collection<String>> captor = ArgumentCaptor.forClass(Collection.class);
-    verify(loop).markForced(captor.capture());
-    // Tempdoc 821 §P/P3: the batch API's force path used to spell its own derivation here
-    // (absolutize, never normalize). Binding the seam to PathNormalizer#normalizeKey is what keeps
-    // it agreeing with FileFreshnessSnapshot.capture — the only producer of the key the extractor
-    // looks up. JobBatchExtractorForcedPathTest carries the behavioural arms.
-    assertEquals(
-        Set.of(PathNormalizer.normalizeKey(file)),
-        Set.copyOf(captor.getValue()),
-        "the key must be the one JobBatchExtractor looks the path up by");
+    assertEquals(List.of(file), queue.enqueuedPaths);
+    org.junit.jupiter.api.Assertions.assertTrue(queue.entries.getFirst().forceReindex());
+    verify(loop, never()).markForced(any());
   }
 
   @Test
-  @DisplayName("submitBatch without force_reindex marks nothing")
+  // "submitBatch without force_reindex marks nothing"
   void submitBatchWithoutForceReindexMarksNothing() throws Exception {
     Path file = Files.writeString(tempDir.resolve("b.txt"), "beta");
     IndexingLoop loop = mock(IndexingLoop.class);
@@ -129,7 +104,7 @@ final class WorkerIngestServiceForceReindexWiringTest {
   }
 
   @Test
-  @DisplayName("an INITIAL scan marks nothing — and does not even touch the indexing loop")
+  // "an INITIAL scan marks nothing — and does not even touch the indexing loop"
   void initialScanDoesNotMarkAnything() throws Exception {
     Path root = Files.createDirectories(tempDir.resolve("plain"));
     Files.writeString(root.resolve("a.txt"), "alpha");
@@ -147,6 +122,14 @@ final class WorkerIngestServiceForceReindexWiringTest {
   /** Minimal queue that records what the walk enqueued. */
   private static final class RecordingQueue implements JobQueue {
     final List<Path> enqueuedPaths = new ArrayList<>();
+    final List<EnqueueEntry> entries = new ArrayList<>();
+
+    @Override
+    public int enqueueEntries(List<EnqueueEntry> admitted, String collection) {
+      entries.addAll(admitted);
+      return enqueue(EnqueueEntry.paths(admitted), collection);
+    }
+
 
     @Override
     public void open() {}

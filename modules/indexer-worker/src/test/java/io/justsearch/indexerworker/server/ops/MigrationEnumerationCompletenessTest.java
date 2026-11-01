@@ -165,6 +165,57 @@ final class MigrationEnumerationCompletenessTest {
   }
 
   @Test
+  void restartedEnumerationRetainsCompletedCoverageAndAdmitsOnlyNewFiles(@TempDir Path directory)
+      throws Exception {
+    Path root = Files.createDirectory(directory.resolve("sources"));
+    Files.writeString(root.resolve("completed.txt"), "completed source");
+    Path db = directory.resolve("jobs.db");
+    var manager = mock(IndexGenerationManager.class);
+    when(manager.readStateBestEffort()).thenReturn(new IndexGenerationManager.State(
+        2, "g-active", "g-building", null, "MIGRATING", false, null, null,
+        System.currentTimeMillis(), null, null, null));
+    List<io.justsearch.indexerworker.queue.SwitchBufferCapableQueue.SwitchBufferOp> receipts;
+    try (var queue = new SqliteJobQueue(db)) {
+      queue.open();
+      var counters = new Counters();
+      var context = new KnowledgeServerMigrationOps.EnqueueContext(
+          List.of(new ResolvedConfig.FileSource(root, "docs")), queue, () -> true, () -> manager,
+          counters.filesSeen, counters.filesEnqueued, counters.rootsDone, counters.lastPath,
+          () -> null, () -> null, ignored -> {}, LoggerFactory.getLogger(getClass()));
+      assertEquals(1, KnowledgeServerMigrationOps.enqueueAllFilesUnderRoots(context));
+      var claim = queue.pollPending(1).getFirst();
+      queue.markDoneTransitions(List.of(new JobQueue.IngestionLedgerTransition(
+          claim, null, claim.plannedSourceSha256())),
+          io.justsearch.indexerworker.ingest.IngestionOutcome.of(
+              io.justsearch.indexerworker.ingest.IngestionOutcomeClass.SUCCESS_FULL,
+              io.justsearch.indexerworker.ingest.IngestionReasonCodes.SUCCESS,
+              io.justsearch.indexerworker.ingest.IngestionRetryPolicy.NONE, "published"));
+      receipts = queue.listSwitchBufferOpsStrictForGeneration("g-building");
+      assertEquals(0, queue.queueDepth());
+      assertEquals(1, KnowledgeServerMigrationOps.enqueueAllFilesUnderRoots(context));
+      assertEquals(receipts, queue.listSwitchBufferOpsStrictForGeneration("g-building"));
+      assertEquals(0, queue.queueDepth(), "completed coverage must not become fresh pending work");
+    }
+    try (var queue = new SqliteJobQueue(db)) {
+      queue.open();
+      Path added = Files.writeString(root.resolve("new.txt"), "new source");
+      var counters = new Counters();
+      var context = new KnowledgeServerMigrationOps.EnqueueContext(
+          List.of(new ResolvedConfig.FileSource(root, "docs")), queue, () -> true, () -> manager,
+          counters.filesSeen, counters.filesEnqueued, counters.rootsDone, counters.lastPath,
+          () -> null, () -> null, ignored -> {}, LoggerFactory.getLogger(getClass()));
+      assertEquals(2, KnowledgeServerMigrationOps.enqueueAllFilesUnderRoots(context));
+      assertEquals(2, counters.filesSeen.get());
+      assertEquals(2, counters.filesEnqueued.get(), "retained work still counts toward enumeration coverage");
+      assertEquals(1, counters.rootsDone.get());
+      var replay = queue.listSwitchBufferOpsStrictForGeneration("g-building");
+      assertTrue(replay.containsAll(receipts));
+      assertEquals(1, queue.queueDepth());
+      assertEquals(added, queue.pollPending(1).getFirst().path());
+    }
+  }
+
+  @Test
   void resumedEnumerationReplacesTheCandidateWitnessWithItsNewAcceptedBytes(
       @TempDir Path directory) throws Exception {
     Path file = Files.writeString(directory.resolve("source.txt"), "first");

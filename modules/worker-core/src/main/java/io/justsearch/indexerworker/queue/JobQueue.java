@@ -209,12 +209,18 @@ public interface JobQueue extends Closeable {
    */
   record IndexJob(Path path, String collection, EnqueueProvenance provenance,
       String scanId, String unitRevision, Long walkEpoch, boolean recordedForce,
-      String plannedSourceSha256, Path ingestionRoot) {
+      String plannedSourceSha256, Path ingestionRoot, boolean forceReindex) {
     public IndexJob {
       if (plannedSourceSha256 != null && !IngestionLedgerTransition.isSha256(plannedSourceSha256)) {
         throw new IllegalArgumentException("Invalid planned source identity");
       }
       if (recordedForce && walkEpoch == null) throw new IllegalArgumentException("Recorded force requires recorded membership");
+    }
+    public IndexJob(Path path, String collection, EnqueueProvenance provenance,
+        String scanId, String unitRevision, Long walkEpoch, boolean recordedForce,
+        String plannedSourceSha256, Path ingestionRoot) {
+      this(path, collection, provenance, scanId, unitRevision, walkEpoch, recordedForce,
+          plannedSourceSha256, ingestionRoot, false);
     }
     public IndexJob(Path path, String collection, EnqueueProvenance provenance,
         String scanId, String unitRevision, Long walkEpoch, boolean recordedForce,
@@ -286,7 +292,7 @@ public interface JobQueue extends Closeable {
    * @param sizeBytes byte size at enqueue time, or {@link #UNKNOWN_SIZE_BYTES} when unknown
    */
   record EnqueueEntry(Path path, long sizeBytes, EnqueueProvenance provenance,
-      String plannedSourceSha256, Path ingestionRoot) {
+      String plannedSourceSha256, Path ingestionRoot, boolean forceReindex) {
     public EnqueueEntry {
       if (plannedSourceSha256 != null && !IngestionLedgerTransition.isSha256(plannedSourceSha256)) {
         throw new IllegalArgumentException("Invalid captured source identity");
@@ -300,13 +306,23 @@ public interface JobQueue extends Closeable {
     }
 
     public EnqueueEntry(Path path, long sizeBytes, EnqueueProvenance provenance,
+        String plannedSourceSha256, Path ingestionRoot) {
+      this(path, sizeBytes, provenance, plannedSourceSha256, ingestionRoot, false);
+    }
+
+    /** Force belongs to this admission and is installed atomically with it. */
+    public EnqueueEntry withForceReindex(boolean force) {
+      return new EnqueueEntry(path, sizeBytes, provenance, plannedSourceSha256, ingestionRoot, force);
+    }
+
+    public EnqueueEntry(Path path, long sizeBytes, EnqueueProvenance provenance,
         String plannedSourceSha256) {
       this(path, sizeBytes, provenance, plannedSourceSha256, null);
     }
 
     /** Root-relative directory policy boundary; this is not a filesystem identity witness. */
     public EnqueueEntry withinRoot(Path root) {
-      return new EnqueueEntry(path, sizeBytes, provenance, plannedSourceSha256, root);
+      return new EnqueueEntry(path, sizeBytes, provenance, plannedSourceSha256, root, forceReindex);
     }
 
     public EnqueueEntry(Path path, long sizeBytes, EnqueueProvenance provenance) {
@@ -478,7 +494,7 @@ public interface JobQueue extends Closeable {
   }
 
   /**
-   * Automatic discovery keeps terminal failures and parser/I/O waits; explicit retries use normal admission.
+   * Automatic discovery preserves unchanged queued work and retry history; explicit retries use normal admission.
    * Returns actual changed rows. Failures must throw so callers can distinguish preserved no-ops.
    */
   default int enqueueMaintenanceScanEntries(List<EnqueueEntry> entries, String collection, String scanId) {
