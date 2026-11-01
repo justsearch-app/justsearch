@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.*;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 import io.justsearch.app.engine.EngineRoot;
+import io.justsearch.app.api.EngineAdmissionService;
 import io.justsearch.app.services.vdu.ImagePreparer;
 import io.justsearch.app.services.intent.EngineProvenance;
 import io.justsearch.app.services.worker.IpcTelemetry;
@@ -156,7 +157,7 @@ class VduBatchProcessorE2ETest {
     assertTrue(client.isHealthy(TEST_ENGINE_CONTEXT), "Engine should be healthy");
 
     // Create testable VDU processor
-    vduProcessor = new TestableVduBatchProcessor(llamaClient, client);
+    vduProcessor = new TestableVduBatchProcessor(llamaClient, client, engine.admission());
   }
 
   @AfterEach
@@ -357,9 +358,18 @@ class VduBatchProcessorE2ETest {
         "❌ Failure reason should NOT be blank - errors must be logged");
     log.info("Failure reason captured: {}", result.lastFailureReason());
 
-    // 6. Verify no longer pending (marked as FAILED) - poll to handle searcher refresh
+    // An ordinary failure leaves the document eligible while allowance remains.
+    assertTrue(awaitPending(docId, 5_000), "First failure must retain the remaining retry allowance");
+    for (int attempt = 2; attempt <= TestableVduBatchProcessor.MAX_RETRIES; attempt++) {
+      var retry = vduProcessor.processPendingFilesWithResults();
+      assertEquals(1, retry.failedCount(), "Each ordinary pass retries the invalid image");
+      assertEquals(0, retry.processedCount());
+      if (attempt < TestableVduBatchProcessor.MAX_RETRIES) {
+        assertTrue(awaitPending(docId, 5_000), "Remaining allowance keeps the document pending");
+      }
+    }
     assertTrue(awaitNotPending(docId, 5_000),
-        "Failed document should not be in pending list");
+        "Exhausted document should not be in pending list");
 
     log.info("✅ Invalid image test PASSED: failure properly recorded");
   }
@@ -648,11 +658,13 @@ class VduBatchProcessorE2ETest {
     private final ExternalLlamaServerClient llamaClient;
     private final KnowledgeClient knowledgeClient;
     private final ImagePreparer imagePreparer;
+    private final EngineAdmissionService admission;
 
     TestableVduBatchProcessor(
-        ExternalLlamaServerClient llamaClient, KnowledgeClient knowledgeClient) {
+        ExternalLlamaServerClient llamaClient, KnowledgeClient knowledgeClient, EngineAdmissionService admission) {
       this.llamaClient = llamaClient;
       this.knowledgeClient = knowledgeClient;
+      this.admission = admission;
       this.imagePreparer = new ImagePreparer();
     }
 
@@ -674,7 +686,13 @@ class VduBatchProcessorE2ETest {
      * @return ProcessingResult containing counts and captured outputs
      */
     ProcessingResult processPendingFilesWithResults() {
-      List<String> pending = knowledgeClient.queryPendingVduDocIds(100, VDU_ENGINE_CONTEXT);
+      try (var work = admission.admit(VDU_ENGINE_CONTEXT, false)) {
+        return processPendingFilesWithResults(work.context());
+      }
+    }
+
+    private ProcessingResult processPendingFilesWithResults(EngineContext context) {
+      List<String> pending = knowledgeClient.queryPendingVduDocIds(100, context);
       log.info("Processing {} pending VDU files", pending.size());
 
       int processed = 0;
@@ -686,9 +704,10 @@ class VduBatchProcessorE2ETest {
       String lastFailureReason = "";
 
       for (String docId : pending) {
+        String attemptId = java.util.UUID.randomUUID().toString();
         try {
           // Mark as PROCESSING (with retry protection)
-          int retryCount = knowledgeClient.markVduProcessing(docId, MAX_RETRIES, VDU_ENGINE_CONTEXT);
+          int retryCount = knowledgeClient.markVduProcessing(docId, MAX_RETRIES, attemptId, context);
           if (retryCount < 0) {
             log.warn("Skipping {} - max retries exceeded", docId);
             lastFailureReason = "Max retries exceeded";
@@ -700,13 +719,14 @@ class VduBatchProcessorE2ETest {
           Path filePath = Path.of(docId);
           if (!Files.exists(filePath)) {
             lastFailureReason = "File no longer exists: " + docId;
-            markFailed(docId, lastFailureReason);
+            markFailed(docId, attemptId, lastFailureReason, context);
             failed++;
             continue;
           }
 
           // Process with real LLM
           log.info("Processing {} (retry {})", docId, retryCount);
+          String sourceSha256 = io.justsearch.indexerworker.loop.SourceContentHash.sha256(filePath);
           VduResult result = processFile(filePath);
 
           // Capture results for verification
@@ -722,7 +742,8 @@ class VduBatchProcessorE2ETest {
               VduUpdateOutcome.VDU_UPDATE_OUTCOME_SUCCESS_TEXT,
               result.enrichment(),
               result.pageCount(),
-              VDU_ENGINE_CONTEXT);
+              attemptId, sourceSha256, false,
+              context);
 
           if (updated) {
             processed++;
@@ -737,7 +758,7 @@ class VduBatchProcessorE2ETest {
         } catch (Exception e) {
           log.error("VDU processing failed for {}: {}", docId, e.getMessage());
           lastFailureReason = e.getMessage();
-          markFailed(docId, e.getMessage());
+          markFailed(docId, attemptId, e.getMessage(), context);
           failed++;
         }
       }
@@ -772,7 +793,7 @@ class VduBatchProcessorE2ETest {
       return new VduResult(extractedText, enrichment, 1);
     }
 
-    private void markFailed(String docId, String reason) {
+    private void markFailed(String docId, String attemptId, String reason, EngineContext context) {
       String safeReason = reason.replace("\"", "'");
       knowledgeClient.updateVduResult(
           docId,
@@ -780,7 +801,8 @@ class VduBatchProcessorE2ETest {
           VduUpdateOutcome.VDU_UPDATE_OUTCOME_FAILED,
           "{\"error\": \"" + safeReason + "\"}",
           0,
-          VDU_ENGINE_CONTEXT);
+          attemptId,
+          context);
     }
 
     record VduResult(String extractedText, String enrichment, int pageCount) {}

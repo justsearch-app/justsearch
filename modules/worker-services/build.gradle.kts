@@ -7,11 +7,6 @@ plugins {
 }
 
 dependencies {
-  testImplementation(project(":modules:app-services")) { isTransitive = false }
-  testImplementation(project(":modules:app-util")) { isTransitive = false }
-  testImplementation(project(":modules:gpu-bridge")) { isTransitive = false }
-  testRuntimeOnly(project(":modules:app-inference")) { isTransitive = false }
-  testRuntimeOnly(project(":modules:ai-backend")) { isTransitive = false }
   testImplementation(testFixtures(project(":modules:adapters-lucene")))
   testImplementation(testFixtures(project(":modules:core")))
   api(project(":modules:app-api"))

@@ -223,6 +223,62 @@ class VduFallbackPublicationTest extends LuceneExecutorTestBase {
     }
   }
 
+  @ParameterizedTest
+  @ValueSource(ints = {0, SchemaFields.VDU_MAX_RETRIES - 1})
+  void eligibilityLossPersistsClaimReleaseAndRefundThenAllowsOrdinaryRetry(int spent) throws Exception {
+    Path source = pdf(2, false);
+    Map<String, String> before;
+    Map<String, Map<String, String>> baselineChunks;
+    try (var runtime = open(); var files = new TempFileManager(directory.resolve("images"))) {
+      seed(runtime, source, baseline);
+      runtime.indexingCoordinator().updateDocument(id,
+          Map.of(SchemaFields.VDU_RETRY_COUNT, Integer.toString(spent)));
+      refresh(runtime);
+      before = descriptors(runtime);
+      baselineChunks = chunks(runtime);
+      var ai = model("stop", transcription);
+      doAnswer(call -> {
+        calls.incrementAndGet();
+        eligible.set(false);
+        return CompletableFuture.completedFuture(
+            new OnlineAiService.VisionCompletionResult(transcription, "stop", 20, -0.02, 0.0));
+      }).when(ai).visionCompletionDetailed(anyString(), any(byte[].class), anyInt(), any(), any(), any());
+      var outcome = batch(service(runtime), processor(files, ai))
+          .processPendingFiles(ctx.engineContext(), ignored -> {});
+      assertEquals(OfflineProcessingOutcome.BlockReason.ACTIVITY_OR_ENERGY, outcome.blockedReason(), "S-D46/C19");
+      assertEquals(1, calls.get(), "eligibility loss prevents page two");
+      assertEquals(0, metadataCalls.get());
+      assertEquals(0, outcome.processed());
+      assertEquals(0, outcome.failed());
+      assertTrue(writes.isEmpty(), "deferral must not publish a partial success or failure");
+      assertEquals("PENDING", field(runtime, SchemaFields.VDU_STATUS), "owned claim is released");
+      assertEquals(Integer.toString(spent), field(runtime, SchemaFields.VDU_RETRY_COUNT), "deferral refunds the attempt");
+      assertEquals(before, descriptors(runtime));
+      assertEquals(baselineChunks, chunks(runtime));
+      assertSearchable("uniquepage51");
+    }
+    eligible.set(true);
+    try (var runtime = open(); var files = new TempFileManager(directory.resolve("retry-images"))) {
+      assertEquals("PENDING", field(runtime, SchemaFields.VDU_STATUS), "claim release survives reopen");
+      assertEquals(Integer.toString(spent), field(runtime, SchemaFields.VDU_RETRY_COUNT), "refund survives reopen");
+      assertEquals(before, descriptors(runtime));
+      assertEquals(baselineChunks, chunks(runtime));
+      var service = service(runtime);
+      assertEquals(List.of(id), service.queryPendingVdu(
+          QueryPendingVduRequest.newBuilder().setLimit(100).build(), ctx).getDocIdsList());
+      assertEquals(1, batch(service, processor(files, "stop", transcription))
+          .processPendingFiles(ctx.engineContext(), ignored -> {}).processed(), "ordinary eligible pass reclaims the document");
+      assertEquals(3, calls.get(), "the later pass processes both pages");
+      assertEquals(Integer.toString(spent + 1), field(runtime, SchemaFields.VDU_RETRY_COUNT));
+      assertEquals("COMPLETED", field(runtime, SchemaFields.VDU_STATUS));
+      assertSearchable("acceptedvisiontoken");
+    }
+    try (var runtime = open()) {
+      assertEquals("COMPLETED", field(runtime, SchemaFields.VDU_STATUS));
+      assertSearchable("acceptedvisiontoken");
+    }
+  }
+
   @Test
   void metadataFallbackDoesNotConcealSourceOrPublicationRefusal() throws Exception {
     Path source = pdf(1, false);
