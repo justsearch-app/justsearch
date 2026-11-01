@@ -213,6 +213,7 @@ def start_snapshot(snapshot):
         vm.ensure_free(check_lock=False)
         folder = vm.ROOT / 'windows'
         disk, variables = folder / 'run.qcow2', folder / 'run-vars.fd'
+        vm.admit_disk()
         disk.unlink(missing_ok=True); variables.unlink(missing_ok=True)
         try:
             vm.run('qemu-img', 'create', '-q', '-f', 'qcow2', '-F', 'qcow2',
@@ -226,6 +227,7 @@ def start_snapshot(snapshot):
 
 
 def seal_snapshot(out, started, inode, args, phase):
+    vm.snapshot_destination(out)
     with vm.locked():
         vm.ensure_free(check_lock=False)
         disk = Path(started['disk'])
@@ -239,6 +241,7 @@ def seal_snapshot(out, started, inode, args, phase):
         shutil.copyfile(out / 'quiet-verify.json', snapshot / 'quiet-verify.json')
         (snapshot / 'manifest.json').write_text(json.dumps({'kind': 'application', 'pins': pins(args, phase),
             'sourceSummary': str((out / 'summary.json').resolve())}, indent=2) + '\n')
+        vm.record_snapshot(out, snapshot / 'disk.qcow2')
 
 
 def provision(args, out):
@@ -341,6 +344,7 @@ Path('C:/Qual/crash-access.json').write_text(json.dumps(result,indent=2))
 
 def prepare_setup(args, out, source=None):
     """No app journeys: cache unchanged inputs, reboot, verify, then rename."""
+    vm.snapshot_destination(out)
     out.mkdir(parents=True, exist_ok=False)
     started = budget = None
     volumes = []
@@ -419,10 +423,12 @@ def prepare_setup(args, out, source=None):
             'edgeDriver': json.loads((out / 'webdriver-versions.json').read_text())}, indent=2) + '\n')
         (out / 'summary.json').write_text(json.dumps({'status': 'setup-ready', 'journeysExecuted': False,
             'writeVolume': volumes, 'guestSettings': 'quiet-verify.json'}, indent=2) + '\n')
+        vm.record_snapshot(out, out / 'disk.qcow2')
         return 0
     except Exception as exc:
-        (out / 'summary.json').write_text(json.dumps({'status': 'failed-infrastructure', 'reason': str(exc),
-            'journeysExecuted': False, 'writeVolume': volumes}, indent=2) + '\n')
+        (out / 'summary.json').write_text(json.dumps(vm.storage_failure(
+            {'status': 'failed-infrastructure', 'reason': str(exc),
+             'journeysExecuted': False, 'writeVolume': volumes}, exc), indent=2) + '\n')
         return 1
     finally:
         if budget:
@@ -573,6 +579,8 @@ def execute(args, out, phase, journeys, snapshot, budget=None):
 
 
 def run_overlay(args, out, phase, journeys, snapshot=None, seal=False):
+    if seal:
+        vm.snapshot_destination(out)
     out.mkdir(parents=True, exist_ok=False)
     started = None
     budget = None
@@ -606,7 +614,8 @@ def run_overlay(args, out, phase, journeys, snapshot=None, seal=False):
         return execute(args, out, phase, journeys, snapshot, budget)
     except Exception as exc:
         lane = 'hosted-windows' if args.session == 'hosted' else 'vm-windows'
-        (out / 'summary.json').write_text(json.dumps(preparation_failure(lane, str(exc)), indent=2) + '\n')
+        (out / 'summary.json').write_text(json.dumps(vm.storage_failure(
+            preparation_failure(lane, str(exc)), exc), indent=2) + '\n')
         (out / 'wrapper-error.txt').write_text(repr(exc) + '\n')
         return 1
     finally:
@@ -676,6 +685,7 @@ def combine(args, out, sources):
                         for key in ('guestWrittenBytes', 'hostQemuWrittenBytes', 'overlayGrowthBytes')},
             'complete': all(all(key in s.get('writeVolume', {}) for key in ('guestWrittenBytes', 'hostQemuWrittenBytes', 'overlayGrowthBytes')) for s in sources.values()),
             'source': 'guest raw bytes and QEMU process write_bytes through pre-shutdown; final overlay allocation growth; every overlay'},
+        storage=vm.combined_storage(sources),
         **summarize(rows, complete))
     (out / 'summary.json').write_text(json.dumps(report, indent=2) + '\n')
     return report_exit_code(report)
@@ -696,6 +706,7 @@ def main():
     parser.add_argument('--snapshot', type=Path)
     parser.add_argument('--setup-snapshot', type=Path, help='Reboot-verified tool/input snapshot; required for fresh runs')
     args = parser.parse_args()
+    vm.snapshot_destination(args.evidence)
     vm.owner()
     ids = {j['id'] for j in json.loads((HERE / 'journeys.json').read_text())['journeys']}
     if args.journeys and not set(args.journeys) <= ids:
@@ -718,7 +729,7 @@ def main():
     def stage(name, phase, journeys, snapshot=None, seal=False):
         run_overlay(args, out / name, phase, journeys, snapshot, seal)
         sources[name] = json.loads((out / name / 'summary.json').read_text())
-        return not any(row['id'] == 'write-budget' for row in sources[name]['journeys'])
+        return not any(row['id'] in ('write-budget', 'storage-budget') for row in sources[name]['journeys'])
     if args.mode == 'rerun':
         phase = json.loads((args.snapshot / 'manifest.json').read_text())['pins']['phase']
         stage('rerun', phase, args.journeys, args.snapshot, seal=True)
