@@ -191,39 +191,6 @@ final class WorkerIngestServiceVduHardeningTest extends io.justsearch.adapters.l
   }
 
   @Nested
-  @DisplayName("Ordinary failure retry allowance")
-  class OrdinaryFailureRetryAllowance {
-
-    @Test
-    @DisplayName("ordinary failures remain pending until the retry allowance is exhausted")
-    void ordinaryFailuresRemainPendingUntilAllowanceExhausted() throws Exception {
-      String docId = indexTestDocument("doc6");
-
-      UpdateVduResultRequest request = UpdateVduResultRequest.newBuilder()
-          .setDocId(docId)
-          .setExtractedContent("")
-          .setVduStatus(SchemaFields.VDU_STATUS_FAILED)
-          .setVduEnrichment("{\"error\":\"extraction_timeout\"}")
-          .setPageCount(0)
-          .build();
-
-      for (int attempt = 1; attempt <= SchemaFields.VDU_MAX_RETRIES; attempt++) {
-        UpdateVduResultResponse response = updateWithClaim(request);
-        assertTrue(response.getSuccess(), response.getError());
-        boolean exhausted = attempt == SchemaFields.VDU_MAX_RETRIES;
-        assertEquals(exhausted ? SchemaFields.VDU_STATUS_FAILED : SchemaFields.VDU_STATUS_PENDING,
-            lifecycle.documentFieldOps().getDocumentField(docId, SchemaFields.VDU_STATUS));
-        assertEquals(Integer.toString(attempt),
-            lifecycle.documentFieldOps().getDocumentField(docId, SchemaFields.VDU_RETRY_COUNT));
-        assertEquals(exhausted ? List.of() : List.of(docId), service.queryPendingVdu(
-            io.justsearch.ipc.QueryPendingVduRequest.newBuilder().setLimit(100).build(), CallContext.none()).getDocIdsList());
-        assertEquals("{\"error\":\"extraction_timeout\"}",
-            lifecycle.documentFieldOps().getDocumentField(docId, SchemaFields.VDU_ENRICHMENT));
-      }
-    }
-  }
-
-  @Nested
   @DisplayName("REJECTED_SUSPECT_TEXT retains baseline (tempdoc 677 abstention gate)")
   class RejectedSuspectTextSemantics {
 
@@ -356,31 +323,7 @@ final class WorkerIngestServiceVduHardeningTest extends io.justsearch.adapters.l
           "SUCCESS_EMPTY should not trigger embedding");
     }
 
-    @Test
-    @DisplayName("FAILED does not overwrite content")
-    void failedDoesNotOverwriteContent() throws Exception {
-      String docId = indexTestDocument("outcome4");
-      String originalContent = lifecycle.documentFieldOps().getDocumentContent(docId);
 
-      UpdateVduResultRequest request = UpdateVduResultRequest.newBuilder()
-          .setDocId(docId)
-          .setOutcome(VduUpdateOutcome.VDU_UPDATE_OUTCOME_FAILED)
-          .setVduEnrichment("{\"error\":\"timeout\"}")
-          .setPageCount(0)
-          .build();
-
-      for (int attempt = 1; attempt <= SchemaFields.VDU_MAX_RETRIES; attempt++) {
-        UpdateVduResultResponse response = updateWithClaim(request);
-        assertTrue(response.getSuccess(), response.getError());
-        assertEquals(attempt == SchemaFields.VDU_MAX_RETRIES
-                ? SchemaFields.VDU_STATUS_FAILED : SchemaFields.VDU_STATUS_PENDING,
-            lifecycle.documentFieldOps().getDocumentField(docId, SchemaFields.VDU_STATUS));
-        assertEquals(Integer.toString(attempt),
-            lifecycle.documentFieldOps().getDocumentField(docId, SchemaFields.VDU_RETRY_COUNT));
-        assertEquals(originalContent, lifecycle.documentFieldOps().getDocumentContent(docId),
-            "Every failed attempt must preserve content, including exhaustion");
-      }
-    }
 
     @Test
     @DisplayName("outcome takes precedence over legacy vdu_status")
@@ -708,6 +651,60 @@ final class WorkerIngestServiceVduHardeningTest extends io.justsearch.adapters.l
       var response = switching.updateVduResult(request, CallContext.none());
       org.junit.jupiter.api.Assertions.assertFalse(response.getSuccess());
       assertEquals(0, jobQueue.switchBufferDepth(), "invalid input must not create accepted replay work");
+    }
+  }
+
+  @Test
+  // ordinary failures remain pending until the retry allowance is exhausted
+  void ordinaryFailuresRemainPendingUntilAllowanceExhausted() throws Exception {
+    String docId = indexTestDocument("doc6");
+
+    UpdateVduResultRequest request = UpdateVduResultRequest.newBuilder()
+        .setDocId(docId)
+        .setExtractedContent("")
+        .setVduStatus(SchemaFields.VDU_STATUS_FAILED)
+        .setVduEnrichment("{\"error\":\"extraction_timeout\"}")
+        .setPageCount(0)
+        .build();
+
+    for (int attempt = 1; attempt <= SchemaFields.VDU_MAX_RETRIES; attempt++) {
+      UpdateVduResultResponse response = updateWithClaim(request);
+      assertTrue(response.getSuccess(), response.getError());
+      boolean exhausted = attempt == SchemaFields.VDU_MAX_RETRIES;
+      assertEquals(exhausted ? SchemaFields.VDU_STATUS_FAILED : SchemaFields.VDU_STATUS_PENDING,
+          lifecycle.documentFieldOps().getDocumentField(docId, SchemaFields.VDU_STATUS));
+      assertEquals(Integer.toString(attempt),
+          lifecycle.documentFieldOps().getDocumentField(docId, SchemaFields.VDU_RETRY_COUNT));
+      assertEquals(exhausted ? List.of() : List.of(docId), service.queryPendingVdu(
+          io.justsearch.ipc.QueryPendingVduRequest.newBuilder().setLimit(100).build(), CallContext.none()).getDocIdsList());
+      assertEquals("{\"error\":\"extraction_timeout\"}",
+          lifecycle.documentFieldOps().getDocumentField(docId, SchemaFields.VDU_ENRICHMENT));
+    }
+  }
+
+  @Test
+  // FAILED does not overwrite content
+  void failedDoesNotOverwriteContent() throws Exception {
+    String docId = indexTestDocument("outcome4");
+    String originalContent = lifecycle.documentFieldOps().getDocumentContent(docId);
+
+    UpdateVduResultRequest request = UpdateVduResultRequest.newBuilder()
+        .setDocId(docId)
+        .setOutcome(VduUpdateOutcome.VDU_UPDATE_OUTCOME_FAILED)
+        .setVduEnrichment("{\"error\":\"timeout\"}")
+        .setPageCount(0)
+        .build();
+
+    for (int attempt = 1; attempt <= SchemaFields.VDU_MAX_RETRIES; attempt++) {
+      UpdateVduResultResponse response = updateWithClaim(request);
+      assertTrue(response.getSuccess(), response.getError());
+      assertEquals(attempt == SchemaFields.VDU_MAX_RETRIES
+              ? SchemaFields.VDU_STATUS_FAILED : SchemaFields.VDU_STATUS_PENDING,
+          lifecycle.documentFieldOps().getDocumentField(docId, SchemaFields.VDU_STATUS));
+      assertEquals(Integer.toString(attempt),
+          lifecycle.documentFieldOps().getDocumentField(docId, SchemaFields.VDU_RETRY_COUNT));
+      assertEquals(originalContent, lifecycle.documentFieldOps().getDocumentContent(docId),
+          "Every failed attempt must preserve content, including exhaustion");
     }
   }
 

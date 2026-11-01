@@ -70,7 +70,7 @@ class VduMutationCommitTest extends LuceneExecutorTestBase {
     }
   }
 
-  @ParameterizedTest
+  @ParameterizedTest(name = "{displayName} [{index}] {arguments}")
   @EnumSource(value = VduUpdateOutcome.class, names = {
       "VDU_UPDATE_OUTCOME_SUCCESS_TEXT", "VDU_UPDATE_OUTCOME_SUCCESS_EMPTY",
       "VDU_UPDATE_OUTCOME_FAILED", "VDU_UPDATE_OUTCOME_REJECTED_SUSPECT_TEXT"})

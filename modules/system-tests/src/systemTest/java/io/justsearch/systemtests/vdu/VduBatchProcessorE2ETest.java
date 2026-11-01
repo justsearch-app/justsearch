@@ -325,7 +325,7 @@ class VduBatchProcessorE2ETest {
   }
 
   @Test
-  @DisplayName("invalid image reaches FAILED status with proper error handling")
+  // invalid image reaches FAILED status with proper error handling
   void invalidImageReachesFailed() throws Exception {
     // 1. Create an invalid "image" (text file with .png extension)
     Path invalidImage = testImageDir.resolve("invalid.png");

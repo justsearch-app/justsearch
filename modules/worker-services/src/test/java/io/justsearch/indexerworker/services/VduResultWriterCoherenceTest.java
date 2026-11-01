@@ -202,7 +202,7 @@ class VduResultWriterCoherenceTest extends LuceneExecutorTestBase {
     }
   }
 
-  @ParameterizedTest
+  @ParameterizedTest(name = "{displayName} [{index}] {arguments}")
   @ValueSource(strings = {"empty", "failed", "rejected", "blank"})
   void vcn1NonReplacingResultsPreserveCountsChunksAndBaselineDescriptors(String outcome) throws Exception {
     Map<String, Map<String, String>> oldChunks;
