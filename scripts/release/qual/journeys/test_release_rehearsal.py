@@ -78,7 +78,7 @@ console.log(JSON.stringify(fn(JSON.parse(process.argv[4]))));
                 (out/'summary.json').write_text('{"journeys":[]}')
                 if seal:
                     (out/'snapshot').mkdir()
-            with patch.object(wrapper, 'parse_args', return_value=args), \
+            with patch.object(wrapper.vm, 'ROOT', Path(temp)), patch.object(wrapper, 'parse_args', return_value=args), \
                  patch.object(wrapper, 'run_overlay', side_effect=stage), patch.object(wrapper, 'combine', return_value=1):
                 wrapper.main()
             self.assertTrue(all(phase == 'candidate' for phase, _ in stages))
@@ -91,7 +91,7 @@ console.log(JSON.stringify(fn(JSON.parse(process.argv[4]))));
             def stage(args, out, phase, journeys, snapshot=None, seal=False):
                 out.mkdir(parents=True)
                 (out/'summary.json').write_text('{"journeys":[]}')
-            with patch.object(wrapper, 'parse_args', return_value=args), \
+            with patch.object(wrapper.vm, 'ROOT', Path(temp)), patch.object(wrapper, 'parse_args', return_value=args), \
                  patch.object(wrapper, 'run_overlay', side_effect=stage) as overlay, \
                  patch.object(wrapper, 'combine', return_value=1):
                 wrapper.main()

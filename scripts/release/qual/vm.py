@@ -35,6 +35,209 @@ OS = {
 }
 STATE = ROOT / 'running.json'
 MEMORY_MIB = 12288
+STORAGE_LIMIT = 150 * 1024 ** 3
+
+
+class StorageBudget(RuntimeError):
+    pass
+
+
+def tree_entries():
+    def fail(exc):
+        raise exc
+    for folder, dirs, files in os.walk(ROOT, followlinks=False, onerror=fail):
+        for name in dirs + files:
+            path = Path(folder) / name
+            yield path, path.lstat()
+
+
+def allocated_bytes():
+    root = ROOT.lstat()
+    seen = {(root.st_dev, root.st_ino)}
+    total = root.st_blocks * 512
+    # Include directory/symlink allocation, just as du -B1 does.
+    for _, info in tree_entries():
+        key = info.st_dev, info.st_ino
+        if key not in seen:
+            total += info.st_blocks * 512
+            seen.add(key)
+    return total
+
+
+def admit_disk():
+    # Called only by new-disk creators holding the VM lifetime lock.
+    used = allocated_bytes()
+    if used >= STORAGE_LIMIT:
+        raise StorageBudget(f'Qualification storage-budget: {used} allocated bytes >= '
+                            f'{STORAGE_LIMIT} (150 GiB); prune retired disks before starting another stage')
+
+
+def internal_path(path):
+    raw = Path(path)
+    for part in [raw, *raw.parents]:
+        if part.is_symlink():
+            raise RuntimeError(f'Symlinked qualification path: {path} ({part})')
+    path = Path(os.path.abspath(path))
+    root = ROOT.resolve()
+    if not path.is_relative_to(root):
+        raise RuntimeError(f'Path outside qualification root: {path}')
+    for part in [path, *path.parents]:
+        if part.is_symlink():
+            raise RuntimeError(f'Symlinked qualification path: {path} ({part})')
+        if part == root:
+            break
+    return path
+
+
+def snapshot_destination(out):
+    internal_path(out)
+
+
+def record_snapshot(out, disk):
+    report = json.loads((out / 'summary.json').read_text())
+    report['storage'] = {'snapshotBytes': disk.stat().st_blocks * 512}
+    save(out / 'summary.json', report)
+
+
+def combined_storage(sources):
+    return {'snapshotBytes': sum(source.get('storage', {}).get('snapshotBytes', 0)
+                                 for source in sources.values())}
+
+
+def storage_failure(report, exc):
+    if isinstance(exc, StorageBudget):
+        row = {'id': 'storage-budget', 'checks': [{'name': 'storage-budget',
+            'status': 'failed-infrastructure', 'reason': str(exc), 'evidence': []}]}
+        rows = report.setdefault('journeys', [])
+        if rows and rows[0]['id'] == 'preparation':
+            rows[0] = row
+        else:
+            rows.append(row)
+    return report
+
+
+def prune_inventory():
+    disks, records = set(), []
+    bases = {internal_path(ROOT / name / 'base.qcow2') for name in OS}
+    for path, info in tree_entries():
+        if path.name == 'base.qcow2':
+            bases.add(internal_path(path))
+        if not stat.S_ISREG(info.st_mode):
+            continue
+        internal_path(path)
+        if path.name == 'base.json':
+            records.append(path)
+        try:
+            with os.fdopen(os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK), 'rb') as source:
+                magic = source.read(4)
+        except OSError as exc:
+            raise RuntimeError(f'Cannot read image header {path}: {exc}') from exc
+        if magic == b'QFI\xfb':
+            if info.st_nlink != 1:
+                raise RuntimeError(f'Ambiguous qcow2 disk: {path}')
+            disks.add(path)
+    # Base receipts may also name a nonstandard base disk.
+    def named_disks(value, folder):
+        if isinstance(value, str):
+            path = Path(os.path.abspath(folder / value))
+            if value.endswith('.qcow2') or path in disks:
+                bases.add(internal_path(path))
+        elif isinstance(value, dict):
+            for item in value.values():
+                named_disks(item, folder)
+        elif isinstance(value, list):
+            for item in value:
+                named_disks(item, folder)
+    for record in records:
+        named_disks(json.loads(record.read_text()), record.parent)
+    parents, missing = {}, {}
+    # Inspect each layer separately: unlike --backing-chain this lets a positive
+    # ENOENT end one chain without hiding corrupt/unreadable existing members.
+    pending = list(disks)
+    for path in pending:
+        try:
+            result = run('qemu-img', 'info', '--output=json', path, capture_output=True, text=True, timeout=30)
+            info = json.loads(result.stdout)
+            if info['format'] != 'qcow2':
+                raise ValueError('not qcow2')
+            data = info.get('format-specific', {}).get('data', {})
+            if 'data-file' in data or data.get('data-file-raw'):
+                raise ValueError('external data file is unsupported for pruning')
+            if data.get('corrupt'):
+                raise ValueError('image is marked corrupt')
+            if info.get('backing-filename-format', 'qcow2') != 'qcow2':
+                raise ValueError('backing format is not qcow2')
+            backing = info.get('backing-filename')
+            parent = None
+            if backing:
+                if ':' in backing:
+                    raise ValueError('ambiguous backing filename')
+                parent = internal_path(path.parent / backing)
+                try:
+                    entry = parent.stat()
+                except FileNotFoundError:
+                    missing[path] = str(parent)
+                    parent = None
+                else:
+                    if not stat.S_ISREG(entry.st_mode) or entry.st_nlink != 1:
+                        raise ValueError(f'not a regular backing file: {parent}')
+                    if parent not in disks:
+                        disks.add(parent)
+                        pending.append(parent)
+            parents[path] = parent
+        except (OSError, ValueError, KeyError, RuntimeError, subprocess.SubprocessError) as exc:
+            raise RuntimeError(f'Cannot inspect qcow2 {path}: {exc}') from exc
+    return disks, parents, missing, bases
+
+
+def prune_plan(targets, reason):
+    if not targets:
+        raise RuntimeError('Pruning requires an explicitly selected evidence subtree')
+    if not reason.strip():
+        raise RuntimeError('Pruning requires a nonempty reason')
+    selected = [internal_path(ROOT / target) for target in targets]
+    disks, parents, missing, bases = prune_inventory()
+    for target in selected:
+        if not target.is_dir():
+            raise RuntimeError(f'Evidence subtree is not a directory: {target}')
+        if target == ROOT.resolve() or target in [ROOT / n for n in OS] or any(
+                base.is_relative_to(target) for base in bases):
+            raise RuntimeError(f'Refusing selection containing a base, OS directory or qualification root: {target}')
+    chains = {}
+    for head in disks:
+        chain = []
+        member = head
+        while member is not None:
+            if member in chain:
+                raise RuntimeError(f'Ambiguous backing cycle: {head} at {member}')
+            chain.append(member)
+            member = parents[member]
+        chains[head] = chain
+    candidates = {p for p in disks if any(p.is_relative_to(t) for t in selected)}
+    protected = {}
+    for head, chain in chains.items():
+        why = (f'missing backing file {missing[chain[-1]]} through {head}' if chain[-1] in missing
+               else f'still referenced by {head}' if head not in candidates else None)
+        if head in bases:
+            why = f'base disk {head}'
+        if why:
+            for member in chain:
+                protected.setdefault(member, []).append(why)
+    planned = sorted(candidates - protected.keys(), key=lambda p: (-len(chains[p]), str(p)))
+    return {'warning': 'Report only; recognises qcow2 images only. An image in another format '
+                       'backed by a listed disk would be missed. Manual deletion requires the '
+                       "owner's approval and backing-chain checks.",
+            'reason': reason, 'subtrees': list(map(str, selected)),
+            'planned': [{'path': str(p), 'allocatedBytes': p.stat().st_blocks * 512} for p in planned],
+            'protected': {str(p): why for p, why in sorted(protected.items())},
+            'missingBacking': {str(p): target for p, target in missing.items()}}
+
+
+def prune_disks(targets, reason):
+    ensure_free()
+    plan = prune_plan(targets, reason)
+    print(json.dumps(plan, indent=2))
+    return plan
 
 
 def wait_host_memory(seconds=900):
@@ -464,6 +667,7 @@ def start(os_name, visible=False):
         folder = ROOT / os_name
         if not (folder / 'base.json').exists():
             raise RuntimeError(f'Build {os_name} base first')
+        admit_disk()
         config()
         overlay = folder / 'run.qcow2'
         variables = folder / 'run-vars.fd'
@@ -798,8 +1002,13 @@ def main():
         sub.add_parser(action)
     p = sub.add_parser('wait-free')
     p.add_argument('--timeout', type=float, required=True)
+    p = sub.add_parser('prune-disks', help='Report retirement candidates among qcow2 images only; writes nothing')
+    p.add_argument('subtrees', nargs='+', type=Path)
+    p.add_argument('--reason', required=True)
     args = parser.parse_args()
-    if args.action == 'build-base':
+    if args.action == 'prune-disks':
+        prune_disks(args.subtrees, args.reason)
+    elif args.action == 'build-base':
         owner()
         ensure_free()
         with locked('build.lock'):
