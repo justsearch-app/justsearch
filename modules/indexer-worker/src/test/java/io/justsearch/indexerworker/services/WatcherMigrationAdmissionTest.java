@@ -29,6 +29,20 @@ final class WatcherMigrationAdmissionTest {
   @ValueSource(strings = {"CREATE", "MODIFY"})
   void inRootLinkKeepsMainAdmissionWithoutReplayLatch(String event) throws Exception {
     Path root = Files.createDirectory(temp.resolve("root"));
+    assertInRootLinkAdmission(root, event);
+  }
+
+  @ParameterizedTest(name = "{displayName} [{index}] {arguments}")
+  @ValueSource(strings = {"CREATE", "MODIFY"})
+  void symlinkedParentRootKeepsMainLinkAdmissionWithoutReplayLatch(String event) throws Exception {
+    Path realParent = Files.createDirectory(temp.resolve("real-parent"));
+    Files.createDirectory(realParent.resolve("root"));
+    Path linkedParent = Files.createSymbolicLink(temp.resolve("link-parent"), realParent);
+    Path root = linkedParent.resolve("root");
+    assertInRootLinkAdmission(root, event);
+  }
+
+  private void assertInRootLinkAdmission(Path root, String event) throws Exception {
     Path target = Files.writeString(root.resolve("target.txt"), "inside bytes");
     Path link = Files.createSymbolicLink(root.resolve("event.txt"), target);
     try (var f = new Fixture(root)) {

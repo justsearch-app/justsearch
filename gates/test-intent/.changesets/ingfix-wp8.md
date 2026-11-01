@@ -7,9 +7,9 @@ author-session: 01a1983a-2327-7182-ad8c-6db284629e3e
 
 # Test-intent entries
 
-This record covers narrowed WP8 against merged main 58ff43faa8. S-D10 source-storage evidence is withdrawn on every route; watcher create/modify admission restores main’s behavior, with containment retained before content reads (S-D1). Parameterized check names preserve their descriptions and expose method names for exact evidence selection. Assertion wrappers preserve the original expectations while making unexpected before-state exceptions assertion failures. Windows placeholder fixtures are synthetic; actual Windows cloud-placeholder watcher events remain unverified in this Linux environment. Supplementary check, not in newChecks: RootLifecycleOpsConcurrencyTest#staleSecondRemovalCannotDeleteAReaddedRoot guards a race that only this branch's unblocked producer drain (S-D41) could introduce: two removals of one root waiting on the same drain while the root is re-added. Merged main 58ff43faa8 holds the lifecycle monitor across the producer, so the race has no before-state equivalent and the check cannot fail there for its reason; it passes on the candidate (P6).
+This record covers narrowed WP8 against merged main 08a63452b2; the existing repaired-behaviour evidence uses historical main 58ff43faa8 as its before reference. S-D10 source-storage evidence is withdrawn on every route; watcher create/modify admission restores main’s behavior, with containment retained before content reads (S-D1). Parameterized check names preserve their descriptions and expose method names for exact evidence selection. Assertion wrappers preserve the original expectations while making unexpected before-state exceptions assertion failures. Windows placeholder fixtures are synthetic; actual Windows cloud-placeholder watcher events remain unverified in this Linux environment. Supplementary check, not in newChecks: RootLifecycleOpsConcurrencyTest#staleSecondRemovalCannotDeleteAReaddedRoot guards a race that only this branch's unblocked producer drain (S-D41) could introduce: two removals of one root waiting on the same drain while the root is re-added. Merged main 58ff43faa8 holds the lifecycle monitor across the producer, so the race has no before-state equivalent and the check cannot fail there for its reason; it passes on the candidate (P6).
 
-R9 builder-8 status: the restored check reaches a real admitted-while-eligible then policy-skipped receipt on the candidate. Publication/readmission is not verified here: both main and candidate stop with "Buffered UPSERT lacks its accepted target projection"; the sandbox has no known root-volume identity, which native policy proof requires. No pass or acceptance is claimed; see tmp/wp8-builder-8-report.txt.
+R9 passes with producer-written evidence in gates/test-intent/evidence/ingfix-wp8-r9.json, including the restored publication/readmission and successor-reopen assertions.
 
 ```json
 {
@@ -1375,8 +1375,8 @@ R9 builder-8 status: the restored check reaches a real admitted-while-eligible t
         "purpose": "Preserve main watcher create/modify admission for folders, in-root symlinks, vanished sources, atomic-save temporary files and ordinary files after withdrawing eager containment.",
         "callersAndStateOwners": "WorkerIngestService.acceptWatcherUpsert routes callbacks to the durable job queue; content admission remains guarded in the consumer and candidate hash routes.",
         "indirectBehaviours": "An event-only source shape must not throw into WatcherCallbacks.failure and latch runtime replay uncertainty. The queue still receives the same eligible entry or built-in policy omission.",
-        "evidence": "WatcherUpsertCompatibilityTest#watcherSourcesKeepMainAdmissionBehaviour runs the same five cases against 58ff43faa8 and the candidate; the assertions check no boundary exception and the actual enqueue path/root for each event, including an atomic-save temporary path already moved into place. The standalone WP8WatcherProbe also runs the five cases through real SQLite on both trees and observes one queued job with root/collection preserved and replayCertain=true. Results recorded in tmp/wp8-builder-7-report.txt.",
-        "unresolvedRisks": "The ordinary watcher route is covered here. The migration route has separate real-dispatch/SQLite checks in WatcherMigrationAdmissionTest: after repair, in-root file symlink CREATE/MODIFY is admitted without calling the failure handler or latching replay uncertainty; outside-root ancestor replacement is refused before hashing. Main’s later replay stall for the buffered symlink upsert is pre-existing and remains out of scope. Actual Windows cloud-placeholder watcher events remain unverified on Linux."
+        "evidence": "WatcherUpsertCompatibilityTest#watcherSourcesKeepMainAdmissionBehaviour covers the five ordinary watcher cases in gates/test-intent/evidence/ingfix-wp8-watcher-preservation.json; the assertions check no boundary exception and the actual enqueue path/root for each event, including an atomic-save temporary path already moved into place.",
+        "unresolvedRisks": "The ordinary watcher route is covered here. The migration route has separate real-dispatch/SQLite checks in WatcherMigrationAdmissionTest: after repair, in-root file symlink CREATE/MODIFY is admitted without calling the failure handler or latching replay uncertainty, including when the watched-root path runs through a symlinked parent; the queue preserves the original event path and root. Outside-root ancestor replacement is refused before hashing. These checks exercise dispatch and durable admission, not native OS delivery or completed replay/cutover. Main’s later replay stall for the buffered symlink upsert is pre-existing and remains out of scope. Actual Windows cloud-placeholder watcher events remain unverified on Linux."
       }
     },
     {
@@ -1384,7 +1384,7 @@ R9 builder-8 status: the restored check reaches a real admitted-while-eligible t
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/WatcherMigrationAdmissionTest.java"
       ],
       "class": "New",
-      "behaviour": "Migration watcher CREATE/MODIFY of an in-root file symlink retains main admission, preserves its event identity and receipt, and never enters the watcher failure handler or latches replay uncertainty. Compared with d8b8db0158: the regression is introduced by WP8; main 58ff43faa8 passes this preservation check. This does not attempt replay/cutover, whose symlink stall is pre-existing on main.",
+      "behaviour": "Migration watcher CREATE/MODIFY of an in-root file symlink retains main admission, preserves its event identity and receipt, and never enters the watcher failure handler or latches replay uncertainty. Compared with d8b8db0158: the regression is introduced by WP8; main 58ff43faa8 passes this preservation check. This does not attempt replay/cutover, whose symlink stall is pre-existing on main. The separate symlinked-parent-root regression check below covers the same admission contract when the stored root spelling differs from its real path.",
       "sources": [
         {
           "kind": "delegated-choice",
@@ -1427,6 +1427,28 @@ R9 builder-8 status: the restored check reaches a real admitted-while-eligible t
       "evidence": "gates/test-intent/evidence/ingfix-wp8-migration-containment.json",
       "newChecks": [
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/WatcherMigrationAdmissionTest.java#outsideAncestorIsRejectedBeforeCandidateContentAccess"
+      ]
+    },
+    {
+      "items": [
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/WatcherMigrationAdmissionTest.java"
+      ],
+      "class": "New",
+      "behaviour": "Migration watcher CREATE/MODIFY of an in-root file symlink is admitted when the watched-root path runs through a symlinked parent folder. The real target is checked and hashed within the real root, while the original event path, stored root, collection and durable receipt are preserved without calling the failure handler or latching replay uncertainty. Compared with 4cfc590c97, which refuses this event; merged main 08a63452b2 is the known-good admission reference. Replay/cutover remains outside this check.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed autonomously with designing all of the smallers and critical fixes. then proceed with implementing them accordingly.",
+          "delegationLocation": "task t-20261030-ingfix request",
+          "delegationScope": "designing and implementing the smaller and critical ingestion-pipeline fixes",
+          "choice": "After an independent verification found regressions, narrow the discovery change so the watcher routes behave as on main: on the migration (candidate-generation) watcher route an in-root symlink create or modify event is admitted as main admits it, without a boundary refusal or a replay-uncertain latch; containment is still enforced where content is read.",
+          "label": "agent choice"
+        }
+      ],
+      "repaired": true,
+      "evidence": "gates/test-intent/evidence/ingfix-wp8-migration-symlinked-parent.json",
+      "newChecks": [
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/WatcherMigrationAdmissionTest.java#symlinkedParentRootKeepsMainLinkAdmissionWithoutReplayLatch"
       ]
     }
   ]

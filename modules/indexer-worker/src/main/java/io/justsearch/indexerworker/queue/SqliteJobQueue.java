@@ -3373,13 +3373,15 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
           ? declaredCollectionRoots.get() : List.of();
       for (JobQueue.EnqueueEntry entry : entries) {
         Path sourcePath = entry.path();
+        Path sourceRoot = entry.ingestionRoot();
         if (maintenance && Files.isSymbolicLink(sourcePath)) {
           // Live watcher events retain main's link admission. Validate the ancestors and the
           // resolved target before hashing, while keeping the event path as the queue identity.
           io.justsearch.indexerworker.loop.SourceAccess.requireSafeAncestors(sourcePath, entry.ingestionRoot());
           sourcePath = sourcePath.toRealPath();
+          sourceRoot = sourceRoot == null ? null : sourceRoot.toRealPath();
         }
-        io.justsearch.indexerworker.loop.SourceAccess.requireContained(sourcePath, entry.ingestionRoot());
+        io.justsearch.indexerworker.loop.SourceAccess.requireContained(sourcePath, sourceRoot);
         if (io.justsearch.indexerworker.ingest.CloudPlaceholderDetector.isCloudPlaceholder(entry.path())) {
           recordIngestionEvent(entry.path(), IngestionOutcome.of(
               IngestionOutcomeClass.DEFERRED_POLICY,
@@ -3401,7 +3403,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
         String observedHash = null;
         try {
           observedHash = entry.plannedSourceSha256() == null
-              ? io.justsearch.indexerworker.loop.SourceContentHash.sha256WithinRoot(sourcePath, entry.ingestionRoot())
+              ? io.justsearch.indexerworker.loop.SourceContentHash.sha256WithinRoot(sourcePath, sourceRoot)
               : io.justsearch.indexerworker.loop.SourceContentHash.admissionIdentity(entry.path(), entry.ingestionRoot());
         } catch (IOException unavailable) {
           if (entry.plannedSourceSha256() == null) throw unavailable;
