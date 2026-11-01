@@ -133,8 +133,8 @@ public final class VduAbstentionGate {
    */
   public static final double AGREEMENT_FLOOR = 0.5;
 
-  /** Minimum token length for the Jaccard word-set agreement tokenizer ({@link #tokenize}). */
-  private static final Pattern WORD_PATTERN = Pattern.compile("[a-z0-9]{3,}");
+  /** Unicode letters and digits, including short transcriptions. */
+  private static final Pattern WORD_PATTERN = Pattern.compile("[\\p{L}\\p{N}]+");
 
   private VduAbstentionGate() {}
 
@@ -283,12 +283,10 @@ public final class VduAbstentionGate {
    * original was a genuine reading of the page (stable under re-sampling) vs. a confabulation
    * (different every time).
    *
-   * <p>Tokenization: lowercase, then extract maximal runs matching {@code [a-z0-9]{3,}} (ASCII
-   * alphanumeric tokens of at least 3 characters — short tokens like "a", "an", "12" are noisy at
-   * this granularity and excluded). Punctuation and whitespace are implicit token separators.
-   * Agreement is {@code |A ∩ B| / |A ∪ B|} over the two token sets; when BOTH texts tokenize to
-   * the empty set (e.g., both blank), agreement is defined as {@code 1.0} — two blank outputs
-   * agree with each other, they are not in disagreement about nothing.
+   * <p>Tokenization uses lowercase Unicode letters and digits with the existing three-character
+   * word floor. Scripts conventionally written without word spaces use character bigrams.
+   * When both token sets are empty, normalized text equality distinguishes short transcriptions
+   * from disagreement. Two blank outputs agree; blank and nonblank outputs disagree.
    *
    * @param a first text (order-independent — this is a symmetric measure)
    * @param b second text
@@ -298,7 +296,8 @@ public final class VduAbstentionGate {
     Set<String> tokensA = tokenize(a);
     Set<String> tokensB = tokenize(b);
     if (tokensA.isEmpty() && tokensB.isEmpty()) {
-      return 1.0;
+      return (a == null ? "" : a.strip().toLowerCase(Locale.ROOT))
+          .equals(b == null ? "" : b.strip().toLowerCase(Locale.ROOT)) ? 1.0 : 0.0;
     }
     Set<String> intersection = new HashSet<>(tokensA);
     intersection.retainAll(tokensB);
@@ -314,7 +313,17 @@ public final class VduAbstentionGate {
     Set<String> tokens = new HashSet<>();
     Matcher matcher = WORD_PATTERN.matcher(text.toLowerCase(Locale.ROOT));
     while (matcher.find()) {
-      tokens.add(matcher.group());
+      String word = matcher.group();
+      int[] points = word.codePoints().toArray();
+      boolean unspaced = word.codePoints().anyMatch(cp -> switch (Character.UnicodeScript.of(cp)) {
+        case HAN, HIRAGANA, KATAKANA, THAI, LAO, KHMER, MYANMAR -> true;
+        default -> false;
+      });
+      if (unspaced && points.length > 1) {
+        for (int i = 0; i < points.length - 1; i++) tokens.add(new String(points, i, 2));
+      } else if (points.length >= 3) {
+        tokens.add(word);
+      }
     }
     return tokens;
   }

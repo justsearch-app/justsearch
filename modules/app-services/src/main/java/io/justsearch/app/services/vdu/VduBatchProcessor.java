@@ -256,10 +256,20 @@ public class VduBatchProcessor {
                     if (!Files.exists(filePath)) {
                         throw new VduProcessor.VduException("File no longer exists", null);
                     }
-                    result = vduProcessor.process(filePath, engineContext);
+                    result = vduProcessor.process(filePath, engineContext,
+                        () -> !shouldInterruptBatch.getAsBoolean()
+                            && (automaticEligibility == null || automaticEligibility.getAsBoolean())
+                            && !vduProcessor.vduInterruptRequested());
                 } catch (VduProcessor.VduException | RuntimeException failure) {
                     EngineFutures.rethrowCancellation(failure);
                     checkInterrupted();
+                    if (failure instanceof VduProcessor.EligibilityDeferred) {
+                        if (!knowledgeClient.releaseVduProcessing(docId, attemptId, engineContext)) {
+                            throw new IllegalStateException("VDU deferral was not acknowledged by the index", failure);
+                        }
+                        blocked = BlockReason.ACTIVITY_OR_ENERGY;
+                        break;
+                    }
                     if (io.justsearch.app.api.chat.GenerationUnavailableException.causedBy(failure)) {
                         // Chat is draining, starting or stopping: the same outcome as AI being
                         // offline. Not this document's failure; the selected unit stays remaining.
@@ -267,7 +277,11 @@ public class VduBatchProcessor {
                         // which looks only at PENDING, starts the next pass for it and refusals
                         // never spend the retries kept for documents that really fail.
                         LOG.info("VDU pass deferred at {}: generation unavailable", docId);
-                        try { knowledgeClient.releaseVduProcessing(docId, attemptId, engineContext); }
+                        try {
+                            if (!knowledgeClient.releaseVduProcessing(docId, attemptId, engineContext)) {
+                                throw new IllegalStateException("VDU release was not acknowledged by the index", failure);
+                            }
+                        }
                         catch (RuntimeException | Error writeFailure) {
                             if (writeFailure != failure) writeFailure.addSuppressed(failure);
                             throw writeFailure;
@@ -313,7 +327,8 @@ public class VduBatchProcessor {
                     enrichment = buildNoTextEnrichment(result.pageCount(), result.enrichment());
                 }
                 if (!knowledgeClient.updateVduResult(
-                        docId, content, outcome, enrichment, result.pageCount(), attemptId, engineContext)) {
+                        docId, content, outcome, enrichment, result.pageCount(), attemptId,
+                        result.sourceSha256(), !result.completeCoverage(), engineContext)) {
                     throw new IllegalStateException("VDU result was not acknowledged by the index");
                 }
                 if (verdict.rejected()) { recordRejected(); failed++; }

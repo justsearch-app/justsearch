@@ -48,7 +48,7 @@ final class LegacyVduSourceRefreshTest extends LuceneExecutorTestBase {
       var service=service(runtime,queue);var ctx=context();var attempt=UUID.randomUUID().toString();
       var request=MarkVduProcessingRequest.newBuilder().setDocId(id).setMaxRetries(3);optional(request,"setAttemptId",attempt);
       assertTrue(service.markVduProcessing(request.build(),ctx).getSuccess());
-      var result=UpdateVduResultRequest.newBuilder().setDocId(id).setOutcome(VduUpdateOutcome.VDU_UPDATE_OUTCOME_SUCCESS_TEXT).setExtractedContent("completed refreshed text");optional(result,"setAttemptId",attempt);
+      var result=UpdateVduResultRequest.newBuilder().setDocId(id).setOutcome(VduUpdateOutcome.VDU_UPDATE_OUTCOME_SUCCESS_TEXT).setExtractedContent("completed refreshed text");optional(result,"setAttemptId",attempt);optional(result,"setSourceSha256",SourceContentHash.sha256(file));
       assertTrue(service.updateVduResult(result.build(),ctx).getSuccess());
       assertEquals("COMPLETED",runtime.documentFieldOps().getDocumentField(id,SchemaFields.VDU_STATUS));
       assertEquals("unrelated text",runtime.documentFieldOps().getDocumentContent("unrelated"));

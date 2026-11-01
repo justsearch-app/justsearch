@@ -321,6 +321,7 @@ final class PrunePrefixReplayFenceTest extends LuceneExecutorTestBase {
 
     var vdu = FenceRace.start("held-vdu-result", () -> publisher.updateVduResult(
         UpdateVduResultRequest.newBuilder().setDocId(path).setAttemptId(attempt)
+            .setSourceSha256("a".repeat(64))
             .setOutcome(VduUpdateOutcome.VDU_UPDATE_OUTCOME_SUCCESS_TEXT)
             .setExtractedContent(content).build(), ctx).getSuccess());
     assertTrue(firstChunkWritten.await(30, TimeUnit.SECONDS));

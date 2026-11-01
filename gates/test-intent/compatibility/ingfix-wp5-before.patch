@@ -1,0 +1,48 @@
+diff --git a/modules/app-services/src/main/java/io/justsearch/app/services/worker/KnowledgeClient.java b/modules/app-services/src/main/java/io/justsearch/app/services/worker/KnowledgeClient.java
+index eedeb9ffe2..c344a85a89 100644
+--- a/modules/app-services/src/main/java/io/justsearch/app/services/worker/KnowledgeClient.java
++++ b/modules/app-services/src/main/java/io/justsearch/app/services/worker/KnowledgeClient.java
+@@ -1861,6 +1861,13 @@ public abstract class KnowledgeClient implements Closeable, SearchPort, Indexing
+ 
+     // ========== VDU Result Update (Phase 3) ==========
+ 
++    // Compatibility only: discard the new publication arguments, preserving before-state behavior.
++    public boolean updateVduResult(String docId, String content,
++            io.justsearch.ipc.VduUpdateOutcome outcome, String enrichment, int pages,
++            String attemptId, String sourceSha256, boolean incompleteCoverage, EngineContext context) {
++        return updateVduResult(docId, content, outcome, enrichment, pages, attemptId, context);
++    }
++
+     public boolean updateVduResult(
+             String docId,
+             String extractedContent,
+diff --git a/modules/ipc-common/src/main/proto/indexing.proto b/modules/ipc-common/src/main/proto/indexing.proto
+index 9f6232d7fd..e20c4e4238 100644
+--- a/modules/ipc-common/src/main/proto/indexing.proto
++++ b/modules/ipc-common/src/main/proto/indexing.proto
+@@ -1176,6 +1176,8 @@ enum VduUpdateOutcome {
+ }
+ 
+ message UpdateVduResultRequest {
++  string source_sha256 = 8; // Compatibility only: ignored by before-state production.
++  bool incomplete_coverage = 9; // Compatibility only: ignored by before-state production.
+   string doc_id = 1;                        // Document ID (normalized path)
+   optional string extracted_content = 2;    // VDU-extracted text content (presence-aware; absent vs empty distinguishable)
+   string vdu_status = 3 [deprecated = true]; // DEPRECATED: Use 'outcome' instead. Kept for back-compat ("COMPLETED" or "FAILED")
+diff --git a/modules/worker-services/src/main/java/io/justsearch/indexerworker/services/VduResultWriter.java b/modules/worker-services/src/main/java/io/justsearch/indexerworker/services/VduResultWriter.java
+index c925c9d0e2..0f106f3d7e 100644
+--- a/modules/worker-services/src/main/java/io/justsearch/indexerworker/services/VduResultWriter.java
++++ b/modules/worker-services/src/main/java/io/justsearch/indexerworker/services/VduResultWriter.java
+@@ -19,6 +19,12 @@ import java.util.Map;
+ public final class VduResultWriter {
+   private VduResultWriter() {}
+ 
++  // Compatibility only: retain the before-state unconditional failure semantics.
++  static boolean apply(RunningRuntime runtime, UpdateVduResultRequest request,
++      boolean chunkSpladeEnabled, Map<String, Object> expectedRevision, int maxRetries) throws IOException {
++    return apply(runtime, request, chunkSpladeEnabled, expectedRevision);
++  }
++
+   /** Validates before direct mutation or buffer acceptance; replay applies the same rules. */
+   public static void validate(UpdateVduResultRequest request) {
+     if (request.getDocId().isBlank()) throw new IllegalArgumentException("doc_id is required");
