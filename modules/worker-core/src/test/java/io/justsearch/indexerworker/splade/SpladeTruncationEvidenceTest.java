@@ -14,7 +14,7 @@ import org.junit.jupiter.api.io.TempDir;
 class SpladeTruncationEvidenceTest {
 
   @Test
-  @DisplayName("deriveWindowCount uses overlap-aware stride")
+  // deriveWindowCount uses overlap-aware stride
   void deriveWindowCountUsesOverlapAwareStride() {
     assertEquals(1, SpladeTruncationEvidence.deriveWindowCount(256, 256, 64));
     assertEquals(2, SpladeTruncationEvidence.deriveWindowCount(257, 256, 64));
@@ -23,7 +23,7 @@ class SpladeTruncationEvidenceTest {
   }
 
   @Test
-  @DisplayName("snapshot reports complete window coverage without truncation")
+  // snapshot reports complete window coverage without truncation
   @SuppressWarnings("unchecked")
   void snapshotReportsTruncationAndWindowHistograms() {
     SpladeTruncationEvidence evidence = new SpladeTruncationEvidence(256, 64);
@@ -49,7 +49,7 @@ class SpladeTruncationEvidenceTest {
   }
 
   @Test
-  @DisplayName("flushIfNeeded writes evidence incrementally")
+  // flushIfNeeded writes evidence incrementally
   void flushIfNeededWritesEvidenceIncrementally(@TempDir Path tempDir) throws Exception {
     SpladeTruncationEvidence evidence = new SpladeTruncationEvidence(256, 64, 2);
     Path outputPath = tempDir.resolve("splade-truncation-summary.json");
