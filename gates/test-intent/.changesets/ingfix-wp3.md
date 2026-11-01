@@ -164,3 +164,14 @@ case names change to make all cases selectable from the outer-class XML.
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a1962f-c70e-7811-9092-cd98997bf71c",
+  "verdict": "accept",
+  "digest": "sha256:46717d2138c96080e35d3c64358f4cf5b5e1141f9f15947ee802f23315c8eae6",
+  "note": "Verifier verifier-1 (WP3, candidate 48ab1fcb32) accepted all three entries (DisambiguationServiceTest defect pin; EntityClusterStoreTest and DisambiguationBackfillOpsTest adaptations); overall accept."
+}
+```
