@@ -96,7 +96,7 @@ final class VduDeferredRetryTest {
     fields.put(SchemaFields.CONTENT, "baseline");
     fields.put(SchemaFields.CONTENT_PREVIEW, "baseline");
     fields.put(SchemaFields.VDU_STATUS, SchemaFields.VDU_STATUS_PENDING);
-    fields.put(SchemaFields.SOURCE_SHA256,"a".repeat(64));
+    fields.put(SchemaFields.SOURCE_SHA256, io.justsearch.indexerworker.loop.SourceContentHash.sha256(picture));
     fields.put(SchemaFields.INDEXED_AT, System.currentTimeMillis());
     runtime.indexingCoordinator().indexSingle(new IndexDocument(fields));
     runtime.commitOps().commitAndTrack();
@@ -120,14 +120,16 @@ final class VduDeferredRetryTest {
     when(processor.hasVisionCapability()).thenReturn(true);
     org.mockito.Mockito.doAnswer(call -> { passes.incrementAndGet(); return null; })
         .when(processor).enterVduMode();
-    when(processor.process(any(), any())).thenAnswer(call -> {
+    when(processor.process(any(), any(), any())).thenAnswer(call -> {
       attempts.incrementAndGet();
       try {
         generation.requireOpen();
       } catch (RuntimeException refused) {
         throw new VduProcessor.VduException("vision call failed", refused);
       }
-      return new VduProcessor.VduResult("page text", "{}", 1);
+      return new VduProcessor.VduResult("page text", "{}", 1,
+          io.justsearch.app.services.vdu.GateVerdict.passed(), true,
+          io.justsearch.indexerworker.loop.SourceContentHash.sha256(picture));
     });
     var gpu = mock(GpuCapabilitiesService.class);
     when(gpu.snapshot()).thenReturn(new GpuCapabilities(null, null, new GpuCapabilities.Effective(

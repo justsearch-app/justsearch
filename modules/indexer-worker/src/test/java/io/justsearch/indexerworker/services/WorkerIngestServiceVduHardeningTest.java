@@ -191,35 +191,6 @@ final class WorkerIngestServiceVduHardeningTest extends io.justsearch.adapters.l
   }
 
   @Nested
-  @DisplayName("FAILED status passthrough")
-  class FailedStatusPassthrough {
-
-    @Test
-    @DisplayName("passes through FAILED status without modification")
-    void passesThroughFailedStatus() throws Exception {
-      String docId = indexTestDocument("doc6");
-
-      UpdateVduResultRequest request = UpdateVduResultRequest.newBuilder()
-          .setDocId(docId)
-          .setExtractedContent("")
-          .setVduStatus(SchemaFields.VDU_STATUS_FAILED)
-          .setVduEnrichment("{\"error\":\"extraction_timeout\"}")
-          .setPageCount(0)
-          .build();
-
-      UpdateVduResultResponse response = updateWithClaim(request);
-
-      assertTrue(response.getSuccess());
-
-      String status = lifecycle.documentFieldOps().getDocumentField(docId, SchemaFields.VDU_STATUS);
-      assertEquals(SchemaFields.VDU_STATUS_FAILED, status);
-
-      String enrichment = lifecycle.documentFieldOps().getDocumentField(docId, SchemaFields.VDU_ENRICHMENT);
-      assertEquals("{\"error\":\"extraction_timeout\"}", enrichment);
-    }
-  }
-
-  @Nested
   @DisplayName("REJECTED_SUSPECT_TEXT retains baseline (tempdoc 677 abstention gate)")
   class RejectedSuspectTextSemantics {
 
@@ -352,29 +323,7 @@ final class WorkerIngestServiceVduHardeningTest extends io.justsearch.adapters.l
           "SUCCESS_EMPTY should not trigger embedding");
     }
 
-    @Test
-    @DisplayName("FAILED does not overwrite content")
-    void failedDoesNotOverwriteContent() throws Exception {
-      String docId = indexTestDocument("outcome4");
-      String originalContent = lifecycle.documentFieldOps().getDocumentContent(docId);
 
-      UpdateVduResultRequest request = UpdateVduResultRequest.newBuilder()
-          .setDocId(docId)
-          .setOutcome(VduUpdateOutcome.VDU_UPDATE_OUTCOME_FAILED)
-          .setVduEnrichment("{\"error\":\"timeout\"}")
-          .setPageCount(0)
-          .build();
-
-      UpdateVduResultResponse response = updateWithClaim(request);
-
-      assertTrue(response.getSuccess());
-
-      String status = lifecycle.documentFieldOps().getDocumentField(docId, SchemaFields.VDU_STATUS);
-      assertEquals("FAILED", status);
-
-      String content = lifecycle.documentFieldOps().getDocumentContent(docId);
-      assertEquals(originalContent, content, "Content should not be overwritten on FAILED");
-    }
 
     @Test
     @DisplayName("outcome takes precedence over legacy vdu_status")
@@ -705,6 +654,60 @@ final class WorkerIngestServiceVduHardeningTest extends io.justsearch.adapters.l
     }
   }
 
+  @Test
+  // ordinary failures remain pending until the retry allowance is exhausted
+  void ordinaryFailuresRemainPendingUntilAllowanceExhausted() throws Exception {
+    String docId = indexTestDocument("doc6");
+
+    UpdateVduResultRequest request = UpdateVduResultRequest.newBuilder()
+        .setDocId(docId)
+        .setExtractedContent("")
+        .setVduStatus(SchemaFields.VDU_STATUS_FAILED)
+        .setVduEnrichment("{\"error\":\"extraction_timeout\"}")
+        .setPageCount(0)
+        .build();
+
+    for (int attempt = 1; attempt <= SchemaFields.VDU_MAX_RETRIES; attempt++) {
+      UpdateVduResultResponse response = updateWithClaim(request);
+      assertTrue(response.getSuccess(), response.getError());
+      boolean exhausted = attempt == SchemaFields.VDU_MAX_RETRIES;
+      assertEquals(exhausted ? SchemaFields.VDU_STATUS_FAILED : SchemaFields.VDU_STATUS_PENDING,
+          lifecycle.documentFieldOps().getDocumentField(docId, SchemaFields.VDU_STATUS));
+      assertEquals(Integer.toString(attempt),
+          lifecycle.documentFieldOps().getDocumentField(docId, SchemaFields.VDU_RETRY_COUNT));
+      assertEquals(exhausted ? List.of() : List.of(docId), service.queryPendingVdu(
+          io.justsearch.ipc.QueryPendingVduRequest.newBuilder().setLimit(100).build(), CallContext.none()).getDocIdsList());
+      assertEquals("{\"error\":\"extraction_timeout\"}",
+          lifecycle.documentFieldOps().getDocumentField(docId, SchemaFields.VDU_ENRICHMENT));
+    }
+  }
+
+  @Test
+  // FAILED does not overwrite content
+  void failedDoesNotOverwriteContent() throws Exception {
+    String docId = indexTestDocument("outcome4");
+    String originalContent = lifecycle.documentFieldOps().getDocumentContent(docId);
+
+    UpdateVduResultRequest request = UpdateVduResultRequest.newBuilder()
+        .setDocId(docId)
+        .setOutcome(VduUpdateOutcome.VDU_UPDATE_OUTCOME_FAILED)
+        .setVduEnrichment("{\"error\":\"timeout\"}")
+        .setPageCount(0)
+        .build();
+
+    for (int attempt = 1; attempt <= SchemaFields.VDU_MAX_RETRIES; attempt++) {
+      UpdateVduResultResponse response = updateWithClaim(request);
+      assertTrue(response.getSuccess(), response.getError());
+      assertEquals(attempt == SchemaFields.VDU_MAX_RETRIES
+              ? SchemaFields.VDU_STATUS_FAILED : SchemaFields.VDU_STATUS_PENDING,
+          lifecycle.documentFieldOps().getDocumentField(docId, SchemaFields.VDU_STATUS));
+      assertEquals(Integer.toString(attempt),
+          lifecycle.documentFieldOps().getDocumentField(docId, SchemaFields.VDU_RETRY_COUNT));
+      assertEquals(originalContent, lifecycle.documentFieldOps().getDocumentContent(docId),
+          "Every failed attempt must preserve content, including exhaustion");
+    }
+  }
+
   // ========== Test Helpers ==========
 
   /**
@@ -718,7 +721,9 @@ final class WorkerIngestServiceVduHardeningTest extends io.justsearch.adapters.l
     String attempt=java.util.UUID.randomUUID().toString();
     var claim=service.markVduProcessing(MarkVduProcessingRequest.newBuilder().setDocId(request.getDocId()).setAttemptId(attempt).build(),ctx);
     assertTrue(claim.getSuccess(),claim.getError());
-    return service.updateVduResult(request.toBuilder().setAttemptId(attempt).build(),ctx);
+    return service.updateVduResult(request.toBuilder().setAttemptId(attempt)
+        .setSourceSha256(lifecycle.documentFieldOps().getDocumentField(request.getDocId(), SchemaFields.SOURCE_SHA256))
+        .build(),ctx);
   }
 
   private String indexTestDocument(String name) throws Exception {

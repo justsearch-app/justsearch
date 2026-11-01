@@ -92,7 +92,7 @@ final class AutomaticVduBreakerTest {
       String id = call.getArgument(0, String.class);
       states.put(id, "PENDING");
       retries.merge(id, -1, Integer::sum);
-      return null;
+      return true;
     }).when(index).releaseVduProcessing(anyString(), any());
     when(index.updateVduResult(anyString(), any(), any(), any(), anyInt(), any())).thenAnswer(call -> {
       states.put(call.getArgument(0, String.class),
@@ -101,7 +101,7 @@ final class AutomaticVduBreakerTest {
       return true;
     });
 
-    processor = mock(VduProcessor.class);
+    processor = VduAttemptTestSupport.processor();
     when(processor.hasVisionCapability()).thenReturn(true);
     doAnswer(call -> {
       entries.incrementAndGet();

@@ -305,6 +305,7 @@ final class PruneWriterFenceTest extends LuceneExecutorTestBase {
     Thread[] vduThread = new Thread[1];
     FutureTask<Boolean> vdu = start("held-vdu-result", () -> service.updateVduResult(
         UpdateVduResultRequest.newBuilder().setDocId(path).setAttemptId(attempt)
+            .setSourceSha256("a".repeat(64))
             .setOutcome(VduUpdateOutcome.VDU_UPDATE_OUTCOME_SUCCESS_TEXT)
             .setExtractedContent(content).build(), ctx).getSuccess(), vduThread);
     assertTrue(firstChunkWritten.await(10, TimeUnit.SECONDS));

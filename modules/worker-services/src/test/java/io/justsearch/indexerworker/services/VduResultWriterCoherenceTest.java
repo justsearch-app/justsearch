@@ -202,7 +202,7 @@ class VduResultWriterCoherenceTest extends LuceneExecutorTestBase {
     }
   }
 
-  @ParameterizedTest
+  @ParameterizedTest(name = "{displayName} [{index}] {arguments}")
   @ValueSource(strings = {"empty", "failed", "rejected", "blank"})
   void vcn1NonReplacingResultsPreserveCountsChunksAndBaselineDescriptors(String outcome) throws Exception {
     Map<String, Map<String, String>> oldChunks;
@@ -211,7 +211,7 @@ class VduResultWriterCoherenceTest extends LuceneExecutorTestBase {
       seed(runtime, LONG, 123L, PENDING);
       oldChunks = chunks(runtime);
       descriptors = preserved(runtime);
-      var request = UpdateVduResultRequest.newBuilder().setDocId(DOC).setExtractedContent(SHORT);
+      var request = UpdateVduResultRequest.newBuilder().setSourceSha256("a".repeat(64)).setDocId(DOC).setExtractedContent(SHORT);
       switch (outcome) {
         case "empty" -> request.setOutcome(VduUpdateOutcome.VDU_UPDATE_OUTCOME_SUCCESS_EMPTY);
         case "failed" -> request.setOutcome(VduUpdateOutcome.VDU_UPDATE_OUTCOME_FAILED);
@@ -219,13 +219,13 @@ class VduResultWriterCoherenceTest extends LuceneExecutorTestBase {
         case "blank" -> request.setExtractedContent("  ");
         default -> throw new AssertionError(outcome);
       }
-      assertTrue(VduResultWriter.apply(runtime, request.build(), false, Map.of(SchemaFields.CONTENT, LONG)));
+      assertTrue(VduResultWriter.apply(runtime, request.build(), false, Map.of(SchemaFields.CONTENT, LONG), SchemaFields.VDU_MAX_RETRIES));
       refresh(runtime);
-      assertNonReplacement(runtime, oldChunks, descriptors, outcome.equals("blank") ? PENDING
+      assertNonReplacement(runtime, oldChunks, descriptors, (outcome.equals("blank") || outcome.equals("failed")) ? PENDING
           : IngestionReasonCodes.EXTRACTION_DROPOUT_UNRECOVERED);
     }
     try (var runtime = open()) {
-      assertNonReplacement(runtime, oldChunks, descriptors, outcome.equals("blank") ? PENDING
+      assertNonReplacement(runtime, oldChunks, descriptors, (outcome.equals("blank") || outcome.equals("failed")) ? PENDING
           : IngestionReasonCodes.EXTRACTION_DROPOUT_UNRECOVERED);
     }
   }
@@ -251,7 +251,7 @@ class VduResultWriterCoherenceTest extends LuceneExecutorTestBase {
       refresh(runtime);
       parent = parent(runtime);
       oldChunks = chunks(runtime);
-      var refused = service.updateVduResult(UpdateVduResultRequest.newBuilder().setDocId(DOC)
+      var refused = service.updateVduResult(UpdateVduResultRequest.newBuilder().setSourceSha256("a".repeat(64)).setDocId(DOC)
           .setAttemptId(attempt).setOutcome(VduUpdateOutcome.VDU_UPDATE_OUTCOME_SUCCESS_TEXT)
           .setExtractedContent(SHORT).build(), ctx);
       assertFalse(refused.getSuccess());
@@ -301,9 +301,9 @@ class VduResultWriterCoherenceTest extends LuceneExecutorTestBase {
           SchemaFields.SPLADE_RETRY_COUNT, 3L, SchemaFields.NER_STATUS, "FAILED", SchemaFields.NER_RETRY_COUNT, 4L);
       runtime.indexingCoordinator().updateDocument(DOC, statuses);
       refresh(runtime);
-      var request = UpdateVduResultRequest.newBuilder().setDocId(DOC).setExtractedContent(SHORT)
+      var request = UpdateVduResultRequest.newBuilder().setSourceSha256("a".repeat(64)).setDocId(DOC).setExtractedContent(SHORT)
           .setVduStatus("CUSTOM_STATUS").build();
-      assertTrue(VduResultWriter.apply(runtime, request, false, Map.of(SchemaFields.CONTENT, SHORT)));
+      assertTrue(VduResultWriter.apply(runtime, request, false, Map.of(SchemaFields.CONTENT, SHORT), SchemaFields.VDU_MAX_RETRIES));
       refresh(runtime);
       assertEquals("CUSTOM_STATUS", field(runtime, SchemaFields.VDU_STATUS));
       for (var entry : statuses.entrySet()) assertEquals(entry.getValue().toString(), field(runtime, entry.getKey()));
@@ -364,7 +364,7 @@ class VduResultWriterCoherenceTest extends LuceneExecutorTestBase {
       var claim = service.markVduProcessing(MarkVduProcessingRequest.newBuilder().setDocId(DOC)
           .setMaxRetries(5).setAttemptId(attempt).build(), ctx);
       assertTrue(claim.getSuccess(), claim.getError());
-      var request = UpdateVduResultRequest.newBuilder().setDocId(DOC).setAttemptId(attempt).setExtractedContent(LONG);
+      var request = UpdateVduResultRequest.newBuilder().setSourceSha256("a".repeat(64)).setDocId(DOC).setAttemptId(attempt).setExtractedContent(LONG);
       if (form.equals("explicit")) request.setOutcome(VduUpdateOutcome.VDU_UPDATE_OUTCOME_SUCCESS_TEXT);
       if (form.equals("legacy")) request.setVduStatus("COMPLETED");
       var result = service.updateVduResult(request.build(), ctx);
@@ -418,11 +418,11 @@ class VduResultWriterCoherenceTest extends LuceneExecutorTestBase {
   }
 
   private static void replace(RunningRuntime runtime, String content, String form) throws Exception {
-    var request = UpdateVduResultRequest.newBuilder().setDocId(DOC).setExtractedContent(content);
+    var request = UpdateVduResultRequest.newBuilder().setSourceSha256("a".repeat(64)).setDocId(DOC).setExtractedContent(content);
     if (form.equals("explicit")) request.setOutcome(VduUpdateOutcome.VDU_UPDATE_OUTCOME_SUCCESS_TEXT);
     if (form.equals("legacy")) request.setVduStatus("COMPLETED");
     assertTrue(VduResultWriter.apply(runtime, request.build(), false,
-        Map.of(SchemaFields.CONTENT, runtime.documentFieldOps().getDocumentContent(DOC))));
+        Map.of(SchemaFields.CONTENT, runtime.documentFieldOps().getDocumentContent(DOC)), SchemaFields.VDU_MAX_RETRIES));
     refresh(runtime);
   }
 

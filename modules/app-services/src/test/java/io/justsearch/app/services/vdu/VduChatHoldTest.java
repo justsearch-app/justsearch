@@ -91,7 +91,7 @@ class VduChatHoldTest {
     VduProcessor processor = org.mockito.Mockito.spy(processor(holds));
     org.mockito.Mockito.doReturn(true).when(processor).hasVisionCapability();
     org.mockito.Mockito.doReturn(new VduProcessor.VduResult("text", "{}", 1))
-        .when(processor).process(any(Path.class), any(EngineContext.class));
+        .when(processor).process(any(Path.class), any(EngineContext.class), any(java.util.function.BooleanSupplier.class));
     KnowledgeClient client = client(3);
     GpuCapabilitiesService gpu = mock(GpuCapabilitiesService.class);
     when(gpu.snapshot()).thenReturn(VduBatchProcessorTest.gpuSnapshot(24_000_000_000L));
@@ -104,7 +104,7 @@ class VduChatHoldTest {
     assertEquals(2, outcome.remaining());
     assertEquals(BlockReason.PROCESSING_REFUSED, outcome.blockedReason());
     verify(hold).close();
-    verify(processor, times(1)).process(any(Path.class), any(EngineContext.class));
+    verify(processor, times(1)).process(any(Path.class), any(EngineContext.class), any(java.util.function.BooleanSupplier.class));
   }
 
   @Test

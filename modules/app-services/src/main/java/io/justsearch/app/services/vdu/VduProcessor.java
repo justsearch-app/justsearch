@@ -17,6 +17,11 @@ import org.slf4j.LoggerFactory;
 import java.awt.image.BufferedImage;
 import java.io.IOException;
 import java.nio.file.Path;
+import java.nio.file.Files;
+import java.security.DigestInputStream;
+import java.security.MessageDigest;
+import java.util.HexFormat;
+import java.util.function.BooleanSupplier;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
@@ -186,7 +191,7 @@ public class VduProcessor {
     }
 
     /** A non-null checkpoint selects the controller's idle-only automatic loaded-chat hold. */
-    public void enterVduMode(java.util.function.BooleanSupplier automaticEligibility) throws VduException {
+    public void enterVduMode(BooleanSupplier automaticEligibility) throws VduException {
         if (chatHolds != null) {
             long launchesBefore = chatHolds.serverLaunches();
             try {
@@ -261,6 +266,12 @@ public class VduProcessor {
      * @throws VduException if processing fails
      */
     public VduResult process(Path filePath, io.justsearch.core.context.EngineContext engineContext) throws VduException {
+        return process(filePath, engineContext, () -> true);
+    }
+
+    /** Eligibility is cooperative between inference requests; terminal cancellation still interrupts them. */
+    public VduResult process(Path filePath, io.justsearch.core.context.EngineContext engineContext,
+            BooleanSupplier eligible) throws VduException {
         if (!hasVisionCapability()) {
             throw new VduException(
                 "Vision capability not available — no vision projector (mmproj) configured. "
@@ -281,16 +292,27 @@ public class VduProcessor {
         // construction so the legacy "no record on resource-construction failure" semantics are
         // preserved. Outer finally checks for null to skip the record on that path.
         Long totalStartNanos = null;
+        Path sourceSnapshot = null;
         try (PdfImageRenderer pdfRenderer = new PdfImageRenderer(tempFileManager)) {
             totalStartNanos = System.nanoTime();
+            requireEligible(eligible);
+            sourceSnapshot = tempFileManager.createTempFile("vdu_source_", fileName.endsWith(".pdf") ? ".pdf" : ".image");
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            try (var input = new DigestInputStream(Files.newInputStream(filePath), digest);
+                 var output = Files.newOutputStream(sourceSnapshot)) {
+                input.transferTo(output);
+            }
+            String sourceSha256 = HexFormat.of().formatHex(digest.digest());
             List<Path> pageImages;
+            int documentPageCount = 1;
 
             if (fileName.endsWith(".pdf")) {
-                pageImages = pdfRenderer.render(filePath);
+                pageImages = pdfRenderer.render(sourceSnapshot);
+                documentPageCount = pdfRenderer.getDocumentPageCount();
                 LOG.debug("Rendered {} pages from PDF", pageImages.size());
             } else {
                 // Direct image - no temp files needed from renderer
-                pageImages = List.of(filePath);
+                pageImages = List.of(sourceSnapshot);
             }
 
             // Tempdoc 677 Stage 0: measure input legibility on every page BEFORE any model call
@@ -318,7 +340,7 @@ public class VduProcessor {
                 GateVerdict stage0Verdict = buildStage0RejectVerdict(pageMeasures);
                 LOG.info("VDU Stage 0 rejected all {} page(s) for {} (no input legibility signal)",
                     pageImages.size(), filePath.getFileName());
-                return new VduResult("", null, pageImages.size(), stage0Verdict);
+                return new VduResult("", null, pageImages.size(), stage0Verdict, false, sourceSha256);
             }
             if (legiblePageIndices.size() < pageImages.size()) {
                 // Partial legibility: some pages are below the Stage 0 floor but not all. Still
@@ -338,13 +360,16 @@ public class VduProcessor {
                 for (int idx : legiblePageIndices) {
                     LOG.debug("Processing page {}/{}", idx + 1, pageImages.size());
 
+                    requireEligible(eligible);
                     byte[] imageBytes = imagePreparer.prepare(pageImages.get(idx));
+                    requireEligible(eligible);
                     OnlineAiService.VisionCompletionResult pageResult = awaitDocument(
                         asVduBulkWork(() -> aiService.visionCompletionDetailed(PASS1_PROMPT,
                                 imageBytes, PASS1_MAX_TOKENS, SamplingParams.VDU, null, engineContext))
                             .orTimeout(VDU_VISION_TIMEOUT_SECONDS, TimeUnit.SECONDS));
                     sentPageResults.add(pageResult);
 
+                    if (pageResult.content() == null || pageResult.content().isBlank()) continue;
                     if (pageImages.size() > 1) {
                         allText.append("--- Page ").append(idx + 1).append(" ---\n");
                     }
@@ -371,28 +396,36 @@ public class VduProcessor {
                 // skip Pass 2 entirely for a document the gate already rejected.
                 LOG.info("VDU Stage 1 rejected output for {} (suspect confabulation)",
                     filePath.getFileName());
-                return new VduResult(extractedText, null, pageImages.size(), stage1Verdict);
+                return new VduResult(extractedText, null, pageImages.size(), stage1Verdict, false, sourceSha256);
             }
 
             // Tempdoc 677 Stage 2: an AMBIGUOUS Stage-1 band is not yet a decision — re-sample the
             // single worst-signal page once (temperature/seed varied) and compare it against its
             // own Pass 1 text. Low agreement resolves to a rejection; high agreement resolves to a
             // pass, and processing continues into Pass 2 exactly as the PASS band would.
+            boolean completeCoverage = pageImages.size() == documentPageCount
+                && legiblePageIndices.size() == documentPageCount
+                && sentPageResults.stream().noneMatch(page -> "length".equals(page.finishReason()));
+            if (extractedText.isBlank()) {
+                return new VduResult("", null, pageImages.size(), GateVerdict.passed(),
+                    completeCoverage, sourceSha256);
+            }
             GateVerdict resolvedVerdict = stage1Verdict;
             if (stage1Verdict.band() == GateVerdict.Band.AMBIGUOUS) {
-                resolvedVerdict = runAgreementProbe(legiblePageIndices, pageImages, sentPageResults, filePath, engineContext);
+                requireEligible(eligible);
+                resolvedVerdict = runAgreementProbe(legiblePageIndices, pageImages, sentPageResults, filePath, engineContext, eligible);
                 if (resolvedVerdict.rejected()) {
                     LOG.info("VDU Stage 2 rejected output for {} (agreement={}, probedPage={})",
                         filePath.getFileName(), resolvedVerdict.agreement(), resolvedVerdict.probedPage());
-                    return new VduResult(extractedText, null, pageImages.size(), resolvedVerdict);
+                    return new VduResult(extractedText, null, pageImages.size(), resolvedVerdict, completeCoverage, sourceSha256);
                 }
             }
 
-            // Pass 2: Summarize and extract entities (timed) — unchanged, gate passed (directly at
-            // Stage 1, or resolved to a pass by Stage 2 above).
+            // Pass 2 supplies optional metadata for text accepted by Stage 1 or Stage 2.
             long pass2StartNanos = System.nanoTime();
             String enrichment;
             try {
+                requireEligible(eligible);
                 String pass2Prompt = String.format(PASS2_PROMPT_TEMPLATE,
                     truncateForPrompt(extractedText, MAX_CONTEXT_CHARS));
                 enrichment = awaitDocument(
@@ -401,6 +434,15 @@ public class VduProcessor {
                             PASS2_MAX_TOKENS,
                             SamplingParams.VDU, engineContext))
                         .orTimeout(VDU_CHAT_TIMEOUT_SECONDS, TimeUnit.SECONDS));
+            } catch (EligibilityDeferred deferred) {
+                enrichment = null;
+            } catch (RuntimeException failure) {
+                EngineFutures.rethrowCancellation(failure);
+                if (Thread.currentThread().isInterrupted()) {
+                    throw new java.util.concurrent.CancellationException("VDU metadata interrupted");
+                }
+                LOG.warn("VDU metadata unavailable for {}; retaining transcription", filePath.getFileName(), failure);
+                enrichment = null;
             } finally {
                 catalog.pass2DurationMs.record(elapsedMs(pass2StartNanos), VduPassTags.of());
             }
@@ -410,11 +452,14 @@ public class VduProcessor {
             }
 
             long elapsed = System.currentTimeMillis() - startTime;
-            LOG.info("VDU complete for {}: {} chars, {} pages, {}ms",
-                filePath.getFileName(), extractedText.length(), pageImages.size(), elapsed);
+            LOG.info("VDU complete for {}: {} chars, {}/{} pages, {}ms, coverage={}",
+                filePath.getFileName(), extractedText.length(), pageImages.size(), documentPageCount, elapsed,
+                completeCoverage ? "complete" : "incomplete");
 
-            return new VduResult(extractedText, enrichment, pageImages.size(), resolvedVerdict);
+            return new VduResult(extractedText, enrichment, pageImages.size(), resolvedVerdict, completeCoverage, sourceSha256);
 
+        } catch (EligibilityDeferred deferred) {
+            throw deferred;
         } catch (IOException e) {
             LOG.error("VDU I/O error for: {}", filePath, e);
             throw new VduException("Failed to read/render document: " + e.getMessage(), e);
@@ -437,10 +482,23 @@ public class VduProcessor {
             // PdfImageRenderer was successfully constructed (legacy Timer.Sample was opened
             // inside the try-with-resources head; failure to acquire the renderer never started
             // the timer). Phase 3 critical-analysis fix B1.
+            if (sourceSnapshot != null) tempFileManager.cleanup(sourceSnapshot);
             if (totalStartNanos != null) {
                 catalog.totalDurationMs.record(elapsedMs(totalStartNanos), VduPassTags.of());
             }
         }
+    }
+
+    private static void requireEligible(BooleanSupplier eligible) throws EligibilityDeferred {
+        if (Thread.currentThread().isInterrupted()) {
+            throw new java.util.concurrent.CancellationException("VDU processing interrupted");
+        }
+        if (!eligible.getAsBoolean()) throw new EligibilityDeferred();
+    }
+
+    /** A deferral returns the owned claim and its retry allowance to the next eligible pass. */
+    public static final class EligibilityDeferred extends VduException {
+        public EligibilityDeferred() { super("VDU eligibility changed between requests", null); }
     }
 
     private static long elapsedMs(long startNanos) {
@@ -588,12 +646,14 @@ public class VduProcessor {
         List<Integer> legiblePageIndices,
         List<Path> pageImages,
         List<OnlineAiService.VisionCompletionResult> sentPageResults,
-        Path filePath, io.justsearch.core.context.EngineContext engineContext) throws IOException {
+        Path filePath, io.justsearch.core.context.EngineContext engineContext, BooleanSupplier eligible)
+            throws IOException, EligibilityDeferred {
         int worstIdx = worstSignalIndex(sentPageResults);
         int pageIndex = legiblePageIndices.get(worstIdx);
         String originalPageText = sentPageResults.get(worstIdx).content();
 
         byte[] imageBytes = imagePreparer.prepare(pageImages.get(pageIndex));
+        requireEligible(eligible);
         OnlineAiService.VisionCompletionResult probeResult = awaitDocument(
             asVduBulkWork(() -> aiService.visionCompletionDetailed(
                     PASS1_PROMPT, imageBytes, PASS1_MAX_TOKENS,
@@ -659,12 +719,19 @@ public class VduProcessor {
     /**
      * Result of VDU processing.
      *
+     * @param completeCoverage every source page was accepted without token truncation
+     * @param sourceSha256 hash of the immutable source snapshot used throughout processing
      * @param gateVerdict the tempdoc 677 abstention cascade's verdict on this document —
      *     {@link GateVerdict#passed()} when neither Stage 0 nor Stage 1 rejected it. The 3-arg
      *     constructor below defaults to {@code passed()} for callers (tests, mocks) predating the
      *     gate that have no opinion on it.
      */
-    public record VduResult(String extractedText, String enrichment, int pageCount, GateVerdict gateVerdict) {
+    public record VduResult(String extractedText, String enrichment, int pageCount, GateVerdict gateVerdict,
+                            boolean completeCoverage, String sourceSha256) {
+
+        public VduResult(String extractedText, String enrichment, int pageCount, GateVerdict gateVerdict) {
+            this(extractedText, enrichment, pageCount, gateVerdict, true, "");
+        }
 
         /** Back-compat constructor: assumes the gate passed (no rejection). */
         public VduResult(String extractedText, String enrichment, int pageCount) {

@@ -70,7 +70,7 @@ class VduMutationCommitTest extends LuceneExecutorTestBase {
     }
   }
 
-  @ParameterizedTest
+  @ParameterizedTest(name = "{displayName} [{index}] {arguments}")
   @EnumSource(value = VduUpdateOutcome.class, names = {
       "VDU_UPDATE_OUTCOME_SUCCESS_TEXT", "VDU_UPDATE_OUTCOME_SUCCESS_EMPTY",
       "VDU_UPDATE_OUTCOME_FAILED", "VDU_UPDATE_OUTCOME_REJECTED_SUSPECT_TEXT"})
@@ -80,13 +80,13 @@ class VduMutationCommitTest extends LuceneExecutorTestBase {
       var service=service(runtime);var ctx=procedureContext();
       assertTrue(service.markVduProcessing(MarkVduProcessingRequest.newBuilder().setDocId(DOC).setAttemptId(ATTEMPT).build(),ctx).getSuccess());
       String content = "Durable extraction with enough words for multiple chunks. ".repeat(400);
-      var result = service.updateVduResult(UpdateVduResultRequest.newBuilder()
+      var result = service.updateVduResult(UpdateVduResultRequest.newBuilder().setSourceSha256("a".repeat(64))
           .setDocId(DOC).setAttemptId(ATTEMPT).setOutcome(outcome).setExtractedContent(content).build(), ctx);
       assertTrue(result.getSuccess(), result.getError());
       String expectedStatus = switch (outcome) {
         case VDU_UPDATE_OUTCOME_SUCCESS_TEXT -> SchemaFields.VDU_STATUS_COMPLETED;
         case VDU_UPDATE_OUTCOME_SUCCESS_EMPTY -> SchemaFields.VDU_STATUS_COMPLETED_EMPTY;
-        case VDU_UPDATE_OUTCOME_FAILED -> SchemaFields.VDU_STATUS_FAILED;
+        case VDU_UPDATE_OUTCOME_FAILED -> SchemaFields.VDU_STATUS_PENDING;
         default -> SchemaFields.VDU_STATUS_REJECTED;
       };
       assertEquals(expectedStatus, committedField(SchemaFields.VDU_STATUS));
@@ -114,7 +114,7 @@ class VduMutationCommitTest extends LuceneExecutorTestBase {
       var context = procedureContext();
       assertTrue(service.markVduProcessing(MarkVduProcessingRequest.newBuilder()
           .setDocId(DOC).setAttemptId(ATTEMPT).build(), context).getSuccess());
-      var result = service.updateVduResult(UpdateVduResultRequest.newBuilder()
+      var result = service.updateVduResult(UpdateVduResultRequest.newBuilder().setSourceSha256("a".repeat(64))
           .setDocId(DOC).setAttemptId(ATTEMPT).setOutcome(VduUpdateOutcome.VDU_UPDATE_OUTCOME_SUCCESS_TEXT)
           .setExtractedContent(content).build(), context);
       assertTrue(result.getSuccess(), result.getError());
@@ -216,7 +216,7 @@ class VduMutationCommitTest extends LuceneExecutorTestBase {
   }
 
   private static UpdateVduResultRequest success() {
-    return UpdateVduResultRequest.newBuilder().setDocId(DOC).setAttemptId(ATTEMPT)
+    return UpdateVduResultRequest.newBuilder().setSourceSha256("a".repeat(64)).setDocId(DOC).setAttemptId(ATTEMPT)
         .setOutcome(VduUpdateOutcome.VDU_UPDATE_OUTCOME_SUCCESS_TEXT)
         .setExtractedContent("new successful text").build();
   }
@@ -271,7 +271,7 @@ class VduMutationCommitTest extends LuceneExecutorTestBase {
     clearInvocations(commits);
     var failure=new IllegalStateException("controlled commit failure");doThrow(failure).when(commits).commitAndTrack(reason);
     switch(reason) {
-      case VDU_UPDATE -> assertFalse(service.updateVduResult(UpdateVduResultRequest.newBuilder().setDocId(DOC).setAttemptId(ATTEMPT).setOutcome(VduUpdateOutcome.VDU_UPDATE_OUTCOME_SUCCESS_EMPTY).build(),ctx).getSuccess());
+      case VDU_UPDATE -> assertFalse(service.updateVduResult(UpdateVduResultRequest.newBuilder().setSourceSha256("a".repeat(64)).setDocId(DOC).setAttemptId(ATTEMPT).setOutcome(VduUpdateOutcome.VDU_UPDATE_OUTCOME_SUCCESS_EMPTY).build(),ctx).getSuccess());
       case VDU_MARK_PROCESSING -> assertFalse(service.markVduProcessing(MarkVduProcessingRequest.newBuilder().setDocId(DOC).setAttemptId(ATTEMPT).build(),ctx).getSuccess());
       case VDU_RECOVERY -> { var thrown=assertThrows(WorkerServiceException.class,()->service.recoverVduProcessing(RecoverVduProcessingRequest.getDefaultInstance(),CallContext.none()));assertEquals(WorkerServiceException.Status.INTERNAL,thrown.status());assertSame(failure,thrown.getCause()); }
       default -> fail("unexpected test reason");
@@ -317,7 +317,7 @@ class VduMutationCommitTest extends LuceneExecutorTestBase {
       var service=service(facade);var ctx=procedureContext();
       assertTrue(service.markVduProcessing(MarkVduProcessingRequest.newBuilder().setDocId(DOC).setAttemptId(ATTEMPT).build(),ctx).getSuccess());
       String content = "Replacement text long enough to create several chunks. ".repeat(400);
-      var result = service.updateVduResult(UpdateVduResultRequest.newBuilder()
+      var result = service.updateVduResult(UpdateVduResultRequest.newBuilder().setSourceSha256("a".repeat(64))
           .setDocId(DOC).setAttemptId(ATTEMPT).setOutcome(VduUpdateOutcome.VDU_UPDATE_OUTCOME_SUCCESS_TEXT)
           .setExtractedContent(content).build(), ctx);
       assertFalse(result.getSuccess());
@@ -396,7 +396,7 @@ class VduMutationCommitTest extends LuceneExecutorTestBase {
       assertTrue(service.markVduProcessing(MarkVduProcessingRequest.newBuilder().setDocId(DOC).setAttemptId(ATTEMPT).build(),ctx).getSuccess());
       clearInvocations(indexing);
       doThrow(new IOException("dropout reason unreadable")).when(fields).getDocumentFieldOrThrow(DOC,SchemaFields.EXTRACTION_REASON_CODE);
-      var result=service.updateVduResult(UpdateVduResultRequest.newBuilder().setDocId(DOC).setAttemptId(ATTEMPT)
+      var result=service.updateVduResult(UpdateVduResultRequest.newBuilder().setSourceSha256("a".repeat(64)).setDocId(DOC).setAttemptId(ATTEMPT)
           .setOutcome(VduUpdateOutcome.VDU_UPDATE_OUTCOME_SUCCESS_EMPTY).build(),ctx);
       assertFalse(result.getSuccess());assertEquals("dropout reason unreadable",result.getError());verifyNoInteractions(indexing);
     }

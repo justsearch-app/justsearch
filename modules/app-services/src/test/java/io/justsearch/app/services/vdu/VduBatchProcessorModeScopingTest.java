@@ -123,7 +123,7 @@ class VduBatchProcessorModeScopingTest {
   }
 
   private Fixture fixture(int count) throws Exception {
-    VduProcessor processor = mock(VduProcessor.class);
+    VduProcessor processor = VduAttemptTestSupport.processor();
     when(processor.hasVisionCapability()).thenReturn(true);
     KnowledgeClient client = VduAttemptTestSupport.client();
     List<String> ids = new ArrayList<>();
