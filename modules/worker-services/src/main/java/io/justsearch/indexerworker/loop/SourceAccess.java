@@ -16,7 +16,8 @@ public final class SourceAccess {
     Path source = file.toAbsolutePath().normalize();
     Path boundary = root.toAbsolutePath().normalize();
     if (!source.startsWith(boundary)) throw new IOException("Source is outside its ingestion boundary");
-    Path parent = source.equals(boundary) ? boundary : source.getParent();
+    if (source.equals(boundary)) boundary = source.getParent();
+    Path parent = source.getParent();
     Path current = boundary;
     Path realRoot = null;
     for (;;) {

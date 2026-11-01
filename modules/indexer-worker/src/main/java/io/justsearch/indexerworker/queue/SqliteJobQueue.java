@@ -76,6 +76,34 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
     declaredCollectionRoots = Objects.requireNonNull(roots);
   }
 
+  private java.util.function.Function<Path, java.util.function.Predicate<Path>> sourceStorageChecks =
+      root -> source -> true;
+
+  @Override
+  public void useSourceStorageChecks(
+      java.util.function.Function<Path, java.util.function.Predicate<Path>> checks) {
+    sourceStorageChecks = Objects.requireNonNull(checks);
+  }
+
+  private Map<Path, java.util.function.Predicate<Path>> sourceChecks(List<EnqueueEntry> entries) {
+    var checks = new HashMap<Path, java.util.function.Predicate<Path>>();
+    for (var entry : entries) {
+      Path root = entry.ingestionRoot() == null ? entry.path().toAbsolutePath().getParent() : entry.ingestionRoot();
+      checks.computeIfAbsent(root, sourceStorageChecks);
+    }
+    return checks;
+  }
+
+  private void requireSourceAccess(EnqueueEntry entry,
+      Map<Path, java.util.function.Predicate<Path>> checks) throws IOException {
+    Path root = entry.ingestionRoot() == null ? entry.path().toAbsolutePath().getParent() : entry.ingestionRoot();
+    if (!checks.get(root).test(entry.path())
+        || io.justsearch.indexerworker.ingest.CloudPlaceholderDetector.isCloudPlaceholder(entry.path())) {
+      throw new IOException("Source storage is unavailable for content access");
+    }
+    io.justsearch.indexerworker.loop.SourceAccess.requireContained(entry.path(), entry.ingestionRoot());
+  }
+
   private java.util.function.Supplier<List<IngestCollectionPolicy.RootBinding>> frozenCollectionRoots = List::of;
 
   /** In-memory recorded-plan snapshot, owned and retired by the generation publisher. */
@@ -298,9 +326,11 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
     if (!hasSufficientDiskSpace()) {
       throw new IllegalStateException("Recorded queue admission is unavailable");
     }
+    var checks = sourceChecks(entries);
     List<EnqueueEntry> witnessedEntries = new ArrayList<>(entries.size());
     try {
       for (EnqueueEntry entry : entries) {
+        if (entry.plannedSourceSha256() == null) requireSourceAccess(entry, checks);
         String hash = entry.plannedSourceSha256() == null
             ? io.justsearch.indexerworker.loop.SourceContentHash.sha256WithinRoot(entry.path(), entry.ingestionRoot())
             : entry.plannedSourceSha256();
@@ -2835,6 +2865,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
       boolean maintenance, java.util.function.BooleanSupplier cancelled) {
     if (entries.isEmpty()) return 0;
     if (!hasSufficientDiskSpace()) throw new IllegalStateException("Insufficient sync disk space");
+    var checks = sourceChecks(entries);
     var declared = collection == null || collection.isBlank()
         ? declaredCollectionRoots.get() : List.<IngestCollectionPolicy.RootBinding>of();
     lockTimed();
@@ -2857,6 +2888,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
           JobQueue.EnqueueEntry admitted = entry;
           if (exact) {
             try {
+              requireSourceAccess(entry, checks);
               admitted = new JobQueue.EnqueueEntry(entry.path(), entry.sizeBytes(), entry.provenance(),
                   io.justsearch.indexerworker.loop.SourceContentHash.sha256WithinRoot(entry.path(), entry.ingestionRoot(), cancelled),
                   entry.ingestionRoot());
@@ -2890,6 +2922,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
   public int enqueueRetirementRootEntries(SwitchBufferOp root,List<JobQueue.EnqueueEntry> entries,
       String collection,boolean maintenance,boolean replay,java.util.function.BooleanSupplier cancelled,
       Map<String,Map<String,String>> completedRows) {
+    var checks = sourceChecks(entries);
     lockTimed();try {
       ensureOpen();
       if(releaseRecovery==null || !releaseRecovery.rootReceipts().contains(root))
@@ -2941,6 +2974,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
             boolean exact=refreshable.contains(path);
             JobQueue.EnqueueEntry admitted=entry;
             if(exact&&!replay) {
+              requireSourceAccess(entry, checks);
               String source=io.justsearch.indexerworker.loop.SourceContentHash.sha256WithinRoot(entry.path(), entry.ingestionRoot(), cancelled);
               admitted=new JobQueue.EnqueueEntry(entry.path(),entry.sizeBytes(),entry.provenance(),source,entry.ingestionRoot());
             }
@@ -3222,6 +3256,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
     }
 
     List<IngestCollectionPolicy.RootBinding> declared;
+    var checks = sourceChecks(entries);
     List<JobQueue.EnqueueEntry> witnessedEntries = new ArrayList<>(entries.size());
     try {
       declared = !enumeration && (collection == null || collection.isBlank())
@@ -3239,7 +3274,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
                   entry.provenance() == null ? null : entry.provenance().transport()));
           return 0;
         }
-        io.justsearch.indexerworker.loop.SourceAccess.requireContained(entry.path(), entry.ingestionRoot());
+        requireSourceAccess(entry, checks);
         String hash = entry.plannedSourceSha256() == null
             ? io.justsearch.indexerworker.loop.SourceContentHash.sha256WithinRoot(entry.path(), entry.ingestionRoot())
             : entry.plannedSourceSha256();
@@ -3326,6 +3361,8 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
               // accepted newer bytes in that interval. Only replace a stale receipt when the
               // enumerator still witnesses the current source; otherwise retain the accepted work.
               try {
+                var entry = new EnqueueEntry(Path.of(path), 0).withinRoot(ingestionRoot);
+                requireSourceAccess(entry, sourceChecks(List.of(entry)));
                 if (!sourceSha256.equals(
                     io.justsearch.indexerworker.loop.SourceContentHash.sha256WithinRoot(Path.of(path), ingestionRoot))) return true;
               } catch (IOException unreadable) {

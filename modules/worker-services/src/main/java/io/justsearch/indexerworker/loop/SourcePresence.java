@@ -95,11 +95,11 @@ public final class SourcePresence {
         return Verdict.SOURCE_UNREADABLE;
       }
     }
+    if (!rootCheck.sourceStorageAvailable(file, root)) return Verdict.ROOT_UNAVAILABLE;
     PathPresence first = PathPresence.probe(file);
     if (first == PathPresence.PRESENT) {
       return Verdict.PRESENT;
     }
-    if (!rootCheck.sourceStorageAvailable(file, root)) return Verdict.ROOT_UNAVAILABLE;
     boolean rooted = answersAsRoot(file, root);
     if (!rooted && rootCheck.isRelease030ExactFile(file)) return Verdict.SOURCE_UNREADABLE;
     Path folder = vouchingFolder(file, root);

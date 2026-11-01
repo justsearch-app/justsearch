@@ -376,6 +376,7 @@ public final class NativePolicyReplay {
             var file = SwitchBufferUpsert.decode(old.op().payload());
             Path path = Path.of(file.path());
             if (!allows(path, file.ingestionRoot(), file.collection()) || !ordinaryIndexOwner(path)) return false;
+            if (!publisher.rootCheck().sourceStorageAvailable(path, file.ingestionRoot())) return false;
             var ancestors = currentAncestors(file.ingestionRoot(), path);
             var before = Files.readAttributes(path,
                 BasicFileAttributes.class, LinkOption.NOFOLLOW_LINKS);

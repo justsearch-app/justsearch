@@ -274,6 +274,7 @@ public final class WorkerIngestService {
         confirmedDeletionMarker);
     this.syncOps.setForcedPathSink(paths -> this.forcedPathSink.accept(paths));
     this.syncOps.setPruneGuardFactory(this::pruneGuard);
+    this.syncOps.setSourceStorageChecks(root -> rootCheck().sourceStorageCheck(root));
     this.syncOps.setPruneWriterFence(pruneWriterFence);
     this.syncOps.setUserExclusions(this::isUserExcluded);
     this.syncOps.setDirectoryExclusions(this::isUserExcludedDirectory);
@@ -288,6 +289,7 @@ public final class WorkerIngestService {
         confirmedDeletionMarker);
     this.candidateDiscoveryOps.setPrefixScopeFactory(root -> prefixScope(root.toString()));
     this.candidateDiscoveryOps.setPruneGuardFactory(this::pruneGuard);
+    this.candidateDiscoveryOps.setSourceStorageChecks(root -> rootCheck().sourceStorageCheck(root));
     this.candidateDiscoveryOps.setDirectoryExclusions(this::isUserExcludedDirectory);
     this.candidateDiscoveryOps.setUserExclusions(this::isUserExcluded);
     this.switchBufferOps =
@@ -694,8 +696,11 @@ public final class WorkerIngestService {
    * (the identity a watch registered, the recorded volume) and applied inside {@code publisher}'s
    * file-mutation fence.
    */
+  private WorkerIngestService sourcePublisher;
+
   public void prunesUnder(WorkerIngestService publisher) {
     Objects.requireNonNull(publisher, "publisher");
+    sourcePublisher = publisher;
     syncOps.setForcedPathSink(paths -> publisher.forcedPathSink.accept(paths));
     syncOps.setPruneGuardFactory(publisher::pruneGuard);
     syncOps.setRetirementExclusions(publisher::isUserExcludedForRetirement);
@@ -951,7 +956,7 @@ public final class WorkerIngestService {
     } catch (IOException unavailable) {
       throw WorkerServiceException.unavailable("Watcher source boundary is unavailable");
     }
-    if (!rootWitness.observeSourceStorage(root)) throw WorkerServiceException.unavailable("Source storage is unavailable");
+    if (!rootCheck().sourceStorageCheck(root).test(path)) throw WorkerServiceException.unavailable("Source storage is unavailable");
     if (SyncDirectoryOps.isCloudPlaceholder(path)) {
       new CloudPlaceholderRecorder(jobQueue).record(path, collection,
           WorkerMethvinWatcher.entryForLiveEvent(path).provenance());
@@ -1245,7 +1250,7 @@ public final class WorkerIngestService {
    * the indexing loop and the watcher so every deletion decision asks the same one (#758).
    */
   public io.justsearch.indexerworker.loop.SourcePresence.RootCheck rootCheck() {
-    return rootWitness;
+    return sourcePublisher == null ? rootWitness : sourcePublisher.rootCheck();
   }
 
   /**
@@ -1930,6 +1935,7 @@ public final class WorkerIngestService {
    */
   public void useExclusionRoots(Supplier<java.util.Collection<Path>> roots) {
     exclusionRoots = Objects.requireNonNull(roots, "roots");
+    if (jobQueue != null) jobQueue.useSourceStorageChecks(rootWitness::sourceStorageCheck);
     if (ingestLifecycle != null) {
       ingestLifecycle.useSourceProcessingPolicy(this::sourceProcessingAllowed);
     }
@@ -3263,6 +3269,7 @@ public final class WorkerIngestService {
             var liveEntry = WorkerMethvinWatcher.entryForLiveEvent(path);
             // Root convergence is content-bound even when size and mtime were preserved.
             // Reuse the queue's captured source witness so extraction cannot skip this claim.
+            if (!rootCheck().sourceStorageAvailable(path, root)) throw new IOException("Source storage is unavailable");
             var capturedEntry = new JobQueue.EnqueueEntry(
                 liveEntry.path(), liveEntry.sizeBytes(), liveEntry.provenance(),
                 io.justsearch.indexerworker.loop.SourceContentHash.sha256WithinRoot(path, root)).withinRoot(root);
@@ -3371,6 +3378,7 @@ public final class WorkerIngestService {
         id, SchemaFields.SOURCE_SHA256);
     String indexedCollection = fields.getDocumentField(
         id, SchemaFields.COLLECTION);
+    if (!rootCheck().sourceStorageAvailable(file, root)) throw new IOException("Source storage is unavailable");
     return io.justsearch.indexerworker.loop.SourceContentHash.sha256WithinRoot(file, root).equals(source)
         && Objects.equals(normalizeRootCollection(collection),
             normalizeRootCollection(indexedCollection));
@@ -3775,16 +3783,32 @@ public final class WorkerIngestService {
     ingestLifecycle.commitOps().commitAndTrack(CommitReason.VDU_RECOVERY);
     if (jobQueue == null) return;
     try {
-      Path path = Path.of(docId);
+      Path path = Path.of(docId).toAbsolutePath().normalize();
+      Path root = legacyVduRoot(path);
+      if (root == null || !rootCheck().sourceStorageCheck(root).test(path)) return;
+      io.justsearch.indexerworker.loop.SourceAccess.requireContained(path, root);
+      if (SyncDirectoryOps.isCloudPlaceholder(path)) {
+        new CloudPlaceholderRecorder(jobQueue).record(path, input.fields().get(SchemaFields.COLLECTION),
+            CallContext.none().provenance());
+        return;
+      }
       var stat = JobQueue.EnqueueEntry.stat(path);
       var entry = new JobQueue.EnqueueEntry(path, stat.sizeBytes(), stat.provenance(),
-          io.justsearch.indexerworker.loop.SourceContentHash.sha256(path));
+          io.justsearch.indexerworker.loop.SourceContentHash.sha256WithinRoot(path, root), root);
       if (jobQueue.enqueueEntriesWithExactCollection(List.of(entry), input.fields().get(SchemaFields.COLLECTION)) != 1) {
         throw new IOException("Legacy VDU source refresh was not admitted: " + docId);
       }
-    } catch (java.nio.file.FileSystemException unavailable) {
+    } catch (IOException | SecurityException unavailable) {
       log.info("Legacy VDU source refresh deferred for {}: {}", docId, unavailable.getMessage());
     }
+  }
+
+  private Path legacyVduRoot(Path file) {
+    if (sourcePublisher != null) return sourcePublisher.legacyVduRoot(file);
+    var roots = new java.util.HashSet<Path>(exclusionRoots.get());
+    declaredCollectionRoots().forEach(binding -> roots.add(binding.path()));
+    return roots.stream().map(root -> root.toAbsolutePath().normalize()).filter(file::startsWith)
+        .max(java.util.Comparator.comparingInt(Path::getNameCount)).orElse(null);
   }
 
   private List<String> processingDocIdsForRecovery() throws IOException {
@@ -4476,6 +4500,7 @@ public final class WorkerIngestService {
             () -> validateRecordedGeneration(Objects.requireNonNull(recorded), ctx),
             switchBufferOps::buildingGenerationForFileAdmission);
         scanner.setUserExclusions(this::isUserExcluded, this::isUserExcludedDirectory);
+        scanner.setSourceStorageChecks(boundary -> rootCheck().sourceStorageCheck(boundary));
         scanner.setAdmissionFence(admit -> withFileMutationFence(() ->
             isCancelled.getAsBoolean() ? 0 : admit.getAsInt()));
         scanner.scan(scanRequest, sink);

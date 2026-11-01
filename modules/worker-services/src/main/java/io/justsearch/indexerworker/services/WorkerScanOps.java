@@ -61,6 +61,13 @@ final class WorkerScanOps {
   static final long QUEUE_LOW_WATERMARK = 70_000L;
   static final long BACKPRESSURE_POLL_MS = 2_000L;
 
+  private java.util.function.Function<Path, Predicate<Path>> sourceStorageChecks =
+      root -> source -> true;
+
+  void setSourceStorageChecks(java.util.function.Function<Path, Predicate<Path>> checks) {
+    sourceStorageChecks = Objects.requireNonNull(checks);
+  }
+
   private final JobQueue jobQueue;
   private final CloudPlaceholderRecorder cloudPlaceholderRecorder;
   private final Predicate<Path> isCloudPlaceholder;
@@ -224,6 +231,7 @@ final class WorkerScanOps {
       return terminal;
     }
 
+    var storage = sourceStorageChecks.apply(root);
     var excludes = io.justsearch.configuration.excludes.ExclusionPatterns.fromPatterns(request.excludeGlobs());
     long[] counters = new long[3]; // [walked, admitted, skipped]
     long[] bytes = new long[1];
@@ -296,6 +304,12 @@ final class WorkerScanOps {
                   || userExclusions.test(file, root)
                   || excludedByOwnership(request, file)
                   || matchesAny(excludes, root, file)) {
+                counters[2]++;
+                return FileVisitResult.CONTINUE;
+              }
+              if (!storage.test(file)) {
+                if (request.recordedEpoch() != null) throw new IOException("Recorded source storage is unavailable");
+                incomplete[0] = true;
                 counters[2]++;
                 return FileVisitResult.CONTINUE;
               }

@@ -41,6 +41,25 @@ import tools.jackson.databind.ObjectMapper;
 final class WatcherMigrationReplayTest extends LuceneExecutorTestBase {
   @TempDir Path temporary;
 
+  @ParameterizedTest
+  @ValueSource(strings = {"regular", "directory"})
+  void standaloneReplayRetainsUnavailableChildStorageBeforeReadOrRetirement(String replacement) throws Exception {
+    try (var f = new Fixture()) {
+      Path child = Files.createDirectory(f.root.resolve("child"));
+      Path file = f.file("child/notes.txt", "original text");
+      f.index(file, "notes");
+      f.debt();
+      RootVolumeLedger.under(temporary).recordIfAbsent(child, "linux-volume-v1:740:ext4:Lw");
+      if (replacement.equals("directory")) { Files.delete(file); Files.createDirectory(file); }
+      try (var hashes = org.mockito.Mockito.mockStatic(SourceContentHash.class, org.mockito.Mockito.CALLS_REAL_METHODS)) {
+        assertTrue(f.prepare().isEmpty(), "standalone replay also needs recorded descendant storage evidence");
+        hashes.verifyNoInteractions();
+      }
+      assertEquals("original text", f.content(file));
+      assertFalse(f.queue.listSwitchBufferOpsStrict().isEmpty());
+    }
+  }
+
   @Test
   void reconciliationReceiptIsAppliedInsteadOfRejectedAsUnsupported() throws Exception {
     try (var f = new Fixture()) {
@@ -593,11 +612,22 @@ final class WatcherMigrationReplayTest extends LuceneExecutorTestBase {
       try {
         try {
           Class<?> implementation = Class.forName("io.justsearch.indexerworker.services.WatcherReplay");
-          Object instance = implementation.getConstructor(WatcherRootReconciliation.class, RunningRuntime.class,
-              JobQueue.class, WorkerIngestService.class, IndexingPacing.class, List.class, List.class,
-              java.util.function.BooleanSupplier.class).newInstance(debt, f.runtime, f.queue, null,
-                  IndexingPacing.unthrottled(), f.roots, admissions.stream().map(a -> a.path()).toList(),
-                  (java.util.function.BooleanSupplier) () -> false);
+          Object instance;
+          try {
+            instance = implementation.getConstructor(WatcherRootReconciliation.class, RunningRuntime.class,
+                JobQueue.class, WorkerIngestService.class, IndexingPacing.class, List.class, List.class,
+                java.util.function.BooleanSupplier.class, NativePolicyReplay.class,
+                io.justsearch.indexerworker.loop.SourcePresence.RootCheck.class).newInstance(
+                    debt, f.runtime, f.queue, null, IndexingPacing.unthrottled(), f.roots,
+                    admissions.stream().map(a -> a.path()).toList(), (java.util.function.BooleanSupplier) () -> false,
+                    null, RootWitness.of(RootVolumeLedger.under(temporary), ignored -> null, ignored -> false));
+          } catch (NoSuchMethodException withoutStorageAuthority) {
+            instance = implementation.getConstructor(WatcherRootReconciliation.class, RunningRuntime.class,
+                JobQueue.class, WorkerIngestService.class, IndexingPacing.class, List.class, List.class,
+                java.util.function.BooleanSupplier.class).newInstance(debt, f.runtime, f.queue, null,
+                    IndexingPacing.unthrottled(), f.roots, admissions.stream().map(a -> a.path()).toList(),
+                    (java.util.function.BooleanSupplier) () -> false);
+          }
           try (var preflight = (AutoCloseable) instance) {
             try {
               implementation.getMethod("prepare", String.class, List.class,

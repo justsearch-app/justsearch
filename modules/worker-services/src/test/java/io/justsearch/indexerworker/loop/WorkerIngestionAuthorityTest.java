@@ -24,6 +24,23 @@ class WorkerIngestionAuthorityTest {
 
 
   @Test
+  void unavailableStorageIsNotClassifiedFromItsUnderlyingPresentReplacement() throws Exception {
+    Path root = Files.createDirectory(tempDir.resolve("root"));
+    Path file = Files.writeString(root.resolve("notes.txt"), "underlying bytes");
+    var authority = new WorkerIngestionAuthority();
+    authority.useRootCheck(new SourcePresence.RootCheck() {
+      @Override public boolean admits(Path folder) { return true; }
+      @Override public boolean vouches(Path folder) { return true; }
+      @Override public boolean sourceStorageAvailable(Path source, Path boundary) { return false; }
+    });
+    assertEquals(SourcePresence.Verdict.ROOT_UNAVAILABLE, authority.presence(file, root));
+    try (var snapshots = org.mockito.Mockito.mockStatic(FileFreshnessSnapshot.class, org.mockito.Mockito.CALLS_REAL_METHODS)) {
+      assertEquals(SourceAdmissionAction.RETRYABLE_FAILURE, authority.admit(rooted(file, root)).action());
+      snapshots.verifyNoInteractions();
+    }
+  }
+
+  @Test
   void ancestorReplacementNeverAdmitsOutsideContentOrProvesDeletion() throws Exception {
     Path root = Files.createDirectory(tempDir.resolve("boundary"));
     Path parent = Files.createDirectory(root.resolve("parent"));

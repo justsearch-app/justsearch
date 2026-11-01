@@ -165,25 +165,28 @@ final class RootVolumeLedger {
     }
   }
 
-  /** Recorded descendants are storage boundaries even when their mount is currently absent. */
-  java.util.Map<Path, String> descendantVolumes(Path root) throws IOException {
+  /** Descendants and the nearest recorded ancestor keep explicit-file storage checks scoped. */
+  java.util.Map<Path, String> sourceVolumes(Path root) throws IOException {
     if (!enabled()) return java.util.Map.of();
     synchronized (lock) {
       var result = new java.util.HashMap<Path, String>();
       Path boundary = root.toAbsolutePath().normalize();
       Properties entries = load();
+      Path nearest = null;
       for (String name : entries.stringPropertyNames()) {
         if (name.startsWith(FILE_FOLDER_PREFIX)) continue;
         Path path = Path.of(name);
         if (!path.equals(boundary) && path.startsWith(boundary)) result.put(path, entries.getProperty(name));
+        else if (boundary.startsWith(path) && (nearest == null || path.getNameCount() > nearest.getNameCount())) nearest = path;
       }
+      if (nearest != null) result.put(nearest, entries.getProperty(key(nearest)));
       return java.util.Map.copyOf(result);
     }
   }
 
   boolean sourceStorageAvailable(Path file, Path root) {
     try {
-      return sourceStorageAvailable(file, descendantVolumes(root));
+      return sourceStorageAvailable(file, sourceVolumes(root));
     } catch (IOException | RuntimeException unavailable) {
       return false;
     }

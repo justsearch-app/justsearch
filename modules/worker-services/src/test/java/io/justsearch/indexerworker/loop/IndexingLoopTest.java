@@ -765,6 +765,30 @@ class IndexingLoopTest {
     }
 
     @Test
+    void storageLostAfterAdmissionDefersBeforeHashingOrExtraction(
+        @org.junit.jupiter.api.io.TempDir Path temp) throws Exception {
+      Path root = Files.createDirectory(temp.resolve("root"));
+      Path file = Files.writeString(root.resolve("notes.txt"), "mounted bytes");
+      RecordingQueue queue = new RecordingQueue();
+      ContentExtractorProvider provider = mock(ContentExtractorProvider.class);
+      var available = new AtomicBoolean(true);
+      IndexingLoop loop = newLoop(queue, provider, () -> available.set(false));
+      loop.useRootCheck(new SourcePresence.RootCheck() {
+        @Override public boolean admits(Path folder) { return true; }
+        @Override public boolean vouches(Path folder) { return true; }
+        @Override public boolean sourceStorageAvailable(Path source, Path boundary) { return available.get(); }
+      });
+      try (var hashes = mockStatic(SourceContentHash.class, CALLS_REAL_METHODS)) {
+        assertNull(invokeExtractJob(loop, new JobQueue.IndexJob(
+            file, null, null, null, null, null, false, null, root)));
+        hashes.verifyNoInteractions();
+      }
+      assertEquals(IngestionReasonCodes.ROOT_UNAVAILABLE, queue.lastOutcome.reasonCode());
+      verifyNoInteractions(provider, queue.indexingCoordinator);
+      assertFalse(queue.done);
+    }
+
+    @Test
     void storageDiscoveryRunsOncePerRootInEachExtractionBatch(
         @org.junit.jupiter.api.io.TempDir Path temp) throws Exception {
       Path root = Files.createDirectory(temp.resolve("root"));
@@ -2115,6 +2139,10 @@ class IndexingLoopTest {
     }
 
     private IndexingLoop newLoop(RecordingQueue queue, ContentExtractorProvider provider) {
+      return newLoop(queue, provider, () -> {});
+    }
+
+    private IndexingLoop newLoop(RecordingQueue queue, ContentExtractorProvider provider, Runnable afterIdentity) {
       DocumentFieldOps documentFieldOps = mock(DocumentFieldOps.class);
       IndexCountOps indexCountOps = mock(IndexCountOps.class);
       WorkerSignalBus signalBus = mock(WorkerSignalBus.class);
@@ -2123,6 +2151,7 @@ class IndexingLoopTest {
           .when(identityStore.resolve(anyString(), anyLong()))
           .thenAnswer(
               invocation -> {
+                afterIdentity.run();
                 String hash = invocation.getArgument(0);
                 long now = invocation.getArgument(1);
                 return new DocumentIdentityStore.Identity(hash, "test-uid-" + hash, now, now);

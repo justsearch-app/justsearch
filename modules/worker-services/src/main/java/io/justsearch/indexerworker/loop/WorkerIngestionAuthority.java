@@ -84,7 +84,7 @@ final class WorkerIngestionAuthority {
     batchStorageChecks = null;
   }
 
-  private boolean sourceStorageAvailable(Path source, Path root) {
+  boolean sourceStorageAvailable(Path source, Path root) {
     Path boundary = root == null ? source.getParent() : root.toAbsolutePath().normalize();
     var checks = batchStorageChecks;
     return (checks == null ? rootCheck.sourceStorageCheck(boundary)
@@ -100,6 +100,10 @@ final class WorkerIngestionAuthority {
               IngestionReasonCodes.SKIPPED_TEMP_OR_SYSTEM,
               IngestionRetryPolicy.NONE,
               "Skipped by ingestion or user exclusion policy"));
+    }
+
+    if (!sourceStorageAvailable(filePath.toAbsolutePath().normalize(), root)) {
+      return SourceAdmission.terminal(SourceAdmissionAction.RETRYABLE_FAILURE, rootUnavailable());
     }
 
     // #758: "cannot read it" is never "it is gone". The snapshot is taken first

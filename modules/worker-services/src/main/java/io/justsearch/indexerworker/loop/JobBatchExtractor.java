@@ -345,10 +345,11 @@ public final class JobBatchExtractor {
       extractSpan.setAttribute("doc.path", filePath.toString());
       long extractStart = System.currentTimeMillis();
       ValidatedExtractionArtifact artifact;
+      requireReadableSource(claim);
       String sourceSha256 = SourceContentHash.sha256WithinRoot(filePath, claim.ingestionRoot());
       try {
         // W1.5 — inlined what used to be extractContent + validateArtifact wrappers.
-        SourceAccess.requireContained(filePath, claim.ingestionRoot());
+        requireReadableSource(claim);
         ExtractionArtifact rawArtifact = contentExtractor.extractArtifact(filePath);
         String sourcePathHash = envelope != null ? envelope.pathHash() : null;
         artifact = rawArtifact.validate(contentExtractor.extractionPolicy(), sourcePathHash);
@@ -359,6 +360,7 @@ public final class JobBatchExtractor {
 
       String sourceSha256AfterExtraction;
       try {
+        requireReadableSource(claim);
         sourceSha256AfterExtraction = SourceContentHash.sha256WithinRoot(filePath, claim.ingestionRoot());
       } catch (IOException changedDuringExtraction) {
         if (staleResolver.tryHandleStale(
@@ -512,6 +514,15 @@ public final class JobBatchExtractor {
         || verdict == SourcePresence.Verdict.SOURCE_UNREADABLE) {
       return ingestionAuthority.notConfirmedAbsent(verdict, claim.path(), failure);
     }
+    if (verdict == SourcePresence.Verdict.PRESENT
+        && io.justsearch.indexerworker.ingest.CloudPlaceholderDetector.isCloudPlaceholder(claim.path())) {
+      return journal.outcome(IngestionOutcomeClass.DEFERRED_POLICY, IngestionReasonCodes.CLOUD_PLACEHOLDER,
+          IngestionRetryPolicy.DEFER_WITHOUT_ATTEMPT, "Cloud-only placeholder");
+    }
+    if (verdict == SourcePresence.Verdict.PRESENT) {
+      try { requireReadableSource(claim); }
+      catch (IOException unavailable) { return ingestionAuthority.sourceUnreadable(claim.path(), unavailable); }
+    }
     if (verdict == SourcePresence.Verdict.PRESENT && !openableForRead(claim.path())) {
       return ingestionAuthority.sourceUnreadable(claim.path(), failure);
     }
@@ -526,6 +537,14 @@ public final class JobBatchExtractor {
       // Failure classification keeps the original retry; uncertainty never authorizes deletion.
       return SourcePresence.Verdict.SOURCE_UNREADABLE;
     }
+  }
+
+  private void requireReadableSource(JobQueue.IndexJob claim) throws IOException {
+    if (!ingestionAuthority.sourceStorageAvailable(claim.path(), claim.ingestionRoot())
+        || io.justsearch.indexerworker.ingest.CloudPlaceholderDetector.isCloudPlaceholder(claim.path())) {
+      throw new IOException("Source storage is unavailable for content access");
+    }
+    SourceAccess.requireContained(claim.path(), claim.ingestionRoot());
   }
 
   private static boolean openableForRead(Path source) {

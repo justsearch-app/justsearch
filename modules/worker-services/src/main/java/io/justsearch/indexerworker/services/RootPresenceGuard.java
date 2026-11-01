@@ -36,7 +36,7 @@ final class RootPresenceGuard implements PruneOps.PresenceGuard {
     this.baseline = baseline;
     this.registered = registered;
     this.volumes = volumes;
-    this.childVolumes = volumes.descendantVolumes(root);
+    this.childVolumes = volumes.sourceVolumes(root);
   }
 
   /**
@@ -97,7 +97,7 @@ final class RootPresenceGuard implements PruneOps.PresenceGuard {
       return false;
     }
     try {
-      childVolumes = volumes.descendantVolumes(root);
+      childVolumes = volumes.sourceVolumes(root);
       RootIdentity current = RootIdentity.capture(root);
       baseline.requireSame(current, root);
       if (registered != null) {
