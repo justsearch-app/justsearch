@@ -1028,3 +1028,14 @@ Evidence is intentionally left for the orchestrator to generate using run-eviden
   "note": "Focused re-verification of 5f8eb48c82 after the final repair: C3 missing/unreadable referenced external weights leave companion identity unresolved on capture and the serving commit route (fail before on a82a8a0594); D93 and P1 hold; exempt files keep global state; entries 1-22 accepted with reasons. Transcribed by the orchestrator from the verifier's report."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a198f8-7389-70c3-a8b1-59fdd5adbb40",
+  "verdict": "accept",
+  "digest": "sha256:1b484a54e29cf988998fbbeaf798d1d868e090683759cd689747263d2a9ee7ac",
+  "note": "All 22 entries accepted; 34 repair checks fail before by assertion and pass; exempt-file duties met (41 cases, no global-state leaks)."
+}
+```
