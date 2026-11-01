@@ -165,6 +165,13 @@ def prune_inventory():
             info = json.loads(result.stdout)
             if info['format'] != 'qcow2':
                 raise ValueError('not qcow2')
+            data = info.get('format-specific', {}).get('data', {})
+            if 'data-file' in data or data.get('data-file-raw'):
+                raise ValueError('external data file is unsupported for pruning')
+            if data.get('corrupt'):
+                raise ValueError('image is marked corrupt')
+            if info.get('backing-filename-format', 'qcow2') != 'qcow2':
+                raise ValueError('backing format is not qcow2')
             backing = info.get('backing-filename')
             backings[path] = backing
             parent = None

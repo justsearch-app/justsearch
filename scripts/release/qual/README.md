@@ -58,7 +58,7 @@ After the release session explicitly retires a merged or superseded wave,
 preview its disk retirement (paths are relative to the qualification root):
 
 ```sh
-python3 scripts/release/qual/vm.py prune-disks evidence/retired-wave \
+python3 vm.py prune-disks evidence/retired-wave \
   --reason 'release reference and retirement decision'
 # Review the plan, then repeat with --apply to delete the planned disks.
 ```
@@ -71,7 +71,8 @@ root is a base, as is any disk named by any `base.json` receipt under the root,
 including moved-aside OS folders. Bases, retained run disks and other
 kept disks protect their ancestors; protected paths explain why they remain.
 Selections containing a base, OS directory or the root, symlinked/escaping
-paths, corrupt or unreadable images, and ambiguous chains refuse deletion.
+paths, corrupt or unreadable images, external data files, non-qcow2 images
+or backing formats, and ambiguous chains refuse deletion.
 A positively missing backing file is reported; its head and existing layers
 before the gap remain protected while independent disks remain eligible.
 

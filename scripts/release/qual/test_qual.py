@@ -49,7 +49,7 @@ class DiskGrowthTests(unittest.TestCase):
         subprocess.run(['qemu-img', 'info', '--output=json', '--backing-chain', str(path)],
                        check=True, capture_output=True)
 
-    def prune_cli(self, *targets, apply=False, publish_child=None):
+    def prune_cli(self, *targets, apply=False, publish_child=None, after_plan=''):
         # Exercise the actual parser and command in a child process, redirecting
         # only its root and host liveness probes to keep all resources private.
         source = '''
@@ -61,7 +61,8 @@ vm.ROOT = Path(sys.argv[2])
 vm.STATE = vm.ROOT / 'running.json'
 vm.live_reasons = lambda check_lock=True: []
 child = json.loads(sys.argv[3])
-if child:
+after_plan = sys.argv[4]
+if child or after_plan:
     original = vm.prune_plan
     def publish(*args):
         plan = original(*args)
@@ -72,17 +73,20 @@ if child:
                 pass
             else:
                 raise AssertionError('Apply did not hold the VM lifetime lock')
-        path, backing = map(Path, child)
-        path.parent.mkdir(parents=True, exist_ok=True)
-        vm.run('qemu-img', 'create', '-q', '-f', 'qcow2', '-F', 'qcow2', '-b', backing, path)
+        if child:
+            path, backing = map(Path, child)
+            path.parent.mkdir(parents=True, exist_ok=True)
+            vm.run('qemu-img', 'create', '-q', '-f', 'qcow2', '-F', 'qcow2', '-b', backing, path)
+        exec(after_plan)
         return plan
     vm.prune_plan = publish
-sys.argv = ['vm.py', 'prune-disks', *sys.argv[4:]]
+sys.argv = ['vm.py', 'prune-disks', *sys.argv[5:]]
 vm.main()
 '''
         harness = os.environ.get('QUAL_HARNESS_DIR', str(Path(__file__).resolve().parent))
         return subprocess.run([sys.executable, '-c', source, harness, str(self.root),
             json.dumps(list(map(str, publish_child)) if publish_child else None),
+            after_plan,
             *targets, '--reason', 'regression retirement', *(['--apply'] if apply else [])],
             capture_output=True, text=True, timeout=30)
 
@@ -116,6 +120,93 @@ vm.main()
         self.readable(child)
         receipt = next((self.root / 'evidence').glob('old.prune-*.json'))
         self.assertEqual(json.loads(receipt.read_text())['deleted'], [])
+
+    def test_cli_external_data_file_refuses_before_any_deletion(self):
+        selected = self.image('evidence/old/data.qcow2')
+        kept = self.root / 'kept.img'
+        create = f"vm.run('qemu-img', 'create', '-q', '-f', 'qcow2', '-o', 'data_file={selected}', '{kept}', '1M')"
+        # Creation truncates the external data file. Restore it as a valid qcow2
+        # so the old inventory would mistake it for an independent candidate.
+        create += f"\nvm.run('qemu-img', 'create', '-q', '-f', 'qcow2', '{selected}', '1M')"
+        for late, apply in ((False, False), (False, True), (True, True)):
+            with self.subTest(after_plan=late, apply=apply):
+                if not late:
+                    exec(create, {'vm': vm})
+                result = self.prune_cli('evidence/old', apply=apply, after_plan=create if late else '')
+                self.assertNotEqual(result.returncode, 0, result.stdout)
+                self.assertIn(str(kept), result.stderr)
+                self.assertIn('external data file', result.stderr)
+                self.assertTrue(selected.exists())
+                self.readable(selected)
+                self.readable(kept)
+                kept.unlink()
+        receipt = next((self.root / 'evidence').glob('old.prune-*.json'))
+        self.assertEqual(json.loads(receipt.read_text())['deleted'], [])
+
+    def test_cli_corrupt_mark_refuses_before_any_deletion(self):
+        selected = self.image('evidence/old/disk.qcow2', self.base)
+        for name in ('kept.img', 'evidence/old/corrupt.qcow2'):
+            for late, apply in ((False, False), (False, True), (True, True)):
+                with self.subTest(image=name, after_plan=late, apply=apply):
+                    bad = self.image(name)
+                    mark = f"""
+with Path({str(bad)!r}).open('r+b') as out:
+    out.seek(72)  # qcow2 v3 incompatible_features, big endian uint64
+    flags = int.from_bytes(out.read(8), 'big')
+    out.seek(72)
+    out.write((flags | (1 << 1)).to_bytes(8, 'big'))
+"""
+                    if not late:
+                        exec(mark, {'Path': Path})
+                        info = json.loads(subprocess.check_output(['qemu-img', 'info', '--output=json', str(bad)]))
+                        self.assertTrue(info['format-specific']['data']['corrupt'])
+                    result = self.prune_cli('evidence/old', apply=apply, after_plan=mark if late else '')
+                    self.assertNotEqual(result.returncode, 0, result.stdout)
+                    self.assertIn(str(bad), result.stderr)
+                    self.assertIn('marked corrupt', result.stderr)
+                    self.assertTrue(selected.exists())
+                    self.assertTrue(bad.exists())
+                    bad.unlink()
+        for receipt in (self.root / 'evidence').glob('old.prune-*.json'):
+            self.assertEqual(json.loads(receipt.read_text())['deleted'], [])
+
+    def test_cli_non_qcow2_content_refuses(self):
+        selected = self.image('evidence/old/disk.qcow2', self.base)
+        bad = self.root / 'kept.img'
+        subprocess.run(['qemu-img', 'create', '-q', '-f', 'qcow', str(bad), '1M'], check=True)
+        self.assertEqual(bad.read_bytes()[:4], b'QFI\xfb')
+        result = self.prune_cli('evidence/old', apply=True)
+        self.assertNotEqual(result.returncode, 0, result.stdout)
+        self.assertIn(str(bad), result.stderr)
+        self.assertIn('not qcow2', result.stderr)
+        self.assertTrue(selected.exists())
+
+    def test_cli_non_qcow2_backing_format_refuses(self):
+        selected = self.image('evidence/old/disk.qcow2', self.base)
+        bad = self.root / 'kept.img'
+        subprocess.run(['qemu-img', 'create', '-q', '-f', 'qcow2', '-F', 'raw', '-b',
+                        str(selected), str(bad)], check=True, capture_output=True)
+        result = self.prune_cli('evidence/old', apply=True)
+        self.assertNotEqual(result.returncode, 0, result.stdout)
+        self.assertIn(str(bad), result.stderr)
+        self.assertIn('backing format is not qcow2', result.stderr)
+        self.assertTrue(selected.exists())
+
+    def test_raw_data_file_flag_without_filename_refuses(self):
+        selected = self.image('evidence/old/disk.qcow2', self.base)
+        real_run = vm.run
+        def raw_flag(*args, **kwargs):
+            result = real_run(*args, **kwargs)
+            if args[-1] == self.base:
+                info = json.loads(result.stdout)
+                info['format-specific']['data']['data-file-raw'] = True
+                result.stdout = json.dumps(info)
+            return result
+        for apply in (False, True):
+            with self.subTest(apply=apply), patch.object(vm, 'run', side_effect=raw_flag), \
+                 self.assertRaisesRegex(RuntimeError, 'base.qcow2: external data file'):
+                self.prune('evidence/old', apply=apply)
+            self.assertTrue(selected.exists())
 
     def test_moved_base_receipt_protects_nonstandard_image_name(self):
         disk = self.image('evidence/old/disk.img', self.base)
