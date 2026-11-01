@@ -1,0 +1,687 @@
+---
+schema: test-intent.v1
+task: t-20261101-uiimpl
+author-role: builder
+author-session: builder-uiimpl-lib-20261101
+---
+
+# Test-intent entries
+
+Structural Library redesign: classify the changed tests by oracle class in one pass against the
+agent-drafted, owner-adopted scenarios. Adaptation entries preserve the prior oracle; New entries
+name their added or intentionally relocated expectations. The preserved portions of mixed files
+are described explicitly. No test is deleted, skipped or disabled.
+
+Test ledger (all entries are durable product checks):
+
+- Tests added or rewritten: modules/ui-web/src/shell-v0/chrome/Shell.test.ts — L14, P9 — navigation/history and recovery — durable
+- Tests added or rewritten: modules/ui-web/src/shell-v0/commands/CommandPaletteProjection.test.ts — L14 — indexing-rules route — durable
+- Tests added or rewritten: modules/ui-web/src/shell-v0/components/FailedJobsDrawer.test.ts — L13, L12 — folder switching and late replies — durable
+- Tests added or rewritten: modules/ui-web/src/shell-v0/components/IndexingControls.toolbar.test.ts — L1, L15, P5 — pause durations and combined holds — durable
+- Tests added or rewritten: modules/ui-web/src/shell-v0/components/IndexingPause.test.ts — P5 — recovery control selector — durable
+- Tests added or rewritten: modules/ui-web/src/shell-v0/components/StatusDeck.test.ts — L2 — energy-wait wording — durable
+- Tests added or rewritten: modules/ui-web/src/shell-v0/components/SurfaceTabs.test.ts — L1 — actions slot and tab keyboard semantics — durable
+- Tests added or rewritten: modules/ui-web/src/shell-v0/components/indexingStatusFollowup.test.ts — L2, L10 — empty and unknown-state headlines — durable
+- Tests added or rewritten: modules/ui-web/src/shell-v0/components/indexingStatusSurfaces.test.ts — L2, L4 — status wording — durable
+- Tests added or rewritten: modules/ui-web/src/shell-v0/components/indexingSurfaceSweep.test.ts — L2, L4 — status wording and shared row projection — durable
+- Tests added or rewritten: modules/ui-web/src/shell-v0/renderers/controls/FolderCardRenderer.removal.test.ts — P8, L5 — expanded row removal — durable
+- Tests added or rewritten: modules/ui-web/src/shell-v0/renderers/controls/FolderCardRenderer.test.ts — P8, L5 — expanded row removal intent — durable
+- Tests added or rewritten: modules/ui-web/src/shell-v0/state/indexingProgress.pause.test.ts — P5 — energy-wait wording — durable
+- Tests added or rewritten: modules/ui-web/src/shell-v0/state/indexingStatus.test.ts — L2 — indexing activity wording — durable
+- Tests added or rewritten: modules/ui-web/src/shell-v0/views/BulkOperationImmediateRefusal.test.ts — P4, P6 — accept-gaps label — durable
+- Tests added or rewritten: modules/ui-web/src/shell-v0/views/HealthSurface.render.test.ts — L2 — shared activity wording — durable
+- Tests added or rewritten: modules/ui-web/src/shell-v0/views/LibrarySurface.addCollection.test.ts — P1 — Add folder label — durable
+- Tests added or rewritten: modules/ui-web/src/shell-v0/views/LibrarySurface.bulkOutcome.test.ts — P4, P6 — accept-gaps label — durable
+- Tests added or rewritten: modules/ui-web/src/shell-v0/views/LibrarySurface.excludes-override.test.ts — L7 — visible override and line-input description — durable
+- Tests added or rewritten: modules/ui-web/src/shell-v0/views/LibrarySurface.excludes.test.ts — L7 — line-input/review selectors and transport identity — durable
+- Tests added or rewritten: modules/ui-web/src/shell-v0/views/LibrarySurface.failedChip.test.ts — L16 — last-known failure state selector — durable
+- Tests added or rewritten: modules/ui-web/src/shell-v0/views/LibrarySurface.folderActions.test.ts — L12, P1, P2 — pending Add across member tabs — durable
+- Tests added or rewritten: modules/ui-web/src/shell-v0/views/LibrarySurface.gapDecision.test.ts — P6 — readable gap reasons and accept label — durable
+- Tests added or rewritten: modules/ui-web/src/shell-v0/views/LibrarySurface.redesign.test.ts — L5, L20, V1 — disclosure focus and shared row parity — durable
+- Tests added or rewritten: modules/ui-web/src/shell-v0/views/LibrarySurface.render.test.ts — L2, L4, L5, L10 — moved heading and row facts — durable
+- Tests added or rewritten: modules/ui-web/src/shell-v0/views/LibrarySurface.settings-attempt.test.ts — L7 — retained-base settings transport and line inputs — durable
+- Tests added or rewritten: modules/ui-web/src/shell-v0/views/LibrarySurface.slice2.test.ts — L12, L14, L19, V2, V3 — scrolling, saves, external conflicts — durable
+- Tests added or rewritten: modules/ui-web/src/shell-v0/views/SettingsSurface.indexingRules.test.ts — L8, L14, L15 — moved editor and remedies — durable
+
+Execution evidence was produced by the repository's unmodified run-evidence.mjs in a shared clone
+inside the session temporary directory, with its own copied dependencies. Its detached before
+checkouts belong to that clone and do not write into the source repository. VITEST_MAX_WORKERS=4.
+Failed-files repair compares with 08a63452b2; the verifier's V1/V2/V3 repairs compare with 7c9a5fe9ce.
+Browser viewport and actual native-shell verification are independent of these unit checks.
+
+```json
+{
+  "entries": [
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/components/IndexingPause.test.ts",
+        "modules/ui-web/src/shell-v0/renderers/controls/FolderCardRenderer.removal.test.ts",
+        "modules/ui-web/src/shell-v0/renderers/controls/FolderCardRenderer.test.ts",
+        "modules/ui-web/src/shell-v0/views/BulkOperationImmediateRefusal.test.ts",
+        "modules/ui-web/src/shell-v0/views/LibrarySurface.addCollection.test.ts",
+        "modules/ui-web/src/shell-v0/views/LibrarySurface.bulkOutcome.test.ts",
+        "modules/ui-web/src/shell-v0/views/LibrarySurface.excludes.test.ts",
+        "modules/ui-web/src/shell-v0/views/LibrarySurface.failedChip.test.ts",
+        "modules/ui-web/src/shell-v0/views/LibrarySurface.gapDecision.test.ts",
+        "modules/ui-web/src/shell-v0/views/LibrarySurface.settings-attempt.test.ts"
+      ],
+      "class": "Adaptation",
+      "moved": [
+        "rename",
+        "split",
+        "input re-encoding"
+      ],
+      "whatMoved": "Pause recovery selects the non-toolbar remedy; row Remove is reached by opening its disclosure and selecting Remove from library; Add Folder is now Add folder; accept-gaps is now Use the new index without them, with the same exact gap reason expressed in words. Skip rules moved from one newline-separated textarea to individual line inputs; saved-pattern review selects its named details element. Settings-request counts select the original witnessed/AbortSignal transport, excluding the new editor's independent settings read. Announcements select the surface action status after the toolbar gained a status node; failed metadata selects the folder state containing the same retry/rebuild qualifiers. Inputs, preconditions, observation, fault injection, expected outcome, tags and conditions are kept; only presentation selectors, control encoding and wording moved.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "L1",
+          "quote": "The Folders tab is one page using the whole window: headline, one summary line, attention items (when any), folder list, skip rules and indexing times, then one-line links to other apps' documents and Activity. Window actions sit beside the member tabs (Folders, Browse): Pause indexing with until-I-resume / 15 min / 1 h, a ⋯ menu with Reindex everything and Process pending work, and a filled Add folder. No card boxes or outlined pill buttons. Tab semantics, keyboard navigation and focus restoration of SurfaceTabs stay intact.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "L5",
+          "quote": "A row expands in place (button with aria-expanded, keyboard operable; several may be open): collection, searchable-by-words verdict, meaning processing percent worded as progress (not coverage), indexed X ago, verified X ago, unreadable count opening the failed-files list, and actions Open in Explorer and Remove from library. Open rows stay open through live refreshes.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "L7",
+          "quote": "Skip rules edited on the page, one per line with Add a rule, keeping every existing exclude-pattern behaviour: explicit save and reload, uncertain-save retention, conflict review, preview, typed-consent apply, admin/env override notice, partial results, exact-path keep-outs with remove.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "P1",
+          "quote": "Add folder: picker or typed path, collection, preview, refusal of missing, non-folder, duplicate, overlapping and reserved-collection entries.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "P2",
+          "quote": "Remove: nested and enclosing-root confirmation, overlapping-removal suppression, lost-response reconcile, retry, focus restore.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "P4",
+          "quote": "Reindex everything and process pending work, with operation-history outcomes.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "P5",
+          "quote": "Pause/resume with durations; schedule and battery holds shown; settings-recovery path.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "P6",
+          "quote": "Rebuild decision: accept gaps / cancel with the exact gap list and recorded outcomes.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "P8",
+          "quote": "A themed presentation that replaces the folder rows still receives the existing fields and its remove / show-failed intents still work (parity of the new rows is L20).",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "P10",
+          "quote": "Existing Library behaviour tests keep asserting the same behaviour after selector and wording updates; none is weakened or dropped without a recorded reason.",
+          "label": "agent-drafted, owner-adopted"
+        }
+      ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/components/StatusDeck.test.ts",
+        "modules/ui-web/src/shell-v0/components/indexingStatusSurfaces.test.ts",
+        "modules/ui-web/src/shell-v0/components/indexingSurfaceSweep.test.ts",
+        "modules/ui-web/src/shell-v0/state/indexingProgress.pause.test.ts",
+        "modules/ui-web/src/shell-v0/state/indexingStatus.test.ts",
+        "modules/ui-web/src/shell-v0/views/HealthSurface.render.test.ts"
+      ],
+      "class": "Adaptation",
+      "moved": [
+        "rename",
+        "split",
+        "input re-encoding"
+      ],
+      "whatMoved": "Idle enrichment deferred / Enrichment pending is worded Meaning processing is waiting; save energy becomes saves energy; sparse enrichment becomes some meaning processing. The same reason matrices, freshness transitions, no-active-progress, aggregate, announcements and ready-versus-enriching outcomes remain. The Library sweep calls renderCardsRegion after renderCard was retired, with the original root as its single input. Inputs, preconditions, observation, fault injection, expected outcome, tags and conditions are kept; only presentation selectors, control encoding and wording moved.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "L2",
+          "quote": "Headline: \"Your files are searchable\" when nothing needs attention; \"N things need your attention\" counting distinct actionable items, deduplicated; while status is unconfirmed or loading it says so and never claims searchable. Summary line: searchable documents and folder count from status, plus what is running now.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "L4",
+          "quote": "Folder row: name, path, one status in words from folderStatus for every state it decides today (removal incomplete, provisional/unknown, unavailable, walk failure, indexing/waiting manual/rules/retry, scanning, failed jobs, deletion unverified, enriching, keyword-only/blocked, ready, no indexable files), a thin progress bar when the state has a fraction, and the file count labelled as files found. Last-known and unknown qualifiers kept.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "P10",
+          "quote": "Existing Library behaviour tests keep asserting the same behaviour after selector and wording updates; none is weakened or dropped without a recorded reason.",
+          "label": "agent-drafted, owner-adopted"
+        }
+      ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/views/LibrarySurface.render.test.ts"
+      ],
+      "class": "Adaptation",
+      "moved": [
+        "rename",
+        "split",
+        "input re-encoding"
+      ],
+      "whatMoved": "The true-empty state is observed in the add-a-folder headline. Word-search readiness, enrichment progress, last-indexed time and terminal Up to date status now occupy the shared row's summary and expanded facts; tests open the disclosure and read those locations. The existing incomplete-versus-settled distinction is retained, with an explicit nonterminal assertion for incomplete meaning processing. Inputs, preconditions, observation, fault injection, expected outcome, tags and conditions are kept; only presentation selectors, control encoding and wording moved.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "L2",
+          "quote": "Headline: \"Your files are searchable\" when nothing needs attention; \"N things need your attention\" counting distinct actionable items, deduplicated; while status is unconfirmed or loading it says so and never claims searchable. Summary line: searchable documents and folder count from status, plus what is running now.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "L4",
+          "quote": "Folder row: name, path, one status in words from folderStatus for every state it decides today (removal incomplete, provisional/unknown, unavailable, walk failure, indexing/waiting manual/rules/retry, scanning, failed jobs, deletion unverified, enriching, keyword-only/blocked, ready, no indexable files), a thin progress bar when the state has a fraction, and the file count labelled as files found. Last-known and unknown qualifiers kept.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "L5",
+          "quote": "A row expands in place (button with aria-expanded, keyboard operable; several may be open): collection, searchable-by-words verdict, meaning processing percent worded as progress (not coverage), indexed X ago, verified X ago, unreadable count opening the failed-files list, and actions Open in Explorer and Remove from library. Open rows stay open through live refreshes.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "L10",
+          "quote": "Empty and rebuilding: no folders shows an add-a-folder headline and Add folder; rebuilding with no folders shown says folders will reappear. Browser mode: typed path entry for Add folder and one quiet note, not a banner.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "P10",
+          "quote": "Existing Library behaviour tests keep asserting the same behaviour after selector and wording updates; none is weakened or dropped without a recorded reason.",
+          "label": "agent-drafted, owner-adopted"
+        }
+      ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/chrome/Shell.test.ts",
+        "modules/ui-web/src/shell-v0/commands/CommandPaletteProjection.test.ts",
+        "modules/ui-web/src/shell-v0/views/SettingsSurface.indexingRules.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "L8/L14 relocate the rule editor, command-palette entry and hours/battery remedies from Settings to Library, also from Browse. Shell navigation consumes focus once, excludes focus from history, and preserves plain Back/Forward destinations; legacy rule-focus navigation redirects to Library while recovery remains in Settings. Existing validation, rule-pair payloads, consent, disabled schedule retention, battery-only null schedule, busy/read-only behavior, manual-only Resume and combined-hold assertions are retained at the extracted editor/shared controls. Checkbox-off input is re-encoded through the Any time radio. Shell energy wording alone changes to saves energy.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "L8",
+          "quote": "When to index is edited on the Library page only: any time, or only between two times on chosen weekdays (overnight allowed), and pause while on battery; written through core.set-indexing-rules with the existing validation, draft, busy, read-only and conflict handling. Settings no longer edits them and shows a link to this section instead. Saved meaning is unchanged: an absent schedule stays absent (battery-only saves keep schedule null), a disabled schedule keeps its days and times, and the battery preference, manual-pause deadline and recovery reason survive saves and restart.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "L12",
+          "quote": "Live behaviour: statuses update without collapsing rows or losing a rules draft; a second window shows the same state; reload or switching tabs mid-operation keeps pending outcomes (existing race classes).",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "L14",
+          "quote": "Every route to the moved controls lands on the Library's When-to-index section with keyboard focus: Change hours / Change battery from the Tasks panel and shared indexing controls, the command palette, including when the Browse tab is selected. Settings recovery still leads to Settings, Reset to defaults, and a rule save never clears that hold.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "L15",
+          "quote": "Combined holds: manual pause, schedule and battery at the same time (including pausing and an empty queue) are all named; Resume clears only the manual pause and says what still holds indexing.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "P5",
+          "quote": "Pause/resume with durations; schedule and battery holds shown; settings-recovery path.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "P9",
+          "quote": "Deep links to the Library and to its Browse member tab land on the right tab.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "P10",
+          "quote": "Existing Library behaviour tests keep asserting the same behaviour after selector and wording updates; none is weakened or dropped without a recorded reason.",
+          "label": "agent-drafted, owner-adopted"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/library-redesign-new.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/chrome/Shell.test.ts",
+        "modules/ui-web/src/shell-v0/commands/CommandPaletteProjection.test.ts",
+        "modules/ui-web/src/shell-v0/views/SettingsSurface.indexingRules.test.ts"
+      ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/components/SurfaceTabs.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "The actions slot is beside, outside the tablist, does not gain tab semantics, and leaves ArrowRight tab navigation and focus intact. Existing tab checks remain unchanged.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "L1",
+          "quote": "The Folders tab is one page using the whole window: headline, one summary line, attention items (when any), folder list, skip rules and indexing times, then one-line links to other apps' documents and Activity. Window actions sit beside the member tabs (Folders, Browse): Pause indexing with until-I-resume / 15 min / 1 h, a ⋯ menu with Reindex everything and Process pending work, and a filled Add folder. No card boxes or outlined pill buttons. Tab semantics, keyboard navigation and focus restoration of SurfaceTabs stay intact.",
+          "label": "agent-drafted, owner-adopted"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/library-redesign-new.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/components/SurfaceTabs.test.ts"
+      ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/components/IndexingControls.toolbar.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "The pause menu preserves until-I-resume, 15-minute and one-hour deadlines; suppresses concurrent requests; Escape restores trigger focus; Resume clears only manual pause and reports remaining confirmed schedule and battery holds.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "L1",
+          "quote": "The Folders tab is one page using the whole window: headline, one summary line, attention items (when any), folder list, skip rules and indexing times, then one-line links to other apps' documents and Activity. Window actions sit beside the member tabs (Folders, Browse): Pause indexing with until-I-resume / 15 min / 1 h, a ⋯ menu with Reindex everything and Process pending work, and a filled Add folder. No card boxes or outlined pill buttons. Tab semantics, keyboard navigation and focus restoration of SurfaceTabs stay intact.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "L15",
+          "quote": "Combined holds: manual pause, schedule and battery at the same time (including pausing and an empty queue) are all named; Resume clears only the manual pause and says what still holds indexing.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "P5",
+          "quote": "Pause/resume with durations; schedule and battery holds shown; settings-recovery path.",
+          "label": "agent-drafted, owner-adopted"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/library-redesign-new.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/components/IndexingControls.toolbar.test.ts"
+      ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/components/indexingStatusFollowup.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "Existing retained migration checks keep inputs and outcomes; the empty observation moves to the add-a-folder headline. The rebuild decision heading itself must carry the existing unknown qualifier, as well as the panel body, for retained/nonfresh observations.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "L2",
+          "quote": "Headline: \"Your files are searchable\" when nothing needs attention; \"N things need your attention\" counting distinct actionable items, deduplicated; while status is unconfirmed or loading it says so and never claims searchable. Summary line: searchable documents and folder count from status, plus what is running now.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "L3",
+          "quote": "Each attention item appears once above the list with what it means and its actions: folder can't be found (worded \"reconnect the drive or remove it\", no drive-vs-folder claim) with Check again (core.reconcile-root) and Remove; unreadable files named with reasons and Try again; indexing held: manual pause with Resume, schedule or battery hold with \"Change when to index\" (no Resume-now override, none exists), settings recovery with Open Settings; rebuild running or needing a decision with the existing accept-gaps / cancel and exact gap list; unfinished removals with retry / withdraw and their consent; deletions not verified with Reindex; bulk reindex failed or unknown with Check outcome.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "L10",
+          "quote": "Empty and rebuilding: no folders shows an add-a-folder headline and Add folder; rebuilding with no folders shown says folders will reappear. Browser mode: typed path entry for Add folder and one quiet note, not a banner.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "P10",
+          "quote": "Existing Library behaviour tests keep asserting the same behaviour after selector and wording updates; none is weakened or dropped without a recorded reason.",
+          "label": "agent-drafted, owner-adopted"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/library-redesign-new.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/components/indexingStatusFollowup.test.ts"
+      ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/views/LibrarySurface.excludes-override.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "The existing admin/env override notice remains visible without opening How rules work and still names source, exact override patterns and accessible description. The editor reference moves from textarea to the first skip-rule input; all preview/apply payload and consent checks remain.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "L7",
+          "quote": "Skip rules edited on the page, one per line with Add a rule, keeping every existing exclude-pattern behaviour: explicit save and reload, uncertain-save retention, conflict review, preview, typed-consent apply, admin/env override notice, partial results, exact-path keep-outs with remove.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "P10",
+          "quote": "Existing Library behaviour tests keep asserting the same behaviour after selector and wording updates; none is weakened or dropped without a recorded reason.",
+          "label": "agent-drafted, owner-adopted"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/library-redesign-new.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/views/LibrarySurface.excludes-override.test.ts"
+      ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/views/LibrarySurface.folderActions.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "Add stays pending with the same path/collection draft while the real member tabs switch to Browse; the single accepted result appears on return to Folders. Existing add, picker, removal, stale-response and nested-confirmation oracles are preserved: controls move into expanded rows, labels change to Add folder / Remove from library, and announcements select their surface status node.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "L12",
+          "quote": "Live behaviour: statuses update without collapsing rows or losing a rules draft; a second window shows the same state; reload or switching tabs mid-operation keeps pending outcomes (existing race classes).",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "P1",
+          "quote": "Add folder: picker or typed path, collection, preview, refusal of missing, non-folder, duplicate, overlapping and reserved-collection entries.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "P2",
+          "quote": "Remove: nested and enclosing-root confirmation, overlapping-removal suppression, lost-response reconcile, retry, focus restore.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "P9",
+          "quote": "Deep links to the Library and to its Browse member tab land on the right tab.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "P10",
+          "quote": "Existing Library behaviour tests keep asserting the same behaviour after selector and wording updates; none is weakened or dropped without a recorded reason.",
+          "label": "agent-drafted, owner-adopted"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/library-redesign-new.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/views/LibrarySurface.folderActions.test.ts"
+      ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/views/LibrarySurface.redesign.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "Observed document counts determine truthful headings; actionable rebuild outcomes deduplicate; missing-root/requeued failures stay named and reachable until settled. Shared themed/fallback disclosures keep independent expansion, full-path tooltips, files-found counts and word/progress facts. Explorer is hidden in browser mode, uses each resolved path on desktop, and reports unresolved/removed/disconnected/native refusal through the existing bridge, including Unicode and commas in the path. Two mounted windows observe the same holds while preserving a draft. Expanded facts replace duplicate metadata; unconfirmed/waiting status is stated once. Fallback focus preservation is checked alongside the repaired themed focus check covered separately below. Native shell execution remains for desktop verification.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "L2",
+          "quote": "Headline: \"Your files are searchable\" when nothing needs attention; \"N things need your attention\" counting distinct actionable items, deduplicated; while status is unconfirmed or loading it says so and never claims searchable. Summary line: searchable documents and folder count from status, plus what is running now.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "L3",
+          "quote": "Each attention item appears once above the list with what it means and its actions: folder can't be found (worded \"reconnect the drive or remove it\", no drive-vs-folder claim) with Check again (core.reconcile-root) and Remove; unreadable files named with reasons and Try again; indexing held: manual pause with Resume, schedule or battery hold with \"Change when to index\" (no Resume-now override, none exists), settings recovery with Open Settings; rebuild running or needing a decision with the existing accept-gaps / cancel and exact gap list; unfinished removals with retry / withdraw and their consent; deletions not verified with Reindex; bulk reindex failed or unknown with Check outcome.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "L4",
+          "quote": "Folder row: name, path, one status in words from folderStatus for every state it decides today (removal incomplete, provisional/unknown, unavailable, walk failure, indexing/waiting manual/rules/retry, scanning, failed jobs, deletion unverified, enriching, keyword-only/blocked, ready, no indexable files), a thin progress bar when the state has a fraction, and the file count labelled as files found. Last-known and unknown qualifiers kept.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "L5",
+          "quote": "A row expands in place (button with aria-expanded, keyboard operable; several may be open): collection, searchable-by-words verdict, meaning processing percent worded as progress (not coverage), indexed X ago, verified X ago, unreadable count opening the failed-files list, and actions Open in Explorer and Remove from library. Open rows stay open through live refreshes.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "L6",
+          "quote": "Open in Explorer in the desktop app opens the folder through the existing reveal-in-explorer bridge; it is absent in browser mode and disabled with a reason for a folder that can't be found.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "L12",
+          "quote": "Live behaviour: statuses update without collapsing rows or losing a rules draft; a second window shows the same state; reload or switching tabs mid-operation keeps pending outcomes (existing race classes).",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "L16",
+          "quote": "Failure evidence during retry: when failed counts drop to zero only because jobs requeue, the problem stays listed as last known with its files reachable until a settled observation clears it.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "L17",
+          "quote": "A folder that can't be found recovers through the worker's background observation: after the drive returns, both the live page and a freshly loaded page show the row restored, keeping last-known counts and any separate failures.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "L18",
+          "quote": "Open in Explorer targets the resolved path, not the name: two folders with the same name open their own paths; an unresolved path, a folder removed or disconnected after rendering, and a native refusal each show a reason, never success; paths with spaces, commas and Unicode work through the real shell; existing refusals of network and device paths stay.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "L20",
+          "quote": "The default themed folder rows (FolderCardRenderer) and the Library's own fallback rows both deliver L3 to L5 (they differ today: the default lacks the full-path tooltip and \"Reindex to verify\").",
+          "label": "agent-drafted, owner-adopted"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/library-redesign-new.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/views/LibrarySurface.redesign.test.ts"
+      ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/views/LibrarySurface.slice2.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "Skip rules edit/add/remove one line at a time with explicit Save. Both save orders and quick succession preserve both settings pairs after reload without a self-conflict, including subsequent saves. Serialized writes survive tab changes; a rule-save completion survives reload while another window keeps its own dirty draft. Settings links to the Library editor and saves retain recovery/manual deadlines. Live and cold focus requests coalesce once, select Folders from Browse, and scroll the focused control into view after layout. Genuine external settings changes still conflict in either editor and never overwrite that change or either local draft.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "L7",
+          "quote": "Skip rules edited on the page, one per line with Add a rule, keeping every existing exclude-pattern behaviour: explicit save and reload, uncertain-save retention, conflict review, preview, typed-consent apply, admin/env override notice, partial results, exact-path keep-outs with remove.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "L8",
+          "quote": "When to index is edited on the Library page only: any time, or only between two times on chosen weekdays (overnight allowed), and pause while on battery; written through core.set-indexing-rules with the existing validation, draft, busy, read-only and conflict handling. Settings no longer edits them and shows a link to this section instead. Saved meaning is unchanged: an absent schedule stays absent (battery-only saves keep schedule null), a disabled schedule keeps its days and times, and the battery preference, manual-pause deadline and recovery reason survive saves and restart.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "L12",
+          "quote": "Live behaviour: statuses update without collapsing rows or losing a rules draft; a second window shows the same state; reload or switching tabs mid-operation keeps pending outcomes (existing race classes).",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "L14",
+          "quote": "Every route to the moved controls lands on the Library's When-to-index section with keyboard focus: Change hours / Change battery from the Tasks panel and shared indexing controls, the command palette, including when the Browse tab is selected. Settings recovery still leads to Settings, Reset to defaults, and a rule save never clears that hold.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "L19",
+          "quote": "Exclusion saves and indexing-rule saves never overwrite each other, in either order, including quick successive saves and version conflicts; both read back intact after reload.",
+          "label": "agent-drafted, owner-adopted"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/library-redesign-new.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/views/LibrarySurface.slice2.test.ts"
+      ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/components/FailedJobsDrawer.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "Changing an open failed-files drawer from A to B replaces evidence and retry row keys with B, ignores late A, and reads the current folder again on reopen/remount.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "L12",
+          "quote": "Live behaviour: statuses update without collapsing rows or losing a rules draft; a second window shows the same state; reload or switching tabs mid-operation keeps pending outcomes (existing race classes).",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "L13",
+          "quote": "Repair (broken today): with the failed-files list open for folder A, choosing folder B's problem replaces the rows and retry targets with B's.",
+          "label": "agent-drafted, owner-adopted"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/library-redesign-failed-files.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/components/FailedJobsDrawer.test.ts#switches an open drawer from A to B and ignores A arriving late",
+        "modules/ui-web/src/shell-v0/components/FailedJobsDrawer.test.ts#loads the current target after a drawer is remounted while its store is open"
+      ],
+      "repaired": true
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/views/LibrarySurface.redesign.test.ts",
+        "modules/ui-web/src/shell-v0/views/LibrarySurface.slice2.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "Repair pins for V1/L5: themed row focus remains on its toggle on open, live refresh and close, with aria-expanded synchronized. V2/L14: mounted, cold-arrival and Browse navigation focus and center the requested control after layout with no animation. V3/L19: both sequential save orders and quick successive saves share local successors, permit a following save and persist both values after reload. Every named check passes on the candidate and fails by assertion on 7c9a5fe9ce.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "L5",
+          "quote": "A row expands in place (button with aria-expanded, keyboard operable; several may be open): collection, searchable-by-words verdict, meaning processing percent worded as progress (not coverage), indexed X ago, verified X ago, unreadable count opening the failed-files list, and actions Open in Explorer and Remove from library. Open rows stay open through live refreshes.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "L12",
+          "quote": "Live behaviour: statuses update without collapsing rows or losing a rules draft; a second window shows the same state; reload or switching tabs mid-operation keeps pending outcomes (existing race classes).",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "L14",
+          "quote": "Every route to the moved controls lands on the Library's When-to-index section with keyboard focus: Change hours / Change battery from the Tasks panel and shared indexing controls, the command palette, including when the Browse tab is selected. Settings recovery still leads to Settings, Reset to defaults, and a rule save never clears that hold.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "L19",
+          "quote": "Exclusion saves and indexing-rule saves never overwrite each other, in either order, including quick successive saves and version conflicts; both read back intact after reload.",
+          "label": "agent-drafted, owner-adopted"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/library-redesign-repairs.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/views/LibrarySurface.redesign.test.ts#V1 themed disclosure retains focus on toggle and live refresh",
+        "modules/ui-web/src/shell-v0/views/LibrarySurface.slice2.test.ts#V2 scrolls the focused indexing control into view after layout from mounted",
+        "modules/ui-web/src/shell-v0/views/LibrarySurface.slice2.test.ts#V2 scrolls the focused indexing control into view after layout from new arrival",
+        "modules/ui-web/src/shell-v0/views/LibrarySurface.slice2.test.ts#V2 scrolls the focused indexing control into view after layout from Browse",
+        "modules/ui-web/src/shell-v0/views/LibrarySurface.slice2.test.ts#L19 rules first saves both editors without a local conflict and keeps edits after reload",
+        "modules/ui-web/src/shell-v0/views/LibrarySurface.slice2.test.ts#L19 exclusions first saves both editors without a local conflict and keeps edits after reload",
+        "modules/ui-web/src/shell-v0/views/LibrarySurface.slice2.test.ts#V3 quick successive saves rules first share only local witnesses",
+        "modules/ui-web/src/shell-v0/views/LibrarySurface.slice2.test.ts#V3 quick successive saves exclusions first share only local witnesses"
+      ],
+      "repaired": true
+    }
+  ]
+}
+```
+
+## Acceptance records

@@ -16,6 +16,7 @@
  */
 
 import { html, css, nothing, type TemplateResult } from 'lit';
+import { createOperationKey } from '../../api/operationKey.js';
 import { repeat } from 'lit/directives/repeat.js';
 import { renderFolderRow, folderRowStyles, type FolderRow, type FolderRowIntent } from '../components/folderRow.js';
 import { createSettingsAttempt, executeSettingsAttempt, readSettingsObservation, SettingsAttemptError, type SettingsAttempt, type SettingsWitness } from '../../api/settingsAttempt.js';
@@ -860,8 +861,37 @@ export class LibrarySurface extends JfElement {
     }
   }
 
+  private focusedFolderToggle: HTMLElement | null = null;
+
+  protected override willUpdate(changed: Map<string, unknown>): void {
+    super.willUpdate(changed);
+    const active = deepActiveElement();
+    this.focusedFolderToggle = active instanceof HTMLElement && active.matches('.folder-toggle')
+      && this.shadowRoot?.activeElement ? active : null;
+  }
+
+  private async restoreFolderToggleFocus(previous: HTMLElement): Promise<void> {
+    // Declared presentations replace nested renderer elements. Wait for each new renderer's
+    // update, then restore only the disclosure that held focus; never steal a later focus move.
+    const controls = previous.getAttribute('aria-controls');
+    const visit = async (root: ShadowRoot): Promise<HTMLElement | null> => {
+      for (const child of root.querySelectorAll<HTMLElement>('*')) {
+        if ('updateComplete' in child) await (child as JfElement).updateComplete;
+        if (child.matches('.folder-toggle') && child.getAttribute('aria-controls') === controls) return child;
+        if (child.shadowRoot) { const found = await visit(child.shadowRoot); if (found) return found; }
+      }
+      return null;
+    };
+    const replacement = await visit(this.shadowRoot!);
+    const active = deepActiveElement();
+    if (this.isConnected && !previous.isConnected && (!active || active === document.body)) {
+      replacement?.focus({ preventScroll: true });
+    }
+  }
+
   protected override updated(changed: Map<string, unknown>): void {
     super.updated(changed);
+    if (this.focusedFolderToggle) void this.restoreFolderToggleFocus(this.focusedFolderToggle);
     if (changed.has('apiBase') && changed.get('apiBase') !== undefined
         || changed.has('activeTab') && changed.get('activeTab') !== undefined) {
       this.leaveForgetPlacement();
@@ -1407,6 +1437,33 @@ export class LibrarySurface extends JfElement {
     }
   }
 
+  private settingsWrites: Promise<unknown> = Promise.resolve();
+
+  private queueSettingsWrite<T>(write: () => Promise<T>): Promise<T> {
+    const pending = this.settingsWrites.then(write);
+    this.settingsWrites = pending.catch(() => {});
+    return pending;
+  }
+
+  private readonly saveIndexingRulesWithSettings = (write: (operationKey: string) => Promise<unknown>): Promise<void> =>
+    this.queueSettingsWrite(async () => {
+      // Do not adopt another window's revision just because our own rule write follows it.
+      const before = await readSettingsObservation((path, init) => this.doFetch(path, init));
+      if (!this.excludesWitness || this.excludesAttempt
+          || before.witness.acceptedRevision !== this.excludesWitness.acceptedRevision
+          || before.witness.lastCommittedOperationKey !== this.excludesWitness.lastCommittedOperationKey) {
+        throw new Error('Settings changed elsewhere. Reload saved patterns and review your edits before saving again.');
+      }
+      const operationKey = createOperationKey();
+      await write(operationKey);
+      const after = await readSettingsObservation((path, init) => this.doFetch(path, init));
+      if (after.witness.acceptedRevision !== before.witness.acceptedRevision + 1
+          || after.witness.lastCommittedOperationKey !== operationKey) {
+        throw new Error('Indexing rules were saved, but settings changed elsewhere. Reload and review before saving again.');
+      }
+      this.excludesWitness = after.witness;
+    });
+
   private async persistExcludes(): Promise<boolean> {
     if (!this.excludesLoaded || !this.excludesWitness) return false;
     if (!this.excludesAttempt && !this.excludesDirty) return true;
@@ -1766,7 +1823,7 @@ export class LibrarySurface extends JfElement {
     this.excludesError = null;
     this.excludesNotice = '';
     this.excludesResult = null;
-    try { await this.persistExcludes(); }
+    try { await this.queueSettingsWrite(() => this.persistExcludes()); }
     finally { this.excludesBusy = false; }
   }
 
@@ -2245,7 +2302,8 @@ export class LibrarySurface extends JfElement {
           ${this.excludesBusy ? 'Working on exclusions…' : this.excludesResult ? this.renderExcludesResult(this.excludesResult) : this.excludesNotice}
         </div>
       </section>
-      <jf-indexing-rules-editor api-base=${this.apiBase} .host_=${this.host_}></jf-indexing-rules-editor>
+      <jf-indexing-rules-editor api-base=${this.apiBase} .host_=${this.host_}
+        .saveWithSettings=${this.saveIndexingRulesWithSettings}></jf-indexing-rules-editor>
       </div>
       ${!(this.unfinishedForgets?.items.length ?? 0) ? html`<details class="removal-history"><summary>${this.forgetReadStatus === 'unavailable' ? 'Removal history unavailable — check again' : 'Removal history'}</summary>${this.renderUnfinishedForgets()}</details>` : nothing}
       <div class="bottom-links">

@@ -1,0 +1,87 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
+  },
+  "createdAt": "2026-11-01T17:49:24.213Z",
+  "revision": "7c9a5fe9ced52ebe97934c563d4c65314df2f468",
+  "tree": "b133d1bdc98c744166b1846cff2bb0f2c6aa56e0",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/components/FailedJobsDrawer.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/du6gb4k_/tmp/test-intent-vitest-3-1793555357375.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 1519
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/components/FailedJobsDrawer.test.ts#switches an open drawer from A to B and ignores A arriving late",
+      "file": "modules/ui-web/src/shell-v0/components/FailedJobsDrawer.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:8af902de1b9816565fc3b6110f53be6208ac8c1c85f8d81ac06dd4deaf22d993",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "switches an open drawer from A to B and ignores A arriving late",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/FailedJobsDrawer.test.ts#loads the current target after a drawer is remounted while its store is open",
+      "file": "modules/ui-web/src/shell-v0/components/FailedJobsDrawer.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:8af902de1b9816565fc3b6110f53be6208ac8c1c85f8d81ac06dd4deaf22d993",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "loads the current target after a drawer is remounted while its store is open",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "08a63452b2",
+    "revision": "08a63452b2d267c200dfdfc76c9e5f9a9012b52b",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/components/FailedJobsDrawer.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/du6gb4k_/tmp/test-intent-vitest-3-1793555362078.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 1620,
+        "output": "JSON report written to /home/elias/.cache/am/du6gb4k_/tmp/test-intent-vitest-3-1793555362078.json\n\n"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui-web/src/shell-v0/components/FailedJobsDrawer.test.ts#switches an open drawer from A to B and ignores A arriving late",
+        "classification": "assertion",
+        "detail": "switches an open drawer from A to B and ignores A arriving late:  AssertionError: expected [] to deeply equal [ 'B-file' ]\n    at /home/elias/.cache/am/du6gb4k_/tmp/test-intent-before-94ntfv/modules/ui-web/src/shell-v0/components/FailedJobsDrawer.test.ts:582:46\n    at file:///home/elias/.cache/am/du6gb4k_/tmp/test-intent-before-94ntfv/modules/ui-web/node_modules/@"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/FailedJobsDrawer.test.ts#loads the current target after a drawer is remounted while its store is open",
+        "classification": "assertion",
+        "detail": "loads the current target after a drawer is remounted while its store is open:  AssertionError: expected [] to deeply equal [ 'current-file' ]\n    at /home/elias/.cache/am/du6gb4k_/tmp/test-intent-before-94ntfv/modules/ui-web/src/shell-v0/components/FailedJobsDrawer.test.ts:601:46\n    at file:///home/elias/.cache/am/du6gb4k_/tmp/test-intent-before-94ntfv/modules/ui-web/node_mod"
+      }
+    ]
+  },
+  "digest": "sha256:db0dd1f4e9c0217b1000d72363f871f7b1381a75d8529af29306359902ab85cd"
+}

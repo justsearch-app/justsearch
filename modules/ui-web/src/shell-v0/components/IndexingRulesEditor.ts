@@ -12,6 +12,7 @@ export class IndexingRulesEditor extends JfElement {
   static properties = {
     apiBase: { type: String, attribute: 'api-base' }, host_: { attribute: false },
     readOnly: { state: true },
+    saveWithSettings: { attribute: false },
     indexingRules: { state: true },
     indexingRulesLoaded: { state: true },
     indexingRulesSaving: { state: true },
@@ -21,6 +22,8 @@ export class IndexingRulesEditor extends JfElement {
   declare apiBase: string;
   declare host_: PluginHostApi | undefined;
   declare readOnly: boolean;
+  /** Library serializes its two editors and advances their shared settings witness. */
+  declare saveWithSettings: ((write: (operationKey: string) => Promise<unknown>) => Promise<void>) | undefined;
   private loadSerial = 0;
   private indexingRulesDirty = false;
   private indexingScheduleConfigured = false;
@@ -44,9 +47,14 @@ export class IndexingRulesEditor extends JfElement {
     const control = this.indexingRuleFocus;
     if (!control || !this.indexingRulesLoaded) return;
     const target = this.shadowRoot?.getElementById(control === 'hours' ? 'indexing-hours' : 'indexing-battery');
+    // Navigation can request focus before the containing surface becomes visible. Wait for
+    // its layout frame before scrolling, and cancel if a newer request or navigation wins.
+    await new Promise<void>(resolve => requestAnimationFrame(() => resolve()));
+    if (!this.isConnected || this.indexingRuleFocus !== control) return;
     this.indexingRuleFocus = null;
-    target?.scrollIntoView?.({ block: 'nearest' });
-    if (this.readOnly) this.shadowRoot?.getElementById('when-to-index')?.focus(); else target?.focus();
+    const focusTarget = this.readOnly ? this.shadowRoot?.getElementById('when-to-index') : target;
+    focusTarget?.focus({ preventScroll: true });
+    focusTarget?.scrollIntoView?.({ block: 'center', behavior: 'instant' });
   }
 
   private editIndexingRules(patch: Partial<typeof this.indexingRules>): void {
@@ -78,11 +86,13 @@ export class IndexingRulesEditor extends JfElement {
     this.indexingRulesSaving = true;
     ++this.loadSerial;
     try {
-      await getOperationClient(this.apiBase).invokeWithConsent('core.set-indexing-rules', {
+      const write = (operationKey?: string) => getOperationClient(this.apiBase).invokeWithConsent('core.set-indexing-rules', {
+        ...(operationKey ? { idempotencyKey: operationKey } : {}),
         args: { schedule: this.indexingScheduleConfigured
           ? { enabled: draft.enabled, days: [...draft.days], startMinute, endMinute } : null,
           pauseOnBattery: draft.pauseOnBattery },
       }, { requestConsent: requestAuthorization });
+      if (this.saveWithSettings) await this.saveWithSettings(write); else await write();
       this.indexingRulesDirty = false;
       this.indexingRulesMessage = 'Indexing rules saved.';
     } catch (error) {

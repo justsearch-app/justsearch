@@ -17,6 +17,7 @@ const initialPolicy = { paused: true, reason: 'SETTINGS_RECOVERY', untilEpochMs:
 const key = (revision: number) => `0194f72c-0000-7000-8000-${String(revision).padStart(12, '0')}`;
 async function settle(el: Mounted): Promise<void> {
   for (let i = 0; i < 30; ++i) { await Promise.resolve(); await el.updateComplete; }
+  await new Promise<void>(resolve => requestAnimationFrame(() => resolve()));
 }
 function action(el: Mounted, label: string): Button {
   const button = el.shadowRoot!.querySelector<Button>(`jf-button[label="${label}"]`);
@@ -56,15 +57,17 @@ function fixture() {
     return Response.json({ ui: wireUi(), witness: { acceptedRevision: revision, lastCommittedOperationKey: lastKey } });
   });
   const operations = vi.fn(async (_path: RequestInfo | URL, init?: RequestInit) => {
-    const { args } = JSON.parse(String(init?.body));
+    const { args, idempotencyKey } = JSON.parse(String(init?.body));
     if (ruleWait) await ruleWait;
     ui = { ...ui, indexingPause: { ...ui.indexingPause, schedule: args.schedule, pauseOnBattery: args.pauseOnBattery } };
-    lastKey = key(++revision);
+    lastKey = idempotencyKey ?? key(revision + 1); ++revision;
     return Response.json({ success: true, message: 'Accepted' });
   });
   vi.stubGlobal('fetch', operations);
   const host = createMockHostApi({ data: { fetch: fetchSettings } });
-  return { host, fetchSettings, operations, read: () => structuredClone(ui),
+  return { host, fetchSettings, operations,
+    externalChange: () => { ui = { ...ui, excludePatterns: ['*.external'] }; lastKey = key(++revision); },
+    read: () => structuredClone(ui),
     holdRules: () => { ruleWait = new Promise<void>(resolve => { releaseRule = resolve; }); },
     releaseRules: () => { releaseRule!(); ruleWait = null; } };
 }
@@ -91,21 +94,26 @@ it('B1 edits one rule per line, adds and removes a rule without implicitly savin
   expect(f.read().excludePatterns).toEqual(['*.tmp']);
 });
 
-it.each(['rules first', 'exclusions first'] as const)('L19 %s keeps both edits after reload, with retained-draft conflict review', async order => {
+it.each(['rules first', 'exclusions first'] as const)('L19 %s saves both editors without a local conflict and keeps edits after reload', async order => {
   const f = fixture(); const el = await mount(f.host); const rules = editor(el);
   el.excludesText = '*.new'; await editBattery(rules, true);
   if (order === 'rules first') {
     await saveRules(rules); action(el, 'Save patterns').onActivate(); await settle(el);
     expect(el.excludesText).toBe('*.new');
-    expect(el.shadowRoot!.querySelector('#excludes-error')?.textContent).toContain('Settings changed elsewhere');
-    action(el, 'Review latest settings, keep draft').onActivate(); await settle(el);
-    expect(el.excludesText).toBe('*.new');
-    action(el, 'Save patterns').onActivate(); await settle(el);
+    expect(el.shadowRoot!.querySelector('#excludes-error')).toBeNull();
+    expect(f.read().excludePatterns).toEqual(['*.new']);
   } else {
     action(el, 'Save patterns').onActivate(); await settle(el); await saveRules(rules);
   }
   const expected = { excludePatterns: ['*.new'], indexingPause: { ...initialPolicy, pauseOnBattery: true } };
+  expect(rules.indexingRulesError).toBe('');
+  expect(el.shadowRoot!.querySelector('#excludes-error')).toBeNull();
   expect(f.read()).toEqual(expected);
+  // Both editors must adopt each local successor, including when exclusions saved first.
+  el.excludesText = '*.again'; action(el, 'Save patterns').onActivate(); await settle(el);
+  expect(el.shadowRoot!.querySelector('#excludes-error')).toBeNull();
+  expect(f.read().excludePatterns).toEqual(['*.again']);
+  el.excludesText = '*.new'; action(el, 'Save patterns').onActivate(); await settle(el);
   el.remove(); const reloaded = await mount(f.host);
   expect(reloaded.excludesText).toBe('*.new');
   expect(editor(reloaded).indexingRules.pauseOnBattery).toBe(true);
@@ -178,4 +186,52 @@ it('L14 drains only the latest pending request when Library connects', async () 
   expect(takeIndexingRuleFocus()).toBeUndefined();
   el.remove(); document.body.append(el); await settle(el);
   expect(editor(el).shadowRoot!.activeElement?.id).not.toBe('indexing-battery');
+});
+
+it.each(['rules first', 'exclusions first'] as const)('V3 quick successive saves %s share only local witnesses', async order => {
+  const f = fixture(); const el = await mount(f.host); const rules = editor(el);
+  el.excludesText = '*.quick'; await editBattery(rules, true);
+  const submit = () => rules.shadowRoot!.querySelector('form')!.dispatchEvent(new Event('submit', { cancelable: true }));
+  if (order === 'rules first') { submit(); action(el, 'Save patterns').onActivate(); }
+  else { action(el, 'Save patterns').onActivate(); submit(); }
+  await settle(el); await settle(rules);
+  expect(el.shadowRoot!.querySelector('#excludes-error')).toBeNull();
+  expect(rules.indexingRulesError).toBe('');
+  expect(f.read()).toEqual({ excludePatterns: ['*.quick'], indexingPause: { ...initialPolicy, pauseOnBattery: true } });
+  el.excludesText = '*.after-quick'; action(el, 'Save patterns').onActivate(); await settle(el);
+  expect(el.shadowRoot!.querySelector('#excludes-error')).toBeNull();
+  expect(f.read().excludePatterns).toEqual(['*.after-quick']);
+  el.remove(); const reloaded = await mount(f.host);
+  expect(reloaded.excludesText).toBe('*.after-quick');
+  expect(editor(reloaded).indexingRules.pauseOnBattery).toBe(true);
+});
+
+it.each(['rules', 'exclusions'])('V3 genuine external change conflicts with %s and retains both drafts', async changed => {
+  const f = fixture(); const el = await mount(f.host); const rules = editor(el);
+  el.excludesText = '*.mine'; await editBattery(rules, true); f.externalChange();
+  if (changed === 'rules') {
+    await saveRules(rules);
+    expect(rules.indexingRulesError).toContain('Settings changed elsewhere');
+    expect(f.operations).not.toHaveBeenCalled();
+  } else {
+    action(el, 'Save patterns').onActivate(); await settle(el);
+    expect(el.shadowRoot!.querySelector('#excludes-error')?.textContent).toContain('Settings changed elsewhere');
+  }
+  expect(f.read().excludePatterns).toEqual(['*.external']);
+  expect(f.read().indexingPause.pauseOnBattery).toBe(false);
+  expect(el.excludesText).toBe('*.mine'); expect(rules.indexingRules.pauseOnBattery).toBe(true);
+});
+
+it.each(['mounted', 'new arrival', 'Browse'])('V2 scrolls the focused indexing control into view after layout from %s', async route => {
+  const scroll = vi.spyOn(HTMLElement.prototype, 'scrollIntoView');
+  const f = fixture();
+  if (route === 'new arrival') requestIndexingRuleFocus('battery');
+  const el = await mount(f.host);
+  if (route !== 'new arrival') {
+    if (route === 'Browse') { el.activeTab = 'core.browse-surface'; await settle(el); }
+    requestIndexingRuleFocus('battery'); await settle(el); await settle(editor(el));
+  }
+  expect(editor(el).shadowRoot!.activeElement?.id).toBe('indexing-battery');
+  expect(scroll).toHaveBeenCalledWith({ block: 'center', behavior: 'instant' });
+  expect(scroll.mock.contexts.at(-1)).toBe(editor(el).shadowRoot!.activeElement);
 });

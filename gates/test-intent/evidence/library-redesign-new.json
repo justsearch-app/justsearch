@@ -1,0 +1,773 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
+  },
+  "createdAt": "2026-11-01T17:49:26.720Z",
+  "revision": "7c9a5fe9ced52ebe97934c563d4c65314df2f468",
+  "tree": "b133d1bdc98c744166b1846cff2bb0f2c6aa56e0",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/chrome/Shell.test.ts\" \"src/shell-v0/commands/CommandPaletteProjection.test.ts\" \"src/shell-v0/components/SurfaceTabs.test.ts\" \"src/shell-v0/components/IndexingControls.toolbar.test.ts\" \"src/shell-v0/components/indexingStatusFollowup.test.ts\" \"src/shell-v0/views/LibrarySurface.excludes-override.test.ts\" \"src/shell-v0/views/LibrarySurface.folderActions.test.ts\" \"src/shell-v0/views/LibrarySurface.redesign.test.ts\" \"src/shell-v0/views/LibrarySurface.slice2.test.ts\" \"src/shell-v0/views/SettingsSurface.indexingRules.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/du6gb4k_/tmp/test-intent-vitest-3-1793555358524.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 8195
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/chrome/Shell.test.ts",
+      "file": "modules/ui-web/src/shell-v0/chrome/Shell.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:08ce02e18e9f2d9398eb5d9221ae1ac2f6993e84ccb1aed9d23c770fac2d4b5a",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Shell — slice 492 substrate integration S2 full Shell announces each indexing transition once while Search stays quiet across numeric and identical polls",
+          "status": "passed"
+        },
+        {
+          "name": "Shell — slice 492 substrate integration 906: invoke failure uses handler facts through the real client and toast channel",
+          "status": "passed"
+        },
+        {
+          "name": "Shell — slice 492 substrate integration 906: undo failure uses handler facts through the real client and toast channel",
+          "status": "passed"
+        },
+        {
+          "name": "Shell — slice 492 substrate integration XA1: invoke reports a gone approval as a neutral closed request",
+          "status": "passed"
+        },
+        {
+          "name": "Shell — slice 492 substrate integration XA1: undo reports a gone approval as a neutral closed request",
+          "status": "passed"
+        },
+        {
+          "name": "Shell — slice 492 substrate integration XA1: invoke reports a withdrawn approval as a neutral closed request",
+          "status": "passed"
+        },
+        {
+          "name": "Shell — slice 492 substrate integration XA1: undo reports a withdrawn approval as a neutral closed request",
+          "status": "passed"
+        },
+        {
+          "name": "Shell — slice 492 substrate integration XA1: invoke reports a denied-gone approval as a neutral closed request",
+          "status": "passed"
+        },
+        {
+          "name": "Shell — slice 492 substrate integration XA1: undo reports a denied-gone approval as a neutral closed request",
+          "status": "passed"
+        },
+        {
+          "name": "Shell — slice 492 substrate integration 906: an uncertain mutation response asks users to check its effect, without retrying",
+          "status": "passed"
+        },
+        {
+          "name": "Shell — slice 492 substrate integration Tempdoc 738 — the topbar Simple/Detailed toggle reflects the live uiMode and drives it on click",
+          "status": "passed"
+        },
+        {
+          "name": "Shell — slice 492 substrate integration 923 review — topbar persistence joins the shared cross-control mode queue",
+          "status": "passed"
+        },
+        {
+          "name": "Shell — slice 492 substrate integration 923 F-22 — normalizes a persisted Ask pane to Search or its Library pair",
+          "status": "passed"
+        },
+        {
+          "name": "Shell — slice 492 substrate integration connectedCallback bootstrap URL-hash state-bearing intent at boot distributes to stores via the substrate (the headline regression scenario)",
+          "status": "passed"
+        },
+        {
+          "name": "Shell — slice 492 substrate integration connectedCallback bootstrap C1 C2 pending conversation claims precede a surface navigation at every debounce boundary",
+          "status": "passed"
+        },
+        {
+          "name": "Shell — slice 492 substrate integration connectedCallback bootstrap rail click dispatches with RAIL transport",
+          "status": "passed"
+        },
+        {
+          "name": "Shell — slice 492 substrate integration connectedCallback bootstrap activateSurface requires a transport (compile-time check, runtime smoke)",
+          "status": "passed"
+        },
+        {
+          "name": "Shell — slice 492 substrate integration disconnectedCallback teardown cleanly tears down without throwing when sources are mid-bootstrap",
+          "status": "passed"
+        },
+        {
+          "name": "Shell — slice 492 substrate integration disconnectedCallback teardown subsequent connect after disconnect re-bootstraps cleanly",
+          "status": "passed"
+        },
+        {
+          "name": "Shell — Search Thread S6 citation-select rework a citation-select event pushes the doc path + highlight range onto inspectorState (no jf-inspector-pane lookup)",
+          "status": "passed"
+        },
+        {
+          "name": "Shell — Search Thread S6 citation-select rework never mounts the retired jf-inspector-pane",
+          "status": "passed"
+        },
+        {
+          "name": "Shell — settings window vs. stage navigation (tempdoc 855) a realized stage navigation DISMISSES the open window — and fires no history.back()",
+          "status": "passed"
+        },
+        {
+          "name": "Shell — settings window vs. stage navigation (tempdoc 855) a stage navigation while the window is CLOSED touches nothing (no stray dismiss path)",
+          "status": "passed"
+        },
+        {
+          "name": "Shell — settings window close semantics (tempdoc 855 §11.1 D3/D4) R2 keeps Settings closed after Escape during delayed source bootstrap",
+          "status": "passed"
+        },
+        {
+          "name": "Shell — settings window close semantics (tempdoc 855 §11.1 D3/D4) R2 keeps Settings closed after Close during delayed source bootstrap",
+          "status": "passed"
+        },
+        {
+          "name": "Shell — settings window close semantics (tempdoc 855 §11.1 D3/D4) R2 cancels a startup recovery arrival after pointerdown outside Settings",
+          "status": "passed"
+        },
+        {
+          "name": "Shell — settings window close semantics (tempdoc 855 §11.1 D3/D4) R2 cancels a startup recovery arrival after keydown outside Settings",
+          "status": "passed"
+        },
+        {
+          "name": "Shell — settings window close semantics (tempdoc 855 §11.1 D3/D4) R2 cancels a startup recovery arrival after blur outside Settings",
+          "status": "passed"
+        },
+        {
+          "name": "Shell — settings window close semantics (tempdoc 855 §11.1 D3/D4) R2 preserves a startup recovery arrival across app focus moves",
+          "status": "passed"
+        },
+        {
+          "name": "Shell — settings window close semantics (tempdoc 855 §11.1 D3/D4) R2 forwards a fresh recovery URL to the existing pending focus walk",
+          "status": "passed"
+        },
+        {
+          "name": "Shell — settings window close semantics (tempdoc 855 §11.1 D3/D4) R2 consumes recovery focus ('in-app boolean') before Back and Forward",
+          "status": "passed"
+        },
+        {
+          "name": "Shell — settings window close semantics (tempdoc 855 §11.1 D3/D4) R2 consumes recovery focus ('URL string') before Back and Forward",
+          "status": "passed"
+        },
+        {
+          "name": "Shell — settings window close semantics (tempdoc 855 §11.1 D3/D4) L14 routes hours to Library once without replay on Back and Forward",
+          "status": "passed"
+        },
+        {
+          "name": "Shell — settings window close semantics (tempdoc 855 §11.1 D3/D4) L14 routes battery to Library once without replay on Back and Forward",
+          "status": "passed"
+        },
+        {
+          "name": "Shell — settings window close semantics (tempdoc 855 §11.1 D3/D4) L14 redirects the legacy Settings rule-focus route to Library",
+          "status": "passed"
+        },
+        {
+          "name": "Shell — settings window close semantics (tempdoc 855 §11.1 D3/D4) R2 does not focus Reset for a false recovery URL flag",
+          "status": "passed"
+        },
+        {
+          "name": "Shell — settings window close semantics (tempdoc 855 §11.1 D3/D4) (a) an in-app open pushes ONE entry, and Escape unwinds it with exactly one history.back()",
+          "status": "passed"
+        },
+        {
+          "name": "Shell — settings window close semantics (tempdoc 855 §11.1 D3/D4) (b) a boot entry pushes NOTHING, so Escape navigates forward to the stage surface instead of Back",
+          "status": "passed"
+        },
+        {
+          "name": "Shell — settings window close semantics (tempdoc 855 §11.1 D3/D4) (d) after a boot-entry close, the stage surface OWNS the URL projection again",
+          "status": "passed"
+        },
+        {
+          "name": "Shell — settings window close semantics (tempdoc 855 §11.1 D3/D4) (c) a repeat navigation while the window is open stacks no entry — Escape still closes in one step",
+          "status": "passed"
+        },
+        {
+          "name": "Shell — settings window close semantics (tempdoc 855 §11.1 D3/D4) a member deep-link opens the window AND delivers the member intent (window closed)",
+          "status": "passed"
+        },
+        {
+          "name": "Shell — settings window close semantics (tempdoc 855 §11.1 D3/D4) a member deep-link delivers the member intent while the window is ALREADY open",
+          "status": "passed"
+        },
+        {
+          "name": "Shell — appearance listener seam (tempdoc 855 fix round F2) registers the jf-set-appearance listener that applies the high-contrast root class",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/commands/CommandPaletteProjection.test.ts",
+      "file": "modules/ui-web/src/shell-v0/commands/CommandPaletteProjection.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:f70369a1cec9d9f37ef4fa7b7b53aabbd1365717037de7652bdb9eabce5a090f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "CommandPaletteProjection (§21.C) projects global Actions into PaletteEntry shape",
+          "status": "passed"
+        },
+        {
+          "name": "CommandPaletteProjection (§21.C) excludes non-global Actions (appliesTo set)",
+          "status": "passed"
+        },
+        {
+          "name": "CommandPaletteProjection (§21.C) WP3.8b opens indexing rules in Settings instead of invoking the operation without arguments",
+          "status": "passed"
+        },
+        {
+          "name": "CommandPaletteProjection (§21.C) back-maps core.action.op.* to legacy op.* id",
+          "status": "passed"
+        },
+        {
+          "name": "CommandPaletteProjection (§21.C) includes legacy Commands alongside Actions",
+          "status": "passed"
+        },
+        {
+          "name": "CommandPaletteProjection (§21.C) 557 P2 — commandLabel localizes a labelKey through the display projector",
+          "status": "passed"
+        },
+        {
+          "name": "CommandPaletteProjection (§21.C) 557 P2 — commandLabel falls back to the raw label when no labelKey",
+          "status": "passed"
+        },
+        {
+          "name": "CommandPaletteProjection (§21.C) 557 P2 — a Command with labelKey projects the localized label into the palette",
+          "status": "passed"
+        },
+        {
+          "name": "CommandPaletteProjection (§21.C) §8 v0 — surfaces a search-intent entry for non-empty free text",
+          "status": "passed"
+        },
+        {
+          "name": "CommandPaletteProjection (§21.C) §8 v0 — no search-intent entry for an empty query",
+          "status": "passed"
+        },
+        {
+          "name": "CommandPaletteProjection (§21.C) §8 v0 — search-intent entry is appended last (commands keep ranking)",
+          "status": "passed"
+        },
+        {
+          "name": "CommandPaletteProjection (§21.C) preserves Action over legacy Command when both share the projected id",
+          "status": "passed"
+        },
+        {
+          "name": "CommandPaletteProjection (§21.C) multi-word queries match non-leading tokens (F10) ranks the AI-install actions above the raw-search intent for \"install ai\"",
+          "status": "passed"
+        },
+        {
+          "name": "CommandPaletteProjection (§21.C) multi-word queries match non-leading tokens (F10) still matches the single-token query \"repair\" (no regression)",
+          "status": "passed"
+        },
+        {
+          "name": "CommandPaletteProjection (§21.C) multi-word queries match non-leading tokens (F10) requires EVERY token to be present (a token the label lacks still misses)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/SurfaceTabs.test.ts",
+      "file": "modules/ui-web/src/shell-v0/components/SurfaceTabs.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:711ea1c6a74d6555c2aabf3841a8dd0adafe1438b9931564cb2fc470b7ebeb7e",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "jf-surface-tabs renders one tab per item in declared order",
+          "status": "passed"
+        },
+        {
+          "name": "jf-surface-tabs projects window actions beside the tablist without adding them to tab keyboard navigation",
+          "status": "passed"
+        },
+        {
+          "name": "jf-surface-tabs shows the first item active by default and renders its content",
+          "status": "passed"
+        },
+        {
+          "name": "jf-surface-tabs honors an explicit active-id",
+          "status": "passed"
+        },
+        {
+          "name": "jf-surface-tabs switches tab on click and emits tab-change",
+          "status": "passed"
+        },
+        {
+          "name": "jf-surface-tabs preserves per-member altitude framing — TRUST keeps an Audit marker + data-altitude (578 §9.4.B)",
+          "status": "passed"
+        },
+        {
+          "name": "jf-surface-tabs navigates with arrow keys (roving tabindex)",
+          "status": "passed"
+        },
+        {
+          "name": "jf-surface-tabs emits nothing for an empty items list",
+          "status": "passed"
+        },
+        {
+          "name": "jf-surface-tabs — surfaceId member mount mounts the registered member element for a surfaceId item",
+          "status": "passed"
+        },
+        {
+          "name": "jf-surface-tabs — surfaceId member mount renders an unknown-surface empty state for an unresolvable surfaceId",
+          "status": "passed"
+        },
+        {
+          "name": "jf-surface-tabs — surfaceId member mount threads host_ to the mounted member element",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/IndexingControls.toolbar.test.ts",
+      "file": "modules/ui-web/src/shell-v0/components/IndexingControls.toolbar.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:e4e6c6edb3a137bf94dc9773e65013fca7feb26cf04142072b8e38821fef62f0",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "pause menu preserves the 0 duration and suppresses concurrent requests",
+          "status": "passed"
+        },
+        {
+          "name": "pause menu preserves the 900000 duration and suppresses concurrent requests",
+          "status": "passed"
+        },
+        {
+          "name": "pause menu preserves the 3600000 duration and suppresses concurrent requests",
+          "status": "passed"
+        },
+        {
+          "name": "Resume clears manual pause and reports the remaining holds from confirmed status",
+          "status": "passed"
+        },
+        {
+          "name": "Escape closes the keyboard-operable pause menu and restores its trigger",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/indexingStatusFollowup.test.ts",
+      "file": "modules/ui-web/src/shell-v0/components/indexingStatusFollowup.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:2d72afb8fc9bbd537446657617b667930d0c53d59b20cdd08d23c23f0ee25e75",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "WP3.3 sixth verifier regressions S33.4 S33.6 Library empty roots qualify retained migration and recover on fresh observations",
+          "status": "passed"
+        },
+        {
+          "name": "WP3.3 sixth verifier regressions S33.4 Library rebuild controls qualify retained build and activation observations",
+          "status": "passed"
+        },
+        {
+          "name": "WP3.3 sixth verifier regressions S33.6 Search v3 Ask and deck announce indexing changes once and repeat polls silently",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/LibrarySurface.excludes-override.test.ts",
+      "file": "modules/ui-web/src/shell-v0/views/LibrarySurface.excludes-override.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:a24915d04410e6345a32041da891eed4cfc1d6fa7d4eed9f71e9fde2a77c3665",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "OV1 names the env_var policy before actions and in Preview, Apply and confirmation",
+          "status": "passed"
+        },
+        {
+          "name": "OV1 names the jvm_arg policy before actions and in Preview, Apply and confirmation",
+          "status": "passed"
+        },
+        {
+          "name": "OV1 Save retains the override and explains when the saved list takes effect",
+          "status": "passed"
+        },
+        {
+          "name": "OV1 without an override, including after restart, keeps the saved-list behavior",
+          "status": "passed"
+        },
+        {
+          "name": "OV1 an empty override is still named and is not replaced by the saved list",
+          "status": "passed"
+        },
+        {
+          "name": "OV1 refuses Preview and Apply when the effective policy cannot be read",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/LibrarySurface.folderActions.test.ts",
+      "file": "modules/ui-web/src/shell-v0/views/LibrarySurface.folderActions.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:7a5be6e5ad32829e83f06c6597b6557ad0da956b5c88a2792faf5148e5b79dba",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "keeps a refused Add draft reachable and allows correction and retry",
+          "status": "passed"
+        },
+        {
+          "name": "explains a preview overlap (inside) and blocks click and Enter before Add",
+          "status": "passed"
+        },
+        {
+          "name": "explains a preview overlap (containing) and blocks click and Enter before Add",
+          "status": "passed"
+        },
+        {
+          "name": "submits Add once while waiting and announces its outcome",
+          "status": "passed"
+        },
+        {
+          "name": "switching member tabs during Add retains the pending outcome and draft until acceptance",
+          "status": "passed"
+        },
+        {
+          "name": "a cancelled native picker leaves a closed form and an existing draft unchanged",
+          "status": "passed"
+        },
+        {
+          "name": "exposes row removal progress, suppresses repeats and keeps the other row usable",
+          "status": "passed"
+        },
+        {
+          "name": "a refused removal retains the row, explains retry without a live-watch claim, and retries",
+          "status": "passed"
+        },
+        {
+          "name": "reconciles an uncertain removal response with current roots (NETWORK_ERROR)",
+          "status": "passed"
+        },
+        {
+          "name": "reconciles an uncertain removal response with current roots (SERIALIZATION_ERROR)",
+          "status": "passed"
+        },
+        {
+          "name": "reconciles an uncertain removal response with current roots (HANDLER_FAILURE)",
+          "status": "passed"
+        },
+        {
+          "name": "ignores an old removal response after returning and reads the current roots",
+          "status": "passed"
+        },
+        {
+          "name": "names legacy inner folders and ancestor coverage in Remove confirmations",
+          "status": "passed"
+        },
+        {
+          "name": "distinguishes accepted reindex from the recorded completion and failure",
+          "status": "passed"
+        },
+        {
+          "name": "explains an empty reindex scope and offline folders without claiming a full reindex",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/LibrarySurface.redesign.test.ts",
+      "file": "modules/ui-web/src/shell-v0/views/LibrarySurface.redesign.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:1a9dbb9ea5aa1984a85995a80dd4b677e99539709ee3fb00827b6d5578f3fc67",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "the headline uses observed searchable documents (undefined)",
+          "status": "passed"
+        },
+        {
+          "name": "the headline uses observed searchable documents (0)",
+          "status": "passed"
+        },
+        {
+          "name": "the headline uses observed searchable documents (20)",
+          "status": "passed"
+        },
+        {
+          "name": "counts a rebuild decision during recovery and counts a terminal outcome only once",
+          "status": "passed"
+        },
+        {
+          "name": "retains named last-known failures while a missing folder returns and jobs requeue, until settled",
+          "status": "passed"
+        },
+        {
+          "name": "fallback rows keep several disclosures open through status updates and expose full paths",
+          "status": "passed"
+        },
+        {
+          "name": "themed rows keep several disclosures open through status updates and expose full paths",
+          "status": "passed"
+        },
+        {
+          "name": "Explorer actions are absent in browsers and use each resolved path on desktop",
+          "status": "passed"
+        },
+        {
+          "name": "Explorer explains unresolved including changes after rendering",
+          "status": "passed"
+        },
+        {
+          "name": "Explorer explains removed including changes after rendering",
+          "status": "passed"
+        },
+        {
+          "name": "Explorer explains disconnected including changes after rendering",
+          "status": "passed"
+        },
+        {
+          "name": "Explorer explains native refusal including changes after rendering",
+          "status": "passed"
+        },
+        {
+          "name": "uses the existing native reveal bridge and surfaces its network/device refusal",
+          "status": "passed"
+        },
+        {
+          "name": "a second window receives live folder holds without overwriting a skip-rules draft",
+          "status": "passed"
+        },
+        {
+          "name": "A2 expanded facts replace the old metadata line",
+          "status": "passed"
+        },
+        {
+          "name": "A3 A5 unconfirmed status and automatic waits are stated once in the page heading and summary",
+          "status": "passed"
+        },
+        {
+          "name": "V1 fallback disclosure retains focus on toggle and live refresh",
+          "status": "passed"
+        },
+        {
+          "name": "V1 themed disclosure retains focus on toggle and live refresh",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/LibrarySurface.slice2.test.ts",
+      "file": "modules/ui-web/src/shell-v0/views/LibrarySurface.slice2.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:72f4ff8a30f39646b8a16b907d5dc0fe94dc3160395d70114dcbda28195edfa9",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "B1 edits one rule per line, adds and removes a rule without implicitly saving",
+          "status": "passed"
+        },
+        {
+          "name": "L19 rules first saves both editors without a local conflict and keeps edits after reload",
+          "status": "passed"
+        },
+        {
+          "name": "L19 exclusions first saves both editors without a local conflict and keeps edits after reload",
+          "status": "passed"
+        },
+        {
+          "name": "L12 L19 concurrent saves and tab changes retain one rule request and both outcomes",
+          "status": "passed"
+        },
+        {
+          "name": "L12 reload during a rule save reads its result while a second window keeps an edited draft",
+          "status": "passed"
+        },
+        {
+          "name": "L14 Settings links to the Library editor and recovery stays in Settings after a rule save",
+          "status": "passed"
+        },
+        {
+          "name": "L14 consumes a live focus request once from folders, coalescing quick requests",
+          "status": "passed"
+        },
+        {
+          "name": "L14 consumes a live focus request once from core.browse-surface, coalescing quick requests",
+          "status": "passed"
+        },
+        {
+          "name": "L14 drains only the latest pending request when Library connects",
+          "status": "passed"
+        },
+        {
+          "name": "V3 quick successive saves rules first share only local witnesses",
+          "status": "passed"
+        },
+        {
+          "name": "V3 quick successive saves exclusions first share only local witnesses",
+          "status": "passed"
+        },
+        {
+          "name": "V3 genuine external change conflicts with rules and retains both drafts",
+          "status": "passed"
+        },
+        {
+          "name": "V3 genuine external change conflicts with exclusions and retains both drafts",
+          "status": "passed"
+        },
+        {
+          "name": "V2 scrolls the focused indexing control into view after layout from mounted",
+          "status": "passed"
+        },
+        {
+          "name": "V2 scrolls the focused indexing control into view after layout from new arrival",
+          "status": "passed"
+        },
+        {
+          "name": "V2 scrolls the focused indexing control into view after layout from Browse",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/SettingsSurface.indexingRules.test.ts",
+      "file": "modules/ui-web/src/shell-v0/views/SettingsSurface.indexingRules.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:b722fc281724b034799db6d57f7981cb48673a938cfe762dd3a8f29fd0cb8de7",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "WP3.8b rules editor S38.1 S38.7 loads labelled days and native locale times and saves both rules retaining disabled hours",
+          "status": "passed"
+        },
+        {
+          "name": "WP3.8b rules editor S38.2 announces equal endpoints and retains the refused draft",
+          "status": "passed"
+        },
+        {
+          "name": "WP3.8b rules editor S38.2 announces missing time and retains the refused draft",
+          "status": "passed"
+        },
+        {
+          "name": "WP3.8b rules editor S38.2 refuses enabled hours without days and accepts the retained empty set when off",
+          "status": "passed"
+        },
+        {
+          "name": "WP3.8b rules editor S38.2 retains the draft and announces Engine 400 without stale replay",
+          "status": "passed"
+        },
+        {
+          "name": "WP3.8b rules editor S38.2 retains the draft and announces Engine 409 without stale replay",
+          "status": "passed"
+        },
+        {
+          "name": "WP3.8b rules editor S38.2 retains the draft and announces Engine 200 without stale replay",
+          "status": "passed"
+        },
+        {
+          "name": "WP3.8b rules editor S38.7 waits for saved rules before editing or applying deferred rule focus",
+          "status": "passed"
+        },
+        {
+          "name": "WP3.8b rules editor S38.7 keeps read-only rules readable without issuing a save",
+          "status": "passed"
+        },
+        {
+          "name": "WP3.8b rules editor S38.7 preserves Save focus while pending and sends one unchanged rule pair",
+          "status": "passed"
+        },
+        {
+          "name": "WP3.8b rules editor D4 preserves both rules through approval and uses the approved preparation key",
+          "status": "passed"
+        },
+        {
+          "name": "WP3.8b rules editor D4 changing battery preserves an absent schedule until the hours are edited",
+          "status": "passed"
+        },
+        {
+          "name": "WP3.8b rules editor D6 keeps battery available with unknown power and explains the rule",
+          "status": "passed"
+        },
+        {
+          "name": "WP3.8b rules editor S38.7 focuses hours on Library even from Browse",
+          "status": "passed"
+        },
+        {
+          "name": "WP3.8b rules editor S38.7 focuses battery on Library even from Browse",
+          "status": "passed"
+        },
+        {
+          "name": "WP3.8b policy status and actions D5 PAUSING schedule names the rule with an empty queue and offers its Library action",
+          "status": "passed"
+        },
+        {
+          "name": "WP3.8b policy status and actions D5 PAUSED schedule names the rule with an empty queue and offers its Library action",
+          "status": "passed"
+        },
+        {
+          "name": "WP3.8b policy status and actions D5 PAUSING on_battery names the rule with an empty queue and offers its Library action",
+          "status": "passed"
+        },
+        {
+          "name": "WP3.8b policy status and actions D5 PAUSED on_battery names the rule with an empty queue and offers its Library action",
+          "status": "passed"
+        },
+        {
+          "name": "WP3.8b policy status and actions D5 orders combined reasons and restricts recovery actions",
+          "status": "passed"
+        },
+        {
+          "name": "WP3.8b policy status and actions D5 names every folder rule without Waiting for Resume and preserves failure evidence",
+          "status": "passed"
+        },
+        {
+          "name": "WP3.8b policy status and actions S38.5 Resume clears manual only and announces both remaining rules after confirmed status",
+          "status": "passed"
+        },
+        {
+          "name": "WP3.8b policy status and actions S38.5 waits for manual-pause removal before announcing it cleared",
+          "status": "passed"
+        },
+        {
+          "name": "WP3.8b policy status and actions D5 does not invoke a focused Resume when manual pause clears leaving hours",
+          "status": "passed"
+        },
+        {
+          "name": "WP3.8b policy status and actions D5 jf-library-surface names schedule holds for queued work",
+          "status": "passed"
+        },
+        {
+          "name": "WP3.8b policy status and actions D5 jf-task-list names schedule holds for queued work",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:7e12c864fa505a62e267375470c1c43ddd97cadf1cc1e901c751b6ea38a1bc7f"
+}

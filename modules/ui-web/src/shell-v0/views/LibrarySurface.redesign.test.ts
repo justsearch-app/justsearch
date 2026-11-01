@@ -183,3 +183,26 @@ it('A3 A5 unconfirmed status and automatic waits are stated once in the page hea
   expect(el.shadowRoot!.querySelector('.subtitle')!.textContent).toContain('Meaning search is waiting while the computer saves energy.');
   expect(el.shadowRoot!.querySelector('.subtitle')!.textContent).not.toContain('Meaning processing is waiting');
 });
+
+it.each(['fallback', 'themed'])('V1 %s disclosure retains focus on toggle and live refresh', async mode => {
+  if (mode === 'themed') expect(applyPresentationBodies(CORE_DECLARED).ok).toBe(true);
+  observe(20); const { el } = await mount();
+  const find = (node: ParentNode): HTMLButtonElement | null => {
+    for (const child of node.querySelectorAll('*')) {
+      if (child.matches('.folder-toggle')) return child as HTMLButtonElement;
+      if (child.shadowRoot) { const found = find(child.shadowRoot); if (found) return found; }
+    }
+    return null;
+  };
+  const active = () => { let node = document.activeElement; while (node?.shadowRoot?.activeElement) node = node.shadowRoot.activeElement; return node; };
+  await vi.waitFor(() => expect(find(el.shadowRoot!)).not.toBeNull());
+  find(el.shadowRoot!)!.focus(); find(el.shadowRoot!)!.click(); await settle(el);
+  await vi.waitFor(() => expect(active()).toBe(find(el.shadowRoot!)));
+  expect(find(el.shadowRoot!)!.getAttribute('aria-expanded')).toBe('true');
+  el.roots = el.roots.map(r => ({ ...r, fileCount: 21 })); await settle(el);
+  await vi.waitFor(() => expect(active()).toBe(find(el.shadowRoot!)));
+  expect(find(el.shadowRoot!)!.getAttribute('aria-expanded')).toBe('true');
+  find(el.shadowRoot!)!.click(); await settle(el);
+  await vi.waitFor(() => expect(active()).toBe(find(el.shadowRoot!)));
+  expect(find(el.shadowRoot!)!.getAttribute('aria-expanded')).toBe('false');
+});

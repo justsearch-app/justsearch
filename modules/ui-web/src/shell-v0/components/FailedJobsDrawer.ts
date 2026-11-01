@@ -257,6 +257,12 @@ export class FailedJobsDrawer extends JfElement {
       display: none;
     }
     :host([inline]) { display: block; margin: .5rem 0 0 1.7rem; }
+    :host([inline]) {
+      --justsearch-shell-form-button-border: transparent;
+      --justsearch-shell-form-button-bg: transparent;
+      --justsearch-shell-action-button-padding: .4rem 0;
+      --justsearch-shell-form-control-spacing: 0;
+    }
     :host([inline]) .row { padding: .4rem 0; border: 0; }
     :host([inline]) .row-path { font-size: 13px; }
     :host([inline]) .row-error { color: var(--text-secondary); }

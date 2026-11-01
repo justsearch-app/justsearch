@@ -1,0 +1,207 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
+  },
+  "createdAt": "2026-11-01T17:48:59.913Z",
+  "revision": "7c9a5fe9ced52ebe97934c563d4c65314df2f468",
+  "tree": "53456c7c12b815a68320cad0bca09d6162c1e38a",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/LibrarySurface.redesign.test.ts\" \"src/shell-v0/views/LibrarySurface.slice2.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/du6gb4k_/tmp/test-intent-vitest-4-1793555327799.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 3807
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/views/LibrarySurface.redesign.test.ts#V1 themed disclosure retains focus on toggle and live refresh",
+      "file": "modules/ui-web/src/shell-v0/views/LibrarySurface.redesign.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:1a9dbb9ea5aa1984a85995a80dd4b677e99539709ee3fb00827b6d5578f3fc67",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "V1 themed disclosure retains focus on toggle and live refresh",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/LibrarySurface.slice2.test.ts#V2 scrolls the focused indexing control into view after layout from mounted",
+      "file": "modules/ui-web/src/shell-v0/views/LibrarySurface.slice2.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:72f4ff8a30f39646b8a16b907d5dc0fe94dc3160395d70114dcbda28195edfa9",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "V2 scrolls the focused indexing control into view after layout from mounted",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/LibrarySurface.slice2.test.ts#V2 scrolls the focused indexing control into view after layout from new arrival",
+      "file": "modules/ui-web/src/shell-v0/views/LibrarySurface.slice2.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:72f4ff8a30f39646b8a16b907d5dc0fe94dc3160395d70114dcbda28195edfa9",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "V2 scrolls the focused indexing control into view after layout from new arrival",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/LibrarySurface.slice2.test.ts#V2 scrolls the focused indexing control into view after layout from Browse",
+      "file": "modules/ui-web/src/shell-v0/views/LibrarySurface.slice2.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:72f4ff8a30f39646b8a16b907d5dc0fe94dc3160395d70114dcbda28195edfa9",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "V2 scrolls the focused indexing control into view after layout from Browse",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/LibrarySurface.slice2.test.ts#L19 rules first saves both editors without a local conflict and keeps edits after reload",
+      "file": "modules/ui-web/src/shell-v0/views/LibrarySurface.slice2.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:72f4ff8a30f39646b8a16b907d5dc0fe94dc3160395d70114dcbda28195edfa9",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "L19 rules first saves both editors without a local conflict and keeps edits after reload",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/LibrarySurface.slice2.test.ts#L19 exclusions first saves both editors without a local conflict and keeps edits after reload",
+      "file": "modules/ui-web/src/shell-v0/views/LibrarySurface.slice2.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:72f4ff8a30f39646b8a16b907d5dc0fe94dc3160395d70114dcbda28195edfa9",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "L19 exclusions first saves both editors without a local conflict and keeps edits after reload",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/LibrarySurface.slice2.test.ts#V3 quick successive saves rules first share only local witnesses",
+      "file": "modules/ui-web/src/shell-v0/views/LibrarySurface.slice2.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:72f4ff8a30f39646b8a16b907d5dc0fe94dc3160395d70114dcbda28195edfa9",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "V3 quick successive saves rules first share only local witnesses",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/LibrarySurface.slice2.test.ts#V3 quick successive saves exclusions first share only local witnesses",
+      "file": "modules/ui-web/src/shell-v0/views/LibrarySurface.slice2.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:72f4ff8a30f39646b8a16b907d5dc0fe94dc3160395d70114dcbda28195edfa9",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "V3 quick successive saves exclusions first share only local witnesses",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "7c9a5fe9ce",
+    "revision": "7c9a5fe9ced52ebe97934c563d4c65314df2f468",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/LibrarySurface.redesign.test.ts\" \"src/shell-v0/views/LibrarySurface.slice2.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/du6gb4k_/tmp/test-intent-vitest-4-1793555335813.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 3583,
+        "output": "JSON report written to /home/elias/.cache/am/du6gb4k_/tmp/test-intent-vitest-4-1793555335813.json\n\n"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui-web/src/shell-v0/views/LibrarySurface.redesign.test.ts#V1 themed disclosure retains focus on toggle and live refresh",
+        "classification": "assertion",
+        "detail": "V1 themed disclosure retains focus on toggle and live refresh:  AssertionError: expected <body>…(1)</body> to be <button type=\"button\" …(3)>…(3)</button> // Object.is equality\n    at /home/elias/.cache/am/du6gb4k_/tmp/test-intent-before-wo4PdS/modules/ui-web/src/shell-v0/views/LibrarySurface.redesign.test.ts:200:43\n    at Timeout.checkCallback (file:///home/elia"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/LibrarySurface.slice2.test.ts#V2 scrolls the focused indexing control into view after layout from mounted",
+        "classification": "assertion",
+        "detail": "V2 scrolls the focused indexing control into view after layout from mounted:  AssertionError: expected \"scrollIntoView\" to be called with arguments: [ { block: 'center', …(1) } ]\n\nReceived:\n\n  1st scrollIntoView call:\n\n  [\n    {\n-     \"behavior\": \"instant\",\n-     \"block\": \"center\",\n+     \"block\": \"nearest\",\n    },\n  ]\n\n\nNumber of calls: 1\n\n    at Proxy.<anonymous> (file:///ho"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/LibrarySurface.slice2.test.ts#V2 scrolls the focused indexing control into view after layout from new arrival",
+        "classification": "assertion",
+        "detail": "V2 scrolls the focused indexing control into view after layout from new arrival:  AssertionError: expected \"scrollIntoView\" to be called with arguments: [ { block: 'center', …(1) } ]\n\nReceived:\n\n  1st scrollIntoView call:\n\n  [\n    {\n-     \"behavior\": \"instant\",\n-     \"block\": \"center\",\n+     \"block\": \"nearest\",\n    },\n  ]\n\n\nNumber of calls: 1\n\n    at Proxy.<anonymous> (file:///ho"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/LibrarySurface.slice2.test.ts#V2 scrolls the focused indexing control into view after layout from Browse",
+        "classification": "assertion",
+        "detail": "V2 scrolls the focused indexing control into view after layout from Browse:  AssertionError: expected \"scrollIntoView\" to be called with arguments: [ { block: 'center', …(1) } ]\n\nReceived:\n\n  1st scrollIntoView call:\n\n  [\n    {\n-     \"behavior\": \"instant\",\n-     \"block\": \"center\",\n+     \"block\": \"nearest\",\n    },\n  ]\n\n\nNumber of calls: 1\n\n    at Proxy.<anonymous> (file:///ho"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/LibrarySurface.slice2.test.ts#L19 rules first saves both editors without a local conflict and keeps edits after reload",
+        "classification": "assertion",
+        "detail": "L19 rules first saves both editors without a local conflict and keeps edits after reload:  AssertionError: expected <p id=\"excludes-error\" role=\"alert\"></p> to be null\n    at /home/elias/.cache/am/du6gb4k_/tmp/test-intent-before-wo4PdS/modules/ui-web/src/shell-v0/views/LibrarySurface.slice2.test.ts:103:61\n    at file:///home/elias/.cache/am/du6gb4k_/tmp/test-intent-before-wo4PdS/modules/u"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/LibrarySurface.slice2.test.ts#L19 exclusions first saves both editors without a local conflict and keeps edits after reload",
+        "classification": "assertion",
+        "detail": "L19 exclusions first saves both editors without a local conflict and keeps edits after reload:  AssertionError: expected <p id=\"excludes-error\" role=\"alert\"></p> to be null\n    at /home/elias/.cache/am/du6gb4k_/tmp/test-intent-before-wo4PdS/modules/ui-web/src/shell-v0/views/LibrarySurface.slice2.test.ts:114:59\n    at file:///home/elias/.cache/am/du6gb4k_/tmp/test-intent-before-wo4PdS/modules/u"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/LibrarySurface.slice2.test.ts#V3 quick successive saves rules first share only local witnesses",
+        "classification": "assertion",
+        "detail": "V3 quick successive saves rules first share only local witnesses:  AssertionError: expected <p id=\"excludes-error\" role=\"alert\"></p> to be null\n    at /home/elias/.cache/am/du6gb4k_/tmp/test-intent-before-wo4PdS/modules/ui-web/src/shell-v0/views/LibrarySurface.slice2.test.ts:198:59\n    at file:///home/elias/.cache/am/du6gb4k_/tmp/test-intent-before-wo4PdS/modules/u"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/LibrarySurface.slice2.test.ts#V3 quick successive saves exclusions first share only local witnesses",
+        "classification": "assertion",
+        "detail": "V3 quick successive saves exclusions first share only local witnesses:  AssertionError: expected <p id=\"excludes-error\" role=\"alert\"></p> to be null\n    at /home/elias/.cache/am/du6gb4k_/tmp/test-intent-before-wo4PdS/modules/ui-web/src/shell-v0/views/LibrarySurface.slice2.test.ts:202:59\n    at file:///home/elias/.cache/am/du6gb4k_/tmp/test-intent-before-wo4PdS/modules/u"
+      }
+    ]
+  },
+  "digest": "sha256:879b6cb0977f7f8d153fc2c4a4dbbfa9e7c77fc6db0899e68cf32582be19e7fc"
+}
