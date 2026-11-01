@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
   },
-  "createdAt": "2026-11-01T17:49:34.762Z",
-  "revision": "409869eb5d9fcf3f7ee32207d440c4ea3fb779c5",
-  "tree": "cba365bd35b4fda904d300cdfe2592230db66657",
+  "createdAt": "2026-11-01T18:48:20.097Z",
+  "revision": "798c4eaab5e5b50b2a3c84a0df20e9ecc549c9ed",
+  "tree": "02a7a5607f61d16b2814e7cbf5750937c67f675f",
   "environment": {
     "platform": "linux",
     "arch": "x64",
@@ -21,13 +21,13 @@
       "command": "./gradlew :modules:worker-core:test --tests \"io.justsearch.indexerworker.disambiguation.DisambiguationReconciliationTest.failedFinalPublicationRetriesRetirementWithZeroNewForms\" --tests \"io.justsearch.indexerworker.disambiguation.DisambiguationReconciliationTest.failedResetRestartsFromTheBeginningAndCanBeRetried\" --tests \"io.justsearch.indexerworker.disambiguation.DisambiguationReconciliationTest.establishedMultiPageLibraryThenOneAdditionHasBoundedWork\" --tests \"io.justsearch.indexerworker.disambiguation.DisambiguationReconciliationTest.newMultiPageLibraryPublishesOnlyAtCompletion\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 4149
+      "durationMs": 4613
     },
     {
       "command": "./gradlew :modules:worker-services:test --tests \"io.justsearch.indexerworker.loop.ops.DisambiguationBackfillOpsTest.absentServiceDoesNotReadCorpus\" --tests \"io.justsearch.indexerworker.loop.ops.DisambiguationBackfillOpsTest.unavailableServiceDoesNotReadCorpus\" --tests \"io.justsearch.indexerworker.loop.ops.DisambiguationBackfillOpsTest.newlyVisiblePendingNerDefersReconciliation\" --tests \"io.justsearch.indexerworker.loop.ops.DisambiguationBackfillOpsTest.failedSelectionDoesNotAcknowledgeCursor\" --tests \"io.justsearch.indexerworker.loop.ops.DisambiguationBackfillOpsTest.processesAllDocsUnderForegroundLoad\" --tests \"io.justsearch.indexerworker.loop.ops.DisambiguationBackfillOpsTest.changedReaderDoesNotAcknowledgeMixedPass\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 3787
+      "durationMs": 3572
     }
   ],
   "checks": [
@@ -183,5 +183,5 @@
     }
   ],
   "failBefore": null,
-  "digest": "sha256:2bec153e0666bb9a3eee97f23dd21b6e685c8bfe76746a081465915dccc1c931"
+  "digest": "sha256:e2a4604a482f350a812499290184da48c9b0888652217bcbb639f370d87cc23e"
 }
