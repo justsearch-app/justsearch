@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.indexerworker.services;
 
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -25,7 +26,6 @@ import io.justsearch.indexerworker.loop.IndexingLoop;
 import io.justsearch.indexerworker.loop.pacing.IndexingPacing;
 import io.justsearch.indexerworker.queue.JobQueue;
 import io.justsearch.indexerworker.queue.SqliteJobQueue;
-import io.justsearch.indexerworker.util.PathNormalizer;
 import io.justsearch.indexing.SchemaFields;
 import io.justsearch.indexing.api.IndexDocument;
 import io.justsearch.indexing.runtime.CommitMetadataSource;
@@ -59,7 +59,7 @@ final class WorkerSelectedForceCompatibilityTest extends LuceneExecutorTestBase 
   @AfterEach
   void clearFingerprint() { EmbeddingFingerprint.invalidate(); }
 
-  @ParameterizedTest
+  @ParameterizedTest(name = "{displayName} [{index}] {arguments}")
   @CsvSource({"false,recorded", "true,recorded", "false,ordinary", "true,ordinary", "false,refused", "true,refused"})
   void selectedForceCannotAttestToUntouchedVectors(boolean mismatch, String kind) throws Exception {
     EmbeddingFingerprint.setForTesting(CURRENT_FP);
@@ -100,7 +100,7 @@ final class WorkerSelectedForceCompatibilityTest extends LuceneExecutorTestBase 
       var service = new WorkerIngestService(admissionQueue, loop, null,
           IndexingPacing.unthrottled(), base, layout.activeGenerationPath(), runtime, runtime, null, 0L);
       service.setEmbeddingCompatController(ecc);
-      admit(kind, source, service, queue, layout.activeGenerationId(), loop);
+      assertDoesNotThrow(() -> admit(kind, source, service, queue, layout.activeGenerationId(), loop));
 
       assertEquals(expected, ecc.state(), "selected admission or refusal must not transition compatibility");
       assertFalse(ecc.checkRebuildCompletion(queue.queueDepth(), count(runtime, SchemaFields.EMBEDDING_STATUS_PENDING)),
@@ -150,13 +150,14 @@ final class WorkerSelectedForceCompatibilityTest extends LuceneExecutorTestBase 
       verify(loop, never()).markForced(anyCollection());
     } else {
       assertEquals(1, service.submitBatch(batch, CallContext.none()).getAcceptedCount());
-      verify(loop).markForced(List.of(PathNormalizer.normalizeKey(file)));
+      verify(loop, never()).markForced(anyCollection());
     }
     var claims = queue.pollPending(2);
     assertEquals(1, claims.size());
     var claim = claims.getFirst();
     assertEquals(file, claim.path());
     assertEquals(kind.equals("recorded"), claim.recordedForce());
+    assertEquals(kind.equals("ordinary"), claim.forceReindex());
     assertEquals(kind.equals("recorded") ? KEY : null, claim.scanId());
   }
 

@@ -232,6 +232,10 @@ def _build_index_state_at_query(
     """
     max_doc = snapshot.get("indexMaxDoc")
     num_docs = snapshot.get("indexNumDocs")
+    if isinstance(max_doc, (int, float)) and max_doc < 0:
+        max_doc = None
+    if isinstance(num_docs, (int, float)) and num_docs < 0:
+        num_docs = None
     deleted_docs = (
         max_doc - num_docs
         if isinstance(max_doc, (int, float)) and isinstance(num_docs, (int, float))

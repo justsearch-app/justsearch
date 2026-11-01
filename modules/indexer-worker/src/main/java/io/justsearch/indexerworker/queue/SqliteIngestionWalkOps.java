@@ -145,7 +145,8 @@ final class SqliteIngestionWalkOps {
   }
 
   static int enqueueRecorded(Connection connection, String key, long epoch,
-      java.util.List<JobQueue.EnqueueEntry> entries, String collection, long now) throws SQLException {
+      java.util.List<JobQueue.EnqueueEntry> entries, String collection, long now,
+      java.util.Map<JobQueue.EnqueueEntry, SqliteJobQueue.AdmissionSource> sources) throws SQLException {
     Objects.requireNonNull(entries, "entries");
     var progress = find(connection, key)
         .orElseThrow(() -> new IllegalStateException("Recorded walk state is unavailable"));
@@ -198,8 +199,8 @@ final class SqliteIngestionWalkOps {
       try (var insert = connection.prepareStatement("""
           INSERT INTO jobs
             (path, state, attempts, last_updated, collection, size_bytes, scan_id, originator,
-             transport, unit_revision, walk_seen_epoch, planned_source_sha256, ingestion_root)
-          VALUES (?, 'PENDING', 0, ?, ?, ?, ?, ?, ?, lower(hex(randomblob(16))), ?, ?, ?)
+             transport, unit_revision, walk_seen_epoch, planned_source_sha256, ingestion_root, admitted_source_sha256)
+          VALUES (?, 'PENDING', 0, ?, ?, ?, ?, ?, ?, lower(hex(randomblob(16))), ?, ?, ?, ?)
           """ + SqliteSchema.REENQUEUE_JOB_ON_CONFLICT)) {
         insert.setString(1, path); insert.setLong(2, now);
         insert.setString(3, declaredCollection != null ? declaredCollection : priorCollection);
@@ -210,6 +211,9 @@ final class SqliteIngestionWalkOps {
         insert.setString(7, entry.provenance() == null ? null : entry.provenance().transport());
         insert.setLong(8, epoch); insert.setString(9, entry.plannedSourceSha256());
         insert.setString(10, io.justsearch.indexerworker.util.PathNormalizer.normalizeKey(entry.ingestionRoot()));
+        var source = sources.get(entry);
+        insert.setString(11, entry.plannedSourceSha256() != null ? entry.plannedSourceSha256()
+            : source != null && source.stillCurrent(entry.path()) ? source.sha256() : null);
         if (insert.executeUpdate() != 1) throw new SQLException("Recorded admission was not written");
         changed = true;
       }

@@ -108,7 +108,7 @@ final class WorkerIngestServiceCandidateReconciliationTest
     assertEquals(WorkerServiceException.Status.UNAVAILABLE, failure.status());
     verify(beyondBudget, never()).fields();
     assertFalse(fixture.admission.replayCertain());
-    verify(fixture.queue, never()).enqueueAndBufferFileForGeneration(any(), any(), any());
+    verify(fixture.queue, never()).enqueueMaintenanceFileForGeneration(any(), any(), any());
     verify(fixture.candidateWriter, never()).deleteByIdAndChunks(any());
   }
 
@@ -130,7 +130,7 @@ final class WorkerIngestServiceCandidateReconciliationTest
 
     assertEquals(WorkerServiceException.Status.UNAVAILABLE, failure.status());
     assertFalse(fixture.admission.replayCertain());
-    verify(fixture.queue, never()).enqueueAndBufferFileForGeneration(any(), any(), any());
+    verify(fixture.queue, never()).enqueueMaintenanceFileForGeneration(any(), any(), any());
     assertFalse(Thread.currentThread().isInterrupted());
   }
 
@@ -142,14 +142,14 @@ final class WorkerIngestServiceCandidateReconciliationTest
     Fixture fixture = fixture();
     watch(fixture, root);
     var expired = new java.util.concurrent.atomic.AtomicBoolean();
-    when(fixture.queue.enqueueAndBufferFileForGeneration(
+    when(fixture.queue.enqueueMaintenanceFileForGeneration(
         eq(fixture.buildingGeneration), any(), nullable(String.class)))
         .thenAnswer(ignored -> { expired.set(true); return true; });
 
     assertThrows(WorkerServiceException.class,
         () -> fixture.service.syncDirectory(request(root), context(expired)));
 
-    verify(fixture.queue, times(1)).enqueueAndBufferFileForGeneration(
+    verify(fixture.queue, times(1)).enqueueMaintenanceFileForGeneration(
         eq(fixture.buildingGeneration), any(), nullable(String.class));
     assertFalse(fixture.admission.replayCertain());
   }
@@ -242,7 +242,7 @@ final class WorkerIngestServiceCandidateReconciliationTest
     assertEquals(1, response.getFilesAdded());
     assertEquals(1, response.getFilesDeleted());
     var entry = ArgumentCaptor.forClass(JobQueue.EnqueueEntry.class);
-    verify(fixture.queue).enqueueAndBufferFileForGeneration(
+    verify(fixture.queue).enqueueMaintenanceFileForGeneration(
         eq(fixture.buildingGeneration), entry.capture(), eq("research"));
     assertEquals(added, entry.getValue().path());
     assertEquals(root, entry.getValue().ingestionRoot());
@@ -282,7 +282,7 @@ final class WorkerIngestServiceCandidateReconciliationTest
 
       assertEquals(1, response.getFilesAdded());
       var entry = ArgumentCaptor.forClass(JobQueue.EnqueueEntry.class);
-      verify(fixture.queue, times(1)).enqueueAndBufferFileForGeneration(
+      verify(fixture.queue, times(1)).enqueueMaintenanceFileForGeneration(
           eq(fixture.buildingGeneration), entry.capture(), eq("research"));
       assertEquals(admitted, entry.getValue().path());
       assertEquals(root, entry.getValue().ingestionRoot());
@@ -298,7 +298,7 @@ final class WorkerIngestServiceCandidateReconciliationTest
         "private content");
     Fixture fixture = fixture();
     watch(fixture, root);
-    when(fixture.queue.enqueueAndBufferFileForGeneration(
+    when(fixture.queue.enqueueMaintenanceFileForGeneration(
         eq(fixture.buildingGeneration), any(), eq("research"))).thenAnswer(call -> {
           assertEquals(admitted, ((JobQueue.EnqueueEntry) call.getArgument(1)).path());
           IngestionSkipPolicy.installResolved(
@@ -309,7 +309,7 @@ final class WorkerIngestServiceCandidateReconciliationTest
     var response = fixture.service.syncDirectory(request(root), CallContext.none());
 
     assertEquals(1, response.getFilesAdded(), "Only successful admissions count as added");
-    verify(fixture.queue, times(1)).enqueueAndBufferFileForGeneration(
+    verify(fixture.queue, times(1)).enqueueMaintenanceFileForGeneration(
         eq(fixture.buildingGeneration), any(), eq("research"));
     assertTrue(fixture.admission.replayCertain());
   }
@@ -515,7 +515,7 @@ final class WorkerIngestServiceCandidateReconciliationTest
     watch(ordinary, root);
     assertEquals(0,
         ordinary.service.syncDirectory(request(root, false), CallContext.none()).getFilesAdded());
-    verify(ordinary.queue, never()).enqueueAndBufferFileForGeneration(
+    verify(ordinary.queue, never()).enqueueMaintenanceFileForGeneration(
         eq(ordinary.buildingGeneration), any(JobQueue.EnqueueEntry.class),
         nullable(String.class));
 
@@ -523,7 +523,7 @@ final class WorkerIngestServiceCandidateReconciliationTest
     watch(forced, root);
     assertEquals(1,
         forced.service.syncDirectory(request(root, true), CallContext.none()).getFilesAdded());
-    verify(forced.queue).enqueueAndBufferFileForGeneration(
+    verify(forced.queue).enqueueMaintenanceFileForGeneration(
         eq(forced.buildingGeneration), any(JobQueue.EnqueueEntry.class),
         nullable(String.class));
   }
@@ -733,7 +733,7 @@ final class WorkerIngestServiceCandidateReconciliationTest
     when(serving.indexingCoordinator()).thenReturn(servingWriter);
     when(serving.commitOps()).thenReturn(servingCommit);
     SwitchBufferCapableQueue queue = mock(SwitchBufferCapableQueue.class);
-    when(queue.enqueueAndBufferFileForGeneration(
+    when(queue.enqueueMaintenanceFileForGeneration(
             eq(building), any(), nullable(String.class)))
         .thenReturn(true);
     when(queue.putSwitchBufferForGeneration(eq(building), any(), eq("DELETE"), any()))

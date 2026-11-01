@@ -161,6 +161,8 @@ public enum LifecycleReasonCode {
   TELEMETRY_DISK_SPACE_LOW("telemetry.disk_space_low"),
 
   // --- Chunk Embedding (Phase 2 backfill) ---
+  ENRICHMENT_FAILED("enrichment.failed"),
+  ENRICHMENT_MISSING("enrichment.missing"),
   CHUNK_EMBEDDING_NOT_READY("chunk_embedding.not_ready"),
   CHUNK_EMBEDDING_IN_PROGRESS("chunk_embedding.in_progress"),
 
@@ -339,6 +341,8 @@ public enum LifecycleReasonCode {
           TELEMETRY_METRICS_STALE,
           TELEMETRY_METRICS_HIGH_FAILURE_RATE,
           TELEMETRY_DISK_SPACE_LOW,
+          ENRICHMENT_FAILED,
+          ENRICHMENT_MISSING,
           CHUNK_EMBEDDING_NOT_READY,
           CHUNK_EMBEDDING_IN_PROGRESS,
           INDEXING_PAUSED_ENERGY_SAVER,

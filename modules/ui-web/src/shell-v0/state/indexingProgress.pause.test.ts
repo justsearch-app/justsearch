@@ -70,4 +70,15 @@ describe('WP3.7 status-owned pause projection', () => {
     expect(select(noPolicyReason).phase).toBe('indexing');
     expect(select(noPolicyReason).indexingPercent).toBe(40);
   });
+  it('preserves the pause cause and embedding unavailability together', () => {
+    const snapshot = status('PAUSED', 'user_paused', 0);
+    snapshot.worker!.enrichment = { embeddingEnabled: true, embeddingAvailable: false,
+      embeddingPendingCount: 2, embeddingDocCount: 2 };
+    const progress = select(snapshot);
+    expect(progress.phase).toBe('paused');
+    expect(progress.activity.detail).toContain('Paused by you');
+    expect(progress.activity.detail).toContain('Embedding cannot run right now');
+    expect(progress.enrichingEtaSeconds).toBeNull();
+  });
+
 });

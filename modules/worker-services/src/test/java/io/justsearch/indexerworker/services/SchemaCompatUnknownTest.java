@@ -63,11 +63,12 @@ final class SchemaCompatUnknownTest extends io.justsearch.adapters.lucene.runtim
     runtime.commitOps().maybeRefreshBlocking();
     counts = spy(runtime.indexCountOps());
     doAnswer(inv -> countsFail.get() ? 0L : inv.callRealMethod()).when(counts).docCount();
-    doAnswer(inv -> {
-          if (countsFail.get()) throw new IOException("reader unavailable");
-          return inv.callRealMethod();
-        })
-        .when(counts).docCountOrThrow();
+    org.mockito.stubbing.Answer<Object> countRead = inv -> {
+      if (countsFail.get()) throw new IOException("reader unavailable");
+      return inv.callRealMethod();
+    };
+    doAnswer(countRead).when(counts).docCountOrThrow();
+    doAnswer(countRead).when(counts).parentDocCountOrThrow();
     doAnswer(inv -> countsFail.get() ? 0 : inv.callRealMethod())
         .when(counts).countByField(anyString(), anyString());
     doAnswer(inv -> {

@@ -953,6 +953,8 @@ public class IndexingController {
                     m.put("parentDocsSettledNer", coverage.parentDocsSettledNer());
                     m.put("chunkDocsTotal", coverage.chunkDocsTotal());
                     m.put("chunkDocsSettled", coverage.chunkDocsSettled());
+                    m.put("failedStages", coverage.failedStages());
+                    m.put("missingArtifactStages", coverage.missingArtifactStages());
                     return m;
                   })
               .toList();

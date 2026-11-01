@@ -364,3 +364,12 @@ describe("the tail's sources trigger says only what the panel actually holds", (
     expect(sv3SourcesTriggerLabel(SOURCES_LABEL, 5)).toBe('Sources');
   });
 });
+
+
+it.each(['unknown', 'stale'])('does not present a retained zero as the current search corpus when %s', state => {
+  const previous = {
+    lastSettledIndex: { documentCount: 7, searchableDocumentCount: 0, indexSizeBytes: 10 },
+    status: { worker: { countObservations: { searchable: { state, observedAtMs: 1234 } } } },
+  } as unknown as AiState;
+  expect(projectSv3Corpus(previous)).toEqual(SV3_CORPUS_UNKNOWN);
+});

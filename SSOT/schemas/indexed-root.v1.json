@@ -1,5 +1,13 @@
 {
   "$schema" : "https://json-schema.org/draft/2020-12/schema",
+  "$defs" : {
+    "Map(String,Boolean)" : {
+      "type" : "object",
+      "additionalProperties" : {
+        "type" : "boolean"
+      }
+    }
+  },
   "type" : "object",
   "properties" : {
     "chunkDocsSettled" : {
@@ -17,6 +25,9 @@
     "failedCount" : {
       "type" : "integer"
     },
+    "failedStages" : {
+      "$ref" : "#/$defs/Map(String,Boolean)"
+    },
     "fileCount" : {
       "type" : "integer"
     },
@@ -28,6 +39,9 @@
     },
     "lastVerifiedIsoTime" : {
       "type" : "string"
+    },
+    "missingArtifactStages" : {
+      "$ref" : "#/$defs/Map(String,Boolean)"
     },
     "parentDocsSettledEmbedding" : {
       "type" : "integer"

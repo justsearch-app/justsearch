@@ -995,6 +995,23 @@ class TestBuildSummaryEmbedsCeCoverage:
 # ---------------------------------------------------------------------------
 
 class TestBuildIndexStateAtQuery:
+    @pytest.mark.parametrize("max_doc,num_docs", [(-1, -1), (-1, 50), (50, -1)])
+    def test_unreadable_merge_counters_are_not_zero_debt(self, max_doc, num_docs):
+        block = _build_index_state_at_query(
+            {"indexMaxDoc": max_doc, "indexNumDocs": num_docs}, "2026-10-31T00:00:00+00:00",
+        )
+        assert block["max_doc"] == (None if max_doc < 0 else max_doc)
+        assert block["num_docs"] == (None if num_docs < 0 else num_docs)
+        assert block["deleted_docs"] is None
+
+    def test_empty_index_has_known_zero_merge_debt(self):
+        block = _build_index_state_at_query(
+            {"indexMaxDoc": 0, "indexNumDocs": 0}, "2026-10-31T00:00:00+00:00",
+        )
+        assert block["max_doc"] == 0
+        assert block["num_docs"] == 0
+        assert block["deleted_docs"] == 0
+
     def test_full_snapshot_computes_deleted_docs(self):
         block = _build_index_state_at_query(
             {

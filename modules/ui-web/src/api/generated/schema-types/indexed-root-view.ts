@@ -10,16 +10,21 @@
 
 import { z } from 'zod';
 
+export type MapStringBoolean = Record<string, boolean>;
+export const mapStringBooleanSchema = z.record(z.string(), z.boolean());
+
 export interface IndexedRootView {
   chunkDocsSettled?: number;
   chunkDocsTotal?: number;
   collection?: string;
   deleteDetectionUnverified?: boolean;
   failedCount?: number;
+  failedStages?: MapStringBoolean;
   fileCount?: number;
   inFlightCount?: number;
   lastIndexedIsoTime?: string;
   lastVerifiedIsoTime?: string;
+  missingArtifactStages?: MapStringBoolean;
   parentDocsSettledEmbedding?: number;
   parentDocsSettledNer?: number;
   parentDocsSettledSplade?: number;
@@ -37,10 +42,12 @@ export const indexedRootViewSchema = z.strictObject({
   "collection": z.string().optional(),
   "deleteDetectionUnverified": z.boolean().optional(),
   "failedCount": z.number().int().optional(),
+  "failedStages": mapStringBooleanSchema.optional(),
   "fileCount": z.number().int().optional(),
   "inFlightCount": z.number().int().optional(),
   "lastIndexedIsoTime": z.string().optional(),
   "lastVerifiedIsoTime": z.string().optional(),
+  "missingArtifactStages": mapStringBooleanSchema.optional(),
   "parentDocsSettledEmbedding": z.number().int().optional(),
   "parentDocsSettledNer": z.number().int().optional(),
   "parentDocsSettledSplade": z.number().int().optional(),

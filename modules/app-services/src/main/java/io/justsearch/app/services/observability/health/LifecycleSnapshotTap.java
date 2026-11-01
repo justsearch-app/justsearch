@@ -135,6 +135,24 @@ public final class LifecycleSnapshotTap {
             ReadinessDimension.INDEX_CONTROL_PLANE, "NOT_READY", "component.recovery_exhausted"),
         new ConditionMapping("index.start-error", "worker", Severity.ERROR));
 
+    for (String reason : List.of("index.rebuild_brake_exhausted", "index.rebuild_brake_unreadable")) {
+      MAPPING_TABLE.put(new MappingKey(ReadinessDimension.INDEX_SERVING, "DEGRADED", reason),
+          new ConditionMapping("schema.reindex-required", "worker", Severity.WARNING, List.of(),
+              Optional.of(io.justsearch.agent.api.registry.OperationInvocation.of(
+                  new io.justsearch.agent.api.registry.OperationRef("core.rebuild-index")))));
+    }
+    MAPPING_TABLE.put(
+        new MappingKey(ReadinessDimension.INDEX_SERVING, "UNKNOWN", null),
+        new ConditionMapping("embedding.readiness-unknown", "worker.enrichment", Severity.WARNING));
+    for (String reason : List.of("enrichment.failed", "enrichment.missing")) {
+      MAPPING_TABLE.put(new MappingKey(ReadinessDimension.INDEX_SERVING, "DEGRADED", reason),
+          new ConditionMapping("enrichment.incomplete", "worker.enrichment", Severity.WARNING));
+    }
+    for (String reason : List.of("chunk_embedding.not_ready", "chunk_embedding.in_progress")) {
+      MAPPING_TABLE.put(new MappingKey(ReadinessDimension.CHUNK_EMBEDDING, "DEGRADED", reason),
+          new ConditionMapping("embedding.not-ready", "worker.chunk-embedding", Severity.WARNING));
+    }
+
     // ----- INDEX_SERVING: worker availability + throughput. -----
     MAPPING_TABLE.put(
         new MappingKey(ReadinessDimension.INDEX_SERVING, "NOT_CONFIGURED", "index.unavailable"),
@@ -451,6 +469,9 @@ public final class LifecycleSnapshotTap {
 
   private void reconcileDim(ReadinessDimension dim, ReadinessComponentView component,
       java.util.function.Function<String, Optional<String>> messageForReason) {
+    if (component != null && component.stale()
+        && (dim == ReadinessDimension.CHUNK_EMBEDDING
+            || (dim == ReadinessDimension.INDEX_SERVING && "UNKNOWN".equals(component.state())))) return;
     boolean healthy = isHealthy(component);
     ConditionMapping target = healthy ? null : lookupMapping(dim, component);
     boolean unmappedUnhealthy = !healthy && target == null;

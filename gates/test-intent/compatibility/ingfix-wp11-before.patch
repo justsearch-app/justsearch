@@ -1,0 +1,152 @@
+diff --git a/modules/adapters-lucene/src/main/java/io/justsearch/adapters/lucene/runtime/IndexCountOps.java b/modules/adapters-lucene/src/main/java/io/justsearch/adapters/lucene/runtime/IndexCountOps.java
+index 86166f4bd3..6ae13e3948 100644
+--- a/modules/adapters-lucene/src/main/java/io/justsearch/adapters/lucene/runtime/IndexCountOps.java
++++ b/modules/adapters-lucene/src/main/java/io/justsearch/adapters/lucene/runtime/IndexCountOps.java
+@@ -132,6 +132,11 @@ public final class IndexCountOps {
+    *
+    * <p>Does NOT call {@code ensureStarted()} — caller (facade) is responsible for that guard.
+    */
++  /** Signature scaffolding: retains the before-state's independent reads. */
++  public long parentDocCountOrThrow() throws java.io.IOException {
++    return Math.max(0, docCountOrThrow() - countByFieldOrThrow("is_chunk", "true"));
++  }
++
+   public long docCountOrThrow() throws IOException {
+     return bridge.withSearcher(searcher -> (long) searcher.getIndexReader().numDocs());
+   }
+diff --git a/modules/app-api/src/main/java/io/justsearch/app/api/status/ChunkCoverageView.java b/modules/app-api/src/main/java/io/justsearch/app/api/status/ChunkCoverageView.java
+index 18d28bc54a..280c54953f 100644
+--- a/modules/app-api/src/main/java/io/justsearch/app/api/status/ChunkCoverageView.java
++++ b/modules/app-api/src/main/java/io/justsearch/app/api/status/ChunkCoverageView.java
+@@ -20,7 +20,19 @@ public record ChunkCoverageView(
+     boolean chunkSpladeEnabled,
+     long chunkSpladeCompletedCount,
+     long chunkSpladePendingCount,
+-    double chunkSpladeCoveragePercent) {
++    double chunkSpladeCoveragePercent,
++    boolean chunkingNotRequired,
++    long chunkSpladeDocCount,
++    long chunkSpladeFailedCount) {
++  public ChunkCoverageView(long chunkDocCount, long chunkEmbeddingCompletedCount,
++      long chunkEmbeddingPendingCount, long chunkEmbeddingFailedCount,
++      double chunkVectorCoveragePercent, boolean chunkVectorsReady, boolean chunkSpladeEnabled,
++      long chunkSpladeCompletedCount, long chunkSpladePendingCount, double chunkSpladeCoveragePercent) {
++    this(chunkDocCount, chunkEmbeddingCompletedCount, chunkEmbeddingPendingCount,
++        chunkEmbeddingFailedCount, chunkVectorCoveragePercent, chunkVectorsReady, chunkSpladeEnabled,
++        chunkSpladeCompletedCount, chunkSpladePendingCount, chunkSpladeCoveragePercent, false,
++        0, 0);
++  }
+   public static ChunkCoverageView empty() {
+     return new ChunkCoverageView(0, 0, 0, 0, 0.0, false, false, 0, 0, 0.0);
+   }
+diff --git a/modules/app-api/src/main/java/io/justsearch/app/api/status/CountObservationView.java b/modules/app-api/src/main/java/io/justsearch/app/api/status/CountObservationView.java
+new file mode 100644
+index 0000000000..d679e8994b
+--- /dev/null
++++ b/modules/app-api/src/main/java/io/justsearch/app/api/status/CountObservationView.java
+@@ -0,0 +1,6 @@
++/* SPDX-License-Identifier: Apache-2.0 */
++package io.justsearch.app.api.status;
++
++/** Freshness of a derived count; a stale reading retains its original observation time. */
++@com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL)
++public record CountObservationView(String state, long observedAtMs) {}
+diff --git a/modules/app-api/src/main/java/io/justsearch/app/api/status/EnrichmentProgressView.java b/modules/app-api/src/main/java/io/justsearch/app/api/status/EnrichmentProgressView.java
+index 03a78422bd..77b6880391 100644
+--- a/modules/app-api/src/main/java/io/justsearch/app/api/status/EnrichmentProgressView.java
++++ b/modules/app-api/src/main/java/io/justsearch/app/api/status/EnrichmentProgressView.java
+@@ -28,6 +28,7 @@ public record EnrichmentProgressView(
+     // owns. Publishing the thresholds is what lets off-process oracles (jseval's
+     // chunk_completeness guard) read them instead of mirroring the Java constants and drifting.
+     List<StageCompletenessView> completeness,
++    Boolean completenessKnown,
+     int chunkMinChars,
+     double vectorReadyPercent,
+     Map<String, Long> enrichmentCompleted,
+diff --git a/modules/app-api/src/main/java/io/justsearch/app/api/status/WorkerOperationalView.java b/modules/app-api/src/main/java/io/justsearch/app/api/status/WorkerOperationalView.java
+index adfcca43aa..3f21270032 100644
+--- a/modules/app-api/src/main/java/io/justsearch/app/api/status/WorkerOperationalView.java
++++ b/modules/app-api/src/main/java/io/justsearch/app/api/status/WorkerOperationalView.java
+@@ -18,6 +18,7 @@ import io.soabase.recordbuilder.core.RecordBuilder;
+ @JsonInclude(JsonInclude.Include.NON_NULL)
+ public record WorkerOperationalView(
+     CoreIndexView core,
++    java.util.Map<String, CountObservationView> countObservations,
+     FailureTrackingView failure,
+     MigrationGenerationView migration,
+     CompatibilityStatusView compatibility,
+diff --git a/modules/app-inference/src/main/java/io/justsearch/app/inference/CudaRuntimeDetection.java b/modules/app-inference/src/main/java/io/justsearch/app/inference/CudaRuntimeDetection.java
+index 05254c4507..5785023c46 100644
+--- a/modules/app-inference/src/main/java/io/justsearch/app/inference/CudaRuntimeDetection.java
++++ b/modules/app-inference/src/main/java/io/justsearch/app/inference/CudaRuntimeDetection.java
+@@ -26,6 +26,12 @@ final class CudaRuntimeDetection {
+    * @param serverExecutable path to the llama-server executable
+    * @return a warning message if CUDA runtime is missing, or {@code null} if OK
+    */
++  /** Signature scaffolding: target is ignored, preserving Windows-only detection. */
++  static String detectCudaRuntimeWarning(
++      Path serverExecutable, io.justsearch.configuration.NativeTargets target) {
++    return detectCudaRuntimeWarning(serverExecutable);
++  }
++
+   static String detectCudaRuntimeWarning(Path serverExecutable) {
+     if (serverExecutable == null) {
+       return null;
+diff --git a/modules/ipc-common/src/main/proto/indexing.proto b/modules/ipc-common/src/main/proto/indexing.proto
+index 64bb7651b9..9f6232d7fd 100644
+--- a/modules/ipc-common/src/main/proto/indexing.proto
++++ b/modules/ipc-common/src/main/proto/indexing.proto
+@@ -860,7 +860,10 @@ message ChunkCoverage {
+   int64 splade_completed_count = 8;
+   int64 splade_pending_count = 9;
+   double splade_coverage_percent = 10;
+-  // Next available field number: 11
++  bool chunking_not_required = 11; // All live parents declare zero chunks for their current revision.
++  optional int64 splade_doc_count = 12; // Only chunks carrying splade_status; absent on older workers.
++  int64 splade_failed_count = 13;
++  // Next available field number: 14
+ }
+
+ // Map-based accumulated per-batch timing for enrichment phases (354).
+@@ -935,7 +938,8 @@ message EnrichmentCoverage {
+   bool embedding_available = 21;
+   bool splade_available = 22;
+   bool ner_available = 23;
+-  // Next available field number: 24
++  optional bool completeness_known = 24;
++  // Next available field number: 25
+ }
+
+ // One enrichment stage's completeness audit (tempdoc 821 §3-C3).
+@@ -1039,6 +1043,12 @@ message VisualExtractionStatus {
+
+ // 341: Decomposed into nested sub-messages. Each sub-message owns its own
+ // field number space, eliminating collision risk as subsystems grow.
++// Count provenance: unknown has no observation; stale retains its original observation time.
++message CountObservation {
++  string state = 1; // fresh | stale | unknown
++  int64 observed_at_ms = 2;
++}
++
+ message StatusResponse {
+   CoreStatus core = 1;
+   FailureStatus failure = 2;
+@@ -1056,7 +1066,8 @@ message StatusResponse {
+   // 371: Content hash of the Worker distribution (stale-JVM detection).
+   string build_stamp = 12;
+   VisualExtractionStatus visual_extraction = 13;
+-  // Next available field number: 14
++  map<string, CountObservation> count_observations = 14; // active | building | searchable
++  // Next available field number: 15
+ }
+
+ // === Delete by Path (Prefix) ===
+@@ -1430,6 +1441,8 @@ message RootCoverageCounts {
+   int64 parent_docs_settled_ner = 4;        // ner_status terminal (+COMPLETED_EMPTY)
+   int64 chunk_docs_total = 5;               // chunk docs carrying chunk_embedding_status
+   int64 chunk_docs_settled = 6;             // chunk_embedding_status terminal (COMPLETED|FAILED)
++  map<string, bool> failed_stages = 9; // Terminal failure is settled, but cannot certify searchability.
++  map<string, bool> missing_artifact_stages = 10; // Completed dense work missing its artifact.
+ }
+
+ message CountJobsByPathPrefixResponse {

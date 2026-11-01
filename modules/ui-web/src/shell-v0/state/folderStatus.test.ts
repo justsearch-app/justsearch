@@ -36,6 +36,7 @@ const ctx = (
     enrichmentStages: { embedding: boolean; splade: boolean; ner: boolean } | null;
     enrichmentPending: boolean;
     enrichmentBlocked: boolean;
+    enrichmentBlockedDetail: string | null;
   }> = {},
 ) => ({
   relativeTime: 'just now',
@@ -537,4 +538,56 @@ describe('folderStatus — index-wide enrichment fallback (809 finding 1)', () =
     );
     expect(fs.state).toBe('empty');
   });
+});
+
+
+describe('terminal enrichment failure', () => {
+  it.each(['embedding', 'splade', 'ner', 'chunkVectors'])(
+    'does not certify fully searchable for failed %s', stage => {
+      const result = folderStatus(row({ parentDocsTotalEmbedding: 1, parentDocsSettledEmbedding: 1,
+        parentDocsTotalSplade: 1, parentDocsSettledSplade: 1, parentDocsTotalNer: 1,
+        parentDocsSettledNer: 1, chunkDocsTotal: 1, chunkDocsSettled: 1,
+        failedStages: { [stage]: true },
+      }), ctx({ enrichmentStages: ALL_STAGES }));
+      expect(result.state).toBe('keyword-only');
+      expect(result.metaText).toContain('Some enrichment failed');
+      expect(result.metaText).not.toContain('fully searchable');
+    });
+
+  it('does not warn for an intentionally disabled stage', () => {
+    const result = folderStatus(row({ parentDocsTotalEmbedding: 1, parentDocsSettledEmbedding: 1,
+      failedStages: { splade: true },
+    }), ctx({ enrichmentStages: { embedding: true, splade: false, ner: false } }));
+    expect(result.state).toBe('ready');
+    expect(result.metaText).toContain('fully searchable');
+  });
+});
+
+
+it('uses producer unavailability for an unfinished folder while completed folders stay complete', () => {
+  const context = ctx({ enrichmentStages: ALL_STAGES, enrichmentBlocked: true,
+    enrichmentBlockedDetail: 'Embedding cannot run right now. Keyword search remains available.' });
+  const unfinished = folderStatus(row({ parentDocsTotalEmbedding: 2, parentDocsSettledEmbedding: 1 }), context);
+  expect(unfinished.metaText).toContain('Embedding cannot run right now');
+  expect(unfinished.metaText).not.toContain('still catching up');
+  const completed = folderStatus(row({ parentDocsTotalEmbedding: 1, parentDocsSettledEmbedding: 1 }), context);
+  expect(completed.metaText).toContain('fully searchable');
+});
+
+
+it.each(['embedding', 'chunkVectors'])('withholds folder completion when completed %s has no artifact', stage => {
+  const result = folderStatus(row({ parentDocsTotalEmbedding: 10000, parentDocsSettledEmbedding: 10000,
+    chunkDocsTotal: 10000, chunkDocsSettled: 10000, missingArtifactStages: { [stage]: true },
+  }), ctx({ enrichmentStages: ALL_STAGES }));
+  expect(result.state).toBe('keyword-only');
+  expect(result.metaText).not.toContain('fully searchable');
+  expect(result.metaText).toContain('incomplete');
+});
+
+it('retains unknown root coverage instead of claiming improvement', () => {
+  const result = folderStatus(row({ parentDocsTotalEmbedding: -1, parentDocsSettledEmbedding: -1 }),
+    ctx({ enrichmentStages: ALL_STAGES, enrichmentPending: true }));
+  expect(result.state).toBe('unknown');
+  expect(result.metaText).toContain('unconfirmed');
+  expect(result.metaText).not.toContain('catching up');
 });

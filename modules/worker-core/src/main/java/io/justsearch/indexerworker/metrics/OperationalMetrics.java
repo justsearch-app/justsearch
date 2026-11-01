@@ -494,11 +494,22 @@ public final class OperationalMetrics {
     private record Sample(long timeMs, long docs) {}
 
     private final ArrayDeque<Sample> samples = new ArrayDeque<>(MAX_SAMPLES + 1);
+    private final java.util.function.LongSupplier clock;
+
+    public ThroughputMonitor() {
+      this(System::currentTimeMillis);
+    }
+
+    ThroughputMonitor(java.util.function.LongSupplier clock) {
+      this.clock = clock;
+    }
 
     public synchronized void recordSample(long documentsIndexed) {
-      long now = System.currentTimeMillis();
+      long now = clock.getAsLong();
+      if (!samples.isEmpty() && now - samples.getLast().timeMs > MAX_GAP_MS) samples.clear();
+      if (!samples.isEmpty() && now - samples.getLast().timeMs < RollingMonitorWindow.MIN_SAMPLE_MS) return;
       samples.addLast(new Sample(now, documentsIndexed));
-      while (samples.size() > MAX_SAMPLES) {
+      while (samples.size() > 2 && samples.stream().skip(1).findFirst().orElseThrow().timeMs <= now - WINDOW_MS) {
         samples.removeFirst();
       }
     }
@@ -510,12 +521,6 @@ public final class OperationalMetrics {
       Sample oldest = samples.getFirst();
       Sample newest = samples.getLast();
       long deltaTimeMs = newest.timeMs - oldest.timeMs;
-      if (deltaTimeMs > MAX_GAP_MS) {
-        Sample last = samples.getLast();
-        samples.clear();
-        samples.addLast(last);
-        return new ThroughputResult(0.0, "UNKNOWN");
-      }
       if (deltaTimeMs < WINDOW_MS) {
         return new ThroughputResult(0.0, "UNKNOWN");
       }

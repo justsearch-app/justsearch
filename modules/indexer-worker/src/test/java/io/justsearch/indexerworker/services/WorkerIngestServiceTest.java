@@ -686,7 +686,7 @@ final class WorkerIngestServiceTest {
     var coalesced = io.justsearch.indexerworker.queue.SwitchBufferSyncRoot.decode(
         sqliteQueue.listSwitchBufferOps().getFirst().payload());
     assertEquals(provenance, coalesced.provenance(), "maintenance must preserve the buffered agent");
-    assertFalse(coalesced.force(), "coalescing preserves the incoming work parameters");
+    assertTrue(coalesced.force(), "routine sync preserves the accepted forced traversal");
 
     String maintenanceRoot = Files.createDirectories(tempDir.resolve("maintenance-only")).toString();
     addedByThePerson(indexBasePath, Path.of(maintenanceRoot));

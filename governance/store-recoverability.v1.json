@@ -746,8 +746,8 @@
       ],
       "recoverability": "DERIVED",
       "upgradeHandling": "REBUILD",
-      "format": "SQLite WAL schema v25, an unversioned decimal admission high-water witness, and a strict unversioned JSON queue-triage receipt; queue-bound release-0.3.0 recovery Java Properties checkpoint with format=1 (independent of SQLite user_version)",
-      "currentVersion": 25,
+      "format": "SQLite WAL schema v26 (durable force intent and admission source identity), an unversioned decimal admission high-water witness, and a strict unversioned JSON queue-triage receipt; queue-bound release-0.3.0 recovery Java Properties checkpoint with format=1 (independent of SQLite user_version)",
+      "currentVersion": 26,
       "readableLegacyVersions": [
         0,
         1,
@@ -773,7 +773,8 @@
         21,
         22,
         23,
-        24
+        24,
+        25
       ],
       "versionAuthority": "modules/indexer-worker/src/main/java/io/justsearch/indexerworker/queue/SqliteSchema.java",
       "versionSource": {

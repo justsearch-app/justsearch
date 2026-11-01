@@ -688,3 +688,15 @@ it('uses a fresh serving count during migration instead of the retained count', 
   expect(files?.querySelector('.val')?.textContent?.trim()).toBe(formatCount(37));
   expect(files?.getAttribute('aria-label')).not.toContain('last known');
 });
+
+
+it('keeps unavailable enrichment visible when the file queue is empty', async () => {
+  const el = make();
+  el.aiState = makeAiState({ status: { worker: {
+    core: { indexState: 'IDLE', pendingJobs: 0, indexedDocuments: 2, indexHealthy: true },
+    enrichment: { embeddingEnabled: true, embeddingAvailable: false, embeddingDocCount: 2, embeddingPendingCount: 2 },
+  } } as unknown as AiState['status'] });
+  await el.updateComplete;
+  expect(el.shadowRoot?.textContent).toContain('Embedding cannot run right now');
+  expect(el.shadowRoot?.textContent).not.toContain('waiting for AI install');
+});

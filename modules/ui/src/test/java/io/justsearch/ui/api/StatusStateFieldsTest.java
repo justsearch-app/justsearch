@@ -225,6 +225,7 @@ class StatusStateFieldsTest {
       int t = tick.get();
       return WorkerOperationalViewBuilder.builder()
           .core(new CoreIndexView(true, 10 + t, 0, "SERVING", 4096L + t, 0))
+          .countObservations(Map.of("active", new io.justsearch.app.api.status.CountObservationView("fresh", 1234L + t)))
           .failure(FailureTrackingView.empty()).migration(MigrationGenerationView.empty())
           .compatibility(CompatibilityStatusView.empty()).queueDb(QueueDbStatusView.healthy())
           .enrichment(EnrichmentProgressView.empty()).gpu(GpuDiagnosticsView.empty())

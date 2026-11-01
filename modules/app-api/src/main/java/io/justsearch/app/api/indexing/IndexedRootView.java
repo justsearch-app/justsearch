@@ -95,7 +95,9 @@ public record IndexedRootView(
     long parentDocsTotalNer,
     long parentDocsSettledNer,
     long chunkDocsTotal,
-    long chunkDocsSettled) {
+    long chunkDocsSettled,
+    java.util.Map<String, Boolean> failedStages,
+    java.util.Map<String, Boolean> missingArtifactStages) {
 
   public IndexedRootView {
     Objects.requireNonNull(pathHash, "pathHash");

@@ -354,6 +354,10 @@ export interface StatusResponse {
       writerPendingDocs?: number;
       writerQueueDepth?: number;
     };
+    countObservations?: Record<string, {
+      observedAtMs?: number;
+      state?: string;
+    }>;
     enrichment?: {
       backfillMode?: string | null;
       batchTiming?: {
@@ -365,12 +369,15 @@ export interface StatusResponse {
         chunkEmbeddingCompletedCount?: number;
         chunkEmbeddingFailedCount?: number;
         chunkEmbeddingPendingCount?: number;
+        chunkSpladeDocCount?: number;
+        chunkSpladeFailedCount?: number;
         chunkSpladeCompletedCount?: number;
         chunkSpladeCoveragePercent?: number;
         chunkSpladeEnabled?: boolean;
         chunkSpladePendingCount?: number;
         chunkVectorCoveragePercent?: number;
         chunkVectorsReady?: boolean;
+        chunkingNotRequired?: boolean;
       } | null;
       chunkMinChars?: number;
       completedNerCount?: number;
@@ -412,6 +419,7 @@ export interface StatusResponse {
       spladeFailedCount?: number;
       spladePendingCount?: number;
       vectorReadyPercent?: number;
+      completenessKnown?: boolean | null;
     };
     failure?: {
       failedByFileKind?: Record<string, number> | null;
@@ -791,6 +799,10 @@ export const statusResponseSchema = z.strictObject({
       "writerPendingDocs": z.number().int().optional(),
       "writerQueueDepth": z.number().int().optional(),
     }).optional(),
+    "countObservations": z.record(z.string(), z.strictObject({
+      "observedAtMs": z.number().int().optional(),
+      "state": z.string().optional(),
+    })).optional(),
     "enrichment": z.strictObject({
       "backfillMode": z.string().nullable().optional(),
       "batchTiming": z.strictObject({
@@ -802,12 +814,15 @@ export const statusResponseSchema = z.strictObject({
         "chunkEmbeddingCompletedCount": z.number().int().optional(),
         "chunkEmbeddingFailedCount": z.number().int().optional(),
         "chunkEmbeddingPendingCount": z.number().int().optional(),
+        "chunkSpladeDocCount": z.number().int().optional(),
+        "chunkSpladeFailedCount": z.number().int().optional(),
         "chunkSpladeCompletedCount": z.number().int().optional(),
         "chunkSpladeCoveragePercent": z.number().optional(),
         "chunkSpladeEnabled": z.boolean().optional(),
         "chunkSpladePendingCount": z.number().int().optional(),
         "chunkVectorCoveragePercent": z.number().optional(),
         "chunkVectorsReady": z.boolean().optional(),
+        "chunkingNotRequired": z.boolean().optional(),
       }).nullable().optional(),
       "chunkMinChars": z.number().int().optional(),
       "completedNerCount": z.number().int().optional(),
@@ -849,6 +864,7 @@ export const statusResponseSchema = z.strictObject({
       "spladeFailedCount": z.number().int().optional(),
       "spladePendingCount": z.number().int().optional(),
       "vectorReadyPercent": z.number().optional(),
+      "completenessKnown": z.boolean().nullable().optional(),
     }).optional(),
     "failure": z.strictObject({
       "failedByFileKind": z.record(z.string(), z.number().int()).nullable().optional(),

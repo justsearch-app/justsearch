@@ -70,9 +70,11 @@ export interface EnrichmentApplicability {
  * belongs to the consuming surface, not to this projection.
  */
 export interface EnrichingStageRow {
-  readonly id: 'embedding' | 'splade' | 'ner' | 'chunkVectors';
+  readonly id: 'embedding' | 'splade' | 'ner' | 'chunkVectors' | 'chunkSplade';
   readonly total: number;
   readonly pending: number;
+  readonly failed?: number;
+  readonly missing?: number;
 }
 
 /**
@@ -114,13 +116,7 @@ export interface IndexingProgress {
   enrichingPercent: number | null;
   /** Documents still PENDING across every applicable enrichment stage (0 when nothing is pending). */
   enrichingPending: number;
-  /**
-   * Round-15 F1 — documents whose SEMANTIC enrichment is outstanding while the embedding stage is
-   * NOT applicable (no embedding service). Positive evidence that the work exists AND cannot run:
-   * the sole basis for the {@link IndexingPhase} `blocked` arm, and the reason a surface may not
-   * read this state as completion. 0 whenever embedding is applicable — a reachable backlog is
-   * {@link enrichingPending}'s subject, not this one.
-   */
+  /** Known pending work that cannot run: absent embedding or an unavailable enabled producer. */
   blockedPending: number;
   /**
    * 813 §20 — the per-stage BREAKDOWN of {@link enrichingPercent}, one row per stage that
@@ -305,19 +301,11 @@ interface EnrichmentWork {
    * of unfinished work (813 §17 / §1d's false terminal).
    */
   readonly rawPending: number;
-  /**
-   * Round-15 F1 — the same evidence for work that is UNREACHABLE: pending documents on the semantic
-   * stages (parent embedding + the chunk tier that shares its encoder) while embedding is NOT
-   * applicable. See {@link IndexingProgress.blockedPending}.
-   *
-   * Scoped to the EMBEDDING stage on purpose. SPLADE and NER are independently configurable — a
-   * deployment can legitimately run with SPLADE off forever (`SpladeConfig.from`), and their
-   * never-settling documents are exactly what the applicability filter exists to discount. Embedding
-   * is the stage the completion claim rests on: it is what "semantic search" means to the user, it is
-   * what `NO_EMBEDDING_MODEL` reports, and its absence is a state the user can ACT on (install AI),
-   * which is what makes saying so useful rather than merely pedantic.
-   */
+  /** Unreachable work, using the same applicability and live availability as the phase gate. */
   readonly blockedPending: number;
+  readonly embeddingBlocked: boolean;
+  readonly unknown: boolean;
+  readonly incomplete: boolean;
 }
 
 function readEnrichmentWork(status: StatusResponse | null | undefined): EnrichmentWork {
@@ -349,7 +337,7 @@ function readEnrichmentWork(status: StatusResponse | null | undefined): Enrichme
       applicable.splade,
     ),
     // NER reports no doc-count, so its denominator is its own two-valued census.
-    stage('ner', nerCompleted + nerPending, nerPending, applicable.ner),
+    stage('ner', nerCompleted + nerPending + count(enrichment?.failedNerCount), nerPending, applicable.ner),
     // The chunk tier's denominator is CHUNKED documents (813 §13) — never "N of M files". Its
     // applicability is the EMBEDDING stage's: chunk vectors come from the same encoder, so a
     // deployment with embedding switched off (or no embedding service at all) never settles a
@@ -361,7 +349,19 @@ function readEnrichmentWork(status: StatusResponse | null | undefined): Enrichme
       count(chunk?.chunkEmbeddingPendingCount),
       applicable.embedding,
     ),
-  ].filter((s): s is EnrichingStageRow => s !== null);
+    stage('chunkSplade', Math.max(count(chunk?.chunkSpladeDocCount),
+      count(chunk?.chunkSpladeCompletedCount) + count(chunk?.chunkSpladePendingCount) + count(chunk?.chunkSpladeFailedCount)),
+      count(chunk?.chunkSpladePendingCount), chunk?.chunkSpladeEnabled === true),
+  ].filter((s): s is EnrichingStageRow => s !== null).map(row => {
+    const stageId = row.id === 'embedding' ? 'embed' : row.id === 'chunkVectors' ? 'chunk_embed' : row.id;
+    const completeness = enrichment?.completeness?.find(stage => stage.stageId === stageId);
+    const failed = Math.max(count(completeness?.failed), row.id === 'embedding' ? count(enrichment?.embeddingFailedCount)
+      : row.id === 'splade' ? count(enrichment?.spladeFailedCount) : row.id === 'ner' ? count(enrichment?.failedNerCount)
+        : row.id === 'chunkVectors' ? count(chunk?.chunkEmbeddingFailedCount)
+          : row.id === 'chunkSplade' ? count(chunk?.chunkSpladeFailedCount) : 0);
+    const missing = row.pending === 0 ? count(completeness?.missing) : 0;
+    return { ...row, ...(failed > 0 ? { failed } : {}), ...(missing > 0 ? { missing } : {}) };
+  });
 
   // Disabled stages stay excluded: their pending can never settle (813 review F1), so counting them
   // would pin the phase at `enriching` forever.
@@ -369,17 +369,38 @@ function readEnrichmentWork(status: StatusResponse | null | undefined): Enrichme
     (applicable.embedding ? count(enrichment?.embeddingPendingCount) : 0) +
     (applicable.splade ? count(enrichment?.spladePendingCount) : 0) +
     (applicable.ner ? nerPending : 0) +
-    (applicable.embedding ? count(chunk?.chunkEmbeddingPendingCount) : 0);
+    (applicable.embedding ? count(chunk?.chunkEmbeddingPendingCount) : 0) +
+    (chunk?.chunkSpladeEnabled === true ? count(chunk.chunkSpladePendingCount) : 0);
 
-  // The mirror of the line above: the SAME counters on the SAME stages, taken when the stage is not
-  // applicable. Excluding them from the blend is right (nothing will settle, so a percent and an ETA
-  // would both be fabrications); excluding them from the EVIDENCE is what made 0% coverage read as
-  // completion.
-  const blockedPending = applicable.embedding
-    ? 0
-    : count(enrichment?.embeddingPendingCount) + count(chunk?.chunkEmbeddingPendingCount);
+  // Disabled optional stages stay excluded; enabled producers that cannot run retain their backlog.
+  const embeddingBlocked = (!applicable.embedding || enrichment?.embeddingAvailable === false)
+    && count(enrichment?.embeddingPendingCount) + count(chunk?.chunkEmbeddingPendingCount) > 0;
+  const blockedPending = (embeddingBlocked
+    ? count(enrichment?.embeddingPendingCount) + count(chunk?.chunkEmbeddingPendingCount) : 0)
+    + (applicable.splade && enrichment?.spladeAvailable === false ? count(enrichment?.spladePendingCount) : 0)
+    + (applicable.ner && enrichment?.nerAvailable === false ? nerPending : 0)
+    + (chunk?.chunkSpladeEnabled === true && enrichment?.spladeAvailable === false ? count(chunk.chunkSpladePendingCount) : 0);
+  const unknown = (applicable.embedding && chunk?.chunkDocCount === 0 && chunk.chunkingNotRequired === false
+    && (status?.worker?.core?.indexedDocumentsUnknown === true
+      || ['unknown', 'stale'].includes(status?.worker?.countObservations?.active?.state ?? ''))) ||
+    (enrichment?.completenessKnown === false &&
+    (applicable.embedding || applicable.splade || applicable.ner)) || [
+    ...(applicable.embedding ? [enrichment?.embeddingDocCount, enrichment?.embeddingPendingCount,
+      enrichment?.embeddingCoveragePercent, chunk?.chunkDocCount, chunk?.chunkEmbeddingPendingCount, chunk?.chunkVectorCoveragePercent] : []),
+    ...(applicable.splade ? [enrichment?.spladeDocCount, enrichment?.spladePendingCount, enrichment?.spladeCoveragePercent] : []),
+    ...(applicable.ner ? [enrichment?.pendingNerCount, enrichment?.completedNerCount] : []),
+    ...(chunk?.chunkSpladeEnabled === true ? [chunk.chunkSpladeDocCount, chunk.chunkSpladePendingCount, chunk.chunkSpladeCoveragePercent] : []),
+  ].some(value => typeof value === 'number' && value < 0);
+  const applicableStage = (id: string) => id === 'embed' || id === 'chunk_embed'
+    ? applicable.embedding : id === 'splade' ? applicable.splade : id === 'ner' && applicable.ner;
+  const incomplete = (chunk?.chunkSpladeEnabled === true && count(chunk.chunkSpladeFailedCount) > 0) || (applicable.embedding && (count(enrichment?.embeddingFailedCount) > 0 || count(chunk?.chunkEmbeddingFailedCount) > 0 ||
+    (chunk?.chunkDocCount === 0 && chunk.chunkingNotRequired === false && count(status?.worker?.core?.indexedDocuments) > 0) ||
+    (count(chunk?.chunkDocCount) > 0 && typeof chunk?.chunkVectorCoveragePercent === 'number' && chunk.chunkVectorCoveragePercent < 100))) ||
+    (applicable.splade && count(enrichment?.spladeFailedCount) > 0) ||
+    (applicable.ner && count(enrichment?.failedNerCount) > 0) ||
+    (enrichment?.completeness ?? []).some(stage => applicableStage(stage.stageId ?? '') && (count(stage.missing) > 0 || count(stage.failed) > 0));
 
-  return { applicable, rows, rawPending, blockedPending };
+  return { applicable, rows, rawPending, blockedPending, embeddingBlocked, unknown, incomplete };
 }
 
 /**
@@ -408,9 +429,10 @@ function derivePhase(indexState: string | null | undefined, jobsPending: number,
   // Eligibility is decided by the queue in the Worker; browser time never makes a retry due.
   if (indexState === 'WAITING') return 'waiting';
   if (jobsPending > 0) return 'indexing';
+  if (work.unknown) return 'unknown';
   if (work.blockedPending > 0) return indexState === 'ERROR' ? 'error' : 'blocked';
   if (work.rawPending > 0) return 'enriching';
-  return indexState === 'ERROR' ? 'error' : 'ready';
+  return indexState === 'ERROR' || work.incomplete ? 'error' : 'ready';
 }
 
 /**
@@ -623,7 +645,7 @@ export function selectIndexingProgress(
   // up", a full bar contradicting its own caveat. While ANY counted work is pending the display
   // is capped at 99, including denominator-less pending stages. Before any settlement is observed,
   // withhold a starting percentage just as indexing withholds one before an observed drain.
-  const enrichingPercent = total > pending
+  const enrichingPercent = !work.unknown && (!work.incomplete || work.rawPending > 0) && total > pending
     ? Math.min(work.rawPending > 0 ? 99 : 100, Math.round(((total - pending) / total) * 100))
     : null;
 
@@ -637,6 +659,10 @@ export function selectIndexingProgress(
     summary: pause.state === 'pausing' ? 'Pausing — finishing current files' : 'Indexing paused',
     detail: [(pause.reasons?.length ? pause.reasons : [pause.reason]).map(reason =>
       PAUSE_REASON_WORDING.get(reason) ?? 'Indexing is on hold; reason unavailable.').join(' '),
+      work.blockedPending > 0 && (!work.embeddingBlocked || work.applicable.embedding)
+        ? work.embeddingBlocked && status.worker?.enrichment?.embeddingAvailable === false
+          ? 'Embedding cannot run right now. Keyword search remains available.'
+          : 'Some enrichment cannot run right now. Keyword search remains available.' : '',
       (pause.reasons ?? [pause.reason]).includes('user_paused') && pause.untilEpochMs != null
         ? `Until ${new Date(pause.untilEpochMs).toLocaleString()}.` : '',
       pause.waiting && pause.reason !== 'settings_recovery'
@@ -684,7 +710,9 @@ export function selectIndexingProgress(
         ? deriveEtaSeconds(core.recentDocsPerSec, core.recentJobQueueDepth, jobsPending)
         : null,
     indexingPercent,
-    rebuildPercent: !pause && activity.confirmed && count(migration?.activeIndexedDocuments) > 0
+    rebuildPercent: !pause && activity.confirmed &&
+      !['active', 'building'].some(key => ['unknown', 'stale'].includes(status.worker?.countObservations?.[key]?.state ?? '')) &&
+      count(migration?.activeIndexedDocuments) > 0
       ? Math.min(99, Math.round(count(migration?.buildingIndexedDocuments) / count(migration?.activeIndexedDocuments) * 100))
       : null,
     pendingBytes: derivePendingBytes(
@@ -745,7 +773,7 @@ function indexingActivity(
   if (phase === 'error') {
     const failed = count(status.worker?.failure?.failedJobs);
     return { summary: 'Indexing error',
-      detail: failed > 0 ? `${formatCount(failed)} ${failed === 1 ? 'file could' : 'files could'} not be indexed.`
+      detail: readEnrichmentWork(status).incomplete ? 'Some enrichment failed or is missing. Keyword search remains available.' : failed > 0 ? `${formatCount(failed)} ${failed === 1 ? 'file could' : 'files could'} not be indexed.`
         : 'Some files could not be indexed.',
       confirmed: true, enrichmentDeferred };
   }
@@ -758,6 +786,15 @@ function indexingActivity(
     return { summary: 'Waiting to retry',
       detail: `${formatCount(jobs)} ${jobs === 1 ? 'file' : 'files'} waiting.${nextRetry}`,
       confirmed: true, enrichmentDeferred };
+  }
+  if (phase === 'unknown') return { ...EMPTY.activity, detail: 'Enrichment status could not be read.' };
+  if (phase === 'blocked' && !readEnrichmentWork(status).embeddingBlocked) {
+    return { summary: 'Enrichment unavailable', detail: ['Some enrichment cannot run right now. Keyword search remains available.', ...details].join(' '),
+      confirmed: true, enrichmentDeferred: true };
+  }
+  if (phase === 'blocked' && status.worker?.enrichment?.embeddingEnabled !== false) {
+    return { summary: 'Semantic search unavailable', detail: ['Embedding cannot run right now. Keyword search remains available.', ...details].join(' '),
+      confirmed: true, enrichmentDeferred: true };
   }
   const summary = phase === 'indexing'
     ? energy || gpuCauses.length > 0 ? 'Text indexing continues' : 'Indexing'

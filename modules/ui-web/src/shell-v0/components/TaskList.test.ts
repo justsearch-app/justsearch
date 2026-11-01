@@ -706,3 +706,70 @@ it('terminal failures withdraw the completion window and remain visible as error
   expect(host.shadowRoot?.textContent).not.toContain('Everything is indexed');
   expect(q('[role="progressbar"]')).toBeNull();
 });
+
+
+it.each([
+  { embeddingDocCount: 2, embeddingCompletedCount: 1, embeddingFailedCount: 1 },
+  { spladeDocCount: 2, spladeCompletedCount: 1, spladeFailedCount: 1 },
+  { completedNerCount: 1, failedNerCount: 1 },
+  { chunk: { chunkDocCount: 2, chunkEmbeddingCompletedCount: 1, chunkEmbeddingFailedCount: 1 } },
+  { embeddingDocCount: 10000, embeddingCompletedCount: 10000,
+    completeness: [{ stageId: 'embed', expected: 10000, present: 9999, missing: 1, failed: 0 }] },
+])('does not override the failed or missing enrichment headline with a completion claim: %j', async enrichment => {
+  __feedForTest({ status: INDEXING_SNAPSHOT });
+  await flush();
+  __feedForTest({ status: snapshot({ core: { indexState: 'IDLE', pendingJobs: 0, indexHealthy: true }, enrichment }) });
+  await flush();
+  expect((host as TaskList).progress.phase).toBe('error');
+  expect((host as TaskList).showingReady).toBe(false);
+  expect(text('[data-testid="task-title"]')).toBe('Indexing error');
+  expect(host.shadowRoot?.textContent).not.toContain('fully searchable');
+  expect(host.shadowRoot?.textContent).toContain('Keyword search remains available');
+});
+
+it('withdraws the completion window when the next count cannot be read', async () => {
+  __feedForTest({ status: INDEXING_SNAPSHOT });
+  await flush();
+  __feedForTest({ status: READY_SNAPSHOT });
+  await flush();
+  expect((host as TaskList).showingReady).toBe(true);
+  __feedForTest({ status: snapshot({ core: { indexState: 'IDLE', pendingJobs: 0, indexHealthy: true },
+    enrichment: { embeddingPendingCount: -1 } }) });
+  await flush();
+  expect((host as TaskList).progress.phase).toBe('unknown');
+  expect((host as TaskList).showingReady).toBe(false);
+  expect(host.shadowRoot?.textContent).not.toContain('fully searchable');
+});
+
+
+it('describes a producer lost after startup without an AI-install claim in the completion window', async () => {
+  __feedForTest({ status: INDEXING_SNAPSHOT });
+  await flush();
+  __feedForTest({ status: snapshot({ core: { indexState: 'IDLE', pendingJobs: 0, indexHealthy: true },
+    enrichment: { embeddingEnabled: true, embeddingAvailable: false, embeddingDocCount: 2, embeddingPendingCount: 2 } }) });
+  await flush();
+  expect(text('[data-testid="task-title"]')).toBe('Semantic search unavailable');
+  expect(text('[data-testid="task-aggregate-counts"]')).toContain('Embedding cannot run right now');
+  expect(host.shadowRoot?.textContent).not.toContain('waiting for AI install');
+});
+
+
+it('keeps unavailable embedding and other real enrichment work visible after the completion window', async () => {
+  vi.useFakeTimers();
+  __feedForTest({ status: INDEXING_SNAPSHOT });
+  await flush();
+  __feedForTest({ status: snapshot({ core: { indexState: 'IDLE', pendingJobs: 0, indexHealthy: true },
+    enrichment: { embeddingEnabled: true, embeddingAvailable: false, embeddingDocCount: 2,
+      embeddingPendingCount: 2, spladeEnabled: true, spladeAvailable: true,
+      spladeDocCount: 4, spladePendingCount: 1, spladeCompletedCount: 3 } }) });
+  await flush();
+  await vi.advanceTimersByTimeAsync(READY_DISMISS_MS + 1);
+  await flush();
+  expect((host as TaskList).showingReady).toBe(false);
+  expect(host.hasAttribute('data-empty')).toBe(false);
+  expect(text('[data-testid="task-title"]')).toBe('Semantic search unavailable');
+  await showFiles();
+  expect(rowText('[data-testid="task-stage-splade"]')).toBe('Keyword expansion 3 / 4');
+  expect(host.shadowRoot?.textContent).not.toContain('still improving');
+  expect(host.shadowRoot?.textContent).not.toContain('fully searchable');
+});

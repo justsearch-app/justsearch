@@ -24,7 +24,8 @@ import {
   AI_UNAVAILABLE_CAVEAT,
   warrantsSearchDegradationBanner,
 } from './readinessNotice.js';
-import type { SystemHealthVerdict } from './verdict.js';
+import { computeVerdict, type SystemHealthVerdict } from './verdict.js';
+import { known } from './known.js';
 
 const degraded = (
   severity: SystemHealthVerdict['severity'],
@@ -726,4 +727,22 @@ describe('readinessNotice — index and inference rows', () => {
       warrantsSearchDegradationBanner(degraded('info', ['inference.context_reduced'])),
     ).toBe(false);
   });
+});
+
+
+it.each([
+  ['enrichment.failed', 'Some documents could not be enriched'],
+  ['enrichment.missing', 'Some documents are missing enrichment data'],
+])('names %s in the degraded search notice', (code, wording) => {
+  const verdict = computeVerdict({ phase: 'connected', stability: { kind: 'settled' },
+    readiness: known({ retrieval: 'degraded' as const, aiFeatures: 'ready' as const, reasonCodes: [code] }) });
+  expect(verdict.kind).toBe('degraded');
+  expect(verdict.severity).toBe('warn');
+  const notice = readinessNotice(verdict);
+  expect(notice?.causes).toEqual([wording]);
+  expect(notice?.headline).toBe('Enrichment incomplete.');
+  expect(classifyConsequence([code])).toBe('enrichment-incomplete');
+  expect(notice?.body).toBe("Results may miss some documents' semantic matches; keyword search covers them");
+  expect(notice?.body).not.toContain('fully');
+  expect(warrantsSearchDegradationBanner(degraded('warn', [code]))).toBe(true);
 });

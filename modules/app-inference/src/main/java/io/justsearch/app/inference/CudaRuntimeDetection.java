@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.app.inference;
 
+import io.justsearch.configuration.NativeTargets;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -27,7 +28,11 @@ final class CudaRuntimeDetection {
    * @return a warning message if CUDA runtime is missing, or {@code null} if OK
    */
   static String detectCudaRuntimeWarning(Path serverExecutable) {
-    if (serverExecutable == null) {
+    return detectCudaRuntimeWarning(serverExecutable, NativeTargets.currentIfSupported().orElse(null));
+  }
+
+  static String detectCudaRuntimeWarning(Path serverExecutable, NativeTargets target) {
+    if (serverExecutable == null || target == null) {
       return null;
     }
     Path serverDir = serverExecutable.getParent();
@@ -35,15 +40,17 @@ final class CudaRuntimeDetection {
       return null;
     }
 
-    // Check if ggml-cuda.dll exists
-    Path ggmlCuda = serverDir.resolve(io.justsearch.configuration.NativeTargets.forTarget("windows-x86_64").libraryName("ggml-cuda"));
+    String libraryName = target.libraryName("ggml-cuda");
+    Path ggmlCuda = serverDir.resolve(libraryName);
     if (!Files.exists(ggmlCuda)) {
       LOG.warn(
-          "GPU mode requested (-ngl > 0) but ggml-cuda.dll not found in {}. "
+          "GPU mode requested (-ngl > 0) but {} not found in {}. "
               + "GPU acceleration will not work. Install a CUDA-enabled llama-server variant.",
-          serverDir);
+          libraryName, serverDir);
       return null;
     }
+    // The size heuristic and Toolkit DLL search describe the Windows distributions only.
+    if (!target.targetId().startsWith("windows-")) return null;
 
     // Check if it's the small dynamically-linked version (~80MB) vs large statically-linked
     // (~400MB+)

@@ -28,6 +28,7 @@ public record EnrichmentProgressView(
     // owns. Publishing the thresholds is what lets off-process oracles (jseval's
     // chunk_completeness guard) read them instead of mirroring the Java constants and drifting.
     List<StageCompletenessView> completeness,
+    Boolean completenessKnown,
     int chunkMinChars,
     double vectorReadyPercent,
     Map<String, Long> enrichmentCompleted,

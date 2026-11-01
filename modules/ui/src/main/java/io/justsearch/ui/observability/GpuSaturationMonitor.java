@@ -56,8 +56,10 @@ public final class GpuSaturationMonitor {
   /** Records a GPU utilization sample. Call from the scheduled sampler thread. */
   public synchronized void recordSample(int gpuPercent) {
     long now = clock.getAsLong();
+    if (!samples.isEmpty() && now - samples.getLast().timeMs > MAX_GAP_MS) samples.clear();
+    if (!samples.isEmpty() && now - samples.getLast().timeMs < RollingMonitorWindow.MIN_SAMPLE_MS) return;
     samples.addLast(new Sample(now, gpuPercent));
-    while (samples.size() > MAX_SAMPLES) {
+    while (samples.size() > 2 && samples.stream().skip(1).findFirst().orElseThrow().timeMs <= now - WINDOW_MS) {
       samples.removeFirst();
     }
   }
@@ -76,13 +78,6 @@ public final class GpuSaturationMonitor {
     Sample oldest = samples.getFirst();
     Sample newest = samples.getLast();
     long deltaTimeMs = newest.timeMs - oldest.timeMs;
-    if (deltaTimeMs > MAX_GAP_MS) {
-      // Stale window — discard and start over.
-      Sample last = samples.getLast();
-      samples.clear();
-      samples.addLast(last);
-      return new Result(0.0, STATE_UNKNOWN);
-    }
     if (deltaTimeMs < WINDOW_MS) {
       return new Result(0.0, STATE_UNKNOWN);
     }

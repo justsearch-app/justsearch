@@ -32,6 +32,7 @@ export const INGESTION_REASON_LABELS: Readonly<Record<string, string>> = {
   DELETED_OR_MISSING: 'File deleted or missing',
   STALE_AFTER_EXTRACTION: 'File changed during extraction',
   DELETED_AFTER_SNAPSHOT: 'File deleted after it was checked',
+  LOST_CLAIM_OWNERSHIP: 'Superseded by a newer indexing pass of the same file',
   SIZE_CHANGED_AFTER_SNAPSHOT: 'File size changed after it was checked',
   MODIFIED_TIME_CHANGED_AFTER_SNAPSHOT: 'File modification time changed after it was checked',
   FILE_KEY_CHANGED_AFTER_SNAPSHOT: 'File replaced after it was checked',

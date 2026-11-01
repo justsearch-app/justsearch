@@ -19,6 +19,27 @@ final class ChunkCompletenessAdmissionTest extends LuceneExecutorTestBase {
   private static final String CONTENT = "alpha beta gamma delta ".repeat(400);
 
   @Test
+  void admittedByteIdentityMustMatchAlongsideSizeTimestampAndCompleteChunks() throws Exception {
+    try (var runtime = IndexSchema.fromCatalog(
+            new io.justsearch.configuration.JustSearchConfigurationLoader().loadFieldCatalog()).ephemeral()
+        .withExecutorRegistrations(testLuceneExecutors()).open()) {
+      seed(runtime);
+      String source = "a".repeat(64);
+      runtime.indexingCoordinator().updateDocument(PARENT,
+          Map.of(SchemaFields.SIZE_BYTES, 42L, SchemaFields.SOURCE_SHA256, source));
+      refresh(runtime);
+      assertTrue(runtime.documentFieldOps().isUnmodified(PARENT, 123, 42, source));
+      assertFalse(runtime.documentFieldOps().isUnmodified(PARENT, 123, 42, "b".repeat(64)),
+          "matching metadata and complete chunks do not certify different source bytes");
+      assertFalse(runtime.documentFieldOps().isUnmodified(PARENT, 123, 43, source));
+      runtime.indexingCoordinator().deleteById("chunk-0");
+      refresh(runtime);
+      assertFalse(runtime.documentFieldOps().isUnmodified(PARENT, 123, 42, source),
+          "matching source identity cannot bypass missing-chunk repair");
+    }
+  }
+
+  @Test
   void missingChunksAreNotCertifiedByTheParentTimestamp() throws Exception {
     try (var runtime = open()) {
       seed(runtime);

@@ -654,7 +654,8 @@ export class StatusDeck extends JfElement {
       case 'core.queue': {
         const content = (() => {
           if (progress.pause) return html`<span class="val" title=${progress.activity.detail ?? ''}>${progress.activity.summary} — ${progress.activity.detail}</span>`;
-          if (queue <= 0 && embed <= 0 && progress.activity.confirmed) return nothing;
+          if (queue <= 0 && embed <= 0 && progress.activity.confirmed
+              && !(progress.phase === 'blocked' && progress.activity.detail)) return nothing;
           const activity = progress.activity;
           if (!activity.confirmed || activity.detail) {
             const description = [activity.summary, activity.detail].filter(Boolean).join(' — ');

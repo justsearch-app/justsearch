@@ -15,6 +15,40 @@ public final class SourceContentHash {
 
   private SourceContentHash() {}
 
+  private static final boolean HAS_DOS_ATTRIBUTES =
+      java.nio.file.FileSystems.getDefault().supportedFileAttributeViews().contains("dos");
+  private static final int RECALL_ON_DATA_ACCESS = 0x00400000;
+
+  /** Reading a cloud-only file would hydrate it; probe attributes before opening its bytes. */
+  public static boolean isCloudPlaceholder(Path file) {
+    if (!HAS_DOS_ATTRIBUTES) return false;
+    try {
+      int attrs = (int) Files.getAttribute(file, "dos:attributes");
+      return (attrs & RECALL_ON_DATA_ACCESS) != 0;
+    } catch (IOException | UnsupportedOperationException | IllegalArgumentException e) {
+      // A file whose Windows cloud-placeholder attribute cannot be read is not a placeholder.
+      // On some non-Windows JDKs the default FS advertises a "dos" view (so HAS_DOS_ATTRIBUTES
+      // is true) yet rejects the raw "attributes" name with IllegalArgumentException
+      // ('attributes' not recognized) — treat that as "not a placeholder", same as the other
+      // unreadable cases. This keeps the source probe portable across filesystem providers.
+      return false;
+    }
+  }
+
+  /** Best-effort admission proof. Missing evidence never certifies unchanged content. */
+  public static String admissionIdentity(Path path, Path root) {
+    if (root == null || io.justsearch.indexerworker.ingest.IngestionSkipPolicy.shouldSkipWithinRoot(path, root)
+        || isCloudPlaceholder(path)) return null;
+    try {
+      var before = FileFreshnessSnapshot.capture(path);
+      if (!before.regularFile()) return null;
+      String hash = sha256(path, () -> Thread.currentThread().isInterrupted());
+      return before.validateNow() == FileFreshnessSnapshot.SourceValidationResult.FRESH ? hash : null;
+    } catch (IOException | SecurityException unreadable) {
+      return null;
+    }
+  }
+
   public static String sha256(Path path) throws IOException {
     return sha256(path, () -> false);
   }

@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.indexerworker.services;
 
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
@@ -170,6 +171,7 @@ final class WorkerWatcherEventOwnershipTest {
     Path child = Files.writeString(root.resolve("child.txt"), "data");
     Fixture fixture = fixture(root);
     when(fixture.queue.enqueueEntries(any(), any())).thenReturn(1);
+    when(fixture.queue.enqueueMaintenanceScanEntries(any(), any(), any())).thenReturn(1);
     RootWatcherRegistry.Subscription witness = fixture.registry.subscription(root);
     CountDownLatch effectEntered = new CountDownLatch(1);
     CountDownLatch releaseNestedRead = new CountDownLatch(1);
@@ -224,6 +226,55 @@ final class WorkerWatcherEventOwnershipTest {
         CallContext.none()).getWatching());
 
     assertTrue(queued.get(), "the pending receipts must be queued for the current writer");
+  }
+
+  @Test
+  void unchangedServingWatcherEventsDoNotReplaceWorkAndEqualMetadataEditsAreAdmitted() throws Exception {
+    Path root = Files.createDirectory(tempDir.resolve("source-proof"));
+    Path file = Files.writeString(root.resolve("source.txt"), "first");
+    var stamp = Files.getLastModifiedTime(file);
+    var runtime = mock(io.justsearch.adapters.lucene.runtime.RunningRuntime.class);
+    var fields = mock(io.justsearch.adapters.lucene.runtime.DocumentFieldOps.class);
+    when(runtime.isAcceptingWrites()).thenReturn(true);
+    when(runtime.documentFieldOps()).thenReturn(fields);
+    when(fields.isUnmodified(any(), org.mockito.ArgumentMatchers.anyLong(),
+        org.mockito.ArgumentMatchers.anyLong())).thenReturn(true);
+    String key = io.justsearch.indexerworker.util.PathNormalizer.normalizeKey(file);
+    when(fields.getDocumentFieldOrThrow(key, io.justsearch.indexing.SchemaFields.COLLECTION)).thenReturn("docs");
+    var queue = mock(JobQueue.class);
+    when(queue.enqueueEntries(any(), any())).thenReturn(1);
+    when(queue.enqueueMaintenanceScanEntries(any(), any(), any())).thenReturn(1);
+    var service = new WorkerIngestService(queue, null, null, IndexingPacing.unthrottled(),
+        null, null, runtime, runtime, null, 0L);
+    var registry = new RootWatcherRegistry();
+    assertTrue(registry.watch(root.toString(), "docs").watching());
+    service.setRootWatcherRegistry(registry);
+    for (String content : java.util.List.of("other", "third")) {
+      when(fields.getDocumentFieldOrThrow(key, io.justsearch.indexing.SchemaFields.SOURCE_SHA256))
+          .thenReturn(io.justsearch.indexerworker.loop.SourceContentHash.sha256(file));
+      org.mockito.Mockito.clearInvocations(queue);
+      service.acceptWatcherUpsert(registry.subscription(root), "docs", file);
+      assertDoesNotThrow(() -> {
+        org.mockito.Mockito.verify(queue, org.mockito.Mockito.never()).enqueueEntries(any(), any());
+        org.mockito.Mockito.verify(queue, org.mockito.Mockito.never()).enqueueMaintenanceScanEntries(any(), any(), any());
+      }, "proven unchanged watcher events must leave queue ownership intact");
+      Files.writeString(file, content);
+      Files.setLastModifiedTime(file, stamp);
+      service.acceptWatcherUpsert(registry.subscription(root), "docs", file);
+      org.mockito.Mockito.verify(queue).enqueueMaintenanceScanEntries(any(), any(), any());
+    }
+    when(fields.getDocumentFieldOrThrow(key, io.justsearch.indexing.SchemaFields.SOURCE_SHA256))
+        .thenReturn(io.justsearch.indexerworker.loop.SourceContentHash.sha256(file));
+    org.mockito.Mockito.clearInvocations(queue);
+    try (var hashes = org.mockito.Mockito.mockStatic(
+        io.justsearch.indexerworker.loop.SourceContentHash.class, org.mockito.Mockito.CALLS_REAL_METHODS);
+        var placeholders = org.mockito.Mockito.mockStatic(SyncDirectoryOps.class, org.mockito.Mockito.CALLS_REAL_METHODS)) {
+      placeholders.when(() -> SyncDirectoryOps.isCloudPlaceholder(file)).thenReturn(true);
+      service.acceptWatcherUpsert(registry.subscription(root), "docs", file);
+      org.mockito.Mockito.verify(queue, org.mockito.Mockito.never()).enqueueEntries(any(), any());
+      org.mockito.Mockito.verify(queue, org.mockito.Mockito.never()).enqueueMaintenanceScanEntries(any(), any(), any());
+      hashes.verify(() -> io.justsearch.indexerworker.loop.SourceContentHash.sha256(file), org.mockito.Mockito.never());
+    }
   }
 
   private Fixture fixture(Path root) {

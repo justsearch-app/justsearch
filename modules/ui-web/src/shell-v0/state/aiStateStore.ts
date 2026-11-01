@@ -434,14 +434,18 @@ const DOCUMENT_COUNT_STARTUP_WINDOW_MS = 120_000;
  * (`indexedDocumentsUnknown`). Its `indexedDocuments`/`searchableDocuments` then carry a 0 kept only
  * for older readers; it is not a count and must never read as an empty index. Absent ⇒ known.
  */
-function documentCountUnknown(status: StatusSnapshot | null | undefined): boolean {
+function documentCountUnknown(status: StatusSnapshot | null | undefined, population = 'active'): boolean {
+  const observation = status?.worker?.countObservations?.[population];
+  if (observation?.state === 'unknown') return true;
+  if (observation?.state === 'fresh' || observation?.state === 'stale') return false;
   return status?.worker?.core?.indexedDocumentsUnknown === true;
 }
 
 /** A fresh serving-reader count stays usable while a different generation is being built. */
 export function hasLiveDocumentCount(state: AiState | null | undefined): boolean {
   return state != null && state.indexingStatusLive && isWorkerReportedIndex(state.status)
-    && state.index.documentCount.known;
+    && state.index.documentCount.known
+    && state.status?.worker?.countObservations?.active?.state !== 'stale';
 }
 
 /**
@@ -473,7 +477,8 @@ function computeCapabilities(chatDisabledBySpec: boolean): AiCapabilities {
   return {
     chat,
     // #758: an index the backend could not count is not an empty one.
-    rag: chat && (documentCountUnknown(status) || docs > 0),
+    rag: chat && (documentCountUnknown(status)
+      || status?.worker?.countObservations?.active?.state === 'stale' || docs > 0),
     extract: chat,
     embedding: status?.embedding?.compatState === 'COMPATIBLE',
   };
@@ -764,7 +769,7 @@ function computeIndex(): AiIndex {
   const countsUnknown = documentCountUnknown(status);
   return {
     documentCount: countsUnknown ? UNKNOWN : fromStatus(status?.worker?.core?.indexedDocuments),
-    searchableDocumentCount: countsUnknown
+    searchableDocumentCount: documentCountUnknown(status, 'searchable')
       ? UNKNOWN
       : fromStatus(status?.worker?.core?.searchableDocuments),
     pendingJobs: fromStatus(status?.worker?.core?.pendingJobs),
@@ -1136,7 +1141,9 @@ function stampSettledIndex(snap: StatusSnapshot): void {
   });
   if (stability.kind !== 'settled') return;
   // #758: an uncounted index has no count to retain; the last settled one stays.
-  if (documentCountUnknown(snap)) return;
+  if (documentCountUnknown(snap) || documentCountUnknown(snap, 'searchable')
+      || snap.worker?.countObservations?.active?.state === 'stale'
+      || snap.worker?.countObservations?.searchable?.state === 'stale') return;
   const documentCount = snap.worker?.core?.indexedDocuments;
   if (documentCount == null) return;
   lastSettledIndexSig.set({

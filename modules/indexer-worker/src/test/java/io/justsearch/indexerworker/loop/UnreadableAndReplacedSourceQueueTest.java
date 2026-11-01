@@ -166,7 +166,7 @@ final class UnreadableAndReplacedSourceQueueTest {
 
   private Harness harness() throws Exception {
     DocumentFieldOps fields = mock(DocumentFieldOps.class);
-    when(fields.isUnmodified(anyString(), anyLong(), anyLong())).thenReturn(false);
+    when(fields.isUnmodified(anyString(), anyLong(), anyLong(), anyString())).thenReturn(false);
     IndexCountOps counts = mock(IndexCountOps.class);
     when(counts.docCount()).thenReturn(7L);
     when(counts.docCountOrThrow()).thenReturn(7L);

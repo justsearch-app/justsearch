@@ -281,7 +281,7 @@ public final class LuceneRuntimeTypes {
   public record ChunkEmbeddingCounts(int total, int completed, int pending, int failed) {
     /** Coverage percentage (0-100), or 0 if no chunks. */
     public double coveragePercent() {
-      return total > 0 ? (completed * 100.0) / total : 0.0;
+      return total < 0 ? -1.0 : total > 0 ? (completed * 100.0) / total : 0.0;
     }
 
     /** True if coverage >= threshold (typically 95% for RAG readiness). */
@@ -301,10 +301,13 @@ public final class LuceneRuntimeTypes {
    * @param totalChunks live chunk documents (IS_CHUNK=true)
    * @param vectorsPresent live chunk documents that actually carry a {@code chunk_vector} value
    */
-  public record ChunkVectorPresence(int totalChunks, int vectorsPresent) {
+  public record ChunkVectorPresence(int totalChunks, int vectorsPresent, boolean chunkingNotRequired) {
+    public ChunkVectorPresence(int totalChunks, int vectorsPresent) {
+      this(totalChunks, vectorsPresent, false);
+    }
     /** Presence coverage percentage (0-100), or 0 if no chunks. */
     public double coveragePercent() {
-      return totalChunks > 0 ? (vectorsPresent * 100.0) / totalChunks : 0.0;
+      return totalChunks < 0 ? -1.0 : totalChunks > 0 ? (vectorsPresent * 100.0) / totalChunks : 0.0;
     }
 
     /** True if presence coverage >= threshold (typically 95% for RAG readiness). */
@@ -359,7 +362,7 @@ public final class LuceneRuntimeTypes {
   public record EmbeddingCounts(int total, int completed, int pending, int failed) {
     /** Coverage percentage (0-100), or 0 if no documents. */
     public double coveragePercent() {
-      return total > 0 ? (completed * 100.0) / total : 0.0;
+      return total < 0 ? -1.0 : total > 0 ? (completed * 100.0) / total : 0.0;
     }
   }
 
@@ -374,7 +377,7 @@ public final class LuceneRuntimeTypes {
   public record SpladeFeatureCounts(int total, int completed, int pending, int failed) {
     /** Coverage percentage (0-100), or 0 if no documents. */
     public double coveragePercent() {
-      return total > 0 ? (completed * 100.0) / total : 0.0;
+      return total < 0 ? -1.0 : total > 0 ? (completed * 100.0) / total : 0.0;
     }
   }
 
@@ -416,7 +419,16 @@ public final class LuceneRuntimeTypes {
       int parentDocsTotalNer,
       int parentDocsSettledNer,
       int chunkDocsTotal,
-      int chunkDocsSettled) {
+      int chunkDocsSettled,
+      Map<String, Boolean> failedStages,
+      Map<String, Boolean> missingArtifactStages) {
+    public RootCoverageCounts(int parentDocsTotalEmbedding, int parentDocsSettledEmbedding,
+        int parentDocsTotalSplade, int parentDocsSettledSplade, int parentDocsTotalNer,
+        int parentDocsSettledNer, int chunkDocsTotal, int chunkDocsSettled) {
+      this(parentDocsTotalEmbedding, parentDocsSettledEmbedding, parentDocsTotalSplade,
+          parentDocsSettledSplade, parentDocsTotalNer, parentDocsSettledNer,
+          chunkDocsTotal, chunkDocsSettled, Map.of(), Map.of());
+    }
 
     /** All-zero sentinel for the unavailable / blank-prefix path. */
     public static final RootCoverageCounts EMPTY =

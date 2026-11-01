@@ -181,6 +181,18 @@ public final class Release030Fixture {
         }
       }
       connection.commit();
+      // upgrade-030/README.md: unpacking must not invent edits after captured admissions.
+      // Indexed unchanged sources recover their more precise saved mtime in relocateIndex.
+      try (var query = connection.createStatement();
+          var rows = query.executeQuery("SELECT path,last_updated FROM jobs")) {
+        while (rows.next()) {
+          Path file = Path.of(rows.getString("path"));
+          if (file.startsWith(root) && Files.isRegularFile(file)) {
+            Files.setLastModifiedTime(file,
+                java.nio.file.attribute.FileTime.fromMillis(rows.getLong("last_updated")));
+          }
+        }
+      }
     }
   }
 

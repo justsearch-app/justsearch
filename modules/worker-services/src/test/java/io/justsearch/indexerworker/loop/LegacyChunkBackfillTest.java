@@ -138,14 +138,19 @@ final class LegacyChunkBackfillTest extends LuceneExecutorTestBase {
   }
 
   private RunningRuntime open(Path index) throws Exception {
-    return IndexSchema.fromCatalog(FieldCatalogDef.forChunkTesting(2)).atPath(index)
+    var catalog = FieldCatalogDef.forChunkTesting(2);
+    var fields = new java.util.ArrayList<>(catalog.fields());
+    fields.add(new FieldCatalogDef.FieldDef(SchemaFields.SOURCE_SHA256, "keyword", true, false,
+        List.of(), null, null, false));
+    return IndexSchema.fromCatalog(new FieldCatalogDef(catalog.version(), fields)).atPath(index)
         .withExecutorRegistrations(testLuceneExecutors()).open();
   }
 
   private static int seed(RunningRuntime runtime, String id, String content, long modified, long sizeBytes) {
     runtime.indexingCoordinator().indexSingle(new IndexDocument(Map.of(SchemaFields.DOC_ID, id,
         SchemaFields.DOC_UID, id, SchemaFields.PATH, id, SchemaFields.CONTENT, content,
-        SchemaFields.MODIFIED_AT, modified, SchemaFields.SIZE_BYTES, sizeBytes)));
+        SchemaFields.MODIFIED_AT, modified, SchemaFields.SIZE_BYTES, sizeBytes,
+        SchemaFields.SOURCE_SHA256, ChunkParentRevision.sha256Hex(content))));
     refresh(runtime);
     int total = ChunkDocumentWriter.regenerateChunksFromExistingParent(runtime.documentFieldOps(), runtime.indexingCoordinator(), id, content, false);
     refresh(runtime);
@@ -157,6 +162,7 @@ final class LegacyChunkBackfillTest extends LuceneExecutorTestBase {
     runtime.indexingCoordinator().indexSingle(new IndexDocument(Map.of(SchemaFields.DOC_ID, id,
         SchemaFields.DOC_UID, id, SchemaFields.PATH, id, SchemaFields.CONTENT, content,
         SchemaFields.MODIFIED_AT, modified, SchemaFields.SIZE_BYTES, sizeBytes,
+        SchemaFields.SOURCE_SHA256, ChunkParentRevision.sha256Hex(content),
         SchemaFields.VECTOR, new float[] {0.5f, 0.5f})));
     refresh(runtime);
     return total;

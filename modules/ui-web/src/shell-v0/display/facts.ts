@@ -186,6 +186,12 @@ const FACTS: Record<string, FactDef> = {
       read: (s) =>
         unknownDocumentCountLabel(s.status) ??
         (s.index ? whenKnown(s.index.documentCount, (n) => formatCount(n), () => undefined) : undefined),
+      provenance: (s) => {
+        const observation = s.status?.worker?.countObservations?.active;
+        return observation?.state === 'stale'
+          ? `Last known · observed ${observation.observedAtMs ? new Date(observation.observedAtMs).toLocaleString() : 'at an unknown time'}`
+          : undefined;
+      },
     },
   },
   'core.size': {

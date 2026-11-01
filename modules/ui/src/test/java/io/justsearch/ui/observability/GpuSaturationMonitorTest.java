@@ -108,6 +108,30 @@ final class GpuSaturationMonitorTest {
     assertEquals(GpuSaturationMonitor.STATE_UNKNOWN, m.compute(0).state());
   }
 
+  @Test
+  void continuousPollingRetainsRecentEvidence() throws Exception {
+    var monitor = newMonitor();
+    for (int ms = 0; ms <= 900_000; ms += 100) {
+      clock.set(ms);
+      monitor.recordSample(ms < 600_000 ? 95 : 20);
+      if (ms >= 180_000) assertTrue(!monitor.compute(0).state().equals("UNKNOWN"));
+    }
+    assertEquals("HEALTHY", monitor.compute(0).state());
+    var samples = GpuSaturationMonitor.class.getDeclaredField("samples");
+    samples.setAccessible(true);
+    assertTrue(((java.util.Collection<?>) samples.get(monitor)).size()
+        <= io.justsearch.telemetry.RollingMonitorWindow.MAX_SAMPLES);
+    clock.addAndGet(700_000);
+    monitor.recordSample(95);
+    clock.addAndGet(10_000);
+    monitor.recordSample(95);
+    assertEquals("UNKNOWN", monitor.compute(0).state());
+    clock.addAndGet(170_000);
+    monitor.recordSample(95);
+    assertEquals("SATURATED", monitor.compute(0).state());
+    assertEquals("HEALTHY", monitor.compute(1).state());
+  }
+
   /**
    * Records 13 samples spaced 15s apart so total window is 12 * 15s = 180s = WINDOW_MS,
    * mirroring the production sampler cadence.

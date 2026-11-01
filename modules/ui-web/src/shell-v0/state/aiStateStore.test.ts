@@ -695,6 +695,18 @@ describe('aiStateStore — system-health verdict (595)', () => {
     vi.useRealTimers();
   });
 
+  it.each(['unknown', 'blocked', 'failed'] as const)('clears ETA memory when enrichment becomes %s', state => {
+    feed(withEnrichment(300));
+    expect(getAiState().enrichSettleSamples.length).toBe(1);
+    const status = withEnrichment(state === 'failed' ? 0 : 300);
+    const enrichment = status.worker!.enrichment!;
+    if (state === 'unknown') enrichment.embeddingPendingCount = -1;
+    if (state === 'blocked') enrichment.embeddingAvailable = false;
+    if (state === 'failed') enrichment.embeddingFailedCount = 1;
+    feed(status);
+    expect(getAiState().enrichSettleSamples).toEqual([]);
+  });
+
   it('§20: the trail is bounded — only the most recent samples are kept', () => {
     vi.useFakeTimers();
     for (let i = 0; i < 9; i += 1) {

@@ -69,6 +69,10 @@ final class WorkerStatusMapper {
         var rerankerProbe = gpuStatus.getRerankerOrtCuda();
 
         return WorkerOperationalViewBuilder.builder()
+                .countObservations(status.getCountObservationsMap().entrySet().stream().collect(
+                    java.util.stream.Collectors.toUnmodifiableMap(java.util.Map.Entry::getKey,
+                        entry -> new io.justsearch.app.api.status.CountObservationView(
+                            entry.getValue().getState(), entry.getValue().getObservedAtMs()))))
                 .core(new CoreIndexView(
                         core.getIsHealthy(),
                         core.getDocCount(),
@@ -154,7 +158,11 @@ final class WorkerStatusMapper {
                                 enrichment.getChunk().getSpladeEnabled(),
                                 enrichment.getChunk().getSpladeCompletedCount(),
                                 enrichment.getChunk().getSpladePendingCount(),
-                                enrichment.getChunk().getSpladeCoveragePercent()))
+                                enrichment.getChunk().getSpladeCoveragePercent(),
+                                enrichment.getChunk().getChunkingNotRequired(),
+                                enrichment.getChunk().hasSpladeDocCount() ? enrichment.getChunk().getSpladeDocCount()
+                                    : enrichment.getChunk().getSpladeEnabled() ? -1 : 0,
+                                enrichment.getChunk().getSpladeFailedCount()))
                         .embeddingDocCount(enrichment.getEmbedding().getDocCount())
                         .embeddingCompletedCount(enrichment.getEmbedding().getCompletedCount())
                         .embeddingPendingCount(enrichment.getEmbedding().getPendingCount())
@@ -169,6 +177,7 @@ final class WorkerStatusMapper {
                         .completedNerCount(enrichment.getCompletedNerCount())
                         .failedNerCount(enrichment.getFailedNerCount())
                         .completeness(mapCompleteness(enrichment))
+                        .completenessKnown(enrichment.hasCompletenessKnown() ? enrichment.getCompletenessKnown() : null)
                         .chunkMinChars(enrichment.getChunkMinChars())
                         .vectorReadyPercent(enrichment.getVectorReadyPercent())
                         .embeddingEnabled(enrichment.getEmbeddingEnabled())

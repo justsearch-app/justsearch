@@ -312,16 +312,20 @@ public final class JobBatchExtractor {
         batchStats.recordFailed();
         return null;
       }
+      requireReadableSource(claim);
+      String sourceSha256 = SourceContentHash.sha256WithinRoot(filePath, claim.ingestionRoot());
       try {
         String normalizedPath = envelope.normalizedPath();
         boolean forceReindex = claim.plannedSourceSha256() != null
             || (claim.walkEpoch() != null
-                ? claim.recordedForce() : forcedPaths.remove(normalizedPath));
+                ? claim.recordedForce() : claim.forceReindex() || forcedPaths.remove(normalizedPath));
         // Skip isUnmodified() on empty index — every doc is new (312 item 10).
         if (!forceReindex && !indexEmptyForBatch) {
-          if (documentFieldOps.isUnmodified(normalizedPath, envelope.modifiedAtMs(), envelope.sizeBytes())
+          if (documentFieldOps.isUnmodified(normalizedPath, envelope.modifiedAtMs(), envelope.sizeBytes(), sourceSha256)
               && Objects.equals(collection == null || collection.isBlank() ? null : collection,
-                  documentFieldOps.getDocumentFieldOrThrow(normalizedPath, SchemaFields.COLLECTION))) {
+                  documentFieldOps.getDocumentFieldOrThrow(normalizedPath, SchemaFields.COLLECTION))
+              && FileFreshnessSnapshot.fromEnvelope(envelope).validateNow()
+                  == FileFreshnessSnapshot.SourceValidationResult.FRESH) {
             log.debug("File unchanged, skipping: {}", filePath);
             FileEnvelope envelopeForLedger = envelope;
             journal.recordOutcomeSafely(
@@ -345,8 +349,6 @@ public final class JobBatchExtractor {
       extractSpan.setAttribute("doc.path", filePath.toString());
       long extractStart = System.currentTimeMillis();
       ValidatedExtractionArtifact artifact;
-      requireReadableSource(claim);
-      String sourceSha256 = SourceContentHash.sha256WithinRoot(filePath, claim.ingestionRoot());
       try {
         // W1.5 — inlined what used to be extractContent + validateArtifact wrappers.
         requireReadableSource(claim);

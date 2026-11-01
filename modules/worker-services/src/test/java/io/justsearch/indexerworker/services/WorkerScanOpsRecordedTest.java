@@ -76,7 +76,7 @@ final class WorkerScanOpsRecordedTest {
         eq("green"), eq(KEY), eq(EPOCH), anyList(), eq(COLLECTION)))
         .thenAnswer(call -> ((List<?>) call.getArgument(3)).size());
     WorkerScanOps scan = new WorkerScanOps(queue, new CloudPlaceholderRecorder(queue),
-        path -> false, () -> 0L, () -> false, millis -> true, paths -> {},
+        path -> false, () -> 0L, () -> false, millis -> true,
         () -> {}, () -> "green");
 
     assertEquals(1, scan.scan(recordedRequest(root, List.of()), ignored -> {}).getFilesAdmitted());
@@ -91,7 +91,7 @@ final class WorkerScanOpsRecordedTest {
     Files.writeString(root.resolve("entry.txt"), "ordinary");
     SwitchBufferCapableQueue queue = org.mockito.Mockito.mock(SwitchBufferCapableQueue.class);
     WorkerScanOps scan = new WorkerScanOps(queue, new CloudPlaceholderRecorder(queue),
-        path -> false, () -> 0L, () -> false, millis -> true, paths -> {},
+        path -> false, () -> 0L, () -> false, millis -> true,
         () -> {}, () -> "green");
     var request = new WorkerScanOps.ScanRequest(root, COLLECTION,
         WorkerScanOps.ScanMode.INITIAL, List.of(), "ordinary-scan", PROVENANCE);
@@ -159,8 +159,7 @@ final class WorkerScanOpsRecordedTest {
             path -> path.equals(excludedFile) || path.equals(excludedNested),
             () -> 0L,
             () -> false,
-            millis -> true,
-            paths -> {}, () -> {});
+            millis -> true, () -> {});
     ScanRootProgress terminal =
         ops.scan(
             new WorkerScanOps.ScanRequest(root, COLLECTION, WorkerScanOps.ScanMode.FORCE_REINDEX,
@@ -363,8 +362,7 @@ final class WorkerScanOpsRecordedTest {
             millis -> {
               cancelled.set(true);
               return true;
-            },
-            paths -> {}, () -> {});
+            }, () -> {});
 
     ScanRootProgress terminal = ops.scan(recordedRequest(root, List.of()), ignored -> {});
 
@@ -377,7 +375,7 @@ final class WorkerScanOpsRecordedTest {
 
   private static WorkerScanOps guardedScan(JobQueue queue) {
     return new WorkerScanOps(queue, new CloudPlaceholderRecorder(queue), path -> false,
-        () -> 0L, () -> false, millis -> true, paths -> {}, () -> {});
+        () -> 0L, () -> false, millis -> true, () -> {});
   }
 
   private static WorkerScanOps.ScanRequest recordedRequest(Path root, List<String> globs) {

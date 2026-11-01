@@ -316,17 +316,18 @@ final class QueueDefectRegressionTest {
     }
   }
 
-  @ParameterizedTest
+  @ParameterizedTest(name = "{displayName} [{index}] {arguments}")
   @org.junit.jupiter.params.provider.CsvSource({"IO_FAILED,NONE", "IO_FAILED,RETRY_WITH_BACKOFF",
       "IO_FAILED,RETRY_UNTIL_AVAILABLE", "PARSER_TIMEOUT,RETRY_WITH_BACKOFF"})
   void maintenanceNoopPreservesEverySavedFieldAndActualEnqueueCounters(String type, String policy) throws Exception {
     try(var queue=new SqliteJobQueue(temp.resolve(policy+".db"))) {
-      queue.open(); Path file=temp.resolve("file");
+      queue.open(); Path file=java.nio.file.Files.writeString(temp.resolve("file"), "unchanged content");
       queue.enqueueEntries(List.of(new JobQueue.EnqueueEntry(file,17,new JobQueue.EnqueueProvenance("user","rpc"),null,temp)),"C","scan");
       queue.markFailed(file,outcome(IngestionOutcomeClass.valueOf(type),IngestionRetryPolicy.valueOf(policy)));
       var before=queue.watcherReconciliationRow(file.toString());
       long admitted=queue.throughputMeters().enqueuedTotal();
-      assertEquals(0,queue.enqueueMaintenanceScanEntries(List.of(new JobQueue.EnqueueEntry(file,99)),"other","maintenance"));
+      assertEquals(0,queue.enqueueMaintenanceScanEntries(
+          List.of(new JobQueue.EnqueueEntry(file,17).withinRoot(temp)),"C","maintenance"));
       assertEquals(before,queue.watcherReconciliationRow(file.toString()));
       assertEquals(admitted,queue.throughputMeters().enqueuedTotal());
       assertEquals(1,queue.enqueueEntries(List.of(new JobQueue.EnqueueEntry(file,99)),"other","explicit"));

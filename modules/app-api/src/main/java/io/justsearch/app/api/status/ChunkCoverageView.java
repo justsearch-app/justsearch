@@ -20,7 +20,19 @@ public record ChunkCoverageView(
     boolean chunkSpladeEnabled,
     long chunkSpladeCompletedCount,
     long chunkSpladePendingCount,
-    double chunkSpladeCoveragePercent) {
+    double chunkSpladeCoveragePercent,
+    boolean chunkingNotRequired,
+    long chunkSpladeDocCount,
+    long chunkSpladeFailedCount) {
+  public ChunkCoverageView(long chunkDocCount, long chunkEmbeddingCompletedCount,
+      long chunkEmbeddingPendingCount, long chunkEmbeddingFailedCount,
+      double chunkVectorCoveragePercent, boolean chunkVectorsReady, boolean chunkSpladeEnabled,
+      long chunkSpladeCompletedCount, long chunkSpladePendingCount, double chunkSpladeCoveragePercent) {
+    this(chunkDocCount, chunkEmbeddingCompletedCount, chunkEmbeddingPendingCount,
+        chunkEmbeddingFailedCount, chunkVectorCoveragePercent, chunkVectorsReady, chunkSpladeEnabled,
+        chunkSpladeCompletedCount, chunkSpladePendingCount, chunkSpladeCoveragePercent, false,
+        chunkSpladeCompletedCount + chunkSpladePendingCount, 0);
+  }
   public static ChunkCoverageView empty() {
     return new ChunkCoverageView(0, 0, 0, 0, 0.0, false, false, 0, 0, 0.0);
   }
