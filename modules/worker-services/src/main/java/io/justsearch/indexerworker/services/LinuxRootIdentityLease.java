@@ -129,6 +129,11 @@ final class LinuxRootIdentityLease implements RootIdentityLease {
     return points.stream().filter(path -> !path.equals(root) && path.startsWith(root)).toList();
   }
 
+  /** Unparsed topology for pass-local volume caches; mount IDs remain process evidence only. */
+  static String mountTopology() throws IOException {
+    return Files.readString(MOUNTINFO);
+  }
+
   private static List<Mount> readMounts() throws IOException {
     return parseMounts(Files.readAllLines(MOUNTINFO));
   }

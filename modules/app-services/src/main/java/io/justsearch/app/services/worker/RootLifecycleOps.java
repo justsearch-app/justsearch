@@ -589,14 +589,19 @@ final class RootLifecycleOps {
         // owns their documents; remove the selected registrations/watchers without deleting data.
         // A repeat for an absent registration is harmless, including after a lost response.
         if (!watchedRoots.containsKey(normalized)) return 0;
-        boolean coveredByAncestor = watchedRoots.keySet().stream()
-                .anyMatch(root -> !root.equals(normalized) && normalized.startsWith(root));
+        long retirement = watchedRootsState.rootRetirementRevision(normalized);
 
         // Membership plus its retry reason must survive a stop at any later step.
         // Keep durable-store failures visible to the caller, as before.
         String previousWalkError = watchedRootsState.getWalkError(normalized);
         watchedRootsState.beginRemoval(normalized);
         watchedRootsState.drainRootProducers(normalized);
+        // Draining releases the lifecycle monitor. Another removal may finish and the root
+        // may be re-added before this one resumes; its old intent cannot affect that root.
+        if (!watchedRoots.containsKey(normalized)
+                || retirement != watchedRootsState.rootRetirementRevision(normalized)) return 0;
+        boolean coveredByAncestor = watchedRoots.keySet().stream()
+                .anyMatch(root -> !root.equals(normalized) && normalized.startsWith(root));
         int deletedJobs = 0;
         try {
             // Independently declared descendants retain their watchers and documents.

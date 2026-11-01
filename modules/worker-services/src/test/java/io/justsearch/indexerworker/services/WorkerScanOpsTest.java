@@ -40,6 +40,34 @@ final class WorkerScanOpsTest {
 
   @TempDir Path tempDir;
 
+  @Test
+  void largeRootStorageIdentityIsCapturedOncePerPass() throws Exception {
+    org.junit.jupiter.api.Assumptions.assumeTrue(io.justsearch.configuration.PlatformPaths.isLinux());
+    Path root = Files.createDirectory(tempDir.resolve("large-root-storage"));
+    for (int i = 0; i < 1_000; i++) Files.writeString(root.resolve("notes-" + i + ".txt"), "source");
+    var volumes = RootVolumeLedger.inMemory();
+    volumes.record(root, "windows-volume:1");
+    var identity = new RootIdentity(root, new RootIdentity.WindowsFileIdentity(1L, "0".repeat(32)));
+    var captures = new AtomicInteger();
+    var queue = new RecordingQueue();
+    var scanner = new WorkerScanOps(queue);
+    scanner.setSourceStorageChecks(RootWitness.of(volumes, ignored -> null, ignored -> true)::sourceStorageCheck);
+    try (var identities = org.mockito.Mockito.mockStatic(RootIdentity.class, org.mockito.Mockito.CALLS_REAL_METHODS)) {
+      identities.when(() -> RootIdentity.capture(root)).thenAnswer(call -> {
+        captures.incrementAndGet();
+        return identity;
+      });
+      var request = new WorkerScanOps.ScanRequest(root, null, WorkerScanOps.ScanMode.INITIAL, List.of());
+      var result = scanner.scan(request, ignored -> {});
+      assertEquals(1_000, result.getFilesWalked());
+      assertEquals(1_000, result.getFilesAdmitted());
+      System.out.println("Large-root storage captures for 1000 files: " + captures.get());
+      assertEquals(1, captures.get(), "unchanged storage evidence is amortized within the pass");
+      scanner.scan(request, ignored -> {});
+      assertEquals(2, captures.get(), "a new pass must collect fresh storage evidence");
+    }
+  }
+
   @org.junit.jupiter.params.ParameterizedTest(name = "{displayName} [{index}] {arguments}")
   @org.junit.jupiter.params.provider.ValueSource(ints={0,1,2})
   void maintenanceScanAcceptsNoopsAndReportsOnlyActualAdmissions(int changed) throws Exception {

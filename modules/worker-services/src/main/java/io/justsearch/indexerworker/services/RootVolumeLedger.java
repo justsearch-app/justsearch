@@ -192,6 +192,42 @@ final class RootVolumeLedger {
     }
   }
 
+  /** Pass-local identity reuse; Linux mount topology is still checked before every source. */
+  static java.util.function.Predicate<Path> sourceStorageCheck(java.util.Map<Path, String> recorded) {
+    if (!PlatformPaths.isLinux() || recorded.isEmpty()) {
+      return source -> sourceStorageAvailable(source, recorded);
+    }
+    var checked = new java.util.HashMap<Path, Object>();
+    String[] topology = {null};
+    return source -> {
+      try {
+        String current = LinuxRootIdentityLease.mountTopology();
+        if (!current.equals(topology[0])) {
+          checked.clear();
+          topology[0] = current;
+        }
+        for (Path ancestor = source.toAbsolutePath().normalize(); ancestor != null; ancestor = ancestor.getParent()) {
+          String volume = recorded.get(ancestor);
+          if (volume == null) continue;
+          var attributes = Files.readAttributes(ancestor, java.nio.file.attribute.BasicFileAttributes.class,
+              java.nio.file.LinkOption.NOFOLLOW_LINKS);
+          Object key = attributes.fileKey();
+          if (!attributes.isDirectory() || key == null || !Files.isReadable(ancestor)) return false;
+          if (!key.equals(checked.get(ancestor))) {
+            if (!volume.equals(RootIdentity.capture(ancestor).volume())) return false;
+            // Bracket the capture so a concurrent mount change cannot seed reusable evidence.
+            if (!current.equals(LinuxRootIdentityLease.mountTopology())) return false;
+            checked.put(ancestor, key);
+          }
+        }
+        return true;
+      } catch (IOException | RuntimeException unavailable) {
+        checked.clear();
+        return false;
+      }
+    };
+  }
+
   static boolean sourceStorageAvailable(Path file, java.util.Map<Path, String> descendants) {
     try {
       for (Path ancestor = file.toAbsolutePath().normalize(); ancestor != null; ancestor = ancestor.getParent()) {

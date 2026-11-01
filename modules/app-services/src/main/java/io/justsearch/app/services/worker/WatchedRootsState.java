@@ -85,6 +85,10 @@ public final class WatchedRootsState {
   private final Map<Path, Long> retiredRoots = new java.util.HashMap<>();
   private final Map<Path, Object> initializations = new java.util.HashMap<>();
 
+  synchronized long rootRetirementRevision(Path root) {
+    return retiredRoots.getOrDefault(root, 0L);
+  }
+
   synchronized Object beginInitialization(Path root) {
     if (initializations.containsKey(root)) return null;
     Object ticket = new Object();

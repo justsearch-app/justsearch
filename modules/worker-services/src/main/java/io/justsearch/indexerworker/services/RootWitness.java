@@ -126,7 +126,7 @@ public final class RootWitness implements SourcePresence.RootCheck {
     if (!observeSourceStorage(root)) return source -> false;
     try {
       var descendants = volumes.sourceVolumes(root);
-      return source -> RootVolumeLedger.sourceStorageAvailable(source, descendants);
+      return RootVolumeLedger.sourceStorageCheck(descendants);
     } catch (IOException | RuntimeException unavailable) {
       return source -> false;
     }
