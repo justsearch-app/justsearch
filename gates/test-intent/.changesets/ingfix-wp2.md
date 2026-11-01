@@ -744,31 +744,35 @@ Evidence is intentionally left for the orchestrator to generate using run-eviden
       "items": [
         "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/CombinedEnrichmentRmwIntegrationTest.java"
       ],
-      "class": "New",
+      "class": "Defect pin",
       "sources": [
         {
-          "kind": "delegated-choice",
-          "delegationQuote": "proceed autonomously with designing all of the smallers and critical fixes. then proceed with implementing them accordingly.",
-          "delegationLocation": "task t-20261030-ingfix request",
-          "delegationScope": "fix the defects in the owner-commissioned ingestion defect list, designed by the orchestrator",
-          "choice": "C21. D90/D91 \u2014 preserve: Recovery must retain lexical content, chunk coordinates/revision witnesses and unrelated enrichment; chunk RMW reconstructs non-stored text from its parent; compare keyword/chunk search and stored metadata before and after recovery.",
-          "label": "agent choice"
-        },
-        {
-          "kind": "delegated-choice",
-          "delegationQuote": "proceed autonomously with designing all of the smallers and critical fixes. then proceed with implementing them accordingly.",
-          "delegationLocation": "task t-20261030-ingfix request",
-          "delegationScope": "fix the defects in the owner-commissioned ingestion defect list, designed by the orchestrator",
-          "choice": "P5 Recovery and certification on a healthy index still complete without extra work.",
-          "label": "agent choice"
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261030-ingfix",
+          "scenario": "C21",
+          "quote": "Recovery must retain lexical content, chunk coordinates/revision witnesses and unrelated enrichment; chunk RMW reconstructs non-stored text from its parent; compare keyword/chunk search and stored metadata before and after recovery.",
+          "label": "agent-drafted, owner-adopted"
         }
       ],
+      "defectSource": {
+        "kind": "defect-source",
+        "stronger": {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261030-ingfix",
+          "scenario": "C21",
+          "quote": "Recovery must retain lexical content, chunk coordinates/revision witnesses and unrelated enrichment; chunk RMW reconstructs non-stored text from its parent; compare keyword/chunk search and stored metadata before and after recovery.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        "reproduction": "Seed a parent with COMPLETED SPLADE status and real sparse postings. Run combined backfill with either an available embedding provider and no SPLADE encoder, or blank content with both providers. On 1a9b83a3eb535a07399199fed0f379df33e8db5b with gates/test-intent/compatibility/ingfix-wp2-before.patch and the candidate test file overlaid, each method fails the SPLADE status assertion (expected COMPLETED, actual PENDING); the candidate retains COMPLETED and the old sparse posting."
+      },
+      "reproduction": "Seed a parent with COMPLETED SPLADE status and real sparse postings. Run combined backfill with either an available embedding provider and no SPLADE encoder, or blank content with both providers. On 1a9b83a3eb535a07399199fed0f379df33e8db5b with gates/test-intent/compatibility/ingfix-wp2-before.patch and the candidate test file overlaid, each method fails the SPLADE status assertion (expected COMPLETED, actual PENDING); the candidate retains COMPLETED and the old sparse posting.",
       "evidence": "gates/test-intent/evidence/ingfix-wp2.json",
       "newChecks": [
-        "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/CombinedEnrichmentRmwIntegrationTest.java#embeddingBatchReadsSparseDictionaryOnce"
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/CombinedEnrichmentRmwIntegrationTest.java#absentSpladeEncoderPublishesEmbeddingAndRetainsCompletedSplade",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/CombinedEnrichmentRmwIntegrationTest.java#blankContent_skipsEncoderAndRetainsIndependentCompletedSplade"
       ],
-      "behaviour": "A populated eight-parent/64-term sparse fixture requires one dictionary preservation scan for each uniform outcome batch (success, retry, terminal, blank, failed fallback), with unchanged status progression and retained sparse terms. Adaptations: embedding-only/blank RMW expectations retain independent completed SPLADE postings under C21 instead of the old destructive reset. Parameterized names permit selection.",
-      "repaired": true
+      "behaviour": "Both changed methods are defect pins under C21, replacing the old destructive reset outcome, not Adaptation. absentSpladeEncoderPublishesEmbeddingAndRetainsCompletedSplade publishes the embedding while retaining independent COMPLETED SPLADE status, retry count 0 and existing sparse postings. blankContent_skipsEncoderAndRetainsIndependentCompletedSplade invokes neither encoder, keeps the embedding PENDING with retry count 1, and retains independent COMPLETED SPLADE status and existing sparse postings. Method renames and moving the blank-content DisplayName to a comment only expose the method ids to evidence selection. The pending-embedding, pending-NER and encoder-failure methods are unchanged. No dictionary-scan count or DEBUG message is pinned.",
+      "conflictSearch": "Searched docs/decisions/ with rg -n -i 'splade|sparse|enrichment': no decision record requiring unrelated completed sparse artifacts to be discarded. Searched docs/ with rg -n -i 'splade.{0,100}(reset|preserv|retain)|(?:reset|preserv|retain).{0,100}splade|unrelated enrichment|independent.{0,50}sparse|completed.{0,70}sparse'. Related historical reset behavior exists in docs/tempdocs/711-rmw-preservation-and-followup-designs.md (reset when omitted postings cannot be reread), docs/reference/search-quality-register.md (711 reset-status history), and docs/design/lane-f-engine-jvm/evidence/C1/parent-splade-rmw.md (unavailable providers retain reset/retry). C21 supplies the agreed replacement obligation for recovery to retain unrelated enrichment; these historical descriptions do not supply the changed expectation. Full search output: tmp/wp2-builder-ti7-conflict-search.txt and tmp/wp2-builder-ti7-decision-search.txt."
     },
     {
       "items": [
