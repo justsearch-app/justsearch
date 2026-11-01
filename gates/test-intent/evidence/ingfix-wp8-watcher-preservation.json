@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
   },
-  "createdAt": "2026-11-01T20:32:19.909Z",
-  "revision": "ace5ea15969ffec6d7e615a2e46494b3e846d77c",
-  "tree": "a22fb72725be5775e78f6cf7aa71ad92353701d7",
+  "createdAt": "2026-11-01T21:20:00.733Z",
+  "revision": "d152f159282e0fc7ba9827834d9902b3ff7dbb1f",
+  "tree": "d11b2fc72b64e16b1b42fefb501ccac51994efdc",
   "environment": {
     "platform": "linux",
     "arch": "x64",
@@ -18,16 +18,16 @@
   },
   "runs": [
     {
-      "command": "./gradlew :modules:indexer-worker:test --tests \"io.justsearch.indexerworker.services.WatcherMigrationAdmissionTest.inRootLinkKeepsMainAdmissionWithoutReplayLatch\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
+      "command": "./gradlew :modules:indexer-worker:test --tests \"io.justsearch.indexerworker.services.WatcherMigrationAdmissionTest.inRootLinkKeepsMainAdmissionWithoutReplayLatch\" --tests \"io.justsearch.indexerworker.services.WatcherMigrationAdmissionTest.symlinkedParentRootKeepsMainLinkAdmissionWithoutReplayLatch\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 3920
+      "durationMs": 5478
     },
     {
       "command": "./gradlew :modules:worker-services:test --tests \"io.justsearch.indexerworker.services.WatcherUpsertCompatibilityTest.watcherSourcesKeepMainAdmissionBehaviour\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 4602
+      "durationMs": 5058
     }
   ],
   "checks": [
@@ -35,7 +35,7 @@
       "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/WatcherMigrationAdmissionTest.java#inRootLinkKeepsMainAdmissionWithoutReplayLatch",
       "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/WatcherMigrationAdmissionTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:0b048503f09d2717f57cbfdaf4e3272b8c164b6e625fa04f3d29d7f7b3db7933",
+      "contentDigest": "sha256:2f4dd067c456bfbd6a28f3ed5ce96b539703f85d7f7a9d1c9e24849e2d9799a9",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -80,8 +80,27 @@
           "status": "passed"
         }
       ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/WatcherMigrationAdmissionTest.java#symlinkedParentRootKeepsMainLinkAdmissionWithoutReplayLatch",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/WatcherMigrationAdmissionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:2f4dd067c456bfbd6a28f3ed5ce96b539703f85d7f7a9d1c9e24849e2d9799a9",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "symlinkedParentRootKeepsMainLinkAdmissionWithoutReplayLatch(String) [1] CREATE",
+          "status": "passed"
+        },
+        {
+          "name": "symlinkedParentRootKeepsMainLinkAdmissionWithoutReplayLatch(String) [2] MODIFY",
+          "status": "passed"
+        }
+      ]
     }
   ],
   "failBefore": null,
-  "digest": "sha256:9a974d11785b06df2f0d1940f8c5f3b3ea995e6c62eef169718a8957c4fe6bf9"
+  "digest": "sha256:eec3b13a22aa337c5840f7fabbfe21980a2fb901f216c66314bd9df3e041b020"
 }
