@@ -70,7 +70,7 @@ class DisambiguationBackfillOpsTest {
     ForegroundLoad load = new ForegroundLoad(); load.started();
     var pacing = new IndexingPacing(load, 20, 500L, () -> 0L, () -> 0L, ms -> {});
     DisambiguationBackfillOps.processDisambiguationBackfill(context(pacing));
-    verify(service).replaceSources(Map.of("a", mentions, "b", mentions));
+    verify(service).replaceSources(eq(Map.of("a", mentions, "b", mentions)), any());
     verify(service).acknowledgeReconciliation(1, true);
   }
 

@@ -9,6 +9,7 @@ import io.justsearch.adapters.lucene.runtime.*;
 import io.justsearch.configuration.FieldCatalogDef;
 import io.justsearch.indexerworker.coordination.WorkerSignalBus;
 import io.justsearch.indexerworker.disambiguation.DisambiguationService;
+import io.justsearch.indexerworker.disambiguation.EntityNormalizer;
 import io.justsearch.indexerworker.loop.BackfillScheduler;
 import io.justsearch.indexerworker.loop.pacing.ForegroundLoad;
 import io.justsearch.indexerworker.loop.pacing.IndexingPacing;
@@ -183,6 +184,23 @@ class DisambiguationReconciliationTest extends LuceneExecutorTestBase {
     drain();
     assertEquals(2, variants("new person").size());
     assertEquals(2, variants("sarah chen").size());
+  }
+
+  @Test void holdWhenClusteringStartsLeavesPageRetryable() throws Exception {
+    seed("a", "john smith", "JOHN SMITH"); refresh();
+    doAnswer(call -> {
+      running.set(false);
+      return call.callRealMethod();
+    }).doCallRealMethod().when(service).processBatch(anyMap());
+    try (var normalizer = mockStatic(EntityNormalizer.class, CALLS_REAL_METHODS)) {
+      cycle();
+      normalizer.verify(() -> EntityNormalizer.normalize(anyString(), any()), never());
+    }
+    assertTrue(service.snapshot().isEmpty(), "clustering must observe a hold after harvesting");
+    assertEquals(-1, service.reconciliationCursor());
+    running.set(true);
+    drain();
+    assertEquals(Set.of("john smith", "JOHN SMITH"), variants("john smith"));
   }
 
   @Test void sharedOwnershipSurvivesUntilFinalSourceAndEmptyCorpusRetiresEverything() throws Exception {

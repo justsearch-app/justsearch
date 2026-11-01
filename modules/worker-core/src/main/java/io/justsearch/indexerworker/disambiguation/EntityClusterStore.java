@@ -234,8 +234,12 @@ public final class EntityClusterStore implements Closeable {
     }
   }
 
-  /** Retires unseen sources only after an uninterrupted scan of the whole corpus. */
-  public void retainSources(java.util.Set<String> liveSources) throws SQLException {
+  /**
+   * Retires unseen sources only after an uninterrupted scan of the whole corpus.
+   *
+   * @return whether cluster membership or canonical names changed
+   */
+  public boolean retainSources(java.util.Set<String> liveSources) throws SQLException {
     lock.lock();
     try {
       ensureOpen();
@@ -252,14 +256,15 @@ public final class EntityClusterStore implements Closeable {
           delete.addBatch();
         }
         delete.executeBatch();
-        statement.executeUpdate("DELETE FROM entity_clusters WHERE NOT EXISTS (SELECT 1 FROM entity_mentions m"
+        int removed = statement.executeUpdate("DELETE FROM entity_clusters WHERE NOT EXISTS (SELECT 1 FROM entity_mentions m"
             + " WHERE m.raw_form = entity_clusters.raw_form AND m.entity_type = entity_clusters.entity_type)");
-        statement.executeUpdate("UPDATE entity_clusters SET canonical_form = (SELECT MIN(c.raw_form)"
+        int renamed = statement.executeUpdate("UPDATE entity_clusters SET canonical_form = (SELECT MIN(c.raw_form)"
             + " FROM entity_clusters c WHERE c.cluster_id = entity_clusters.cluster_id"
             + " AND c.entity_type = entity_clusters.entity_type) WHERE NOT EXISTS"
             + " (SELECT 1 FROM entity_clusters c WHERE c.cluster_id = entity_clusters.cluster_id"
             + " AND c.entity_type = entity_clusters.entity_type AND c.raw_form = entity_clusters.canonical_form)");
         connection.commit();
+        return removed != 0 || renamed != 0;
       } catch (SQLException | RuntimeException failure) {
         connection.rollback();
         throw failure;

@@ -7,7 +7,6 @@ import java.io.IOException;
 import java.nio.file.Path;
 import java.sql.SQLException;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -15,6 +14,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.BooleanSupplier;
 import org.apache.commons.codec.language.DoubleMetaphone;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -44,11 +44,55 @@ public final class DisambiguationService implements Closeable {
   private volatile EntityClusterSnapshot snapshot = EntityClusterSnapshot.EMPTY;
   private final AtomicBoolean initialized = new AtomicBoolean(false);
   private boolean needsClose;
+  private final Map<String, TypeIndex> typeIndices = new HashMap<>();
+  private boolean indicesLoaded;
+  private boolean snapshotDirty;
+  private boolean deferSnapshot;
+  private BooleanSupplier continueWork = () -> true;
   private Object completedRevision;
   private Object scanningRevision;
   private Object scanningReader;
   private int scanCursor = -1;
   private final Set<String> scannedSources = new HashSet<>();
+
+  private static final class TypeIndex {
+    final List<String> normalized = new ArrayList<>();
+    final List<String> clusterIds = new ArrayList<>();
+    final Map<String, String> canonicals = new HashMap<>();
+    final Map<String, Integer> sizes = new HashMap<>();
+    final Map<String, Set<Integer>> tokens = new HashMap<>();
+    final Map<String, Set<Integer>> phonetics = new HashMap<>();
+    final Set<String> rawForms = new HashSet<>();
+    final Set<String> corpus = new HashSet<>();
+    final SoftTFIDF scorer = new SoftTFIDF(List.of(), JW_INNER_THETA);
+
+    void add(String raw, String form, String clusterId, String canonical) {
+      addToBlockingIndices(form, normalized.size(), tokens, phonetics);
+      normalized.add(form);
+      clusterIds.add(clusterId);
+      canonicals.put(clusterId, canonical);
+      sizes.merge(clusterId, 1, Integer::sum);
+      rawForms.add(raw);
+    }
+  }
+
+  private void checkpoint() throws SQLException {
+    if (!continueWork.getAsBoolean() || Thread.currentThread().isInterrupted()) {
+      throw new SQLException("Disambiguation paused before completing the page");
+    }
+  }
+
+  /** Applies the indexing loop's pacing and hold checks during clustering as well as harvesting. */
+  public synchronized void replaceSources(
+      Map<String, Map<String, List<String>>> documents, BooleanSupplier continuation)
+      throws SQLException {
+    continueWork = continuation;
+    try {
+      replaceSources(documents);
+    } finally {
+      continueWork = () -> true;
+    }
+  }
 
   /** Starts or resumes a pass; a reader change makes a physical document cursor invalid. */
   public synchronized boolean prepareReconciliation(Object revision, Object reader) {
@@ -66,24 +110,42 @@ public final class DisambiguationService implements Closeable {
     return scanCursor;
   }
 
-  /** Writes ownership before clusters; retries repair any partially persisted cluster batch. */
+  /**
+   * Writes ownership before clusters; retries repair any partially persisted cluster batch.
+   * Snapshot publication waits for successful pass completion.
+   */
   public synchronized void replaceSources(Map<String, Map<String, List<String>>> documents)
       throws SQLException {
     Map<String, List<String>> mentions = new java.util.LinkedHashMap<>();
     for (var document : documents.entrySet()) {
+      checkpoint();
       store.replaceSource(document.getKey(), document.getValue());
       document.getValue().forEach((type, forms) ->
           mentions.computeIfAbsent(type, ignored -> new ArrayList<>()).addAll(forms));
     }
-    processBatch(mentions);
+    deferSnapshot = true;
+    try {
+      processBatch(mentions);
+    } finally {
+      deferSnapshot = false;
+    }
     scannedSources.addAll(documents.keySet());
   }
 
   /** A failed snapshot publication leaves both cursor and completion unacknowledged. */
   public synchronized void acknowledgeReconciliation(int cursor, boolean exhausted) throws SQLException {
     if (exhausted) {
-      store.retainSources(scannedSources);
-      rebuildSnapshot();
+      try {
+        if (store.retainSources(scannedSources)) {
+          indicesLoaded = false;
+          snapshotDirty = true;
+        }
+      } catch (SQLException | RuntimeException failure) {
+        indicesLoaded = false;
+        snapshotDirty = true;
+        throw failure;
+      }
+      publishSnapshotIfDirty();
       completedRevision = scanningRevision;
       scannedSources.clear();
     }
@@ -112,6 +174,7 @@ public final class DisambiguationService implements Closeable {
       completedRevision = null;
       scanningRevision = null;
       scanningReader = null;
+      indicesLoaded = false;
       rebuildSnapshot();
       log.info("DisambiguationService initialized, snapshot has {} types", snapshotTypeCount());
       initialized.set(true);
@@ -140,7 +203,7 @@ public final class DisambiguationService implements Closeable {
    *
    * <p>For each entity type, normalizes mentions, finds candidates via blocking, scores with
    * SoftTFIDF, and assigns to existing clusters or creates singletons. Rebuilds the snapshot
-   * after the batch completes.
+   * after the batch completes if cluster membership changed or publication needs retrying.
    *
    * @param newMentionsByType map of entity type name ("PERSON", "ORGANIZATION", "LOCATION") to
    *     list of raw mention forms
@@ -148,25 +211,30 @@ public final class DisambiguationService implements Closeable {
    */
   public synchronized int processBatch(Map<String, List<String>> newMentionsByType) throws SQLException {
     if (newMentionsByType == null || newMentionsByType.isEmpty()) {
-      rebuildSnapshot();
+      publishSnapshotIfDirty();
       return 0;
     }
 
+    loadIndices();
     int created = 0;
-    for (var entry : newMentionsByType.entrySet()) {
-      String typeName = entry.getKey();
-      List<String> rawForms = entry.getValue();
-      EntityType type = parseEntityType(typeName);
-      if (type == null || rawForms == null || rawForms.isEmpty()) {
-        continue;
+    try {
+      for (var entry : newMentionsByType.entrySet()) {
+        String typeName = entry.getKey();
+        List<String> rawForms = entry.getValue();
+        EntityType type = parseEntityType(typeName);
+        if (type == null || rawForms == null || rawForms.isEmpty()) {
+          continue;
+        }
+
+        created += processTypesBatch(type, typeName, rawForms);
       }
-
-      created += processTypesBatch(type, typeName, rawForms);
+    } catch (SQLException | RuntimeException failure) {
+      indicesLoaded = false;
+      throw failure;
     }
-
-    rebuildSnapshot();
+    publishSnapshotIfDirty();
     if (created > 0) {
-      log.info("Disambiguation batch: {} new entries, snapshot rebuilt", created);
+      log.info("Disambiguation batch: {} new entries", created);
     }
 
     return created;
@@ -174,46 +242,14 @@ public final class DisambiguationService implements Closeable {
 
   private int processTypesBatch(EntityType type, String typeName, List<String> rawForms)
       throws SQLException {
-    // Load existing entries for this type
-    List<ClusterEntry> existing = store.loadAll();
-    List<ClusterEntry> typeEntries = new ArrayList<>();
-    for (ClusterEntry e : existing) {
-      if (typeName.equals(e.entityType())) {
-        typeEntries.add(e);
-      }
-    }
-
-    // Build blocking indices from existing entries
-    List<String> existingNormalized = new ArrayList<>();
-    List<String> existingClusterIds = new ArrayList<>();
-    Map<String, String> clusterIdToCanonical = new HashMap<>();
-    Map<String, Integer> clusterSizes = new HashMap<>();
-
-    for (ClusterEntry e : typeEntries) {
-      existingNormalized.add(EntityNormalizer.normalize(e.rawForm(), type));
-      existingClusterIds.add(e.clusterId());
-      clusterIdToCanonical.put(e.clusterId(), e.canonicalForm());
-      clusterSizes.merge(e.clusterId(), 1, Integer::sum);
-    }
-
-    // Token + phonetic blocking indices
-    Map<String, Set<Integer>> tokenIndex = buildTokenIndex(existingNormalized);
-    Map<String, Set<Integer>> phoneticIndex = buildPhoneticIndex(existingNormalized);
-
-    // Build SoftTFIDF scorer with all known normalized forms
-    Collection<String> corpus = new HashSet<>(existingNormalized);
-    SoftTFIDF scorer = new SoftTFIDF(corpus, JW_INNER_THETA);
+    TypeIndex index = typeIndices.computeIfAbsent(typeName, ignored -> new TypeIndex());
     double threshold = thresholdForType(type);
-
-    // Track existing raw forms to skip duplicates
-    Set<String> knownRawForms = new HashSet<>();
-    for (ClusterEntry e : typeEntries) {
-      knownRawForms.add(e.rawForm());
-    }
+    List<String> addedForms = new ArrayList<>();
 
     int created = 0;
     for (String rawForm : rawForms) {
-      if (rawForm == null || rawForm.isBlank() || knownRawForms.contains(rawForm)) {
+      checkpoint();
+      if (rawForm == null || rawForm.isBlank() || index.rawForms.contains(rawForm)) {
         continue;
       }
 
@@ -223,18 +259,18 @@ public final class DisambiguationService implements Closeable {
       }
 
       // Find candidates via blocking
-      Set<Integer> candidates = findCandidates(normalized, tokenIndex, phoneticIndex);
+      Set<Integer> candidates = findCandidates(normalized, index.tokens, index.phonetics);
 
       // Score against candidates
       String bestClusterId = null;
       double bestScore = 0.0;
 
       for (int idx : candidates) {
-        if (idx >= existingNormalized.size()) continue;
-        double score = scorer.score(normalized, existingNormalized.get(idx));
+        checkpoint();
+        double score = index.scorer.score(normalized, index.normalized.get(idx));
         if (score >= threshold && score > bestScore) {
-          String candidateClusterId = existingClusterIds.get(idx);
-          int currentSize = clusterSizes.getOrDefault(candidateClusterId, 0);
+          String candidateClusterId = index.clusterIds.get(idx);
+          int currentSize = index.sizes.getOrDefault(candidateClusterId, 0);
           if (currentSize < MAX_CLUSTER_SIZE) {
             bestScore = score;
             bestClusterId = candidateClusterId;
@@ -246,61 +282,54 @@ public final class DisambiguationService implements Closeable {
       String assignedClusterId;
       if (bestClusterId != null) {
         // Assign to existing cluster
-        assignedCanonical = clusterIdToCanonical.get(bestClusterId);
+        assignedCanonical = index.canonicals.get(bestClusterId);
         assignedClusterId = bestClusterId;
+        snapshotDirty = true;
         store.upsert(rawForm, typeName, bestClusterId, assignedCanonical, bestScore);
-        clusterSizes.merge(bestClusterId, 1, Integer::sum);
       } else {
         // Create singleton cluster
         assignedClusterId = UUID.randomUUID().toString();
         assignedCanonical = rawForm;
+        snapshotDirty = true;
         store.upsert(rawForm, typeName, assignedClusterId, rawForm, 1.0);
-        clusterSizes.put(assignedClusterId, 1);
       }
 
-      // Add to indices for subsequent mentions in this batch
-      int newIdx = existingNormalized.size();
-      existingNormalized.add(normalized);
-      existingClusterIds.add(assignedClusterId);
-      clusterIdToCanonical.put(assignedClusterId, assignedCanonical);
-      addToBlockingIndices(normalized, newIdx, tokenIndex, phoneticIndex);
-      knownRawForms.add(rawForm);
+      index.add(rawForm, normalized, assignedClusterId, assignedCanonical);
+      if (index.corpus.add(normalized)) addedForms.add(normalized);
       created++;
     }
 
+    for (String form : addedForms) index.scorer.addMention(form);
     return created;
+  }
+
+  private void loadIndices() throws SQLException {
+    if (indicesLoaded) return;
+    typeIndices.clear();
+    for (ClusterEntry entry : store.loadAll()) {
+      checkpoint();
+      EntityType type = parseEntityType(entry.entityType());
+      if (type == null) continue;
+      TypeIndex index = typeIndices.computeIfAbsent(entry.entityType(), ignored -> new TypeIndex());
+      String normalized = EntityNormalizer.normalize(entry.rawForm(), type);
+      index.add(entry.rawForm(), normalized, entry.clusterId(), entry.canonicalForm());
+      if (index.corpus.add(normalized)) index.scorer.addMention(normalized);
+    }
+    indicesLoaded = true;
+  }
+
+  private void publishSnapshotIfDirty() throws SQLException {
+    if (snapshotDirty && !deferSnapshot) rebuildSnapshot();
   }
 
   /** Rebuilds the volatile snapshot from the SQLite store. */
   private void rebuildSnapshot() throws SQLException {
     List<ClusterEntry> entries = store.loadAll();
     this.snapshot = EntityClusterSnapshot.fromEntries(entries);
+    snapshotDirty = false;
   }
 
   // ==================== Blocking Index ====================
-
-  private static Map<String, Set<Integer>> buildTokenIndex(List<String> normalizedForms) {
-    Map<String, Set<Integer>> index = new HashMap<>();
-    for (int i = 0; i < normalizedForms.size(); i++) {
-      for (String token : EntityNormalizer.tokenize(normalizedForms.get(i))) {
-        index.computeIfAbsent(token, k -> new HashSet<>()).add(i);
-      }
-    }
-    return index;
-  }
-
-  private static Map<String, Set<Integer>> buildPhoneticIndex(List<String> normalizedForms) {
-    Map<String, Set<Integer>> index = new HashMap<>();
-    for (int i = 0; i < normalizedForms.size(); i++) {
-      for (String token : EntityNormalizer.tokenize(normalizedForms.get(i))) {
-        String code = METAPHONE.doubleMetaphone(token);
-        if (code != null && !code.isEmpty()) {
-          index.computeIfAbsent(code, k -> new HashSet<>()).add(i);
-        }
-      }
-    }
-    return index;
-  }
 
   private static Set<Integer> findCandidates(
       String normalized,
@@ -364,7 +393,15 @@ public final class DisambiguationService implements Closeable {
     scanningReader = null;
     scanCursor = -1;
     scannedSources.clear();
-    store.deleteAll();
+    indicesLoaded = false;
+    try {
+      store.deleteAll();
+    } catch (SQLException | RuntimeException | Error failure) {
+      snapshotDirty = true;
+      throw failure;
+    }
+    typeIndices.clear();
+    snapshotDirty = false;
     snapshot = EntityClusterSnapshot.EMPTY;
     log.info("DisambiguationService reset to empty state");
   }
@@ -372,6 +409,8 @@ public final class DisambiguationService implements Closeable {
   @Override
   public synchronized void close() throws IOException {
     initialized.set(false);
+    indicesLoaded = false;
+    typeIndices.clear();
     snapshot = EntityClusterSnapshot.EMPTY;
     try {
       store.close();

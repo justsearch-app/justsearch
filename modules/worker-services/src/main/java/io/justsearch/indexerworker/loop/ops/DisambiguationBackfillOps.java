@@ -51,7 +51,10 @@ public final class DisambiguationBackfillOps {
         sources.put(document.id(), document.mentions());
       }
       if (!context.runningSupplier().getAsBoolean() || Thread.currentThread().isInterrupted()) return;
-      service.replaceSources(sources);
+      service.replaceSources(sources, () -> {
+        context.pacing().pace();
+        return context.runningSupplier().getAsBoolean();
+      });
       if (!context.runningSupplier().getAsBoolean() || Thread.currentThread().isInterrupted()) return;
       var current = context.documentFieldOps().entityCorpusState();
       if (!state.equals(current)) return;

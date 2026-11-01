@@ -210,23 +210,36 @@ class DisambiguationServiceTest {
   }
 
   @ParameterizedTest
-  @CsvSource({"2,false", "3,false", "3,true"})
-  void replayRepairsPartialPersistenceAndFailedSnapshot(int failAt, boolean emptyReplay) throws Exception {
+  @CsvSource({"write,false", "publication,false", "publication,true"})
+  void replayRepairsPartialPersistenceAndFailedSnapshot(String failurePoint, boolean emptyReplay) throws Exception {
     Path db = tempDir.resolve("publication-failure.db");
-    AtomicInteger reads = new AtomicInteger();
+    AtomicInteger writes = new AtomicInteger();
     AtomicBoolean faults = new AtomicBoolean(false);
     EntityClusterStore faultingStore = new EntityClusterStore(db, jdbc -> {
       Connection connection = DriverManager.getConnection(jdbc);
       return (Connection) Proxy.newProxyInstance(Connection.class.getClassLoader(), new Class<?>[] {Connection.class},
           (proxy, method, args) -> {
             Object result = invoke(connection, method, args);
+            if (method.getName().equals("prepareStatement")
+                && ((String) args[0]).startsWith("INSERT INTO entity_clusters")) {
+              var statement = (java.sql.PreparedStatement) result;
+              return Proxy.newProxyInstance(Statement.class.getClassLoader(),
+                  new Class<?>[] {java.sql.PreparedStatement.class}, (statementProxy, statementMethod, statementArgs) -> {
+                    if (statementMethod.getName().equals("executeUpdate") && writes.incrementAndGet() == 3
+                        && failurePoint.equals("write") && faults.compareAndSet(true, false)) {
+                      throw new SQLException("cluster write fault between types");
+                    }
+                    return invoke(statement, statementMethod, statementArgs);
+                  });
+            }
             if (!method.getName().equals("createStatement")) return result;
             Statement statement = (Statement) result;
             return Proxy.newProxyInstance(Statement.class.getClassLoader(), new Class<?>[] {Statement.class},
                 (statementProxy, statementMethod, statementArgs) -> {
-                  if (faults.get() && statementMethod.getName().equals("executeQuery")
+                  if (statementMethod.getName().equals("executeQuery")
                       && ((String) statementArgs[0]).contains("FROM entity_clusters")
-                      && reads.incrementAndGet() == failAt) throw new SQLException("snapshot/read fault");
+                      && writes.get() >= 4 && failurePoint.equals("publication")
+                      && faults.compareAndSet(true, false)) throw new SQLException("snapshot publication fault");
                   return invoke(statement, statementMethod, statementArgs);
                 });
           });
