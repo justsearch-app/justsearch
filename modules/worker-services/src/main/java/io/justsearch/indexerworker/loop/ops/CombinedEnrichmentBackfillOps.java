@@ -701,100 +701,9 @@ public final class CombinedEnrichmentBackfillOps {
       int windowDocsResumable = 0;
       int embedDeferredForOtherStages = 0;
 
-      // Phase 3a-i: Late-chunking single-pass embed (tempdoc 691 forensics fold-in). Tries one
-      // whole-document forward pass per chunked parent. A null result (content over the raised
-      // single-pass limit) or a GPU BFC-arena OOM folds the doc INLINE into the ordinary windowed
-      // batch below (embedDocIds/embedContents) rather than deferring to a different RMW pass —
-      // classification stops at the first fallback so the remaining budget reaches actual
-      // window/chunk inference. Unclassified parents remain pending for a later cycle.
-      // Every outcome still resolves within this pass's single bundled write. A non-arena-OOM failure
-      // escalates the parent directly through the same retry-count/FAILED-at-max helper the
-      // windowed batch failure path below uses.
-      if (!lateChunkingDocIds.isEmpty() && embedAvailable) {
-        EmbeddingProvider lateChunkingProvider = context.embeddingProviderSupplier().get();
-        for (int i = 0; i < lateChunkingDocIds.size(); i++) {
-          // One whole-document forward pass per iteration — already the atomic unit, so the
-          // checkpoint costs nothing but a volatile read (tempdoc 809 finding 3).
-          if (stopRequested(context, unitsDone, epochAtSelection)) {
-            aborted = true;
-            docsSkipped += lateChunkingDocIds.size() - i;
-            break;
-          }
-          if (embedShareSpent(context, unitsDone, otherStagesHaveWork)) {
-            embedDeferredForOtherStages += lateChunkingDocIds.size() - i;
-            break;
-          }
-          if (!embeddingReady(context, lateChunkingProvider)) break;
-          String lcDocId = lateChunkingDocIds.get(i);
-          String lcContent = lateChunkingContents.get(i);
-          boolean fellBackToWindows = false;
-          pacer.beforeUnit(1);
-          try {
-            EmbeddingService.ChunkedEmbedding result =
-                lateChunkingProvider.embedWithSpans(lcContent, NO_SPANS);
-            if (result != null && result.primaryVector().length > 0) {
-              Map<String, Object> updates = updatesByDocId.get(lcDocId);
-              updates.put(SchemaFields.VECTOR, result.primaryVector());
-              updates.put(SchemaFields.EMBEDDING_STATUS, SchemaFields.EMBEDDING_STATUS_COMPLETED);
-              updates.put(SchemaFields.EMBEDDING_RETRY_COUNT, "0");
-              singlePassProcessed++;
-              stageAdvancedDocIds.add(lcDocId);
-            } else {
-              // Content exceeds the raised single-pass limit — fold into the windowed batch.
-              embedDocIds.add(lcDocId);
-              embedContents.add(lcContent);
-              directWindowedDocIds.add(lcDocId);
-              longDocWindowed++;
-              fellBackToWindows = true;
-            }
-          } catch (Exception e) {
-            if (!embeddingReady(context, lateChunkingProvider)
-                || (SpladeBackfillOps.isSystemicFailure(e) && !isArenaOomFailure(e))) {
-              break;
-            }
-            if (isArenaOomFailure(e)) {
-              // A single-pass batch-1 forward pass over the whole document needs more contiguous
-              // GPU arena memory than a windowed pass — resource contention, not a bad-input
-              // failure. Fold into the windowed batch same as the over-limit null case.
-              context
-                  .log()
-                  .warn(
-                      "Combined backfill: late-chunking single-pass falling back to windowed for"
-                          + " {} (GPU arena OOM on single-pass batch-1): {}",
-                      lcDocId,
-                      e.getMessage());
-              embedDocIds.add(lcDocId);
-              embedContents.add(lcContent);
-              directWindowedDocIds.add(lcDocId);
-              arenaOomWindowed++;
-              fellBackToWindows = true;
-            } else {
-              context
-                  .log()
-                  .warn(
-                      "Combined backfill: late-chunking single-pass embed failed for {}: {}",
-                      lcDocId,
-                      e.getMessage());
-              Map<String, String> lcDocFields = batchedFields.getOrDefault(lcDocId, Map.of());
-              int currentRetryCount =
-                  parseRetryCountOrZero(lcDocFields.get(SchemaFields.EMBEDDING_RETRY_COUNT));
-              updatesByDocId
-                  .get(lcDocId)
-                  .putAll(EmbeddingBackfillOps.computeEmbeddingFailureUpdate(currentRetryCount));
-              embedFailed++;
-              stageAdvancedDocIds.add(lcDocId);
-            }
-          }
-          pacer.afterUnit(1);
-          unitsDone++;
-          if (fellBackToWindows) break;
-        }
-      }
-
-      // Phase 3a-ii: resumable per-window embed for documents longer than the encoder's context
-      // window (round-15 post-round finding). These are the documents the pre-fix pass could never
-      // finish: the late-chunking fallback above appends them at the TAIL of embedDocIds, behind
-      // every short parent and every chunk doc, so an 8-DOCUMENT slice loop under a 5 s budget
+      // docs/tempdocs/809-human-validation-0.2.0-findings.md: partition resumable window work
+      // from the ordinary batch path. The pre-fix late-chunking fallback appended long parents
+      // behind every short parent and every chunk doc, so an 8-DOCUMENT slice loop under a 5 s budget
       // reached them last or not at all — and when it did, all of a document's windows ran inside
       // one uninterruptible call whose partial results were discarded on interruption. A bounded
       // chunk batch now precedes the windows, then parent windows run before the ordinary remainder.
@@ -826,18 +735,109 @@ public final class CombinedEnrichmentBackfillOps {
             singleWindowContents.add(embedContents.get(i));
           }
         }
-        if (!windowedDocIds.isEmpty()) {
+        if (!windowedDocIds.isEmpty() || !lateChunkingDocIds.isEmpty()) {
           embedDocIds = singleWindowDocIds;
           embedContents = singleWindowContents;
         }
       }
 
       // docs/tempdocs/809-human-validation-0.2.0-findings.md: keep the encoder unit as the scheduling
-      // boundary. One chunk batch gets a turn before parent windows; remaining ordinary work
-      // follows them. Without window work the ordinary batch path retains its original order.
-      priorityChunkEnd = windowedDocIds.isEmpty() ? 0 : Math.min(priorityChunkEnd, EMBED_ENCODE_SLICE);
+      // boundary. One chunk batch gets a turn before single-pass attempts and parent windows;
+      // remaining ordinary work follows them. Without either, retain the ordinary batch path.
+      priorityChunkEnd = windowedDocIds.isEmpty() && lateChunkingDocIds.isEmpty()
+          ? 0 : Math.min(priorityChunkEnd, EMBED_ENCODE_SLICE);
       int sliceStart = 0;
       for (int embedTurn = 0; embedTurn < 2; embedTurn++) {
+        // Phase 3a-i: Late-chunking single-pass embed (tempdoc 691 forensics fold-in). Tries one
+        // whole-document forward pass per chunked parent. A null result (content over the raised
+        // single-pass limit) or a GPU BFC-arena OOM folds the doc INLINE into the window list below
+        // rather than deferring to a different RMW pass —
+        // classification stops at the first fallback so the remaining budget reaches actual
+        // window/chunk inference. Unclassified parents remain pending for a later cycle.
+        // Every outcome still resolves within this pass's single bundled write. A non-arena-OOM failure
+        // escalates the parent directly through the same retry-count/FAILED-at-max helper the
+        // windowed batch failure path below uses.
+        if (embedTurn == 1 && !lateChunkingDocIds.isEmpty() && embedAvailable) {
+          EmbeddingProvider lateChunkingProvider = context.embeddingProviderSupplier().get();
+          for (int i = 0; i < lateChunkingDocIds.size(); i++) {
+            // One whole-document forward pass per iteration — already the atomic unit, so the
+            // checkpoint costs nothing but a volatile read (tempdoc 809 finding 3).
+            if (stopRequested(context, unitsDone, epochAtSelection)) {
+              aborted = true;
+              docsSkipped += lateChunkingDocIds.size() - i;
+              break;
+            }
+            if (embedShareSpent(context, unitsDone, otherStagesHaveWork)) {
+              embedDeferredForOtherStages += lateChunkingDocIds.size() - i;
+              break;
+            }
+            if (!embeddingReady(context, lateChunkingProvider)) break;
+            String lcDocId = lateChunkingDocIds.get(i);
+            String lcContent = lateChunkingContents.get(i);
+            boolean fellBackToWindows = false;
+            pacer.beforeUnit(1);
+            try {
+              EmbeddingService.ChunkedEmbedding result =
+                  lateChunkingProvider.embedWithSpans(lcContent, NO_SPANS);
+              if (result != null && result.primaryVector().length > 0) {
+                Map<String, Object> updates = updatesByDocId.get(lcDocId);
+                updates.put(SchemaFields.VECTOR, result.primaryVector());
+                updates.put(SchemaFields.EMBEDDING_STATUS, SchemaFields.EMBEDDING_STATUS_COMPLETED);
+                updates.put(SchemaFields.EMBEDDING_RETRY_COUNT, "0");
+                singlePassProcessed++;
+                stageAdvancedDocIds.add(lcDocId);
+              } else {
+                // Content exceeds the raised single-pass limit — fold into the windowed batch.
+                windowedDocIds.add(lcDocId);
+                windowedContents.add(lcContent);
+                directWindowedDocIds.add(lcDocId);
+                longDocWindowed++;
+                fellBackToWindows = true;
+              }
+            } catch (Exception e) {
+              if (!embeddingReady(context, lateChunkingProvider)
+                  || (SpladeBackfillOps.isSystemicFailure(e) && !isArenaOomFailure(e))) {
+                break;
+              }
+              if (isArenaOomFailure(e)) {
+                // A single-pass batch-1 forward pass over the whole document needs more contiguous
+                // GPU arena memory than a windowed pass — resource contention, not a bad-input
+                // failure. Fold into the windowed batch same as the over-limit null case.
+                context
+                    .log()
+                    .warn(
+                        "Combined backfill: late-chunking single-pass falling back to windowed for"
+                            + " {} (GPU arena OOM on single-pass batch-1): {}",
+                        lcDocId,
+                        e.getMessage());
+                windowedDocIds.add(lcDocId);
+                windowedContents.add(lcContent);
+                directWindowedDocIds.add(lcDocId);
+                arenaOomWindowed++;
+                fellBackToWindows = true;
+              } else {
+                context
+                    .log()
+                    .warn(
+                        "Combined backfill: late-chunking single-pass embed failed for {}: {}",
+                        lcDocId,
+                        e.getMessage());
+                Map<String, String> lcDocFields = batchedFields.getOrDefault(lcDocId, Map.of());
+                int currentRetryCount =
+                    parseRetryCountOrZero(lcDocFields.get(SchemaFields.EMBEDDING_RETRY_COUNT));
+                updatesByDocId
+                    .get(lcDocId)
+                    .putAll(EmbeddingBackfillOps.computeEmbeddingFailureUpdate(currentRetryCount));
+                embedFailed++;
+                stageAdvancedDocIds.add(lcDocId);
+              }
+            }
+            pacer.afterUnit(1);
+            unitsDone++;
+            if (fellBackToWindows) break;
+          }
+        }
+
         if (embedTurn == 1 && !windowedDocIds.isEmpty() && embedAvailable) {
           EmbeddingProvider provider = context.embeddingProviderSupplier().get();
           WindowedEmbedProgress progress = context.windowedEmbedProgress();

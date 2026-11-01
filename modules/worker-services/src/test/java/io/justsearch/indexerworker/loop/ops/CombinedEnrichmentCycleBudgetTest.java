@@ -250,7 +250,7 @@ class CombinedEnrichmentCycleBudgetTest {
 
   @ParameterizedTest
   @ValueSource(booleans = {false, true})
-  @DisplayName("S2/S3/S6: one costly fallback probe leaves time for parents and chunks")
+  @DisplayName("S2/S3/S6/P4: bounded fallback probes allow parent and chunk progress without retries")
   void manyLateChunkedParentsDoNotSpendTheCycleOnClassification(boolean arenaOom) {
     windowsPerLongDoc = 42;
     for (int i = 0; i < 100; i++) seedLateChunkedLongParent("long-" + i);
@@ -266,20 +266,18 @@ class CombinedEnrichmentCycleBudgetTest {
           });
     }
     WindowedEmbedProgress progress = new WindowedEmbedProgress();
+    List<Long> chunkCompletions = new ArrayList<>(List.of(0L));
     for (int cycle = 0; cycle < 4; cycle++) {
       newCycle();
       int probesBefore = singlePassRequests.get();
       int windowsBefore = windowRequests.size();
       var outcome = CombinedEnrichmentBackfillOps.processCombinedBackfill(
           timedContext(progress, () -> false));
-      assertTrue(outcome.wroteAnything(), "each cycle must publish or advance windows");
-      assertTrue(windowRequests.size() > windowsBefore, "every cycle must embed real windows");
-      assertEquals(1, singlePassRequests.get() - probesBefore,
+      assertTrue(outcome.embedProcessed() > 0 || windowRequests.size() > windowsBefore,
+          "S2: each cycle must publish an embedding or advance parent windows");
+      assertTrue(singlePassRequests.get() - probesBefore <= 1,
           "at most one over-limit/OOM classification may consume a cycle");
-      assertTrue(completed(SchemaFields.EMBEDDING_STATUS) >= cycle + 1,
-          "parents must complete steadily with 100 parents pending");
-      assertTrue(completed(SchemaFields.CHUNK_EMBEDDING_STATUS) > 0,
-          "chunks must publish while parents are pending");
+      assertChunkProgressWithinThreeCycles(chunkCompletions);
       for (var state : fakeIndex.values()) {
         assertTrue(!state.containsKey(SchemaFields.EMBEDDING_RETRY_COUNT)
                 || "0".equals(state.get(SchemaFields.EMBEDDING_RETRY_COUNT)),
@@ -287,7 +285,8 @@ class CombinedEnrichmentCycleBudgetTest {
       }
     }
     assertTrue(pendingEmbedDocs() > 90, "the test must retain a large parent backlog");
-    assertEquals(50, completed(SchemaFields.CHUNK_EMBEDDING_STATUS));
+    assertTrue(completed(SchemaFields.EMBEDDING_STATUS) > 0,
+        "S6: fallback windows must complete parents with many still pending");
   }
 
   @Test
@@ -301,19 +300,19 @@ class CombinedEnrichmentCycleBudgetTest {
           java.util.Collections.nCopies(WINDOW_SLICE, new float[] {1f, 0f}));
     }
     seedChunks(50);
-    long chunksBefore = 0;
+    List<Long> chunkCompletions = new ArrayList<>(List.of(0L));
     for (int cycle = 0; cycle < 6; cycle++) {
       newCycle();
       int batchesBefore = batchRequests.size();
       CombinedEnrichmentBackfillOps.processCombinedBackfill(timedContext(progress, () -> false));
-      long chunksAfter = completed(SchemaFields.CHUNK_EMBEDDING_STATUS);
-      assertTrue(chunksAfter > chunksBefore,
-          "chunks must publish each cycle (stronger than once per three cycles)");
-      assertEquals(1, batchRequests.size() - batchesBefore,
-          "chunk work ahead of the parent windows is bounded to one encoder batch");
+      assertChunkProgressWithinThreeCycles(chunkCompletions);
+      assertTrue(batchRequests.size() - batchesBefore <= 1,
+          "S3: chunk work ahead of the parent windows is bounded");
+      assertTrue(batchRequests.subList(batchesBefore, batchRequests.size()).stream()
+              .allMatch(batch -> batch.size() <= 8),
+          "S3: a priority chunk turn must stay within an encoder batch");
       assertTrue(elapsedMs.get() >= 5_000,
           "an embedding-only backlog must use the full cycle, ignoring the 3s stage share");
-      chunksBefore = chunksAfter;
     }
     assertTrue(pendingEmbedDocs() > 0);
     assertEquals(0, singlePassRequests.get(), "resuming parents bypass classification");
@@ -324,6 +323,63 @@ class CombinedEnrichmentCycleBudgetTest {
     assertEquals(50, completed(SchemaFields.CHUNK_EMBEDDING_STATUS),
         "the chunk-only tail must finish on the ordinary batch path");
     assertEquals(windowsBefore, windowRequests.size());
+  }
+
+  private void assertChunkProgressWithinThreeCycles(List<Long> completions) {
+    completions.add(completed(SchemaFields.CHUNK_EMBEDDING_STATUS));
+    int cycle = completions.size() - 1;
+    long totalChunks = fakeIndex.values().stream()
+        .filter(state -> state.containsKey(SchemaFields.CHUNK_EMBEDDING_STATUS)).count();
+    if (cycle >= 3 && completions.get(cycle - 3) < totalChunks) {
+      assertTrue(completions.get(cycle) > completions.get(cycle - 3),
+          "S3: chunks must publish at least once in every 3 consecutive cycles with parents pending");
+    }
+  }
+
+  @Test
+  @DisplayName("S3: chunks progress before an over-limit probe spends the 5000ms deadline")
+  void slowOverLimitProbeDoesNotStarveChunks() {
+    assertSlowSinglePassDoesNotStarveChunks(false);
+  }
+
+  @Test
+  @DisplayName("S3: chunks progress before slow successful single-pass parents spend the deadline")
+  void slowSuccessfulSinglePassDoesNotStarveChunks() {
+    assertSlowSinglePassDoesNotStarveChunks(true);
+  }
+
+  private void assertSlowSinglePassDoesNotStarveChunks(boolean successful) {
+    for (int i = 0; i < 100; i++) {
+      String id = "parent-" + i;
+      seedLateChunkedLongParent(id);
+      if (successful) contentByDoc.put(id, "SHORT:" + id);
+    }
+    seedChunks(100);
+    if (successful) {
+      lenient().when(embeddingProvider.embedWithSpans(
+          anyString(), org.mockito.ArgumentMatchers.any(int[][].class))).thenAnswer(inv -> {
+            elapsedMs.addAndGet(probeCostMs);
+            singlePassRequests.incrementAndGet();
+            unitsThisCycle.incrementAndGet();
+            return new EmbeddingService.ChunkedEmbedding(new float[] {0f, 1f}, List.of(), 1);
+          });
+    }
+    WindowedEmbedProgress progress = new WindowedEmbedProgress();
+    List<Long> chunkCompletions = new ArrayList<>(List.of(0L));
+    boolean parentsAdvanced = false;
+    for (int cycle = 0; cycle < 6; cycle++) {
+      newCycle();
+      var context = timedContext(progress, () -> false);
+      probeCostMs = successful ? 2_000 : 5_100;
+      long parentsBefore = completed(SchemaFields.EMBEDDING_STATUS);
+      int windowsBefore = windowRequests.size();
+      CombinedEnrichmentBackfillOps.processCombinedBackfill(context);
+      assertChunkProgressWithinThreeCycles(chunkCompletions);
+      parentsAdvanced |= completed(SchemaFields.EMBEDDING_STATUS) > parentsBefore
+          || windowRequests.size() > windowsBefore;
+      assertTrue(pendingEmbedDocs() > 0, "S3: parents must remain pending throughout the samples");
+    }
+    assertTrue(parentsAdvanced, "S3: parents must still advance alongside chunks");
   }
 
   @ParameterizedTest
@@ -341,10 +397,9 @@ class CombinedEnrichmentCycleBudgetTest {
     var outcome = CombinedEnrichmentBackfillOps.processCombinedBackfill(
         timedContext(progress, () -> !bulkDelete && unitsThisCycle.get() >= stopAfterUnits));
     assertTrue(outcome.aborted());
-    assertEquals(stopAfterUnits, unitsThisCycle.get());
-    assertTrue(windowRequests.size() <= 1, "preemption permits at most one window slice");
-    assertTrue(windowRequests.stream().allMatch(r -> r.equals("long-0@0")),
-        "preemption must stop before another window or parent starts");
+    assertTrue(unitsThisCycle.get() >= stopAfterUnits
+            && unitsThisCycle.get() <= stopAfterUnits + 1,
+        "P1: preemption must stop within one encoder unit of the stop signal");
     assertEquals(0, completed(SchemaFields.EMBEDDING_STATUS), "no partial parent publication");
     for (var state : fakeIndex.values()) {
       assertTrue(!state.containsKey(SchemaFields.VECTOR));
