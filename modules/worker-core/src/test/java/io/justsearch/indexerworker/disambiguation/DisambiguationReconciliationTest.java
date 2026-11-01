@@ -15,6 +15,62 @@ import org.junit.jupiter.api.io.TempDir;
 class DisambiguationReconciliationTest {
   @TempDir Path directory;
 
+  @Test void failedFinalPublicationRetriesRetirementWithZeroNewForms() throws Exception {
+    Path database = directory.resolve("retirement-publication.db");
+    var store = spy(new EntityClusterStore(database));
+    try (var service = new DisambiguationService(store)) {
+      service.open();
+      var initial = new java.util.LinkedHashMap<String, Map<String, List<String>>>();
+      initial.put("retired", Map.of("PERSON", List.of("john smith")));
+      initial.put("survivor", Map.of("PERSON", List.of("JOHN SMITH")));
+      assertTrue(service.prepareReconciliation(new Object(), new Object()));
+      service.replaceSources(initial);
+      service.acknowledgeReconciliation(7, true);
+      var captured = service.snapshot();
+      assertEquals(Set.of("john smith", "JOHN SMITH"), captured.expandCanonical("PERSON", "john smith"));
+
+      Object revision = new Object();
+      Object reader = new Object();
+      var survivingSources = Map.of("survivor", Map.of("PERSON", List.of("JOHN SMITH")));
+      assertTrue(service.prepareReconciliation(revision, reader));
+      clearInvocations(store);
+      var retainedSources = new java.util.ArrayList<Set<String>>();
+      doAnswer(call -> {
+        retainedSources.add(Set.copyOf(call.getArgument(0)));
+        return call.callRealMethod();
+      }).when(store).retainSources(anySet());
+      service.replaceSources(survivingSources);
+      doThrow(new SQLException("final snapshot read failure")).doCallRealMethod().when(store).loadAll();
+      assertThrows(SQLException.class, () -> service.acknowledgeReconciliation(8, true));
+
+      assertEquals(-1, service.reconciliationCursor(), "failed publication must not acknowledge the final cursor");
+      assertTrue(service.prepareReconciliation(revision, reader), "completion must remain pending");
+      assertSame(captured, service.snapshot(), "failed publication must preserve the captured snapshot");
+      assertEquals(List.of("JOHN SMITH"), store.loadAll().stream().map(ClusterEntry::rawForm).toList(),
+          "retirement must already have committed before the snapshot read failed");
+      try (var connection = java.sql.DriverManager.getConnection("jdbc:sqlite:" + database.toAbsolutePath());
+          var statement = connection.createStatement();
+          var rows = statement.executeQuery("SELECT source_id, raw_form, entity_type FROM entity_mentions")) {
+        assertTrue(rows.next());
+        assertEquals("survivor", rows.getString(1));
+        assertEquals("JOHN SMITH", rows.getString(2));
+        assertEquals("PERSON", rows.getString(3));
+        assertFalse(rows.next(), "only surviving ownership may remain after retirement");
+      }
+
+      service.replaceSources(survivingSources);
+      verify(store, never()).upsert(anyString(), anyString(), anyString(), anyString(), anyDouble());
+      assertSame(captured, service.snapshot(), "zero-new-form replay must still defer publication");
+      service.acknowledgeReconciliation(8, true);
+      assertFalse(service.prepareReconciliation(revision, reader));
+      assertEquals(8, service.reconciliationCursor());
+      assertEquals("JOHN SMITH", service.snapshot().getCanonical("PERSON", "JOHN SMITH"));
+      assertEquals(Set.of("JOHN SMITH"), service.snapshot().expandCanonical("PERSON", "JOHN SMITH"));
+      assertEquals(Set.of("john smith"), service.snapshot().expandCanonical("PERSON", "john smith"));
+      assertEquals(List.of(Set.of("survivor"), Set.of("survivor")), retainedSources);
+    }
+  }
+
   @Test void failedResetRestartsFromTheBeginningAndCanBeRetried() throws Exception {
     var store = spy(new EntityClusterStore(directory.resolve("entity-clusters.db")));
     try (var service = new DisambiguationService(store)) {

@@ -209,7 +209,7 @@ class DisambiguationServiceTest {
     }
   }
 
-  @ParameterizedTest
+  @ParameterizedTest(name = "{displayName} [{index}] {arguments}")
   @CsvSource({"write,false", "publication,false", "publication,true"})
   void replayRepairsPartialPersistenceAndFailedSnapshot(String failurePoint, boolean emptyReplay) throws Exception {
     Path db = tempDir.resolve("publication-failure.db");
