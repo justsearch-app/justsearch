@@ -89,7 +89,7 @@ final class VduCrashRecoveryTest extends LuceneExecutorTestBase {
     token(builder,attempt);return builder.build();
   }
   private static UpdateVduResultRequest result(String attempt) throws Exception {
-    var builder=UpdateVduResultRequest.newBuilder().setDocId(DOC).setExtractedContent(CONTENT)
+    var builder=UpdateVduResultRequest.newBuilder().setSourceSha256("a".repeat(64)).setDocId(DOC).setExtractedContent(CONTENT)
         .setOutcome(VduUpdateOutcome.VDU_UPDATE_OUTCOME_SUCCESS_TEXT);
     token(builder,attempt);return builder.build();
   }

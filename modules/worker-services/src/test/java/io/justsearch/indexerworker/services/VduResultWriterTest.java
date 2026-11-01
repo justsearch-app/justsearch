@@ -62,7 +62,7 @@ class VduResultWriterTest extends LuceneExecutorTestBase {
     try (var runtime = open()) {
       seed(runtime);
       assertTrue(VduResultWriter.apply(runtime, request.build(), false,
-          Map.of(SchemaFields.CONTENT, ORIGINAL)));
+          Map.of(SchemaFields.CONTENT, ORIGINAL), SchemaFields.VDU_MAX_RETRIES));
       refresh(runtime);
       assertState(runtime, REPLACEMENT, expectedScore);
     }
@@ -86,7 +86,7 @@ class VduResultWriterTest extends LuceneExecutorTestBase {
     try (var runtime = open()) {
       seed(runtime);
       boolean applied = VduResultWriter.apply(runtime, request.build(), false,
-          Map.of(SchemaFields.CONTENT, path.equals("stale") ? "stale revision" : ORIGINAL));
+          Map.of(SchemaFields.CONTENT, path.equals("stale") ? "stale revision" : ORIGINAL), SchemaFields.VDU_MAX_RETRIES);
       assertEquals(!path.equals("stale"), applied);
       refresh(runtime);
       assertState(runtime, ORIGINAL, 0.1);
@@ -102,7 +102,7 @@ class VduResultWriterTest extends LuceneExecutorTestBase {
       seed(runtime);
       var request = UpdateVduResultRequest.newBuilder().setDocId(DOC)
           .setOutcome(VduUpdateOutcome.VDU_UPDATE_OUTCOME_SUCCESS_TEXT).setExtractedContent(" ").build();
-      assertThrows(IllegalArgumentException.class, () -> VduResultWriter.apply(runtime, request, false, Map.of()));
+      assertThrows(IllegalArgumentException.class, () -> VduResultWriter.apply(runtime, request, false, Map.of(), SchemaFields.VDU_MAX_RETRIES));
       assertState(runtime, ORIGINAL, 0.1);
     }
   }

@@ -93,7 +93,7 @@ class VduBatchProcessorAbstentionTest {
     Path file = tempDir.resolve(name);
     Files.writeString(file, "image");
     EngineContext context = TestEngineContexts.durableInternal();
-    VduProcessor processor = mock(VduProcessor.class);
+    VduProcessor processor = VduAttemptTestSupport.processor();
     when(processor.hasVisionCapability()).thenReturn(true);
     when(processor.process(file, context)).thenReturn(result);
     KnowledgeClient client = VduAttemptTestSupport.client();

@@ -75,7 +75,7 @@ final class VduExclusionPublicationFenceTest extends LuceneExecutorTestBase {
           return service.markVduProcessing(MarkVduProcessingRequest.newBuilder()
               .setDocId(id).setAttemptId("attempt").setMaxRetries(3).build(),context).getSuccess();
         }
-        return service.updateVduResult(UpdateVduResultRequest.newBuilder()
+        return service.updateVduResult(UpdateVduResultRequest.newBuilder().setSourceSha256("a".repeat(64))
             .setDocId(id).setAttemptId("attempt").setOutcome(VduUpdateOutcome.VDU_UPDATE_OUTCOME_SUCCESS_TEXT)
             .setExtractedContent("new VDU text ".repeat(600)).setVduEnrichment("vdu marker").build(),context).getSuccess();
       });

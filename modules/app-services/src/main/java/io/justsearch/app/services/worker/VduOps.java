@@ -53,10 +53,19 @@ final class VduOps {
 
     boolean updateVduResult(String docId, String extractedContent, VduUpdateOutcome outcome,
             String enrichment, int pageCount, String attemptId, EngineContext engineContext) {
+        return updateVduResult(docId, extractedContent, outcome, enrichment, pageCount, attemptId,
+            "", false, engineContext);
+    }
+
+    boolean updateVduResult(String docId, String extractedContent, VduUpdateOutcome outcome,
+            String enrichment, int pageCount, String attemptId, String sourceSha256,
+            boolean incompleteCoverage, EngineContext engineContext) {
         var builder =
                 UpdateVduResultRequest.newBuilder()
                         .setDocId(docId)
                         .setAttemptId(attemptId)
+                        .setSourceSha256(sourceSha256)
+                        .setIncompleteCoverage(incompleteCoverage)
                         .setOutcome(outcome)
                         .setVduEnrichment(enrichment != null ? enrichment : "")
                         .setPageCount(pageCount);
@@ -148,7 +157,7 @@ final class VduOps {
         boolean released = rpc.execute("releaseVduProcessing",
                 KnowledgeClient.RpcDeadlineCategory.VDU_OPERATION,
                 calls -> calls.releaseVduProcessing(docId, attemptId), engineContext);
-        forget(attemptId, engineContext);
+        if (released) forget(attemptId, engineContext);
         log.debug("releaseVduProcessing {}: released={}", docId, released);
         return released;
     }

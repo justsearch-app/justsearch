@@ -105,6 +105,7 @@ final class WorkerIngestServiceChunkRegenerationTest extends io.justsearch.adapt
         UpdateVduResultRequest.newBuilder()
             .setDocId(docId)
             .setOutcome(VduUpdateOutcome.VDU_UPDATE_OUTCOME_SUCCESS_TEXT)
+            .setSourceSha256("a".repeat(64))
             .setExtractedContent(content)
             .build();
 

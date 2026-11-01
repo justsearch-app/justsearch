@@ -37,13 +37,17 @@ public final class VduResultWriter {
    * A false result means the parent was absent or its revision changed. Exceptions preserve failure for the caller.
    */
   static boolean apply(RunningRuntime runtime, UpdateVduResultRequest request,
-      boolean chunkSpladeEnabled, Map<String, Object> expectedRevision) throws IOException {
+      boolean chunkSpladeEnabled, Map<String, Object> expectedRevision, int maxRetries) throws IOException {
     validate(request);
     String docId = request.getDocId();
     var outcome = effectiveOutcome(request);
     String content = request.getExtractedContent();
     boolean replaceContent = outcome == VduUpdateOutcome.VDU_UPDATE_OUTCOME_SUCCESS_TEXT
         || (outcome == VduUpdateOutcome.VDU_UPDATE_OUTCOME_UNSPECIFIED && !content.isBlank());
+    if (replaceContent && request.getIncompleteCoverage()) {
+      String baseline = runtime.documentFieldOps().getDocumentFieldOrThrow(docId, SchemaFields.CONTENT);
+      if (baseline != null && !baseline.isBlank()) content = baseline + "\n\n" + content;
+    }
     Map<String, Object> updates = new HashMap<>();
     updates.put(SchemaFields.VDU_PROCESSED, "true");
     switch (outcome) {
@@ -54,8 +58,11 @@ public final class VduResultWriter {
         markDropoutUnrecovered(runtime, docId, updates);
       }
       case VDU_UPDATE_OUTCOME_FAILED -> {
-        updates.put(SchemaFields.VDU_STATUS, SchemaFields.VDU_STATUS_FAILED);
-        markDropoutUnrecovered(runtime, docId, updates);
+        String count = runtime.documentFieldOps().getDocumentFieldOrThrow(docId, SchemaFields.VDU_RETRY_COUNT);
+        boolean exhausted = io.justsearch.indexerworker.util.ParseUtils.parseIntSafe(count, 0) >= maxRetries;
+        updates.put(SchemaFields.VDU_STATUS, exhausted ? SchemaFields.VDU_STATUS_FAILED : SchemaFields.VDU_STATUS_PENDING);
+        updates.put(SchemaFields.VDU_PROCESSED, exhausted ? "true" : "false");
+        if (exhausted) markDropoutUnrecovered(runtime, docId, updates);
       }
       case VDU_UPDATE_OUTCOME_REJECTED_SUSPECT_TEXT -> {
         updates.put(SchemaFields.VDU_STATUS, SchemaFields.VDU_STATUS_REJECTED);
@@ -81,8 +88,9 @@ public final class VduResultWriter {
       updates.put(SchemaFields.EXTRACTION_METHOD, SchemaFields.EXTRACTION_METHOD_VDU);
       updates.put(SchemaFields.EMBEDDING_STATUS, SchemaFields.EMBEDDING_STATUS_PENDING);
     }
-    if (!request.getVduEnrichment().isBlank()) {
-      updates.put(SchemaFields.VDU_ENRICHMENT, request.getVduEnrichment());
+    if (replaceContent || !request.getVduEnrichment().isBlank()) {
+      updates.put(SchemaFields.VDU_ENRICHMENT,
+          request.getVduEnrichment().isBlank() ? null : request.getVduEnrichment());
     }
     if (request.getPageCount() > 0) {
       updates.put(SchemaFields.VDU_PAGE_COUNT, String.valueOf(request.getPageCount()));

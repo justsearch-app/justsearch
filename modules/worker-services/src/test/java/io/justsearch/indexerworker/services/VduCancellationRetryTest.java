@@ -60,7 +60,7 @@ final class VduCancellationRetryTest extends LuceneExecutorTestBase {
       var service = service(runtime);
       var ctx = context();
       assertTrue(service.markVduProcessing(claim(), ctx).getSuccess());
-      assertTrue(service.updateVduResult(UpdateVduResultRequest.newBuilder().setDocId(DOC).setAttemptId(ATTEMPT)
+      assertTrue(service.updateVduResult(UpdateVduResultRequest.newBuilder().setSourceSha256("a".repeat(64)).setDocId(DOC).setAttemptId(ATTEMPT)
           .setOutcome(VduUpdateOutcome.VDU_UPDATE_OUTCOME_SUCCESS_TEXT)
           .setExtractedContent("completed picture text").build(), ctx).getSuccess());
       assertEquals(0, service.recoverVduProcessing(owned(ctx), ctx).getRecoveredCount());

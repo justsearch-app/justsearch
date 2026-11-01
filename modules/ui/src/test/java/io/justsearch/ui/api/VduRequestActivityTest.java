@@ -53,9 +53,10 @@ final class VduRequestActivityTest {
       when(processor.hasVisionCapability()).thenReturn(true);
       when(client.queryPendingVduDocIds(any())).thenReturn(List.of(document.toString()));
       when(client.markVduProcessing(anyString(), anyInt(), anyString(), any())).thenReturn(0);
-      when(processor.process(eq(document), any()))
-          .thenReturn(new VduProcessor.VduResult("page text", "{}", 1));
-      when(client.updateVduResult(anyString(), any(), any(), any(), anyInt(), anyString(), any())).thenReturn(true);
+      when(processor.process(eq(document), any(), any()))
+          .thenReturn(new VduProcessor.VduResult("page text", "{}", 1,
+            GateVerdict.passed(), true, "a".repeat(64)));
+      when(client.updateVduResult(anyString(), any(), any(), any(), anyInt(), anyString(), anyString(), anyBoolean(), any())).thenReturn(true);
       // Mode entry is after the pass captures its activity boundary and before the first unit.
       doAnswer(call -> { fixture.request(kind); return null; }).when(processor).enterVduMode();
       var batch = new VduBatchProcessor(processor, gpu, () -> client, VduMetricCatalog.noop(),
@@ -68,7 +69,7 @@ final class VduRequestActivityTest {
       assertEquals(BlockReason.ACTIVITY_OR_ENERGY, interrupted.blockedReason(), kind);
       assertEquals(1, interrupted.remaining(), "interrupted document remains pending: " + kind);
       verify(client, never()).markVduProcessing(anyString(), anyInt(), anyString(), any());
-      verify(client, never()).updateVduResult(anyString(), any(), any(), any(), anyInt(), anyString(), any());
+      verify(client, never()).updateVduResult(anyString(), any(), any(), any(), anyInt(), anyString(), anyString(), anyBoolean(), any());
       assertTrue(fixture.bootstrap.msSinceLastUserActivity(System.currentTimeMillis()) < 10_000,
           "accepted " + kind + " must register activity in the shared source");
 
@@ -126,10 +127,11 @@ final class VduRequestActivityTest {
       when(processor.hasVisionCapability()).thenReturn(true);
       when(client.queryPendingVduDocIds(any())).thenReturn(List.of(first.toString(), second.toString()));
       when(client.markVduProcessing(anyString(), anyInt(), anyString(), any())).thenReturn(0);
-      when(client.updateVduResult(anyString(), any(), any(), any(), anyInt(), anyString(), any())).thenReturn(true);
-      when(processor.process(any(), any())).thenAnswer(call -> {
+      when(client.updateVduResult(anyString(), any(), any(), any(), anyInt(), anyString(), anyString(), anyBoolean(), any())).thenReturn(true);
+      when(processor.process(any(), any(), any())).thenAnswer(call -> {
         if (activity.equals("during") && call.getArgument(0).equals(first)) fixture.request("ui-chat");
-        return new VduProcessor.VduResult("page text", "{}", 1);
+        return new VduProcessor.VduResult("page text", "{}", 1,
+            GateVerdict.passed(), true, "a".repeat(64));
       });
       if (activity.equals("prior")) fixture.request("ui-chat");
       var batch = new VduBatchProcessor(processor, gpu, () -> client, VduMetricCatalog.noop(),
@@ -141,7 +143,7 @@ final class VduRequestActivityTest {
       assertEquals(activity.equals("during") ? 1 : 0, outcome.remaining(), activity);
       if (activity.equals("during")) {
         verify(client, never()).markVduProcessing(eq(second.toString()), anyInt(), anyString(), any());
-        verify(processor, never()).process(eq(second), any());
+        verify(processor, never()).process(eq(second), any(), any());
       }
     }
   }

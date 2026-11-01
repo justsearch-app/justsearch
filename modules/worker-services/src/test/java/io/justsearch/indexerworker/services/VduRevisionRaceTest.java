@@ -36,7 +36,7 @@ final class VduRevisionRaceTest extends LuceneExecutorTestBase {
       assertFalse(rejected.getSuccess(),"different source bytes invalidate every outcome even when extracted text is identical");
       assertCurrent(runtime,"same extracted text","PENDING","0");
       assertTrue(service.markVduProcessing(mark(B),ctx).getSuccess(),"C1 must be claimable");
-      assertTrue(service.updateVduResult(result(B,VduUpdateOutcome.VDU_UPDATE_OUTCOME_SUCCESS_TEXT),ctx).getSuccess());
+      assertTrue(service.updateVduResult(result(B,VduUpdateOutcome.VDU_UPDATE_OUTCOME_SUCCESS_TEXT).toBuilder().setSourceSha256("b".repeat(64)).build(),ctx).getSuccess());
       assertCurrent(runtime,"old-result-marker","COMPLETED","1");
     }
   }
@@ -51,7 +51,7 @@ final class VduRevisionRaceTest extends LuceneExecutorTestBase {
       var claim=service.markVduProcessing(mark.build(),ctx);assertTrue(claim.getSuccess(),claim.getError());
       java.nio.file.Files.writeString(file,"source-B");
       io.justsearch.indexerworker.loop.VduNativePublicationFixture.publish(runtime,file,"same extracted text","native-uid");
-      var result=UpdateVduResultRequest.newBuilder().setDocId(id).setExtractedContent("stale-native-result")
+      var result=UpdateVduResultRequest.newBuilder().setSourceSha256("a".repeat(64)).setDocId(id).setExtractedContent("stale-native-result")
           .setOutcome(VduUpdateOutcome.VDU_UPDATE_OUTCOME_SUCCESS_TEXT);optional(result,"setAttemptId",A);
       assertFalse(service.updateVduResult(result.build(),ctx).getSuccess(),"real native replacement must revoke C0 authority");
       assertEquals("same extracted text",runtime.documentFieldOps().getDocumentContent(id));
@@ -84,11 +84,12 @@ final class VduRevisionRaceTest extends LuceneExecutorTestBase {
       io.justsearch.indexerworker.loop.VduNativePublicationFixture.publish(runtime,lower,"new native text","case.png");
       String lowerId=io.justsearch.indexerworker.util.PathNormalizer.normalizeKey(lower);
       String upperId=io.justsearch.indexerworker.util.PathNormalizer.normalizeKey(upper);
-      var stale=UpdateVduResultRequest.newBuilder().setDocId(lowerId).setExtractedContent("stale-lower")
+      var stale=UpdateVduResultRequest.newBuilder().setSourceSha256("a".repeat(64)).setDocId(lowerId).setExtractedContent("stale-lower")
           .setOutcome(VduUpdateOutcome.VDU_UPDATE_OUTCOME_SUCCESS_TEXT);optional(stale,"setAttemptId",A);
       assertFalse(service.updateVduResult(stale.build(),ctx).getSuccess(),"atomic replacement revokes just the replaced file's claim");
-      var sibling=UpdateVduResultRequest.newBuilder().setDocId(upperId).setExtractedContent("current-sibling")
+      var sibling=UpdateVduResultRequest.newBuilder().setSourceSha256("a".repeat(64)).setDocId(upperId).setExtractedContent("current-sibling")
           .setOutcome(VduUpdateOutcome.VDU_UPDATE_OUTCOME_SUCCESS_TEXT);optional(sibling,"setAttemptId",B);
+      sibling.setSourceSha256(io.justsearch.indexerworker.loop.SourceContentHash.sha256(upper));
       assertTrue(service.updateVduResult(sibling.build(),ctx).getSuccess(),"case-distinct sibling keeps its claim");
       assertEquals("new native text",runtime.documentFieldOps().getDocumentContent(lowerId));
       assertEquals("current-sibling",runtime.documentFieldOps().getDocumentContent(upperId));
@@ -191,8 +192,9 @@ final class VduRevisionRaceTest extends LuceneExecutorTestBase {
     var builder=MarkVduProcessingRequest.newBuilder().setDocId(DOC).setMaxRetries(3);optional(builder,"setAttemptId",attempt);return builder.build();
   }
   private static UpdateVduResultRequest result(String attempt,VduUpdateOutcome outcome) throws Exception {
-    var builder=UpdateVduResultRequest.newBuilder().setDocId(DOC).setOutcome(outcome).setExtractedContent("old-result-marker").setPageCount(7);
-    optional(builder,"setAttemptId",attempt);return builder.build();
+    var builder=UpdateVduResultRequest.newBuilder().setSourceSha256("a".repeat(64)).setDocId(DOC).setOutcome(outcome).setExtractedContent("old-result-marker").setPageCount(7);
+    optional(builder,"setAttemptId",attempt);
+    builder.setSourceSha256("a".repeat(64));return builder.build();
   }
   private static void optional(Object builder,String method,String value) throws Exception {
     try { builder.getClass().getMethod(method,String.class).invoke(builder,value); }

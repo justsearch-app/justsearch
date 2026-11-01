@@ -37,6 +37,8 @@ public class PdfImageRenderer implements AutoCloseable {
     /** Maximum pages to process per PDF (prevent runaway processing). */
     private static final int MAX_PAGES = 50;
 
+    private int documentPageCount;
+
     private final TempFileManager tempFileManager;
     private final List<Path> renderedImages = new ArrayList<>();
 
@@ -62,6 +64,7 @@ public class PdfImageRenderer implements AutoCloseable {
         try (PDDocument document = Loader.loadPDF(pdfPath.toFile())) {
             BoundedPdfRenderer renderer = new BoundedPdfRenderer(document);
             int totalPages = document.getNumberOfPages();
+            documentPageCount = totalPages;
             int pageCount = Math.min(totalPages, MAX_PAGES);
 
             // Validate every selected page before the first raster allocation. PDFRenderer uses
@@ -107,9 +110,12 @@ public class PdfImageRenderer implements AutoCloseable {
         return List.copyOf(renderedImages);
     }
 
-    /**
-     * Returns the number of rendered images (for progress tracking).
-     */
+    /** Returns the source PDF's page count before the rendering cap. */
+    public int getDocumentPageCount() {
+        return documentPageCount;
+    }
+
+    /** Returns the number of rendered images (for progress tracking). */
     public int getRenderedCount() {
         return renderedImages.size();
     }

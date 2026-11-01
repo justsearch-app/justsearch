@@ -2330,6 +2330,10 @@
       "reason": "JVM/OS temp scratch: allocates and reaps files under java.io.tmpdir for in-flight work."
     },
     {
+      "path": "modules/app-services/src/main/java/io/justsearch/app/services/vdu/VduProcessor.java",
+      "reason": "Copies the source file once into a TempFileManager temp file (the app's temp folder, where the page images PdfImageRenderer renders for VDU also live) while hashing it, so rendering, measurement and the published source hash all use the same bytes; the copy is removed in the processing method's finally block. Losing it costs one re-read of the source on the next VDU attempt; no state survives the attempt."
+    },
+    {
       "path": "modules/worker-services/src/main/java/io/justsearch/indexerworker/loop/PipelineCanary.java",
       "reason": "JVM/OS temp scratch: one tiny built-in RTF marker for bounded extraction health probes, reused by a loop and deleted at loop close. It contains no user content or durable state. A missing file is recreated on demand; an incomplete write is retried before parsing, so losing it costs only another probe. Crash leftovers are disposable temp files."
     },

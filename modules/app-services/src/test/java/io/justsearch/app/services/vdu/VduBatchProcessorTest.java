@@ -38,7 +38,7 @@ class VduBatchProcessorTest {
 
   @BeforeEach
   void setUp() {
-    processor = mock(VduProcessor.class);
+    processor = VduAttemptTestSupport.processor();
     client = VduAttemptTestSupport.client();
     gpu = mock(GpuCapabilitiesService.class);
     context = TestEngineContexts.durableInternal();
