@@ -45,6 +45,28 @@ class EntityClusterStoreTest {
     }
   }
 
+  @Test
+  // future database schema is refused
+  void futureSchemaIsRefused() throws Exception {
+    Path db = tempDir.resolve("entity-clusters.db");
+    store.close();
+    try (var connection = DriverManager.getConnection("jdbc:sqlite:" + db.toAbsolutePath());
+        var statement = connection.createStatement()) {
+      statement.execute("PRAGMA user_version = " + (EntityClusterStore.CURRENT_SCHEMA_VERSION + 1));
+    }
+
+    Connection acquired = DriverManager.getConnection("jdbc:sqlite:" + db.toAbsolutePath());
+    store = new EntityClusterStore(db, ignored -> acquired);
+    try {
+      SQLException failure = assertThrows(SQLException.class, store::open);
+      assertTrue(failure.getMessage().contains("schema version " + (EntityClusterStore.CURRENT_SCHEMA_VERSION + 1)));
+      assertTrue(acquired.isClosed(), "failed initialization must close before returning");
+      assertThrows(SQLException.class, store::loadAll);
+    } finally {
+      acquired.close();
+    }
+  }
+
   @Nested
   @DisplayName("open/close lifecycle")
   class Lifecycle {
@@ -60,28 +82,6 @@ class EntityClusterStoreTest {
     void doubleClose() throws Exception {
       store.close();
       store.close(); // should not throw
-    }
-
-    @Test
-    @DisplayName("future database schema is refused")
-    void futureSchemaIsRefused() throws Exception {
-      Path db = tempDir.resolve("entity-clusters.db");
-      store.close();
-      try (var connection = DriverManager.getConnection("jdbc:sqlite:" + db.toAbsolutePath());
-          var statement = connection.createStatement()) {
-        statement.execute("PRAGMA user_version = 2");
-      }
-
-      Connection acquired = DriverManager.getConnection("jdbc:sqlite:" + db.toAbsolutePath());
-      store = new EntityClusterStore(db, ignored -> acquired);
-      try {
-        SQLException failure = assertThrows(SQLException.class, store::open);
-        assertTrue(failure.getMessage().contains("schema version 2"));
-        assertTrue(acquired.isClosed(), "failed initialization must close before returning");
-        assertThrows(SQLException.class, store::loadAll);
-      } finally {
-        acquired.close();
-      }
     }
 
     @ParameterizedTest

@@ -20,8 +20,8 @@ import org.apache.commons.text.similarity.JaroWinklerSimilarity;
  */
 public final class SoftTFIDF {
   private final double theta;
-  private final Map<String, Double> idfMap;
-  private final int corpusSize;
+  private final Map<String, Integer> documentFrequency = new HashMap<>();
+  private int corpusSize;
   private static final JaroWinklerSimilarity JW = new JaroWinklerSimilarity();
 
   /**
@@ -32,21 +32,14 @@ public final class SoftTFIDF {
    */
   public SoftTFIDF(Collection<String> normalizedMentions, double theta) {
     this.theta = theta;
-    this.corpusSize = Math.max(normalizedMentions.size(), 1);
+    for (String mention : normalizedMentions) addMention(mention);
+  }
 
-    // Build document frequency map: how many mentions contain each token
-    Map<String, Integer> df = new HashMap<>();
-    for (String mention : normalizedMentions) {
-      // Count each unique token once per mention
-      for (String token : new java.util.HashSet<>(EntityNormalizer.tokenize(mention))) {
-        df.merge(token, 1, Integer::sum);
-      }
-    }
-
-    this.idfMap = new HashMap<>(df.size());
-    for (var entry : df.entrySet()) {
-      // Smooth IDF: log(1 + N/df) ensures non-zero weights even with tiny corpora
-      idfMap.put(entry.getKey(), Math.log(1.0 + (double) corpusSize / entry.getValue()));
+  /** Extends the training corpus between batches without rereading earlier mentions. */
+  void addMention(String mention) {
+    corpusSize++;
+    for (String token : new java.util.HashSet<>(EntityNormalizer.tokenize(mention))) {
+      documentFrequency.merge(token, 1, Integer::sum);
     }
   }
 
@@ -107,7 +100,9 @@ public final class SoftTFIDF {
   /** IDF for a token. Unknown tokens get max IDF (rare = strong signal). */
   private double idf(String token) {
     // +1 ensures non-zero IDF even when corpusSize=1 (empty corpus edge case)
-    return idfMap.getOrDefault(token, Math.log((double) corpusSize + 1));
+    int size = Math.max(corpusSize, 1);
+    Integer frequency = documentFrequency.get(token);
+    return frequency == null ? Math.log((double) size + 1) : Math.log(1.0 + (double) size / frequency);
   }
 
   /** Compute TF-IDF weights for a token list. TF = log(tf + 1), sublinear. */
