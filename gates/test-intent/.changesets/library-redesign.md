@@ -940,3 +940,16 @@ Browser viewport and actual native-shell verification are independent of these u
   ]
 }
 ```
+
+## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verifier6-uiimpl-20261102",
+  "verdict": "accept",
+  "digest": "sha256:c6cb57afa22dbdf71ac436f520a6895c2c26c21cbb0cf559cb62402ae1326690",
+  "note": "Independent verifier (round 3 of repair sequence 2) accepted all entries at digest sha256:c6cb57af...6690; verdict recorded by the orchestrator from the verifier's report."
+}
+```
