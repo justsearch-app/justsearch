@@ -44,6 +44,58 @@ to replace existing bases. To rebuild, first stop the VM and explicitly move its
 OS folder aside. A failed build keeps `install.qcow2`, firmware, logs and seed
 media for diagnosis. A retry creates a fresh installation disk.
 
+New run disks are admitted only while the whole qualification tree occupies
+less than **150 GiB allocated**. The check runs under the VM lifetime lock,
+before replacing an existing disk, for fresh runs, snapshot children and the
+first Windows preparation boot. Files with shared inodes count once; symlinks
+are not followed, and sparse virtual size is ignored. This is an admission
+threshold, not a quota: an admitted guest can cross it. Its stopped disk can
+still be sealed, and Windows preparation can reboot that same disk. The next
+allocation refuses with a `storage-budget` infrastructure failure, preserving
+the previous run disk and stopping subsequent journey stages.
+
+After the release session explicitly retires a merged or superseded wave,
+report its disk retirement candidates (paths are relative to the qualification root):
+
+```sh
+python3 vm.py prune-disks evidence/retired-wave \
+  --reason 'release reference and retirement decision'
+```
+
+The command writes nothing. It reports candidate disks with allocated bytes,
+protected disks with their reasons, and refusals. Multiple subtrees may be
+selected. Retirement is never inferred from age, names, reports or GitHub.
+Stop the VM and other image-writing tools before generating the report.
+
+**The report recognises qcow2 images only. An image in another format backed
+by a listed disk would be missed.** Discovery uses regular files' qcow2 header
+magic (`QFI\xfb`), regardless of filename, without following symlinks, and
+follows their backing chains. Every `base.qcow2` anywhere under the root is a
+base, as is any disk named by any `base.json` under the root, including
+moved-aside OS folders. Bases, retained run disks and other kept qcow2 disks
+protect their ancestors; protected paths explain why they remain.
+Selections containing a base, OS directory or the root, symlinked/escaping
+paths, corrupt or unreadable qcow2 images, external data files, non-qcow2
+content with the same header magic or backing formats, and ambiguous chains
+refuse a plan. A positively missing backing file is reported; its head and
+existing layers before the gap remain protected while independent disks
+remain eligible.
+
+Deletion under the qualification root is manual and requires the owner's
+approval. Before requesting approval, check the listed disks and all retained
+images, including other formats, with `qemu-img info --backing-chain <image>`
+to confirm no retained image depends on a listed disk. Resolve refusals and
+uncertain references first. With the owner's approval, delete only the disks
+listed in the reviewed report, children first in the reported order. Keep
+logs, reports, screenshots, archives and firmware. If images or references
+change after review, generate and check a fresh report before deletion.
+
+Journey summaries record `storage.snapshotBytes` after a layer and its
+manifest/checkpoint are fully sealed. It counts that layer's allocated bytes,
+excluding ancestors; combined summaries sum only their stages' new snapshots.
+Existing write counters retain their meanings. Immutable development ZIPs
+already use hardlinks; mutable inputs and qcow2 layers are never deduplicated.
+
 `start <os> --visible` uses a software QEMU GTK window on the current `DISPLAY`;
 headless is the default. Stop it with `vm.py stop`. For a brief visible check,
 keep the window open no more than ten seconds while the owner uses the desktop.

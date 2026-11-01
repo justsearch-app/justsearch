@@ -159,6 +159,49 @@ failure in its source report; using its state cannot certify that assertion.
 The hosted VM uses persistent, isolated XDG directories for these two stages;
 the actual hosted workflow keeps its temporary XDG directories.
 
+After a successful retry, the release session may explicitly retire the failed
+attempt's disks and report candidates with `python3 scripts/release/qual/vm.py
+prune-disks evidence/failed-attempt --reason 'successful retry reference'`.
+The command writes nothing; it lists candidates with allocated bytes,
+protected disks with reasons, and refusals. A retry backed by the failed
+snapshot keeps it as “still referenced”; an independent retry can release it.
+The same procedure applies after a wave is explicitly retired.
+
+The report recognises qcow2 images only. An image in another format backed by
+a listed disk would be missed. Discovery uses qcow2 header magic (`QFI\xfb`),
+regardless of filename, without following symlinks. Every `base.qcow2` under
+the root and every disk named by a `base.json` anywhere under it is a protected
+base, including moved-aside OS folders; selecting a subtree containing one
+refuses a plan.
+
+Stop the VM and other image-writing tools. Before requesting the owner's
+approval for manual deletion, check the listed disks and all retained images,
+including other formats, with `qemu-img info --backing-chain <image>`. Confirm
+that no retained image depends on a listed disk and resolve refusals or
+uncertain references. Only with the owner's approval, delete only the listed
+disks, children first in the report's order. Keep non-disk evidence. Generate
+and check a fresh report if images or references change after review. See the
+qualification README for the full manual procedure and chain protections.
+
+VM evidence and snapshot destinations must be inside the qualification root
+(`/home/elias/dev/justsearch-qual`); replace example `/path/to/*evidence` paths
+accordingly. This makes all sealed layers visible to disk inventory and the
+150 GiB allocated-storage admission threshold. Before each new disk, the
+lifetime-locked check counts the entire root, shared inodes once, without
+following symlinks. A refusal leaves the old disk intact and emits a dedicated
+`storage-budget` check with `failed-infrastructure` status; later stages stop
+and the combined report cannot pass. The threshold is not a quota: a running
+stage can exceed it, but sealing and relaunching the same preparation disk
+remain allowed. Actual hosted workflows without VM disks are unaffected.
+
+`storage.snapshotBytes` is recorded beside `writeVolume` only after complete
+sealing and manifest/checkpoint publication. It counts the new layer's allocated
+bytes, excluding its backing chain; combined summaries sum newly sealed stages
+once, including only one layer across Windows preparation's reboot. Write
+counter meanings are unchanged. A sealing failure can still leave a visible
+partial snapshot directory before its manifest is published; it has no completed
+snapshot storage measurement and must not be used as a complete checkpoint.
+
 Guest-only provisioning masks Snap refresh, firmware update, APT timers and
 the desktop file indexer, and sets swappiness to 1 to prefer reclaiming file
 cache over writing anonymous pages. At first boot, desktop preparation disables
@@ -901,6 +944,18 @@ never recopied or reinstalled on a rerun; only changed harness source is staged.
 Explicit subsets and development reruns remain incomplete and cannot qualify
 a release. Omit `--journeys` only for final full-suite evidence. Keep backing
 snapshots in place; unused child overlays are deleted after evidence collection.
+
+After a successful independent retry, report retirement candidates for its
+failed attempt with `python3 scripts/release/qual/vm.py prune-disks
+evidence/failed-attempt --reason 'successful retry reference'`. Explicitly
+retired waves use the same procedure. Retries that inherit the failed disk
+protect it and its ancestors; the report explains the remaining references.
+The report writes nothing and recognises qcow2 images only; an image in
+another format backed by a listed disk would be missed. Check the listed disks
+and all retained images with `qemu-img info --backing-chain <image>` first.
+Only with the owner's approval, manually delete only listed disks, children
+first. Keep logs and reports. The qualification README describes the full
+manual procedure and refusals.
 
 J1 checks shipped per-user NSIS completion, installed version/image, bundled JVM,
 UI Automation window identity and Engine readiness. Normal first-run text needs

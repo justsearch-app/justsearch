@@ -98,6 +98,7 @@ def start_snapshot(snapshot):
         vm.ensure_free(check_lock=False)
         folder = vm.ROOT / 'ubuntu'
         disk, variables = folder / 'run.qcow2', folder / 'run-vars.fd'
+        vm.admit_disk()
         disk.unlink(missing_ok=True)
         variables.unlink(missing_ok=True)
         try:
@@ -113,6 +114,7 @@ def start_snapshot(snapshot):
 
 
 def seal_snapshot(out, started, inode, args, phase):
+    vm.snapshot_destination(out)
     snapshot = out / 'snapshot'
     with vm.locked():
         vm.ensure_free(check_lock=False)
@@ -129,6 +131,7 @@ def seal_snapshot(out, started, inode, args, phase):
         (snapshot / 'manifest.json').write_text(json.dumps({'pins': pins(args, phase),
             'sourceSummary': str((out / 'summary.json').resolve()),
             'memoryMiB': args.memory_mib}, indent=2) + '\n')
+        vm.record_snapshot(out, snapshot / 'disk.qcow2')
     return snapshot
 
 
@@ -401,6 +404,8 @@ def execute(args, out, phase, journeys, snapshot):
 
 
 def run_overlay(args, out, phase, journeys, snapshot=None, seal=False):
+    if seal:
+        vm.snapshot_destination(out)
     out.mkdir(parents=True, exist_ok=False)
     started = None
     try:
@@ -432,7 +437,7 @@ def run_overlay(args, out, phase, journeys, snapshot=None, seal=False):
         return execute(args, out, phase, journeys, snapshot)
     except Exception as exc:
         lane = 'hosted-linux-x11' if args.session == 'hosted' else 'vm-linux-' + args.session
-        report = preparation_failure(lane, str(exc))
+        report = vm.storage_failure(preparation_failure(lane, str(exc)), exc)
         if isinstance(exc, AssertionError):
             report['journeys'][0]['checks'][0].update(status='failed-product',
                 evidence=['../guest-crashes.json', '../guest-crashes.tar'])
@@ -508,6 +513,7 @@ def combine(args, out, sources):
                   writeVolume={'writtenBytes': total,
                     'source': 'guest whole-device counters, boot to pre-shutdown, all overlays',
                     'complete': all('writtenBytes' in s.get('writeVolume', {}) for s in sources.values())},
+                  storage=vm.combined_storage(sources),
                   execution={'mode': args.mode, 'requestedJourneys': args.journeys,
                              'releaseQualification': args.mode == 'fresh' and not args.journeys},
                   **summarize(rows, full_selection(rows,
@@ -518,12 +524,14 @@ def combine(args, out, sources):
 
 def main():
     args = parse_args()
+    vm.snapshot_destination(args.evidence)
     out = args.evidence.resolve()
     out.mkdir(parents=True, exist_ok=False)
     sources = {}
     def stage(name, phase, journeys, snapshot=None, seal=False):
         run_overlay(args, out / name, phase, journeys, snapshot, seal)
         sources[name] = json.loads((out / name / 'summary.json').read_text())
+        return not any(row['id'] == 'storage-budget' for row in sources[name]['journeys'])
     if args.mode == 'rerun':
         manifest = json.loads((args.snapshot / 'manifest.json').read_text())
         if set(args.journeys) & {'J1', 'J2'}:
@@ -542,7 +550,8 @@ def main():
         for phase in phases:
             setup = ['J1', 'J2', 'J3'] + (['J4'] if phase == 'predecessor' else [])
             name = phase + '-setup'
-            stage(name, phase, setup, seal=True)
+            if not stage(name, phase, setup, seal=True):
+                return combine(args, out, sources)
             snapshot = out / name / 'snapshot'
             remaining = ['J5', 'J6'] if phase == 'predecessor' else ['J4', 'J7', 'J8']
             if args.session == 'wayland' and not update_available:
@@ -550,7 +559,8 @@ def main():
             if args.session == 'hosted':
                 remaining = ['J4', 'J5', 'J6', 'J7', 'J8']  # Retain explicit VM-only decision skips.
             if snapshot.exists():
-                stage(phase, phase, remaining, snapshot)
+                if not stage(phase, phase, remaining, snapshot):
+                    return combine(args, out, sources)
             else:
                 sources[phase] = preparation_failure('hosted-linux-x11' if args.session == 'hosted'
                     else 'vm-linux-wayland', 'Setup did not produce a clean stopped checkpoint')
