@@ -411,6 +411,10 @@ final class SqliteQueueMigrationOps {
         // acknowledging a root-reconciliation obligation it cannot apply.
         log.info("V24 to V25: Required origin-aware DELETE and watcher-reconciliation readers");
       }
+      case 26 -> {
+        addColumnIfMissing(conn, "force_reindex", SqliteSchema.MIGRATE_V25_TO_V26_FORCE);
+        addColumnIfMissing(conn, "admitted_source_sha256", SqliteSchema.MIGRATE_V25_TO_V26_SOURCE);
+      }
       default -> throw new SQLException("Unknown migration version: " + version);
     }
   }

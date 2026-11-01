@@ -1066,3 +1066,143 @@ describe('selectIndexingProgress — round-15 F1: coverage 0 + no model + empty 
     expect(p.phase).toBe('indexing');
   });
 });
+
+describe('enrichment status truthfulness', () => {
+  it.each(['embeddingPendingCount', 'spladePendingCount', 'pendingNerCount'] as const)(
+    'keeps unreadable %s unknown through both selectors', field => {
+      const status = snapshot({ enrichment: { [field]: -1 } });
+      expect(selectIndexingPhase(status)).toBe('unknown');
+      const progress = select(status, true);
+      expect(progress.activity.summary).not.toContain('fully searchable');
+      expect(progress.enrichingPercent).toBeNull();
+      expect(progress.enrichingEtaSeconds).toBeNull();
+    });
+
+  it.each(['embeddingFailedCount', 'spladeFailedCount', 'failedNerCount'] as const)(
+    'withholds completion for terminal %s', field => {
+      const status = snapshot({ core: { indexHealthy: true }, enrichment: { [field]: 1 } });
+      expect(selectIndexingPhase(status)).toBe('error');
+      expect(select(status, true).activity.summary).not.toContain('fully searchable');
+    });
+
+  it('includes enabled chunk SPLADE independently of embedding and its status-less siblings', () => {
+    const status = snapshot({ enrichment: {
+      embeddingEnabled: false, spladePendingCount: 0,
+      chunk: { chunkDocCount: 200, chunkSpladeEnabled: true,
+        chunkSpladeCompletedCount: 3, chunkSpladePendingCount: 1 },
+    } } as Parameters<typeof snapshot>[0]);
+    const progress = select(status, true);
+    expect(progress.phase).toBe('enriching');
+    expect(progress.enrichingStages).toEqual([{ id: 'chunkSplade', total: 4, pending: 1 }]);
+    expect(progress.enrichingPercent).toBe(75);
+    expect(enrichSettledSum(status)).toBe(3);
+    status.worker!.enrichment!.chunk!.chunkSpladePendingCount = 0;
+    expect(selectIndexingPhase(status)).toBe('ready');
+  });
+
+  it.each([false, true])('blocks unavailable embedding with chunkOnly=%s', chunkOnly => {
+    const status = snapshot({ enrichment: { embeddingEnabled: true, embeddingAvailable: false,
+      embeddingPendingCount: chunkOnly ? 0 : 1,
+      chunk: { chunkEmbeddingPendingCount: chunkOnly ? 1 : 0 },
+      spladePendingCount: 5,
+    } } as Parameters<typeof snapshot>[0]);
+    const progress = select(status, true);
+    expect(progress.phase).toBe('blocked');
+    expect(progress.activity.summary).toBe('Semantic search unavailable');
+    expect(progress.enrichingEtaSeconds).toBeNull();
+    status.worker!.enrichment!.embeddingAvailable = true;
+    expect(selectIndexingPhase(status)).toBe('enriching');
+  });
+
+  it('does not round one missing artifact into a completion claim', () => {
+    const status = snapshot({ enrichment: {
+      embeddingDocCount: 10000, embeddingCompletedCount: 10000, embeddingCoveragePercent: 99.99,
+      completeness: [{ stageId: 'embed', tier: 'ARTIFACT', expected: 10000, present: 9999, missing: 1, failed: 0 }],
+    } });
+    expect(selectIndexingPhase(status)).toBe('error');
+    expect(select(status, true).enrichingPercent).toBeNull();
+  });
+});
+
+
+describe('independent count failures and sparse population', () => {
+  it('withholds completion when only the completeness audit is unreadable', () => {
+    const status = snapshot({ enrichment: { completenessKnown: false } });
+    expect(selectIndexingPhase(status)).toBe('unknown');
+    expect(select(status, true).activity.summary).not.toContain('fully searchable');
+  });
+
+  it.each(['chunkEmbeddingPendingCount', 'chunkVectorCoveragePercent', 'chunkDocCount'] as const)(
+    'keeps independently unreadable %s unknown', field => {
+      const status = snapshot({ enrichment: { chunk: { [field]: -1 } } });
+      expect(selectIndexingPhase(status)).toBe('unknown');
+    });
+
+  it('shows chunk SPLADE failures over its own population', () => {
+    const status = snapshot({ enrichment: { embeddingEnabled: false,
+      chunk: { chunkDocCount: 500, chunkSpladeEnabled: true, chunkSpladeDocCount: 4,
+        chunkSpladeCompletedCount: 3, chunkSpladePendingCount: 0, chunkSpladeFailedCount: 1 },
+    } });
+    const progress = select(status, true);
+    expect(progress.phase).toBe('error');
+    expect(progress.enrichingStages).toEqual([{ id: 'chunkSplade', total: 4, pending: 0, failed: 1 }]);
+    expect(progress.enrichingPercent).toBeNull();
+  });
+});
+
+
+describe('live enrichment producer availability', () => {
+  it.each(['splade', 'ner', 'chunkSplade'] as const)('blocks unavailable enabled %s work', stage => {
+    const status = snapshot({ enrichment: {
+      embeddingEnabled: true, embeddingAvailable: true,
+      spladeEnabled: true, spladeAvailable: stage === 'ner', nerEnabled: true, nerAvailable: stage !== 'ner',
+      spladeDocCount: 2, spladePendingCount: stage === 'splade' ? 1 : 0,
+      pendingNerCount: stage === 'ner' ? 1 : 0,
+      chunk: { chunkSpladeEnabled: stage === 'chunkSplade', chunkSpladeDocCount: 2,
+        chunkSpladePendingCount: stage === 'chunkSplade' ? 1 : 0 },
+    } });
+    const progress = select(status, true);
+    expect(progress.phase).toBe('blocked');
+    expect(progress.activity.summary).toBe('Enrichment unavailable');
+    expect(progress.enrichingEtaSeconds).toBeNull();
+    status.worker!.enrichment!.spladeAvailable = true;
+    status.worker!.enrichment!.nerAvailable = true;
+    expect(selectIndexingPhase(status)).toBe('enriching');
+  });
+});
+
+
+it('requires a zero-chunk declaration before certifying a nonempty library', () => {
+  const status = snapshot({ core: { indexedDocuments: 1 }, enrichment: {
+    chunk: { chunkDocCount: 0, chunkingNotRequired: false },
+  } });
+  expect(selectIndexingPhase(status)).toBe('error');
+  expect(select(status, true).activity.summary).not.toContain('fully searchable');
+  status.worker!.enrichment!.chunk!.chunkingNotRequired = true;
+  expect(selectIndexingPhase(status)).toBe('ready');
+});
+
+
+it.each(['unknown', 'stale'] as const)('does not infer zero passage work from a %s parent count', state => {
+  const status = snapshot({ core: { indexedDocuments: 0, indexedDocumentsUnknown: state === 'unknown' },
+    enrichment: { chunk: { chunkDocCount: 0, chunkingNotRequired: false } },
+  });
+  status.worker!.countObservations = { active: { state, observedAtMs: state === 'unknown' ? 0 : 1234 } };
+  expect(selectIndexingPhase(status)).toBe('unknown');
+  expect(select(status, true).enrichingPercent).toBeNull();
+  expect(select(status, true).activity.summary).not.toContain('fully searchable');
+  status.worker!.enrichment!.chunk!.chunkingNotRequired = true;
+  expect(selectIndexingPhase(status)).toBe('ready');
+});
+
+
+it.each([undefined, -1, 0])('shows older-worker chunk SPLADE backlog with total %s', total => {
+  const status = snapshot({ enrichment: { embeddingEnabled: false, spladeEnabled: false, nerEnabled: false,
+    chunk: { chunkSpladeEnabled: true, chunkSpladeDocCount: total,
+      chunkSpladeCompletedCount: 3, chunkSpladePendingCount: 1, chunkSpladeCoveragePercent: 75 },
+  } });
+  const progress = select(status, true);
+  expect(progress.phase).not.toBe('ready');
+  expect(progress.enrichingStages).toContainEqual({ id: 'chunkSplade', total: 4, pending: 1 });
+  expect(progress.activity.summary).not.toContain('fully searchable');
+});

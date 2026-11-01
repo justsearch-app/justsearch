@@ -96,6 +96,10 @@ input re-encoding; the compressed captures retain the original segment
 bytes. Non-stored chunk text is recovered from the parent and its saved
 character offsets. Unchanged source bytes recover their indexed modification
 time so unpacking alone does not turn U9 into a changed-file extraction.
+Queue sources first receive their captured admission's `last_updated` as an
+mtime upper bound, so queue-only retry sources are not given a synthetic
+post-admission edit by unpacking. Indexed unchanged sources then recover their
+more precise indexed timestamp.
 Retry and migration-phase deadlines retain their absolute captured values;
 time-sensitive follow-up tests should prepare those deadlines against their
 chosen clock before boot. This helper intentionally rejects vector-bearing,

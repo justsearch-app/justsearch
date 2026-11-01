@@ -430,7 +430,7 @@ final class DefaultWorkerAppServicesProducerTransferTest {
           invokeDeclared(registry, "subscription", new Class<?>[] {Path.class}, root));
 
       var admitted = new CountDownLatch(1);
-      when(fixture.jobQueue.enqueueEntries(any(), eq("docs"))).thenAnswer(ignored -> {
+      when(fixture.jobQueue.enqueueMaintenanceScanEntries(any(), eq("docs"), any())).thenAnswer(ignored -> {
         admitted.countDown();
         return 1;
       });

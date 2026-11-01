@@ -34,6 +34,7 @@ package io.justsearch.indexerworker.queue;
  *   <li>V23: Monotonic switch-buffer admission count for migration restart fencing</li>
  *   <li>V24: Transactional job counts and indexed readiness/claim selection</li>
  *   <li>V25: Versioned delete intents and durable watcher reload reconciliation receipts</li>
+ *   <li>V26: Durable force intent and rediscovery source identity</li>
  * </ul>
  */
 public final class SqliteSchema {
@@ -46,7 +47,7 @@ public final class SqliteSchema {
    * Target schema version. The migrate() method will upgrade the database
    * to this version using the migration ladder.
    */
-  public static final int TARGET_VERSION = 25;
+  public static final int TARGET_VERSION = 26;
 
   /** Every re-admission retains REPLACE's full reset, while firing ordinary UPDATE triggers. */
   static final String REENQUEUE_JOB_ON_CONFLICT = """
@@ -58,10 +59,17 @@ public final class SqliteSchema {
           AND excluded.ingestion_root IS NULL AND excluded.unit_revision NOT LIKE 'release030-unscoped/%'
           THEN 'release030-unscoped/' || excluded.unit_revision ELSE excluded.unit_revision END,
         walk_seen_epoch=excluded.walk_seen_epoch, planned_source_sha256=excluded.planned_source_sha256,
+        force_reindex=MAX(excluded.force_reindex, jobs.force_reindex),
+        admitted_source_sha256=excluded.admitted_source_sha256,
         ingestion_root=excluded.ingestion_root, error_message=NULL, retry_after=NULL, first_failed_at=NULL,
         content_hash=NULL, last_outcome_class=NULL, last_reason_code=NULL, last_retry_policy=NULL,
         last_diagnostic_summary=NULL, last_outcome_at=NULL
       """;
+
+  static final String MIGRATE_V25_TO_V26_FORCE =
+      "ALTER TABLE jobs ADD COLUMN force_reindex INTEGER NOT NULL DEFAULT 0 CHECK(force_reindex IN (0,1))";
+  static final String MIGRATE_V25_TO_V26_SOURCE =
+      "ALTER TABLE jobs ADD COLUMN admitted_source_sha256 TEXT";
 
   static final String[] MIGRATE_V23_TO_V24 = {
       """

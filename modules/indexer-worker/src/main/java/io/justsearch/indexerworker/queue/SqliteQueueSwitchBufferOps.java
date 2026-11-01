@@ -3,6 +3,7 @@ package io.justsearch.indexerworker.queue;
 
 import io.justsearch.app.api.indexing.AcceptedProjection;
 import io.justsearch.telemetry.Telemetry;
+import java.nio.file.Path;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -380,7 +381,9 @@ final class SqliteQueueSwitchBufferOps {
   private String preserveSyncAdmission(
       Connection conn, String generation, String key, SwitchBufferSyncRoot incoming)
       throws SQLException {
-    if (incoming.provenance() != null) return incoming.encode();
+    boolean retirementOwned = retainedReceipts.get().stream()
+        .anyMatch(receipt -> generation.equals(receipt.generation()) && key.equals(receipt.key()));
+    if (retirementOwned && incoming.provenance() != null) return incoming.encode();
     try (PreparedStatement prior = conn.prepareStatement(
         "SELECT op, payload FROM switch_buffer WHERE generation = ? AND key = ?")) {
       prior.setString(1, generation);
@@ -392,7 +395,12 @@ final class SqliteQueueSwitchBufferOps {
         }
         try {
           var previous = SwitchBufferSyncRoot.decode(rows.getString(2));
-          return new SwitchBufferSyncRoot(incoming.rootPath(), incoming.force(), previous.provenance()).encode();
+          if (!retirementOwned && !io.justsearch.indexerworker.util.PathNormalizer.normalizeKey(Path.of(previous.rootPath()))
+              .equals(io.justsearch.indexerworker.util.PathNormalizer.normalizeKey(Path.of(incoming.rootPath())))) {
+            throw new SQLException("Cannot coalesce sync requests for different roots");
+          }
+          return new SwitchBufferSyncRoot(incoming.rootPath(), incoming.force() || !retirementOwned && previous.force(),
+              incoming.provenance() == null ? previous.provenance() : incoming.provenance()).encode();
         } catch (IllegalArgumentException | tools.jackson.core.JacksonException malformed) {
           // Do not erase an unreadable durable request by acknowledging a maintenance replacement.
           throw new SQLException("Cannot coalesce maintenance over an unreadable SYNC_ROOT", malformed);

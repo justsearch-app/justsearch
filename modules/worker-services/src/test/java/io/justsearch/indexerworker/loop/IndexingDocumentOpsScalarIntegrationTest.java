@@ -71,11 +71,12 @@ class IndexingDocumentOpsScalarIntegrationTest extends LuceneExecutorTestBase {
           () -> false, () -> false, () -> null, fence);
       var claim = new JobQueue.IndexJob(file, null, null, null, null, null, false, null, file);
 
-      // Same on-disk file and mtime as a legacy row. Ordinary ingestion must leave it missing.
+      // Proven unchanged source with a legacy missing quality score; ordinary ingestion keeps it missing.
       runtime.indexingCoordinator().indexSingle(new IndexDocument(Map.of(
           SchemaFields.DOC_ID, id, SchemaFields.DOC_UID, "stable-uid", SchemaFields.PATH, id,
           SchemaFields.MODIFIED_AT, Files.getLastModifiedTime(file).toMillis(),
           SchemaFields.SIZE_BYTES, Files.size(file),
+          SchemaFields.SOURCE_SHA256, SourceContentHash.sha256(file),
           SchemaFields.CONTENT, "legacy content")));
       refresh(runtime);
       assertTrue(extractor.extractAll(List.of(claim)).isEmpty());

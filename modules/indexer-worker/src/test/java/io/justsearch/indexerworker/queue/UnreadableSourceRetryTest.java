@@ -50,6 +50,55 @@ final class UnreadableSourceRetryTest {
   }
 
   @Test
+  void unreadableRediscoveryPreservesExistingFutureIoRetryWait() throws Exception {
+    Path source = Files.writeString(tempDir.resolve("source.txt"), "unchanged bytes");
+    org.junit.jupiter.api.Assumptions.assumeTrue(
+        Files.getFileStore(source).supportsFileAttributeView("posix"));
+    var permissions = Files.getPosixFilePermissions(source);
+    String hash = io.justsearch.indexerworker.loop.SourceContentHash.sha256(source);
+    var stamp = Files.getLastModifiedTime(source);
+    var entry = JobQueue.EnqueueEntry.stat(source).withinRoot(tempDir);
+    assertEquals(1, jobQueue.enqueueEntries(List.of(entry), "docs", "accepted"));
+    var claim = jobQueue.pollPending(1).getFirst();
+    assertTrue(jobQueue.markClaimFailed(claim, IngestionOutcome.of(
+        IngestionOutcomeClass.IO_FAILED, "source_io", IngestionRetryPolicy.RETRY_WITH_BACKOFF), null));
+    var before = readFullRow();
+    assertEquals("PENDING", before.get("state"));
+    assertEquals("1", before.get("attempts"));
+    assertTrue(Long.parseLong(before.get("retry_after")) > System.currentTimeMillis());
+    try {
+      Files.setPosixFilePermissions(source, java.util.Set.of());
+      org.junit.jupiter.api.Assumptions.assumeFalse(Files.isReadable(source),
+          "the test requires actual permission denial");
+      org.junit.jupiter.api.Assertions.assertThrows(java.nio.file.AccessDeniedException.class,
+          () -> io.justsearch.indexerworker.loop.SourceContentHash.sha256(source));
+      for (int rediscovery = 0; rediscovery < 2; rediscovery++) {
+        assertEquals(0, jobQueue.enqueueMaintenanceScanEntries(List.of(entry), "docs", "rediscovery"),
+            "unreadable rediscovery must retain the existing retry obligation");
+        assertEquals(before, readFullRow(), "every saved retry and attribution field must survive");
+        assertTrue(jobQueue.pollPending(1).isEmpty(), "the future retry must remain unavailable");
+      }
+    } finally {
+      Files.setPosixFilePermissions(source, permissions);
+      assertEquals(stamp, Files.getLastModifiedTime(source));
+      assertEquals(hash, io.justsearch.indexerworker.loop.SourceContentHash.sha256(source));
+    }
+  }
+
+  private java.util.Map<String, String> readFullRow() throws Exception {
+    try (var connection = DriverManager.getConnection("jdbc:sqlite:" + dbPath);
+        var statement = connection.createStatement();
+        var rows = statement.executeQuery("SELECT * FROM jobs")) {
+      assertTrue(rows.next());
+      var result = new java.util.TreeMap<String, String>();
+      for (int column = 1; column <= rows.getMetaData().getColumnCount(); column++) {
+        result.put(rows.getMetaData().getColumnName(column), rows.getString(column));
+      }
+      return result;
+    }
+  }
+
+  @Test
   void backOffIsCountedAndGrowsRatherThanRetryingEverySecond() throws Exception {
     Path file = Files.writeString(tempDir.resolve("locked.docx"), "content");
     String normalized = normalize(file);

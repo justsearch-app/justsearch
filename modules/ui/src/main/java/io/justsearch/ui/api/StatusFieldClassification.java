@@ -9,6 +9,7 @@ import io.justsearch.app.api.status.ChunkCoverageView;
 import io.justsearch.app.api.status.CompatibilityStatusView;
 import io.justsearch.app.api.status.ConversationProtectionView;
 import io.justsearch.app.api.status.CoreIndexView;
+import io.justsearch.app.api.status.CountObservationView;
 import io.justsearch.app.api.status.EmbeddingStatusGroup;
 import io.justsearch.app.api.status.EngineComponentView;
 import io.justsearch.app.api.status.EnrichmentProgressView;
@@ -134,7 +135,8 @@ final class StatusFieldClassification {
     put(table, LifecycleSnapshotV2.Component.class, state("state", "reason_code"), time("state_since"));
     put(table, WorkerOperationalView.class,
         state("core", "failure", "migration", "compatibility", "queueDb", "enrichment", "gpu",
-            "vectorFormat", "telemetry", "searchConfig", "visualExtraction", "buildStamp"));
+            "vectorFormat", "telemetry", "searchConfig", "visualExtraction", "buildStamp", "countObservations"));
+    put(table, CountObservationView.class, state("state"), time("observedAtMs"));
     put(table, CoreIndexView.class,
         state("indexHealthy", "indexState", "indexedDocumentsUnknown", "vduAvailable"),
         measurement("indexedDocuments", "pendingJobs", "indexSizeBytes", "pendingVduCount",
@@ -166,7 +168,7 @@ final class StatusFieldClassification {
         state("queueDbHealthy", "queueDbLastQuickCheckOk"),
         time("queueDbLastBackupAtMs", "queueDbLastQuickCheckAtMs", "queueDbLastErrorAtMs"));
     put(table, EnrichmentProgressView.class,
-        state("chunk", "completeness", "chunkMinChars", "embeddingEnabled", "spladeEnabled",
+        state("chunk", "completeness", "completenessKnown", "chunkMinChars", "embeddingEnabled", "spladeEnabled",
             "nerEnabled", "backfillMode", "embeddingAvailable", "spladeAvailable", "nerAvailable"),
         measurement("embeddingDocCount", "embeddingCompletedCount", "embeddingPendingCount",
             "embeddingFailedCount", "embeddingCoveragePercent", "spladeDocCount",
@@ -175,10 +177,10 @@ final class StatusFieldClassification {
             "vectorReadyPercent", "enrichmentCompleted", "batchTiming", "encoderProfiles",
             "embeddedAndSparseCount"));
     put(table, ChunkCoverageView.class,
-        state("chunkVectorsReady", "chunkSpladeEnabled"),
+        state("chunkVectorsReady", "chunkSpladeEnabled", "chunkingNotRequired"),
         measurement("chunkDocCount", "chunkEmbeddingCompletedCount", "chunkEmbeddingPendingCount",
             "chunkEmbeddingFailedCount", "chunkVectorCoveragePercent", "chunkSpladeCompletedCount",
-            "chunkSpladePendingCount", "chunkSpladeCoveragePercent"));
+            "chunkSpladePendingCount", "chunkSpladeCoveragePercent", "chunkSpladeDocCount", "chunkSpladeFailedCount"));
     put(table, StageCompletenessView.class,
         state("stageId", "tier"), measurement("expected", "present", "missing", "failed"));
     put(table, GpuDiagnosticsView.class,

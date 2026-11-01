@@ -1391,7 +1391,8 @@ public abstract class KnowledgeClient implements Closeable, SearchPort, Indexing
                         cov.getParentDocsTotalNer(),
                         cov.getParentDocsSettledNer(),
                         cov.getChunkDocsTotal(),
-                        cov.getChunkDocsSettled()));
+                        cov.getChunkDocsSettled(),
+                        cov.getFailedStagesMap(), cov.getMissingArtifactStagesMap()));
     }
 
     @Override
