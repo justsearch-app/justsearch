@@ -90,3 +90,17 @@ index 0000000000..e9d306133a
 +  private CloudPlaceholderDetector() {}
 +  public static boolean isCloudPlaceholder(Path file) { return false; }
 +}
+diff --git a/modules/app-services/src/main/java/io/justsearch/app/services/worker/WatchedRootsState.java b/modules/app-services/src/main/java/io/justsearch/app/services/worker/WatchedRootsState.java
+index 1e75218c51..f15cef07e1 100644
+--- a/modules/app-services/src/main/java/io/justsearch/app/services/worker/WatchedRootsState.java
++++ b/modules/app-services/src/main/java/io/justsearch/app/services/worker/WatchedRootsState.java
+@@ -64,6 +64,9 @@ public final class WatchedRootsState {
+     return lifecycleLock;
+   }
+
++  // Compatibility signature only; before-state producer draining still holds lifecycleLock.
++  void drainRootProducers(Path removed) {}
++
+   private long retirementRevision;
+   private final Map<Path, Long> retiredRoots = new java.util.HashMap<>();
+   private final Map<Path, Object> initializations = new java.util.HashMap<>();

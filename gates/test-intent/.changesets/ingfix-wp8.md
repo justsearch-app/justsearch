@@ -7,7 +7,7 @@ author-session: 01a194f1-8ed0-78f3-891c-a695c8ab9255
 
 # Test-intent entries
 
-This record covers WP8 against merged main 09c246ae15. Parameterized check names preserve their descriptions and expose method names for exact evidence selection. Assertion wrappers preserve the original expectations while making unexpected before-state exceptions assertion failures. Windows placeholder fixtures are synthetic; actual Windows cloud-placeholder watcher events remain unverified in this Linux environment.
+This record covers WP8 against merged main 09c246ae15. Parameterized check names preserve their descriptions and expose method names for exact evidence selection. Assertion wrappers preserve the original expectations while making unexpected before-state exceptions assertion failures. Windows placeholder fixtures are synthetic; actual Windows cloud-placeholder watcher events remain unverified in this Linux environment. Supplementary check, not in newChecks: RootLifecycleOpsConcurrencyTest#staleSecondRemovalCannotDeleteAReaddedRoot guards a race that only this branch's unblocked producer drain (S-D41) could introduce: two removals of one root waiting on the same drain while the root is re-added. Merged main 09c246ae15 holds the lifecycle monitor across the producer, so the race has no before-state equivalent and the check cannot fail there for its reason; it passes on the candidate (P6).
 
 ```json
 {
@@ -37,7 +37,7 @@ This record covers WP8 against merged main 09c246ae15. Parameterized check names
         "modules/app-services/src/test/java/io/justsearch/app/services/worker/RootLifecycleOpsConcurrencyTest.java"
       ],
       "class": "New",
-      "behaviour": "Reject directory-link roots; allow unrelated removal while a scan is held; fence a second stale removal across remove/re-add.",
+      "behaviour": "Reject directory-link roots; allow unrelated removal while a scan is held. The stale-removal fence across remove/re-add is a supplementary check named in the record's prose.",
       "sources": [
         {
           "kind": "delegated-choice",
@@ -68,8 +68,7 @@ This record covers WP8 against merged main 09c246ae15. Parameterized check names
       "evidence": "gates/test-intent/evidence/ingfix-wp8.json",
       "newChecks": [
         "modules/app-services/src/test/java/io/justsearch/app/services/worker/RootLifecycleOpsConcurrencyTest.java#directoryLinkCannotBecomeAHealthyEmptyWatchedRoot",
-        "modules/app-services/src/test/java/io/justsearch/app/services/worker/RootLifecycleOpsConcurrencyTest.java#heldScanAllowsRemovalOfAnUnrelatedRoot",
-        "modules/app-services/src/test/java/io/justsearch/app/services/worker/RootLifecycleOpsConcurrencyTest.java#staleSecondRemovalCannotDeleteAReaddedRoot"
+        "modules/app-services/src/test/java/io/justsearch/app/services/worker/RootLifecycleOpsConcurrencyTest.java#heldScanAllowsRemovalOfAnUnrelatedRoot"
       ]
     },
     {
@@ -1346,9 +1345,10 @@ This record covers WP8 against merged main 09c246ae15. Parameterized check names
       ],
       "class": "Adaptation",
       "moved": [
-        "input re-encoding"
+        "input re-encoding",
+        "instrumentation"
       ],
-      "whatMoved": "Give successful stale-source deletion fixtures a missing source and rooted witness; observe scoped pruneFile rather than broad deletion, retaining deletion counters, retry propagation and confirmed identity marking.",
+      "whatMoved": "Give successful stale-source deletion fixtures a missing source and rooted witness; observe scoped pruneFile rather than broad deletion, retaining deletion counters, retry propagation and confirmed identity marking. Move the five newChecks methods from TypedIngestionOutcomeTests to the top-level test class with their unchanged fixtures and shared helpers so method filters and the outer-class XML expose them to the evidence runner. All other nested tests and all assertions remain unchanged.",
       "sources": [
         {
           "kind": "delegated-choice",

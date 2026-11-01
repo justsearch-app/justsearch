@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.indexerworker.services;
 
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -73,8 +74,8 @@ final class WorkerIngestServiceCandidateReconciliationTest
     when(fixture.queue.enqueueMaintenanceFileForGeneration(anyString(), any(), nullable(String.class)))
         .thenReturn(true);
     assertTrue(fixture.admission.replayCertain());
-    var result = fixture.service.syncDirectory(SyncDirectoryRequest.newBuilder()
-        .setRootPath(root.toString()).build(), CallContext.none());
+    var result = assertDoesNotThrow(() -> fixture.service.syncDirectory(SyncDirectoryRequest.newBuilder()
+        .setRootPath(root.toString()).build(), CallContext.none()));
     assertEquals("", result.getError());
     assertEquals(1, result.getFilesAdded());
     assertFalse(result.getDeleteDetectionUnverified());

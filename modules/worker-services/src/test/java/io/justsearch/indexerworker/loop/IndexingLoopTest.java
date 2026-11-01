@@ -80,11 +80,11 @@ class IndexingLoopTest {
     var outcomes = new TypedIngestionOutcomeTests();
     Path file = Files.createTempDirectory("js-missing-active").resolve("gone.txt");
     RecordingQueue queue = new RecordingQueue();
-    IndexingLoop loop = outcomes.newLoop(queue, outcomes.providerReturning("unused"));
+    IndexingLoop loop = newLoop(queue, providerReturning("unused"));
     IndexingCoordinator activeWrites = wireActive(loop);
     loop.useRootCheck(addedFolder(file.getParent()));
 
-    outcomes.invokeExtractJob(loop, file);
+    invokeExtractJob(loop, file);
     assertNull(queue.lastOutcome, "the deletion outcome waits for commit");
     outcomes.invokeFinishIdleCommit(loop);
 
@@ -101,11 +101,11 @@ class IndexingLoopTest {
     var outcomes = new TypedIngestionOutcomeTests();
     Path directory = Files.createTempDirectory("js-non-regular-active");
     RecordingQueue queue = new RecordingQueue();
-    IndexingLoop loop = outcomes.newLoop(queue, mock(ContentExtractorProvider.class));
+    IndexingLoop loop = newLoop(queue, mock(ContentExtractorProvider.class));
     IndexingCoordinator activeWrites = wireActive(loop);
 
     loop.useRootCheck(addedFolder(directory.getParent()));
-    outcomes.invokeExtractJob(loop, directory);
+    invokeExtractJob(loop, directory);
     assertNull(queue.lastOutcome, "the retirement outcome waits for commit");
     outcomes.invokeFinishIdleCommit(loop);
 
@@ -658,6 +658,281 @@ class IndexingLoopTest {
     }
   }
 
+  @Test
+  // StaleSourceHandler marks identity deleted only when the source is really gone
+  // (tempdoc 931 §C.6 — the DELETED classification also fires on an IOException).
+  void staleSourceHandlerMarksIdentityOnlyForAVerifiedAbsentSource() throws Exception {
+    List<String> marked = new java.util.ArrayList<>();
+    DocumentIdentityStore recorder =
+        new DocumentIdentityStore() {
+          @Override
+          public void markDeleted(String pathHash, long nowMs) {
+            marked.add(pathHash);
+          }
+
+          @Override
+          public Identity resolve(String pathHash, long nowMs) {
+            throw new UnsupportedOperationException();
+          }
+
+          @Override
+          public Identity importExisting(String pathHash, String docUid, long nowMs) {
+            throw new UnsupportedOperationException();
+          }
+
+          @Override
+          public int importExisting(
+              java.util.Collection<ImportedIdentity> identities, long nowMs) {
+            throw new UnsupportedOperationException();
+          }
+
+          @Override
+          public long identityCount() {
+            throw new UnsupportedOperationException();
+          }
+
+          @Override
+          public boolean hasImportRecord(String generationId) {
+            throw new UnsupportedOperationException();
+          }
+
+          @Override
+          public void recordImport(ImportRecord record) {
+            throw new UnsupportedOperationException();
+          }
+
+          @Override
+          public RekeyResult rekey(String oldPathHash, String newPathHash, long nowMs) {
+            throw new UnsupportedOperationException();
+          }
+
+          @Override
+          public java.util.Optional<Identity> lookup(String pathHash) {
+            throw new UnsupportedOperationException();
+          }
+        };
+    StaleSourceHandler handler =
+        new StaleSourceHandler(
+            mock(IndexingCoordinator.class), recorder);
+
+    Path stillThere = Files.writeString(Files.createTempFile("js-stale-present", ".txt"), "body");
+    assertThrows(IllegalStateException.class, () -> handler.deleteMissingSource(
+        stillThere, stillThere.getParent(), addedFolder(stillThere.getParent())));
+    assertTrue(
+        marked.isEmpty(),
+        "the source is present, so the index delete is not evidence of a deletion");
+
+    Path gone = Files.createTempDirectory("js-stale-gone").resolve("gone.txt");
+    assertEquals(1, handler.deleteMissingSource(gone, gone.getParent(), addedFolder(gone.getParent())));
+    assertEquals(
+        List.of(
+            DocumentIdentityStore.pathHash(
+                io.justsearch.indexerworker.util.PathNormalizer.normalizeKey(gone))),
+        marked);
+  }
+
+  @Test
+  void storageDiscoveryRunsOncePerRootInEachExtractionBatch(
+      @org.junit.jupiter.api.io.TempDir Path temp) throws Exception {
+    Path root = Files.createDirectory(temp.resolve("root"));
+    Path first = Files.writeString(root.resolve("first.txt"), "first");
+    Path second = Files.writeString(root.resolve("second.txt"), "second");
+    RecordingQueue queue = new RecordingQueue();
+    IndexingLoop loop = newLoop(queue, providerReturning("content"));
+    var observations = new java.util.concurrent.atomic.AtomicInteger();
+    loop.useRootCheck(new SourcePresence.RootCheck() {
+      @Override public boolean admits(Path folder) { return true; }
+      @Override public boolean vouches(Path folder) { return true; }
+      @Override public boolean observeSourceStorage(Path boundary) {
+        observations.incrementAndGet();
+        return true;
+      }
+    });
+    setRunning(loop, true);
+    var jobs = List.of(new JobQueue.IndexJob(first, null, null, null, null, null, false, null, root),
+        new JobQueue.IndexJob(second, null, null, null, null, null, false, null, root));
+    assertEquals(2, loop.getExtractor().extractAll(jobs).size());
+    assertEquals(1, observations.get());
+    assertEquals(2, loop.getExtractor().extractAll(jobs).size());
+    assertEquals(2, observations.get(), "each pass refreshes its root observation");
+  }
+
+  @Test
+  void storageLostAfterAdmissionDefersBeforeHashingOrExtraction(
+      @org.junit.jupiter.api.io.TempDir Path temp) throws Exception {
+    Path root = Files.createDirectory(temp.resolve("root"));
+    Path file = Files.writeString(root.resolve("notes.txt"), "mounted bytes");
+    RecordingQueue queue = new RecordingQueue();
+    ContentExtractorProvider provider = mock(ContentExtractorProvider.class);
+    var available = new AtomicBoolean(true);
+    IndexingLoop loop = newLoop(queue, provider, () -> available.set(false));
+    loop.useRootCheck(new SourcePresence.RootCheck() {
+      @Override public boolean admits(Path folder) { return true; }
+      @Override public boolean vouches(Path folder) { return true; }
+      @Override public boolean sourceStorageAvailable(Path source, Path boundary) { return available.get(); }
+    });
+    try (var hashes = mockStatic(SourceContentHash.class, CALLS_REAL_METHODS)) {
+      assertNull(invokeExtractJob(loop, new JobQueue.IndexJob(
+          file, null, null, null, null, null, false, null, root)));
+      hashes.verifyNoInteractions();
+    }
+    assertEquals(IngestionReasonCodes.ROOT_UNAVAILABLE, queue.lastOutcome.reasonCode());
+    verifyNoInteractions(provider, queue.indexingCoordinator);
+    assertFalse(queue.done);
+  }
+
+  @Test
+  void storageObservationIsBatchedButAvailabilityChangesBetweenFilesAndPassesAreSeen(
+      @org.junit.jupiter.api.io.TempDir Path temp) throws Exception {
+    Path root = Files.createDirectory(temp.resolve("root"));
+    Path first = Files.writeString(root.resolve("first.txt"), "first");
+    Path second = Files.writeString(root.resolve("second.txt"), "mounted bytes");
+    RecordingQueue queue = new RecordingQueue();
+    var available = new AtomicBoolean(true);
+    var observations = new java.util.concurrent.atomic.AtomicInteger();
+    var reads = new java.util.ArrayList<Path>();
+    IndexingLoop loop = newLoop(queue, new ContentExtractorProvider() {
+      @Override public ExtractionResult extract(Path path) throws IOException {
+        reads.add(path);
+        if (path.equals(first)) {
+          Files.writeString(second, "different underlying bytes");
+          available.set(false);
+        }
+        return new ExtractionResult(Files.readString(path), null, "text/plain");
+      }
+      @Override public String detectMimeType(Path path) { return "text/plain"; }
+    });
+    loop.useRootCheck(new SourcePresence.RootCheck() {
+      @Override public boolean admits(Path folder) { return true; }
+      @Override public boolean vouches(Path folder) { return true; }
+      @Override public boolean observeSourceStorage(Path boundary) {
+        observations.incrementAndGet();
+        return true;
+      }
+      @Override public boolean sourceStorageAvailable(Path source, Path boundary) {
+        return source.equals(first) || available.get();
+      }
+    });
+    setRunning(loop, true);
+    var jobs = List.of(new JobQueue.IndexJob(first, null, null, null, null, null, false, null, root),
+        new JobQueue.IndexJob(second, null, null, null, null, null, false, null, root));
+    assertEquals(1, loop.getExtractor().extractAll(jobs).size());
+    assertEquals(List.of(first), reads, "the second file lost storage before its content was opened");
+    assertEquals(IngestionReasonCodes.ROOT_UNAVAILABLE, queue.lastOutcome.reasonCode());
+    assertEquals(1, observations.get(), "one mount discovery per root in this batch");
+    available.set(true);
+    assertEquals(1, loop.getExtractor().extractAll(List.of(jobs.get(1))).size());
+    assertEquals(2, observations.get(), "the next pass must refresh storage evidence");
+    available.set(false);
+    assertTrue(loop.getExtractor().extractAll(List.of(jobs.get(1))).isEmpty());
+    assertEquals(3, observations.get());
+    assertEquals(List.of(first, second), reads);
+  }
+
+  @Test
+  void unavailableChildStorageDefersDifferentUnderlyingBytesBeforeContentAccess(
+      @org.junit.jupiter.api.io.TempDir Path temp) throws Exception {
+    Path root = Files.createDirectory(temp.resolve("root"));
+    Path file = Files.writeString(Files.createDirectory(root.resolve("child")).resolve("notes.txt"),
+        "original mounted bytes");
+    RecordingQueue queue = new RecordingQueue();
+    ContentExtractorProvider provider = mock(ContentExtractorProvider.class);
+    IndexingLoop loop = newLoop(queue, provider);
+    var available = new AtomicBoolean(true);
+    loop.useRootCheck(new SourcePresence.RootCheck() {
+      @Override public boolean admits(Path folder) { return true; }
+      @Override public boolean vouches(Path folder) { return true; }
+      @Override public boolean sourceStorageAvailable(Path source, Path boundary) {
+        return available.get();
+      }
+    });
+    available.set(false);
+    Files.writeString(file, "different underlying filesystem bytes");
+    try (var hashes = mockStatic(SourceContentHash.class, CALLS_REAL_METHODS)) {
+      assertNull(invokeExtractJob(loop, new JobQueue.IndexJob(
+          file, null, null, null, null, null, false, null, root)));
+      assertEquals(IngestionReasonCodes.ROOT_UNAVAILABLE, queue.lastOutcome.reasonCode());
+      hashes.verifyNoInteractions();
+    }
+    verifyNoInteractions(provider, queue.indexingCoordinator);
+    assertFalse(queue.done, "uncertain storage cannot retire the indexed original");
+  }
+
+  private IndexingLoop newLoop(RecordingQueue queue, ContentExtractorProvider provider) {
+    return newLoop(queue, provider, () -> {});
+  }
+
+  private IndexingLoop newLoop(RecordingQueue queue, ContentExtractorProvider provider, Runnable afterIdentity) {
+    DocumentFieldOps documentFieldOps = mock(DocumentFieldOps.class);
+    IndexCountOps indexCountOps = mock(IndexCountOps.class);
+    WorkerSignalBus signalBus = mock(WorkerSignalBus.class);
+    DocumentIdentityStore identityStore = mock(DocumentIdentityStore.class);
+    lenient()
+        .when(identityStore.resolve(anyString(), anyLong()))
+        .thenAnswer(
+            invocation -> {
+              afterIdentity.run();
+              String hash = invocation.getArgument(0);
+              long now = invocation.getArgument(1);
+              return new DocumentIdentityStore.Identity(hash, "test-uid-" + hash, now, now);
+            });
+    queue.indexingCoordinator = mock(IndexingCoordinator.class);
+    return new IndexingLoop(io.justsearch.indexerworker.TestWorkerExecutorRegistrations.ocr(), io.justsearch.indexerworker.TestWorkerExecutorRegistrations.timebox(),
+        queue,
+        queue.indexingCoordinator,
+        mock(CommitOps.class),
+        documentFieldOps,
+        indexCountOps,
+        () -> null,
+        signalBus,
+        IndexingPacing.unthrottled(),
+        null,
+        null,
+        null,
+        null,
+        new TimeboxedContentExtractor(io.justsearch.indexerworker.TestWorkerExecutorRegistrations.timebox(),
+            provider,
+            Duration.ofSeconds(5),
+            (io.justsearch.indexerworker.extract.ExtractionMetricCatalog) null),
+        null, // W7.2 — default EncoderBindings
+        new IndexingLoopOptions(false, null, identityStore, null, null, null));
+  }
+
+  private Object invokeExtractJob(IndexingLoop loop, Path file) throws Exception {
+    return invokeExtractJob(loop, rootedJob(file, null));
+  }
+
+  private Object invokeExtractJob(IndexingLoop loop, JobQueue.IndexJob claim) throws Exception {
+    // W5.2: extractJob moved to JobBatchExtractor. Call via the package-private accessor
+    // + reflection on the now-private extractJob method on the extractor.
+    Method method =
+        JobBatchExtractor.class.getDeclaredMethod("extractJob", JobQueue.IndexJob.class);
+    method.setAccessible(true);
+    var extracted = method.invoke(loop.getExtractor(), claim);
+    if (extracted instanceof ExtractedJob job) assertSame(claim, job.claim());
+    return extracted;
+  }
+
+  private void setRunning(IndexingLoop loop, boolean value) throws Exception {
+    var field = IndexingLoop.class.getDeclaredField("running");
+    field.setAccessible(true);
+    ((AtomicBoolean) field.get(loop)).set(value);
+  }
+
+  private ContentExtractorProvider providerReturning(String content) {
+    return new ContentExtractorProvider() {
+      @Override
+      public ExtractionResult extract(Path file) {
+        return new ExtractionResult(content, null, "text/plain");
+      }
+
+      @Override
+      public String detectMimeType(Path file) {
+        return "text/plain";
+      }
+    };
+  }
+
   @Nested
   @DisplayName("typed ingestion outcomes")
   class TypedIngestionOutcomeTests {
@@ -735,132 +1010,9 @@ class IndexingLoopTest {
       verify(queue.indexingCoordinator).pruneFile(anyString(), any(), any());
     }
 
-    @Test
-    void unavailableChildStorageDefersDifferentUnderlyingBytesBeforeContentAccess(
-        @org.junit.jupiter.api.io.TempDir Path temp) throws Exception {
-      Path root = Files.createDirectory(temp.resolve("root"));
-      Path file = Files.writeString(Files.createDirectory(root.resolve("child")).resolve("notes.txt"),
-          "original mounted bytes");
-      RecordingQueue queue = new RecordingQueue();
-      ContentExtractorProvider provider = mock(ContentExtractorProvider.class);
-      IndexingLoop loop = newLoop(queue, provider);
-      var available = new AtomicBoolean(true);
-      loop.useRootCheck(new SourcePresence.RootCheck() {
-        @Override public boolean admits(Path folder) { return true; }
-        @Override public boolean vouches(Path folder) { return true; }
-        @Override public boolean sourceStorageAvailable(Path source, Path boundary) {
-          return available.get();
-        }
-      });
-      available.set(false);
-      Files.writeString(file, "different underlying filesystem bytes");
-      try (var hashes = mockStatic(SourceContentHash.class, CALLS_REAL_METHODS)) {
-        assertNull(invokeExtractJob(loop, new JobQueue.IndexJob(
-            file, null, null, null, null, null, false, null, root)));
-        assertEquals(IngestionReasonCodes.ROOT_UNAVAILABLE, queue.lastOutcome.reasonCode());
-        hashes.verifyNoInteractions();
-      }
-      verifyNoInteractions(provider, queue.indexingCoordinator);
-      assertFalse(queue.done, "uncertain storage cannot retire the indexed original");
-    }
 
-    @Test
-    void storageLostAfterAdmissionDefersBeforeHashingOrExtraction(
-        @org.junit.jupiter.api.io.TempDir Path temp) throws Exception {
-      Path root = Files.createDirectory(temp.resolve("root"));
-      Path file = Files.writeString(root.resolve("notes.txt"), "mounted bytes");
-      RecordingQueue queue = new RecordingQueue();
-      ContentExtractorProvider provider = mock(ContentExtractorProvider.class);
-      var available = new AtomicBoolean(true);
-      IndexingLoop loop = newLoop(queue, provider, () -> available.set(false));
-      loop.useRootCheck(new SourcePresence.RootCheck() {
-        @Override public boolean admits(Path folder) { return true; }
-        @Override public boolean vouches(Path folder) { return true; }
-        @Override public boolean sourceStorageAvailable(Path source, Path boundary) { return available.get(); }
-      });
-      try (var hashes = mockStatic(SourceContentHash.class, CALLS_REAL_METHODS)) {
-        assertNull(invokeExtractJob(loop, new JobQueue.IndexJob(
-            file, null, null, null, null, null, false, null, root)));
-        hashes.verifyNoInteractions();
-      }
-      assertEquals(IngestionReasonCodes.ROOT_UNAVAILABLE, queue.lastOutcome.reasonCode());
-      verifyNoInteractions(provider, queue.indexingCoordinator);
-      assertFalse(queue.done);
-    }
 
-    @Test
-    void storageDiscoveryRunsOncePerRootInEachExtractionBatch(
-        @org.junit.jupiter.api.io.TempDir Path temp) throws Exception {
-      Path root = Files.createDirectory(temp.resolve("root"));
-      Path first = Files.writeString(root.resolve("first.txt"), "first");
-      Path second = Files.writeString(root.resolve("second.txt"), "second");
-      RecordingQueue queue = new RecordingQueue();
-      IndexingLoop loop = newLoop(queue, providerReturning("content"));
-      var observations = new java.util.concurrent.atomic.AtomicInteger();
-      loop.useRootCheck(new SourcePresence.RootCheck() {
-        @Override public boolean admits(Path folder) { return true; }
-        @Override public boolean vouches(Path folder) { return true; }
-        @Override public boolean observeSourceStorage(Path boundary) {
-          observations.incrementAndGet();
-          return true;
-        }
-      });
-      setRunning(loop, true);
-      var jobs = List.of(new JobQueue.IndexJob(first, null, null, null, null, null, false, null, root),
-          new JobQueue.IndexJob(second, null, null, null, null, null, false, null, root));
-      assertEquals(2, loop.getExtractor().extractAll(jobs).size());
-      assertEquals(1, observations.get());
-      assertEquals(2, loop.getExtractor().extractAll(jobs).size());
-      assertEquals(2, observations.get(), "each pass refreshes its root observation");
-    }
 
-    @Test
-    void storageObservationIsBatchedButAvailabilityChangesBetweenFilesAndPassesAreSeen(
-        @org.junit.jupiter.api.io.TempDir Path temp) throws Exception {
-      Path root = Files.createDirectory(temp.resolve("root"));
-      Path first = Files.writeString(root.resolve("first.txt"), "first");
-      Path second = Files.writeString(root.resolve("second.txt"), "mounted bytes");
-      RecordingQueue queue = new RecordingQueue();
-      var available = new AtomicBoolean(true);
-      var observations = new java.util.concurrent.atomic.AtomicInteger();
-      var reads = new java.util.ArrayList<Path>();
-      IndexingLoop loop = newLoop(queue, new ContentExtractorProvider() {
-        @Override public ExtractionResult extract(Path path) throws IOException {
-          reads.add(path);
-          if (path.equals(first)) {
-            Files.writeString(second, "different underlying bytes");
-            available.set(false);
-          }
-          return new ExtractionResult(Files.readString(path), null, "text/plain");
-        }
-        @Override public String detectMimeType(Path path) { return "text/plain"; }
-      });
-      loop.useRootCheck(new SourcePresence.RootCheck() {
-        @Override public boolean admits(Path folder) { return true; }
-        @Override public boolean vouches(Path folder) { return true; }
-        @Override public boolean observeSourceStorage(Path boundary) {
-          observations.incrementAndGet();
-          return true;
-        }
-        @Override public boolean sourceStorageAvailable(Path source, Path boundary) {
-          return source.equals(first) || available.get();
-        }
-      });
-      setRunning(loop, true);
-      var jobs = List.of(new JobQueue.IndexJob(first, null, null, null, null, null, false, null, root),
-          new JobQueue.IndexJob(second, null, null, null, null, null, false, null, root));
-      assertEquals(1, loop.getExtractor().extractAll(jobs).size());
-      assertEquals(List.of(first), reads, "the second file lost storage before its content was opened");
-      assertEquals(IngestionReasonCodes.ROOT_UNAVAILABLE, queue.lastOutcome.reasonCode());
-      assertEquals(1, observations.get(), "one mount discovery per root in this batch");
-      available.set(true);
-      assertEquals(1, loop.getExtractor().extractAll(List.of(jobs.get(1))).size());
-      assertEquals(2, observations.get(), "the next pass must refresh storage evidence");
-      available.set(false);
-      assertTrue(loop.getExtractor().extractAll(List.of(jobs.get(1))).isEmpty());
-      assertEquals(3, observations.get());
-      assertEquals(List.of(first, second), reads);
-    }
 
     @Test
     void nonRegularSourceIsSkippedBeforeExtraction() throws Exception {
@@ -1739,78 +1891,6 @@ class IndexingLoopTest {
           "A failed delete must retain a recoverable queue obligation");
     }
 
-    @Test
-    // StaleSourceHandler marks identity deleted only when the source is really gone
-    // (tempdoc 931 §C.6 — the DELETED classification also fires on an IOException).
-    void staleSourceHandlerMarksIdentityOnlyForAVerifiedAbsentSource() throws Exception {
-      List<String> marked = new java.util.ArrayList<>();
-      DocumentIdentityStore recorder =
-          new DocumentIdentityStore() {
-            @Override
-            public void markDeleted(String pathHash, long nowMs) {
-              marked.add(pathHash);
-            }
-
-            @Override
-            public Identity resolve(String pathHash, long nowMs) {
-              throw new UnsupportedOperationException();
-            }
-
-            @Override
-            public Identity importExisting(String pathHash, String docUid, long nowMs) {
-              throw new UnsupportedOperationException();
-            }
-
-            @Override
-            public int importExisting(
-                java.util.Collection<ImportedIdentity> identities, long nowMs) {
-              throw new UnsupportedOperationException();
-            }
-
-            @Override
-            public long identityCount() {
-              throw new UnsupportedOperationException();
-            }
-
-            @Override
-            public boolean hasImportRecord(String generationId) {
-              throw new UnsupportedOperationException();
-            }
-
-            @Override
-            public void recordImport(ImportRecord record) {
-              throw new UnsupportedOperationException();
-            }
-
-            @Override
-            public RekeyResult rekey(String oldPathHash, String newPathHash, long nowMs) {
-              throw new UnsupportedOperationException();
-            }
-
-            @Override
-            public java.util.Optional<Identity> lookup(String pathHash) {
-              throw new UnsupportedOperationException();
-            }
-          };
-      StaleSourceHandler handler =
-          new StaleSourceHandler(
-              mock(IndexingCoordinator.class), recorder);
-
-      Path stillThere = Files.writeString(Files.createTempFile("js-stale-present", ".txt"), "body");
-      assertThrows(IllegalStateException.class, () -> handler.deleteMissingSource(
-          stillThere, stillThere.getParent(), addedFolder(stillThere.getParent())));
-      assertTrue(
-          marked.isEmpty(),
-          "the source is present, so the index delete is not evidence of a deletion");
-
-      Path gone = Files.createTempDirectory("js-stale-gone").resolve("gone.txt");
-      assertEquals(1, handler.deleteMissingSource(gone, gone.getParent(), addedFolder(gone.getParent())));
-      assertEquals(
-          List.of(
-              DocumentIdentityStore.pathHash(
-                  io.justsearch.indexerworker.util.PathNormalizer.normalizeKey(gone))),
-          marked);
-    }
 
 
     @Test
@@ -2137,60 +2217,9 @@ class IndexingLoopTest {
       }
     }
 
-    private IndexingLoop newLoop(RecordingQueue queue, ContentExtractorProvider provider) {
-      return newLoop(queue, provider, () -> {});
-    }
 
-    private IndexingLoop newLoop(RecordingQueue queue, ContentExtractorProvider provider, Runnable afterIdentity) {
-      DocumentFieldOps documentFieldOps = mock(DocumentFieldOps.class);
-      IndexCountOps indexCountOps = mock(IndexCountOps.class);
-      WorkerSignalBus signalBus = mock(WorkerSignalBus.class);
-      DocumentIdentityStore identityStore = mock(DocumentIdentityStore.class);
-      lenient()
-          .when(identityStore.resolve(anyString(), anyLong()))
-          .thenAnswer(
-              invocation -> {
-                afterIdentity.run();
-                String hash = invocation.getArgument(0);
-                long now = invocation.getArgument(1);
-                return new DocumentIdentityStore.Identity(hash, "test-uid-" + hash, now, now);
-              });
-      queue.indexingCoordinator = mock(IndexingCoordinator.class);
-      return new IndexingLoop(io.justsearch.indexerworker.TestWorkerExecutorRegistrations.ocr(), io.justsearch.indexerworker.TestWorkerExecutorRegistrations.timebox(),
-          queue,
-          queue.indexingCoordinator,
-          mock(CommitOps.class),
-          documentFieldOps,
-          indexCountOps,
-          () -> null,
-          signalBus,
-          IndexingPacing.unthrottled(),
-          null,
-          null,
-          null,
-          null,
-          new TimeboxedContentExtractor(io.justsearch.indexerworker.TestWorkerExecutorRegistrations.timebox(),
-              provider,
-              Duration.ofSeconds(5),
-              (io.justsearch.indexerworker.extract.ExtractionMetricCatalog) null),
-          null, // W7.2 — default EncoderBindings
-          new IndexingLoopOptions(false, null, identityStore, null, null, null));
-    }
 
-    private Object invokeExtractJob(IndexingLoop loop, Path file) throws Exception {
-      return invokeExtractJob(loop, rootedJob(file, null));
-    }
 
-    private Object invokeExtractJob(IndexingLoop loop, JobQueue.IndexJob claim) throws Exception {
-      // W5.2: extractJob moved to JobBatchExtractor. Call via the package-private accessor
-      // + reflection on the now-private extractJob method on the extractor.
-      Method method =
-          JobBatchExtractor.class.getDeclaredMethod("extractJob", JobQueue.IndexJob.class);
-      method.setAccessible(true);
-      var extracted = method.invoke(loop.getExtractor(), claim);
-      if (extracted instanceof ExtractedJob job) assertSame(claim, job.claim());
-      return extracted;
-    }
 
     private void invokeWriteExtractedJob(IndexingLoop loop, Object extractedJob) throws Exception {
       // W5.1: writeExtractedJob moved to JobBatchWriter.write.
@@ -2227,11 +2256,6 @@ class IndexingLoopTest {
       method.invoke(loop, jobs);
     }
 
-    private void setRunning(IndexingLoop loop, boolean value) throws Exception {
-      var field = IndexingLoop.class.getDeclaredField("running");
-      field.setAccessible(true);
-      ((AtomicBoolean) field.get(loop)).set(value);
-    }
 
     private Object extractedJob(Path file, String content) throws Exception {
       return buildExtractedJob(file, content, false);
@@ -2264,19 +2288,6 @@ class IndexingLoopTest {
           "00000000-0000-4000-8000-000000000001");
     }
 
-    private ContentExtractorProvider providerReturning(String content) {
-      return new ContentExtractorProvider() {
-        @Override
-        public ExtractionResult extract(Path file) {
-          return new ExtractionResult(content, null, "text/plain");
-        }
-
-        @Override
-        public String detectMimeType(Path file) {
-          return "text/plain";
-        }
-      };
-    }
 
     private ContentExtractorProvider providerThrowing(ContentExtractor.ExtractionException exception) {
       return new ContentExtractorProvider() {

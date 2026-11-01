@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.indexerworker.loop;
 
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.anyLong;
@@ -69,8 +70,10 @@ final class OriginBoundaryAdmissionTest {
       fixture.loop.start();
       fixture.awaitPolicy(10);
       fixture.stopLoopForOtherAssertions();
-      verify(content, org.mockito.Mockito.never())
-          .extractArtifact(org.mockito.ArgumentMatchers.any());
+      assertDoesNotThrow(() -> {
+        verify(content, org.mockito.Mockito.never())
+            .extractArtifact(org.mockito.ArgumentMatchers.any());
+      });
       assertEquals("PENDING", fixture.rows().getFirst().state());
       try (var connection = java.sql.DriverManager.getConnection("jdbc:sqlite:" + fixture.db);
           var statement = connection.createStatement();

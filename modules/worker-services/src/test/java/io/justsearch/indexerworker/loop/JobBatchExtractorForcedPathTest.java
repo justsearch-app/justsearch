@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.indexerworker.loop;
 
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -74,7 +75,9 @@ final class JobBatchExtractorForcedPathTest {
       detector.when(() -> io.justsearch.indexerworker.ingest.CloudPlaceholderDetector.isCloudPlaceholder(file))
           .thenReturn(true);
       assertEquals(List.of(), h.extractor().extractAll(List.of(claim)));
-      verify(h.contentExtractor(), never()).extractArtifact(any());
+      assertDoesNotThrow(() -> {
+        verify(h.contentExtractor(), never()).extractArtifact(any());
+      });
       hashes.verifyNoInteractions();
       verify(h.jobQueue()).deferClaim(eq(claim),
           org.mockito.ArgumentMatchers.argThat(outcome ->
@@ -99,7 +102,9 @@ final class JobBatchExtractorForcedPathTest {
     var claim = new JobQueue.IndexJob(file, null, null, null, null, null, false, null, root);
     org.mockito.Mockito.doCallRealMethod().when(h.journal()).recordOutcomeSafely(any(), any(), any());
     assertEquals(List.of(), h.extractor().extractAll(List.of(claim)));
-    verify(h.contentExtractor(), never()).extractArtifact(any());
+    assertDoesNotThrow(() -> {
+      verify(h.contentExtractor(), never()).extractArtifact(any());
+    });
     verify(h.jobQueue()).markClaimFailed(eq(claim), any(), any());
   }
 
@@ -115,7 +120,9 @@ final class JobBatchExtractorForcedPathTest {
     var h = newHarness(Set.of(PathNormalizer.normalizeKey(raw)));
     var claim = new JobQueue.IndexJob(raw, null, null, null, null, null, false, null, root);
     assertEquals(List.of(), h.extractor().extractAll(List.of(claim)));
-    verify(h.contentExtractor(), never()).extractArtifact(any());
+    assertDoesNotThrow(() -> {
+      verify(h.contentExtractor(), never()).extractArtifact(any());
+    });
   }
 
   /** Everything the extractor needs, with the forced set as the single variable under test. */

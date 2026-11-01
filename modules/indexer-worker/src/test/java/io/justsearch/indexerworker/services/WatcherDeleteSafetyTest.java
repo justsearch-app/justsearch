@@ -149,8 +149,8 @@ final class WatcherDeleteSafetyTest extends LuceneExecutorTestBase {
         Files.createSymbolicLink(gone, replacement.equals("link")
             ? Files.writeString(temp.resolve("outside.txt"), "outside text") : temp.resolve("absent"));
       }
-      var result = migrating.syncDirectory(SyncDirectoryRequest.newBuilder()
-          .setRootPath(root.toString()).build(), CallContext.none());
+      var result = assertDoesNotThrow(() -> migrating.syncDirectory(SyncDirectoryRequest.newBuilder()
+          .setRootPath(root.toString()).build(), CallContext.none()));
       assertEquals("", result.getError());
       assertFalse(result.getDeleteDetectionUnverified());
       assertEquals(1, result.getFilesDeleted());
