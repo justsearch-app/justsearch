@@ -3372,7 +3372,14 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
       declared = !enumeration && (collection == null || collection.isBlank())
           ? declaredCollectionRoots.get() : List.of();
       for (JobQueue.EnqueueEntry entry : entries) {
-        io.justsearch.indexerworker.loop.SourceAccess.requireContained(entry.path(), entry.ingestionRoot());
+        Path sourcePath = entry.path();
+        if (maintenance && Files.isSymbolicLink(sourcePath)) {
+          // Live watcher events retain main's link admission. Validate the ancestors and the
+          // resolved target before hashing, while keeping the event path as the queue identity.
+          io.justsearch.indexerworker.loop.SourceAccess.requireSafeAncestors(sourcePath, entry.ingestionRoot());
+          sourcePath = sourcePath.toRealPath();
+        }
+        io.justsearch.indexerworker.loop.SourceAccess.requireContained(sourcePath, entry.ingestionRoot());
         if (io.justsearch.indexerworker.ingest.CloudPlaceholderDetector.isCloudPlaceholder(entry.path())) {
           recordIngestionEvent(entry.path(), IngestionOutcome.of(
               IngestionOutcomeClass.DEFERRED_POLICY,
@@ -3385,7 +3392,6 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
                   entry.provenance() == null ? null : entry.provenance().transport()));
           return 0;
         }
-        requireSourceAccess(entry);
         AdmissionWitness before = null;
         try {
           before = AdmissionWitness.capture(entry.path());
@@ -3395,7 +3401,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
         String observedHash = null;
         try {
           observedHash = entry.plannedSourceSha256() == null
-              ? io.justsearch.indexerworker.loop.SourceContentHash.sha256WithinRoot(entry.path(), entry.ingestionRoot())
+              ? io.justsearch.indexerworker.loop.SourceContentHash.sha256WithinRoot(sourcePath, entry.ingestionRoot())
               : io.justsearch.indexerworker.loop.SourceContentHash.admissionIdentity(entry.path(), entry.ingestionRoot());
         } catch (IOException unavailable) {
           if (entry.plannedSourceSha256() == null) throw unavailable;

@@ -9,6 +9,8 @@ author-session: 01a1983a-2327-7182-ad8c-6db284629e3e
 
 This record covers narrowed WP8 against merged main 58ff43faa8. S-D10 source-storage evidence is withdrawn on every route; watcher create/modify admission restores main’s behavior, with containment retained before content reads (S-D1). Parameterized check names preserve their descriptions and expose method names for exact evidence selection. Assertion wrappers preserve the original expectations while making unexpected before-state exceptions assertion failures. Windows placeholder fixtures are synthetic; actual Windows cloud-placeholder watcher events remain unverified in this Linux environment. Supplementary check, not in newChecks: RootLifecycleOpsConcurrencyTest#staleSecondRemovalCannotDeleteAReaddedRoot guards a race that only this branch's unblocked producer drain (S-D41) could introduce: two removals of one root waiting on the same drain while the root is re-added. Merged main 58ff43faa8 holds the lifecycle monitor across the producer, so the race has no before-state equivalent and the check cannot fail there for its reason; it passes on the candidate (P6).
 
+R9 builder-8 status: the restored check reaches a real admitted-while-eligible then policy-skipped receipt on the candidate. Publication/readmission is not verified here: both main and candidate stop with "Buffered UPSERT lacks its accepted target projection"; the sandbox has no known root-volume identity, which native policy proof requires. No pass or acceptance is claimed; see tmp/wp8-builder-8-report.txt.
+
 ```json
 {
   "entries": [
@@ -1299,9 +1301,11 @@ This record covers narrowed WP8 against merged main 58ff43faa8. S-D10 source-sto
       "whatMoved": "The same removal-waits observation accepts WAITING as well as BLOCKED after drainRootProducers releases the lifecycle monitor. Inputs, producer hold, completion/drain and timeout assertions are retained.",
       "sources": [
         {
-          "kind": "owner-words",
+          "kind": "owner-adopted-scenario",
           "quote": "Block A’s scan and require B’s removal to complete independently.",
-          "location": "task t-20261030-ingfix agreement S-D41"
+          "task": "t-20261030-ingfix",
+          "scenario": "S-D41",
+          "label": "agent-drafted, owner-adopted"
         }
       ]
     },
@@ -1312,14 +1316,18 @@ This record covers narrowed WP8 against merged main 58ff43faa8. S-D10 source-sto
       "class": "Obsolete",
       "sources": [
         {
-          "kind": "owner-words",
+          "kind": "owner-adopted-scenario",
           "quote": "Recreate the root and require watching and obsolete-document cleanup to recover.",
-          "location": "task t-20261030-ingfix agreement S-D13"
+          "task": "t-20261030-ingfix",
+          "scenario": "S-D13",
+          "label": "agent-drafted, owner-adopted"
         },
         {
-          "kind": "owner-words",
+          "kind": "owner-adopted-scenario",
           "quote": "Recreate a Linux watched root on its recorded volume with a new inode while the registry retains its old identity; require automatic watcher restoration, missed-file discovery and obsolete-document cleanup.",
-          "location": "task t-20261030-ingfix agreement C10"
+          "task": "t-20261030-ingfix",
+          "scenario": "C10",
+          "label": "agent-drafted, owner-adopted"
         }
       ],
       "conflictSearch": "Searched docs/decisions and docs/ for RootWatcherRegistry, RootPresenceGuard, watched-root recreation, root inode and retained identities. ADR-0028 concerns resolver retention on explicit unwatch, not watcher reincarnation. docs/explanation/11-index-schema-migration.md (#758) says deletion requires the same folder/volume; those held-operation guards remain and a successful same-volume recovery establishes a new watcher witness before reconciliation. docs/tempdocs/418 and 626 describe watcher ownership/deletion safety; no decision requires permanently refusing same-volume recreated roots. Removed replacedFolderBeforeRecoveryNeverBecomesTheNewIdentity and handoverRetainsTheFolderWitnessEvenWhileItsPathIsMissing because their refusal-to-adopt oracle directly contradicts S-D13/C10. Different-volume/symlink/mid-operation replacement guards remain."
@@ -1328,25 +1336,40 @@ This record covers narrowed WP8 against merged main 58ff43faa8. S-D10 source-sto
       "items": [
         "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineForgetInProcessTest.java"
       ],
-      "class": "Obsolete",
+      "class": "New",
       "sources": [
         {
-          "kind": "owner-words",
+          "kind": "owner-adopted-scenario",
           "quote": "Migrate a root containing a document, symlink and excluded subtree; require skipping without hashing excluded files.",
-          "location": "task t-20261030-ingfix agreement S-D4"
+          "task": "t-20261030-ingfix",
+          "scenario": "S-D4",
+          "label": "agent-drafted, owner-adopted"
         },
         {
-          "kind": "owner-words",
+          "kind": "owner-adopted-scenario",
           "quote": "Exclusions keep the same matching semantics; excluded files are never admitted.",
-          "location": "task t-20261030-ingfix agreement P4"
+          "task": "t-20261030-ingfix",
+          "scenario": "P4",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "quote": "Migration must skip symlinks, special files, built-in skipped trees and user-excluded trees before queue hashing or subtree traversal.",
+          "task": "t-20261030-ingfix",
+          "scenario": "C27",
+          "label": "agent-drafted, owner-adopted"
         },
         {
           "kind": "owner-words",
-          "quote": "Migration must skip symlinks, special files, built-in skipped trees and user-excluded trees before queue hashing or subtree traversal.",
-          "location": "task t-20261030-ingfix agreement C27"
+          "quote": "its \"readmit after exclusion removed\" outcome then has no coverage: give that outcome a setup that P4 allows (for example admit the file before the exclusion is added) with the same observation and expected outcome, and classify the change by the class table.",
+          "location": "task t-20261030-ingfix builder-8 request"
         }
       ],
-      "conflictSearch": "Searched docs/decisions and docs/ for migration exclusion, excluded-file admission and native policy skip. No decision requires admitting an excluded file just to create a skipped candidate receipt. R9HotPublicSaveAfterNativePolicySkipReadmitsCurrentBytesAndKeepsCompletedForgetReceipt requires that forbidden receipt in its setup, so remove R9 and its exclusively used helper branches; keep the native migration control and completed-forget preservation checks."
+      "behaviour": "Restore R9 readmission after HOT public exclusion removal, keeping its observed new receipt/revision, current bytes, collection/root, completed Forget operation and successor-reopen assertions. Its changed precondition admits the source while eligible, then installs exclusion before consumption; no excluded file is admitted. This is New because the setup/precondition changes, not Adaptation. R2 controls remain.",
+      "evidence": "gates/test-intent/evidence/ingfix-wp8-r9.json",
+      "newChecks": [
+        "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineForgetInProcessTest.java#R9HotPublicSaveAfterNativePolicySkipReadmitsCurrentBytesAndKeepsCompletedForgetReceipt"
+      ]
     },
     {
       "items": [
@@ -1358,8 +1381,55 @@ This record covers narrowed WP8 against merged main 58ff43faa8. S-D10 source-sto
         "callersAndStateOwners": "WorkerIngestService.acceptWatcherUpsert routes callbacks to the durable job queue; content admission remains guarded in the consumer and candidate hash routes.",
         "indirectBehaviours": "An event-only source shape must not throw into WatcherCallbacks.failure and latch runtime replay uncertainty. The queue still receives the same eligible entry or built-in policy omission.",
         "evidence": "WatcherUpsertCompatibilityTest#watcherSourcesKeepMainAdmissionBehaviour runs the same five cases against 58ff43faa8 and the candidate; the assertions check no boundary exception and the actual enqueue path/root for each event, including an atomic-save temporary path already moved into place. The standalone WP8WatcherProbe also runs the five cases through real SQLite on both trees and observes one queued job with root/collection preserved and replayCertain=true. Results recorded in tmp/wp8-builder-7-report.txt.",
-        "unresolvedRisks": "No Windows placeholder provider is available; these five preservation fixtures use real local filesystem paths and a mocked queue."
+        "unresolvedRisks": "The ordinary watcher route is covered here. The migration route has separate real-dispatch/SQLite checks in WatcherMigrationAdmissionTest: after repair, in-root file symlink CREATE/MODIFY is admitted without calling the failure handler or latching replay uncertainty; outside-root ancestor replacement is refused before hashing. Main’s later replay stall for the buffered symlink upsert is pre-existing and remains out of scope. Actual Windows cloud-placeholder watcher events remain unverified on Linux."
       }
+    },
+    {
+      "items": [
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/WatcherMigrationAdmissionTest.java"
+      ],
+      "class": "New",
+      "behaviour": "Migration watcher CREATE/MODIFY of an in-root file symlink retains main admission, preserves its event identity and receipt, and never enters the watcher failure handler or latches replay uncertainty. Compared with d8b8db0158: the regression is introduced by WP8; main 58ff43faa8 passes this preservation check. This does not attempt replay/cutover, whose symlink stall is pre-existing on main.",
+      "sources": [
+        {
+          "kind": "owner-words",
+          "quote": "On the migration watcher route, restore main's behaviour for in-root symlink create and modify events (no refusal, no exception into the watcher failure handler, no replay-uncertain latch)",
+          "location": "task t-20261030-ingfix builder-8 request"
+        }
+      ],
+      "repaired": true,
+      "evidence": "gates/test-intent/evidence/ingfix-wp8-migration.json",
+      "newChecks": [
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/WatcherMigrationAdmissionTest.java#inRootLinkKeepsMainAdmissionWithoutReplayLatch"
+      ]
+    },
+    {
+      "items": [
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/WatcherMigrationAdmissionTest.java"
+      ],
+      "class": "New",
+      "behaviour": "Migration watcher admission rejects a file through an outside-root ancestor symlink before opening content for hashing, including when the final component is itself a symlink. Rejection leaves no job or buffered upsert and retains the failure signal. Compared with main 58ff43faa8, which hashes and admits these sources.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261030-ingfix",
+          "scenario": "S-D1",
+          "quote": "Replace a queued file’s parent with an outside-root symlink and require rejection before content access.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261030-ingfix",
+          "scenario": "C2",
+          "quote": "Check content access before extraction too: `SqliteJobQueue.enqueueCandidateFileBatch` hashes candidate admissions, and captured scans hash during enumeration. Repeat the ancestor replacement through both entry points and require rejection before those reads.",
+          "label": "agent-drafted, owner-adopted"
+        }
+      ],
+      "repaired": true,
+      "evidence": "gates/test-intent/evidence/ingfix-wp8-migration-containment.json",
+      "newChecks": [
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/WatcherMigrationAdmissionTest.java#outsideAncestorIsRejectedBeforeCandidateContentAccess"
+      ]
     }
   ]
 }
