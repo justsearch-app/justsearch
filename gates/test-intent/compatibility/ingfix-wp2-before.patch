@@ -1,0 +1,85 @@
+diff --git a/modules/adapters-lucene/src/main/java/io/justsearch/adapters/lucene/commit/IndexFingerprint.java b/modules/adapters-lucene/src/main/java/io/justsearch/adapters/lucene/commit/IndexFingerprint.java
+index c0edba39ad..29691cd2a5 100644
+--- a/modules/adapters-lucene/src/main/java/io/justsearch/adapters/lucene/commit/IndexFingerprint.java
++++ b/modules/adapters-lucene/src/main/java/io/justsearch/adapters/lucene/commit/IndexFingerprint.java
+@@ -141,6 +141,10 @@ public final class IndexFingerprint {
+ 
+   /** Tri-state identity of one model that contributes content to the index. */
+   public record ModelFingerprint(ModelState state, String sha) {
++    // Compatibility signatures only: the baseline has graph-only model identity.
++    public ModelFingerprint withAssets(Optional<String> assets) { return this; }
++    public String assetsSha() { return null; }
++
+     public ModelFingerprint {
+       Objects.requireNonNull(state, "state");
+     }
+diff --git a/modules/ort-common/src/main/java/io/justsearch/ort/OnnxExternalData.java b/modules/ort-common/src/main/java/io/justsearch/ort/OnnxExternalData.java
+index b014a2d11b..d1719db79e 100644
+--- a/modules/ort-common/src/main/java/io/justsearch/ort/OnnxExternalData.java
++++ b/modules/ort-common/src/main/java/io/justsearch/ort/OnnxExternalData.java
+@@ -46,6 +46,11 @@ public final class OnnxExternalData {
+     }
+   }
+ 
++  // Compatibility signature: baseline exposes no collected companion locations.
++  public static Set<String> externalDataLocations(Path model) throws IOException {
++    return Set.of();
++  }
++
+   private enum Kind { MODEL, GRAPH, NODE, ATTRIBUTE, TENSOR, SPARSE, TRAINING, FUNCTION }
+ 
+   private static final class Inspector {
+diff --git a/modules/worker-core/src/main/java/io/justsearch/indexerworker/embed/EmbeddingCompatibilityController.java b/modules/worker-core/src/main/java/io/justsearch/indexerworker/embed/EmbeddingCompatibilityController.java
+index 29bc22e8a1..7fc77ffc63 100644
+--- a/modules/worker-core/src/main/java/io/justsearch/indexerworker/embed/EmbeddingCompatibilityController.java
++++ b/modules/worker-core/src/main/java/io/justsearch/indexerworker/embed/EmbeddingCompatibilityController.java
+@@ -174,6 +174,16 @@ public final class EmbeddingCompatibilityController {
+         EmbeddingFingerprint::get);
+   }
+ 
++  // Compatibility overload: retain baseline graph-only compatibility behaviour.
++  public EmbeddingCompatibilityController(
++      Supplier<Map<String, String>> storedMetadataSupplier, LongSupplier docCountSupplier,
++      java.util.function.IntSupplier completedEmbeddingCountSupplier,
++      Supplier<Optional<String>> currentFingerprintSupplier,
++      Supplier<Optional<String>> currentAssetsSupplier) {
++    this(storedMetadataSupplier, docCountSupplier, completedEmbeddingCountSupplier,
++        currentFingerprintSupplier);
++  }
++
+   /** Uses one generation's captured model identity instead of the process-wide serving model. */
+   public EmbeddingCompatibilityController(
+       Supplier<Map<String, String>> storedMetadataSupplier,
+diff --git a/modules/worker-core/src/main/java/io/justsearch/indexerworker/embed/EmbeddingFingerprint.java b/modules/worker-core/src/main/java/io/justsearch/indexerworker/embed/EmbeddingFingerprint.java
+index e6f50e737a..03eafe55fb 100644
+--- a/modules/worker-core/src/main/java/io/justsearch/indexerworker/embed/EmbeddingFingerprint.java
++++ b/modules/worker-core/src/main/java/io/justsearch/indexerworker/embed/EmbeddingFingerprint.java
+@@ -132,4 +132,6 @@ public final class EmbeddingFingerprint {
+   }
+ 
+   private record CachedResult(Optional<Path> modelPath, Optional<String> fingerprint) {}
++  // Compatibility signature: the baseline has no companion identity.
++  public static Optional<String> assets() { return Optional.empty(); }
+ }
+diff --git a/modules/worker-core/src/main/java/io/justsearch/indexerworker/ner/NerFingerprint.java b/modules/worker-core/src/main/java/io/justsearch/indexerworker/ner/NerFingerprint.java
+index cff2c08bb9..3541c42e90 100644
+--- a/modules/worker-core/src/main/java/io/justsearch/indexerworker/ner/NerFingerprint.java
++++ b/modules/worker-core/src/main/java/io/justsearch/indexerworker/ner/NerFingerprint.java
+@@ -109,4 +109,6 @@ public final class NerFingerprint {
+   }
+ 
+   private record CachedResult(Optional<Path> modelPath, Optional<String> fingerprint) {}
++  // Compatibility signature: the baseline has no companion identity.
++  public static Optional<String> assets() { return Optional.empty(); }
+ }
+diff --git a/modules/worker-core/src/main/java/io/justsearch/indexerworker/splade/SpladeFingerprint.java b/modules/worker-core/src/main/java/io/justsearch/indexerworker/splade/SpladeFingerprint.java
+index 33cbed10c0..af8c3a93f4 100644
+--- a/modules/worker-core/src/main/java/io/justsearch/indexerworker/splade/SpladeFingerprint.java
++++ b/modules/worker-core/src/main/java/io/justsearch/indexerworker/splade/SpladeFingerprint.java
+@@ -100,4 +100,6 @@ public final class SpladeFingerprint {
+   }
+ 
+   private record CachedResult(Optional<Path> modelPath, Optional<String> fingerprint) {}
++  // Compatibility signature: the baseline has no companion identity.
++  public static Optional<String> assets() { return Optional.empty(); }
+ }

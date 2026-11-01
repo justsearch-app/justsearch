@@ -75,7 +75,7 @@ class KnowledgeServerTest {
     org.mockito.Mockito.verify(controller).checkRebuildCompletion(0L, 0);
   }
 
-  @org.junit.jupiter.params.ParameterizedTest
+  @org.junit.jupiter.params.ParameterizedTest(name = "{displayName} [{index}] {arguments}")
   @org.junit.jupiter.params.provider.ValueSource(booleans = {true, false})
   void onlyEnabledChunkStageBlocksEmbeddingCutover(boolean chunksEnabled) throws Exception {
     var server = createServerWithJobQueue(new StubJobQueue());

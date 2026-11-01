@@ -22,7 +22,124 @@ import org.junit.jupiter.api.io.TempDir;
 final class CandidateIndexTargetCaptureTest extends io.justsearch.adapters.lucene.runtime.LuceneExecutorTestBase {
   @TempDir Path tempDir;
 
-  @org.junit.jupiter.params.ParameterizedTest
+  @org.junit.jupiter.params.ParameterizedTest(name = "{displayName} [{index}] {arguments}")
+  @org.junit.jupiter.params.provider.ValueSource(strings = {"embedding", "splade", "ner"})
+  void externalWeightReplacementChangesCandidateIdentity(String role) throws Exception {
+    Path models = createExternalModelSet("external-candidate-" + role, role);
+    var config = candidate(models);
+    var original = CandidateIndexTargetCapture.captureWithRuntimeInputs(config);
+    Path selected = models.resolve(role);
+    byte[] graph = Files.readAllBytes(selected.resolve("model.onnx"));
+    byte[] tokenizer = Files.readAllBytes(selected.resolve("tokenizer.json"));
+    byte[] sidecar = Files.readAllBytes(selected.resolve("model.onnx_data"));
+
+    var source = new io.justsearch.adapters.lucene.commit.SsotCommitMetadataSource(
+        config, original.runtimeFingerprintInputs());
+    Path index = tempDir.resolve("external-index-" + role);
+    try (var runtime = io.justsearch.adapters.lucene.runtime.IndexSchema.fromCatalog(
+        io.justsearch.configuration.FieldCatalogDef.forTesting(768), source,
+        new io.justsearch.adapters.lucene.commit.JsonSchemaCommitMetadataValidator())
+        .atPath(index).withExecutorRegistrations(testLuceneExecutors()).open()) {
+      runtime.indexingCoordinator().indexSingle(new io.justsearch.indexing.api.IndexDocument(
+          java.util.Map.of("doc_id", "one", "doc_uid", "one#0", "content", "candidate text")));
+      runtime.commitOps().commitAndTrack();
+    }
+    Files.writeString(selected.resolve("weights.bin"), "replacement weights");
+    var changed = CandidateIndexTargetCapture.captureWithRuntimeInputs(config);
+    var changedSource = new io.justsearch.adapters.lucene.commit.SsotCommitMetadataSource(
+        config, changed.runtimeFingerprintInputs());
+    var diffs = io.justsearch.adapters.lucene.runtime.IndexMetadataParityGuard.inspectCommittedParity(
+        index, changedSource::build);
+
+    org.junit.jupiter.api.Assertions.assertTrue(diffs.stream()
+        .anyMatch(diff -> diff.key().equals(role + "_model_assets_sha256")),
+        "external inference weights must contribute to the candidate identity for " + role);
+    assertEquals(original.selectedModels().get(role).sha256(), changed.selectedModels().get(role).sha256());
+    org.junit.jupiter.api.Assertions.assertArrayEquals(graph, Files.readAllBytes(selected.resolve("model.onnx")));
+    org.junit.jupiter.api.Assertions.assertArrayEquals(tokenizer, Files.readAllBytes(selected.resolve("tokenizer.json")));
+    org.junit.jupiter.api.Assertions.assertArrayEquals(sidecar, Files.readAllBytes(selected.resolve("model.onnx_data")));
+  }
+
+  @org.junit.jupiter.params.ParameterizedTest(name = "{displayName} [{index}] {arguments}")
+  @org.junit.jupiter.params.provider.ValueSource(strings = {"embedding", "splade", "ner"})
+  void externalWeightReplacementChangesStartupProviderIdentity(String role) throws Exception {
+    Path models = createExternalModelSet("external-startup-" + role, role);
+    var previousStore = io.justsearch.configuration.resolved.ConfigStore.globalOrNull();
+    var installedStore = new io.justsearch.configuration.resolved.ConfigStore(candidate(models));
+    io.justsearch.configuration.resolved.ConfigStore.setGlobal(installedStore);
+    try {
+      invalidateStartupFingerprints();
+      var originalGraph = startupGraphFingerprint(role);
+      var originalAssets = startupAssetsFingerprint(role);
+      Path selected = models.resolve(role);
+      byte[] graph = Files.readAllBytes(selected.resolve("model.onnx"));
+      byte[] tokenizer = Files.readAllBytes(selected.resolve("tokenizer.json"));
+      byte[] sidecar = Files.readAllBytes(selected.resolve("model.onnx_data"));
+      byte[] hashSidecar = Files.readAllBytes(selected.resolve("model.onnx.sha256"));
+
+      Files.writeString(selected.resolve("weights.bin"), "replacement weights");
+      invalidateStartupFingerprints();
+      var changedGraph = startupGraphFingerprint(role);
+      var changedAssets = startupAssetsFingerprint(role);
+
+      assertNotEquals(originalAssets, changedAssets,
+          "external inference weights must contribute to the startup identity for " + role);
+      org.junit.jupiter.api.Assertions.assertTrue(originalAssets.isPresent() && changedAssets.isPresent());
+      org.junit.jupiter.api.Assertions.assertTrue(originalGraph.isPresent());
+      assertEquals(originalGraph, changedGraph);
+      org.junit.jupiter.api.Assertions.assertArrayEquals(graph, Files.readAllBytes(selected.resolve("model.onnx")));
+      org.junit.jupiter.api.Assertions.assertArrayEquals(tokenizer, Files.readAllBytes(selected.resolve("tokenizer.json")));
+      org.junit.jupiter.api.Assertions.assertArrayEquals(sidecar, Files.readAllBytes(selected.resolve("model.onnx_data")));
+      org.junit.jupiter.api.Assertions.assertArrayEquals(hashSidecar, Files.readAllBytes(selected.resolve("model.onnx.sha256")));
+    } finally {
+      invalidateStartupFingerprints();
+      io.justsearch.configuration.resolved.ConfigStore.restoreGlobal(installedStore, previousStore);
+    }
+  }
+
+  private static java.util.Optional<String> startupGraphFingerprint(String role) {
+    return switch (role) {
+      case "embedding" -> io.justsearch.indexerworker.embed.EmbeddingFingerprint.get();
+      case "splade" -> io.justsearch.indexerworker.splade.SpladeFingerprint.get();
+      case "ner" -> io.justsearch.indexerworker.ner.NerFingerprint.get();
+      default -> throw new IllegalArgumentException(role);
+    };
+  }
+
+  private static java.util.Optional<String> startupAssetsFingerprint(String role) {
+    return switch (role) {
+      case "embedding" -> io.justsearch.indexerworker.embed.EmbeddingFingerprint.assets();
+      case "splade" -> io.justsearch.indexerworker.splade.SpladeFingerprint.assets();
+      case "ner" -> io.justsearch.indexerworker.ner.NerFingerprint.assets();
+      default -> throw new IllegalArgumentException(role);
+    };
+  }
+
+  private static void invalidateStartupFingerprints() {
+    io.justsearch.indexerworker.embed.EmbeddingFingerprint.invalidate();
+    io.justsearch.indexerworker.splade.SpladeFingerprint.invalidate();
+    io.justsearch.indexerworker.ner.NerFingerprint.invalidate();
+  }
+
+  private Path createExternalModelSet(String name, String role) throws IOException {
+    Path models = createModelSet(name, "embedding");
+    Path selected = models.resolve(role);
+    byte[] location = "weights.bin".getBytes(StandardCharsets.UTF_8);
+    var entry = new java.io.ByteArrayOutputStream();
+    entry.writeBytes(new byte[] {10, 8});
+    entry.writeBytes("location".getBytes(StandardCharsets.UTF_8));
+    entry.write(18); entry.write(location.length); entry.writeBytes(location);
+    var graph = new java.io.ByteArrayOutputStream();
+    graph.writeBytes(new byte[] {58, (byte) (entry.size() + 6), 42,
+        (byte) (entry.size() + 4), 106, (byte) entry.size()});
+    graph.writeBytes(entry.toByteArray()); graph.writeBytes(new byte[] {112, 1});
+    Files.write(selected.resolve("model.onnx"), graph.toByteArray());
+    Files.writeString(selected.resolve("weights.bin"), "original weights");
+    Files.writeString(selected.resolve("model.onnx_data"), "unchanged conventional sidecar");
+    return models;
+  }
+
+  @org.junit.jupiter.params.ParameterizedTest(name = "{displayName} [{index}] {arguments}")
   @org.junit.jupiter.params.provider.ValueSource(strings = {"embedding", "splade", "ner"})
   void candidateCommitPersistsOwnCompanionsAndRejectsChangedTokenizerOnReopen(String role) throws Exception {
     Path models = createModelSet("candidate-" + role, "embedding-a");

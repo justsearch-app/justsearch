@@ -64,7 +64,7 @@ class InPlaceEmbeddingRebuildRecoveryTest extends io.justsearch.adapters.lucene.
     EmbeddingFingerprint.invalidate();
   }
 
-  @ParameterizedTest
+  @ParameterizedTest(name = "{displayName} [{index}] {arguments}")
   @ValueSource(booleans = {true, false})
   void rescueReplacesOldChunkVectorsAndTerminalFailureRemovesOldParentVector(boolean chunksEnabled) throws Exception {
     EmbeddingFingerprint.setForTesting(FP);

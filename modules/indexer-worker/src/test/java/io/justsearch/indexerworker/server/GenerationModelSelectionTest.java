@@ -18,7 +18,7 @@ import org.junit.jupiter.api.io.TempDir;
 final class GenerationModelSelectionTest {
   @TempDir Path temp;
 
-  @org.junit.jupiter.params.ParameterizedTest
+  @org.junit.jupiter.params.ParameterizedTest(name = "{displayName} [{index}] {arguments}")
   @org.junit.jupiter.params.provider.CsvSource({
       "embedding,tokenizer.json", "embedding,1_Pooling/config.json",
       "embedding,pooling_config.json", "embedding,prefix_config.json",
@@ -70,7 +70,7 @@ final class GenerationModelSelectionTest {
     assertTrue(selection.verify(role).isEmpty());
   }
 
-  @org.junit.jupiter.params.ParameterizedTest
+  @org.junit.jupiter.params.ParameterizedTest(name = "{displayName} [{index}] {arguments}")
   @org.junit.jupiter.params.provider.ValueSource(strings = {"embedding", "splade", "ner"})
   void externalWeightsChangeRejectsCompatibilityAfterCommitAndReopen(String role) throws Exception {
     Path graph = temp.resolve("external/model.onnx");

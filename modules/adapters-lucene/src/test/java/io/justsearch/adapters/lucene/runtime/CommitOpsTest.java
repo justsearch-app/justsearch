@@ -50,7 +50,7 @@ class CommitOpsTest extends LuceneExecutorTestBase {
         null);
   }
 
-  @org.junit.jupiter.params.ParameterizedTest
+  @org.junit.jupiter.params.ParameterizedTest(name = "{displayName} [{index}] {arguments}")
   @org.junit.jupiter.params.provider.ValueSource(strings = {"embedding", "splade", "ner"})
   void lexicalCommitPreservesUnresolvedCompanionAndRejectsReplacementAfterReopen(String role) throws Exception {
     var config = io.justsearch.configuration.resolved.ResolvedConfig.builder().build();

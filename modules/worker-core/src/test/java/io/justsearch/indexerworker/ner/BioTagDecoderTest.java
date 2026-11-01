@@ -48,29 +48,31 @@ class BioTagDecoderTest {
     assertEquals("吴 京", cjk.get(0).text());
   }
 
+  @Test
+  // single-word person entity
+  void singleWordPerson() {
+    float[][] logits = {
+        logitsFor(O),     // [CLS]
+        logitsFor(B_PER), // John
+        logitsFor(O),     // works
+        logitsFor(O),     // [SEP]
+    };
+    String[] tokens = {"[CLS]", "John", "works", "[SEP]"};
+    long[] wordIds = {-1, 0, 1, -1};
+
+    List<BioTagDecoder.Entity> entities = BioTagDecoder.decode(logits, tokens, wordIds);
+
+    assertEquals(1, entities.size());
+    assertEquals("John", entities.get(0).text());
+    assertEquals("person", entities.get(0).type());
+    assertTrue(entities.get(0).confidence() > 0.9f);
+  }
+
+
   @Nested
   @DisplayName("Basic entity extraction")
   class BasicExtraction {
 
-    @Test
-    @DisplayName("single-word person entity")
-    void singleWordPerson() {
-      float[][] logits = {
-          logitsFor(O),     // [CLS]
-          logitsFor(B_PER), // John
-          logitsFor(O),     // works
-          logitsFor(O),     // [SEP]
-      };
-      String[] tokens = {"[CLS]", "John", "works", "[SEP]"};
-      long[] wordIds = {-1, 0, 1, -1};
-
-      List<BioTagDecoder.Entity> entities = BioTagDecoder.decode(logits, tokens, wordIds);
-
-      assertEquals(1, entities.size());
-      assertEquals("John", entities.get(0).text());
-      assertEquals("person", entities.get(0).type());
-      assertTrue(entities.get(0).confidence() > 0.9f);
-    }
 
     @Test
     @DisplayName("multi-word person entity")

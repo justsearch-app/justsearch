@@ -227,7 +227,7 @@ class CombinedEnrichmentRmwIntegrationTest extends io.justsearch.adapters.lucene
     assertTrue(hasSparseHit("old", docId), "embedding retry bookkeeping must retain sparse postings");
   }
 
-  @org.junit.jupiter.params.ParameterizedTest
+  @org.junit.jupiter.params.ParameterizedTest(name = "{displayName} [{index}] {arguments}")
   @org.junit.jupiter.params.provider.ValueSource(strings = {"success", "retry", "terminal", "blank", "fallback"})
   void embeddingBatchReadsSparseDictionaryOnce(String outcome) throws Exception {
     int count = 8;

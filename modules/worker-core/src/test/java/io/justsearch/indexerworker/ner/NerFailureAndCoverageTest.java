@@ -19,6 +19,52 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
 final class NerFailureAndCoverageTest {
+  @Test
+  void conflictingOverlapPredictionsSelectContextAndStitchCompleteBioEntity() throws Exception {
+    var sessions = mock(SessionHandle.class);
+    var lease = mock(SessionHandle.Lease.class);
+    when(sessions.acquire(any())).thenReturn(lease);
+    var encoding = ownerEncoding(23, "tail", 221);
+    String[] tokens = encoding.getTokens();
+    tokens[10] = "Mia"; tokens[11] = "Chen"; tokens[12] = "Jr";
+    var tokenizer = mock(HuggingFaceTokenizer.class);
+    when(tokenizer.encode(anyString())).thenReturn(encoding);
+    var calls = new AtomicInteger();
+    when(lease.run(anyMap())).thenAnswer(call -> {
+      Map<String, OnnxTensor> inputs = call.getArgument(0);
+      LongBuffer ids = inputs.get("input_ids").getLongBuffer();
+      boolean first = calls.getAndIncrement() == 0;
+      float[][][] logits = new float[1][ids.limit()][9];
+      for (int token = 0; token < ids.limit(); token++) {
+        long id = ids.get(token);
+        // At the shared middle token, equal context keeps the first window's I-PER.
+        // The outer overlap tokens choose opposite windows by their deeper context.
+        int label = id == 210 ? (first ? 3 : 5)
+            : id == 211 ? (first ? 4 : 6) : id == 212 ? (first ? 7 : 4) : 0;
+        logits[0][token][label] = 10;
+      }
+      var result = mock(OrtSession.Result.class); var value = mock(OnnxTensor.class);
+      when(value.getValue()).thenReturn(logits); when(result.get(0)).thenReturn(value);
+      return result;
+    });
+    try (var tensors = mockStatic(OnnxTensor.class);
+        var service = new NerService(new NerAssembly(sessions, new NerShape(14, false), tokenizer,
+            BioTagDecoder.LabelMapping.bertBaseNer(), null),
+            new NerConfig(true, Path.of("fixture"), 14, .5f, false, 0, 0))) {
+      tensors.when(() -> OnnxTensor.createTensor(any(), any(LongBuffer.class), any(long[].class)))
+          .thenAnswer(call -> {
+            var tensor = mock(OnnxTensor.class);
+            when(tensor.getLongBuffer()).thenReturn(call.getArgument(1));
+            return tensor;
+          });
+      var result = service.extractEntities("Mia Chen Jr");
+      assertEquals(List.of("Mia Chen Jr"), result.persons());
+      assertTrue(result.organizations().isEmpty());
+      assertTrue(result.locations().isEmpty());
+      assertEquals(2, calls.get(), "both overlapping windows must participate");
+    }
+  }
+
   @ParameterizedTest
   @ValueSource(strings = {"first", "middle", "last"})
   void anyFailedChunkRejectsTheWholeDocument(String position) throws Exception {
