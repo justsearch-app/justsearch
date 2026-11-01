@@ -700,6 +700,8 @@ public final class CombinedEnrichmentBackfillOps {
       int windowDocsCompleted = 0;
       int windowDocsResumable = 0;
       int embedDeferredForOtherStages = 0;
+      int singlePassDeferred = 0;
+      int embedPopulation = embedDocIds.size() + lateChunkingDocIds.size();
 
       // docs/tempdocs/809-human-validation-0.2.0-findings.md: partition resumable window work
       // from the ordinary batch path. The pre-fix late-chunking fallback appended long parents
@@ -747,6 +749,7 @@ public final class CombinedEnrichmentBackfillOps {
       priorityChunkEnd = windowedDocIds.isEmpty() && lateChunkingDocIds.isEmpty()
           ? 0 : Math.min(priorityChunkEnd, EMBED_ENCODE_SLICE);
       int sliceStart = 0;
+      embeddingTurns:
       for (int embedTurn = 0; embedTurn < 2; embedTurn++) {
         // Phase 3a-i: Late-chunking single-pass embed (tempdoc 691 forensics fold-in). Tries one
         // whole-document forward pass per chunked parent. A null result (content over the raised
@@ -834,7 +837,10 @@ public final class CombinedEnrichmentBackfillOps {
             }
             pacer.afterUnit(1);
             unitsDone++;
-            if (fellBackToWindows) break;
+            if (fellBackToWindows) {
+              singlePassDeferred += lateChunkingDocIds.size() - i - 1;
+              break;
+            }
           }
         }
 
@@ -992,32 +998,34 @@ public final class CombinedEnrichmentBackfillOps {
               sliceStart = Math.min(sliceStart + EMBED_ENCODE_SLICE, sliceLimit)) {
             if (stopRequested(context, unitsDone, epochAtSelection)) {
               aborted = true;
-              if (embedTurn == 1) docsSkipped += embedDocIds.size() - sliceStart;
-              break;
+              docsSkipped += embedDocIds.size() - sliceStart;
+              break embeddingTurns;
             }
             if (embedShareSpent(context, unitsDone, otherStagesHaveWork)) {
-              if (embedTurn == 1) embedDeferredForOtherStages += embedDocIds.size() - sliceStart;
-              break;
+              embedDeferredForOtherStages += embedDocIds.size() - sliceStart;
+              break embeddingTurns;
             }
             int sliceEnd = Math.min(sliceStart + EMBED_ENCODE_SLICE, sliceLimit);
             List<String> sliceDocIds = embedDocIds.subList(sliceStart, sliceEnd);
             pacer.beforeUnit(sliceDocIds.size());
-            if (!embeddingReady(context, provider)) break;
+            if (!embeddingReady(context, provider)) break embeddingTurns;
             List<float[]> vectors;
             try {
               vectors = provider.embedDocumentBatch(embedContents.subList(sliceStart, sliceEnd));
             } catch (Exception failure) {
-              if (!embeddingReady(context, provider) || SpladeBackfillOps.isSystemicFailure(failure)) break;
+              if (!embeddingReady(context, provider) || SpladeBackfillOps.isSystemicFailure(failure)) {
+                break embeddingTurns;
+              }
               vectors = null;
             } finally {
               pacer.afterUnit(sliceDocIds.size());
+              unitsDone++;
             }
-            unitsDone++;
-            if (!embeddingReady(context, provider)) break;
+            if (!embeddingReady(context, provider)) break embeddingTurns;
             boolean fallback = vectors == null || vectors.size() != sliceDocIds.size();
             if (fallback) vectors = new ArrayList<>(java.util.Collections.nCopies(sliceDocIds.size(), null));
             for (int i = 0; i < sliceDocIds.size(); i++) {
-              if (!embeddingReady(context, provider)) break;
+              if (!embeddingReady(context, provider)) break embeddingTurns;
               if (fallback) {
                 // The failed batch is not a document attempt. Reach at least one individual call,
                 // even when it consumed the deadline; hard stops still pre-empt immediately.
@@ -1025,19 +1033,21 @@ public final class CombinedEnrichmentBackfillOps {
                     || context.indexingCoordinator().bulkDeleteEpoch() != epochAtSelection
                     || (i > 0 && stopRequested(context, unitsDone, epochAtSelection))) {
                   aborted = true;
-                  docsSkipped += sliceDocIds.size() - i;
-                  break;
+                  docsSkipped += embedDocIds.size() - sliceStart - i;
+                  break embeddingTurns;
                 }
                 pacer.beforeUnit(1);
                 try {
                   vectors.set(i, provider.embedDocument(embedContents.get(sliceStart + i),
                       InferenceRequest.background()));
                 } catch (Exception failure) {
-                  if (!embeddingReady(context, provider) || SpladeBackfillOps.isSystemicFailure(failure)) break;
+                  if (!embeddingReady(context, provider) || SpladeBackfillOps.isSystemicFailure(failure)) {
+                    break embeddingTurns;
+                  }
                 } finally {
                   pacer.afterUnit(1);
                 }
-                if (!embeddingReady(context, provider)) break;
+                if (!embeddingReady(context, provider)) break embeddingTurns;
               }
               float[] vector = vectors.get(i);
               String eid = sliceDocIds.get(i);
@@ -1333,11 +1343,11 @@ public final class CombinedEnrichmentBackfillOps {
               "Combined backfill: docs={} (embed={},splade={},chunks={}),"
                   + " fetch={}ms, embed={}ms(ok={},fail={},singlePass={},longDocWindowed={},"
                   + "arenaOomWindowed={},windowUnits={},windowDocsDone={},windowDocsResuming={},"
-                  + "deferredForOtherStages={}),"
+                  + "deferredForOtherStages={},singlePassDeferred={}),"
                   + " splade={}ms(ok={},fail={}), ner={}ms(ok={},fail={}),"
                   + " write={}ms(written={}), total={}ms",
               pendingIds.size(),
-              embedDocIds.size() + windowedDocIds.size(),
+              embedPopulation,
               spladeDocIds.size(),
               chunkIdsInBatch.size(),
               fetchMs,
@@ -1351,6 +1361,7 @@ public final class CombinedEnrichmentBackfillOps {
               windowDocsCompleted,
               windowDocsResumable,
               embedDeferredForOtherStages,
+              singlePassDeferred,
               spladeMs,
               spladeProcessed,
               spladeFailed,

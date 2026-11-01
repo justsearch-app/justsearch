@@ -25,6 +25,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.CancellationException;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.BooleanSupplier;
 import org.junit.jupiter.api.BeforeEach;
@@ -397,13 +398,87 @@ class CombinedEnrichmentCycleBudgetTest {
     var outcome = CombinedEnrichmentBackfillOps.processCombinedBackfill(
         timedContext(progress, () -> !bulkDelete && unitsThisCycle.get() >= stopAfterUnits));
     assertTrue(outcome.aborted());
-    assertTrue(unitsThisCycle.get() >= stopAfterUnits
-            && unitsThisCycle.get() <= stopAfterUnits + 1,
-        "P1: preemption must stop within one encoder unit of the stop signal");
+    assertEquals(stopAfterUnits, unitsThisCycle.get(),
+        "P1: a synchronous stop signal must prevent the next encoder call");
     assertEquals(0, completed(SchemaFields.EMBEDDING_STATUS), "no partial parent publication");
     for (var state : fakeIndex.values()) {
       assertTrue(!state.containsKey(SchemaFields.VECTOR));
       assertTrue(!state.containsKey(SchemaFields.EMBEDDING_RETRY_COUNT));
+    }
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"systemic", "hard-stop", "bulk-delete"})
+  @DisplayName("P1: a failed priority chunk turn cannot restart embedding in the parent turn")
+  void failedPriorityChunkBatchStopsEmbeddingAcrossTurns(String failureKind) {
+    seedLateChunkedLongParent("new-parent");
+    seedLongEmbedDoc("window-parent");
+    seedChunks(16);
+    if (failureKind.equals("bulk-delete")) {
+      lenient().when(indexingCoordinator.bulkDeleteEpoch()).thenAnswer(
+          inv -> unitsThisCycle.get() > 0 ? 1L : 0L);
+    }
+    lenient().doAnswer(inv -> {
+      batchRequests.add(List.copyOf(inv.getArgument(0)));
+      unitsThisCycle.incrementAndGet();
+      throw new CancellationException("encoder session cancelled");
+    }).when(embeddingProvider).embedDocumentBatch(anyList());
+    newCycle();
+    var outcome = CombinedEnrichmentBackfillOps.processCombinedBackfill(
+        timedContext(new WindowedEmbedProgress(),
+            () -> failureKind.equals("hard-stop") && unitsThisCycle.get() > 0));
+    assertEquals(0, singlePassRequests.get(),
+        "P1: a failed priority chunk turn must not start a parent single-pass call");
+    assertTrue(windowRequests.isEmpty(),
+        "P1: a failed priority chunk turn must not start a parent window call");
+    assertEquals(1, batchRequests.size(),
+        "P1: the abandoned priority chunk batch must not be retried in the same cycle");
+    assertEquals(8, batchRequests.getFirst().size(),
+        "S3: the priority turn is at most one encoder batch");
+    org.mockito.Mockito.verify(embeddingProvider, org.mockito.Mockito.never())
+        .embedDocument(anyString(), org.mockito.ArgumentMatchers.any());
+    assertEquals(1, unitsThisCycle.get(), "P1: only the throwing batch may run");
+    assertEquals(0, outcome.embedProcessed());
+    assertEquals(0, completed(SchemaFields.CHUNK_EMBEDDING_STATUS));
+    assertEquals(0, completed(SchemaFields.EMBEDDING_STATUS));
+    for (var state : fakeIndex.values()) {
+      assertTrue(!state.containsKey(SchemaFields.VECTOR));
+      assertTrue(!state.containsKey(SchemaFields.CHUNK_VECTOR));
+      assertTrue(!state.containsKey(SchemaFields.EMBEDDING_RETRY_COUNT));
+      assertTrue(!state.containsKey(SchemaFields.CHUNK_EMBEDDING_RETRY_COUNT));
+    }
+  }
+
+  @Test
+  @DisplayName("P4/P10: non-systemic priority batch failures retain individual retry accounting")
+  void nonSystemicPriorityBatchFailureStillChargesIndividualRetries() {
+    seedLateChunkedLongParent("short-parent");
+    contentByDoc.put("short-parent", "SHORT:short-parent");
+    seedChunks(16);
+    lenient().doAnswer(inv -> {
+      batchRequests.add(List.copyOf(inv.getArgument(0)));
+      unitsThisCycle.incrementAndGet();
+      throw new IllegalArgumentException("bad batch input");
+    }).when(embeddingProvider).embedDocumentBatch(anyList());
+    lenient().doAnswer(inv -> {
+      singlePassRequests.incrementAndGet();
+      unitsThisCycle.incrementAndGet();
+      return new EmbeddingService.ChunkedEmbedding(new float[] {0f, 1f}, List.of(), 1);
+    }).when(embeddingProvider).embedWithSpans(
+        anyString(), org.mockito.ArgumentMatchers.any(int[][].class));
+    newCycle();
+    var outcome = CombinedEnrichmentBackfillOps.processCombinedBackfill(
+        timedContext(new WindowedEmbedProgress(), () -> false));
+    assertEquals(1, outcome.embedProcessed(), "P4: parent work still completes after a bad batch");
+    assertEquals(1, singlePassRequests.get());
+    assertEquals(2, batchRequests.size(), "each chunk batch is attempted only once");
+    for (int i = 0; i < 16; i++) {
+      var state = fakeIndex.get("chunk-" + i);
+      assertEquals("1", state.get(SchemaFields.CHUNK_EMBEDDING_RETRY_COUNT),
+          "P4/P10: each failed individual fallback charges exactly one retry");
+      assertEquals(SchemaFields.EMBEDDING_STATUS_PENDING,
+          state.get(SchemaFields.CHUNK_EMBEDDING_STATUS));
+      assertTrue(!state.containsKey(SchemaFields.CHUNK_VECTOR));
     }
   }
 
