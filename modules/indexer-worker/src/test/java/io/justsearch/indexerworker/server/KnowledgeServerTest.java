@@ -75,6 +75,28 @@ class KnowledgeServerTest {
     org.mockito.Mockito.verify(controller).checkRebuildCompletion(0L, 0);
   }
 
+  @org.junit.jupiter.params.ParameterizedTest
+  @org.junit.jupiter.params.provider.ValueSource(booleans = {true, false})
+  void onlyEnabledChunkStageBlocksEmbeddingCutover(boolean chunksEnabled) throws Exception {
+    var server = createServerWithJobQueue(new StubJobQueue());
+    setField(server, "startupConfiguration", io.justsearch.configuration.resolved.ResolvedConfig.builder()
+        .putDefault("rag.chunk_vectors.enabled", Boolean.toString(chunksEnabled)).build());
+    var runtime = org.mockito.Mockito.mock(io.justsearch.adapters.lucene.runtime.RunningRuntime.class,
+        org.mockito.Mockito.RETURNS_DEEP_STUBS);
+    org.mockito.Mockito.when(runtime.indexCountOps().countByFieldOrThrow(
+        io.justsearch.indexing.SchemaFields.CHUNK_EMBEDDING_STATUS,
+        io.justsearch.indexing.SchemaFields.EMBEDDING_STATUS_PENDING)).thenReturn(7);
+    var controller = org.mockito.Mockito.mock(EmbeddingCompatibilityController.class);
+    org.mockito.Mockito.when(controller.currentFingerprint()).thenReturn("current-model");
+    org.mockito.Mockito.when(controller.reconcileStampEvidence()).thenReturn(true);
+    org.mockito.Mockito.when(controller.fingerprintToStamp()).thenReturn(Optional.of("current-model"));
+    setField(server, "ingestLifecycle", runtime);
+    setField(server, "embeddingCompatController", controller);
+    var finalizeCutover = KnowledgeServer.class.getDeclaredMethod("finalizeEmbeddingRebuildBeforeCutover");
+    finalizeCutover.setAccessible(true);
+    assertEquals(!chunksEnabled, finalizeCutover.invoke(server));
+  }
+
   @Nested
   class CutoverAttestationTests {
     private final AtomicLong documents = new AtomicLong();
@@ -159,6 +181,15 @@ class KnowledgeServerTest {
         org.mockito.Mockito.when(runtime.indexCountOps().docCountOrThrow())
             .thenThrow(new IOException("green reader unavailable"));
       }
+      Path graph = Files.createDirectories(base.resolve("model")).resolve("model.onnx");
+      Files.writeString(graph, "test graph");
+      Files.writeString(graph.getParent().resolve("tokenizer.json"), "{}");
+      var identity = GenerationModelSelection.captureIdentity(graph);
+      setField(server, "initialModelSelection", GenerationModelSelection.accepted(
+          Map.of("embedding", new io.justsearch.indexerworker.index.IndexGenerationManager.ModelArtifact(
+              graph.toString(), identity.sha256())), "splade", 768));
+      setField(server, "startupConfiguration",
+          io.justsearch.configuration.resolved.ResolvedConfig.builder().build());
       var initialize = KnowledgeServer.class.getDeclaredMethod("initEmbeddingCompatibilityController");
       initialize.setAccessible(true);
       initialize.invoke(server);

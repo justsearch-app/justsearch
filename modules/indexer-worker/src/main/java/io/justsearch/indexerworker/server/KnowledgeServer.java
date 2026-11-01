@@ -10482,13 +10482,16 @@ public final class KnowledgeServer implements Closeable {
     }
     if (ingestLifecycle == null) return false;
     try {
+      ResolvedConfig config = recordedCandidate == null
+          ? startupConfiguration : recordedCandidate.configuration();
+      boolean chunkVectorsEnabled = config == null || config.rag().chunkVectorsEnabled();
       long queueDepth = jobQueue.queueDepth();
       int pendingEmbeddings =
           ingestLifecycle
               .indexCountOps()
               .countByFieldOrThrow(SchemaFields.EMBEDDING_STATUS, SchemaFields.EMBEDDING_STATUS_PENDING)
-          + ingestLifecycle.indexCountOps().countByFieldOrThrow(
-              SchemaFields.CHUNK_EMBEDDING_STATUS, SchemaFields.EMBEDDING_STATUS_PENDING);
+          + (chunkVectorsEnabled ? ingestLifecycle.indexCountOps().countByFieldOrThrow(
+              SchemaFields.CHUNK_EMBEDDING_STATUS, SchemaFields.EMBEDDING_STATUS_PENDING) : 0);
       if (pendingEmbeddings > 0) return false;
       ecc.checkRebuildCompletion(queueDepth, pendingEmbeddings);
       return ecc.reconcileStampEvidence()

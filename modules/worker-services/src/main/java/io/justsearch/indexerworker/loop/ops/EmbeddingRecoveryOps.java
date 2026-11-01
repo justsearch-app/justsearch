@@ -23,8 +23,9 @@ import org.slf4j.Logger;
  * {@code EMBEDDING_STATUS=COMPLETED} — or {@code FAILED} — have unknowable provenance: they may have
  * been written by a different embedding model, and there is no fingerprint to prove otherwise. The
  * only sound recovery is to re-embed them under the current model. This op clears unknown-provenance
- * vectors and re-marks parents and chunks PENDING, with a fresh retry budget. Certification waits
- * for both backfills to drain; failed documents cannot expose their old vectors.
+ * vectors and re-marks parents and enabled chunks PENDING, with a fresh retry budget. Disabled
+ * chunk vectors are invalidated without scheduling work. Certification waits for enabled backfills
+ * to drain; failed documents cannot expose their old vectors.
  */
 public final class EmbeddingRecoveryOps {
   private EmbeddingRecoveryOps() {}
@@ -93,10 +94,13 @@ public final class EmbeddingRecoveryOps {
         return LegacyRescueOutcome.SKIPPED;
       }
 
+      var config = running.resolvedConfig();
+      boolean chunkVectorsEnabled = config == null || config.rag().chunkVectorsEnabled();
       int remarked =
           remarkEmbeddedParentDocsPending(
               running.documentFieldOps(), running.indexingCoordinator(), batchSize, log);
-      remarkChunkDocsPending(running.documentFieldOps(), running.indexingCoordinator(), batchSize);
+      remarkChunkDocsPending(
+          running.documentFieldOps(), running.indexingCoordinator(), batchSize, chunkVectorsEnabled);
 
       // RMW refreshes before writes; only this post-write barrier makes the re-mark visible to
       // normal and shutdown certification. Stay BLOCKED_LEGACY until every old status is gone.
@@ -110,7 +114,8 @@ public final class EmbeddingRecoveryOps {
           SchemaFields.EMBEDDING_STATUS, SchemaFields.EMBEDDING_STATUS_PENDING);
       int pendingChunks = countOps.countByFieldOrThrow(
           SchemaFields.CHUNK_EMBEDDING_STATUS, SchemaFields.EMBEDDING_STATUS_PENDING);
-      if (completed != 0 || failed != 0 || pendingParents != docs || pendingChunks != chunkDocs) {
+      if (completed != 0 || failed != 0 || pendingParents != docs
+          || pendingChunks != (chunkVectorsEnabled ? chunkDocs : 0)) {
         throw new IllegalStateException("Legacy recovery did not cover every unknown-provenance parent or chunk");
       }
       boolean started = ecc.maybeAutoStartRebuildForBlockedLegacy(docs);
@@ -211,12 +216,13 @@ public final class EmbeddingRecoveryOps {
   }
 
   private static void remarkChunkDocsPending(
-      DocumentFieldOps fields, IndexingCoordinator coordinator, int batchSize) {
+      DocumentFieldOps fields, IndexingCoordinator coordinator, int batchSize, boolean chunkVectorsEnabled) {
     var ids = collectAllIds(fields, SchemaFields.IS_CHUNK, "true", batchSize);
     List<Map.Entry<String, Map<String, Object>>> batch = new ArrayList<>(batchSize);
     for (String id : ids) {
       Map<String, Object> updates = new java.util.HashMap<>();
-      updates.put(SchemaFields.CHUNK_EMBEDDING_STATUS, SchemaFields.EMBEDDING_STATUS_PENDING);
+      updates.put(SchemaFields.CHUNK_EMBEDDING_STATUS, chunkVectorsEnabled
+          ? SchemaFields.EMBEDDING_STATUS_PENDING : SchemaFields.EMBEDDING_STATUS_FAILED);
       updates.put(SchemaFields.CHUNK_EMBEDDING_RETRY_COUNT, "0");
       updates.put(SchemaFields.CHUNK_VECTOR, null);
       batch.add(Map.entry(id, updates));

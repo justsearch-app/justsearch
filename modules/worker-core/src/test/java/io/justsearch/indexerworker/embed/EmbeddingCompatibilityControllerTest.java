@@ -21,6 +21,24 @@ final class EmbeddingCompatibilityControllerTest {
 
   private ConfigStore prevStore;
 
+  @Test
+  void unreadableCompanionsDoNotAdoptOrEraseCommittedProvenance() {
+    String graph = "a".repeat(64);
+    String assets = "b".repeat(64);
+    var readable = new java.util.concurrent.atomic.AtomicBoolean(false);
+    var controller = new EmbeddingCompatibilityController(
+        () -> Map.of("embedding_model_sha256", graph, "embedding_model_assets_sha256", assets),
+        () -> 1L, () -> 1, () -> java.util.Optional.of(graph),
+        () -> readable.get() ? java.util.Optional.of(assets) : java.util.Optional.empty());
+    controller.refresh();
+    assertEquals(EmbeddingCompatibilityController.State.UNAVAILABLE, controller.state());
+    assertTrue(controller.fingerprintToStamp().isEmpty());
+    assertEquals(java.util.Optional.of(graph), controller.fingerprintForCommit());
+    readable.set(true);
+    controller.refresh();
+    assertEquals(EmbeddingCompatibilityController.State.COMPATIBLE, controller.state());
+  }
+
   @BeforeEach
   void setUpConfigStore() {
     prevStore = ConfigStore.globalOrNull();

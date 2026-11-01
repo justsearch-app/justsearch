@@ -573,10 +573,13 @@ public final class WritePathOps {
           && !hasReconstructableChunkProof(input, parentCache)) {
         // Quarantine preserves the captured identity comparison without inventing chunk text.
         // Only failure bookkeeping may use this lane; successful artifacts still require proof.
-        if (updates.isEmpty() || updates.entrySet().stream().anyMatch(entry ->
-            (!ENRICHMENT_STAGE_FIELDS.containsKey(entry.getKey())
+        if ((updates.containsKey(SchemaFields.CHUNK_VECTOR)
+                && !"FAILED".equals(updates.get(SchemaFields.CHUNK_EMBEDDING_STATUS)))
+            || updates.isEmpty() || updates.entrySet().stream().anyMatch(entry ->
+            !(SchemaFields.CHUNK_VECTOR.equals(entry.getKey()) && entry.getValue() == null)
+            && ((!ENRICHMENT_STAGE_FIELDS.containsKey(entry.getKey())
                 && !ENRICHMENT_STAGE_FIELDS.containsValue(entry.getKey()))
-            || (entry.getKey().endsWith("_status") && !"FAILED".equals(entry.getValue())))) return false;
+            || (entry.getKey().endsWith("_status") && !"FAILED".equals(entry.getValue()))))) return false;
         updates = new HashMap<>(updates);
         updates.put(SchemaFields.CHUNK_CONTENT, "");
         for (String status : List.of(SchemaFields.CHUNK_EMBEDDING_STATUS, SchemaFields.SPLADE_STATUS)) {

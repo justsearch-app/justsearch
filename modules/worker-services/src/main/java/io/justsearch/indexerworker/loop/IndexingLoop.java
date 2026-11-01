@@ -400,7 +400,11 @@ public class IndexingLoop implements Closeable {
         new IngestionOutcomeJournal(
             jobQueue, metrics, outcomeWriteFailureCounter, () -> detailedTracing);
     this.embeddingLifecycle =
-        new EmbeddingProviderLifecycle(signalBus, jobQueue, indexCountOps, commitOps);
+        new EmbeddingProviderLifecycle(signalBus, jobQueue, indexCountOps, commitOps,
+            () -> {
+              var config = resolvedConfigSupplier.get();
+              return config == null || config.rag().chunkVectorsEnabled();
+            });
     if (embeddingService != null) {
       embeddingLifecycle.setEmbeddingProvider(embeddingService);
     }

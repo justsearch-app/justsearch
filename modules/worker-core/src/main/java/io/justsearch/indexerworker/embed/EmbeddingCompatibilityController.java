@@ -97,6 +97,7 @@ public final class EmbeddingCompatibilityController {
   private final java.util.function.IntSupplier completedEmbeddingCountSupplier;
   private final Supplier<Optional<String>> currentFingerprintSupplier;
   private final Supplier<Optional<String>> currentAssetsSupplier;
+  private final boolean companionIdentityRequired;
   private final AtomicReference<State> state = new AtomicReference<>(State.UNAVAILABLE);
   private final AtomicReference<String> currentFingerprint = new AtomicReference<>();
   private final AtomicReference<String> storedFingerprint = new AtomicReference<>();
@@ -182,7 +183,7 @@ public final class EmbeddingCompatibilityController {
       java.util.function.IntSupplier completedEmbeddingCountSupplier,
       Supplier<Optional<String>> currentFingerprintSupplier) {
     this(storedMetadataSupplier, docCountSupplier, completedEmbeddingCountSupplier,
-        currentFingerprintSupplier, Optional::empty);
+        currentFingerprintSupplier, Optional::empty, false);
   }
 
   /** Uses the generation's separately versioned output-determining companion identity. */
@@ -191,6 +192,16 @@ public final class EmbeddingCompatibilityController {
       java.util.function.IntSupplier completedEmbeddingCountSupplier,
       Supplier<Optional<String>> currentFingerprintSupplier,
       Supplier<Optional<String>> currentAssetsSupplier) {
+    this(storedMetadataSupplier, docCountSupplier, completedEmbeddingCountSupplier,
+        currentFingerprintSupplier, currentAssetsSupplier, true);
+  }
+
+  private EmbeddingCompatibilityController(
+      Supplier<Map<String, String>> storedMetadataSupplier, LongSupplier docCountSupplier,
+      java.util.function.IntSupplier completedEmbeddingCountSupplier,
+      Supplier<Optional<String>> currentFingerprintSupplier,
+      Supplier<Optional<String>> currentAssetsSupplier, boolean companionIdentityRequired) {
+    this.companionIdentityRequired = companionIdentityRequired;
     this.currentAssetsSupplier = Objects.requireNonNull(currentAssetsSupplier, "currentAssetsSupplier");
     this.storedMetadataSupplier = Objects.requireNonNull(storedMetadataSupplier, "storedMetadataSupplier");
     this.docCountSupplier = Objects.requireNonNull(docCountSupplier, "docCountSupplier");
@@ -235,6 +246,16 @@ public final class EmbeddingCompatibilityController {
     String storedFp = stored == null ? null : stored.get(COMMIT_META_KEY);
     storedFingerprint.set(storedFp);
 
+    Optional<String> currentAssets = currentAssetsSupplier.get();
+    if (companionIdentityRequired && currentAssets.isEmpty()) {
+      attestationAlreadyOnDisk = false;
+      rebuildCompleted = false;
+      state.set(State.UNAVAILABLE);
+      reasonCode.set("COMPANION_IDENTITY_UNRESOLVED");
+      log.warn("Embedding compatibility: UNAVAILABLE (companion identity cannot be resolved)");
+      return;
+    }
+
     if (storedFp == null || storedFp.isBlank()) {
       attestationAlreadyOnDisk = false;
       // If the index is empty (fresh install / new generation), it's safe to start writing vectors.
@@ -262,7 +283,6 @@ public final class EmbeddingCompatibilityController {
     }
 
     String storedAssets = stored == null ? null : stored.get("embedding_model_assets_sha256");
-    Optional<String> currentAssets = currentAssetsSupplier.get();
     boolean assetsMatch = storedAssets == null || currentAssets.isEmpty()
         || storedAssets.equals(currentAssets.get());
     if (storedFp.equals(current.get()) && assetsMatch) {
@@ -601,7 +621,8 @@ public final class EmbeddingCompatibilityController {
    * No index IO or additional authority is introduced on the commit path.
    */
   public Optional<String> fingerprintForCommit() {
-    if (state.get() == State.BLOCKED_MISMATCH) {
+    if (state.get() == State.BLOCKED_MISMATCH
+        || "COMPANION_IDENTITY_UNRESOLVED".equals(reasonCode.get())) {
       return Optional.ofNullable(storedFingerprint.get());
     }
     return fingerprintToStamp();

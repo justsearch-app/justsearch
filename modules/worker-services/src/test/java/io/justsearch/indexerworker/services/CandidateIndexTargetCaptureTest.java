@@ -19,8 +19,40 @@ import java.util.HexFormat;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
-final class CandidateIndexTargetCaptureTest {
+final class CandidateIndexTargetCaptureTest extends io.justsearch.adapters.lucene.runtime.LuceneExecutorTestBase {
   @TempDir Path tempDir;
+
+  @org.junit.jupiter.params.ParameterizedTest
+  @org.junit.jupiter.params.provider.ValueSource(strings = {"embedding", "splade", "ner"})
+  void candidateCommitPersistsOwnCompanionsAndRejectsChangedTokenizerOnReopen(String role) throws Exception {
+    Path models = createModelSet("candidate-" + role, "embedding-a");
+    var config = candidate(models);
+    var captured = CandidateIndexTargetCapture.captureWithRuntimeInputs(config);
+    var source = new io.justsearch.adapters.lucene.commit.SsotCommitMetadataSource(
+        config, captured.runtimeFingerprintInputs());
+    Path index = tempDir.resolve("index-" + role);
+    try (var runtime = io.justsearch.adapters.lucene.runtime.IndexSchema.fromCatalog(
+        io.justsearch.configuration.FieldCatalogDef.forTesting(768), source,
+        new io.justsearch.adapters.lucene.commit.JsonSchemaCommitMetadataValidator())
+        .atPath(index).withExecutorRegistrations(testLuceneExecutors()).open()) {
+      runtime.indexingCoordinator().indexSingle(new io.justsearch.indexing.api.IndexDocument(
+          java.util.Map.of("doc_id", "one", "doc_uid", "one#0", "content", "candidate text")));
+      runtime.commitOps().commitAndTrack();
+      for (String model : java.util.List.of("embedding", "splade", "ner")) {
+        org.junit.jupiter.api.Assertions.assertNotNull(
+            runtime.latestCommitUserDataBestEffort().get(model + "_model_assets_sha256"));
+      }
+    }
+    Files.writeString(models.resolve(role).resolve("tokenizer.json"), "{\"changed\":true}");
+    var changed = CandidateIndexTargetCapture.captureWithRuntimeInputs(config);
+    var changedSource = new io.justsearch.adapters.lucene.commit.SsotCommitMetadataSource(
+        config, changed.runtimeFingerprintInputs());
+    var diffs = io.justsearch.adapters.lucene.runtime.IndexMetadataParityGuard.inspectCommittedParity(
+        index, changedSource::build);
+    org.junit.jupiter.api.Assertions.assertTrue(diffs.stream()
+        .anyMatch(diff -> diff.key().equals(role + "_model_assets_sha256")));
+    assertEquals(captured.selectedModels().get(role).sha256(), changed.selectedModels().get(role).sha256());
+  }
 
   @Test
   void candidateModelBytesChangeTargetWithoutProcessWideProviders() throws Exception {

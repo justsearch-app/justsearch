@@ -50,6 +50,43 @@ class CommitOpsTest extends LuceneExecutorTestBase {
         null);
   }
 
+  @org.junit.jupiter.params.ParameterizedTest
+  @org.junit.jupiter.params.provider.ValueSource(strings = {"embedding", "splade", "ner"})
+  void lexicalCommitPreservesUnresolvedCompanionAndRejectsReplacementAfterReopen(String role) throws Exception {
+    var config = io.justsearch.configuration.resolved.ResolvedConfig.builder().build();
+    var absent = io.justsearch.adapters.lucene.commit.IndexFingerprint.ModelFingerprint.notConfigured();
+    var original = io.justsearch.adapters.lucene.commit.IndexFingerprint.ModelFingerprint.present("a".repeat(64))
+        .withAssets(java.util.Optional.of("b".repeat(64)));
+    var current = new AtomicReference<>(original);
+    java.util.function.Supplier<CommitMetadataSource> sources = () -> new SsotCommitMetadataSource(config,
+        new SsotCommitMetadataSource.RuntimeFingerprintInputs(768,
+            role.equals("embedding") ? current.get() : absent,
+            role.equals("splade") ? current.get() : absent,
+            role.equals("ner") ? current.get() : absent));
+    var schema = IndexSchema.fromCatalog(FieldCatalogDef.forTesting(768), sources, metadata -> {});
+    String key = role + "_model_assets_sha256";
+    String saved;
+    try (var runtime = schema.atPath(tempDir).withExecutorRegistrations(testLuceneExecutors()).open()) {
+      runtime.commitOps().stopCommitTimer();
+      runtime.indexingCoordinator().indexSingle(new IndexDocument(Map.of(
+          SchemaFields.DOC_ID, "parent", SchemaFields.DOC_UID, "parent#0", SchemaFields.CONTENT, "lexical")));
+      runtime.commitOps().commitAndTrack();
+      saved = runtime.latestCommitUserDataBestEffort().get(key);
+      assertNotNull(saved);
+      current.set(io.justsearch.adapters.lucene.commit.IndexFingerprint.ModelFingerprint.indeterminate());
+      runtime.indexingCoordinator().updateDocument("parent", Map.of(SchemaFields.CONTENT, "changed lexical"));
+      runtime.commitOps().commitAndTrack();
+      assertEquals(saved, runtime.latestCommitUserDataBestEffort().get(key));
+      assertFalse(runtime.latestCommitUserDataBestEffort().containsKey("index_fingerprint"));
+    }
+    // Restoring the same assets must not turn the saved null graph into a false mismatch.
+    current.set(original);
+    assertTrue(IndexMetadataParityGuard.inspectCommittedParity(tempDir, sources.get()::build).isEmpty());
+    current.set(original.withAssets(java.util.Optional.of("c".repeat(64))));
+    var diffs = IndexMetadataParityGuard.inspectCommittedParity(tempDir, sources.get()::build);
+    assertTrue(diffs.stream().anyMatch(diff -> diff.key().equals(key)));
+  }
+
   // -- buildMetadataSnapshot tests --
 
   @Test
