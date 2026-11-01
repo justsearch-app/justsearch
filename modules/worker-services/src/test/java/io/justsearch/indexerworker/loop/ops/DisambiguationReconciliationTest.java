@@ -102,7 +102,7 @@ class DisambiguationReconciliationTest extends LuceneExecutorTestBase {
     return snapshot.expandCanonical("PERSON", snapshot.getCanonical("PERSON", raw));
   }
 
-  @ParameterizedTest @ValueSource(ints = {0, 500, 501, 1001})
+  @ParameterizedTest(name = "{displayName} [{index}] {arguments}") @ValueSource(ints = {0, 500, 501, 1001})
   void wholeCorpusAndSuccessfulQuiescence(int count) throws Exception {
     for (int i = 0; i < count; i++) seed(sourceId(i), uniqueName(i), uniqueName(i).toUpperCase(Locale.ROOT), "shared person");
     refresh();
@@ -115,7 +115,7 @@ class DisambiguationReconciliationTest extends LuceneExecutorTestBase {
     verify(service, never()).processBatch(anyMap());
   }
 
-  @ParameterizedTest @CsvSource({"false,false,false", "false,true,false", "true,false,false", "true,true,false",
+  @ParameterizedTest(name = "{displayName} [{index}] {arguments}") @CsvSource({"false,false,false", "false,true,false", "true,false,false", "true,true,false",
       "false,false,true", "false,true,true"})
   void equalCountNerPublicationsInvalidateCompletedPass(boolean replaceId, boolean combined, boolean failAfterPublication) throws Exception {
     seed("original", "john smith", "JOHN SMITH");
@@ -194,7 +194,9 @@ class DisambiguationReconciliationTest extends LuceneExecutorTestBase {
     }).doCallRealMethod().when(service).processBatch(anyMap());
     try (var normalizer = mockStatic(EntityNormalizer.class, CALLS_REAL_METHODS)) {
       cycle();
-      normalizer.verify(() -> EntityNormalizer.normalize(anyString(), any()), never());
+      assertDoesNotThrow(
+          () -> normalizer.verify(() -> EntityNormalizer.normalize(anyString(), any()), never()),
+          "clustering must not normalize mentions after the hold starts");
     }
     assertTrue(service.snapshot().isEmpty(), "clustering must observe a hold after harvesting");
     assertEquals(-1, service.reconciliationCursor());

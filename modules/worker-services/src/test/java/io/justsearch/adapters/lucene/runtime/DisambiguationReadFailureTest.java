@@ -27,7 +27,7 @@ import org.junit.jupiter.params.provider.ValueSource;
 class DisambiguationReadFailureTest extends LuceneExecutorTestBase {
   @TempDir Path directory;
 
-  @ParameterizedTest @ValueSource(strings = {"readiness", "completedCount", "selection", "fields"})
+  @ParameterizedTest(name = "{displayName} [{index}] {arguments}") @ValueSource(strings = {"readiness", "completedCount", "selection", "fields"})
   void realReaderFailuresCannotLatchIncompleteWork(String point) throws Exception {
     AtomicBoolean fail = new AtomicBoolean(true);
     AtomicBoolean reached = new AtomicBoolean();

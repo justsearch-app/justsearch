@@ -1,0 +1,16 @@
+diff --git a/modules/worker-core/src/main/java/io/justsearch/indexerworker/disambiguation/DisambiguationService.java b/modules/worker-core/src/main/java/io/justsearch/indexerworker/disambiguation/DisambiguationService.java
+index 17b53e1729..fbc5833f1f 100644
+--- a/modules/worker-core/src/main/java/io/justsearch/indexerworker/disambiguation/DisambiguationService.java
++++ b/modules/worker-core/src/main/java/io/justsearch/indexerworker/disambiguation/DisambiguationService.java
+@@ -81,6 +81,11 @@ public final class DisambiguationService implements Closeable {
+     return initialized.get();
+   }
+ 
++  // Before-state compatibility only: the one-shot scan has no saved physical cursor.
++  public int reconciliationCursor() {
++    return -1;
++  }
++
+   /** Returns the current cluster snapshot for query-time use (volatile read, ~1-5ns). */
+   public EntityClusterSnapshot snapshot() {
+     return snapshot;
