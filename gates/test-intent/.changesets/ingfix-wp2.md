@@ -1051,3 +1051,14 @@ Evidence is intentionally left for the orchestrator to generate using run-eviden
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a196d6-0c31-72b1-b7ca-f32fb0817413",
+  "verdict": "accept",
+  "digest": "sha256:211ebb0384ea79aafc8508a73426156e2073b95d0bdab15171224603e003b465",
+  "note": "Focused re-verification of 5f8eb48c82 after the final repair: C3 missing/unreadable referenced external weights leave companion identity unresolved on capture and the serving commit route (fail before on a82a8a0594); D93 and P1 hold; exempt files keep global state; entries 1-22 accepted with reasons. Transcribed by the orchestrator from the verifier's report."
+}
+```
