@@ -8,7 +8,7 @@ import '../renderers/controls/XUiRendererControl.js';
 import type { LibrarySurface } from './LibrarySurface.js';
 import type { FolderCardRenderer } from '../renderers/controls/FolderCardRenderer.js';
 import { createMockHostApi } from '../plugin-api/testHostApi.js';
-import { __feedForTest, __resetAiStateForTest, type StatusSnapshot } from '../state/aiStateStore.js';
+import { __feedForTest, __resetAiStateForTest, __tickClockForTest, type StatusSnapshot } from '../state/aiStateStore.js';
 import type { IndexedRootView } from '../../api/generated/schema-types/indexed-root-view.js';
 import type { FailedJobsDrawer } from '../components/FailedJobsDrawer.js';
 import { applyPresentationBodies, clearPresentation } from '../state/presentationRuntime.js';
@@ -173,7 +173,7 @@ it('A2 expanded facts replace the old metadata line', async () => {
 
 it('A3 A5 unconfirmed status and automatic waits are stated once in the page heading and summary', async () => {
   observe(20); const { el } = await mount();
-  Object.assign(el, { indexingActivity: { confirmed: false, summary: 'Indexing status unconfirmed', detail: null } });
+  Object.assign(el, { headlineStatusLive: false, indexingActivity: { confirmed: false, summary: 'Indexing status unconfirmed', detail: null } });
   await settle(el);
   expect(el.shadowRoot!.querySelector('h2')!.textContent).toContain('unconfirmed');
   expect(el.shadowRoot!.querySelector('.subtitle')!.textContent).not.toContain('Indexing status unconfirmed');
@@ -205,4 +205,22 @@ it.each(['fallback', 'themed'])('V1 %s disclosure retains focus on toggle and li
   find(el.shadowRoot!)!.click(); await settle(el);
   await vi.waitFor(() => expect(active()).toBe(find(el.shadowRoot!)));
   expect(find(el.shadowRoot!)!.getAttribute('aria-expanded')).toBe('false');
+});
+
+it('D keeps the last confirmed headline during transient stale samples, expires at the shared liveness threshold', async () => {
+  observe(20); const { el } = await mount();
+  const receivedAt = Date.now();
+  const headline = el.shadowRoot!.querySelector('h2')!.textContent;
+  const now = vi.spyOn(Date, 'now');
+  for (let second = 0; second < 25; second++) {
+    now.mockReturnValue(receivedAt + second * 1000);
+    __feedForTest({ status: { meta: { workerRpcAtMs: receivedAt },
+      operating: { freshness: { staleAfterMs: 30000, staleSources: second % 2 ? ['indexing'] : [] } },
+      worker: { core: { indexedDocuments: 20, indexState: 'IDLE', indexHealthy: true } }
+    } as unknown as StatusSnapshot });
+    await settle(el);
+    expect(el.shadowRoot!.querySelector('h2')!.textContent).toBe(headline);
+  }
+  now.mockReturnValue(receivedAt + 31000); __tickClockForTest(); await settle(el);
+  expect(el.shadowRoot!.querySelector('h2')!.textContent).toBe('Indexing status unconfirmed');
 });

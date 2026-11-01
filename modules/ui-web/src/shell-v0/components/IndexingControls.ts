@@ -3,7 +3,7 @@ import { SignalWatcher } from '@lit-labs/signals';
 import { css, html, nothing, type PropertyValues } from 'lit';
 import { JfElement } from '../primitives/JfElement.js';
 import { selectIndexingProgress, type IndexingProgress } from '../state/indexingProgress.js';
-import { getOperationClient } from '../operations/OperationClient.js';
+import { getOperationClient, type OperationInvocationSuccess } from '../operations/OperationClient.js';
 import { requestSurfaceNavigation, requestIndexingRuleNavigation } from '../controllers/navigateRequest.js';
 import { icon } from './Icon.js';
 import { requestAuthorization } from '../operations/authorizationBroker.js';
@@ -16,6 +16,7 @@ class IndexingControls extends SignalWatcher(JfElement) {
     toolbar: { type: Boolean, reflect: true }, menuOpen: { state: true },
     allowPause: { type: Boolean, attribute: 'allow-pause' },
     duration: { state: true }, pending: { state: true }, message: { state: true },
+    saveWithSettings: { attribute: false },
   };
   declare progress: IndexingProgress;
   declare apiBase: string;
@@ -26,6 +27,7 @@ class IndexingControls extends SignalWatcher(JfElement) {
   declare duration: number;
   declare pending: boolean;
   declare message: string;
+  declare saveWithSettings: ((write: (operationKey: string) => Promise<OperationInvocationSuccess>) => Promise<void>) | undefined;
 
   // Retain the last observed action through uncertain polls and while it has focus.
   // This is control identity, never a claim that indexing is paused or running.
@@ -139,10 +141,11 @@ class IndexingControls extends SignalWatcher(JfElement) {
     this.message = '';
     this.awaitingStatus = false;
     try {
-      await getOperationClient(this.apiBase).invokeWithConsent(
-        resume ? 'core.indexing-resume' : 'core.indexing-pause', { args },
+      const write = (operationKey?: string) => getOperationClient(this.apiBase).invokeWithConsent(
+        resume ? 'core.indexing-resume' : 'core.indexing-pause', { args, ...(operationKey ? { idempotencyKey: operationKey } : {}) },
         { requestConsent: requestAuthorization },
       );
+      if (this.saveWithSettings) await this.saveWithSettings(write); else await write();
       this.requestedResume = resume;
       this.awaitingStatus = true;
       this.message = 'Waiting for status to confirm the request.';

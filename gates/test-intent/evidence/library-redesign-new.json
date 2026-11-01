@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
   },
-  "createdAt": "2026-11-01T17:49:26.720Z",
-  "revision": "7c9a5fe9ced52ebe97934c563d4c65314df2f468",
-  "tree": "b133d1bdc98c744166b1846cff2bb0f2c6aa56e0",
+  "createdAt": "2026-11-01T19:13:29.562Z",
+  "revision": "d19aa236c7fc9359cae03201eb6a1d7d21b53c01",
+  "tree": "856d3f98d784d8f96382b6370fd65e308aa8d315",
   "environment": {
     "platform": "linux",
     "arch": "x64",
@@ -18,10 +18,10 @@
   },
   "runs": [
     {
-      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/chrome/Shell.test.ts\" \"src/shell-v0/commands/CommandPaletteProjection.test.ts\" \"src/shell-v0/components/SurfaceTabs.test.ts\" \"src/shell-v0/components/IndexingControls.toolbar.test.ts\" \"src/shell-v0/components/indexingStatusFollowup.test.ts\" \"src/shell-v0/views/LibrarySurface.excludes-override.test.ts\" \"src/shell-v0/views/LibrarySurface.folderActions.test.ts\" \"src/shell-v0/views/LibrarySurface.redesign.test.ts\" \"src/shell-v0/views/LibrarySurface.slice2.test.ts\" \"src/shell-v0/views/SettingsSurface.indexingRules.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/du6gb4k_/tmp/test-intent-vitest-3-1793555358524.json\"",
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/chrome/Shell.test.ts\" \"src/shell-v0/commands/CommandPaletteProjection.test.ts\" \"src/shell-v0/components/SurfaceTabs.test.ts\" \"src/shell-v0/components/IndexingControls.toolbar.test.ts\" \"src/shell-v0/components/indexingStatusFollowup.test.ts\" \"src/shell-v0/views/LibrarySurface.excludes-override.test.ts\" \"src/shell-v0/views/LibrarySurface.folderActions.test.ts\" \"src/shell-v0/views/LibrarySurface.redesign.test.ts\" \"src/shell-v0/views/LibrarySurface.slice2.test.ts\" \"src/shell-v0/views/SettingsSurface.indexingRules.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/dl6eky4a/tmp/test-intent-vitest-428-1793560397913.json\"",
       "cwd": "modules/ui-web",
       "exitCode": 0,
-      "durationMs": 8195
+      "durationMs": 11648
     }
   ],
   "checks": [
@@ -498,7 +498,7 @@
       "id": "modules/ui-web/src/shell-v0/views/LibrarySurface.redesign.test.ts",
       "file": "modules/ui-web/src/shell-v0/views/LibrarySurface.redesign.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:1a9dbb9ea5aa1984a85995a80dd4b677e99539709ee3fb00827b6d5578f3fc67",
+      "contentDigest": "sha256:27dec2dac83ad807653c8fe84ce086b33cce15bb24a376bb30420bb21f45b934",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -574,6 +574,10 @@
         {
           "name": "V1 themed disclosure retains focus on toggle and live refresh",
           "status": "passed"
+        },
+        {
+          "name": "D keeps the last confirmed headline during transient stale samples, expires at the shared liveness threshold",
+          "status": "passed"
         }
       ]
     },
@@ -581,7 +585,7 @@
       "id": "modules/ui-web/src/shell-v0/views/LibrarySurface.slice2.test.ts",
       "file": "modules/ui-web/src/shell-v0/views/LibrarySurface.slice2.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:72f4ff8a30f39646b8a16b907d5dc0fe94dc3160395d70114dcbda28195edfa9",
+      "contentDigest": "sha256:c90a590026743bd771752df9144a3cb2e307161f61a9e70fc19f6d3886aa2f99",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -639,15 +643,27 @@
           "status": "passed"
         },
         {
-          "name": "V2 scrolls the focused indexing control into view after layout from mounted",
+          "name": "B own Pause then Resume then time save, and time save then Pause then skip save, chain committed witnesses",
           "status": "passed"
         },
         {
-          "name": "V2 scrolls the focused indexing control into view after layout from new arrival",
+          "name": "B unrelated external write conflicts with skip rules, keeps the draft until explicit review, and permits the baseline absolute time save",
           "status": "passed"
         },
         {
-          "name": "V2 scrolls the focused indexing control into view after layout from Browse",
+          "name": "B missing operation witness never refreshes a skip-rule draft",
+          "status": "passed"
+        },
+        {
+          "name": "B gap operation witness never refreshes a skip-rule draft",
+          "status": "passed"
+        },
+        {
+          "name": "B wrong key operation witness never refreshes a skip-rule draft",
+          "status": "passed"
+        },
+        {
+          "name": "L19 configured disabled schedule survives successive rule saves and skip save",
           "status": "passed"
         }
       ]
@@ -656,7 +672,7 @@
       "id": "modules/ui-web/src/shell-v0/views/SettingsSurface.indexingRules.test.ts",
       "file": "modules/ui-web/src/shell-v0/views/SettingsSurface.indexingRules.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:b722fc281724b034799db6d57f7981cb48673a938cfe762dd3a8f29fd0cb8de7",
+      "contentDigest": "sha256:2f73b03f1e3031263f55ec79716464f076f7fa10376c207eaabc085295f3c31b",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -769,5 +785,5 @@
     }
   ],
   "failBefore": null,
-  "digest": "sha256:7e12c864fa505a62e267375470c1c43ddd97cadf1cc1e901c751b6ea38a1bc7f"
+  "digest": "sha256:15364beb98c09177d971163b608ddcb58242523afbee367ee30184b130bd5964"
 }

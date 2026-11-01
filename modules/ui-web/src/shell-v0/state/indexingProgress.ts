@@ -799,7 +799,7 @@ function indexingActivity(
   const summary = phase === 'indexing'
     ? energy || gpuCauses.length > 0 ? 'Text indexing continues' : 'Indexing'
     : phase === 'enriching'
-      ? energy ? 'Meaning processing is waiting' : gpuCauses.length > 0 ? 'Meaning processing is waiting' : 'Search is ready — still improving'
+      ? energy ? 'Meaning processing is waiting to save energy' : gpuCauses.length > 0 ? 'Meaning processing is waiting for the GPU' : 'Search is ready — still improving'
       : phase === 'blocked' ? 'Semantic search waiting for AI install'
         : status.worker?.core?.indexHealthy === true ? 'Ready — fully searchable' : 'Indexing queue empty';
   return { summary, detail: details.join(' ') || null, confirmed: true, enrichmentDeferred };

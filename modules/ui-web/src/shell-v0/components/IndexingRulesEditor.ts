@@ -2,10 +2,15 @@
 import { css, html, nothing, type PropertyValues } from 'lit';
 import { JfElement } from '../primitives/JfElement.js';
 import { authorizedFetch } from '../api/authorizedFetch.js';
-import { getOperationClient, OperationError } from '../operations/OperationClient.js';
+import { getOperationClient, OperationError, type OperationInvocationSuccess } from '../operations/OperationClient.js';
 import { requestAuthorization } from '../operations/authorizationBroker.js';
 import type { PluginHostApi } from '../plugin-api/plugin-types.js';
-import type { SettingsV2 } from '../../api/generated/schema-types/settings-v2.js';
+import { settingsV2Schema, type SettingsV2 } from '../../api/generated/schema-types/settings-v2.js';
+
+export type SavedIndexingRules = {
+  schedule: NonNullable<NonNullable<NonNullable<SettingsV2['ui']>['indexingPause']>['schedule']> | null;
+  pauseOnBattery: boolean;
+};
 
 /** The indexing editor, extracted from Settings. Only the explicit rule pair is written. */
 export class IndexingRulesEditor extends JfElement {
@@ -23,7 +28,8 @@ export class IndexingRulesEditor extends JfElement {
   declare host_: PluginHostApi | undefined;
   declare readOnly: boolean;
   /** Library serializes its two editors and advances their shared settings witness. */
-  declare saveWithSettings: ((write: (operationKey: string) => Promise<unknown>) => Promise<void>) | undefined;
+  declare saveWithSettings: ((write: (operationKey: string) => Promise<OperationInvocationSuccess>, saved: SavedIndexingRules) => Promise<void>) | undefined;
+  private savedRules: SavedIndexingRules = { schedule: null, pauseOnBattery: false };
   private loadSerial = 0;
   private indexingRulesDirty = false;
   private indexingScheduleConfigured = false;
@@ -46,12 +52,13 @@ export class IndexingRulesEditor extends JfElement {
     await this.updateComplete;
     const control = this.indexingRuleFocus;
     if (!control || !this.indexingRulesLoaded) return;
-    const target = this.shadowRoot?.getElementById(control === 'hours' ? 'indexing-hours' : 'indexing-battery');
-    // Navigation can request focus before the containing surface becomes visible. Wait for
-    // its layout frame before scrolling, and cancel if a newer request or navigation wins.
-    await new Promise<void>(resolve => requestAnimationFrame(() => resolve()));
+    // Let the containing surface and its tabs finish their queued updates. A view
+    // transition can suspend animation frames while its update callback is pending,
+    // so arrival focus must not wait for a paint to become available.
+    await new Promise<void>(resolve => setTimeout(resolve, 0));
     if (!this.isConnected || this.indexingRuleFocus !== control) return;
     this.indexingRuleFocus = null;
+    const target = this.shadowRoot?.getElementById(control === 'hours' ? 'indexing-hours' : 'indexing-battery');
     const focusTarget = this.readOnly ? this.shadowRoot?.getElementById('when-to-index') : target;
     focusTarget?.focus({ preventScroll: true });
     focusTarget?.scrollIntoView?.({ block: 'center', behavior: 'instant' });
@@ -86,13 +93,14 @@ export class IndexingRulesEditor extends JfElement {
     this.indexingRulesSaving = true;
     ++this.loadSerial;
     try {
+      const next: SavedIndexingRules = { schedule: this.indexingScheduleConfigured
+        ? { enabled: draft.enabled, days: [...draft.days], startMinute, endMinute } : null,
+        pauseOnBattery: draft.pauseOnBattery };
       const write = (operationKey?: string) => getOperationClient(this.apiBase).invokeWithConsent('core.set-indexing-rules', {
-        ...(operationKey ? { idempotencyKey: operationKey } : {}),
-        args: { schedule: this.indexingScheduleConfigured
-          ? { enabled: draft.enabled, days: [...draft.days], startMinute, endMinute } : null,
-          pauseOnBattery: draft.pauseOnBattery },
+        ...(operationKey ? { idempotencyKey: operationKey } : {}), args: next,
       }, { requestConsent: requestAuthorization });
-      if (this.saveWithSettings) await this.saveWithSettings(write); else await write();
+      if (this.saveWithSettings) await this.saveWithSettings(write, this.savedRules); else await write();
+      this.savedRules = next;
       this.indexingRulesDirty = false;
       this.indexingRulesMessage = 'Indexing rules saved.';
     } catch (error) {
@@ -137,12 +145,13 @@ export class IndexingRulesEditor extends JfElement {
       const res = this.host_ ? await this.host_.data.fetch('/api/settings/v2')
         : await authorizedFetch(`${this.apiBase}/api/settings/v2`);
       if (!res.ok) throw new Error(`Could not load indexing rules (${res.status}).`);
-      const data = await res.json() as SettingsV2;
+      const data = settingsV2Schema.parse(await res.json());
       if (serial !== this.loadSerial) return;
       this.readOnly = data.settingsMode === 'in_memory';
       if (!this.indexingRulesDirty && !this.indexingRulesSaving) {
         const policy = data.ui?.indexingPause;
         const schedule = policy?.schedule;
+        this.savedRules = { schedule: schedule ?? null, pauseOnBattery: policy?.pauseOnBattery ?? false };
         this.indexingScheduleConfigured = schedule != null;
         const time = (minutes: number) => `${String(Math.floor(minutes / 60)).padStart(2, '0')}:${String(minutes % 60).padStart(2, '0')}`;
         this.indexingRules = { enabled: schedule?.enabled ?? false,

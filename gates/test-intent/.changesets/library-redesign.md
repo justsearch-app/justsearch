@@ -37,16 +37,16 @@ Test ledger (all entries are durable product checks):
 - Tests added or rewritten: modules/ui-web/src/shell-v0/views/LibrarySurface.failedChip.test.ts — L16 — last-known failure state selector — durable
 - Tests added or rewritten: modules/ui-web/src/shell-v0/views/LibrarySurface.folderActions.test.ts — L12, P1, P2 — pending Add across member tabs — durable
 - Tests added or rewritten: modules/ui-web/src/shell-v0/views/LibrarySurface.gapDecision.test.ts — P6 — readable gap reasons and accept label — durable
-- Tests added or rewritten: modules/ui-web/src/shell-v0/views/LibrarySurface.redesign.test.ts — L5, L20, V1 — disclosure focus and shared row parity — durable
+- Tests added or rewritten: modules/ui-web/src/shell-v0/views/LibrarySurface.redesign.test.ts — L2, L5, L20, D, V1 — headline stability, disclosure focus and shared row parity — durable
 - Tests added or rewritten: modules/ui-web/src/shell-v0/views/LibrarySurface.render.test.ts — L2, L4, L5, L10 — moved heading and row facts — durable
 - Tests added or rewritten: modules/ui-web/src/shell-v0/views/LibrarySurface.settings-attempt.test.ts — L7 — retained-base settings transport and line inputs — durable
-- Tests added or rewritten: modules/ui-web/src/shell-v0/views/LibrarySurface.slice2.test.ts — L12, L14, L19, V2, V3 — scrolling, saves, external conflicts — durable
+- Tests added or rewritten: modules/ui-web/src/shell-v0/views/LibrarySurface.slice2.test.ts — L12, L14, L19, B, V3 — focus requests, witnessed saves, external conflicts — durable
 - Tests added or rewritten: modules/ui-web/src/shell-v0/views/SettingsSurface.indexingRules.test.ts — L8, L14, L15 — moved editor and remedies — durable
 
 Execution evidence was produced by the repository's unmodified run-evidence.mjs in a shared clone
 inside the session temporary directory, with its own copied dependencies. Its detached before
 checkouts belong to that clone and do not write into the source repository. VITEST_MAX_WORKERS=4.
-Failed-files repair compares with 08a63452b2; the verifier's V1/V2/V3 repairs compare with 7c9a5fe9ce.
+Failed-files repair compares with 08a63452b2; the verifier's V1/V3 repairs compare with 7c9a5fe9ce. Round-3 B/C/D checks compare with d19aa236c7. V2 geometry is exercised in real Chromium by jseval arrival steps; happy-dom only checks focus intent delivery.
 Browser viewport and actual native-shell verification are independent of these unit checks.
 
 ```json
@@ -69,15 +69,16 @@ Browser viewport and actual native-shell verification are independent of these u
       "moved": [
         "rename",
         "split",
-        "input re-encoding"
+        "input re-encoding",
+        "instrumentation"
       ],
-      "whatMoved": "Pause recovery selects the non-toolbar remedy; row Remove is reached by opening its disclosure and selecting Remove from library; Add Folder is now Add folder; accept-gaps is now Use the new index without them, with the same exact gap reason expressed in words. Skip rules moved from one newline-separated textarea to individual line inputs; saved-pattern review selects its named details element. Settings-request counts select the original witnessed/AbortSignal transport, excluding the new editor's independent settings read. Announcements select the surface action status after the toolbar gained a status node; failed metadata selects the folder state containing the same retry/rebuild qualifiers. Inputs, preconditions, observation, fault injection, expected outcome, tags and conditions are kept; only presentation selectors, control encoding and wording moved.",
+      "whatMoved": "Pause recovery selects the non-toolbar remedy; row Remove is reached by opening its disclosure and selecting Remove from library; Add Folder is now Add folder; accept-gaps is now Use the new index without them, with the same exact gap reason expressed in words. Skip rules moved from one newline-separated textarea to individual line inputs; saved-pattern review selects its named details element. Instrumentation moved: settings-request counts select the original witnessed/AbortSignal transport, excluding the new editor's independent settings read. Announcements select the surface action status after the toolbar gained a status node; failed metadata selects the folder state containing the same retry/rebuild qualifiers. Inputs, preconditions, observation, fault injection, expected outcome, tags and conditions are kept; only presentation selectors, control encoding and wording moved.",
       "sources": [
         {
           "kind": "owner-adopted-scenario",
           "task": "t-20261101-uiimpl",
           "scenario": "L1",
-          "quote": "The Folders tab is one page using the whole window: headline, one summary line, attention items (when any), folder list, skip rules and indexing times, then one-line links to other apps' documents and Activity. Window actions sit beside the member tabs (Folders, Browse): Pause indexing with until-I-resume / 15 min / 1 h, a ⋯ menu with Reindex everything and Process pending work, and a filled Add folder. No card boxes or outlined pill buttons. Tab semantics, keyboard navigation and focus restoration of SurfaceTabs stay intact.",
+          "quote": "The Folders tab is one page using the whole window: headline, one summary line, attention items (when any), folder list, skip rules and indexing times, then one-line links to other apps' documents and Activity. Window actions sit beside the member tabs (Folders, Browse): Pause indexing with until-I-resume / 15 min / 1 h, a \u22ef menu with Reindex everything and Process pending work, and a filled Add folder. No card boxes or outlined pill buttons. Tab semantics, keyboard navigation and focus restoration of SurfaceTabs stay intact.",
           "label": "agent-drafted, owner-adopted"
         },
         {
@@ -160,7 +161,7 @@ Browser viewport and actual native-shell verification are independent of these u
         "split",
         "input re-encoding"
       ],
-      "whatMoved": "Idle enrichment deferred / Enrichment pending is worded Meaning processing is waiting; save energy becomes saves energy; sparse enrichment becomes some meaning processing. The same reason matrices, freshness transitions, no-active-progress, aggregate, announcements and ready-versus-enriching outcomes remain. The Library sweep calls renderCardsRegion after renderCard was retired, with the original root as its single input. Inputs, preconditions, observation, fault injection, expected outcome, tags and conditions are kept; only presentation selectors, control encoding and wording moved.",
+      "whatMoved": "The distinct energy and GPU summary labels are preserved as Meaning processing is waiting to save energy / Meaning processing is waiting for the GPU; exact status-deck chip and selector expectations keep those causes separate; save energy becomes saves energy; sparse enrichment becomes some meaning processing. The same reason matrices, freshness transitions, no-active-progress, aggregate, announcements and ready-versus-enriching outcomes remain. The Library sweep calls renderCardsRegion after renderCard was retired, with the original root as its single input. Inputs, preconditions, observation, fault injection, expected outcome, tags and conditions are kept; only presentation selectors, control encoding and wording moved.",
       "sources": [
         {
           "kind": "owner-adopted-scenario",
@@ -311,7 +312,7 @@ Browser viewport and actual native-shell verification are independent of these u
           "kind": "owner-adopted-scenario",
           "task": "t-20261101-uiimpl",
           "scenario": "L1",
-          "quote": "The Folders tab is one page using the whole window: headline, one summary line, attention items (when any), folder list, skip rules and indexing times, then one-line links to other apps' documents and Activity. Window actions sit beside the member tabs (Folders, Browse): Pause indexing with until-I-resume / 15 min / 1 h, a ⋯ menu with Reindex everything and Process pending work, and a filled Add folder. No card boxes or outlined pill buttons. Tab semantics, keyboard navigation and focus restoration of SurfaceTabs stay intact.",
+          "quote": "The Folders tab is one page using the whole window: headline, one summary line, attention items (when any), folder list, skip rules and indexing times, then one-line links to other apps' documents and Activity. Window actions sit beside the member tabs (Folders, Browse): Pause indexing with until-I-resume / 15 min / 1 h, a \u22ef menu with Reindex everything and Process pending work, and a filled Add folder. No card boxes or outlined pill buttons. Tab semantics, keyboard navigation and focus restoration of SurfaceTabs stay intact.",
           "label": "agent-drafted, owner-adopted"
         }
       ],
@@ -331,7 +332,7 @@ Browser viewport and actual native-shell verification are independent of these u
           "kind": "owner-adopted-scenario",
           "task": "t-20261101-uiimpl",
           "scenario": "L1",
-          "quote": "The Folders tab is one page using the whole window: headline, one summary line, attention items (when any), folder list, skip rules and indexing times, then one-line links to other apps' documents and Activity. Window actions sit beside the member tabs (Folders, Browse): Pause indexing with until-I-resume / 15 min / 1 h, a ⋯ menu with Reindex everything and Process pending work, and a filled Add folder. No card boxes or outlined pill buttons. Tab semantics, keyboard navigation and focus restoration of SurfaceTabs stay intact.",
+          "quote": "The Folders tab is one page using the whole window: headline, one summary line, attention items (when any), folder list, skip rules and indexing times, then one-line links to other apps' documents and Activity. Window actions sit beside the member tabs (Folders, Browse): Pause indexing with until-I-resume / 15 min / 1 h, a \u22ef menu with Reindex everything and Process pending work, and a filled Add folder. No card boxes or outlined pill buttons. Tab semantics, keyboard navigation and focus restoration of SurfaceTabs stay intact.",
           "label": "agent-drafted, owner-adopted"
         },
         {
@@ -558,7 +559,7 @@ Browser viewport and actual native-shell verification are independent of these u
         "modules/ui-web/src/shell-v0/views/LibrarySurface.slice2.test.ts"
       ],
       "class": "New",
-      "behaviour": "Skip rules edit/add/remove one line at a time with explicit Save. Both save orders and quick succession preserve both settings pairs after reload without a self-conflict, including subsequent saves. Serialized writes survive tab changes; a rule-save completion survives reload while another window keeps its own dirty draft. Settings links to the Library editor and saves retain recovery/manual deadlines. Live and cold focus requests coalesce once, select Folders from Browse, and scroll the focused control into view after layout. Genuine external settings changes still conflict in either editor and never overwrite that change or either local draft.",
+      "behaviour": "Skip rules edit/add/remove one line at a time with explicit Save. Both save orders and quick succession preserve both settings pairs after reload without a self-conflict, including subsequent saves. Serialized writes survive tab changes; a rule-save completion survives reload while another window keeps its own dirty draft. Settings links to the Library editor and saves retain recovery/manual deadlines. Live and cold focus requests coalesce once, select Folders from Browse, and request focus once; actual scrolling is checked by the jseval Chromium arrival steps. External changes to the respective settings still conflict in either editor and never overwrite that change or either local draft. Deferred focus assertions wait for completion of the arrival task without changing their exact target or outcome.",
       "sources": [
         {
           "kind": "owner-adopted-scenario",
@@ -636,7 +637,7 @@ Browser viewport and actual native-shell verification are independent of these u
         "modules/ui-web/src/shell-v0/views/LibrarySurface.slice2.test.ts"
       ],
       "class": "New",
-      "behaviour": "Repair pins for V1/L5: themed row focus remains on its toggle on open, live refresh and close, with aria-expanded synchronized. V2/L14: mounted, cold-arrival and Browse navigation focus and center the requested control after layout with no animation. V3/L19: both sequential save orders and quick successive saves share local successors, permit a following save and persist both values after reload. Every named check passes on the candidate and fails by assertion on 7c9a5fe9ce.",
+      "behaviour": "Repair pins for V1/L5: themed row focus remains on its toggle on open, live refresh and close, with aria-expanded synchronized. V3/L19: both sequential save orders and quick successive saves share local successors, permit a following save and persist both values after reload. Real Chromium arrival geometry replaces the three V2 happy-dom scroll-argument checks; jseval captures governance tooling outside the flagged product test set.",
       "sources": [
         {
           "kind": "owner-adopted-scenario",
@@ -670,13 +671,56 @@ Browser viewport and actual native-shell verification are independent of these u
       "evidence": "gates/test-intent/evidence/library-redesign-repairs.json",
       "newChecks": [
         "modules/ui-web/src/shell-v0/views/LibrarySurface.redesign.test.ts#V1 themed disclosure retains focus on toggle and live refresh",
-        "modules/ui-web/src/shell-v0/views/LibrarySurface.slice2.test.ts#V2 scrolls the focused indexing control into view after layout from mounted",
-        "modules/ui-web/src/shell-v0/views/LibrarySurface.slice2.test.ts#V2 scrolls the focused indexing control into view after layout from new arrival",
-        "modules/ui-web/src/shell-v0/views/LibrarySurface.slice2.test.ts#V2 scrolls the focused indexing control into view after layout from Browse",
         "modules/ui-web/src/shell-v0/views/LibrarySurface.slice2.test.ts#L19 rules first saves both editors without a local conflict and keeps edits after reload",
         "modules/ui-web/src/shell-v0/views/LibrarySurface.slice2.test.ts#L19 exclusions first saves both editors without a local conflict and keeps edits after reload",
         "modules/ui-web/src/shell-v0/views/LibrarySurface.slice2.test.ts#V3 quick successive saves rules first share only local witnesses",
-        "modules/ui-web/src/shell-v0/views/LibrarySurface.slice2.test.ts#V3 quick successive saves exclusions first share only local witnesses"
+        "modules/ui-web/src/shell-v0/views/LibrarySurface.slice2.test.ts#V3 quick successive saves exclusions first share only local witnesses",
+        "modules/ui-web/src/shell-v0/views/LibrarySurface.slice2.test.ts#L19 configured disabled schedule survives successive rule saves and skip save"
+      ],
+      "repaired": true
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/views/LibrarySurface.redesign.test.ts",
+        "modules/ui-web/src/shell-v0/views/LibrarySurface.slice2.test.ts",
+        "modules/ui-web/src/shell-v0/components/indexingStatusSurfaces.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "Round-3 repairs B/C/D: own Pause/Resume/time-save receipts advance only a directly succeeding held witness; missing, gapped and mismatched receipts cannot refresh a skip-rule draft. External settings writes keep skip-rule conflicts until explicit reload/review; the baseline absolute indexing-times write still succeeds after an unrelated external write. The headline remains stable for 25 transient stale samples, then expires at the shared liveness threshold. Exact distinct energy/GPU labels reach the status-deck chip.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "L19",
+          "quote": "Existing contract (LibrarySurface.settings-attempt.test.ts, main): the exclusion save carries the witness read with the draft, never refreshes it before saving, advances it only from its own committed result, and after any version conflict requires an explicit reload with the draft kept. That contract is kept (data safety).",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "L2",
+          "quote": "The new headline must not alternate between \"N things need your attention\" and \"Indexing status unconfirmed\" at idle; switch to the unconfirmed wording only when status stays unconfirmed past the existing liveness threshold, otherwise keep the last confirmed headline (with its last-known qualifier where the existing rules require one).",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "P10",
+          "quote": "Restore distinct plain-language labels for the energy hold and the GPU hold everywhere they were distinct before (status deck chip included); tests assert the exact distinct strings again, not substrings.",
+          "label": "agent-drafted, owner-adopted"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/library-redesign-round3.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/views/LibrarySurface.redesign.test.ts#D keeps the last confirmed headline during transient stale samples, expires at the shared liveness threshold",
+        "modules/ui-web/src/shell-v0/views/LibrarySurface.slice2.test.ts#B own Pause then Resume then time save, and time save then Pause then skip save, chain committed witnesses",
+        "modules/ui-web/src/shell-v0/views/LibrarySurface.slice2.test.ts#B unrelated external write conflicts with skip rules, keeps the draft until explicit review, and permits the baseline absolute time save",
+        "modules/ui-web/src/shell-v0/views/LibrarySurface.slice2.test.ts#B missing operation witness never refreshes a skip-rule draft",
+        "modules/ui-web/src/shell-v0/views/LibrarySurface.slice2.test.ts#B gap operation witness never refreshes a skip-rule draft",
+        "modules/ui-web/src/shell-v0/views/LibrarySurface.slice2.test.ts#B wrong key operation witness never refreshes a skip-rule draft",
+        "modules/ui-web/src/shell-v0/components/indexingStatusSurfaces.test.ts#C distinct energy_saver summary reaches the status chip",
+        "modules/ui-web/src/shell-v0/components/indexingStatusSurfaces.test.ts#C distinct game_mode summary reaches the status chip",
+        "modules/ui-web/src/shell-v0/components/indexingStatusSurfaces.test.ts#C distinct gpu_busy_external summary reaches the status chip"
       ],
       "repaired": true
     }

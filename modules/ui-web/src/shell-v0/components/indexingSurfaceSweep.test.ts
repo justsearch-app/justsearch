@@ -251,7 +251,7 @@ describe('WP3.3 complete surface sweep', () => {
       const el = harness('jf-status-deck', state);
       el.aiState = { ...state, statusLabel: 'Indexing', aiEngine: { kind: 'indexing', stability: { kind: 'settled' }, installFailure: null } };
       expect(el.inferenceChipReadout().label, which).toBe(unconfirmed(which) ? UNCONFIRMED
-        : which === 'energy' ? 'Meaning processing is waiting' : which === 'chat' ? 'Search is ready — still improving' : 'Meaning processing is waiting');
+        : which === 'energy' ? 'Meaning processing is waiting to save energy' : which === 'chat' ? 'Search is ready — still improving' : 'Meaning processing is waiting for the GPU');
     }
   });
   it('S33.1 S33.4 Search composer and chat-off explanations use observed indexing activity and scoped reasons', () => {

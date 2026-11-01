@@ -17,6 +17,7 @@
 
 import { html, css, nothing, type TemplateResult } from 'lit';
 import { createOperationKey } from '../../api/operationKey.js';
+import { settingsV2Schema } from '../../api/generated/schema-types/settings-v2.js';
 import { repeat } from 'lit/directives/repeat.js';
 import { renderFolderRow, folderRowStyles, type FolderRow, type FolderRowIntent } from '../components/folderRow.js';
 import { createSettingsAttempt, executeSettingsAttempt, readSettingsObservation, SettingsAttemptError, type SettingsAttempt, type SettingsWitness } from '../../api/settingsAttempt.js';
@@ -27,7 +28,7 @@ import type { ForgetPage, ForgetOutcome } from '../../api/generated/schema-types
 import { confirmForget } from '../components/searchResults/forgetConsent.js';
 import { JfElement } from '../primitives/JfElement.js';
 import '../components/OpButton.js';
-import { OperationError } from '../operations/OperationClient.js';
+import { OperationError, type OperationInvocationSuccess } from '../operations/OperationClient.js';
 import type { OpSuccessEventDetail, OpErrorEventDetail } from '../components/OpButton.js';
 import '../components/Button.js';
 import type { JfButton } from '../components/Button.js';
@@ -46,7 +47,7 @@ import { activeBodyFor, subscribePresentation } from '../state/presentationRunti
 import { subscribeAiState } from '../state/aiStateStore.js';
 import '../components/IndexingControls.js';
 import '../components/IndexingRulesEditor.js';
-import type { IndexingRulesEditor } from '../components/IndexingRulesEditor.js';
+import type { IndexingRulesEditor, SavedIndexingRules } from '../components/IndexingRulesEditor.js';
 import '../components/FailedJobsDrawer.js';
 import { LIBRARY_CARDS_REGION } from '../themes/builtinPresentations.js';
 import '../components/DeclaredSurface.js';
@@ -434,6 +435,7 @@ export class LibrarySurface extends JfElement {
     this.forgetDecisionKey = null;
     this.forgetMessage = '';
     this.excludesBusy = false;
+    this.pendingIndexingFocus = undefined;
     this.excludesError = null;
     this.excludesNotice = '';
     this.excludesResult = null;
@@ -734,6 +736,9 @@ export class LibrarySurface extends JfElement {
 
   private indexingRuleUnsub: (() => void) | undefined;
   private indexingFocusSerial = 0;
+  private pendingIndexingFocus: IndexingRuleControl | undefined;
+  private headlineStatusLive = false;
+  private lastConfirmedHeadline: string | undefined;
 
   private requestIndexingFocus(control: IndexingRuleControl): void {
     const serial = ++this.indexingFocusSerial;
@@ -779,6 +784,7 @@ export class LibrarySurface extends JfElement {
         s.episodeMaxPendingJobs,
         s.enrichSettleSamples,
       );
+      this.headlineStatusLive = s.indexingStatusLive;
       this.indexingActivity = progress.activity;
       this.indexProgress = progress;
       this.retryWaiting = progress.activity.confirmed && progress.phase === 'waiting';
@@ -891,6 +897,11 @@ export class LibrarySurface extends JfElement {
 
   protected override updated(changed: Map<string, unknown>): void {
     super.updated(changed);
+    if (!this.loading && this.pendingIndexingFocus) {
+      const control = this.pendingIndexingFocus;
+      this.pendingIndexingFocus = undefined;
+      void this.focusIndexingRule(control);
+    }
     if (this.focusedFolderToggle) void this.restoreFolderToggleFocus(this.focusedFolderToggle);
     if (changed.has('apiBase') && changed.get('apiBase') !== undefined
         || changed.has('activeTab') && changed.get('activeTab') !== undefined) {
@@ -1445,23 +1456,34 @@ export class LibrarySurface extends JfElement {
     return pending;
   }
 
-  private readonly saveIndexingRulesWithSettings = (write: (operationKey: string) => Promise<unknown>): Promise<void> =>
+  private async invokeSettingsWrite(write: (operationKey: string) => Promise<OperationInvocationSuccess>): Promise<void> {
+    const operationKey = createOperationKey();
+    const result = await write(operationKey);
+    const receipt = settingsV2Schema.pick({ witness: true }).safeParse({ witness: result.structuredData?.witness });
+    const witness = receipt.success ? receipt.data.witness : null;
+    // Only this write's direct successor can advance a retained draft. A missing receipt
+    // or an intervening writer leaves its original witness to the normal conflict path.
+    if (witness && this.excludesWitness && !this.excludesAttempt && !this.excludesConflict
+        && witness.acceptedRevision === this.excludesWitness.acceptedRevision + 1
+        && witness.lastCommittedOperationKey === operationKey) this.excludesWitness = witness;
+  }
+
+  private readonly saveSettingsOperation = (write: (operationKey: string) => Promise<OperationInvocationSuccess>): Promise<void> =>
+    this.queueSettingsWrite(() => this.invokeSettingsWrite(write));
+
+  private readonly saveIndexingRulesWithSettings = (write: (operationKey: string) => Promise<OperationInvocationSuccess>, saved: SavedIndexingRules): Promise<void> =>
     this.queueSettingsWrite(async () => {
-      // Do not adopt another window's revision just because our own rule write follows it.
       const before = await readSettingsObservation((path, init) => this.doFetch(path, init));
-      if (!this.excludesWitness || this.excludesAttempt
-          || before.witness.acceptedRevision !== this.excludesWitness.acceptedRevision
-          || before.witness.lastCommittedOperationKey !== this.excludesWitness.lastCommittedOperationKey) {
-        throw new Error('Settings changed elsewhere. Reload saved patterns and review your edits before saving again.');
+      const policy = before.ui?.indexingPause;
+      const schedule = policy?.schedule ?? null;
+      const sameSchedule = schedule === null ? saved.schedule === null : saved.schedule !== null
+        && schedule.enabled === saved.schedule.enabled
+        && schedule.startMinute === saved.schedule.startMinute && schedule.endMinute === saved.schedule.endMinute
+        && JSON.stringify(schedule.days) === JSON.stringify(saved.schedule.days);
+      if (this.excludesAttempt || !sameSchedule || (policy?.pauseOnBattery ?? false) !== saved.pauseOnBattery) {
+        throw new Error('Indexing times changed elsewhere. Review saved indexing rules before saving your draft.');
       }
-      const operationKey = createOperationKey();
-      await write(operationKey);
-      const after = await readSettingsObservation((path, init) => this.doFetch(path, init));
-      if (after.witness.acceptedRevision !== before.witness.acceptedRevision + 1
-          || after.witness.lastCommittedOperationKey !== operationKey) {
-        throw new Error('Indexing rules were saved, but settings changed elsewhere. Reload and review before saving again.');
-      }
-      this.excludesWitness = after.witness;
+      await this.invokeSettingsWrite(write);
     });
 
   private async persistExcludes(): Promise<boolean> {
@@ -1969,7 +1991,8 @@ export class LibrarySurface extends JfElement {
     }
     if (this.indexProgress.pause) items.push({ key: 'hold', title: this.indexingActivity.summary,
       detail: this.indexingActivity.detail ?? undefined,
-      actions: html`<jf-indexing-controls compact .progress=${this.indexProgress} api-base=${this.apiBase}></jf-indexing-controls>` });
+      actions: html`<jf-indexing-controls compact .progress=${this.indexProgress} api-base=${this.apiBase}
+        .saveWithSettings=${this.saveSettingsOperation}></jf-indexing-controls>` });
     if (this.reindexCancelKey && !['complete', 'failed', 'unknown', 'expired'].includes(this.bulkOutcome?.state ?? '')) items.push({ key: 'rebuild', title: 'Rebuild in progress' });
     for (const item of this.unfinishedForgets?.items ?? []) items.push({ key: `forget:${item.operationKey}`, title: 'Unfinished removal' });
     if (this.bulkOutcome && ['failed', 'unknown', 'expired'].includes(this.bulkOutcome.state)) items.push({ key: 'bulk', title: 'Rebuild outcome needs checking',
@@ -1992,7 +2015,7 @@ export class LibrarySurface extends JfElement {
 
   private get activitySentence(): string {
     const activity = this.indexingActivity;
-    if (!activity.confirmed) return '';
+    if (!activity.confirmed) return this.headlineStatusLive && this.lastConfirmedHeadline ? 'Indexing status unconfirmed — details last known' : '';
     // The detail already names this wait and its cause; announce it once.
     if (activity.summary === 'Meaning processing is waiting' && activity.detail) return activity.detail;
     return [activity.summary, activity.detail].filter(Boolean).join(' — ');
@@ -2001,8 +2024,10 @@ export class LibrarySurface extends JfElement {
   async focusIndexingRule(control: 'hours' | 'battery'): Promise<void> {
     const serial = ++this.indexingFocusSerial;
     this.activeTab = 'folders';
+    this.pendingIndexingFocus = control;
     await this.updateComplete;
-    if (!this.isConnected || serial !== this.indexingFocusSerial) return;
+    if (this.loading || !this.isConnected || serial !== this.indexingFocusSerial) return;
+    this.pendingIndexingFocus = undefined;
     const editor = this.shadowRoot?.querySelector<IndexingRulesEditor>('jf-indexing-rules-editor');
     await editor?.focusIndexingRule(control);
   }
@@ -2010,12 +2035,13 @@ export class LibrarySurface extends JfElement {
   private renderHeader(): TemplateResult {
     const count = this.attentionItems().length;
     const headline = this.loading ? 'Loading your Library…'
-      : !this.indexingActivity.confirmed ? this.indexingActivity.summary
+      : !this.indexingActivity.confirmed ? this.headlineStatusLive && this.lastConfirmedHeadline ? this.lastConfirmedHeadline : this.indexingActivity.summary
         : count ? `${count} ${count === 1 ? 'thing needs' : 'things need'} your attention`
           : this.provisional ? 'Rebuilding your Library'
             : !this.roots.length ? 'Add a folder to start searching'
               : !this.defaultScopeDocuments.known ? 'Checking your folders'
                 : this.defaultScopeDocuments.value === 0 ? 'Indexing your files' : 'Your files are searchable';
+    if (!this.loading && this.indexingActivity.confirmed) this.lastConfirmedHeadline = headline;
     return html`<div class="header"><div class="header-left"><h2>${headline}</h2>
       <p class="subtitle">${this.defaultScopeDocuments.known ? `${this.defaultScopeDocuments.value.toLocaleString()} searchable documents` : 'Searchable document count unconfirmed'}
         · ${this.roots.length} ${this.roots.length === 1 ? 'folder' : 'folders'}${this.activitySentence ? ` · ${this.activitySentence}` : ''}</p>
@@ -2024,7 +2050,8 @@ export class LibrarySurface extends JfElement {
 
   private renderWindowActions(): TemplateResult {
     return html`        <div slot="actions" class="window-actions">
-          <jf-indexing-controls data-testid="library-indexing-pause" compact toolbar allow-pause .progress=${this.indexProgress} api-base=${this.apiBase}></jf-indexing-controls>
+          <jf-indexing-controls data-testid="library-indexing-pause" compact toolbar allow-pause .progress=${this.indexProgress} api-base=${this.apiBase}
+            .saveWithSettings=${this.saveSettingsOperation}></jf-indexing-controls>
           <details class="more-actions"><summary aria-label="More Library actions">${icon({ name: 'more-horizontal', size: 18 })}</summary><div>
           <!-- Tempdoc 511 Phase 9: <jf-operation> aggregate component
                supersedes the slice 509 <jf-op-button>. LibrarySurface

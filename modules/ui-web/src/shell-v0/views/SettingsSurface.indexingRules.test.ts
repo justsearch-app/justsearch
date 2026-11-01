@@ -124,7 +124,7 @@ describe('WP3.8b rules editor', () => {
     await el.focusIndexingRule('hours');
     release(Response.json({ ui: { indexingPause: { schedule: saved, pauseOnBattery: true } } }));
     await settle(el);
-    expect(el.shadowRoot!.activeElement?.id).toBe('indexing-hours');
+    await vi.waitFor(() => expect(el.shadowRoot!.activeElement?.id).toBe('indexing-hours'));
     expect(input(el, 'input[type=time]').value).toBe('22:00');
   });
   it('S38.7 keeps read-only rules readable without issuing a save', async () => {

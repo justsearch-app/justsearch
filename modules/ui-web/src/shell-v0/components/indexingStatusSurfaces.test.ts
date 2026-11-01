@@ -7,6 +7,7 @@ import './IndexingOverlay.js';
 import '../views/HealthSurface.js';
 import '../views/LibrarySurface.js';
 import { __feedForTest, __resetAiStateForTest, __tickClockForTest, getAiState, type StatusSnapshot } from '../state/aiStateStore.js';
+import { selectIndexingProgress } from '../state/indexingProgress.js';
 import { __resetTasksForTest } from '../substrates/tasks/index.js';
 import type { LibrarySurface } from '../views/LibrarySurface.js';
 import type { PluginHostApi } from '../plugin-api/plugin-types.js';
@@ -150,7 +151,7 @@ describe('WP3.3 shared status surfaces', () => {
     feed(status(0));
     await mountAll();
     for (const [i, text] of texts().entries()) {
-      expect(text, surfaces[i]!.localName).toContain(i === 4 ? 'Meaning search is waiting' : 'Meaning processing is waiting');
+      expect(text, surfaces[i]!.localName).toContain('Meaning processing is waiting to save energy');
       expect(text, surfaces[i]!.localName).toContain('saves energy');
       expect(text, surfaces[i]!.localName).not.toMatch(/Ready — fully searchable|Up to date|System idle|Batch Processing Active/);
     }
@@ -197,7 +198,7 @@ describe('WP3.3 shared status surfaces', () => {
     const library = surfaces[4] as LibrarySurface;
     library.roots = library.roots.map(root => ({ ...root, inFlightCount: 0 }));
     await flush();
-    expect(library.shadowRoot!.textContent).toContain('Meaning processing');
+    expect(library.shadowRoot!.querySelector('.folder-state .card-meta')?.textContent?.trim()).toBe('Meaning processing');
     expect(library.shadowRoot!.textContent).not.toContain('0%');
   });
 
@@ -225,4 +226,13 @@ describe('WP3.3 shared status surfaces', () => {
       expect(surfaces.slice(1).flatMap((el) => [...el.shadowRoot!.querySelectorAll('[data-testid="indexing-announcer"]')])).toHaveLength(0);
     } finally { observer.disconnect(); }
   });
+});
+
+it.each([['energy_saver', 'Meaning processing is waiting to save energy'],
+  ['game_mode', 'Meaning processing is waiting for the GPU'],
+  ['gpu_busy_external', 'Meaning processing is waiting for the GPU']])('C distinct %s summary reaches the status chip', async (reason, summary) => {
+  const snapshot = status(0, [reason]);
+  expect(selectIndexingProgress(snapshot, true, 0, []).activity.summary).toBe(summary);
+  feed(snapshot); await mountAll();
+  expect(surfaces[0]!.shadowRoot!.querySelector('jf-indexing-controls')?.parentElement?.textContent).toContain(summary);
 });

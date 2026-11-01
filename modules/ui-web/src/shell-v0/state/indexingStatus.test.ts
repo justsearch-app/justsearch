@@ -40,7 +40,7 @@ describe('WP3.3 shared indexing activity', () => {
       confirmed: true, enrichmentDeferred: true,
     });
     expect(activity(snapshot(0, 80, ['energy_saver']))).toMatchObject({
-      summary: 'Meaning processing is waiting', detail: 'Meaning search is waiting while the computer saves energy.',
+      summary: 'Meaning processing is waiting to save energy', detail: 'Meaning search is waiting while the computer saves energy.',
     });
   });
 
@@ -49,7 +49,7 @@ describe('WP3.3 shared indexing activity', () => {
       for (const placement of [true, false, undefined]) {
         for (const jobs of [0, 4]) {
           expect(activity(snapshot(jobs, 80, [reason!], placement))).toMatchObject({
-            summary: jobs ? 'Text indexing continues' : 'Meaning processing is waiting',
+            summary: jobs ? 'Text indexing continues' : 'Meaning processing is waiting for the GPU',
             detail: `GPU-bound idle enrichment deferred while ${cause}. CPU-only idle enrichment can continue. Sparse enrichment between files also waits, including on CPU.`,
             enrichmentDeferred: true,
           });
@@ -85,7 +85,7 @@ describe('WP3.3 shared indexing activity', () => {
   it('S33.1 does not call an empty file queue Ready while energy-deferred enrichment waits even with wire IDLE', () => {
     const status = snapshot(0, 80, ['energy_saver']);
     status.operating!.indexing!.state = 'IDLE';
-    expect(activity(status)).toMatchObject({ summary: 'Meaning processing is waiting', enrichmentDeferred: true });
+    expect(activity(status)).toMatchObject({ summary: 'Meaning processing is waiting to save energy', enrichmentDeferred: true });
   });
 
   it('S33.5 caps indexing with a positive tail', () => {

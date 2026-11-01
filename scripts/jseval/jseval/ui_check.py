@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import re
 import time
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field, replace
@@ -1389,6 +1390,80 @@ def _build_steps(ui_url: str, cooldown_ms: int, timeout_ms: int) -> list[Step]:
             await _settle_focus_marks(page)
         return setup
 
+    def setup_library_arrival(route, width, height):
+        async def setup(page):
+            # The minimal capture catalog only declares Settings members. Supply the
+            # production Library/Browse composition through the real catalog transport.
+            catalog = json.loads(ui_fixtures._surfaces_catalog_body())
+            catalog["entries"].extend([
+                ui_fixtures._surface_entry("core.library-surface", "jf-library-surface", "RAIL",
+                                           members=["core.browse-surface"]),
+                ui_fixtures._surface_entry("core.browse-surface", "jf-browse-surface", "DEEPLINK"),
+            ])
+            async def library_catalog(request):
+                await request.fulfill(status=200, content_type="application/json", body=json.dumps(catalog))
+            await page.route("**/api/registry/surfaces*", library_catalog)
+            await page.reload(wait_until="domcontentloaded")
+            await _await_app_ready(page)
+            await page.set_viewport_size({"width": width, "height": height})
+            if route == "reduced":
+                await page.emulate_media(reduced_motion="reduce")
+            if route in ("palette", "browse", "attention"):
+                await _view_setup("library")(page)
+            if route == "settings":
+                await _view_setup("settings")(page)
+                await page.get_by_role("button", name="Indexing", exact=True).click()
+            elif route == "browse":
+                await page.get_by_role("tab", name="Browse", exact=True).click()
+            elif route != "attention":
+                await _view_setup("home")(page)
+            if route == "palette":
+                await page.keyboard.press("Control+k")
+                await page.get_by_role("option").filter(has_text="Change indexing rules").click()
+            elif route in ("status", "browse"):
+                control = page.locator('jf-status-deck').get_by_role("button", name="Change hours", exact=True)
+                if not await control.is_visible():
+                    await page.get_by_role("button", name=re.compile(r"more status item")).click()
+                await control.click()
+            elif route in ("tasks", "reduced"):
+                await page.locator('jf-task-list').get_by_role("button", name="Change hours", exact=True).click()
+            elif route == "settings":
+                await page.locator('jf-settings-surface').get_by_role("button", name="Change when to index", exact=True).click()
+            else:
+                await page.locator('jf-library-surface .attention').get_by_role("button", name="Change when to index", exact=True).first.click()
+            target = page.locator(S.CSS_LIBRARY_INDEXING_HOURS)
+            await target.wait_for(state="visible")
+            # Let navigation, root loading and all finite layout transitions settle without
+            # Playwright's focus/click auto-scroll repairing the result being measured.
+            await page.wait_for_timeout(1500)
+            result = await target.evaluate("""el => {
+                let active = document.activeElement;
+                while (active?.shadowRoot?.activeElement) active = active.shadowRoot.activeElement;
+                const r = el.getBoundingClientRect();
+                const clips = [{top: 0, bottom: innerHeight, left: 0, right: innerWidth}];
+                for (let a = el.parentElement ?? el.getRootNode().host; a;
+                     a = a.assignedSlot ?? a.parentElement ?? a.getRootNode().host) {
+                    if (/(auto|scroll|hidden|clip)/.test(getComputedStyle(a).overflowY)) clips.push(a.getBoundingClientRect());
+                }
+                return {focused: active === el, rect: r.toJSON(), clips: clips.map(b => ({top:b.top,bottom:b.bottom})),
+                    visible: r.height > 0 && clips.every(b => r.top >= b.top - 1 && r.bottom <= b.bottom + 1)};
+            }""")
+            assert result["focused"] and result["visible"], f"Library arrival {route} {width}x{height}: {result}"
+            print(f"Library arrival {route} {width}x{height}: focused and fully visible {result['rect']}")
+        return setup
+
+    async def setup_library_idle_headline(page):
+        await _view_setup("library")(page)
+        heading = page.locator('jf-library-surface h2')
+        await heading.wait_for(state="visible")
+        await page.wait_for_timeout(1500)
+        samples = []
+        for _ in range(25):
+            samples.append(await heading.inner_text())
+            await page.wait_for_timeout(1000)
+        assert len(set(samples)) == 1 and "unconfirmed" not in samples[0], samples
+        print(f"Library idle headline: 25 one-second samples, one headline: {samples[0]}")
+
     def setup_library_size(width, height):
         async def setup(page):
             await page.set_viewport_size({"width": width, "height": height})
@@ -2180,6 +2255,11 @@ def _build_steps(ui_url: str, cooldown_ms: int, timeout_ms: int) -> list[Step]:
              fixtures_variant="indexing-rules"),
         Step("library-indexing-held", setup=setup_indexing_rules(focus_rules=False), isolated=True,
              fixtures_variant="indexing-rules"),
+        *[Step(f"library-arrival-{route}-{width}x{height}", setup=setup_library_arrival(route, width, height),
+               isolated=True, fixtures_variant="indexing-rules")
+          for route in ("tasks", "palette", "status", "browse", "attention", "settings", "reduced")
+          for width, height in ((1280, 720), (600, 400))],
+        Step("library-idle-headline", setup=setup_library_idle_headline, isolated=True, fixtures_variant="enriching"),
         Step("library-medium", setup=setup_library_size(760, 720), isolated=True,
              fixtures_variant="enriching"),
         Step("library-minimum", setup=setup_library_size(600, 400), isolated=True,
