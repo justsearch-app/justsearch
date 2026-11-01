@@ -167,6 +167,15 @@ keeps it as “still referenced”; an independent retry can release it. Non-dis
 evidence remains. The same procedure applies after a wave is explicitly
 retired; see the qualification README for chain protection and receipts.
 
+Pruning inventories regular files by qcow2 header magic (`QFI\xfb`), regardless
+of filename, without following symlinks. Every `base.qcow2` under the root and
+every disk named by a `base.json` receipt anywhere under it is a protected base,
+including moved-aside OS folders; selecting a subtree containing one refuses.
+Apply holds the VM lifetime lock throughout and repeats the whole inventory
+before the first unlink; any changed image set, identity or backing reference
+refuses all deletions. Only writers taking that lock are serialised. Images
+written by other tools can race pruning; stop those tools before pruning.
+
 VM evidence and snapshot destinations must be inside the qualification root
 (`/home/elias/dev/justsearch-qual`); replace example `/path/to/*evidence` paths
 accordingly. This makes all sealed layers visible to disk inventory and the

@@ -121,41 +121,41 @@ def disk_identity(path):
     return info.st_dev, info.st_ino, info.st_size, info.st_mtime_ns, info.st_ctime_ns
 
 
-def prune_plan(targets, reason):
-    if not targets:
-        raise RuntimeError('Pruning requires an explicitly selected evidence subtree')
-    if not reason.strip():
-        raise RuntimeError('Pruning requires a nonempty reason')
-    selected = [internal_path(ROOT / target) for target in targets]
+def prune_inventory():
+    disks, records = {}, []
     bases = {internal_path(ROOT / name / 'base.qcow2') for name in OS}
+    for path, info in tree_entries():
+        if path.name == 'base.qcow2':
+            bases.add(internal_path(path))
+        if not stat.S_ISREG(info.st_mode):
+            continue
+        internal_path(path)
+        if path.name == 'base.json':
+            records.append(path)
+        try:
+            with os.fdopen(os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK), 'rb') as source:
+                magic = source.read(4)
+        except OSError as exc:
+            raise RuntimeError(f'Cannot read image header {path}: {exc}') from exc
+        if magic == b'QFI\xfb':
+            if info.st_nlink != 1:
+                raise RuntimeError(f'Ambiguous qcow2 disk: {path}')
+            disks[path] = disk_identity(path)
     # Base receipts may also name a nonstandard base disk.
     def named_disks(value, folder):
-        if isinstance(value, str) and value.endswith('.qcow2'):
-            bases.add(internal_path(folder / value))
+        if isinstance(value, str):
+            path = Path(os.path.abspath(folder / value))
+            if value.endswith('.qcow2') or path in disks:
+                bases.add(internal_path(path))
         elif isinstance(value, dict):
             for item in value.values():
                 named_disks(item, folder)
         elif isinstance(value, list):
             for item in value:
                 named_disks(item, folder)
-    for name in OS:
-        record = internal_path(ROOT / name / 'base.json')
-        if record.exists():
-            named_disks(json.loads(record.read_text()), record.parent)
-    for target in selected:
-        if not target.is_dir():
-            raise RuntimeError(f'Evidence subtree is not a directory: {target}')
-        if target == ROOT.resolve() or target in [ROOT / n for n in OS] or any(
-                base.is_relative_to(target) for base in bases):
-            raise RuntimeError(f'Refusing selection containing a base, OS directory or qualification root: {target}')
-    disks = {}
-    for path, info in tree_entries():
-        if path.suffix == '.qcow2':
-            internal_path(path)
-            if not stat.S_ISREG(info.st_mode) or info.st_nlink != 1:
-                raise RuntimeError(f'Ambiguous qcow2 disk: {path}')
-            disks[path] = disk_identity(path)
-    parents, missing = {}, {}
+    for record in records:
+        named_disks(json.loads(record.read_text()), record.parent)
+    parents, missing, backings = {}, {}, {}
     # Inspect each layer separately: unlike --backing-chain this lets a positive
     # ENOENT end one chain without hiding corrupt/unreadable existing members.
     pending = list(disks)
@@ -166,6 +166,7 @@ def prune_plan(targets, reason):
             if info['format'] != 'qcow2':
                 raise ValueError('not qcow2')
             backing = info.get('backing-filename')
+            backings[path] = backing
             parent = None
             if backing:
                 if ':' in backing:
@@ -185,6 +186,23 @@ def prune_plan(targets, reason):
             parents[path] = parent
         except (OSError, ValueError, KeyError, RuntimeError, subprocess.SubprocessError) as exc:
             raise RuntimeError(f'Cannot inspect qcow2 {path}: {exc}') from exc
+    return disks, parents, missing, backings, bases
+
+
+def prune_plan(targets, reason):
+    if not targets:
+        raise RuntimeError('Pruning requires an explicitly selected evidence subtree')
+    if not reason.strip():
+        raise RuntimeError('Pruning requires a nonempty reason')
+    selected = [internal_path(ROOT / target) for target in targets]
+    inventory = prune_inventory()
+    disks, parents, missing, _, bases = inventory
+    for target in selected:
+        if not target.is_dir():
+            raise RuntimeError(f'Evidence subtree is not a directory: {target}')
+        if target == ROOT.resolve() or target in [ROOT / n for n in OS] or any(
+                base.is_relative_to(target) for base in bases):
+            raise RuntimeError(f'Refusing selection containing a base, OS directory or qualification root: {target}')
     chains = {}
     for head in disks:
         chain = []
@@ -210,7 +228,7 @@ def prune_plan(targets, reason):
             'planned': [{'path': str(p), 'allocatedBytes': p.stat().st_blocks * 512} for p in planned],
             'protected': {str(p): why for p, why in sorted(protected.items())},
             'missingBacking': {str(p): target for p, target in missing.items()}, 'deleted': []}
-    return plan, disks
+    return plan, inventory
 
 
 def prune_disks(targets, reason, apply=False):
@@ -225,7 +243,8 @@ def prune_disks(targets, reason, apply=False):
             except BlockingIOError:
                 raise RuntimeError('VM lifetime lock held; refusing prune') from None
         ensure_free(check_lock=False)
-        plan, identities = prune_plan(targets, reason)
+        plan, inventory = prune_plan(targets, reason)
+        identities = inventory[0]
         if apply:
             target = Path(plan['subtrees'][0])
             receipt = target.parent / (target.name + '.prune-' + str(time.time_ns()) + '.json')
@@ -234,6 +253,10 @@ def prune_disks(targets, reason, apply=False):
                 json.dump(plan, out, indent=2)
                 out.write('\n')
             try:
+                # All harness disk writers share this lifetime lock. Re-scan the
+                # whole graph, including heads published since the first scan.
+                if prune_inventory() != inventory:
+                    raise RuntimeError('Disk inventory changed since prune plan')
                 for path, expected in identities.items():
                     if disk_identity(internal_path(path)) != expected:
                         raise RuntimeError(f'Disk changed since prune plan: {path}')

@@ -49,6 +49,84 @@ class DiskGrowthTests(unittest.TestCase):
         subprocess.run(['qemu-img', 'info', '--output=json', '--backing-chain', str(path)],
                        check=True, capture_output=True)
 
+    def prune_cli(self, *targets, apply=False, publish_child=None):
+        # Exercise the actual parser and command in a child process, redirecting
+        # only its root and host liveness probes to keep all resources private.
+        source = '''
+import fcntl, json, os, sys
+from pathlib import Path
+sys.path.insert(0, sys.argv[1])
+import vm
+vm.ROOT = Path(sys.argv[2])
+vm.STATE = vm.ROOT / 'running.json'
+vm.live_reasons = lambda check_lock=True: []
+child = json.loads(sys.argv[3])
+if child:
+    original = vm.prune_plan
+    def publish(*args):
+        plan = original(*args)
+        with (vm.ROOT / 'vm.lock').open() as lease:
+            try:
+                fcntl.flock(lease, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            except BlockingIOError:
+                pass
+            else:
+                raise AssertionError('Apply did not hold the VM lifetime lock')
+        path, backing = map(Path, child)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        vm.run('qemu-img', 'create', '-q', '-f', 'qcow2', '-F', 'qcow2', '-b', backing, path)
+        return plan
+    vm.prune_plan = publish
+sys.argv = ['vm.py', 'prune-disks', *sys.argv[4:]]
+vm.main()
+'''
+        harness = os.environ.get('QUAL_HARNESS_DIR', str(Path(__file__).resolve().parent))
+        return subprocess.run([sys.executable, '-c', source, harness, str(self.root),
+            json.dumps(list(map(str, publish_child)) if publish_child else None),
+            *targets, '--reason', 'regression retirement', *(['--apply'] if apply else [])],
+            capture_output=True, text=True, timeout=30)
+
+    def test_cli_kept_child_with_img_suffix_protects_selected_parent(self):
+        parent = self.image('evidence/old/disk.qcow2', self.base)
+        child = self.image('kept/child.img', parent)
+        result = self.prune_cli('evidence/old')
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(json.loads(result.stdout)['planned'], [])
+        applied = self.prune_cli('evidence/old', apply=True)
+        self.assertEqual(applied.returncode, 0, applied.stderr)
+        self.assertEqual(json.loads(applied.stdout)['deleted'], [])
+        self.readable(child)
+
+    def test_cli_moved_aside_os_base_refuses_selection(self):
+        (self.root / 'ubuntu').rename(self.root / 'ubuntu-old')
+        base = self.root / 'ubuntu-old/base.qcow2'
+        result = self.prune_cli('ubuntu-old', apply=True)
+        self.assertNotEqual(result.returncode, 0, result.stdout)
+        self.assertIn('Refusing selection containing a base', result.stderr)
+        self.readable(base)
+        self.assertEqual(list(self.root.glob('*.prune-*.json')), [])
+
+    def test_cli_head_published_after_plan_refuses_before_unlink(self):
+        parent = self.image('evidence/old/disk.qcow2', self.base)
+        child = self.root / 'kept/child.qcow2'
+        result = self.prune_cli('evidence/old', apply=True, publish_child=(child, parent))
+        self.assertNotEqual(result.returncode, 0, result.stdout)
+        self.assertIn('inventory changed since prune plan', result.stderr)
+        self.assertTrue(parent.exists())
+        self.readable(child)
+        receipt = next((self.root / 'evidence').glob('old.prune-*.json'))
+        self.assertEqual(json.loads(receipt.read_text())['deleted'], [])
+
+    def test_moved_base_receipt_protects_nonstandard_image_name(self):
+        disk = self.image('evidence/old/disk.img', self.base)
+        record = self.root / 'windows-old/base.json'
+        record.parent.mkdir()
+        record.write_text(json.dumps({'disk': '../evidence/old/disk.img'}))
+        result = self.prune_cli('evidence/old', apply=True)
+        self.assertNotEqual(result.returncode, 0, result.stdout)
+        self.assertIn('Refusing selection containing a base', result.stderr)
+        self.readable(disk)
+
     def test_independent_retirement_preserves_non_disks_and_requires_apply(self):
         disk = self.image('evidence/retired/snapshot/disk.qcow2', self.base)
         log = disk.parent / 'run.log'; log.write_bytes(b'unchanged evidence\x00')
@@ -112,7 +190,7 @@ class DiskGrowthTests(unittest.TestCase):
 
     def test_corrupt_or_unreadable_image_anywhere_aborts_every_deletion(self):
         disk = self.image('evidence/old/disk.qcow2', self.base)
-        bad = self.root / 'elsewhere.qcow2'; bad.write_bytes(b'corrupt')
+        bad = self.root / 'elsewhere.qcow2'; bad.write_bytes(b'QFI\xfbcorrupt')
         with self.assertRaisesRegex(RuntimeError, 'elsewhere.qcow2'):
             self.prune('evidence/old', apply=True)
         self.assertTrue(disk.exists()); bad.unlink()

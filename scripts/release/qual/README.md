@@ -64,8 +64,11 @@ python3 scripts/release/qual/vm.py prune-disks evidence/retired-wave \
 ```
 
 Multiple subtrees may be selected. Retirement is never inferred from age,
-names, reports or GitHub. Stop the VM first. The command inventories all qcow2
-layers and follows their backing chains. Bases, retained run disks and other
+names, reports or GitHub. Stop the VM first. The command inventories regular files
+by their qcow2 header magic (`QFI\xfb`), regardless of filename, without following
+symlinks, and follows their backing chains. Every `base.qcow2` anywhere under the
+root is a base, as is any disk named by any `base.json` receipt under the root,
+including moved-aside OS folders. Bases, retained run disks and other
 kept disks protect their ancestors; protected paths explain why they remain.
 Selections containing a base, OS directory or the root, symlinked/escaping
 paths, corrupt or unreadable images, and ambiguous chains refuse deletion.
@@ -79,6 +82,12 @@ the reason, planned deletions with allocated bytes, protection reasons, and
 actual completed deletions. A receipt must be writable before deletion begins;
 an unlink failure stops immediately. Re-running recomputes the graph and keeps
 earlier receipts. The default dry run writes nothing.
+
+Apply holds the VM lifetime lock for the whole operation and re-inventories the
+root immediately before the first unlink. A changed image set, file identity or
+backing reference refuses all deletions. Harness disk creation, VM lifetimes and
+snapshot sealing share that lock. Only writers taking the VM lock are serialised;
+images written by other tools can race this check. Stop those tools before pruning.
 
 Journey summaries record `storage.snapshotBytes` after a layer and its
 manifest/checkpoint are fully sealed. It counts that layer's allocated bytes,
