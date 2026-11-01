@@ -1238,6 +1238,10 @@ public final class CombinedEnrichmentBackfillOps {
       }
       int written = 0;
       if (!batchUpdates.isEmpty()) {
+        if (batchUpdates.stream().anyMatch(entry ->
+            SchemaFields.NER_STATUS_COMPLETED.equals(entry.getValue().get(SchemaFields.NER_STATUS)))) {
+          context.documentFieldOps().markNerPublished();
+        }
         var result = batch.updateBatch(batchUpdates);
         written = result.updatedCount();
         if (written == batchUpdates.size()) {
