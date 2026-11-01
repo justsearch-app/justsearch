@@ -372,3 +372,14 @@ to produce acceptable repair evidence with this runner version.
   "note": "All 10 entries accepted; exempt-file duties met (32 cases pass unskipped, repair checks fail before by assertion, isolation probes restored)."
 }
 ```
+
+```json
+{
+  "kind": "audit",
+  "role": "reviewer",
+  "session": "01a1987a-0a61-7511-89a1-58ed29265fd6",
+  "verdict": "accept",
+  "digest": "sha256:4138f92cad320ffb01d22f32ad027e1aff98d767d7567b415fe668c12cfd7627",
+  "note": "Audit: all 10 entries and exempt-file duties accepted; earlier findings resolved. The auditor saw the existing acceptance record early and reports excluding it from its assessment."
+}
+```
