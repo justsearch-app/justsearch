@@ -139,6 +139,12 @@ final class WorkerIngestionAuthority {
               "Source is not a regular file"));
     }
 
+    if (SourceContentHash.isCloudPlaceholder(filePath)) {
+      return SourceAdmission.terminal(SourceAdmissionAction.RETRYABLE_FAILURE,
+          outcome(IngestionOutcomeClass.DEFERRED_POLICY, IngestionReasonCodes.CLOUD_PLACEHOLDER,
+              IngestionRetryPolicy.DEFER_WITHOUT_ATTEMPT,
+              "Cloud-only placeholder; reading would hydrate over network"));
+    }
     if (!Files.isReadable(filePath)) {
       return SourceAdmission.terminal(
           SourceAdmissionAction.RETRYABLE_FAILURE, sourceUnreadable(filePath, null));

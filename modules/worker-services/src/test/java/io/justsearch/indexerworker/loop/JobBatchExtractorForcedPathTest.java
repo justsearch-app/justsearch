@@ -91,7 +91,7 @@ final class JobBatchExtractorForcedPathTest {
     // Nothing changed on disk — the index's view of this doc is current. This is the precondition
     // that makes the UNCHANGED branch the DEFAULT outcome, so taking it is not the finding; NOT
     // taking it is.
-    when(documentFieldOps.isUnmodified(anyString(), anyLong(), anyLong())).thenReturn(true);
+    when(documentFieldOps.isUnmodified(anyString(), anyLong(), anyLong(), anyString())).thenReturn(true);
 
     IndexCountOps indexCountOps = mock(IndexCountOps.class);
     // A non-empty index, so the `indexEmptyForBatch` short-circuit (312 item 10) is NOT what
@@ -237,7 +237,7 @@ final class JobBatchExtractorForcedPathTest {
     Harness h = newHarness(legacyMarks);
     var claim = new JobQueue.IndexJob(file, null, null, "recorded", "unit", 1L, true, null, file);
     h.extractor().extractAll(List.of(claim));
-    verify(h.documentFieldOps(), never()).isUnmodified(anyString(), anyLong(), anyLong());
+    verify(h.documentFieldOps(), never()).isUnmodified(anyString(), anyLong(), anyLong(), anyString());
     verify(h.contentExtractor()).extractArtifact(file);
     assertTrue(legacyMarks.isEmpty());
   }
@@ -250,7 +250,7 @@ final class JobBatchExtractorForcedPathTest {
     Harness h = newHarness(legacyMarks);
     var claim = new JobQueue.IndexJob(file, null, null, "recorded", "unit", 1L, false, null, file);
     h.extractor().extractAll(List.of(claim));
-    verify(h.documentFieldOps()).isUnmodified(eq(forcedKey(file)), anyLong(), anyLong());
+    verify(h.documentFieldOps()).isUnmodified(eq(forcedKey(file)), anyLong(), anyLong(), anyString());
     verify(h.contentExtractor(), never()).extractArtifact(any());
     assertEquals(Set.of(forcedKey(file)), legacyMarks, "a recorded claim cannot steal legacy force intent");
   }
@@ -272,7 +272,7 @@ final class JobBatchExtractorForcedPathTest {
     assertEquals(List.of(), h.extractor().extractAll(List.of(claim)));
 
     verify(h.contentExtractor(), never()).extractArtifact(any());
-    verify(h.documentFieldOps(), never()).isUnmodified(anyString(), anyLong(), anyLong());
+    verify(h.documentFieldOps(), never()).isUnmodified(anyString(), anyLong(), anyLong(), anyString());
   }
 
   @Test
@@ -289,7 +289,7 @@ final class JobBatchExtractorForcedPathTest {
     verify(h.journal(), never()).recordOutcomeSafely(any(), eq("UNCHANGED"), any());
     // The force short-circuits `!forceReindex && ...` before the mtime lookup, so the check is
     // never even asked — a stronger assertion than "it was asked and ignored".
-    verify(h.documentFieldOps(), never()).isUnmodified(anyString(), anyLong(), anyLong());
+    verify(h.documentFieldOps(), never()).isUnmodified(anyString(), anyLong(), anyLong(), anyString());
     assertTrue(forcedPaths.isEmpty(), "the mark is one-shot: consumed by this pass, not sticky");
   }
 
@@ -305,7 +305,7 @@ final class JobBatchExtractorForcedPathTest {
     // The inverse arm: identical file, identical mocks, empty forced set. Without this, the test
     // above could pass because extraction always runs, proving nothing about the force.
     assertEquals(List.of(), extracted, "an unchanged doc yields no extracted job");
-    verify(h.documentFieldOps()).isUnmodified(eq(forcedKey(file)), anyLong(), anyLong());
+    verify(h.documentFieldOps()).isUnmodified(eq(forcedKey(file)), anyLong(), anyLong(), anyString());
     verify(h.contentExtractor(), never()).extractArtifact(any());
     verify(h.journal()).recordOutcomeSafely(eq(file), eq("UNCHANGED"), any());
     verify(h.batchStats()).recordSkipped();
@@ -439,7 +439,7 @@ final class JobBatchExtractorForcedPathTest {
     unchangedOrder.verify(unchangedHarness.identityStore()).resolve(anyString(), anyLong());
     unchangedOrder
         .verify(unchangedHarness.documentFieldOps())
-        .isUnmodified(eq(forcedKey(unchanged)), anyLong(), anyLong());
+        .isUnmodified(eq(forcedKey(unchanged)), anyLong(), anyLong(), anyString());
 
     Path forced = Files.writeString(tempDir.resolve("forced.txt"), "same");
     Set<String> forcedPaths = ConcurrentHashMap.newKeySet();
@@ -468,7 +468,7 @@ final class JobBatchExtractorForcedPathTest {
 
     assertEquals(List.of(), extracted, "no artifact may escape without a persisted identity");
     verify(h.contentExtractor(), never()).extractArtifact(any());
-    verify(h.documentFieldOps(), never()).isUnmodified(anyString(), anyLong(), anyLong());
+    verify(h.documentFieldOps(), never()).isUnmodified(anyString(), anyLong(), anyLong(), anyString());
     verify(h.journal()).recordOutcomeSafely(eq(file), eq("WRITE_FAILED(document_identity)"), any());
     verify(h.batchStats()).recordFailed();
   }
@@ -508,7 +508,7 @@ final class JobBatchExtractorForcedPathTest {
 
     verify(h.contentExtractor()).extractArtifact(submitted);
     verify(h.journal(), never()).recordOutcomeSafely(any(), eq("UNCHANGED"), any());
-    verify(h.documentFieldOps(), never()).isUnmodified(anyString(), anyLong(), anyLong());
+    verify(h.documentFieldOps(), never()).isUnmodified(anyString(), anyLong(), anyLong(), anyString());
     assertTrue(forcedPaths.isEmpty(), "the envelope's lookup consumed the mark");
   }
 

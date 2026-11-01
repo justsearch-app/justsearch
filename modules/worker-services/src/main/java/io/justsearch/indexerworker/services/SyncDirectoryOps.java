@@ -85,12 +85,6 @@ final class SyncDirectoryOps {
   private static final int MAX_INDEXED_PATHS_FOR_MISSING_SCAN = 200_000;
   private static final int MAX_INDEXED_PATH_CHARS_FOR_MISSING_SCAN = 16 * 1024 * 1024;
 
-  private static final boolean HAS_DOS_ATTRIBUTES =
-      java.nio.file.FileSystems.getDefault().supportedFileAttributeViews().contains("dos");
-
-  /** FILE_ATTRIBUTE_RECALL_ON_DATA_ACCESS — set on OneDrive cloud-only placeholders. */
-  private static final int RECALL_ON_DATA_ACCESS = 0x00400000;
-
   private final ReadPathOps readPathOps;
   private final PruneOps pruneOps;
   private final CommitOps commitOps;
@@ -1275,19 +1269,7 @@ final class SyncDirectoryOps {
    * network download; skip them during indexing.
    */
   static boolean isCloudPlaceholder(Path file) {
-    if (!HAS_DOS_ATTRIBUTES) return false;
-    try {
-      int attrs = (int) Files.getAttribute(file, "dos:attributes");
-      return (attrs & RECALL_ON_DATA_ACCESS) != 0;
-    } catch (IOException | UnsupportedOperationException | IllegalArgumentException e) {
-      // A file whose Windows cloud-placeholder attribute cannot be read is not a placeholder.
-      // On some non-Windows JDKs the default FS advertises a "dos" view (so HAS_DOS_ATTRIBUTES
-      // is true) yet rejects the raw "attributes" name with IllegalArgumentException
-      // ('attributes' not recognized) — treat that as "not a placeholder", same as the other
-      // unreadable cases. Keeps the worker's scan cross-platform (tempdoc 668). No-op on Windows,
-      // where the attribute is always readable.
-      return false;
-    }
+    return io.justsearch.indexerworker.loop.SourceContentHash.isCloudPlaceholder(file);
   }
 
   /** Delegates the observation and its admission attribution to the shared recorder. */

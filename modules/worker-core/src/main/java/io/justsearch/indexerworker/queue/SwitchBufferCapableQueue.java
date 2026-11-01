@@ -234,6 +234,12 @@ public interface SwitchBufferCapableQueue extends JobQueue {
         "Atomic generation-scoped batch admission is unavailable");
   }
 
+  /** Rediscovery covers an identical candidate admission without replacing its job or receipt. */
+  default boolean enqueueMaintenanceFileForGeneration(
+      String generation, EnqueueEntry entry, String collection) {
+    throw new UnsupportedOperationException("Atomic candidate rediscovery is unavailable");
+  }
+
   /**
    * Covers a native migration enumeration batch atomically. An earlier accepted foreground
    * mutation for the same candidate path wins over this baseline scan; the covered count includes

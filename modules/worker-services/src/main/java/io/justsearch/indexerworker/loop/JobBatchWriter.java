@@ -148,9 +148,14 @@ public final class JobBatchWriter {
     String publishedPath = null;
     try {
       if (!jobQueue.ownsClaimForPublication(ex.claim())) {
+        stageRecorder.record("write", 0, IngestionReasonCodes.LOST_CLAIM_OWNERSHIP);
+        log.info("Discarding superseded publication for {}: {}", ex.filePath(),
+            IngestionReasonCodes.LOST_CLAIM_OWNERSHIP);
         journal.recordOutcomeSafely(ex.filePath(), "SUPERSEDED_BEFORE_WRITE",
             () -> jobQueue.markClaimDone(ex.claim(),
-                journal.skipped(IngestionReasonCodes.DELETED_AFTER_SNAPSHOT),
+                journal.outcome(IngestionOutcomeClass.STALE_SOURCE,
+                    IngestionReasonCodes.LOST_CLAIM_OWNERSHIP, IngestionRetryPolicy.NONE,
+                    "Publication claim superseded"),
                 LedgerEntryFactory.forEnvelope(ex.envelope(), ex.collection(), ex.artifact(),
                     contentExtractor.extractionPolicy(), ex.provenance())));
         batchStats.recordSkipped();
