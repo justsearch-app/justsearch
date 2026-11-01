@@ -45,7 +45,10 @@ function library(state: AiState): LibrarySurface {
   el.provisional = state.stability.kind === 'provisional';
   const progress = selectIndexingProgress(state.status, state.indexingStatusLive, state.episodeMaxPendingJobs, state.enrichSettleSamples);
   el.indexingActivity = progress.activity;
-  Object.assign(el, { indexProgress: progress });
+  const rebuilding = state.stability.kind === 'provisional' &&
+    (state.stability.cause === 'rebuilding' || state.stability.cause === 'generation-switch');
+  Object.assign(el, { indexProgress: progress, rebuilding,
+    provisionalHeadline: rebuilding ? 'Rebuilding your Library' : state.statusLabel });
   return el;
 }
 function dom(template: TemplateResult): HTMLDivElement {

@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
   },
-  "createdAt": "2026-11-01T21:46:34.440Z",
-  "revision": "7c124c7c228707305855589b4e151c97cabb277a",
-  "tree": "e1ee0b21b9e6bb3839469a41daceaaba35e03178",
+  "createdAt": "2026-11-01T22:48:46.816Z",
+  "revision": "2b29617fcb38298986b79bfe9294aba6ddd4b6eb",
+  "tree": "59ba30d0623331bd3e2097d3d83075555f63b5a5",
   "environment": {
     "platform": "linux",
     "arch": "x64",
@@ -18,10 +18,10 @@
   },
   "runs": [
     {
-      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/state/indexingFreshness.test.ts\" \"src/shell-v0/components/indexingStatusSurfaces.test.ts\" \"src/shell-v0/components/indexingStatusFollowup.test.ts\" \"src/shell-v0/components/indexingSurfaceSweep.test.ts\" \"src/shell-v0/components/indexingMissedSurfaces.test.ts\" \"src/shell-v0/views/LibrarySurface.redesign.test.ts\" \"src/shell-v0/views/SettingsSurface.settingsRecovery.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/5iqrcnfb/tmp/test-intent-vitest-318-1793569585652.json\"",
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/state/indexingFreshness.test.ts\" \"src/shell-v0/components/indexingStatusSurfaces.test.ts\" \"src/shell-v0/components/indexingStatusFollowup.test.ts\" \"src/shell-v0/components/indexingSurfaceSweep.test.ts\" \"src/shell-v0/components/indexingMissedSurfaces.test.ts\" \"src/shell-v0/views/LibrarySurface.redesign.test.ts\" \"src/shell-v0/views/SettingsSurface.settingsRecovery.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/isqhj119/tmp/test-intent-vitest-3-1793573319166.json\"",
       "cwd": "modules/ui-web",
       "exitCode": 0,
-      "durationMs": 8784
+      "durationMs": 7644
     }
   ],
   "checks": [
@@ -123,7 +123,7 @@
       "id": "modules/ui-web/src/shell-v0/components/indexingStatusFollowup.test.ts",
       "file": "modules/ui-web/src/shell-v0/components/indexingStatusFollowup.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:d3ad1ea0f98dd90b3869037ed3cd4ae96bea697e8690bf8dfab4b089d44bb3c0",
+      "contentDigest": "sha256:98f83bcb2bea98e8d5a263f995d4149773e364dbe1fd7677e6f8e14f4843ac82",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -500,5 +500,5 @@
     }
   ],
   "failBefore": null,
-  "digest": "sha256:83cbe82f4605a29a49990c48cea247be5eb03610ee0b304347074dac2ab80b99"
+  "digest": "sha256:851efa23a31c1780b75d5f41502a1604548dfbd211e2b64eab96f85eba1bdd1f"
 }

@@ -12,7 +12,13 @@ agent-drafted, owner-adopted scenarios. Adaptation entries preserve the prior or
 name their added or intentionally relocated expectations. The preserved portions of mixed files
 are described explicitly. No test is deleted, skipped or disabled.
 
+Entries 18 and 19 cite the earlier S33.4 expectation verbatim from
+`gates/test-intent/.changesets/uiux-status.md:60`. The age bound is an agent choice under the
+owner's quoted delegation, not owner wording or the orchestrator's round decision.
+
 Test ledger (all entries are durable product checks):
+
+- Tests added or rewritten: modules/ui-web/src/shell-v0/views/LibrarySurface.transitions.test.ts — L2, L10 — shared catching-up/restart wording, empty roots and recovery, real migration preservation — durable
 
 - Tests added or rewritten: modules/ui-web/src/shell-v0/chrome/Shell.test.ts — L14, P9 — navigation/history and recovery — durable
 - Tests added or rewritten: modules/ui-web/src/shell-v0/commands/CommandPaletteProjection.test.ts — L14 — indexing-rules route — durable
@@ -378,7 +384,7 @@ Browser viewport and actual native-shell verification are independent of these u
         "modules/ui-web/src/shell-v0/components/indexingStatusFollowup.test.ts"
       ],
       "class": "New",
-      "behaviour": "Existing retained migration checks keep inputs and outcomes; the empty observation moves to the add-a-folder headline. The rebuild decision heading itself must carry the existing unknown qualifier, as well as the panel body, for retained/nonfresh observations. Its detached Library harness now passes the same complete progress projection as the live subscription, including the existing liveness verdict; every empty/rebuilding/freshness expectation is unchanged.",
+      "behaviour": "Existing retained migration checks keep inputs and outcomes; the empty observation moves to the add-a-folder headline. The rebuild decision heading itself must carry the existing unknown qualifier, as well as the panel body, for retained/nonfresh observations. Its detached Library harness now passes the same complete progress projection and transition headline/rebuild identity as the live subscription, including the existing liveness verdict; every empty/rebuilding/freshness expectation is unchanged.",
       "sources": [
         {
           "kind": "owner-adopted-scenario",
@@ -855,9 +861,20 @@ Browser viewport and actual native-shell verification are independent of these u
           "label": "agent-drafted, owner-adopted"
         },
         {
-          "kind": "owner-words",
-          "quote": "an observation is stale only when the client has missed an expected refresh, i.e. now - observedAt > staleAfterMs + the client's read interval (statusPoll INTERVAL_MS, which already bounds a read). It still can never stay confirmed indefinitely.",
-          "location": "task t-20261101-uiimpl request"
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "S334",
+          "quote": "S33.4 When a reason clears, its explanation disappears after the next fresh status observation; when status is stale or unavailable, surfaces mark the observation as unconfirmed instead of asserting current activity or quiescence.",
+          "label": "agent-drafted, owner-adopted",
+          "agreedScenario": "S33.4"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "well from now on you can just proceed autonomously accordinglky",
+          "delegationLocation": "task t-20261101-uiimpl user turn after the WP1 summary",
+          "delegationScope": "Proceed autonomously with implementing the agreed window designs and choosing implementation details within the adopted scenarios, including the shared observation-age bound.",
+          "choice": "stale only after staleAfterMs plus the client's read interval",
+          "label": "agent choice"
         }
       ],
       "evidence": "gates/test-intent/evidence/library-redesign-liveness-preservation.json",
@@ -895,9 +912,20 @@ Browser viewport and actual native-shell verification are independent of these u
           "label": "agent-drafted, owner-adopted"
         },
         {
-          "kind": "owner-words",
-          "quote": "an observation is stale only when the client has missed an expected refresh, i.e. now - observedAt > staleAfterMs + the client's read interval (statusPoll INTERVAL_MS, which already bounds a read). It still can never stay confirmed indefinitely.",
-          "location": "task t-20261101-uiimpl request"
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261019-bd718f",
+          "scenario": "S334",
+          "quote": "S33.4 When a reason clears, its explanation disappears after the next fresh status observation; when status is stale or unavailable, surfaces mark the observation as unconfirmed instead of asserting current activity or quiescence.",
+          "label": "agent-drafted, owner-adopted",
+          "agreedScenario": "S33.4"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "well from now on you can just proceed autonomously accordinglky",
+          "delegationLocation": "task t-20261101-uiimpl user turn after the WP1 summary",
+          "delegationScope": "Proceed autonomously with implementing the agreed window designs and choosing implementation details within the adopted scenarios, including the shared observation-age bound.",
+          "choice": "stale only after staleAfterMs plus the client's read interval",
+          "label": "agent choice"
         }
       ],
       "evidence": "gates/test-intent/evidence/library-redesign-liveness.json",

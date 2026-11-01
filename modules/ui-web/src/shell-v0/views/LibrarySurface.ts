@@ -233,6 +233,8 @@ const LIVE_REFRESH_MIN_MS = 4000;
 export class LibrarySurface extends JfElement {
   private expandedFolders = new Set<string>();
   private contactUnconfirmed = false;
+  private rebuilding = false;
+  private provisionalHeadline = 'Indexing status unconfirmed';
   private indexProgress = selectIndexingProgress(null, false, 0, []);
   static properties = {
     apiBase: { attribute: 'api-base', type: String },
@@ -773,10 +775,13 @@ export class LibrarySurface extends JfElement {
     if (this.reindexOutcomeKey) void this.checkReindexOutcome();
     if (!this.excludesLoadStarted) void this.loadExcludes();
     this.presentationUnsub = subscribePresentation(() => this.requestUpdate());
-    // 595 §4.3 — observe the one Stability axis so an empty roots list during a
-    // transition renders as "Rebuilding…", not "No watched folders".
+    // Keep empty roots provisional during transitions, but only call a real
+    // rebuild/migration "Rebuilding". Other transitions use the status bar's wording.
     this.aiUnsub = subscribeAiState((s) => {
       this.provisional = s.stability.kind === 'provisional';
+      this.rebuilding = s.stability.kind === 'provisional' &&
+        (s.stability.cause === 'rebuilding' || s.stability.cause === 'generation-switch');
+      this.provisionalHeadline = this.rebuilding ? 'Rebuilding your Library' : s.statusLabel;
       this.contactUnconfirmed = s.stability.kind === 'provisional' &&
         ['initial-load', 'updating', 'channel-stale'].includes(s.stability.cause);
       this.observeGapDecision(s.status?.worker?.migration);
@@ -2053,11 +2058,11 @@ export class LibrarySurface extends JfElement {
     const headline = this.loading ? 'Loading your Library…'
       : !this.indexProgress.live || this.contactUnconfirmed ? 'Indexing status unconfirmed'
         : count ? `${count} ${count === 1 ? 'thing needs' : 'things need'} your attention`
-          : !this.indexingActivity.confirmed ? this.indexingActivity.summary
-          : this.provisional ? 'Rebuilding your Library'
-            : !this.roots.length ? 'Add a folder to start searching'
-              : !this.defaultScopeDocuments.known ? 'Checking your folders'
-                : this.defaultScopeDocuments.value === 0 ? 'Indexing your files' : 'Your files are searchable';
+          : this.provisional ? this.provisionalHeadline
+            : !this.indexingActivity.confirmed ? this.indexingActivity.summary
+              : !this.roots.length ? 'Add a folder to start searching'
+                : !this.defaultScopeDocuments.known ? 'Checking your folders'
+                  : this.defaultScopeDocuments.value === 0 ? 'Indexing your files' : 'Your files are searchable';
     return html`<div class="header"><div class="header-left"><h2>${headline}</h2>
       <p class="subtitle">${this.defaultScopeDocuments.known ? `${this.defaultScopeDocuments.value.toLocaleString()} searchable documents` : 'Searchable document count unconfirmed'}
         · ${this.roots.length} ${this.roots.length === 1 ? 'folder' : 'folders'}${this.activitySentence ? ` · ${this.activitySentence}` : ''}</p>
@@ -2244,9 +2249,13 @@ export class LibrarySurface extends JfElement {
       ${this.loading
         ? html`<div class="empty">Loading…</div>`
         : this.roots.length === 0
-          ? !this.indexingActivity.confirmed || this.contactUnconfirmed
-            ? html`<div class="empty">${this.contactUnconfirmed ? 'Indexing status unconfirmed' : this.indexingActivity.summary}. Folder details are last known; current status is unconfirmed.</div>`
-            : this.provisional
+          ? this.contactUnconfirmed || !this.indexProgress.live
+            ? html`<div class="empty">Indexing status unconfirmed. Folder details are last known; current status is unconfirmed.</div>`
+            : this.provisional && !this.rebuilding
+            ? html`<div class="empty">${this.provisionalHeadline} ${!this.indexingActivity.confirmed ? `${this.indexingActivity.summary}. ` : ''}Folder details are unconfirmed.</div>`
+            : !this.indexingActivity.confirmed
+            ? html`<div class="empty">${this.indexingActivity.summary}. Folder details are last known; current status is unconfirmed.</div>`
+            : this.rebuilding
             ? html`<div class="empty">
                 Rebuilding index… your watched folders will reappear when it finishes.
               </div>`
