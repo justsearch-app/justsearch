@@ -1456,3 +1456,14 @@ R9 passes with producer-written evidence in gates/test-intent/evidence/ingfix-wp
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "c0ef77cd-4800-45da-b602-43bcbfe9986b",
+  "verdict": "accept",
+  "digest": "sha256:cfb3a1a5ddcc083023685c3088c651e46a16b4740cb717ce6d40ba3da1ffd8eb",
+  "note": "Independent verifier session (Claude, no author context) accepted entries 0-50: sources within the owner's delegation; fail-before on 58ff43faa8 with a behaviour-neutral compatibility patch; R9 promotion hold judged sound (observation, outcome and 45 s bound unchanged; 8/8 on 2 cores and 8/8 on 1 core under contention); entries 47-50 reproduced by its own probes."
+}
+```
