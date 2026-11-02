@@ -106,19 +106,19 @@
       "mode": "local-subset",
       "commands": [
         "node scripts/ci/check-jseval-lock.mjs",
-        "python -m pip install -e scripts/jseval -c scripts/jseval/requirements.lock.txt",
+        "python -m pip install -e scripts/jsharness -e scripts/jseval -c scripts/jseval/requirements.lock.txt",
         "python -m pip install \"pytest>=7.0\" \"pyyaml>=6.0\" \"hypothesis>=6.0\" \"jsonschema>=4.0\"",
-        "python -m pytest scripts/jseval/tests -q -p no:cacheprovider"
+        "python -m pytest scripts/jseval/tests scripts/jsharness/tests -q -p no:cacheprovider"
       ]
     },
     {
       "check": "Measured axe",
       "mode": "local-subset",
       "commands": [
-        "python -m pip install -e \"scripts/jseval[ui]\" -c scripts/jseval/requirements.lock.txt",
+        "python -m pip install -e \"scripts/jsharness[ui]\" -c scripts/jsharness/requirements.lock.txt",
         "npm ci --prefix modules/ui-web --audit=false",
         "python -m playwright install --with-deps chromium",
-        "python -m jseval ui-a11y-gate --output-dir build/ci/ui-a11y"
+        "python -m jsharness ui-a11y-gate --output-dir build/ci/ui-a11y"
       ]
     },
     {

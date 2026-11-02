@@ -71,7 +71,7 @@ env.PIP_CACHE_DIR = path.join(prep, 'pip-cache');
 // Avoid user-site packages, foreign module paths and redirected bytecode caches.
 env.PYTHONNOUSERSITE = '1';
 env.PYTHONDONTWRITEBYTECODE = '1';
-env.PYTHONPATH = path.join(root, 'scripts/jseval');
+env.PYTHONPATH = path.join(root, 'scripts/jsharness');
 for (const [key, directory] of Object.entries({
   JUSTSEARCH_DEV_RUNNER_STATE_ROOT: 'dev-runner',
   JUSTSEARCH_HOME: 'home',
@@ -95,15 +95,15 @@ if (version.status !== 0) {
   process.stderr.write(version.stderr);
   process.exit(version.status || 1);
 }
-const constraints = version.stdout.trim() === '3.13' ? ['-c', path.join(root, 'scripts/jseval/requirements.lock.txt')] : [];
+const constraints = version.stdout.trim() === '3.13' ? ['-c', path.join(root, 'scripts/jsharness/requirements.lock.txt')] : [];
 // Read the declared requirements without asking setuptools to build metadata in
-// the source tree. Import jseval directly via PYTHONPATH instead of installing it.
+// the source tree. Import jsharness directly via PYTHONPATH instead of installing it.
 const requirements = spawnSync(python, ['-c', `
 import json, sys, tomllib
 from pathlib import Path
 project = tomllib.loads(Path(sys.argv[1]).read_text())['project']
 print(json.dumps(project['dependencies'] + project['optional-dependencies']['ui']))
-`, path.join(root, 'scripts/jseval/pyproject.toml')], { env, encoding: 'utf8' });
+`, path.join(root, 'scripts/jsharness/pyproject.toml')], { env, encoding: 'utf8' });
 if (requirements.error) throw requirements.error;
 if (requirements.status !== 0) {
   process.stderr.write(requirements.stderr);

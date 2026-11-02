@@ -144,7 +144,7 @@ log "ingest response: $(head -c 300 "$out_abs/ingest-response.json")"
 search_load 60 "$out_abs/search-load-during-enrich.csv"
 log "waiting for enrichment"
 (cd scripts/jseval && python -c "
-import sys; from jseval.readiness import wait_pipeline_complete
+import sys; from jsharness.readiness import wait_pipeline_complete
 r = wait_pipeline_complete('$base', timeout_sec=1500)
 print(r)
 " > "$out_abs/enrichment-wait.txt" 2>&1)

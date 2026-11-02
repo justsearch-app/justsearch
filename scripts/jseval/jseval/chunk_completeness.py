@@ -34,7 +34,7 @@ def resolve_chunk_threshold_chars(status_payload: dict | None) -> int | None:
     there is deliberately NO local fallback constant, because a fallback is the mirror again.
 
     Accepts either a raw ``/api/status`` payload or one already flattened by
-    ``jseval.readiness.flatten_status`` (the flattener lifts ``worker``'s sub-records to the top
+    ``jsharness.readiness.flatten_status`` (the flattener lifts ``worker``'s sub-records to the top
     level). ``None`` means "this backend does not publish the threshold" -- a payload predating
     821, or no status snapshot at all. Callers must treat that as "nothing to expect", the same
     never-blocks path a missing ``corpus.jsonl`` already takes; they must NOT substitute a guess.

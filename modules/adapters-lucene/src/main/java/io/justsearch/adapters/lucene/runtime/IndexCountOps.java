@@ -556,7 +556,7 @@ public final class IndexCountOps {
         // COMPLETED_EMPTY (encode ran fine, produced no materialisable weight). Both mean "SPLADE is
         // done for this document", so coverage must sum them — counting only COMPLETED would leave
         // spladeCoveragePercent permanently below the 99.9 readiness bar every consumer gates on
-        // (scripts/jseval/jseval/readiness.py) once pending hits zero. Mirrors the NER precedent in
+        // (scripts/jsharness/jsharness/readiness.py) once pending hits zero. Mirrors the NER precedent in
         // IndexStatusOps#buildEnrichment.
         Query completedQuery = new BooleanQuery.Builder()
             .add(wholeDocsQuery, BooleanClause.Occur.FILTER)

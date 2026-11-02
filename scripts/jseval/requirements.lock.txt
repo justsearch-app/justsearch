@@ -2,15 +2,15 @@
 #
 # WHAT THIS FILE IS
 # jseval (scripts/jseval/pyproject.toml) declares floor-only constraints with no upper
-# bounds and no lockfile, so `pip install -e scripts/jseval` can resolve a DIFFERENT
+# bounds and no lockfile, so `pip install -e scripts/jsharness -e scripts/jseval` can resolve a DIFFERENT
 # dependency graph on every run as new releases land upstream. jseval produces the
 # numbers behind this project's PUBLIC published claims (the agent-utility replay gate
 # in .github/workflows/ci.yml's `public-claims` job runs it in CI), so an unpinned
 # resolver is a reproducibility hole in the measurement harness itself. This file pins
 # the exact transitive closure of the BASE install only — i.e. exactly what
-# `pip install -e scripts/jseval` resolves with no optional extras — because that is
+# `pip install -e scripts/jsharness -e scripts/jseval` resolves with no optional extras — because that is
 # exactly what CI installs (ci.yml:53) and is therefore the only surface CI can validate
-# against. The `[project.optional-dependencies]` extras (ranx, ui, config, ner, scan,
+# against. The `[project.optional-dependencies]` extras (ranx, config, ner, scan,
 # agent, dev) are intentionally NOT locked here: CI never installs them, so there would
 # be no CI signal to catch a stale extras-pin, and the `agent` extra alone pulls a ~80
 # package closure through inspect-ai that deserves its own scoped lock if it is ever
@@ -22,7 +22,7 @@
 # This is a pip CONSTRAINTS file, not a requirements file — it does not install
 # anything by itself. Wire it with `-c`:
 #
-#   pip install -e scripts/jseval -c scripts/jseval/requirements.lock.txt
+#   pip install -e scripts/jsharness -e scripts/jseval -c scripts/jseval/requirements.lock.txt
 #
 # `-c` only pins the version of a package that pip already decided to install (because
 # pyproject.toml's own dependency list pulled it in); it never forces the install of a
@@ -50,7 +50,7 @@
 #   python -m pip install --dry-run --ignore-installed --report report.json \
 #     --python-version 3.13 --implementation cp --abi cp313 \
 #     --platform manylinux2014_x86_64 --only-binary=:all: \
-#     -e scripts/jseval
+#     -e scripts/jsharness -e scripts/jseval
 #
 # Known limitation of that command (verified empirically while generating this file):
 # pip's --platform/--implementation/--abi flags retarget which WHEEL TAGS it will
@@ -103,3 +103,6 @@ requests==2.34.2
 scipy==1.16.3
 tqdm==4.70.0
 urllib3==2.8.0
+
+# Local peer package: install -e scripts/jsharness alongside -e scripts/jseval.
+jsharness==0.1.0

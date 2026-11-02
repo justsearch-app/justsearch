@@ -24,7 +24,8 @@ from jseval.ingest import (
     ingest_and_wait,
     prepare_corpus,
 )
-from jseval.types import IngestConfig, ReadinessResult
+from jsharness.types import ReadinessResult
+from jseval.types import IngestConfig
 from jseval.raw_corpus_manifest import RawCorpusManifestError
 
 

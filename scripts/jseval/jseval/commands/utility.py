@@ -392,7 +392,7 @@ def cmd_utility_run(ctx, queries, corpus_dir, corpus_root, mcp_config, model, co
     # (old calibration files keep working byte-for-byte).
     timeout_s_by_condition = None
     if calibration:
-        from ..types import ReadinessResult
+        from jsharness.types import ReadinessResult
         calib = json.loads(Path(calibration).read_text(encoding="utf-8"))
         # Provenance binding (tempdoc 758 §A/§B) — fail closed BEFORE spending if the banked
         # calibration was pinned at a different git checkout, or the `claude` CLI drifted, since

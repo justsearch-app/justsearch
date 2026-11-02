@@ -104,8 +104,8 @@ source tmp/ui-checks/env.sh
 du -sh node_modules modules/ui-web/node_modules scripts/wire-contract/node_modules tmp/ui-checks
 npm run test:unit:run --prefix modules/ui-web -- src/shell-v0/controllers/AgentSessionController.test.ts --maxWorkers=4
 npm run test:unit:run --prefix modules/ui-web -- --maxWorkers=4
-python -m jseval ui-shot sv3-search-results --fixtures --no-demo --output-dir "$UI_CHECKS_DIR/captures"
-python -m jseval ui-a11y-gate --output-dir "$UI_CHECKS_DIR/a11y"
+python -m jsharness ui-shot sv3-search-results --fixtures --no-demo --output-dir "$UI_CHECKS_DIR/captures"
+python -m jsharness ui-a11y-gate --output-dir "$UI_CHECKS_DIR/a11y"
 node scripts/ci/report-github-advisories.mjs
 npm --prefix modules/ui-web run knip:report
 node scripts/docs/generate-runtime-config-matrix.mjs
@@ -442,14 +442,14 @@ Desktop-only features (native folder picker, file dialogs) are unavailable in a 
 - Stop the dev stack with `Ctrl+C` in the terminal running `dev:all`.
 - On Windows, if processes linger, terminate the process tree (e.g., via `taskkill /T /F`) to avoid stale ports.
 
-#### 3.4.7 Visual verification of UI component changes (jseval ui-shot)
+#### 3.4.7 Visual verification of UI component changes (jsharness ui-shot)
 
-When editing files under `modules/ui-web/src/`, use `jseval ui-shot` for targeted screenshot capture to verify visual correctness:
+When editing files under `modules/ui-web/src/`, use `jsharness ui-shot` for targeted screenshot capture to verify visual correctness:
 
-- **Single step**: `jseval ui-shot <step>` captures a screenshot of the named UI state. Read the output PNG path to see the result inline.
-- **Step discovery**: `jseval ui-shot --list` shows all available steps (chain and isolated) with their dependency relationships.
-- **Affected steps**: `jseval ui-shot --affected <file>` finds which steps exercise a given source file. Works with full Windows paths.
-- **Measurement companion (615 §6.2)**: every capture also writes a `<step>.measure.json` (accessibility tree + axe violations + element geometry/overflow + console errors) and prints a one-line fact summary. Judge correctness from the **facts** (cheaper + more reliable than the PNG); read the PNG for gestalt. The harness drives Lit `shell-v0`. `python -m jseval ui-shot` defaults to mock-data demo mode. For a real backend, use `--no-demo` with a running dev stack (AI also needs `ai_activate`), and choose a step without its own response mocks or demo-URL navigation: those steps still use demo data with `--no-demo`.
+- **Single step**: `jsharness ui-shot <step>` captures a screenshot of the named UI state. Read the output PNG path to see the result inline.
+- **Step discovery**: `jsharness ui-shot --list` shows all available steps (chain and isolated) with their dependency relationships.
+- **Affected steps**: `jsharness ui-shot --affected <file>` finds which steps exercise a given source file. Works with full Windows paths.
+- **Measurement companion (615 §6.2)**: every capture also writes a `<step>.measure.json` (accessibility tree + axe violations + element geometry/overflow + console errors) and prints a one-line fact summary. Judge correctness from the **facts** (cheaper + more reliable than the PNG); read the PNG for gestalt. The harness drives Lit `shell-v0`. `python -m jsharness ui-shot` defaults to mock-data demo mode. For a real backend, use `--no-demo` with a running dev stack (AI also needs `ai_activate`), and choose a step without its own response mocks or demo-URL navigation: those steps still use demo data with `--no-demo`.
 
 ### 3.5. CI signal model
 

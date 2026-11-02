@@ -239,7 +239,7 @@ const FOREIGN_BACKEND_PORTS = [33221];
 /**
  * Tempdoc 844 D3 — where a non-dev-runner producer declares its run.
  *
- * `scripts/jseval/jseval/run_register.py` writes one small versioned record per backend it
+ * `scripts/jsharness/jsharness/run_register.py` writes one small versioned record per backend it
  * spawns; this is the consumer. The directory sits BESIDE the dev-runner's own state, never
  * inside it: `dev-runner.cjs` enumerates only `runs/` (which it also prunes) and reads
  * `active.json` / `active.lock.json` / `op-leases.json` / `sessions/` / `interference-events.ndjson`

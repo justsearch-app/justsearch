@@ -19,10 +19,10 @@ from . import corpora
 from . import history as history_mod
 from . import manifest as manifest_mod
 from . import provenance
-from . import readiness
+from jsharness import readiness
 from . import retriever
 from . import scoring
-from .types import ReadinessResult
+from jsharness.types import ReadinessResult
 
 log = logging.getLogger(__name__)
 
@@ -955,7 +955,7 @@ def _compute_chunk_completeness(
 
     # Observed: worker.enrichment.chunk.* from the run-completion /api/status snapshot
     # (readiness.py already reads this same nested path — flatten_status merges it to the
-    # top level; jseval.readiness is already imported for the readiness-poll machinery).
+    # top level; jsharness.readiness is already imported for the readiness-poll machinery).
     flat_status = readiness.flatten_status(dict(status_snapshot)) if status_snapshot else {}
     observed_chunk_doc_count = flat_status.get("chunkDocCount", 0)
     observed_coverage_pct = flat_status.get("chunkVectorCoveragePercent")

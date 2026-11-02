@@ -1748,7 +1748,7 @@ export class Sv3Composer extends JfElement {
    * ONE renderer, because the two controls are one grammar and a second copy of it is how a row of
    * controls starts drifting. Only the MENUS are still written twice, and only because their option
    * rows carry different data-attribute NAMES (`data-effort` is read by the ui-shot harness,
-   * `scripts/jseval/jseval/ui_check.py:1539`) — a lit template cannot parametrise an attribute name.
+   * `scripts/jsharness/jsharness/ui_check.py:1539`) — a lit template cannot parametrise an attribute name.
    */
   private controlTrigger(spec: {
     readonly testid: string;

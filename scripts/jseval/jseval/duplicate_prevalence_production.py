@@ -33,8 +33,8 @@ from .raw_corpus_manifest import (
     validate_raw_manifest,
 )
 from . import ingest as ingest_module
-from . import readiness
-from .readiness import flatten_status
+from jsharness import readiness
+from jsharness.readiness import flatten_status
 
 
 SOURCE_KIND = prevalence.PRODUCTION_EXTRACTED

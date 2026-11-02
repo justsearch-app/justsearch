@@ -37,7 +37,9 @@ function repoRootFromCwd() {
 }
 
 const REPO_ROOT = repoRootFromCwd();
-const JSEVAL_DIR = path.join(REPO_ROOT, 'scripts', 'jseval');
+const PACKAGE_NAME = process.argv[2] ?? 'jseval';
+if (!['jseval', 'jsharness'].includes(PACKAGE_NAME)) throw new Error('expected jseval or jsharness');
+const JSEVAL_DIR = path.join(REPO_ROOT, 'scripts', PACKAGE_NAME);
 const PYPROJECT_PATH = path.join(JSEVAL_DIR, 'pyproject.toml');
 const LOCK_PATH = path.join(JSEVAL_DIR, 'requirements.lock.txt');
 
@@ -50,7 +52,7 @@ platform (CPython 3.13 / manylinux2014_x86_64 — check .github/workflows/ci.yml
   python -m pip install --dry-run --ignore-installed --report report.json \\
     --python-version 3.13 --implementation cp --abi cp313 \\
     --platform manylinux2014_x86_64 --only-binary=:all: \\
-    -e scripts/jseval
+    -e scripts/jsharness -e scripts/jseval
 
 Then extract name==version pairs from report.json's install[].metadata (dropping
 jseval itself), and re-add the \`colorama==<version>; platform_system == "Windows"\`
@@ -103,7 +105,8 @@ function extractDependenciesArray(pyprojectText) {
 }
 
 function parseDirectDependencies(pyprojectText) {
-  const arrayBody = extractDependenciesArray(pyprojectText);
+  const ui = PACKAGE_NAME === 'jsharness' ? (/^ui\s*=\s*\[([^\]]*)\]/m.exec(pyprojectText)?.[1] ?? '') : '';
+  const arrayBody = extractDependenciesArray(pyprojectText) + ui;
   const entryPattern = /"([^"]+)"|'([^']+)'/g;
   const deps = [];
   let match;

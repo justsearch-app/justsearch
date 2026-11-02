@@ -8,7 +8,7 @@ import time
 
 import httpx
 
-from . import suite_stats
+from jsharness import suite_stats
 
 log = logging.getLogger(__name__)
 

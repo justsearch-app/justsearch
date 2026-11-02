@@ -12,7 +12,7 @@ from unittest.mock import Mock
 import pytest
 
 from jseval import duplicate_prevalence_production as production
-from jseval import readiness
+from jsharness import readiness
 from jseval import result_identity
 from jseval.raw_corpus_manifest import RawCorpusContext, build_raw_manifest
 

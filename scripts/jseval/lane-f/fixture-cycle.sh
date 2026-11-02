@@ -68,7 +68,7 @@ log "ingest: ${ingest_response:0:200}"
 # tail exit status, so piping here would have silently swallowed the very failure this guards.
 wait_out=$( (cd scripts/jseval && python -c "
 import sys
-from jseval.readiness import wait_pipeline_complete
+from jsharness.readiness import wait_pipeline_complete
 r = wait_pipeline_complete('$base', timeout_sec=900)
 print('READY', r.passed)
 sys.exit(0 if r.passed else 1)

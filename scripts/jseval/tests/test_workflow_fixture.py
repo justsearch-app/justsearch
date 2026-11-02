@@ -1365,7 +1365,7 @@ def test_enrichment_uses_the_shared_readiness_predicate():
     while failing the capture check (or worse, the reverse). Asserted by feeding the SAME
     snapshot to both and requiring the same verdict.
     """
-    from jseval.readiness import _check_pipeline_complete_conditions
+    from jsharness.readiness import _check_pipeline_complete_conditions
 
     snapshot = {"indexState": "INDEXING", "embeddingCoveragePercent": 38.0,
                 "spladeCoveragePercent": 100.0, "nerEnabled": False}

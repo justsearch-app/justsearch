@@ -6,7 +6,7 @@ import logging
 
 import httpx
 
-from .readiness import flatten_status
+from jsharness.readiness import flatten_status
 
 log = logging.getLogger(__name__)
 

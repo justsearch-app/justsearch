@@ -36,7 +36,7 @@ test('scorer, test, and unrelated instrument bytes do not enter measurement iden
   assert.equal(normal.pairIdentity, scorerChanged.pairIdentity);
   assert.ok(normal.pairIdentityInputs.instruments['scripts/jseval/lane-f/e-start-ready.mjs']);
   assert.ok(normal.pairIdentityInputs.instruments['scripts/jseval/jseval/bulk_load.py']);
-  assert.ok(normal.pairIdentityInputs.instruments['scripts/jseval/jseval/readiness.py']);
+  assert.ok(normal.pairIdentityInputs.instruments['scripts/jsharness/jsharness/readiness.py']);
   assert.ok(normal.pairIdentityInputs.instruments['scripts/jseval/jseval/search_load.py']);
   assert.ok(normal.pairIdentityInputs.instruments['scripts/dev/lib/stop-exit-census.cjs']);
   assert.ok(normal.pairIdentityInputs.instruments['scripts/dev/lib/stop-exit-census.ps1']);

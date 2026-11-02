@@ -4,7 +4,7 @@
  *
  * 615's thesis: verification infrastructure is product infrastructure — a verifier pointed at deleted
  * code is the same failure class as a dangling guard (reports green while asserting nothing). The
- * `ui-shot`/`ui-check` step index (`scripts/jseval/jseval/ui_step_index.json`) was an UNGOVERNED
+ * `ui-shot`/`ui-check` step index (`scripts/jsharness/jsharness/ui_step_index.json`) was an UNGOVERNED
  * register that silently kept mapping the retired React stack (the `modules/ui-web/src/components`
  * directory of `.tsx` files, which no longer exists) while the live UI is Lit `shell-v0`. This gate
  * applies the same
@@ -25,7 +25,7 @@
  *
  * HONEST SCOPE (mirrors check-declared-surfaces): this is a POSITIVE-COVERAGE catalog, not a behavioural
  * scan. It asserts the declared paths exist and the rail set is covered; it does NOT verify a step
- * actually renders the live UI (that is what running `jseval ui-check` against the dev stack does).
+ * actually renders the live UI (that is what running `jsharness ui-check` against the dev stack does).
  * Lighter scripts/ci tier; wired as a ci.yml step + the pre-merge checks table (docs/reference/contributing/pre-merge-checks.md).
  */
 import { existsSync, readFileSync } from 'node:fs';

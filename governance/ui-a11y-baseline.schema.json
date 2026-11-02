@@ -35,12 +35,12 @@
           },
           "uiShotStep": {
             "type": "string",
-            "description": "The `jseval ui-shot` step name this row is captured under. The row's identity, and the join to governance/ui-proportion-baseline.v1.json's step registrations."
+            "description": "The `jsharness ui-shot` step name this row is captured under. The row's identity, and the join to governance/ui-proportion-baseline.v1.json's step registrations."
           },
           "knownRules": {
             "type": "array",
             "items": { "type": "string" },
-            "description": "axe rule ids ACCEPTED as debt in this capture state (e.g. 'color-contrast'). A violation NOT listed here is NEW and must be investigated, so this list is the whole authority — the shrinking-ratchet contract this register shares with the other UI baselines. An empty list means the capture is clean and any violation is a regression. Regenerate deliberately via scripts/jseval/experiments/regen_a11y_baseline.py.",
+            "description": "axe rule ids ACCEPTED as debt in this capture state (e.g. 'color-contrast'). A violation NOT listed here is NEW and must be investigated, so this list is the whole authority — the shrinking-ratchet contract this register shares with the other UI baselines. An empty list means the capture is clean and any violation is a regression. Regenerate deliberately via scripts/jsharness/experiments/regen_a11y_baseline.py.",
             "uniqueItems": true
           },
           "note": {

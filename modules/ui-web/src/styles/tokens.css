@@ -343,7 +343,7 @@
   --surface-content-max-width: 72rem;
   /* Tempdoc 816 §3/§4a.3 — the MEASURE tokens: role-derived inline-size bounds in CONTENT units.
      The values are NOT authored here — `governance/ui-proportion-baseline.v1.json`'s `roles` block
-     is the authority (it also states each bound's function) and `jseval ui-proportion-gate` fails on
+     is the authority (it also states each bound's function) and `jsharness ui-proportion-gate` fails on
      any drift between these declarations and the register (the catalog-verbatim pattern: one
      authority both renders and judges).
      NOT to be confused with --surface-content-max-width above: that is the SURFACE PAGE column

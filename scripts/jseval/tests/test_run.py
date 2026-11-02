@@ -23,7 +23,8 @@ from jseval.run import (
     _settle_index,
     execute_run,
 )
-from jseval.types import AnnProofResult, ComparabilityResult, QueryRecord, ReadinessResult
+from jsharness.types import ReadinessResult
+from jseval.types import AnnProofResult, ComparabilityResult, QueryRecord
 from jseval import raw_corpus_manifest as rcm
 
 

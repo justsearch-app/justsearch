@@ -67,7 +67,7 @@ test('main keeps the running run and runs all slow tiers without masking failure
   assert.equal(gate.if, undefined);
   assert.equal(gate['continue-on-error'], undefined);
   assert.match(gate.run, /set -o pipefail/);
-  assert.match(gate.run, /python -m jseval ui-a11y-gate --output-dir build\/ci\/ui-a11y/);
+  assert.match(gate.run, /python -m jsharness ui-a11y-gate --output-dir build\/ci\/ui-a11y/);
   assert.ok(workflow.jobs['ci-walltime'].needs.includes('measured-axe'));
   const walltime = JSON.parse(read('scripts/ci/ci-walltime-policy.v1.json'));
   const budget = walltime.lanes.find(lane => lane.job === axe.name);
