@@ -1280,6 +1280,8 @@ class IndexingLoopTest {
       invokeWriteExtractedJob(loop, extractedJob(file, "body"));
       verify(ecc, never()).noteSuccessfulEmbeddingObserved();
 
+      when(queue.indexingCoordinator.indexSingle(any())).thenReturn(true);
+
       // The batch/migration path hands write() a precomputed embedding: the doc carries
       // EMBEDDING_STATUS_COMPLETED, which IS the evidence the stamp must be earned from.
       loop.getWriter()
@@ -1931,7 +1933,7 @@ class IndexingLoopTest {
       IndexingLoop loop = newLoop(queue, providerReturning("body"));
       var claims = List.of(rootedJob(first, null), rootedJob(second, null));
       setRunning(loop, true);
-      doThrow(new AssertionError("isolated write failure")).doNothing()
+      doThrow(new AssertionError("isolated write failure")).doAnswer(invocation -> null)
           .when(queue.indexingCoordinator).indexSingle(any());
       invokeProcessBatch(loop, claims);
       assertEquals(IngestionOutcomeClass.WRITE_FAILED, queue.lastOutcome.outcomeClass());

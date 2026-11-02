@@ -24,7 +24,6 @@ final class SpladeTruncationEvidence {
   private final int windowOverlapTokens;
   private final int flushEveryDocuments;
   private final LongAdder documentsEncoded = new LongAdder();
-  private final LongAdder truncatedDocuments = new LongAdder();
   private final LongAdder totalObservedTokens = new LongAdder();
   private final AtomicInteger maxObservedTokens = new AtomicInteger();
   private final AtomicLong lastFlushedDocumentCount = new AtomicLong();
@@ -46,9 +45,6 @@ final class SpladeTruncationEvidence {
     documentsEncoded.increment();
     totalObservedTokens.add(safeCount);
     updateMaxObservedTokens(safeCount);
-    if (safeCount > maxSequenceLength) {
-      truncatedDocuments.increment();
-    }
 
     int windows = deriveWindowCount(safeCount, maxSequenceLength, windowOverlapTokens);
     windowHistogram.computeIfAbsent(windows, ignored -> new LongAdder()).increment();
@@ -62,7 +58,7 @@ final class SpladeTruncationEvidence {
 
   Map<String, Object> snapshot(Path modelPath) {
     long docs = documentsEncoded.sum();
-    long truncated = truncatedDocuments.sum();
+    long truncated = 0L;
     long observedTokens = totalObservedTokens.sum();
 
     Map<String, Object> summary = new LinkedHashMap<>();
@@ -131,8 +127,8 @@ final class SpladeTruncationEvidence {
     if (safeTokenCount <= safeMaxSeqLen) {
       return 1;
     }
-    int stride = Math.max(1, safeMaxSeqLen - Math.max(0, windowOverlapTokens));
-    return 1 + (int) Math.ceil((double) (safeTokenCount - safeMaxSeqLen) / stride);
+    return io.justsearch.indexerworker.embed.onnx.TokenWindows.count(
+        safeTokenCount, safeMaxSeqLen, Math.max(0, windowOverlapTokens), safeMaxSeqLen);
   }
 
   private void updateMaxObservedTokens(int observedTokenCount) {

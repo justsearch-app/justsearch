@@ -38,6 +38,19 @@ import org.slf4j.LoggerFactory;
 class EmbeddingRecoveryOpsTest {
   private static final org.slf4j.Logger LOG = LoggerFactory.getLogger(EmbeddingRecoveryOpsTest.class);
 
+  @Test
+  void terminalParentAndChunkFailuresExplicitlyRemovePriorVectors() {
+    var parent = EmbeddingBackfillOps.computeEmbeddingFailureUpdate(SchemaFields.EMBEDDING_MAX_RETRIES - 1);
+    assertTrue(parent.containsKey(SchemaFields.VECTOR));
+    org.junit.jupiter.api.Assertions.assertNull(parent.get(SchemaFields.VECTOR));
+    assertEquals("FAILED", parent.get(SchemaFields.EMBEDDING_STATUS));
+    var chunk = EmbeddingBackfillOps.computeChunkEmbeddingFailureUpdate(SchemaFields.EMBEDDING_MAX_RETRIES - 1);
+    assertTrue(chunk.containsKey(SchemaFields.CHUNK_VECTOR));
+    org.junit.jupiter.api.Assertions.assertNull(chunk.get(SchemaFields.CHUNK_VECTOR));
+    assertEquals("FAILED", chunk.get(SchemaFields.CHUNK_EMBEDDING_STATUS));
+    assertFalse(EmbeddingBackfillOps.computeEmbeddingFailureUpdate(0).containsKey(SchemaFields.VECTOR));
+  }
+
   @AfterEach
   void clearFingerprint() { EmbeddingFingerprint.invalidate(); }
 

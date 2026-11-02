@@ -201,11 +201,8 @@ public final class BioTagDecoder {
     }
   }
 
-  /** Minimum entity text length after stripping. Filters single-char noise ("E", "P", "&"). */
-  static final int MIN_ENTITY_LENGTH = 2;
-
-  /** Minimum number of alphabetic characters required. Filters initial fragments ("R .", "K ."). */
-  static final int MIN_ALPHA_CHARS = 3;
+  /** A single ideograph can be a complete name; confidence filtering belongs to the caller. */
+  static final int MIN_ENTITY_LENGTH = 1;
 
   /** ALL-CAPS words that are scientific section headers, not organization names. */
   static final Set<String> SECTION_HEADER_WORDS =
@@ -252,12 +249,14 @@ public final class BioTagDecoder {
     if (entityText.length() < MIN_ENTITY_LENGTH) return null;
     // Filter punctuation-only entities (e.g., "&", ".", ",")
     if (entityText.codePoints().noneMatch(Character::isLetterOrDigit)) return null;
-    // Filter initial fragments ("R .", "K .", "D . J") — require ≥3 alphabetic characters
-    if (entityText.codePoints().filter(Character::isLetter).count() < MIN_ALPHA_CHARS) return null;
+    if (entityText.codePoints().filter(Character::isLetter).count() < 3
+        && !entityText.codePoints().allMatch(c -> Character.isLetter(c) || Character.isWhitespace(c))) return null;
     // Strip leading section-header words from entity text. Handles both pure headers
     // ("METHODS AND FINDINGS" → rejected) and contaminated spans
     // ("DATA SOURCES Medline Embase" → "Medline Embase").
-    entityText = stripLeadingHeaderWords(entityText);
+    if (entityText.codePointCount(0, entityText.length()) >= 3) {
+      entityText = stripLeadingHeaderWords(entityText);
+    }
     if (entityText == null) return null;
     float avgConf = confCount > 0 ? confSum / confCount : 0f;
     return new Entity(entityText, type, avgConf);

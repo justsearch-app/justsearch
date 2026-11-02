@@ -87,6 +87,24 @@ final class IndexFingerprintTest {
   }
 
   @Test
+  void companionOutageKeepsKnownGraphAndGraphOutageKeepsKnownCompanions() {
+    var graphOnly = ModelFingerprint.present("a".repeat(64)).withAssets(Optional.empty());
+    assertEquals("a".repeat(64), graphOnly.sha());
+    assertEquals(IndexFingerprint.ModelState.INDETERMINATE, graphOnly.state());
+    assertTrue(IndexFingerprint.compute(withModels(graphOnly, null, null)).isEmpty());
+    assertEquals(List.of("embedding_model_assets_sha256"),
+        withModels(graphOnly, null, null).indeterminateInputs());
+    assertTrue(new String(IndexFingerprint.canonicalJson(withModels(graphOnly, null, null)),
+        StandardCharsets.UTF_8).contains("\"embedding_model_sha256\":\"" + "a".repeat(64) + "\""));
+
+    var companionsOnly = ModelFingerprint.indeterminate().withAssets(Optional.of("b".repeat(64)));
+    assertEquals("b".repeat(64), companionsOnly.assetsSha());
+    assertTrue(IndexFingerprint.compute(withModels(companionsOnly, null, null)).isEmpty());
+    assertEquals(List.of("embedding_model_sha256"),
+        withModels(companionsOnly, null, null).indeterminateInputs());
+  }
+
+  @Test
   void identicalInputsGiveIdenticalFingerprints() {
     assertEquals(fp(baseline()), fp(baseline()));
   }

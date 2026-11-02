@@ -62,11 +62,30 @@ final class EnrichmentBatch {
   }
 
   int failure(String id, String retryField, IntFunction<Map<String, Object>> compute) {
+    var updates = failureUpdate(id, retryField, compute);
+    boolean applied = update(id, updates);
+    return applied && updates.keySet().stream().anyMatch(key -> key.endsWith("_status")) ? 1 : 0;
+  }
+
+  /** Publishes retry and terminal failures in batches, retaining the actual terminal-write count. */
+  int failures(List<String> ids, String retryField, IntFunction<Map<String, Object>> compute) {
+    var retryUpdates = new java.util.ArrayList<Map.Entry<String, Map<String, Object>>>();
+    var terminalUpdates = new java.util.ArrayList<Map.Entry<String, Map<String, Object>>>();
+    for (String id : ids) {
+      var updates = failureUpdate(id, retryField, compute);
+      var target = updates.keySet().stream().anyMatch(key -> key.endsWith("_status"))
+          ? terminalUpdates : retryUpdates;
+      target.add(Map.entry(id, updates));
+    }
+    if (!retryUpdates.isEmpty()) updateBatch(retryUpdates);
+    return terminalUpdates.isEmpty() ? 0 : updateBatch(terminalUpdates).updatedCount();
+  }
+
+  private Map<String, Object> failureUpdate(String id, String retryField,
+      IntFunction<Map<String, Object>> compute) {
     int previous;
     try { previous = Integer.parseInt(fields(id).getOrDefault(retryField, "0")); }
     catch (NumberFormatException invalid) { previous = 0; }
-    var updates = compute.apply(previous);
-    boolean applied = update(id, updates);
-    return applied && updates.keySet().stream().anyMatch(key -> key.endsWith("_status")) ? 1 : 0;
+    return compute.apply(previous);
   }
 }

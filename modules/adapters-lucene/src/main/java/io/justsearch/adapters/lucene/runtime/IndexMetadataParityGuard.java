@@ -141,6 +141,7 @@ public final class IndexMetadataParityGuard implements IndexOpenGuard {
         ParityExpectation expectation = expectationSupplier.get();
         Map<String, Object> expectedMetadata = expectation.metadata();
         List<String> unresolved = expectation.unresolvedInputs();
+        logCompanionAdoption(indexPath, stored, expectedMetadata);
         warnIfFingerprintUncomputable(stored, expectedMetadata, unresolved);
         // numDocs, not maxDoc: an index whose every document is deleted has nothing left whose
         // shape could be wrong, and migrating it would rebuild emptiness.
@@ -193,9 +194,22 @@ public final class IndexMetadataParityGuard implements IndexOpenGuard {
         // tolerates that uncertainty; it cannot authorize discarding a migration.
         return false;
       }
+      logCompanionAdoption(path, stored, expected);
       for (var leaf : reader.leaves()) leaf.reader().checkIntegrity();
       return !ParityDiagnostics.requiresRebuild(
           ParityDiagnostics.diff(stored, expected, Math.max(1, reader.numDocs()), unresolvedInputs));
+    }
+  }
+
+  /** A missing companion field adopts the current identity; it proves no historical bytes. */
+  private static void logCompanionAdoption(Path path, Map<String, String> stored,
+      Map<String, Object> expected) {
+    for (String role : List.of("embedding", "splade", "ner")) {
+      String key = role + "_model_assets_sha256";
+      if (expected.containsKey(key) && !stored.containsKey(key)) {
+        log.info("Index at {} has graph-only {} identity; adopting companion identity with"
+            + " pre-adoption companion provenance unverified", path, role);
+      }
     }
   }
 

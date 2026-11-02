@@ -47,6 +47,21 @@
       "pattern": "^[a-f0-9]{64}$",
       "description": "SHA-256 fingerprint of the embedding model GGUF file used to generate vectors in this index. Optional for legacy indexes; when present, vector/hybrid queries require a matching current model."
     },
+    "embedding_model_assets_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$",
+      "description": "Companion assets and effective output configuration, separate from the graph checksum. Compared only when both identities are present; graph-only indexes adopt it without rebuilding."
+    },
+    "splade_model_assets_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$",
+      "description": "Companion assets and effective output configuration, separate from the graph checksum. Compared only when both identities are present; graph-only indexes adopt it without rebuilding."
+    },
+    "ner_model_assets_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$",
+      "description": "Companion assets and effective output configuration, separate from the graph checksum. Compared only when both identities are present; graph-only indexes adopt it without rebuilding."
+    },
     "vector_format": {
       "type": "string",
       "enum": ["float32", "int8_sq"],

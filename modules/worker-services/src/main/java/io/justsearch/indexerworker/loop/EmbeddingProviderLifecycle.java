@@ -429,10 +429,9 @@ public final class EmbeddingProviderLifecycle {
     }
 
     String stored = controller.storedFingerprint();
-    if (stored != null && !stored.isBlank()) return false; // already persisted
-
     String current = controller.currentFingerprint();
     if (current == null || current.isBlank()) return false; // model not producing a fp yet
+    if (current.equals(stored)) return false;
 
     // Tempdoc 730 review hardening (item 3): also require the LIVE fingerprint, not just the
     // ECC's cached currentFingerprint() snapshot. The two can diverge (the model going offline

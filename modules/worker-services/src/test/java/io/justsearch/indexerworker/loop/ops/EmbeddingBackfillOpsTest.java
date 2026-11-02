@@ -220,13 +220,10 @@ class EmbeddingBackfillOpsTest {
           assertDoesNotThrow(() -> EmbeddingBackfillOps.processChunkEmbeddingBackfill(context()));
 
       assertTrue(result.success());
-      verify(indexingCoordinator)
-          .updateDocument(
-              eq("chunk2"),
-              argThat(
-                  (Map<String, Object> m) ->
-                      "1".equals(m.get(SchemaFields.CHUNK_EMBEDDING_RETRY_COUNT))
-                          && !m.containsKey(SchemaFields.CHUNK_EMBEDDING_STATUS)));
+      verify(indexingCoordinator).updateDocumentsBatchIf(argThat(updates ->
+          updates.size() == 1 && updates.getFirst().getKey().equals("chunk2")
+              && "1".equals(updates.getFirst().getValue().get(SchemaFields.CHUNK_EMBEDDING_RETRY_COUNT))
+              && !updates.getFirst().getValue().containsKey(SchemaFields.CHUNK_EMBEDDING_STATUS)), anyMap());
     }
   }
 

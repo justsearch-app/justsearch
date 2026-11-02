@@ -159,6 +159,15 @@ class KnowledgeServerTest {
         org.mockito.Mockito.when(runtime.indexCountOps().docCountOrThrow())
             .thenThrow(new IOException("green reader unavailable"));
       }
+      Path graph = Files.createDirectories(base.resolve("model")).resolve("model.onnx");
+      Files.write(graph, new byte[] {58, 0});
+      Files.writeString(graph.getParent().resolve("tokenizer.json"), "{}");
+      var identity = GenerationModelSelection.captureIdentity(graph);
+      setField(server, "initialModelSelection", GenerationModelSelection.accepted(
+          Map.of("embedding", new io.justsearch.indexerworker.index.IndexGenerationManager.ModelArtifact(
+              graph.toString(), identity.sha256())), "splade", 768));
+      setField(server, "startupConfiguration",
+          io.justsearch.configuration.resolved.ResolvedConfig.builder().build());
       var initialize = KnowledgeServer.class.getDeclaredMethod("initEmbeddingCompatibilityController");
       initialize.setAccessible(true);
       initialize.invoke(server);

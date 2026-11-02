@@ -4013,14 +4013,15 @@ public final class KnowledgeServer implements Closeable {
     return new EncoderSet.ModelIdentity(
         selection != null ? selection.fingerprint("embedding")
             : IndexFingerprint.ModelFingerprint.of(
-                EmbeddingFingerprint.modelPath().isPresent(), EmbeddingFingerprint.get()),
+                EmbeddingFingerprint.modelPath().isPresent(), EmbeddingFingerprint.get()).withAssets(EmbeddingFingerprint.assets()),
         selection != null ? selection.fingerprint("splade")
             : IndexFingerprint.ModelFingerprint.of(
-                SpladeFingerprint.modelPath().isPresent(), SpladeFingerprint.get()),
+                SpladeFingerprint.modelPath().isPresent(), SpladeFingerprint.get()).withAssets(SpladeFingerprint.assets()),
         selection != null ? selection.fingerprint("ner")
             : IndexFingerprint.ModelFingerprint.of(
                 io.justsearch.indexerworker.ner.NerFingerprint.modelPath().isPresent(),
-                io.justsearch.indexerworker.ner.NerFingerprint.get()),
+                io.justsearch.indexerworker.ner.NerFingerprint.get()).withAssets(
+                    io.justsearch.indexerworker.ner.NerFingerprint.assets()),
         "bge-m3".equalsIgnoreCase(sparseMode), dimension);
   }
 
@@ -5382,7 +5383,9 @@ public final class KnowledgeServer implements Closeable {
           () -> ingestLifecycle.latestCommitUserDataBestEffort(),
           this::trustworthyDocCountOrThrow,
           this::trustworthyCompletedEmbeddingCountOrThrow,
-          () -> java.util.Optional.ofNullable(candidateFingerprint.sha()));
+          () -> java.util.Optional.ofNullable(candidateFingerprint.sha()),
+          () -> java.util.Optional.ofNullable(SsotCommitMetadataSource.modelAssetsIdentity(
+              "embedding", candidateFingerprint.assetsSha(), recordedCandidate.configuration())));
       candidateEcc.refresh();
       candidateEmbeddingCompatController = candidateEcc;
     }
@@ -6507,7 +6510,11 @@ public final class KnowledgeServer implements Closeable {
             this::trustworthyDocCountOrThrow,
             this::trustworthyCompletedEmbeddingCountOrThrow,
             () -> initialModelSelection == null ? EmbeddingFingerprint.get()
-                : initialModelSelection.availableFingerprint("embedding"));
+                : initialModelSelection.availableFingerprint("embedding"),
+            () -> java.util.Optional.ofNullable(SsotCommitMetadataSource.modelAssetsIdentity(
+                "embedding", initialModelSelection == null
+                    ? EmbeddingFingerprint.assets().orElse(null)
+                    : initialModelSelection.fingerprint("embedding").assetsSha(), startupConfiguration)));
     ecc.refresh();
     embeddingCompatController = ecc;
     if (corruptionRecoveryRebuildStarted || isResumedEmptyCorruptionRecovery()) {
@@ -6740,12 +6747,13 @@ public final class KnowledgeServer implements Closeable {
     return new SsotCommitMetadataSource.RuntimeFingerprintInputs(
         "bge-m3".equalsIgnoreCase(config.ai().sparseModel()) ? 1024 : null,
         IndexFingerprint.ModelFingerprint.of(
-            EmbeddingFingerprint.modelPath().isPresent(), EmbeddingFingerprint.get()),
+            EmbeddingFingerprint.modelPath().isPresent(), EmbeddingFingerprint.get()).withAssets(EmbeddingFingerprint.assets()),
         IndexFingerprint.ModelFingerprint.of(
-            SpladeFingerprint.modelPath().isPresent(), SpladeFingerprint.get()),
+            SpladeFingerprint.modelPath().isPresent(), SpladeFingerprint.get()).withAssets(SpladeFingerprint.assets()),
         IndexFingerprint.ModelFingerprint.of(
             io.justsearch.indexerworker.ner.NerFingerprint.modelPath().isPresent(),
-            io.justsearch.indexerworker.ner.NerFingerprint.get()));
+            io.justsearch.indexerworker.ner.NerFingerprint.get()).withAssets(
+                io.justsearch.indexerworker.ner.NerFingerprint.assets()));
   }
 
   private Map<String, Object> configuredTargetCommitMetadata(ResolvedConfig config) {
