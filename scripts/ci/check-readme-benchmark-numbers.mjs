@@ -7,7 +7,8 @@
  * cannot silently go stale.
  *
  * Usage: node scripts/ci/check-readme-benchmark-numbers.mjs
- * Exit 0 = consistent (or skipped); non-zero = a shown number disagrees with the release.
+ * Exit 0 = consistent (or skipped); non-zero = a shown row disagrees with, or has no evidence in, the release.
+ * Unit fixtures: scripts/ci/check-readme-benchmark-numbers.test.mjs (sibling convention).
  *
  * Skip-if-absent (the 632 sidecar local-vs-CI duality): no release, or no README with a "## Benchmarks"
  * section → skipped (exit 0). README path auto-resolves between the root README.md and the staged
@@ -56,7 +57,7 @@ function findReadmeWithBenchmarks(root) {
 }
 
 // Return the table-row lines inside the "## Benchmarks" section (between that heading and the next "## ").
-function benchmarkTableRows(lines) {
+export function benchmarkTableRows(lines) {
   const rows = [];
   let inSection = false;
   for (const line of lines) {
@@ -70,47 +71,46 @@ function benchmarkTableRows(lines) {
   return rows;
 }
 
-function main() {
-  const root = repoRoot();
-  const releasePath = path.join(root, "scripts", "jseval", "release.v1.json");
-  if (!fs.existsSync(releasePath)) {
-    console.log("check-readme-benchmark-numbers: skipped (no release.v1.json).");
-    return;
-  }
-  const release = JSON.parse(fs.readFileSync(releasePath, "utf8"));
+// Editorial label token -> the release dataset that row must resolve to. Values are DERIVED from the
+// release (not hardcoded), so the check stays correct across releases. A corpus the README omits is
+// simply skipped; a corpus it SHOWS must resolve to measured or explicitly withheld evidence.
+const EXPECTATIONS = [
+  { token: "SciFact", dataset: "beir/scifact" },
+  { token: "Enron", dataset: "mixed/enron-qa" },
+  { token: "MIRACL-de", dataset: "mixed/miracl-de-2k" },
+  { token: "MIRACL-fr", dataset: "mixed/miracl-fr-2k" },
+  { token: "CourtListener", dataset: "mixed/courtlistener-200", alsoFullAblation: true },
+  { token: "CLERC", dataset: "mixed/legal-clerc-200" },
+];
+
+/** Pure (unit-tested): compare the README benchmark rows with the release. Returns {failures, checked}. */
+export function checkBenchmarkRows(rows, release) {
   if (release.status === "superseded") throw new Error("superseded release cannot supply current README claims");
   const measured = release.measured || {};
   const ablations = release.ablations || {};
-
-  const found = findReadmeWithBenchmarks(root);
-  if (!found) {
-    console.log("check-readme-benchmark-numbers: skipped (no README with a '## Benchmarks' section).");
-    return;
-  }
-  const rows = benchmarkTableRows(found.lines);
-
-  // Editorial label token -> the release value(s) that row must show. Values are DERIVED from the release
-  // (not hardcoded), so the check stays correct across releases. A corpus the README omits is simply skipped.
-  const courtFull = ablations["mixed/courtlistener-200"] && ablations["mixed/courtlistener-200"][0];
-  const expectations = [
-    { token: "SciFact", values: [nd(measured["beir/scifact"])] },
-    { token: "Enron", values: [nd(measured["mixed/enron-qa"])] },
-    { token: "MIRACL-de", values: [nd(measured["mixed/miracl-de-2k"])] },
-    { token: "MIRACL-fr", values: [nd(measured["mixed/miracl-fr-2k"])] },
-    { token: "CourtListener", values: [nd(courtFull), nd(measured["mixed/courtlistener-200"])] },
-    { token: "CLERC", dataset: "mixed/legal-clerc-200", values: [nd(measured["mixed/legal-clerc-200"])] },
-  ];
-
+  const withheld = release.withheld || {};
   const failures = [];
   let checked = 0;
-  for (const exp of expectations) {
+  for (const exp of EXPECTATIONS) {
     const row = rows.find((r) => r.toLowerCase().includes(exp.token.toLowerCase()));
     if (!row) continue; // README chose not to show this corpus — editorial freedom.
-    if (release.withheld?.[exp.dataset] && (!/withheld/i.test(row) || /\b0\.\d+/.test(row))) {
-      failures.push(`${exp.token}: default-mode row must state WITHHELD without a quality score`);
+    if (withheld[exp.dataset]) {
+      checked += 1;
+      if (!/withheld/i.test(row) || /\b0\.\d+/.test(row)) {
+        failures.push(`${exp.token}: default-mode row must state WITHHELD without a quality score — row: ${row.trim()}`);
+      }
+      continue;
     }
-    for (const v of exp.values) {
-      if (v == null) continue; // release doesn't carry this number — nothing to assert.
+    const value = nd(measured[exp.dataset]);
+    if (value == null) {
+      failures.push(
+        `${exp.token}: README shows a row but the release has neither a measured nDCG@10 nor a withheld entry for ${exp.dataset} — row: ${row.trim()}`
+      );
+      continue;
+    }
+    const full = exp.alsoFullAblation ? nd(ablations[exp.dataset] && ablations[exp.dataset][0]) : null;
+    for (const v of [full, value]) {
+      if (v == null) continue;
       checked += 1;
       const forms = roundedForms(v);
       if (!forms.some((f) => row.includes(f))) {
@@ -120,6 +120,25 @@ function main() {
       }
     }
   }
+  return { failures, checked };
+}
+
+function main() {
+  const root = repoRoot();
+  const releasePath = path.join(root, "scripts", "jseval", "release.v1.json");
+  if (!fs.existsSync(releasePath)) {
+    console.log("check-readme-benchmark-numbers: skipped (no release.v1.json).");
+    return;
+  }
+  const release = JSON.parse(fs.readFileSync(releasePath, "utf8"));
+  if (release.status === "superseded") throw new Error("superseded release cannot supply current README claims");
+
+  const found = findReadmeWithBenchmarks(root);
+  if (!found) {
+    console.log("check-readme-benchmark-numbers: skipped (no README with a '## Benchmarks' section).");
+    return;
+  }
+  const { failures, checked } = checkBenchmarkRows(benchmarkTableRows(found.lines), release);
 
   if (failures.length) {
     console.error(`check-readme-benchmark-numbers: FAIL (${found.rel})`);
@@ -127,8 +146,11 @@ function main() {
     console.error("  Fix the README number to match scripts/jseval/release.v1.json (the canonical release).");
     process.exitCode = 1;
   } else {
-    console.log(`check-readme-benchmark-numbers: OK (${found.rel}; ${checked} shown numbers match release.v1.json)`);
+    console.log(`check-readme-benchmark-numbers: OK (${found.rel}; ${checked} shown entries match release.v1.json)`);
   }
 }
 
-main();
+// Import-safe for the sibling .test.mjs (same pattern as check-outward-number-citations.mjs).
+if (process.argv[1] && process.argv[1].replace(/\\/g, "/").endsWith("check-readme-benchmark-numbers.mjs")) {
+  main();
+}

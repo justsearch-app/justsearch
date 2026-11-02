@@ -9,7 +9,7 @@ deferred, and what a collaborator would find useful to work on.
 ## What's measured, and how
 
 Every retrieval-quality number JustSearch publishes traces to one canonical, reproducible release object
-(`scripts/jseval/release.v1.json`) — a single sweep of the production-default pipeline across a fixed
+(`scripts/jseval/release.v1.json`) — a single sweep of the explicit `hybrid` preset across a fixed
 corpus set, at one commit, on stated hardware, with cited external baselines shown honestly (not as a "we
 beat X" claim — see the comparison-class notes in
 [`docs/reference/benchmarks/methodology.md`](docs/reference/benchmarks/methodology.md)). The result numbers
