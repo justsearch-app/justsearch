@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
   },
-  "createdAt": "2026-11-02T10:48:26.877Z",
-  "revision": "1b5ceea94b1384a23077db4873879da0c5ea77de",
-  "tree": "f8b25f8c10f99fc2ee48189adf4a04f85b006bac",
+  "createdAt": "2026-11-02T11:12:46.376Z",
+  "revision": "234d87ca0b728e9fdeb1afb581f3e5b9132346c2",
+  "tree": "e3f4dd83fc5c419eda84bc90b9bf71384df9c97e",
   "environment": {
     "platform": "linux",
     "arch": "x64",
@@ -18,10 +18,10 @@
   },
   "runs": [
     {
-      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/BrainSurface.observationFreshness.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/dw1j0qa8/tmp/test-intent-vitest-471-1793616505643.json\"",
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/BrainSurface.observationFreshness.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/08cb7uwy/tmp/test-intent-vitest-206-1793617964984.json\"",
       "cwd": "modules/ui-web",
       "exitCode": 0,
-      "durationMs": 1229
+      "durationMs": 1388
     }
   ],
   "checks": [
@@ -29,7 +29,7 @@
       "id": "modules/ui-web/src/shell-v0/views/BrainSurface.observationFreshness.test.ts#H3 a failed install read closes the gate immediately and a successful retry recovers",
       "file": "modules/ui-web/src/shell-v0/views/BrainSurface.observationFreshness.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:9fe670ba06aebfc6345cb0bb0b3e745eede1c789e68230d2b9510b776b03e358",
+      "contentDigest": "sha256:fbd2b1382711b141f86fd8284448d8329b66a3c3f2158906cca9b8e3c6695785",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -44,7 +44,7 @@
       "id": "modules/ui-web/src/shell-v0/views/BrainSurface.observationFreshness.test.ts#H3 a failed runtime read closes the gate immediately and a successful retry recovers",
       "file": "modules/ui-web/src/shell-v0/views/BrainSurface.observationFreshness.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:9fe670ba06aebfc6345cb0bb0b3e745eede1c789e68230d2b9510b776b03e358",
+      "contentDigest": "sha256:fbd2b1382711b141f86fd8284448d8329b66a3c3f2158906cca9b8e3c6695785",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -57,5 +57,5 @@
     }
   ],
   "failBefore": null,
-  "digest": "sha256:9b30e1d78b30e601e2425f0897253809208978169f57a8ab0fe16c7b3ab48c6a"
+  "digest": "sha256:8c5bc5e2f24f280661ff78bb51351d284f14e992daf84b11ed38ba26e9ae8099"
 }

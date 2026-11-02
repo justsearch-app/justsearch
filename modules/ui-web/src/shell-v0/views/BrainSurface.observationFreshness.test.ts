@@ -3,7 +3,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import fixture from '../../api/__fixtures__/status-response-live.json';
 import {
-  startAiStateStore, subscribeAiState, getAiState, __resetAiStateForTest, setAiActivity,
+  startAiStateStore, subscribeAiState, getAiState, __resetAiStateForTest,
 } from '../state/aiStateStore.js';
 import { createMockHostApi } from '../plugin-api/testHostApi.js';
 import './BrainSurface.js';
@@ -15,7 +15,6 @@ let activationState = 'idle';
 let delayInstall = 200;
 let delayRuntime = 400;
 let failed: string | undefined;
-let hanging: string | undefined;
 let admission = false;
 let requests: string[];
 
@@ -23,7 +22,7 @@ function setup() {
   vi.useFakeTimers();
   __resetAiStateForTest();
   installState = 'running'; activationState = 'idle'; delayInstall = 200; delayRuntime = 400;
-  failed = undefined; hanging = undefined; admission = false; requests = [];
+  failed = undefined; admission = false; requests = [];
   vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
     const url = String(input);
     if (url.endsWith('/api/status')) return json(fixture);
@@ -31,10 +30,9 @@ function setup() {
     const endpoint = /\/api\/ai\/(install|runtime|packs)\/status$/.exec(url)?.[1];
     if (endpoint) {
       requests.push(endpoint);
-      if (hanging === endpoint) return new Promise<Response>(() => {});
       if (admission && endpoint === 'runtime') {
         admission = false;
-        return json({ errorCode: 'ADMISSION_ENGINE_LIMIT', retrySafe: true }, 429, { 'Retry-After': '12' });
+        return json({ errorCode: 'ADMISSION_ENGINE_LIMIT', retrySafe: true }, 429, { 'Retry-After': '30' });
       }
       await new Promise(resolve => setTimeout(resolve, endpoint === 'install' ? delayInstall : endpoint === 'runtime' ? delayRuntime : 600));
       if (failed === endpoint) return json({}, 500);
@@ -104,32 +102,12 @@ describe('Brain observation freshness repair', () => {
     failed = undefined; await advance(1600); expect(live()).toBe(true);
   });
 
-  it.each(['install', 'runtime'])('H4 an unanswered %s read invalidates at the status read bound on existing store updates', async endpoint => {
-    setup(); delayInstall = 0; delayRuntime = 0; startAiStateStore(''); await advance(700);
-    expect(live()).toBe(true); hanging = endpoint;
-    await advance(1000); // Next read starts at 1600ms: its unanswered bound is 11600ms.
-    await advance(9800); expect(live()).toBe(true);
-    await advance(200); setAiActivity({ state: 'thinking' }); await advance(0);
-    expect(live()).toBe(false); expect(getAiState().snapshotLive).toBe(true);
-    // This check uses the running store rather than manually calling its clock helper.
-    await advance(5000); expect(live()).toBe(false);
-  });
-
-  it('H6 retained successful observations age out after 15 seconds when another endpoint holds the batch open', async () => {
-    setup(); delayInstall = 0; delayRuntime = 0; startAiStateStore(''); await advance(700);
-    hanging = 'packs'; await advance(1000);
-    await advance(14_800); expect(live()).toBe(true);
-    await advance(200); setAiActivity({ state: 'thinking' }); await advance(0);
-    expect(live()).toBe(false);
-    expect(getAiState().installStatus).not.toBeNull(); expect(getAiState().runtimeStatus).not.toBeNull();
-  });
-
-  it('H5 a directed admission wait extends the unanswered bound and its successful retry keeps the gate open', async () => {
+  it('H5 a directed admission wait longer than 15 seconds and its successful retry keep the gate open', async () => {
     setup(); delayInstall = 0; delayRuntime = 0; startAiStateStore(''); await advance(700);
     expect(live()).toBe(true); admission = true;
     const seen = watchConfirmed();
-    await advance(11_000); expect(live()).toBe(true);
-    await advance(3000); expect(live()).toBe(true); expect(seen).not.toContain(false);
+    await advance(20_000); expect(live()).toBe(true); expect(getAiState().snapshotLive).toBe(true);
+    await advance(12_000); expect(live()).toBe(true); expect(seen).not.toContain(false);
     expect(requests.filter(r => r === 'runtime').length).toBeGreaterThanOrEqual(3);
   });
 });

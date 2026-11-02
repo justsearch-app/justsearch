@@ -18,8 +18,6 @@
  */
 
 import { authorizedFetch } from '../api/authorizedFetch.js';
-import { observeAdmissionWait } from '../../api/admissionFetch.js';
-import { INTERVAL_MS as READ_BOUND_MS } from './statusPoll.js';
 import type { AiInstallStatus } from '../../api/generated/schema-types/ai-install-status.js';
 import type { AiRuntimeStatusResponse } from '../../api/generated/schema-types/ai-runtime-status-response.js';
 import type { InstallComponentEstimate } from '../state/installComponents.js';
@@ -108,10 +106,7 @@ export interface PackImportStatus {
 }
 
 export interface AiObservation {
-  lastSuccessMs: number | null;
   latestReadFailed: boolean;
-  /** An unanswered read becomes a failed observation; admission waits extend this deadline. */
-  unansweredAfterMs: number | null;
 }
 
 export interface AiInstallSnapshot {
@@ -163,13 +158,9 @@ export function pollIntervalFor(snapshot: AiInstallSnapshot): number {
   return SLOW_INTERVAL_MS;
 }
 
-/** Independent of response order and adaptive cadence, like status observation liveness. */
+/** Completed reads own observation validity; pending reads defer to app-wide liveness. */
 export function isAiObservationLive(observation: AiObservation | undefined): boolean {
-  const now = Date.now();
-  return observation !== undefined && !observation.latestReadFailed
-    && observation.lastSuccessMs !== null
-    && now - observation.lastSuccessMs <= SLOW_INTERVAL_MS + READ_BOUND_MS
-    && (observation.unansweredAfterMs === null || now < observation.unansweredAfterMs);
+  return observation !== undefined && !observation.latestReadFailed;
 }
 
 async function fetchJson<T>(path: string, signal: AbortSignal): Promise<T | null> {
@@ -190,30 +181,14 @@ function publish(current: AbortController): void {
 }
 
 async function readStatus(key: 'install' | 'runtime' | 'packs', current: AbortController): Promise<void> {
-  // Each endpoint owns its read deadline. The store already checks time while reads hang,
-  // so neither a successful observation nor a pending read needs its own timer.
-  const signal = AbortSignal.any([current.signal]);
-  if (key !== 'packs') {
-    const observationKey = `${key}Observation` as const;
-    const observation = last[observationKey] ?? { lastSuccessMs: null, latestReadFailed: false, unansweredAfterMs: null };
-    last = { ...last, [observationKey]: { ...observation, unansweredAfterMs: Date.now() + READ_BOUND_MS } };
-    if (observation.lastSuccessMs !== null) publish(current);
-    observeAdmissionWait(signal, delayMs => {
-      if (controller !== current) return;
-      last = { ...last, [observationKey]: { ...last[observationKey]!, unansweredAfterMs: Date.now() + delayMs + READ_BOUND_MS } };
-      publish(current);
-    });
-  }
-  const value = await fetchJson<NonNullable<AiInstallSnapshot[typeof key]>>(`/api/ai/${key}/status`, signal);
+  const value = await fetchJson<NonNullable<AiInstallSnapshot[typeof key]>>(`/api/ai/${key}/status`, current.signal);
   if (controller !== current) return;
   // A failed read retains history but immediately invalidates its observation.
   last = { ...last, [key]: value ?? last[key] };
   if (key !== 'packs') {
     const observationKey = `${key}Observation` as const;
     last = { ...last, [observationKey]: {
-      lastSuccessMs: value !== null ? Date.now() : last[observationKey]!.lastSuccessMs,
       latestReadFailed: value === null,
-      unansweredAfterMs: null,
     } };
   }
   publish(current);

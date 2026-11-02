@@ -1220,9 +1220,7 @@ function checkStaleness(): void {
   const { reachable: reachableNow } = computeReachability();
   const indexingStatusLiveNow = computeIndexingStatusLive(isSnapshotLive({ reachable: reachableNow }));
   if (phaseNow !== current.phase || reachableNow !== current.connection.reachable ||
-      indexingStatusLiveNow !== current.indexingStatusLive ||
-      isAiObservationLive(installObservationSig.get()) !== current.installObservationLive ||
-      isAiObservationLive(runtimeObservationSig.get()) !== current.runtimeObservationLive) {
+      indexingStatusLiveNow !== current.indexingStatusLive) {
     clockTickSig.set(clockTickSig.get() + 1);
   }
 }

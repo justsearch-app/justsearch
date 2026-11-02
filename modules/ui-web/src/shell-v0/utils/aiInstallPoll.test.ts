@@ -261,8 +261,8 @@ describe('aiInstallPoll lifecycle cancellation', () => {
     await vi.advanceTimersByTimeAsync(0);
     expect(listener).toHaveBeenLastCalledWith({
       install: { state: 'idle' }, runtime: { state: 'idle' }, packs: { state: 'idle' },
-      installObservation: { lastSuccessMs: Date.now(), latestReadFailed: false, unansweredAfterMs: null },
-      runtimeObservation: { lastSuccessMs: Date.now(), latestReadFailed: false, unansweredAfterMs: null },
+      installObservation: { latestReadFailed: false },
+      runtimeObservation: { latestReadFailed: false },
     });
     await vi.advanceTimersByTimeAsync(5_000);
     expect(fetchMock).toHaveBeenCalledTimes(9);
@@ -289,18 +289,5 @@ describe('AI observation freshness', () => {
     expect(live(endpoint === 'install' ? 'runtime' : 'install')).toBe(true);
     failed = false; await vi.advanceTimersByTimeAsync(5000);
     expect(live(endpoint)).toBe(true); unsub();
-  });
-  it('G1 unanswered reads invalidate observations within the fixed liveness bound', async () => {
-    vi.useFakeTimers(); let pending = false;
-    vi.stubGlobal('fetch', vi.fn(async () => pending ? new Promise<Response>(() => {}) : jsonResponse({ state: 'idle' })));
-    let last: AiInstallSnapshot | undefined;
-    const unsub = subscribeAiInstall(s => { last = s; });
-    // Compatibility with the before-state: it treated every retained value as current.
-    const live = (key: 'install' | 'runtime') => last?.[`${key}Observation`] ? isAiObservationLive(last[`${key}Observation`])
-      : (last as AiInstallSnapshot & { installLive?: boolean; runtimeLive?: boolean })?.[`${key}Live`] ?? (last?.[key] != null);
-    await vi.advanceTimersByTimeAsync(0);
-    expect(live('install')).toBe(true); expect(live('runtime')).toBe(true);
-    pending = true; await vi.advanceTimersByTimeAsync(15_001);
-    expect(live('install')).toBe(false); expect(live('runtime')).toBe(false); unsub();
   });
 });

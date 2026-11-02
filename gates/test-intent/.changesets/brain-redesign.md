@@ -577,7 +577,7 @@ axe run remain necessary.
       ],
       "class": "New",
       "repaired": true,
-      "behaviour": "S1–S7 review repairs: supported Automatic semantics (GPU null display without a reset; context reset writes zero; no longest-answer reset), mock null-as-keep merge matching SettingsPatch, active status plus active model for On, initial settings-read uncertainty with reachable blocked reasons, selected additions Install action and exact consent, last-observed picture-reading wording on disconnect, independent bounded Health endpoint requests that skip overlapping ticks and ignore timed-out late results, and shared expanded/controls semantics for every feature opener. The GPU slider preservation check retires its impossible null-reset assertion while retaining its untouched-value and processor-only assertions.",
+      "behaviour": "S1\u2013S7 review repairs: supported Automatic semantics (GPU null display without a reset; context reset writes zero; no longest-answer reset), mock null-as-keep merge matching SettingsPatch, active status plus active model for On, initial settings-read uncertainty with reachable blocked reasons, selected additions Install action and exact consent, last-observed picture-reading wording on disconnect, independent bounded Health endpoint requests that skip overlapping ticks and ignore timed-out late results, and shared expanded/controls semantics for every feature opener. The GPU slider preservation check retires its impossible null-reset assertion while retaining its untouched-value and processor-only assertions.",
       "sources": [
         {
           "kind": "owner-adopted-scenario",
@@ -710,10 +710,10 @@ axe run remain necessary.
       ],
       "evidence": "gates/test-intent/evidence/brain-live-repairs.json",
       "newChecks": [
-        "modules/ui-web/src/shell-v0/views/BrainSurface.repairRemedy.test.ts#repairNeeded ⇒ Repair is the primary action in the alert",
-        "modules/ui-web/src/shell-v0/views/BrainSurface.repairRemedy.test.ts#required file missing but the capability is observably running ⇒ the \"working, but\" copy",
-        "modules/ui-web/src/shell-v0/views/BrainSurface.repairRemedy.test.ts#required file missing and the capability is down ⇒ the full-strength copy is unchanged",
-        "modules/ui-web/src/shell-v0/views/BrainSurface.repairRemedy.test.ts#three failed repair passes ⇒ the manual fallback, not an unqualified Repair button"
+        "modules/ui-web/src/shell-v0/views/BrainSurface.repairRemedy.test.ts#repairNeeded \u21d2 Repair is the primary action in the alert",
+        "modules/ui-web/src/shell-v0/views/BrainSurface.repairRemedy.test.ts#required file missing but the capability is observably running \u21d2 the \"working, but\" copy",
+        "modules/ui-web/src/shell-v0/views/BrainSurface.repairRemedy.test.ts#required file missing and the capability is down \u21d2 the full-strength copy is unchanged",
+        "modules/ui-web/src/shell-v0/views/BrainSurface.repairRemedy.test.ts#three failed repair passes \u21d2 the manual fallback, not an unqualified Repair button"
       ]
     },
     {
@@ -807,7 +807,7 @@ axe run remain necessary.
       ],
       "class": "New",
       "repaired": true,
-      "behaviour": "D1–D10 live redesign repairs: one confirmed-live page gate and installed repair wording with saved answer intent; passive preview reads never block real switch clicks or overwrite newer saves; sliders keep focus and drafts, serialize/coalesce the latest committed change, stop on conflict and distinguish Automatic-at-maximum from zero; all-app status GPU memory (device-zero semantics repaired separately in G5); sentence word boundaries; single-gesture panel handoff without focus scrolling; cancelled package bytes; the picture branch takes layout space; repair copy points to existing locations. Geometry and native keyboard behavior are additionally exercised in Chromium across viewport sizes, themes, forced colors and 200% reflow.",
+      "behaviour": "D1\u2013D10 live redesign repairs: one confirmed-live page gate and installed repair wording with saved answer intent; passive preview reads never block real switch clicks or overwrite newer saves; sliders keep focus and drafts, serialize/coalesce the latest committed change, stop on conflict and distinguish Automatic-at-maximum from zero; all-app status GPU memory (device-zero semantics repaired separately in G5); sentence word boundaries; single-gesture panel handoff without focus scrolling; cancelled package bytes; the picture branch takes layout space; repair copy points to existing locations. Geometry and native keyboard behavior are additionally exercised in Chromium across viewport sizes, themes, forced colors and 200% reflow.",
       "sources": [
         {
           "kind": "owner-adopted-scenario",
@@ -920,7 +920,7 @@ axe run remain necessary.
       ],
       "class": "New",
       "repaired": true,
-      "behaviour": "G1–G5 review repairs: successful per-endpoint observations age out after the fixed 15-second bound (superseding the original per-interval expiry) and failed reads invalidate retained state while origin stays reachable; Advanced labels retained observations; a selected missing answer package uses runtime intent without package declines or download consent while Repair owns acquisition; passive previews finish before another passive batch starts and do not lock choices; graphics memory is device zero, one of N devices, never an aggregate. The previous D5 aggregate assertion is replaced by G5 because /api/status.gpu produces device-zero memory. B14 declined-package consent remains asserted unchanged.",
+      "behaviour": "G1\u2013G5 review repairs: failed reads independently invalidate retained state while origin stays reachable; successful observations have no age, with the page gate also requiring app-wide snapshotLive; Advanced labels retained observations; a selected missing answer package uses runtime intent without package declines or download consent while Repair owns acquisition; passive previews finish before another passive batch starts and do not lock choices; graphics memory is device zero, one of N devices, never an aggregate. The previous D5 aggregate assertion is replaced by G5 because /api/status.gpu produces device-zero memory. B14 declined-package consent remains asserted unchanged.",
       "sources": [
         {
           "kind": "owner-adopted-scenario",
@@ -976,7 +976,7 @@ axe run remain necessary.
           "delegationQuote": "well from now on you can just proceed autonomously accordinglky",
           "delegationLocation": "task t-20261101-uiimpl, user turn after the WP1 summary",
           "delegationScope": "Implement the agreed AI Brain window redesign, step 1.",
-          "choice": "Require successful install/runtime endpoint observations within the fixed 15-second freshness bound, with unanswered reads invalid after 10 seconds unless admission waiting extends that read bound, invalidate failures independently of reachable origin, and use the single gate for Advanced state claims; keep selected missing-answer-files switches on saved intent with Repair owning acquisition, preserve declined-package consent; serialize passive refresh batches; label device-zero graphics memory as one of N devices.",
+          "choice": "freshness narrowed to failed-read plus app-wide liveness: latest completed successful install/runtime reads count while snapshotLive holds; a failed read invalidates immediately; pending reads and admission waits have no independent freshness bound. Remove the age bound, unanswered-read tracking and freshness timers (task t-20261101-uiimpl).",
           "label": "agent choice"
         }
       ],
@@ -990,8 +990,7 @@ axe run remain necessary.
         "modules/ui-web/src/shell-v0/views/BrainSurface.liveRepairs.test.ts#G4 passive previews complete before another batch starts and converge other windows without locking choices",
         "modules/ui-web/src/shell-v0/views/BrainSurface.liveRepairs.test.ts#G5 Linux memory uses device zero status GPU figures and labels one of several devices",
         "modules/ui-web/src/shell-v0/utils/aiInstallPoll.test.ts#G1 a failed install read invalidates retained observations even with other endpoints reachable",
-        "modules/ui-web/src/shell-v0/utils/aiInstallPoll.test.ts#G1 a failed runtime read invalidates retained observations even with other endpoints reachable",
-        "modules/ui-web/src/shell-v0/utils/aiInstallPoll.test.ts#G1 unanswered reads invalidate observations within the fixed liveness bound"
+        "modules/ui-web/src/shell-v0/utils/aiInstallPoll.test.ts#G1 a failed runtime read invalidates retained observations even with other endpoints reachable"
       ]
     },
     {
@@ -1016,7 +1015,7 @@ axe run remain necessary.
         "instrumentation",
         "input re-encoding"
       ],
-      "whatMoved": "Successful-observation fixtures explicitly supply the install/runtime poll owners’ freshness flags. Existing expected outcomes, race injections and operation oracles remain unchanged. aiInstallPoll lifecycle snapshot equality includes successful-read timestamps and read outcomes; StatusDeck’s complete AiState factory supplies false for absent observations. The new G checks and corrected G5 device-zero assertion are separately warranted as repaired behavior. The desktop terminal-recovery check again expects four recurring timers, because observation expiry uses the existing store clock; it still requires all five requests aborted, no later requests, and zero timers after teardown.",
+      "whatMoved": "Successful-observation fixtures explicitly supply the install/runtime poll owners\u2019 freshness flags. Existing expected outcomes, race injections and operation oracles remain unchanged. aiInstallPoll lifecycle snapshot equality includes completed-read outcomes; StatusDeck\u2019s complete AiState factory supplies false for absent observations. The new G checks and corrected G5 device-zero assertion are separately warranted as repaired behavior. The desktop terminal-recovery check again expects four recurring timers, because observation freshness adds no timers; it still requires all five requests aborted, no later requests, and zero timers after teardown.",
       "newChecks": []
     },
     {
@@ -1026,7 +1025,7 @@ axe run remain necessary.
       ],
       "class": "New",
       "repaired": true,
-      "behaviour": "H1/H2/H4–H6: successful delayed polls preserve the progress controls and keyboard focus, either response order and both cadence transitions remain live, unanswered reads and aged observations close the gate on existing store updates, admission waits extend the unanswered bound, and shutdown owns only the original four recurring timers. These checks fail by assertion on 1b5ceea94b.",
+      "behaviour": "H1/H2 and desktop recovery: successful delayed polls preserve progress controls and keyboard focus, either response order and both cadence transitions remain live, and shutdown owns only the original four recurring timers. These checks fail by assertion on 1b5ceea94b. H4/H6 and the former H5 deadline expectation are retired under the explicit Obsolete entry; the longer admission-wait regression is recorded separately.",
       "sources": [
         {
           "kind": "owner-adopted-scenario",
@@ -1047,7 +1046,7 @@ axe run remain necessary.
           "delegationQuote": "well from now on you can just proceed autonomously accordinglky",
           "delegationLocation": "task t-20261101-uiimpl, user turn after the WP1 summary",
           "delegationScope": "Implement the agreed AI Brain window redesign, step 1.",
-          "choice": "Replace per-observation expiry timers with successful-read time and latest outcome. Freshness has one 15-second bound; unanswered reads invalidate after the status poller's 10-second bound, extended by its admission-wait observer. Evaluate on store updates and its existing clock, preserving Pause focus across delays and cadence transitions.",
+          "choice": "freshness narrowed to failed-read plus app-wide liveness: latest completed successful install/runtime reads count while snapshotLive holds; a failed read invalidates immediately; pending reads and admission waits have no independent freshness bound. Remove the age bound, unanswered-read tracking and freshness timers (task t-20261101-uiimpl).",
           "label": "agent choice"
         }
       ],
@@ -1056,10 +1055,6 @@ axe run remain necessary.
         "modules/ui-web/src/shell-v0/views/BrainSurface.observationFreshness.test.ts#H1 delayed successful download polls preserve the same Pause control and keyboard focus",
         "modules/ui-web/src/shell-v0/views/BrainSurface.observationFreshness.test.ts#H2 reversed replies and both cadence transitions keep successful observations live: install first",
         "modules/ui-web/src/shell-v0/views/BrainSurface.observationFreshness.test.ts#H2 reversed replies and both cadence transitions keep successful observations live: runtime first",
-        "modules/ui-web/src/shell-v0/views/BrainSurface.observationFreshness.test.ts#H4 an unanswered install read invalidates at the status read bound on existing store updates",
-        "modules/ui-web/src/shell-v0/views/BrainSurface.observationFreshness.test.ts#H4 an unanswered runtime read invalidates at the status read bound on existing store updates",
-        "modules/ui-web/src/shell-v0/views/BrainSurface.observationFreshness.test.ts#H5 a directed admission wait extends the unanswered bound and its successful retry keeps the gate open",
-        "modules/ui-web/src/shell-v0/views/BrainSurface.observationFreshness.test.ts#H6 retained successful observations age out after 15 seconds when another endpoint holds the batch open",
         "modules/ui-web/src/boot/desktopRecoveryPolling.test.ts#stops all real store pollers with scheduled requests"
       ]
     },
@@ -1090,6 +1085,60 @@ axe run remain necessary.
       "newChecks": [
         "modules/ui-web/src/shell-v0/views/BrainSurface.observationFreshness.test.ts#H3 a failed install read closes the gate immediately and a successful retry recovers",
         "modules/ui-web/src/shell-v0/views/BrainSurface.observationFreshness.test.ts#H3 a failed runtime read closes the gate immediately and a successful retry recovers"
+      ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/utils/aiInstallPoll.test.ts",
+        "modules/ui-web/src/shell-v0/views/BrainSurface.observationFreshness.test.ts"
+      ],
+      "class": "Obsolete",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "well from now on you can just proceed autonomously accordinglky",
+          "delegationLocation": "task t-20261101-uiimpl, user turn after the WP1 summary",
+          "delegationScope": "Implement the agreed AI Brain window redesign, step 1.",
+          "choice": "freshness narrowed to failed-read plus app-wide liveness: latest completed successful install/runtime reads count while snapshotLive holds; a failed read invalidates immediately; pending reads and admission waits have no independent freshness bound. Remove the age bound, unanswered-read tracking and freshness timers (task t-20261101-uiimpl).",
+          "label": "agent choice"
+        }
+      ],
+      "conflictSearch": "Searched docs/decisions and the task\u2019s prior freshness choices for conflict: the current narrowing explicitly supersedes time-based freshness. Retired G1 unanswered reads invalidate observations within the fixed liveness bound; H4 unanswered install/runtime reads invalidate at the status read bound; H6 successful observations age out after 15 seconds; and H5\u2019s admission-wait deadline-extension expectation. Their production age/deadline tracking is deleted. Failed-read invalidation, focus preservation, successful cadence/response-order behavior and desktop recovery\u2019s four timers remain checked."
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/views/BrainSurface.observationFreshness.test.ts"
+      ],
+      "class": "New",
+      "repaired": true,
+      "behaviour": "H5: a server-directed 30-second admission wait does not close the observation gate while the app-wide snapshot stays live, and the successful retry preserves it. This admission-wait regression fails by assertion on 234d87ca0b, whose 15-second age bound invalidates the retained runtime observation.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "B13",
+          "quote": "Live behaviour: status, install progress and switch states update without collapsing open panels or Advanced settings, without losing a slider draft; package previews and LLM settings refresh when install state changes and when the window regains focus, ignoring out-of-order responses, so a second window converges; reload or tab switch mid-install keeps the progress and outcome. (challenger 7)",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "Q3",
+          "quote": "Settings saves keep witnesses and conflict review; offline runtime mutations are never queued; unknown/last-observed values stay labelled.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "well from now on you can just proceed autonomously accordinglky",
+          "delegationLocation": "task t-20261101-uiimpl, user turn after the WP1 summary",
+          "delegationScope": "Implement the agreed AI Brain window redesign, step 1.",
+          "choice": "freshness narrowed to failed-read plus app-wide liveness: latest completed successful install/runtime reads count while snapshotLive holds; a failed read invalidates immediately; pending reads and admission waits have no independent freshness bound. Remove the age bound, unanswered-read tracking and freshness timers (task t-20261101-uiimpl).",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/brain-freshness-narrowing.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/views/BrainSurface.observationFreshness.test.ts#H5 a directed admission wait longer than 15 seconds and its successful retry keep the gate open"
       ]
     }
   ]
@@ -1418,3 +1467,30 @@ removed after their checks; validation logs and PNGs remain beneath the supplied
 Elapsed repair/validation window: 2026-11-02 10:43–11:00 UTC.
 
 ## Acceptance records
+
+
+Freshness narrowing repair (task t-20261101-uiimpl; supersedes earlier timing ledgers):
+
+Decision: freshness narrowed to failed-read plus app-wide liveness (agent choice under the quoted delegation).
+Deleted observation timestamps, age and unanswered deadlines, admission deadline observers and
+the freshness branches in the store clock. No new timer; desktop recovery still owns four.
+
+- Tests added or rewritten: modules/ui-web/src/shell-v0/utils/aiInstallPoll.test.ts — G1/Q3: retained history, immediate failure/recovery and lifecycle outcomes remain; unanswered-bound test retired as Obsolete — durable.
+- Tests added or rewritten: modules/ui-web/src/shell-v0/views/BrainSurface.observationFreshness.test.ts — H1/H2/H3/H5/B13/Q3: preserve focus, cadence/reply-order and immediate failure checks; 30-second admission-wait regression; H4/H6 retired as Obsolete — durable.
+
+Validation of the narrowed candidate (2026-11-02; no commit):
+- `.agents/preflight` is absent. Lint and typecheck exit 0. Full ui-web suite: exit 0, 685 files / 8,794 tests passed. Final removal of unused hanging-read fixture scaffolding was followed by lint/typecheck and the three affected suites: 24/24 tests passed.
+- `npm --prefix modules/ui-web run knip:report`: exit 0 (report names knip’s findings exit 1); `node scripts/governance/run.mjs --gate dead-code --mode gate`: exit 0, pass, five findings.
+- `node scripts/ci/run-ui-web-gates.mjs`: exit 0, 31/31 passed, including style literals.
+- Evidence: regenerated review repairs on 13a89c28aa, focus/cadence/four-timer repairs on 1b5ceea94b and H3 preservation; new H5 admission wait passes here and fails by assertion on 234d87ca0b. H1/H2/H3 preservation also passes on the isolated 234d87ca0b baseline (five selected cases, H5 deliberately not selected). Earlier slice A/B evidence and fail-before refs remain unchanged.
+- `ui-shot` ai-brain — exit 0; ready reference’s open page, sentence/path/graphics bar/links; fixture-unknown feature observations labelled unknown.
+- `ui-shot` ai-brain-light — exit 0; same ready layout in light colors, legible hairlines.
+- `ui-shot` ai-brain-advanced — exit 0; Advanced reference’s grouped rows and native sliders; capture scrolls to expanded controls.
+- `ui-shot` ai-brain-advanced-light — exit 0; same Advanced groups and sliders in light colors.
+- `ui-shot` ai-brain-components — exit 0; Advanced reference’s downloaded-files placement; fixture inventory lists known sizes and acquisition choices.
+- `ui-shot` ai-brain-components-light — exit 0; same downloaded-files layout, legible in light colors.
+- `ui-shot` ai-brain-consent — exit 0; not-installed reference’s page behind existing size/licence consent; only selected packages listed.
+- `ui-shot` ai-brain-consent-light — exit 0; same not-installed page and consent in light colors. All eight captures: zero new/serious axe violations, zero real console errors, no horizontal overflow; PNGs visually inspected against the four reference pictures.
+- Aggregate visual checks are incomplete: the builder ran a11y and proportion concurrently in separate process namespaces, which overwrote their shared tmp/ui-shot-server.json with mutually invisible process IDs. Repeated Vite starts exhausted ports 5174–5223. Proportion exited 2 (capture errors); a11y was interrupted (exit 130) after exhaustion. This is a check-infrastructure blocker, not a product assertion. Do not change Search or any baseline to address it.
+- Stopping the a11y command by its recorded session identity stopped that namespace’s Vite children. Completed-command process namespaces are inaccessible from subsequent exec calls; surviving servers observed on odd ports 5177 through 5223 were started by these checks and require host cleanup, then sequential aggregate reruns. Initial owner ports 5173–5175 were untouched. A native cleanup connector was attempted but returned UNAVAILABLE (429) before starting a brief.
+Resources: own temporary shared clones and dereferenced dependency copies; fixture browsers and own Vite servers. No owner backend, model or GPU was used. Candidate code deletes age/unanswered tracking and adds no timer. No acceptance record written.
