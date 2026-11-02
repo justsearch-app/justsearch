@@ -12,7 +12,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
 final class IndexOwnershipRuntimeAdmissionTest extends RuntimeTestBase {
-  @ParameterizedTest
+  @ParameterizedTest(name = "{displayName} [{index}] {arguments}")
   @ValueSource(strings = {"writable", "read-only", "deferred"})
   void everyManagedOpenInspectsTheWholeNamespaceBeforeLucene(String mode) throws Exception {
     Path active = seedOwnedIndex();

@@ -17,7 +17,7 @@ import org.junit.jupiter.params.provider.ValueSource;
 import tools.jackson.databind.ObjectMapper;
 
 final class IndexingControllerGcOwnershipTest {
-  @ParameterizedTest
+  @ParameterizedTest(name = "{displayName} [{index}] {arguments}")
   @ValueSource(booleans = {true, false})
   void gcResponseSeparatesEmptyRemnantsAndListsUnprovenCleanupPaths(boolean accepted) throws Exception {
     var service = mock(IndexingService.class);

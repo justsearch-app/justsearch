@@ -41,7 +41,7 @@ class GenerationPointerDurabilityTest {
     assertArrayEquals(valid, Files.readAllBytes(temporary.resolve("state.json")));
   }
 
-  @ParameterizedTest
+  @ParameterizedTest(name = "{displayName} [{index}] {arguments}")
   @org.junit.jupiter.params.provider.ValueSource(booleans = {false, true})
   void bootKeepsUnprovenScratchAndRemovesOnlyValidatedStateTemps(boolean repair) throws Exception {
     var manager = new IndexGenerationManager(temporary);
