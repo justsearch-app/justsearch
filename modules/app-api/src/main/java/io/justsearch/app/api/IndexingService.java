@@ -341,6 +341,8 @@ public interface IndexingService {
     throw new UnsupportedOperationException("Indexing service unavailable");
   }
 
+  record IndexCleanupWarning(String path, String reason) {}
+
   /**
    * Outcome of an index GC invocation. Carries the worker-side counts so the
    * Operation handler's structured-output map (and the REST controller's response
@@ -355,9 +357,14 @@ public interface IndexingService {
    * @param prunedCount number of marked generations physically removed (0 if rejected)
    * @param error worker error message when {@code accepted=false}; empty string on success
    */
-  record IndexGcOutcome(boolean accepted, int markedCount, int prunedCount, String error) {
+  record IndexGcOutcome(boolean accepted, int markedCount, int prunedCount, String error,
+      int emptyLeftoversRemoved, List<IndexCleanupWarning> cleanupWarnings) {
+    public IndexGcOutcome(boolean accepted, int markedCount, int prunedCount, String error) {
+      this(accepted, markedCount, prunedCount, error, 0, List.of());
+    }
     public IndexGcOutcome {
       java.util.Objects.requireNonNull(error, "error");
+      cleanupWarnings = List.copyOf(cleanupWarnings);
     }
 
     /** Sentinel for the unavailable-service code path. */

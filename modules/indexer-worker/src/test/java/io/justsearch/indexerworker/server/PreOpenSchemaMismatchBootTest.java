@@ -244,29 +244,60 @@ final class PreOpenSchemaMismatchBootTest {
   }
 
   @Test
-  void interruptedBackupWithEmptyActiveRestoresBothOwnershipFiles(@TempDir Path tempDir)
+  void foreignDirectoryRefusalPrecedesJournalMutationAndCarriesPathToFatalMarker(@TempDir Path tempDir)
+      throws Exception {
+    var layout = WorkerBootFixture.layout(tempDir);
+    Path foreign = java.nio.file.Files.createDirectory(layout.indexBase().resolve("indices/foreign"));
+    java.nio.file.Files.writeString(foreign.resolve("payload"), "foreign bytes");
+    Path journal = layout.dataDir().resolve("jobs.db");
+    java.nio.file.Files.writeString(journal, "unproven journal bytes");
+    byte[] state = java.nio.file.Files.readAllBytes(layout.indexBase().resolve("state.json"));
+    var previous = io.justsearch.configuration.resolved.ConfigStore.globalOrNull();
+    WorkerBootFixture.publishConfig(layout.dataDir(), layout.indexBase(), "BLUE_GREEN_MIGRATE");
+    var installed = io.justsearch.configuration.resolved.ConfigStore.global();
+    try {
+      server = new KnowledgeServer(new io.justsearch.core.execution.TestEngineExecutors(),
+          WorkerBootFixture.workerConfig(layout.dataDir()));
+      assertThrows(IOException.class, server::start);
+      String fatal = io.justsearch.ipc.WorkerFatalReasonMarker.readAndClear(layout.dataDir());
+      assertNotNull(fatal);
+      assertTrue(fatal.startsWith("index_ownership_unproven\n"), fatal);
+      assertTrue(fatal.contains(foreign.toString()), fatal);
+      assertTrue(fatal.contains("Evidence: missing"), fatal);
+      assertEquals("foreign bytes", java.nio.file.Files.readString(foreign.resolve("payload")));
+      assertEquals("unproven journal bytes", java.nio.file.Files.readString(journal));
+      org.junit.jupiter.api.Assertions.assertArrayEquals(state,
+          java.nio.file.Files.readAllBytes(layout.indexBase().resolve("state.json")));
+      assertFalse(java.nio.file.Files.exists(foreign.resolve(".justsearch-generation.sentinel")));
+    } finally {
+      try { if (server != null) server.close(); }
+      finally {
+        server = null;
+        io.justsearch.configuration.resolved.ConfigStore.restoreGlobal(installed, previous);
+      }
+    }
+  }
+
+  @Test
+  void interruptedBackupWithEmptyActiveRefusesExistingUnprovenTarget(@TempDir Path tempDir)
       throws Exception {
     WorkerBootFixture.Layout layout = WorkerBootFixture.layout(tempDir);
     Path backup = recoveryBackup(layout, "20000101-000000");
     java.nio.file.Files.move(layout.activePath(), backup);
     java.nio.file.Files.createDirectory(layout.activePath());
-
-    Path preparationEvidence = layout.activePath().resolve("recovery-prepared");
-    assertTrue(layout.genManager().reconcileActiveRecoveryOwnership(activeGenerationPath -> {
-      assertEquals(layout.activePath(), activeGenerationPath);
-      assertFalse(
-          java.nio.file.Files.exists(
-              activeGenerationPath.resolve(".justsearch-generation.sentinel")));
-      assertFalse(
-          java.nio.file.Files.exists(
-              activeGenerationPath.resolve(".justsearch-index-generation.json")));
-      java.nio.file.Files.writeString(preparationEvidence, "prepared-before-ownership");
-    }));
-    assertTrue(java.nio.file.Files.exists(preparationEvidence));
-    assertOwnershipEquals(backup, layout.activePath());
-    assertFalse(
-        layout.genManager().reconcileActiveRecoveryOwnership(),
-        "a complete reconciled pair is an idempotent no-op");
+    byte[] state = java.nio.file.Files.readAllBytes(layout.indexBase().resolve("state.json"));
+    var called = new java.util.concurrent.atomic.AtomicBoolean();
+    IOException refusal = assertThrows(IOException.class,
+        () -> layout.genManager().reconcileActiveRecoveryOwnership(path -> called.set(true)));
+    assertTrue(refusal.getMessage().contains("index.ownership_unproven"));
+    assertFalse(called.get());
+    try (var entries = java.nio.file.Files.list(layout.activePath())) {
+      assertEquals(0, entries.count(), "an existing unproven target is never claimed");
+    }
+    org.junit.jupiter.api.Assertions.assertArrayEquals(state,
+        java.nio.file.Files.readAllBytes(layout.indexBase().resolve("state.json")));
+    assertTrue(java.nio.file.Files.isRegularFile(backup.resolve(".justsearch-generation.sentinel")));
+    assertTrue(java.nio.file.Files.isRegularFile(backup.resolve(".justsearch-index-generation.json")));
   }
 
   @Test
@@ -289,14 +320,14 @@ final class PreOpenSchemaMismatchBootTest {
     WorkerBootFixture.Layout layout = WorkerBootFixture.layout(tempDir);
     Path backup = recoveryBackup(layout, "20000101-000000");
     java.nio.file.Files.move(layout.activePath(), backup);
-    java.nio.file.Files.createDirectory(layout.activePath());
     java.nio.file.Files.writeString(
         backup.resolve(".justsearch-index-generation.json"), "{not valid json");
 
     IOException mismatch = assertThrows(
         IOException.class,
         () -> layout.genManager().reconcileActiveRecoveryOwnership());
-    assertTrue(mismatch.getMessage().contains("manifest is invalid"));
+    assertTrue(mismatch.getMessage().contains("index.ownership_unproven"));
+    assertTrue(mismatch.getMessage().contains("malformed"));
     assertFalse(
         java.nio.file.Files.exists(
             layout.activePath().resolve(".justsearch-index-generation.json")),
@@ -308,7 +339,6 @@ final class PreOpenSchemaMismatchBootTest {
     WorkerBootFixture.Layout layout = WorkerBootFixture.layout(tempDir);
     Path first = recoveryBackup(layout, "20000101-000000");
     java.nio.file.Files.move(layout.activePath(), first);
-    java.nio.file.Files.createDirectory(layout.activePath());
     Path second = recoveryBackup(layout, "20000101-000001");
     java.nio.file.Files.createDirectory(second);
     java.nio.file.Files.copy(

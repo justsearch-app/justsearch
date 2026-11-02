@@ -26,7 +26,7 @@ final class IndexGenerationRetirementTest {
   @TempDir Path temp;
 
   @Test
-  void refusedRecordedTargetRetiresAfterPointerClearAndPartialMarkedDelete() throws Exception {
+  void refusedRecordedTargetLeavesUnprovenMarkedPayloadAndReleasesCapacity() throws Exception {
     Path base = temp.resolve("refused-pointer-cut");
     IndexGenerationManager manager = new IndexGenerationManager(base);
     String active = manager.initializeOrLoad().activeGenerationId();
@@ -50,8 +50,9 @@ final class IndexGenerationRetirementTest {
     assertTrue(manager.refusedRecordedGenerationRetired(KEY, active));
     assertNull(manager.readStateBestEffort().previous_generation(),
         "a deleted refused B must release its stale A alias before another build");
-    assertFalse(Files.exists(marked));
-    assertEquals(1, generationDirectoryCount(base));
+    assertTrue(Files.exists(marked));
+    assertTrue(manager.cleanupWarnings().stream().anyMatch(w -> w.path().equals(marked.toString())));
+    assertEquals(2, generationDirectoryCount(base));
     assertEquals(IndexGenerationManager.recordedGenerationId(NEXT_KEY),
         manager.startRecordedMigration(NEXT_KEY, SOURCE, FINGERPRINT, active, List.of())
             .building_generation());
@@ -131,7 +132,7 @@ final class IndexGenerationRetirementTest {
   }
 
   @Test
-  void retryUsesExactPointerBindingAfterPartialDeleteRemovedOwnershipMetadata()
+  void retryLeavesAndReportsMarkedPredecessorWithoutOwnershipMetadata()
       throws Exception {
     Promoted promoted = promote(temp.resolve("partial-delete"));
     SafeIndexPathOps.MarkResult marked =
@@ -146,12 +147,13 @@ final class IndexGenerationRetirementTest {
         promoted.manager().retirePreviousGeneration(promoted.active(), promoted.previous());
 
     assertNull(retired.previous_generation());
-    assertFalse(Files.exists(partial));
-    assertEquals(1, generationDirectoryCount(promoted.base()));
+    assertTrue(Files.exists(partial));
+    assertTrue(promoted.manager().cleanupWarnings().stream().anyMatch(w -> w.path().equals(partial.toString())));
+    assertEquals(2, generationDirectoryCount(promoted.base()));
   }
 
   @Test
-  void pointerBoundPartialDeleteStillRefusesSurvivingForeignOwnershipEvidence()
+  void pointerBoundPartialDeleteLeavesAndReportsForeignOwnershipEvidence()
       throws Exception {
     Promoted promoted = promote(temp.resolve("foreign-partial"));
     SafeIndexPathOps.MarkResult marked =
@@ -166,17 +168,11 @@ final class IndexGenerationRetirementTest {
         manifest.replace(promoted.previous(), "g-another-generation"));
     Files.writeString(partial.resolve("segments_locked-on-first-delete"), "must remain");
 
-    assertThrows(
-        IOException.class,
-        () ->
-            promoted
-                .manager()
-                .retirePreviousGeneration(promoted.active(), promoted.previous()));
-
+    org.junit.jupiter.api.Assertions.assertDoesNotThrow(
+        () -> promoted.manager().retirePreviousGeneration(promoted.active(), promoted.previous()));
     assertTrue(Files.exists(partial));
-    assertEquals(
-        promoted.previous(),
-        promoted.manager().readStateBestEffort().previous_generation());
+    assertNull(promoted.manager().readStateBestEffort().previous_generation());
+    assertTrue(promoted.manager().cleanupWarnings().stream().anyMatch(w -> w.path().equals(partial.toString())));
   }
 
   @Test
@@ -341,7 +337,9 @@ final class IndexGenerationRetirementTest {
     Path base = temp.resolve("retained-capacity");
     IndexGenerationManager manager = new IndexGenerationManager(base);
     String active = manager.initializeOrLoad().activeGenerationId();
-    Files.createDirectory(base.resolve("indices").resolve("g-retained.del-test"));
+    Path retained = Files.createDirectory(base.resolve("indices/g-retained.del-20260101-000000"));
+    Files.writeString(retained.resolve(".justsearch-generation.sentinel"),
+        "justsearch_generation_sentinel_v1\ngeneration_id=g-retained\ncreated_at_ms=1\n");
 
     assertThrows(
         IOException.class,

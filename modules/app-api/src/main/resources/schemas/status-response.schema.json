@@ -23,6 +23,17 @@
       "type" : "string",
       "enum" : [ "ABSENT", "STARTING", "READY", "RELOADING", "FAILED", "UNAVAILABLE" ]
     },
+    "IndexCleanupWarning" : {
+      "type" : "object",
+      "properties" : {
+        "path" : {
+          "type" : [ "string", "null" ]
+        },
+        "reason" : {
+          "type" : [ "string", "null" ]
+        }
+      }
+    },
     "MigrationEnumeratorView-nullable" : {
       "type" : [ "object", "null" ],
       "properties" : {
@@ -390,6 +401,12 @@
       "properties" : {
         "buildingGenerationId" : {
           "type" : [ "string", "null" ]
+        },
+        "cleanupWarnings" : {
+          "type" : [ "array", "null" ],
+          "items" : {
+            "$ref" : "#/$defs/IndexCleanupWarning"
+          }
         },
         "enumerator" : {
           "$ref" : "#/$defs/MigrationEnumeratorView-nullable"
@@ -1049,20 +1066,20 @@
                 "chunkEmbeddingPendingCount" : {
                   "type" : "integer"
                 },
-                "chunkSpladeDocCount" : {
-                  "type" : "integer"
-                },
-                "chunkSpladeFailedCount" : {
-                  "type" : "integer"
-                },
                 "chunkSpladeCompletedCount" : {
                   "type" : "integer"
                 },
                 "chunkSpladeCoveragePercent" : {
                   "type" : "number"
                 },
+                "chunkSpladeDocCount" : {
+                  "type" : "integer"
+                },
                 "chunkSpladeEnabled" : {
                   "type" : "boolean"
+                },
+                "chunkSpladeFailedCount" : {
+                  "type" : "integer"
                 },
                 "chunkSpladePendingCount" : {
                   "type" : "integer"
@@ -1109,6 +1126,9 @@
                   }
                 }
               }
+            },
+            "completenessKnown" : {
+              "type" : [ "boolean", "null" ]
             },
             "embeddedAndSparseCount" : {
               "type" : "integer"
@@ -1207,9 +1227,6 @@
             },
             "vectorReadyPercent" : {
               "type" : "number"
-            },
-            "completenessKnown" : {
-              "type" : [ "boolean", "null" ]
             }
           }
         },
@@ -1297,6 +1314,12 @@
             },
             "buildingIndexedDocuments" : {
               "type" : "integer"
+            },
+            "cleanupWarnings" : {
+              "type" : [ "array", "null" ],
+              "items" : {
+                "$ref" : "#/$defs/IndexCleanupWarning"
+              }
             },
             "migrationEnumerator" : {
               "$ref" : "#/$defs/MigrationEnumeratorView-nullable"

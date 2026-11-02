@@ -364,6 +364,11 @@ const CAUSE_ROWS: ReadonlyArray<{
     wording: 'The search index is still starting',
     severity: 'info',
   },
+  {
+    code: 'index.ownership_unproven',
+    wording: 'Search could not start because JustSearch cannot verify index folder ownership',
+    severity: 'error',
+  },
   { code: 'index.unavailable', wording: 'The search index is unavailable', severity: 'error' },
   {
     code: 'index.activating',
@@ -653,6 +658,7 @@ const SEARCH_UNAVAILABLE_CODES: ReadonlySet<string> = new Set([
   'index.migration_journal_unavailable',
   'index.failed',
   'index.corrupt',
+  'index.ownership_unproven',
   'index.schema_open_refused',
   'component.start_deadline',
   'component.recovery_exhausted',
@@ -883,7 +889,16 @@ export function severityForCodes(codes: readonly string[]): Severity {
 export function readinessNotice(
   verdict: SystemHealthVerdict,
   activity?: IndexingProgress['activity'],
+  ownershipDetail?: string,
 ): ReadinessNoticeView | null {
+  if (verdict.reasons.includes('index.ownership_unproven')) {
+    return {
+      headline: 'Search is unavailable',
+      body: ownershipDetail ?? 'JustSearch cannot verify index folder ownership. Nothing was changed. Restore your index from a backup, or move the folder out of the index folder, then restart.',
+      causes: wordCauses(['index.ownership_unproven'], activity),
+      remedy: OPEN_HEALTH,
+    };
+  }
   if (activity && !activity.confirmed && verdict.kind !== 'unreachable' && verdict.reasons.some(isIndexingObservation)) {
     return {
       headline: activity.summary,

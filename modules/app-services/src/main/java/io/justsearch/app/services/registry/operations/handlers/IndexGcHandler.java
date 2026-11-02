@@ -117,7 +117,9 @@ public final class IndexGcHandler implements OperationHandler {
           Map.of(
               "accepted", true,
               "markedCount", outcome.markedCount(),
-              "prunedCount", outcome.prunedCount()));
+              "prunedCount", outcome.prunedCount(),
+              "emptyLeftoversRemoved", outcome.emptyLeftoversRemoved(),
+              "cleanupWarnings", outcome.cleanupWarnings()));
     } catch (RuntimeException e) {
       handle.release(OpLeaseOutcome.FAILURE);
       io.justsearch.app.services.worker.EngineRefusals.rethrow(e);

@@ -856,6 +856,11 @@ public final class KnowledgeServerBootstrap implements Closeable {
      */
     private WorkerDown workerDownCode(LifecycleReasonCode generic, String detail) {
         String fatal = io.justsearch.ipc.WorkerFatalReasonMarker.readAndClear(config.dataDir());
+        String ownershipPrefix = io.justsearch.ipc.WorkerFatalReasonMarker.INDEX_OWNERSHIP_UNPROVEN + "\n";
+        if (fatal != null && fatal.startsWith(ownershipPrefix)) {
+            return latchIndexFatal(new WorkerDown(LifecycleReasonCode.INDEX_OWNERSHIP_UNPROVEN,
+                    fatal.substring(ownershipPrefix.length())));
+        }
         if (io.justsearch.ipc.WorkerFatalReasonMarker.INDEX_CORRUPT.equals(fatal)) {
             return latchIndexFatal(
                     new WorkerDown(LifecycleReasonCode.INDEX_CORRUPT, INDEX_CORRUPT_DETAIL));

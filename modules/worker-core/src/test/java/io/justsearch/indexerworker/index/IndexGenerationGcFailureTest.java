@@ -67,7 +67,8 @@ final class IndexGenerationGcFailureTest {
 
   private Path generation(String name) throws Exception {
     Path path = Files.createDirectory(temp.resolve("indices").resolve(name));
-    Files.writeString(path.resolve(".justsearch-generation.sentinel"), "generation_id=" + name + "\n");
+    Files.writeString(path.resolve(".justsearch-generation.sentinel"), "justsearch_generation_sentinel_v1\ngeneration_id="
+        + name.replaceFirst("\\.del-.*$", "") + "\ncreated_at_ms=1\n");
     Files.writeString(path.resolve("payload"), "retained on failure");
     return path;
   }

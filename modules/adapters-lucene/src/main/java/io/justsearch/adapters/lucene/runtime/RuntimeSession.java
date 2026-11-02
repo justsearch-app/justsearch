@@ -628,6 +628,7 @@ final class RuntimeSession implements AutoCloseable {
 
   private Components openComponentsWithRecovery(boolean readOnly) {
     Path effectivePath = resolveEffectivePath();
+
     try {
       return openComponents(readOnly);
     } catch (IndexRuntimeIOException e) {
@@ -733,6 +734,17 @@ final class RuntimeSession implements AutoCloseable {
   private Components openComponents(boolean readOnly) {
     if (prebuiltComponents != null) {
       return prebuiltComponents;
+    }
+    Path effectivePath = resolveEffectivePath();
+    if (effectivePath != null && effectivePath.getParent() != null
+        && "indices".equals(effectivePath.getParent().getFileName().toString())) {
+      try {
+        IndexOwnership.inspectNamespace(effectivePath.getParent().getParent());
+        IndexOwnership.inspectCanonical(effectivePath, effectivePath.getParent());
+      }
+      catch (IOException refusal) {
+        throw new IndexRuntimeIOException(IndexRuntimeIOException.Reason.DISK_IO, refusal.getMessage(), refusal);
+      }
     }
     try {
       return ComponentsFactory.build(
@@ -1050,14 +1062,14 @@ final class RuntimeSession implements AutoCloseable {
     }
     Path allowedRoot = indexBasePath.toAbsolutePath().normalize();
 
+    Path generationRoot = allowedRoot.resolve("indices");
+    var evidence = IndexOwnership.inspect(target, generationRoot);
+    if (evidence.manifest() == null) throw new IndexOwnership.Unproven(target, "missing");
     if (!LuceneRuntimeUtils.looksLikeLuceneIndexDirectory(target)) {
-      throw new IOException(
-          "Refusing recovery for "
-              + reason
-              + ": target does not look like a Lucene index directory: "
-              + target);
+      throw new IOException("Refusing recovery: target has no Lucene index: " + target);
     }
-
-    SafeIndexPathOps.backupDirectory(target, allowedRoot);
+    IndexRecoveryMarker.write(target, reason);
+    SafeIndexPathOps.backupDirectory(target, generationRoot);
+    IndexOwnership.create(allowedRoot, evidence.identity(), evidence.sentinel(), evidence.manifest());
   }
 }

@@ -234,7 +234,9 @@ final class MigrationOps {
                     resp.getMarkedCount(),
                     resp.getPrunedCount());
             return new io.justsearch.app.api.IndexingService.IndexGcOutcome(
-                    true, resp.getMarkedCount(), resp.getPrunedCount(), "");
+                    true, resp.getMarkedCount(), resp.getPrunedCount(), "", resp.getEmptyLeftoversRemoved(),
+                    resp.getCleanupWarningsList().stream().map(w ->
+                        new io.justsearch.app.api.IndexingService.IndexCleanupWarning(w.getPath(), w.getReason())).toList());
         } catch (CircuitBreakerOpenException e) {
             log.debug("runIndexGc rejected by circuit breaker");
             return new io.justsearch.app.api.IndexingService.IndexGcOutcome(

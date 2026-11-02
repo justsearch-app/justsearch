@@ -164,7 +164,8 @@ export function projectSv3Degradation(snapshot: AiState | null): Sv3Degradation 
   if (!warrantsSearchDegradationBanner(verdict)) return null;
   const activity = snapshot ? selectIndexingProgress(snapshot.status, snapshot.indexingStatusLive,
     snapshot.episodeMaxPendingJobs, snapshot.enrichSettleSamples).activity : undefined;
-  const notice = readinessNotice(verdict, activity);
+  const notice = readinessNotice(verdict, activity,
+    snapshot?.status?.readiness?.engineComponents?.['index']?.reason);
   // Unreachable: the predicate above already returns false for a null notice. Kept as the type's
   // own narrowing rather than a non-null assertion, which would outlive the predicate's contract.
   if (notice === null) return null;

@@ -39,7 +39,8 @@ public final class CleanShutdownMarker {
   /** Records a clean shutdown (best-effort; a failure here just means the next open scans FULL). */
   public static void write(Path indexDir) {
     try {
-      Files.writeString(pathFor(indexDir), "clean\n", StandardCharsets.UTF_8);
+      requireRegularIfPresent(pathFor(indexDir));
+      IndexOwnership.replaceControl(pathFor(indexDir), "clean\n".getBytes(StandardCharsets.UTF_8));
     } catch (IOException e) {
       // best-effort: a missing marker only costs a FULL scan on the next open, never correctness.
     }
@@ -51,7 +52,11 @@ public final class CleanShutdownMarker {
    * them is a consequence of opening (tempdoc 915, open item O14).
    */
   public static boolean wasClean(Path indexDir) {
-    return Files.exists(pathFor(indexDir));
+    try {
+      requireRegularIfPresent(pathFor(indexDir));
+      return IndexOwnership.entryExists(pathFor(indexDir))
+          && "clean\n".equals(new String(IndexOwnership.readBounded(pathFor(indexDir), 1_024), StandardCharsets.UTF_8));
+    } catch (IOException unavailable) { return false; }
   }
 
   /**
@@ -66,6 +71,14 @@ public final class CleanShutdownMarker {
    * saw one generation do that on five consecutive boots.
    */
   public static void consume(Path indexDir) throws IOException {
+    requireRegularIfPresent(pathFor(indexDir));
     Files.deleteIfExists(pathFor(indexDir));
   }
+  private static void requireRegularIfPresent(Path path) throws IOException {
+    if (IndexOwnership.entryExists(path)
+        && !IndexOwnership.plainAttributes(path).isRegularFile()) {
+      throw new IndexOwnership.Unproven(path, "unexpected control object");
+    }
+  }
+
 }

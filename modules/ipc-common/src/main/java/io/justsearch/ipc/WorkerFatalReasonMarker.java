@@ -36,6 +36,8 @@ public final class WorkerFatalReasonMarker {
   public static final String INDEX_SCHEMA_MISMATCH = "index_schema_mismatch";
   public static final String MIGRATION_JOURNAL_UNAVAILABLE = "migration_journal_unavailable";
 
+  public static final String INDEX_OWNERSHIP_UNPROVEN = "index_ownership_unproven";
+
   private static final String FILE = "worker-fatal-reason";
 
   private WorkerFatalReasonMarker() {}
@@ -58,6 +60,11 @@ public final class WorkerFatalReasonMarker {
     }
   }
 
+  public static void write(Path dataDir, String reason, String detail) {
+    String bounded = detail == null ? "" : detail.substring(0, Math.min(detail.length(), 2_048));
+    write(dataDir, reason + "\n" + bounded);
+  }
+
   /**
    * Head side: read the fatal reason and clear it, so a later clean restart does not re-trigger the
    * affordance. Returns {@code null} if no marker / unreadable.
@@ -71,7 +78,12 @@ public final class WorkerFatalReasonMarker {
       if (!Files.exists(p)) {
         return null;
       }
-      String reason = Files.readString(p, StandardCharsets.UTF_8).trim();
+      String reason;
+      try (var input = Files.newInputStream(p, java.nio.file.LinkOption.NOFOLLOW_LINKS)) {
+        byte[] bytes = input.readNBytes(8_193);
+        if (bytes.length > 8_192) return null;
+        reason = new String(bytes, StandardCharsets.UTF_8).trim();
+      }
       Files.deleteIfExists(p);
       return reason.isEmpty() ? null : reason;
     } catch (IOException e) {

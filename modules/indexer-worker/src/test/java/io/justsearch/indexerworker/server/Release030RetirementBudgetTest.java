@@ -33,9 +33,6 @@ final class Release030RetirementBudgetTest {
       boolean force, boolean promotes, @TempDir Path temporary) throws Exception {
     Path root = Release030Fixture.unpack("migrating", temporary);
     var original = state(root);
-    Path sentinel = Release030RetirementSafetyTest.buildingSentinel(root);
-    String owner = Files.readString(sentinel);
-    Files.writeString(sentinel, "unverified candidate owner");
     Files.delete(root.resolve("roots/beta/file-01.txt"));
     ConfigStore previous = ConfigStore.globalOrNull();
     WorkerBootFixture.publishConfig(root.resolve("data"), root.resolve("data/index/default"),
@@ -46,8 +43,9 @@ final class Release030RetirementBudgetTest {
     try {
       var models = new ReleasedModelIdentities(root);
       try (models) {
-        try (var executors = new TestEngineExecutors(); var server = boot(root, executors)) {
-          Files.writeString(sentinel, owner);
+        try (var certificate = Release030RetirementSafetyTest.denyCommittedCompatibility();
+            var executors = new TestEngineExecutors(); var server = boot(root, executors)) {
+          certificate.reset();
           assertEquals("MIGRATING", state(root).migration_state(), "uncertified builds retain native cutover");
           var queue = Release030RetirementSafetyTest.queue(server);
           for (int failure = 0; failure < failures; failure++) {
@@ -85,7 +83,6 @@ final class Release030RetirementBudgetTest {
         }
       }
     } finally {
-      if (Files.exists(sentinel)) Files.writeString(sentinel, owner);
       ConfigStore.restoreGlobal(installed, previous);
     }
   }

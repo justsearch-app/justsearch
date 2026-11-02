@@ -186,7 +186,11 @@ final class LifecycleDurabilityTest extends RuntimeTestBase {
   }
 
   private Path seed() throws Exception {
-    Path index = tempDir.resolve("index");
+    Path index = Files.createDirectories(tempDir.resolve("indices/index"));
+    Files.writeString(index.resolve(".justsearch-generation.sentinel"),
+        "justsearch_generation_sentinel_v1\ngeneration_id=index\ncreated_at_ms=1\n");
+    Files.writeString(index.resolve(".justsearch-index-generation.json"),
+        "{\"format_version\":1,\"generation_id\":\"index\",\"source\":\"new\",\"created_at_ms\":2}");
     try (var runtime = builder(index, "STRUCTURAL", false, "FAIL_CLOSED").open()) {
       runtime.session().snapshot.writer().getConfig().setUseCompoundFile(false);
       var random = new java.util.Random(17);

@@ -283,15 +283,12 @@ final class SchemaMismatchStatusContractTest {
 
   private void seedLegacyIndexWithBogusSchemaFingerprint(Path dataDir) throws Exception {
     // Worker default when index.collections is absent: collectionName=default.
-    //
-    // Important (Windows): avoid creating a "legacy" index directly under indexBasePath because
-    // the Worker will try to import it by moving the directory, which can fail if any mmapped
-    // handles are still being released. Instead, pre-create a generation directory under
-    // indexBasePath/indices/ so the Worker adopts it without moving files.
     Path indexBasePath = dataDir.resolve("index").resolve("default");
     Path indicesDir = indexBasePath.resolve("indices");
     Path genPath = indicesDir.resolve("v0_imported");
     Files.createDirectories(genPath);
+    Files.writeString(genPath.resolve(".justsearch-generation.sentinel"),
+        "justsearch_generation_sentinel_v1\ngeneration_id=v0_imported\ncreated_at_ms=1\n");
 
     String bogusFp = "0".repeat(64);
 

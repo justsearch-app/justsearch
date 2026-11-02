@@ -746,3 +746,16 @@ it.each([
   expect(notice?.body).not.toContain('fully');
   expect(warrantsSearchDegradationBanner(degraded('warn', [code]))).toBe(true);
 });
+
+
+describe('index ownership refusal', () => {
+  it('S16: shows unavailable search, the rejected folder and manual remedy without Rebuild', () => {
+    const detail = 'Search could not start because JustSearch cannot verify that the folder /index/indices/foreign belongs to it. Nothing in it was changed. If it is your JustSearch index, restore it from a backup; otherwise move it out of the index folder, then restart.';
+    const notice = readinessNotice(degraded('error', ['index.ownership_unproven']), undefined, detail);
+    expect(notice?.headline).toBe('Search is unavailable');
+    expect(notice?.body).toBe(detail);
+    expect(notice?.remedy.label).not.toMatch(/rebuild/i);
+    expect(notice?.body).not.toMatch(/keyword/i);
+    expect(classifyConsequence(['index.ownership_unproven'])).toBe('search-unavailable');
+  });
+});

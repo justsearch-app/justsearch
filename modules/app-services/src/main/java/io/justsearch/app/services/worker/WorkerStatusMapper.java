@@ -120,6 +120,8 @@ final class WorkerStatusMapper {
                         .migrationPauseReason(migration.getPauseReason())
                         .migrationPausedAtMs(migration.getPausedAtMs())
                         .migrationSource(migration.getMigrationSource())
+                        .cleanupWarnings(migration.getCleanupWarningsList().stream()
+                            .map(w -> new io.justsearch.app.api.IndexingService.IndexCleanupWarning(w.getPath(), w.getReason())).toList())
                         .migrationEnumerator(new MigrationEnumeratorView(
                                 enumerator.getRunning(),
                                 enumerator.getDone(),

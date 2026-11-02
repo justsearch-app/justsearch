@@ -8,12 +8,13 @@ import tools.jackson.databind.json.JsonMapper;
 import io.justsearch.adapters.lucene.runtime.SafeIndexPathOps;
 import io.justsearch.configuration.SystemAccess;
 import java.io.IOException;
+import io.justsearch.adapters.lucene.runtime.IndexOwnership;
+import io.justsearch.adapters.lucene.runtime.IndexRecoveryMarker;
+import java.nio.file.LinkOption;
 import java.nio.channels.FileChannel;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.AtomicMoveNotSupportedException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.StandardCopyOption;
 import java.nio.file.StandardOpenOption;
 import java.time.Instant;
 import java.time.ZoneOffset;
@@ -295,25 +296,90 @@ public final class IndexGenerationManager {
     this.statePrevPath = this.basePath.resolve(STATE_PREV_FILE);
   }
 
+  public record CleanupWarning(String path, String reason) {}
+  private volatile List<CleanupWarning> cleanupWarnings = List.of();
+
+  public List<CleanupWarning> cleanupWarnings() { return cleanupWarnings; }
+
+  private void warnCleanup(Path path, String reason) {
+    String exact = path.toAbsolutePath().normalize().toString();
+    var warnings = new ArrayList<>(cleanupWarnings.stream().filter(warning -> !warning.path().equals(exact)).toList());
+    var warning = new CleanupWarning(exact, reason);
+    if (warnings.size() < 64) warnings.add(warning);
+    cleanupWarnings = List.copyOf(warnings);
+  }
+
+  /** Read-only admission before journals, pointer recovery, normalization or allocation. */
+  public IndexOwnership.NamespaceInspection inspectNamespace() throws IOException {
+    cleanupWarnings = List.of();
+    var inspection = IndexOwnership.inspectNamespace(basePath);
+    for (var warning : inspection.warnings()) warnCleanup(warning.path(), warning.reason());
+    return inspection;
+  }
+
+  private int removeEmptyLeftovers() throws IOException {
+    return removeEmptyLeftovers(Set.of(), false);
+  }
+
+  private int removeEmptyLeftovers(Set<String> protectedIds, boolean allowRecorded) throws IOException {
+    if (!Files.isDirectory(indicesDir, LinkOption.NOFOLLOW_LINKS)) return 0;
+    int removed = 0;
+    try (var entries = Files.list(indicesDir)) {
+      for (Path path : entries.toList()) {
+        String name = path.getFileName().toString();
+        if (protectedIds.contains(name) || isRecordedIdentity(name) && !allowRecorded) continue;
+        java.nio.file.attribute.BasicFileAttributes attributes;
+        try { attributes = IndexOwnership.plainAttributes(path); }
+        catch (IOException unproven) { warnCleanup(path, unproven.getMessage()); continue; }
+        if (!attributes.isDirectory() || attributes.isOther() || attributes.isSymbolicLink()) continue;
+        try (var contents = Files.list(path)) {
+          if (contents.findAny().isPresent()) continue;
+        }
+        try { Files.delete(path); removed++; }
+        catch (IOException incomplete) { warnCleanup(path, "empty directory cleanup incomplete"); }
+      }
+    }
+    return removed;
+  }
+
+  private void cleanupStaging() throws IOException {
+    Path staging = basePath.resolve("staging");
+    if (Files.notExists(staging, LinkOption.NOFOLLOW_LINKS)) return;
+    IndexOwnership.requireDirectory(staging);
+    try (var entries = Files.list(staging)) {
+      for (Path path : entries.toList()) {
+        try {
+          IndexOwnership.inspectStaging(path, staging);
+          deleteRetirementPayloadBeforeOwnership(path, path.getFileName().toString());
+          finishOwnedDeletion(path);
+        } catch (IOException unproven) { warnCleanup(path, unproven.getMessage()); }
+      }
+    }
+  }
+
   /**
    * Ensures the index layout exists and returns the active generation directory.
    *
    * <p>If {@code state.json} exists, it is authoritative.
    * If not, this method will:
    * <ul>
-   *   <li>import a legacy index found directly under {@code basePath} into {@code indices/v0_imported}, or</li>
+   *   <li>refuse unproven directories and flat legacy layouts, or</li>
    *   <li>adopt an existing single generation under {@code indices/}, or</li>
    *   <li>create a new generation under {@code indices/}.</li>
    * </ul>
    */
   public IndexLayout initializeOrLoad() throws IOException {
     try (var ignored = stateControl()) {
+      var inspection = inspectNamespace();
       Files.createDirectories(basePath);
 
       State state = loadStateBestEffort();
       if (state != null) {
+        IndexLayout layout = resolveFromState(state);
         cleanupAbandonedStateTemps();
-        return resolveFromState(state);
+        removeEmptyLeftovers();
+        cleanupStaging();
+        return layout;
       }
       // #758: neither state.json nor its backup can be read, yet one of
       // them exists. Whatever brake it held is gone, so whether a rebuild budget was spent cannot be
@@ -321,14 +387,14 @@ public final class IndexGenerationManager {
       // but the new record says the brake was lost, so no automatic rebuild starts on its account.
       boolean stateLost = stateRecordPossiblyPresent();
 
-      // No state.json: decide between legacy import, adoption, or new generation.
-      IndexLayout layout;
-      if (looksLikeLegacyIndexInBasePath(basePath)) {
-        layout = importLegacyIndex();
-      } else {
-        IndexLayout adopted = tryAdoptSingleExistingGeneration();
-        layout = adopted != null ? adopted : createFreshGeneration("new");
+      if (inspection.canonicalOwned().size() > 1) {
+        throw new IOException("Several owned generations without a readable pointer; refusing to choose");
       }
+      // Logical boot fences have run before reclaiming empty remnants.
+      removeEmptyLeftovers();
+      cleanupStaging();
+      IndexLayout adopted = tryAdoptSingleExistingGeneration();
+      IndexLayout layout = adopted != null ? adopted : createFreshGeneration("new");
       return stateLost ? recordBrakeStateLost(layout) : layout;
     }
   }
@@ -415,6 +481,7 @@ public final class IndexGenerationManager {
   public BootLayout initializeForBoot(BootOwnership ownership, String effectiveFingerprint) throws IOException {
     Objects.requireNonNull(ownership, "ownership");
     try (var ignored = stateControl()) {
+      inspectNamespace();
       if (ownership instanceof BootOwnership.Native) {
         State observed = null;
         try { observed = readRecordedState(); }
@@ -443,11 +510,11 @@ public final class IndexGenerationManager {
       }
       if (ownership instanceof BootOwnership.Recorded recorded
           && recorded.previousSourcePointerProven()
-          && Files.notExists(statePath, java.nio.file.LinkOption.NOFOLLOW_LINKS)) {
+          && Files.notExists(statePath, LinkOption.NOFOLLOW_LINKS)) {
         restoreProvenPreviousSource(recorded, effectiveFingerprint);
       }
-      if (Files.notExists(statePath, java.nio.file.LinkOption.NOFOLLOW_LINKS)
-          && Files.exists(statePrevPath, java.nio.file.LinkOption.NOFOLLOW_LINKS)) {
+      if (Files.notExists(statePath, LinkOption.NOFOLLOW_LINKS)
+          && Files.exists(statePrevPath, LinkOption.NOFOLLOW_LINKS)) {
         throw new IOException("index.generation_previous_unproven: recorded receipts do not prove the previous pointer");
       }
       IndexLayout layout = strictBootLayout(readRecordedState());
@@ -507,13 +574,18 @@ public final class IndexGenerationManager {
               .contains(previous.migration_state())) {
         throw new IOException("previous pointer disagrees with recorded capture receipts");
       }
-      requireOwnedRetirementDirectory(layout.activeGenerationPath(), owner.sourceGeneration(), false, false);
       requireRecordedGeneration(resolveGenerationPathReadOnly(target), target, owner.source(),
           owner.targetFingerprint(), false, true, owner.projectionSourceIds());
       try (var entries = Files.list(indicesDir)) {
         for (Path entry : entries.toList()) {
           String identity = entry.getFileName().toString();
           if (!identity.equals(target) && !identity.equals(owner.sourceGeneration())) {
+            boolean marked = false;
+            try { marked = IndexOwnership.representation(identity).role() == IndexOwnership.Role.MARKED; }
+            catch (IOException invalid) { /* Not a generation representation. */ }
+            if ((marked || Files.exists(entry.resolve(DELETE_MARKER), LinkOption.NOFOLLOW_LINKS))
+                && !ownedOrWarn(entry)) continue;
+            if (Files.isRegularFile(entry, LinkOption.NOFOLLOW_LINKS)) continue;
             throw new IOException("unrelated generation evidence: " + identity);
           }
         }
@@ -548,8 +620,9 @@ public final class IndexGenerationManager {
       throw new IOException("Serving and building generation identities must be distinct");
     }
     Path activePath = resolveGenerationPathReadOnly(active);
-    if (!Files.isDirectory(indicesDir, java.nio.file.LinkOption.NOFOLLOW_LINKS)
-        || !Files.isDirectory(activePath, java.nio.file.LinkOption.NOFOLLOW_LINKS)) {
+    IndexOwnership.inspectCanonical(activePath, indicesDir);
+    if (!Files.isDirectory(indicesDir, LinkOption.NOFOLLOW_LINKS)
+        || !Files.isDirectory(activePath, LinkOption.NOFOLLOW_LINKS)) {
       throw new IOException("Authoritative active generation directory is unavailable");
     }
     return new IndexLayout(basePath, indicesDir, statePath, state, active, activePath);
@@ -567,10 +640,11 @@ public final class IndexGenerationManager {
    */
   public java.util.Optional<IndexLayout> inspectCurrentLayoutForBoot() throws IOException {
     try (var ignored = stateControl()) {
-      if (Files.notExists(statePath, java.nio.file.LinkOption.NOFOLLOW_LINKS)) {
+      inspectNamespace();
+      if (Files.notExists(statePath, LinkOption.NOFOLLOW_LINKS)) {
         return java.util.Optional.empty();
       }
-      if (!Files.isRegularFile(statePath, java.nio.file.LinkOption.NOFOLLOW_LINKS)) {
+      if (!Files.isRegularFile(statePath, LinkOption.NOFOLLOW_LINKS)) {
         throw new IOException("Authoritative generation state is not a regular file: " + statePath);
       }
       return java.util.Optional.of(strictBootLayout(readRecordedState()));
@@ -580,6 +654,7 @@ public final class IndexGenerationManager {
   /** Read-only queue admission guard, before SQLite may migrate or quarantine any live bytes. */
   public boolean requiresMigrationJournalForBoot() throws IOException {
     try (var ignored = stateControl()) {
+      inspectNamespace();
       State state = tryReadState(statePath);
       boolean fallback = state == null;
       if (fallback) state = tryReadState(statePrevPath);
@@ -590,7 +665,7 @@ public final class IndexGenerationManager {
       final String active;
       try { active = requireSafeGenerationId(state.active_generation(), "queue admission generation"); }
       catch (IOException invalid) { return true; }
-      if (!Files.isDirectory(resolveGenerationPathReadOnly(active), java.nio.file.LinkOption.NOFOLLOW_LINKS)) {
+      if (!Files.isDirectory(resolveGenerationPathReadOnly(active), LinkOption.NOFOLLOW_LINKS)) {
         return true;
       }
       String phase = state.migration_state();
@@ -599,7 +674,8 @@ public final class IndexGenerationManager {
       if (!MigrationState.IDLE.name().equals(phase)
           || state.building_generation() != null && !state.building_generation().isBlank()
           || state.previous_generation() != null && !state.previous_generation().isBlank()
-              && !active.equals(state.previous_generation())) return true;
+              && !active.equals(state.previous_generation())
+              && previousConsumesCapacity(state.previous_generation())) return true;
       return fallback ? hasRecordedFallbackEvidence() || retainedGenerationCount() > 1
           : hasPristineRecordedOrphan(state);
     }
@@ -623,7 +699,7 @@ public final class IndexGenerationManager {
         String identity = directory.getFileName().toString();
         if (!isRecordedIdentity(identity) || identity.equals(state.active_generation())
             || identity.equals(state.previous_generation())
-            || !Files.isDirectory(directory, java.nio.file.LinkOption.NOFOLLOW_LINKS)) continue;
+            || !Files.isDirectory(directory, LinkOption.NOFOLLOW_LINKS)) continue;
         try (var contents = Files.list(directory)) {
           // A crash-created target can have either metadata file missing. Completed empty
           // generations have Lucene commit files; GC-retained archives must not fence native boot.
@@ -639,7 +715,11 @@ public final class IndexGenerationManager {
   private boolean hasRecordedFallbackEvidence() throws IOException {
     if (Files.isDirectory(indicesDir)) {
       try (var entries = Files.list(indicesDir)) {
-        if (entries.anyMatch(path -> isRecordedIdentity(path.getFileName().toString()))) return true;
+        for (Path path : entries.toList()) {
+          if (isRecordedIdentity(path.getFileName().toString())
+              && !(Files.exists(path.resolve(DELETE_MARKER), LinkOption.NOFOLLOW_LINKS)
+                  && !ownedOrWarn(path))) return true;
+        }
       }
     }
     if (Files.isRegularFile(statePrevPath)) {
@@ -678,36 +758,16 @@ public final class IndexGenerationManager {
     if (exact.getFileName() == null) throw new IOException("Opened generation path has no identity");
     String generationId = requireSafeGenerationId(exact.getFileName().toString(), "opened generation");
     if (!exact.equals(resolveGenerationPathReadOnly(generationId))
-        || !Files.isDirectory(exact, java.nio.file.LinkOption.NOFOLLOW_LINKS)) {
+        || !Files.isDirectory(exact, LinkOption.NOFOLLOW_LINKS)) {
       throw new IOException("Opened runtime is outside the owned generation directory");
     }
-    Path manifestPath = exact.resolve(GENERATION_MANIFEST);
-    if (!Files.isRegularFile(manifestPath, java.nio.file.LinkOption.NOFOLLOW_LINKS)
-        || Files.size(manifestPath) > 16_384) {
-      throw new IOException("Opened generation manifest is unavailable");
-    }
-    final GenerationManifest manifest;
-    try {
-      manifest = JSON.readValue(
-          io.justsearch.configuration.persistence.ContendedFileReads.readAllBytes(manifestPath),
-          GenerationManifest.class);
-    } catch (tools.jackson.core.JacksonException malformed) {
-      throw new IOException("Opened generation manifest is invalid", malformed);
-    }
-    if (manifest == null || !generationId.equals(manifest.generation_id())) {
-      throw new IOException("Opened generation manifest names another directory");
-    }
+    var evidence = IndexOwnership.inspectCanonical(exact, indicesDir);
+    if (evidence.manifest() == null) throw new IOException("Opened generation manifest is unavailable");
+    final GenerationManifest manifest = RECORDED_JSON.readValue(evidence.manifest(), GenerationManifest.class);
     return manifest;
   }
 
-  /**
-   * Reconciles ownership after an interrupted adapter backup-first rebuild.
-   *
-   * <p>The authoritative state pointer and the adapter's exact encoded backup name establish the
-   * owner. Every matching backup must contain the same valid metadata. Complete active metadata is
-   * validated without writing; absent or partial metadata is restored idempotently from that exact
-   * backup authority. Any ambiguity fails closed.
-   */
+  /** Restores an absent active directory from a validated exact backup through staging. */
   public boolean reconcileActiveRecoveryOwnership() throws IOException {
     return reconcileActiveRecoveryOwnership(activeGenerationPath -> {});
   }
@@ -720,7 +780,8 @@ public final class IndexGenerationManager {
       throws IOException {
     Objects.requireNonNull(preparation, "preparation");
     try (var ignored = stateControl()) {
-      if (Files.notExists(statePath, java.nio.file.LinkOption.NOFOLLOW_LINKS)) {
+      inspectNamespace();
+      if (Files.notExists(statePath, LinkOption.NOFOLLOW_LINKS)) {
         return false;
       }
       State state;
@@ -751,66 +812,39 @@ public final class IndexGenerationManager {
       if (generationId.equals(state.building_generation())) {
         throw new IOException("Serving and building generation identities must be distinct");
       }
-      if (!Files.isDirectory(indicesDir, java.nio.file.LinkOption.NOFOLLOW_LINKS)) {
+      if (!Files.isDirectory(indicesDir, LinkOption.NOFOLLOW_LINKS)) {
         throw new IOException("Authoritative generation root is unavailable");
       }
       Path exact = resolveGenerationPathReadOnly(generationId);
 
-      Path sentinelPath = exact.resolve(GENERATION_SENTINEL);
-      Path manifestPath = exact.resolve(GENERATION_MANIFEST);
-      boolean sentinelExists = Files.exists(sentinelPath, java.nio.file.LinkOption.NOFOLLOW_LINKS);
-      boolean manifestExists = Files.exists(manifestPath, java.nio.file.LinkOption.NOFOLLOW_LINKS);
-      if (sentinelExists && manifestExists) {
-        requireRetirementSentinel(sentinelPath, generationId, exact);
-        requireRetirementManifest(manifestPath, generationId, exact);
-        return false;
+      IndexOwnership.Evidence existing = null;
+      if (Files.exists(exact, LinkOption.NOFOLLOW_LINKS)) {
+        existing = IndexOwnership.inspect(exact, indicesDir);
+        if (existing.manifest() != null) return false;
       }
       List<Path> backups = recoveryBackups(exact);
       if (backups.isEmpty()) {
-        throw new IOException("Active generation ownership is unavailable without a recovery backup");
+        if (existing != null) return false;
+        throw new IOException("Active generation is absent without an owned backup");
       }
-
       OwnershipBytes authority = null;
       for (Path backup : backups) {
         OwnershipBytes candidate = readRecoveryOwnership(backup, generationId);
-        if (authority == null) {
-          authority = candidate;
-        } else if (!authority.equals(candidate)) {
-          throw new IOException("Recovery backups disagree on generation ownership");
-        }
+        if (authority != null && !authority.equals(candidate)) throw new IOException("Recovery backups disagree");
+        authority = candidate;
       }
-
-      if (sentinelExists) {
-        requireRetirementSentinel(sentinelPath, generationId, exact);
-        String activeSentinel = new String(
-            io.justsearch.configuration.persistence.ContendedFileReads.readAllBytes(sentinelPath),
-            StandardCharsets.UTF_8);
-        if (!authority.sentinel().equals(activeSentinel)) {
-          throw new IOException("Active generation sentinel disagrees with recovery backup");
-        }
+      if (existing != null && !authority.sentinel().equals(new String(existing.sentinel(), StandardCharsets.UTF_8))) {
+        throw new IOException("Active generation sentinel disagrees with recovery backup");
       }
-      if (manifestExists) {
-        requireRetirementManifest(manifestPath, generationId, exact);
-        String activeManifest = new String(
-            io.justsearch.configuration.persistence.ContendedFileReads.readAllBytes(manifestPath),
-            StandardCharsets.UTF_8);
-        if (!authority.manifest().equals(activeManifest)) {
-          throw new IOException("Active generation manifest disagrees with recovery backup");
-        }
-      }
-      if (Files.notExists(exact, java.nio.file.LinkOption.NOFOLLOW_LINKS)) {
-        Files.createDirectory(exact);
-      } else if (!Files.isDirectory(exact, java.nio.file.LinkOption.NOFOLLOW_LINKS)) {
-        throw new IOException("Authoritative active generation path is not a directory");
-      }
+      if (!IndexRecoveryMarker.exists(exact)) IndexRecoveryMarker.write(exact, "interrupted_backup_first");
       preparation.prepare(exact);
-      if (!sentinelExists) {
+      if (existing != null) {
         io.justsearch.configuration.persistence.AtomicFileWrites.replaceStrict(
-            sentinelPath, authority.sentinel().getBytes(StandardCharsets.UTF_8));
-      }
-      if (!manifestExists) {
-        io.justsearch.configuration.persistence.AtomicFileWrites.replaceStrict(
-            manifestPath, authority.manifest().getBytes(StandardCharsets.UTF_8));
+            exact.resolve(GENERATION_MANIFEST), authority.manifest().getBytes(StandardCharsets.UTF_8));
+        IndexOwnership.forceDirectory(exact);
+      } else {
+        IndexOwnership.create(basePath, generationId, authority.sentinel().getBytes(StandardCharsets.UTF_8),
+            authority.manifest().getBytes(StandardCharsets.UTF_8));
       }
       return true;
     }
@@ -832,20 +866,12 @@ public final class IndexGenerationManager {
 
   private static OwnershipBytes readRecoveryOwnership(Path backup, String generationId)
       throws IOException {
-    if (!Files.isDirectory(backup, java.nio.file.LinkOption.NOFOLLOW_LINKS)) {
-      throw new IOException("Recovery backup is not a directory: " + backup);
+    var evidence = IndexOwnership.inspect(backup, backup.getParent());
+    if (!generationId.equals(evidence.identity()) || evidence.manifest() == null) {
+      throw new IndexOwnership.Unproven(backup, "missing");
     }
-    Path sentinel = backup.resolve(GENERATION_SENTINEL);
-    Path manifest = backup.resolve(GENERATION_MANIFEST);
-    requireRetirementSentinel(sentinel, generationId, backup);
-    requireRetirementManifest(manifest, generationId, backup);
-    return new OwnershipBytes(
-        new String(
-            io.justsearch.configuration.persistence.ContendedFileReads.readAllBytes(sentinel),
-            StandardCharsets.UTF_8),
-        new String(
-            io.justsearch.configuration.persistence.ContendedFileReads.readAllBytes(manifest),
-            StandardCharsets.UTF_8));
+    return new OwnershipBytes(new String(evidence.sentinel(), StandardCharsets.UTF_8),
+        new String(evidence.manifest(), StandardCharsets.UTF_8));
   }
 
   private record OwnershipBytes(String sentinel, String manifest) {}
@@ -865,7 +891,7 @@ public final class IndexGenerationManager {
     String base = "g-" + TS.format(Instant.now());
     String candidate = base;
     int suffix = 1;
-    while (Files.exists(resolveGenerationPath(candidate))) {
+    while (Files.exists(resolveGenerationPath(candidate), LinkOption.NOFOLLOW_LINKS)) {
       candidate = base + "-" + suffix;
       suffix++;
     }
@@ -929,9 +955,7 @@ public final class IndexGenerationManager {
       pruneMarkedForDeletionBestEffort();
       requireBuildCapacity(normalized, null, true);
       String genId = newUniqueGenerationId();
-      Path genPath = resolveGenerationPath(genId);
-      Files.createDirectories(genPath);
-      writeMigrationGenerationFilesStrict(genPath, genId,
+      writeMigrationGenerationFilesStrict(genId,
           source == null || source.isBlank() ? "migration" : source.trim(), expectedSources);
 
       State next =
@@ -976,6 +1000,7 @@ public final class IndexGenerationManager {
     List<String> expectedSources = projectionSourceIds == null ? null
         : checkedProjectionSourceIds(projectionSourceIds);
     try (var ignored = stateControl()) {
+      inspectNamespace();
       String target = recordedGenerationId(operationKey);
       if (source == null || source.isBlank() || source.length() > 256
           || source.chars().anyMatch(Character::isISOControl)
@@ -1002,7 +1027,7 @@ public final class IndexGenerationManager {
           throw new IOException("Recorded generation source differs from the accepted preparation");
         }
       }
-      if (!Files.isDirectory(resolveGenerationPathReadOnly(active), java.nio.file.LinkOption.NOFOLLOW_LINKS)) {
+      if (!Files.isDirectory(resolveGenerationPathReadOnly(active), LinkOption.NOFOLLOW_LINKS)) {
         throw new IOException("Active generation directory is unavailable");
       }
       MigrationState phase = parseMigrationStateOrDefault(current.migration_state(), MigrationState.FAILED);
@@ -1026,21 +1051,18 @@ public final class IndexGenerationManager {
         throw new IOException("Recorded generation conflicts with the current migration state");
       }
       requireBuildCapacity(current, target, false);
-      if (Files.exists(targetPath, java.nio.file.LinkOption.NOFOLLOW_LINKS)) {
+      if (Files.exists(targetPath, LinkOption.NOFOLLOW_LINKS)) {
         requireRecordedGeneration(targetPath, target, source, targetIndexFingerprint, true,
             true, expectedSources);
       } else {
         Files.createDirectories(indicesDir);
-        Files.createDirectory(targetPath);
         long created = System.currentTimeMillis();
         var manifest = new GenerationManifest(expectedSources == null
             ? RECORDED_MANIFEST_FORMAT_VERSION : RECORDED_PROJECTION_MANIFEST_FORMAT_VERSION,
             target, source, created, targetIndexFingerprint, Map.of(), null, null,
             expectedSources);
-        io.justsearch.configuration.persistence.AtomicFileWrites.replaceStrict(
-            targetPath.resolve(GENERATION_SENTINEL), recordedSentinel(target, created).getBytes(StandardCharsets.UTF_8));
-        io.justsearch.configuration.persistence.AtomicFileWrites.replaceStrict(
-            targetPath.resolve(GENERATION_MANIFEST), RECORDED_JSON.writeValueAsBytes(manifest));
+        IndexOwnership.create(basePath, target, recordedSentinel(target, created).getBytes(StandardCharsets.UTF_8),
+            RECORDED_JSON.writeValueAsBytes(manifest));
       }
       State next = new State(STATE_FORMAT_VERSION, active, target, active, MigrationState.MIGRATING.name(),
           false, null, null, System.currentTimeMillis(), current.auto_rebuild_key(),
@@ -1101,7 +1123,7 @@ public final class IndexGenerationManager {
       GenerationManifest manifest;
       try {
         manifest = RECORDED_JSON.readValue(
-            io.justsearch.configuration.persistence.ContendedFileReads.readAllBytes(manifestPath),
+            IndexOwnership.readBounded(manifestPath, 16_384),
             GenerationManifest.class);
       } catch (tools.jackson.core.JacksonException malformed) {
         throw new IOException("Recorded generation manifest is invalid", malformed);
@@ -1144,20 +1166,15 @@ public final class IndexGenerationManager {
   private static void requireRecordedGeneration(Path directory, String target, String source,
       String targetFingerprint, boolean pristine, boolean enforceSourceSet,
       List<String> expectedSources) throws IOException {
-    if (!Files.isDirectory(directory, java.nio.file.LinkOption.NOFOLLOW_LINKS)) {
+    if (!Files.isDirectory(directory, LinkOption.NOFOLLOW_LINKS)) {
       throw new IOException("Recorded generation directory is not an owned regular directory");
     }
-    Path manifestPath = directory.resolve(GENERATION_MANIFEST);
-    Path sentinelPath = directory.resolve(GENERATION_SENTINEL);
-    if (!Files.isRegularFile(manifestPath, java.nio.file.LinkOption.NOFOLLOW_LINKS)
-        || !Files.isRegularFile(sentinelPath, java.nio.file.LinkOption.NOFOLLOW_LINKS)
-        || Files.size(manifestPath) > 16_384 || Files.size(sentinelPath) > 1_024) {
-      throw new IOException("Recorded generation ownership metadata is unavailable");
-    }
+    var evidence = IndexOwnership.inspect(directory, directory.getParent());
+    if (evidence.manifest() == null) throw new IOException("Recorded generation ownership metadata is unavailable");
     final GenerationManifest manifest;
     try {
       manifest = RECORDED_JSON.readValue(
-          io.justsearch.configuration.persistence.ContendedFileReads.readAllBytes(manifestPath), GenerationManifest.class);
+          evidence.manifest(), GenerationManifest.class);
     } catch (tools.jackson.core.JacksonException malformed) {
       throw new IOException("Recorded generation manifest is invalid", malformed);
     }
@@ -1174,9 +1191,7 @@ public final class IndexGenerationManager {
         || manifest.created_at_ms() <= 0) {
       throw new IOException("Recorded generation metadata does not match its accepted target");
     }
-    String sentinel = new String(
-        io.justsearch.configuration.persistence.ContendedFileReads.readAllBytes(sentinelPath), StandardCharsets.UTF_8);
-    if (!recordedSentinel(target, manifest.created_at_ms()).equals(sentinel)) {
+    if (evidence.createdAtMs() != manifest.created_at_ms()) {
       throw new IOException("Recorded generation sentinel does not match its manifest");
     }
     if (pristine) {
@@ -1261,12 +1276,11 @@ public final class IndexGenerationManager {
       String target = recordedGenerationId(operationKey);
       String source = requireSafeGenerationId(sourceGeneration, "recorded source generation");
       State current = requireRefusedRecordedRetirementState(target, source);
-      // The durable operation key binds the exact target even after state.json lost its building
-      // pointer. A partial marked directory can be retried after Windows refused one payload file.
-      deleteExactRetiredRepresentation(target, true);
+      // The operation selects the target; ownership metadata independently authorizes deletion.
+      deleteExactRetiredRepresentation(target);
       if (current.previous_generation() == null) return;
       // The recorded build used A as its previous pointer, although it never promoted. Release
-      // that alias only after B is physically absent, or a fresh candidate sees false capacity.
+      // that alias once no owned B representation remains.
       State released = new State(STATE_FORMAT_VERSION, source, null, null,
           MigrationState.IDLE.name(), current.migration_paused(), current.pause_reason(),
           current.paused_at_ms(), System.currentTimeMillis(), current.auto_rebuild_key(),
@@ -1277,7 +1291,7 @@ public final class IndexGenerationManager {
         try {
           State observed = requireRefusedRecordedRetirementState(target, source);
           if (observed.previous_generation() == null
-              && exactRetirementRepresentations(target, true).isEmpty()) return;
+              && exactRetirementRepresentations(target).isEmpty()) return;
         } catch (IOException unresolved) {
           ambiguous.addSuppressed(unresolved);
         }
@@ -1298,7 +1312,7 @@ public final class IndexGenerationManager {
       }
       State retirement = requireRefusedRecordedRetirementState(target, source);
       return retirement.previous_generation() == null
-          && exactRetirementRepresentations(target, true).isEmpty();
+          && exactRetirementRepresentations(target).isEmpty();
     }
   }
 
@@ -1319,6 +1333,7 @@ public final class IndexGenerationManager {
   /** Sets operator pause intent for migration orchestration (best-effort). */
   public State setMigrationPaused(boolean paused, String reason) throws IOException {
     try (var ignored = stateControl()) {
+      inspectNamespace();
       State current = readStateBestEffort();
       if (current == null) {
         // Ensure layout exists
@@ -1365,6 +1380,7 @@ public final class IndexGenerationManager {
    */
   public void updateMigrationState(MigrationState state) throws IOException {
     try (var ignored = stateControl()) {
+      inspectNamespace();
       Objects.requireNonNull(state, "state");
       State current = readStateBestEffort();
       if (current == null) {
@@ -1435,6 +1451,7 @@ public final class IndexGenerationManager {
    */
   public int recordAutoRebuildAttempt(String targetKey) throws IOException {
     try (var ignored = stateControl()) {
+      inspectNamespace();
       State current = readStateBestEffort();
       if (current == null) {
         // #758: a state record that exists but cannot be read holds a brake this
@@ -1898,9 +1915,7 @@ public final class IndexGenerationManager {
         throw new IOException("Previous generation differs from the expected retirement target");
       }
 
-      boolean pointerBindsRetirement =
-          observedPrevious != null && !observedPrevious.isBlank();
-      deleteExactRetiredRepresentation(previous, pointerBindsRetirement);
+      deleteExactRetiredRepresentation(previous);
       if (observedPrevious == null || observedPrevious.isBlank()) {
         return current;
       }
@@ -1940,7 +1955,6 @@ public final class IndexGenerationManager {
   /** Caller has checkpointed source reconciliation before cancelling this exact release build. */
   public void validateReleaseRetirementOwner(String generation) throws IOException {
     Path exact = resolveGenerationPathStrict(generation);
-    requireRetirementSentinel(exact.resolve(GENERATION_SENTINEL), generation, exact);
     manifestForOwnedPath(exact);
   }
 
@@ -1962,8 +1976,6 @@ public final class IndexGenerationManager {
               || MigrationState.SWITCHING.name().equals(current.migration_state()))) {
         throw new IOException("Release build changed before cancellation");
       }
-      requireRetirementSentinel(resolveGenerationPathReadOnly(active).resolve(GENERATION_SENTINEL),
-          active, resolveGenerationPathReadOnly(active));
       manifestForOwnedPath(resolveGenerationPathReadOnly(active));
       State next = new State(STATE_FORMAT_VERSION, active, null, building, MigrationState.IDLE.name(),
           false, null, null, System.currentTimeMillis(), current.auto_rebuild_key(),
@@ -1995,137 +2007,50 @@ public final class IndexGenerationManager {
     return state;
   }
 
-  private void deleteExactRetiredRepresentation(
-      String generationId, boolean durablyBound) throws IOException {
+  private void deleteExactRetiredRepresentation(String generationId) throws IOException {
     Path original = resolveGenerationPathReadOnly(generationId);
-    if (Files.exists(original, java.nio.file.LinkOption.NOFOLLOW_LINKS)) {
-      requireOwnedRetirementDirectory(original, generationId, false,
-          durablyBound && Files.exists(original.resolve(DELETE_MARKER),
-              java.nio.file.LinkOption.NOFOLLOW_LINKS));
-      SafeIndexPathOps.MarkResult marked = SafeIndexPathOps.markForDeletion(original, indicesDir);
-      Path effective = normalize(marked.effectivePath());
-      requireOwnedRetirementDirectory(
-          effective,
-          generationId,
-          !effective.getFileName().toString().equals(generationId),
-          durablyBound);
+    if (Files.exists(original, LinkOption.NOFOLLOW_LINKS) && ownedOrWarn(original)) {
+      var marked = SafeIndexPathOps.markForDeletion(original, indicesDir);
+      if (!marked.renamedToDel() && !marked.wroteMarker()) {
+        throw new IOException("Could not mark predecessor for deletion: " + original);
+      }
     }
-
-    for (Path retired :
-        exactRetirementRepresentations(generationId, durablyBound)) {
+    for (Path retired : exactRetirementRepresentations(generationId)) {
       deleteRetirementPayloadBeforeOwnership(retired, generationId);
-      io.justsearch.configuration.FileOps.deleteRecursivelyBestEffort(retired, log);
+      finishOwnedDeletion(retired);
     }
-    if (!exactRetirementRepresentations(generationId, durablyBound).isEmpty()) {
-      throw new IOException(
-          "Exact predecessor directory remains after deletion: " + generationId);
+    if (!exactRetirementRepresentations(generationId).isEmpty()) {
+      throw new IOException("Exact predecessor directory remains after deletion: " + generationId);
     }
   }
 
-  private List<Path> exactRetirementRepresentations(
-      String generationId, boolean durablyBound) throws IOException {
-    if (!Files.isDirectory(indicesDir, java.nio.file.LinkOption.NOFOLLOW_LINKS)) {
-      return List.of();
-    }
+  private List<Path> exactRetirementRepresentations(String generationId) throws IOException {
+    if (!Files.isDirectory(indicesDir, LinkOption.NOFOLLOW_LINKS)) return List.of();
     List<Path> exact = new ArrayList<>();
     try (var entries = Files.list(indicesDir)) {
       for (Path entry : entries.toList()) {
         String name = entry.getFileName().toString();
-        if (!name.equals(generationId) && !isMarkedRetirementName(name, generationId)) {
-          continue;
+        if ((name.equals(generationId) || isMarkedRetirementName(name, generationId)) && ownedOrWarn(entry)) {
+          exact.add(entry);
         }
-        boolean markedName = !name.equals(generationId);
-        requireOwnedRetirementDirectory(
-            entry,
-            generationId,
-            markedName,
-            durablyBound && (markedName || Files.exists(entry.resolve(DELETE_MARKER),
-                java.nio.file.LinkOption.NOFOLLOW_LINKS)));
-        exact.add(entry);
       }
     }
     exact.sort(Comparator.comparing(Path::toString));
     return exact;
   }
 
-  private void requireOwnedRetirementDirectory(
-      Path directory,
-      String generationId,
-      boolean markedName,
-      boolean allowPointerBoundPartialMetadata)
-      throws IOException {
-    Path exact = normalize(directory);
-    Path root = normalize(indicesDir);
-    String name = exact.getFileName().toString();
-    boolean exactName =
-        markedName ? isMarkedRetirementName(name, generationId) : name.equals(generationId);
-    if (!exact.startsWith(root)
-        || exact.equals(root)
-        || !exactName
-        || !Files.isDirectory(exact, java.nio.file.LinkOption.NOFOLLOW_LINKS)) {
-      throw new IOException("Refusing unsafe predecessor retirement path: " + exact);
-    }
-    Path sentinel = exact.resolve(GENERATION_SENTINEL);
-    Path manifestPath = exact.resolve(GENERATION_MANIFEST);
-    boolean sentinelExists = Files.exists(sentinel, java.nio.file.LinkOption.NOFOLLOW_LINKS);
-    boolean manifestExists = Files.exists(manifestPath, java.nio.file.LinkOption.NOFOLLOW_LINKS);
-    // FileOps historically could delete both metadata files before a locked payload. In that
-    // recovery shape the strict previous_generation pointer plus SafeIndexPathOps' exact encoded
-    // rename is the durable ownership proof. Any surviving metadata must still agree.
-    if ((!sentinelExists || !manifestExists) && !allowPointerBoundPartialMetadata) {
-      throw new IOException("Predecessor ownership metadata is unavailable: " + exact);
-    }
-    if (sentinelExists) {
-      requireRetirementSentinel(sentinel, generationId, exact);
-    }
-    if (manifestExists) {
-      requireRetirementManifest(manifestPath, generationId, exact);
-    }
-  }
-
   private static boolean isMarkedRetirementName(String name, String generationId) {
-    String prefix = generationId + ".del-";
-    if (!name.startsWith(prefix)) {
-      return false;
-    }
-    String suffix = name.substring(prefix.length());
-    return suffix.matches("[0-9]{8}-[0-9]{6}");
-  }
-
-  private static void requireRetirementSentinel(
-      Path sentinel, String generationId, Path directory) throws IOException {
-    if (!Files.isRegularFile(sentinel, java.nio.file.LinkOption.NOFOLLOW_LINKS)
-        || Files.size(sentinel) > 1_024) {
-      throw new IOException("Predecessor sentinel is invalid: " + directory);
-    }
-    String body =
-        new String(
-            io.justsearch.configuration.persistence.ContendedFileReads.readAllBytes(sentinel),
-            StandardCharsets.UTF_8);
-    if (body.lines().noneMatch(line -> line.equals("generation_id=" + generationId))) {
-      throw new IOException("Predecessor sentinel identifies another generation: " + directory);
-    }
-  }
-
-  private static void requireRetirementManifest(
-      Path manifestPath, String generationId, Path directory) throws IOException {
-    if (!Files.isRegularFile(manifestPath, java.nio.file.LinkOption.NOFOLLOW_LINKS)
-        || Files.size(manifestPath) > 16_384) {
-      throw new IOException("Predecessor manifest is invalid: " + directory);
-    }
-    final GenerationManifest manifest;
     try {
-      manifest =
-          JSON.readValue(
-              io.justsearch.configuration.persistence.ContendedFileReads.readAllBytes(
-                  manifestPath),
-              GenerationManifest.class);
-    } catch (tools.jackson.core.JacksonException malformed) {
-      throw new IOException("Predecessor manifest is invalid: " + directory, malformed);
-    }
-    if (manifest == null || !generationId.equals(manifest.generation_id())) {
-      throw new IOException("Predecessor manifest identifies another generation: " + directory);
-    }
+      var representation = IndexOwnership.representation(name);
+      return generationId.equals(representation.identity()) && representation.role() == IndexOwnership.Role.MARKED;
+    } catch (IOException invalid) { return false; }
+  }
+
+  private static void finishOwnedDeletion(Path directory) throws IOException {
+    Files.deleteIfExists(directory.resolve(DELETE_MARKER));
+    Files.deleteIfExists(directory.resolve(GENERATION_MANIFEST));
+    Files.delete(directory.resolve(GENERATION_SENTINEL));
+    Files.delete(directory);
   }
 
   private void deleteRetirementPayloadBeforeOwnership(Path directory, String generationId)
@@ -2143,12 +2068,12 @@ public final class IndexGenerationManager {
     }
     for (Path entry : payload) {
       io.justsearch.configuration.FileOps.deleteRecursivelyBestEffort(entry, log);
-      if (Files.notExists(entry, java.nio.file.LinkOption.NOFOLLOW_LINKS)) {
+      if (Files.notExists(entry, LinkOption.NOFOLLOW_LINKS)) {
         haltAfterObservedRetirementDeletion(generationId, directory, entry);
       }
     }
     for (Path entry : payload) {
-      if (!Files.notExists(entry, java.nio.file.LinkOption.NOFOLLOW_LINKS)) {
+      if (!Files.notExists(entry, LinkOption.NOFOLLOW_LINKS)) {
         throw new IOException(
             "Predecessor payload remains locked after deletion: " + directory);
       }
@@ -2178,7 +2103,7 @@ public final class IndexGenerationManager {
       java.nio.file.attribute.BasicFileAttributes directory;
       try {
         directory = Files.readAttributes(indicesDir, java.nio.file.attribute.BasicFileAttributes.class,
-            java.nio.file.LinkOption.NOFOLLOW_LINKS);
+            LinkOption.NOFOLLOW_LINKS);
       } catch (java.nio.file.NoSuchFileException absent) {
         return 0;
       }
@@ -2196,11 +2121,33 @@ public final class IndexGenerationManager {
     }
   }
 
-  private static boolean isRetainedRepresentation(Path entry) throws IOException {
-    // Diagnostic corruption backups are not open/serving/building representations.
-    return Files.readAttributes(entry, java.nio.file.attribute.BasicFileAttributes.class,
-            java.nio.file.LinkOption.NOFOLLOW_LINKS).isDirectory()
-        && !entry.getFileName().toString().matches("g-.+\\.bak-[0-9]{8}-[0-9]{6}");
+  private boolean ownedOrWarn(Path entry) {
+    try { IndexOwnership.inspect(entry, indicesDir); return true; }
+    catch (IOException unproven) { warnCleanup(entry, unproven.getMessage()); return false; }
+  }
+
+  private boolean isRetainedRepresentation(Path entry) throws IOException {
+    if (!Files.readAttributes(entry, java.nio.file.attribute.BasicFileAttributes.class,
+        LinkOption.NOFOLLOW_LINKS).isDirectory()) return false;
+    if (!ownedOrWarn(entry)) return false;
+    return !IndexOwnership.representation(entry.getFileName().toString()).backup();
+  }
+
+  private boolean previousConsumesCapacity(String identity) throws IOException {
+    if (!exactRetirementRepresentations(identity).isEmpty()) return true;
+    if (Files.isDirectory(indicesDir, LinkOption.NOFOLLOW_LINKS)) {
+      try (var entries = Files.list(indicesDir)) {
+        for (Path path : entries.toList()) {
+          String name = path.getFileName().toString();
+          if (isMarkedRetirementName(name, identity)
+              || name.equals(identity) && Files.exists(path.resolve(DELETE_MARKER), LinkOption.NOFOLLOW_LINKS)) {
+            warnCleanup(path, "ownership unproven; excluded from predecessor capacity");
+            return false;
+          }
+        }
+      }
+    }
+    return true;
   }
 
   private void requireBuildCapacity(State state, String acceptedTarget, boolean allowActivePrevious)
@@ -2208,10 +2155,11 @@ public final class IndexGenerationManager {
     String active =
         requireSafeGenerationId(state.active_generation(), "state.json active_generation");
     if (state.previous_generation() != null && !state.previous_generation().isBlank()
-        && (!allowActivePrevious || !active.equals(state.previous_generation()))) {
+        && (!allowActivePrevious || !active.equals(state.previous_generation()))
+        && previousConsumesCapacity(state.previous_generation())) {
       throw new IOException("Previous generation still occupies build capacity");
     }
-    if (!Files.isDirectory(indicesDir, java.nio.file.LinkOption.NOFOLLOW_LINKS)) {
+    if (!Files.isDirectory(indicesDir, LinkOption.NOFOLLOW_LINKS)) {
       return;
     }
     try (var entries = Files.list(indicesDir)) {
@@ -2234,6 +2182,8 @@ public final class IndexGenerationManager {
     State normalized = normalizeAndUpgradeStateIfNeeded(state);
     String genId = requireSafeGenerationId(normalized.active_generation(), "state.json active_generation");
     Path genPath = resolveGenerationPath(genId);
+    IndexOwnership.inspectCanonical(genPath, indicesDir);
+    writeGenerationFiles(genPath, genId, "adopt_existing");
     if (!Files.isDirectory(genPath)) {
       throw new IOException(
           "Index state points to missing generation directory: active_generation="
@@ -2242,39 +2192,6 @@ public final class IndexGenerationManager {
               + genPath);
     }
     return new IndexLayout(basePath, indicesDir, statePath, normalized, genId, genPath);
-  }
-
-  private IndexLayout importLegacyIndex() throws IOException {
-    // Move basePath out of the way, then recreate basePath with the generation layout.
-    String ts = TS.format(Instant.now());
-    Path legacyMoved = basePath.resolveSibling(basePath.getFileName() + ".legacy-" + ts);
-
-    if (!Files.isDirectory(basePath)) {
-      throw new IOException("Index base path is not a directory: " + basePath);
-    }
-    if (Files.exists(legacyMoved)) {
-      throw new IOException("Legacy import destination already exists: " + legacyMoved);
-    }
-
-    log.info("Legacy index detected at {}; importing into generation layout", basePath);
-    Files.move(basePath, legacyMoved);
-    Files.createDirectories(basePath);
-    Files.createDirectories(indicesDir);
-
-    String genId = "v0_imported";
-    Path genPath = resolveGenerationPath(genId);
-    if (Files.exists(genPath)) {
-      throw new IOException("Refusing legacy import: generation already exists: " + genPath);
-    }
-
-    Files.move(legacyMoved, genPath);
-    writeGenerationFiles(genPath, genId, "legacy_import");
-
-    State state = newIdleState(genId, null, null);
-    writeState(state);
-    log.info("Legacy import complete. Active generation: {} ({})", genId, genPath);
-
-    return new IndexLayout(basePath, indicesDir, statePath, state, genId, genPath);
   }
 
   private IndexLayout tryAdoptSingleExistingGeneration() throws IOException {
@@ -2286,7 +2203,13 @@ public final class IndexGenerationManager {
     try (var stream = Files.list(indicesDir)) {
       stream
           .filter(Files::isDirectory)
-          .filter(p -> !p.getFileName().toString().contains(".del-"))
+          .filter(p -> {
+            try {
+              return IndexOwnership.representation(p.getFileName().toString()).role()
+                      == IndexOwnership.Role.CANONICAL
+                  && IndexOwnership.inspect(p, indicesDir) != null;
+            } catch (IOException unproven) { return false; }
+          })
           .forEach(candidates::add);
     }
 
@@ -2298,7 +2221,7 @@ public final class IndexGenerationManager {
           "Index has {} generations under {} but no state.json; refusing to guess active generation",
           candidates.size(),
           indicesDir);
-      return null;
+      throw new IOException("Several owned generations without pointers; refusing to choose");
     }
 
     Path genPath = candidates.get(0).toAbsolutePath().normalize();
@@ -2319,8 +2242,9 @@ public final class IndexGenerationManager {
     Files.createDirectories(indicesDir);
     String genId = newUniqueGenerationId();
     Path genPath = resolveGenerationPath(genId);
-    Files.createDirectories(genPath);
-    writeGenerationFiles(genPath, genId, source);
+    long created = System.currentTimeMillis();
+    IndexOwnership.create(basePath, genId, recordedSentinel(genId, created).getBytes(StandardCharsets.UTF_8),
+        JSON.writeValueAsBytes(new GenerationManifest(MANIFEST_FORMAT_VERSION, genId, source, created)));
 
     State state = newIdleState(genId, null, null);
     writeState(state);
@@ -2550,6 +2474,7 @@ public final class IndexGenerationManager {
             state.auto_rebuild_first_ms());
 
     if (v != STATE_FORMAT_VERSION) {
+      inspectNamespace();
       // Upgrade v1 -> v2 in-place (best-effort).
       try {
         writeState(normalized);
@@ -2573,48 +2498,27 @@ public final class IndexGenerationManager {
     }
   }
 
-  private void writeGenerationFiles(Path genDir, String genId, String source) {
-    try {
-      // Sentinel authorizes future deletion/GC (defense-in-depth against deleting arbitrary dirs).
-      Path sentinel = genDir.resolve(GENERATION_SENTINEL);
-      if (!Files.exists(sentinel)) {
-        String body =
-            "justsearch_generation_sentinel_v1\n"
-                + "generation_id="
-                + genId
-                + "\ncreated_at_ms="
-                + System.currentTimeMillis()
-                + "\n";
-        Files.writeString(sentinel, body, StandardCharsets.UTF_8);
-      }
-
-      Path manifest = genDir.resolve(GENERATION_MANIFEST);
-      if (!Files.exists(manifest)) {
-        GenerationManifest m =
-            new GenerationManifest(MANIFEST_FORMAT_VERSION, genId, source, System.currentTimeMillis());
-        JSON.writerWithDefaultPrettyPrinter().writeValue(manifest.toFile(), m);
-      }
-    } catch (Exception e) {
-      // Best-effort. These files are guardrails/diagnostics, not required to open Lucene.
-      log.warn("Failed to write generation metadata files for {}", genDir, e);
+  private void writeGenerationFiles(Path genDir, String genId, String source) throws IOException {
+    IndexOwnership.inspect(genDir, indicesDir);
+    if (Files.notExists(genDir.resolve(GENERATION_MANIFEST), LinkOption.NOFOLLOW_LINKS)) {
+      io.justsearch.configuration.persistence.AtomicFileWrites.replaceStrict(genDir.resolve(GENERATION_MANIFEST),
+          JSON.writeValueAsBytes(new GenerationManifest(MANIFEST_FORMAT_VERSION, genId, source,
+              System.currentTimeMillis())));
+      IndexOwnership.forceDirectory(genDir);
     }
   }
 
   /** Candidate identity must be durable before state.json may point at it. */
-  private static void writeMigrationGenerationFilesStrict(Path genDir, String genId,
+  private void writeMigrationGenerationFilesStrict(String genId,
       String source, List<String> projectionSourceIds) throws IOException {
     long created = System.currentTimeMillis();
-    io.justsearch.configuration.persistence.AtomicFileWrites.replaceStrict(
-        genDir.resolve(GENERATION_SENTINEL), recordedSentinel(genId, created)
-            .getBytes(StandardCharsets.UTF_8));
     var manifest = new GenerationManifest(PROJECTION_MANIFEST_FORMAT_VERSION,
         genId, source, created, null, Map.of(), null, null, projectionSourceIds);
     byte[] bytes = JSON.writeValueAsBytes(manifest);
     if (bytes.length > 16_384) {
       throw new IOException("Projection source manifest exceeds its ownership limit");
     }
-    io.justsearch.configuration.persistence.AtomicFileWrites.replaceStrict(
-        genDir.resolve(GENERATION_MANIFEST), bytes);
+    IndexOwnership.create(basePath, genId, recordedSentinel(genId, created).getBytes(StandardCharsets.UTF_8), bytes);
   }
 
   /**
@@ -2632,7 +2536,8 @@ public final class IndexGenerationManager {
       if (!Files.exists(manifest)) {
         return null;
       }
-      GenerationManifest m = JSON.readValue(manifest.toFile(), GenerationManifest.class);
+      GenerationManifest m = RECORDED_JSON.readValue(
+          IndexOwnership.validateManifest(manifest, genId), GenerationManifest.class);
       return m == null ? null : m.source();
     } catch (Exception e) {
       log.debug("Failed to read generation manifest source for {}: {}", genId, e.getMessage());
@@ -2677,9 +2582,19 @@ public final class IndexGenerationManager {
     try (var entries = Files.list(basePath)) {
       for (Path entry : entries.filter(path -> path.getFileName().toString()
           .matches("state[.]json[.][0-9]+[.]tmp"))
-          .filter(path -> Files.isRegularFile(path, java.nio.file.LinkOption.NOFOLLOW_LINKS)).toList()) {
-        try { Files.deleteIfExists(entry); }
-        catch (IOException failure) { log.warn("Could not remove abandoned generation temp {}", entry, failure); }
+          .filter(path -> Files.isRegularFile(path, LinkOption.NOFOLLOW_LINKS)).toList()) {
+        try {
+          State staged = RECORDED_JSON.readValue(IndexOwnership.readBounded(entry, 16_384), State.class);
+          if (staged == null || staged.format_version() < 1 || staged.format_version() > STATE_FORMAT_VERSION
+              || staged.updated_at_ms() <= 0) throw new IOException("Invalid staged state");
+          String identity = requireSafeGenerationId(staged.active_generation(), "staged state active generation");
+          IndexOwnership.inspect(resolveGenerationPathReadOnly(identity), indicesDir);
+          Files.delete(entry);
+          cleanupWarnings = cleanupWarnings.stream()
+              .filter(warning -> !warning.path().equals(entry.toAbsolutePath().normalize().toString())).toList();
+        } catch (IOException | tools.jackson.core.JacksonException unproven) {
+          warnCleanup(entry, "unproven state temporary left untouched");
+        }
       }
     } catch (IOException failure) {
       log.warn("Could not inspect abandoned generation temps at {}", basePath, failure);
@@ -2687,6 +2602,7 @@ public final class IndexGenerationManager {
   }
 
   private void writeState(State state) throws IOException {
+    inspectNamespace();
     Objects.requireNonNull(state, "state");
     Files.createDirectories(basePath);
     haltAtPointerPublication("before-backup", state);
@@ -2747,23 +2663,6 @@ public final class IndexGenerationManager {
     return p;
   }
 
-  private static boolean looksLikeLegacyIndexInBasePath(Path basePath) {
-    // Detect legacy Lucene index files directly under basePath (not under indices/<gen>/).
-    if (basePath == null || !Files.isDirectory(basePath)) {
-      return false;
-    }
-    try (var stream = Files.list(basePath)) {
-      return stream.anyMatch(
-          p -> {
-            String n = p.getFileName().toString().toLowerCase(Locale.ROOT);
-            // Only look for the canonical marker at the base path level.
-            return n.startsWith("segments");
-          });
-    } catch (Exception ignored) {
-      return false;
-    }
-  }
-
   private static String requireSafeGenerationId(String id, String ctx) throws IOException {
     if (id == null || id.isBlank()) {
       throw new IOException(ctx + " is missing/blank");
@@ -2788,83 +2687,59 @@ public final class IndexGenerationManager {
    * a DELETEME marker). Called after recorded refusal and during generation startup/GC.
    */
   public void pruneMarkedForDeletionBestEffort() {
-    try (var ignored = stateControl()) {
-      if (!Files.isDirectory(indicesDir)) {
-        return;
-      }
-      State state = readStateBestEffort();
-      if (state == null) {
-        // Safer to skip deletion when we don't know what's active/previous/building.
-        return;
-      }
-      Set<String> protectedIds = protectedGenerationIds(state);
-      try (var stream = Files.list(indicesDir)) {
-        stream
-            .filter(Files::isDirectory)
-            .filter(
-                p -> {
-                  String name = p.getFileName().toString();
-                  if (protectedIds.contains(name)) {
-                    return false;
-                  }
-                  boolean marked = name.contains(".del-") || Files.exists(p.resolve(DELETE_MARKER));
-                  if (!marked) return false;
-                  // Defense-in-depth: only delete dirs that look like JustSearch generations.
-                  return Files.exists(p.resolve(GENERATION_SENTINEL));
-                })
-            .sorted(Comparator.comparing(Path::toString))
-            .forEach(
-                p -> {
-                  try {
-                    io.justsearch.configuration.FileOps.deleteRecursivelyBestEffort(p, log);
-                  } catch (Exception e) {
-                    log.debug("Failed to delete marked directory {}: {}", p, e.getMessage());
-                  }
-                });
-      } catch (Exception e) {
-        log.debug("Error while pruning marked-for-deletion directories: {}", e.getMessage());
-      }
-    }
+    try { gcBestEffort(0, true, false); }
+    catch (RuntimeException incomplete) { log.debug("Marked cleanup incomplete", incomplete); }
   }
 
-  public record GcResult(int markedCount, int prunedCount) {}
+  public record GcResult(int markedCount, int prunedCount, int emptyLeftoversRemoved,
+      List<CleanupWarning> cleanupWarnings) {
+    public GcResult(int markedCount, int prunedCount) { this(markedCount, prunedCount, 0, List.of()); }
+    public GcResult { cleanupWarnings = List.copyOf(cleanupWarnings); }
+  }
 
-  /**
-   * Best-effort GC for old, unreferenced generations/backups.
-   *
-   * <p>This method is intended to be called via an explicit operator control, not automatically.
-   */
+  /** Explicit GC selects only fully owned, unreferenced representations. */
   public GcResult gcBestEffort(int keepLatest, boolean pruneMarkedOnly) {
+    return gcBestEffort(keepLatest, pruneMarkedOnly, true);
+  }
+
+  private GcResult gcBestEffort(int keepLatest, boolean pruneMarkedOnly, boolean explicit) {
     try (var ignored = stateControl()) {
+      cleanupWarnings = List.of();
       try {
         State state = strictBootLayout(readRecordedState()).state();
         Set<String> protectedIds = protectedGenerationIds(state);
         List<Path> candidates = new ArrayList<>();
         List<Path> markedPaths = new ArrayList<>();
+        Set<String> emptyProtectedIds = new java.util.HashSet<>(protectedIds);
+        boolean allowRecorded = explicit && MigrationState.IDLE.name().equals(state.migration_state())
+            && (state.building_generation() == null || state.building_generation().isBlank());
+        if (allowRecorded && IndexOwnership.entryExists(statePrevPath)) {
+          State previous = tryReadState(statePrevPath);
+          if (previous == null || previous.active_generation() == null
+              || previous.active_generation().isBlank()) allowRecorded = false;
+          else java.util.stream.Stream.of(previous.active_generation(), previous.previous_generation())
+              .filter(id -> id != null && !id.isBlank()).forEach(emptyProtectedIds::add);
+        }
+        int empty = removeEmptyLeftovers(emptyProtectedIds, allowRecorded);
+        cleanupStaging();
         try (var stream = Files.list(indicesDir)) {
           for (Path path : stream.toList()) {
-            if (!Files.readAttributes(path, java.nio.file.attribute.BasicFileAttributes.class,
-                java.nio.file.LinkOption.NOFOLLOW_LINKS).isDirectory()) continue;
-            String name = path.getFileName().toString();
-            if (protectedIds.contains(name)) continue;
-            try {
-              if (!Files.readAttributes(path.resolve(GENERATION_SENTINEL),
-                  java.nio.file.attribute.BasicFileAttributes.class,
-                  java.nio.file.LinkOption.NOFOLLOW_LINKS).isRegularFile()) continue;
-            } catch (java.nio.file.NoSuchFileException absentSentinel) {
+            var attributes = Files.readAttributes(path, java.nio.file.attribute.BasicFileAttributes.class,
+                LinkOption.NOFOLLOW_LINKS);
+            if (attributes.isRegularFile()) {
+              String name = path.getFileName().toString();
+              if (!name.endsWith(".clean-shutdown") && !name.endsWith(".rebuild-pending")) {
+                warnCleanup(path, "unrecognized file left unchanged");
+              }
               continue;
             }
-            boolean markedForDeletion = name.contains(".del-");
-            if (!markedForDeletion) {
-              try {
-                Files.readAttributes(path.resolve(DELETE_MARKER), java.nio.file.attribute.BasicFileAttributes.class,
-                    java.nio.file.LinkOption.NOFOLLOW_LINKS);
-                markedForDeletion = true;
-              } catch (java.nio.file.NoSuchFileException absentMarker) {
-                markedForDeletion = false;
-              }
-            }
-            if (markedForDeletion) markedPaths.add(path);
+            String name = path.getFileName().toString();
+            if (!ownedOrWarn(path)) continue;
+            var representation = IndexOwnership.representation(name);
+            if (!representation.backup() && protectedIds.contains(representation.identity())) continue;
+            boolean marked = representation.role() == IndexOwnership.Role.MARKED
+                || Files.exists(path.resolve(DELETE_MARKER), LinkOption.NOFOLLOW_LINKS);
+            if (marked) markedPaths.add(path);
             else candidates.add(path);
           }
         }
@@ -2883,14 +2758,17 @@ public final class IndexGenerationManager {
         }
         int pruned = 0;
         for (Path path : markedPaths) {
-          deleteRetirementPayloadBeforeOwnership(path, path.getFileName().toString());
-          var result = io.justsearch.configuration.FileOps.deleteRecursivelyBestEffort(path, log);
-          if (result.failed() != 0 || Files.exists(path)) {
-            throw new IOException("Generation cleanup incomplete: " + path);
+          IndexOwnership.inspect(path, indicesDir);
+          try {
+            deleteRetirementPayloadBeforeOwnership(path, path.getFileName().toString());
+            finishOwnedDeletion(path);
+            pruned++;
+          } catch (IOException incomplete) {
+            warnCleanup(path, "cleanup incomplete: " + incomplete.getMessage());
+            throw incomplete;
           }
-          pruned++;
         }
-        return new GcResult(marked, pruned);
+        return new GcResult(marked, pruned, empty, cleanupWarnings);
       } catch (IOException failure) {
         throw new java.io.UncheckedIOException("Index GC incomplete", failure);
       }

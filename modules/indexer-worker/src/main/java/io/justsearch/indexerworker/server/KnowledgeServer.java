@@ -1271,6 +1271,7 @@ public final class KnowledgeServer implements Closeable {
       var journalWitness = new io.justsearch.indexerworker.queue.MigrationJournalWitness(
           effectiveIndexBasePath, dataDir.resolve("jobs.db"));
       IndexGenerationManager genManager = new IndexGenerationManager(effectiveIndexBasePath);
+      genManager.inspectNamespace();
       boolean unfinishedMigration = recordedIngestionLifecycle.generationPendingAtBoot()
           || genManager.requiresMigrationJournalForBoot();
       if (unfinishedMigration) journalWitness.validateUnfinished(dataDir.resolve("jobs.db"));
@@ -2077,7 +2078,21 @@ public final class KnowledgeServer implements Closeable {
       // with the actual cause visible nowhere but the (then separate) worker.log. It is a
       // deliberate refusal, not a
       // crash, and it has its own remedy. Other fatal causes stay generic.
-      if (e.getMessage() != null && e.getMessage().startsWith(
+      io.justsearch.adapters.lucene.runtime.IndexOwnership.Unproven ownershipRefusal = null;
+      for (Throwable cause = e; cause != null; cause = cause.getCause()) {
+        if (cause instanceof io.justsearch.adapters.lucene.runtime.IndexOwnership.Unproven unproven) {
+          ownershipRefusal = unproven;
+          break;
+        }
+      }
+      if (ownershipRefusal != null) {
+        String detail = "Search could not start because JustSearch cannot verify that the folder "
+            + ownershipRefusal.path() + " belongs to it. Nothing in it was changed. "
+            + "If it is your JustSearch index, restore it from a backup; otherwise move it out of the index folder, then restart. "
+            + "Evidence: " + ownershipRefusal.evidenceClass();
+        io.justsearch.ipc.WorkerFatalReasonMarker.write(dataDir,
+            io.justsearch.ipc.WorkerFatalReasonMarker.INDEX_OWNERSHIP_UNPROVEN, detail);
+      } else if (e.getMessage() != null && e.getMessage().startsWith(
           io.justsearch.indexerworker.queue.MigrationJournalWitness.REFUSAL)) {
         io.justsearch.ipc.WorkerFatalReasonMarker.write(dataDir,
             io.justsearch.ipc.WorkerFatalReasonMarker.MIGRATION_JOURNAL_UNAVAILABLE);

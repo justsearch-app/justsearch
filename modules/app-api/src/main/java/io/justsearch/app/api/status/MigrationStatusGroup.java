@@ -14,7 +14,15 @@ public record MigrationStatusGroup(
     long switchingAgeMs,
     long switchingMaxDurationMs,
     MigrationEnumeratorView enumerator,
-    String migrationSource) {
+    String migrationSource,
+    java.util.List<io.justsearch.app.api.IndexingService.IndexCleanupWarning> cleanupWarnings) {
+
+  public MigrationStatusGroup(long observedAtMs, String state, String buildingGenerationId,
+      String previousGenerationId, boolean paused, String pauseReason, long switchingAgeMs,
+      long switchingMaxDurationMs, MigrationEnumeratorView enumerator, String migrationSource) {
+    this(observedAtMs, state, buildingGenerationId, previousGenerationId, paused, pauseReason,
+        switchingAgeMs, switchingMaxDurationMs, enumerator, migrationSource, java.util.List.of());
+  }
 
   public static MigrationStatusGroup from(WorkerOperationalView w) {
     return new MigrationStatusGroup(
@@ -27,6 +35,7 @@ public record MigrationStatusGroup(
         w.migration().migrationSwitchingAgeMs(),
         w.migration().migrationSwitchingMaxDurationMs(),
         w.migration().migrationEnumerator(),
-        w.migration().migrationSource());
+        w.migration().migrationSource(),
+        w.migration().cleanupWarnings());
   }
 }

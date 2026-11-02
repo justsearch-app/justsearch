@@ -41,6 +41,30 @@ final class KnowledgeServerWorkerDownCodeTest {
     }
   }
 
+  @Test
+  void ownershipRefusalPreservesPathAndEvidenceAcrossRetriesUntilValidatedReady(@TempDir Path tempDir) {
+    String detail = "Search could not start because JustSearch cannot verify that the folder "
+        + tempDir.resolve("indices/foreign") + " belongs to it. Nothing in it was changed. "
+        + "If it is your JustSearch index, restore it from a backup; otherwise move it out of the index folder, then restart. Evidence: missing";
+    WorkerFatalReasonMarker.write(tempDir, "index_ownership_unproven\n" + detail);
+    try (var fixture = KnowledgeServerBootstrapTestFixture.create(configFor(tempDir))) {
+      var bootstrap = fixture.bootstrap();
+      bootstrap.transitionWorkerDown(LifecycleReasonCode.INDEX_FAILED, "startup failed");
+      var capability = bootstrap.workerCapability();
+      assertEquals("index.ownership_unproven", capability.pendingReason());
+      assertEquals(detail, capability.pendingDetail());
+      assertFalse(Files.exists(WorkerFatalReasonMarker.pathFor(tempDir)));
+      fixture.indexComponent().transition(ComponentState.STARTING,
+          LifecycleReasonCode.COMPONENT_RECOVERING.code(), "retry");
+      bootstrap.transitionWorkerDown(LifecycleReasonCode.INDEX_FAILED, "retry failed");
+      assertEquals("index.ownership_unproven", capability.pendingReason());
+      assertEquals(detail, capability.pendingDetail());
+      fixture.publishSamplerReady();
+      assertEquals(CapabilityHealth.READY, capability.health());
+      assertEquals(null, capability.pendingReason());
+    }
+  }
+
   private static KnowledgeServerConfig configFor(Path dir) {
     return new KnowledgeServerConfig(
         false, dir, dir, dir,
