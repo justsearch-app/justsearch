@@ -1478,3 +1478,14 @@ R9 passes with producer-written evidence in gates/test-intent/evidence/ingfix-wp
   "note": "Re-acceptance after merging main 5f53e2ae41 (independent Codex session): all 51 entries accepted; merge preserves the covered oracles; compatibility patch behaviour-neutral on 5f53e2ae41; all 43 repair checks fail before by assertion and pass after; six evidence files validate. R9/S55 runtime inconclusive in its sandbox (no /dev/disk/by-uuid); earlier verifier session c0ef77cd verified R9 on the host."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a19a26-e3bb-7202-93e1-6a350f3de9a7",
+  "verdict": "accept",
+  "digest": "sha256:f696d2aed670b8f395efd958c8989f5df5241c023a6f511f6b1d641e0030981d",
+  "note": "Re-acceptance after the Windows fixture fix (independent Codex session): all 51 entries accepted; the nested-root fixture keeps distinct ancestor/nested volume answers, root authority and PRESENT assertions; stated 8.3 real-path cause plausible; no other unresolved-path volume lookup on the branch; all 43 repair checks fail before by assertion and pass after. R9/S55 not runnable in its sandbox (no volume evidence); R9 passed on the host in the local gate on c81e881ddf."
+}
+```
