@@ -38,9 +38,15 @@ def _identity_rows(h: RunHeader) -> dict[str, str]:
     return {"commit": h.commit + (" (dirty)" if h.dirty_hash else ""),
             "collection version": h.collection_version[:16],
             "index key": h.index_key,
-            "index population": f"{pop.get('count')} docs, manifest {str(pop.get('manifest_sha256'))[:12]}",
+            "index population": f"{pop.get('count')} docs, manifest "
+                                f"{str(pop.get('manifest_sha256'))[:12]}, content "
+                                f"{str(pop.get('content_sha256'))[:12]}",
+            "index build": h.index_build + (f" (cache key {h.index_cache_key})"
+                                            if h.index_cache_key else ""),
             **{f"index state: {k}": str(v) for k, v in sorted(h.index_state.items())},
             "request config": h.request_config_sha256[:12],
+            "expected legs / reranker": f"{'+'.join(h.expected_legs)} / {h.expected_reranker}",
+            **{f"budget: {k}": str(v) for k, v in sorted(h.budget.items())},
             **{f"model: {k}": _short(v) for k, v in sorted(h.model_hashes.items())},
             "hardware": ", ".join(f"{k}={v}" for k, v in sorted(h.hardware.items())) or "-",
             "started / ended": f"{h.started} / {h.ended}"}
@@ -62,7 +68,8 @@ def render(cmp: Comparison) -> str:
     c, v = cmp.collection, cmp.verdict
     out = [f"# Search quality: {c.name}", "", f"**{outcome_line(cmp)}**", "",
            f"Exit code {v.exit_code}. Collection version `{c.version[:16]}`, "
-           f"{len(c.queries)} queries, {len(c.documents)} documents.", ""]
+           f"{len(c.queries)} queries, {len(c.documents)} documents; numpy {v.numpy_version}.",
+           ""]
     if v.reasons:
         out += ["## Reasons", ""] + [f"- {r}" for r in v.reasons] + [""]
     if cmp.baseline and cmp.candidate:
@@ -76,6 +83,8 @@ def render(cmp: Comparison) -> str:
         if cmp.confounds:
             out += ["Uncontrolled differences (comparison is INCONCLUSIVE):", ""]
             out += [f"- {x}" for x in cmp.confounds] + [""]
+            for k, ids in cmp.affected.items():
+                out += [f"Affected queries ({k}, {len(ids)}): " + ", ".join(ids), ""]
         if cmp.notes:
             out += [f"- note: {x}" for x in cmp.notes] + [""]
     if v.groups:

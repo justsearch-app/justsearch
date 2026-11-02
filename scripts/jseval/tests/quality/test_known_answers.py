@@ -48,7 +48,7 @@ def test_query_without_positive_or_unknown_judged_doc_stops():
     j = {q: dict(d) for q, d in c.judgments.items()}
     j["q001"] = {d: 0 for d in j["q001"]}
     j["q002"]["not-in-manifest"] = 1
-    bad = qc.Collection(c.name, c.language, c.queries, j, c.documents)
+    bad = qc.Collection(c.name, c.language, c.queries, j, c.documents, c.content)
     with pytest.raises(ka.KnownAnswerFailure) as e:
         ka.check(bad, config_for(bad))
     text = " ".join(e.value.reasons)
@@ -83,4 +83,4 @@ def test_known_answers_pass_on_every_official_collection_and_catch_a_dropped_pos
     q = sorted(j)[0]
     del j[q][next(d for d, g in sorted(j[q].items()) if g > 0)]
     with pytest.raises(ka.KnownAnswerFailure, match="expected positives"):
-        ka.check(qc.Collection(c.name, c.language, c.queries, j, c.documents), cfg)
+        ka.check(qc.Collection(c.name, c.language, c.queries, j, c.documents, c.content), cfg)

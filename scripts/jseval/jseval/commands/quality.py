@@ -1,11 +1,14 @@
 """jseval quality: offline search-quality checks over stored RunRecords (S27).
 
 One command per action, a one-line outcome on stdout, exit codes PASS 0 / REGRESSION 1 /
-INVALID or INCONCLUSIVE 2. ``COLLECTION`` is a config alias (built from its official source, see
-``jseval/quality/config/``) or a stored collection directory. Running a search is not done here.
+INVALID or INCONCLUSIVE 2 — an unexpected error or an interrupt is INVALID too, never the
+REGRESSION code an unhandled Python error would exit with. ``COLLECTION`` is a config alias
+(built from its official source, see ``jseval/quality/config/``) or a stored collection
+directory. Running a search is not done here.
 """
 from __future__ import annotations
 
+import functools
 import json
 import subprocess
 from pathlib import Path
@@ -15,12 +18,29 @@ import click
 from ..quality import collections as qcoll
 from ..quality import compare as qcmp
 from ..quality import known_answers, report, scoring
-from ..quality.types import Outcome, RunRecord, RunRecordError
+from ..quality.types import Outcome, RunRecordError, atomic_write_text
 
 
 def _invalid(ctx, message: str) -> None:
     click.echo(f"INVALID {message}")
     ctx.exit(Outcome.INVALID.exit_code)
+
+
+def _never_crash(command):
+    """Any unexpected error (or Ctrl-C) prints a one-line INVALID and exits 2."""
+
+    @functools.wraps(command)
+    def run(*args, **kwargs):
+        try:
+            return command(*args, **kwargs)
+        except (click.exceptions.Exit, click.ClickException):
+            raise
+        except KeyboardInterrupt:
+            _invalid(click.get_current_context(), "interrupted before an outcome was complete")
+        except Exception as e:
+            _invalid(click.get_current_context(), f"unexpected error: {type(e).__name__}: {e}")
+
+    return run
 
 
 def _checked_collection(ctx, ref: str):
@@ -43,6 +63,7 @@ def quality_group() -> None:
 @quality_group.command("known-answers")
 @click.argument("collection")
 @click.pass_context
+@_never_crash
 def cmd_known_answers(ctx, collection: str) -> None:
     """Run the known-answer checks of COLLECTION (counts, constructed rankings)."""
     c, _cfg, ka = _checked_collection(ctx, collection)
@@ -58,6 +79,7 @@ def cmd_known_answers(ctx, collection: str) -> None:
 @click.option("--store-baseline", type=click.Path(dir_okay=False, path_type=Path),
               help="Also store this run as a baseline (run digest + per-query metrics).")
 @click.pass_context
+@_never_crash
 def cmd_score(ctx, collection: str, run: Path, store_baseline: Path | None) -> None:
     """Score a stored RUN against COLLECTION after validating it completely."""
     c, _cfg, _ka = _checked_collection(ctx, collection)
@@ -71,10 +93,10 @@ def cmd_score(ctx, collection: str, run: Path, store_baseline: Path | None) -> N
     except scoring.ScoringError as e:
         _invalid(ctx, f"{c.name}: {e}")
     unj, slots, _pairs = scoring.unjudged_top(c.judgments, record.results)
-    click.echo(report.score_line(c, scoring.aggregate(per_query), unj / max(1, slots),
-                                 len(per_query)))
     if store_baseline:
         qcmp.write_baseline(run, c, store_baseline)
+    click.echo(report.score_line(c, scoring.aggregate(per_query), unj / max(1, slots),
+                                 len(per_query)))
 
 
 def _head_commit() -> str | None:
@@ -93,12 +115,14 @@ def _head_commit() -> str | None:
               type=click.Path(dir_okay=False, path_type=Path), help="Candidate RunRecord (.jsonl).")
 @click.option("--intended", default="commit", show_default=True,
               help="Comma-separated identity fields the change is meant to differ in "
-                   "(commit, index_key, request_config, models, index_state[.key]).")
+                   "(commit, index_key, index_build, request_config, models, budget[.key], "
+                   "index_state[.key], served[.legs|.reranker|.expected]).")
 @click.option("--expect-commit", default="HEAD", show_default=True,
               help="The exact candidate commit; a result from another commit is INVALID.")
 @click.option("--report", "report_path", type=click.Path(dir_okay=False, path_type=Path),
               help="Write the readable report (Markdown) here.")
 @click.pass_context
+@_never_crash
 def cmd_compare(ctx, collection: str, baseline_path: Path, candidate_path: Path, intended: str,
                 expect_commit: str, report_path: Path | None) -> None:
     """Compare a CANDIDATE run with a stored BASELINE, question by question."""
@@ -119,8 +143,10 @@ def cmd_compare(ctx, collection: str, baseline_path: Path, candidate_path: Path,
                           intended=[s.strip() for s in intended.split(",") if s.strip()],
                           expect_commit=expect_commit, invalid=invalid)
     if report_path:
-        report_path.parent.mkdir(parents=True, exist_ok=True)
-        report_path.write_text(report.render(result), encoding="utf-8")
+        try:
+            atomic_write_text(report_path, report.render(result))
+        except OSError as e:  # the verdict without its report is an incomplete outcome
+            _invalid(ctx, f"{c.name}: cannot write the report {report_path}: {e}")
     if ctx.find_root().obj and ctx.find_root().obj.get("json"):
         click.echo(json.dumps(result.verdict.to_dict(), indent=1))
     else:

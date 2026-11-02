@@ -8,10 +8,10 @@ import math
 import pytest
 
 from jseval.quality import collections as qc
-from jseval.quality import legacy, scoring
+from jseval.quality import scoring
 from jseval.quality.types import QueryResult
 
-from .helpers import DE_RUN, SCIFACT_RUN, have_ir
+from .helpers import DE_RUN_NAME, SCIFACT_RUN_NAME, have_ir, real_run, run_from_harness
 
 J = {"q": {"a": 2, "b": 1, "c": 0}}
 
@@ -53,16 +53,17 @@ def test_unjudged_share_counts_top_ten_slots_per_query():
     assert pairs == {("q", "x"), ("q", "y"), ("q2", "a")}
 
 
-@pytest.mark.parametrize("alias,run_dir,ir_parts,expected", [
-    ("scifact", SCIFACT_RUN, ("beir", "scifact"), 0.759),
-    ("miracl-de", DE_RUN, ("miracl", "v1.0", "de", "docs.pklz4"), 0.986)])
-def test_ndcg_matches_the_harness_on_todays_runs(alias, run_dir, ir_parts, expected):
-    if not run_dir.exists() or not have_ir(*ir_parts):
-        pytest.skip("today's harness outputs or the ir_datasets cache are not present")
+@pytest.mark.parametrize("alias,run_name,ir_parts,expected", [
+    ("scifact", SCIFACT_RUN_NAME, ("beir", "scifact"), 0.759),
+    ("miracl-de", DE_RUN_NAME, ("miracl", "v1.0", "de", "docs.pklz4"), 0.986)])
+def test_ndcg_matches_the_harness_on_todays_runs(alias, run_name, ir_parts, expected):
+    run_dir, why = real_run(run_name)
+    if run_dir is None or not have_ir(*ir_parts):
+        pytest.skip(why or f"{'/'.join(ir_parts)} is not in the ir_datasets cache")
     c = qc.build(qc.load_config(alias))
     summary = json.loads((run_dir / "summary.json").read_text())
     for mode in ("lexical", "vector", "splade", "hybrid"):
-        run = legacy.run_from_harness(run_dir, c, mode)
+        run = run_from_harness(run_dir, c, mode)
         assert len(run.results) == len(c.queries)
         agg = scoring.aggregate(scoring.score_results(c.judgments, run.results))
         harness = summary["per_mode"][mode]["aggregate_metrics"]

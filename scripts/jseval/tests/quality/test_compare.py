@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import math
 from dataclasses import replace
 
@@ -10,10 +11,18 @@ import pytest
 
 from jseval.quality import collections as qc
 from jseval.quality import compare as qcmp
-from jseval.quality import legacy
-from jseval.quality.types import Outcome, QueryResult
+from jseval.quality.types import Outcome, QueryResult, Served
 
-from .helpers import SCIFACT_RUN, config_for, have_ir, make_collection, make_run, with_results
+from .helpers import (
+    SCIFACT_RUN_NAME,
+    config_for,
+    have_ir,
+    make_collection,
+    make_run,
+    real_run,
+    run_from_harness,
+    with_results,
+)
 
 
 @pytest.fixture
@@ -47,15 +56,15 @@ def test_ten_percent_of_top_results_swapped_is_a_regression():
     assert g.mean_delta < -g.margin and g.ci_high < 0 and g.p_adjusted < 0.05
 
 
-@pytest.mark.skipif(not SCIFACT_RUN.exists() or not have_ir("beir", "scifact"),
-                    reason="today's scifact run or beir/scifact cache not present")
 def test_real_scifact_run_with_ten_percent_top_results_swapped_regresses():
+    run_dir, why = real_run(SCIFACT_RUN_NAME)
+    if run_dir is None or not have_ir("beir", "scifact"):
+        pytest.skip(why or "beir/scifact is not in the ir_datasets cache")
     cfg = qc.load_config("scifact")
     col = qc.build(cfg)
-    run = legacy.run_from_harness(SCIFACT_RUN, col, "hybrid")
+    run = run_from_harness(run_dir, col, "hybrid")
     # make the legacy record a valid arm for this collection (its index predates the manifest)
-    header = replace(run.header, index_population={"count": len(col.documents),
-                                                   "manifest_sha256": col.manifest_sha256})
+    header = replace(run.header, index_population=col.index_population())
     base = replace(run, header=header)
     swapped = []
     for i, r in enumerate(base.results):
@@ -112,9 +121,16 @@ def test_group_membership_is_fixed_by_labels_not_input_order(c):
     (lambda c, r: replace(r, header=replace(r.header, ended=None)), "interrupted output"),
     (lambda c, r: replace(r, header=replace(r.header, dirty_hash="d" * 40)), "dirty tree"),
     (lambda c, r: replace(r, header=replace(r.header, collection="other")), "not 'synthetic'"),
-    (lambda c, r: replace(r, header=replace(r.header, index_population={"count": 59,
-                                                                        "manifest_sha256": "x"})),
+    (lambda c, r: replace(r, header=replace(r.header, index_population={
+        "count": 59, "manifest_sha256": "x", "content_sha256": "y"})),
      "index population 59 docs"),
+    # same paths, different indexed text (a changed document format or a re-extraction)
+    (lambda c, r: replace(r, header=replace(r.header, index_population={
+        **c.index_population(), "content_sha256": "c" * 64})),
+     f"content cccccccccccc is not exactly the collection's 60 docs"),
+    (lambda c, r: with_results(r, [replace(x, served=Served(("lexical",), "executed"))
+                                   if x.qid in ("q002", "q007") else x for x in r.results]),
+     "2 queries were served by fewer legs than the declared lexical, dense (q002, q007)"),
 ])
 def test_invalid_candidates_are_refused_with_their_reason(c, mutate, reason):
     cmp = qcmp.compare(c, config_for(c), _run(c), mutate(c, _run(c, commit="b" * 40)))
@@ -127,7 +143,7 @@ def test_altered_judgments_refuse_the_comparison(c):
     base, cand = _run(c), _run(c, commit="b" * 40)
     j = {q: dict(d) for q, d in c.judgments.items()}
     j["q000"]["d000"] = 0 if j["q000"].get("d000") else 1
-    altered = qc.Collection(c.name, c.language, c.queries, j, c.documents)
+    altered = qc.Collection(c.name, c.language, c.queries, j, c.documents, c.content)
     cmp = qcmp.compare(altered, config_for(altered), base, cand)
     assert cmp.verdict.outcome is Outcome.INVALID
     assert any("judgments, queries or documents were altered" in r for r in cmp.verdict.reasons)
@@ -242,3 +258,134 @@ def test_holm_and_paired_stats():
     assert lo < d.mean() < hi < 0 and p < 0.001 and dz < 0
     assert qcmp.paired_stats(d, 4000, 1, "g") == (lo, hi, p, dz)  # seeded
     assert all(math.isfinite(x) for x in (lo, hi, p))
+
+
+# ------------------------------------------------------------------ served legs, reranker, budget
+
+def _skip_reranker(run, qids, reason="DEADLINE_EXCEEDED"):
+    return with_results(run, [replace(r, served=Served(r.served.legs, "skipped", reason))
+                              if r.qid in qids else r for r in run.results])
+
+
+def test_same_rankings_with_the_reranker_skipped_on_some_queries_is_inconclusive(c):
+    skipped = {"q001", "q011", "q021", "q031", "q041", "q051"}  # 10%: a loaded machine
+    cand = _skip_reranker(_run(c, commit="b" * 40), skipped)
+    cmp = qcmp.compare(c, config_for(c), _run(c), cand)
+    assert cmp.verdict.outcome is Outcome.INCONCLUSIVE and cmp.verdict.exit_code == 2
+    assert all(row["delta"] == 0 for row in cmp.per_query.values())  # same rankings
+    assert cmp.affected["served.reranker"] == sorted(skipped)
+    assert any(x.startswith("served.reranker: differs on 6 queries (q001, q011, q021, q031, "
+                            "q041, q051)") for x in cmp.confounds), cmp.confounds
+    assert "confounded" in cmp.verdict.reasons[0]
+
+
+def test_a_degraded_baseline_cannot_hide_a_broken_reranker(c):
+    """Baseline skipped the reranker on 20% of queries, the candidate on all of them."""
+    qids = sorted(c.queries)
+    base = _skip_reranker(_run(c), set(qids[::5]))
+    cand = _skip_reranker(_run(c, commit="b" * 40), set(qids), "MODEL_LOAD_FAILED")
+    cmp = qcmp.compare(c, config_for(c), base, cand)
+    assert cmp.verdict.outcome is Outcome.INCONCLUSIVE
+    assert len(cmp.affected["served.reranker"]) == 48
+    # both arms skipped everywhere although both declared it: still never a pass
+    base_all = _skip_reranker(_run(c), set(qids))
+    cmp = qcmp.compare(c, config_for(c), base_all, cand)
+    assert cmp.verdict.outcome is Outcome.INCONCLUSIVE
+    assert "served.reranker" not in cmp.affected
+    assert cmp.affected["served.reranker_skipped"] == qids
+    # declared as part of the change, a reranker difference is not a confound, a shortfall is
+    cmp = qcmp.compare(c, config_for(c), base, cand, intended=["commit", "served"])
+    assert cmp.verdict.outcome is Outcome.INCONCLUSIVE
+    assert [x.split(":")[0] for x in cmp.confounds] == ["served.reranker_skipped"]
+
+
+def test_a_reranker_the_arms_do_not_declare_is_compared_but_not_required(c):
+    base = _skip_reranker(_run(c, expected_reranker="skipped"), set(c.queries))
+    cand = _skip_reranker(_run(c, commit="b" * 40, expected_reranker="skipped"), set(c.queries))
+    assert qcmp.compare(c, config_for(c), base, cand).verdict.outcome is Outcome.PASS
+    cmp = qcmp.compare(c, config_for(c), base, _run(c, commit="b" * 40))
+    assert cmp.verdict.outcome is Outcome.INCONCLUSIVE
+    assert {"served.expected", "served.reranker"} <= {x.split(":")[0] for x in cmp.confounds}
+
+
+def test_served_leg_differences_are_named_unless_declared(c):
+    base = _run(c, expected_legs=("lexical",))
+    cand = with_results(_run(c, commit="b" * 40, expected_legs=("lexical",)),
+                        [replace(r, served=Served(("lexical",), "executed")) if r.qid == "q009"
+                         else r for r in _run(c).results])
+    cmp = qcmp.compare(c, config_for(c), base, cand)
+    assert cmp.verdict.outcome is Outcome.INCONCLUSIVE
+    assert cmp.affected == {"served.legs": ["q009"]}
+    cmp = qcmp.compare(c, config_for(c), base, cand, intended=["commit", "served.legs"])
+    assert cmp.verdict.outcome is Outcome.PASS and "served.legs" in cmp.differences
+
+
+def test_a_budget_difference_is_inconclusive(c):
+    base = _run(c, budget={"deadline_ms": 2000})
+    cand = _run(c, commit="b" * 40, budget={"deadline_ms": 500})
+    cmp = qcmp.compare(c, config_for(c), base, cand)
+    assert cmp.verdict.outcome is Outcome.INCONCLUSIVE
+    assert "budget.deadline_ms: 2000 -> 500" in cmp.confounds
+    assert qcmp.compare(c, config_for(c), base, cand,
+                        intended=["commit", "budget"]).verdict.outcome is Outcome.PASS
+
+
+def test_a_fresh_versus_cached_index_is_named(c):
+    cand = _run(c, commit="b" * 40, index_build="cached", index_cache_key="k-123")
+    cmp = qcmp.compare(c, config_for(c), _run(c), cand)
+    assert cmp.verdict.outcome is Outcome.INCONCLUSIVE
+    assert "index_build: fresh -> cached" in cmp.confounds
+
+
+# ------------------------------------------------------------------ group size, margin edges
+
+def test_a_tiny_group_is_never_non_inferior_unless_it_is_the_only_group():
+    c = make_collection({"en/vague": 60, "de/known-item": 1}, n_docs=100)
+    cmp = qcmp.compare(c, config_for(c), _run(c), _run(c, commit="b" * 40))
+    by = {g.group: g for g in cmp.verdict.groups}
+    tiny = by["lang=de kind=known-item"]
+    assert (tiny.n, tiny.ci_low, tiny.ci_high, tiny.outcome) == (1, 0, 0, "inconclusive")
+    assert by["lang=en kind=vague"].outcome == "non-inferior"
+    assert cmp.verdict.outcome is Outcome.INCONCLUSIVE
+    assert "lang=de kind=known-item: n=1 is below the minimum group size 20" in cmp.verdict.reasons
+    only = make_collection({"en/vague": 5})
+    assert qcmp.compare(only, config_for(only), _run(only),
+                        _run(only, commit="b" * 40)).verdict.outcome is Outcome.PASS
+
+
+def test_a_significant_loss_within_the_margin_is_non_inferior():
+    c = make_collection({"en/vague": 300}, n_docs=400)
+    slight = {q: ("slight" if i % 10 == 0 else "good") for i, q in enumerate(sorted(c.queries))}
+    cmp = qcmp.compare(c, config_for(c), _run(c), _run(c, slight, commit="b" * 40))
+    (g,) = cmp.verdict.groups
+    assert -g.margin < g.mean_delta < 0 and g.p_adjusted < 0.05 and g.ci_high < 0  # a real loss
+    assert g.ci_low >= -g.margin and g.outcome == "non-inferior"
+    assert cmp.verdict.outcome is Outcome.PASS
+
+
+def test_a_loss_beyond_the_margin_that_is_not_significant_is_inconclusive(c):
+    worse = {q: ("bad" if q in ("q005", "q050") else "good") for q in c.queries}
+    cmp = qcmp.compare(c, config_for(c), _run(c), _run(c, worse, commit="b" * 40))
+    (g,) = cmp.verdict.groups
+    assert g.mean_delta < -g.margin and g.p_adjusted >= 0.05 and g.ci_low < -g.margin
+    assert g.outcome == "inconclusive" and cmp.verdict.outcome is Outcome.INCONCLUSIVE
+
+
+def test_every_verdict_records_the_numpy_version(c):
+    for cand in (_run(c, commit="b" * 40), None):
+        v = qcmp.compare(c, config_for(c), _run(c), cand).verdict
+        assert v.numpy_version == np.__version__ == v.to_dict()["numpy_version"]
+
+
+def test_a_baseline_file_without_its_run_digest_is_refused(c, tmp_path):
+    p = tmp_path / "base.jsonl"
+    _run(c).write(p)
+    stored = qcmp.write_baseline(p, c)
+    doc = json.loads(stored.read_text())
+    del doc["run_sha256"]
+    stored.write_text(json.dumps(doc))
+    with pytest.raises(qcmp.BaselineError, match="KeyError: 'run_sha256'"):
+        qcmp.load_baseline(stored)
+    stored.write_text("[1, 2]")
+    with pytest.raises(qcmp.BaselineError, match="not a jseval.quality.baseline.v1 file"):
+        qcmp.load_baseline(stored)

@@ -5,19 +5,23 @@ decisions is fixed:
 
 1. INVALID — either arm is not a complete, valid result for this collection and candidate: wrong
    collection or label version, interrupted, zero queries, missing / duplicate / extra query ids,
-   query text changed under the same id, failed queries, documents outside the manifest, an index
-   population that is not exactly the manifest, a dirty tree, a candidate from another commit or
-   model set, a stored baseline whose metrics disagree with its own rescoring, non-finite metrics.
+   query text changed under the same id, failed queries, queries served by fewer legs than the
+   run declared, documents outside the manifest, an index population that is not exactly the
+   manifest and its content, a dirty tree, a candidate from another commit or model set, a stored
+   baseline whose metrics disagree with its own rescoring, non-finite metrics.
 2. INCONCLUSIVE — the arms differ in something other than the declared change (models, request
-   settings, index key, index state such as freshness, enrichment or merge state), or — for a
-   collection with pooled judgments only — the labels are too incomplete for this pair of
-   rankings (the unjudged pairs to judge are listed). With official, fixed judgments an unjudged
-   document counts as non-relevant and the unjudged share is reported, never changing the verdict.
+   settings, budget, index key, fresh or cached index, index state such as freshness, enrichment
+   or merge state, the legs or reranker status that served each query — the affected queries are
+   named), an arm skipped the reranker on queries it declared it for, or — for a collection with
+   pooled judgments only — the labels are too incomplete for this pair of rankings (the unjudged
+   pairs to judge are listed). With official, fixed judgments an unjudged document counts as
+   non-relevant and the unjudged share is reported, never changing the verdict.
 3. Per group (fixed by query labels, never by input order): paired sign-flip randomization test
    on the per-query delta of the primary metric, Holm-adjusted over the collection's groups, a
    paired bootstrap 95% interval and d_z. A group *regressed* when the loss is significant and
    larger than its margin; *improved* when the gain is significant and larger than its margin;
    *non-inferior* when the interval excludes a loss larger than the margin; else *inconclusive*.
+   A group smaller than the configured minimum is *inconclusive* unless it is the only group.
    Any regressed group makes the comparison REGRESSION; any inconclusive group INCONCLUSIVE; a
    gain elsewhere never offsets either.
 """
@@ -91,13 +95,16 @@ def load_baseline(path: str | os.PathLike) -> tuple[RunRecord, dict]:
         raise BaselineError(f"absent baseline: {p}")
     try:
         doc = json.loads(p.read_text(encoding="utf-8"))
-        if doc.get("schema") != BASELINE_SCHEMA:
+        if not isinstance(doc, dict) or doc.get("schema") != BASELINE_SCHEMA:
             raise BaselineError(f"{p}: not a {BASELINE_SCHEMA} file")
         run_path = p.parent / doc["run_file"]
         text = run_path.read_text(encoding="utf-8")
-    except (OSError, ValueError, KeyError) as e:
-        raise BaselineError(f"{p}: {e}") from None
-    if sha256_text(text) != doc["run_sha256"]:
+        recorded = doc["run_sha256"]
+    except BaselineError:
+        raise
+    except (OSError, ValueError, KeyError, TypeError) as e:
+        raise BaselineError(f"{p}: {type(e).__name__}: {e}") from None
+    if sha256_text(text) != recorded:
         raise BaselineError(f"{p}: its run file {run_path} changed after the baseline was stored")
     return RunRecord.loads(text, str(run_path)), doc
 
@@ -119,11 +126,13 @@ def validate_run(c: Collection, run: RunRecord, label_versions: set[str], arm: s
         out.append(f"{arm}: interrupted output (the run never recorded its end)")
     if h.dirty_hash is not None:
         out.append(f"{arm}: built from a dirty tree ({h.dirty_hash[:12]})")
-    pop = h.index_population
-    if pop.get("count") != len(c.documents) or pop.get("manifest_sha256") != c.manifest_sha256:
+    pop, want = h.index_population, c.index_population()
+    if any(pop.get(k) != v for k, v in want.items()):
         out.append(f"{arm}: index population {pop.get('count')} docs / manifest "
-                   f"{str(pop.get('manifest_sha256'))[:12]} is not exactly the collection's "
-                   f"{len(c.documents)} docs / {c.manifest_sha256[:12]}")
+                   f"{str(pop.get('manifest_sha256'))[:12]} / content "
+                   f"{str(pop.get('content_sha256'))[:12]} is not exactly the collection's "
+                   f"{want['count']} docs / {want['manifest_sha256'][:12]} / "
+                   f"{want['content_sha256'][:12]}")
     if not run.results:
         out.append(f"{arm}: zero queries")
         return out
@@ -144,6 +153,11 @@ def validate_run(c: Collection, run: RunRecord, label_versions: set[str], arm: s
     failed = [r for r in run.results if r.error is not None]
     if failed:
         out.append(f"{arm}: {len(failed)} queries failed (e.g. {failed[0].qid}: {failed[0].error})")
+    short = sorted(r.qid for r in run.results
+                   if r.error is None and not set(h.expected_legs) <= set(r.served.legs))
+    if short:
+        out.append(f"{arm}: {len(short)} queries were served by fewer legs than the declared "
+                   f"{', '.join(h.expected_legs)} ({_ids(short)})")
     outside = sorted({d for r in run.results for d in r.ranked if d not in c.documents})
     if outside:
         out.append(f"{arm}: {len(outside)} delivered documents are not in the manifest "
@@ -169,10 +183,40 @@ def identity_differences(b: RunHeader, n: RunHeader) -> dict[str, str]:
                         if b.model_hashes.get(k) != n.model_hashes.get(k))
     if model_keys:
         diffs["models"] = "differ in " + ", ".join(model_keys)
-    for k in sorted(set(b.index_state) | set(n.index_state)):
-        if b.index_state.get(k) != n.index_state.get(k):
-            diffs[f"index_state.{k}"] = f"{b.index_state.get(k)!r} -> {n.index_state.get(k)!r}"
+    if b.index_build != n.index_build:
+        diffs["index_build"] = f"{b.index_build} -> {n.index_build}"
+    for name in ("index_state", "budget"):
+        bm, nm = getattr(b, name), getattr(n, name)
+        for k in sorted(set(bm) | set(nm)):
+            if bm.get(k) != nm.get(k):
+                diffs[f"{name}.{k}"] = f"{bm.get(k)!r} -> {nm.get(k)!r}"
+    if (set(b.expected_legs), b.expected_reranker) != (set(n.expected_legs), n.expected_reranker):
+        diffs["served.expected"] = (f"legs {'+'.join(b.expected_legs)} reranker "
+                                    f"{b.expected_reranker} -> legs {'+'.join(n.expected_legs)} "
+                                    f"reranker {n.expected_reranker}")
     return diffs
+
+
+def served_differences(baseline: RunRecord, candidate: RunRecord) -> dict[str, list[str]]:
+    """Queries served differently between the arms, or short of their arm's declared reranker
+    use: ``served.legs`` / ``served.reranker`` (the arms differ on the query) and
+    ``served.reranker_skipped`` (declared ``executed``, skipped in at least one arm)."""
+    b = {r.qid: r.served for r in baseline.results}
+    n = {r.qid: r.served for r in candidate.results}
+    qids = sorted(set(b) & set(n))
+    out = {
+        "served.legs": [q for q in qids if set(b[q].legs) != set(n[q].legs)],
+        "served.reranker": [q for q in qids if b[q].reranker != n[q].reranker],
+        "served.reranker_skipped": [
+            q for q in qids
+            if (baseline.header.expected_reranker == "executed" and b[q].reranker != "executed")
+            or (candidate.header.expected_reranker == "executed" and n[q].reranker != "executed")],
+    }
+    return {k: v for k, v in out.items() if v}
+
+
+def _ids(qids: list[str], show: int = 10) -> str:
+    return ", ".join(qids[:show]) + (f", +{len(qids) - show} more" if len(qids) > show else "")
 
 
 def _is_intended(name: str, intended: Iterable[str]) -> bool:
@@ -209,7 +253,10 @@ def paired_stats(deltas: np.ndarray, resamples: int, seed: int, key: str):
     return lo, hi, p, dz
 
 
-def group_outcome(mean_delta: float, lo: float, p_adj: float, margin: float, alpha: float) -> str:
+def group_outcome(mean_delta: float, lo: float, p_adj: float, margin: float, alpha: float,
+                  too_small: bool = False) -> str:
+    if too_small:
+        return GROUP_INCONCLUSIVE
     if p_adj < alpha and mean_delta < -margin:
         return GROUP_REGRESSED
     if p_adj < alpha and mean_delta > margin:
@@ -232,6 +279,7 @@ class Comparison:
     per_query: dict[str, dict[str, Any]] = field(default_factory=dict)
     differences: dict[str, str] = field(default_factory=dict)
     confounds: list[str] = field(default_factory=list)
+    affected: dict[str, list[str]] = field(default_factory=dict)  # per-query confound -> qids
     notes: list[str] = field(default_factory=list)
     unjudged: dict[str, Any] = field(default_factory=dict)
     judgment_requests: list[tuple[str, str]] = field(default_factory=list)
@@ -301,7 +349,8 @@ def compare(c: Collection, cfg: QualityConfig, baseline: RunRecord | None,
     members: dict[str, list[str]] = {}
     for q in qids:
         members.setdefault(per_query[q]["group"], []).append(q)
-    if len(members) > 1:
+    several = len(members) > 1
+    if several:
         members = {ALL_GROUP: qids, **members}
     stats = {}
     for g, ids in members.items():
@@ -314,9 +363,11 @@ def compare(c: Collection, cfg: QualityConfig, baseline: RunRecord | None,
         n_mean = scoring.mean(cand_pq, metric, ids)
         delta = math.fsum(per_query[q]["delta"] for q in ids) / len(ids)
         margin = cfg.margin(g)
+        too_small = several and g != ALL_GROUP and len(ids) < cfg.min_group_size
         groups.append(GroupVerdict(g, len(ids), metric, b_mean, n_mean, delta, lo, hi, dz, p,
                                    adjusted[g], margin,
-                                   group_outcome(delta, lo, adjusted[g], margin, cfg.alpha)))
+                                   group_outcome(delta, lo, adjusted[g], margin, cfg.alpha,
+                                                 too_small)))
 
     # Unjudged top-10 share per arm; pairs in only one arm's top 10 decide whether labels suffice.
     b_unj, b_slots, b_pairs = scoring.unjudged_top(c.judgments, baseline.results)
@@ -331,7 +382,16 @@ def compare(c: Collection, cfg: QualityConfig, baseline: RunRecord | None,
     requests: list[tuple[str, str]] = []
 
     differences = identity_differences(baseline.header, candidate.header)
-    confounds = [f"{k}: {v}" for k, v in differences.items() if not _is_intended(k, intended)]
+    affected = served_differences(baseline, candidate)
+    for k, ids in affected.items():
+        what = ("reranker skipped where its arm declared it executed" if k.endswith("_skipped")
+                else "differs")
+        differences[k] = f"{what} on {len(ids)} queries ({_ids(ids)})"
+    # a skipped declared reranker is a shortfall of the arm itself, never an intended change
+    affected = {k: v for k, v in affected.items()
+                if k.endswith("_skipped") or not _is_intended(k, intended)}
+    confounds = [f"{k}: {v}" for k, v in differences.items()
+                 if not _is_intended(k, intended) or k in affected]
     reasons = []
     if confounds:
         outcome = Outcome.INCONCLUSIVE
@@ -352,12 +412,15 @@ def compare(c: Collection, cfg: QualityConfig, baseline: RunRecord | None,
                         for g in regressed]
         elif undecided:
             outcome = Outcome.INCONCLUSIVE
-            reasons += [f"{g.group}: interval [{g.ci_low:+.4f}, {g.ci_high:+.4f}] admits a loss "
+            reasons += [f"{g.group}: n={g.n} is below the minimum group size {cfg.min_group_size}"
+                        if several and g.group != ALL_GROUP and g.n < cfg.min_group_size else
+                        f"{g.group}: interval [{g.ci_low:+.4f}, {g.ci_high:+.4f}] admits a loss "
                         f"beyond margin {g.margin}" for g in undecided]
         else:
             outcome = Outcome.PASS
     return Comparison(Verdict(outcome, tuple(reasons), tuple(groups)), c, cfg, baseline,
-                      candidate, per_query, differences, confounds, notes, unjudged, requests)
+                      candidate, per_query, differences, confounds, affected, notes, unjudged,
+                      requests)
 
 
 def _check_stored_metrics(stored: Mapping, rescored: Mapping, c: Collection) -> list[str]:

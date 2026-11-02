@@ -5,7 +5,8 @@ Stored format (one directory per collection)::
     queries.jsonl       {"qid", "text", "groups"} per line, sorted by qid
     qrels.tsv           canonical TREC qrels (graded, complete: unjudged = non-relevant)
     manifest.tsv        relpath \\t doc_id, sorted by relpath
-    collection.v1.json  name, language, version, the three digests, counts, metadata
+    content.tsv         doc_id \\t sha256 of the document's text (types.document_text), by doc_id
+    collection.v1.json  name, language, version, the four digests, counts, metadata
 
 Builders (all deterministic, offline once ``ir_datasets`` has its files cached — it reads
 ``IR_DATASETS_HOME``, default ``~/.ir_datasets``):
@@ -36,8 +37,11 @@ from .types import (
     Collection,
     QueryText,
     atomic_write_text,
+    canonical_content_text,
     canonical_manifest_text,
     canonical_qrels_text,
+    document_text,
+    parse_content_text,
     parse_qrels_text,
     sha256_text,
 )
@@ -75,6 +79,9 @@ class QualityConfig:
     bootstrap_resamples: int = 10000
     seed: int = 20261102
     max_differing_unjudged_share: float = 0.10
+    # A group with fewer queries is INCONCLUSIVE unless it is the collection's only group: its
+    # percentile interval is too narrow to support non-inferiority (one query: [0, 0]).
+    min_group_size: int = 20
     most_changed: int = 10
     top: int = 5
 
@@ -102,6 +109,7 @@ class QualityConfig:
                    bootstrap_resamples=int(boot.get("resamples", 10000)),
                    seed=int(boot.get("seed", 20261102)),
                    max_differing_unjudged_share=float(unj.get("max_differing_share", 0.10)),
+                   min_group_size=int(d.get("min_group_size", 20)),
                    most_changed=int(rep.get("most_changed", 10)), top=int(rep.get("top", 5)))
 
 
@@ -119,7 +127,9 @@ def load_config(alias_or_path: str | os.PathLike) -> QualityConfig:
                                   f"(known: {', '.join(known_aliases())})")
     try:
         return QualityConfig.from_dict(json.loads(p.read_text(encoding="utf-8")))
-    except (OSError, ValueError, KeyError) as e:
+    except CollectionError:
+        raise
+    except (OSError, ValueError, KeyError, TypeError, AttributeError) as e:
         raise CollectionError(f"{p}: {e}") from None
 
 
@@ -135,9 +145,11 @@ def write_collection(c: Collection, out_dir: str | os.PathLike) -> Path:
     atomic_write_text(out / "queries.jsonl", queries)
     atomic_write_text(out / "qrels.tsv", canonical_qrels_text(c.judgments))
     atomic_write_text(out / "manifest.tsv", canonical_manifest_text(c.documents))
+    atomic_write_text(out / "content.tsv", canonical_content_text(c.content))
     meta = {"schema": COLLECTION_SCHEMA, "name": c.name, "language": c.language,
             "version": c.version, "judgments_sha256": c.judgments_sha256,
-            "manifest_sha256": c.manifest_sha256, "counts": c.counts(), "metadata": c.metadata}
+            "manifest_sha256": c.manifest_sha256, "content_sha256": c.content_sha256,
+            "counts": c.counts(), "metadata": c.metadata}
     atomic_write_text(out / "collection.v1.json",
                       json.dumps(meta, ensure_ascii=False, indent=2, sort_keys=True) + "\n")
     return out
@@ -150,13 +162,17 @@ def load_collection(path: str | os.PathLike) -> Collection:
         meta = json.loads((d / "collection.v1.json").read_text(encoding="utf-8"))
         qrels_text = (d / "qrels.tsv").read_text(encoding="utf-8")
         manifest_text = (d / "manifest.tsv").read_text(encoding="utf-8")
+        content_text = (d / "content.tsv").read_text(encoding="utf-8")
         query_lines = (d / "queries.jsonl").read_text(encoding="utf-8").splitlines()
-    except OSError as e:
+    except (OSError, ValueError) as e:
         raise CollectionError(f"{d}: incomplete collection: {e}") from None
-    if meta.get("schema") != COLLECTION_SCHEMA:
+    if not isinstance(meta, dict) or meta.get("schema") != COLLECTION_SCHEMA:
         raise CollectionError(f"{d}: not a {COLLECTION_SCHEMA} collection")
+    if not isinstance(meta.get("version"), str) or not meta["version"]:
+        raise CollectionError(f"{d}: collection.v1.json records no version")
     try:
         judgments = parse_qrels_text(qrels_text)
+        content = parse_content_text(content_text)
         documents: dict[str, str] = {}
         for n, line in enumerate(manifest_text.splitlines(), 1):
             rel, sep, doc_id = line.partition("\t")
@@ -170,12 +186,23 @@ def load_collection(path: str | os.PathLike) -> Collection:
             if not line.strip():
                 continue
             row = json.loads(line)
+            if not isinstance(row, dict) or not isinstance(row.get("text"), str):
+                raise ValueError(f"queries.jsonl line {n}: expected an object with a text")
             if row["qid"] in queries:
                 raise ValueError(f"queries.jsonl line {n}: duplicate query id {row['qid']}")
             queries[row["qid"]] = QueryText(row["text"], dict(row.get("groups") or {}))
     except (ValueError, KeyError) as e:
         raise CollectionError(f"{d}: {e}") from None
 
+    try:
+        return _verified(d, meta, queries, judgments, documents, content)
+    except CollectionError:
+        raise
+    except (ValueError, KeyError, TypeError) as e:
+        raise CollectionError(f"{d}: {e}") from None
+
+
+def _verified(d: Path, meta: Mapping, queries, judgments, documents, content) -> Collection:
     recorded_counts = meta.get("counts") or {}
     if sha256_text(canonical_qrels_text(judgments)) != meta.get("judgments_sha256"):
         raise CollectionError(
@@ -183,11 +210,10 @@ def load_collection(path: str | os.PathLike) -> Collection:
             f"recorded {_count_text(recorded_counts)}, found {_count_text(_judgment_counts(judgments))})")
     if sha256_text(canonical_manifest_text(documents)) != meta.get("manifest_sha256"):
         raise CollectionError(f"{d}: manifest.tsv does not match the recorded manifest sha256")
-    try:
-        return Collection(meta["name"], meta["language"], queries, judgments, documents,
-                          dict(meta.get("metadata") or {}), meta["version"])
-    except ValueError as e:
-        raise CollectionError(f"{d}: {e}") from None
+    if sha256_text(canonical_content_text(content)) != meta.get("content_sha256"):
+        raise CollectionError(f"{d}: content.tsv does not match the recorded content sha256")
+    return Collection(meta["name"], meta["language"], queries, judgments, documents, content,
+                      dict(meta.get("metadata") or {}), meta["version"])
 
 
 def _judgment_counts(judgments: Mapping[str, Mapping[str, int]]) -> dict:
@@ -276,9 +302,18 @@ def build_ir_datasets(cfg: QualityConfig) -> Collection:
     ds, queries, judgments = _load_queries_and_qrels(cfg.source["dataset"], cfg.labels)
     unjudged = sorted(set(queries) - set(judgments))
     queries = {q: t for q, t in queries.items() if q in judgments}
-    documents = {d.doc_id: doc_relpath(d.doc_id) for d in ds.docs_iter()}
-    return Collection(cfg.collection, cfg.language, queries, judgments, documents,
+    documents, content = {}, {}
+    for d in ds.docs_iter():
+        if d.doc_id in documents:
+            raise CollectionError(f"{cfg.source['dataset']}: duplicate doc id {d.doc_id}")
+        documents[d.doc_id] = doc_relpath(d.doc_id)
+        content[d.doc_id] = _doc_sha256(d)
+    return Collection(cfg.collection, cfg.language, queries, judgments, documents, content,
                       _metadata(cfg, queries_without_judgments=len(unjudged)))
+
+
+def _doc_sha256(doc) -> str:
+    return sha256_text(document_text(getattr(doc, "title", "") or "", doc.text))
 
 
 def build_miracl_pool(cfg: QualityConfig) -> Collection:
@@ -289,21 +324,32 @@ def build_miracl_pool(cfg: QualityConfig) -> Collection:
     n_filler, seed = int(cfg.source["filler"]), int(cfg.source["seed"])
     docs = ds.docs_iter()  # indexable once the docstore exists
     total = ds.docs_count()
+    if n_filler < 0 or n_filler > total - len(judged):
+        raise CollectionError(f"{cfg.collection}: {n_filler} filler passages requested, but the "
+                              f"corpus has only {total - len(judged)} unjudged passages")
     rng = random.Random(seed)
     filler: list[str] = []
+    content: dict[str, str] = {}
     seen_pos: set[int] = set()
-    while len(filler) < n_filler:
+    while len(filler) < n_filler:  # ends: at least n_filler unjudged positions exist
         pos = rng.randrange(total)
         if pos in seen_pos:
             continue
         seen_pos.add(pos)
-        doc_id = docs[pos].doc_id
-        if doc_id not in judged:
-            filler.append(doc_id)
+        doc = docs[pos]
+        if doc.doc_id not in judged:
+            filler.append(doc.doc_id)
+            content[doc.doc_id] = _doc_sha256(doc)
+    for doc in ds.docs_store().get_many_iter(judged):
+        content[doc.doc_id] = _doc_sha256(doc)
+    missing = sorted(judged - set(content))
+    if missing:
+        raise CollectionError(f"{cfg.collection}: {len(missing)} judged passages are not in the "
+                              f"corpus (e.g. {missing[0]})")
     pool = sorted(judged) + sorted(filler)
     return Collection(cfg.collection, cfg.language,
                       {q: t for q, t in queries.items() if q in judgments}, judgments,
-                      {d: doc_relpath(d) for d in pool},
+                      {d: doc_relpath(d) for d in pool}, content,
                       _metadata(cfg, judged_documents=len(judged), filler_documents=len(filler),
                                 docs_count=total))
 
@@ -312,39 +358,80 @@ def from_beir_dir(dataset_dir: str | os.PathLike, cfg: QualityConfig) -> Collect
     """A materialized BEIR-layout directory (the Enron recipe cells, later the real-use set).
 
     Per-query ``groups`` in ``queries.jsonl`` (e.g. ``{"kind": "vague"}``) override the config
-    labels, so a mixed set keeps its own known-item / vague membership.
+    labels, so a mixed set keeps its own known-item / vague membership. A document's content hash
+    is taken over ``document_text(title, text)`` of its corpus row. Every line must parse: a
+    malformed line or a repeated document id, query id or judged pair is refused with its line
+    number, never dropped or overwritten.
     """
     d = Path(dataset_dir)
     try:
-        documents = {}
-        for line in (d / "corpus.jsonl").read_text(encoding="utf-8").splitlines():
-            if line.strip():
-                row = json.loads(line)
-                documents[row["_id"]] = row.get("relpath") or doc_relpath(row["_id"])
+        documents: dict[str, str] = {}
+        content: dict[str, str] = {}
+        for n, row in _jsonl_rows(d / "corpus.jsonl"):
+            doc_id = row["_id"]
+            if doc_id in documents:
+                raise ValueError(f"corpus.jsonl line {n}: doc id {doc_id} appears twice")
+            if not isinstance(row.get("text"), str):
+                raise ValueError(f"corpus.jsonl line {n}: {doc_id} has no text")
+            documents[doc_id] = row.get("relpath") or doc_relpath(doc_id)
+            content[doc_id] = sha256_text(document_text(row.get("title") or "", row["text"]))
         queries = {}
-        for line in (d / "queries.jsonl").read_text(encoding="utf-8").splitlines():
-            if line.strip():
-                row = json.loads(line)
-                queries[row["_id"]] = QueryText(row["text"],
-                                                {**cfg.labels, **(row.get("groups") or {})})
+        for n, row in _jsonl_rows(d / "queries.jsonl"):
+            qid = row["_id"]
+            if qid in queries:
+                raise ValueError(f"queries.jsonl line {n}: query id {qid} appears twice")
+            if not isinstance(row.get("text"), str):
+                raise ValueError(f"queries.jsonl line {n}: query {qid} has no text")
+            queries[qid] = QueryText(row["text"], {**cfg.labels, **(row.get("groups") or {})})
         judgments: dict[str, dict[str, int]] = {}
         for n, line in enumerate((d / "qrels" / "test.tsv").read_text(encoding="utf-8")
-                                 .splitlines()):
+                                 .splitlines(), 1):
             parts = line.split("\t")
-            if n == 0 and parts[0] == "query-id":
+            if n == 1 and parts[0] == "query-id":
                 continue
-            if len(parts) == 3:
-                judgments.setdefault(parts[0], {})[parts[1]] = int(parts[2])
-    except (OSError, ValueError, KeyError) as e:
+            if not line.strip():
+                continue
+            if len(parts) != 3 or not parts[0] or not parts[1]:
+                raise ValueError(f"qrels/test.tsv line {n}: expected 'query-id<TAB>corpus-id<TAB>"
+                                 f"score', got {line!r}")
+            try:
+                grade = int(parts[2])
+            except ValueError:
+                raise ValueError(f"qrels/test.tsv line {n}: grade {parts[2]!r} is not an "
+                                 "integer") from None
+            docs = judgments.setdefault(parts[0], {})
+            if parts[1] in docs:
+                raise ValueError(f"qrels/test.tsv line {n}: duplicate judgment for "
+                                 f"{parts[0]}/{parts[1]}")
+            docs[parts[1]] = grade
+    except (OSError, ValueError, KeyError, TypeError) as e:
         raise CollectionError(f"{d}: {e}") from None
-    return Collection(cfg.collection, cfg.language,
-                      {q: t for q, t in queries.items() if q in judgments}, judgments, documents,
-                      {"config": cfg.collection, "source": {**cfg.source, "path": str(d)}})
+    try:
+        return Collection(cfg.collection, cfg.language,
+                          {q: t for q, t in queries.items() if q in judgments}, judgments,
+                          documents, content,
+                          {"config": cfg.collection, "source": {**cfg.source, "path": str(d)}})
+    except ValueError as e:
+        raise CollectionError(f"{d}: {e}") from None
+
+
+def _jsonl_rows(path: Path):
+    for n, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
+        if not line.strip():
+            continue
+        try:
+            row = json.loads(line)
+        except ValueError as e:
+            raise ValueError(f"{path.name} line {n}: {e}") from None
+        if not isinstance(row, dict) or not isinstance(row.get("_id"), str) or not row["_id"]:
+            raise ValueError(f"{path.name} line {n}: expected an object with an '_id'")
+        yield n, row
 
 
 def write_documents(c: Collection, out_root: str | os.PathLike) -> int:
-    """Write every pool document's text (``title`` + blank line + ``text``) at its manifest path
-    under ``out_root``, so an engine can index exactly the collection. Official sources only."""
+    """Write every pool document's text (:func:`document_text`) at its manifest path under
+    ``out_root``, so an engine can index exactly the collection. Official sources only. A text
+    whose hash differs from the collection's content hash is refused before it is written."""
     import ir_datasets
 
     dataset = c.metadata.get("source", {}).get("dataset")
@@ -354,10 +441,14 @@ def write_documents(c: Collection, out_root: str | os.PathLike) -> int:
     root = Path(out_root)
     n = 0
     for doc in store.get_many_iter(c.documents.keys()):
+        text = document_text(getattr(doc, "title", "") or "", doc.text)
+        if sha256_text(text) != c.content[doc.doc_id]:
+            raise CollectionError(f"{c.name}: the text of {doc.doc_id} does not match its "
+                                  "recorded content hash")
         p = root / c.documents[doc.doc_id]
         p.parent.mkdir(parents=True, exist_ok=True)
-        title = getattr(doc, "title", "") or ""
-        p.write_text(f"{title}\n\n{doc.text}" if title else doc.text, encoding="utf-8")
+        with open(p, "w", encoding="utf-8", newline="") as f:  # the hashed text, byte for byte
+            f.write(text)
         n += 1
     if n != len(c.documents):
         raise CollectionError(f"{c.name}: wrote {n} of {len(c.documents)} documents")
@@ -388,7 +479,7 @@ def with_added_judgments(c: Collection, added: Mapping[str, Mapping[str, int]],
     lineage.append({"from_version": c.version, "added_qrels": canonical_qrels_text(added),
                     "note": note})
     return Collection(c.name, c.language, dict(c.queries), judgments, dict(c.documents),
-                      {**c.metadata, "label_lineage": lineage})
+                      dict(c.content), {**c.metadata, "label_lineage": lineage})
 
 
 def ancestor_versions(c: Collection) -> list[str]:
@@ -401,7 +492,8 @@ def ancestor_versions(c: Collection) -> list[str]:
                 del judgments[qid][doc_id]
             if not judgments[qid]:
                 del judgments[qid]
-        prior = Collection(c.name, c.language, dict(c.queries), judgments, dict(c.documents))
+        prior = Collection(c.name, c.language, dict(c.queries), judgments, dict(c.documents),
+                           dict(c.content))
         if prior.version != entry["from_version"]:
             raise CollectionError(f"{c.name}: label lineage does not re-derive "
                                   f"{entry['from_version']}")

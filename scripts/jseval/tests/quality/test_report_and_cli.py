@@ -6,8 +6,10 @@ import json
 import os
 import subprocess
 import sys
+from dataclasses import replace
 from pathlib import Path
 
+import numpy as np
 import pytest
 from click.testing import CliRunner
 
@@ -15,6 +17,7 @@ from jseval.cli import main
 from jseval.quality import collections as qc
 from jseval.quality import compare as qcmp
 from jseval.quality import report
+from jseval.quality.types import Served
 
 from .helpers import config_for, make_collection, make_run
 
@@ -130,3 +133,62 @@ def test_python_dash_m_entry_point(stored):
                        cwd=JSEVAL_DIR)
     assert p.returncode == 0, p.stderr
     assert p.stdout.startswith("VALID synthetic n=40")
+
+
+def test_cli_never_exits_with_the_regression_code_on_bad_input_or_a_crash(stored, monkeypatch):
+    c, d, tmp = stored
+    r = _cli("score", d, tmp / "base.jsonl", "--store-baseline", tmp / "base.baseline.json")
+    assert r.exit_code == 0, r.output
+    common = ["--baseline", tmp / "base.baseline.json", "--expect-commit", "b" * 40]
+    # a header that parses but has the wrong shape
+    lines = (tmp / "same.jsonl").read_text().splitlines(True)
+    head = json.loads(lines[0])
+    for key, value in (("index_population", [40]), ("model_hashes", "e1"),
+                       ("index_state", ["settled"])):
+        (tmp / "shaped.jsonl").write_text(json.dumps({**head, key: value}) + "\n"
+                                          + "".join(lines[1:]))
+        r = _cli("compare", d, *common, "--candidate", tmp / "shaped.jsonl")
+        assert r.exit_code == 2 and r.output.startswith("INVALID") and key in r.output, r.output
+    head["candidate"]["dirty_hash"] = 7
+    (tmp / "shaped.jsonl").write_text(json.dumps(head) + "\n" + "".join(lines[1:]))
+    r = _cli("compare", d, *common, "--candidate", tmp / "shaped.jsonl")
+    assert r.exit_code == 2 and "dirty_hash" in r.output, r.output
+    # a baseline file without its run digest
+    doc = json.loads((tmp / "base.baseline.json").read_text())
+    del doc["run_sha256"]
+    (tmp / "nodigest.baseline.json").write_text(json.dumps(doc))
+    r = _cli("compare", d, "--baseline", tmp / "nodigest.baseline.json", "--expect-commit",
+             "b" * 40, "--candidate", tmp / "same.jsonl")
+    assert r.exit_code == 2 and "run_sha256" in r.output, r.output
+    # a report path that cannot be written
+    (tmp / "afile").write_text("x")
+    r = _cli("compare", d, *common, "--candidate", tmp / "same.jsonl", "--report",
+             tmp / "afile" / "r.md")
+    assert r.exit_code == 2 and r.output.startswith("INVALID synthetic: cannot write the report"), \
+        r.output
+    assert len(r.output.strip().splitlines()) == 1
+    # any other unexpected error, and an interrupt
+    monkeypatch.setattr(qcmp, "compare", lambda *a, **k: 1 / 0)
+    r = _cli("compare", d, *common, "--candidate", tmp / "same.jsonl")
+    assert r.exit_code == 2 and "ZeroDivisionError" in r.output, r.output
+
+    def interrupt(*a, **k):
+        raise KeyboardInterrupt
+
+    monkeypatch.setattr(qcmp, "compare", interrupt)
+    r = _cli("compare", d, *common, "--candidate", tmp / "same.jsonl")
+    assert r.exit_code == 2 and "interrupted" in r.output, r.output
+
+
+def test_report_names_affected_queries_effective_inputs_and_numpy():
+    c = make_collection({"en/vague": 60})
+    cand = make_run(c, commit="b" * 40, budget={"deadline_ms": 300})
+    cand = replace(cand, results=tuple(
+        replace(r, served=Served(r.served.legs, "skipped", "DEADLINE_EXCEEDED"))
+        if r.qid in ("q003", "q004") else r for r in cand.results))
+    text = report.render(qcmp.compare(c, config_for(c), make_run(c), cand))
+    assert "Affected queries (served.reranker, 2): q003, q004" in text
+    assert "| budget: deadline_ms | - | 300 | differs |" in text
+    assert "| expected legs / reranker | lexical+dense / executed | lexical+dense / executed |  |" in text
+    assert "| index build | fresh | fresh |  |" in text
+    assert f"numpy {np.__version__}." in text
