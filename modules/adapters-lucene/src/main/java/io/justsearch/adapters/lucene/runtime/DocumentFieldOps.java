@@ -682,6 +682,19 @@ public final class DocumentFieldOps {
 
   private boolean isUnmodified(String docId, long currentLastModified, Long currentSizeBytes,
       String sourceSha256) {
+    return isUnmodified(docId, currentLastModified, currentSizeBytes, sourceSha256, null);
+  }
+
+  /** Extraction freshness also requires the identity of the effective extraction policy. */
+  public boolean isUnmodified(String docId, long currentLastModified, long currentSizeBytes,
+      String sourceSha256, String extractionPolicyId) {
+    java.util.Objects.requireNonNull(extractionPolicyId, "extractionPolicyId");
+    return isUnmodified(docId, currentLastModified, Long.valueOf(currentSizeBytes),
+        sourceSha256, extractionPolicyId);
+  }
+
+  private boolean isUnmodified(String docId, long currentLastModified, Long currentSizeBytes,
+      String sourceSha256, String extractionPolicyId) {
     // A complete stale reader is a false positive after committed deletion/replacement. Commit
     // prepares the reader; retry if another commit overtakes this admission's reader lease.
     try {
@@ -708,9 +721,15 @@ public final class DocumentFieldOps {
                     searcher, docNum, SchemaFields.SIZE_BYTES);
                 if (sizeBytes < 0 || sizeBytes != currentSizeBytes) return false;
               }
-              if (sourceSha256 != null) {
-                String storedHash = searcher.storedFields().document(docNum).get(SchemaFields.SOURCE_SHA256);
-                if (!sourceSha256.equals(storedHash)) return false;
+              if (sourceSha256 != null || extractionPolicyId != null) {
+                var evidence = searcher.storedFields().document(docNum,
+                    Set.of(SchemaFields.SOURCE_SHA256, SchemaFields.EXTRACTION_POLICY_ID));
+                if (sourceSha256 != null && !sourceSha256.equals(evidence.get(SchemaFields.SOURCE_SHA256))) {
+                  return false;
+                }
+                if (extractionPolicyId != null && !extractionPolicyId.equals(evidence.get(SchemaFields.EXTRACTION_POLICY_ID))) {
+                  return false;
+                }
               }
               var assessment = session.chunkCompleteness.assess(searcher, docNum, docId);
               boolean unchanged = assessment.complete();

@@ -316,7 +316,8 @@ public final class JobBatchExtractor {
                 ? claim.recordedForce() : claim.forceReindex() || forcedPaths.remove(normalizedPath));
         // Skip isUnmodified() on empty index — every doc is new (312 item 10).
         if (!forceReindex && !indexEmptyForBatch) {
-          if (documentFieldOps.isUnmodified(normalizedPath, envelope.modifiedAtMs(), envelope.sizeBytes(), sourceSha256)
+          if (documentFieldOps.isUnmodified(normalizedPath, envelope.modifiedAtMs(), envelope.sizeBytes(),
+                  sourceSha256, contentExtractor.extractionPolicy().policyId())
               && Objects.equals(collection == null || collection.isBlank() ? null : collection,
                   documentFieldOps.getDocumentFieldOrThrow(normalizedPath, SchemaFields.COLLECTION))
               && FileFreshnessSnapshot.fromEnvelope(envelope).validateNow()

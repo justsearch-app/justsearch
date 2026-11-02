@@ -1,0 +1,29 @@
+diff --git a/modules/adapters-lucene/src/main/java/io/justsearch/adapters/lucene/runtime/DocumentFieldOps.java b/modules/adapters-lucene/src/main/java/io/justsearch/adapters/lucene/runtime/DocumentFieldOps.java
+index f098a237a9..cf144284c1 100644
+--- a/modules/adapters-lucene/src/main/java/io/justsearch/adapters/lucene/runtime/DocumentFieldOps.java
++++ b/modules/adapters-lucene/src/main/java/io/justsearch/adapters/lucene/runtime/DocumentFieldOps.java
+@@ -680,6 +680,11 @@ public final class DocumentFieldOps {
+     return isUnmodified(docId, currentLastModified, Long.valueOf(currentSizeBytes), sourceSha256);
+   }
+ 
++  public boolean isUnmodified(String docId, long currentLastModified, long currentSizeBytes,
++      String sourceSha256, String extractionPolicyId) {
++    return isUnmodified(docId, currentLastModified, currentSizeBytes, sourceSha256);
++  }
++
+   private boolean isUnmodified(String docId, long currentLastModified, Long currentSizeBytes,
+       String sourceSha256) {
+     // A complete stale reader is a false positive after committed deletion/replacement. Commit
+diff --git a/modules/worker-services/src/main/java/io/justsearch/indexerworker/services/SyncDirectoryOps.java b/modules/worker-services/src/main/java/io/justsearch/indexerworker/services/SyncDirectoryOps.java
+index 6e9a043673..fba9f5d9a6 100644
+--- a/modules/worker-services/src/main/java/io/justsearch/indexerworker/services/SyncDirectoryOps.java
++++ b/modules/worker-services/src/main/java/io/justsearch/indexerworker/services/SyncDirectoryOps.java
+@@ -97,6 +97,8 @@ final class SyncDirectoryOps {
+   void setForcedPathSink(java.util.function.Consumer<java.util.Collection<String>> sink) { forcedPathSink = java.util.Objects.requireNonNull(sink); }
+   private final int pathScanCap;
+   private final int pathCharCap;
++
++  void setExtractionPolicyId(String policyId) {}
+   private volatile java.util.function.BiPredicate<Path, Path> userExclusions = (file, root) -> false;
+ 
+   void setUserExclusions(java.util.function.BiPredicate<Path, Path> exclusions) {

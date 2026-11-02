@@ -63,13 +63,15 @@ final class LegacyChunkBackfillTest extends LuceneExecutorTestBase {
       vectors = vectors(index);
       assertEquals(total + 1, vectors.size(), "fixture has real parent and child vectors");
       var extraction = mock(TimeboxedContentExtractor.class);
+      when(extraction.extractionPolicy()).thenReturn(TikaExtractionPolicy.defaults());
       var journal = mock(IngestionOutcomeJournal.class);
       var batch = extractor(runtime, extraction, journal);
       assertEquals(List.of(), batch.extractAll(List.of(job(file))));
       var outcome = org.mockito.ArgumentCaptor.forClass(String.class);
       verify(journal).recordOutcomeSafely(eq(file), outcome.capture(), any());
       assertEquals("UNCHANGED", outcome.getValue(), "complete legacy scan retains unchanged admission");
-      verifyNoInteractions(extraction);
+      verify(extraction).extractionPolicy();
+      verifyNoMoreInteractions(extraction);
       assertEquals(Integer.toString(total), runtime.documentFieldOps().getDocumentField(id, SchemaFields.CHUNK_TOTAL));
       assertEquals(ChunkParentRevision.sha256Hex(content),
           runtime.documentFieldOps().getDocumentField(id, SchemaFields.CHUNK_PARENT_CONTENT_SHA256));
@@ -142,6 +144,8 @@ final class LegacyChunkBackfillTest extends LuceneExecutorTestBase {
     var fields = new java.util.ArrayList<>(catalog.fields());
     fields.add(new FieldCatalogDef.FieldDef(SchemaFields.SOURCE_SHA256, "keyword", true, false,
         List.of(), null, null, false));
+    fields.add(new FieldCatalogDef.FieldDef(SchemaFields.EXTRACTION_POLICY_ID, "keyword", true, false,
+        List.of(), null, null, false));
     return IndexSchema.fromCatalog(new FieldCatalogDef(catalog.version(), fields)).atPath(index)
         .withExecutorRegistrations(testLuceneExecutors()).open();
   }
@@ -150,6 +154,7 @@ final class LegacyChunkBackfillTest extends LuceneExecutorTestBase {
     runtime.indexingCoordinator().indexSingle(new IndexDocument(Map.of(SchemaFields.DOC_ID, id,
         SchemaFields.DOC_UID, id, SchemaFields.PATH, id, SchemaFields.CONTENT, content,
         SchemaFields.MODIFIED_AT, modified, SchemaFields.SIZE_BYTES, sizeBytes,
+        SchemaFields.EXTRACTION_POLICY_ID, TikaExtractionPolicy.defaults().policyId(),
         SchemaFields.SOURCE_SHA256, ChunkParentRevision.sha256Hex(content))));
     refresh(runtime);
     int total = ChunkDocumentWriter.regenerateChunksFromExistingParent(runtime.documentFieldOps(), runtime.indexingCoordinator(), id, content, false);
@@ -162,6 +167,7 @@ final class LegacyChunkBackfillTest extends LuceneExecutorTestBase {
     runtime.indexingCoordinator().indexSingle(new IndexDocument(Map.of(SchemaFields.DOC_ID, id,
         SchemaFields.DOC_UID, id, SchemaFields.PATH, id, SchemaFields.CONTENT, content,
         SchemaFields.MODIFIED_AT, modified, SchemaFields.SIZE_BYTES, sizeBytes,
+        SchemaFields.EXTRACTION_POLICY_ID, TikaExtractionPolicy.defaults().policyId(),
         SchemaFields.SOURCE_SHA256, ChunkParentRevision.sha256Hex(content),
         SchemaFields.VECTOR, new float[] {0.5f, 0.5f})));
     refresh(runtime);

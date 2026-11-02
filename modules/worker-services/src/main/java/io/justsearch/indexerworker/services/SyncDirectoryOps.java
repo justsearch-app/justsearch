@@ -97,6 +97,16 @@ final class SyncDirectoryOps {
   void setForcedPathSink(java.util.function.Consumer<java.util.Collection<String>> sink) { forcedPathSink = java.util.Objects.requireNonNull(sink); }
   private final int pathScanCap;
   private final int pathCharCap;
+  private String extractionPolicyId = io.justsearch.indexerworker.extract.TikaExtractionPolicy.defaults().policyId();
+
+  void setExtractionPolicyId(String policyId) {
+    extractionPolicyId = java.util.Objects.requireNonNull(policyId, "policyId");
+  }
+
+  private boolean extractionMatches(IndexedFileStamp indexed) {
+    return extractionPolicyId.equals(indexed.extractionPolicyId())
+        && indexed.sourceSha256() != null && !indexed.sourceSha256().isBlank();
+  }
   private volatile java.util.function.BiPredicate<Path, Path> userExclusions = (file, root) -> false;
 
   void setUserExclusions(java.util.function.BiPredicate<Path, Path> exclusions) {
@@ -339,7 +349,8 @@ final class SyncDirectoryOps {
                 // as the separately retained normalized disk key.
                 budget.retain(2L * file.toString().length());
                 IndexedFileStamp indexed = indexedFiles.get(normalized);
-                if (force || indexed == null || !indexed.matches(attrs) || !collectionMatches(indexed, file, collection, declared)) {
+                if (force || indexed == null || !indexed.matches(attrs) || !extractionMatches(indexed)
+                    || !collectionMatches(indexed, file, collection, declared)) {
                   eligibleFiles.add(file.toAbsolutePath().normalize());
                 }
               }
@@ -450,10 +461,8 @@ final class SyncDirectoryOps {
    * the upgrade seeding's evidence). A missing
    * size or time is {@code -1}.
    */
-  record IndexedFileStamp(Path path, long sizeBytes, long modifiedAtMs, String collection) {
-    IndexedFileStamp(Path path, long sizeBytes, long modifiedAtMs) {
-      this(path, sizeBytes, modifiedAtMs, null);
-    }
+  record IndexedFileStamp(Path path, long sizeBytes, long modifiedAtMs, String collection,
+      String extractionPolicyId, String sourceSha256) {
     boolean matches(BasicFileAttributes attrs) {
       return sizeBytes >= 0 && modifiedAtMs >= 0 && attrs.isRegularFile()
           && attrs.size() == sizeBytes && attrs.lastModifiedTime().toMillis() == modifiedAtMs;
@@ -497,7 +506,8 @@ final class SyncDirectoryOps {
           query, prefixScopeFactory.apply(root).excludedSubtrees());
       var result = readPathOps.search(scopedQuery, limit,
           Set.of(SchemaFields.DOC_ID, SchemaFields.PATH, SchemaFields.PROJECTION_SOURCE_ID,
-              SchemaFields.SIZE_BYTES, SchemaFields.MODIFIED_AT, SchemaFields.COLLECTION),
+              SchemaFields.SIZE_BYTES, SchemaFields.MODIFIED_AT, SchemaFields.COLLECTION,
+              SchemaFields.EXTRACTION_POLICY_ID, SchemaFields.SOURCE_SHA256),
           LuceneRuntimeTypes.RuntimeSearchSort.PATH_ASC, null);
       if (result == null) throw new IOException("Serving index sample returned no result");
       List<IndexedFileStamp> sample = new ArrayList<>();
@@ -514,7 +524,8 @@ final class SyncDirectoryOps {
         }
         sample.add(new IndexedFileStamp(Path.of(path),
             longOrMissing(hit.fields().get(SchemaFields.SIZE_BYTES)),
-            longOrMissing(hit.fields().get(SchemaFields.MODIFIED_AT)), hit.fields().get(SchemaFields.COLLECTION)));
+            longOrMissing(hit.fields().get(SchemaFields.MODIFIED_AT)), hit.fields().get(SchemaFields.COLLECTION),
+            hit.fields().get(SchemaFields.EXTRACTION_POLICY_ID), hit.fields().get(SchemaFields.SOURCE_SHA256)));
       }
       return sample;
     } catch (IOException incomplete) {
@@ -560,7 +571,8 @@ final class SyncDirectoryOps {
         checkCancelled(cancelled);
         var result = readPathOps.search(scopedQuery, 256,
             Set.of(SchemaFields.DOC_ID, SchemaFields.PATH, SchemaFields.PROJECTION_SOURCE_ID,
-                SchemaFields.SIZE_BYTES, SchemaFields.MODIFIED_AT, SchemaFields.COLLECTION),
+                SchemaFields.SIZE_BYTES, SchemaFields.MODIFIED_AT, SchemaFields.COLLECTION,
+              SchemaFields.EXTRACTION_POLICY_ID, SchemaFields.SOURCE_SHA256),
             LuceneRuntimeTypes.RuntimeSearchSort.PATH_ASC, cursor);
         if (result == null) throw new IOException("Serving index path scan returned no result");
         if (result.totalHits() > pathScanCap) {
@@ -584,7 +596,8 @@ final class SyncDirectoryOps {
           }
           if (paths.put(canonical, new IndexedFileStamp(Path.of(canonical),
               longOrMissing(hit.fields().get(SchemaFields.SIZE_BYTES)),
-              longOrMissing(hit.fields().get(SchemaFields.MODIFIED_AT)), hit.fields().get(SchemaFields.COLLECTION))) == null) {
+              longOrMissing(hit.fields().get(SchemaFields.MODIFIED_AT)), hit.fields().get(SchemaFields.COLLECTION),
+                hit.fields().get(SchemaFields.EXTRACTION_POLICY_ID), hit.fields().get(SchemaFields.SOURCE_SHA256))) == null) {
             budget.retain(canonical.length());
           }
           requireBelowCap(paths.size(), "index");
@@ -1022,7 +1035,8 @@ final class SyncDirectoryOps {
               // Retirement replay retains its separate ownership and current-byte proof.
               if (force || indexed == null
                   || ((admissionMode == AdmissionMode.DEFAULT || admissionMode == AdmissionMode.MAINTENANCE)
-                      && (!indexed.matches(attrs) || !collectionMatches(indexed, file, collection, declared)))) {
+                      && (!indexed.matches(attrs) || !extractionMatches(indexed)
+                          || !collectionMatches(indexed, file, collection, declared)))) {
                 // 813 Slice B: the walk already holds the size — no extra stat.
                 if (stopped()) return FileVisitResult.TERMINATE;
                 spool.add(file, attrs.size());
@@ -1259,7 +1273,8 @@ final class SyncDirectoryOps {
             readPathOps.search(
                 scopedQuery,
                 batchSize,
-                Set.of(SchemaFields.DOC_ID, SchemaFields.SIZE_BYTES, SchemaFields.MODIFIED_AT, SchemaFields.COLLECTION),
+                Set.of(SchemaFields.DOC_ID, SchemaFields.SIZE_BYTES, SchemaFields.MODIFIED_AT, SchemaFields.COLLECTION,
+                SchemaFields.EXTRACTION_POLICY_ID, SchemaFields.SOURCE_SHA256),
                 LuceneRuntimeTypes.RuntimeSearchSort.PATH_ASC,
                 cursor);
 
@@ -1269,7 +1284,8 @@ final class SyncDirectoryOps {
           if (path != null) {
             if (paths.put(path, new IndexedFileStamp(Path.of(path),
                 longOrMissing(hit.fields().get(SchemaFields.SIZE_BYTES)),
-                longOrMissing(hit.fields().get(SchemaFields.MODIFIED_AT)), hit.fields().get(SchemaFields.COLLECTION))) == null) pathChars += path.length();
+                longOrMissing(hit.fields().get(SchemaFields.MODIFIED_AT)), hit.fields().get(SchemaFields.COLLECTION),
+                hit.fields().get(SchemaFields.EXTRACTION_POLICY_ID), hit.fields().get(SchemaFields.SOURCE_SHA256))) == null) pathChars += path.length();
             if (paths.size() > pathScanCap
                 || pathChars > pathCharCap) {
               return null;

@@ -48,7 +48,12 @@ final class WatcherDeleteSafetyTest extends LuceneExecutorTestBase {
   }
 
   private void reopenRuntime() throws Exception {
-    runtime = IndexSchema.fromCatalog(FieldCatalogDef.forChunkTestingWithVduRetryCount(0))
+    var catalog = FieldCatalogDef.forChunkTestingWithVduRetryCount(0);
+    var fields = new java.util.ArrayList<>(catalog.fields());
+    for (String field : List.of(SchemaFields.SOURCE_SHA256, SchemaFields.EXTRACTION_POLICY_ID)) {
+      fields.add(new FieldCatalogDef.FieldDef(field, "keyword", true, false, List.of(), null, null, false));
+    }
+    runtime = IndexSchema.fromCatalog(new FieldCatalogDef(catalog.version(), fields))
         .atPath(index).withExecutorRegistrations(testLuceneExecutors()).open();
     service = service(runtime);
   }
@@ -71,6 +76,8 @@ final class WatcherDeleteSafetyTest extends LuceneExecutorTestBase {
         SchemaFields.DOC_ID, id, SchemaFields.PATH, id,
         SchemaFields.DOC_UID, java.util.UUID.randomUUID().toString(),
         SchemaFields.SIZE_BYTES, Files.size(file),
+        SchemaFields.SOURCE_SHA256, io.justsearch.indexerworker.loop.SourceContentHash.sha256(file),
+        SchemaFields.EXTRACTION_POLICY_ID, io.justsearch.indexerworker.extract.TikaExtractionPolicy.defaults().policyId(),
         SchemaFields.MODIFIED_AT, Files.getLastModifiedTime(file).toMillis(),
         SchemaFields.CONTENT, "original " + name, SchemaFields.COLLECTION, "docs")));
     runtime.commitOps().commitAndTrack(CommitReason.SWITCH_BUFFER_REPLAY);

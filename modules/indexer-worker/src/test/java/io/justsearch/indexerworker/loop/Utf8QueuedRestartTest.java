@@ -56,7 +56,7 @@ class Utf8QueuedRestartTest extends LuceneExecutorTestBase {
   @TempDir Path tempDir;
 
   @Test
-  void oldStoredFieldsAndChunksSurviveRestartWithUnchangedQueuedWork() throws Exception {
+  void ordinaryQueuedWorkRepairsOlderPolicyAndSurvivesAnotherRestart() throws Exception {
     restartScenario(false);
   }
 
@@ -100,7 +100,7 @@ class Utf8QueuedRestartTest extends LuceneExecutorTestBase {
       assertEquals(1, queue.enqueueEntries(List.of(JobQueue.EnqueueEntry.stat(file).withinRoot(tempDir))));
     }
 
-    Map<String, Map<String, String>> repaired = null;
+    Map<String, Map<String, String>> repaired;
     try (var runtime = open(); var queue = new SqliteJobQueue(db);
         var owners = new TestEngineExecutors(); var parser = new ContentExtractor();
         var timebox = new TimeboxedContentExtractor(PipelineTestFixture.registration(owners,
@@ -127,10 +127,13 @@ class Utf8QueuedRestartTest extends LuceneExecutorTestBase {
           () -> false, () -> false, () -> null, fence);
       var claims = queue.pollPending(1);
       assertEquals(1, claims.size(), "work must survive the restart");
-      assertTrue(extractor.extractAll(claims).isEmpty(), "queued unchanged source must not be re-extracted");
+      var ordinary = extractor.extractAll(claims);
+      assertEquals(1, ordinary.size(), "ordinary queued work must repair an older extraction policy");
+      writer.write(ordinary.getFirst(), null);
+      refresh(runtime);
       journal.drainPending();
       assertEquals(0, queue.queueDepth());
-      assertEquals(original, snapshot(runtime, id), "unchanged queued work must preserve all fields and chunks");
+      assertNotEquals(original, snapshot(runtime, id), "ordinary policy repair replaces historical text and chunks");
       if (force) {
         forced.add(id);
         assertEquals(1, queue.enqueueEntries(List.of(JobQueue.EnqueueEntry.stat(file).withinRoot(tempDir))));
@@ -140,34 +143,34 @@ class Utf8QueuedRestartTest extends LuceneExecutorTestBase {
         refresh(runtime);
         journal.drainPending();
         assertEquals(0, queue.queueDepth());
-        assertEquals(SOURCE, runtime.documentFieldOps().getDocumentContent(id).strip());
-        assertEquals(TITLE, runtime.documentFieldOps().getDocumentField(id, SchemaFields.TITLE));
-        assertEquals("מרים", runtime.documentFieldOps().getDocumentField(id, SchemaFields.META_AUTHOR));
-        assertEquals("tika-default-v8", runtime.documentFieldOps().getDocumentField(id, SchemaFields.EXTRACTION_POLICY_ID));
-        // An explicitly BOM-marked UTF-8 control supplies known-good derived fields on both trees.
-        Path control = Files.writeString(tempDir.resolve("control.md"), "\uFEFF" + SOURCE);
-        var expected = buildDocument(file, parser.extract(control)).fields();
-        for (String field : List.of(SchemaFields.CONTENT_SHA256, SchemaFields.CONTENT_PREVIEW,
-            SchemaFields.MIME, SchemaFields.LANGUAGE, SchemaFields.PARENT_TOKEN_COUNT,
-            SchemaFields.EXTRACTION_QUALITY_SCORE)) {
-          Object value = expected.get(field);
-          assertEquals(value == null ? null : value.toString(),
-              runtime.documentFieldOps().getDocumentField(id, field), field);
-        }
-        String content = runtime.documentFieldOps().getDocumentContent(id);
-        String revision = ChunkParentRevision.sha256Hex(content);
-        assertEquals(revision, runtime.documentFieldOps().getDocumentField(id, SchemaFields.CHUNK_PARENT_CONTENT_SHA256));
-        List<String> children = runtime.documentFieldOps().queryDocIdsByField(SchemaFields.PARENT_DOC_ID, id, 10000);
-        assertFalse(children.isEmpty(), "forced reindex must regenerate Hebrew chunks");
-        for (String child : children) {
-          assertEquals(revision, runtime.documentFieldOps().getDocumentField(child, SchemaFields.CHUNK_PARENT_CONTENT_SHA256));
-          assertTrue(runtime.documentFieldOps().getDocumentContent(child).contains("ספרים"));
-        }
-        repaired = snapshot(runtime, id);
       }
+      assertEquals(SOURCE, runtime.documentFieldOps().getDocumentContent(id).strip());
+      assertEquals(TITLE, runtime.documentFieldOps().getDocumentField(id, SchemaFields.TITLE));
+      assertEquals("מרים", runtime.documentFieldOps().getDocumentField(id, SchemaFields.META_AUTHOR));
+      assertEquals("tika-default-v8", runtime.documentFieldOps().getDocumentField(id, SchemaFields.EXTRACTION_POLICY_ID));
+      // An explicitly BOM-marked UTF-8 control supplies known-good derived fields on both trees.
+      Path control = Files.writeString(tempDir.resolve("control.md"), "\uFEFF" + SOURCE);
+      var expected = buildDocument(file, parser.extract(control)).fields();
+      for (String field : List.of(SchemaFields.CONTENT_SHA256, SchemaFields.CONTENT_PREVIEW,
+          SchemaFields.MIME, SchemaFields.LANGUAGE, SchemaFields.PARENT_TOKEN_COUNT,
+          SchemaFields.EXTRACTION_QUALITY_SCORE)) {
+        Object value = expected.get(field);
+        assertEquals(value == null ? null : value.toString(),
+            runtime.documentFieldOps().getDocumentField(id, field), field);
+      }
+      String content = runtime.documentFieldOps().getDocumentContent(id);
+      String revision = ChunkParentRevision.sha256Hex(content);
+      assertEquals(revision, runtime.documentFieldOps().getDocumentField(id, SchemaFields.CHUNK_PARENT_CONTENT_SHA256));
+      List<String> children = runtime.documentFieldOps().queryDocIdsByField(SchemaFields.PARENT_DOC_ID, id, 10000);
+      assertFalse(children.isEmpty(), "forced reindex must regenerate Hebrew chunks");
+      for (String child : children) {
+        assertEquals(revision, runtime.documentFieldOps().getDocumentField(child, SchemaFields.CHUNK_PARENT_CONTENT_SHA256));
+        assertTrue(runtime.documentFieldOps().getDocumentContent(child).contains("ספרים"));
+      }
+      repaired = snapshot(runtime, id);
     }
     try (var runtime = open()) {
-      assertEquals(force ? repaired : original, snapshot(runtime, id), "stored state must survive another restart");
+      assertEquals(repaired, snapshot(runtime, id), "stored state must survive another restart");
     }
   }
 

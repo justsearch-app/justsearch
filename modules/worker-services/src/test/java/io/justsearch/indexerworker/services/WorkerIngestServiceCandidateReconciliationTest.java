@@ -714,6 +714,8 @@ final class WorkerIngestServiceCandidateReconciliationTest
       Path file = Path.of(path);
       if (Files.isRegularFile(file)) {
         fields.put(SchemaFields.COLLECTION, "research");
+        fields.put(SchemaFields.EXTRACTION_POLICY_ID, io.justsearch.indexerworker.extract.TikaExtractionPolicy.defaults().policyId());
+        fields.put(SchemaFields.SOURCE_SHA256, io.justsearch.indexerworker.loop.SourceContentHash.sha256(file));
         fields.put(SchemaFields.SIZE_BYTES, String.valueOf(Files.size(file)));
         fields.put(SchemaFields.MODIFIED_AT, String.valueOf(Files.getLastModifiedTime(file).toMillis()));
       }

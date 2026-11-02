@@ -952,7 +952,7 @@ public final class WorkerIngestService {
       var fields = ingestLifecycle.documentFieldOps();
       String key = PathNormalizer.normalizeKey(path);
       if (!source.isRegularFile()
-          || !fields.isUnmodified(key, source.lastModifiedTime().toMillis(), source.size())
+          || !fields.isUnmodified(key, source.lastModifiedTime().toMillis(), source.size(), null, extractionPolicyId)
           || !Objects.equals(normalizeRootCollection(collection),
               normalizeRootCollection(fields.getDocumentFieldOrThrow(key, SchemaFields.COLLECTION)))) return false;
       // A metadata-only event cannot replace accepted work while the source is deferred.
@@ -1841,6 +1841,15 @@ public final class WorkerIngestService {
   }
 
   private volatile Supplier<io.justsearch.ort.PolicySnapshot> policySnapshotSupplier;
+
+  private String extractionPolicyId = io.justsearch.indexerworker.extract.TikaExtractionPolicy.defaults().policyId();
+
+  /** Uses the same applied policy as the worker's extractor, including configured limits. */
+  public void setExtractionPolicy(io.justsearch.indexerworker.extract.TikaExtractionPolicy policy) {
+    extractionPolicyId = Objects.requireNonNull(policy, "policy").policyId();
+    syncOps.setExtractionPolicyId(extractionPolicyId);
+    candidateDiscoveryOps.setExtractionPolicyId(extractionPolicyId);
+  }
 
   /** Sets the resolved config supplier for search config status reporting (343). */
   public void setResolvedConfigSupplier(

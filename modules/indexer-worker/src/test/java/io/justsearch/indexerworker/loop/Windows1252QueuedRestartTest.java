@@ -42,7 +42,7 @@ class Windows1252QueuedRestartTest extends LuceneExecutorTestBase {
   }
 
   @Test
-  void enN3QueuedRestartKeepsLegacyProvenanceUntilForcedReextraction() throws Exception {
+  void queuedRestartRepairsLegacyPolicyThroughOrdinaryAndForcedReextraction() throws Exception {
     Path file = Files.writeString(tempDir.resolve("unchanged.txt"), "UTF-8 café € 😀 preserved source");
     String id = PathNormalizer.normalizeKey(file);
     Path db = tempDir.resolve("queue.db");
@@ -85,9 +85,14 @@ class Windows1252QueuedRestartTest extends LuceneExecutorTestBase {
 
       var claims = queue.pollPending(1);
       assertEquals(1, claims.size(), "queued work survives restart");
-      assertTrue(extractor.extractAll(claims).isEmpty(), "unchanged legacy content is not rewritten");
-      assertEquals("legacy extracted text", runtime.documentFieldOps().getDocumentContent(id));
-      assertEquals("tika-default-v1", runtime.documentFieldOps().getDocumentField(id, SchemaFields.EXTRACTION_POLICY_ID));
+      var ordinary = extractor.extractAll(claims);
+      assertEquals(1, ordinary.size(), "ordinary ingestion repairs an older extraction policy");
+      writer.write(ordinary.getFirst(), null);
+      refresh(runtime);
+      journal.drainPending();
+      assertEquals(Files.readString(file), runtime.documentFieldOps().getDocumentContent(id).strip());
+      assertEquals(TikaExtractionPolicy.defaults().policyId(),
+          runtime.documentFieldOps().getDocumentField(id, SchemaFields.EXTRACTION_POLICY_ID));
       assertEquals(0, queue.queueDepth());
       forced.add(id);
       assertEquals(1, queue.enqueueEntries(List.of(JobQueue.EnqueueEntry.stat(file).withinRoot(tempDir))));
