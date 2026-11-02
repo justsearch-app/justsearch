@@ -187,9 +187,9 @@ class TestReleaseProjection:
 
 def test_committed_pointer_file_projects_to_prior_pinned_values():
     """Pins the tempdoc 683 pointer semantics on the REAL committed files (tempdoc 715, then
-    832 rebaseline). release.v1.json carries a `leak` section for its five cohort corpora, so
+    832 rebaseline). release.v1.json carries a `leak` section for its four non-withheld corpora, so
     the release projection must WIN for those, while the fallback baseline survives verbatim
-    for the one corpus absent from the release (golden/needle-burial-v1). release_id is read
+    for the corpora absent from it (golden/needle-burial-v1, withheld legal-clerc-200). release_id is read
     live rather than pinned to a fixed string — `jseval release` re-cuts this file routinely,
     and a literal version pin would need re-editing on every unrelated rebaseline; the real
     regression coverage is the corpus-set and value assertions below, which already read live
@@ -205,14 +205,17 @@ def test_committed_pointer_file_projects_to_prior_pinned_values():
     release = json.loads((root / "release.v1.json").read_text(encoding="utf-8"))
     assert isinstance(release.get("release_id"), str) and release["release_id"], \
         "release.v1.json must carry a non-empty release_id"
+    # The withheld legal hybrid run sets no leak ceiling: leak is measured against the
+    # default-mode final list that the harness judged not comparable.
+    assert set(release["withheld"]) == {"mixed/legal-clerc-200"}
     assert set(release["leak"]) == {
-        "beir/scifact", "mixed/enron-qa", "mixed/legal-clerc-200",
-        "mixed/miracl-de-2k", "mixed/miracl-fr-2k"}
+        "beir/scifact", "mixed/enron-qa", "mixed/miracl-de-2k", "mixed/miracl-fr-2k"}
     doc = load_baselines_doc(bp, project_release=lambda rel, base: _project(
         rel, tolerance_default_abs=base.get("tolerance_default_abs", DEFAULT_TOLERANCE_ABS),
         per_corpus_tolerance=base.get("per_corpus_tolerance")))
     for corpus, entry in release["leak"].items():
         assert doc["baselines"][corpus]["leak_rate_max"] == entry["leak_rate"]  # release wins
-    assert doc["baselines"]["golden/needle-burial-v1"] == \
-        raw["fallback_baselines"]["golden/needle-burial-v1"]  # fallback survives
-    assert set(doc["baselines"]) == set(release["leak"]) | {"golden/needle-burial-v1"}
+    fallback_only = {"golden/needle-burial-v1", "mixed/legal-clerc-200"}
+    for corpus in fallback_only:
+        assert doc["baselines"][corpus] == raw["fallback_baselines"][corpus]  # fallback survives
+    assert set(doc["baselines"]) == set(release["leak"]) | fallback_only

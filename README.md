@@ -1,6 +1,6 @@
 # JustSearch
 
-**JustSearch finds what is inside your files, quickly and accurately, whether you know exactly what you are looking for or only vaguely. It is for anyone who keeps files on their computer, as a search app of its own or as a tool inside other apps and AI agents through MCP.** Under the hood: hybrid search (BM25, dense vectors, learned-sparse, reranking) and an on-device AI assistant for cited answers, summaries and extraction, all running on your machine. Windows installer; on Linux, runs from source.
+**JustSearch finds what is inside your files, quickly and accurately, whether you know exactly what you are looking for or only vaguely. It is for anyone who keeps files on their computer, as a search app of its own or as a tool inside other apps and AI agents through MCP.** Under the hood: hybrid search (keyword + vector + cross-encoder reranking), a separate learned-sparse mode and an on-device AI assistant for cited answers, summaries and extraction, all running on your machine. Windows installer; on Linux, runs from source.
 
 
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
@@ -23,7 +23,8 @@
 JustSearch is local-first: it indexes your local documents, such as PDF, email, Office and most common document
 formats (text extraction is backed by [Apache Tika](https://tika.apache.org/), plus OCR for scanned PDFs and
 images), and answers questions over them with cited passages, **with indexing, retrieval, and built-in AI inference on your machine.**
-It combines three retrieval paradigms (keyword, dense-vector, learned-sparse) with a cross-encoder reranker,
+It offers keyword, dense-vector and learned-sparse retrieval; explicit hybrid mode fuses keyword and
+vector results with cross-encoder reranking,
 and exposes that retrieval over the **Model Context Protocol (MCP)** so any AI agent — local or cloud — can
 use it as a **private retrieval backend**: indexing and retrieval stay on your device. The built-in
 assistant keeps the whole loop on-device. When you connect an external AI client, the retrieved passages
@@ -125,49 +126,55 @@ that ships **{true hybrid retrieval × offline search and AI × multilingual × 
 [sourced comparison](docs/comparison.md) behind that sentence, and if we've missed a tool, please
 [open an issue](https://github.com/justsearch-app/justsearch/issues) and we'll list it.
 
-- **Hybrid retrieval, not single-model RAG** — BM25 + dense vectors + SPLADE learned-sparse, fused and reranked
-  by a cross-encoder. Most local RAG tools use one embedding model and basic chunking.
+- **Hybrid retrieval, not single-model RAG** — keyword + dense vectors, fused and cross-encoder reranked; learned-sparse is a separate mode.
+  Most local RAG tools use one embedding model and basic chunking.
 - **Local search and AI** — indexing, retrieval, and built-in inference run on-device and work offline
   after AI setup. The desktop app also checks for updates by default; [Privacy](#privacy) names the network paths
   and the optional trace exporter.
 - **Multilingual by construction** — one locale-invariant pipeline (ICU + a multilingual model stack), no
-  per-language tuning. Competitive nDCG on German and French, not just English.
+  per-language tuning. Measured on German and French dev queries in sampled document pools, as well as English corpora.
 - **Vision OCR** — extracts text from scanned PDFs and images, so they're searchable too.
 - **BYO-LLM** — runs your own local model via llama.cpp; no API keys, no per-token cost.
 
 ## Benchmarks
 
-Retrieval quality (nDCG@10) from one reproducible release run (`scripts/jseval/release.v1.json`, RTX 4070,
-~300 queries/corpus; measured on the canonical 2026-08-14 release tree — the first release scored on the
-corrected delivered-ranking basis, tempdoc 803). Numbers are
-the **default `hybrid` config** unless noted:
+Retrieval quality (nDCG@10) from release `linux-complete-qrels-2026-11-02`
+(`scripts/jseval/release.v1.json`): Linux 7.0 (x86_64), NVIDIA RTX 4070 12 GB,
+driver 580.178.04, ORT 1.24.3 with host CUDA 12.9/cuDNN 9; 200–343 queries per corpus.
+Explicit `hybrid` mode uses keyword + vector + cross-encoder reranking; learned-sparse is off.
+This is a new Linux measurement, not a rerun of the superseded Windows release.
 
 | Corpus | nDCG@10 | Note |
 |---|---|---|
-| BEIR / SciFact | **0.757** | in the range of published single-model retrievers (ColBERTv2 0.693, SPLADE++ 0.71) — but read this as *system vs. component*: ours is a full hybrid+rerank pipeline, theirs are single models |
-| Enron-QA | 0.796 | |
-| MIRACL-de (German) | 0.857 | multilingual — no per-language tuning |
-| MIRACL-fr (French) | 0.884 | |
-| Legal (CLERC case-retrieval) | 0.578 | citation-retrieval task on real US federal case law; replaces an earlier bespoke legal corpus that had no reproducible construction path (tempdoc 666) |
+| BEIR / SciFact | **0.759** | CE applied 299/300; 1 deadline drop; system vs. published single-model components |
+| Enron-QA | 0.806 | CE applied 277/300; 17 deterministic navigational skips, 6 deadline drops (2.0%; harness verdict ok) |
+| MIRACL-de (German) | 0.986 | dev split, complete positive judgments; CE applied 305/305, no drops; no per-language tuning |
+| MIRACL-fr (French) | 0.990 | dev split, complete positive judgments; CE applied 343/343, no drops |
+| Legal (CLERC case-retrieval) | WITHHELD | 25/200 CE deadline misses under the default 200 ms budget; ablations and caveat in the methodology |
+
+Legal has 198 documents, all judged relevant to at least one query, and roughly 260-word queries.
+Its hybrid result is not comparable: 12.5% deadline misses on this machine (60% in an earlier run
+under heavier load). The release retains lexical/vector/splade ablations and publishes no legal hybrid floor.
 
 External-baseline figures are cited from published papers (SIGIR/NAACL; sources + split caveats in
 `release.v1.json`) — **not** re-run by us, and not directly apples-to-apples: a hybrid+rerank *system* is
-expected to exceed single-model *components*, and MIRACL baselines are a different (dev) split. The honest
+expected to exceed single-model *components*, and our MIRACL dev queries use a much smaller document pool than the published dev baselines. The honest
 reading is "a reproducible offline hybrid system lands in the range of strong published retrievers," not
 "we beat them" — full comparison-class notes in
 [the methodology](docs/reference/benchmarks/methodology.md#how-to-read-the-comparison-system-vs-component).
 Per-corpus nDCG@10 floors are checked against a pinned baseline at release-composition time
 (`python -m jseval relevance-gate`, `scripts/jseval/relevance-ratchet-baselines.v1.json`); that is a
-local gate run when a release is composed, not an automated CI job. The README table itself is checked
-against the release object in CI (`scripts/ci/check-readme-benchmark-numbers.mjs`).
+local gate run when a release is composed, not an automated CI job.
 
 Reproduce (from `scripts/jseval`): `python -m jseval run --start-backend --dataset beir/scifact --modes hybrid`
 then `python -m jseval relevance-gate --dataset beir/scifact`. Slugs: `beir/scifact`, `mixed/enron-qa`,
 `mixed/legal-clerc-200`, `mixed/miracl-de-2k`, `mixed/miracl-fr-2k`.
 Full methodology, comparison-class caveats, and reproduction:
 [`docs/reference/benchmarks/methodology.md`](docs/reference/benchmarks/methodology.md). The table above is
-hand-written from `scripts/jseval/release.v1.json` (the canonical 2026-08-14 release); CI checks every
-number it shows against that file (`scripts/ci/check-readme-benchmark-numbers.mjs`).
+hand-written from `scripts/jseval/release.v1.json` (the current Linux release). CI compares each
+row's nDCG@10 value, or its WITHHELD marker, with that file (`scripts/ci/check-readme-benchmark-numbers.mjs`);
+the note column and the counts and percentages in the prose are copied from the release by hand and are
+not checked by CI.
 For the broader research angle — open questions, what's deferred, and how to get involved — see
 [`RESEARCH.md`](RESEARCH.md).
 
@@ -179,6 +186,8 @@ answer better than one without?) under a fail-closed publication policy:
 <!-- agent-utility:generated:start - run: node scripts/docs/gen-public-agent-utility.mjs -->
 
 Accepted publication `agent-utility-hero-2026-07-28` (record `c5a75457b264`, policy `agent-utility-public-v4`). Agents adopted JustSearch, but the campaign did not establish an efficiency or accuracy improvement across every required stratum.
+
+Accuracy intervals are recomputed from the published observations under v5 question-level semantics (95% question-cluster bootstrap; seeds are replicates within questions). Point estimates and the historical adoption-only outcome are unchanged. Token and cost intervals remain descriptive cell-level intervals. Provenance: `scripts/jseval/public-agent-utility/question-level.v1.json`; reproduce with `python -m jseval.utility_public_projection --check`. The hash-pinned v4 bundle is unchanged.
 
 [See the per-stratum evidence, provenance, and limitations](docs/reference/benchmarks/agent-utility.md).
 

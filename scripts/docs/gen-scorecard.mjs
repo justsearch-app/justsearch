@@ -33,6 +33,7 @@ const AXES = [
 ];
 
 function build(release, relBase, leakBase) {
+  if (release?.status === "superseded") throw new Error("superseded release cannot supply a current scorecard");
   const L = [
     "---",
     "title: Engine-quality scorecard",
@@ -55,16 +56,25 @@ function build(release, relBase, leakBase) {
   }
   const relTol = (relBase && relBase.tolerance_default_abs) || 0.02;
   const sha = ((release.cohort && release.cohort.git_sha) || "unknown").slice(0, 10);
-  L.push(`*Release \`${release.release_id || sha}\`, default mode \`${release.default_mode || "hybrid"}\`.*`, "");
+  L.push(`*Release \`${release.release_id || sha}\`, measured mode \`${release.default_mode || "hybrid"}\`.*`, "");
+  const hw = release.cohort?.hardware || {};
+  L.push([hw.os, hw.gpu_name, hw.gpu_driver_version && `driver ${hw.gpu_driver_version}`, hw.ort_version && `ORT ${hw.ort_version}`].filter(Boolean).join(" · "), "");
+  L.push("Explicit hybrid mode uses keyword + vector + cross-encoder reranking; learned-sparse is off. MIRACL: dev split.", "");
+  for (const [corpus, entry] of Object.entries(release.withheld || {})) {
+    L.push(`### ${corpus}`, "", `**${entry.config_mode}: WITHHELD.** ${entry.reason} No hybrid regression floor is published. See the methodology for the lexical/vector/splade ablations and corpus caveat.`, "");
+  }
   for (const corpus of Object.keys(release.measured).sort()) {
     const m = release.measured[corpus];
-    L.push(`### ${corpus}`, "", "| Axis | Metric | This release | Guard | Status |", "|---|---|---|---|---|");
+    L.push(`### ${corpus}`, "");
+    const ce = m.ce_coverage;
+    if (ce) L.push(`CE applied ${ce.applied}/${m.corpus_source.query_count}; ${ce.legitimate_skips} deterministic skips; ${ce.silent_drops} deadline drops (\`${ce.verdict}\`).`, "");
+    L.push("| Axis | Metric | This release | Guard | Status |", "|---|---|---|---|---|");
     for (const a of AXES) {
       const v = (a.src === "metrics" ? m.metrics || {} : m.run_metrics || {})[a.key];
       if (typeof v !== "number") continue;
       let guard, status;
       if (a.axis === "quality") {
-        const floor = v - relTol; // projected relevance floor = release nDCG − tolerance
+        const floor = v - (relBase?.per_corpus_tolerance?.[corpus] ?? relTol);
         guard = `≥ ${num(floor, 3)} (floor)`;
         status = v >= floor ? "✅" : "❌";
       } else {

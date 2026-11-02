@@ -8,6 +8,8 @@
  * the real offline replay (`python -m jseval utility-replay`) below rather than re-implemented
  * here, so the two can never silently drift apart. See the deletion mapping against
  * `scripts/jseval/jseval/utility_publication.py::replay_publication` in the authoring changeset.
+ * The recomputed question-level projection beside the publication is likewise checked by its own
+ * offline recomputation (`python -m jseval.utility_public_projection --check`).
  */
 
 import crypto from "node:crypto";
@@ -111,6 +113,25 @@ export function validatePointer({ pointerPath = POINTER_PATH, publicRoot = PUBLI
     );
     if (replay.error || replay.status !== 0) fail(missingPythonMessage(python, replay));
     console.log(`check-public-agent-utility: replayed ${pointer.current.publication_id}`);
+
+    // The recomputed question-level intervals shown beside the publication are statistical claims
+    // of their own: recompute them offline from the replayed observations and require the committed
+    // projection to match byte for byte, so a tampered interval cannot pass by regenerating the docs.
+    if (fs.existsSync(path.join(publicRoot, "question-level.v1.json"))) {
+      const recompute = spawnSync(
+        python,
+        ["-m", "jseval.utility_public_projection", "--check"],
+        { cwd: root, encoding: "utf8", env: { ...process.env, JUSTSEARCH_REPO_ROOT: root } },
+      );
+      if (recompute.error) fail(missingPythonMessage(python, recompute));
+      if (recompute.status !== 0) {
+        fail(
+          `question-level projection does not match its offline recomputation (status ${recompute.status}):\n` +
+            (recompute.stderr || recompute.stdout || "(no output captured)"),
+        );
+      }
+      console.log("check-public-agent-utility: question-level projection recomputed");
+    }
   } else if (pointer.previous === null && pointer.selected_at !== null) {
     fail("the initial no-result pointer must have selected_at=null");
   } else if (pointer.previous !== null && pointer.selected_at === null) {

@@ -576,6 +576,9 @@ jobs:
       - name: README benchmark numbers match the canonical release
         run: node scripts/ci/check-readme-benchmark-numbers.mjs
 
+      - name: README benchmark check refuses unmeasured and withheld numbers (tests)
+        run: node scripts/ci/check-readme-benchmark-numbers.test.mjs
+
       - name: Release baseline stays in sync with the ratchet + scorecard
         run: node scripts/ci/check-release-baseline-sync.mjs
 
@@ -584,6 +587,9 @@ jobs:
 
       - name: Outward benchmark numbers cite the canonical release
         run: node scripts/ci/check-outward-number-citations.mjs
+
+      - name: Outward citation check refuses superseded releases (tests)
+        run: node scripts/ci/check-outward-number-citations.test.mjs
 
       # Tempdoc 835: the shared llama-server argument-rejection predicate. Its previous form was a
       # string literal inside one CI script that silently stopped matching when the bundled build's
@@ -607,6 +613,9 @@ jobs:
 
       - name: Test agent-utility projection lifecycle and drift
         run: node scripts/docs/gen-public-agent-utility.test.mjs
+
+      - name: Benchmark pages name the measured mode, not a product default (tests)
+        run: node scripts/docs/gen-benchmark-mode-label.test.mjs
 
       - name: Test agent-utility publication pointer gate
         run: node scripts/ci/check-public-agent-utility.test.mjs

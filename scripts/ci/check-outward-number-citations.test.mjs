@@ -9,6 +9,8 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { spawnSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
 import {
   collectReleaseNumbers,
   matchesReleaseValue,
@@ -103,6 +105,37 @@ ok('root RESEARCH.md is part of the outward surface', () => {
     fs.writeFileSync(path.join(root, 'RESEARCH.md'), '# research');
     const names = listOutwardFiles(root).map((file) => path.basename(file)).sort();
     return JSON.stringify(names) === JSON.stringify(['README.md', 'RESEARCH.md']);
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+// --- superseded evidence (review 2026-11-02): the archived Windows release vouches for nothing ---
+const HERE = path.dirname(fileURLToPath(import.meta.url));
+const SUPERSEDED = JSON.parse(
+  fs.readFileSync(path.join(HERE, '..', 'jseval', 'releases', '832-rebaseline-2026-08-14.v1.json'), 'utf8'),
+);
+ok('fixture: the archived 832 release is marked superseded', () => SUPERSEDED.status === 'superseded');
+ok('collectReleaseNumbers rejects a superseded release before collecting numbers', () => {
+  try {
+    collectReleaseNumbers(SUPERSEDED);
+    return false;
+  } catch (e) {
+    return /superseded/.test(e.message);
+  }
+});
+ok('the CLI fails when release.v1.json is superseded, even for its own MIRACL-de 0.857', () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'outward-superseded-'));
+  try {
+    fs.writeFileSync(path.join(root, 'settings.gradle.kts'), '');
+    fs.mkdirSync(path.join(root, 'scripts', 'jseval'), { recursive: true });
+    fs.writeFileSync(path.join(root, 'scripts', 'jseval', 'release.v1.json'), JSON.stringify(SUPERSEDED));
+    fs.writeFileSync(path.join(root, 'README.md'), 'MIRACL-de hybrid nDCG@10 = 0.857.\n');
+    const result = spawnSync(process.execPath, [path.join(HERE, 'check-outward-number-citations.mjs')], {
+      cwd: root,
+      encoding: 'utf8',
+    });
+    return result.status !== 0 && /superseded/.test(result.stderr);
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
   }

@@ -99,7 +99,36 @@ function loadSelection(root) {
   if (sha256(observationsPath) !== manifest.observations.sha256) {
     throw new Error("selected agent-utility observation evidence hash mismatch");
   }
-  return { pointer, manifest, record };
+  const projectionPath = path.join(root, "scripts/jseval/public-agent-utility/question-level.v1.json");
+  let projection = null;
+  if (fs.existsSync(projectionPath)) {
+    projection = readJson(projectionPath);
+    const policy = activeClaimPolicy(root);
+    const policyPath = path.join(root, "scripts/jseval/utility-claim-policy.v5.json");
+    if (projection.schema !== "agent-utility-question-level-projection.v1" ||
+        projection.publication_id !== manifest.publication_id ||
+        projection.record_sha256 !== manifest.record.sha256 ||
+        projection.observations_sha256 !== manifest.observations.sha256 ||
+        projection.policy_id !== policy.policy_id ||
+        projection.policy_sha256 !== sha256(policyPath) ||
+        projection.outcome !== record.claim_verdict.outcome) {
+      throw new Error("question-level projection does not match the selected publication and active policy");
+    }
+    const byId = new Map(projection.strata.map((cell) => [cell.stratum_id, cell.question_level]));
+    const strata = record.estimands.intention_to_treat.strata;
+    if (byId.size !== strata.length) throw new Error("question-level projection has different strata");
+    for (const cell of strata) {
+      const stats = byId.get(cell.stratum_id);
+      if (!stats || stats.unit !== "qid" || stats.n_paired_cells !== cell.n_paired_observations ||
+          stats.n_qids !== cell.query_count ||
+          Math.abs(stats.aggregate_delta - cell.accuracy.delta) > 0.000051 ||
+          !Array.isArray(stats.delta_ci) || stats.delta_ci.length !== 2) {
+        throw new Error(`question-level projection changes the paired set or estimate: ${cell.stratum_id}`);
+      }
+      cell.question_level = stats;
+    }
+  }
+  return { pointer, manifest, record, projection };
 }
 
 function cells(record) {
@@ -148,6 +177,10 @@ function accuracyDelta(value) {
     : "n/a";
 }
 
+function accuracyBlock(cell) {
+  return cell.question_level ? { ...cell.accuracy, delta_ci: cell.question_level.delta_ci } : cell.accuracy;
+}
+
 function usd(value, signedValue = false) {
   if (typeof value !== "number" || !Number.isFinite(value)) return "n/a";
   const prefix = value < 0 ? "-" : signedValue ? "+" : "";
@@ -183,7 +216,7 @@ function researchTable(record) {
       const tokens = deltaWithInterval(
         cell.provider_cache_creation_input_tokens, "delta_mean", (value) => signed(value, 1),
       );
-      const accuracy = deltaWithInterval(cell.accuracy, "delta", accuracyDelta);
+      const accuracy = deltaWithInterval(accuracyBlock(cell), "delta", accuracyDelta);
       const adoption = percentage(cell.adoption?.with_tool?.adoption_rate);
       return `| ${stratumLabel(cell)} | ${markdown(cell.model)} | ${outcome} | ${tokens} | ${accuracy} | ${adoption} | ${cell.n_paired_observations} |`;
     }),
@@ -201,7 +234,7 @@ function metricTable(cell) {
   return [
     "| Measure | Condition A | Condition B (with JustSearch) | Paired delta and interval |",
     "|---|---:|---:|---:|",
-    `| Accuracy | ${percentage(cell.accuracy?.baseline)} | ${percentage(cell.accuracy?.with_tool)} | ${deltaWithInterval(cell.accuracy, "delta", accuracyDelta)} |`,
+    `| Accuracy | ${percentage(cell.accuracy?.baseline)} | ${percentage(cell.accuracy?.with_tool)} | ${deltaWithInterval(accuracyBlock(cell), "delta", accuracyDelta)} |`,
     `| Provider cache-creation input tokens | ${distribution(tokens.baseline, (value) => number(value, 1))} | ${distribution(tokens.with_tool, (value) => number(value, 1))} | ${deltaWithInterval(tokens, "delta_mean", (value) => signed(value, 1))} |`,
     `| Cost (USD) | ${distribution(cost.baseline, usd)} | ${distribution(cost.with_tool, usd)} | ${deltaWithInterval(cost, "delta_mean", (value) => usd(value, true))} |`,
   ].join("\n");
@@ -245,6 +278,8 @@ function referenceStratum(cell, outcome) {
       `(${adopted.adopted_cells ?? "n/a"}/${adopted.eligible_cells ?? "n/a"} eligible cells).`,
     "",
     metricTable(cell),
+    ...(cell.question_level ? ["", `Accuracy interval: question-cluster ${cell.question_level.ci_method}, ` +
+      `${cell.question_level.n_qids} questions; paired sign-flip p=${number(cell.question_level.signflip_p_two_sided, 4)}.`] : []),
     "",
     `Seeds: ${cell.seed_count ?? "n/a"} (${(cell.seed_ids || []).map(markdown).join(", ") || "n/a"}); ` +
       `queries: ${cell.query_count ?? "n/a"}; expected/observed cells: ` +
@@ -313,14 +348,22 @@ function accepted(selection, target) {
   const identity =
     `Accepted publication \`${manifest.publication_id}\` (record ` +
     `\`${record.semantic_digest.slice(0, 12)}\`, policy \`${manifest.policy.id}\`).`;
+  const recomputed = selection.projection ?
+    "Accuracy intervals are recomputed from the published observations under v5 question-level semantics " +
+    "(95% question-cluster bootstrap; seeds are replicates within questions). Point estimates and the " +
+    "historical adoption-only outcome are unchanged. Token and cost intervals remain descriptive cell-level intervals. " +
+    "Provenance: `scripts/jseval/public-agent-utility/question-level.v1.json`; reproduce with " +
+    "`python -m jseval.utility_public_projection --check`. The hash-pinned v4 bundle is unchanged." : "";
   if (target === "readme") {
     return `${identity} ${outcomeStatement}\n\n` +
+      (recomputed ? `${recomputed}\n\n` : "") +
       "[See the per-stratum evidence, provenance, and limitations](docs/reference/benchmarks/agent-utility.md).";
   }
   if (target === "research") {
     return [
       `${identity} ${outcomeStatement}`,
       "",
+      ...(recomputed ? [recomputed, ""] : []),
       researchTable(record),
       "",
       "Provider cache-creation input tokens exclude cache reads and retain the provider-specific meaning of that counter. " +
@@ -335,6 +378,7 @@ function accepted(selection, target) {
   return [
     `${identity} ${outcomeStatement}`,
     "",
+    ...(recomputed ? [recomputed, ""] : []),
     ...cells(record).flatMap(({ cell, outcome: stratumOutcome }) => [
       referenceStratum(cell, stratumOutcome), "",
     ]),
