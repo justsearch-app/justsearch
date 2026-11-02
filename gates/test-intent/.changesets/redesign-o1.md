@@ -949,4 +949,190 @@ window; refreshed test-intent execution evidence and acceptance; assessment of t
 suite Nvidia failure. The builder does not author the verifier's evidence or acceptance and does
 not change GPU detection to resolve an out-of-scope assertion.
 
+## Final repair round: native upgrade admission and pointer protection
+
+This is the third and final repair round. The candidate is narrowed to the verifier's four
+findings; creation, retirement, recorded bindings, and the existing S17 unreferenced-leftover
+exemption retain their contracts. Admission now reads current state and then the previous pointer
+exactly in native boot order, without restoring or normalizing either. It protects active, building
+and previous directory bindings, including marked and empty directories, before any initializer
+writes. Recovery restores the native v1/.prev historical layout without changing recorded fallback
+fences. Lucene 10.4.0's bundled codec extensions were read from the dependency's constants; unknown
+extensions and files whose link count cannot be established as one are refused. Windows uses the
+existing no-follow native handle and its BY_HANDLE_FILE_INFORMATION link count. The two OS reads
+now call the existing configuration funnel; SystemAccessFunnelTest and its allowlist are unchanged.
+A genuine foreign Lucene index with an agreeing backup remains an explicitly documented limit.
+
+Call-path addition: `WindowsOwnerOnlyDirectory#requireSingleLink` exposes that existing native
+inspection to the Lucene adapter. No new persisted structure or persisted meaning is introduced.
+The unchanged clean-shutdown sibling issue was reproduced by verifier-2 on both main and the
+candidate, so no control-file deletion was added.
+
+Both new test files are isolated ([exempt]), durable, use only temporary resources, and do not
+change process-global state. The scoped static AtomicFileWrites mock closes after every case.
+The release checks read the committed upgrade-030/small.zip without relocation or rewriting any
+Lucene bytes, exercise both historical layouts, and assert all 38 documents remain searchable.
+Synthetic checks also search a real one-document Lucene index. The marked-pointer matrix covers
+active/building/previous, DELETEME/deletion-name/empty shapes, v2/v1 and absent/empty/torn .prev
+fallbacks, through seven initializers; whole-namespace snapshots include state.json and .prev.
+
+Sources of intent (agent choices, one per quoted scenario):
+
+- kind: delegated-choice
+- delegationQuote: "now proceed autonomusly with remaining design work and potentially some research. once done, you can proceed with the implementations of the remaining work you proposed and designed"
+- delegationLocation: "task t-20261102-redesign request"
+- delegationScope: "implement the redesigns and fixes the orchestrator proposed and designed after the ingestion defect list"
+- choice: "U1/U2 completed: the admission repair resolves the active identity exactly as the base's boot does in every state the base accepts: state.json format 2, state.json format 1 (native normalization), and state.json.prev when state.json is absent, empty or torn and the base falls back to it."
+- choice: "S5/S6 completed: a directory named by any resolved state pointer (active, building or previous; from v2, v1 or .prev) is never treated as a warning-only marked leftover, whatever it contains (DELETEME, .del- name, missing metadata)."
+- choice: "S7 allowlist tightened: only real regular files with a link count of 1 where the platform reports it (on Windows through the existing native-handle checks; if a platform cannot report it, refuse rather than assume), whose names match the Lucene index-file grammar of the bundled Lucene version (segments_N, write.lock, and _<generation>[_<suffix>].<extension> with the extensions that Lucene's codecs in this build actually write); anything else is refused, unchanged."
+- label: "agent choice"
+
+Defect safeguards: no data loss (the pointer matrix and link/extension refusals prevent writing or
+claiming foreign bytes), no leak across a requested scope (an external hard-link alias keeps its
+bytes when the empty sentinel is atomically replaced). Reproductions construct these objects on a
+real temporary filesystem and compare returned refusal plus byte snapshots. Compatibility checks
+are preservation against original main and regression repairs against the rejected candidate;
+they are deliberately not misclassified as original-main assertion failures in `newChecks`.
+
+Repair replay (no compatibility patch is needed on 49486d3eca):
+
+```text
+--before 49486d3eca
+--overlay modules/worker-core/src/test/java/io/justsearch/indexerworker/index/HistoricalOwnershipAdmissionTest.java
+--overlay modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/ReleasedOwnershipUpgradeTest.java
+--check modules/worker-core/src/test/java/io/justsearch/indexerworker/index/HistoricalOwnershipAdmissionTest.java#recoveredActiveAcceptsV1Pointer
+--check modules/worker-core/src/test/java/io/justsearch/indexerworker/index/HistoricalOwnershipAdmissionTest.java#recoveredActiveAcceptsEveryPreviousPointerFallback
+--check modules/worker-core/src/test/java/io/justsearch/indexerworker/index/HistoricalOwnershipAdmissionTest.java#emptySentinelAcceptsV1Pointer
+--check modules/worker-core/src/test/java/io/justsearch/indexerworker/index/HistoricalOwnershipAdmissionTest.java#emptySentinelAcceptsEveryPreviousPointerFallback
+--check modules/worker-core/src/test/java/io/justsearch/indexerworker/index/HistoricalOwnershipAdmissionTest.java#everyPointedUnprovenMarkedDirectoryRefusesEveryInitializerBeforeWrites
+--check modules/worker-core/src/test/java/io/justsearch/indexerworker/index/HistoricalOwnershipAdmissionTest.java#backupAuthorityRejectsHardLinkedLuceneFilesUnchanged
+--check modules/worker-core/src/test/java/io/justsearch/indexerworker/index/HistoricalOwnershipAdmissionTest.java#backupAuthorityRejectsUnknownLuceneExtensionUnchanged
+--check modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/ReleasedOwnershipUpgradeTest.java#recoveredReleasedBytesStartWithV1AndEveryPreviousPointerFallback
+--check modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/ReleasedOwnershipUpgradeTest.java#emptySentinelReleasedBytesStartWithV1AndEveryPreviousPointerFallback
+--check modules/dead-code-audit/src/test/java/io/justsearch/deadcode/SystemAccessFunnelTest.java#every_system_access_outside_the_configuration_funnel_is_on_the_allowlist
+```
+
+Additional preservation checks on 49486d3eca (same overlays):
+
+```text
+--check modules/worker-core/src/test/java/io/justsearch/indexerworker/index/HistoricalOwnershipAdmissionTest.java#everyInitializerRepairsEmptySentinelBeforeOtherWritesWithoutChangingHardLinkAlias
+--check modules/worker-core/src/test/java/io/justsearch/indexerworker/index/HistoricalOwnershipAdmissionTest.java#readOnlyGuardsLeaveEmptySentinelAndPointersUntouched
+--check modules/worker-core/src/test/java/io/justsearch/indexerworker/index/HistoricalOwnershipAdmissionTest.java#historicalLayoutsKeepCurrentPointerCompatibility
+--check modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/ReleasedOwnershipUpgradeTest.java#releasedBytesKeepCurrentPointerCompatibility
+```
+
+Original-main compatibility replay uses `--before 344bdaf03c` with the same two overlays, no
+`--before-patch` (these tests use only signatures already present there), and the first four worker
+checks, both historical release checks, and the two current-pointer compatibility checks above.
+The U2 first-write oracle requires the new atomic repair and is not an original-main preservation
+claim. Original S1-S17 replay remains `--before 344bdaf03c --before-patch
+gates/test-intent/compatibility/redesign-o1-before.patch` with the earlier check lists; it was not
+repeated in this bounded round. No generated evidence or independent acceptance is authored here.
+
+Initial harness setup is not counted as execution evidence: an overloaded JUnit method reference
+failed compilation and was replaced by an explicit lambda. The original-main native boot path does
+not guarantee metadata presence after v1/.prev fallback, so preservation observes active identity
+and searchable documents. Empty-sentinel preservation uses initializeForBoot directly, as the
+verifier's U2 reproduction does; recovery reconciliation is independently covered by the U2
+first-write check, where the repair itself is required. No pre-existing check or oracle changed.
+
+Round-3 execution results follow; all launched checks have finished.
+
+### Round-3 execution observations
+
+These are builder observations from JUnit XML and command logs, not formal evidence or acceptance.
+
+| Check (class#method; paths in the replay lists above) | 49486d3eca | Candidate | 344bdaf03c preservation |
+| --- | --- | --- | --- |
+| `HistoricalOwnershipAdmissionTest#backupAuthorityRejectsHardLinkedLuceneFilesUnchanged` | assertion failure | passed | not selected |
+| `HistoricalOwnershipAdmissionTest#backupAuthorityRejectsUnknownLuceneExtensionUnchanged` | assertion failure | passed | not selected |
+| `HistoricalOwnershipAdmissionTest#emptySentinelAcceptsEveryPreviousPointerFallback` | assertion failure | passed | passed |
+| `HistoricalOwnershipAdmissionTest#emptySentinelAcceptsV1Pointer` | assertion failure | passed | passed |
+| `HistoricalOwnershipAdmissionTest#everyInitializerRepairsEmptySentinelBeforeOtherWritesWithoutChangingHardLinkAlias` | passed | passed | not selected |
+| `HistoricalOwnershipAdmissionTest#everyPointedUnprovenMarkedDirectoryRefusesEveryInitializerBeforeWrites` | assertion failure | passed | not selected |
+| `HistoricalOwnershipAdmissionTest#historicalLayoutsKeepCurrentPointerCompatibility` | passed | passed | passed |
+| `HistoricalOwnershipAdmissionTest#readOnlyGuardsLeaveEmptySentinelAndPointersUntouched` | passed | passed | not selected |
+| `HistoricalOwnershipAdmissionTest#recoveredActiveAcceptsEveryPreviousPointerFallback` | assertion failure | passed | passed |
+| `HistoricalOwnershipAdmissionTest#recoveredActiveAcceptsV1Pointer` | assertion failure | passed | passed |
+| `ReleasedOwnershipUpgradeTest#emptySentinelReleasedBytesStartWithV1AndEveryPreviousPointerFallback` | assertion failure | passed | passed |
+| `ReleasedOwnershipUpgradeTest#recoveredReleasedBytesStartWithV1AndEveryPreviousPointerFallback` | assertion failure | passed | passed |
+| `ReleasedOwnershipUpgradeTest#releasedBytesKeepCurrentPointerCompatibility` | passed | passed | passed |
+| `SystemAccessFunnelTest#every_system_access_outside_the_configuration_funnel_is_on_the_allowlist` | assertion failure | passed | not selected |
+
+All before-state failures are AssertionFailedError or MultipleFailuresError, with no skips or
+unrelated exceptions. The pointed-directory test reaches 378 combinations; 369 assertions fail on
+49486d3eca, and all 378 combinations pass on the repaired candidate. The native v1/.prev
+compatibility checks are preservation against main, rather than original-main fail-before claims.
+
+The complete module command exited 1 (27m56s plus 61 seconds waiting for a slot). Its saved XML
+is in `$TMPDIR/o1-round3-full-results/`, captured before focused replays could replace it.
+
+```sh
+env -u DISPLAY -u WAYLAND_DISPLAY js-gradle-slot ./gradlew -PskipWebBuild=true --continue :modules:configuration:test :modules:worker-core:test :modules:adapters-lucene:test :modules:indexer-worker:test :modules:app-services:test :modules:ui:test :modules:ipc-common:test
+```
+
+| Module | Tests | Failures | Skipped |
+| --- | ---: | ---: | ---: |
+| configuration | 370 | 0 | 0 |
+| worker-core | 647 | 0 | 15 |
+| adapters-lucene | 960 | 0 | 3 |
+| indexer-worker | 2503 | 1 | 39 |
+| app-services | 5035 | 1 | 11 |
+| ui | 2374 | 1 | 2 |
+| ipc-common | 4 | 0 | 0 |
+
+Exactly three unchanged tests failed in the broad command:
+
+- `ExtractionInfrastructureTest#snapshotStorage(readonly-child)`: the initial healthy-source extraction timed out after 5,000 ms.
+- `GplStageReportWriteOnlyTest#no production code reads either stage-3 report back`: Files.walk encountered a removed `modules/indexer-worker/build/tmp/test-jvm/test/junit-*` directory.
+- `NvidiaSmiAvailabilityHttpTest#anInstalledNvidiaSmiIsAvailableWhenNvmlSuppliesTheMemory`: nvidiaSmiAvailable was false although the fixture expected true.
+
+Main compatibility replay: exit 0; all eight preservation methods passed (five synthetic and
+three released-byte methods). Its worker task reused the identical final-source results freshly
+executed in the preceding main replay; the released-byte methods ran freshly. Main's focused
+ExtractionInfrastructureTest also freshly passed all eight cases. Main's focused GPL check freshly
+passed all three cases. The first main Nvidia result was FROM-CACHE and is not counted as a fresh
+environmental replay; the subsequent `--rerun` invocation freshly passed both Nvidia checks
+(exit 0, 14 seconds). The broad command is not relabeled green.
+
+Final candidate compatibility/extraction replay: exit 0, 16 selected tests, zero failures or skips.
+All 13 new ownership methods and the unchanged system-access guard passed on the candidate.
+ExtractionInfrastructureTest freshly passed all eight cases on both main and the candidate; the
+five-second warmup failure in the broad run did not reproduce in either focused replay.
+
+Candidate GPL/Nvidia replay: exit 0, 27 seconds, all five checks freshly passed without skips.
+All three broad-suite failures therefore passed focused replays on both main and the candidate.
+This does not establish that the broad-suite failures were environmental or that the broad
+command passed.
+
+`env -u DISPLAY -u WAYLAND_DISPLAY node scripts/dev/java-prepush.mjs --unreferenced`
+passed (exit 0, 7m25s after 770 seconds waiting for a shared slot; 76 tasks executed,
+two from cache, 173 up-to-date). Compilation, PMD, all three UnreferencedCodeTest checks and
+the reached integration tasks completed without failures; skipped real-drive/model cases are
+not claimed as passes. The outer check driver returns exit 1 to preserve the earlier module
+suite failure, rather than masking it with the later successful prepush.
+
+`node scripts/governance/gates/test-intent/cli.mjs --base 344bdaf03c` exits 1 with exactly one
+problem: missing independent acceptance. All flagged files are covered, and both new test files
+are classified [exempt]. The builder has not supplied an acceptance record. `git diff --check`
+passes. No tests or product code changed after the reported final checks.
+
+Handback: implementation complete, acceptance blocked by the three broad-suite failures in
+unchanged tests. They need independent assessment by the orchestrator; their focused passes are
+reported without calling the broad command green. The original S1-S17 fail-before evidence and
+compatibility patch remain unchanged; this round adds the final-candidate regression/preservation
+observations above.
+
+Shared resources touched: the prescribed Gradle slots and Gradle dependency/build cache, plus
+machine CPU. Tests used their own temporary files, child processes and ports. No shared dev stack,
+owner application, GPU workload or another checkout's dependency tree was used. Both baseline
+checkouts are shared clones inside `$TMPDIR`, with independent build folders. The verifier's
+`tmp/verifier2-probes/` was read only. No `.agents/preflight` exists. No commit, push, publication,
+generated evidence or independent acceptance was made. Head remains 49486d3eca.
+
+Tests added or rewritten in this round:
+
+- `modules/worker-core/src/test/java/io/justsearch/indexerworker/index/HistoricalOwnershipAdmissionTest.java` — U1/U2, S5/S6 pointed-directory admission, S7 link/codec allowlist and read-only/atomic-repair preservation — durable
+- `modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/ReleasedOwnershipUpgradeTest.java` — U1/U2 with unchanged released index bytes and 38 searchable documents in every pointer layout — durable
+
 ## Acceptance records

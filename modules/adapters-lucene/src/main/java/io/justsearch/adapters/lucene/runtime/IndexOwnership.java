@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.adapters.lucene.runtime;
 
+import io.justsearch.configuration.PlatformPaths;
 import io.justsearch.configuration.persistence.AtomicFileWrites;
 import io.justsearch.configuration.persistence.WindowsOwnerOnlyDirectory;
 import java.io.IOException;
@@ -90,7 +91,7 @@ public final class IndexOwnership {
   public static BasicFileAttributes plainAttributes(Path path) throws IOException {
     BasicFileAttributes attributes = Files.readAttributes(path, BasicFileAttributes.class, LinkOption.NOFOLLOW_LINKS);
     if (attributes.isSymbolicLink() || attributes.isOther()) throw new Unproven(path, "link");
-    if (System.getProperty("os.name", "").startsWith("Windows")) {
+    if (PlatformPaths.isWindows()) {
       try { WindowsOwnerOnlyDirectory.requireNonReparsePoint(path); }
       catch (IOException failure) {
         if (failure.getMessage().startsWith("Reparse point")) throw new Unproven(path, "link");
@@ -302,39 +303,47 @@ public final class IndexOwnership {
 
   /** Common read-only physical gate; pointer and recorded-operation decisions remain with their owner. */
   public static NamespaceInspection inspectNamespace(Path basePath) throws IOException {
-    return inspectNamespace(basePath, () -> null);
+    return inspectNamespace(basePath, null, Set.of());
   }
 
   /**
-   * Like {@link #inspectNamespace(Path)}; {@code pointedActive} supplies the active identity the
-   * authoritative state pointer names, or null, and is asked only when an unproven canonical
-   * directory is found. Pointers never prove ownership: they only select which directory the two
-   * narrow historical repairs may apply to.
+   * Pointers select the two narrow historical active repairs, never ownership. Every referenced
+   * directory must pass admission even if its name or DELETEME would otherwise mark a leftover.
    */
   public static NamespaceInspection inspectNamespace(Path basePath,
-      java.util.function.Supplier<String> pointedActive) throws IOException {
-    try { return inspectNamespaceEntries(realBase(basePath), pointedActive); }
+      String pointedActive, Set<String> pointedGenerations) throws IOException {
+    try { return inspectNamespaceEntries(realBase(basePath), pointedActive, pointedGenerations); }
     catch (Unproven refusal) { throw refusal; }
     catch (IOException unreadable) { throw new Unproven(basePath, "unreadable"); }
   }
 
-  // Lucene index file names: segments_N, pending_segments_N, write.lock, and per-segment files
-  // such as _0.cfs, _0_1.liv or _0_Lucene99HnswVectorsFormat_0.vem.
+  // Lucene 10.4.0 IndexFileNames.CODEC_FILE_PATTERN and the extensions written by its bundled
+  // codecs (including compound, live docs and vector formats):
+  // https://lucene.apache.org/core/10_4_0/core/org/apache/lucene/index/IndexFileNames.html
   private static final Pattern LUCENE_FILE = Pattern.compile(
-      "segments_[0-9a-z]+|pending_segments_[0-9a-z]+|segments\\.gen|write\\.lock"
-          + "|_[0-9a-z]+(_[A-Za-z0-9-]+)*\\.[A-Za-z0-9]+");
+      "segments_[0-9a-z]+|write\\.lock"
+          + "|_[a-z0-9]+(_.*)?\\.(tim|tip|tmd|psm|doc|pos|pay|vemq|veq|cfs|cfe|dvd|dvm|liv"
+          + "|nvd|nvm|kdd|kdi|kdm|fdt|fdx|fdm|tvd|tvx|tvm|fnm|vemf|vec|vem|vex|si)");
 
-  /** True only for a non-empty directory of real regular Lucene files: no links, subdirectories or other names. */
+  /**
+   * The historical recovery authority admits real regular Lucene files with one link only.
+   * A foreign Lucene index beside an agreeing owned backup is indistinguishable here and remains
+   * accepted: the named limit of historical in-place recovery using backup ownership evidence.
+   */
   public static boolean holdsOnlyLuceneFiles(Path directory) throws IOException {
     requireDirectory(directory);
     boolean any = false;
     try (var entries = Files.list(directory)) {
       for (Path entry : entries.toList()) {
         if (!LUCENE_FILE.matcher(entry.getFileName().toString()).matches()) return false;
-        BasicFileAttributes attributes;
-        try { attributes = plainAttributes(entry); }
-        catch (Unproven link) { return false; }
-        if (!attributes.isRegularFile()) return false;
+        try {
+          if (!plainAttributes(entry).isRegularFile()) return false;
+          if (PlatformPaths.isWindows()) WindowsOwnerOnlyDirectory.requireSingleLink(entry);
+          else {
+            Object links = Files.getAttribute(entry, "unix:nlink", LinkOption.NOFOLLOW_LINKS);
+            if (!(links instanceof Number count) || count.longValue() != 1) return false;
+          }
+        } catch (IOException | UnsupportedOperationException unavailable) { return false; }
         any = true;
       }
     }
@@ -392,7 +401,7 @@ public final class IndexOwnership {
   }
 
   private static NamespaceInspection inspectNamespaceEntries(Path basePath,
-      java.util.function.Supplier<String> pointedActive) throws IOException {
+      String pointedActive, Set<String> pointedGenerations) throws IOException {
     Path indicesDir = basePath.resolve("indices");
     Path statePath = basePath.resolve("state.json");
     Path statePrevPath = basePath.resolve("state.json.prev");
@@ -451,14 +460,17 @@ public final class IndexOwnership {
                   && Files.exists(entry.resolve("DELETEME"), LinkOption.NOFOLLOW_LINKS);
           try {
             inspect(entry, indicesDir);
+            if (pointedGenerations.contains(name) && representation.role() != Role.CANONICAL) {
+              throw new Unproven(entry, "wrong identity");
+            }
             if (representation != null && representation.role() == IndexOwnership.Role.CANONICAL) {
               ownedCanonical.add(entry);
             }
           } catch (IOException unproven) {
-            if (marked) { addWarning(warnings, entry, unproven.getMessage()); continue; }
+            if (marked && !pointedGenerations.contains(name)) { addWarning(warnings, entry, unproven.getMessage()); continue; }
             if (unproven instanceof Unproven refusal && "link".equals(refusal.evidenceClass())) throw refusal;
             if (unproven instanceof Unproven && representation != null && representation.role() == Role.CANONICAL
-                && attributes.isDirectory() && !attributes.isOther() && name.equals(pointedActive.get())) {
+                && attributes.isDirectory() && !attributes.isOther() && name.equals(pointedActive)) {
               if (restorableActive == null && holdsOnlyLuceneFiles(entry)
                   && agreedBackupEvidence(indicesDir, name) != null) {
                 restorableActive = entry;
@@ -469,7 +481,8 @@ public final class IndexOwnership {
                 continue;
               }
             }
-            if (!attributes.isSymbolicLink() && !attributes.isOther() && attributes.isDirectory()) {
+            if (!pointedGenerations.contains(name)
+                && !attributes.isSymbolicLink() && !attributes.isOther() && attributes.isDirectory()) {
               try (var contents = Files.list(entry)) {
                 if (contents.findAny().isEmpty()) continue;
               }
@@ -539,7 +552,7 @@ public final class IndexOwnership {
   }
 
   public static void forceDirectory(Path directory) throws IOException {
-    if (System.getProperty("os.name", "").startsWith("Windows")) {
+    if (PlatformPaths.isWindows()) {
       // AtomicFileWrites promises forced files and atomic moves on Windows, not
       // parent-directory entry durability across physical power loss. POSIX supports this force.
       return;

@@ -67,10 +67,15 @@ public final class WindowsOwnerOnlyDirectory {
 
   /** Opens the entry itself and rejects reparse points before an index operation. */
   public static void requireNonReparsePoint(Path path) throws IOException {
-    inspectEntry(path);
+    inspectEntry(path, false);
   }
 
-  private static void inspectEntry(Path path) throws IOException {
+  /** Opens the entry itself and requires one link for historical index recovery admission. */
+  public static void requireSingleLink(Path path) throws IOException {
+    inspectEntry(path, true);
+  }
+
+  private static void inspectEntry(Path path, boolean singleLink) throws IOException {
     try (Arena arena = Arena.ofConfined()) {
       MemorySegment captured = arena.allocate(Win32.STATE);
       MemorySegment handle = (MemorySegment) Win32.OPEN.invokeExact(captured,
@@ -84,6 +89,9 @@ public final class WindowsOwnerOnlyDirectory {
         }
         if ((information.get(ValueLayout.JAVA_INT, 0) & 0x400) != 0) {
           throw new IOException("Reparse point is not an owned entry: " + path);
+        }
+        if (singleLink && Integer.toUnsignedLong(information.get(ValueLayout.JAVA_INT, 40)) != 1) {
+          throw new IOException("Entry must have exactly one link: " + path);
         }
       } finally {
         int _ = (int) Win32.CLOSE.invokeExact(handle);

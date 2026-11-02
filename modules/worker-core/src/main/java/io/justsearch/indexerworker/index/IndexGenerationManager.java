@@ -323,7 +323,16 @@ public final class IndexGenerationManager {
 
   private IndexOwnership.NamespaceInspection admitNamespace(Admission admission) throws IOException {
     cleanupWarnings = List.of();
-    var inspection = IndexOwnership.inspectNamespace(basePath, this::pointedActiveForAdmission);
+    State pointer = stateForAdmission();
+    var referenced = new java.util.HashSet<String>();
+    if (pointer != null) {
+      for (String identity : new String[] {pointer.active_generation(), pointer.building_generation(), pointer.previous_generation()}) {
+        if (identity != null && !identity.isBlank()) referenced.add(identity);
+      }
+    }
+    String active = pointer != null && (pointer.format_version() == 1 || pointer.format_version() == STATE_FORMAT_VERSION)
+        ? pointer.active_generation() : null;
+    var inspection = IndexOwnership.inspectNamespace(basePath, active, referenced);
     for (var warning : inspection.warnings()) warnCleanup(warning.path(), warning.reason());
     if (admission != Admission.READ_ONLY && inspection.sentinelRepair() != null) {
       // Before anything else writes: releases up to v0.1.0 wrote the sentinel non-atomically.
@@ -336,27 +345,30 @@ public final class IndexGenerationManager {
     return inspection;
   }
 
-  /**
-   * The current-format state pointer's active identity, else null. Read bounded through a
-   * non-following handle without waiting for locks: an unavailable pointer selects no repair.
-   */
-  private String pointedActiveForAdmission() {
+  /** Same current-then-previous selection as native boot, without normalization or restoration. */
+  private State stateForAdmission() throws IOException {
+    State current = readStateForAdmission(statePath);
+    return current != null ? current : readStateForAdmission(statePrevPath);
+  }
+
+  /** Bounded, non-following read; inspecting a pointer must never restore or rewrite it. */
+  private State readStateForAdmission(Path path) throws IOException {
     try {
-      if (!IndexOwnership.plainAttributes(statePath).isRegularFile()) return null;
+      if (!IndexOwnership.plainAttributes(path).isRegularFile()) {
+        throw new IndexOwnership.Unproven(path, "unexpected control object");
+      }
       byte[] bytes;
-      try (FileChannel channel = FileChannel.open(statePath, StandardOpenOption.READ, LinkOption.NOFOLLOW_LINKS)) {
+      try (FileChannel channel = FileChannel.open(path, StandardOpenOption.READ, LinkOption.NOFOLLOW_LINKS)) {
         var buffer = java.nio.ByteBuffer.allocate(16_385);
         while (buffer.hasRemaining() && channel.read(buffer) != -1) { }
-        if (buffer.position() > 16_384) return null;
+        if (buffer.position() > 16_384) throw new IndexOwnership.Unproven(path, "malformed");
         bytes = java.util.Arrays.copyOf(buffer.array(), buffer.position());
       }
-      State state = JSON.readValue(bytes, State.class);
-      if (state == null || state.format_version() != STATE_FORMAT_VERSION) return null;
-      return requireSafeGenerationId(state.active_generation(), "state.json active_generation");
-    } catch (IOException | RuntimeException unavailable) {
-      // The gate itself refuses non-regular pointers; an unreadable pointer selects no repair.
-      return null;
-    }
+      try { return JSON.readValue(bytes, State.class); }
+      catch (tools.jackson.core.JacksonException malformed) { return null; }
+    } catch (java.nio.file.NoSuchFileException absent) { return null;
+    } catch (IndexOwnership.Unproven refusal) { throw refusal;
+    } catch (IOException unavailable) { throw new IndexOwnership.Unproven(path, "unreadable"); }
   }
 
   private int removeEmptyLeftovers() throws IOException {
@@ -823,31 +835,23 @@ public final class IndexGenerationManager {
     Objects.requireNonNull(preparation, "preparation");
     try (var ignored = stateControl()) {
       var inspection = admitNamespace(Admission.RECOVERY);
-      if (Files.notExists(statePath, LinkOption.NOFOLLOW_LINKS)) {
-        return false;
-      }
       State state;
       try { state = readRecordedState(); }
       catch (IOException invalid) {
-        // Boot ownership decides whether ordinary .prev recovery is allowed. A malformed native
-        // pointer has no adapter-recovery authority yet; do not preempt that later decision.
-        if ((invalid.getCause() instanceof tools.jackson.core.JacksonException
-                || "Authoritative generation state is empty".equals(invalid.getMessage()))
-            && !hasRecordedFallbackEvidence()) return false;
-        throw invalid;
+        // Preserve recorded-operation fences: only native fallback may use the previous pointer.
+        state = stateForAdmission();
+        if (hasRecordedFallbackEvidence()) throw invalid;
+        if (state == null || retainedGenerationCount() > 1) return false;
       }
-      if (state.format_version() == 1) {
-        // Ownership-aware boot decides whether v1 is a native layout that may be normalized or a
-        // recorded/fenced layout that must remain read-only and fail strict validation.
-        return false;
-      }
-      if (state.format_version() != STATE_FORMAT_VERSION) {
-        throw new IOException("Recovery reconciliation requires current generation state format");
+      if (state.format_version() == 1 && hasRecordedFallbackEvidence()) return false;
+      if (state.format_version() != 1 && state.format_version() != STATE_FORMAT_VERSION) {
+        throw new IOException("Recovery reconciliation requires supported generation state format");
       }
       String generationId =
           requireSafeGenerationId(state.active_generation(), "state.json active_generation");
       try {
-        MigrationState.valueOf(state.migration_state());
+        MigrationState.valueOf(state.format_version() == 1 && state.migration_state() == null
+            ? MigrationState.IDLE.name() : state.migration_state());
       } catch (IllegalArgumentException | NullPointerException invalid) {
         throw new IOException("Authoritative generation phase is invalid", invalid);
       }
