@@ -377,3 +377,14 @@ exec env -u DISPLAY -u WAYLAND_DISPLAY js-gradle-slot ./gradlew -PskipWebBuild=t
 Baseline checks were grouped into the same four test tasks with the isolated enrichment classes and the additive status method selected. After the corrected retirement fixture, its exact method was selected again. The separate P1 preservation method was selected on the same baseline clone and passed. All Gradle invocations used -PskipWebBuild=true and unset DISPLAY/WAYLAND_DISPLAY; none used a shared running service or shared build output directory.
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "641bfced-e217-4f4f-9291-3353a2d25889",
+  "verdict": "accept",
+  "digest": "sha256:45fe8967126d66d7ed9554e94340c3eaa5339bcde29d82d215be5c3432222ea7",
+  "note": "Transcribed by the orchestrator from verifier-2 (Claude, session 641bfced-e217-4f4f-9291-3353a2d25889) on 63c8104675: accept overall (adaptation 12 files, status schema + fixture, four-file New entry, five exempt files)."
+}
+```
