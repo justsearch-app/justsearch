@@ -30,8 +30,8 @@ The source revision is `c2892448eadbf81d97fc507af1a8b666fd6c7896` with the uncom
 correction applied during measurement; each exact source summary is SHA-256-pinned in the release.
 The five runs used a clean data folder per collection and ran sequentially with nice/ionice.
 Hardware/runtime: Linux 7.0 (x86_64), NVIDIA RTX 4070 12 GB, driver 580.178.04,
-ORT 1.24.3 with host CUDA 12.9/cuDNN 9. Learned-sparse ablation rows changed in part because
-#1092 (windowed SPLADE encoding) is included in this measured source revision.
+ORT 1.24.3 with host CUDA 12.9/cuDNN 9. Learned-sparse ablation rows changed in part
+because #1092 (windowed SPLADE encoding) is included in this measured source revision.
 
 The Windows release `832-rebaseline-2026-08-14` is **superseded**: its MIRACL judgments retained
 only the first relevant document and its hybrid description incorrectly included learned-sparse.
