@@ -376,7 +376,9 @@ public final class ActionLedgerProjection {
   /** Coarse originator attribution derived from the source transport. */
   public static String originatorOf(TransportTag transport) {
     return switch (transport) {
-      case LLM_EMISSION, AGENT_LOOP, WORKFLOW, MCP -> "agent";
+      // An outside program holding only the manifest token is not the person: same class as MCP.
+      // Persisted attribution (ingestion queue) accepts only user/agent/system.
+      case LLM_EMISSION, AGENT_LOOP, WORKFLOW, MCP, HTTP_API -> "agent";
       case SYSTEM_INTERNAL, SCHEDULED, RULE_ENGINE -> "system";
       default -> "user";
     };

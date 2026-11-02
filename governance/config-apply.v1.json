@@ -1047,6 +1047,10 @@
       "applyScope": "hot"
     },
     {
+      "key": "justsearch.windowCredential",
+      "applyScope": "restart-required"
+    },
+    {
       "key": "policy.gpu_acceleration_enabled",
       "applyScope": "restart-required"
     },

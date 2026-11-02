@@ -836,6 +836,7 @@ fn spawn_headless_backend<R: tauri::Runtime>(
         // session token and enforce it on every mutating loopback request. Browser development
         // uses the separate dev-stack launch path and does not pass through this command.
         .arg("-Djustsearch.prod=true")
+        .arg("-Djustsearch.windowCredential=true")
         .arg(format!(
             "-Djustsearch.app.version={}",
             app.package_info().version
@@ -910,25 +911,13 @@ fn spawn_headless_backend<R: tauri::Runtime>(
         thread::spawn(move || {
             let reader = BufReader::new(stdout);
             for line in reader.lines().flatten() {
-                // Security: do NOT write JUSTSEARCH_SESSION_TOKEN= lines to the
-                // log file. The token is a secret that should only be delivered
-                // to the UI in-memory.
-                //
-                // Tempdoc 501 Phase 8: the consumer-side parse is gone —
-                // watch_manifest() now reads sessionToken from the manifest's
-                // head.sessionToken field. This line stays as a redaction
-                // guard so the token never lands on disk even if HeadlessApp
-                // keeps emitting it for human observation.
-                if line.starts_with("JUSTSEARCH_SESSION_TOKEN=") {
+                // Consume both secret records before logging; notify even when the manifest's
+                // token arrived first. The credential is bound to this admitted incarnation.
+                if state_clone.host.consume_credential_line(generation, &line) {
+                    state_clone.session_token_ready.notify_waiters();
                     continue;
                 }
 
-                // Write all other lines to the log file.
-                // Tempdoc 501 Phase 8: the JUSTSEARCH_API_PORT= and
-                // JUSTSEARCH_SESSION_TOKEN= stdout lines stay in the log for
-                // human observation but the consumer-side parse is gone —
-                // watch_manifest() is the ONLY discovery path, and tempdoc 805
-                // G.1 made the binding it feeds instance-keyed.
                 if let Ok(mut f) = log_clone.lock() {
                     let _ = writeln!(f, "{line}");
                 }
@@ -1154,13 +1143,16 @@ async fn api_port(state: tauri::State<'_, Arc<BackendState>>) -> Result<Option<u
 struct SessionCredential {
     origin: String,
     token: String,
+    #[serde(rename = "windowCredential")]
+    window_credential: String,
 }
 
 fn session_credential(state: &BackendState) -> Option<SessionCredential> {
-    let binding = state.binding_snapshot();
+    let (binding, window_credential) = state.host.window_session_binding()?;
     Some(SessionCredential {
         origin: format!("http://127.0.0.1:{}", binding.port?),
         token: binding.token?,
+        window_credential,
     })
 }
 

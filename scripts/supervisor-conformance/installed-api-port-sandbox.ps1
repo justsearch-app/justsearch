@@ -99,6 +99,8 @@ Copy-Item -LiteralPath $installer -Destination $stagedInstaller
 Copy-Item -LiteralPath $node -Destination $stagedNode
 Copy-Item -LiteralPath (Join-Path $PSScriptRoot "installed-api-port-restart.mjs") `
   -Destination $stagedFixture
+Copy-Item -LiteralPath (Join-Path $PSScriptRoot "window-request.mjs") `
+  -Destination (Join-Path $fixtureDir "window-request.mjs")
 Copy-Item -LiteralPath (Join-Path $PSScriptRoot "installed-api-port-sandbox-guest.ps1") `
   -Destination $stagedGuest
 Copy-Item -LiteralPath (Join-Path $repoRoot "modules\ui-web\src\api\operationKey.ts") `

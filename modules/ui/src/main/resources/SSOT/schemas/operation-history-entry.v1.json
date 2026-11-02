@@ -51,7 +51,7 @@
         },
         "transport" : {
           "type" : "string",
-          "enum" : [ "URL_BAR", "URL_DEEPLINK", "LLM_EMISSION", "PALETTE", "BUTTON", "RAIL", "AGENT_LOOP", "WORKFLOW", "MCP", "PLUGIN_EMITTED", "SCHEDULED", "RULE_ENGINE", "SYSTEM_INTERNAL" ]
+          "enum" : [ "URL_BAR", "URL_DEEPLINK", "LLM_EMISSION", "PALETTE", "BUTTON", "RAIL", "AGENT_LOOP", "WORKFLOW", "MCP", "PLUGIN_EMITTED", "SCHEDULED", "RULE_ENGINE", "SYSTEM_INTERNAL", "HTTP_API" ]
         }
       }
     },

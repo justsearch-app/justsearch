@@ -198,10 +198,11 @@ public final class PluginVerificationController {
 
   /**
    * POST /api/plugins/allowlist — operator approves a plugin artifact, adding its SHA-256 to the
-   * trust allowlist (persisted). The loopback-only API makes this inherently operator-local; the
+   * trust allowlist (persisted). Packaged app requests require window authority; the
    * approval is the explicit, auditable trust ceremony tempdoc 560 §28 relies on (short of Sigstore).
    */
   public void handleApprove(Context ctx) {
+    if (!WindowAuthority.require(ctx)) return;
     String sha = extractSha(ctx);
     if (sha == null) return; // extractSha already wrote the 400
     boolean added = addToAllowlist(sha);

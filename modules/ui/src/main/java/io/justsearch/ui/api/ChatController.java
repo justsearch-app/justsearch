@@ -266,7 +266,7 @@ public final class ChatController {
   private static Map<String, Object> readBody(Context ctx) {
     return ctx.body() == null || ctx.body().isEmpty()
         ? Map.of()
-        : MAPPER.readValue(ctx.body(), Map.class);
+        : WindowAuthority.limitAutonomy(ctx, MAPPER.readValue(ctx.body(), Map.class));
   }
 
   /**

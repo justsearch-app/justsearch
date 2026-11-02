@@ -96,23 +96,27 @@ public final class RequestEngineContext {
         TransportTag.AGENT_LOOP, incoming.survival(), incoming.urgency());
   }
 
-  /** Existing browser transport fallback; catalog resolution remains the trust authority. */
+  /** Only a verified window may claim a direct gesture; weaker provenance stays weaker. */
   private static TransportTag transport(Context request) {
     String header = request.header("X-JustSearch-Transport");
-    if (header == null || header.isBlank()) return TransportTag.BUTTON;
+    boolean window = WindowAuthority.hasAuthority(request);
+    if (header == null || header.isBlank()) return window ? TransportTag.BUTTON : TransportTag.HTTP_API;
     TransportTag declared;
     try {
       declared = TransportTag.valueOf(header.trim().toUpperCase(Locale.ROOT));
     } catch (IllegalArgumentException e) {
-      // Unknown cooperative hints have no authority and preserve the browser default. Registered
-      // backend-only transports are handled below and remain explicit rejections.
-      return TransportTag.BUTTON;
+      // Unknown hints keep the window default only with window authority. Registered
+      // backend-only transports remain explicit rejections.
+      return window ? TransportTag.BUTTON : TransportTag.HTTP_API;
     }
     return switch (declared) {
       // The shell also forwards untrusted provenance when approving/replaying an AI action.
-      case BUTTON, RAIL, PALETTE, URL_BAR, URL_DEEPLINK,
-          LLM_EMISSION, AGENT_LOOP, WORKFLOW, MCP -> declared;
-      case SYSTEM_INTERNAL -> TransportTag.BUTTON;
+      case BUTTON, RAIL, PALETTE, SYSTEM_INTERNAL -> window
+          ? (declared == TransportTag.SYSTEM_INTERNAL ? TransportTag.BUTTON : declared)
+          : TransportTag.HTTP_API;
+      case URL_BAR, URL_DEEPLINK, LLM_EMISSION, AGENT_LOOP, WORKFLOW, MCP -> declared;
+      // HTTP_API is Engine attribution, not a new cooperative hint in headless/dev/window calls.
+      case HTTP_API -> window ? TransportTag.BUTTON : TransportTag.HTTP_API;
       case PLUGIN_EMITTED, SCHEDULED, RULE_ENGINE ->
           throw new BadRequestResponse("Backend transport cannot be declared by HTTP header");
     };

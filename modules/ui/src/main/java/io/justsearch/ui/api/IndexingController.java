@@ -209,6 +209,7 @@ public class IndexingController {
   }
 
   public void handleAddRoot(Context ctx) {
+    if (!WindowAuthority.require(ctx)) return;
     try {
       Map<String, String> body = ctx.bodyAsClass(Map.class);
       String path = body.get("path");

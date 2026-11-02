@@ -426,7 +426,7 @@ async function main() {
             `Peek (no approval): GET http://127.0.0.1:${resolvedPort}/api/authorizations/pending/${pendingId}\n`,
           );
           process.stdout.write(
-            `Approve + execute: POST http://127.0.0.1:${resolvedPort}/api/authorizations/approve  body: {"pendingId":"${pendingId}","execute":true}\n`,
+            `Packaged app: approve this pending action in the app window. Headless/dev operator only: POST http://127.0.0.1:${resolvedPort}/api/authorizations/approve  body: {"pendingId":"${pendingId}","execute":true}\n`,
           );
         } else {
           process.stdout.write(

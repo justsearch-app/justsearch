@@ -24,6 +24,7 @@ enum Discovery {
 struct OwnedChild {
     child: Child,
     generation: u64,
+    window_credential: Option<String>,
     /// The incarnation's job (Spec F §2.1). `None` only when the job could not be created and the
     /// Engine was started uncontained.
     job: Option<IncarnationJob>,
@@ -213,6 +214,7 @@ impl EngineHost {
         inner.child = Some(OwnedChild {
             child,
             generation,
+            window_credential: None,
             job,
         });
         Ok(AdmittedChild {
@@ -305,6 +307,31 @@ impl EngineHost {
             .expect("engine host mutex poisoned")
             .binding
             .clone()
+    }
+
+    /// Consume secret stdout records before either logger sees them. A predecessor pipe cannot
+    /// install a credential on its successor, even if its drain thread runs late.
+    pub(crate) fn consume_credential_line(&self, generation: u64, line: &str) -> bool {
+        if line.starts_with("JUSTSEARCH_SESSION_TOKEN=") { return true; }
+        let Some(credential) = line.strip_prefix("JUSTSEARCH_WINDOW_CREDENTIAL=") else {
+            return false;
+        };
+        let mut inner = self.inner.lock().expect("engine host mutex poisoned");
+        if let Some(child) = inner.child.as_mut().filter(|child| child.generation == generation) {
+            if child.window_credential.is_none() && !credential.is_empty() {
+                child.window_credential = Some(credential.to_string());
+            }
+        }
+        true
+    }
+
+    /// Take the window credential and manifest binding atomically, after validating their owner.
+    /// This secret deliberately lives outside Binding/ManifestFields (which implement Debug).
+    pub(crate) fn window_session_binding(&self) -> Option<(Binding, String)> {
+        let inner = self.inner.lock().expect("engine host mutex poisoned");
+        let Discovery::Bound { pid, .. } = inner.discovery else { return None; };
+        let child = inner.child.as_ref().filter(|child| child.child.id() == pid)?;
+        Some((inner.binding.clone(), child.window_credential.clone()?))
     }
 
     /// One incarnation supplies the port, token and PID. Recheck the owned child after proof:

@@ -4,6 +4,8 @@ import os from 'node:os';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
 
+import { requestThroughWindow } from './window-request.mjs';
+
 import { createOperationKey } from '../../modules/ui-web/src/api/operationKey.ts';
 
 const guestUser = os.userInfo();
@@ -86,8 +88,9 @@ async function post(port, endpoint, token, body, timeoutMs = 10_000) {
   }, timeoutMs);
 }
 
-async function reserveFixedPort() {
+async function reserveFixedPort(excluded = new Set()) {
   for (let port = 41_000; port < 42_000; port += 1) {
+    if (excluded.has(port)) continue;
     const free = await new Promise((resolve) => {
       const server = net.createServer();
       server.once('error', () => resolve(false));
@@ -196,7 +199,7 @@ async function applyPort(binding, requestedPort, label) {
   // is the only process that could write this operation COMPLETE before its recorded exit.
   const exitObservationPromise = observePredecessorExit(
     path.join(runtime, 'supervisor.v1.json'), oldSupervisor);
-  const receipt = await post(oldPort, '/api/settings/v2', token, {
+  const receipt = await requestThroughWindow(debugPort, '/api/settings/v2', {
     witness: settingsResponse.body.witness,
     operationKey,
     apiPort: requestedPort,
@@ -322,9 +325,12 @@ async function terminateOwnedShellTree() {
 }
 
 const fixedPort = await reserveFixedPort();
+// Release devtools are enabled in this owned Windows Sandbox session only.
+const debugPort = await reserveFixedPort(new Set([fixedPort]));
 const shell = spawn(installedExe, [], {
   cwd: path.dirname(installedExe),
-  env: cleanChildEnvironment(),
+  env: { ...cleanChildEnvironment(),
+    WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS: `--remote-debugging-port=${debugPort}` },
   stdio: ['ignore', 'ignore', 'pipe'],
   windowsHide: true,
 });
@@ -338,6 +344,14 @@ try {
       throw new Error(`installed shell exited during startup: code=${shell.exitCode} signal=${shell.signalCode} ${shellError}`);
     }
     return currentBinding();
+  });
+  await waitFor('owned installed webview', 30_000, async () => {
+    const response = await fetch(`http://127.0.0.1:${debugPort}/json/list`, {
+      signal: AbortSignal.timeout(2000),
+    });
+    const pages = await response.json();
+    return pages.some(page => page.type === 'page'
+      && /^(?:http:\/\/tauri\.localhost|tauri:\/\/localhost)(?:\/|$)/.test(page.url));
   });
   requireProductPolicy(initial, 'initial binding');
   const fixed = await applyPort(initial, fixedPort, 'fixed');

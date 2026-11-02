@@ -897,6 +897,28 @@ print(json.dumps({'content':content,'truncated':offset>0}))
             raise Unavailable('Prerequisite unavailable: ' + key)
         return self.facts[key]
 
+    def window_api(self, endpoint, body):
+        # Packaged app: the manifest token reads and searches only. Changes the person would make
+        # (add a folder, start an install) go through the app window's own credential.
+        if not self.wd:
+            raise Unavailable('App window required for a mutation in the packaged release journey')
+        # Keep the credential inside the owned WebDriver webview; evidence contains responses only.
+        result = self.wd.execute("""
+return (async () => {
+ const credential = await window.__TAURI_INTERNALS__.invoke('session_token');
+ if (!credential?.windowCredential) throw new Error('Window credential not ready');
+ const response = await fetch(credential.origin + arguments[0], {
+   method:'POST', redirect:'error', headers:{'Content-Type':'application/json',
+     'X-JustSearch-Session':credential.token, 'X-JustSearch-Window':credential.windowCredential},
+   body:JSON.stringify(arguments[1])
+ });
+ return {status:response.status, text:await response.text()};
+})();
+""", [endpoint, body])
+        if not result or not 200 <= result.get('status', 0) < 300:
+            raise ProductFailure('App window request failed: ' + json.dumps(result))
+        return json.loads(result['text'])
+
     def api(self, endpoint, body=None):
         # Follow the installed shell's production manifest, never a guessed port.
         # Verify its live instance before sending its owner-only credential.

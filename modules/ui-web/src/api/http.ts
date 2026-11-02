@@ -184,6 +184,7 @@ export function createApiError(
 
 /** Header name for the desktop session token (must match backend). */
 export const SESSION_TOKEN_HEADER = 'X-JustSearch-Session';
+const WINDOW_CREDENTIAL_HEADER = 'X-JustSearch-Window';
 
 /**
  * The webview's half of the backend binding (tempdoc 805 G.1).
@@ -199,6 +200,7 @@ export const SESSION_TOKEN_HEADER = 'X-JustSearch-Session';
  */
 interface SessionTokenBinding {
   token: string | null;
+  windowCredential: string | null;
   origin: string | null;
   resolved: boolean;
   inFlight: Promise<string | null> | null;
@@ -208,6 +210,7 @@ interface SessionTokenBinding {
 
 const sessionBinding: SessionTokenBinding = {
   token: null,
+  windowCredential: null,
   origin: null,
   resolved: false,
   inFlight: null,
@@ -223,6 +226,7 @@ const sessionBinding: SessionTokenBinding = {
  */
 export function invalidateSessionToken(): void {
   sessionBinding.token = null;
+  sessionBinding.windowCredential = null;
   sessionBinding.origin = null;
   sessionBinding.resolved = false;
   sessionBinding.inFlight = null;
@@ -287,7 +291,7 @@ export async function resolveSessionTokenFromTauri(): Promise<string | null> {
   const pending = (async (): Promise<string | null> => {
     try {
       const { invoke } = await import('@tauri-apps/api/core');
-      const credential = await invoke<{ origin?: unknown; token?: unknown } | null>('session_token');
+      const credential = await invoke<{ origin?: unknown; token?: unknown; windowCredential?: unknown } | null>('session_token');
       const normalized = normalizeNonBlankString(credential?.token);
       const origin = normalizeNonBlankString(credential?.origin);
       // Only the exact loopback origin issued by the shell is a credential binding.
@@ -297,6 +301,7 @@ export async function resolveSessionTokenFromTauri(): Promise<string | null> {
       // instance, so it is neither returned nor cached.
       if (normalized !== null && sessionBinding.generation === generation) {
         sessionBinding.token = normalized;
+        sessionBinding.windowCredential = normalizeNonBlankString(credential?.windowCredential);
         sessionBinding.origin = origin;
         sessionBinding.resolved = true;
       }
@@ -584,25 +589,25 @@ function globalFetch(input: RequestInfo | URL, init?: RequestInit): Promise<Resp
 
 const TOKEN_REQUIRED_CODE = 'UI_TOKEN_REQUIRED';
 
-function headerAlreadySet(headers: HeadersInit | undefined): boolean {
+function headerAlreadySet(headers: HeadersInit | undefined, name = SESSION_TOKEN_HEADER): boolean {
   if (!headers) return false;
-  const key = SESSION_TOKEN_HEADER.toLowerCase();
-  if (headers instanceof Headers) return headers.has(SESSION_TOKEN_HEADER);
+  const key = name.toLowerCase();
+  if (headers instanceof Headers) return headers.has(name);
   if (Array.isArray(headers)) return headers.some(([k]) => k.toLowerCase() === key);
   return Object.keys(headers).some((k) => k.toLowerCase() === key);
 }
 
-function withToken(headers: HeadersInit | undefined, token: string): HeadersInit {
+function withToken(headers: HeadersInit | undefined, token: string, name = SESSION_TOKEN_HEADER): HeadersInit {
   if (headers instanceof Headers) {
     const merged = new Headers(headers);
-    merged.set(SESSION_TOKEN_HEADER, token);
+    merged.set(name, token);
     return merged;
   }
   if (Array.isArray(headers)) {
-    return [...headers, [SESSION_TOKEN_HEADER, token]];
+    return [...headers.filter(([key]) => key.toLowerCase() !== name.toLowerCase()), [name, token]];
   }
   // Plain-record shape is preserved (call sites and their tests read it back as one).
-  return { ...(headers ?? {}), [SESSION_TOKEN_HEADER]: token } as Record<string, string>;
+  return { ...(headers ?? {}), [name]: token } as Record<string, string>;
 }
 
 export async function fetchWithSessionToken(
@@ -638,14 +643,23 @@ async function sendWithToken(input: RequestInfo | URL, init?: RequestInit): Prom
   const callerHeaders = init?.headers ??
     (typeof Request !== 'undefined' && input instanceof Request ? input.headers : undefined);
   if (!token) {
-    if (!headerAlreadySet(callerHeaders)) return globalFetch(input, init);
+    if (!headerAlreadySet(callerHeaders) && !headerAlreadySet(callerHeaders, WINDOW_CREDENTIAL_HEADER)) return globalFetch(input, init);
     const headers = new Headers(callerHeaders);
     headers.delete(SESSION_TOKEN_HEADER);
+    headers.delete(WINDOW_CREDENTIAL_HEADER);
     return globalFetch(input, { ...init, headers });
+  }
+  let headers = headerAlreadySet(callerHeaders) ? callerHeaders : withToken(callerHeaders, token);
+  if (sessionBinding.windowCredential) {
+    headers = withToken(headers, sessionBinding.windowCredential, WINDOW_CREDENTIAL_HEADER);
+  } else if (headerAlreadySet(headers, WINDOW_CREDENTIAL_HEADER)) {
+    const stripped = new Headers(headers);
+    stripped.delete(WINDOW_CREDENTIAL_HEADER);
+    headers = stripped;
   }
   return globalFetch(input, {
     ...init,
-    headers: headerAlreadySet(callerHeaders) ? callerHeaders : withToken(callerHeaders, token),
+    headers,
     // Fetch must never forward a credential or its request body through a redirect.
     redirect: 'error',
   });
@@ -658,10 +672,11 @@ async function sendWithToken(input: RequestInfo | URL, init?: RequestInit): Prom
  * Reads a CLONE so the caller still gets an unconsumed body.
  */
 async function isStaleTokenRejection(response: Response): Promise<boolean> {
-  if (response.status !== 401) return false;
+  if (response.status !== 401 && response.status !== 403) return false;
   try {
     const body = (await response.clone().json()) as { errorCode?: unknown };
-    return body?.errorCode === TOKEN_REQUIRED_CODE;
+    return (response.status === 401 && body?.errorCode === TOKEN_REQUIRED_CODE)
+      || (response.status === 403 && body?.errorCode === 'WINDOW_CREDENTIAL_REQUIRED');
   } catch {
     return false; // unparseable body — not a claim we can act on
   }

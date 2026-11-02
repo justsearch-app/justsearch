@@ -308,6 +308,8 @@ public class LocalApiServer {
     ConfigStore cs = ConfigStore.globalOrNull();
     this.prodMode = cs != null && cs.get().policy().prodMode();
     this.sessionToken = b.sessionToken;
+    // Never a field: the credential reaches only the request filter (thin-composer rule).
+    String windowCredential = prodMode ? b.windowCredential : null;
     var backgroundLimits = b.executors.limits(
         io.justsearch.core.execution.EngineExecutorSpec.Kind.BACKGROUND);
     this.slowRequestOwner = b.executors.register(new io.justsearch.core.execution.EngineExecutorSpec(
@@ -343,7 +345,7 @@ public class LocalApiServer {
     // Bind loopback-only by default (prod + dev). This is a local desktop app; avoid LAN exposure.
     try {
       try {
-        buildAndStartApp(bindPort);
+        buildAndStartApp(bindPort, windowCredential);
       } catch (Exception e) {
         if (configuredPort != null && configuredPort != 0 && isBindFailure(e)
             && requestReleasesDrained(this.app)) {
@@ -353,7 +355,7 @@ public class LocalApiServer {
               "Port " + configuredPort + " in use, falling back to ephemeral",
               Map.of("requestedPort", configuredPort, "error", String.valueOf(e.getMessage())));
           // Javalin cannot restart the failed instance; retry with a fresh ephemeral bind.
-          buildAndStartApp(0);
+          buildAndStartApp(0, windowCredential);
           effectivePortPolicy = null;
         } else {
           throw e;
@@ -407,7 +409,7 @@ public class LocalApiServer {
    * fail-closed session-token refusal lives in the {@code ApiSecurityFilters} constructor
    * (constructed once, above the try) rather than in its install path (tempdoc 884 item 23).
    */
-  private void buildAndStartApp(int bindPort) {
+  private void buildAndStartApp(int bindPort, String windowCredential) {
     this.app = Javalin.create(config -> {
       config.showJavalinBanner = false;
       config.jetty.modifyServer(LocalApiServer::configureTransportShutdown);
@@ -615,6 +617,7 @@ public class LocalApiServer {
       // best-effort
     }
 
+    WindowAuthority.install(this.app, windowCredential);
     securityFilters.install(this.app, session -> convApi.mcpProtocolHandler() == null
         ? java.util.Optional.empty() : convApi.mcpProtocolHandler().clientIdentity(session));
     RouteLifecycleHeaders.install(this.app);
@@ -740,7 +743,7 @@ public class LocalApiServer {
     // V1.5.2 replaces with sigstore-java chain verification).
     app.post("/api/plugins/verify", pluginVerificationController::handleVerify, ActivityRole.USER_ACTION);
     // Tempdoc 560 §28 — operator-approval allowlist (the production-real trust ceremony for a
-    // URL-loaded third-party plugin; loopback-only ⇒ inherently operator-local).
+    // URL-loaded third-party plugin). In the packaged app approval needs the window credential.
     app.post("/api/plugins/allowlist", pluginVerificationController::handleApprove, ActivityRole.USER_ACTION);
     app.get("/api/plugins/allowlist", pluginVerificationController::handleList, ActivityRole.OBSERVATION);
 
@@ -1203,6 +1206,7 @@ public class LocalApiServer {
     String knowledgeServerStartError;
     private Telemetry telemetry;
     private String sessionToken;
+    private String windowCredential;
     private Path userHome;
     io.justsearch.app.services.worker.WorkerFeatureCache workerFeatureCache;
     GplStatusProvider gplJobCoordinator;
@@ -1411,6 +1415,12 @@ public class LocalApiServer {
 
     public Builder sessionToken(String sessionToken) {
       this.sessionToken = sessionToken;
+      return this;
+    }
+
+    /** In-memory credential minted only for the packaged shell; never published. */
+    public Builder windowCredential(String credential) {
+      this.windowCredential = credential;
       return this;
     }
 

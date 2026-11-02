@@ -77,5 +77,7 @@ public enum TransportTag {
    * fired by health-event resolution, indexing pipeline orchestration). Default fallback
    * when no caller-supplied transport context exists.
    */
-  SYSTEM_INTERNAL
+  SYSTEM_INTERNAL,
+  /** HTTP caller without proof of an app-window gesture (manifest token only). */
+  HTTP_API
 }

@@ -311,7 +311,7 @@ public final class RunStreamController {
     }
     Map<String, Object> body = MAPPER.readValue(ctx.body(), Map.class);
     StoreIdRequest.normalizeOptionalIds(body);
-    return body;
+    return WindowAuthority.limitAutonomy(ctx, body);
   }
 
   private static Map<String, Object> errorBody(String message, ApiErrorCode code) {

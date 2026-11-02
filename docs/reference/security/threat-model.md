@@ -134,13 +134,34 @@ That user is the trust boundary; another local account is outside it. See ADR-00
 `ProductionRouteTokenWalkTest` for the registered-route authentication check. Windows ACL and
 second-account access require platform verification in addition to source probes.
 
-**This token is deliberately independent of the trust lattice's per-action consent gate (tempdoc
-655) — a different axis, not a substitute.** The session token answers "is this caller allowed to
-reach the API at all" (authentication); the trust lattice's `GateBehavior`
-(`AUTO`/`INLINE_CONFIRM`/`TYPED_CONFIRM`/`DENY`, consumed via a pending-authorization + capsule/
-durable-grant ceremony) answers "is this specific action approved" (authorization) — holding the
-token satisfies neither `INLINE_CONFIRM` nor `TYPED_CONFIRM` on its own, and vice versa. Two
-independent layers an attacker (or a misbehaving MCP client) must clear, by design.
+**Packaged app: the manifest token is not the operator.** It permits read/search and untrusted
+requests. Approvals, operation/family grant creation, plugin trust and agent-autonomy increases
+require the app window's separate per-boot credential. A caller with only the manifest token cannot
+turn a transport header or client label into a button, rail or palette click. Medium-risk operations
+without a covering grant prompt in the app. Routes with no pending flow refuse with
+`WINDOW_CREDENTIAL_REQUIRED` (403): the direct folder-add API and settings writes. Use the app. Pending actions wait and expire
+without a window approving them. The approval bridge remains event-only: actions announced while
+it is disconnected are not recovered here.
+
+The shell requests the window credential at production Engine spawn. The Engine delivers it once
+through its stdout pipe; the shell consumes that record before logging and holds the credential
+in memory. Only the shell's existing webview command supplies it to the UI. It never enters the
+runtime manifest/history, public discovery, HTTP API responses, logs or diagnostics. It rotates on
+every Engine boot, independently of the manifest token. Deep links retain URL provenance even when
+the webview attaches this credential; receiving a link is not a click.
+
+**Headless: token-as-operator remains exposed.** With no shell launch flag, possession of the
+manifest token still permits approvals and grant creation. Any same-user process that can read it
+can approve actions. Development mode keeps its existing behavior. Consent capsules still bind an
+exact pending operation and arguments, are single use, and expire after five minutes.
+
+**Accepted residuals:** another same-user process can edit saved grants or the plugin allowlist;
+these files are not authenticated. Existing entries, including earlier self-grants that cannot be
+distinguished from genuine approvals, survive upgrades unchanged. The window credential lives in
+Engine, shell and webview memory, and release devtools can expose it. On Linux a same-user process
+able to open the Engine stdout pipe through `/proc` could race the shell for its one delivery;
+after the shell consumes the bytes, the pipe retains no readable credential record. This is not
+isolation from a process that can inspect or alter the app's memory or saved files.
 
 ### Repudiation
 Single-user local app; no multi-tenant identity. Out of scope — there is no shared server to repudiate to.

@@ -143,6 +143,7 @@ public final class AuthorizationController {
    * user never saw.
    */
   public void handleApprove(Context ctx) {
+    if (!WindowAuthority.require(ctx)) return;
     io.justsearch.app.api.EngineWorkHandle executionWork = null;
     try {
       if (pendingStore == null) {
@@ -376,7 +377,7 @@ public final class AuthorizationController {
 
   // ── Durable-grant management surface (tempdoc 560 §28 / 4d) ────────────────────────────────────────
   // GET /api/authorizations/grants — list; POST — grant (operation|family); DELETE — revoke. The
-  // loopback-only API makes these inherently operator-local; they are the management surface for the
+  // packaged app requires window authority for creation; they are the management surface for the
   // durable allow-always grants the gate honors (the per-op and the wider CapabilityFamily position).
 
   /** GET /api/authorizations/grants — the operator's current durable grants (operation + family). */
@@ -401,6 +402,7 @@ public final class AuthorizationController {
 
   /** POST /api/authorizations/grants {kind, target, sourceTier} — record a durable allow-always grant. */
   public void handleGrant(Context ctx) {
+    if (!WindowAuthority.require(ctx)) return;
     GrantRequest req = parseGrantRequest(ctx);
     if (req == null) return; // parseGrantRequest already wrote the error
     // Tempdoc 875 C.2: an operation grant on a HIGH-risk operation is inert at the gate (the risk
