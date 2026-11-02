@@ -887,7 +887,7 @@ index), `scripts/jseval/jseval/shadow_eval.py` (LR5-b runner),
 
 ### 3. Workflow-Run Telemetry
 
-> **Removed (tempdoc 638):** the run-centric workflow-telemetry subsystem (`scripts/lib/workflow-telemetry.mjs` + the bench/*workflow* scripts + the `tmp/workflow-telemetry/runs/` evidence store) was deleted. The `docs/reference/contracts/workflow-telemetry-contract.v1.md` contract is retained only as historical design context. Runtime metrics, traces, and agent telemetry (below) are unaffected.
+> **Removed (tempdoc 638):** the run-centric workflow-telemetry subsystem (`scripts/lib/workflow-telemetry.mjs` + the bench/*workflow* scripts + the `tmp/workflow-telemetry/runs/` evidence store) was deleted. Runtime metrics, traces, and agent telemetry (below) are unaffected.
 
 Optional external overlay (runtime traces):
 

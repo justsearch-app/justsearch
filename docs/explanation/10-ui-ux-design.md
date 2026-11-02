@@ -268,9 +268,3 @@ Adding a 3rd theme requires overriding 3 RGB primitives + tuning per-theme light
 *   **Zone Focus Management:** Tab cycling between zones moves DOM focus to the target zone's primary element (input or container) via `requestAnimationFrame`, enabling immediate keyboard interaction after zone switch.
 *   **Destructive Action Confirmation:** Reset to Defaults and Restart Worker require a confirmation dialog (`warning` variant) before executing.
 *   **WCAG Contrast Verification:** All views pass WCAG AA color-contrast (4.5:1 normal text, 3:1 large text) in both dark and light themes, verified by `@axe-core/playwright` scans integrated into the evidence bundle capture script (`--a11y-scan` flag).
-
-## 5. User readiness notes (living doc)
-
-While the UI is still evolving, the current workflow verification checklist and known issues are tracked in:
-
-- `docs/reference/ui-user-readiness.md`

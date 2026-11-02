@@ -76,4 +76,4 @@ Use ONNX Runtime's official Java bindings instead of llama.cpp for inference.
 
 **Rejected because:** ONNX Runtime's GGUF support is limited. The llama.cpp ecosystem provides the best GGUF model compatibility, quantization support, and community momentum for local LLM inference. ONNX Runtime is used separately for the reranker (where it's the better fit), but the generative and embedding workloads require llama.cpp's specialized optimizations (KV cache management, speculative decoding, context shifting).
 
-See also: [AI Bridge Deep Dive](../explanation/17-ai-bridge-deep-dive.md) for the full FFM binding architecture and actor concurrency model.
+See also: [ADR-0017](0017-ai-bridge-module-decomposition.md) for how the former ai-bridge module was decomposed.
