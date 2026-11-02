@@ -469,7 +469,7 @@ Changed test files against main (all durable product checks):
         "modules/ui-web/src/shell-v0/state/brainPage.test.ts"
       ],
       "class": "New",
-      "behaviour": "Advanced opens in place (its four groups and the three sliders are present right after Advanced settings is opened, with no further section to expand) without writes and retains per-part choices. Range controls retain drafts through refresh/tab changes, commit once per change with witnesses, preserve all untouched settings and null semantics, distinguish automatic GPU allocation from zero, recover from conflicts, and converge across windows. Installed inactive variants activate using the real endpoint fields (that check and the Automatic-versus-zero check address defects observed at main and have their own entry, without a fail-before because main has no such controls). Settings reads resolve safely after disconnect and with focus in a sibling shadow tree. The sentence table covers unavailable and excluded packages.",
+      "behaviour": "Advanced opens in place (its four groups and the three sliders are present right after Advanced settings is opened, with no further section to expand) without writes and retains per-part choices. Range controls retain drafts through refresh/tab changes, commit once per change with witnesses, preserve all untouched settings and null semantics, distinguish automatic GPU allocation from zero, recover from conflicts, and converge across windows. Installed inactive variants activate using the real endpoint fields (that check and the Automatic-versus-zero check repair defects observed at main and have their own entry with assertion fail-before evidence through main’s existing Runtime controls). Settings reads resolve safely after disconnect and with focus in a sibling shadow tree. The sentence table covers unavailable and excluded packages.",
       "sources": [
         {
           "kind": "owner-adopted-scenario",
@@ -533,7 +533,8 @@ Changed test files against main (all durable product checks):
         "modules/ui-web/src/shell-v0/views/BrainSurface.sliceB.test.ts"
       ],
       "class": "New",
-      "behaviour": "B20, behaviour broken at main (344bdaf03c). Graphics card use: with saved llm.gpuLayers null the Advanced slider reads \"Automatic\"; moving it to 0 saves exactly { gpuLayers: 0 }, reads \"0 layers · processor only\", and keeps maxTokens null, contextWindow 0 and modelPath. Runtime variants: with runtimeStatus.installedVariants [cuda12] and active.activeVariantId null, Other options offers Activate for the installed inactive variant and invokes core.activate-runtime-variant { variantId: cuda12 }. Main has its own controls for both: a GPU layers number input in its Runtime section, whose value is gpuLayers ?? 0, and GPU runtime variant rows with Activate and Deactivate buttons built from runtimeStatus.variants and activation.activeVariantId. An independent acceptor demonstrated both defects on main by assertion through main's own controls: a saved Automatic (null) is shown as '0', and with the endpoint's real fields main offers no Activate. That demonstration is not part of this changeset's evidence. These checks, run on main, fail only because main lacks the new slider and Other options controls, which does not show the defect, so they are New without repaired; the evidence records that both pass on this candidate.",
+      "repaired": true,
+      "behaviour": "B20, behaviour broken at main (344bdaf03c). Graphics card use: with saved llm.gpuLayers null the Advanced slider reads \"Automatic\"; moving it to 0 saves exactly { gpuLayers: 0 }, reads \"0 layers · processor only\", and keeps maxTokens null, contextWindow 0 and modelPath. Runtime variants: with runtimeStatus.installedVariants [cuda12] and active.activeVariantId null, Other options offers Activate for the installed inactive variant and invokes core.activate-runtime-variant { variantId: cuda12 }. Main has its own controls for both: a GPU layers number input in its Runtime section, whose value is gpuLayers ?? 0, and GPU runtime variant rows with Activate and Deactivate buttons built from runtimeStatus.variants and activation.activeVariantId. Both checks are repairs. The execution evidence runs the unchanged assertions on main through its existing Runtime controls using gates/test-intent/evidence/brain-b20-main-controls.patch: the compatibility patch opens the existing Runtime section, aliases its GPU layers input with the candidate selector, and projects its unchanged displayed number as aria-valuetext. Main fails by assertion because saved Automatic (null) is displayed as '0' and the endpoint's real variant fields offer no Activate; both checks pass on the candidate. The patch changes neither the GPU value expression nor variant field reads, fixtures or assertions.",
       "sources": [
         {
           "kind": "owner-adopted-scenario",
@@ -1648,13 +1649,13 @@ the healthy-install and optional-only-gap replacement checks have their own entr
 344bdaf03c. snapshotLiveness: the status-panel fixture carries a read, saved "on" answer choice; the dead panel's
 answers action is "Stop answers" and unavailable with the liveness reason, the live one available; the dead
 "Online" check is replaced by the Answer questions step state; the retired label, "Online" and status-dot
-expectations are recorded in the Obsolete entry. B20: not marked repaired, because main has no such controls.
+expectations are recorded in the Obsolete entry. B20: both checks are marked repaired, with assertion fail-before evidence through main’s existing Runtime controls using the before-only compatibility patch.
 Sweep of the Brain test files changed against 344bdaf03c for negatives on text no product code contains: the
 Health telemetry check "Recent mode transitions" is removed (the base's Brain-panel absence check is the
 Brain no-render check), the Advanced ".accordion-header" absence check becomes a presence check of the three
 sliders, and the two repairRun planning negatives add the current download words to "Preparing download" (the
 defect wording the 591a7ad461 repair removed, kept as its fail-before oracle). Evidence the edits staled is
-regenerated with each entry's --before; brain-main-repairs is regenerated without one.
+regenerated with each entry's --before; brain-main-repairs is regenerated with --before 344bdaf03c and --before-patch gates/test-intent/evidence/brain-b20-main-controls.patch.
 
 ## Acceptance records
 

@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
   },
-  "createdAt": "2026-11-02T18:44:15.762Z",
-  "revision": "ed9b29de09037e95f2aa2cd970ca3956e1887563",
-  "tree": "7f53dfc303e2b25b31cbb67810013ccc761e6894",
+  "createdAt": "2026-11-02T19:58:15.224Z",
+  "revision": "2cf285fd23fbcfde0c927992acad8ab02ee718b6",
+  "tree": "d39f8e2c8242adce3e55fb18e7e5f32c69869771",
   "environment": {
     "platform": "linux",
     "arch": "x64",
@@ -18,10 +18,10 @@
   },
   "runs": [
     {
-      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/BrainSurface.sliceB.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/tgk4vsot/tmp/test-intent-vitest-2205-1793645051811.json\"",
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/BrainSurface.sliceB.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/kwc6gwc0/tmp/test-intent-vitest-2-1793649483830.json\"",
       "cwd": "modules/ui-web",
       "exitCode": 0,
-      "durationMs": 3950
+      "durationMs": 5374
     }
   ],
   "checks": [
@@ -56,6 +56,37 @@
       ]
     }
   ],
-  "failBefore": null,
-  "digest": "sha256:ddbcc1d81d242e58d2c3fac66ce405a058436b8f0ba0130cb0394da09ef2a308"
+  "failBefore": {
+    "ref": "344bdaf03c",
+    "revision": "344bdaf03c556e053c0e13f043f96c6f50216849",
+    "overlays": [],
+    "patches": [
+      {
+        "path": "gates/test-intent/evidence/brain-b20-main-controls.patch",
+        "contentDigest": "sha256:b9458bae4f4b1a0613d8363d3edc175e9ac2e2142852553bc19ff64e2e8ca1a5"
+      }
+    ],
+    "runs": [
+      {
+        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/BrainSurface.sliceB.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/kwc6gwc0/tmp/test-intent-vitest-2-1793649492433.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 2202,
+        "output": "JSON report written to /home/elias/.cache/am/kwc6gwc0/tmp/test-intent-vitest-2-1793649492433.json\n\n"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui-web/src/shell-v0/views/BrainSurface.sliceB.test.ts#Automatic stays distinct from processor-only, and changing one slider preserves the other five settings",
+        "classification": "assertion",
+        "detail": "Brain Advanced controls Automatic stays distinct from processor-only, and changing one slider preserves the other five settings:  AssertionError: graphics card use for a saved null: expected '0' to be 'Automatic' // Object.is equality\n    at /home/elias/.cache/am/kwc6gwc0/tmp/test-intent-before-1PnpUA/modules/ui-web/src/shell-v0/views/BrainSurface.sliceB.test.ts:216:89\n    at runNextTicks (node:internal/process/task_queues:65:"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/BrainSurface.sliceB.test.ts#an installed inactive variant can be activated from the real endpoint fields",
+        "classification": "assertion",
+        "detail": "Brain Advanced controls an installed inactive variant can be activated from the real endpoint fields:  AssertionError: button Activate; rendered: Refresh status, Online, Indexing, Reload, Cancel, Accept and download: expected undefined to be truthy\n    at clickButton (/home/elias/.cache/am/kwc6gwc0/tmp/test-intent-before-1PnpUA/modules/ui-web/src/shell-v0/views/BrainSurface.sliceB.test.ts:44:146)"
+      }
+    ]
+  },
+  "digest": "sha256:5ba6c45e2c58480840f5e7a2841bc984a1871f33dc65c3b9d20eedceb8f71cea"
 }
