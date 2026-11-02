@@ -76,11 +76,10 @@ class IndexingControls extends SignalWatcher(JfElement) {
     :host([compact]) button, :host([compact]) select { border: 0; background: transparent; }
     .pause-menu { position: relative; }
     .pause-menu > button { display: inline-flex; align-items: center; gap: .4rem; }
-    .pause-options { position: absolute; top: 100%; right: 0; z-index: 5; min-width: 11rem;
+    .pause-options { position: absolute; top: 100%; right: 0; z-index: 1; min-width: 11rem;
       padding: .35rem; background: var(--surface-1); border: 1px solid var(--border-subtle); }
     .pause-options button { display: block; width: 100%; text-align: start; }
     .pause-options button:hover { background: var(--surface-2); }
-    :host([compact]) label { font-size: 0; }
     :host([compact]) select { font-size: var(--font-size-xs); }
     @media (forced-colors: active) {
       button, select { color: ButtonText; background: ButtonFace; border-color: ButtonText; }
@@ -195,7 +194,7 @@ class IndexingControls extends SignalWatcher(JfElement) {
         this.focused = event.relatedTarget instanceof Node && !!this.shadowRoot?.contains(event.relatedTarget);
         this.requestUpdate();
       }}>
-      ${this.action === 'pause' ? html`<label>Pause duration
+      ${this.action === 'pause' ? html`<label><span class=${this.compact ? 'visually-hidden' : ''}>Pause duration</span>
         <select aria-label="Pause duration"
           .value=${String(this.duration)} @change=${(e: Event) => { this.duration = Number((e.target as HTMLSelectElement).value); }}>
           <option value="0">Until I resume</option>

@@ -52,7 +52,7 @@ export class IngestionSummary extends JfElement {
 
   static styles = css`
     :host { display: block; margin-top: 1.5rem; }
-    :host([compact]) { margin-top: 0; flex: 1 1 17rem; min-width: 0; font-size: 13px; color: var(--text-secondary); }
+    :host([compact]) { margin-top: 0; flex: 1 1 17rem; min-width: 0; font-size: var(--font-size-sm); color: var(--text-secondary); }
     :host([compact]) section { padding: 1rem 0; border: 0; border-radius: 0; background: transparent; }
     summary { cursor: pointer; }
     section { padding: 1rem; background: var(--surface-secondary);

@@ -53,7 +53,7 @@ export const folderRowStyles = css`
   .chevron { display: inline-flex; }
   .folder-toggle[aria-expanded='true'] .chevron { transform: rotate(90deg); }
   .card-info { min-width: 0; }
-  .card-path { font-size: 14px; }
+  .card-path { font-size: var(--font-size-sm); }
   .folder-name, .folder-path { display: block; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
   .folder-path { font-size: var(--font-size-xs); color: var(--text-secondary); margin-top: .2rem; }
   .folder-state { display: flex; flex-wrap: wrap; align-items: center; gap: .45rem;
@@ -70,7 +70,7 @@ export const folderRowStyles = css`
   .folder-details dt { color: var(--text-secondary); }
   .folder-details dd { margin: 0; overflow-wrap: anywhere; }
   .row-actions { display: flex; flex-direction: column; align-items: start; }
-  .row-actions jf-button::part(control) { font-size: 14px; }
+  .row-actions jf-button::part(control) { font-size: var(--font-size-sm); }
   .status-icon { display: inline-flex; }
   .status-icon.indexed { color: var(--text-success); }
   .status-icon.error { color: var(--text-danger); }

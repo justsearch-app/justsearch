@@ -272,7 +272,7 @@ export class FailedJobsDrawer extends JfElement {
       --justsearch-shell-form-control-spacing: 0;
     }
     :host([inline]) .row { padding: .4rem 0; border: 0; }
-    :host([inline]) .row-path { font-size: 13px; }
+    :host([inline]) .row-path { font-size: var(--font-size-sm); }
     :host([inline]) .row-error { color: var(--text-secondary); }
     :host([inline]) .loading, :host([inline]) .empty { padding: .5rem 0; text-align: start; }
     .panel {

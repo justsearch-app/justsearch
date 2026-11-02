@@ -668,47 +668,47 @@ export class LibrarySurface extends JfElement {
     folderRowStyles,
     css`
       .folders-scroll { padding: 1.8rem 2.5rem; min-width: 0; }
-      .header-left h2 { font-size: 26px; font-weight: 400; }
+      .header-left h2 { font-size: var(--font-size-xl); font-weight: 400; }
       .header { margin-bottom: 1.5rem; }
       .subtitle { overflow-wrap: anywhere; }
-      .header-left .subtitle { font-size: 14px; }
-      jf-declared-surface::part(heading) { font-size: 12px; font-weight: 500;
+      .header-left .subtitle { font-size: var(--font-size-sm); }
+      jf-declared-surface::part(heading) { font-size: var(--font-size-xs); font-weight: 500;
         text-transform: none; letter-spacing: normal; }
-      .removal-history { margin-top: 1rem; font-size: 12px; color: var(--text-secondary); }
+      .removal-history { margin-top: 1rem; font-size: var(--font-size-xs); color: var(--text-secondary); }
       .removal-history summary { cursor: pointer; }
       .window-actions { display: flex; flex-wrap: wrap; gap: .5rem; align-items: center; }
       .more-actions { position: relative; }
       .more-actions summary { cursor: pointer; list-style: none; padding: .4rem; color: var(--text-secondary); }
-      .more-actions[open] > div { position: absolute; z-index: 2; right: 0; min-width: 15rem;
+      .more-actions[open] > div { position: absolute; z-index: 1; right: 0; min-width: 15rem;
         padding: .5rem; background: var(--surface-2); border: 1px solid var(--border-subtle); }
-      .browser-banner { padding: 0; border: 0; background: transparent; color: var(--text-secondary); font-size: 12px; }
+      .browser-banner { padding: 0; border: 0; background: transparent; color: var(--text-secondary); font-size: var(--font-size-xs); }
       .excludes-section, .gap-decision { background: transparent; border: 0; border-radius: 0;
         border-top: 1px solid var(--border-subtle); padding: 1rem 0; }
-      h3, .excludes-header h3 { color: var(--text-secondary); font-size: 12px; font-weight: 500; text-transform: none; letter-spacing: normal; }
+      h3, .excludes-header h3 { color: var(--text-secondary); font-size: var(--font-size-xs); font-weight: 500; text-transform: none; letter-spacing: normal; }
       .attention { margin-bottom: 1.75rem; }
       .attention:empty, .action-message:empty { display: none; }
       .library-rules { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 2.5rem; margin-top: 1.5rem; }
       .library-rules > .excludes-section { margin: 0; padding: 0; border: 0; }
       .excludes-header { display: block; }
       .excludes-header .actions { margin: .5rem 0; }
-      .rules-help { font-size: 12px; color: var(--text-secondary); margin: .5rem 0; }
+      .rules-help { font-size: var(--font-size-xs); color: var(--text-secondary); margin: .5rem 0; }
       .rules-help summary { cursor: pointer; }
       .skip-rule { display: flex; align-items: center; border-bottom: 1px solid var(--border-subtle); }
-      .skip-rule input { flex: 1; min-width: 0; padding: .5rem .2rem; font: inherit; font-size: 14px; font-family: monospace;
+      .skip-rule input { flex: 1; min-width: 0; padding: .5rem .2rem; font: inherit; font-size: var(--font-size-sm); font-family: monospace;
         border: 0; background: transparent; color: var(--text-primary); }
       .skip-rule input:focus-visible { outline: 2px solid var(--accent-tint); outline-offset: 2px; }
       .add-rule::part(control) { color: var(--accent-tint); }
       @media (max-width: 800px) { .library-rules { grid-template-columns: minmax(0, 1fr); gap: 1.5rem; } }
       @media (forced-colors: active) { .skip-rule { border-color: CanvasText; } .skip-rule input:focus-visible { outline-color: Highlight; } }
-      .gap-decision h3 { font-size: 14px; font-weight: 400; color: var(--text-primary); }
+      .gap-decision h3 { font-size: var(--font-size-sm); font-weight: 400; color: var(--text-primary); }
       .attention-item { padding: .85rem 0; border-top: 1px solid var(--border-subtle); }
-      .attention-title { display: flex; gap: .7rem; align-items: center; font-size: 14px; }
+      .attention-title { display: flex; gap: .7rem; align-items: center; font-size: var(--font-size-sm); }
       .attention-title > span { color: var(--text-warning); }
-      .attention-item p { margin: .35rem 0 .3rem 1.7rem; font-size: 13px; color: var(--text-secondary); overflow-wrap: anywhere; }
+      .attention-item p { margin: .35rem 0 .3rem 1.7rem; font-size: var(--font-size-sm); color: var(--text-secondary); overflow-wrap: anywhere; }
       .attention-actions { margin-left: 1.7rem; }
       .attention-actions jf-failed-jobs-drawer { margin-left: 0; }
       .bottom-links { display: flex; flex-wrap: wrap; gap: 1.5rem; margin-top: 1.5rem;
-        border-top: 1px solid var(--border-subtle); padding-top: .75rem; font-size: 13px; color: var(--text-secondary); }
+        border-top: 1px solid var(--border-subtle); padding-top: .75rem; font-size: var(--font-size-sm); color: var(--text-secondary); }
       .bottom-links details { min-width: 0; flex: 1 1 17rem; }
       .bottom-links summary { cursor: pointer; }
       .bottom-links .excludes-section { margin-top: .5rem; }

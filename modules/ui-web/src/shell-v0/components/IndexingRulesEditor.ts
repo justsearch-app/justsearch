@@ -241,20 +241,20 @@ export class IndexingRulesEditor extends JfElement {
 
   static styles = css`
     :host { display: block; min-width: 0; }
-    h3 { margin: 0 0 .75rem; font-size: 12px; font-weight: 500; color: var(--text-secondary); }
+    h3 { margin: 0 0 .75rem; font-size: var(--font-size-xs); font-weight: 500; color: var(--text-secondary); }
     fieldset { border: 0; padding: 0; margin: 0; min-width: 0; }
-    label { display: inline-flex; align-items: center; gap: .45rem; font-size: 14px; }
+    label { display: inline-flex; align-items: center; gap: .45rem; font-size: var(--font-size-sm); }
     .conflict-actions { display: flex; flex-wrap: wrap; gap: .5rem 1rem; }
     .rule-choice { display: flex; flex-wrap: wrap; gap: .5rem; align-items: center; margin-bottom: .8rem; }
     .indexing-days { display: flex; flex-wrap: wrap; gap: .5rem .9rem; margin: .5rem 0 1rem; }
-    .indexing-days label { font-size: 12px; }
+    .indexing-days label { font-size: var(--font-size-xs); }
     .indexing-days[hidden] { display: none; }
     input { font: inherit; color: var(--text-primary); accent-color: var(--accent-tint); max-width: 100%; }
     input[type=time] { background: transparent; border: 0; border-bottom: 1px dotted var(--border-subtle); padding: .1rem; color-scheme: inherit; }
-    button { font: inherit; font-size: 14px; background: transparent; border: 0; color: var(--text-primary); padding: .4rem 0; cursor: pointer; }
+    button { font: inherit; font-size: var(--font-size-sm); background: transparent; border: 0; color: var(--text-primary); padding: .4rem 0; cursor: pointer; }
     button[aria-disabled=true] { opacity: .65; cursor: default; }
     button:focus-visible, input:focus-visible, summary:focus-visible { outline: 2px solid var(--accent-tint); outline-offset: 2px; }
-    p, details { margin: .5rem 0; color: var(--text-secondary); font-size: 12px; overflow-wrap: anywhere; }
+    p, details { margin: .5rem 0; color: var(--text-secondary); font-size: var(--font-size-xs); overflow-wrap: anywhere; }
     p:empty { display: none; }
     summary { cursor: pointer; }
     #indexing-rules-error { color: var(--text-primary); }
