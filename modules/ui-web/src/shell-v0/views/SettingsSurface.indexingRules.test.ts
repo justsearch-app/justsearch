@@ -1,10 +1,12 @@
 // @vitest-environment happy-dom
 // SPDX-License-Identifier: Apache-2.0
+import { takeIndexingRuleFocus } from '../router/indexingRuleIntent.js';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import './SettingsSurface.js';
 import './LibrarySurface.js';
 import '../components/TaskList.js';
-import type { SettingsSurface } from './SettingsSurface.js';
+import type { IndexingRulesEditor } from '../components/IndexingRulesEditor.js';
+import type { LibrarySurface } from './LibrarySurface.js';
 import type { StatusSnapshot } from '../state/aiStateStore.js';
 import { __feedForTest, __feedContactForTest, __resetAiStateForTest } from '../state/aiStateStore.js';
 import { createMockHostApi } from '../plugin-api/testHostApi.js';
@@ -28,7 +30,7 @@ function observe(reasons: string[], state = 'PAUSED', pending = 3): void {
 async function settle(el: Mounted): Promise<void> {
   await el.updateComplete; await new Promise(resolve => setTimeout(resolve, 0)); await el.updateComplete;
 }
-async function mount(tag = 'jf-settings-surface'): Promise<Mounted> {
+async function mount(tag = 'jf-indexing-rules-editor'): Promise<Mounted> {
   const el = document.createElement(tag) as Mounted;
   const host = createMockHostApi(); host.data.fetch = (path, init) => fetch(path, { ...init, body: typeof init?.body === 'object' ? JSON.stringify(init.body) : init?.body });
   Object.assign(el, { host_: host, activeCategory: 'indexing' });
@@ -39,7 +41,7 @@ function input(el: Mounted, selector: string): HTMLInputElement {
   expect(result, `control ${selector} is mounted`).not.toBeNull(); return result!;
 }
 async function edit(el: Mounted, selector: string, value: string | boolean): Promise<void> {
-  const field = input(el, selector);
+  const field = input(el, selector === '#indexing-hours' && value === false ? 'input[name=indexing-hours]:not(#indexing-hours)' : selector);
   if (typeof value === 'boolean') field.checked = value; else field.value = value;
   field.dispatchEvent(new Event(typeof value === 'boolean' ? 'change' : 'input', { bubbles: true })); await settle(el);
 }
@@ -117,12 +119,12 @@ describe('WP3.8b rules editor', () => {
     let release!: (response: Response) => void;
     fetchMock.mockImplementation(async (url: RequestInfo | URL) => String(url).endsWith('/api/settings/v2')
       ? new Promise<Response>(resolve => { release = resolve; }) : Response.json({}));
-    const el = await mount() as SettingsSurface;
+    const el = await mount() as IndexingRulesEditor;
     expect(input(el, '#indexing-hours').closest('fieldset')?.disabled).toBe(true);
     await el.focusIndexingRule('hours');
     release(Response.json({ ui: { indexingPause: { schedule: saved, pauseOnBattery: true } } }));
     await settle(el);
-    expect(el.shadowRoot!.activeElement?.id).toBe('indexing-hours');
+    await vi.waitFor(() => expect(el.shadowRoot!.activeElement?.id).toBe('indexing-hours'));
     expect(input(el, 'input[type=time]').value).toBe('22:00');
   });
   it('S38.7 keeps read-only rules readable without issuing a save', async () => {
@@ -171,31 +173,35 @@ describe('WP3.8b rules editor', () => {
     expect(JSON.parse(String(ruleCalls()[0]![1].body)).args).toEqual({ schedule: saved, pauseOnBattery: false });
   });
   for (const destination of ['hours', 'battery'] as const) {
-    it(`S38.7 focuses ${destination} in the indexing category`, async () => {
-      const el = await mount() as SettingsSurface; el.activeCategory = 'interface'; await settle(el);
-      expect('focusIndexingRule' in el, 'indexing focus route exists').toBe(true);
-      await el.focusIndexingRule(destination); expect(el.activeCategory).toBe('indexing');
-      expect(el.shadowRoot!.activeElement?.id).toBe(destination === 'hours' ? 'indexing-hours' : 'indexing-battery');
+    it(`S38.7 focuses ${destination} on Library even from Browse`, async () => {
+      const el = await mount('jf-library-surface') as LibrarySurface;
+      el.activeTab = 'core.browse-surface'; await settle(el);
+      await el.focusIndexingRule(destination);
+      const editor = el.shadowRoot!.querySelector<IndexingRulesEditor>('jf-indexing-rules-editor')!;
+      await settle(editor);
+      expect(el.activeTab).toBe('folders');
+      expect(editor.shadowRoot!.activeElement?.id).toBe(destination === 'hours' ? 'indexing-hours' : 'indexing-battery');
     });
   }
 });
 
 describe('WP3.8b policy status and actions', () => {
   for (const reason of ['schedule', 'on_battery']) for (const state of ['PAUSING', 'PAUSED']) {
-    it(`D5 ${state} ${reason} names the rule with an empty queue and offers its Settings action`, async () => {
-      observe([reason], state, 0); const el = await mount(); const c = await control(el);
+    it(`D5 ${state} ${reason} names the rule with an empty queue and offers its Library action`, async () => {
+      observe([reason], state, 0); const el = await mount('jf-settings-surface'); const c = await control(el);
       expect(el.shadowRoot!.textContent).toContain(reason === 'schedule' ? 'Outside indexing hours.' : 'Paused while this computer is running on battery.');
       expect(el.shadowRoot!.textContent).not.toContain('Ready'); expect(c.shadowRoot!.textContent).not.toContain('Resume indexing');
       const navigate = vi.fn(); document.addEventListener('jf-navigate-to-surface', navigate);
       try { action(c, reason === 'schedule' ? 'Change hours' : 'Change battery setting').click(); }
       finally { document.removeEventListener('jf-navigate-to-surface', navigate); }
-      expect(navigate).toHaveBeenCalledWith(expect.objectContaining({ detail: { surfaceId: 'core.settings-surface', state: { focusIndexingRule: reason === 'schedule' ? 'hours' : 'battery' } } }));
+      expect(navigate).toHaveBeenCalledWith(expect.objectContaining({ detail: { surfaceId: 'core.library-surface' } }));
+      expect(takeIndexingRuleFocus()).toBe(reason === 'schedule' ? 'hours' : 'battery');
       const p = selectIndexingProgress(status([reason], state, 0), true, 0, []);
       expect(p.phase).toBe(state === 'PAUSING' ? 'pausing' : 'paused'); expect(p.etaSeconds).toBeNull();
     });
   }
   it('D5 orders combined reasons and restricts recovery actions', async () => {
-    observe(['on_battery', 'schedule', 'user_paused', 'settings_recovery']); const el = await mount(); const c = await control(el);
+    observe(['on_battery', 'schedule', 'user_paused', 'settings_recovery']); const el = await mount('jf-settings-surface'); const c = await control(el);
     const text = el.shadowRoot!.textContent!;
     expect(text.indexOf('Settings recovery')).toBeLessThan(text.indexOf('Paused by you'));
     expect(text.indexOf('Paused by you')).toBeLessThan(text.indexOf('Outside indexing hours'));
@@ -212,7 +218,7 @@ describe('WP3.8b policy status and actions', () => {
     }
   });
   it('S38.5 Resume clears manual only and announces both remaining rules after confirmed status', async () => {
-    observe(['user_paused', 'schedule', 'on_battery']); const el = await mount(); const c = await control(el);
+    observe(['user_paused', 'schedule', 'on_battery']); const el = await mount('jf-settings-surface'); const c = await control(el);
     expect(c.shadowRoot!.textContent).toContain('Change hours'); expect(c.shadowRoot!.textContent).toContain('Change battery setting');
     action(c, 'Resume indexing').click(); await settle(c);
     expect(fetchMock.mock.calls.some(call => String(call[0]).endsWith('/core.indexing-resume/invoke'))).toBe(true);
@@ -221,7 +227,7 @@ describe('WP3.8b policy status and actions', () => {
     expect(el.shadowRoot!.textContent).not.toContain('Paused by you'); expect(el.shadowRoot!.textContent).not.toContain('Work is waiting for Resume');
   });
   it('S38.5 waits for manual-pause removal before announcing it cleared', async () => {
-    observe(['user_paused', 'schedule']); const el = await mount(); const c = await control(el);
+    observe(['user_paused', 'schedule']); const el = await mount('jf-settings-surface'); const c = await control(el);
     action(c, 'Resume indexing').click(); await settle(c);
     observe(['user_paused', 'schedule']); await settle(el); await settle(c);
     expect(c.shadowRoot!.querySelector('[role=status]')?.textContent).toContain('Waiting for status');
@@ -230,7 +236,7 @@ describe('WP3.8b policy status and actions', () => {
     expect(c.shadowRoot!.querySelector('[role=status]')?.textContent).toContain('Manual pause cleared');
   });
   it('D5 does not invoke a focused Resume when manual pause clears leaving hours', async () => {
-    observe(['user_paused', 'schedule']); const el = await mount(); const c = await control(el);
+    observe(['user_paused', 'schedule']); const el = await mount('jf-settings-surface'); const c = await control(el);
     const resume = action(c, 'Resume indexing'); resume.focus(); observe(['schedule']); await settle(el); await settle(c);
     expect(c.shadowRoot!.activeElement).toBe(resume); expect(resume.getAttribute('aria-disabled')).toBe('true');
     expect(c.shadowRoot!.textContent).toContain('still held by indexing hours'); resume.click(); await settle(c);
@@ -239,7 +245,11 @@ describe('WP3.8b policy status and actions', () => {
   for (const tag of ['jf-library-surface', 'jf-task-list']) {
     it(`D5 ${tag} names schedule holds for queued work`, async () => {
       observe(['schedule']); const el = await mount(tag); expect(el.shadowRoot!.textContent).toContain('Outside indexing hours');
-      expect(el.shadowRoot!.textContent).not.toContain('Work is waiting for Resume'); expect((await control(el)).shadowRoot!.textContent).toContain('Change hours');
+      expect(el.shadowRoot!.textContent).not.toContain('Work is waiting for Resume'); const controls = [...el.shadowRoot!.querySelectorAll<Mounted>('jf-indexing-controls')];
+      for (const c of controls) await settle(c);
+      const remedy = tag === 'jf-library-surface' ? controls.find(c => !c.hasAttribute('toolbar')) : controls[0];
+      expect(remedy?.shadowRoot!.textContent).toContain(tag === 'jf-library-surface' ? 'Change when to index' : 'Change hours');
+      if (tag === 'jf-library-surface') expect(controls[0]!.shadowRoot!.textContent).toContain('Pause indexing');
     });
   }
 });

@@ -44,8 +44,8 @@ async function mount(tag: string): Promise<Mounted> {
   await settle(el);
   return el;
 }
-async function controls(el: Mounted): Promise<Mounted> {
-  const control = el.shadowRoot?.querySelector('jf-indexing-controls') as Mounted | null;
+async function controls(el: Mounted, remedy = false): Promise<Mounted> {
+  const control = el.shadowRoot?.querySelector(remedy ? 'jf-indexing-controls:not([toolbar])' : 'jf-indexing-controls') as Mounted | null;
   expect(control, 'surface exposes indexing controls').not.toBeNull();
   await control!.updateComplete;
   return control!;
@@ -323,7 +323,7 @@ describe('CR37 keyboard continuity and recovery', () => {
       expect(text).toContain('reset is confirmed in Settings');
       expect(text).toContain('Check exclusions');
       expect(text).not.toMatch(/held until you resume|waiting for Resume/i);
-      const control = await controls(el);
+      const control = await controls(el, tag === 'jf-library-surface');
       expect(control.shadowRoot!.textContent).not.toContain('Resume indexing');
       const open = button(control);
       expect(open.textContent).toContain('Open Settings at Reset to defaults');

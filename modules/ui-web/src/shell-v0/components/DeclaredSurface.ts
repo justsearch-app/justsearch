@@ -249,7 +249,7 @@ export class DeclaredSurface extends JfElement {
         role=${role ?? nothing}
         aria-label=${role && decl.heading ? decl.heading : nothing}
       >
-        ${decl.heading ? html`<h3>${decl.heading}</h3>` : nothing}
+        ${decl.heading ? html`<h3 part="heading">${decl.heading}</h3>` : nothing}
         ${decl.liveness
           ? html`<jf-liveness-readout metric-id=${decl.liveness}></jf-liveness-readout>`
           : nothing}

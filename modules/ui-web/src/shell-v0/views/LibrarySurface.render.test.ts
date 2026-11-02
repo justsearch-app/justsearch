@@ -76,7 +76,7 @@ describe('LibrarySurface — transition-aware empty state (595 §4.3)', () => {
     }
   });
 
-  it('when settled with no folders, it still shows the genuine "No watched folders" empty state', async () => {
+  it('when settled with no folders, it still shows the add-a-folder headline when there are genuinely no watched folders', async () => {
     // settled store (no migration / IDLE)
     __feedForTest({
       status: {
@@ -98,7 +98,7 @@ describe('LibrarySurface — transition-aware empty state (595 §4.3)', () => {
     try {
       await el.updateComplete;
       const text = el.shadowRoot?.textContent ?? '';
-      expect(text).toContain('No watched folders');
+      expect(el.shadowRoot?.querySelector('h2')?.textContent).toBe('Add a folder to start searching');
       expect(text).not.toContain('Rebuilding index');
     } finally {
       el.remove();
@@ -221,6 +221,8 @@ describe('LibrarySurface — a folder row never names itself with a hash (804 F8
       expect(name).not.toBeNull();
       expect(name?.textContent?.trim()).toBe('seed-corpus');
       expect(name?.getAttribute('title')).toBe('/home/me/Documents/seed-corpus');
+      el.shadowRoot?.querySelector<HTMLButtonElement>('.folder-toggle')?.click();
+      await el.updateComplete;
       // The row still carries a Remove action — it just now names what it would remove.
       expect(el.shadowRoot?.textContent ?? '').toContain('Remove');
       expect(name?.textContent ?? '').not.toMatch(BARE_HEX_ID);
@@ -300,6 +302,8 @@ describe('LibrarySurface — the folder row consults enrichment coverage (809 fi
     el.resolvedPaths = { [HASH]: '/home/me/Documents/seed-corpus' };
     el.requestUpdate();
     await el.updateComplete;
+    el.shadowRoot?.querySelector<HTMLButtonElement>('.folder-toggle')?.click();
+    await el.updateComplete;
     return el;
   }
 
@@ -313,8 +317,9 @@ describe('LibrarySurface — the folder row consults enrichment coverage (809 fi
     const el = await mountWithRow();
     try {
       const text = el.shadowRoot?.textContent ?? '';
-      expect(text).toContain('keyword search ready');
-      expect(text).toContain('semantic search still catching up');
+      expect(el.shadowRoot?.querySelector('.folder-details')?.textContent).toMatch(/Searchable by words\s*Now/);
+      expect(text).toContain('Meaning processing');
+      expect(el.shadowRoot?.querySelector('.folder-state')?.textContent).not.toContain('Up to date');
     } finally {
       el.remove();
     }
@@ -325,7 +330,8 @@ describe('LibrarySurface — the folder row consults enrichment coverage (809 fi
     const el = await mountWithRow();
     try {
       const text = el.shadowRoot?.textContent ?? '';
-      expect(text).toContain('indexed just now');
+      expect(el.shadowRoot?.querySelector('.folder-state')?.textContent).toContain('Up to date');
+      expect(el.shadowRoot?.querySelector('.folder-details')?.textContent).toMatch(/Indexed\s*just now/);
       expect(text).not.toContain('semantic search still catching up');
     } finally {
       el.remove();
@@ -382,7 +388,8 @@ describe('LibrarySurface — the folder row consults enrichment coverage (809 fi
     try {
       expect(el.enrichmentBlocked).toBe(false);
       const text = el.shadowRoot?.textContent ?? '';
-      expect(text).toContain('indexed just now');
+      expect(el.shadowRoot?.querySelector('.folder-state')?.textContent).toContain('Up to date');
+      expect(el.shadowRoot?.querySelector('.folder-details')?.textContent).toMatch(/Indexed\s*just now/);
       expect(text).not.toContain('semantic search waiting for AI install');
     } finally {
       el.remove();
@@ -408,7 +415,7 @@ it('library rows describe retry waiting without claiming active indexing', async
       indexed: true, inFlightCount: 8, failedCount: 0 } as IndexedRootView;
     el.roots = [root];
     await el.updateComplete;
-    const text = el.shadowRoot?.querySelector('.card-meta')?.textContent ?? '';
+    const text = el.shadowRoot?.querySelector('.folder-state')?.textContent ?? '';
     expect(text).toContain('Waiting to retry');
     expect(text).toContain('8 remaining');
     expect(text).toContain(new Date(retry).toLocaleString());

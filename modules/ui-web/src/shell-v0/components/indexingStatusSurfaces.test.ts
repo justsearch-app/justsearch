@@ -7,6 +7,7 @@ import './IndexingOverlay.js';
 import '../views/HealthSurface.js';
 import '../views/LibrarySurface.js';
 import { __feedForTest, __resetAiStateForTest, __tickClockForTest, getAiState, type StatusSnapshot } from '../state/aiStateStore.js';
+import { selectIndexingProgress } from '../state/indexingProgress.js';
 import { __resetTasksForTest } from '../substrates/tasks/index.js';
 import type { LibrarySurface } from '../views/LibrarySurface.js';
 import type { PluginHostApi } from '../plugin-api/plugin-types.js';
@@ -81,7 +82,7 @@ describe('WP3.3 shared status surfaces', () => {
     await mountAll();
     for (const [i, text] of texts().entries()) {
       expect(text, surfaces[i]!.localName).toContain('Text indexing continues');
-      expect(text, surfaces[i]!.localName).toContain('Idle enrichment deferred to save energy. Sparse enrichment can continue between files.');
+      expect(text, surfaces[i]!.localName).toContain('Meaning search is waiting while the computer saves energy. Some meaning processing can continue between files.');
       expect(text, surfaces[i]!.localName).not.toMatch(/queue[^.]*paused|Paused — saving energy|Batch Processing Active/);
     }
   });
@@ -93,13 +94,13 @@ describe('WP3.3 shared status surfaces', () => {
     await flush();
     for (const [i, text] of texts().entries()) {
       expect(text, surfaces[i]!.localName).toContain('GPU-bound idle enrichment deferred while a game is running.');
-      expect(text, surfaces[i]!.localName).not.toContain('save energy');
+      expect(text, surfaces[i]!.localName).not.toContain('saves energy');
     }
     feed(status(4, []));
     await flush();
     for (const text of texts()) {
       expect(text).not.toContain('game is running');
-      expect(text).not.toContain('save energy');
+      expect(text).not.toContain('saves energy');
     }
   });
 
@@ -124,15 +125,15 @@ describe('WP3.3 shared status surfaces', () => {
     fresh.operating!.freshness.staleAfterMs = 30_000;
     feed(fresh);
     await mountAll();
-    for (const text of texts()) expect(text).toContain('save energy');
+    for (const text of texts()) expect(text).toContain('saves energy');
 
-    vi.setSystemTime(observedAt + 23_001);
+    vi.setSystemTime(observedAt + 33_001);
     __feedForTest({ inference: { mode: 'indexing', starting: false } });
     await flush();
     expect(getAiState().snapshotLive, 'inference still confirms Engine reachability').toBe(true);
     for (const [i, text] of texts().entries()) {
       expect(text, surfaces[i]!.localName).toContain('Indexing status unconfirmed');
-      expect(text, surfaces[i]!.localName).not.toMatch(/Text indexing continues|Ready — fully searchable|save energy/);
+      expect(text, surfaces[i]!.localName).not.toMatch(/Text indexing continues|Ready — fully searchable|saves energy/);
     }
 
     const recovered = status(jobs, []);
@@ -142,7 +143,7 @@ describe('WP3.3 shared status surfaces', () => {
     await flush();
     for (const [i, text] of texts().entries()) {
       expect(text, surfaces[i]!.localName).not.toContain('Indexing status unconfirmed');
-      expect(text, surfaces[i]!.localName).not.toContain('save energy');
+      expect(text, surfaces[i]!.localName).not.toContain('saves energy');
     }
   });
 
@@ -150,7 +151,10 @@ describe('WP3.3 shared status surfaces', () => {
     feed(status(0));
     await mountAll();
     for (const [i, text] of texts().entries()) {
-      expect(text, surfaces[i]!.localName).toContain('Enrichment deferred');
+      expect(text, surfaces[i]!.localName).toContain(i === 4
+        ? 'Meaning search is waiting while the computer saves energy.' : 'Meaning processing is waiting to save energy');
+      if (i === 4) expect(text.match(/saves energy/g)).toHaveLength(1);
+      expect(text, surfaces[i]!.localName).toContain('saves energy');
       expect(text, surfaces[i]!.localName).not.toMatch(/Ready — fully searchable|Up to date|System idle|Batch Processing Active/);
     }
   });
@@ -163,7 +167,7 @@ describe('WP3.3 shared status surfaces', () => {
       await flush();
       for (const [i, text] of texts().entries()) {
         expect(text, surfaces[i]!.localName).toContain('CPU-only idle enrichment can continue.');
-        expect(text, surfaces[i]!.localName).not.toContain('Enrichment deferred while');
+        expect(text, surfaces[i]!.localName).not.toContain('Meaning processing is waiting while');
       }
     }
   });
@@ -196,7 +200,7 @@ describe('WP3.3 shared status surfaces', () => {
     const library = surfaces[4] as LibrarySurface;
     library.roots = library.roots.map(root => ({ ...root, inFlightCount: 0 }));
     await flush();
-    expect(library.shadowRoot!.textContent).toContain('semantic search still catching up');
+    expect(library.shadowRoot!.querySelector('.folder-state .card-meta')?.textContent?.trim()).toBe('Meaning processing');
     expect(library.shadowRoot!.textContent).not.toContain('0%');
   });
 
@@ -206,7 +210,7 @@ describe('WP3.3 shared status surfaces', () => {
     const deck = surfaces[0]!;
     const announcer = deck.shadowRoot?.querySelector('[data-testid="indexing-announcer"]');
     expect(announcer).not.toBeNull();
-    expect(announcer?.textContent).toContain('Idle enrichment deferred to save energy. Sparse enrichment can continue between files.');
+    expect(announcer?.textContent).toContain('Meaning search is waiting while the computer saves energy. Some meaning processing can continue between files.');
     const mutations: MutationRecord[] = [];
     const observer = new MutationObserver((records) => mutations.push(...records));
     observer.observe(announcer!, { childList: true, characterData: true, subtree: true });
@@ -224,4 +228,13 @@ describe('WP3.3 shared status surfaces', () => {
       expect(surfaces.slice(1).flatMap((el) => [...el.shadowRoot!.querySelectorAll('[data-testid="indexing-announcer"]')])).toHaveLength(0);
     } finally { observer.disconnect(); }
   });
+});
+
+it.each([['energy_saver', 'Meaning processing is waiting to save energy'],
+  ['game_mode', 'Meaning processing is waiting for the GPU'],
+  ['gpu_busy_external', 'Meaning processing is waiting for the GPU']])('C distinct %s summary reaches the status chip', async (reason, summary) => {
+  const snapshot = status(0, [reason]);
+  expect(selectIndexingProgress(snapshot, true, 0, []).activity.summary).toBe(summary);
+  feed(snapshot); await mountAll();
+  expect(surfaces[0]!.shadowRoot!.querySelector('jf-indexing-controls')?.parentElement?.textContent).toContain(summary);
 });

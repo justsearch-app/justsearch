@@ -7,6 +7,7 @@
  * Shell listens for and routes through `activateSurface`. One seam, both producers — no component reaches
  * into routing directly. Mirrors the rail's existing event-to-shell navigation pattern.
  */
+import { requestIndexingRuleFocus, type IndexingRuleControl } from '../router/indexingRuleIntent.js';
 import type { StateSnapshot } from '../router/types.js';
 
 export const NAVIGATE_TO_SURFACE_EVENT = 'jf-navigate-to-surface';
@@ -24,4 +25,10 @@ export function requestSurfaceNavigation(surfaceId: string, state?: StateSnapsho
       detail: { surfaceId, ...(state ? { state } : {}) },
     }),
   );
+}
+
+/** Publish the arrival request before navigating; no focus state enters history. */
+export function requestIndexingRuleNavigation(control: IndexingRuleControl): void {
+  requestIndexingRuleFocus(control);
+  requestSurfaceNavigation('core.library-surface');
 }
