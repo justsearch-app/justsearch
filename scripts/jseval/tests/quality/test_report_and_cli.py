@@ -25,6 +25,19 @@ def _worse(c):
     return {q: ("bad" if i % 3 == 0 else "good") for i, q in enumerate(sorted(c.queries))}
 
 
+def test_report_states_the_unjudged_share_as_information_for_official_judgments():
+    c = make_collection({"en/vague": 60})
+    cmp = qcmp.compare(c, config_for(c, judgments="official"), make_run(c),
+                       make_run(c, _worse(c), commit="b" * 40))
+    text = report.render(cmp)
+    assert "Share of top-10 results without a judgment: baseline" in text
+    assert "official judgments: unjudged counts as non-relevant, information only" in text
+    assert "threshold" not in text.split("## Unjudged results")[1].split("##")[0]
+    pooled = report.render(qcmp.compare(c, config_for(c, judgments="pooled"), make_run(c),
+                                        make_run(c, _worse(c), commit="b" * 40)))
+    assert "threshold 10%" in pooled
+
+
 def test_report_has_outcome_line_most_changed_queries_and_unjudged_share():
     c = make_collection({"en/vague": 60})
     cmp = qcmp.compare(c, config_for(c), make_run(c), make_run(c, _worse(c), commit="b" * 40))
@@ -58,7 +71,8 @@ def stored(tmp_path):
     c = make_collection({"en/vague": 40})
     d = qc.write_collection(c, tmp_path / "col")
     cfg = {"schema": "jseval.quality.config.v1", "collection": c.name, "language": "en",
-           "source": {"kind": "synthetic"}, "labels": {}, "expected": c.counts(),
+           "source": {"kind": "synthetic"}, "judgments": "official", "labels": {},
+           "expected": c.counts(),
            "bootstrap": {"resamples": 2000, "seed": 1}}
     (d / "quality.config.json").write_text(json.dumps(cfg))
     base = tmp_path / "base.jsonl"

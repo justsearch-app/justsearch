@@ -93,7 +93,9 @@ def render(cmp: Comparison) -> str:
         out += ["## Unjudged results", "",
                 f"Share of top-10 results without a judgment: baseline {u['baseline_share']:.1%}, "
                 f"candidate {u['candidate_share']:.1%}. Unjudged pairs in only one arm's top 10: "
-                f"{u['differing_pairs']} ({u['differing_share']:.1%}; threshold {u['threshold']:.0%}).",
+                f"{u['differing_pairs']} ({u['differing_share']:.1%}; "
+                + (f"threshold {u['threshold']:.0%})." if u["threshold"] is not None else
+                   "official judgments: unjudged counts as non-relevant, information only)."),
                 ""]
         if cmp.judgment_requests:
             out += [f"{len(cmp.judgment_requests)} pairs go to judgment with the collection's "

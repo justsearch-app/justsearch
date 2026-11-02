@@ -9,8 +9,10 @@ decisions is fixed:
    population that is not exactly the manifest, a dirty tree, a candidate from another commit or
    model set, a stored baseline whose metrics disagree with its own rescoring, non-finite metrics.
 2. INCONCLUSIVE — the arms differ in something other than the declared change (models, request
-   settings, index key, index state such as freshness, enrichment or merge state), or the labels
-   are too incomplete for this pair of rankings (the unjudged pairs to judge are listed).
+   settings, index key, index state such as freshness, enrichment or merge state), or — for a
+   collection with pooled judgments only — the labels are too incomplete for this pair of
+   rankings (the unjudged pairs to judge are listed). With official, fixed judgments an unjudged
+   document counts as non-relevant and the unjudged share is reported, never changing the verdict.
 3. Per group (fixed by query labels, never by input order): paired sign-flip randomization test
    on the per-query delta of the primary metric, Holm-adjusted over the collection's groups, a
    paired bootstrap 95% interval and d_z. A group *regressed* when the loss is significant and
@@ -321,9 +323,11 @@ def compare(c: Collection, cfg: QualityConfig, baseline: RunRecord | None,
     n_unj, n_slots, n_pairs = scoring.unjudged_top(c.judgments, candidate.results)
     differing = b_pairs ^ n_pairs
     differing_share = len(differing) / max(1, b_slots + n_slots)
+    pooled = cfg.judgments == qcoll.JUDGMENTS_POOLED
     unjudged = {"baseline_share": b_unj / max(1, b_slots), "candidate_share": n_unj / max(1, n_slots),
                 "differing_pairs": len(differing), "differing_share": differing_share,
-                "threshold": cfg.max_differing_unjudged_share}
+                "judgments": cfg.judgments,
+                "threshold": cfg.max_differing_unjudged_share if pooled else None}
     requests: list[tuple[str, str]] = []
 
     differences = identity_differences(baseline.header, candidate.header)
@@ -333,7 +337,7 @@ def compare(c: Collection, cfg: QualityConfig, baseline: RunRecord | None,
         outcome = Outcome.INCONCLUSIVE
         reasons.append("confounded: the arms differ in more than the declared change ("
                        + "; ".join(confounds) + ")")
-    if differing_share > cfg.max_differing_unjudged_share:
+    if pooled and differing_share > cfg.max_differing_unjudged_share:
         outcome = Outcome.INCONCLUSIVE
         requests = sorted(b_pairs | n_pairs)
         reasons.append(f"labels incomplete: {differing_share:.1%} of top-10 pairs are unjudged in "

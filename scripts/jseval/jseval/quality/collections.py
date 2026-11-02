@@ -44,6 +44,11 @@ from .types import (
 
 CONFIG_SCHEMA = "jseval.quality.config.v1"
 CONFIG_DIR = Path(__file__).with_name("config")
+# Where a collection's judgments come from (S17). ``official``: fixed published judgments, an
+# unjudged document counts as non-relevant and the unjudged share is information only. ``pooled``:
+# judged on demand by a labeller, so too many unjudged pairs send them to judgment first.
+JUDGMENTS_OFFICIAL = "official"
+JUDGMENTS_POOLED = "pooled"
 
 
 class CollectionError(ValueError):
@@ -62,6 +67,7 @@ class QualityConfig:
     source: Mapping[str, Any]
     labels: Mapping[str, str]
     expected: Mapping[str, Any]
+    judgments: str = JUDGMENTS_POOLED
     groups: tuple[str, ...] = ("lang", "kind")
     metric: str = "nDCG@10"
     margins: Mapping[str, float] = field(default_factory=lambda: {"default": 0.01})
@@ -85,9 +91,12 @@ class QualityConfig:
         boot = d.get("bootstrap") or {}
         unj = d.get("unjudged") or {}
         rep = d.get("report") or {}
+        if d.get("judgments") not in (JUDGMENTS_OFFICIAL, JUDGMENTS_POOLED):
+            raise CollectionError(f"config judgments must be {JUDGMENTS_OFFICIAL!r} or "
+                                  f"{JUDGMENTS_POOLED!r}, not {d.get('judgments')!r}")
         return cls(collection=d["collection"], language=d["language"], source=d["source"],
                    labels=d.get("labels") or {}, expected=d["expected"],
-                   groups=tuple(d.get("groups") or ("lang", "kind")),
+                   judgments=d["judgments"], groups=tuple(d.get("groups") or ("lang", "kind")),
                    metric=d.get("metric", "nDCG@10"), margins=margins,
                    alpha=float(d.get("alpha", 0.05)),
                    bootstrap_resamples=int(boot.get("resamples", 10000)),

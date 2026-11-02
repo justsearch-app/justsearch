@@ -181,18 +181,40 @@ def test_declared_change_is_not_a_confound(c):
     assert "models" in cmp.differences
 
 
-def test_many_unjudged_differences_send_pairs_to_judgment(c):
-    base = _run(c)
+def _unjudged_candidate(c, base, keep=2):
+    """The baseline's first ``keep`` results, then six documents unjudged for that query."""
     shifted = []
     for r in base.results:
         j = c.judgments[r.qid]
         fresh = tuple(d for d in sorted(c.documents, reverse=True) if d not in j)[:6]
-        shifted.append(replace(r, ranked=r.ranked[:2] + fresh))
-    cand = with_results(replace(base, header=replace(base.header, commit="b" * 40)), shifted)
-    cmp = qcmp.compare(c, config_for(c), base, cand)
+        shifted.append(replace(r, ranked=r.ranked[:keep] + fresh))
+    return with_results(replace(base, header=replace(base.header, commit="b" * 40)), shifted)
+
+
+def test_many_unjudged_differences_send_pairs_to_judgment_with_pooled_judgments(c):
+    base = _run(c)
+    cand = _unjudged_candidate(c, base)
+    cmp = qcmp.compare(c, config_for(c, judgments="pooled"), base, cand)
     assert cmp.verdict.outcome is Outcome.INCONCLUSIVE
     assert "labels incomplete" in cmp.verdict.reasons[0]
-    assert cmp.judgment_requests and all(d not in c.judgments[q] for q, d in cmp.judgment_requests)
+    assert cmp.unjudged["differing_share"] > cmp.unjudged["threshold"] == 0.10
+    expected = sorted({(r.qid, d) for run in (base, cand) for r in run.results for d in r.ranked
+                       if d not in c.judgments[r.qid]})
+    assert cmp.judgment_requests == expected
+    assert all(d not in c.judgments[q] for q, d in cmp.judgment_requests)
+
+
+@pytest.mark.parametrize("keep,outcome", [(2, Outcome.PASS), (0, Outcome.REGRESSION)])
+def test_official_judgments_count_unjudged_as_non_relevant_and_only_report_the_share(c, keep,
+                                                                                      outcome):
+    base = _run(c)
+    cand = _unjudged_candidate(c, base, keep)  # keep=0: the positives are pushed out of the top 10
+    cmp = qcmp.compare(c, config_for(c, judgments="official"), base, cand)
+    assert cmp.verdict.outcome is outcome, cmp.verdict.reasons
+    assert not any("labels incomplete" in r for r in cmp.verdict.reasons)
+    assert not cmp.judgment_requests
+    assert cmp.unjudged["differing_share"] > 0.10 and cmp.unjudged["candidate_share"] > 0.5
+    assert cmp.unjudged["judgments"] == "official" and cmp.unjudged["threshold"] is None
 
 
 def test_stored_baseline_round_trip_and_tamper_detection(c, tmp_path):

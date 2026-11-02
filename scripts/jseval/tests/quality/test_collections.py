@@ -78,6 +78,22 @@ def test_packaged_configs_parse():
         assert set(cfg.expected) >= {"queries", "judgments", "positives", "grades", "documents"}
 
 
+def test_existing_collections_have_official_judgments_and_the_field_is_required(tmp_path):
+    assert {a: qc.load_config(a).judgments for a in
+            ("scifact", "miracl-de", "miracl-fr", "enron-email")} == dict.fromkeys(
+        ("scifact", "miracl-de", "miracl-fr", "enron-email"), qc.JUDGMENTS_OFFICIAL)
+    doc = json.loads((qc.CONFIG_DIR / "scifact.json").read_text(encoding="utf-8"))
+    for value in (None, "fixed"):
+        if value is None:
+            doc.pop("judgments")
+        else:
+            doc["judgments"] = value
+        p = tmp_path / "c.json"
+        p.write_text(json.dumps(doc), encoding="utf-8")
+        with pytest.raises(qc.CollectionError, match="config judgments must be 'official' or 'pooled'"):
+            qc.load_config(p)
+
+
 def test_added_judgments_make_a_new_verifiable_version():
     c = make_collection()
     new = qc.with_added_judgments(c, {"q000": {"d050": 1}}, "judged 1 pair, rubric v1")
