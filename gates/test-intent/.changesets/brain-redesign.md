@@ -1584,3 +1584,25 @@ desktopRecoveryPolling is recorded as a comment-only change.
   "note": "Audit by independent reviewer session reviewer-25 (Claude): reject. M1 assertions on old labels can no longer fail (repairRemedy Install checks, pausedInstall 'Not Installed', snapshotLiveness 'Shut Down AI'); M2 superseded entry descriptions (componentList, telemetry slice A, sparkline); M3 B20 repairs recorded without fail-before. Recorded by the orchestrator, who transcribed it."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verifier-16",
+  "verdict": "reject",
+  "digest": "sha256:a7f0b419fc3f63764386fddadca6bfdb27fa76cdbb66bdd4b7ecb9162640040d",
+  "note": "Acceptance by independent verifier session verifier-16 (Claude): reject. F1 repairRemedy:237 matches retired text 'use Repair.'; F2 snapshotLiveness:359 'Online' cannot fail. Transcribed by the orchestrator."
+}
+```
+
+```json
+{
+  "kind": "audit",
+  "role": "reviewer",
+  "session": "reviewer-26",
+  "verdict": "reject",
+  "digest": "sha256:a7f0b419fc3f63764386fddadca6bfdb27fa76cdbb66bdd4b7ecb9162640040d",
+  "note": "Audit by independent reviewer session reviewer-26 (Claude): reject. M1 snapshotLiveness label/offline checks pass for the wrong reason; M2 B20 fail-before shows missing controls, not the defect; M3 repairRemedy replacement expectations lack evidence. Transcribed by the orchestrator."
+}
+```
