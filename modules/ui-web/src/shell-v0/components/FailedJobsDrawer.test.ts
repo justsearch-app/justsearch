@@ -861,3 +861,26 @@ it('an inline list torn down never removes the open global drawer registration',
     expect(isFailedJobsOpen()).toBe(false);
   } finally { drawer.remove(); inline.remove(); globalThis.fetch = oldFetch; __resetTransientArbiter(); }
 });
+
+it('R3d the real Try again button stays operable while a retry never answers', async () => {
+  const retried: string[] = []; const oldFetch = globalThis.fetch;
+  globalThis.fetch = vi.fn(async (url: unknown, init?: RequestInit) => {
+    if (String(url).includes('by-prefix')) return new Response(byPrefixBody([job({ pathHash: 'A' })]));
+    if (String(url).includes('/invoke')) { retried.push(JSON.parse(String(init?.body)).args.pathHash); return new Promise<Response>(() => {}); }
+    return Response.json({});
+  }) as typeof fetch;
+  const el = document.createElement('jf-failed-jobs-drawer') as FailedJobsDrawer;
+  el.inline = true; el.folderPathHash = 'folder'; el.observedCount = 1;
+  try {
+    document.body.append(el); await pump(el);
+    const atom = inlineRetry(el); await settle(atom);
+    const control = atom.shadowRoot!.querySelector('jf-control')! as Element & { busy: boolean };
+    await settle(control);
+    const button = () => control.shadowRoot!.querySelector('button')!;
+    button().click(); await pump(el); await new Promise(resolve => setTimeout(resolve, 400)); await settle(control);
+    expect(control.busy).toBe(false);
+    expect(button().getAttribute('aria-disabled')).not.toBe('true');
+    button().click(); await pump(el);
+    expect(retried).toEqual(['A', 'A']);
+  } finally { el.remove(); globalThis.fetch = oldFetch; }
+});

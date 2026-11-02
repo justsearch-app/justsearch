@@ -381,7 +381,7 @@ export class FailedJobsDrawer extends JfElement {
       ${this.lastKnown ? html`<p>Last-known failures; retries are in progress.</p>` : nothing}
       ${this.renderBody()}
       ${this.rows.length ? html`<jf-button variant="ghost" label="Try again"
-        .onActivate=${() => this.retryAll()}>${icon({ name: 'refresh-cw', size: 14 })} Try again</jf-button>` : nothing}
+        .onActivate=${() => { void this.retryAll(); /* no promise back: jf-control would hold Try again busy until the batch settles */ }}>${icon({ name: 'refresh-cw', size: 14 })} Try again</jf-button>` : nothing}
     </div>`;
     if (!this.open) return html``;
     return html`
