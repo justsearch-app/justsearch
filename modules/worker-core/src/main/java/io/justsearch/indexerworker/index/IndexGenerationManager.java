@@ -2829,11 +2829,6 @@ public final class IndexGenerationManager {
 
   public record GcResult(int markedCount, int prunedCount) {}
 
-  private static boolean isRenamedForDeletion(String name) {
-    int suffix = name.lastIndexOf(".del-");
-    return suffix > 0 && isMarkedRetirementName(name, name.substring(0, suffix));
-  }
-
   /**
    * Best-effort GC for old, unreferenced generations/backups.
    *
@@ -2851,13 +2846,13 @@ public final class IndexGenerationManager {
             if (!Files.readAttributes(path, java.nio.file.attribute.BasicFileAttributes.class,
                 java.nio.file.LinkOption.NOFOLLOW_LINKS).isDirectory()) continue;
             String name = path.getFileName().toString();
-            if (protectedIds.stream().anyMatch(id -> name.equals(id) || isMarkedRetirementName(name, id))) continue;
+            if (protectedIds.contains(name)) continue;
             try {
               if (!Files.readAttributes(path.resolve(GENERATION_SENTINEL),
                   java.nio.file.attribute.BasicFileAttributes.class,
                   java.nio.file.LinkOption.NOFOLLOW_LINKS).isRegularFile()) continue;
             } catch (java.nio.file.NoSuchFileException absentSentinel) {
-              if (!isRenamedForDeletion(name)) continue;
+              continue;
             }
             boolean markedForDeletion = name.contains(".del-");
             if (!markedForDeletion) {
@@ -2889,13 +2884,6 @@ public final class IndexGenerationManager {
         int pruned = 0;
         for (Path path : markedPaths) {
           deleteRetirementPayloadBeforeOwnership(path, path.getFileName().toString());
-          if (!isRenamedForDeletion(path.getFileName().toString())) {
-            var marking = SafeIndexPathOps.markForDeletion(path, indicesDir);
-            if (!marking.renamedToDel()) {
-              throw new IOException("Could not rename generation before ownership cleanup: " + path);
-            }
-            path = marking.effectivePath();
-          }
           var result = io.justsearch.configuration.FileOps.deleteRecursivelyBestEffort(path, log);
           if (result.failed() != 0 || Files.exists(path)) {
             throw new IOException("Generation cleanup incomplete: " + path);
