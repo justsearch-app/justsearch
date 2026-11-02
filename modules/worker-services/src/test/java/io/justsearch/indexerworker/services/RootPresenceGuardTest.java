@@ -43,10 +43,11 @@ final class RootPresenceGuardTest {
     Path root = Files.createDirectory(tempDir.resolve("ancestor"));
     Path nested = Files.createDirectory(root.resolve("independent"));
     Path file = Files.writeString(nested.resolve("notes.txt"), "independent source");
+    Path realNested = nested.toRealPath();
     var previous = RootIdentity.VOLUME_IDENTITY_LOOKUP;
     boolean unavailable = RootIdentity.VOLUME_IDENTITY_UNAVAILABLE.getAndSet(false);
     try {
-      RootIdentity.VOLUME_IDENTITY_LOOKUP = path -> path.startsWith(nested) ? "test-volume:2" : "test-volume:3";
+      RootIdentity.VOLUME_IDENTITY_LOOKUP = path -> path.startsWith(realNested) ? "test-volume:2" : "test-volume:3";
       var volumes = RootVolumeLedger.under(tempDir.resolve("ledger"));
       volumes.record(root, "test-volume:1");
       volumes.record(nested, "test-volume:2");
