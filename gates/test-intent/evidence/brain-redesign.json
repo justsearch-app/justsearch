@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
   },
-  "createdAt": "2026-11-02T07:01:10.757Z",
-  "revision": "6680864f7d3dffbafa39f14ad65b6be149b54d36",
-  "tree": "c49913e1a345adb2c8b0929f3009e8d8d0318276",
+  "createdAt": "2026-11-02T07:45:38.695Z",
+  "revision": "f2f1945c23e621be24776621de89283e5d2e3d62",
+  "tree": "94c68f2a7a1b52ec0502155f9d9686bc70cb08fc",
   "environment": {
     "platform": "linux",
     "arch": "x64",
@@ -18,10 +18,10 @@
   },
   "runs": [
     {
-      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/BrainSurface.ui-mode.test.ts\" \"src/shell-v0/views/BrainSurface.pausedInstall.test.ts\" \"src/shell-v0/views/BrainSurface.snapshotLiveness.test.ts\" \"src/shell-v0/views/BrainSurface.telemetry-mode.test.ts\" \"src/shell-v0/state/aiStateStore.restartInference.test.ts\" \"src/shell-v0/state/brainPage.test.ts\" \"src/shell-v0/views/BrainSurface.redesign.test.ts\" \"src/shell-v0/views/BrainSurface.installRefresh.test.ts\" \"src/shell-v0/views/BrainSurface.repairRemedy.test.ts\" \"src/shell-v0/views/BrainSurface.skipReason.test.ts\" \"src/shell-v0/views/BrainSurface.sparkline.test.ts\" \"src/shell-v0/views/BrainSurface.sliceB.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/cdcs43uq/tmp/test-intent-vitest-4-1793602863602.json\"",
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/BrainSurface.ui-mode.test.ts\" \"src/shell-v0/views/BrainSurface.pausedInstall.test.ts\" \"src/shell-v0/views/BrainSurface.snapshotLiveness.test.ts\" \"src/shell-v0/views/BrainSurface.telemetry-mode.test.ts\" \"src/shell-v0/state/aiStateStore.restartInference.test.ts\" \"src/shell-v0/state/brainPage.test.ts\" \"src/shell-v0/views/BrainSurface.redesign.test.ts\" \"src/shell-v0/views/BrainSurface.installRefresh.test.ts\" \"src/shell-v0/views/BrainSurface.repairRemedy.test.ts\" \"src/shell-v0/views/BrainSurface.skipReason.test.ts\" \"src/shell-v0/views/BrainSurface.sparkline.test.ts\" \"src/shell-v0/views/BrainSurface.sliceB.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/g_6kr5uz/tmp/test-intent-vitest-511-1793605533974.json\"",
       "cwd": "modules/ui-web",
       "exitCode": 0,
-      "durationMs": 7151
+      "durationMs": 4720
     }
   ],
   "checks": [
@@ -174,7 +174,7 @@
       "id": "modules/ui-web/src/shell-v0/views/BrainSurface.telemetry-mode.test.ts",
       "file": "modules/ui-web/src/shell-v0/views/BrainSurface.telemetry-mode.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:4c127b9b09a53dff053d95cf217effad6ba69b07eb849fccc7ec1763f1af54ee",
+      "contentDigest": "sha256:678369940fe0863cca2707107a567d7abeb7611eed3aefacc3fb13e11e422bf1",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -205,6 +205,18 @@
         },
         {
           "name": "developer telemetry belongs to Health AI Engine engine history link focuses the section when Health is mounted already and when it mounts later",
+          "status": "passed"
+        },
+        {
+          "name": "Health telemetry request independence S6 slow transitions survives a poll tick while the other endpoint publishes independently",
+          "status": "passed"
+        },
+        {
+          "name": "Health telemetry request independence S6 slow traces survives a poll tick while the other endpoint publishes independently",
+          "status": "passed"
+        },
+        {
+          "name": "Health telemetry request independence S6 a bounded pending read becomes unavailable and can retry, ignoring late results",
           "status": "passed"
         }
       ]
@@ -574,7 +586,7 @@
       "id": "modules/ui-web/src/shell-v0/views/BrainSurface.sliceB.test.ts",
       "file": "modules/ui-web/src/shell-v0/views/BrainSurface.sliceB.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:6534220433a3d27035687f230d6e1d35ad57f9caef6dc64e033069944248b842",
+      "contentDigest": "sha256:75eff2e2eda481e4d1ccb3ded748f966fc45433fb8976828ea6c4cd2516279cd",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -642,10 +654,42 @@
         {
           "name": "Brain Advanced controls an installed inactive variant can be activated from the real endpoint fields",
           "status": "passed"
+        },
+        {
+          "name": "Brain step 1 review repairs S1 only reading memory can reset automatically and persists zero through backend merge",
+          "status": "passed"
+        },
+        {
+          "name": "Brain step 1 review repairs S1 reading memory Automatic sends zero rather than a null no-op",
+          "status": "passed"
+        },
+        {
+          "name": "Brain step 1 review repairs S2 inactive loaded sessions are off and never promised, while unknown remains unknown",
+          "status": "passed"
+        },
+        {
+          "name": "Brain step 1 review repairs S3 saved answer intent is unknown and blocked while initial settings are pending",
+          "status": "passed"
+        },
+        {
+          "name": "Brain step 1 review repairs S3 saved answer intent is unknown and blocked while initial settings are failed",
+          "status": "passed"
+        },
+        {
+          "name": "Brain step 1 review repairs S4 installed systems retain an additions Install action with selected size and exact consent",
+          "status": "passed"
+        },
+        {
+          "name": "Brain step 1 review repairs S5 disconnect during picture reading uses last-observed wording until a live completion",
+          "status": "passed"
+        },
+        {
+          "name": "Brain step 1 review repairs S7 every phrase, step and About opener shares expanded state and panel association",
+          "status": "passed"
         }
       ]
     }
   ],
   "failBefore": null,
-  "digest": "sha256:d74fb12e59612f4833da6a133eb82056c5ec15c777b51990cdd880209d073b1e"
+  "digest": "sha256:3b480187b852dee17858d525df07de3f57567ca30ff1409aab9dee123d54978a"
 }

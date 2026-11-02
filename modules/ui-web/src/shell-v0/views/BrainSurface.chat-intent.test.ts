@@ -26,6 +26,7 @@ interface PanelHarness {
   planPreview: unknown;
   inference: unknown;
   settings: { chatEnabled: boolean };
+  settingsRead: boolean;
   _unifiedAiState: unknown;
   host_: unknown;
   fetchJson(path: string): Promise<unknown>;
@@ -48,6 +49,7 @@ function renderPanel(kind: AiEngineVerdict['kind'], opts: { onlineAiEnabled?: bo
   el.policy = { downloadsEnabled: true, onlineAiEnabled: opts.onlineAiEnabled ?? true };
   el.installStatus = { state: 'completed', installedFully: true };
   el.settings = { chatEnabled: kind === 'online' || kind === 'starting' };
+  el.settingsRead = true; // This harness supplies the successful settings-read snapshot directly.
   el.planPreview = opts.chatUnavailable ? { components: [{ id: 'chat', state: 'unavailable', unavailableReason: opts.chatUnavailable }] } : { components: [{ id: 'embedding', state: 'installed' }, { id: 'chat', state: 'installed', declinable: true }] };
   el.inference = null;
   el._unifiedAiState = { aiEngine: verdict(kind), snapshotLive: true };

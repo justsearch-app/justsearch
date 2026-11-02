@@ -26,7 +26,7 @@ export function composeBrainSentence(
   verdict: AiEngineVerdict,
   installed: boolean,
   features: Readonly<Record<BrainFeatureId, BrainFeature>>,
-  readingPictures: boolean,
+  readingPictures: boolean | null,
 ): BrainSentencePart[] {
   const { meaning, reranker, chat, pictures } = features;
   const parts: BrainSentencePart[] = [];
@@ -41,7 +41,7 @@ export function composeBrainSentence(
   } else {
     parts.push({ text: meaning.active === true ? 'It understands what your files are about' : meaning.active === false ? 'Understanding meaning is not active' : 'Understanding meaning is unconfirmed', feature: 'meaning' });
     parts.push({ text: reranker.active === true ? ', puts the best match first' : reranker.active === false ? ', without best match first' : ', with best match first unconfirmed', feature: 'reranker' });
-    parts.push({ text: !chat.installed ? '. Answers are not downloaded yet' : !chat.selected ? '. Answers are off; background work can continue' : readingPictures ? '. Answers are temporarily unavailable while pictures are being read; they resume after the current document' : chat.active === true ? ' and answers your questions with sources' : chat.active === null ? '. Answer availability is unconfirmed' : '. Answers are not available yet', feature: 'chat' });
+    parts.push({ text: !chat.installed ? '. Answers are not downloaded yet' : !chat.selected ? '. Answers are off; background work can continue' : readingPictures === null ? '. Pictures were being read when last observed; current answer availability is unconfirmed' : readingPictures ? '. Answers are temporarily unavailable while pictures are being read; they resume after the current document' : chat.active === true ? ' and answers your questions with sources' : chat.active === null ? '. Answer availability is unconfirmed' : '. Answers are not available yet', feature: 'chat' });
     parts.push({ text: pictures.active === true ? '. It reads text in scans and images' : pictures.active === false ? ". It doesn't read text in scans and images yet" : '. Reading text in scans and images is unconfirmed', feature: 'pictures' });
   }
   if (verdict.kind === 'connecting') parts.push({ text: '. AI status is still being checked' });

@@ -549,6 +549,7 @@ export class BrainSurface extends JfElement {
    */
   declare host_: PluginHostApi | undefined;
   declare settings: UiSettings;
+  private settingsRead = false;
   declare llm: LlmSettings;
   // Tempdoc 586 §3 — `inference` + `systemStatus` are sourced from the shared
   // aiStateStore (the single observed-state authority, aiStateStore.ts §B7),
@@ -1286,6 +1287,7 @@ export class BrainSurface extends JfElement {
     const llmRevision = this.llmRevision;
     const settings = await this.fetchJson<{ ui?: UiSettings; llm?: LlmSettings }>('/api/settings/v2');
     if (!this.isConnected || revision !== this.refreshRevision || choice !== this.choiceRevision || !settings) return;
+    this.settingsRead = true;
     this.settings = { ...(settings.ui ?? {}), mode: getUiMode() };
     // Drafts own their values even after focus moves to another surface. Revisions
     // also cover edits and witnessed saves completed while this read was pending.
@@ -1350,7 +1352,7 @@ export class BrainSurface extends JfElement {
           ?? this._unifiedAiState?.capabilities?.chat === true)
         : !unavailable && component != null && component.declined !== true && component.state !== 'declined';
       const active = !live ? null : id === 'chat' ? this._unifiedAiState?.capabilities?.chat ?? null
-        : onnx?.status === 'unknown' ? null : onnx?.modelActive ?? null;
+        : onnx?.status == null || onnx.status === 'unknown' ? null : onnx.status === 'active' && onnx.modelActive === true;
       const percent = packageProgress?.bytesTotal && packageProgress.bytesTotal > 0
         ? Math.floor(((packageProgress.bytesDownloaded ?? 0) / packageProgress.bytesTotal) * 100) : null;
       const state = unavailable ? `Unavailable on this computer: ${component!.unavailableReason || 'Not available in this install mode.'}`
@@ -1362,7 +1364,8 @@ export class BrainSurface extends JfElement {
       const acquisitionControl = component?.declinable === true && (!installed || !present);
       const runtimeControl = installed && present && id === 'chat';
       const blockedReason = unavailable ? component?.unavailableReason || state
-        : this.planLockReason()
+        : (id === 'chat' && installed && present && !this.settingsRead ? 'Saved answer choice is not known. Refresh settings before changing answers.' : null)
+        ?? this.planLockReason()
         ?? (this.busy['inference-switch'] ? 'Saving the answer choice' : null)
         ?? (installed && !live ? reasonFor('binding.unreachable').wording : null)
         ?? (installed && !component && !present ? 'Package status is unavailable. Refresh to check the files.' : null)
@@ -1370,7 +1373,7 @@ export class BrainSurface extends JfElement {
         ?? (!present && this.policy?.downloadsEnabled === false ? 'Downloads are disabled by administrator policy.' : null);
       features[id] = {
         id, label, selected, installed: present, active, availability: unavailable ? 'unavailable' : component ? 'available' : 'unknown',
-        state: id === 'chat' && installed && present && this.settings.chatEnabled == null ? `${state} · automatic (no saved answer choice)` : state,
+        state: id === 'chat' && installed && present ? !this.settingsRead ? `${state} · Saved answer choice is not known` : this.settings.chatEnabled == null ? `${state} · automatic (no saved answer choice)` : state : state,
         size: component?.totalBytes && component.totalBytes > 0 ? formatBytes(component.totalBytes) : null,
         switchable: !unavailable && (acquisitionControl || runtimeControl), blockedReason,
       };
@@ -1400,6 +1403,7 @@ export class BrainSurface extends JfElement {
         @click=${() => { if (!feature.blockedReason) void this.changeFeature(feature); }}
       ><span></span></button>
       <button type="button" class="feature-phrase" aria-label=${`About ${feature.label}`}
+        aria-expanded=${this.featureInfo === feature.id} aria-controls=${`brain-feature-panel-${feature.id}`}
         @click=${(event: Event) => this.openFeatureInfo(feature.id, event)}>${icon({ name: 'help-circle', size: 12 })}</button>
       ${feature.blockedReason ? html`<span id=${`${id}-reason`} class="switch-reason">${feature.blockedReason}</span>` : nothing}
     </span>`;
@@ -1446,7 +1450,7 @@ export class BrainSurface extends JfElement {
       chat: 'Answers written from your files, with sources you can check.',
       pictures: 'Reads text and content in scans and pictures when the engine has a projector attached.',
     };
-    return html`<div class="feature-panel" tabindex="-1" role="region" aria-label=${`About ${feature.label}`}>
+    return html`<div id=${`brain-feature-panel-${feature.id}`} class="feature-panel" tabindex="-1" role="region" aria-label=${`About ${feature.label}`}>
       <strong>${feature.label}</strong>
       <div class="feature-tradeoffs"><div><h3>You get</h3><p>+ ${benefits[feature.id]}</p></div>
         <div><h3>It costs</h3><p>${feature.size ? `${feature.size} registry file footprint. ` : ''}${feature.id === 'pictures' ? 'Included in the answer model’s files. ' : ''}Uses processing and graphics memory while working. Other heavy apps may slow down.</p></div></div>
@@ -1459,7 +1463,7 @@ export class BrainSurface extends JfElement {
     const count = this._unifiedAiState?.index?.documentCount;
     const renderStep = (feature: BrainFeature, glyph: 'zap' | 'list' | 'message-square' | 'image') => html`
       <div class="path-step" data-feature=${feature.id}>
-        <button type="button" class="step-info" @click=${(event: Event) => this.openFeatureInfo(feature.id, event)} aria-expanded=${this.featureInfo === feature.id}>
+        <button type="button" class="step-info" @click=${(event: Event) => this.openFeatureInfo(feature.id, event)} aria-expanded=${this.featureInfo === feature.id} aria-controls=${`brain-feature-panel-${feature.id}`}>
           <span class="step-symbol" data-active=${feature.active === true}>${icon({ name: glyph, size: 20 })}</span>
           ${feature.label}
         </button>
@@ -2224,7 +2228,8 @@ export class BrainSurface extends JfElement {
     })();
 
     const features = this.brainFeatures();
-    const readingPictures = this.systemStatus?.inference?.procedure === 'VDU_BATCH';
+    const readingPictures = this.systemStatus?.inference?.procedure === 'VDU_BATCH'
+      ? this._unifiedAiState?.snapshotLive === true ? true : null : false;
     const installed = this.hasInstalledAi();
     const processorOnly = this.runtimeStatus?.active?.gpuLayers === 0;
     const reindexRequired = this.systemStatus?.embedding?.compatState === 'BLOCKED_LEGACY'
@@ -2237,10 +2242,13 @@ export class BrainSurface extends JfElement {
     const installSize = this.planPreview?.totalDownloadBytes;
     const actionLabel = primaryAction.label === 'Install AI' && typeof installSize === 'number' && installSize >= 0
       ? `Install AI · ${formatBytes(installSize)}` : primaryAction.label;
+    const additionsLabel = `Install additions · ${typeof installSize === 'number' && installSize >= 0 ? formatBytes(installSize) : 'size unknown'}`;
+    const additions = installed && !activationRequired && aiState !== 'installing'
+      && this.planPreview?.components?.some(c => c.state === 'to-download' && !c.declined) === true;
     return html`
       <div data-testid="brain-simple-panel">
         <h1 class="brain-headline" tabindex="-1">${headline}${aiState === 'installing' && pct !== null ? ` ${pct}%` : ''}</h1>
-        <p class="brain-sentence">${composeBrainSentence(aiVerdict, installed, features, readingPictures).map(part => part.feature ? html`<button type="button" class="feature-phrase" @click=${(event: Event) => this.openFeatureInfo(part.feature!, event)}>${part.text}</button>${this.renderFeatureSwitch(features[part.feature], 'sentence')}` : part.text)}</p>
+        <p class="brain-sentence">${composeBrainSentence(aiVerdict, installed, features, readingPictures).map(part => part.feature ? html`<button type="button" class="feature-phrase" aria-expanded=${this.featureInfo === part.feature} aria-controls=${`brain-feature-panel-${part.feature}`} @click=${(event: Event) => this.openFeatureInfo(part.feature!, event)}>${part.text}</button>${this.renderFeatureSwitch(features[part.feature], 'sentence')}` : part.text)}</p>
         <div class="brain-status-detail">${aiState === 'connecting' ? html`<jf-pulse-dots></jf-pulse-dots>` : nothing}${sc.sub}${this.installStalled() ? html` <span role="status">Download stalled — no recent progress.</span>` : nothing}</div>
         ${!installed || aiState === 'installing' || activationRequired ? html`<div class="status-row">
           <jf-button class=${primaryAction.primary && !installed ? 'install-action' : ''}
@@ -2251,6 +2259,11 @@ export class BrainSurface extends JfElement {
             data-testid="brain-simple-action"
           >${icon({ name: primaryAction.iconName, size: 14 })} ${actionLabel}</jf-button>
           ${!installed ? html`<span class="brain-status-detail">You will see each licence before anything downloads.</span>` : nothing}
+        </div>` : nothing}
+        ${additions ? html`<div class="status-row">
+          <jf-button variant="ghost" label=${additionsLabel}
+            .availability=${downloadsDisabled ? unavailableBecause('Downloads are disabled by administrator policy.') : this.planLockReason() ? unavailableBecause(this.planLockReason()!) : AVAILABLE}
+            .onActivate=${() => void this.startInstall()}>${icon({ name: 'download', size: 14 })} ${additionsLabel}</jf-button>
         </div>` : nothing}
         ${aiState === 'installing'
           ? html`
@@ -2972,17 +2985,17 @@ export class BrainSurface extends JfElement {
     const saved = this.llm[key];
     const draft = this.llmDrafts.get(key);
     const value = draft == null ? saved : Number(draft);
-    const automatic = value == null || (key !== 'gpuLayers' && value === 0);
-    const shown = automatic ? 'Automatic' : key === 'gpuLayers' && value === 0 ? '0 layers · processor only' : `${NUM.format(value!)} ${key === 'gpuLayers' ? 'layers' : 'tokens'}`;
+    const automatic = key === 'gpuLayers' ? value == null : key === 'contextWindow' && value === 0;
+    const shown = automatic ? 'Automatic' : value == null ? 'Not configured' : key === 'gpuLayers' && value === 0 ? '0 layers · processor only' : `${NUM.format(value!)} ${key === 'gpuLayers' ? 'layers' : 'tokens'}`;
     return html`<div class="advanced-row">
       <div><label for=${`brain-${key}`}>${label}</label><p>${description}</p></div>
-      <div class="slider-setting"><input id=${`brain-${key}`} type="range" min="0" max=${Math.max(max, saved ?? 0)} step="1"
+      <div class="slider-setting"><input id=${`brain-${key}`} type="range" min=${key === 'maxTokens' ? 16 : 0} max=${Math.max(max, saved ?? 0)} step="1"
         .value=${String(value ?? 0)} aria-label=${label} aria-valuetext=${shown} ?disabled=${this.llmPending > 0}
         @input=${(event: Event) => this.editLlm(key, (event.target as HTMLInputElement).value)}
         @change=${(event: Event) => void this.patchLlm({ [key]: Number((event.target as HTMLInputElement).value) })}>
         <output for=${`brain-${key}`}>${shown}</output>
-        <jf-button variant="ghost" label=${`Automatic ${label.toLowerCase()}`} ?disabled=${this.llmPending > 0 || value == null}
-          .onActivate=${() => void this.patchLlm({ [key]: null })}>${icon({ name: 'refresh-cw', size: 12 })} Automatic</jf-button>
+        ${key === 'contextWindow' ? html`<jf-button variant="ghost" label=${`Automatic ${label.toLowerCase()}`} ?disabled=${this.llmPending > 0 || value === 0}
+          .onActivate=${() => void this.patchLlm({ contextWindow: 0 })}>${icon({ name: 'refresh-cw', size: 12 })} Automatic</jf-button>` : nothing}
       </div>
     </div>`;
   }

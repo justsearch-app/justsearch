@@ -17,6 +17,7 @@ let transitionsBody: unknown;
 let tracesBody: unknown;
 let unavailable: boolean;
 let late: Promise<Response> | null;
+let endpointRead: ((path: string, signal?: AbortSignal) => Promise<Response>) | null;
 let signals: AbortSignal[];
 let requests: string[];
 const json = (body: unknown) => new Response(JSON.stringify(body), { headers: { 'content-type': 'application/json' } });
@@ -26,6 +27,7 @@ async function mount(): Promise<HealthSurface> {
   el.host_ = createMockHostApi({ data: { fetch: async (path: string, init?: {signal?: AbortSignal}) => {
     if (path.includes('/transitions') || path.includes('/traces?')) {
       requests.push(path); if (init?.signal) signals.push(init.signal);
+      if (endpointRead) return endpointRead(path, init?.signal);
       if (late) return late;
       if (unavailable) throw new Error('Unavailable');
       return json(path.includes('/transitions') ? transitionsBody : tracesBody);
@@ -39,7 +41,7 @@ beforeEach(() => {
   vi.useFakeTimers();
   vi.stubGlobal('fetch', vi.fn(async () => json({})));
   transitionsBody = { transitions }; tracesBody = { spans, tracesAvailable: true };
-  unavailable = false; late = null; requests = []; signals = [];
+  unavailable = false; late = null; endpointRead = null; requests = []; signals = [];
 });
 afterEach(() => { document.body.innerHTML = ''; vi.useRealTimers(); vi.unstubAllGlobals(); __resetUiModeForTest(); });
 describe('developer telemetry belongs to Health AI Engine', () => {
@@ -100,5 +102,42 @@ describe('developer telemetry belongs to Health AI Engine', () => {
     el.shadowRoot!.querySelector<HTMLElement>('#ai-engine')!.blur();
     requestMemberTab('core.health-surface', 'ai-engine');
     await vi.waitFor(() => expect(el.shadowRoot!.activeElement?.id).toBe('ai-engine'));
+  });
+});
+
+describe('Health telemetry request independence', () => {
+  it.each(['transitions', 'traces'])('S6 slow %s survives a poll tick while the other endpoint publishes independently', async slow => {
+    let release!: (response: Response) => void;
+    endpointRead = path => path.includes('/' + slow + '?') ? new Promise(resolve => { release = resolve; })
+      : Promise.resolve(json(path.includes('/transitions') ? { transitions } : { spans, tracesAvailable: true }));
+    const el = await mount();
+    await vi.advanceTimersByTimeAsync(0); await settle(el);
+    const fastRow = slow === 'traces' ? 'brain-transition-row' : 'brain-trace-row';
+    // One case pins independent publication first; the other pins non-starvation
+    // first, so fail-before evidence identifies both original defects.
+    if (slow === 'transitions') expect(el.shadowRoot!.querySelectorAll(`[data-testid="${fastRow}"]`).length).toBeGreaterThan(0);
+    await vi.advanceTimersByTimeAsync(6000); await settle(el);
+    expect(requests.filter(path => path.includes('/' + slow + '?'))).toHaveLength(1);
+    expect(signals.every(signal => !signal.aborted)).toBe(true);
+    expect(el.shadowRoot!.querySelectorAll(`[data-testid="${fastRow}"]`).length).toBeGreaterThan(0);
+    release(json(slow === 'traces' ? { spans, tracesAvailable: true } : { transitions })); await vi.advanceTimersByTimeAsync(0); await settle(el);
+    expect(el.shadowRoot!.querySelectorAll('[data-testid="brain-transition-row"]')).toHaveLength(2);
+    expect(el.shadowRoot!.querySelectorAll('[data-testid="brain-trace-row"]')).toHaveLength(1);
+    await vi.advanceTimersByTimeAsync(4000); await settle(el);
+    expect(requests.filter(path => path.includes('/' + slow + '?'))).toHaveLength(2);
+  });
+  it('S6 a bounded pending read becomes unavailable and can retry, ignoring late results', async () => {
+    const el = await mount();
+    let release!: (response: Response) => void;
+    endpointRead = path => path.includes('/traces?') ? new Promise(resolve => { release = resolve; }) : Promise.resolve(json({ transitions }));
+    await vi.advanceTimersByTimeAsync(5000);
+    const pendingSignal = signals.at(-1)!;
+    await vi.advanceTimersByTimeAsync(15000); await settle(el);
+    expect(pendingSignal.aborted).toBe(true);
+    expect(el.shadowRoot!.textContent).toContain('Recent spans unavailable');
+    endpointRead = null; release(json({ spans: [{ ...spans[0], name: 'obsolete' }], tracesAvailable: true })); await settle(el);
+    expect(el.shadowRoot!.textContent).not.toContain('obsolete');
+    await vi.advanceTimersByTimeAsync(5000); await settle(el);
+    expect(el.shadowRoot!.querySelectorAll('[data-testid="brain-trace-row"]')).toHaveLength(1);
   });
 });

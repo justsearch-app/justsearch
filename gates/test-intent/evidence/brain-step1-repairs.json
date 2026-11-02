@@ -1,0 +1,267 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
+  },
+  "createdAt": "2026-11-02T07:45:28.039Z",
+  "revision": "f2f1945c23e621be24776621de89283e5d2e3d62",
+  "tree": "fb510275acfc02f13be70c896ba357451a4ecada",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/BrainSurface.sliceB.test.ts\" \"src/shell-v0/views/BrainSurface.telemetry-mode.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/g_6kr5uz/tmp/test-intent-vitest-338-1793605522459.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 1664
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/views/BrainSurface.sliceB.test.ts#S1 only reading memory can reset automatically and persists zero through backend merge",
+      "file": "modules/ui-web/src/shell-v0/views/BrainSurface.sliceB.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:75eff2e2eda481e4d1ccb3ded748f966fc45433fb8976828ea6c4cd2516279cd",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Brain step 1 review repairs S1 only reading memory can reset automatically and persists zero through backend merge",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/BrainSurface.sliceB.test.ts#S1 reading memory Automatic sends zero rather than a null no-op",
+      "file": "modules/ui-web/src/shell-v0/views/BrainSurface.sliceB.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:75eff2e2eda481e4d1ccb3ded748f966fc45433fb8976828ea6c4cd2516279cd",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Brain step 1 review repairs S1 reading memory Automatic sends zero rather than a null no-op",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/BrainSurface.sliceB.test.ts#S2 inactive loaded sessions are off and never promised, while unknown remains unknown",
+      "file": "modules/ui-web/src/shell-v0/views/BrainSurface.sliceB.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:75eff2e2eda481e4d1ccb3ded748f966fc45433fb8976828ea6c4cd2516279cd",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Brain step 1 review repairs S2 inactive loaded sessions are off and never promised, while unknown remains unknown",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/BrainSurface.sliceB.test.ts#S4 installed systems retain an additions Install action with selected size and exact consent",
+      "file": "modules/ui-web/src/shell-v0/views/BrainSurface.sliceB.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:75eff2e2eda481e4d1ccb3ded748f966fc45433fb8976828ea6c4cd2516279cd",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Brain step 1 review repairs S4 installed systems retain an additions Install action with selected size and exact consent",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/BrainSurface.sliceB.test.ts#S5 disconnect during picture reading uses last-observed wording until a live completion",
+      "file": "modules/ui-web/src/shell-v0/views/BrainSurface.sliceB.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:75eff2e2eda481e4d1ccb3ded748f966fc45433fb8976828ea6c4cd2516279cd",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Brain step 1 review repairs S5 disconnect during picture reading uses last-observed wording until a live completion",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/BrainSurface.sliceB.test.ts#S7 every phrase, step and About opener shares expanded state and panel association",
+      "file": "modules/ui-web/src/shell-v0/views/BrainSurface.sliceB.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:75eff2e2eda481e4d1ccb3ded748f966fc45433fb8976828ea6c4cd2516279cd",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Brain step 1 review repairs S7 every phrase, step and About opener shares expanded state and panel association",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/BrainSurface.telemetry-mode.test.ts#S6 a bounded pending read becomes unavailable and can retry, ignoring late results",
+      "file": "modules/ui-web/src/shell-v0/views/BrainSurface.telemetry-mode.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:678369940fe0863cca2707107a567d7abeb7611eed3aefacc3fb13e11e422bf1",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Health telemetry request independence S6 a bounded pending read becomes unavailable and can retry, ignoring late results",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/BrainSurface.sliceB.test.ts#S3 saved answer intent is unknown and blocked while initial settings are pending",
+      "file": "modules/ui-web/src/shell-v0/views/BrainSurface.sliceB.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:75eff2e2eda481e4d1ccb3ded748f966fc45433fb8976828ea6c4cd2516279cd",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Brain step 1 review repairs S3 saved answer intent is unknown and blocked while initial settings are pending",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/BrainSurface.sliceB.test.ts#S3 saved answer intent is unknown and blocked while initial settings are failed",
+      "file": "modules/ui-web/src/shell-v0/views/BrainSurface.sliceB.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:75eff2e2eda481e4d1ccb3ded748f966fc45433fb8976828ea6c4cd2516279cd",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Brain step 1 review repairs S3 saved answer intent is unknown and blocked while initial settings are failed",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/BrainSurface.telemetry-mode.test.ts#S6 slow transitions survives a poll tick while the other endpoint publishes independently",
+      "file": "modules/ui-web/src/shell-v0/views/BrainSurface.telemetry-mode.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:678369940fe0863cca2707107a567d7abeb7611eed3aefacc3fb13e11e422bf1",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Health telemetry request independence S6 slow transitions survives a poll tick while the other endpoint publishes independently",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/BrainSurface.telemetry-mode.test.ts#S6 slow traces survives a poll tick while the other endpoint publishes independently",
+      "file": "modules/ui-web/src/shell-v0/views/BrainSurface.telemetry-mode.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:678369940fe0863cca2707107a567d7abeb7611eed3aefacc3fb13e11e422bf1",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Health telemetry request independence S6 slow traces survives a poll tick while the other endpoint publishes independently",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "f2f1945c23",
+    "revision": "f2f1945c23e621be24776621de89283e5d2e3d62",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/BrainSurface.sliceB.test.ts\" \"src/shell-v0/views/BrainSurface.telemetry-mode.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/g_6kr5uz/tmp/test-intent-vitest-338-1793605525961.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 1627,
+        "output": "JSON report written to /home/elias/.cache/am/g_6kr5uz/tmp/test-intent-vitest-338-1793605525961.json\n\n"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui-web/src/shell-v0/views/BrainSurface.sliceB.test.ts#S1 only reading memory can reset automatically and persists zero through backend merge",
+        "classification": "assertion",
+        "detail": "Brain step 1 review repairs S1 only reading memory can reset automatically and persists zero through backend merge:  AssertionError: expected [ 'Stop answers', …(8) ] to not include 'Automatic graphics card use'\n    at Proxy.<anonymous> (file:///home/elias/.cache/am/g_6kr5uz/tmp/test-intent-before-bZoMC6/modules/ui-web/node_modules/@vitest/expect/dist/index.js:1319:15)\n    at Proxy.<anonymous> (file:///home/elias/"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/BrainSurface.sliceB.test.ts#S1 reading memory Automatic sends zero rather than a null no-op",
+        "classification": "assertion",
+        "detail": "Brain step 1 review repairs S1 reading memory Automatic sends zero rather than a null no-op:  AssertionError: expected 8192 to be +0 // Object.is equality\n    at /home/elias/.cache/am/g_6kr5uz/tmp/test-intent-before-bZoMC6/modules/ui-web/src/shell-v0/views/BrainSurface.sliceB.test.ts:271:37\n    at file:///home/elias/.cache/am/g_6kr5uz/tmp/test-intent-before-bZoMC6/modules/ui-web/node_modules"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/BrainSurface.sliceB.test.ts#S2 inactive loaded sessions are off and never promised, while unknown remains unknown",
+        "classification": "assertion",
+        "detail": "Brain step 1 review repairs S2 inactive loaded sessions are off and never promised, while unknown remains unknown:  AssertionError: expected '\\n        \\n          \\n    \\n  \\n   …' to contain 'Off'\n    at /home/elias/.cache/am/g_6kr5uz/tmp/test-intent-before-bZoMC6/modules/ui-web/src/shell-v0/views/BrainSurface.sliceB.test.ts:279:84\n    at file:///home/elias/.cache/am/g_6kr5uz/tmp/test-intent-before-bZoMC6/modul"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/BrainSurface.sliceB.test.ts#S4 installed systems retain an additions Install action with selected size and exact consent",
+        "classification": "assertion",
+        "detail": "Brain step 1 review repairs S4 installed systems retain an additions Install action with selected size and exact consent:  AssertionError: button Install additions · 1.0 KB; rendered: Stop answers, Refresh status, Automatic reading memory, Automatic longest answer, Automatic graphics card use, Restart AI, Repair installation, Cancel, Accept and download: expected undefined to be truthy\n    at clickButton (/home/elias/.c"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/BrainSurface.sliceB.test.ts#S5 disconnect during picture reading uses last-observed wording until a live completion",
+        "classification": "assertion",
+        "detail": "Brain step 1 review repairs S5 disconnect during picture reading uses last-observed wording until a live completion:  AssertionError: expected 'Understanding meaning is unconfirmed,…' not to contain 'while pictures are being read'\n    at /home/elias/.cache/am/g_6kr5uz/tmp/test-intent-before-bZoMC6/modules/ui-web/src/shell-v0/views/BrainSurface.sliceB.test.ts:321:78\n    at file:///home/elias/.cache/am/g_6kr5uz/tmp/t"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/BrainSurface.sliceB.test.ts#S7 every phrase, step and About opener shares expanded state and panel association",
+        "classification": "assertion",
+        "detail": "Brain step 1 review repairs S7 every phrase, step and About opener shares expanded state and panel association:  AssertionError: expected null to be 'false' // Object.is equality\n    at /home/elias/.cache/am/g_6kr5uz/tmp/test-intent-before-bZoMC6/modules/ui-web/src/shell-v0/views/BrainSurface.sliceB.test.ts:331:80\n    at runNextTicks (node:internal/process/task_queues:65:5)\n    at listOnTimeout (node:internal/"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/BrainSurface.telemetry-mode.test.ts#S6 a bounded pending read becomes unavailable and can retry, ignoring late results",
+        "classification": "assertion",
+        "detail": "Health telemetry request independence S6 a bounded pending read becomes unavailable and can retry, ignoring late results:  AssertionError: expected '\\n      \\n      \\n        \\n         …' to contain 'Recent spans unavailable'\n    at /home/elias/.cache/am/g_6kr5uz/tmp/test-intent-before-bZoMC6/modules/ui-web/src/shell-v0/views/BrainSurface.telemetry-mode.test.ts:137:40\n    at file:///home/elias/.cache/am/g_6kr5uz/tmp/te"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/BrainSurface.sliceB.test.ts#S3 saved answer intent is unknown and blocked while initial settings are pending",
+        "classification": "assertion",
+        "detail": "Brain step 1 review repairs S3 saved answer intent is unknown and blocked while initial settings are pending:  AssertionError: expected '\\n        \\n          \\n    \\n  \\n   …' to contain 'Saved answer choice is not known'\n    at /home/elias/.cache/am/g_6kr5uz/tmp/test-intent-before-bZoMC6/modules/ui-web/src/shell-v0/views/BrainSurface.sliceB.test.ts:290:30\n    at runNextTicks (node:internal/process/task_que"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/BrainSurface.sliceB.test.ts#S3 saved answer intent is unknown and blocked while initial settings are failed",
+        "classification": "assertion",
+        "detail": "Brain step 1 review repairs S3 saved answer intent is unknown and blocked while initial settings are failed:  AssertionError: expected '\\n        \\n          \\n    \\n  \\n   …' to contain 'Saved answer choice is not known'\n    at /home/elias/.cache/am/g_6kr5uz/tmp/test-intent-before-bZoMC6/modules/ui-web/src/shell-v0/views/BrainSurface.sliceB.test.ts:290:30\n    at runNextTicks (node:internal/process/task_que"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/BrainSurface.telemetry-mode.test.ts#S6 slow transitions survives a poll tick while the other endpoint publishes independently",
+        "classification": "assertion",
+        "detail": "Health telemetry request independence S6 slow transitions survives a poll tick while the other endpoint publishes independently:  AssertionError: expected 0 to be greater than 0\n    at /home/elias/.cache/am/g_6kr5uz/tmp/test-intent-before-bZoMC6/modules/ui-web/src/shell-v0/views/BrainSurface.telemetry-mode.test.ts:118:110\n    at file:///home/elias/.cache/am/g_6kr5uz/tmp/test-intent-before-bZoMC6/modules/ui-web/node_modules/@vi"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/BrainSurface.telemetry-mode.test.ts#S6 slow traces survives a poll tick while the other endpoint publishes independently",
+        "classification": "assertion",
+        "detail": "Health telemetry request independence S6 slow traces survives a poll tick while the other endpoint publishes independently:  AssertionError: expected [ …(2) ] to have a length of 1 but got 2\n    at Proxy.<anonymous> (file:///home/elias/.cache/am/g_6kr5uz/tmp/test-intent-before-bZoMC6/modules/ui-web/node_modules/@vitest/expect/dist/index.js:1389:20)\n    at Proxy.<anonymous> (file:///home/elias/.cache/am/g_6kr5uz/tmp/test-i"
+      }
+    ]
+  },
+  "digest": "sha256:edcce77f734166462fbab89f0f2a6e1e3e145cfd99a68d2ce2b2f29e5a2fe513"
+}

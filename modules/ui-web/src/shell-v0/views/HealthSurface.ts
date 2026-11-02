@@ -214,7 +214,7 @@ export class HealthSurface extends JfElement {
   declare recentSpans: TraceSpan[];
   declare tracesAvailable: boolean;
   private telemetryTimer: number | null = null;
-  private telemetryAbort: AbortController | null = null;
+  private telemetryRequests = new Map<string, AbortController>();
   private sectionUnsub: (() => void) | null = null;
   declare apiBase: string;
   declare host_: PluginHostApi;
@@ -660,7 +660,8 @@ export class HealthSurface extends JfElement {
       window.clearInterval(this.pollStatus);
       this.pollStatus = null;
     }
-    this.telemetryAbort?.abort();
+    for (const controller of this.telemetryRequests.values()) controller.abort();
+    this.telemetryRequests.clear();
     if (this.telemetryTimer !== null) window.clearInterval(this.telemetryTimer);
     this.telemetryTimer = null;
     this.sectionUnsub?.();
@@ -1243,25 +1244,43 @@ export class HealthSurface extends JfElement {
   }
 
   private async refreshTelemetry(): Promise<void> {
-    // One owner and one in-flight snapshot; an unmount invalidates all late responses.
-    this.telemetryAbort?.abort();
-    const controller = new AbortController();
-    this.telemetryAbort = controller;
-    const read = async <T,>(path: string): Promise<T | null> => {
+    // Each endpoint owns its bounded request. Slow traces must not hold back
+    // transitions, and a polling tick must not cancel work still in progress.
+    const read = async <T,>(path: string, publish: (value: T | null) => void): Promise<void> => {
+      if (this.telemetryRequests.has(path)) return;
+      const controller = new AbortController();
+      this.telemetryRequests.set(path, controller);
+      let onAbort!: () => void;
+      const aborted = new Promise<null>(resolve => {
+        onAbort = () => resolve(null);
+        controller.signal.addEventListener('abort', onAbort, { once: true });
+      });
+      const timeout = window.setTimeout(() => controller.abort(), 15000);
       try {
-        const response = await this.doFetch(path, { signal: controller.signal });
-        return response.ok ? await response.json() as T : null;
-      } catch { return null; }
+        const response = (async () => {
+          try {
+            const result = await this.doFetch(path, { signal: controller.signal });
+            return result.ok ? await result.json() as T : null;
+          } catch { return null; }
+        })();
+        const value = await Promise.race([response, aborted]);
+        if (this.isConnected && this.telemetryRequests.get(path) === controller) publish(value);
+      } finally {
+        window.clearTimeout(timeout);
+        controller.signal.removeEventListener('abort', onAbort);
+        if (this.telemetryRequests.get(path) === controller) this.telemetryRequests.delete(path);
+      }
     };
-    const [transitions, traces] = await Promise.all([
-      read<{ transitions?: TransitionRecord[] }>('/api/inference/transitions?limit=8'),
-      read<TraceExplorerResponse>('/api/diagnostics/traces?limit=10'),
+    await Promise.all([
+      read<{ transitions?: TransitionRecord[] }>('/api/inference/transitions?limit=8', value => {
+        this.transitionsAvailable = Array.isArray(value?.transitions);
+        this.transitions = value?.transitions ?? [];
+      }),
+      read<TraceExplorerResponse>('/api/diagnostics/traces?limit=10', value => {
+        this.tracesAvailable = value?.tracesAvailable === true;
+        this.recentSpans = value?.spans ?? [];
+      }),
     ]);
-    if (controller.signal.aborted || !this.isConnected) return;
-    this.transitionsAvailable = Array.isArray(transitions?.transitions);
-    this.transitions = transitions?.transitions ?? [];
-    this.tracesAvailable = traces?.tracesAvailable === true;
-    this.recentSpans = traces?.spans ?? [];
   }
 
   /**

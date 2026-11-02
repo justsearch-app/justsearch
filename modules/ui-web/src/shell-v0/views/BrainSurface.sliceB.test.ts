@@ -16,7 +16,7 @@ import './BrainSurface.js';
 import { createMockHostApi } from '../plugin-api/testHostApi.js';
 import type { AiInstallManifest } from '../../api/domains/packs.js';
 
-interface Brain extends HTMLElement { apiBase: string; host_: unknown; llm: {contextWindow?: number; gpuLayers?: number | null; maxTokens?: number | null; modelPath?: string | null}; patchLlm(updates: {contextWindow: number}): Promise<void>; refreshSettings(): Promise<void>; updateComplete: Promise<boolean> }
+interface Brain extends HTMLElement { installConsentOpen: boolean; apiBase: string; host_: unknown; llm: {contextWindow?: number; gpuLayers?: number | null; maxTokens?: number | null; modelPath?: string | null}; patchLlm(updates: {contextWindow: number}): Promise<void>; refreshSettings(): Promise<void>; updateComplete: Promise<boolean> }
 interface Button extends HTMLElement { updateComplete: Promise<boolean>; disabled: boolean; label: string }
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
 const manifest: AiInstallManifest = { schemaVersion: 2, packages: ['embedding', 'reranker', 'chat', 'splade', 'ner', 'citation-scorer'].map(id => ({ id, label: id, license: 'Apache-2.0', termsUrl: 'https://example.invalid/terms', variants: [], supportingFiles: [] })) };
@@ -65,7 +65,7 @@ beforeEach(() => {
     runtime: { mode: 'online', modelId: 'answer-model', modelLabel: 'Answer model', installed: { known: true, value: true } },
     capabilities: { chat: true }, status: { inference: { chatEnabledSpec: true }, operating: { gpu: { stale: false, adapter: 'Test adapter', adapterTotalBytes: 8192, adapterFreeBytes: 4096 } } },
     installStatus: { state: 'completed', phase: 'done', installedFully: true },
-    runtimeStatus: { active: { mmprojActive: true }, onnxFeatures: [{ id: 'embed', modelActive: true }, { id: 'reranker', modelActive: true }] },
+    runtimeStatus: { active: { mmprojActive: true }, onnxFeatures: [{ id: 'embed', status: 'active', modelActive: true }, { id: 'reranker', status: 'active', modelActive: true }] },
     index: { documentCount: { known: true, value: 24 } },
   } as unknown as AiState;
   vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
@@ -74,8 +74,9 @@ beforeEach(() => {
     if (path.endsWith('/api/settings/v2') && init?.method === 'POST') {
       const body = JSON.parse(String(init.body));
       if (settingsConflict) return json({ errorCode: 'VERSION_CONFLICT' }, 409);
-      llmValues = { ...llmValues, ...body.llm };
-      return json({ state: 'COMPLETE', operationKey: body.operationKey, witness: { acceptedRevision: 1, lastCommittedOperationKey: body.operationKey }, llm: body.llm });
+      // SettingsPatch.merge only applies non-null members; null retains saved values.
+      llmValues = { ...llmValues, ...Object.fromEntries(Object.entries(body.llm ?? {}).filter(([, value]) => value != null)) };
+      return json({ state: 'COMPLETE', operationKey: body.operationKey, witness: { acceptedRevision: 1, lastCommittedOperationKey: body.operationKey }, llm: llmValues });
     }
     if (path.endsWith('/api/settings/v2')) return settingsGet ? settingsGet() : json({ ui: { chatEnabled }, llm: llmValues, witness: { acceptedRevision: 0, lastCommittedOperationKey: null } });
     if (path.endsWith('/plan-preview')) return previewGet ? previewGet() : json(preview);
@@ -213,10 +214,8 @@ describe('Brain Advanced controls', () => {
     expect(el.llm.gpuLayers).toBe(0);
     expect(gpu.getAttribute('aria-valuetext')).toBe('0 layers · processor only');
     expect(el.llm.maxTokens).toBeNull(); expect(el.llm.contextWindow).toBe(0); expect(el.llm.modelPath).toBe('/model');
-    await clickButton(el, 'Automatic graphics card use');
-    expect(el.llm.gpuLayers).toBeNull();
-    expect(gpu.getAttribute('aria-valuetext')).toBe('Automatic');
-    expect(vi.mocked(fetch).mock.calls.filter(([,init]) => init?.method === 'POST').map(([,init]) => JSON.parse(String(init!.body)).llm)).toEqual([{ gpuLayers: 0 }, { gpuLayers: null }]);
+    expect([...el.shadowRoot!.querySelectorAll<Button>('jf-button')].map(b => b.label)).not.toContain('Automatic graphics card use');
+    expect(vi.mocked(fetch).mock.calls.filter(([,init]) => init?.method === 'POST').map(([,init]) => JSON.parse(String(init!.body)).llm)).toEqual([{ gpuLayers: 0 }]);
   });
   it('a slider conflict shows review guidance, keeps the saved value and allows an explicit retry', async () => {
     llmValues = { gpuLayers: 8 }; settingsConflict = true;
@@ -248,5 +247,98 @@ describe('Brain Advanced controls', () => {
     [...el.shadowRoot!.querySelectorAll<HTMLButtonElement>('button')].find(b => b.textContent?.includes('Other options'))!.click(); await el.updateComplete;
     await clickButton(el, 'Activate');
     expect(calls).toEqual([{ id: 'core.activate-runtime-variant', args: { variantId: 'cuda12' } }]);
+  });
+});
+
+// Each repair is observed through rendered controls and the endpoint contract.
+describe('Brain step 1 review repairs', () => {
+  it('S1 only reading memory can reset automatically and persists zero through backend merge', async () => {
+    llmValues = { gpuLayers: 0, contextWindow: 8192, maxTokens: 2048 };
+    const el = await mount(); await advanced(el);
+    const labels = [...el.shadowRoot!.querySelectorAll<Button>('jf-button')].map(b => b.label);
+    expect(labels).not.toContain('Automatic graphics card use');
+    expect(labels).not.toContain('Automatic longest answer');
+    await clickButton(el, 'Automatic reading memory');
+    expect(llmValues).toEqual({ gpuLayers: 0, contextWindow: 0, maxTokens: 2048 });
+    window.dispatchEvent(new Event('focus')); await settle(el);
+    expect(el.shadowRoot!.querySelector('#brain-contextWindow')!.getAttribute('aria-valuetext')).toBe('Automatic');
+    expect(vi.mocked(fetch).mock.calls.filter(([, init]) => init?.method === 'POST').map(([, init]) => JSON.parse(String(init!.body)).llm)).toEqual([{ contextWindow: 0 }]);
+  });
+  it('S1 reading memory Automatic sends zero rather than a null no-op', async () => {
+    llmValues = { contextWindow: 8192 };
+    const el = await mount(); await advanced(el);
+    await clickButton(el, 'Automatic reading memory');
+    expect(llmValues.contextWindow).toBe(0);
+    expect(el.llm.contextWindow).toBe(0);
+    await el.refreshSettings(); await settle(el);
+    expect(el.shadowRoot!.querySelector('#brain-contextWindow')!.getAttribute('aria-valuetext')).toBe('Automatic');
+  });
+  it('S2 inactive loaded sessions are off and never promised, while unknown remains unknown', async () => {
+    emit({ runtimeStatus: { onnxFeatures: [{ id: 'embed', status: 'active', modelActive: false }, { id: 'reranker', status: 'inactive', modelActive: true }] } });
+    const el = await mount();
+    expect(el.shadowRoot!.querySelector('[data-feature="reranker"]')!.textContent).toContain('Off');
+    expect(el.shadowRoot!.querySelector('.brain-sentence')!.textContent).toContain('without best match first');
+    expect(el.shadowRoot!.querySelector('[data-feature="meaning"]')!.textContent).toContain('Off');
+    emit({ runtimeStatus: { onnxFeatures: [{ id: 'reranker', status: 'unknown', modelActive: true }] } }); await el.updateComplete;
+    expect(el.shadowRoot!.querySelector('[data-feature="reranker"]')!.textContent).toContain('Unknown');
+  });
+  it.each(['pending', 'failed'])('S3 saved answer intent is unknown and blocked while initial settings are %s', async outcome => {
+    let release!: (value: Response) => void;
+    settingsGet = outcome === 'pending' ? () => new Promise(resolve => { release = resolve; }) : async () => json({}, 503);
+    const el = await mount();
+    const path = el.shadowRoot!.querySelector('[data-feature="chat"]')!;
+    expect(path.textContent).toContain('Saved answer choice is not known');
+    expect(path.textContent).not.toContain('automatic (no saved answer choice)');
+    for (const toggle of switches(el, 'Answer questions')) {
+      expect(toggle.getAttribute('aria-disabled')).toBe('true');
+      expect(el.shadowRoot!.getElementById(toggle.getAttribute('aria-describedby')!)!.textContent).toContain('Saved answer choice is not known');
+      toggle.click();
+    }
+    await settle(el); expect(calls).toEqual([]);
+    if (outcome === 'pending') { release(json({ ui: { chatEnabled: null } })); await settle(el); }
+    else { settingsGet = null; await el.refreshSettings(); await settle(el); }
+    expect(switches(el, 'Answer questions')[0]!.getAttribute('aria-disabled')).toBe('false');
+    if (outcome === 'pending') expect(path.textContent).toContain('automatic (no saved answer choice)');
+  });
+  it('S4 installed systems retain an additions Install action with selected size and exact consent', async () => {
+    preview = { totalDownloadBytes: 1024, components: [component('embedding'), component('chat'), component('reranker', 'to-download'), component('splade', 'declined', true)] };
+    emit({ installStatus: { state: 'completed', installedFully: true, pendingRegistryAdditions: ['reranker'] } });
+    const el = await mount(); await advanced(el);
+    expect(el.shadowRoot!.querySelector('[data-testid="install-pending-registry-additions"]')!.textContent).toContain('run Install');
+    await clickButton(el, 'Install additions · 1.0 KB');
+    expect(el.installConsentOpen).toBe(true);
+    expect(el.shadowRoot!.querySelector('dialog')!.textContent).toContain('reranker');
+    expect(el.shadowRoot!.querySelector('dialog')!.textContent).not.toContain('splade');
+    expect(calls).toEqual([]);
+    await clickButton(el, 'Accept and download');
+    expect(calls).toContainEqual({ id: 'core.start-ai-install', args: { acceptTerms: true } });
+  });
+  it('S5 disconnect during picture reading uses last-observed wording until a live completion', async () => {
+    emit({ status: { inference: { chatEnabledSpec: true, procedure: 'VDU_BATCH' } } as AiState['status'] });
+    const el = await mount();
+    expect(el.shadowRoot!.querySelector('.brain-sentence')!.textContent).toContain('while pictures are being read');
+    emit({ snapshotLive: false }); await el.updateComplete;
+    expect(el.shadowRoot!.querySelector('.brain-sentence')!.textContent).not.toContain('while pictures are being read');
+    expect(el.shadowRoot!.querySelector('.brain-sentence')!.textContent).toContain('Pictures were being read when last observed');
+    emit({ snapshotLive: true, status: { inference: { chatEnabledSpec: true, procedure: 'NONE' } } as AiState['status'] }); await el.updateComplete;
+    expect(el.shadowRoot!.querySelector('.brain-sentence')!.textContent).toContain('answers your questions');
+    expect(el.shadowRoot!.querySelector('.brain-sentence')!.textContent).not.toContain('last observed');
+  });
+  it('S7 every phrase, step and About opener shares expanded state and panel association', async () => {
+    const el = await mount();
+    const openers = [...el.shadowRoot!.querySelectorAll<HTMLButtonElement>('.feature-phrase, .step-info')];
+    expect(openers.length).toBeGreaterThan(8);
+    for (const opener of openers) expect(opener.getAttribute('aria-expanded')).toBe('false');
+    const chat = openers.filter(b => b.getAttribute('aria-controls') === 'brain-feature-panel-chat');
+    expect(chat).toHaveLength(4);
+    for (const opener of chat) {
+      opener.click(); await el.updateComplete;
+      const panel = el.shadowRoot!.getElementById('brain-feature-panel-chat')!;
+      expect(panel).not.toBeNull();
+      for (const button of chat) expect(button.getAttribute('aria-expanded')).toBe('true');
+      panel.querySelector<HTMLButtonElement>('button')!.click(); await el.updateComplete;
+      for (const button of chat) expect(button.getAttribute('aria-expanded')).toBe('false');
+    }
+    expect(calls).toEqual([]);
   });
 });

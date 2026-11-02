@@ -566,6 +566,112 @@ axe run remain necessary.
           "label": "agent-drafted, owner-adopted"
         }
       ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/views/BrainSurface.sliceB.test.ts",
+        "modules/ui-web/src/shell-v0/views/BrainSurface.telemetry-mode.test.ts"
+      ],
+      "class": "New",
+      "repaired": true,
+      "behaviour": "S1–S7 review repairs: supported Automatic semantics (GPU null display without a reset; context reset writes zero; no longest-answer reset), mock null-as-keep merge matching SettingsPatch, active status plus active model for On, initial settings-read uncertainty with reachable blocked reasons, selected additions Install action and exact consent, last-observed picture-reading wording on disconnect, independent bounded Health endpoint requests that skip overlapping ticks and ignore timed-out late results, and shared expanded/controls semantics for every feature opener. The GPU slider preservation check retires its impossible null-reset assertion while retaining its untouched-value and processor-only assertions.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "B3",
+          "quote": "The sentence is generated from real state for every combination of install state and switch state; it names only what is true now (for example \"It doesn't read text in scans and images yet\" only when that is off or missing) and ends with where it runs. Feature phrases carry their switch inline where a switch exists; the same switch appears at the step in the path, and both always show the same state and act the same.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "B4",
+          "quote": "Path: Your files (file count from status), Read the text (built in), Understand meaning (needed, its size, no switch), Best match first, Answer questions (model name and size when installed), with Text in scans and images as a branch off Read the text. Each step shows its known size (registry download/footprint size, never claimed as measured disk use) and its state in words (on, off, not downloaded, downloading x%, unavailable on this computer with the reason).",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "B6",
+          "quote": "Selecting a feature (its phrase, its step or its switch's info affordance) opens one small panel at that step: \"You get\" and \"It costs\" in plain words, with only known numbers (download size, on-disk size, that it uses graphics memory while working); no made-up per-feature memory figures. Escape and outside click close it, focus returns; only one panel at a time.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "B8",
+          "quote": "Install: the Install AI button shows the selected total size and opens the existing licence/size consent; downloading shows progress, pause/resume, cancel with retained bytes, stalled and blocked stages, and search ready before completion, in the same page (no nested panel). Repair, retry after failure and the working-but-missing / manual fallback stay reachable.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "B15",
+          "quote": "(challenger 2) The answer switch shows the saved intent (nullable chatEnabled: unset stays distinct from explicit off); the sentence explains current availability, including answers off while background work continues and answers temporarily unavailable while pictures are being read, and their completion.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "B20",
+          "quote": "(challenger 10, 11, broken today) Runtime variant controls read the endpoint's real fields (installedVariants, active.activeVariantId) and work with an installed inactive variant; graphics card use distinguishes Automatic (null) from 0 layers (processor only); sliders keep untouched values, save once per change (not per drag step), are keyboard operable and handle a conflict response. Opening Advanced never writes the global ui.mode; the page is the same under either global mode.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "B21",
+          "quote": "(challenger 14) Health owns the telemetry fetching it shows (works when Health is opened before or without AI Brain; stops when Health unmounts; the link works when Health is already mounted), and shows empty/unavailable states instead of hiding the sections. AI Brain no longer polls telemetry.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "Q3",
+          "quote": "Settings saves keep witnesses and conflict review; offline runtime mutations are never queued; unknown/last-observed values stay labelled.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "Q6",
+          "quote": "(challenger 12) Backend restart and upgrade: retained bytes survive and resume; explicit answers-off stays off; newly registered packages stay \"available additions\"; optional missing supporting files do not become required repair failures. Saved values keep their meaning: declinedAiPackages is acquisition preference only (never runtime enablement); nullable chatEnabled; the six LLM settings with null semantics.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "well from now on you can just proceed autonomously accordinglky",
+          "delegationLocation": "task t-20261101-uiimpl, user turn after the WP1 summary",
+          "delegationScope": "Implement the agreed AI Brain window design, step 1, including independent-review repairs.",
+          "choice": "Use each existing backend field's supported Automatic meaning, preserve unknown settings until a successful read, restore the existing size/licence consent for additions, and bound each independent Health telemetry request at 15 seconds while skipping overlapping ticks.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/brain-step1-repairs.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/views/BrainSurface.sliceB.test.ts#S1 only reading memory can reset automatically and persists zero through backend merge",
+        "modules/ui-web/src/shell-v0/views/BrainSurface.sliceB.test.ts#S1 reading memory Automatic sends zero rather than a null no-op",
+        "modules/ui-web/src/shell-v0/views/BrainSurface.sliceB.test.ts#S2 inactive loaded sessions are off and never promised, while unknown remains unknown",
+        "modules/ui-web/src/shell-v0/views/BrainSurface.sliceB.test.ts#S4 installed systems retain an additions Install action with selected size and exact consent",
+        "modules/ui-web/src/shell-v0/views/BrainSurface.sliceB.test.ts#S5 disconnect during picture reading uses last-observed wording until a live completion",
+        "modules/ui-web/src/shell-v0/views/BrainSurface.sliceB.test.ts#S7 every phrase, step and About opener shares expanded state and panel association",
+        "modules/ui-web/src/shell-v0/views/BrainSurface.telemetry-mode.test.ts#S6 a bounded pending read becomes unavailable and can retry, ignoring late results",
+        "modules/ui-web/src/shell-v0/views/BrainSurface.sliceB.test.ts#S3 saved answer intent is unknown and blocked while initial settings are pending",
+        "modules/ui-web/src/shell-v0/views/BrainSurface.sliceB.test.ts#S3 saved answer intent is unknown and blocked while initial settings are failed",
+        "modules/ui-web/src/shell-v0/views/BrainSurface.telemetry-mode.test.ts#S6 slow transitions survives a poll tick while the other endpoint publishes independently",
+        "modules/ui-web/src/shell-v0/views/BrainSurface.telemetry-mode.test.ts#S6 slow traces survives a poll tick while the other endpoint publishes independently"
+      ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/views/BrainSurface.chat-intent.test.ts"
+      ],
+      "class": "Adaptation",
+      "moved": [
+        "input re-encoding"
+      ],
+      "whatMoved": "The direct-render harness marks its injected saved settings snapshot as successfully read, matching the new S3 initial-read guard. All lifecycle operation arguments, unavailable-reason and policy assertions stay unchanged. Pending/failed reads are separately pinned by the rendered S3 regression checks."
     }
   ]
 }
@@ -627,5 +733,65 @@ server record and exhausted its startup port range. The aggregates were rerun ag
 explicitly owned server, sequentially, without changing gate code or baselines. The final
 server was stopped by its creating process; the final listening-port check matched the two
 pre-existing listeners (5174 and 5175).
+
+
+Step 1 review repair handoff (2026-11-02 07:49 UTC; uncommitted):
+
+S1–S7 are repaired. The Automatic mock now follows SettingsPatch.merge's non-null member
+application. GPU Automatic is a display of an unset value; there is no unsupported null reset.
+Reading memory resets to zero, and Longest answer has no Automatic action (its range begins
+at the backend's minimum of 16). Loaded inactive sessions are Off. A successful settings read
+is required before the saved answer intent is called automatic or can be changed. Selected
+additions have a size-labelled Install action using the existing consent. Retained VDU_BATCH
+is described as last observed. Health publishes each endpoint independently, skips overlapping
+polls, and times out each request after 15 seconds; disconnect invalidates every pending response.
+All feature openers share expanded state and the panel's controls id.
+
+- Tests added or rewritten: modules/ui-web/src/shell-v0/views/BrainSurface.sliceB.test.ts — S1–S5/S7, backend merge semantics, untouched slider settings, unknown intent, addition consent and opener accessibility — durable.
+- Tests added or rewritten: modules/ui-web/src/shell-v0/views/BrainSurface.telemetry-mode.test.ts — S6/B21; independent publication, non-starvation, bounded retry and late-response rejection; existing ownership/unmount/deep-link assertions retained — durable.
+- Tests added or rewritten: modules/ui-web/src/shell-v0/views/BrainSurface.chat-intent.test.ts — S3/Q5; the direct-render fixture marks its supplied settings snapshot as read; every existing operation and policy oracle remains — durable.
+
+The final focused run passed 43 tests. The chat-intent preservation harness passed all nine
+checks on the isolated f2f1945c23 before clone and on the candidate. General evidence and the
+R1–R6 slice B evidence were regenerated because their test files changed. All eleven S1–S7
+repair checks fail by assertion on f2f1945c23 and pass on the candidate; the two S6 slow-endpoint
+cases deliberately identify independent publication and starvation separately. The original
+slice A consent evidence is unchanged and remains bound to its unchanged test file.
+
+Acceptance checks actually run:
+
+- `npm --prefix modules/ui-web run lint`: exit 0; `npm --prefix modules/ui-web run typecheck`: exit 0.
+- `npm --prefix modules/ui-web run test:unit:run -- --maxWorkers=4`: exit 0, 683 files and 8,764 tests passed. An initial invocation ended with signal 143; the first completed run found the seven legacy direct-render harness failures caused by the new initial-read guard, repaired by the fixture adaptation above. No assertion was weakened. A final targeted run after the additions unknown-size label adjustment passed all 43 affected tests.
+- `npm --prefix modules/ui-web run knip:report`: exit 0 (underlying Knip report exit 1); `node scripts/governance/run.mjs --gate dead-code --mode gate`: pass, five findings, zero failing gates.
+- `node scripts/ci/run-ui-web-gates.mjs`: exit 0, 31/31 passed, including style literals.
+- All eight registered Brain `jseval ui-shot <step> --fixtures --no-demo` captures: exit 0, zero axe violations, zero real console errors, no sideways overflow. All PNGs inspected against the supplied references.
+- `jseval ui-a11y-gate`: exit 2, capture error on unchanged Search Filters step `sv3-filters-docked-600x400-forced`: `axe error: Page.add_script_tag: Execution context was destroyed, most likely because of a navigation.` The other 109 surfaces are clean, including every Brain surface and both Search steps named in the brief.
+- `jseval ui-proportion-gate`: exit 2, unchanged Search Filters step `sv3-filters-docked-1280x720-light` did not mount required selector `jf-sv3-filters` (`selector missing, hidden or without positive width/height`). Brain rows passed. No Search recipe, selector or baseline was changed; cause of these aggregate capture failures remains unverified and is returned under the builder come-back condition.
+- `node scripts/governance/gates/test-intent/cli.mjs`: only independent acceptance missing. No acceptance record was written.
+- Existing redesign race checks and slice B checks executed: concurrent choices/consent, stale responses, two windows, reload and tab switches during install; settings drafts and late saves; Health late/unmounted/timed-out responses.
+
+Final registered capture comparisons:
+
+- ai-brain — ready reference's open headline, sentence, path, graphics bar and links; fixture-unknown feature observations remain labelled unknown.
+- ai-brain-light — same arrangement and readable hairlines in light colors.
+- ai-brain-advanced — expands Answers below the links as in the Advanced reference; lower groups use hairline rows and native sliders, with supported Automatic controls only.
+- ai-brain-advanced-light — same in-place groups in light colors.
+- ai-brain-components — Downloaded files uses the Advanced reference's open row language, known registry sizes and individual optional choices.
+- ai-brain-components-light — same inventory, aligned sizes and text actions with light contrast.
+- ai-brain-consent — existing size/licence consent over the new-install page, with the fixture's selected 1.52 GB package set.
+- ai-brain-consent-light — same exact set and consent actions in light colors.
+
+Additional Chromium captures at 1280×720, 760×720 and 600×400 in dark, light and forced colors
+all completed with zero axe violations, zero real console errors and no document sideways
+overflow. ArrowRight operated the native reading-memory slider in each. The existing panel
+200% reflow checks were not changed by these repairs.
+
+No `.agents/preflight` exists. No Gradle or full governance gate ran. Checks used session-owned
+fixture browsers, isolated shared before/evidence clones with their own dependency copies,
+and temporary HTTP servers from the unit suite; no owner's app, backend stack, model or GPU
+was used. The explicitly started Vite at 127.0.0.1:5174 was stopped; the final 5173–5223 listener
+check is empty, matching the initial snapshot. Work remains uncommitted. Delivery is blocked
+on the two Search Filters aggregate capture errors above, for the orchestrator to resolve or
+record independently; no further repair outside this assignment was attempted.
 
 ## Acceptance records
