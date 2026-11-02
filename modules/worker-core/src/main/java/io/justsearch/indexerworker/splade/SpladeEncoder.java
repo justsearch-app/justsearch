@@ -176,7 +176,8 @@ public final class SpladeEncoder implements Closeable {
     this.reluOnlyActivation = config.isReluOnlyActivation();
     this.truncationEvidencePath = truncationEvidencePath;
     this.truncationEvidence =
-        new SpladeTruncationEvidence(maxSeqLen, EVIDENCE_WINDOW_OVERLAP_TOKENS);
+        new SpladeTruncationEvidence(maxSeqLen,
+            Math.min(EVIDENCE_WINDOW_OVERLAP_TOKENS, (maxSeqLen - 2) / 4));
 
     // Register GPU release callback via typed W5 wiring (replaces legacy
     // setOnBeforeGpuRelease(Runnable); tempdoc 397 §14.5 W5).
@@ -309,13 +310,20 @@ public final class SpladeEncoder implements Closeable {
     Encoding encoding = tokenizer.encode(text);
     truncationEvidence.record(encoding.getIds().length);
     truncationEvidence.flushIfNeeded(truncationEvidencePath, config.modelPath());
-    int seqLen = Math.min(encoding.getIds().length, maxSeqLen);
-    long[] inputIds = truncate(encoding.getIds(), seqLen);
-    long[] attentionMask = truncate(encoding.getAttentionMask(), seqLen);
-    long[] tokenTypeIds = truncate(encoding.getTypeIds(), seqLen);
     profiler.addPhaseNs("tokenize", System.nanoTime() - tTok);
-
-    return runOnnxInferenceSingle(inputIds, attentionMask, tokenTypeIds, acquisition);
+    if (encoding.getIds().length <= maxSeqLen) {
+      return runOnnxInferenceSingle(encoding.getIds(), encoding.getAttentionMask(),
+          encoding.getTypeIds(), acquisition);
+    }
+    var windows = new io.justsearch.indexerworker.embed.onnx.TokenWindows(
+        encoding.getIds(), encoding.getAttentionMask(), encoding.getTypeIds(), maxSeqLen,
+        Math.min(EVIDENCE_WINDOW_OVERLAP_TOKENS, (maxSeqLen - 2) / 4), maxSeqLen);
+    Map<String, Float> combined = new HashMap<>();
+    for (long[][] window : windows) {
+      var sparse = runOnnxInferenceSingle(window[0], window[1], window[2], acquisition);
+      sparse.forEach((term, weight) -> combined.merge(term, weight, Math::max));
+    }
+    return combined;
   }
 
   /**
@@ -411,6 +419,7 @@ public final class SpladeEncoder implements Closeable {
     long[][] maskByText = new long[n][];
     long[][] typesByText = new long[n][];
     int[] tokenCounts = new int[n];
+    List<Map<String, Float>> results = new ArrayList<>(Collections.nCopies(n, null));
     long tTok = System.nanoTime();
     for (var group : BoundedTokenizeGroups.ranges(texts, charBudget)) {
       int groupStart = group.startInclusive();
@@ -419,28 +428,38 @@ public final class SpladeEncoder implements Closeable {
       for (int i = 0; i < groupEncodings.length; i++) {
         int idx = groupStart + i;
         Encoding enc = groupEncodings[i];
-        truncationEvidence.record(enc.getIds().length);
-        int seqLen = Math.min(enc.getIds().length, maxSeqLen);
+        if (enc.getIds().length > maxSeqLen) {
+          tokenCounts[idx] = enc.getIds().length;
+          continue;
+        }
+        int seqLen = enc.getIds().length;
         tokenCounts[idx] = seqLen;
         idsByText[idx] = truncate(enc.getIds(), seqLen);
         maskByText[idx] = truncate(enc.getAttentionMask(), seqLen);
         typesByText[idx] = truncate(enc.getTypeIds(), seqLen);
       }
     }
+    for (int i = 0; i < n; i++) {
+      if (idsByText[i] != null) truncationEvidence.record(tokenCounts[i]);
+    }
     profiler.addPhaseNs("tokenize", System.nanoTime() - tTok);
     truncationEvidence.flushIfNeeded(truncationEvidencePath, config.modelPath());
+    for (int i = 0; i < n; i++) {
+      if (tokenCounts[i] > maxSeqLen) {
+        results.set(i, encode(texts.get(i), LocalSessionAcquisition.background()));
+      }
+    }
+
 
     // Phase 2: Build index array sorted by effective token count (ascending)
-    Integer[] sortedIndices = new Integer[n];
-    for (int i = 0; i < n; i++) {
-      sortedIndices[i] = i;
-    }
+    Integer[] sortedIndices = java.util.stream.IntStream.range(0, n)
+        .filter(i -> results.get(i) == null).boxed().toArray(Integer[]::new);
+    int fittingCount = sortedIndices.length;
     Arrays.sort(sortedIndices, Comparator.comparingInt(i -> tokenCounts[i]));
 
     // Phase 3: Partition into token-budget sub-batches and encode each
-    List<Map<String, Float>> results = new ArrayList<>(Collections.nCopies(n, null));
     int pos = 0;
-    while (pos < n) {
+    while (pos < fittingCount) {
       int batchStart = pos;
       int batchTokens = 0;
       // Spec E §2.2: the plan read for this call may take fewer items than the count cap (items are
@@ -450,11 +469,11 @@ public final class SpladeEncoder implements Closeable {
               sessions.arenaPlan(),
               EncoderRole.SPLADE,
               maxBatch,
-              n - pos,
+              fittingCount - pos,
               i -> tokenCounts[sortedIndices[batchStart + i]],
               this::inferenceSeqLen,
               count -> count);
-      while (pos < n
+      while (pos < fittingCount
           && (pos - batchStart) < callItems
           && batchTokens + tokenCounts[sortedIndices[pos]] <= tokenBudget) {
         batchTokens += tokenCounts[sortedIndices[pos]];
@@ -507,8 +526,11 @@ public final class SpladeEncoder implements Closeable {
     long tTok = System.nanoTime();
     for (int i = 0; i < batchSize; i++) {
       Encoding encoding = tokenizer.encode(texts.get(i));
+      if (encoding.getIds().length > maxSeqLen) {
+        return List.of(encode(texts.get(i), LocalSessionAcquisition.background()));
+      }
       truncationEvidence.record(encoding.getIds().length);
-      int seqLen = Math.min(encoding.getIds().length, maxSeqLen);
+      int seqLen = encoding.getIds().length;
       allInputIds[i] = truncate(encoding.getIds(), seqLen);
       allAttentionMask[i] = truncate(encoding.getAttentionMask(), seqLen);
       allTokenTypeIds[i] = truncate(encoding.getTypeIds(), seqLen);

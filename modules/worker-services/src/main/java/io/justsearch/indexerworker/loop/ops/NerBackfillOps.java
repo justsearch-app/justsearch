@@ -121,6 +121,10 @@ public final class NerBackfillOps {
 
       // Batch-write all collected updates (single NRT refresh for the entire batch)
       if (!batchUpdates.isEmpty()) {
+        if (batchUpdates.stream().anyMatch(entry ->
+            SchemaFields.NER_STATUS_COMPLETED.equals(entry.getValue().get(SchemaFields.NER_STATUS)))) {
+          context.documentFieldOps().markNerPublished();
+        }
         processed = batch.updateBatch(batchUpdates).updatedCount();
       }
 

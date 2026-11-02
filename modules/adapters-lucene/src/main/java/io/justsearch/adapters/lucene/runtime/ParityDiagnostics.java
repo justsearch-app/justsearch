@@ -42,7 +42,8 @@ public final class ParityDiagnostics {
    * {@code BLUE_GREEN_MIGRATE} builds a Green generation while Blue keeps serving reads.
    */
   public static final Set<String> REBUILD_REQUIRING_KEYS =
-      Set.of(io.justsearch.adapters.lucene.commit.IndexFingerprint.COMMIT_META_KEY);
+      Set.of(io.justsearch.adapters.lucene.commit.IndexFingerprint.COMMIT_META_KEY,
+          "embedding_model_assets_sha256", "splade_model_assets_sha256", "ner_model_assets_sha256");
 
   /**
    * True if any of the supplied diffs is on a {@link #REBUILD_REQUIRING_KEYS rebuild-requiring}
@@ -152,6 +153,18 @@ public final class ParityDiagnostics {
       long docCount, List<String> indeterminateInputs) {
     Objects.requireNonNull(indeterminateInputs, "indeterminateInputs");
     List<Diff> diffs = new ArrayList<>();
+    if (!holdsNothingToMigrate(docCount) && stored != null && expected != null) {
+      for (String role : List.of("embedding", "splade", "ner")) {
+        String key = role + "_model_assets_sha256";
+        String previous = stored.get(key);
+        String current = asString(expected.get(key));
+        if (!isBlank(previous) && !isBlank(current) && !previous.equals(current)) {
+          diffs.add(new Diff(key,
+              previous, current, "Output-determining " + role + " model assets changed"));
+        }
+      }
+    }
+
     // Runs when EITHER digest is missing and both sides recorded the inputs. It is the answer for
     // that case, so the loop below must not also file the absent digest as its own finding.
     boolean inputsCompared =

@@ -6,7 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doReturn;
-import static org.mockito.Mockito.doNothing;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.spy;
 
@@ -342,7 +342,7 @@ final class AcceptedProjectionBroadReplayTest extends LuceneExecutorTestBase {
 
     try (var queue = openQueue("approved-absent.db"); var original = runtime()) {
       var indexing = spy(original.indexingCoordinator());
-      doNothing().when(indexing).indexSingle(org.mockito.ArgumentMatchers.any(
+      doAnswer(invocation -> null).when(indexing).indexSingle(org.mockito.ArgumentMatchers.any(
           io.justsearch.indexing.api.IndexDocument.class));
       var runtime = spy(original);
       doReturn(indexing).when(runtime).indexingCoordinator();

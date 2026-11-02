@@ -982,10 +982,11 @@
       ],
       "recoverability": "MIXED",
       "upgradeHandling": "READ_IN_PLACE",
-      "format": "SQLite WAL schema v1",
-      "currentVersion": 1,
+      "format": "SQLite WAL schema v2",
+      "currentVersion": 2,
       "readableLegacyVersions": [
-        0
+        0,
+        1
       ],
       "versionAuthority": "modules/worker-core/src/main/java/io/justsearch/indexerworker/disambiguation/EntityClusterStore.java",
       "versionSource": {

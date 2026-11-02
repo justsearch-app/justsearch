@@ -4,8 +4,9 @@ package io.justsearch.indexerworker.disambiguation;
 /**
  * DDL for the entity-clusters.db database.
  *
- * <p>Two tables: {@code entity_clusters} maps raw entity forms to cluster IDs and canonical forms;
- * {@code entity_overrides} records user-initiated merge/split operations.
+ * <p>{@code entity_clusters} maps raw forms to clusters and canonical forms;
+ * {@code entity_mentions} records source ownership; {@code entity_overrides} records
+ * user-initiated merge/split operations.
  */
 public final class EntityClusterSchema {
   private EntityClusterSchema() {}
@@ -23,6 +24,19 @@ public final class EntityClusterSchema {
         PRIMARY KEY (raw_form, entity_type)
       )
       """;
+
+  public static final String CREATE_MENTIONS_TABLE =
+      """
+      CREATE TABLE IF NOT EXISTS entity_mentions (
+        source_id TEXT NOT NULL,
+        raw_form TEXT NOT NULL,
+        entity_type TEXT NOT NULL,
+        PRIMARY KEY (source_id, raw_form, entity_type)
+      )
+      """;
+
+  public static final String CREATE_MENTION_FORM_INDEX =
+      "CREATE INDEX IF NOT EXISTS idx_em_form ON entity_mentions(raw_form, entity_type)";
 
   public static final String CREATE_CLUSTER_ID_INDEX =
       """

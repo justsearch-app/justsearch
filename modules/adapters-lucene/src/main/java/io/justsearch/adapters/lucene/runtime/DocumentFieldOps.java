@@ -42,6 +42,75 @@ public final class DocumentFieldOps {
   private final String idField;
   private final RuntimeSession session;
   private final ReadPathOps readPathOps;
+  private final java.util.concurrent.atomic.AtomicLong nerPublicationRevision =
+      new java.util.concurrent.atomic.AtomicLong();
+
+  /** Invalidates grouping before NER publication, so partial writes cannot hide a revision. */
+  public void markNerPublished() {
+    nerPublicationRevision.incrementAndGet();
+  }
+
+  public record EntityCorpusRevision(Object owner, long publication, int completed, long deletions) {}
+
+  public record EntityCorpusState(EntityCorpusRevision revision, Object readerKey, int pendingNer) {}
+
+  /** Strict control read: failed counts must never certify reconciliation readiness. */
+  public EntityCorpusState entityCorpusState() throws IOException {
+    var lifecycle = session.snapshot;
+    if (lifecycle == null || lifecycle.searcherManager() == null) throw new IOException("Entity reader unavailable");
+    lifecycle.searcherManager().maybeRefreshBlocking();
+    return bridge.withSearcherNoRefresh(searcher -> new EntityCorpusState(
+        new EntityCorpusRevision(this, nerPublicationRevision.get(), searcher.count(new TermQuery(
+            new Term(SchemaFields.NER_STATUS, SchemaFields.NER_STATUS_COMPLETED))),
+            session.bulkDeleteEpoch.get()), searcher.getIndexReader().getReaderCacheHelper().getKey(),
+            searcher.count(new TermQuery(new Term(SchemaFields.NER_STATUS, SchemaFields.NER_STATUS_PENDING)))));
+  }
+
+  public record EntityDocument(String id, Map<String, List<String>> mentions) {}
+
+  public record EntityPage(List<EntityDocument> documents, int cursor, boolean exhausted) {}
+
+  /** Reads IDs and all entity fields from one reader; a changed reader invalidates the cursor. */
+  public EntityPage entityPage(Object readerKey, int cursor, int limit) throws IOException {
+    if (limit <= 0) throw new IllegalArgumentException("Entity batch size must be positive");
+    return bridge.withSearcherNoRefresh(searcher -> {
+      if (searcher.getIndexReader().getReaderCacheHelper().getKey() != readerKey) {
+        throw new IOException("Entity corpus reader changed during reconciliation");
+      }
+      Query query = new TermQuery(new Term(SchemaFields.NER_STATUS, SchemaFields.NER_STATUS_COMPLETED));
+      var after = cursor < 0 ? null : new org.apache.lucene.search.FieldDoc(cursor, Float.NaN, new Object[] {cursor});
+      var hits = searcher.searchAfter(after, query, limit, org.apache.lucene.search.Sort.INDEXORDER);
+      List<EntityDocument> documents = new ArrayList<>();
+      var stored = searcher.storedFields();
+      var allows = session.sourceProcessingPolicy;
+      Map<String, String> parents = new HashMap<>();
+      int next = cursor;
+      for (var hit : hits.scoreDocs) {
+        next = hit.doc;
+        Map<String, String> sourceFields = SearchResultFormatter.extractFromStoredFields(
+            stored, hit.doc, false, Set.of(idField, SchemaFields.PATH,
+                SchemaFields.PARENT_DOC_ID, SchemaFields.PROJECTION_SOURCE_ID));
+        String id = sourceFields.get(idField);
+        if (id == null || id.isBlank()) throw new IOException("Entity document has no ID");
+        if (allows != null && !io.justsearch.configuration.excludes.ExclusionPatterns.current().isEmpty()
+            && !allows.test(processingSource(id, sourceFields, parents))) continue;
+        Map<String, List<String>> mentions = new LinkedHashMap<>();
+        String[] fields = {SchemaFields.ENTITY_PERSONS_RAW, SchemaFields.ENTITY_ORGANIZATIONS_RAW,
+            SchemaFields.ENTITY_LOCATIONS_RAW};
+        String[] types = {"PERSON", "ORGANIZATION", "LOCATION"};
+        for (int i = 0; i < fields.length; i++) {
+          var def = session.fieldMapper.fieldDef(fields[i]);
+          List<String> values = def != null && def.docValues && def.multiValued
+              ? readPathOps.projectMultiValuedDocValues(searcher, hit.doc, def.id) : List.of();
+          if (values.isEmpty()) values = List.of(stored.document(hit.doc, Set.of(fields[i])).getValues(fields[i]));
+          mentions.put(types[i], values.stream().map(String::trim).filter(v -> !v.isEmpty()).distinct().toList());
+        }
+        documents.add(new EntityDocument(id, mentions));
+      }
+      return new EntityPage(List.copyOf(documents), next, hits.scoreDocs.length < limit);
+    });
+  }
+
 
   /** Recheck IDs retained by a backfill cache before starting another batch. */
   public Set<String> excludedProcessingIds(List<String> docIds) {

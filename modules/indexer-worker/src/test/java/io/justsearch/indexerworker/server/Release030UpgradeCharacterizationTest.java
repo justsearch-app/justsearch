@@ -264,6 +264,7 @@ final class Release030UpgradeCharacterizationTest {
     ReleasedModelIdentities(Path root) throws Exception { this(root, false); }
 
     ReleasedModelIdentities(Path root, boolean nativeAnalyzerMismatch) throws Exception {
+      java.nio.file.Files.write(root.resolve("model-identity-only.onnx"), new byte[] {58, 0});
       var json = new tools.jackson.databind.ObjectMapper();
       var state = json.readTree(root.resolve("data/index/default/state.json").toFile());
       Path generation = root.resolve("data/index/default/indices").resolve(state.get("active_generation").asText());

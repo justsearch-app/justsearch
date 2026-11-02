@@ -817,13 +817,10 @@ public final class OnnxEmbeddingEncoder implements Closeable {
    * inference — so a caller can partition a batch into "one forward pass" and "needs resuming"
    * lanes before spending any GPU.
    *
-   * <p>The {@code text.length() <= maxSeqLen} short-circuit is exact, not a heuristic: the
-   * tokenizer never emits more tokens than the input has characters, so a text that short cannot
-   * exceed the context window. It keeps the ordinary short-document batch path free of a second
-   * tokenization.
+   * <p>Counts from the same tokenizer output as inference, including model framing tokens.
    */
   public int windowCount(String text) {
-    if (text == null || text.isEmpty() || text.length() <= maxSeqLen) {
+    if (text == null || text.isEmpty()) {
       return 1;
     }
     Encoding encoding = tokenizer.encode(text);

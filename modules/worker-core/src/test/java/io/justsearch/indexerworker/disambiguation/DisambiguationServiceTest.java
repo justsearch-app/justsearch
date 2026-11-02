@@ -209,6 +209,55 @@ class DisambiguationServiceTest {
     }
   }
 
+  @ParameterizedTest(name = "{displayName} [{index}] {arguments}")
+  @CsvSource({"write,false", "publication,false", "publication,true"})
+  void replayRepairsPartialPersistenceAndFailedSnapshot(String failurePoint, boolean emptyReplay) throws Exception {
+    Path db = tempDir.resolve("publication-failure.db");
+    AtomicInteger writes = new AtomicInteger();
+    AtomicBoolean faults = new AtomicBoolean(false);
+    EntityClusterStore faultingStore = new EntityClusterStore(db, jdbc -> {
+      Connection connection = DriverManager.getConnection(jdbc);
+      return (Connection) Proxy.newProxyInstance(Connection.class.getClassLoader(), new Class<?>[] {Connection.class},
+          (proxy, method, args) -> {
+            Object result = invoke(connection, method, args);
+            if (method.getName().equals("prepareStatement")
+                && ((String) args[0]).startsWith("INSERT INTO entity_clusters")) {
+              var statement = (java.sql.PreparedStatement) result;
+              return Proxy.newProxyInstance(Statement.class.getClassLoader(),
+                  new Class<?>[] {java.sql.PreparedStatement.class}, (statementProxy, statementMethod, statementArgs) -> {
+                    if (statementMethod.getName().equals("executeUpdate") && writes.incrementAndGet() == 3
+                        && failurePoint.equals("write") && faults.compareAndSet(true, false)) {
+                      throw new SQLException("cluster write fault between types");
+                    }
+                    return invoke(statement, statementMethod, statementArgs);
+                  });
+            }
+            if (!method.getName().equals("createStatement")) return result;
+            Statement statement = (Statement) result;
+            return Proxy.newProxyInstance(Statement.class.getClassLoader(), new Class<?>[] {Statement.class},
+                (statementProxy, statementMethod, statementArgs) -> {
+                  if (statementMethod.getName().equals("executeQuery")
+                      && ((String) statementArgs[0]).contains("FROM entity_clusters")
+                      && writes.get() >= 4 && failurePoint.equals("publication")
+                      && faults.compareAndSet(true, false)) throw new SQLException("snapshot publication fault");
+                  return invoke(statement, statementMethod, statementArgs);
+                });
+          });
+    });
+    try (DisambiguationService candidate = new DisambiguationService(faultingStore)) {
+      candidate.open();
+      var input = new java.util.LinkedHashMap<String, List<String>>();
+      input.put("PERSON", List.of("john smith", "JOHN SMITH"));
+      input.put("LOCATION", List.of("New York", "NEW YORK"));
+      faults.set(true);
+      assertThrows(SQLException.class, () -> candidate.processBatch(input));
+      assertTrue(candidate.snapshot().isEmpty(), "failed publication preserves the captured snapshot");
+      candidate.processBatch(emptyReplay ? Map.of() : input);
+      assertEquals(Set.of("john smith", "JOHN SMITH"), candidate.snapshot().expandCanonical("PERSON", "john smith"));
+      assertEquals(Set.of("New York", "NEW YORK"), candidate.snapshot().expandCanonical("LOCATION", "New York"));
+    }
+  }
+
   private static Throwable injectedFailure(String kind, String message) {
     return switch (kind) {
       case "sql" -> new SQLException(message);

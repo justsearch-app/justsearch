@@ -21,6 +21,24 @@ final class EmbeddingCompatibilityControllerTest {
 
   private ConfigStore prevStore;
 
+  @Test
+  void unreadableCompanionsDoNotAdoptOrEraseCommittedProvenance() {
+    String graph = "a".repeat(64);
+    String assets = "b".repeat(64);
+    var readable = new java.util.concurrent.atomic.AtomicBoolean(false);
+    var controller = new EmbeddingCompatibilityController(
+        () -> Map.of("embedding_model_sha256", graph, "embedding_model_assets_sha256", assets),
+        () -> 1L, () -> 1, () -> java.util.Optional.of(graph),
+        () -> readable.get() ? java.util.Optional.of(assets) : java.util.Optional.empty());
+    controller.refresh();
+    assertEquals(EmbeddingCompatibilityController.State.UNAVAILABLE, controller.state());
+    assertTrue(controller.fingerprintToStamp().isEmpty());
+    assertEquals(java.util.Optional.of(graph), controller.fingerprintForCommit());
+    readable.set(true);
+    controller.refresh();
+    assertEquals(EmbeddingCompatibilityController.State.COMPATIBLE, controller.state());
+  }
+
   @BeforeEach
   void setUpConfigStore() {
     prevStore = ConfigStore.globalOrNull();
@@ -31,6 +49,34 @@ final class EmbeddingCompatibilityControllerTest {
   void tearDown() {
     EmbeddingFingerprint.invalidate();
     TestResolvedConfigHelper.restoreGlobal(prevStore);
+  }
+
+  @Test
+  void successfulCommitReadbackClearsAnAbsentStampWithoutDiscardingRepairEvidence() {
+    EmbeddingFingerprint.setForTesting("current");
+    var persisted = new java.util.concurrent.atomic.AtomicReference<Map<String, String>>(
+        Map.of(EmbeddingCompatibilityController.COMMIT_META_KEY, "current"));
+    var controller = new EmbeddingCompatibilityController(persisted::get, () -> 1L, () -> 0);
+    controller.refresh();
+    persisted.set(Map.of());
+    controller.refreshStoredFingerprintAfterCommit();
+    assertNull(controller.storedFingerprint());
+    assertEquals(java.util.Optional.of("current"), controller.fingerprintToStamp());
+  }
+
+  @Test
+  void preparingMetadataDoesNotClaimDurableFingerprint() {
+    EmbeddingFingerprint.setForTesting("current");
+    var persisted = new java.util.concurrent.atomic.AtomicReference<Map<String, String>>(Map.of());
+    var controller = new EmbeddingCompatibilityController(persisted::get, () -> 0L, () -> 1);
+    controller.refresh();
+    controller.noteSuccessfulEmbeddingObserved();
+    assertEquals(java.util.Optional.of("current"), controller.fingerprintToStamp());
+    assertNull(controller.storedFingerprint(), "preparation is not a successful commit");
+    assertEquals(java.util.Optional.of("current"), controller.fingerprintToStamp());
+    persisted.set(Map.of(EmbeddingCompatibilityController.COMMIT_META_KEY, "current"));
+    controller.refreshStoredFingerprintAfterCommit();
+    assertEquals("current", controller.storedFingerprint());
   }
 
   @Test

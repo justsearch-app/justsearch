@@ -99,7 +99,7 @@ final class ServiceOutageBoundaryTest {
         assertEquals("WAITING", h.status().getCore().getState());
         assertTrue(h.status().getFailure().getNextRetryAtMs() > System.currentTimeMillis());
         execute(connection, "PRAGMA query_only=OFF");
-        doNothing().when(h.writer).indexSingle(any());
+        doAnswer(invocation -> null).when(h.writer).indexSingle(any());
         await(() -> h.rows().stream().allMatch(r -> r.state().equals("DONE")), 9_000);
         h.stop(); h.assertAttemptsZero();
       } finally {
