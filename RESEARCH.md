@@ -1,11 +1,13 @@
 # Research
 
 JustSearch is also a research project about how people and AI agents find, read and use
-what is in their files. We test this work in JustSearch itself.
+what is in their files. Its purpose is findings that make JustSearch better: every question
+is tested in JustSearch itself, and its answer could change it.
 
-We publish results only once they are confirmed: checked against a baseline, repeated,
-and tested on more than one collection. They must also matter beyond JustSearch.
-Most work stays internal; "this did not help" is a result too.
+Findings stay internal by default; "this did not help" is a result too. A finding is
+published only once it is confirmed (checked against a baseline, repeated, and tested on
+more than one collection), only when it matters beyond JustSearch, and only by a separate
+decision each time.
 
 Published search-quality evidence is in the [benchmark methodology](docs/reference/benchmarks/methodology.md),
 with the numbers in the [README](README.md#benchmarks).
