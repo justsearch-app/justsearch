@@ -5546,9 +5546,18 @@ public final class KnowledgeServer implements Closeable {
           ? null : projection.reranker().modelPath();
       Path citationDirectory = citationPathChanged && candidate.getCitationScorerModelPath().isBlank()
           ? null : projection.citation().modelPath();
+      var observed = old.queryRoleSet.surfaceForOwner().componentObservation().querySelection()
+          .orElse(prior);
+      // A failed session may publish an absent role. Its durable selection still owns the
+      // exact files to restore after Repair, even though no native session is currently wired.
+      var retainedReranker = observed == null ? null : observed.reranker();
+      if ((retainedReranker == null || retainedReranker.state() == QueryRoleSelection.State.DISABLED)
+          && prior != null && prior.reranker().state() == QueryRoleSelection.State.SELECTED) {
+        retainedReranker = prior.reranker();
+      }
       QueryRoleSelection selection = new QueryRoleSelection(
-          QueryRoleSelectionResolver.select("reranker", rerankerPathChanged, rerankerDirectory,
-              prior == null ? null : prior.reranker(), initialModelSelection,
+          QueryRoleSelectionResolver.selectReranker(candidate, rerankerPathChanged, rerankerDirectory,
+              retainedReranker, initialModelSelection,
               old.queryRoleSet.reranker() != null, projection.reranker().gpuEnabled()),
           QueryRoleSelectionResolver.select("citation-scorer", citationPathChanged,
               citationDirectory, prior == null ? null : prior.citation(), initialModelSelection,

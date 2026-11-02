@@ -37,7 +37,11 @@ final class QueryRoleSelectionResolver {
         EnvRegistry.RERANK_MODEL_PATH.configKey());
     boolean citationOverride = isOperatorOverride(resolved,
         EnvRegistry.CITATION_SCORER_MODEL_PATH.configKey());
-    if (!rerankerOverride && !citationOverride) {
+    var enabledSource = resolved.resolution(EnvRegistry.RERANK_ENABLED.configKey());
+    boolean explicitlyOff = !rerankerOverride && enabledSource != null
+        && enabledSource.sourceOrdinal() == ResolvedConfigBuilder.ORDINAL_SETTINGS_JSON
+        && "false".equalsIgnoreCase(enabledSource.value());
+    if (!rerankerOverride && !citationOverride && !explicitlyOff) {
       return new BootResolution(enrich(committed), Map.of());
     }
     var projection = EncoderConfigurationProjection.from(resolved);
@@ -45,7 +49,7 @@ final class QueryRoleSelectionResolver {
     var citation = projection.citation();
     Map<EncoderRole, String> unavailable = new EnumMap<>(EncoderRole.class);
     QueryRoleSelection.Role selectedReranker = captureForBoot(EncoderRole.RERANKER,
-        unavailable, () -> rerankerOverride
+        unavailable, () -> explicitlyOff ? QueryRoleSelection.Role.disabled() : rerankerOverride
             ? select("reranker", true, reranker.modelPath(), null, generation, false,
                 reranker.gpuEnabled())
             : select("reranker", false, reranker.modelPath(),
@@ -113,6 +117,31 @@ final class QueryRoleSelectionResolver {
     if (variant == null) throw new IOException("Active legacy query model is unavailable: "
         + packageId);
     return capture(packageId, variant.modelFile(), gpuEnabled);
+  }
+
+  /** The retained identity is owned by the same prepared settings candidate as the switch. */
+  static QueryRoleSelection.Role selectReranker(io.justsearch.app.api.UiSettings candidate,
+      boolean pathChanged, Path desiredDirectory, QueryRoleSelection.Role prior,
+      GenerationModelSelection generation, boolean currentlyWired, boolean gpuEnabled)
+      throws IOException {
+    if (Boolean.FALSE.equals(candidate.getRerankerEnabled())) {
+      QueryRoleSelection.Role retained = pathChanged
+          ? select("reranker", true, desiredDirectory, null, generation, currentlyWired, gpuEnabled)
+          : prior;
+      if (retained == null && currentlyWired) {
+        retained = select("reranker", false, desiredDirectory, null, generation, true, gpuEnabled);
+      }
+      if (retained != null && retained.state() == QueryRoleSelection.State.SELECTED) {
+        candidate.setRerankerRestoreSelection(retained);
+      }
+      return QueryRoleSelection.Role.disabled();
+    }
+    boolean enabling = Boolean.TRUE.equals(candidate.getRerankerEnabled())
+        && (prior == null || prior.state() == QueryRoleSelection.State.DISABLED);
+    var retained = candidate.getRerankerRestoreSelection();
+    if (enabling && !pathChanged && retained != null) return enrich("reranker", retained);
+    return select("reranker", pathChanged || enabling, desiredDirectory, prior,
+        generation, currentlyWired, gpuEnabled);
   }
 
   static QueryRoleSelection enrich(QueryRoleSelection selection) {

@@ -56,6 +56,17 @@ public final class SettingsServiceImpl implements SettingsService {
         "servingRefreshProfileId");
   }
 
+  private static void requireRerankerChoiceAuthority(io.justsearch.app.api.settings.SettingsV2 input) {
+    if (input.rerankerEnabled() == null) return;
+    for (var key : java.util.List.of(io.justsearch.configuration.EnvRegistry.RERANK_MODEL_PATH,
+        io.justsearch.configuration.EnvRegistry.RERANK_ENABLED)) {
+      if (key.get().filter(value -> !value.isBlank()).isPresent()) {
+        throw refused("QUERY_ROLE_PATH_OVERRIDDEN",
+            "Best match first is controlled by an operator override; change that override first");
+      }
+    }
+  }
+
   @Override public String servingRefreshProfileId() {
     return servingRefreshProfileId.get();
   }
@@ -86,6 +97,7 @@ public final class SettingsServiceImpl implements SettingsService {
     if (input.witness() == null || engineAdmission == null || context.workId().isEmpty()) {
       throw new IllegalArgumentException("Accepted reconfigure requires a witness and exact admitted work");
     }
+    requireRerankerChoiceAuthority(input);
     var patch = SettingsPatch.normalize(input);
     UiModeIntent modeIntent = modeIntentOf(modeIntentHeader, patch);
     if (!publicWriteActive.compareAndSet(false, true)) {
@@ -240,6 +252,7 @@ public final class SettingsServiceImpl implements SettingsService {
         return startPublic(existing.orElseThrow(),
             ignored -> { throw new IllegalStateException("A recorded settings attempt cannot execute again"); });
       }
+      requireRerankerChoiceAuthority(patch);
       if (!store.mode().isWritable()) throw refused("SETTINGS_READ_ONLY", "Settings persistence is disabled");
       UiSettingsStore.Snapshot snapshot;
       try { snapshot = store.inspect(); }

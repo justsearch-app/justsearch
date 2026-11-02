@@ -42,6 +42,7 @@ export interface LLMSettings {
 }
 
 export interface AppSettings {
+  rerankerEnabled?: boolean | null;
   ui?: UISettings | undefined;
   llm?: LLMSettings | undefined;
   indexPaths?: string[] | undefined;

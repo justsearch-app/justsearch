@@ -63,7 +63,7 @@ final class IndexingRulesPersistenceTest {
   @Test
   void futureVersionWithDuplicateRuleTokensFailsLoudWithoutQuarantine() throws Exception {
     var store = store("future", "{\"paused\":false,\"pauseOnBattery\":true,\"pauseOnBattery\":false}");
-    String future = Files.readString(store.settingsPath()).replace("\"schemaVersion\":6", "\"schemaVersion\":7");
+    String future = Files.readString(store.settingsPath()).replace("\"schemaVersion\":6", "\"schemaVersion\":99");
     Files.writeString(store.settingsPath(), future);
     assertThrows(io.justsearch.configuration.persistence.UnsupportedStoreVersionException.class, store::load);
     assertEquals(future, Files.readString(store.settingsPath()), "future settings bytes remain untouched");

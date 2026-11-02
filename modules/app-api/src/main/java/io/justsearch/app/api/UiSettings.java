@@ -296,6 +296,25 @@ public final class UiSettings {
   // SPLADE_MODEL_PATH, CITATION_SCORER_MODEL_PATH).
   private String embedOnnxModelPath = "";
   private String rerankerModelPath = "";
+  // Null preserves legacy query-role authority; false keeps the installed files unused.
+  private Boolean rerankerEnabled;
+  private io.justsearch.app.api.settings.QueryRoleSelection.Role rerankerRestoreSelection;
+
+  public Boolean getRerankerEnabled() { return rerankerEnabled; }
+  public void setRerankerEnabled(Boolean enabled) { rerankerEnabled = enabled; }
+
+  public io.justsearch.app.api.settings.QueryRoleSelection.Role getRerankerRestoreSelection() {
+    return rerankerRestoreSelection;
+  }
+
+  public void setRerankerRestoreSelection(
+      io.justsearch.app.api.settings.QueryRoleSelection.Role selection) {
+    if (selection != null && selection.state()
+        != io.justsearch.app.api.settings.QueryRoleSelection.State.SELECTED) {
+      throw new IllegalArgumentException("Retained reranker must select exact files");
+    }
+    rerankerRestoreSelection = selection;
+  }
   private String nerModelPath = "";
   private String spladeModelPath = "";
   private String citationScorerModelPath = "";

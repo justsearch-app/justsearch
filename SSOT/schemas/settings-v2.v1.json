@@ -60,6 +60,9 @@
     "operationKey" : {
       "type" : [ "string", "null" ]
     },
+    "rerankerEnabled" : {
+      "type" : [ "boolean", "null" ]
+    },
     "rerankerModelPath" : {
       "type" : [ "string", "null" ]
     },

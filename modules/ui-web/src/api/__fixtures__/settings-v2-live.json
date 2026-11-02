@@ -37,5 +37,6 @@
     "reason" : "candidate_fits_after_source_release",
     "freeBytes" : 10,
     "footprintBytes" : 20
-  }
+  },
+  "rerankerEnabled" : null
 }

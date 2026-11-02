@@ -61,7 +61,7 @@ public final class UiSettingsStore {
 
   private static final Logger log = LoggerFactory.getLogger(UiSettingsStore.class);
 
-  public static final int CURRENT_SCHEMA_VERSION = 6;
+  public static final int CURRENT_SCHEMA_VERSION = 7;
 
   /**
    * Versions this build can still read and migrate forward. {@code 0} is the unversioned legacy
@@ -69,7 +69,7 @@ public final class UiSettingsStore {
    * fatal by {@link StoreFormatVersions#requireReadable}, so every schema bump must extend this
    * list or every existing install fails to start.
    */
-  private static final int[] READABLE_LEGACY_VERSIONS = {0, 1, 2, 3, 4, 5};
+  private static final int[] READABLE_LEGACY_VERSIONS = {0, 1, 2, 3, 4, 5, 6};
 
   /**
    * The pre-883 shipped default for {@code contextLength}. Tempdoc 883 made the context window a
@@ -428,6 +428,10 @@ public final class UiSettingsStore {
    * spelled 0 = auto. Any other positive value is a deliberate operator override and is preserved.
    */
   private static UiSettings migrate(UiSettings settings, int storedVersion) {
+    if (storedVersion < 7) {
+      settings.setRerankerEnabled(null);
+      settings.setRerankerRestoreSelection(null);
+    }
     // Through schema3 zero was omitted from ConfigStore and meant automatic, including
     // whole-document defaults. Preserve that behavior; schema4 can persist an explicit CPU zero.
     if (storedVersion < 4 && settings.getGpuLayers() == 0) settings.setGpuLayers(null);

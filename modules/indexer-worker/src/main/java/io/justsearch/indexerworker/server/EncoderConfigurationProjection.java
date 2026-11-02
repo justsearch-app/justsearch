@@ -159,6 +159,15 @@ final class EncoderConfigurationProjection {
     var b = desired.bgeM3;
     var r = desired.reranker;
     var c = desired.citation;
+    var enabledSource = cfg.resolution(key(EnvRegistry.RERANK_ENABLED));
+    var pathSource = cfg.resolution(key(EnvRegistry.RERANK_MODEL_PATH));
+    boolean savedOff = enabledSource != null
+        && enabledSource.sourceOrdinal()
+            == io.justsearch.configuration.resolved.ResolvedConfigBuilder.ORDINAL_SETTINGS_JSON
+        && "false".equalsIgnoreCase(enabledSource.value())
+        && (pathSource == null || pathSource.sourceOrdinal()
+            < io.justsearch.configuration.resolved.ResolvedConfigBuilder.ORDINAL_ENV_VAR);
+    if (savedOff) rerankerDir = r.modelPath();
     return new EncoderConfigurationProjection(cfg, mode,
         new EmbeddingConfig(embeddingDir != null, embeddingDir, e.backend(), e.gpuEnabled(),
             e.gpuDeviceId(), e.gpuMemLimitBytes(), e.contextLength(), e.lateChunkingEnabled(),
@@ -169,7 +178,7 @@ final class EncoderConfigurationProjection {
             n.gpuEnabled(), n.gpuDeviceId(), n.gpuMemLimitBytes()),
         new BgeM3Config(embeddingDir != null && "bge-m3".equalsIgnoreCase(mode), embeddingDir,
             b.maxSequenceLength(), b.gpuEnabled(), b.gpuDeviceId(), b.gpuMemLimitBytes()),
-        new RerankerConfig(rerankerDir != null, rerankerDir, r.topK(), r.deadlineBudgetMs(),
+        new RerankerConfig(rerankerDir != null && !savedOff, rerankerDir, r.topK(), r.deadlineBudgetMs(),
             r.minHitsThreshold(), r.maxSequenceLength(), r.gpuEnabled(), r.gpuDeviceId(),
             r.maxAvgDocLengthChars(), r.judgeBlendEnabled(), r.judgeBlendAlpha(),
             r.judgeArbitrationEnabled(), r.judgeArbitrationAlphaDiverge(),

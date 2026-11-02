@@ -738,6 +738,13 @@ public final class AiInstallService implements io.justsearch.app.api.AiInstallSe
     UiSettingsStore.Snapshot snapshot = settingsStore.inspect();
     UiSettings candidate = snapshot.settings();
     String originalSettingsJson = JSON.writeValueAsString(candidate);
+    // Carry an older explicit query-role disablement into the full installer candidate.
+    // Generation activation otherwise replaces that envelope witness with the downloaded roles.
+    if (candidate.getRerankerEnabled() == null && snapshot.queryRoles() != null
+        && snapshot.queryRoles().reranker().state()
+            == io.justsearch.app.api.settings.QueryRoleSelection.State.DISABLED) {
+      candidate.setRerankerEnabled(false);
+    }
     Path root = contract.modelsDir() == null ? modelsDir : contract.modelsDir();
     if (root == null) return Optional.empty();
     root = root.toAbsolutePath().normalize();
@@ -846,7 +853,9 @@ public final class AiInstallService implements io.justsearch.app.api.AiInstallSe
   private static void setOnnxCandidatePath(UiSettings settings, String packageId, String path) {
     switch (packageId) {
       case "embedding" -> settings.setEmbedOnnxModelPath(path);
-      case "reranker" -> settings.setRerankerModelPath(path);
+      case "reranker" -> {
+        if (!Boolean.FALSE.equals(settings.getRerankerEnabled())) settings.setRerankerModelPath(path);
+      }
       case "ner" -> settings.setNerModelPath(path);
       case "splade" -> settings.setSpladeModelPath(path);
       case "citation-scorer" -> settings.setCitationScorerModelPath(path);

@@ -20,7 +20,8 @@ public record SettingsV2(
     Boolean restartScheduled,
     String rerankerModelPath,
     String citationScorerModelPath,
-    CompositionV2 composition
+    CompositionV2 composition,
+    Boolean rerankerEnabled
 ) {
   public SettingsV2 {
     // Do not replace nulls with defaults here.
@@ -66,6 +67,15 @@ public record SettingsV2(
       Boolean restartScheduled, String rerankerModelPath, String citationScorerModelPath) {
     this(ui, llm, indexPaths, settingsMode, witness, operationKey, state, apiPort,
         restartScheduled, rerankerModelPath, citationScorerModelPath, null);
+  }
+
+  /** Compatibility constructor before the live reranker preference. */
+  public SettingsV2(UiSettingsV2 ui, LlmSettingsV2 llm, List<String> indexPaths, String settingsMode,
+      SettingsWitness witness, String operationKey, String state, Integer apiPort,
+      Boolean restartScheduled, String rerankerModelPath, String citationScorerModelPath,
+      CompositionV2 composition) {
+    this(ui, llm, indexPaths, settingsMode, witness, operationKey, state, apiPort,
+        restartScheduled, rerankerModelPath, citationScorerModelPath, composition, null);
   }
 
   public static SettingsV2 empty() {

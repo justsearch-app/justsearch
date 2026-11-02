@@ -245,6 +245,9 @@ public final class ConfigStoreRebuilder {
     putSettingIfPresent(
         builder, "justsearch.embed.onnx.model_path", settings.getEmbedOnnxModelPath());
     putSettingIfPresent(builder, "justsearch.rerank.model_path", settings.getRerankerModelPath());
+    if (settings.getRerankerEnabled() != null) {
+      builder.putSettings(EnvRegistry.RERANK_ENABLED.configKey(), settings.getRerankerEnabled().toString());
+    }
     putSettingIfPresent(builder, "justsearch.ner.model_path", settings.getNerModelPath());
     putSettingIfPresent(builder, "justsearch.splade.model_path", settings.getSpladeModelPath());
     putSettingIfPresent(

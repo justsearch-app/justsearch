@@ -197,7 +197,7 @@ public class SettingsController {
     int status = switch (code) {
       case "BAD_REQUEST", "INVALID_REQUEST", "INVALID_PATH", "OPERATION_KEY_INVALID" -> 400;
       case "SETTINGS_READ_ONLY", "VERSION_CONFLICT", "RECONFIGURE_IN_PROGRESS",
-          "GENERATION_BOUND_REQUIRES_REINDEX", "RESTART_SOURCE_DRIFT",
+          "GENERATION_BOUND_REQUIRES_REINDEX", "RESTART_SOURCE_DRIFT", "QUERY_ROLE_PATH_OVERRIDDEN",
           "OPERATION_KEY_EXPIRED", "OPERATION_KEY_REUSED", "OPERATION_PREPARATION_UNAVAILABLE" -> 409;
       case "SETTINGS_RECOVERY_REQUIRED", "OPERATIONS_CAPACITY", "ENGINE_CLOSING" -> 503;
       case "COMPONENT_PREPARATION_REQUIRED" -> 503;
@@ -210,7 +210,7 @@ public class SettingsController {
           "COMPONENT_PREPARATION_REQUIRED" -> ApiErrorCode.SERVICE_UNAVAILABLE;
       case "SETTINGS_RECOVERY_REQUIRED" -> ApiErrorCode.INVALID_STATE;
       case "BAD_REQUEST", "INVALID_REQUEST", "OPERATION_KEY_INVALID", "VERSION_CONFLICT",
-          "GENERATION_BOUND_REQUIRES_REINDEX", "RESTART_SOURCE_DRIFT", "OPERATION_KEY_EXPIRED",
+          "GENERATION_BOUND_REQUIRES_REINDEX", "RESTART_SOURCE_DRIFT", "QUERY_ROLE_PATH_OVERRIDDEN", "OPERATION_KEY_EXPIRED",
           "OPERATION_KEY_REUSED", "OPERATION_PREPARATION_UNAVAILABLE" -> ApiErrorCode.INVALID_REQUEST;
       default -> retryable ? ApiErrorCode.SERVICE_UNAVAILABLE : ApiErrorCode.INTERNAL_ERROR;
     };
@@ -242,7 +242,7 @@ public class SettingsController {
     return new SettingsV2(settings.ui(), settings.llm(), settings.indexPaths(),
         settings.settingsMode(), settings.witness(), settings.operationKey(), settings.state(),
         settings.apiPort(), settings.restartScheduled(), settings.rerankerModelPath(),
-        settings.citationScorerModelPath());
+        settings.citationScorerModelPath(), null, settings.rerankerEnabled());
   }
 
   private static CompositionV2 composition(Object value) {
