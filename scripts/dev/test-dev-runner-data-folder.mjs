@@ -51,7 +51,7 @@ function personalFolder(base) {
 /** dev-all in a copy of the repository whose Gradle is a stub that only records it was run. */
 function fakeRepository(name) {
   const fake = path.join(root, name);
-  for (const dir of ['scripts/dev/lib', 'scripts/lib', 'modules/ui-web/scripts']) {
+  for (const dir of ['scripts/dev/lib', 'scripts/dev/admission.py', 'scripts/lib', 'modules/ui-web/scripts']) {
     fs.cpSync(path.join(repo, dir), path.join(fake, dir), { recursive: true });
   }
   for (const file of ['contracts/native-targets/spec.v1.json', 'governance/store-recoverability.v1.json', 'governance/supervision-contract.v1.json']) {

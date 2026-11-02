@@ -11,6 +11,8 @@ import sys
 import time
 import threading
 import io
+import importlib.util
+import contextlib
 from pathlib import Path
 
 import httpx
@@ -257,6 +259,25 @@ def _boot_and_wait(
     port: int,
     llm: bool,
     health_timeout_sec: float,
+) -> subprocess.Popen:
+    if sys.platform == "linux":
+        source = Path(__file__).resolve().parents[2] / "dev" / "admission.py"
+        spec = importlib.util.spec_from_file_location("js_admission", source)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        admission = module.heavy("jseval backend start", env)
+    else:
+        admission = contextlib.nullcontext(env)
+    with admission as admitted:
+        return _boot_admitted(
+            resolved_root=resolved_root, resolved_data=resolved_data, gradlew=gradlew,
+            env=admitted, port=port, llm=llm, health_timeout_sec=health_timeout_sec,
+        )
+
+
+def _boot_admitted(
+    *, resolved_root: Path, resolved_data: Path, gradlew: Path,
+    env: dict[str, str], port: int, llm: bool, health_timeout_sec: float,
 ) -> subprocess.Popen:
     """Build installDist, start the bound persistent runner and wait for readiness.
 

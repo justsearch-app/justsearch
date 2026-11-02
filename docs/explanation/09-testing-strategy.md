@@ -20,6 +20,8 @@ JustSearch employs a rigorous 4-tier testing strategy (`modules/system-tests`), 
 
 ## Local test profiles and bounded Gradle runs
 
+For bounded exclusive scoring, cooperative background work, and real-process admission checks, see [machine admission](../how-to/machine-admission.md).
+
 Run checks against private fixtures, never a copy of your real `.justsearch` profile.
 The [JVM conventions](../../build-logic/src/main/kotlin/conventions/JvmBaseConventionsPlugin.kt)
 give each Gradle `Test` task a profile under that module's `build/test-profile/<task>/home`:

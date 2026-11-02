@@ -63,6 +63,7 @@ const DATA = path.join(ROOT, 'data');
 function copyCheckout(dest) {
   const items = [
     'scripts/dev/dev-runner.cjs',
+    'scripts/dev/admission.py',
     'scripts/dev/justsearch-dev-mcp.mjs',
     'scripts/dev/justsearch-dev-mcp',
     'scripts/dev/lib',

@@ -100,3 +100,28 @@ def test_failed_runner_cleanup_keeps_registration():
         with pytest.raises(RuntimeError, match="cleanup failed.*retaining registration"):
             stop_backend(proc)
     retire.assert_not_called()
+
+
+@pytest.mark.skipif(sys.platform != "linux", reason="Linux machine admission")
+def test_backend_start_holds_real_admission_and_releases_on_error(tmp_path, monkeypatch):
+    import json
+    monkeypatch.setenv("JS_ADMISSION_DIR", str(tmp_path / "admission"))
+    monkeypatch.delenv("JS_ADMISSION_TOKEN", raising=False)
+    admission = Path(__file__).resolve().parents[2] / "dev/admission.py"
+
+    def status():
+        return json.loads(subprocess.check_output([sys.executable, str(admission), "status"], text=True))
+
+    def boot(**kwargs):
+        assert kwargs["env"]["JS_ADMISSION_TOKEN"]
+        rows = status()
+        assert len(rows) == 1
+        assert rows[0]["mode"] == "heavy"
+        assert rows[0]["purpose"] == "jseval backend start"
+        raise RuntimeError("fixture boot failure")
+
+    with patch("jseval.backend._boot_admitted", side_effect=boot):
+        with pytest.raises(RuntimeError, match="fixture boot failure"):
+            _boot_and_wait(resolved_root=tmp_path, resolved_data=tmp_path / "data", gradlew=tmp_path / "gradlew",
+                           env=dict(os.environ), port=33221, llm=False, health_timeout_sec=1)
+    assert status() == []

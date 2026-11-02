@@ -86,7 +86,7 @@ require('http').createServer((q,s)=>{s.statusCode=q.url.startsWith('/api/status'
 /** A scratch copy of the scripts under test, with fixture Vite and Gradle; plain files only. */
 function fakeRepository(name) {
   const fake = path.join(root, name);
-  for (const dir of ['scripts/dev/lib', 'scripts/lib', 'modules/ui-web/scripts']) {
+  for (const dir of ['scripts/dev/lib', 'scripts/dev/admission.py', 'scripts/lib', 'modules/ui-web/scripts']) {
     fs.cpSync(path.join(repo, dir), path.join(fake, dir), { recursive: true });
   }
   for (const file of ['scripts/dev/serve-worktree-fe.cjs', 'contracts/native-targets/spec.v1.json', 'governance/supervision-contract.v1.json']) {

@@ -1,0 +1,10 @@
+Candidate for ~/.local/share/justsearch-tools/gradle-slot.sh; not installed.
+
+Compared with the installed wrapper, add only the admission re-exec block immediately
+before `dir=${JS_GRADLE_SLOT_DIR:-/tmp/js-linux-port}`. It locates admission.py in the
+current repository and runs this same shell script inside `heavy`, preserving argv,
+-w, exit status, queue, two slots and worker cap. JS_GRADLE_ADMISSION_ENTERED applies
+only to the re-exec's PID, avoiding a re-exec loop; normal nested-slot refusal stays
+before admission. Existing admission nesting is handled by admission.py's inherited
+marker. Acquisition order: machine admission, worktree lock, queue, Gradle slot.
+Requires Python >= 3.11 and this repository's scripts/dev/admission.py.

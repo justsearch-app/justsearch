@@ -42,8 +42,48 @@ function windowsBatchInvocation(command, args, env = process.env) {
 
 function invocationForSpawn(tool, args, options = {}) {
   const invocation = toolInvocation(tool, args, options);
+  if (tool === 'gradle' && (options.platform ?? process.platform) === 'linux') {
+    return { command: 'python3', args: [path.join(ROOT, 'scripts/dev/admission.py'),
+      'heavy', '--purpose', 'Gradle', '--', invocation.command, ...invocation.args], shell: false };
+  }
   return (options.platform ?? process.platform) === 'win32' && /\.(cmd|bat)$/i.test(invocation.command)
     ? windowsBatchInvocation(invocation.command, invocation.args, options.env) : invocation;
+}
+
+// A pipe-scoped shared holder: readiness releases it; runner death closes the pipe too.
+// The child emits the nesting token only after acquiring admission.
+async function acquireHeavy(purpose) {
+  if (process.platform !== 'linux') return async () => {};
+  const child = spawn('python3', [path.join(ROOT, 'scripts/dev/admission.py'), 'heavy',
+    '--purpose', purpose, '--', 'python3', '-u', '-c',
+    'import os,sys; print(os.environ["JS_ADMISSION_TOKEN"], flush=True); sys.stdin.buffer.read()'],
+  { stdio: ['pipe', 'pipe', 'inherit'], env: process.env });
+  const ended = new Promise((resolve, reject) => {
+    child.once('error', reject);
+    child.once('close', code => code === 0 ? resolve() : reject(new Error(`machine admission exited ${code}`)));
+  });
+  // Attach immediately: a spawn failure must not become an unhandled rejection.
+  ended.catch(() => {});
+  let output = '';
+  const token = await new Promise((resolve, reject) => {
+    child.stdout.on('data', data => {
+      output += data;
+      if (output.includes('\n')) resolve(output.split('\n')[0]);
+    });
+    child.once('error', reject);
+    child.once('close', () => reject(new Error('machine admission ended before acquisition')));
+  });
+  const previous = process.env.JS_ADMISSION_TOKEN;
+  process.env.JS_ADMISSION_TOKEN = token;
+  let released = false;
+  return async () => {
+    if (released) return;
+    released = true;
+    if (previous === undefined) delete process.env.JS_ADMISSION_TOKEN;
+    else process.env.JS_ADMISSION_TOKEN = previous;
+    child.stdin.end();
+    await ended;
+  };
 }
 
 function runToolSync(tool, args, options = {}) {
@@ -65,4 +105,4 @@ if (require.main === module) {
     });
   } catch (error) { console.error(error.message); process.exitCode = 2; }
 }
-module.exports = { resolveNpmInvocation, toolInvocation, runToolSync, quoteCmdArgument, windowsBatchInvocation, invocationForSpawn };
+module.exports = { resolveNpmInvocation, toolInvocation, runToolSync, quoteCmdArgument, windowsBatchInvocation, invocationForSpawn, acquireHeavy };
