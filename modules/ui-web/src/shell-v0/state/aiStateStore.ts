@@ -43,6 +43,8 @@ import {
 } from '../utils/statusPoll.js';
 import {
   subscribeAiInstall,
+  isAiObservationLive,
+  type AiObservation,
   setAiInstallApiBase,
   __resetAiInstallPollForTest,
   type AiInstallSnapshot,
@@ -346,6 +348,8 @@ export interface AiState {
   installStatus: InstallStatus | null;
   runtimeStatus: AiRuntimeStatus | null;
   packStatus: PackImportStatus | null;
+  installObservationLive: boolean;
+  runtimeObservationLive: boolean;
   /**
    * Tempdoc 663 Design pass 2 - the ONE AI-engine lifecycle verdict, the fourth 594/595/596 sibling.
    * Computed once here from `installStatus`/`runtimeStatus`/`runtime`/`connection.reachable` - every
@@ -377,6 +381,8 @@ const installStateSig = signal<Maybe<{ installed: boolean; installing: boolean }
 // 663 Stage 3 — raw install/runtime/pack snapshots from the shared `aiInstallPoll`.
 const installStatusSig = signal<InstallStatus | null>(null);
 const runtimeStatusSig = signal<AiRuntimeStatus | null>(null);
+const installObservationSig = signal<AiObservation | undefined>(undefined);
+const runtimeObservationSig = signal<AiObservation | undefined>(undefined);
 const packStatusSig = signal<PackImportStatus | null>(null);
 // 595 §15.3 (E2) — retained last-settled index counts. Written ONLY by the poll
 // callback (`onStatusUpdate`), read by `buildSnapshot`; no computed writes it.
@@ -999,6 +1005,8 @@ function buildSnapshot(): AiState {
     installStatus,
     runtimeStatus,
     packStatus: packStatusSig.get(),
+    installObservationLive: isAiObservationLive(installObservationSig.get()),
+    runtimeObservationLive: isAiObservationLive(runtimeObservationSig.get()),
     aiEngine,
     chatDisabledBySpec,
     chatUnloadedReason: chatUnloadedReason(
@@ -1109,6 +1117,8 @@ function onStatusUpdate(snap: StatusSnapshot | null, invalidated = false): void 
  * as before; this finally wires the (previously dead-in-production) `installStateSig`.
  */
 function onAiInstallUpdate(snap: AiInstallSnapshot): void {
+  installObservationSig.set(snap.installObservation);
+  runtimeObservationSig.set(snap.runtimeObservation);
   installStatusSig.set(snap.install);
   runtimeStatusSig.set(snap.runtime);
   packStatusSig.set(snap.packs);
@@ -1329,6 +1339,8 @@ export function __resetAiStateForTest(): void {
   lastStatusSuccessSig.set(null);
   activitySig.set(INITIAL_ACTIVITY);
   installStateSig.set(UNKNOWN);
+  installObservationSig.set(undefined);
+  runtimeObservationSig.set(undefined);
   installStatusSig.set(null);
   runtimeStatusSig.set(null);
   packStatusSig.set(null);

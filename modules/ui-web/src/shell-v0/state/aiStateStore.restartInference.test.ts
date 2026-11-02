@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 // SPDX-License-Identifier: Apache-2.0
 // b82 S5: a restart signal revokes everything the previous process reported. Inference data from
-// the previous head must not keep the Brain Online, nor offer Shut Down AI, while the new head has
+// the previous head must not keep the Brain Online, nor offer Stop answers, while the new head has
 // confirmed nothing.
 import { afterEach, expect, it, vi } from 'vitest';
 import { render, type TemplateResult } from 'lit';
@@ -43,7 +43,7 @@ it('a restarted head that confirms nothing cannot inherit the previous head Onli
   await vi.advanceTimersByTimeAsync(0);
   expect(getAiState().runtime.mode, 'head A is online').toBe('online');
   expect(getAiState().capabilities.chat).toBe(true);
-  expect(panel()).toContain('Shut Down AI');
+  expect(panel()).toContain('Stop answers');
 
   // Head B: every status and inference read is refused.
   send.mockImplementation(async () => new Response('{}', { status: 500, headers: headers('B', 1) }));
@@ -56,5 +56,5 @@ it('a restarted head that confirms nothing cannot inherit the previous head Onli
   expect(state.capabilities.chat, 'chat is not available on a head that confirmed nothing').toBe(false);
   expect(state.runtime.mode, 'the Brain is not Online from the previous head').not.toBe('online');
   expect(state.aiEngine.kind).not.toBe('online');
-  expect(text, 'no Shut Down AI for an engine nothing confirmed').not.toContain('Shut Down AI');
+  expect(text, 'no Stop answers for an engine nothing confirmed').not.toContain('Stop answers');
 });

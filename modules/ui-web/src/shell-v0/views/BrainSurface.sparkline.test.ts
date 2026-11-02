@@ -16,10 +16,12 @@ beforeEach(() => {
   vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new TypeError('Test backend unavailable')));
 });
 afterEach(() => { globalThis.fetch = originalFetch; });
-import './BrainSurface';
+import './HealthSurface';
+import { createMockHostApi } from '../plugin-api/testHostApi.js';
 import { __resetUiModeForTest, setUiMode } from '../state/uiModeState.js';
 
 interface SparklineHost extends HTMLElement {
+  host_: unknown;
   settings: { mode?: 'simple' | 'advanced' };
   inference: { generation?: number; mode?: string; activeModelId?: string | null } | null;
   transitions: Array<{
@@ -38,14 +40,14 @@ async function mountAndRender(state: {
   generation: number;
   transitions: SparklineHost['transitions'];
 }): Promise<string> {
-  const el = document.createElement('jf-brain-surface') as SparklineHost;
+  const el = document.createElement('jf-health-surface') as SparklineHost;
   // The transition timeline (and its sparkline) is Detailed-mode developer telemetry — it was
   // moved out of the Simple panel, which is the first-run consumer surface.
   setUiMode('advanced');
-  el.settings = { mode: 'advanced' };
+  el.host_ = createMockHostApi({ data: { fetch: async () => new Promise<Response>(() => {}) } });
+  document.body.appendChild(el);
   el.inference = { generation: state.generation, mode: 'offline', activeModelId: null };
   el.transitions = state.transitions;
-  document.body.appendChild(el);
   await el.updateComplete;
   // Scope to the sparkline itself: the Detailed panel's own chrome contains SVG icons, so a
   // whole-shadowRoot `<circle` count would no longer measure the sparkline's dots.
@@ -57,7 +59,7 @@ async function mountAndRender(state: {
 
 afterEach(() => __resetUiModeForTest());
 
-describe('BrainSurface.renderGenerationSparkline', () => {
+describe('HealthSurface.renderGenerationSparkline', () => {
   it('renders no sparkline when generation is 0', async () => {
     const html = await mountAndRender({
       generation: 0,

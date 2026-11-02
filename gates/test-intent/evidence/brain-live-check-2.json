@@ -1,0 +1,147 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
+  },
+  "createdAt": "2026-11-02T11:46:51.561Z",
+  "revision": "1dbc9b1762ce29aeb4e243fc0372c8d7d141a4bf",
+  "tree": "e3188a8c5198e07a53ecee6fd222ce5677721298",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/BrainSurface.liveRepairs.test.ts\" --reporter=json --outputFile=\"/tmp/test-intent-vitest-3213854-1793620005684.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 1948
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/views/BrainSurface.liveRepairs.test.ts#D4 after a cancelled run, steps whose files are present or that never downloaded are not labelled cancelled",
+      "file": "modules/ui-web/src/shell-v0/views/BrainSurface.liveRepairs.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:52130c24fb07e873f5d2f5f7ace7a528cced82519aba0bfa3da3aab030e73dbf",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Brain live redesign repairs D4 after a cancelled run, steps whose files are present or that never downloaded are not labelled cancelled",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/BrainSurface.liveRepairs.test.ts#B11 the repair remedy appears once, in the repair alert, not repeated by the status line",
+      "file": "modules/ui-web/src/shell-v0/views/BrainSurface.liveRepairs.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:52130c24fb07e873f5d2f5f7ace7a528cced82519aba0bfa3da3aab030e73dbf",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Brain live redesign repairs B11 the repair remedy appears once, in the repair alert, not repeated by the status line",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/BrainSurface.liveRepairs.test.ts#D4 a cancelled run never leaves a step saying Downloading: zero-byte interruptions are not downloaded, present files keep their observed state",
+      "file": "modules/ui-web/src/shell-v0/views/BrainSurface.liveRepairs.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:52130c24fb07e873f5d2f5f7ace7a528cced82519aba0bfa3da3aab030e73dbf",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Brain live redesign repairs D4 a cancelled run never leaves a step saying Downloading: zero-byte interruptions are not downloaded, present files keep their observed state",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/BrainSurface.liveRepairs.test.ts#D4 a failed run with a package record left downloading shows no step as Downloading",
+      "file": "modules/ui-web/src/shell-v0/views/BrainSurface.liveRepairs.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:52130c24fb07e873f5d2f5f7ace7a528cced82519aba0bfa3da3aab030e73dbf",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Brain live redesign repairs D4 a failed run with a package record left downloading shows no step as Downloading",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/BrainSurface.liveRepairs.test.ts#D4 a completed run with a package record left downloading shows no step as Downloading",
+      "file": "modules/ui-web/src/shell-v0/views/BrainSurface.liveRepairs.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:52130c24fb07e873f5d2f5f7ace7a528cced82519aba0bfa3da3aab030e73dbf",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Brain live redesign repairs D4 a completed run with a package record left downloading shows no step as Downloading",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "2c7f1e8d99",
+    "revision": "2c7f1e8d99717c245b39651cc3d7f48bc3fba43a",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/BrainSurface.liveRepairs.test.ts\" --reporter=json --outputFile=\"/tmp/test-intent-vitest-3213854-1793620009405.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 1818,
+        "output": "JSON report written to /tmp/test-intent-vitest-3213854-1793620009405.json\n\n"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui-web/src/shell-v0/views/BrainSurface.liveRepairs.test.ts#D4 after a cancelled run, steps whose files are present or that never downloaded are not labelled cancelled",
+        "classification": "assertion",
+        "detail": "Brain live redesign repairs D4 after a cancelled run, steps whose files are present or that never downloaded are not labelled cancelled:  AssertionError: expected '\\n        \\n          \\n    \\n  \\n   …' not to contain 'Cancelled'\n    at /tmp/test-intent-before-Ki2kNx/modules/ui-web/src/shell-v0/views/BrainSurface.liveRepairs.test.ts:204:134\n    at runNextTicks (node:internal/process/task_queues:65:5)\n    at listOnTimeout (node:intern"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/BrainSurface.liveRepairs.test.ts#B11 the repair remedy appears once, in the repair alert, not repeated by the status line",
+        "classification": "assertion",
+        "detail": "Brain live redesign repairs B11 the repair remedy appears once, in the repair alert, not repeated by the status line:  AssertionError: expected 2 to be 1 // Object.is equality\n    at /tmp/test-intent-before-Ki2kNx/modules/ui-web/src/shell-v0/views/BrainSurface.liveRepairs.test.ts:227:93\n    at runNextTicks (node:internal/process/task_queues:65:5)\n    at listOnTimeout (node:internal/timers:644:9)\n    at processTimers"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/BrainSurface.liveRepairs.test.ts#D4 a cancelled run never leaves a step saying Downloading: zero-byte interruptions are not downloaded, present files keep their observed state",
+        "classification": "assertion",
+        "detail": "Brain live redesign repairs D4 a cancelled run never leaves a step saying Downloading: zero-byte interruptions are not downloaded, present files keep their observed state:  AssertionError: expected '\\n        \\n          \\n    \\n  \\n   …' to contain 'Not downloaded'\n    at /tmp/test-intent-before-Ki2kNx/modules/ui-web/src/shell-v0/views/BrainSurface.liveRepairs.test.ts:211:67\n    at runNextTicks (node:internal/process/task_queues:65:5)\n    at listOnTimeout (node:intern"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/BrainSurface.liveRepairs.test.ts#D4 a failed run with a package record left downloading shows no step as Downloading",
+        "classification": "assertion",
+        "detail": "Brain live redesign repairs D4 a failed run with a package record left downloading shows no step as Downloading:  AssertionError: expected '\\n        \\n          \\n    \\n  \\n   …' not to contain 'Downloading'\n    at /tmp/test-intent-before-Ki2kNx/modules/ui-web/src/shell-v0/views/BrainSurface.liveRepairs.test.ts:220:25\n    at runNextTicks (node:internal/process/task_queues:65:5)\n    at listOnTimeout (node:inter"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/BrainSurface.liveRepairs.test.ts#D4 a completed run with a package record left downloading shows no step as Downloading",
+        "classification": "assertion",
+        "detail": "Brain live redesign repairs D4 a completed run with a package record left downloading shows no step as Downloading:  AssertionError: expected '\\n        \\n          \\n    \\n  \\n   …' not to contain 'Downloading'\n    at /tmp/test-intent-before-Ki2kNx/modules/ui-web/src/shell-v0/views/BrainSurface.liveRepairs.test.ts:220:25\n    at runNextTicks (node:internal/process/task_queues:65:5)\n    at listOnTimeout (node:inter"
+      }
+    ]
+  },
+  "digest": "sha256:49f579f6fee7dd82da4fd3d2df17ab6c48c5f665c418c61dd132adc18de93dd2"
+}

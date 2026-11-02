@@ -950,14 +950,15 @@ def _build_steps(ui_url: str, cooldown_ms: int, timeout_ms: int) -> list[Step]:
                         )
                 if cooldown_ms > 0:
                     await asyncio.sleep(cooldown_ms / 1000)
-            if base == "library":
+            if base in ("library", "ai-brain"):
                 await _library_appearance(page)
+            if view_name in ("ai-brain-advanced", "ai-brain-components"):
+                await page.locator("jf-brain-surface").get_by_role("button", name="Advanced settings", exact=True).click()
             if view_name == "ai-brain-advanced":
-                await _set_detail_level_in_settings(page, "Detailed")
-            if view_name in ("ai-brain-components", "ai-brain-consent"):
-                # These controls live in the Simple panel; the captured settings fixture starts
-                # Detailed. Select the panel through the shared witnessed header control first.
-                await _set_detail_level_in_settings(page, "Simple")
+                # Keep the expanded controls in this capture after the path grew taller.
+                answers = page.locator("jf-brain-surface .brain-advanced > section").first
+                await answers.wait_for(state="visible", timeout=10_000)
+                await answers.scroll_into_view_if_needed(timeout=5_000)
             if view_name == "ai-brain-components":
                 lst = page.get_by_test_id(S.TID_INSTALL_COMPONENT_LIST)
                 await lst.wait_for(state="visible", timeout=10_000)

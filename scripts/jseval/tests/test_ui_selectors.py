@@ -12,6 +12,8 @@ from __future__ import annotations
 
 import asyncio
 
+import pytest
+
 from jseval.ui_check import (
     _build_steps,
     _cite_card_selected_selector,
@@ -193,6 +195,11 @@ class _HarnessLocator:
 
     async def wait_for(self, **kwargs):
         self.page.calls.append(("wait_for", self.selector, kwargs))
+        self.page.waited.add(self.selector)
+
+    def _assert_waited_before_use(self):
+        if self.selector in self.page.brain_controls:
+            assert self.selector in self.page.waited, f"{self.selector} used before it was awaited"
 
     async def fill(self, value: str):
         self.page.calls.append(("fill", self.selector, value))
@@ -200,12 +207,16 @@ class _HarnessLocator:
             self.page.density = {"0": "Compact", "1": "Comfortable", "2": "Spacious"}[value]
 
     async def click(self, **kwargs):
+        self._assert_waited_before_use()
         self.page.calls.append(("click", self.selector, kwargs))
+        if self.selector == _BRAIN_ADVANCED_TOGGLE:
+            self.page.advanced_open = not self.page.advanced_open  # the real button opens and closes
         for label in ("Simple", "Detailed"):
             if f"role=button;name={label};" in self.selector:
                 self.page.checked_labels = {label}
 
     async def scroll_into_view_if_needed(self, **kwargs):
+        self._assert_waited_before_use()
         self.page.calls.append(("scroll", self.selector))
 
     async def press(self, key, **kwargs):
@@ -264,11 +275,18 @@ class _ExpectResponse:
         return False
 
 
+_BRAIN_ADVANCED_TOGGLE = "jf-brain-surface >> role=button;name=Advanced settings;exact=True"
+
+
 class _HarnessPage:
+    brain_controls = {f"testid={S.TID_INSTALL_COMPONENT_LIST}", f"testid={S.TID_BRAIN_SIMPLE_ACTION}"}
+
     def __init__(self):
         self.calls = []
         self.density = "Comfortable"
         self.checked_labels = set()
+        self.waited = set()
+        self.advanced_open = False
 
     def locator(self, selector):
         self.calls.append(("locator", selector))
@@ -279,8 +297,8 @@ class _HarnessPage:
         return _HarnessLocator(self, f"page >> role={role};name={name};exact={exact}")
 
     def get_by_test_id(self, test_id):
-        if test_id in (S.TID_INSTALL_COMPONENT_LIST, S.TID_BRAIN_SIMPLE_ACTION):
-            assert self.checked_labels == {"Simple"}, "The requested Brain control is hidden in Detailed"
+        if test_id == S.TID_INSTALL_COMPONENT_LIST:
+            assert self.advanced_open, "The component list is hidden until Advanced settings is open"
         self.calls.append(("get_by_test_id", test_id))
         return _HarnessLocator(self, f"testid={test_id}")
 
@@ -332,13 +350,38 @@ def test_detail_level_setup_does_not_invent_a_write_when_already_selected():
     assert not any(call[0] == "expect_response_args" for call in page.calls)
 
 
-def test_brain_install_drilldowns_select_the_panel_before_using_its_controls():
-    steps = {step.name: step for step in _build_steps("http://localhost:5186", 0, 1000)}
-    for name in ("ai-brain-components", "ai-brain-consent",
-                 "ai-brain-components-light", "ai-brain-consent-light"):
-        assert steps[name].fixtures_variant == "install-preview"
-        page = _HarnessPage()
-        page.checked_labels = {"Detailed"}
-        asyncio.run(steps[name].setup(page))
-        assert page.checked_labels == {"Simple"}
-        assert any(call[0] == "expect_response_args" for call in page.calls)
+@pytest.mark.parametrize("global_mode", ["Simple", "Detailed"])
+@pytest.mark.parametrize("name", ["ai-brain", "ai-brain-advanced", "ai-brain-components", "ai-brain-consent",
+                                  "ai-brain-light", "ai-brain-advanced-light",
+                                  "ai-brain-components-light", "ai-brain-consent-light"])
+def test_brain_steps_open_their_controls_on_the_page_under_either_global_mode(name, global_mode):
+    # B20: the AI Brain page is the same under either app-wide mode and never writes ui.mode.
+    step = {step.name: step for step in _build_steps("http://localhost:5186", 0, 1000)}[name]
+    install_step = "components" in name or "consent" in name
+    assert step.fixtures_variant == ("install-preview" if install_step else "default")
+    page = _HarnessPage()
+    page.checked_labels = {global_mode}
+    asyncio.run(step.setup(page))  # the fake asserts each control is awaited (and reachable) before use
+    assert page.checked_labels == {global_mode}
+    assert not any(call[0] == "expect_response_args" for call in page.calls), "a settings write was made"
+    assert not any(
+        call[0] == "click" and ("name=Simple;" in call[1] or "name=Detailed;" in call[1])
+        for call in page.calls
+    )
+    assert not any(call[0] == "evaluate" and "/api/settings" in str(call[1]) for call in page.calls), \
+        "a settings write was made through a script"
+    clicks = [call[1] for call in page.calls if call[0] == "click"]
+    if "advanced" in name or "components" in name:
+        assert clicks.count(_BRAIN_ADVANCED_TOGGLE) == 1 and page.advanced_open
+    if not install_step:
+        return
+    if "components" in name:
+        assert _BRAIN_ADVANCED_TOGGLE in clicks
+        assert ("scroll", f"testid={S.TID_INSTALL_COMPONENT_LIST}") in page.calls
+    else:
+        action = f"testid={S.TID_BRAIN_SIMPLE_ACTION}"
+        assert action in clicks
+        dialog_waits = [k for k, call in enumerate(page.calls)
+                        if call[:2] == ("wait_for", f"testid={S.TID_INSTALL_CONSENT_DIALOG}")]
+        assert dialog_waits and dialog_waits[0] > next(
+            k for k, call in enumerate(page.calls) if call[:2] == ("click", action))

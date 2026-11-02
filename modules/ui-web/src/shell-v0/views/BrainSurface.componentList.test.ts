@@ -141,6 +141,10 @@ describe('BrainSurface — the component list', () => {
     el.installStatus = installStatus;
     document.body.appendChild(el);
     await settle(el);
+    (el as unknown as { _unifiedAiState: unknown })._unifiedAiState = { installObservationLive: true, runtimeObservationLive: true, snapshotLive: true, aiEngine: { kind: 'not_installed', stability: { kind: 'settled' }, installFailure: null } };
+    el.requestUpdate(); await el.updateComplete;
+    el.shadowRoot?.querySelector<HTMLButtonElement>('.brain-links button')?.click();
+    await el.updateComplete;
     return el;
   }
 
@@ -274,17 +278,11 @@ describe('BrainSurface — the component list', () => {
 
   it('declining a component POSTs the decline (and the toggle reads as an opt-OUT)', async () => {
     const el = await mount();
-    const toggle = el.shadowRoot?.querySelector('[data-testid="component-toggle-reranker"]') as
-      | (HTMLElement & { onActivate?: () => void; label?: string; pressed?: boolean })
-      | null;
-    // 840 post-review F — the control is a SWITCH now, so its state lives in `aria-pressed` and its
-    // name is stable ("Search reranker") instead of flipping between "Turn off"/"Turn on". What the old
-    // label assertion pinned — that this is an opt-OUT on a selected component, so activating it
-    // DECLINES rather than enables — is pinned below by the POSTed decline plus `pressed === true`.
-    expect(toggle?.label).toBe('Search reranker');
-    expect(toggle?.pressed).toBe(true);
-    expect(toggle?.shadowRoot?.querySelector('button')?.getAttribute('aria-pressed')).toBe('true');
-    toggle?.onActivate?.();
+    const toggle = el.shadowRoot?.querySelector<HTMLButtonElement>('[data-testid="component-toggle-reranker"]');
+    expect(toggle?.getAttribute('aria-label')).toBe('Include Search reranker');
+    expect(toggle?.getAttribute('role')).toBe('switch');
+    expect(toggle?.getAttribute('aria-checked')).toBe('true');
+    toggle?.click();
     await settle(el);
     expect(declineCalls).toHaveLength(1);
     expect(declineCalls[0]!.method).toBe('POST');
@@ -355,6 +353,7 @@ describe('BrainSurface — honest install progress', () => {
     // Derive the verdict the way the store does, so a regression in `computeAiEngineVerdict` fails
     // these render assertions too rather than being papered over by a hand-written verdict.
     (el as unknown as { _unifiedAiState: unknown })._unifiedAiState = {
+      installObservationLive: true, runtimeObservationLive: true, snapshotLive: true,
       aiEngine: computeAiEngineVerdict({
         installStatus: status,
         runtimeStatus: null,

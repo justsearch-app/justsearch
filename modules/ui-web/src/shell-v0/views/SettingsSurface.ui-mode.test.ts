@@ -14,6 +14,8 @@ import {
 interface SettingsHost extends HTMLElement {
   host_?: unknown;
   ui: { mode?: 'simple' | 'advanced' };
+  saving: boolean;
+  error: string | null;
   updateComplete: Promise<unknown>;
 }
 
@@ -149,4 +151,32 @@ describe('SettingsSurface shared detail level', () => {
     expect(posts[0]?.intent).toMatch(/:\d+$/);
     expect(posts[0]?.intent).toMatch(/:2$/);
   });
+});
+
+// The settings owner reconciles the optimistic projection after a refused or hung save.
+it.each(['rejected', 'timed out'] as const)('rolls detail level back and clears busy when a save is %s', async outcome => {
+  const el = document.createElement('jf-settings-surface') as SettingsHost;
+  let aborted = false;
+  el.host_ = createMockHostApi({ data: { fetch: async (path: string, init?: { method?: string; signal?: AbortSignal }) => {
+    if (path === '/api/settings/v2' && init?.method === 'POST') {
+      if (outcome === 'rejected') return new Response('{}', { status: 500 });
+      return new Promise<Response>((_resolve, reject) => init.signal?.addEventListener('abort', () => {
+        aborted = true; reject(init.signal?.reason);
+      }, { once: true }));
+    }
+    return path === '/api/settings/v2' ? settingsSnapshot() : new Response('{}');
+  } } });
+  document.body.appendChild(el);
+  await vi.waitFor(() => expect(el.ui.mode).toBe('simple'));
+  if (outcome === 'timed out') vi.useFakeTimers();
+  setUiMode('advanced');
+  document.dispatchEvent(new CustomEvent('jf-save-settings', { detail: { settings: { ui: { mode: 'advanced' } } } }));
+  expect(el.saving).toBe(true);
+  if (outcome === 'timed out') await vi.advanceTimersByTimeAsync(10_000);
+  await vi.waitFor(() => expect(el.saving).toBe(false));
+  expect(getUiMode()).toBe('simple');
+  expect(el.ui.mode).toBe('simple');
+  expect(el.error).toContain(outcome === 'rejected' ? 'HTTP_500' : 'timed out');
+  expect(aborted).toBe(outcome === 'timed out');
+  vi.useRealTimers();
 });

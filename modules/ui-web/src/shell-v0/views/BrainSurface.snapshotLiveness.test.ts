@@ -36,6 +36,7 @@ interface Harness {
   systemStatus: unknown;
   runtimeStatus: unknown;
   inference: unknown;
+  installStatus: InstallStatus | null;
   policy: unknown;
   busy: Record<string, boolean>;
   _unifiedAiState: unknown;
@@ -57,6 +58,7 @@ function harness(live: boolean): Harness {
   el.apiBase = '';
   el.busy = {};
   el.policy = {};
+  el.installStatus = { state: 'completed', installedFully: true };
   el.systemStatus = {
     embedding: { pendingCount: 5084, completedCount: 104, docCount: 5188, coveragePercent: 2.0 },
     worker: {
@@ -84,7 +86,7 @@ function harness(live: boolean): Harness {
   };
   el._unifiedAiState = {
     verdict: live ? LIVE_VERDICT : DEAD_VERDICT,
-    snapshotLive: live,
+    installObservationLive: live, runtimeObservationLive: live, snapshotLive: live,
     indexingStatusLive: live,
     aiEngine: { kind: 'online', stability: { kind: 'settled' }, installFailure: null },
     episodeMaxPendingJobs: 0,
@@ -308,6 +310,7 @@ describe('BrainSurface — the status card sentence (807 Part A)', () => {
     installStatus: InstallStatus | null;
     inference: unknown;
     _unifiedAiState: unknown;
+    settings: { chatEnabled?: boolean | null };
     renderSimplePanel(): TemplateResult;
   }
 
@@ -323,12 +326,18 @@ describe('BrainSurface — the status card sentence (807 Part A)', () => {
     loadStartedAtMs: null,
   };
 
-  /** A healthy engine observed at some past moment; `live` says whether that observation still holds. */
+  /**
+   * A healthy engine observed at some past moment; `live` says whether that observation still holds.
+   * The saved answer choice is read and on (B15: the answers action follows it), and the retained
+   * observation still says chat ran, so only liveness separates the live and dead renders.
+   */
   function panel(live: boolean): PanelHarness {
     const el = document.createElement('jf-brain-surface') as unknown as PanelHarness;
     el.apiBase = '';
     el.busy = {};
     el.policy = {};
+    el.settings = { chatEnabled: true };
+    (el as unknown as { settingsRead: boolean }).settingsRead = true;
     el.installStatus = { state: 'idle', phase: 'idle', installedFully: true };
     el.inference = { mode: 'online' };
     const aiEngine = computeAiEngineVerdict({
@@ -342,50 +351,90 @@ describe('BrainSurface — the status card sentence (807 Part A)', () => {
     });
     el._unifiedAiState = {
       verdict: live ? LIVE_VERDICT : DEAD_VERDICT,
-      snapshotLive: live,
+      installObservationLive: live, runtimeObservationLive: live, snapshotLive: live,
       aiEngine,
       runtime: RUNTIME,
+      capabilities: { chat: true },
       inference: el.inference,
       status: {},
     } as unknown as AiState;
     return el;
   }
 
+  /** The state words under the "Answer questions" step (its last meta line). */
+  function answersStepState(dom: HTMLElement): string | undefined {
+    const metas = dom.querySelectorAll('.path-step[data-feature="chat"] .step-meta');
+    return metas[metas.length - 1]?.textContent?.trim();
+  }
+
+  /** The Start/Stop answers action in the links below the path. */
+  function answersAction(dom: HTMLElement): { label: string; availability?: Availability } | null {
+    return dom.querySelector('[data-testid="brain-simple-action"]') as unknown as { label: string; availability?: Availability } | null;
+  }
+
   it('THE round-13 photograph: with the backend gone, the card no longer reads "Online / Chat and summaries ready."', () => {
     const dom = domOf(panel(false).renderSimplePanel());
     expect(dom.textContent).not.toContain('Chat and summaries ready.');
-    expect(dom.textContent).not.toContain('Online');
-    // ...and the dot beside it is not the settled green one.
-    // `tone` is bound as an ATTRIBUTE (`tone=${...}`), and the atom is not upgraded in this detached
-    // render — read the attribute, not a property that would be `undefined` either way.
-    const dot = dom.querySelector('jf-status-dot');
-    expect(dot?.getAttribute('tone')).not.toBe('success');
+    // Main's present-tense "Online" status word is gone; its successor is the answers step state,
+    // which must not report the retained "on" observation as current.
+    expect(answersStepState(dom)).toBe('Unknown — checking AI status');
+    expect(dom.querySelector('.brain-headline')?.textContent).not.toBe('AI is ready');
   });
 
   it('the card offers no action whose precondition is a live backend (807 A.3)', () => {
     const dom = domOf(panel(false).renderSimplePanel());
-    const action = dom.querySelector('[data-testid="brain-simple-action"]') as unknown as {
-      label: string;
-      availability?: { kind: string };
-    } | null;
-    expect(action?.label).not.toBe('Shut Down AI');
-    expect(action?.availability?.kind).not.toBe('available');
+    const action = answersAction(dom);
+    // "Shut Down AI" is now "Stop answers" and its label follows the saved choice (B15), so a dead
+    // backend still names it; what must not happen is offering it while nothing is confirmed.
+    expect(action?.label).toBe('Stop answers');
+    expect(action?.availability).toEqual({ kind: 'unavailable', reason: 'Checking AI status before changing features.' });
   });
 
-  it('ANTI-REGRESSION: a live observation still renders the green "Online / Chat and summaries ready."', () => {
+  it('Q3: an offline click on Start/Stop answers neither queues nor fires when the backend returns', async () => {
+    // The REAL gate value the surface produces for the answers control, driven through a REAL jf-control.
+    const dom = domOf(panel(false).renderSimplePanel());
+    const answers = answersAction(dom);
+    expect(answers?.label, 'the answers control is rendered').toBe('Stop answers');
+    expect(answers!.availability?.kind).toBe('unavailable');
+    expect((answers!.availability as { transient?: boolean }).transient).toBeFalsy();
+
+    const onActivate = vi.fn();
+    const toasts: string[] = [];
+    const listener = (e: Event) => toasts.push((e as CustomEvent).detail?.message ?? '');
+    document.addEventListener(EPHEMERAL_TOAST_EVENT, listener);
+    const el = document.createElement('jf-control') as Control;
+    el.label = answers!.label;
+    el.availability = answers!.availability as Availability;
+    el.onActivate = onActivate;
+    document.body.appendChild(el);
+    await el.updateComplete;
+
+    el.shadowRoot!.querySelector('button')!.click();
+    expect(onActivate).not.toHaveBeenCalled();
+    expect(toasts.some((m) => /queued/i.test(m))).toBe(false);
+
+    el.availability = { kind: 'available' }; // the backend comes back
+    await el.updateComplete;
+    document.removeEventListener(EPHEMERAL_TOAST_EVENT, listener);
+    expect(onActivate).not.toHaveBeenCalled(); // no unattended runtime mutation
+    el.remove();
+  });
+
+  it('ANTI-REGRESSION: a live observation still renders the ready headline and availability', () => {
     const dom = domOf(panel(true).renderSimplePanel());
-    expect(dom.textContent).toContain('Online');
+    expect(dom.querySelector('.brain-headline')?.textContent).toBe('AI is ready');
     expect(dom.textContent).toContain('Chat and summaries ready.');
-    // `tone` is bound as an ATTRIBUTE (`tone=${...}`), and the atom is not upgraded in this detached
-    // render — read the attribute, not a property that would be `undefined` either way.
-    const dot = dom.querySelector('jf-status-dot');
-    expect(dot?.getAttribute('tone')).toBe('success');
+    expect(answersStepState(dom)).toBe('On');
+    expect(answersAction(dom)?.label).toBe('Stop answers');
+    expect(answersAction(dom)?.availability).toEqual({ kind: 'available' });
   });
 });
 
 describe('BrainSurface — Runtime card (807)', () => {
   it('labels the readout as last-known and blocks its controls with a reason when not live', () => {
-    const dom = domOf(harness(false).renderRuntimeSection());
+    const owner = harness(false) as ReturnType<typeof harness> & { expanded: Record<string, boolean>; renderAdvanced(): TemplateResult };
+    owner.expanded = { advanced: true };
+    const dom = domOf(owner.renderAdvanced());
     expect(dom.textContent).toContain(DISCONNECTED);
     expect(dom.textContent).toContain('last observed');
     // Every control whose precondition is a live backend is unavailable-WITH-A-REASON (the 596 soft
@@ -394,8 +443,8 @@ describe('BrainSurface — Runtime card (807)', () => {
       label: string;
       availability?: { kind: string; reason?: string; transient?: boolean };
     }[];
-    const gated = buttons.filter((b) => ['Online', 'Indexing', 'Reload'].includes(b.label));
-    expect(gated.length).toBe(3);
+    const gated = buttons.filter((b) => ['Restart AI'].includes(b.label));
+    expect(gated.length).toBe(1);
     for (const b of gated) {
       expect(b.availability?.kind, b.label).toBe('unavailable');
       expect(b.availability?.reason, b.label).toBe(DISCONNECTED);
@@ -409,9 +458,11 @@ describe('BrainSurface — Runtime card (807)', () => {
 
   it('P2: an offline click on a runtime control neither queues nor fires when the backend returns', async () => {
     // The REAL gate value the surface produces, driven through a REAL jf-control.
-    const dom = domOf(harness(false).renderRuntimeSection());
+    const owner = harness(false) as ReturnType<typeof harness> & { expanded: Record<string, boolean>; renderAdvanced(): TemplateResult };
+    owner.expanded = { advanced: true };
+    const dom = domOf(owner.renderAdvanced());
     const online = Array.from(dom.querySelectorAll('jf-button')).find(
-      (b) => (b as unknown as { label: string }).label === 'Online',
+      (b) => (b as unknown as { label: string }).label === 'Restart AI',
     ) as unknown as { availability?: Availability };
     expect(online?.availability?.kind).toBe('unavailable');
 
@@ -420,7 +471,7 @@ describe('BrainSurface — Runtime card (807)', () => {
     const listener = (e: Event) => toasts.push((e as CustomEvent).detail?.message ?? '');
     document.addEventListener(EPHEMERAL_TOAST_EVENT, listener);
     const el = document.createElement('jf-control') as Control;
-    el.label = 'Online';
+    el.label = 'Restart AI';
     el.availability = online.availability as Availability;
     el.onActivate = onActivate;
     document.body.appendChild(el);
@@ -438,11 +489,12 @@ describe('BrainSurface — Runtime card (807)', () => {
   });
 
   it('ANTI-REGRESSION: a healthy verdict leaves the Runtime readout and its controls alone', () => {
-    const el = harness(true);
+    const el = harness(true) as ReturnType<typeof harness> & { expanded: Record<string, boolean>; renderAdvanced(): TemplateResult };
+    el.expanded = { advanced: true };
     // This preservation case describes one healthy queue observation on both transports.
     const status = el.systemStatus as { worker: { enrichment: { embeddingPendingCount: number } } };
     status.worker.enrichment.embeddingPendingCount = 4789;
-    const dom = domOf(el.renderRuntimeSection());
+    const dom = domOf(el.renderAdvanced());
     expect(dom.textContent).not.toContain(DISCONNECTED);
     expect(dom.textContent).toContain('available'); // CUDA: available
     expect(dom.textContent).toContain(num(4789)); // embed queue, un-caveated
@@ -451,8 +503,8 @@ describe('BrainSurface — Runtime card (807)', () => {
       label: string;
       availability?: { kind: string };
     }[];
-    for (const b of buttons.filter((x) => ['Online', 'Indexing', 'Reload'].includes(x.label))) {
-      expect(b.availability?.kind, b.label).toBe('available');
-    }
+    const gated = buttons.filter((x) => x.label === 'Restart AI');
+    expect(gated).toHaveLength(1);
+    expect(gated[0]!.availability?.kind).toBe('available');
   });
 });

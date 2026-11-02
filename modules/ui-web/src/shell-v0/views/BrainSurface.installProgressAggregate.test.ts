@@ -31,7 +31,7 @@ interface BrainHost extends HTMLElement {
   apiBase: string;
   settings: { mode?: 'simple' | 'advanced' };
   installStatus: InstallStatus | null;
-  _unifiedAiState: { aiEngine: AiEngineVerdict } | null;
+  _unifiedAiState: { aiEngine: AiEngineVerdict; snapshotLive: boolean; installObservationLive: boolean; runtimeObservationLive: boolean } | null;
   requestUpdate(): void;
   updateComplete: Promise<boolean>;
 }
@@ -47,6 +47,7 @@ async function mountFor(installStatus: InstallStatus): Promise<BrainHost> {
   // so a regression in the derivation fails these render assertions too.
   el.installStatus = installStatus;
   el._unifiedAiState = {
+    installObservationLive: true, runtimeObservationLive: true, snapshotLive: true,
     aiEngine: computeAiEngineVerdict({
       installStatus,
       runtimeStatus: null,

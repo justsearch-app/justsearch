@@ -1,0 +1,28 @@
+Before-only B20 control compatibility adapter for main 344bdaf03c.
+Open main's existing Runtime section without writing the global UI mode. Alias its
+GPU layers number input with the candidate selector and expose the SAME displayed
+number as aria-valuetext for the unchanged assertion. The value expression stays
+String(this.llm.gpuLayers ?? 0); neither null semantics nor variant field reads are
+repaired. No test assertion or endpoint fixture changes.
+
+--- a/modules/ui-web/src/shell-v0/views/BrainSurface.ts
++++ b/modules/ui-web/src/shell-v0/views/BrainSurface.ts
+@@ -3447,6 +3447,8 @@
+             <label class="field">
+               GPU layers
+               <input
++                id="brain-gpuLayers"
++                aria-valuetext=${String(this.llm.gpuLayers ?? 0)}
+                 type="number"
+                 min="0"
+                 .value=${String(this.llm.gpuLayers ?? 0)}
+@@ -3515,7 +3517,8 @@
+     if (!this.apiBase && this.apiBase !== '') {
+       return html`<div class="empty-state">No API connection. Start the JustSearch backend to configure AI.</div>`;
+     }
+-    const mode = getUiMode();
++    // Before-only navigation adapter: expose main's existing, initially open Runtime section.
++    const mode = 'advanced';
+     // Tempdoc 586 §F-1a — true cold start (no snapshot yet from store or refreshAll).
+     const loading =
+       this.inference == null && this.installStatus == null && this.runtimeStatus == null;

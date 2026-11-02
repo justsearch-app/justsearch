@@ -1,0 +1,87 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
+  },
+  "createdAt": "2026-11-02T19:39:30.467Z",
+  "revision": "91d4ad5fa16f356b50bd022557c08e8c6217c595",
+  "tree": "2126a69487e8be394a7a804f331b44fea877ca17",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/BrainSurface.repairRemedy.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/jg_1vrfg/tmp/test-intent-vitest-827-1793648365205.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 1698
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/views/BrainSurface.repairRemedy.test.ts#no repair needed ⇒ Maintenance still offers repair without claiming a gap",
+      "file": "modules/ui-web/src/shell-v0/views/BrainSurface.repairRemedy.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:51a70a70570da00ea674f1f564503795a13e433be0611123e42c108eb23c6062",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "BrainSurface Detailed — the install panel names the same remedy Simple points at no repair needed ⇒ Maintenance still offers repair without claiming a gap",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/BrainSurface.repairRemedy.test.ts#optional-only gap ⇒ no repair prompt at all, and the gap is still named",
+      "file": "modules/ui-web/src/shell-v0/views/BrainSurface.repairRemedy.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:51a70a70570da00ea674f1f564503795a13e433be0611123e42c108eb23c6062",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "BrainSurface — the repair claim names its authority optional-only gap ⇒ no repair prompt at all, and the gap is still named",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "344bdaf03c",
+    "revision": "344bdaf03c556e053c0e13f043f96c6f50216849",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/BrainSurface.repairRemedy.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/jg_1vrfg/tmp/test-intent-vitest-827-1793648368229.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 1995,
+        "output": "JSON report written to /home/elias/.cache/am/jg_1vrfg/tmp/test-intent-vitest-827-1793648368229.json\n\n"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui-web/src/shell-v0/views/BrainSurface.repairRemedy.test.ts#no repair needed ⇒ Maintenance still offers repair without claiming a gap",
+        "classification": "assertion",
+        "detail": "BrainSurface Detailed — the install panel names the same remedy Simple points at no repair needed ⇒ Maintenance still offers repair without claiming a gap:  AssertionError: expected undefined to be 'ghost' // Object.is equality\n    at /home/elias/.cache/am/jg_1vrfg/tmp/test-intent-before-kUgHQ7/modules/ui-web/src/shell-v0/views/BrainSurface.repairRemedy.test.ts:99:29\n    at file:///home/elias/.cache/am/jg_1vrfg/tmp/cand/modules/ui-web/node_modules/@vite"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/BrainSurface.repairRemedy.test.ts#optional-only gap ⇒ no repair prompt at all, and the gap is still named",
+        "classification": "assertion",
+        "detail": "BrainSurface — the repair claim names its authority optional-only gap ⇒ no repair prompt at all, and the gap is still named:  AssertionError: expected undefined to be 'ghost' // Object.is equality\n    at /home/elias/.cache/am/jg_1vrfg/tmp/test-intent-before-kUgHQ7/modules/ui-web/src/shell-v0/views/BrainSurface.repairRemedy.test.ts:179:29\n    at file:///home/elias/.cache/am/jg_1vrfg/tmp/cand/modules/ui-web/node_modules/@vit"
+      }
+    ]
+  },
+  "digest": "sha256:3bd7aa0b3d1f7b31428d00b1ef1bd8141dd97f50cea772011369a4f664297c24"
+}

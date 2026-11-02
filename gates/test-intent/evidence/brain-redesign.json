@@ -1,0 +1,520 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
+  },
+  "createdAt": "2026-11-02T18:44:08.902Z",
+  "revision": "ed9b29de09037e95f2aa2cd970ca3956e1887563",
+  "tree": "d1a3f255eb3e5195e8a935683141a2fb40c6db95",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/BrainSurface.ui-mode.test.ts\" \"src/shell-v0/views/BrainSurface.pausedInstall.test.ts\" \"src/shell-v0/views/BrainSurface.snapshotLiveness.test.ts\" \"src/shell-v0/state/aiStateStore.restartInference.test.ts\" \"src/shell-v0/views/BrainSurface.telemetry-mode.test.ts\" \"src/shell-v0/views/BrainSurface.sliceB.test.ts\" \"src/shell-v0/state/brainPage.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/tgk4vsot/tmp/test-intent-vitest-2058-1793645045901.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 3000
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/views/BrainSurface.ui-mode.test.ts",
+      "file": "modules/ui-web/src/shell-v0/views/BrainSurface.ui-mode.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:bd8c3009bcd5892e123eeceb4f35313deabf0b032a8b5813b79af93b832eb787",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "AI Brain independent of global detail level renders the same page under either global ui.mode",
+          "status": "passed"
+        },
+        {
+          "name": "AI Brain independent of global detail level opening Advanced never writes ui.mode (simple)",
+          "status": "passed"
+        },
+        {
+          "name": "AI Brain independent of global detail level opening Advanced never writes ui.mode (advanced)",
+          "status": "passed"
+        },
+        {
+          "name": "AI Brain independent of global detail level does not let its settings refresh overwrite a newer shared choice",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/BrainSurface.pausedInstall.test.ts",
+      "file": "modules/ui-web/src/shell-v0/views/BrainSurface.pausedInstall.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:510e51168304e9e2876720549542f176d438aac7c93861804468d6804f120a0c",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "BrainSurface — idle panel over a paused download acknowledges the retained bytes instead of claiming \"AI isn't installed yet\"",
+          "status": "passed"
+        },
+        {
+          "name": "BrainSurface — idle panel over a paused download offers to resume rather than to start over",
+          "status": "passed"
+        },
+        {
+          "name": "BrainSurface — idle panel over a paused download a genuinely fresh install is untouched — still \"AI isn't installed yet\" / \"Install AI\"",
+          "status": "passed"
+        },
+        {
+          "name": "BrainSurface — idle panel over a paused download shows the retained download and the explicit activation CTA",
+          "status": "passed"
+        },
+        {
+          "name": "BrainSurface — the consent dialog re-asks the backend before opening shows the plan as of the click, not as of mount",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/BrainSurface.snapshotLiveness.test.ts",
+      "file": "modules/ui-web/src/shell-v0/views/BrainSurface.snapshotLiveness.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:751e14ef4b1ad92d9e24dcf751efee4e9a68a3764038bee246af85bba71408f2",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "BrainSurface — enrichment progress card (807) S33.4 a fresh timestamp with 'worker RPC stale' is unconfirmed, then recovers",
+          "status": "passed"
+        },
+        {
+          "name": "BrainSurface — enrichment progress card (807) S33.4 a fresh timestamp with 'indexing lane stale' is unconfirmed, then recovers",
+          "status": "passed"
+        },
+        {
+          "name": "BrainSurface — enrichment progress card (807) S33.4 an expired indexing observation is unconfirmed even while the Engine remains reachable, then recovers",
+          "status": "passed"
+        },
+        {
+          "name": "BrainSurface — enrichment progress card (807) stops presenting as live progress when the snapshot is not live",
+          "status": "passed"
+        },
+        {
+          "name": "BrainSurface — enrichment progress card (807) stops ANIMATING when the snapshot is not live (the spinner is the present-tense claim)",
+          "status": "passed"
+        },
+        {
+          "name": "BrainSurface — enrichment progress card (807) ANTI-REGRESSION: a healthy verdict still renders the live progress card unchanged",
+          "status": "passed"
+        },
+        {
+          "name": "BrainSurface — enrichment progress SCOPE (round-15 scope mismatch) THE defect: the card does not disappear when its old single signal hits 100%",
+          "status": "passed"
+        },
+        {
+          "name": "BrainSurface — enrichment progress SCOPE (round-15 scope mismatch) shows the AGGREGATE percent, the one the other surfaces show — not the embedding stage",
+          "status": "passed"
+        },
+        {
+          "name": "BrainSurface — enrichment progress SCOPE (round-15 scope mismatch) declares its SCOPE, and no longer promises a quantity it is not measuring",
+          "status": "passed"
+        },
+        {
+          "name": "BrainSurface — enrichment progress SCOPE (round-15 scope mismatch) withdraws once the WHOLE blend settles, not once one stage does",
+          "status": "passed"
+        },
+        {
+          "name": "BrainSurface — enrichment progress SCOPE (round-15 scope mismatch) renders no progress bar when semantic enrichment cannot run at all (round-15 F1)",
+          "status": "passed"
+        },
+        {
+          "name": "BrainSurface — capability counts (807) \"4/4 active\" stops claiming active when the snapshot is not live",
+          "status": "passed"
+        },
+        {
+          "name": "BrainSurface — capability counts (807) ANTI-REGRESSION: a healthy verdict still says \"4/4 active\"",
+          "status": "passed"
+        },
+        {
+          "name": "BrainSurface — the status card sentence (807 Part A) THE round-13 photograph: with the backend gone, the card no longer reads \"Online / Chat and summaries ready.\"",
+          "status": "passed"
+        },
+        {
+          "name": "BrainSurface — the status card sentence (807 Part A) the card offers no action whose precondition is a live backend (807 A.3)",
+          "status": "passed"
+        },
+        {
+          "name": "BrainSurface — the status card sentence (807 Part A) Q3: an offline click on Start/Stop answers neither queues nor fires when the backend returns",
+          "status": "passed"
+        },
+        {
+          "name": "BrainSurface — the status card sentence (807 Part A) ANTI-REGRESSION: a live observation still renders the ready headline and availability",
+          "status": "passed"
+        },
+        {
+          "name": "BrainSurface — Runtime card (807) labels the readout as last-known and blocks its controls with a reason when not live",
+          "status": "passed"
+        },
+        {
+          "name": "BrainSurface — Runtime card (807) P2: an offline click on a runtime control neither queues nor fires when the backend returns",
+          "status": "passed"
+        },
+        {
+          "name": "BrainSurface — Runtime card (807) ANTI-REGRESSION: a healthy verdict leaves the Runtime readout and its controls alone",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/state/aiStateStore.restartInference.test.ts",
+      "file": "modules/ui-web/src/shell-v0/state/aiStateStore.restartInference.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:72ffd13623ae2876d5938bf4fd55d7b0ac98ea2530ae1d90562e0bd14603cbaf",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "a restarted head that confirms nothing cannot inherit the previous head Online state",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/BrainSurface.telemetry-mode.test.ts",
+      "file": "modules/ui-web/src/shell-v0/views/BrainSurface.telemetry-mode.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:03647f706a58ea7a39ad2cab5ec05a95c7779cdd4006ea5fd4e9cf9db3b24296",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "developer telemetry belongs to Health AI Engine Health opened first fetches and renders transitions, generation and spans under simple mode",
+          "status": "passed"
+        },
+        {
+          "name": "developer telemetry belongs to Health AI Engine Health opened first fetches and renders transitions, generation and spans under advanced mode",
+          "status": "passed"
+        },
+        {
+          "name": "developer telemetry belongs to Health AI Engine Brain never polls telemetry, with Advanced closed or open",
+          "status": "passed"
+        },
+        {
+          "name": "developer telemetry belongs to Health AI Engine empty and unavailable states keep their sections visible, without fabricated data",
+          "status": "passed"
+        },
+        {
+          "name": "developer telemetry belongs to Health AI Engine a trace file unavailable flag does not display supplied spans",
+          "status": "passed"
+        },
+        {
+          "name": "developer telemetry belongs to Health AI Engine unmount aborts reads and stops polling; late responses cannot replace the old snapshot",
+          "status": "passed"
+        },
+        {
+          "name": "developer telemetry belongs to Health AI Engine engine history link focuses the section when Health is mounted already and when it mounts later",
+          "status": "passed"
+        },
+        {
+          "name": "Health telemetry request independence S6 slow transitions survives a poll tick while the other endpoint publishes independently",
+          "status": "passed"
+        },
+        {
+          "name": "Health telemetry request independence S6 slow traces survives a poll tick while the other endpoint publishes independently",
+          "status": "passed"
+        },
+        {
+          "name": "Health telemetry request independence S6 a bounded pending read becomes unavailable and can retry, ignoring late results",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/BrainSurface.sliceB.test.ts",
+      "file": "modules/ui-web/src/shell-v0/views/BrainSurface.sliceB.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:078fe6e972d488ad4ca5e9d43db8ecf60ee254c75e58d47fd92fee67c6aad032",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Brain slice A independent review repairs R1 acquisition decline does not hide existing answer files or replace their runtime switch, including after remount",
+          "status": "passed"
+        },
+        {
+          "name": "Brain slice A independent review repairs R2 unavailable answers are not promised, and pictures use explicit availability",
+          "status": "passed"
+        },
+        {
+          "name": "Brain slice A independent review repairs R2 not-in-mode answers are not promised, and pictures use explicit availability",
+          "status": "passed"
+        },
+        {
+          "name": "Brain slice A independent review repairs R3 live installed packages replace stale not-downloaded paths before the staged run ends",
+          "status": "passed"
+        },
+        {
+          "name": "Brain slice A independent review repairs R4 an unknown runtime observation stays unconfirmed in both sentence and path",
+          "status": "passed"
+        },
+        {
+          "name": "Brain slice A independent review repairs R5 a settings GET begun before a witnessed LLM save cannot revert the saved value",
+          "status": "passed"
+        },
+        {
+          "name": "Brain slice A independent review repairs R6 the processor-fallback repair hint remains an accessible alert with its action",
+          "status": "passed"
+        },
+        {
+          "name": "Brain refresh lifetime a settings refresh resolves when focus moves into a sibling shadow root",
+          "status": "passed"
+        },
+        {
+          "name": "Brain refresh lifetime a pending settings read can resolve after disconnect without rejecting or replacing values",
+          "status": "passed"
+        },
+        {
+          "name": "Brain refresh lifetime a pending settings read can reject after disconnect without rejecting or replacing values",
+          "status": "passed"
+        },
+        {
+          "name": "Brain Advanced controls renders the four groups in place, keeps optional part choices, and never writes on open",
+          "status": "passed"
+        },
+        {
+          "name": "Brain Advanced controls sliders keep an unfocused draft across refresh, save once on change with witnesses, and preserve untouched values",
+          "status": "passed"
+        },
+        {
+          "name": "Brain Advanced controls Automatic stays distinct from processor-only, and changing one slider preserves the other five settings",
+          "status": "passed"
+        },
+        {
+          "name": "Brain Advanced controls a slider conflict shows review guidance, keeps the saved value and allows an explicit retry",
+          "status": "passed"
+        },
+        {
+          "name": "Brain Advanced controls a second window sees a committed slider value on focus, while a draft survives tab switching and refresh",
+          "status": "passed"
+        },
+        {
+          "name": "Brain Advanced controls an installed inactive variant can be activated from the real endpoint fields",
+          "status": "passed"
+        },
+        {
+          "name": "Brain step 1 review repairs S1 only reading memory can reset automatically and persists zero through backend merge",
+          "status": "passed"
+        },
+        {
+          "name": "Brain step 1 review repairs S1 reading memory Automatic sends zero rather than a null no-op",
+          "status": "passed"
+        },
+        {
+          "name": "Brain step 1 review repairs S2 inactive loaded sessions are off and never promised, while unknown remains unknown",
+          "status": "passed"
+        },
+        {
+          "name": "Brain step 1 review repairs S2 Advanced applies the same rule: a loaded but inactive feature is not in use or counted active",
+          "status": "passed"
+        },
+        {
+          "name": "Brain step 1 review repairs S3 saved answer intent is unknown and blocked while initial settings are pending",
+          "status": "passed"
+        },
+        {
+          "name": "Brain step 1 review repairs S3 saved answer intent is unknown and blocked while initial settings are failed",
+          "status": "passed"
+        },
+        {
+          "name": "Brain step 1 review repairs S4 installed systems retain an additions Install action with selected size and exact consent",
+          "status": "passed"
+        },
+        {
+          "name": "Brain step 1 review repairs S5 disconnect during picture reading uses last-observed wording until a live completion",
+          "status": "passed"
+        },
+        {
+          "name": "Brain step 1 review repairs S7 every phrase, step and About opener shares expanded state and panel association",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/state/brainPage.test.ts",
+      "file": "modules/ui-web/src/shell-v0/state/brainPage.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:00ed7099c6639a8d8ca642d0a106783abc2d5da59f5db4bab4c7b16f7e5a9067",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Brain sentence from observed state and saved choice installed: reranker=true answers=true pictures=true",
+          "status": "passed"
+        },
+        {
+          "name": "Brain sentence from observed state and saved choice installed: reranker=true answers=true pictures=false",
+          "status": "passed"
+        },
+        {
+          "name": "Brain sentence from observed state and saved choice installed: reranker=true answers=true pictures=null",
+          "status": "passed"
+        },
+        {
+          "name": "Brain sentence from observed state and saved choice installed: reranker=true answers=false pictures=true",
+          "status": "passed"
+        },
+        {
+          "name": "Brain sentence from observed state and saved choice installed: reranker=true answers=false pictures=false",
+          "status": "passed"
+        },
+        {
+          "name": "Brain sentence from observed state and saved choice installed: reranker=true answers=false pictures=null",
+          "status": "passed"
+        },
+        {
+          "name": "Brain sentence from observed state and saved choice installed: reranker=true answers=null pictures=true",
+          "status": "passed"
+        },
+        {
+          "name": "Brain sentence from observed state and saved choice installed: reranker=true answers=null pictures=false",
+          "status": "passed"
+        },
+        {
+          "name": "Brain sentence from observed state and saved choice installed: reranker=true answers=null pictures=null",
+          "status": "passed"
+        },
+        {
+          "name": "Brain sentence from observed state and saved choice installed: reranker=false answers=true pictures=true",
+          "status": "passed"
+        },
+        {
+          "name": "Brain sentence from observed state and saved choice installed: reranker=false answers=true pictures=false",
+          "status": "passed"
+        },
+        {
+          "name": "Brain sentence from observed state and saved choice installed: reranker=false answers=true pictures=null",
+          "status": "passed"
+        },
+        {
+          "name": "Brain sentence from observed state and saved choice installed: reranker=false answers=false pictures=true",
+          "status": "passed"
+        },
+        {
+          "name": "Brain sentence from observed state and saved choice installed: reranker=false answers=false pictures=false",
+          "status": "passed"
+        },
+        {
+          "name": "Brain sentence from observed state and saved choice installed: reranker=false answers=false pictures=null",
+          "status": "passed"
+        },
+        {
+          "name": "Brain sentence from observed state and saved choice installed: reranker=false answers=null pictures=true",
+          "status": "passed"
+        },
+        {
+          "name": "Brain sentence from observed state and saved choice installed: reranker=false answers=null pictures=false",
+          "status": "passed"
+        },
+        {
+          "name": "Brain sentence from observed state and saved choice installed: reranker=false answers=null pictures=null",
+          "status": "passed"
+        },
+        {
+          "name": "Brain sentence from observed state and saved choice installed: reranker=null answers=true pictures=true",
+          "status": "passed"
+        },
+        {
+          "name": "Brain sentence from observed state and saved choice installed: reranker=null answers=true pictures=false",
+          "status": "passed"
+        },
+        {
+          "name": "Brain sentence from observed state and saved choice installed: reranker=null answers=true pictures=null",
+          "status": "passed"
+        },
+        {
+          "name": "Brain sentence from observed state and saved choice installed: reranker=null answers=false pictures=true",
+          "status": "passed"
+        },
+        {
+          "name": "Brain sentence from observed state and saved choice installed: reranker=null answers=false pictures=false",
+          "status": "passed"
+        },
+        {
+          "name": "Brain sentence from observed state and saved choice installed: reranker=null answers=false pictures=null",
+          "status": "passed"
+        },
+        {
+          "name": "Brain sentence from observed state and saved choice installed: reranker=null answers=null pictures=true",
+          "status": "passed"
+        },
+        {
+          "name": "Brain sentence from observed state and saved choice installed: reranker=null answers=null pictures=false",
+          "status": "passed"
+        },
+        {
+          "name": "Brain sentence from observed state and saved choice installed: reranker=null answers=null pictures=null",
+          "status": "passed"
+        },
+        {
+          "name": "Brain sentence from observed state and saved choice before install: reranker=true answers=true",
+          "status": "passed"
+        },
+        {
+          "name": "Brain sentence from observed state and saved choice before install: reranker=true answers=false",
+          "status": "passed"
+        },
+        {
+          "name": "Brain sentence from observed state and saved choice before install: reranker=false answers=true",
+          "status": "passed"
+        },
+        {
+          "name": "Brain sentence from observed state and saved choice before install: reranker=false answers=false",
+          "status": "passed"
+        },
+        {
+          "name": "Brain sentence from observed state and saved choice before install never promises excluded answers: unavailable",
+          "status": "passed"
+        },
+        {
+          "name": "Brain sentence from observed state and saved choice before install never promises excluded answers: not-in-mode",
+          "status": "passed"
+        },
+        {
+          "name": "Brain sentence from observed state and saved choice before install never promises excluded answers: declined",
+          "status": "passed"
+        },
+        {
+          "name": "Brain sentence from observed state and saved choice before install never promises excluded answers: selected",
+          "status": "passed"
+        },
+        {
+          "name": "Brain sentence from observed state and saved choice unknown status never claims availability or a missing installation",
+          "status": "passed"
+        },
+        {
+          "name": "Brain sentence from observed state and saved choice answers-off takes precedence over a picture-reading hold",
+          "status": "passed"
+        },
+        {
+          "name": "Brain sentence from observed state and saved choice answers resume after picture reading and missing answers never claim to answer",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:0bee0f260744b4ec6258de1109c7130f695437ddbd37951fb01281ec7fcd5681"
+}
