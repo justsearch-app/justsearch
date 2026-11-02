@@ -706,3 +706,113 @@ it('R3b a fresh failure list retries A again along with refused B and newly fail
     expect(retry().disabled).toBe(false);
   } finally { el.remove(); globalThis.fetch = oldFetch; }
 });
+
+it.each(['empty', 'partial'])('R3c a silent retry ends at 30 seconds with a subsequent %s refresh, keeps unattempted files and ignores its late answer', async response => {
+  vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+  let answerOld!: (response: Response) => void;
+  let answerNew!: (response: Response) => void;
+  const original = [job({ pathHash: 'silent', state: 'INDEXED_SOURCE_UNREADABLE', errorMessage: 'Access denied' }),
+    job({ pathHash: 'unattempted', state: 'RETRY_EXHAUSTED', errorMessage: 'Drive offline' })];
+  let listing = original;
+  let reads = 0;
+  const retried: string[] = []; const oldFetch = globalThis.fetch;
+  globalThis.fetch = vi.fn(async (url: unknown, init?: RequestInit) => {
+    if (String(url).includes('by-prefix')) { ++reads; return new Response(byPrefixBody(listing)); }
+    if (String(url).includes('/invoke')) {
+      retried.push(JSON.parse(String(init?.body)).args.pathHash);
+      if (retried.length === 1) return new Promise<Response>(resolve => { answerOld = resolve; });
+      if (retried.length === 2) return new Promise<Response>(resolve => { answerNew = resolve; });
+      return Response.json({ success: true });
+    }
+    return Response.json({});
+  }) as typeof fetch;
+  const el = document.createElement('jf-failed-jobs-drawer') as FailedJobsDrawer;
+  el.inline = true; el.folderPathHash = 'folder'; el.observedCount = 2;
+  const retry = () => el.shadowRoot!.querySelector<HTMLElement & { onActivate(): void; disabled: boolean }>('jf-button[label="Try again"]')!;
+  try {
+    document.body.append(el); await pump(el);
+    retry().onActivate(); retry().onActivate(); await pump(el);
+    listing = response === 'empty' ? [] : [job({ pathHash: 'other-failure' })];
+    el.observedCount = listing.length; await pump(el);
+    await vi.advanceTimersByTimeAsync(29_999); await pump(el);
+    expect(reads).toBe(1); expect(retry().disabled).toBe(true);
+    expect(retried).toEqual(['silent']);
+    await vi.advanceTimersByTimeAsync(1); await pump(el);
+    expect(retry().disabled).toBe(false);
+    expect(reads).toBe(2); // Exactly one fetch after abandoning the batch.
+    expect(retried).toEqual(['silent']); // The remaining files stay visible for another choice.
+    expect(el.rows.map(row => row.pathHash)).toEqual(expect.arrayContaining(['silent', 'unattempted']));
+    if (response === 'partial') expect(el.rows.map(row => row.pathHash)).toContain('other-failure');
+    const silent = el.shadowRoot!.querySelector('[data-state="INDEXED_SOURCE_UNREADABLE"]')!;
+    expect(silent.textContent).toContain('No answer yet — check again');
+    expect(silent.textContent).toContain('Access denied');
+    expect(el.shadowRoot!.querySelector('[data-state="RETRY_EXHAUSTED"]')!.textContent).toContain('Drive offline');
+
+    // Count updates resume, and a new list is retried in full, including a new failure.
+    listing = [...original, job({ pathHash: 'new-failure' })];
+    el.observedCount = 3; await pump(el); expect(reads).toBe(3);
+    retry().onActivate(); await pump(el); expect(retry().disabled).toBe(true);
+    answerOld(response === 'empty' ? Response.json({ success: true }) : Response.json({ success: false }, { status: 409 }));
+    await pump(el);
+    expect(retry().disabled).toBe(true); expect(reads).toBe(3);
+    expect(retried).toEqual(['silent', 'silent']);
+    expect(el.rows.map(row => row.pathHash)).toEqual(['silent', 'unattempted', 'new-failure']);
+    expect(el.shadowRoot!.textContent).not.toContain('No answer yet');
+    answerNew(Response.json({ success: true })); await pump(el);
+    expect(retried).toEqual(['silent', 'silent', 'unattempted', 'new-failure']);
+    expect(retry().disabled).toBe(false); expect(reads).toBe(4);
+    // Advancing beyond the retired deadlines must not restart the old batch.
+    await vi.advanceTimersByTimeAsync(30_000); await pump(el);
+    expect(retried).toEqual(['silent', 'silent', 'unattempted', 'new-failure']);
+    expect(reads).toBe(4); expect(retry().disabled).toBe(false);
+    expect(vi.getTimerCount()).toBe(0);
+  } finally { el.remove(); globalThis.fetch = oldFetch; vi.useRealTimers(); }
+});
+
+it('R3c a timed-out retry cannot change another window, a switched folder or a remounted list', async () => {
+  vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+  let answerOld!: (response: Response) => void;
+  const oldFetch = globalThis.fetch;
+  const retried: string[] = [];
+  globalThis.fetch = vi.fn(async (url: unknown, init?: RequestInit) => {
+    if (String(url).includes('by-prefix')) {
+      const folder = new URL(String(url), 'http://test').searchParams.get('pathHash');
+      return new Response(byPrefixBody([job({ pathHash: `${folder}-file`, errorMessage: `${folder} reason` })]));
+    }
+    if (String(url).includes('/invoke')) {
+      retried.push(JSON.parse(String(init?.body)).args.pathHash);
+      if (retried.length === 1) return new Promise<Response>(resolve => { answerOld = resolve; });
+      return Response.json({ success: true });
+    }
+    return Response.json({});
+  }) as typeof fetch;
+  const first = document.createElement('jf-failed-jobs-drawer') as FailedJobsDrawer;
+  const second = document.createElement('jf-failed-jobs-drawer') as FailedJobsDrawer;
+  for (const el of [first, second]) { el.inline = true; el.folderPathHash = 'A'; el.observedCount = 1; }
+  const retry = (el: FailedJobsDrawer) => el.shadowRoot!.querySelector<HTMLElement & { onActivate(): void; disabled: boolean }>('jf-button[label="Try again"]')!;
+  try {
+    document.body.append(first, second); await pump(first); await pump(second);
+    retry(first).onActivate(); await pump(first);
+    retry(second).onActivate(); await pump(second);
+    expect(retry(second).disabled).toBe(false);
+    expect(second.shadowRoot!.textContent).not.toContain('No answer yet');
+    await vi.advanceTimersByTimeAsync(30_000); await pump(first);
+    expect(retry(first).disabled).toBe(false);
+    expect(first.shadowRoot!.textContent).toContain('No answer yet — check again');
+    first.folderPathHash = 'B'; await pump(first);
+    expect(first.rows.map(row => row.pathHash)).toEqual(['B-file']);
+    expect(first.shadowRoot!.textContent).not.toContain('No answer yet');
+    // Switching away and back/remounting uses a fresh list, as does a reload.
+    first.remove(); document.body.append(first); await pump(first);
+    answerOld(Response.json({ success: true })); await pump(first); await pump(second);
+    expect(first.rows.map(row => row.pathHash)).toEqual(['B-file']);
+    expect(second.rows.map(row => row.pathHash)).toEqual(['A-file']);
+    expect(first.shadowRoot!.textContent).not.toContain('No answer yet');
+    retry(first).onActivate(); await pump(first);
+    expect(retried).toEqual(['A-file', 'A-file', 'B-file']);
+    expect(retry(first).disabled).toBe(false);
+    await vi.advanceTimersByTimeAsync(30_000); await pump(first);
+    expect(retried).toEqual(['A-file', 'A-file', 'B-file']);
+    expect(vi.getTimerCount()).toBe(0);
+  } finally { first.remove(); second.remove(); globalThis.fetch = oldFetch; vi.useRealTimers(); }
+});

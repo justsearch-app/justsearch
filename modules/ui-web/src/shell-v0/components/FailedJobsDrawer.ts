@@ -100,6 +100,7 @@ export class FailedJobsDrawer extends JfElement {
   private targetFolder: string | null = null;
   private requestSerial = 0;
   private retryBatch: object | null = null;
+  private unansweredRetry: string | null = null;
   private unsub: (() => void) | null = null;
 
   // 574 §23.B — single-open arbitration by construction; the panel reflects the failedJobsDrawer store.
@@ -145,6 +146,7 @@ export class FailedJobsDrawer extends JfElement {
       this.error = null;
       this.loading = false;
       this.retryBatch = null;
+      this.unansweredRetry = null;
       if (next) void this.refresh();
     }
     this.requestUpdate();
@@ -157,6 +159,7 @@ export class FailedJobsDrawer extends JfElement {
     this.requestSerial++;
     this.targetFolder = null;
     this.retryBatch = null;
+    this.unansweredRetry = null;
   }
 
   override updated(changed: Map<string, unknown>): void {
@@ -164,7 +167,7 @@ export class FailedJobsDrawer extends JfElement {
       this.open = true;
       if (changed.has('folderPathHash') || changed.has('observedCount') && !this.lastKnown) {
         if (this.targetFolder !== this.folderPathHash) {
-          this.rows = []; this.resolved = {}; this.retryBatch = null;
+          this.rows = []; this.resolved = {}; this.retryBatch = null; this.unansweredRetry = null;
         }
         this.targetFolder = this.folderPathHash;
         void this.refresh();
@@ -177,7 +180,7 @@ export class FailedJobsDrawer extends JfElement {
     }
   }
 
-  private async refresh(): Promise<void> {
+  private async refresh(retainRows: FailedRow[] = []): Promise<void> {
     // Live counts may drop during requeue. Finish retrying the displayed list
     // before fetching its replacement; only a target/lifecycle change cancels it.
     if (this.inline && this.retryBatch) return;
@@ -206,7 +209,9 @@ export class FailedJobsDrawer extends JfElement {
       // parse site (not at each render site) also covers `retryAll` and `onRowActionSuccess`, which
       // key on `pathHash`. Mirrors api/domains/indexing.ts's defensive `(parsed.jobs ?? [])`.
       const rows = (Array.isArray(parsed?.jobs) ? parsed.jobs : []).map(toRow);
-      if (!this.inline || rows.length > 0 || !this.rows.length) this.rows = rows;
+      if (!this.inline || rows.length > 0 || !this.rows.length) {
+        this.rows = [...rows, ...retainRows.filter(row => !rows.some(fresh => fresh.pathHash === row.pathHash))];
+      }
       // Lazy-resolve hashes → display paths (best-effort; deleted files resolve to null → show hash).
       for (const r of this.rows) {
         if (r.pathHash && !this.resolved[r.pathHash]) {
@@ -244,28 +249,44 @@ export class FailedJobsDrawer extends JfElement {
     if (this.retryBatch || this.loading) return;
     const batch = {};
     this.retryBatch = batch;
+    this.unansweredRetry = null;
     const folder = this.targetFolder;
     const rows = [...this.rows];
     this.requestUpdate();
     const serial = this.requestSerial;
     const client = getOperationClient(this.apiBase || '');
+    let retainRows: FailedRow[] = [];
     try {
-      for (const r of rows) {
+      for (const [index, r] of rows.entries()) {
         if (serial !== this.requestSerial || !this.open || this.retryBatch !== batch) break;
+        let deadline: ReturnType<typeof setTimeout> | undefined;
         try {
-          await client.invoke(RETRY_OP, { args: { pathHash: r.pathHash } });
+          const invocation = client.invoke(RETRY_OP, { args: { pathHash: r.pathHash } }).then(() => true);
+          // The operation may still run after the UI stops waiting. Race only its
+          // answer; a late completion has no continuation that can change this list.
+          const answered = this.inline ? await Promise.race([
+            invocation,
+            new Promise<false>(resolve => { deadline = setTimeout(() => resolve(false), 30_000); }),
+          ]) : await invocation;
           if (!this.isConnected || folder !== this.targetFolder || this.retryBatch !== batch) break;
+          if (!answered) {
+            this.unansweredRetry = r.pathHash;
+            retainRows = rows.slice(index);
+            break;
+          }
           if (!this.inline) this.rows = this.rows.filter(row => row.pathHash !== r.pathHash);
           if (serial !== this.requestSerial || !this.open) break;
         } catch {
           // Leave the failed row; its error stays visible.
+        } finally {
+          clearTimeout(deadline);
         }
       }
     } finally {
       // A switched folder may already own a new batch, which this one must not clear.
       if (this.retryBatch === batch) {
         this.retryBatch = null;
-        if (this.inline) await this.refresh();
+        if (this.inline) await this.refresh(retainRows);
         this.requestUpdate();
       }
     }
@@ -475,6 +496,9 @@ export class FailedJobsDrawer extends JfElement {
               </div>`
             : nothing}
           ${r.errorMessage ? html`<div class="row-error">${r.errorMessage}</div>` : nothing}
+          ${this.unansweredRetry === r.pathHash
+            ? html`<div class="row-gaveup" role="status">No answer yet — check again</div>`
+            : nothing}
           ${scanId
             ? html`<div class="row-scan" data-testid="failed-job-scan" title=${scanId}>
                 Scan ${scanShort}

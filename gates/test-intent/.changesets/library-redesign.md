@@ -82,6 +82,8 @@ Final-review repairs at e3916fe2db (all durable):
 The R1–R3 evidence is produced in a separate shared clone with copied dependencies;
 its detached before-checkout and build outputs belong to that clone. No acceptance record is changed. Re-review repairs R2b/R3b also fail on 48bf54c1b2: Save my draft invokes a third write instead of retaining two, and retry produces A/B/B/C instead of A/B/A/B/C. Discard is a preservation case on that baseline. The combined evidence below retains e3916fe2db as the original R1–R3 before-state and covers the final behavior.
 
+R3c continuation on 9a3d163e1d (durable): the same failed-files check file covers the per-invocation 30-second deadline, retained unattempted files, late success/refusal, resumed count refreshes, second-window isolation and target/remount races. The 30-second bound is an agent choice under the quoted delegation. `gates/test-intent/evidence/library-redesign-r3c.json` records the three new checks failing by assertion on 9a3d163e1d and passing after repair. The combined R1–R3 evidence is refreshed against its original e3916fe2db before-state. Its generator runs in a shared clone with private dependencies.
+
 ```json
 {
   "entries": [
@@ -1025,7 +1027,7 @@ its detached before-checkout and build outputs belong to that clone. No acceptan
         "modules/ui-web/src/shell-v0/components/FailedJobsDrawer.test.ts"
       ],
       "class": "New",
-      "behaviour": "Live count refreshes neither replace the inline list nor cancel a retry batch. The batch attempts every displayed file, then fetches the list once. Every Try again retries every file in the current list, including files that failed again after a successful retry. Empty observations retain last-known failure evidence; no pending retry backlog is kept. Switching inline targets and reconnecting isolate batch ownership, retaining failure distinctions and ignoring old completions.",
+      "behaviour": "Live count refreshes neither replace the inline list nor cancel a retry batch. The batch attempts every displayed file unless an inline invocation goes unanswered for 30 seconds, then fetches the list once. Every Try again retries every file in the current list, including files that failed again after a successful retry. Empty observations retain last-known failure evidence; no pending retry backlog is kept. Switching inline targets and reconnecting isolate batch ownership, retaining failure distinctions and ignoring old completions. An inline invocation without an answer ends its batch after 30 seconds and shows No answer yet — check again for that file. The unanswered and unattempted files survive the one follow-up fetch, count refreshes resume and Try again is usable. Late successful or refused answers cannot alter a newer list or batch, another window, or a remounted target.",
       "sources": [
         {
           "kind": "owner-adopted-scenario",
@@ -1040,6 +1042,14 @@ its detached before-checkout and build outputs belong to that clone. No acceptan
           "scenario": "P3",
           "quote": "Failed-files list and retry for one folder, keeping unreadable / indexed-unreadable / retry-exhausted / parser-failure distinctions (switching folders is L13).",
           "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "well from now on you can just proceed autonomously accordinglky",
+          "delegationLocation": "task t-20261101-uiimpl, user turn after the WP1 summary",
+          "delegationScope": "Proceed autonomously with implementing the agreed window designs and choosing implementation details within the adopted scenarios.",
+          "choice": "Stop waiting for an inline retry invocation after 30 seconds, ending its batch with an unknown outcome and retaining the unanswered and unattempted files for another explicit Try again. Race a timer in the drawer through the existing operation client; do not add a transport option.",
+          "label": "agent choice"
         }
       ],
       "evidence": "gates/test-intent/evidence/library-redesign-r1-r3.json",
@@ -1047,7 +1057,10 @@ its detached before-checkout and build outputs belong to that clone. No acceptan
         "modules/ui-web/src/shell-v0/components/FailedJobsDrawer.test.ts#R3 live empty refresh waits for the batch, retains failure evidence and leaves Try again usable",
         "modules/ui-web/src/shell-v0/components/FailedJobsDrawer.test.ts#R3 live partial refresh waits for the batch, retains failure evidence and leaves Try again usable",
         "modules/ui-web/src/shell-v0/components/FailedJobsDrawer.test.ts#R3 switching inline targets isolates pending retry batches and ignores late completions after reconnect",
-        "modules/ui-web/src/shell-v0/components/FailedJobsDrawer.test.ts#R3b a fresh failure list retries A again along with refused B and newly failed C"
+        "modules/ui-web/src/shell-v0/components/FailedJobsDrawer.test.ts#R3b a fresh failure list retries A again along with refused B and newly failed C",
+        "modules/ui-web/src/shell-v0/components/FailedJobsDrawer.test.ts#R3c a silent retry ends at 30 seconds with a subsequent empty refresh, keeps unattempted files and ignores its late answer",
+        "modules/ui-web/src/shell-v0/components/FailedJobsDrawer.test.ts#R3c a silent retry ends at 30 seconds with a subsequent partial refresh, keeps unattempted files and ignores its late answer",
+        "modules/ui-web/src/shell-v0/components/FailedJobsDrawer.test.ts#R3c a timed-out retry cannot change another window, a switched folder or a remounted list"
       ],
       "repaired": true
     }
