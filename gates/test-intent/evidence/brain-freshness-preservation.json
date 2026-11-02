@@ -1,0 +1,61 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
+  },
+  "createdAt": "2026-11-02T10:48:26.877Z",
+  "revision": "1b5ceea94b1384a23077db4873879da0c5ea77de",
+  "tree": "f8b25f8c10f99fc2ee48189adf4a04f85b006bac",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/BrainSurface.observationFreshness.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/dw1j0qa8/tmp/test-intent-vitest-471-1793616505643.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 1229
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/views/BrainSurface.observationFreshness.test.ts#H3 a failed install read closes the gate immediately and a successful retry recovers",
+      "file": "modules/ui-web/src/shell-v0/views/BrainSurface.observationFreshness.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:9fe670ba06aebfc6345cb0bb0b3e745eede1c789e68230d2b9510b776b03e358",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Brain observation freshness repair H3 a failed install read closes the gate immediately and a successful retry recovers",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/BrainSurface.observationFreshness.test.ts#H3 a failed runtime read closes the gate immediately and a successful retry recovers",
+      "file": "modules/ui-web/src/shell-v0/views/BrainSurface.observationFreshness.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:9fe670ba06aebfc6345cb0bb0b3e745eede1c789e68230d2b9510b776b03e358",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Brain observation freshness repair H3 a failed runtime read closes the gate immediately and a successful retry recovers",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:9b30e1d78b30e601e2425f0897253809208978169f57a8ab0fe16c7b3ab48c6a"
+}

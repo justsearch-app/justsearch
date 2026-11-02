@@ -43,6 +43,8 @@ import {
 } from '../utils/statusPoll.js';
 import {
   subscribeAiInstall,
+  isAiObservationLive,
+  type AiObservation,
   setAiInstallApiBase,
   __resetAiInstallPollForTest,
   type AiInstallSnapshot,
@@ -379,8 +381,8 @@ const installStateSig = signal<Maybe<{ installed: boolean; installing: boolean }
 // 663 Stage 3 — raw install/runtime/pack snapshots from the shared `aiInstallPoll`.
 const installStatusSig = signal<InstallStatus | null>(null);
 const runtimeStatusSig = signal<AiRuntimeStatus | null>(null);
-const installObservationLiveSig = signal(false);
-const runtimeObservationLiveSig = signal(false);
+const installObservationSig = signal<AiObservation | undefined>(undefined);
+const runtimeObservationSig = signal<AiObservation | undefined>(undefined);
 const packStatusSig = signal<PackImportStatus | null>(null);
 // 595 §15.3 (E2) — retained last-settled index counts. Written ONLY by the poll
 // callback (`onStatusUpdate`), read by `buildSnapshot`; no computed writes it.
@@ -1003,8 +1005,8 @@ function buildSnapshot(): AiState {
     installStatus,
     runtimeStatus,
     packStatus: packStatusSig.get(),
-    installObservationLive: installObservationLiveSig.get(),
-    runtimeObservationLive: runtimeObservationLiveSig.get(),
+    installObservationLive: isAiObservationLive(installObservationSig.get()),
+    runtimeObservationLive: isAiObservationLive(runtimeObservationSig.get()),
     aiEngine,
     chatDisabledBySpec,
     chatUnloadedReason: chatUnloadedReason(
@@ -1115,8 +1117,8 @@ function onStatusUpdate(snap: StatusSnapshot | null, invalidated = false): void 
  * as before; this finally wires the (previously dead-in-production) `installStateSig`.
  */
 function onAiInstallUpdate(snap: AiInstallSnapshot): void {
-  installObservationLiveSig.set(snap.installLive === true);
-  runtimeObservationLiveSig.set(snap.runtimeLive === true);
+  installObservationSig.set(snap.installObservation);
+  runtimeObservationSig.set(snap.runtimeObservation);
   installStatusSig.set(snap.install);
   runtimeStatusSig.set(snap.runtime);
   packStatusSig.set(snap.packs);
@@ -1218,7 +1220,9 @@ function checkStaleness(): void {
   const { reachable: reachableNow } = computeReachability();
   const indexingStatusLiveNow = computeIndexingStatusLive(isSnapshotLive({ reachable: reachableNow }));
   if (phaseNow !== current.phase || reachableNow !== current.connection.reachable ||
-      indexingStatusLiveNow !== current.indexingStatusLive) {
+      indexingStatusLiveNow !== current.indexingStatusLive ||
+      isAiObservationLive(installObservationSig.get()) !== current.installObservationLive ||
+      isAiObservationLive(runtimeObservationSig.get()) !== current.runtimeObservationLive) {
     clockTickSig.set(clockTickSig.get() + 1);
   }
 }
@@ -1337,8 +1341,8 @@ export function __resetAiStateForTest(): void {
   lastStatusSuccessSig.set(null);
   activitySig.set(INITIAL_ACTIVITY);
   installStateSig.set(UNKNOWN);
-  installObservationLiveSig.set(false);
-  runtimeObservationLiveSig.set(false);
+  installObservationSig.set(undefined);
+  runtimeObservationSig.set(undefined);
   installStatusSig.set(null);
   runtimeStatusSig.set(null);
   packStatusSig.set(null);

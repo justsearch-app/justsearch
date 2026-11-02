@@ -18,6 +18,8 @@
  */
 
 import { authorizedFetch } from '../api/authorizedFetch.js';
+import { observeAdmissionWait } from '../../api/admissionFetch.js';
+import { INTERVAL_MS as READ_BOUND_MS } from './statusPoll.js';
 import type { AiInstallStatus } from '../../api/generated/schema-types/ai-install-status.js';
 import type { AiRuntimeStatusResponse } from '../../api/generated/schema-types/ai-runtime-status-response.js';
 import type { InstallComponentEstimate } from '../state/installComponents.js';
@@ -105,13 +107,19 @@ export interface PackImportStatus {
   packageId?: string;
 }
 
+export interface AiObservation {
+  lastSuccessMs: number | null;
+  latestReadFailed: boolean;
+  /** An unanswered read becomes a failed observation; admission waits extend this deadline. */
+  unansweredAfterMs: number | null;
+}
+
 export interface AiInstallSnapshot {
   install: InstallStatus | null;
   runtime: AiRuntimeStatus | null;
   packs: PackImportStatus | null;
-  /** Latest endpoint reads succeeded and have not exceeded the poll interval. */
-  installLive?: boolean;
-  runtimeLive?: boolean;
+  installObservation?: AiObservation;
+  runtimeObservation?: AiObservation;
 }
 
 type Listener = (snapshot: AiInstallSnapshot) => void;
@@ -120,7 +128,6 @@ const listeners = new Set<Listener>();
 let timer: number | null = null;
 let controller: AbortController | null = null;
 let apiBase = '';
-const expiryTimers = new Map<'install' | 'runtime', number>();
 let last: AiInstallSnapshot = { install: null, runtime: null, packs: null };
 
 // Matches the original per-operation pollers' cadence (1s) while something is actually happening —
@@ -156,9 +163,18 @@ export function pollIntervalFor(snapshot: AiInstallSnapshot): number {
   return SLOW_INTERVAL_MS;
 }
 
-async function fetchJson<T>(path: string, current: AbortController): Promise<T | null> {
+/** Independent of response order and adaptive cadence, like status observation liveness. */
+export function isAiObservationLive(observation: AiObservation | undefined): boolean {
+  const now = Date.now();
+  return observation !== undefined && !observation.latestReadFailed
+    && observation.lastSuccessMs !== null
+    && now - observation.lastSuccessMs <= SLOW_INTERVAL_MS + READ_BOUND_MS
+    && (observation.unansweredAfterMs === null || now < observation.unansweredAfterMs);
+}
+
+async function fetchJson<T>(path: string, signal: AbortSignal): Promise<T | null> {
   try {
-    const res = await authorizedFetch((apiBase || '') + path, { signal: current.signal });
+    const res = await authorizedFetch((apiBase || '') + path, { signal });
     if (!res.ok) return null;
     return (await res.json()) as T;
   } catch {
@@ -173,20 +189,32 @@ function publish(current: AbortController): void {
   }
 }
 
-async function readStatus<K extends 'install' | 'runtime' | 'packs'>(key: K, current: AbortController): Promise<void> {
-  const value = await fetchJson<NonNullable<AiInstallSnapshot[K]>>(`/api/ai/${key}/status`, current);
+async function readStatus(key: 'install' | 'runtime' | 'packs', current: AbortController): Promise<void> {
+  // Each endpoint owns its read deadline. The store already checks time while reads hang,
+  // so neither a successful observation nor a pending read needs its own timer.
+  const signal = AbortSignal.any([current.signal]);
+  if (key !== 'packs') {
+    const observationKey = `${key}Observation` as const;
+    const observation = last[observationKey] ?? { lastSuccessMs: null, latestReadFailed: false, unansweredAfterMs: null };
+    last = { ...last, [observationKey]: { ...observation, unansweredAfterMs: Date.now() + READ_BOUND_MS } };
+    if (observation.lastSuccessMs !== null) publish(current);
+    observeAdmissionWait(signal, delayMs => {
+      if (controller !== current) return;
+      last = { ...last, [observationKey]: { ...last[observationKey]!, unansweredAfterMs: Date.now() + delayMs + READ_BOUND_MS } };
+      publish(current);
+    });
+  }
+  const value = await fetchJson<NonNullable<AiInstallSnapshot[typeof key]>>(`/api/ai/${key}/status`, signal);
   if (controller !== current) return;
-  // Retain history, but invalidate a failed read independently of origin reachability
-  // and of other endpoints that may still be pending.
+  // A failed read retains history but immediately invalidates its observation.
   last = { ...last, [key]: value ?? last[key] };
   if (key !== 'packs') {
-    window.clearTimeout(expiryTimers.get(key));
-    last = { ...last, [`${key}Live`]: value !== null };
-    if (value !== null) expiryTimers.set(key, window.setTimeout(() => {
-      if (controller !== current) return;
-      last = { ...last, [`${key}Live`]: false };
-      publish(current);
-    }, pollIntervalFor(last)));
+    const observationKey = `${key}Observation` as const;
+    last = { ...last, [observationKey]: {
+      lastSuccessMs: value !== null ? Date.now() : last[observationKey]!.lastSuccessMs,
+      latestReadFailed: value === null,
+      unansweredAfterMs: null,
+    } };
   }
   publish(current);
 }
@@ -229,8 +257,6 @@ function stop(): void {
     window.clearTimeout(timer);
     timer = null;
   }
-  for (const timer of expiryTimers.values()) window.clearTimeout(timer);
-  expiryTimers.clear();
   last = { install: null, runtime: null, packs: null };
 }
 
