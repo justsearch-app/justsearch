@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
   },
-  "createdAt": "2026-11-01T20:28:59.704Z",
-  "revision": "9e08da1084b4ed3f335b712592d57fae64a459e7",
-  "tree": "2c9853dd5d08b93be28c6a7c8366d0fee49d1b61",
+  "createdAt": "2026-11-02T03:03:00.872Z",
+  "revision": "d53a24557e5a668898c19cee37db1b6527fafc59",
+  "tree": "ceb00effb923403dcc1f32275adca0886c97c561",
   "environment": {
     "platform": "linux",
     "arch": "x64",
@@ -18,10 +18,10 @@
   },
   "runs": [
     {
-      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/chrome/Shell.test.ts\" \"src/shell-v0/commands/CommandPaletteProjection.test.ts\" \"src/shell-v0/views/SettingsSurface.indexingRules.test.ts\" \"src/shell-v0/components/SurfaceTabs.test.ts\" \"src/shell-v0/components/IndexingControls.toolbar.test.ts\" \"src/shell-v0/components/indexingStatusFollowup.test.ts\" \"src/shell-v0/views/LibrarySurface.excludes-override.test.ts\" \"src/shell-v0/views/LibrarySurface.folderActions.test.ts\" \"src/shell-v0/views/LibrarySurface.redesign.test.ts\" \"src/shell-v0/views/LibrarySurface.slice2.test.ts\" \"src/shell-v0/components/IndexingRulesEditor.arrival.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/6h90meu0/tmp/test-intent-vitest-5-1793564924808.json\"",
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/chrome/Shell.test.ts\" \"src/shell-v0/commands/CommandPaletteProjection.test.ts\" \"src/shell-v0/views/SettingsSurface.indexingRules.test.ts\" \"src/shell-v0/components/SurfaceTabs.test.ts\" \"src/shell-v0/components/IndexingControls.toolbar.test.ts\" \"src/shell-v0/components/indexingStatusFollowup.test.ts\" \"src/shell-v0/views/LibrarySurface.excludes-override.test.ts\" \"src/shell-v0/views/LibrarySurface.folderActions.test.ts\" \"src/shell-v0/views/LibrarySurface.redesign.test.ts\" \"src/shell-v0/views/LibrarySurface.slice2.test.ts\" \"src/shell-v0/components/IndexingRulesEditor.arrival.test.ts\" --reporter=json --outputFile=\"/tmp/test-intent-vitest-2829182-1793588574432.json\"",
       "cwd": "modules/ui-web",
       "exitCode": 0,
-      "durationMs": 14894
+      "durationMs": 6438
     }
   ],
   "checks": [
@@ -484,7 +484,7 @@
       "id": "modules/ui-web/src/shell-v0/components/indexingStatusFollowup.test.ts",
       "file": "modules/ui-web/src/shell-v0/components/indexingStatusFollowup.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:7ad4da6cc85cd6ecadfa9385ca9e15da944d5242af24412561b1f1e7dc36cc2e",
+      "contentDigest": "sha256:98f83bcb2bea98e8d5a263f995d4149773e364dbe1fd7677e6f8e14f4843ac82",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -542,7 +542,7 @@
       "id": "modules/ui-web/src/shell-v0/views/LibrarySurface.folderActions.test.ts",
       "file": "modules/ui-web/src/shell-v0/views/LibrarySurface.folderActions.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:7a5be6e5ad32829e83f06c6597b6557ad0da956b5c88a2792faf5148e5b79dba",
+      "contentDigest": "sha256:158fed6db9aa61fea56c5ef0cb5c57aaef075987828116c966c9f526d5520bc8",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -606,6 +606,26 @@
         {
           "name": "explains an empty reindex scope and offline folders without claiming a full reindex",
           "status": "passed"
+        },
+        {
+          "name": "R1 browser Add reveals and focuses Folders from folders and Cancel restores focus",
+          "status": "passed"
+        },
+        {
+          "name": "R1 browser Add reveals and focuses Folders from core.browse-surface and Cancel restores focus",
+          "status": "passed"
+        },
+        {
+          "name": "R1 desktop Add reveals and focuses Folders from folders and Cancel restores focus",
+          "status": "passed"
+        },
+        {
+          "name": "R1 desktop Add reveals and focuses Folders from core.browse-surface and Cancel restores focus",
+          "status": "passed"
+        },
+        {
+          "name": "R1 a late picker selects Folders, but a response from before reconnect cannot open a form",
+          "status": "passed"
         }
       ]
     },
@@ -613,7 +633,7 @@
       "id": "modules/ui-web/src/shell-v0/views/LibrarySurface.redesign.test.ts",
       "file": "modules/ui-web/src/shell-v0/views/LibrarySurface.redesign.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:e8206069ad01ae01ddd70dee11a8f748c1b250f3fb58d8b41b15515878c15d97",
+      "contentDigest": "sha256:7694021ebe709affacc1e12975eeace5780d4e1d6ef12359cd8aeb512efadd41",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -705,6 +725,18 @@
         {
           "name": "D1 never claims searchable during unconfirmed polls, including 42 seconds past the shared threshold",
           "status": "passed"
+        },
+        {
+          "name": "L2 lost status contact never describes a rebuild (empty roots: false)",
+          "status": "passed"
+        },
+        {
+          "name": "L2 lost status contact never describes a rebuild (empty roots: true)",
+          "status": "passed"
+        },
+        {
+          "name": "L2 a confirmed migration still describes rebuilding",
+          "status": "passed"
         }
       ]
     },
@@ -712,7 +744,7 @@
       "id": "modules/ui-web/src/shell-v0/views/LibrarySurface.slice2.test.ts",
       "file": "modules/ui-web/src/shell-v0/views/LibrarySurface.slice2.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:c90a590026743bd771752df9144a3cb2e307161f61a9e70fc19f6d3886aa2f99",
+      "contentDigest": "sha256:4b63aaa008d685ff72617a21d473f18b270b0e940ba885e960c7448cfa1238e8",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -792,6 +824,34 @@
         {
           "name": "L19 configured disabled schedule survives successive rule saves and skip save",
           "status": "passed"
+        },
+        {
+          "name": "R2 another window changes saved rules; Save my draft recovers and later saves work",
+          "status": "passed"
+        },
+        {
+          "name": "R2 another window changes saved rules; Discard my draft recovers and later saves work",
+          "status": "passed"
+        },
+        {
+          "name": "R2 recovered draft and quick skip save (rules first) retain both through reload",
+          "status": "passed"
+        },
+        {
+          "name": "R2 recovered draft and quick skip save (exclusions first) retain both through reload",
+          "status": "passed"
+        },
+        {
+          "name": "R2b Save my draft uses the displayed conflict rules despite a later second-window save",
+          "status": "passed"
+        },
+        {
+          "name": "R2b Discard my draft uses the displayed conflict rules despite a later second-window save",
+          "status": "passed"
+        },
+        {
+          "name": "R2 reconnect keeps a dirty battery-only draft and provides a current baseline for recovery",
+          "status": "passed"
         }
       ]
     },
@@ -799,7 +859,7 @@
       "id": "modules/ui-web/src/shell-v0/components/IndexingRulesEditor.arrival.test.ts#L14 a later user focus move cancels arrival scrolling",
       "file": "modules/ui-web/src/shell-v0/components/IndexingRulesEditor.arrival.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:7fdeef1f017c3b92646b89e8a5c275bdafb918e52152bff4be09141691e11de9",
+      "contentDigest": "sha256:309e35e3da0f302329cdf195d3c1237ebdb23975ec387f31c50b69e2fffaa8ab",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -812,5 +872,5 @@
     }
   ],
   "failBefore": null,
-  "digest": "sha256:6806c7146bff10ff15b9d50b666f7725b6fe5cf0de8e1dc021d0ed19a014f599"
+  "digest": "sha256:1d454d8efb77f4f93915a1bfcd063ba31b75ae3c907ff6cf15f4b9bb6c8c34e9"
 }

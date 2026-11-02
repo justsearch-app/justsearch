@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
   },
-  "createdAt": "2026-11-02T02:45:10.669Z",
-  "revision": "528a4342a46bfb4aeed8cd5c85037536ad77f218",
-  "tree": "f8c049a8e3db2da65accb58dd41c8b2720c110eb",
+  "createdAt": "2026-11-02T03:01:31.359Z",
+  "revision": "d53a24557e5a668898c19cee37db1b6527fafc59",
+  "tree": "d023f9b3310cd0e6ee928c7e21790779a931ecc6",
   "environment": {
     "platform": "linux",
     "arch": "x64",
@@ -18,10 +18,10 @@
   },
   "runs": [
     {
-      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/components/FailedJobsDrawer.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/hob46ns_/tmp/test-intent-vitest-393-1793587508873.json\"",
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/components/FailedJobsDrawer.test.ts\" --reporter=json --outputFile=\"/tmp/test-intent-vitest-2824456-1793588490138.json\"",
       "cwd": "modules/ui-web",
       "exitCode": 0,
-      "durationMs": 1793
+      "durationMs": 1219
     }
   ],
   "checks": [
@@ -29,7 +29,7 @@
       "id": "modules/ui-web/src/shell-v0/components/FailedJobsDrawer.test.ts#R3d a fresh failure list retries A again along with refused B and newly failed C",
       "file": "modules/ui-web/src/shell-v0/components/FailedJobsDrawer.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:87444339f1a5c7b9ff0fde1cb0ff79bb80339e60c7c8012b3570f622ee0b39f8",
+      "contentDigest": "sha256:63858d25b492d8e597c0dd1fe8525b35e33da309cb5130b443f4a3914fb92a8d",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -44,7 +44,7 @@
       "id": "modules/ui-web/src/shell-v0/components/FailedJobsDrawer.test.ts#R3d late retry results cannot touch a switched target or remounted element (inline: true)",
       "file": "modules/ui-web/src/shell-v0/components/FailedJobsDrawer.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:87444339f1a5c7b9ff0fde1cb0ff79bb80339e60c7c8012b3570f622ee0b39f8",
+      "contentDigest": "sha256:63858d25b492d8e597c0dd1fe8525b35e33da309cb5130b443f4a3914fb92a8d",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -59,7 +59,7 @@
       "id": "modules/ui-web/src/shell-v0/components/FailedJobsDrawer.test.ts#R3d late retry results cannot touch a switched target or remounted element (inline: false)",
       "file": "modules/ui-web/src/shell-v0/components/FailedJobsDrawer.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:87444339f1a5c7b9ff0fde1cb0ff79bb80339e60c7c8012b3570f622ee0b39f8",
+      "contentDigest": "sha256:63858d25b492d8e597c0dd1fe8525b35e33da309cb5130b443f4a3914fb92a8d",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -74,7 +74,7 @@
       "id": "modules/ui-web/src/shell-v0/components/FailedJobsDrawer.test.ts#R3d a second window and a reload or tab remount use fresh lists while an old retry is pending",
       "file": "modules/ui-web/src/shell-v0/components/FailedJobsDrawer.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:87444339f1a5c7b9ff0fde1cb0ff79bb80339e60c7c8012b3570f622ee0b39f8",
+      "contentDigest": "sha256:63858d25b492d8e597c0dd1fe8525b35e33da309cb5130b443f4a3914fb92a8d",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -87,5 +87,5 @@
     }
   ],
   "failBefore": null,
-  "digest": "sha256:4b6497d19072e712edfcf6c89053509af24d5a834b7d2aaef5ea19d34b6d08b5"
+  "digest": "sha256:ddc7f34d0e12ce294ce30024db55a8f416bbfafc50e2f0a6df00a9bbb5c2d13c"
 }

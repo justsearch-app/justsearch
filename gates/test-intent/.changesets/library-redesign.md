@@ -1105,6 +1105,35 @@ The old R3c deadline evidence is retired.
         "modules/ui-web/src/shell-v0/components/FailedJobsDrawer.test.ts#R3d a second window and a reload or tab remount use fresh lists while an old retry is pending"
       ],
       "repaired": false
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/components/FailedJobsDrawer.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "The inline failed-files list keeps its last-known rows, their failure distinctions and Try again visible beside the error when a refresh fails (HTTP error or rejection); an inline list never registers or unregisters the global failed-files drawer, so tearing one down leaves the open drawer arbitrated.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "L16",
+          "quote": "Failure evidence during retry: when failed counts drop to zero only because jobs requeue, the problem stays listed as last known with its files reachable until a settled observation clears it.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "P3",
+          "quote": "Failed-files list and retry for one folder, keeping unreadable / indexed-unreadable / retry-exhausted / parser-failure distinctions (switching folders is L13).",
+          "label": "agent-drafted, owner-adopted"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/library-redesign-r3e.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/components/FailedJobsDrawer.test.ts#R3d a failed refresh keeps the last-known inline rows visible beside the error",
+        "modules/ui-web/src/shell-v0/components/FailedJobsDrawer.test.ts#an inline list torn down never removes the open global drawer registration"
+      ],
+      "repaired": true
     }
   ]
 }

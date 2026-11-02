@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
   },
-  "createdAt": "2026-11-02T02:45:00.317Z",
-  "revision": "528a4342a46bfb4aeed8cd5c85037536ad77f218",
-  "tree": "b0b4c1893c626c4c4bbe8c825aedb8bfc71e1dd2",
+  "createdAt": "2026-11-02T03:01:20.787Z",
+  "revision": "d53a24557e5a668898c19cee37db1b6527fafc59",
+  "tree": "bd30cdabd49d9bc2c19bd9070ea018ad0eb3526f",
   "environment": {
     "platform": "linux",
     "arch": "x64",
@@ -18,10 +18,10 @@
   },
   "runs": [
     {
-      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/components/FailedJobsDrawer.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/hob46ns_/tmp/test-intent-vitest-206-1793587493239.json\"",
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/components/FailedJobsDrawer.test.ts\" --reporter=json --outputFile=\"/tmp/test-intent-vitest-2823716-1793588474474.json\"",
       "cwd": "modules/ui-web",
       "exitCode": 0,
-      "durationMs": 1830
+      "durationMs": 1344
     }
   ],
   "checks": [
@@ -29,7 +29,7 @@
       "id": "modules/ui-web/src/shell-v0/components/FailedJobsDrawer.test.ts#R3d live empty refresh replaces the list during retry without dropping unattempted files",
       "file": "modules/ui-web/src/shell-v0/components/FailedJobsDrawer.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:87444339f1a5c7b9ff0fde1cb0ff79bb80339e60c7c8012b3570f622ee0b39f8",
+      "contentDigest": "sha256:63858d25b492d8e597c0dd1fe8525b35e33da309cb5130b443f4a3914fb92a8d",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -44,7 +44,7 @@
       "id": "modules/ui-web/src/shell-v0/components/FailedJobsDrawer.test.ts#R3d live partial refresh replaces the list during retry without dropping unattempted files",
       "file": "modules/ui-web/src/shell-v0/components/FailedJobsDrawer.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:87444339f1a5c7b9ff0fde1cb0ff79bb80339e60c7c8012b3570f622ee0b39f8",
+      "contentDigest": "sha256:63858d25b492d8e597c0dd1fe8525b35e33da309cb5130b443f4a3914fb92a8d",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -59,7 +59,7 @@
       "id": "modules/ui-web/src/shell-v0/components/FailedJobsDrawer.test.ts#R3d a silent retry followed by a silent listing keeps Try again enabled and rows visible",
       "file": "modules/ui-web/src/shell-v0/components/FailedJobsDrawer.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:87444339f1a5c7b9ff0fde1cb0ff79bb80339e60c7c8012b3570f622ee0b39f8",
+      "contentDigest": "sha256:63858d25b492d8e597c0dd1fe8525b35e33da309cb5130b443f4a3914fb92a8d",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -74,7 +74,7 @@
       "id": "modules/ui-web/src/shell-v0/components/FailedJobsDrawer.test.ts#R3d a second click while retry is pending retries every listed file again",
       "file": "modules/ui-web/src/shell-v0/components/FailedJobsDrawer.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:87444339f1a5c7b9ff0fde1cb0ff79bb80339e60c7c8012b3570f622ee0b39f8",
+      "contentDigest": "sha256:63858d25b492d8e597c0dd1fe8525b35e33da309cb5130b443f4a3914fb92a8d",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -89,7 +89,7 @@
       "id": "modules/ui-web/src/shell-v0/components/FailedJobsDrawer.test.ts#R3d a late listing cannot overwrite a newer count refresh",
       "file": "modules/ui-web/src/shell-v0/components/FailedJobsDrawer.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:87444339f1a5c7b9ff0fde1cb0ff79bb80339e60c7c8012b3570f622ee0b39f8",
+      "contentDigest": "sha256:63858d25b492d8e597c0dd1fe8525b35e33da309cb5130b443f4a3914fb92a8d",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -108,40 +108,40 @@
     "patches": [],
     "runs": [
       {
-        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/components/FailedJobsDrawer.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/hob46ns_/tmp/test-intent-vitest-206-1793587497517.json\"",
+        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/components/FailedJobsDrawer.test.ts\" --reporter=json --outputFile=\"/tmp/test-intent-vitest-2823716-1793588479119.json\"",
         "cwd": "<before-worktree>",
         "exitCode": 1,
-        "durationMs": 2155,
-        "output": "JSON report written to /home/elias/.cache/am/hob46ns_/tmp/test-intent-vitest-206-1793587497517.json\n\n"
+        "durationMs": 1336,
+        "output": "JSON report written to /tmp/test-intent-vitest-2823716-1793588479119.json\n\n"
       }
     ],
     "checks": [
       {
         "id": "modules/ui-web/src/shell-v0/components/FailedJobsDrawer.test.ts#R3d live empty refresh replaces the list during retry without dropping unattempted files",
         "classification": "assertion",
-        "detail": "R3d live empty refresh replaces the list during retry without dropping unattempted files:  AssertionError: expected 1 to be 2 // Object.is equality\n    at /home/elias/.cache/am/hob46ns_/tmp/test-intent-before-hd5q0X/modules/ui-web/src/shell-v0/components/FailedJobsDrawer.test.ts:632:19\n    at file:///home/elias/.cache/am/hob46ns_/tmp/test-intent-before-hd5q0X/modules/ui-web/node_modules/@"
+        "detail": "R3d live empty refresh replaces the list during retry without dropping unattempted files:  AssertionError: expected 1 to be 2 // Object.is equality\n    at /tmp/test-intent-before-UsZT2c/modules/ui-web/src/shell-v0/components/FailedJobsDrawer.test.ts:632:19\n    at file:///tmp/test-intent-before-UsZT2c/modules/ui-web/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:20"
       },
       {
         "id": "modules/ui-web/src/shell-v0/components/FailedJobsDrawer.test.ts#R3d live partial refresh replaces the list during retry without dropping unattempted files",
         "classification": "assertion",
-        "detail": "R3d live partial refresh replaces the list during retry without dropping unattempted files:  AssertionError: expected 1 to be 2 // Object.is equality\n    at /home/elias/.cache/am/hob46ns_/tmp/test-intent-before-hd5q0X/modules/ui-web/src/shell-v0/components/FailedJobsDrawer.test.ts:632:19\n    at file:///home/elias/.cache/am/hob46ns_/tmp/test-intent-before-hd5q0X/modules/ui-web/node_modules/@"
+        "detail": "R3d live partial refresh replaces the list during retry without dropping unattempted files:  AssertionError: expected 1 to be 2 // Object.is equality\n    at /tmp/test-intent-before-UsZT2c/modules/ui-web/src/shell-v0/components/FailedJobsDrawer.test.ts:632:19\n    at file:///tmp/test-intent-before-UsZT2c/modules/ui-web/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:20"
       },
       {
         "id": "modules/ui-web/src/shell-v0/components/FailedJobsDrawer.test.ts#R3d a silent retry followed by a silent listing keeps Try again enabled and rows visible",
         "classification": "assertion",
-        "detail": "R3d a silent retry followed by a silent listing keeps Try again enabled and rows visible:  AssertionError: expected true to be false // Object.is equality\n    at /home/elias/.cache/am/hob46ns_/tmp/test-intent-before-hd5q0X/modules/ui-web/src/shell-v0/components/FailedJobsDrawer.test.ts:663:38\n    at file:///home/elias/.cache/am/hob46ns_/tmp/test-intent-before-hd5q0X/modules/ui-web/node_mo"
+        "detail": "R3d a silent retry followed by a silent listing keeps Try again enabled and rows visible:  AssertionError: expected true to be false // Object.is equality\n    at /tmp/test-intent-before-UsZT2c/modules/ui-web/src/shell-v0/components/FailedJobsDrawer.test.ts:663:38\n    at file:///tmp/test-intent-before-UsZT2c/modules/ui-web/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:20"
       },
       {
         "id": "modules/ui-web/src/shell-v0/components/FailedJobsDrawer.test.ts#R3d a second click while retry is pending retries every listed file again",
         "classification": "assertion",
-        "detail": "R3d a second click while retry is pending retries every listed file again:  AssertionError: expected [ 'A' ] to deeply equal [ 'A', 'A' ]\n    at /home/elias/.cache/am/hob46ns_/tmp/test-intent-before-hd5q0X/modules/ui-web/src/shell-v0/components/FailedJobsDrawer.test.ts:692:21\n    at file:///home/elias/.cache/am/hob46ns_/tmp/test-intent-before-hd5q0X/modules/ui-web/node_modu"
+        "detail": "R3d a second click while retry is pending retries every listed file again:  AssertionError: expected [ 'A' ] to deeply equal [ 'A', 'A' ]\n    at /tmp/test-intent-before-UsZT2c/modules/ui-web/src/shell-v0/components/FailedJobsDrawer.test.ts:692:21\n    at file:///tmp/test-intent-before-UsZT2c/modules/ui-web/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:20"
       },
       {
         "id": "modules/ui-web/src/shell-v0/components/FailedJobsDrawer.test.ts#R3d a late listing cannot overwrite a newer count refresh",
         "classification": "assertion",
-        "detail": "R3d a late listing cannot overwrite a newer count refresh:  AssertionError: expected  to have a length of 1 but got +0\n    at Proxy.<anonymous> (file:///home/elias/.cache/am/hob46ns_/tmp/test-intent-before-hd5q0X/modules/ui-web/node_modules/@vitest/expect/dist/index.js:1389:20)\n    at Proxy.<anonymous> (file:///home/elias/.cache/am/hob46ns_/tmp/test-intent-b"
+        "detail": "R3d a late listing cannot overwrite a newer count refresh:  AssertionError: expected  to have a length of 1 but got +0\n    at Proxy.<anonymous> (file:///tmp/test-intent-before-UsZT2c/modules/ui-web/node_modules/@vitest/expect/dist/index.js:1389:20)\n    at Proxy.<anonymous> (file:///tmp/test-intent-before-UsZT2c/modules/ui-web/node_modules/@vitest/expect/dist"
       }
     ]
   },
-  "digest": "sha256:ed778c92878f02b9b8be6cfd01d4dedbf5db3de3810b06e4dfc204be89f9de19"
+  "digest": "sha256:90ede641b7c26f759ee6a22c5cce0a19dd142968c045232ec882662aade90d91"
 }
