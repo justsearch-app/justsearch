@@ -577,7 +577,7 @@ axe run remain necessary.
       ],
       "class": "New",
       "repaired": true,
-      "behaviour": "S1\u2013S7 review repairs: supported Automatic semantics (GPU null display without a reset; context reset writes zero; no longest-answer reset), mock null-as-keep merge matching SettingsPatch, active status plus active model for On, initial settings-read uncertainty with reachable blocked reasons, selected additions Install action and exact consent, last-observed picture-reading wording on disconnect, independent bounded Health endpoint requests that skip overlapping ticks and ignore timed-out late results, and shared expanded/controls semantics for every feature opener. The GPU slider preservation check retires its impossible null-reset assertion while retaining its untouched-value and processor-only assertions.",
+      "behaviour": "S1–S7 review repairs: supported Automatic semantics (GPU null display without a reset; context reset writes zero; no longest-answer reset), mock null-as-keep merge matching SettingsPatch, active status plus active model for On, initial settings-read uncertainty with reachable blocked reasons, selected additions Install action and exact consent, last-observed picture-reading wording on disconnect, independent bounded Health endpoint requests that skip overlapping ticks and ignore timed-out late results, and shared expanded/controls semantics for every feature opener. The GPU slider preservation check retires its impossible null-reset assertion while retaining its untouched-value and processor-only assertions.",
       "sources": [
         {
           "kind": "owner-adopted-scenario",
@@ -710,10 +710,10 @@ axe run remain necessary.
       ],
       "evidence": "gates/test-intent/evidence/brain-live-repairs.json",
       "newChecks": [
-        "modules/ui-web/src/shell-v0/views/BrainSurface.repairRemedy.test.ts#repairNeeded \u21d2 Repair is the primary action in the alert",
-        "modules/ui-web/src/shell-v0/views/BrainSurface.repairRemedy.test.ts#required file missing but the capability is observably running \u21d2 the \"working, but\" copy",
-        "modules/ui-web/src/shell-v0/views/BrainSurface.repairRemedy.test.ts#required file missing and the capability is down \u21d2 the full-strength copy is unchanged",
-        "modules/ui-web/src/shell-v0/views/BrainSurface.repairRemedy.test.ts#three failed repair passes \u21d2 the manual fallback, not an unqualified Repair button"
+        "modules/ui-web/src/shell-v0/views/BrainSurface.repairRemedy.test.ts#repairNeeded ⇒ Repair is the primary action in the alert",
+        "modules/ui-web/src/shell-v0/views/BrainSurface.repairRemedy.test.ts#required file missing but the capability is observably running ⇒ the \"working, but\" copy",
+        "modules/ui-web/src/shell-v0/views/BrainSurface.repairRemedy.test.ts#required file missing and the capability is down ⇒ the full-strength copy is unchanged",
+        "modules/ui-web/src/shell-v0/views/BrainSurface.repairRemedy.test.ts#three failed repair passes ⇒ the manual fallback, not an unqualified Repair button"
       ]
     },
     {
@@ -807,7 +807,7 @@ axe run remain necessary.
       ],
       "class": "New",
       "repaired": true,
-      "behaviour": "D1\u2013D10 live redesign repairs: one confirmed-live page gate and installed repair wording with saved answer intent; passive preview reads never block real switch clicks or overwrite newer saves; sliders keep focus and drafts, serialize/coalesce the latest committed change, stop on conflict and distinguish Automatic-at-maximum from zero; all-app status GPU memory (device-zero semantics repaired separately in G5); sentence word boundaries; single-gesture panel handoff without focus scrolling; cancelled package bytes; the picture branch takes layout space; repair copy points to existing locations. Geometry and native keyboard behavior are additionally exercised in Chromium across viewport sizes, themes, forced colors and 200% reflow.",
+      "behaviour": "D1–D10 live redesign repairs: one confirmed-live page gate and installed repair wording with saved answer intent; passive preview reads never block real switch clicks or overwrite newer saves; sliders keep focus and drafts, serialize/coalesce the latest committed change, stop on conflict and distinguish Automatic-at-maximum from zero; all-app status GPU memory (device-zero semantics repaired separately in G5); sentence word boundaries; single-gesture panel handoff without focus scrolling; cancelled package bytes; the picture branch takes layout space; repair copy points to existing locations. Geometry and native keyboard behavior are additionally exercised in Chromium across viewport sizes, themes, forced colors and 200% reflow.",
       "sources": [
         {
           "kind": "owner-adopted-scenario",
@@ -920,7 +920,7 @@ axe run remain necessary.
       ],
       "class": "New",
       "repaired": true,
-      "behaviour": "G1\u2013G5 review repairs: failed reads independently invalidate retained state while origin stays reachable; successful observations have no age, with the page gate also requiring app-wide snapshotLive; Advanced labels retained observations; a selected missing answer package uses runtime intent without package declines or download consent while Repair owns acquisition; passive previews finish before another passive batch starts and do not lock choices; graphics memory is device zero, one of N devices, never an aggregate. The previous D5 aggregate assertion is replaced by G5 because /api/status.gpu produces device-zero memory. B14 declined-package consent remains asserted unchanged.",
+      "behaviour": "G1–G5 review repairs: failed reads independently invalidate retained state while origin stays reachable; successful observations have no age, with the page gate also requiring app-wide snapshotLive; Advanced labels retained observations; a selected missing answer package uses runtime intent without package declines or download consent while Repair owns acquisition; passive previews finish before another passive batch starts and do not lock choices; graphics memory is device zero, one of N devices, never an aggregate. The previous D5 aggregate assertion is replaced by G5 because /api/status.gpu produces device-zero memory. B14 declined-package consent remains asserted unchanged.",
       "sources": [
         {
           "kind": "owner-adopted-scenario",
@@ -1015,7 +1015,7 @@ axe run remain necessary.
         "instrumentation",
         "input re-encoding"
       ],
-      "whatMoved": "Successful-observation fixtures explicitly supply the install/runtime poll owners\u2019 freshness flags. Existing expected outcomes, race injections and operation oracles remain unchanged. aiInstallPoll lifecycle snapshot equality includes completed-read outcomes; StatusDeck\u2019s complete AiState factory supplies false for absent observations. The new G checks and corrected G5 device-zero assertion are separately warranted as repaired behavior. The desktop terminal-recovery check again expects four recurring timers, because observation freshness adds no timers; it still requires all five requests aborted, no later requests, and zero timers after teardown.",
+      "whatMoved": "Successful-observation fixtures explicitly supply the install/runtime poll owners’ freshness flags. Existing expected outcomes, race injections and operation oracles remain unchanged. aiInstallPoll lifecycle snapshot equality includes completed-read outcomes; StatusDeck’s complete AiState factory supplies false for absent observations. The new G checks and corrected G5 device-zero assertion are separately warranted as repaired behavior. The desktop terminal-recovery check again expects four recurring timers, because observation freshness adds no timers; it still requires all five requests aborted, no later requests, and zero timers after teardown.",
       "newChecks": []
     },
     {
@@ -1103,7 +1103,7 @@ axe run remain necessary.
           "label": "agent choice"
         }
       ],
-      "conflictSearch": "Searched docs/decisions and the task\u2019s prior freshness choices for conflict: the current narrowing explicitly supersedes time-based freshness. Retired G1 unanswered reads invalidate observations within the fixed liveness bound; H4 unanswered install/runtime reads invalidate at the status read bound; H6 successful observations age out after 15 seconds; and H5\u2019s admission-wait deadline-extension expectation. Their production age/deadline tracking is deleted. Failed-read invalidation, focus preservation, successful cadence/response-order behavior and desktop recovery\u2019s four timers remain checked."
+      "conflictSearch": "Searched docs/decisions and the task’s prior freshness choices for conflict: the current narrowing explicitly supersedes time-based freshness. Retired G1 unanswered reads invalidate observations within the fixed liveness bound; H4 unanswered install/runtime reads invalidate at the status read bound; H6 successful observations age out after 15 seconds; and H5’s admission-wait deadline-extension expectation. Their production age/deadline tracking is deleted. Failed-read invalidation, focus preservation, successful cadence/response-order behavior and desktop recovery’s four timers remain checked."
     },
     {
       "items": [
@@ -1147,7 +1147,7 @@ axe run remain necessary.
       ],
       "class": "New",
       "repaired": true,
-      "behaviour": "V12: after a cancelled run only steps whose files are absent and that downloaded bytes say 'Cancelled · N kept'; present, pending and skipped packages keep their real state, and no step says Downloading unless the run is running (cancelled, failed or completed runs with a leftover downloading record) (a zero-byte interruption reads Not downloaded; a present package keeps its observed On/Off). The repair alert carries the 'A required component is missing' remedy once; the status line does not repeat it. Both fail by assertion on 2c7f1e8d99 (live check verifier-12: 'Cancelled · 0 B kept' on an active reranker and installed answers; the remedy shown twice).",
+      "behaviour": "V12: after a cancelled run only steps whose files are absent and that downloaded bytes say 'Cancelled · N kept'; present, pending and skipped packages keep their real state, and no step says Downloading unless the run is running (cancelled, failed or completed runs with a leftover downloading record) (a zero-byte interruption reads Not downloaded; a present package keeps its observed On/Off). The repair alert carries the 'A required component is missing' remedy once; the status line does not repeat it. These checks fail by assertion on 2c7f1e8d99 (live check verifier-12: 'Cancelled · 0 B kept' on an active reranker and installed answers; the remedy shown twice).",
       "sources": [
         {
           "kind": "owner-adopted-scenario",
@@ -1194,11 +1194,126 @@ axe run remain necessary.
           "scenario": "B2",
           "quote": "Headline from the shared AI verdict for every lifecycle state it decides today: not installed, download paused/stopped, installing (with progress), install failed, starting/recovering, connecting/unconfirmed, ready, running on the processor instead of the graphics card, activation or reindex required. While status is unknown it says so and never claims ready.",
           "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "B4",
+          "quote": "Path: Your files (file count from status), Read the text (built in), Understand meaning (needed, its size, no switch), Best match first, Answer questions (model name and size when installed), with Text in scans and images as a branch off Read the text. Each step shows its known size (registry download/footprint size, never claimed as measured disk use) and its state in words (on, off, not downloaded, downloading x%, unavailable on this computer with the reason).",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "B13",
+          "quote": "Live behaviour: status, install progress and switch states update without collapsing open panels or Advanced settings, without losing a slider draft; package previews and LLM settings refresh when install state changes and when the window regains focus, ignoring out-of-order responses, so a second window converges; reload or tab switch mid-install keeps the progress and outcome. (challenger 7)",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "well from now on you can just proceed autonomously accordinglky",
+          "delegationLocation": "task t-20261101-uiimpl, user turn after the WP1 summary",
+          "delegationScope": "Implement the agreed AI Brain redesign and repair its review defects.",
+          "choice": "Step wording while a run is starting: 'Preparing download' while the run plans and 'Waiting to download' for a package queued in the run, instead of a stale percentage or 'On' (task t-20261101-uiimpl).",
+          "label": "agent choice"
         }
       ],
       "evidence": "gates/test-intent/evidence/brain-running-repair.json",
       "newChecks": [
+        "modules/ui-web/src/shell-v0/views/BrainSurface.repairRun.test.ts#Repair response shows installing progress, Pause and Cancel before the shared verdict catches up, and Cancel retains bytes",
+        "modules/ui-web/src/shell-v0/views/BrainSurface.repairRun.test.ts#a new Repair in preflight never displays the previous run percentage or ready stages",
+        "modules/ui-web/src/shell-v0/views/BrainSurface.repairRun.test.ts#a new Repair in plan never displays the previous run percentage or ready stages",
+        "modules/ui-web/src/shell-v0/views/BrainSurface.repairRun.test.ts#a pending package in the current run waits instead of claiming On from the old runtime",
+        "modules/ui-web/src/shell-v0/views/BrainSurface.repairRun.test.ts#an additions run keeps controls through a missing runtime observation, a second window and remount"
+      ]
+    },
+    {
+      "items": [
         "modules/ui-web/src/shell-v0/views/BrainSurface.repairRun.test.ts"
+      ],
+      "class": "New",
+      "repaired": true,
+      "behaviour": "Unchanged prior store snapshots do not erase a newer Repair response or unlock Repair. Equal/newer store observations win, including when an older operation reply arrives late. Failed install reads gate retained download/planning progress, stages and controls and successful reads recover them. A newer operation response bridges a failed observation only until the store catches up. Each selected check fails by assertion on 4c6637f1b6. While a Repair run is being planned, a package unavailable on this computer or declined keeps its own state instead of 'Preparing download' (live check verifier-14).",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "B8",
+          "quote": "Install: the Install AI button shows the selected total size and opens the existing licence/size consent; downloading shows progress, pause/resume, cancel with retained bytes, stalled and blocked stages, and search ready before completion, in the same page (no nested panel). Repair, retry after failure and the working-but-missing / manual fallback stay reachable.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "B2",
+          "quote": "Headline from the shared AI verdict for every lifecycle state it decides today: not installed, download paused/stopped, installing (with progress), install failed, starting/recovering, connecting/unconfirmed, ready, running on the processor instead of the graphics card, activation or reindex required. While status is unknown it says so and never claims ready.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "Q3",
+          "quote": "Settings saves keep witnesses and conflict review; offline runtime mutations are never queued; unknown/last-observed values stay labelled.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "well from now on you can just proceed autonomously accordinglky",
+          "delegationLocation": "task t-20261101-uiimpl, user turn after the WP1 summary",
+          "delegationScope": "Implement the agreed AI Brain redesign and repair its review defects.",
+          "choice": "Compare updatedAtEpochMs only: keep an operation response while newer than the store; equal or newer store status wins. Current download facts and controls require live install observation or that newer response; runtime-only failure does not hide the download block.",
+          "label": "agent choice"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "B4",
+          "quote": "Path: Your files (file count from status), Read the text (built in), Understand meaning (needed, its size, no switch), Best match first, Answer questions (model name and size when installed), with Text in scans and images as a branch off Read the text. Each step shows its known size (registry download/footprint size, never claimed as measured disk use) and its state in words (on, off, not downloaded, downloading x%, unavailable on this computer with the reason).",
+          "label": "agent-drafted, owner-adopted"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/brain-running-observation-repair.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/views/BrainSurface.repairRun.test.ts#a newer Repair response survives unchanged store notifications until an equal or newer install observation wins",
+        "modules/ui-web/src/shell-v0/views/BrainSurface.repairRun.test.ts#a late Repair response never replaces the store install status with an older timestamp",
+        "modules/ui-web/src/shell-v0/views/BrainSurface.repairRun.test.ts#a failed install read gates a retained running download observation and recovery restores it",
+        "modules/ui-web/src/shell-v0/views/BrainSurface.repairRun.test.ts#a failed install read gates a retained running plan observation and recovery restores it",
+        "modules/ui-web/src/shell-v0/views/BrainSurface.repairRun.test.ts#a Repair response can supersede a failed install read only until the store acknowledges its timestamp",
+        "modules/ui-web/src/shell-v0/views/BrainSurface.repairRun.test.ts#while a Repair run is being planned, a package unavailable on this computer is not said to be preparing"
+      ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/views/BrainSurface.repairRun.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "A runtime-only read failure preserves current install progress and controls when the install observation remains live. This preservation check passes before and after the repair.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "B8",
+          "quote": "Install: the Install AI button shows the selected total size and opens the existing licence/size consent; downloading shows progress, pause/resume, cancel with retained bytes, stalled and blocked stages, and search ready before completion, in the same page (no nested panel). Repair, retry after failure and the working-but-missing / manual fallback stay reachable.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "B2",
+          "quote": "Headline from the shared AI verdict for every lifecycle state it decides today: not installed, download paused/stopped, installing (with progress), install failed, starting/recovering, connecting/unconfirmed, ready, running on the processor instead of the graphics card, activation or reindex required. While status is unknown it says so and never claims ready.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "Q3",
+          "quote": "Settings saves keep witnesses and conflict review; offline runtime mutations are never queued; unknown/last-observed values stay labelled.",
+          "label": "agent-drafted, owner-adopted"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/brain-running-runtime-preservation.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/views/BrainSurface.repairRun.test.ts#a runtime-only read failure keeps live install progress and controls"
       ]
     }
   ]
