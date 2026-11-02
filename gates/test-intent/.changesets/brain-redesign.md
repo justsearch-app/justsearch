@@ -1713,3 +1713,25 @@ regenerated with each entry's --before; brain-main-repairs is regenerated with -
   "note": "Audit by independent reviewer session reviewer-28 (Codex): reject only entry 34 (aiInstallPoll.refresh.test.ts marked repaired; its before-state fails because the helper is absent); all other entries accepted. Transcribed by the orchestrator."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verifier-18c",
+  "verdict": "accept",
+  "digest": "sha256:8daa604994186e47d94bb3716acda31599c62b66d6482c9bada571ebb2c19e0d",
+  "note": "Acceptance by independent verifier session verifier-18c (Codex): accept, all entries; reproduced both B20 failures on main. Transcribed by the orchestrator (Codex sandbox cannot run accept)."
+}
+```
+
+```json
+{
+  "kind": "audit",
+  "role": "reviewer",
+  "session": "reviewer-30",
+  "verdict": "accept",
+  "digest": "sha256:8daa604994186e47d94bb3716acda31599c62b66d6482c9bada571ebb2c19e0d",
+  "note": "Audit by independent reviewer session reviewer-30 (Codex): accept, no must-fix. Transcribed by the orchestrator."
+}
+```
