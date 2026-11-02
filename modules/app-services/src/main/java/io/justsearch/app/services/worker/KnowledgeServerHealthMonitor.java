@@ -520,7 +520,7 @@ public final class KnowledgeServerHealthMonitor implements Closeable, ComponentR
   private boolean escalateRetainedFailures() {
     if (!recoveryAttemptRunning.get() && !initialOwnerPending()) return false;
     for (var row : componentRegistry.snapshot().components()) {
-      if (!row.spec().essential()) continue;
+      if (!row.spec().essential() || ownershipRefused(row)) continue;
       boolean expiredUnavailableOwner = row.state() == ComponentState.UNAVAILABLE
           && retainedOwnerDeadlineExceeded(row, true);
       if (!eligibleForComponentRecovery(row) && !expiredUnavailableOwner) continue;
@@ -596,10 +596,15 @@ public final class KnowledgeServerHealthMonitor implements Closeable, ComponentR
 
   private static boolean eligibleForComponentRecovery(
       EngineComponentSnapshot.Component row) {
-    return row.state() == ComponentState.FAILED
+    return !ownershipRefused(row) && (row.state() == ComponentState.FAILED
         || ("encoders".equals(row.spec().name())
             && row.state() == ComponentState.UNAVAILABLE
-            && LifecycleReasonCode.COMPONENT_RECOVERY_FAILED.code().equals(row.reasonCode()));
+            && LifecycleReasonCode.COMPONENT_RECOVERY_FAILED.code().equals(row.reasonCode())));
+  }
+
+  private static boolean ownershipRefused(EngineComponentSnapshot.Component row) {
+    return "index".equals(row.spec().name())
+        && LifecycleReasonCode.INDEX_OWNERSHIP_UNPROVEN.code().equals(row.reasonCode());
   }
 
   private ComponentRecoveryAuthority.Outcome scheduleComponentRecovery(String name,

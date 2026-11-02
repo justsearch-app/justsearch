@@ -649,10 +649,9 @@ public class HeadlessApp {
       }
       // Deliberately NO transition here. The bootstrap that just failed is the producer of this
       // verdict and has already narrated it exactly once (startWithRetry's final catch), with the
-      // code it actually knows to be true: index.failed or either fatal index code
-      // (index.corrupt / index.schema_open_refused). The fatal-index latch carries the
-      // specific cause across the three
-      // SUPPRESSED start attempts that each consumed the one-shot marker — without it this branch
+      // code it actually knows to be true: index.failed or a fatal index refusal.
+      // The fatal-index latch carries the specific cause across any suppressed start attempts
+      // that consumed the one-shot marker — without it this branch
       // logged, and /api/health served, the generic spawn failure for a deliberate refusal.
       // Re-stamping the generic code here would destroy that specific cause all over again.
       healthMonitor = startHealthMonitor(bootstrap, apiServer, knowledgeServer,
@@ -662,7 +661,7 @@ public class HeadlessApp {
         log.warn("Index startup exceeded its wait while the API remains available; monitoring its"
             + " physical owner until it completes");
       } else {
-        log.warn("Knowledge Server failed to start: {} (worker reason: {}) — boot recovery armed",
+        log.warn("Knowledge Server failed to start: {} (worker reason: {})",
             knowledgeServerStartError, bootstrap.capabilities().worker().pendingReason());
       }
     } else if (knowledgeServerStartError != null) {

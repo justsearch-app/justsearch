@@ -62,7 +62,7 @@ import { presentVerdict, type SystemHealthVerdict } from '../state/verdict.js';
 import { formatRelativeMs } from '../../utils/relativeTime.js';
 import { type Maybe, UNKNOWN } from '../state/known.js';
 import { unavailableBecause } from '../state/availability.js';
-import { reasonFor } from '../state/readinessNotice.js';
+import { readinessNotice, reasonFor } from '../state/readinessNotice.js';
 import { selectIndexingProgress } from '../state/indexingProgress.js';
 import '../components/IndexingControls.js';
 import {
@@ -759,6 +759,12 @@ export class HealthSurface extends JfElement {
   // B7: refresh now fetches ONLY the Health-specific failed-jobs list.
   // status + inference come from the shared aiStateStore (see connectedCallback).
   private async refresh(): Promise<void> {
+    if (this.ownershipRefusal()) {
+      this.failedJobs = [];
+      this.error = null;
+      this.initialPollComplete = true;
+      return;
+    }
     this.loading = true;
     try {
       const fj = await this.doFetch('/api/indexing/failed-jobs?limit=20').then((r) =>
@@ -766,7 +772,7 @@ export class HealthSurface extends JfElement {
       );
       if (fj?.jobs) this.failedJobs = fj.jobs as FailedJob[];
     } catch (err) {
-      this.error = err instanceof Error ? err.message : String(err);
+      if (!this.ownershipRefusal()) this.error = err instanceof Error ? err.message : String(err);
     } finally {
       this.loading = false;
       this.initialPollComplete = true;
@@ -1388,6 +1394,8 @@ export class HealthSurface extends JfElement {
    */
   /** The footer body sentence per verdict kind (595 §10.5 — single-sourced wording). */
   private renderRecommendedActions(): TemplateResult {
+    const refusal = this.ownershipRefusal();
+    if (refusal) return html`<div class="card section recommended"><h3>${refusal.headline}</h3><p>${refusal.body}</p></div>`;
     // 595 §4.2 — the footer rollup CONSUMES the same one verdict the header does,
     // so the two can no longer disagree on a boundary value (the §1.1 split: a
     // 'Service degraded' header beside a '✓ All systems operational' footer). The
@@ -1492,19 +1500,19 @@ export class HealthSurface extends JfElement {
       <div class="card section">
         <h3>Quick actions</h3>
         <div class="actions" @op-success=${() => this.refresh()}>
-          <jf-operation
+          ${this.ownershipRefusal() ? nothing : html`<jf-operation
             operation-id="core.reindex"
             context="button"
             api-base=${this.apiBase}
-          ></jf-operation>
-          <jf-operation
+          ></jf-operation>`}
+          ${this.ownershipRefusal() ? nothing : html`<jf-operation
             operation-id="core.recover-component"
             context="button"
             api-base=${this.apiBase}
             title="Recover the index component"
             .args=${{ name: 'index' }}
-          ></jf-operation>
-          <jf-operation
+          ></jf-operation>`}
+          ${this.ownershipRefusal() ? nothing : html`<jf-operation
             operation-id="core.rebuild-index"
             @op-success=${(event: CustomEvent<OpSuccessEventDetail>) => {
               this.bulkError = null;
@@ -1513,7 +1521,7 @@ export class HealthSurface extends JfElement {
             @op-error=${(event: CustomEvent<OpErrorEventDetail>) => this.showBulkError(event.detail)}
             context="button"
             api-base=${this.apiBase}
-          ></jf-operation>
+          ></jf-operation>`}
           <jf-operation
             operation-id="core.clear-failed-jobs"
             context="button"
@@ -1591,7 +1599,15 @@ export class HealthSurface extends JfElement {
     `;
   }
 
+  private ownershipRefusal() {
+    return this.verdict.reasons.includes('index.ownership_unproven')
+      ? readinessNotice(this.verdict, undefined,
+          this.status?.readiness?.engineComponents?.['index']?.evidence)
+      : null;
+  }
+
   override render(): TemplateResult {
+    const refusal = this.ownershipRefusal();
     const progress = this.indexingProgress();
     // Tempdoc 571 §11 / 578 — the §11.8 hand-rolled Health|Logs tab strip is RETIRED: Logs is now a
     // sibling member of the System hub (one <jf-surface-tabs>), so Health renders only its own body.
@@ -1600,11 +1616,11 @@ export class HealthSurface extends JfElement {
     return html`
       ${this.renderHeader()}
       <div class="body">
-        <div data-testid="health-indexing-pause">
+        ${refusal ? nothing : html`<div data-testid="health-indexing-pause">
           ${progress.pause || !progress.activity.confirmed ? html`<p>${progress.activity.summary} — ${progress.activity.detail}</p>` : nothing}
           <jf-indexing-controls .progress=${progress} api-base=${this.apiBase}></jf-indexing-controls>
-        </div>
-        ${this.error
+        </div>`}
+        ${this.error && !refusal
           ? html`<jf-error-alert tone="error" .onDismiss=${() => (this.error = null)}
               >${this.error}</jf-error-alert
             >`

@@ -115,7 +115,9 @@ export class CapabilityMap extends JfElement {
         availability:
           this.aiState?.snapshotLive === false
             ? unavailableBecause(reasonFor('binding.unreachable').wording)
-            : AVAILABLE,
+            : this.aiState?.verdict?.reasons.includes('index.ownership_unproven')
+              ? unavailableBecause(reasonFor('index.ownership_unproven').wording)
+              : AVAILABLE,
       },
     ];
     for (const a of AFFORDANCES) {

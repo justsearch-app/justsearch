@@ -8,7 +8,7 @@ author-session: redesign-o1-builder
 # Test-intent entries
 
 Execution evidence and independent acceptance are left to the orchestrator/verifier, as requested.
-The web check is not executed in this sandbox. Preservation checks are the existing module suites,
+The original web check was not executed in this sandbox; the real-system repair below records its executed frontend checks. Preservation checks are the existing module suites,
 including IndexRebuildBrakeTest, recorded-operation boot/recovery bindings, recovery policies,
 retention and active/building/previous protection. Isolated new files are supplied in the extra
 check list at handoff; they restore static mocks and use only their temporary resources.
@@ -126,7 +126,7 @@ check list at handoff; they restore static mocks and use only their temporary re
         "modules/ui-web/src/shell-v0/state/readinessNotice.test.ts"
       ],
       "class": "New",
-      "behaviour": "Ownership refusal presents unavailable search with the rejected folder and manual recovery instruction and no Rebuild action or keyword fallback. Existing notice checks remain unchanged.",
+      "behaviour": "Ownership refusal presents unavailable search with the rejected folder and manual recovery instruction and no Rebuild action or keyword fallback. Empty or whitespace detail keeps the manual recovery fallback. The existing no-Rebuild assertion now requires the exact Open Health remedy (also resolves its invalid union-member property access); all other notice checks remain unchanged.",
       "repaired": true,
       "sources": [
         {
@@ -140,7 +140,8 @@ check list at handoff; they restore static mocks and use only their temporary re
       ],
       "evidence": "gates/test-intent/evidence/redesign-o1.json",
       "newChecks": [
-        "modules/ui-web/src/shell-v0/state/readinessNotice.test.ts#S16: shows unavailable search, the rejected folder and manual remedy without Rebuild"
+        "modules/ui-web/src/shell-v0/state/readinessNotice.test.ts#S16: shows unavailable search, the rejected folder and manual remedy without Rebuild",
+        "modules/ui-web/src/shell-v0/state/readinessNotice.test.ts#S16: an empty ownership detail keeps the manual recovery instruction"
       ]
     },
     {
@@ -703,5 +704,249 @@ lock-retrying reader delayed state publication under a held lock
 (`IndexGenerationVduEligibilityTest#strictReadReopensAfterLockWaitAndRefusesAStateChangedByTheGenerationOwner`);
 the pointer is now read lazily and without lock waits, and that check passes.
 `node scripts/dev/java-prepush.mjs --unreferenced` passed (exit 0).
+
+## Repair round after real-system review (2026-11-02)
+
+S16 web repair: Search reads `readiness.engineComponents.index.evidence`, the field serialized by
+status, and Health uses the same readiness-notice detail. During ownership refusal Health renders
+the rejected folder and manual recovery instruction instead of recommended repair operations,
+hides Reindex/Force Rebuild and indexing controls, does not poll failed jobs on the unavailable
+index, and suppresses an already-observed/racing failed-job error. The keyword capability row
+reads the ownership refusal from the same verdict. Other quick actions remain available.
+The extra web file is an isolated new source ([exempt]); its five checks use local status inputs,
+mock fetch, and remove mounted elements and restore global fetch/store state after every case.
+All checks below are durable; no acceptance record or generated evidence was written by the builder.
+
+`npx vitest run` with the two overlays below against afa1fdcec6: all six repair checks failed by
+AssertionError (57 other checks passed). On the candidate, all six repair checks and the reached
+notice/search/Health/capability suites passed (147 tests, six files). They also failed by assertion
+on original main 344bdaf03c with no compatibility patch (the earlier S16 check also failed there;
+56 preservation checks passed). TypeScript no-emit and ESLint on all six changed TypeScript files passed.
+The initial candidate check found a missing OPEN_HEALTH import in the new test; corrected before
+these final outcomes. The typecheck also exposed the earlier S16 test accessing `label` on the
+operation-or-navigation union; its no-Rebuild assertion now requires the exact Open Health remedy.
+The test-intent CLI ran against 344bdaf03c. It reports the expected stale evidence for this changed
+notice file and the prior repair's restart test, plus missing independent acceptance. The builder
+has not weakened or changed those gates or authored their acceptance/evidence.
+
+Orphan-marker finding: the temporary `OrphanCleanShutdownProbeTest` initialized a real manager,
+seeded an old generation with the full historical v1 sentinel plus payload and sibling clean-shutdown
+marker, ran `gcBestEffort(0, false)`, asserted one generation pruned, and observed that the sibling
+still contained `clean\n`. It passed on 344bdaf03c (24 seconds) and afa1fdcec6 (33 seconds), each
+in its own shared temporary clone/build folder. This is pre-existing behavior; no marker cleanup
+change is made. The probe is scaffolding in the temporary clones only, outside the product suite.
+
+The fatal-index latch itself already recognizes ownership (bootstrap), retains it (LifecycleReasonCode),
+and carries its detailed marker (WorkerFatalReasonMarker); HeadlessApp already forwards that detail.
+Java restart policy remains a decision: `KnowledgeServerHealthMonitor.immediateEscalation` and
+`ComponentRecoveryMonitorTest#essentialIndexFatalReasonsEscalateOnFirstTickWithoutAdmittingRecovery`
+explicitly require schema/corrupt failures to restart an essential index's Engine. Applying that
+policy exactly to ownership contradicts S16's requirement that the API stay available. The builder
+asked whether to suppress automatic restart for ownership only or for all fatal-index refusals;
+no Java policy change is made pending that answer. This follows the builder's come-back rule for
+a design/scenario contradiction, rather than changing the existing schema/corruption contract.
+
+Fail-before replay options for this repair (no `--before-patch` needed on afa1fdcec6 or 344bdaf03c):
+
+```text
+--before afa1fdcec6
+--overlay modules/ui-web/src/shell-v0/state/readinessNotice.test.ts
+--overlay modules/ui-web/src/shell-v0/views/OwnershipRefusal.test.ts
+--check modules/ui-web/src/shell-v0/state/readinessNotice.test.ts#S16: an empty ownership detail keeps the manual recovery instruction
+--check modules/ui-web/src/shell-v0/views/OwnershipRefusal.test.ts#S16: the search notice reads the rejected path from status evidence
+--check modules/ui-web/src/shell-v0/views/OwnershipRefusal.test.ts#S16: Health shows the folder and manual recovery instruction
+--check modules/ui-web/src/shell-v0/views/OwnershipRefusal.test.ts#S16: Health never offers Reindex, Force Rebuild or Retry for an unproven folder
+--check modules/ui-web/src/shell-v0/views/OwnershipRefusal.test.ts#S16: Health does not claim keyword search is available during refusal
+--check modules/ui-web/src/shell-v0/views/OwnershipRefusal.test.ts#S16: Health suppresses refused-index fetch errors while preserving the folder notice
+```
+
+| Check | Before afa1fdcec6 | Candidate |
+| --- | --- | --- |
+| `modules/ui-web/src/shell-v0/state/readinessNotice.test.ts#S16: an empty ownership detail keeps the manual recovery instruction` | assertion: whitespace body omitted manual recovery | passed |
+| `modules/ui-web/src/shell-v0/views/OwnershipRefusal.test.ts#S16: the search notice reads the rejected path from status evidence` | assertion: generic body omitted rejected path/detail | passed |
+| `modules/ui-web/src/shell-v0/views/OwnershipRefusal.test.ts#S16: Health shows the folder and manual recovery instruction` | assertion: rejected path absent | passed |
+| `modules/ui-web/src/shell-v0/views/OwnershipRefusal.test.ts#S16: Health never offers Reindex, Force Rebuild or Retry for an unproven folder` | assertion: core.reindex was offered | passed |
+| `modules/ui-web/src/shell-v0/views/OwnershipRefusal.test.ts#S16: Health does not claim keyword search is available during refusal` | assertion: keyword row claimed Available | passed |
+| `modules/ui-web/src/shell-v0/views/OwnershipRefusal.test.ts#S16: Health suppresses refused-index fetch errors while preserving the folder notice` | assertion: raw Failed to fetch was rendered | passed |
+
+Final check commands for the real-system repair:
+
+```sh
+# In modules/ui-web:
+npx vitest run src/shell-v0/views/OwnershipRefusal.test.ts src/shell-v0/state/readinessNotice.test.ts src/shell-v0/views/HealthSurface.render.test.ts src/shell-v0/views/HealthSurface.recovery.test.ts src/shell-v0/components/CapabilityMap.test.ts src/shell-v0/views/search-v3/SearchV3View.degradation.test.ts --maxWorkers=2
+npx tsc -p tsconfig.json --noEmit --incremental false
+npx eslint src/shell-v0/components/CapabilityMap.ts src/shell-v0/state/readinessNotice.ts src/shell-v0/state/readinessNotice.test.ts src/shell-v0/views/HealthSurface.ts src/shell-v0/views/OwnershipRefusal.test.ts src/shell-v0/views/search-v3/sv3-degradation.ts --no-cache
+# In the repository root:
+env -u DISPLAY -u WAYLAND_DISPLAY node scripts/dev/java-prepush.mjs --unreferenced
+env -u DISPLAY -u WAYLAND_DISPLAY js-gradle-slot ./gradlew -PskipWebBuild=true --continue :modules:worker-core:test :modules:adapters-lucene:test :modules:indexer-worker:test :modules:app-services:test :modules:ui:test :modules:ipc-common:test
+```
+
+Prepush completed successfully (8 seconds, 246 tasks up-to-date and five from cache; cached outcomes
+are identified here, not described as fresh executions). The combined module command finished with exit 1 in 26m59s: indexer-worker freshly ran
+2,500 tests, one failure and 39 skipped. Worker-core, adapters-lucene, app-services, UI and ipc-common
+test tasks were UP-TO-DATE. Skipped cases are not claimed as passes. The single failure and focused
+baseline outcomes are recorded below. No Java source was edited in this repair; the runtime-restart
+policy remains unresolved.
+One failure was reported during the combined module run:
+`ReturnedRootCurrentByteReplayTest#provenAbsentUnavailablePredecessorWakesWithoutARegularSourceHash`,
+line 176: the replay Optional was absent, violating the existing "proven absence must retain the
+retry-only wake path" assertion. Focused replays passed on both original main 344bdaf03c and
+repair baseline afa1fdcec6 (17 seconds each). All Java sources in this session's candidate equal
+afa1fdcec6, so this is not attributed to the web repair, but the combined suite is not claimed green
+or the failure claimed environmental. No oracle, fixture, bound, selector or product code was
+changed for it. Raw logs are temporary `o1-returned-root-base.log`, `o1-returned-root-before.log`
+and `o1-realsys-modules.log`.
+
+Shared resources: the prescribed Gradle slots and Gradle dependency/build cache only. Every baseline
+clone has its own build folders and copied frontend dependencies. No running owner app, dev stack,
+GPU, unrelated service or other session's dependency tree was used. No `.agents/preflight` exists.
+
+## Ownership recovery policy repair (2026-11-02)
+
+The final S16 decision supersedes the unresolved restart-policy question above: ownership refusal
+suppresses both automatic component recovery and Engine restart, and only a validated open clears
+its code, path and evidence class. Corruption and schema refusals retain their existing policy.
+The UI draft was reviewed and retained; Health also hides the pre-existing index recovery action
+while ownership is unproven. The orphan clean-shutdown probe is absent from this checkout and the
+new temporary clone; its earlier before/after finding stands, and no marker cleanup is changed.
+
+Implementation: `KnowledgeServerHealthMonitor` excludes an ownership-refused index from recovery
+admission and retained-owner escalation (including an exhausted budget and pending initial owner).
+`KnowledgeServerBootstrap` ends its startup retry arc on this refusal, rejects physical component
+recovery while it is latched, and preserves the original fatal detail even if another fatal marker
+arrives. A direct start can still validate the index after the user's manual repair; a healthy
+physical observation clears the fatal latch. HeadlessApp keeps publishing the bootstrap detail and
+no longer claims boot recovery is armed for every startup refusal. No schema/corruption policy,
+persisted value, scenario or ownership validator changes.
+
+Source of intent (agent choice):
+
+- kind: delegated-choice
+- delegationQuote: "now proceed autonomusly with remaining design work and potentially some research. once done, you can proceed with the implementations of the remaining work you proposed and designed"
+- delegationLocation: "task t-20261102-redesign request"
+- delegationScope: "implement the redesigns and fixes the orchestrator proposed and designed after the ingestion defect list"
+- choice: "S16 The refusal reaches the user: HTTP status/readiness carries `index.ownership_unproven` with the rejected path and evidence class, sticky across retries, cleared after a validated start; UI notice says search is unavailable (not keyword-fallback wording), shows path and instruction, offers no Rebuild."
+- label: "agent choice"
+
+The new `OwnershipRefusalRecoveryTest` is isolated ([exempt]), changes no global state, uses only
+its temporary directory and closed executor/registry fixtures, and adds five durable checks.
+The injected clock advances 400 seconds without sleeps, beyond the recovery backoffs and the
+one-minute physical-owner deadline. These are component/bootstrap checks; the orchestrator's
+real-system verification still owns the complete running-app/HTTP boundary proof.
+
+Fail-before replay (builder observations, not formal evidence or acceptance):
+
+```text
+--before afa1fdcec6
+--overlay modules/app-services/src/test/java/io/justsearch/app/services/worker/OwnershipRefusalRecoveryTest.java
+--overlay modules/ui-web/src/shell-v0/state/readinessNotice.test.ts
+--overlay modules/ui-web/src/shell-v0/views/OwnershipRefusal.test.ts
+--check modules/app-services/src/test/java/io/justsearch/app/services/worker/OwnershipRefusalRecoveryTest.java#ownershipRefusalDoesNotAdmitAutomaticOrManualRecovery
+--check modules/app-services/src/test/java/io/justsearch/app/services/worker/OwnershipRefusalRecoveryTest.java#ownershipRefusalDoesNotRestartEngineAfterBudgetAndOwnerDeadline
+--check modules/app-services/src/test/java/io/justsearch/app/services/worker/OwnershipRefusalRecoveryTest.java#ownershipRefusalStopsStartupRetriesAndKeepsStatusUntilValidatedStart
+--check modules/app-services/src/test/java/io/justsearch/app/services/worker/OwnershipRefusalRecoveryTest.java#ownershipFatalLatchKeepsPathAndEvidenceUntilAValidatedStart
+--check modules/app-services/src/test/java/io/justsearch/app/services/worker/OwnershipRefusalRecoveryTest.java#ownershipLatchRefusesPhysicalComponentRecovery
+--check modules/ui-web/src/shell-v0/state/readinessNotice.test.ts#S16: an empty ownership detail keeps the manual recovery instruction
+--check modules/ui-web/src/shell-v0/views/OwnershipRefusal.test.ts#S16: the search notice reads the rejected path from status evidence
+--check modules/ui-web/src/shell-v0/views/OwnershipRefusal.test.ts#S16: Health shows the folder and manual recovery instruction
+--check modules/ui-web/src/shell-v0/views/OwnershipRefusal.test.ts#S16: Health never offers Reindex, Force Rebuild or Retry for an unproven folder
+--check modules/ui-web/src/shell-v0/views/OwnershipRefusal.test.ts#S16: Health does not claim keyword search is available during refusal
+--check modules/ui-web/src/shell-v0/views/OwnershipRefusal.test.ts#S16: Health suppresses refused-index fetch errors while preserving the folder notice
+```
+
+No `--before-patch` is needed for afa1fdcec6. Original-scenario replay remains
+`--before 344bdaf03c --before-patch gates/test-intent/compatibility/redesign-o1-before.patch`
+with the earlier overlays/checks in this changeset; those original results were not rerun in this
+bounded continuation. No generated evidence or acceptance record was authored.
+
+| Java check (OwnershipRefusalRecoveryTest) | Before afa1fdcec6 | Candidate |
+| --- | --- | --- |
+| `ownershipRefusalDoesNotAdmitAutomaticOrManualRecovery` | assertion: ACCEPTED instead of NOT_APPLICABLE | passed |
+| `ownershipRefusalDoesNotRestartEngineAfterBudgetAndOwnerDeadline` | assertion: one Engine escalation instead of zero | passed |
+| `ownershipRefusalStopsStartupRetriesAndKeepsStatusUntilValidatedStart` | assertion: three starts instead of one | passed; detail retained over 400 seconds and cleared after healthy start |
+| `ownershipFatalLatchKeepsPathAndEvidenceUntilAValidatedStart` | assertion: schema refusal replaced ownership latch | passed; validated start clears latch |
+| `ownershipLatchRefusesPhysicalComponentRecovery` | assertion: physical owner returned SUPERSEDED instead of bootstrap refusing | passed; physical owner never invoked |
+
+The focused command on each tree was:
+
+```sh
+env -u DISPLAY -u WAYLAND_DISPLAY js-gradle-slot ./gradlew -PskipWebBuild=true :modules:app-services:test --tests io.justsearch.app.services.worker.OwnershipRefusalRecoveryTest --tests io.justsearch.app.services.worker.ComponentRecoveryMonitorTest
+```
+
+Candidate: 46 tests, zero failures/skips, exit 0 (32 seconds). Before: 46 tests, exactly the five
+new assertion failures, zero skips, exit 1 (20 seconds). All 41 unchanged ComponentRecoveryMonitorTest
+checks pass on both, including essential corruption/schema escalation and optional local recovery.
+The before checkout is a shared clone under `$TMPDIR/o1-sticky-before` with its own build folders.
+Frontend dependencies are a separate reflink/copy in that clone, never a write into the candidate's
+dependency tree. Candidate Vitest: all 147 tests in the six reached files passed (4.84 seconds).
+TypeScript no-emit and ESLint passed. Replaying the two web overlays on afa1fdcec6 failed all six repair checks by assertion (57 preservation checks passed), matching the per-check table above. Final suite/prepush outcomes follow below.
+The test-intent CLI ran against 344bdaf03c: all flagged items have entries, but the gate still
+requires refreshed independent evidence for readinessNotice and IndexGenerationManagerRestartTest,
+and independent acceptance. The builder leaves those to the verifier as instructed.
+
+### Full module run in this continuation
+
+The prescribed six-module command (printed above) completed with exit 1 in 27m06s. It freshly
+executed app-services, indexer-worker and UI; worker-core, adapters-lucene and ipc-common test tasks
+were UP-TO-DATE. Skips are not claimed as passes.
+
+| Module | Tests | Failures | Skipped |
+| --- | ---: | ---: | ---: |
+| worker-core | 637 | 0 | 15 |
+| adapters-lucene | 960 | 0 | 3 |
+| indexer-worker | 2500 | 0 | 39 |
+| app-services | 5035 | 0 | 11 |
+| UI | 2374 | 1 | 2 |
+| ipc-common | 4 | 0 | 0 |
+
+The one failure is the unchanged
+`NvidiaSmiAvailabilityHttpTest#anInstalledNvidiaSmiIsAvailableWhenNvmlSuppliesTheMemory`, line 83:
+the HTTP response reports `nvidiaSmiAvailable=false` where the fixture expects true. No Nvidia
+code, fixture, oracle, selector or timeout changed. Original main 344bdaf03c was checked out in a
+second shared clone, `$TMPDIR/o1-sticky-main`; the exact class freshly passed there (2 tests,
+zero failures/skips, exit 0, 16 seconds after 455 seconds waiting for a slot). This is not proof of
+an environmental failure; the full module command is not claimed green.
+
+The focused baseline command was:
+
+```sh
+env -u DISPLAY -u WAYLAND_DISPLAY js-gradle-slot ./gradlew -PskipWebBuild=true :modules:ui:test --tests io.justsearch.ui.api.NvidiaSmiAvailabilityHttpTest
+```
+
+Temporary logs for this continuation: `$TMPDIR/o1-sticky-focused.log`,
+`o1-sticky-before.log`, `o1-sticky-web.log`, `o1-sticky-before-web.log`, `o1-sticky-tsc.log`,
+`o1-sticky-eslint.log`, `o1-sticky-test-intent.log`, `o1-sticky-modules.log`,
+`o1-sticky-main-nvidia.log`, `o1-sticky-prepush.log`, and `o1-sticky-candidate-nvidia.log`.
+The complete broad-run JUnit XML was copied to `$TMPDIR/o1-sticky-full-results/` before the focused
+replay can replace module results. Shared resources touched: the prescribed Gradle slots and
+Gradle dependency/build cache. No owner app, shared dev stack, GPU workload or other session's
+service or dependency tree was used. No commit, push, publish, generated evidence or acceptance
+record was made. No `.agents/preflight` exists. All five new Java checks and all six web repair
+checks are durable; no scaffolding probe remains.
+
+### Final prepush and focused replay
+
+`env -u DISPLAY -u WAYLAND_DISPLAY node scripts/dev/java-prepush.mjs --unreferenced` passed
+(exit 0, 5m56s after 1,626 seconds waiting for a shared slot; 23 tasks executed, 10 from cache,
+218 up-to-date). PMD and all three UnreferencedCodeTest checks passed. The reached app-services
+and UI integration tasks ran; indexing, reranker and app-api integration tasks were UP-TO-DATE.
+No repair or retry of prepush was needed in this continuation.
+
+The same focused Nvidia command printed above then freshly passed on the candidate (exit 0,
+13 seconds, two tests, zero failures/skips). Thus the one broad-suite Nvidia assertion did not
+reproduce in either the original-main or candidate focused replay. It is not relabeled a pass:
+the broad module command still exited 1. No further test or product repair followed that replay.
+The final diff check passed, and the branch head remains afa1fdcec6; every change is uncommitted.
+
+Tests added or rewritten in this continuation:
+
+- `modules/app-services/src/test/java/io/justsearch/app/services/worker/OwnershipRefusalRecoveryTest.java` — S16 recovery, restart, retention and validated-start clearing (five checks) — durable
+- `modules/ui-web/src/shell-v0/state/readinessNotice.test.ts` — S16 empty-detail remedy and exact no-Rebuild remedy — durable
+- `modules/ui-web/src/shell-v0/views/OwnershipRefusal.test.ts` — S16 search path, Health notice, no repair/retry action, keyword availability and fetch-error suppression (five checks) — durable
+
+Open for independent verification: the complete running-app/HTTP refusal across the former restart
+window; refreshed test-intent execution evidence and acceptance; assessment of the unchanged broad
+suite Nvidia failure. The builder does not author the verifier's evidence or acceptance and does
+not change GPU detection to resolve an out-of-scope assertion.
 
 ## Acceptance records

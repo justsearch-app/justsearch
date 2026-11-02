@@ -406,9 +406,8 @@ public final class KnowledgeServerBootstrap implements Closeable {
      * <p>Item A11 removed the transient/permanent classifier ({@code WorkerStartFailures}) with the
      * spawner it classified: its whole vocabulary was spawn-shaped (worker jar missing, port
      * discovery timeout, PID mismatch), and an in-process composition fails for different reasons —
-     * a Lucene open, a jobs.db migration. Every attempt is now retried within the budget, which is
-     * what the spawn-shaped classifier did for the transient class anyway; a permanent failure
-     * simply costs the remaining attempts before the same verdict lands.
+     * a Lucene open, a jobs.db migration. Attempts are retried within the budget except for an
+     * ownership refusal, which requires the user to restore or move the rejected folder.
      */
     public void startWithRetry() throws IOException, InterruptedException {
         startWithRetry(DEFAULT_START_ATTEMPTS, DEFAULT_START_RETRY_BACKOFF_MS);
@@ -453,6 +452,9 @@ public final class KnowledgeServerBootstrap implements Closeable {
                 last = e;
                 if (e instanceof InterruptedException) {
                     Thread.currentThread().interrupt();
+                    break;
+                }
+                if (indexFatalCode() == LifecycleReasonCode.INDEX_OWNERSHIP_UNPROVEN) {
                     break;
                 }
                 if (started.get()) {
@@ -520,6 +522,9 @@ public final class KnowledgeServerBootstrap implements Closeable {
         java.util.Objects.requireNonNull(preparePublication, "preparePublication");
         initLock.lockInterruptibly();
         try {
+            if (indexFatalCode() == LifecycleReasonCode.INDEX_OWNERSHIP_UNPROVEN) {
+                return io.justsearch.core.component.ComponentRecoveryAction.Result.REFUSED;
+            }
             return owner.recover(request, new RecoveryBody() {
                 @Override
                 public boolean run(java.util.function.BooleanSupplier mayOpen) throws Exception {
@@ -888,6 +893,10 @@ public final class KnowledgeServerBootstrap implements Closeable {
     }
 
     private WorkerDown latchIndexFatal(WorkerDown verdict) {
+        WorkerDown held = latchedIndexFatalVerdict;
+        if (held != null && held.code() == LifecycleReasonCode.INDEX_OWNERSHIP_UNPROVEN) {
+            return held;
+        }
         latchedIndexFatalVerdict = verdict;
         return verdict;
     }

@@ -894,7 +894,7 @@ export function readinessNotice(
   if (verdict.reasons.includes('index.ownership_unproven')) {
     return {
       headline: 'Search is unavailable',
-      body: ownershipDetail ?? 'JustSearch cannot verify index folder ownership. Nothing was changed. Restore your index from a backup, or move the folder out of the index folder, then restart.',
+      body: ownershipDetail?.trim() || 'JustSearch cannot verify index folder ownership. Nothing was changed. Restore your index from a backup, or move the folder out of the index folder, then restart.',
       causes: wordCauses(['index.ownership_unproven'], activity),
       remedy: OPEN_HEALTH,
     };
