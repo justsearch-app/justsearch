@@ -355,11 +355,7 @@ describe('BrainSurface — the status card sentence (807 Part A)', () => {
     const dom = domOf(panel(false).renderSimplePanel());
     expect(dom.textContent).not.toContain('Chat and summaries ready.');
     expect(dom.textContent).not.toContain('Online');
-    // ...and the dot beside it is not the settled green one.
-    // `tone` is bound as an ATTRIBUTE (`tone=${...}`), and the atom is not upgraded in this detached
-    // render — read the attribute, not a property that would be `undefined` either way.
-    const dot = dom.querySelector('jf-status-dot');
-    expect(dot?.getAttribute('tone')).not.toBe('success');
+    expect(dom.querySelector('.brain-headline')?.textContent).not.toBe('AI is ready');
   });
 
   it('the card offers no action whose precondition is a live backend (807 A.3)', () => {
@@ -372,14 +368,11 @@ describe('BrainSurface — the status card sentence (807 Part A)', () => {
     expect(action?.availability?.kind).not.toBe('available');
   });
 
-  it('ANTI-REGRESSION: a live observation still renders the green "Online / Chat and summaries ready."', () => {
+  it('ANTI-REGRESSION: a live observation still renders the ready headline and availability', () => {
     const dom = domOf(panel(true).renderSimplePanel());
-    expect(dom.textContent).toContain('Online');
+    expect(dom.querySelector('.brain-headline')?.textContent).toBe('AI is ready');
     expect(dom.textContent).toContain('Chat and summaries ready.');
-    // `tone` is bound as an ATTRIBUTE (`tone=${...}`), and the atom is not upgraded in this detached
-    // render — read the attribute, not a property that would be `undefined` either way.
-    const dot = dom.querySelector('jf-status-dot');
-    expect(dot?.getAttribute('tone')).toBe('success');
+
   });
 });
 

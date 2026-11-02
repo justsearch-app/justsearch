@@ -141,6 +141,12 @@ describe('BrainSurface — the component list', () => {
     el.installStatus = installStatus;
     document.body.appendChild(el);
     await settle(el);
+    // Acquisition details now live under Advanced settings → Models.
+    el.shadowRoot?.querySelector<HTMLButtonElement>('.brain-links button')?.click();
+    await el.updateComplete;
+    const models = Array.from(el.shadowRoot?.querySelectorAll<HTMLButtonElement>('.accordion-header') ?? []).find(button => button.textContent?.includes('Models'));
+    models?.click();
+    await el.updateComplete;
     return el;
   }
 

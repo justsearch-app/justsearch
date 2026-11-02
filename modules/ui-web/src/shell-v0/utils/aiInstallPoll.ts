@@ -19,6 +19,7 @@
 
 import { authorizedFetch } from '../api/authorizedFetch.js';
 import type { AiInstallStatus } from '../../api/generated/schema-types/ai-install-status.js';
+import type { AiRuntimeStatusResponse } from '../../api/generated/schema-types/ai-runtime-status-response.js';
 import type { InstallComponentEstimate } from '../state/installComponents.js';
 
 /**
@@ -65,6 +66,8 @@ export interface InstallPlanPreview {
 }
 
 export interface AiRuntimeStatus {
+  /** Observed engine identity; a downloaded projector is not an attached projector. */
+  active?: AiRuntimeStatusResponse['active'];
   activation?: {
     state?: string;
     phase?: string;

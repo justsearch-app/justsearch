@@ -25,6 +25,7 @@ interface PanelHarness {
   installStatus: unknown;
   planPreview: unknown;
   inference: unknown;
+  settings: { chatEnabled: boolean };
   _unifiedAiState: unknown;
   host_: unknown;
   fetchJson(path: string): Promise<unknown>;
@@ -45,10 +46,11 @@ function renderPanel(kind: AiEngineVerdict['kind'], opts: { onlineAiEnabled?: bo
   el.apiBase = '';
   el.busy = {};
   el.policy = { downloadsEnabled: true, onlineAiEnabled: opts.onlineAiEnabled ?? true };
-  el.installStatus = null;
-  el.planPreview = opts.chatUnavailable ? { components: [{ id: 'chat', state: 'unavailable', unavailableReason: opts.chatUnavailable }] } : null;
+  el.installStatus = { state: 'completed', installedFully: true };
+  el.settings = { chatEnabled: kind === 'online' || kind === 'starting' };
+  el.planPreview = opts.chatUnavailable ? { components: [{ id: 'chat', state: 'unavailable', unavailableReason: opts.chatUnavailable }] } : { components: [{ id: 'embedding', state: 'installed' }, { id: 'chat', state: 'installed', declinable: true }] };
   el.inference = null;
-  el._unifiedAiState = { aiEngine: verdict(kind) };
+  el._unifiedAiState = { aiEngine: verdict(kind), snapshotLive: true };
   el.host_ = {
     data: {
       invokeOperation: (operationId: string, args: Record<string, unknown>) => {
