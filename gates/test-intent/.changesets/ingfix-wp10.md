@@ -95,3 +95,16 @@ as exempt by the gate; their repair checks are also included in the verifier's e
   ]
 }
 ```
+
+## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "b8cc3e05-717a-4896-808f-47e6a0867dc1",
+  "verdict": "accept",
+  "digest": "sha256:5fcdc10296c9ec7085e38898b6c447ac4cfc4ebdec8b389bada667f071b77ea7",
+  "note": "Independent verifier (Claude) accepted all three entries on 3d9d0fd1b3: each fails on main by assertion for the defect under test and passes after, existing assertions retained; 23 repair checks pass; exempt files earlier verified isolated by verifier-1 and verifier-2."
+}
+```
