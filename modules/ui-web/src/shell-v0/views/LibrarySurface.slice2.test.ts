@@ -352,6 +352,38 @@ it.each(['rules first', 'exclusions first'] as const)('R2 recovered draft and qu
   expect(reloaded.excludesText).toBe('*.recovered'); expect(editor(reloaded).indexingRules.start).toBe('22:00');
 });
 
+it.each(['Save my draft', 'Discard my draft'])('R2b %s uses the displayed conflict rules despite a later second-window save', async choice => {
+  const f = fixture(); const el = await mount(f.host); const other = await mount(f.host);
+  const rules = editor(el), otherRules = editor(other);
+  await editStart(rules, '21:00');
+  await editBattery(otherRules, true); await saveRules(otherRules); // B
+  await saveRules(rules);
+  const review = () => rules.shadowRoot!.querySelector('[aria-label="Saved indexing rules"]')?.textContent;
+  expect(review()).toContain('Pause while on battery: on');
+  await editStart(otherRules, '23:00'); await saveRules(otherRules); // C, after B was displayed
+  const before = f.read(); const writes = f.operations.mock.calls.length;
+  recoveryButton(rules, choice).click(); recoveryButton(rules, choice).click(); await settle(rules);
+  expect(f.operations).toHaveBeenCalledTimes(writes);
+  expect(f.read()).toEqual(before);
+  if (choice === 'Save my draft') {
+    expect(rules.indexingRules.start).toBe('21:00');
+    expect(review()).toContain('23:00');
+    expect(rules.indexingRulesError).toContain('Indexing times changed elsewhere');
+    recoveryButton(rules, choice).click(); await settle(rules);
+    expect(f.operations).toHaveBeenCalledTimes(writes + 1);
+    expect(f.read().indexingPause).toEqual({ ...initialPolicy, schedule: {
+      enabled: false, days: [1, 2, 3, 4, 5, 6, 7], startMinute: 1260, endMinute: 1020,
+    } });
+  } else {
+    expect(rules.indexingRules.start).toBe('23:00');
+    expect(rules.indexingRules.pauseOnBattery).toBe(true);
+  }
+  expect(rules.indexingRulesError).toBe('');
+  el.remove(); const reloaded = await mount(f.host);
+  expect(editor(reloaded).indexingRules.start).toBe(choice === 'Save my draft' ? '21:00' : '23:00');
+  expect(f.read().indexingPause.reason).toBe('SETTINGS_RECOVERY');
+});
+
 it('R2 reconnect keeps a dirty battery-only draft and provides a current baseline for recovery', async () => {
   const f = fixture(); const el = await mount(f.host); const rules = editor(el);
   await editBattery(rules, true); f.externalRules();

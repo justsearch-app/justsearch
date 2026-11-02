@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
   },
-  "createdAt": "2026-11-02T01:47:32.819Z",
-  "revision": "e3916fe2db1b57ce54b39c9f16adb1d34721490c",
-  "tree": "00f5639ba523f04a795638307cb849f350116923",
+  "createdAt": "2026-11-02T02:01:47.131Z",
+  "revision": "48bf54c1b28756f87915f5ce241b99a2ab54b3fd",
+  "tree": "3787d32d8ad37e68ae52d4f9eed4befbc6b1b527",
   "environment": {
     "platform": "linux",
     "arch": "x64",
@@ -18,10 +18,10 @@
   },
   "runs": [
     {
-      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/LibrarySurface.folderActions.test.ts\" \"src/shell-v0/views/LibrarySurface.slice2.test.ts\" \"src/shell-v0/components/FailedJobsDrawer.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/osos9z_x/tmp/test-intent-vitest-4-1793584044496.json\"",
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/LibrarySurface.folderActions.test.ts\" \"src/shell-v0/views/LibrarySurface.slice2.test.ts\" \"src/shell-v0/components/FailedJobsDrawer.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/lm95hj7z/tmp/test-intent-vitest-5-1793584887982.json\"",
       "cwd": "modules/ui-web",
       "exitCode": 0,
-      "durationMs": 2573
+      "durationMs": 7609
     }
   ],
   "checks": [
@@ -104,7 +104,7 @@
       "id": "modules/ui-web/src/shell-v0/views/LibrarySurface.slice2.test.ts#R2 another window changes saved rules; Save my draft recovers and later saves work",
       "file": "modules/ui-web/src/shell-v0/views/LibrarySurface.slice2.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:5ef2f3df2b8453d92258f2363e34bebdf18b69bebeb67c8e72ae71ebec326d6a",
+      "contentDigest": "sha256:4b63aaa008d685ff72617a21d473f18b270b0e940ba885e960c7448cfa1238e8",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -119,7 +119,7 @@
       "id": "modules/ui-web/src/shell-v0/views/LibrarySurface.slice2.test.ts#R2 another window changes saved rules; Discard my draft recovers and later saves work",
       "file": "modules/ui-web/src/shell-v0/views/LibrarySurface.slice2.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:5ef2f3df2b8453d92258f2363e34bebdf18b69bebeb67c8e72ae71ebec326d6a",
+      "contentDigest": "sha256:4b63aaa008d685ff72617a21d473f18b270b0e940ba885e960c7448cfa1238e8",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -134,7 +134,7 @@
       "id": "modules/ui-web/src/shell-v0/views/LibrarySurface.slice2.test.ts#R2 recovered draft and quick skip save (rules first) retain both through reload",
       "file": "modules/ui-web/src/shell-v0/views/LibrarySurface.slice2.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:5ef2f3df2b8453d92258f2363e34bebdf18b69bebeb67c8e72ae71ebec326d6a",
+      "contentDigest": "sha256:4b63aaa008d685ff72617a21d473f18b270b0e940ba885e960c7448cfa1238e8",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -149,7 +149,7 @@
       "id": "modules/ui-web/src/shell-v0/views/LibrarySurface.slice2.test.ts#R2 recovered draft and quick skip save (exclusions first) retain both through reload",
       "file": "modules/ui-web/src/shell-v0/views/LibrarySurface.slice2.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:5ef2f3df2b8453d92258f2363e34bebdf18b69bebeb67c8e72ae71ebec326d6a",
+      "contentDigest": "sha256:4b63aaa008d685ff72617a21d473f18b270b0e940ba885e960c7448cfa1238e8",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -164,7 +164,7 @@
       "id": "modules/ui-web/src/shell-v0/views/LibrarySurface.slice2.test.ts#R2 reconnect keeps a dirty battery-only draft and provides a current baseline for recovery",
       "file": "modules/ui-web/src/shell-v0/views/LibrarySurface.slice2.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:5ef2f3df2b8453d92258f2363e34bebdf18b69bebeb67c8e72ae71ebec326d6a",
+      "contentDigest": "sha256:4b63aaa008d685ff72617a21d473f18b270b0e940ba885e960c7448cfa1238e8",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -176,31 +176,61 @@
       ]
     },
     {
-      "id": "modules/ui-web/src/shell-v0/components/FailedJobsDrawer.test.ts#R3 live empty refresh interrupts a batch without stranding Try again or dropping untried files",
-      "file": "modules/ui-web/src/shell-v0/components/FailedJobsDrawer.test.ts",
+      "id": "modules/ui-web/src/shell-v0/views/LibrarySurface.slice2.test.ts#R2b Save my draft uses the displayed conflict rules despite a later second-window save",
+      "file": "modules/ui-web/src/shell-v0/views/LibrarySurface.slice2.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:aa597f191f26a1ea7fd12647c2b9d50b5ed90fb2fa05115cf0e170304072dd7e",
+      "contentDigest": "sha256:4b63aaa008d685ff72617a21d473f18b270b0e940ba885e960c7448cfa1238e8",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
       "cases": [
         {
-          "name": "R3 live empty refresh interrupts a batch without stranding Try again or dropping untried files",
+          "name": "R2b Save my draft uses the displayed conflict rules despite a later second-window save",
           "status": "passed"
         }
       ]
     },
     {
-      "id": "modules/ui-web/src/shell-v0/components/FailedJobsDrawer.test.ts#R3 live partial refresh interrupts a batch without stranding Try again or dropping untried files",
-      "file": "modules/ui-web/src/shell-v0/components/FailedJobsDrawer.test.ts",
+      "id": "modules/ui-web/src/shell-v0/views/LibrarySurface.slice2.test.ts#R2b Discard my draft uses the displayed conflict rules despite a later second-window save",
+      "file": "modules/ui-web/src/shell-v0/views/LibrarySurface.slice2.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:aa597f191f26a1ea7fd12647c2b9d50b5ed90fb2fa05115cf0e170304072dd7e",
+      "contentDigest": "sha256:4b63aaa008d685ff72617a21d473f18b270b0e940ba885e960c7448cfa1238e8",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
       "cases": [
         {
-          "name": "R3 live partial refresh interrupts a batch without stranding Try again or dropping untried files",
+          "name": "R2b Discard my draft uses the displayed conflict rules despite a later second-window save",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/FailedJobsDrawer.test.ts#R3 live empty refresh waits for the batch, retains failure evidence and leaves Try again usable",
+      "file": "modules/ui-web/src/shell-v0/components/FailedJobsDrawer.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:57626297afc2522df3220e05bd7db94a1837b994fc43461dd9a70de9a2c80e78",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "R3 live empty refresh waits for the batch, retains failure evidence and leaves Try again usable",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/FailedJobsDrawer.test.ts#R3 live partial refresh waits for the batch, retains failure evidence and leaves Try again usable",
+      "file": "modules/ui-web/src/shell-v0/components/FailedJobsDrawer.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:57626297afc2522df3220e05bd7db94a1837b994fc43461dd9a70de9a2c80e78",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "R3 live partial refresh waits for the batch, retains failure evidence and leaves Try again usable",
           "status": "passed"
         }
       ]
@@ -209,13 +239,28 @@
       "id": "modules/ui-web/src/shell-v0/components/FailedJobsDrawer.test.ts#R3 switching inline targets isolates pending retry batches and ignores late completions after reconnect",
       "file": "modules/ui-web/src/shell-v0/components/FailedJobsDrawer.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:aa597f191f26a1ea7fd12647c2b9d50b5ed90fb2fa05115cf0e170304072dd7e",
+      "contentDigest": "sha256:57626297afc2522df3220e05bd7db94a1837b994fc43461dd9a70de9a2c80e78",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
       "cases": [
         {
           "name": "R3 switching inline targets isolates pending retry batches and ignores late completions after reconnect",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/FailedJobsDrawer.test.ts#R3b a fresh failure list retries A again along with refused B and newly failed C",
+      "file": "modules/ui-web/src/shell-v0/components/FailedJobsDrawer.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:57626297afc2522df3220e05bd7db94a1837b994fc43461dd9a70de9a2c80e78",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "R3b a fresh failure list retries A again along with refused B and newly failed C",
           "status": "passed"
         }
       ]
@@ -228,80 +273,95 @@
     "patches": [],
     "runs": [
       {
-        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/LibrarySurface.folderActions.test.ts\" \"src/shell-v0/views/LibrarySurface.slice2.test.ts\" \"src/shell-v0/components/FailedJobsDrawer.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/osos9z_x/tmp/test-intent-vitest-4-1793584049831.json\"",
+        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/LibrarySurface.folderActions.test.ts\" \"src/shell-v0/views/LibrarySurface.slice2.test.ts\" \"src/shell-v0/components/FailedJobsDrawer.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/lm95hj7z/tmp/test-intent-vitest-5-1793584901759.json\"",
         "cwd": "<before-worktree>",
         "exitCode": 1,
-        "durationMs": 2510,
-        "output": "JSON report written to /home/elias/.cache/am/osos9z_x/tmp/test-intent-vitest-4-1793584049831.json\n\n"
+        "durationMs": 4723,
+        "output": "JSON report written to /home/elias/.cache/am/lm95hj7z/tmp/test-intent-vitest-5-1793584901759.json\n\n"
       }
     ],
     "checks": [
       {
         "id": "modules/ui-web/src/shell-v0/views/LibrarySurface.folderActions.test.ts#R1 browser Add reveals and focuses Folders from folders and Cancel restores focus",
         "classification": "assertion",
-        "detail": "R1 browser Add reveals and focuses Folders from folders and Cancel restores focus:  AssertionError: expected null to be 'Folder path' // Object.is equality\n    at /home/elias/.cache/am/osos9z_x/tmp/test-intent-before-46r0Oq/modules/ui-web/src/shell-v0/views/LibrarySurface.folderActions.test.ts:253:70\n    at file:///home/elias/.cache/am/osos9z_x/tmp/test-intent-before-46r0Oq/modules"
+        "detail": "R1 browser Add reveals and focuses Folders from folders and Cancel restores focus:  AssertionError: expected null to be 'Folder path' // Object.is equality\n    at /home/elias/.cache/am/lm95hj7z/tmp/test-intent-before-xI6SZ5/modules/ui-web/src/shell-v0/views/LibrarySurface.folderActions.test.ts:253:70\n    at file:///home/elias/.cache/am/lm95hj7z/tmp/test-intent-before-xI6SZ5/modules"
       },
       {
         "id": "modules/ui-web/src/shell-v0/views/LibrarySurface.folderActions.test.ts#R1 browser Add reveals and focuses Folders from core.browse-surface and Cancel restores focus",
         "classification": "assertion",
-        "detail": "R1 browser Add reveals and focuses Folders from core.browse-surface and Cancel restores focus:  AssertionError: expected 'core.browse-surface' to be 'folders' // Object.is equality\n    at /home/elias/.cache/am/osos9z_x/tmp/test-intent-before-46r0Oq/modules/ui-web/src/shell-v0/views/LibrarySurface.folderActions.test.ts:249:26\n    at file:///home/elias/.cache/am/osos9z_x/tmp/test-intent-before-4"
+        "detail": "R1 browser Add reveals and focuses Folders from core.browse-surface and Cancel restores focus:  AssertionError: expected 'core.browse-surface' to be 'folders' // Object.is equality\n    at /home/elias/.cache/am/lm95hj7z/tmp/test-intent-before-xI6SZ5/modules/ui-web/src/shell-v0/views/LibrarySurface.folderActions.test.ts:249:26\n    at file:///home/elias/.cache/am/lm95hj7z/tmp/test-intent-before-x"
       },
       {
         "id": "modules/ui-web/src/shell-v0/views/LibrarySurface.folderActions.test.ts#R1 desktop Add reveals and focuses Folders from folders and Cancel restores focus",
         "classification": "assertion",
-        "detail": "R1 desktop Add reveals and focuses Folders from folders and Cancel restores focus:  AssertionError: expected null to be 'Folder path' // Object.is equality\n    at /home/elias/.cache/am/osos9z_x/tmp/test-intent-before-46r0Oq/modules/ui-web/src/shell-v0/views/LibrarySurface.folderActions.test.ts:253:70\n    at file:///home/elias/.cache/am/osos9z_x/tmp/test-intent-before-46r0Oq/modules"
+        "detail": "R1 desktop Add reveals and focuses Folders from folders and Cancel restores focus:  AssertionError: expected null to be 'Folder path' // Object.is equality\n    at /home/elias/.cache/am/lm95hj7z/tmp/test-intent-before-xI6SZ5/modules/ui-web/src/shell-v0/views/LibrarySurface.folderActions.test.ts:253:70\n    at file:///home/elias/.cache/am/lm95hj7z/tmp/test-intent-before-xI6SZ5/modules"
       },
       {
         "id": "modules/ui-web/src/shell-v0/views/LibrarySurface.folderActions.test.ts#R1 desktop Add reveals and focuses Folders from core.browse-surface and Cancel restores focus",
         "classification": "assertion",
-        "detail": "R1 desktop Add reveals and focuses Folders from core.browse-surface and Cancel restores focus:  AssertionError: expected 'core.browse-surface' to be 'folders' // Object.is equality\n    at /home/elias/.cache/am/osos9z_x/tmp/test-intent-before-46r0Oq/modules/ui-web/src/shell-v0/views/LibrarySurface.folderActions.test.ts:249:26\n    at file:///home/elias/.cache/am/osos9z_x/tmp/test-intent-before-4"
+        "detail": "R1 desktop Add reveals and focuses Folders from core.browse-surface and Cancel restores focus:  AssertionError: expected 'core.browse-surface' to be 'folders' // Object.is equality\n    at /home/elias/.cache/am/lm95hj7z/tmp/test-intent-before-xI6SZ5/modules/ui-web/src/shell-v0/views/LibrarySurface.folderActions.test.ts:249:26\n    at file:///home/elias/.cache/am/lm95hj7z/tmp/test-intent-before-x"
       },
       {
         "id": "modules/ui-web/src/shell-v0/views/LibrarySurface.folderActions.test.ts#R1 a late picker selects Folders, but a response from before reconnect cannot open a form",
         "classification": "assertion",
-        "detail": "R1 a late picker selects Folders, but a response from before reconnect cannot open a form:  AssertionError: expected 'core.browse-surface' to be 'folders' // Object.is equality\n    at /home/elias/.cache/am/osos9z_x/tmp/test-intent-before-46r0Oq/modules/ui-web/src/shell-v0/views/LibrarySurface.folderActions.test.ts:269:24\n    at file:///home/elias/.cache/am/osos9z_x/tmp/test-intent-before-4"
+        "detail": "R1 a late picker selects Folders, but a response from before reconnect cannot open a form:  AssertionError: expected 'core.browse-surface' to be 'folders' // Object.is equality\n    at /home/elias/.cache/am/lm95hj7z/tmp/test-intent-before-xI6SZ5/modules/ui-web/src/shell-v0/views/LibrarySurface.folderActions.test.ts:269:24\n    at file:///home/elias/.cache/am/lm95hj7z/tmp/test-intent-before-x"
       },
       {
         "id": "modules/ui-web/src/shell-v0/views/LibrarySurface.slice2.test.ts#R2 another window changes saved rules; Save my draft recovers and later saves work",
         "classification": "assertion",
-        "detail": "R2 another window changes saved rules; Save my draft recovers and later saves work:  AssertionError: the given combination of arguments (undefined and string) is invalid for this assertion. You can use an array, a map, an object, a set, a string, or a weakset instead of a string\n    at Proxy.<anonymous> (file:///home/elias/.cache/am/osos9z_x/tmp/test-intent-before-46r0Oq/modules/ui-"
+        "detail": "R2 another window changes saved rules; Save my draft recovers and later saves work:  AssertionError: the given combination of arguments (undefined and string) is invalid for this assertion. You can use an array, a map, an object, a set, a string, or a weakset instead of a string\n    at Proxy.<anonymous> (file:///home/elias/.cache/am/lm95hj7z/tmp/test-intent-before-xI6SZ5/modules/ui-"
       },
       {
         "id": "modules/ui-web/src/shell-v0/views/LibrarySurface.slice2.test.ts#R2 another window changes saved rules; Discard my draft recovers and later saves work",
         "classification": "assertion",
-        "detail": "R2 another window changes saved rules; Discard my draft recovers and later saves work:  AssertionError: the given combination of arguments (undefined and string) is invalid for this assertion. You can use an array, a map, an object, a set, a string, or a weakset instead of a string\n    at Proxy.<anonymous> (file:///home/elias/.cache/am/osos9z_x/tmp/test-intent-before-46r0Oq/modules/ui-"
+        "detail": "R2 another window changes saved rules; Discard my draft recovers and later saves work:  AssertionError: the given combination of arguments (undefined and string) is invalid for this assertion. You can use an array, a map, an object, a set, a string, or a weakset instead of a string\n    at Proxy.<anonymous> (file:///home/elias/.cache/am/lm95hj7z/tmp/test-intent-before-xI6SZ5/modules/ui-"
       },
       {
         "id": "modules/ui-web/src/shell-v0/views/LibrarySurface.slice2.test.ts#R2 recovered draft and quick skip save (rules first) retain both through reload",
         "classification": "assertion",
-        "detail": "R2 recovered draft and quick skip save (rules first) retain both through reload:  AssertionError: Save my draft: expected undefined to be defined\n    at recoveryButton (/home/elias/.cache/am/osos9z_x/tmp/test-intent-before-46r0Oq/modules/ui-web/src/shell-v0/views/LibrarySurface.slice2.test.ts:306:25)\n    at /home/elias/.cache/am/osos9z_x/tmp/test-intent-before-46r0Oq/modules/ui-w"
+        "detail": "R2 recovered draft and quick skip save (rules first) retain both through reload:  AssertionError: Save my draft: expected undefined to be defined\n    at recoveryButton (/home/elias/.cache/am/lm95hj7z/tmp/test-intent-before-xI6SZ5/modules/ui-web/src/shell-v0/views/LibrarySurface.slice2.test.ts:306:25)\n    at /home/elias/.cache/am/lm95hj7z/tmp/test-intent-before-xI6SZ5/modules/ui-w"
       },
       {
         "id": "modules/ui-web/src/shell-v0/views/LibrarySurface.slice2.test.ts#R2 recovered draft and quick skip save (exclusions first) retain both through reload",
         "classification": "assertion",
-        "detail": "R2 recovered draft and quick skip save (exclusions first) retain both through reload:  AssertionError: Save my draft: expected undefined to be defined\n    at recoveryButton (/home/elias/.cache/am/osos9z_x/tmp/test-intent-before-46r0Oq/modules/ui-web/src/shell-v0/views/LibrarySurface.slice2.test.ts:306:25)\n    at /home/elias/.cache/am/osos9z_x/tmp/test-intent-before-46r0Oq/modules/ui-w"
+        "detail": "R2 recovered draft and quick skip save (exclusions first) retain both through reload:  AssertionError: Save my draft: expected undefined to be defined\n    at recoveryButton (/home/elias/.cache/am/lm95hj7z/tmp/test-intent-before-xI6SZ5/modules/ui-web/src/shell-v0/views/LibrarySurface.slice2.test.ts:306:25)\n    at /home/elias/.cache/am/lm95hj7z/tmp/test-intent-before-xI6SZ5/modules/ui-w"
       },
       {
         "id": "modules/ui-web/src/shell-v0/views/LibrarySurface.slice2.test.ts#R2 reconnect keeps a dirty battery-only draft and provides a current baseline for recovery",
         "classification": "assertion",
-        "detail": "R2 reconnect keeps a dirty battery-only draft and provides a current baseline for recovery:  AssertionError: Save my draft: expected undefined to be defined\n    at recoveryButton (/home/elias/.cache/am/osos9z_x/tmp/test-intent-before-46r0Oq/modules/ui-web/src/shell-v0/views/LibrarySurface.slice2.test.ts:306:25)\n    at /home/elias/.cache/am/osos9z_x/tmp/test-intent-before-46r0Oq/modules/ui-w"
+        "detail": "R2 reconnect keeps a dirty battery-only draft and provides a current baseline for recovery:  AssertionError: Save my draft: expected undefined to be defined\n    at recoveryButton (/home/elias/.cache/am/lm95hj7z/tmp/test-intent-before-xI6SZ5/modules/ui-web/src/shell-v0/views/LibrarySurface.slice2.test.ts:306:25)\n    at /home/elias/.cache/am/lm95hj7z/tmp/test-intent-before-xI6SZ5/modules/ui-w"
       },
       {
-        "id": "modules/ui-web/src/shell-v0/components/FailedJobsDrawer.test.ts#R3 live empty refresh interrupts a batch without stranding Try again or dropping untried files",
+        "id": "modules/ui-web/src/shell-v0/views/LibrarySurface.slice2.test.ts#R2b Save my draft uses the displayed conflict rules despite a later second-window save",
         "classification": "assertion",
-        "detail": "R3 live empty refresh interrupts a batch without stranding Try again or dropping untried files:  AssertionError: expected true to be false // Object.is equality\n    at /home/elias/.cache/am/osos9z_x/tmp/test-intent-before-46r0Oq/modules/ui-web/src/shell-v0/components/FailedJobsDrawer.test.ts:629:30\n    at file:///home/elias/.cache/am/osos9z_x/tmp/test-intent-before-46r0Oq/modules/ui-web/node_mo"
+        "detail": "R2b Save my draft uses the displayed conflict rules despite a later second-window save:  AssertionError: the given combination of arguments (undefined and string) is invalid for this assertion. You can use an array, a map, an object, a set, a string, or a weakset instead of a string\n    at Proxy.<anonymous> (file:///home/elias/.cache/am/lm95hj7z/tmp/test-intent-before-xI6SZ5/modules/ui-"
       },
       {
-        "id": "modules/ui-web/src/shell-v0/components/FailedJobsDrawer.test.ts#R3 live partial refresh interrupts a batch without stranding Try again or dropping untried files",
+        "id": "modules/ui-web/src/shell-v0/views/LibrarySurface.slice2.test.ts#R2b Discard my draft uses the displayed conflict rules despite a later second-window save",
         "classification": "assertion",
-        "detail": "R3 live partial refresh interrupts a batch without stranding Try again or dropping untried files:  AssertionError: expected true to be false // Object.is equality\n    at /home/elias/.cache/am/osos9z_x/tmp/test-intent-before-46r0Oq/modules/ui-web/src/shell-v0/components/FailedJobsDrawer.test.ts:629:30\n    at file:///home/elias/.cache/am/osos9z_x/tmp/test-intent-before-46r0Oq/modules/ui-web/node_mo"
+        "detail": "R2b Discard my draft uses the displayed conflict rules despite a later second-window save:  AssertionError: the given combination of arguments (undefined and string) is invalid for this assertion. You can use an array, a map, an object, a set, a string, or a weakset instead of a string\n    at Proxy.<anonymous> (file:///home/elias/.cache/am/lm95hj7z/tmp/test-intent-before-xI6SZ5/modules/ui-"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/FailedJobsDrawer.test.ts#R3 live empty refresh waits for the batch, retains failure evidence and leaves Try again usable",
+        "classification": "assertion",
+        "detail": "R3 live empty refresh waits for the batch, retains failure evidence and leaves Try again usable:  AssertionError: expected 2 to be 1 // Object.is equality\n    at /home/elias/.cache/am/lm95hj7z/tmp/test-intent-before-xI6SZ5/modules/ui-web/src/shell-v0/components/FailedJobsDrawer.test.ts:629:19\n    at file:///home/elias/.cache/am/lm95hj7z/tmp/test-intent-before-xI6SZ5/modules/ui-web/node_modules/@"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/FailedJobsDrawer.test.ts#R3 live partial refresh waits for the batch, retains failure evidence and leaves Try again usable",
+        "classification": "assertion",
+        "detail": "R3 live partial refresh waits for the batch, retains failure evidence and leaves Try again usable:  AssertionError: expected 2 to be 1 // Object.is equality\n    at /home/elias/.cache/am/lm95hj7z/tmp/test-intent-before-xI6SZ5/modules/ui-web/src/shell-v0/components/FailedJobsDrawer.test.ts:629:19\n    at file:///home/elias/.cache/am/lm95hj7z/tmp/test-intent-before-xI6SZ5/modules/ui-web/node_modules/@"
       },
       {
         "id": "modules/ui-web/src/shell-v0/components/FailedJobsDrawer.test.ts#R3 switching inline targets isolates pending retry batches and ignores late completions after reconnect",
         "classification": "assertion",
-        "detail": "R3 switching inline targets isolates pending retry batches and ignores late completions after reconnect:  AssertionError: expected true to be false // Object.is equality\n    at /home/elias/.cache/am/osos9z_x/tmp/test-intent-before-46r0Oq/modules/ui-web/src/shell-v0/components/FailedJobsDrawer.test.ts:659:92\n    at file:///home/elias/.cache/am/osos9z_x/tmp/test-intent-before-46r0Oq/modules/ui-web/node_mo"
+        "detail": "R3 switching inline targets isolates pending retry batches and ignores late completions after reconnect:  AssertionError: expected true to be false // Object.is equality\n    at /home/elias/.cache/am/lm95hj7z/tmp/test-intent-before-xI6SZ5/modules/ui-web/src/shell-v0/components/FailedJobsDrawer.test.ts:665:92\n    at file:///home/elias/.cache/am/lm95hj7z/tmp/test-intent-before-xI6SZ5/modules/ui-web/node_mo"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/FailedJobsDrawer.test.ts#R3b a fresh failure list retries A again along with refused B and newly failed C",
+        "classification": "assertion",
+        "detail": "R3b a fresh failure list retries A again along with refused B and newly failed C:  AssertionError: expected 2 to be 4 // Object.is equality\n    at /home/elias/.cache/am/lm95hj7z/tmp/test-intent-before-xI6SZ5/modules/ui-web/src/shell-v0/components/FailedJobsDrawer.test.ts:705:19\n    at file:///home/elias/.cache/am/lm95hj7z/tmp/test-intent-before-xI6SZ5/modules/ui-web/node_modules/@"
       }
     ]
   },
-  "digest": "sha256:9adbf2fc6f5b88831889f015d000ecc6549b75c6fa95ff7fe3b4ecbd98e4808f"
+  "digest": "sha256:8dc72292b9b2f296b10c4b3c82fa83b8fc7c2233e3b4153c11974bd933b6e48a"
 }

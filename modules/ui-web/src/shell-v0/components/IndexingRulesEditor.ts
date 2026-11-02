@@ -165,7 +165,7 @@ export class IndexingRulesEditor extends JfElement {
     if (this.indexingRuleFocus) void this.focusPendingIndexingRule();
   }
 
-  private async loadSettings(mode: 'preserve' | 'conflict' | 'discard' | 'rebase' = 'preserve'): Promise<boolean> {
+  private async loadSettings(mode: 'preserve' | 'conflict' | 'discard' = 'preserve'): Promise<boolean> {
     const serial = ++this.loadSerial;
     try {
       const res = this.host_ ? await this.host_.data.fetch('/api/settings/v2')
@@ -179,7 +179,7 @@ export class IndexingRulesEditor extends JfElement {
       const saved = { schedule: schedule ?? null, pauseOnBattery: policy?.pauseOnBattery ?? false };
       if (mode === 'conflict' || mode === 'preserve' && this.indexingRulesDirty
           && JSON.stringify(saved) !== JSON.stringify(this.savedRules)) this.conflictingRules = saved;
-      if (mode === 'rebase' || mode === 'discard' || !this.indexingRulesDirty && !this.indexingRulesSaving) this.savedRules = saved;
+      if (mode === 'discard' || !this.indexingRulesDirty && !this.indexingRulesSaving) this.savedRules = saved;
       if (mode === 'discard' || !this.indexingRulesDirty && !this.indexingRulesSaving) {
         this.indexingScheduleConfigured = schedule != null;
         const time = (minutes: number) => `${String(Math.floor(minutes / 60)).padStart(2, '0')}:${String(minutes % 60).padStart(2, '0')}`;
@@ -207,10 +207,17 @@ export class IndexingRulesEditor extends JfElement {
 
   private async resolveConflict(event: Event, keepDraft: boolean): Promise<void> {
     if (this.indexingRulesSaving || this.readOnly) return;
+    if (keepDraft) {
+      // Consent covers exactly the rules displayed in this review. The serialized
+      // save guard must reject another writer's change since that observation.
+      if (!this.conflictingRules) return;
+      this.savedRules = this.conflictingRules;
+      await this.saveIndexingRules(event);
+      return;
+    }
     this.indexingRulesSaving = true;
-    const loaded = await this.loadSettings(keepDraft ? 'rebase' : 'discard');
+    await this.loadSettings('discard');
     this.indexingRulesSaving = false;
-    if (loaded && keepDraft) await this.saveIndexingRules(event);
   }
 
   private renderSavedRules() {

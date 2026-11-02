@@ -100,7 +100,6 @@ export class FailedJobsDrawer extends JfElement {
   private targetFolder: string | null = null;
   private requestSerial = 0;
   private retryBatch: object | null = null;
-  private pendingRetries: FailedRow[] = [];
   private unsub: (() => void) | null = null;
 
   // 574 §23.B — single-open arbitration by construction; the panel reflects the failedJobsDrawer store.
@@ -146,7 +145,6 @@ export class FailedJobsDrawer extends JfElement {
       this.error = null;
       this.loading = false;
       this.retryBatch = null;
-      this.pendingRetries = [];
       if (next) void this.refresh();
     }
     this.requestUpdate();
@@ -159,7 +157,6 @@ export class FailedJobsDrawer extends JfElement {
     this.requestSerial++;
     this.targetFolder = null;
     this.retryBatch = null;
-    this.pendingRetries = [];
   }
 
   override updated(changed: Map<string, unknown>): void {
@@ -167,7 +164,7 @@ export class FailedJobsDrawer extends JfElement {
       this.open = true;
       if (changed.has('folderPathHash') || changed.has('observedCount') && !this.lastKnown) {
         if (this.targetFolder !== this.folderPathHash) {
-          this.rows = []; this.resolved = {}; this.retryBatch = null; this.pendingRetries = [];
+          this.rows = []; this.resolved = {}; this.retryBatch = null;
         }
         this.targetFolder = this.folderPathHash;
         void this.refresh();
@@ -181,6 +178,9 @@ export class FailedJobsDrawer extends JfElement {
   }
 
   private async refresh(): Promise<void> {
+    // Live counts may drop during requeue. Finish retrying the displayed list
+    // before fetching its replacement; only a target/lifecycle change cancels it.
+    if (this.inline && this.retryBatch) return;
     const folder = this.targetFolder;
     if (!folder) return;
     const serial = ++this.requestSerial;
@@ -206,19 +206,6 @@ export class FailedJobsDrawer extends JfElement {
       // parse site (not at each render site) also covers `retryAll` and `onRowActionSuccess`, which
       // key on `pathHash`. Mirrors api/domains/indexing.ts's defensive `(parsed.jobs ?? [])`.
       const rows = (Array.isArray(parsed?.jobs) ? parsed.jobs : []).map(toRow);
-      if (this.inline) {
-        // A count update can interrupt a retry batch. Keep files that never received
-        // a successful retry even when the new listing omits them during requeue.
-        if (this.pendingRetries.length) {
-          for (const row of rows) {
-            if (!this.rows.some(previous => previous.pathHash === row.pathHash)
-                && !this.pendingRetries.some(pending => pending.pathHash === row.pathHash)) this.pendingRetries.push(row);
-          }
-        }
-        for (const pending of this.pendingRetries) {
-          if (!rows.some(row => row.pathHash === pending.pathHash)) rows.push(pending);
-        }
-      }
       if (!this.inline || rows.length > 0 || !this.rows.length) this.rows = rows;
       // Lazy-resolve hashes → display paths (best-effort; deleted files resolve to null → show hash).
       for (const r of this.rows) {
@@ -258,8 +245,7 @@ export class FailedJobsDrawer extends JfElement {
     const batch = {};
     this.retryBatch = batch;
     const folder = this.targetFolder;
-    const rows = [...(this.pendingRetries.length ? this.pendingRetries : this.rows)];
-    this.pendingRetries = [...rows];
+    const rows = [...this.rows];
     this.requestUpdate();
     const serial = this.requestSerial;
     const client = getOperationClient(this.apiBase || '');
@@ -269,7 +255,6 @@ export class FailedJobsDrawer extends JfElement {
         try {
           await client.invoke(RETRY_OP, { args: { pathHash: r.pathHash } });
           if (!this.isConnected || folder !== this.targetFolder || this.retryBatch !== batch) break;
-          this.pendingRetries = this.pendingRetries.filter(row => row.pathHash !== r.pathHash);
           if (!this.inline) this.rows = this.rows.filter(row => row.pathHash !== r.pathHash);
           if (serial !== this.requestSerial || !this.open) break;
         } catch {
@@ -277,9 +262,12 @@ export class FailedJobsDrawer extends JfElement {
         }
       }
     } finally {
-      // A list refresh invalidates response rendering, not ownership of this batch.
       // A switched folder may already own a new batch, which this one must not clear.
-      if (this.retryBatch === batch) { this.retryBatch = null; this.requestUpdate(); }
+      if (this.retryBatch === batch) {
+        this.retryBatch = null;
+        if (this.inline) await this.refresh();
+        this.requestUpdate();
+      }
     }
   }
 

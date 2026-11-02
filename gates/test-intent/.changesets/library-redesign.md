@@ -77,10 +77,10 @@ Final-review repairs at e3916fe2db (all durable):
 
 - Tests added or rewritten: modules/ui-web/src/shell-v0/views/LibrarySurface.folderActions.test.ts — R1, L1/P1 — Add from both tabs and modes, focus/cancel, late picker and reconnect — durable
 - Tests added or rewritten: modules/ui-web/src/shell-v0/views/LibrarySurface.slice2.test.ts — R2, L8/L19 — explicit conflict recovery, second window, reconnect, successive saves and reload — durable
-- Tests added or rewritten: modules/ui-web/src/shell-v0/components/FailedJobsDrawer.test.ts — R3, L13/P3 — refresh-interrupted retries, retained untried files and target/lifecycle races — durable
+- Tests added or rewritten: modules/ui-web/src/shell-v0/components/FailedJobsDrawer.test.ts — R3, L13/P3 — count refreshes deferred through retry batches, re-failed files, retained evidence and target/lifecycle races — durable
 
 The R1–R3 evidence is produced in a separate shared clone with copied dependencies;
-its detached before-checkout and build outputs belong to that clone. No acceptance record is changed.
+its detached before-checkout and build outputs belong to that clone. No acceptance record is changed. Re-review repairs R2b/R3b also fail on 48bf54c1b2: Save my draft invokes a third write instead of retaining two, and retry produces A/B/B/C instead of A/B/A/B/C. Discard is a preservation case on that baseline. The combined evidence below retains e3916fe2db as the original R1–R3 before-state and covers the final behavior.
 
 ```json
 {
@@ -983,7 +983,7 @@ its detached before-checkout and build outputs belong to that clone. No acceptan
         "modules/ui-web/src/shell-v0/views/LibrarySurface.slice2.test.ts"
       ],
       "class": "New",
-      "behaviour": "A rules conflict retains the draft and shows current saved hours, days and battery preference in words. Explicit Save my draft re-reads the current baseline and uses the serialized settings guard; Discard my draft loads the current rules. Both recover subsequent saves without reload. Second-window writes, reconnects, disabled or absent schedules, recovery holds, and quick skip/rules saves in both orders preserve saved meaning.",
+      "behaviour": "A rules conflict retains the draft and shows current saved hours, days and battery preference in words. Explicit Save my draft uses exactly the displayed saved rules as the baseline for the serialized settings guard; a later change prevents a write and refreshes the review for another explicit choice; Discard my draft loads the current rules. Both recover subsequent saves without reload. Second-window writes, reconnects, disabled or absent schedules, recovery holds, and quick skip/rules saves in both orders preserve saved meaning.",
       "sources": [
         {
           "kind": "owner-adopted-scenario",
@@ -1004,7 +1004,7 @@ its detached before-checkout and build outputs belong to that clone. No acceptan
           "delegationQuote": "well from now on you can just proceed autonomously accordinglky",
           "delegationLocation": "task t-20261101-uiimpl, user turn after the WP1 summary",
           "delegationScope": "Proceed autonomously with implementing the agreed window designs and choosing implementation details within the adopted scenarios.",
-          "choice": "Recover indexing-rule conflicts with a current saved-rules review and explicit Save my draft (fresh baseline plus the existing exclusion-ordering guard) or Discard my draft.",
+          "choice": "Recover indexing-rule conflicts with an explicit Save my draft against exactly the displayed saved rules and the existing exclusion-ordering guard; a later change writes nothing and requires review again. Discard my draft loads the current saved rules. No silent rebase reload.",
           "label": "agent choice"
         }
       ],
@@ -1014,7 +1014,9 @@ its detached before-checkout and build outputs belong to that clone. No acceptan
         "modules/ui-web/src/shell-v0/views/LibrarySurface.slice2.test.ts#R2 another window changes saved rules; Discard my draft recovers and later saves work",
         "modules/ui-web/src/shell-v0/views/LibrarySurface.slice2.test.ts#R2 recovered draft and quick skip save (rules first) retain both through reload",
         "modules/ui-web/src/shell-v0/views/LibrarySurface.slice2.test.ts#R2 recovered draft and quick skip save (exclusions first) retain both through reload",
-        "modules/ui-web/src/shell-v0/views/LibrarySurface.slice2.test.ts#R2 reconnect keeps a dirty battery-only draft and provides a current baseline for recovery"
+        "modules/ui-web/src/shell-v0/views/LibrarySurface.slice2.test.ts#R2 reconnect keeps a dirty battery-only draft and provides a current baseline for recovery",
+        "modules/ui-web/src/shell-v0/views/LibrarySurface.slice2.test.ts#R2b Save my draft uses the displayed conflict rules despite a later second-window save",
+        "modules/ui-web/src/shell-v0/views/LibrarySurface.slice2.test.ts#R2b Discard my draft uses the displayed conflict rules despite a later second-window save"
       ],
       "repaired": true
     },
@@ -1023,7 +1025,7 @@ its detached before-checkout and build outputs belong to that clone. No acceptan
         "modules/ui-web/src/shell-v0/components/FailedJobsDrawer.test.ts"
       ],
       "class": "New",
-      "behaviour": "Live empty and partial listings interrupt a retry batch without stranding Try again or losing files that have not been retried. The next click retries remaining and newly observed files. Switching inline targets and reconnecting isolate batch ownership, retaining failure distinctions and ignoring old completions.",
+      "behaviour": "Live count refreshes neither replace the inline list nor cancel a retry batch. The batch attempts every displayed file, then fetches the list once. Every Try again retries every file in the current list, including files that failed again after a successful retry. Empty observations retain last-known failure evidence; no pending retry backlog is kept. Switching inline targets and reconnecting isolate batch ownership, retaining failure distinctions and ignoring old completions.",
       "sources": [
         {
           "kind": "owner-adopted-scenario",
@@ -1042,9 +1044,10 @@ its detached before-checkout and build outputs belong to that clone. No acceptan
       ],
       "evidence": "gates/test-intent/evidence/library-redesign-r1-r3.json",
       "newChecks": [
-        "modules/ui-web/src/shell-v0/components/FailedJobsDrawer.test.ts#R3 live empty refresh interrupts a batch without stranding Try again or dropping untried files",
-        "modules/ui-web/src/shell-v0/components/FailedJobsDrawer.test.ts#R3 live partial refresh interrupts a batch without stranding Try again or dropping untried files",
-        "modules/ui-web/src/shell-v0/components/FailedJobsDrawer.test.ts#R3 switching inline targets isolates pending retry batches and ignores late completions after reconnect"
+        "modules/ui-web/src/shell-v0/components/FailedJobsDrawer.test.ts#R3 live empty refresh waits for the batch, retains failure evidence and leaves Try again usable",
+        "modules/ui-web/src/shell-v0/components/FailedJobsDrawer.test.ts#R3 live partial refresh waits for the batch, retains failure evidence and leaves Try again usable",
+        "modules/ui-web/src/shell-v0/components/FailedJobsDrawer.test.ts#R3 switching inline targets isolates pending retry batches and ignores late completions after reconnect",
+        "modules/ui-web/src/shell-v0/components/FailedJobsDrawer.test.ts#R3b a fresh failure list retries A again along with refused B and newly failed C"
       ],
       "repaired": true
     }
