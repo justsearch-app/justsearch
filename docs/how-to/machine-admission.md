@@ -2,6 +2,7 @@
 title: Bound a search-quality scoring window
 type: how-to
 status: stable
+description: "Give a short search-quality scoring run the machine to itself: heavy work waits or pauses, and everything resumes when the window ends."
 ---
 
 # Bound a search-quality scoring window
