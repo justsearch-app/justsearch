@@ -35,6 +35,8 @@ final class DeclaredCollectionScanSnapshotTest {
       hits.add(new LuceneRuntimeTypes.SearchHit(file.toString(), 1.0f, Map.of(
           SchemaFields.PATH, file.toString(), SchemaFields.SIZE_BYTES, String.valueOf(Files.size(file)),
           SchemaFields.MODIFIED_AT, String.valueOf(Files.getLastModifiedTime(file).toMillis()),
+          SchemaFields.EXTRACTION_POLICY_ID, io.justsearch.indexerworker.extract.TikaExtractionPolicy.defaults().policyId(),
+          SchemaFields.SOURCE_SHA256, io.justsearch.indexerworker.loop.SourceContentHash.sha256(file),
           SchemaFields.COLLECTION, "first")));
     }
     var reads = mock(ReadPathOps.class);

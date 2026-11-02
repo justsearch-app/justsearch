@@ -272,6 +272,8 @@ final class SyncDirectoryOpsCandidateDiscoveryTest {
           fields.put(SchemaFields.PATH, normalized);
           if (Files.isRegularFile(path)) {
             try {
+              fields.put(SchemaFields.EXTRACTION_POLICY_ID, io.justsearch.indexerworker.extract.TikaExtractionPolicy.defaults().policyId());
+              fields.put(SchemaFields.SOURCE_SHA256, io.justsearch.indexerworker.loop.SourceContentHash.sha256(path));
               fields.put(SchemaFields.SIZE_BYTES, String.valueOf(Files.size(path)));
               fields.put(SchemaFields.MODIFIED_AT, String.valueOf(Files.getLastModifiedTime(path).toMillis()));
             } catch (IOException failure) {

@@ -43,7 +43,7 @@ class SplitSurrogateQueuedRestartTest extends LuceneExecutorTestBase {
   }
 
   @Test
-  void restartKeepsLegacyReplacementsAndPolicyWithoutUserAction() throws Exception {
+  void ordinaryReprocessingRepairsLegacyReplacementsAndPolicyAcrossRestart() throws Exception {
     checkQueuedRestart(false);
   }
 
@@ -105,22 +105,28 @@ class SplitSurrogateQueuedRestartTest extends LuceneExecutorTestBase {
 
       var claims = queue.pollPending(1);
       assertEquals(1, claims.size(), "queued work survives restart");
-      assertTrue(extractor.extractAll(claims).isEmpty(), "unchanged legacy content is not rewritten");
-      assertEquals(legacy, runtime.documentFieldOps().getDocumentContent(id));
-      assertEquals("tika-default-v3", runtime.documentFieldOps().getDocumentField(id, SchemaFields.EXTRACTION_POLICY_ID));
-      assertEquals(0, queue.queueDepth());
-      if (!force) return;
-      forced.add(id);
-      assertEquals(1, queue.enqueueEntries(List.of(JobQueue.EnqueueEntry.stat(file).withinRoot(tempDir))));
-      var extracted = extractor.extractAll(queue.pollPending(1));
-      assertEquals(1, extracted.size(), "force bypasses the unchanged decision");
-      writer.write(extracted.getFirst(), null);
+      var ordinary = extractor.extractAll(claims);
+      assertEquals(1, ordinary.size(), "ordinary ingestion repairs an older extraction policy");
+      writer.write(ordinary.getFirst(), null);
       refresh(runtime);
       journal.drainPending();
-      assertEquals(0, queue.queueDepth());
       assertRepairedFields(runtime, id, expected, prefix);
       assertEquals(TikaExtractionPolicy.defaults().policyId(),
           runtime.documentFieldOps().getDocumentField(id, SchemaFields.EXTRACTION_POLICY_ID));
+      assertEquals(0, queue.queueDepth());
+      if (force) {
+        forced.add(id);
+        assertEquals(1, queue.enqueueEntries(List.of(JobQueue.EnqueueEntry.stat(file).withinRoot(tempDir))));
+        var extracted = extractor.extractAll(queue.pollPending(1));
+        assertEquals(1, extracted.size(), "force bypasses the unchanged decision");
+        writer.write(extracted.getFirst(), null);
+        refresh(runtime);
+        journal.drainPending();
+        assertEquals(0, queue.queueDepth());
+        assertRepairedFields(runtime, id, expected, prefix);
+        assertEquals(TikaExtractionPolicy.defaults().policyId(),
+            runtime.documentFieldOps().getDocumentField(id, SchemaFields.EXTRACTION_POLICY_ID));
+      }
     }
     try (var runtime = open()) {
       assertRepairedFields(runtime, id, expected, prefix);

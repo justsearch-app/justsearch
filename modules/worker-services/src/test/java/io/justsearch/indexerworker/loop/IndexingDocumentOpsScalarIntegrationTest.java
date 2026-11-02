@@ -77,6 +77,7 @@ class IndexingDocumentOpsScalarIntegrationTest extends LuceneExecutorTestBase {
           SchemaFields.MODIFIED_AT, Files.getLastModifiedTime(file).toMillis(),
           SchemaFields.SIZE_BYTES, Files.size(file),
           SchemaFields.SOURCE_SHA256, SourceContentHash.sha256(file),
+          SchemaFields.EXTRACTION_POLICY_ID, timebox.extractionPolicy().policyId(),
           SchemaFields.CONTENT, "legacy content")));
       refresh(runtime);
       assertTrue(extractor.extractAll(List.of(claim)).isEmpty());

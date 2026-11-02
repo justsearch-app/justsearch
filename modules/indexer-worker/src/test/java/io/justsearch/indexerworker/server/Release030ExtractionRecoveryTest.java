@@ -25,7 +25,7 @@ import org.junit.jupiter.api.io.TempDir;
     io.justsearch.indexerworker.services.NoVolumeIdentityExtension.class)
 final class Release030ExtractionRecoveryTest {
   @Test
-  void recoveryWalkExtractsChangedFilesAndSkipsUnchangedReleaseFiles(@TempDir Path temporary)
+  void recoveryWalkExtractsChangedFilesAndRepairsOlderExtractionPolicy(@TempDir Path temporary)
       throws Exception {
     Path root = Release030Fixture.unpack("small", temporary);
     Path added = Files.writeString(root.resolve("roots/alpha/during-upgrade.txt"), "ochrearrival");
@@ -49,8 +49,10 @@ final class Release030ExtractionRecoveryTest {
             && count(root, "state='PENDING' AND retry_after IS NULL OR state='PROCESSING'") == 0,
             "new and changed files finish through the recovery walk");
         assertTrue(counts.changed.get() > 0, "the probe sees real extraction calls for admitted new work");
-        assertEquals(0, counts.unchanged.get(), "unchanged release documents need no extraction");
-        assertTrue(count(root, "last_reason_code='UNCHANGED'") >= 20, "the release's unchanged fast path ran");
+        assertTrue(counts.unchanged.get() > 0, "unchanged release sources with older extraction evidence are repaired");
+        assertEquals(TikaExtractionPolicy.defaults().policyId(), server.lifecycleManagerForTests()
+            .documentFieldOps().getDocumentFieldOrThrow(key(root.resolve("roots/alpha/file-01.txt")),
+                io.justsearch.indexing.SchemaFields.EXTRACTION_POLICY_ID));
         System.out.println("Release030 extraction calls: changed=" + counts.changed.get()
             + " unchanged=" + counts.unchanged.get());
       }

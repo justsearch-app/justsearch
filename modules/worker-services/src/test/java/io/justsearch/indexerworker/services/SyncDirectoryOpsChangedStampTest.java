@@ -92,6 +92,8 @@ final class SyncDirectoryOpsChangedStampTest {
     String id = PathNormalizer.normalizeKey(file);
     var fields = new HashMap<String, String>();
     fields.put(SchemaFields.PATH, id);
+    fields.put(SchemaFields.EXTRACTION_POLICY_ID, io.justsearch.indexerworker.extract.TikaExtractionPolicy.defaults().policyId());
+    fields.put(SchemaFields.SOURCE_SHA256, io.justsearch.indexerworker.loop.SourceContentHash.sha256(file));
     fields.put(SchemaFields.MODIFIED_AT, String.valueOf(stamp.toMillis()));
     if (!change.equals("missing-size")) fields.put(SchemaFields.SIZE_BYTES, String.valueOf(Files.size(file)));
     if (change.equals("size")) {

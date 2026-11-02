@@ -238,7 +238,8 @@ final class WorkerWatcherEventOwnershipTest {
     when(runtime.isAcceptingWrites()).thenReturn(true);
     when(runtime.documentFieldOps()).thenReturn(fields);
     when(fields.isUnmodified(any(), org.mockito.ArgumentMatchers.anyLong(),
-        org.mockito.ArgumentMatchers.anyLong())).thenReturn(true);
+        org.mockito.ArgumentMatchers.anyLong(), org.mockito.ArgumentMatchers.isNull(),
+        org.mockito.ArgumentMatchers.anyString())).thenReturn(true);
     String key = io.justsearch.indexerworker.util.PathNormalizer.normalizeKey(file);
     when(fields.getDocumentFieldOrThrow(key, io.justsearch.indexing.SchemaFields.COLLECTION)).thenReturn("docs");
     var queue = mock(JobQueue.class);

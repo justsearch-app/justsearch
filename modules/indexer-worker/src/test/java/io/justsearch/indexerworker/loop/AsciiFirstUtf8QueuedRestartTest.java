@@ -61,7 +61,7 @@ class AsciiFirstUtf8QueuedRestartTest extends LuceneExecutorTestBase {
   @TempDir Path tempDir;
 
   @Test
-  void oldStoredFieldsAndChunksSurviveRestartWithUnchangedQueuedWork() throws Exception {
+  void ordinaryQueuedWorkRepairsOlderPolicyAndSurvivesAnotherRestart() throws Exception {
     restartScenario(false, true);
   }
 
@@ -147,10 +147,16 @@ class AsciiFirstUtf8QueuedRestartTest extends LuceneExecutorTestBase {
           () -> false, () -> false, () -> null, fence);
       var claims = queue.pollPending(1);
       assertEquals(1, claims.size(), "work must survive the restart");
-      assertTrue(extractor.extractAll(claims).isEmpty(), "queued unchanged source must not be re-extracted");
+      var ordinary = extractor.extractAll(claims);
+      assertEquals(old ? 1 : 0, ordinary.size(), "only an older extraction policy requires ordinary repair");
+      if (old) {
+        writer.write(ordinary.getFirst(), null);
+        refresh(runtime);
+        assertCorrect(runtime, id, sourceSha);
+      }
       journal.drainPending();
       assertEquals(0, queue.queueDepth());
-      assertEquals(original, snapshot(runtime, id), "unchanged queued work must preserve all fields and chunks");
+      if (!old) assertEquals(original, snapshot(runtime, id), "current queued work preserves all fields and chunks");
       if (force) {
         forced.add(id);
         assertEquals(1, queue.enqueueEntries(List.of(JobQueue.EnqueueEntry.stat(file).withinRoot(tempDir))));
@@ -160,6 +166,8 @@ class AsciiFirstUtf8QueuedRestartTest extends LuceneExecutorTestBase {
         refresh(runtime);
         journal.drainPending();
         assertEquals(0, queue.queueDepth());
+      }
+      if (old || force) {
         assertEquals(SOURCE, runtime.documentFieldOps().getDocumentContent(id).strip());
         assertEquals(TITLE, runtime.documentFieldOps().getDocumentField(id, SchemaFields.TITLE));
         assertEquals("מרים", runtime.documentFieldOps().getDocumentField(id, SchemaFields.META_AUTHOR));
@@ -186,7 +194,7 @@ class AsciiFirstUtf8QueuedRestartTest extends LuceneExecutorTestBase {
     try (var runtime = open(); var queue = new SqliteJobQueue(db)) {
       queue.open();
       assertTrue(queue.recentIngestionEvents(100).containsAll(historical));
-      assertEquals(force ? repaired : original, snapshot(runtime, id), "stored state must survive another restart");
+      assertEquals(old || force ? repaired : original, snapshot(runtime, id), "stored state must survive another restart");
     }
   }
 

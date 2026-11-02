@@ -107,7 +107,7 @@ final class Release030UpgradeProbeTest {
         } while (System.nanoTime() < deadline);
         assertEquals(0, count(root, "state='FAILED' AND last_reason_code='PARSER_FAILED'"),
             "the measured new paths must not fail parsing");
-        assertEquals(0, extractions.unchanged.get(), "scale recovery never extracts unchanged indexed files");
+        assertTrue(extractions.unchanged.get() > 0, "scale recovery repairs unchanged sources with older extraction evidence");
         assertTrue(extractions.changed.get() > 0);
         boolean complete = remaining == 0 && !recovery.isAlive()
             && !Files.exists(root.resolve("data/upgrade-030-recovery.properties"));
