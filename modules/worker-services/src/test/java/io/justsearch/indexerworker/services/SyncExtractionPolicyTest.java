@@ -26,13 +26,13 @@ import org.junit.jupiter.params.provider.ValueSource;
 final class SyncExtractionPolicyTest {
   @TempDir Path temporary;
 
-  @ParameterizedTest
+  @ParameterizedTest(name = "{displayName} [{index}] {arguments}")
   @ValueSource(strings = {"old-policy", "missing-policy", "missing-hash", "configured-policy"})
   void reconciliationSelectsStaleExtractionThroughExistingAdmission(String stale) throws Exception {
     check(stale, true);
   }
 
-  @ParameterizedTest
+  @ParameterizedTest(name = "{displayName} [{index}] {arguments}")
   @ValueSource(strings = {"default", "configured"})
   void currentEffectivePolicyKeepsUnchangedFilesSkipped(String policy) throws Exception {
     check(policy, false);

@@ -21,7 +21,7 @@ final class ExtractionPolicyFreshnessTest extends LuceneExecutorTestBase {
   private static final String POLICY = "configured-policy";
   private static final String SOURCE = "a".repeat(64);
 
-  @ParameterizedTest
+  @ParameterizedTest(name = "{displayName} [{index}] {arguments}")
   @ValueSource(strings = {"older-policy", "missing-policy"})
   void unknownOrOlderPolicyRequiresExtraction(String state) {
     try (var runtime = open()) {
@@ -43,7 +43,7 @@ final class ExtractionPolicyFreshnessTest extends LuceneExecutorTestBase {
     }
   }
 
-  @ParameterizedTest
+  @ParameterizedTest(name = "{displayName} [{index}] {arguments}")
   @ValueSource(strings = {"missing-size", "missing-hash", "different-hash", "incomplete-chunks", "deleted", "replaced"})
   void currentPolicyCannotBypassOtherRepairReasons(String reason) {
     try (var runtime = open()) {

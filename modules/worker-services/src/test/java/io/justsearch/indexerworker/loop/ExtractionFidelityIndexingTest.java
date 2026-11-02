@@ -37,7 +37,7 @@ class ExtractionFidelityIndexingTest extends LuceneExecutorTestBase {
     runtime.commitOps().maybeRefreshBlocking();
   }
 
-  @org.junit.jupiter.params.ParameterizedTest
+  @org.junit.jupiter.params.ParameterizedTest(name = "{displayName} [{index}] {arguments}")
   @org.junit.jupiter.params.provider.ValueSource(strings = {"old-policy", "missing-policy", "configured-policy"})
   void ordinaryIngestionRepairsHistoricalExtractionAndStaysCurrentAfterReopening(String legacy) throws Exception {
     checkHistoricalRepair(legacy);
