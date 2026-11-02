@@ -1529,8 +1529,7 @@ Changed test files against main (all durable product checks):
         "modules/ui-web/src/shell-v0/utils/aiInstallPoll.refresh.test.ts"
       ],
       "class": "New",
-      "repaired": true,
-      "behaviour": "Refresh immediately or share one queued batch after the active batch; never overlap endpoint reads; continue the regular schedule; no-op with no subscribers; cancelled queued reads cannot affect a replacement lifecycle.",
+      "behaviour": "Contract of the new immediate-read helper: refresh immediately or share one queued batch after the active batch; never overlap endpoint reads; continue the regular schedule; no-op with no subscribers; cancelled queued reads cannot affect a replacement lifecycle. Not claimed as a repair: the helper does not exist before this change, so its before-state runs fail only because it is absent; the caller-level repair and its fail-before are the next entry.",
       "sources": [
         {
           "kind": "owner-adopted-scenario",
@@ -1700,5 +1699,16 @@ regenerated with each entry's --before; brain-main-repairs is regenerated withou
   "verdict": "reject",
   "digest": "sha256:a7f0b419fc3f63764386fddadca6bfdb27fa76cdbb66bdd4b7ecb9162640040d",
   "note": "Audit by independent reviewer session reviewer-26 (Claude): reject. M1 snapshotLiveness label/offline checks pass for the wrong reason; M2 B20 fail-before shows missing controls, not the defect; M3 repairRemedy replacement expectations lack evidence. Transcribed by the orchestrator."
+}
+```
+
+```json
+{
+  "kind": "audit",
+  "role": "reviewer",
+  "session": "reviewer-28",
+  "verdict": "reject",
+  "digest": "sha256:b7c6db00aace06f8578db2ef4c7598751a89cc734a1fb554b1218b1a430f8537",
+  "note": "Audit by independent reviewer session reviewer-28 (Codex): reject only entry 34 (aiInstallPoll.refresh.test.ts marked repaired; its before-state fails because the helper is absent); all other entries accepted. Transcribed by the orchestrator."
 }
 ```
