@@ -126,8 +126,8 @@ that ships **{true hybrid retrieval × offline search and AI × multilingual × 
 [sourced comparison](docs/comparison.md) behind that sentence, and if we've missed a tool, please
 [open an issue](https://github.com/justsearch-app/justsearch/issues) and we'll list it.
 
-- **Hybrid retrieval, not single-model RAG** — keyword + dense vectors, fused and cross-encoder reranked; learned-sparse is a separate mode
-  by a cross-encoder. Most local RAG tools use one embedding model and basic chunking.
+- **Hybrid retrieval, not single-model RAG** — keyword + dense vectors, fused and cross-encoder reranked; learned-sparse is a separate mode.
+  Most local RAG tools use one embedding model and basic chunking.
 - **Local search and AI** — indexing, retrieval, and built-in inference run on-device and work offline
   after AI setup. The desktop app also checks for updates by default; [Privacy](#privacy) names the network paths
   and the optional trace exporter.
