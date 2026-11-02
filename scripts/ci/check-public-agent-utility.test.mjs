@@ -184,6 +184,53 @@ scenario("pointer.current selecting a manifest for a different publication_id fa
   ok("names the selection mismatch", /does not select the matching accepted publication/.test(result.stderr || ""));
 });
 
+// --- recomputed question-level intervals (review 2026-11-02): tampering fails even after the docs are
+// regenerated, because the gate recomputes the projection offline from the replayed observations ---
+scenario("a tampered question-level interval fails even with regenerated docs", (root, ok) => {
+  const REPO_ROOT = path.resolve(path.dirname(SCRIPT), "..", "..");
+  const copy = (relative) => fs.cpSync(path.join(REPO_ROOT, relative), path.join(root, relative), { recursive: true });
+  fs.writeFileSync(path.join(root, "settings.gradle.kts"), "");
+  copy(path.join("scripts", "jseval", "public-agent-utility"));
+  // The selected manifest pins its canonical record outside the bundle directory; copy that one file.
+  const realPointer = JSON.parse(fs.readFileSync(pointerPath(REPO_ROOT), "utf8"));
+  const manifestRel = path.join("scripts", "jseval", "public-agent-utility", realPointer.current.path);
+  const manifest = JSON.parse(fs.readFileSync(path.join(REPO_ROOT, manifestRel), "utf8"));
+  copy(path.relative(REPO_ROOT, path.resolve(REPO_ROOT, path.dirname(manifestRel), manifest.record.path)));
+  for (const name of fs.readdirSync(path.join(REPO_ROOT, "scripts", "jseval"))) {
+    if (/^utility-claim-policy\..*\.json$/.test(name)) copy(path.join("scripts", "jseval", name));
+  }
+  copy(path.join("scripts", "docs", "gen-public-agent-utility.mjs"));
+  const docs = ["README.md", "RESEARCH.md", path.join("docs", "reference", "benchmarks", "agent-utility.md")];
+  for (const doc of docs) copy(doc);
+
+  // Shift one published upper bound textually, so nothing else in the file changes.
+  const projection = path.join(root, "scripts", "jseval", "public-agent-utility", "question-level.v1.json");
+  const original = fs.readFileSync(projection, "utf8");
+  const tampered = original.replace(
+    /("delta_ci": \[\s*-?[\d.e-]+,\s*)(-?[\d.e-]+)/,
+    (_, head, upper) => `${head}${Number(upper) + 0.1}`,
+  );
+  ok("the fixture interval was tampered", tampered !== original);
+  fs.writeFileSync(projection, tampered);
+
+  const regen = spawnSync(process.execPath, [path.join(root, "scripts", "docs", "gen-public-agent-utility.mjs")], {
+    cwd: root, encoding: "utf8",
+  });
+  ok("the docs regenerate from the tampered projection", regen.status === 0);
+  ok(
+    "the regenerated docs carry the tampered interval",
+    docs.some((doc) => fs.readFileSync(path.join(root, doc), "utf8") !== fs.readFileSync(path.join(REPO_ROOT, doc), "utf8")),
+  );
+
+  const result = run(root);
+  ok("exits non-zero", result.status !== 0);
+  ok(
+    "names the failed offline recomputation",
+    /question-level projection does not match its offline recomputation/.test(result.stderr || "")
+      && /question-level projection is stale/.test(result.stderr || ""),
+  );
+});
+
 // --- missing-Python message formatter (pure function; no subprocess needed) ---
 ok(
   "an ENOENT spawn error produces the not-found remedy, naming the attempted binary",

@@ -39,17 +39,19 @@ def _repo_relative(p: Path) -> str:
 @click.option("--data-dir", type=click.Path(), default=lambda: str(DEFAULT_JSEVAL_DATA_DIR),
               help="Data dir whose eval-results/ holds runs (for --latest-per-dataset).")
 @click.option("--default-mode", default="hybrid", show_default=True,
-              help="Production-default search mode whose metrics are the per-corpus headline.")
+              help="Measured search mode whose metrics are the per-corpus headline (not the product default, AUTO).")
 @click.option("--external-baselines", type=click.Path(exists=True, resolve_path=True), default=None,
               help="Path to external-baselines.v1.json (cited published baselines, side-by-side).")
 @click.option("--release-id", default=None, help="Optional human label for this release.")
 @click.option("--allow-incomparable", is_flag=True,
               help="Compose even if a default-mode run is not comparable (diagnostics only).")
+@click.option("--withhold-default", multiple=True, metavar="DATASET=REASON",
+              help="Explicitly withhold a dataset's default-mode claim and floor; retain its source and ablations.")
 @click.option("--out", "out_path", type=click.Path(), default=None,
               help="Where to write release.v1.json (default: <data-dir>/release.v1.json).")
 @click.pass_context
 def cmd_release(ctx, runs, latest_per_dataset, data_dir, default_mode, external_baselines,
-                release_id, allow_incomparable, out_path):
+                release_id, allow_incomparable, withhold_default, out_path):
     """Compose cohort-identical eval runs into one publishable benchmark release (tempdoc 623).
 
     A release is a PROJECTION over runs that share one config/commit/hardware — not a new
@@ -107,6 +109,13 @@ def cmd_release(ctx, runs, latest_per_dataset, data_dir, default_mode, external_
     if not run_dirs:
         click.echo("Error: provide --run (repeatable) or --latest-per-dataset", err=True)
         sys.exit(2)
+
+    withheld = {}
+    for entry in withhold_default:
+        dataset, sep, reason = entry.partition("=")
+        if not sep or not reason.strip() or dataset in withheld:
+            raise click.BadParameter("use DATASET=REASON once per dataset", param_hint="--withhold-default")
+        withheld[dataset] = reason
 
     # tempdoc 802: record WHICH artifacts this release projects from, alongside parsing them.
     # `compose()` sees only summaries; the run dirs are known here and nowhere downstream, so a
@@ -170,6 +179,7 @@ def cmd_release(ctx, runs, latest_per_dataset, data_dir, default_mode, external_
             leak_by_dataset=leak_by_dataset or None,
             union_recall_by_dataset=union_recall_by_dataset or None,
             run_sources=run_sources,
+            withheld_default=withheld,
         )
     except _release.ComposeError as e:
         click.echo(f"compose refused: {e}", err=True)
@@ -247,6 +257,21 @@ def cmd_release(ctx, runs, latest_per_dataset, data_dir, default_mode, external_
                 gate="release", dataset=f"{ds}:leg_union_recall",
                 changesets_dir=changesets_dir,
             )
+        # A measured or leak row that disappears removes that corpus's floor or ceiling, which is a
+        # relaxation too. The loops above only see rows present in the new release, so check the
+        # old rows here: an explicit withhold reason recorded in the new release justifies the
+        # removal; otherwise the same justified changeset is required.
+        new_withheld = release_doc.get("withheld") or {}
+        for section, old_rows, suffix in (("measured", old_measured, "measured"),
+                                          ("leak", old_leak, "leak_rate")):
+            new_rows = release_doc.get(section) or {}
+            for ds in sorted(set(old_rows) - set(new_rows)):
+                reason = (new_withheld.get(ds) or {}).get("reason")
+                if isinstance(reason, str) and reason.strip():
+                    continue
+                _bshift.assert_baseline_not_removed(
+                    gate="release", dataset=f"{ds}:{suffix}", changesets_dir=changesets_dir,
+                )
     except _bshift.BaselineRelaxedWithoutJustificationError as e:
         click.echo(f"release refused: {e}", err=True)
         sys.exit(1)

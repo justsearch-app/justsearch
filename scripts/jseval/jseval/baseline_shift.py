@@ -138,6 +138,23 @@ def load_changesets(changesets_dir: Path | str, *, baseline_ref: str | None = No
     return declarations
 
 
+def _has_justified_changeset(gate: str, dataset: str, changesets_dir: Path | str,
+                             baseline_ref: str | None) -> bool:
+    for cs in load_changesets(changesets_dir, baseline_ref=baseline_ref):
+        if cs.get("classification") != "baseline-relaxation":
+            continue
+        if cs.get("gate") not in (gate, "*"):
+            continue
+        if cs.get("dataset") not in (dataset, "*"):
+            continue
+        # `tempdoc:` is commonly written as a bare number in frontmatter (e.g. `tempdoc: 636`),
+        # which YAML type-infers as an int, not a str — accept any non-empty scalar, not just str.
+        tempdoc = cs.get("tempdoc")
+        if tempdoc is not None and str(tempdoc).strip():
+            return True
+    return False
+
+
 def assert_baseline_not_relaxed(
     old_value: float | None,
     new_value: float,
@@ -163,22 +180,35 @@ def assert_baseline_not_relaxed(
     if not relaxed:
         return
 
-    for cs in load_changesets(changesets_dir, baseline_ref=baseline_ref):
-        if cs.get("classification") != "baseline-relaxation":
-            continue
-        if cs.get("gate") not in (gate, "*"):
-            continue
-        if cs.get("dataset") not in (dataset, "*"):
-            continue
-        # `tempdoc:` is commonly written as a bare number in frontmatter (e.g. `tempdoc: 636`),
-        # which YAML type-infers as an int, not a str — accept any non-empty scalar, not just str.
-        tempdoc = cs.get("tempdoc")
-        if tempdoc is not None and str(tempdoc).strip():
-            return  # justified — allow the relaxation
+    if _has_justified_changeset(gate, dataset, changesets_dir, baseline_ref):
+        return
 
     raise BaselineRelaxedWithoutJustificationError(
         f"{gate}/{dataset}: baseline would relax ({old_value!r} -> {new_value!r}) with no "
         f"classified 'baseline-relaxation' changeset (gate={gate!r}, dataset={dataset!r}) "
         f"carrying a non-empty 'tempdoc:' field under {changesets_dir}. "
         f"See scripts/jseval/.changesets/README.md."
+    )
+
+
+def assert_baseline_not_removed(
+    *,
+    gate: str,
+    dataset: str,
+    changesets_dir: Path | str,
+    baseline_ref: str | None = None,
+) -> None:
+    """Raise :class:`BaselineRelaxedWithoutJustificationError` when a pinned baseline row
+    disappears and no matching, justified changeset covers it.
+
+    Removing a row removes its floor or ceiling, which is the loosest relaxation there is; it
+    needs the same ``baseline-relaxation`` changeset as :func:`assert_baseline_not_relaxed`.
+    """
+    if _has_justified_changeset(gate, dataset, changesets_dir, baseline_ref):
+        return
+    raise BaselineRelaxedWithoutJustificationError(
+        f"{gate}/{dataset}: baseline row would be removed with no classified "
+        f"'baseline-relaxation' changeset (gate={gate!r}, dataset={dataset!r}) carrying a "
+        f"non-empty 'tempdoc:' field under {changesets_dir}, and no withhold reason recorded "
+        f"for it in the new release. See scripts/jseval/.changesets/README.md."
     )

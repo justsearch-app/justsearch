@@ -38,8 +38,16 @@ const CORPUS_TOKEN = /(SciFact|Enron|MIRACL|CLERC|CourtListener|BEIR)/i;
 const NDCG_DECIMAL = /nDCG@?\d*\s*[:=]?\s*(0\.\d{2,})/gi;
 const PERCENTAGE = /(?<![\d.])(\d{2,3}(?:\.\d+)?)\s*%/g;
 
-/** Every numeric value the release vouches for: measured + ablations metrics/run_metrics + external baselines. */
+/**
+ * Every numeric value the release vouches for: measured + ablations metrics/run_metrics + external baselines.
+ * A superseded release vouches for nothing: it is rejected before any number is collected.
+ */
 export function collectReleaseNumbers(release) {
+  if (release?.status === "superseded") {
+    throw new Error(
+      `release ${release.release_id ?? "<unknown>"} is superseded and cannot make outward numbers citable`
+    );
+  }
   const out = [];
   const pushMetrics = (entry) => {
     for (const key of ["metrics", "run_metrics"]) {
@@ -137,8 +145,15 @@ function main() {
     return;
   }
   const release = JSON.parse(fs.readFileSync(releasePath, "utf8"));
+  let releaseNumbers;
+  try {
+    releaseNumbers = collectReleaseNumbers(release);
+  } catch (error) {
+    console.error(`check-outward-number-citations: FAIL - ${error.message}`);
+    process.exitCode = 1;
+    return;
+  }
   const releaseId = typeof release.release_id === "string" ? release.release_id : null;
-  const releaseNumbers = collectReleaseNumbers(release);
 
   const failures = [];
   let scanned = 0;

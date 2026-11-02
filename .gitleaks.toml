@@ -15,6 +15,7 @@ regexes = ['''(?i)(?:agent_cohort_key|config_cohort_key|search_config_cohort_key
 paths = [
   '''^scripts/jseval/(?:[^/]+/)*(?:calibration(?:-[^/]+)?|[^/]*utility-comparison[^/]*|release\.v1)\.json$''',
   '''^scripts/jseval/(?:[^/]+/)*observations\.v1\.jsonl$''',
+  '''^scripts/jseval/releases/[^/]+\.v1\.json$''',
 ]
 
 [[allowlists]]

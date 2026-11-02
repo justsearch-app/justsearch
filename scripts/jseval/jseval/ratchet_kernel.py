@@ -46,7 +46,10 @@ def load_baselines_doc(
     if current_release and project_release is not None:
         release_path = (path.parent / current_release).resolve()
         if release_path.is_file():
-            projected = project_release(json.loads(release_path.read_text(encoding="utf-8")), doc)
+            release = json.loads(release_path.read_text(encoding="utf-8"))
+            if release.get("status") == "superseded":
+                raise ValueError(f"superseded release cannot supply regression floors: {release_path}")
+            projected = project_release(release, doc)
             merged = dict(doc.get("fallback_baselines") or {})
             merged.update(projected.get("baselines") or {})  # release wins over fallback
             doc = {**doc, **projected, "baselines": merged}
