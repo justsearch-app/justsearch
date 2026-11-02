@@ -130,8 +130,8 @@ The venv installs the base and `ui` dependencies declared in
 (and jseval) on `PYTHONPATH`, without installing either or writing metadata or bytecode
 under `scripts/`. The value comes from `scripts/lib/python-path.cjs`, the one
 definition every script uses (shell: source `scripts/lib/python-path.sh` and call
-`js_pythonpath <checkout>`); CI fails a PYTHONPATH that names `scripts/jseval` without
-`scripts/jsharness` (`scripts/ci/check-pythonpath.mjs`). Python 3.13 with CI's constraint file,
+`js_pythonpath <checkout>`). jseval loads the jsharness of its own checkout even when only
+`scripts/jseval` is on the path. Python 3.13 with CI's constraint file,
 `-c scripts/jsharness/requirements.lock.txt`, pins the base and `ui` dependencies
 (Playwright, and with it the Chromium revision) as CI does. Other interpreters
 resolve dependencies freely without that Python 3.13 constraint file.

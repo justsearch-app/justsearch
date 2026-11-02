@@ -113,8 +113,8 @@ def _count_phrases(html: str, phrases: list[str]) -> dict[str, int]:
     a browser-side probe (a Python re-implementation would test the copy, not the probe).
 
     Skips (never fails) where the ui-shot harness's own browser stack is absent, so a
-    checkout without `pip install jsharness[ui]` / `playwright install chromium` still runs
-    the rest of the suite."""
+    checkout without `pip install -e 'scripts/jsharness[ui]'` / `playwright install chromium`
+    still runs the rest of the suite."""
     sync_playwright = pytest.importorskip(
         "playwright.sync_api", reason="playwright (the ui-shot harness dependency) not installed",
     ).sync_playwright

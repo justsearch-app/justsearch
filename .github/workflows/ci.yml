@@ -103,15 +103,12 @@ jobs:
         run: |
           node scripts/ci/check-jseval-lock.mjs
           node scripts/ci/check-jseval-lock.mjs jsharness
+          node --test scripts/ci/check-jseval-lock.test.mjs
 
-      - name: PYTHONPATH names jseval with jsharness
-        # A caller that builds the Python path itself and names only scripts/jseval fails
-        # to import jsharness, or runs another checkout's copy. Callers take the value from
-        # scripts/lib/python-path.cjs (shell: python-path.sh); this fails any script,
-        # workflow or documented command that sets PYTHONPATH to scripts/jseval alone.
-        run: |
-          node scripts/ci/check-pythonpath.mjs
-          node --test scripts/ci/check-pythonpath.test.mjs scripts/lib/python-path.test.mjs
+      - name: Python path helper
+        # scripts/lib/python-path.cjs (shell: python-path.sh) gives callers the PYTHONPATH
+        # naming both packages of their own checkout.
+        run: node --test scripts/lib/python-path.test.mjs
 
       - name: Install canonical jseval
         # Constraint-installed against the dependency lock (tempdoc 792 §6) so the

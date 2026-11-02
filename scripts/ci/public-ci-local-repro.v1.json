@@ -8,8 +8,7 @@
       "mode": "local-subset",
       "commands": [
         "node scripts/ci/check-lockfile-completeness.mjs",
-        "node scripts/ci/check-pythonpath.mjs",
-        "node --test scripts/ci/check-pythonpath.test.mjs scripts/lib/python-path.test.mjs",
+        "node --test scripts/lib/python-path.test.mjs",
         "npm ci --audit=false",
         "node scripts/agent-analytics/run-all-tests.mjs",
         "node scripts/ci/check-workflow-triggers.mjs",
@@ -108,6 +107,8 @@
       "mode": "local-subset",
       "commands": [
         "node scripts/ci/check-jseval-lock.mjs",
+        "node scripts/ci/check-jseval-lock.mjs jsharness",
+        "node --test scripts/ci/check-jseval-lock.test.mjs",
         "python -m pip install -e scripts/jsharness -e scripts/jseval -c scripts/jseval/requirements.lock.txt",
         "python -m pip install \"pytest>=7.0\" \"pyyaml>=6.0\" \"hypothesis>=6.0\" \"jsonschema>=4.0\"",
         "python -m pytest scripts/jseval/tests scripts/jsharness/tests -q -p no:cacheprovider"
