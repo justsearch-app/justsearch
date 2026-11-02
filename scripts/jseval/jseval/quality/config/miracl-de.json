@@ -1,0 +1,46 @@
+{
+  "schema": "jseval.quality.config.v1",
+  "collection": "miracl-de",
+  "language": "de",
+  "source": {
+    "kind": "miracl-pool",
+    "dataset": "miracl/de/dev",
+    "seed": 4242,
+    "filler": 2000
+  },
+  "labels": {
+    "lang": "de",
+    "kind": "vague"
+  },
+  "expected": {
+    "queries": 305,
+    "judgments": 3144,
+    "positives": 811,
+    "grades": {
+      "0": 2333,
+      "1": 811
+    },
+    "documents": 5103
+  },
+  "groups": [
+    "lang",
+    "kind"
+  ],
+  "metric": "nDCG@10",
+  "margins": {
+    "default": 0.01
+  },
+  "alpha": 0.05,
+  "bootstrap": {
+    "resamples": 10000,
+    "seed": 20261102
+  },
+  "unjudged": {
+    "max_differing_share": 0.1
+  },
+  "report": {
+    "most_changed": 10,
+    "top": 5
+  },
+  "notes": "Margin 0.01 nDCG@10 (absolute, per group): the smallest change treated as meaningful in BEIR/MIRACL-style reporting, about 1-1.5% relative at today's 0.76 (scifact) and 0.99 (de) and about a tenth of the lexical->hybrid gaps measured on 2026-11-02 (+0.10 scifact, +0.20 de). alpha 0.05 two-sided, Holm over the collection's groups. Unjudged threshold 0.10: if more than 1 in 10 top-10 slots of the two arms hold documents unjudged for that query in only one arm, the labels are not trusted for this pair until judged. Pool: every judged passage (relevant and non-relevant) + 2000 filler passages sampled with random.Random(4242) from corpus positions; 2000 keeps a CPU index build in minutes while adding unrelated distractor mass of the same order as the judged pool."
+}

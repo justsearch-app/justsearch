@@ -36,6 +36,7 @@ _GROUP_MODULES = (
     "ops",
     "index_cache_cmd",
     "workflow_fixture",
+    "quality",
 )
 # Pre-existing command modules that live at jseval.* (registered here too).
 _LEGACY_MODULES = ("qu_spike", "qu_v3_eval")

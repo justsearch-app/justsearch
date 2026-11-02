@@ -1,0 +1,16 @@
+{
+  "schema": "jseval.quality.config.v1",
+  "collection": "enron-email",
+  "language": "en",
+  "source": {"kind": "beir-dir", "path": null, "recipe": "scripts/jseval/707-corpora/en-email-enron-raw/1000-short-natural"},
+  "labels": {"lang": "en", "kind": "known-item"},
+  "expected": {"queries": 50, "judgments": 100, "positives": 100, "grades": {"1": 100}, "documents": 1000},
+  "groups": ["lang", "kind"],
+  "metric": "nDCG@10",
+  "margins": {"default": 0.02},
+  "alpha": 0.05,
+  "bootstrap": {"resamples": 10000, "seed": 20261102},
+  "unjudged": {"max_differing_share": 0.10},
+  "report": {"most_changed": 10, "top": 5},
+  "notes": "Recipe set: the 707 en-email cell (50 fabricated questions, 2 gold mails each, 900 real Enron distractors) materialized by corpus-inject-real + corpus build; pass its BEIR-layout directory. Margin 0.02 because with 50 queries a 0.01 non-inferiority bound is out of reach (one query moving from rank 1 to 2 shifts the mean by ~0.006)."
+}
