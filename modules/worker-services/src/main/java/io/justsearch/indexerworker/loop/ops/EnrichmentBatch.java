@@ -13,6 +13,9 @@ import java.util.function.IntFunction;
 /** Inference inputs and their comparison proof stay together through success and failure. */
 final class EnrichmentBatch {
   private final IndexingCoordinator coordinator;
+  private EnrichmentAccounting accounting;
+  private final java.util.Set<String> acceptedIds = new java.util.HashSet<>();
+  private final Map<String, java.util.Set<String>> correctedFailedStatuses = new HashMap<>();
   private final Map<String, DocumentFieldOps.EnrichmentInput> inputs;
 
   EnrichmentBatch(DocumentFieldOps fields, IndexingCoordinator coordinator, List<String> ids)
@@ -25,6 +28,17 @@ final class EnrichmentBatch {
       long maxContentChars) throws IOException {
     this.coordinator = coordinator;
     this.inputs = fields.getEnrichmentInputs(ids, maxContentChars);
+  }
+
+  EnrichmentBatch accounting(EnrichmentAccounting accounting) {
+    this.accounting = accounting;
+    return this;
+  }
+
+  java.util.Set<String> acceptedIds() { return java.util.Set.copyOf(acceptedIds); }
+
+  boolean rejectedOutput(String id, String statusField) {
+    return correctedFailedStatuses.getOrDefault(id, java.util.Set.of()).contains(statusField);
   }
 
   java.util.Set<String> ids() {
@@ -53,12 +67,34 @@ final class EnrichmentBatch {
     return result;
   }
 
+  void computed(String id, EnrichmentAccounting.Stage stage) {
+    if (accounting != null) accounting.computed(id, stage);
+  }
+
+  void cancelled(EnrichmentAccounting.Stage stage, Throwable failure) {
+    if (accounting != null) accounting.cancelled(stage, failure);
+  }
+
   boolean update(String id, Map<String, Object> updates) {
-    return coordinator.updateDocumentIf(id, inputs.get(id), updates);
+    if (accounting != null) accounting.computed(id, updates);
+    var receipt = inputs.get(id) == null
+        ? new io.justsearch.adapters.lucene.runtime.LuceneRuntimeTypes.EnrichmentPublicationReceipt(
+            List.of(), List.of(id), null)
+        : coordinator.publishEnrichmentBatch(List.of(Map.entry(id, updates)), Map.of(id, inputs.get(id)));
+    acceptedIds.addAll(receipt.acceptedIds());
+    correctedFailedStatuses.putAll(receipt.correctedFailedStatuses());
+    if (accounting != null) accounting.published(List.of(Map.entry(id, updates)), receipt);
+    boolean accepted = receipt.result().updatedCount() == 1;
+    return accepted;
   }
 
   BatchUpdateResult updateBatch(List<Map.Entry<String, Map<String, Object>>> updates) {
-    return coordinator.updateDocumentsBatchIf(updates, inputs);
+    if (accounting != null) updates.forEach(entry -> accounting.computed(entry.getKey(), entry.getValue()));
+    var receipt = coordinator.publishEnrichmentBatch(updates, inputs);
+    acceptedIds.addAll(receipt.acceptedIds());
+    correctedFailedStatuses.putAll(receipt.correctedFailedStatuses());
+    if (accounting != null) accounting.published(updates, receipt);
+    return receipt.result();
   }
 
   int failure(String id, String retryField, IntFunction<Map<String, Object>> compute) {

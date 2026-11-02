@@ -22,16 +22,31 @@ package io.justsearch.indexerworker.loop.ops;
  *     and {@code processNerBackfill} carry it for shape-consistency only — neither caller reads
  *     it today.
  * @param docsProcessed count of documents this call successfully completed (not merely
- *     attempted) — the same count each op already logged, now surfaced to the caller. Units are
- *     documents, not batches (contrast {@code batchTimingCount}, which counts batches — see
+ *     attempted), excluding output the writer corrected to FAILED. Units are documents, not
+ *     batches (contrast {@code batchTimingCount}, which counts batches — see
  *     {@code OperationalMetrics#recordStageTiming} javadoc).
  * @param elapsedMs wall-clock time for the whole call, in milliseconds.
+ * @param accounting final selected-stage dispositions and computed/publication counters
+ * @param attempted whether work was attempted, including calls with zero completions
  */
-public record StageOutcome(boolean success, int docsProcessed, long elapsedMs) {
+public record StageOutcome(boolean success, int docsProcessed, long elapsedMs,
+    EnrichmentAccounting.Summary accounting, boolean attempted) {
+  public StageOutcome(boolean success, int docsProcessed, long elapsedMs) {
+    this(success, docsProcessed, elapsedMs, EnrichmentAccounting.Summary.empty(), true);
+  }
+
+  static StageOutcome observed(boolean success, int docsProcessed, long startNanos,
+      EnrichmentAccounting accounting) {
+    var summary = accounting.snapshot();
+    long rejectedOutputs = summary.tickets().values().stream()
+        .filter(disposition -> disposition == EnrichmentAccounting.Disposition.REJECTED_OUTPUT).count();
+    return new StageOutcome(success, Math.max(0, docsProcessed - (int) rejectedOutputs),
+        (System.nanoTime() - startNanos) / 1_000_000, summary, true);
+  }
 
   /** A no-op outcome: nothing was pending, nothing to record. */
   public static StageOutcome none() {
-    return new StageOutcome(true, 0, 0);
+    return new StageOutcome(true, 0, 0, EnrichmentAccounting.Summary.empty(), false);
   }
 
   /** No documents processed, but the call took real time (e.g., interrupted mid-batch). */

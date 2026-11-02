@@ -608,6 +608,17 @@ final class StatusRecordSchemaTest {
     }
   }
 
+  @Test
+  void additiveEnrichmentOutcomesAppearInStatusAndSharedFixture() throws Exception {
+    JsonNode serialized = MAPPER.valueToTree(EnrichmentProgressView.empty());
+    assertTrue(serialized.path("enrichmentOutcomes").isObject());
+    assertEquals(0, serialized.path("enrichmentOutcomes").size());
+    JsonNode fixture = MAPPER.readTree(Files.readString(CrossLanguageContract.STATUS_FIXTURE));
+    JsonNode outcomes = fixture.path("worker").path("enrichment").path("enrichmentOutcomes");
+    assertTrue(outcomes.isObject());
+    assertEquals(0, outcomes.size());
+  }
+
   // ---- Cross-language contract fixture (368 RC1) ----
 
   @Nested

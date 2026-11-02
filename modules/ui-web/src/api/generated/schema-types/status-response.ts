@@ -407,6 +407,7 @@ export interface StatusResponse {
         phaseTotalUs?: Record<string, number> | null;
       }> | null;
       enrichmentCompleted?: Record<string, number> | null;
+      enrichmentOutcomes?: Record<string, number> | null;
       failedNerCount?: number;
       nerAvailable?: boolean | null;
       nerEnabled?: boolean;
@@ -852,6 +853,7 @@ export const statusResponseSchema = z.strictObject({
         "phaseTotalUs": z.record(z.string(), z.number().int()).nullable().optional(),
       })).nullable().optional(),
       "enrichmentCompleted": z.record(z.string(), z.number().int()).nullable().optional(),
+      "enrichmentOutcomes": z.record(z.string(), z.number().int()).nullable().optional(),
       "failedNerCount": z.number().int().optional(),
       "nerAvailable": z.boolean().nullable().optional(),
       "nerEnabled": z.boolean().optional(),

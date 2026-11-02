@@ -510,12 +510,14 @@ public final class WritePathOps {
       Map<String, Object> updates,
       ParentSliceCache parentCache,
       Map<String, Object> expectedFields) throws IOException {
-    return readModifyWrite(searcher, docId, updates, parentCache, expectedFields, null);
+    return readModifyWrite(searcher, docId, updates, parentCache, expectedFields, null,
+        new FieldMapper.DroppedVectorReport());
   }
 
   private boolean readModifyWrite(IndexSearcher searcher, String docId, Map<String, Object> updates,
       ParentSliceCache parentCache, Map<String, Object> expectedFields,
-      DocumentFieldOps.EnrichmentInput input) throws IOException {
+      DocumentFieldOps.EnrichmentInput input, FieldMapper.DroppedVectorReport droppedVectors)
+      throws IOException {
     var topDocs = searcher.search(new TermQuery(new Term(idField, docId)), 1);
     if (topDocs.scoreDocs.length == 0) {
       log.debug("readModifyWrite: document not found: {}", docId);
@@ -664,7 +666,6 @@ public final class WritePathOps {
     StatusArtifactContract.enforce(session, fields, "read-modify-write:" + docId);
 
     // Re-index with updated fields
-    FieldMapper.DroppedVectorReport droppedVectors = new FieldMapper.DroppedVectorReport();
     Document newDoc = session.fieldMapper.toDocument(fields, droppedVectors);
     if (droppedVectors.count() > 0) {
       log.warn(
@@ -1164,10 +1165,13 @@ public final class WritePathOps {
     return true;
   }
 
-  LuceneRuntimeTypes.BatchUpdateResult updateDocumentsBatchIf(
+  LuceneRuntimeTypes.EnrichmentPublicationReceipt publishEnrichmentBatch(
       List<Map.Entry<String, Map<String, Object>>> updates,
       Map<String, DocumentFieldOps.EnrichmentInput> inputs) {
     guardWritable();
+    List<String> accepted = new ArrayList<>();
+    List<String> rejected = new ArrayList<>();
+    Map<String, Set<String>> correctedFailedStatuses = new HashMap<>();
     try {
       var snap = session.snapshot;
       if (snap != null && snap.searcherManager() != null) snap.searcherManager().maybeRefreshBlocking();
@@ -1177,10 +1181,9 @@ public final class WritePathOps {
         Map<String, Map<String, String>> parents = new HashMap<>();
         Map<String, java.util.IdentityHashMap<Map<String, String>, Boolean>> parentComparisons = new HashMap<>();
         org.apache.lucene.index.StoredFields parentStoredFields = null;
-        int updated = 0;
         for (var update : updates) {
           var input = inputs.get(update.getKey());
-          if (input == null) continue;
+          if (input == null) { rejected.add(update.getKey()); continue; }
           if (input.parentId() != null && !input.parentId().isBlank()) {
             if (!parents.containsKey(input.parentId())) {
               if (parentStoredFields == null) parentStoredFields = searcher.storedFields();
@@ -1191,16 +1194,30 @@ public final class WritePathOps {
             // Different expectations for the same parent retain independent comparisons.
             if (!parentComparisons
                 .computeIfAbsent(input.parentId(), ignored -> new java.util.IdentityHashMap<>())
-                .computeIfAbsent(input.parentFields(), expected -> java.util.Objects.equals(expected, parents.get(input.parentId())))) continue;
+                .computeIfAbsent(input.parentFields(), expected -> java.util.Objects.equals(expected, parents.get(input.parentId())))) {
+              rejected.add(update.getKey());
+              continue;
+            }
             var parent = parents.get(input.parentId());
             if (parent != null) cache.putContentIfAbsent(input.parentId(), parent.get(SchemaFields.CONTENT));
           }
-          if (readModifyWrite(searcher, update.getKey(), update.getValue(), cache, Map.of(), input)) updated++;
+          var droppedVectors = new FieldMapper.DroppedVectorReport();
+          if (readModifyWrite(searcher, update.getKey(), update.getValue(), cache, Map.of(), input, droppedVectors)) {
+            accepted.add(update.getKey());
+            if (!droppedVectors.correctedFailedStatuses().isEmpty()) {
+              correctedFailedStatuses.put(update.getKey(), droppedVectors.correctedFailedStatuses());
+            }
+          } else {
+            rejected.add(update.getKey());
+          }
         }
-        return new LuceneRuntimeTypes.BatchUpdateResult(updated, updates.size() - updated);
+        return new LuceneRuntimeTypes.EnrichmentPublicationReceipt(accepted, rejected, correctedFailedStatuses, null);
       });
     } catch (IOException e) {
-      throw IndexRuntimeIOException.fromIndexOperation(e, "Failed conditional batch update");
+      return new LuceneRuntimeTypes.EnrichmentPublicationReceipt(accepted, rejected, correctedFailedStatuses,
+          IndexRuntimeIOException.fromIndexOperation(e, "Failed conditional batch update"));
+    } catch (RuntimeException e) {
+      return new LuceneRuntimeTypes.EnrichmentPublicationReceipt(accepted, rejected, correctedFailedStatuses, e);
     }
   }
 

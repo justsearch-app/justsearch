@@ -1,0 +1,136 @@
+diff --git a/modules/adapters-lucene/src/main/java/io/justsearch/adapters/lucene/runtime/IndexingCoordinator.java b/modules/adapters-lucene/src/main/java/io/justsearch/adapters/lucene/runtime/IndexingCoordinator.java
+index 6b740cc473..144c9ea505 100644
+--- a/modules/adapters-lucene/src/main/java/io/justsearch/adapters/lucene/runtime/IndexingCoordinator.java
++++ b/modules/adapters-lucene/src/main/java/io/justsearch/adapters/lucene/runtime/IndexingCoordinator.java
+@@ -279,6 +279,17 @@ public final class IndexingCoordinator {
+         Map.of(docId, input)).updatedCount() == 1;
+   }
+ 
++  public LuceneRuntimeTypes.EnrichmentPublicationReceipt publishEnrichmentBatch(
++      List<Map.Entry<String, Map<String, Object>>> updates,
++      Map<String, DocumentFieldOps.EnrichmentInput> inputs) {
++    try {
++      updateDocumentsBatchIf(updates, inputs);
++      return new LuceneRuntimeTypes.EnrichmentPublicationReceipt(List.of(), List.of(), null);
++    } catch (RuntimeException failure) {
++      return new LuceneRuntimeTypes.EnrichmentPublicationReceipt(List.of(), List.of(), failure);
++    }
++  }
++
+   /** A batch's comparisons and writes share the same current reader and mutation lock. */
+   public BatchUpdateResult updateDocumentsBatchIf(
+       List<Map.Entry<String, Map<String, Object>>> updates,
+diff --git a/modules/adapters-lucene/src/main/java/io/justsearch/adapters/lucene/runtime/LuceneRuntimeTypes.java b/modules/adapters-lucene/src/main/java/io/justsearch/adapters/lucene/runtime/LuceneRuntimeTypes.java
+index ccad4e9597..0434aeb864 100644
+--- a/modules/adapters-lucene/src/main/java/io/justsearch/adapters/lucene/runtime/LuceneRuntimeTypes.java
++++ b/modules/adapters-lucene/src/main/java/io/justsearch/adapters/lucene/runtime/LuceneRuntimeTypes.java
+@@ -31,6 +31,29 @@ public final class LuceneRuntimeTypes {
+    */
+   public record BatchUpdateResult(int updatedCount, int notFoundCount) {}
+ 
++  /** In-memory receipt for ordered conditional publication; failure leaves the suffix unattempted. */
++  public record EnrichmentPublicationReceipt(
++      List<String> acceptedIds, List<String> rejectedIds,
++      Map<String, java.util.Set<String>> correctedFailedStatuses, RuntimeException failure) {
++    public EnrichmentPublicationReceipt {
++      acceptedIds = List.copyOf(acceptedIds);
++      rejectedIds = List.copyOf(rejectedIds);
++      correctedFailedStatuses = correctedFailedStatuses.entrySet().stream().collect(
++          java.util.stream.Collectors.toUnmodifiableMap(Map.Entry::getKey,
++              entry -> java.util.Set.copyOf(entry.getValue())));
++    }
++
++    public EnrichmentPublicationReceipt(List<String> acceptedIds, List<String> rejectedIds,
++        RuntimeException failure) {
++      this(acceptedIds, rejectedIds, Map.of(), failure);
++    }
++
++    public BatchUpdateResult result() {
++      if (failure != null) throw failure;
++      return new BatchUpdateResult(acceptedIds.size(), rejectedIds.size());
++    }
++  }
++
+   // ==========================================================================
+   // Build State
+   // ==========================================================================
+diff --git a/modules/worker-services/src/main/java/io/justsearch/indexerworker/loop/ops/CombinedEnrichmentBackfillOps.java b/modules/worker-services/src/main/java/io/justsearch/indexerworker/loop/ops/CombinedEnrichmentBackfillOps.java
+index 6437fbe2cd..91232da975 100644
+--- a/modules/worker-services/src/main/java/io/justsearch/indexerworker/loop/ops/CombinedEnrichmentBackfillOps.java
++++ b/modules/worker-services/src/main/java/io/justsearch/indexerworker/loop/ops/CombinedEnrichmentBackfillOps.java
+@@ -291,6 +291,12 @@ public final class CombinedEnrichmentBackfillOps {
+       long totalMs,
+       long workSetSignature) {
+ 
++    public boolean attempted() { return recordTiming; }
++
++    public EnrichmentAccounting.Summary accounting() {
++      return EnrichmentAccounting.Summary.empty();
++    }
++
+     /** No pending work / interrupted before any stage ran — nothing to record. */
+     public static CombinedOutcome none() {
+       return new CombinedOutcome(false, false, false, false, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
+diff --git a/modules/worker-services/src/main/java/io/justsearch/indexerworker/loop/ops/StageOutcome.java b/modules/worker-services/src/main/java/io/justsearch/indexerworker/loop/ops/StageOutcome.java
+index 31fdb1e0fd..9a642001a9 100644
+--- a/modules/worker-services/src/main/java/io/justsearch/indexerworker/loop/ops/StageOutcome.java
++++ b/modules/worker-services/src/main/java/io/justsearch/indexerworker/loop/ops/StageOutcome.java
+@@ -29,6 +29,10 @@ package io.justsearch.indexerworker.loop.ops;
+  */
+ public record StageOutcome(boolean success, int docsProcessed, long elapsedMs) {
+ 
++  public EnrichmentAccounting.Summary accounting() {
++    return EnrichmentAccounting.Summary.empty();
++  }
++
+   /** A no-op outcome: nothing was pending, nothing to record. */
+   public static StageOutcome none() {
+     return new StageOutcome(true, 0, 0);
+diff --git a/modules/worker-services/src/main/java/io/justsearch/indexerworker/loop/ops/EnrichmentAccounting.java b/modules/worker-services/src/main/java/io/justsearch/indexerworker/loop/ops/EnrichmentAccounting.java
+new file mode 100644
+index 0000000000..bf65a84ace
+--- /dev/null
++++ b/modules/worker-services/src/main/java/io/justsearch/indexerworker/loop/ops/EnrichmentAccounting.java
+@@ -0,0 +1,42 @@
++/* SPDX-License-Identifier: Apache-2.0 */
++package io.justsearch.indexerworker.loop.ops;
++
++import io.justsearch.indexing.SchemaFields;
++import java.util.Map;
++
++public final class EnrichmentAccounting {
++  public enum Stage {
++    EMBED("embed", SchemaFields.EMBEDDING_STATUS, SchemaFields.EMBEDDING_RETRY_COUNT),
++    CHUNK_EMBED("chunk_embed", SchemaFields.CHUNK_EMBEDDING_STATUS, SchemaFields.CHUNK_EMBEDDING_RETRY_COUNT),
++    SPLADE("splade", SchemaFields.SPLADE_STATUS, SchemaFields.SPLADE_RETRY_COUNT),
++    NER("ner", SchemaFields.NER_STATUS, SchemaFields.NER_RETRY_COUNT);
++
++    final String key;
++    final String status;
++    final String retry;
++
++    Stage(String key, String status, String retry) {
++      this.key = key;
++      this.status = status;
++      this.retry = retry;
++    }
++  }
++
++  public enum Disposition { PUBLISHED, COMPLETED_EMPTY, FAILED_CHARGED, DEFERRED, REJECTED_STALE, REJECTED_OUTPUT, CANCELLED }
++  public record Ticket(String documentId, Stage stage) {}
++
++  public record Summary(Map<Ticket, Disposition> tickets, Map<String, Long> counters) {
++    public Summary {
++      tickets = Map.copyOf(tickets);
++      counters = Map.copyOf(counters);
++    }
++
++    public static Summary empty() { return new Summary(Map.of(), Map.of()); }
++
++    public long count(Stage stage, Disposition disposition) {
++      return tickets.entrySet().stream()
++          .filter(entry -> entry.getKey().stage() == stage && entry.getValue() == disposition).count();
++    }
++  }
++
++}

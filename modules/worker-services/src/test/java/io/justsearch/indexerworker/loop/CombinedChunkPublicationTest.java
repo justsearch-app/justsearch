@@ -11,7 +11,6 @@ import static org.mockito.Mockito.when;
 
 import io.justsearch.adapters.lucene.runtime.IndexSchema;
 import io.justsearch.adapters.lucene.runtime.LuceneExecutorTestBase;
-import io.justsearch.adapters.lucene.runtime.LuceneRuntimeTypes.BatchUpdateResult;
 import io.justsearch.configuration.FieldCatalogDef;
 import io.justsearch.indexerworker.embed.EmbeddingProvider;
 import io.justsearch.indexerworker.loop.ops.CombinedEnrichmentBackfillOps;
@@ -76,11 +75,11 @@ class CombinedChunkPublicationTest extends LuceneExecutorTestBase {
       var coordinator = spy(runtime.indexingCoordinator());
       var written = new ArrayList<Integer>();
       doAnswer(call -> {
-        BatchUpdateResult result = (BatchUpdateResult) call.callRealMethod();
-        written.add(result.updatedCount());
+        var result = (io.justsearch.adapters.lucene.runtime.LuceneRuntimeTypes.EnrichmentPublicationReceipt) call.callRealMethod();
+        written.add(result.acceptedIds().size());
         if (refreshAfterPublication) runtime.commitOps().maybeRefreshBlocking();
         return result;
-      }).when(coordinator).updateDocumentsBatchIf(anyList(), anyMap());
+      }).when(coordinator).publishEnrichmentBatch(anyList(), anyMap());
       var context = new CombinedEnrichmentBackfillOps.BackfillContext(
           runtime.documentFieldOps(), coordinator, runtime.commitOps(), IndexingPacing.unthrottled(),
           () -> embedding, () -> null, () -> null, () -> true, () -> true, 100,

@@ -28,7 +28,7 @@ final class EnrichmentPublicationBenchmarkTest extends LuceneExecutorTestBase {
       runtime.commitOps().stopCommitTimer();
       var coordinator = mock(IndexingCoordinator.class, withSettings().spiedInstance(runtime.indexingCoordinator())
           .defaultAnswer(invocation -> {
-            if (!invocation.getMethod().getName().startsWith("updateDocumentsBatch")) return invocation.callRealMethod();
+            if (!invocation.getMethod().getName().equals("publishEnrichmentBatch")) return invocation.callRealMethod();
             long start = System.nanoTime();
             Object result = invocation.callRealMethod();
             times.add(System.nanoTime() - start);

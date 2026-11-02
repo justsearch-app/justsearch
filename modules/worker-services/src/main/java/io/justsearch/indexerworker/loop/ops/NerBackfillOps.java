@@ -43,6 +43,7 @@ public final class NerBackfillOps {
    */
   public static StageOutcome processNerBackfill(BackfillContext context) {
     long methodStart = System.nanoTime();
+    EnrichmentAccounting accounting = new EnrichmentAccounting();
     try {
       List<String> pendingIds =
           context
@@ -50,6 +51,7 @@ public final class NerBackfillOps {
               .queryDocIdsByField(
                   SchemaFields.NER_STATUS, SchemaFields.NER_STATUS_PENDING, context.batchSize());
 
+      accounting.select(pendingIds, EnrichmentAccounting.Stage.NER);
       if (pendingIds.isEmpty()) {
         return StageOutcome.none();
       }
@@ -63,13 +65,17 @@ public final class NerBackfillOps {
       // (single NRT refresh instead of 100 × 85ms per-doc refreshes)
       List<Map.Entry<String, Map<String, Object>>> batchUpdates = new ArrayList<>();
 
-      if (!context.runningSupplier().getAsBoolean()) return StageOutcome.elapsedSince(methodStart);
-      EnrichmentBatch batch = new EnrichmentBatch(context.documentFieldOps(), context.indexingCoordinator(), pendingIds);
+      if (!context.runningSupplier().getAsBoolean()) {
+        accounting.cancelRemaining();
+        return StageOutcome.observed(true, 0, methodStart, accounting);
+      }
+      EnrichmentBatch batch = new EnrichmentBatch(context.documentFieldOps(), context.indexingCoordinator(), pendingIds).accounting(accounting);
       for (String docId : pendingIds) {
         // NER is CPU-only: interrupt on shutdown, no GPU check. Tempdoc 885 item 3: foreground
         // load paces the per-document loop instead of breaking out of it.
         context.pacing().pace();
         if (!context.runningSupplier().getAsBoolean()) {
+          accounting.cancelRemaining();
           context.log().debug("NER backfill interrupted: loop stopping");
           break;
         }
@@ -108,10 +114,12 @@ public final class NerBackfillOps {
 
           applyEntityFieldUpdates(updates, result);
 
+          accounting.computed(docId, updates);
           batchUpdates.add(Map.entry(docId, updates));
           processed++;
 
         } catch (Exception e) {
+          accounting.cancelled(EnrichmentAccounting.Stage.NER, e);
           context.log().error("NER backfill failed for doc {}: {}", docId, e.getMessage());
           markedFailed +=
               batch.failure(docId, SchemaFields.NER_RETRY_COUNT, NerBackfillOps::computeNerFailureUpdate);
@@ -140,11 +148,12 @@ public final class NerBackfillOps {
                 failed,
                 markedFailed);
       }
-      return new StageOutcome(true, processed, (System.nanoTime() - methodStart) / 1_000_000);
+      return StageOutcome.observed(true, processed, methodStart, accounting);
 
     } catch (Exception e) {
+      accounting.cancelled(EnrichmentAccounting.Stage.NER, e);
       context.log().error("Error during NER backfill", e);
-      return new StageOutcome(false, 0, (System.nanoTime() - methodStart) / 1_000_000);
+      return StageOutcome.observed(false, 0, methodStart, accounting);
     }
   }
 

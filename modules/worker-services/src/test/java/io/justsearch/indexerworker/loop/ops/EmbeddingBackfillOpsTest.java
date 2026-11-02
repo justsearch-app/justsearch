@@ -100,8 +100,8 @@ class EmbeddingBackfillOpsTest {
         writesAllowed::get, 100, LoggerFactory.getLogger(EmbeddingBackfillOpsTest.class));
     if (chunk) EmbeddingBackfillOps.processChunkEmbeddingBackfill(ctx);
     else EmbeddingBackfillOps.processEmbeddingBackfill(ctx);
-    assertDoesNotThrow(() -> verify(indexingCoordinator, never()).updateDocumentIf(
-        anyString(), any(DocumentFieldOps.EnrichmentInput.class), anyMap()));
+    assertDoesNotThrow(() -> verify(indexingCoordinator, never()).publishEnrichmentBatch(
+        anyList(), anyMap()));
     verify(embeddingProvider, never()).embedDocument(eq("later content"), any(InferenceRequest.class));
 
     failing.set(false);
@@ -111,10 +111,12 @@ class EmbeddingBackfillOpsTest {
     StageOutcome recovered = chunk ? EmbeddingBackfillOps.processChunkEmbeddingBackfill(ctx)
         : EmbeddingBackfillOps.processEmbeddingBackfill(ctx);
     assertEquals(2, recovered.docsProcessed());
-    verify(indexingCoordinator).updateDocumentIf(eq("first"), any(DocumentFieldOps.EnrichmentInput.class), argThat(update ->
-        "COMPLETED".equals(update.get(status))));
-    verify(indexingCoordinator).updateDocumentIf(eq("later"), any(DocumentFieldOps.EnrichmentInput.class), argThat(update ->
-        "COMPLETED".equals(update.get(status))));
+    verify(indexingCoordinator).publishEnrichmentBatch(argThat(updates ->
+        updates.size() == 1 && "first".equals(updates.get(0).getKey())
+            && "COMPLETED".equals(updates.get(0).getValue().get(status))), anyMap());
+    verify(indexingCoordinator).publishEnrichmentBatch(argThat(updates ->
+        updates.size() == 1 && "later".equals(updates.get(0).getKey())
+            && "COMPLETED".equals(updates.get(0).getValue().get(status))), anyMap());
   }
 
   @Nested
@@ -152,19 +154,21 @@ class EmbeddingBackfillOpsTest {
       verify(embeddingProvider).embedDocument(eq("content one"), any(InferenceRequest.class));
       verify(embeddingProvider).embedDocument(eq("content two"), any(InferenceRequest.class));
       verify(indexingCoordinator)
-          .updateDocument(
-              eq("chunk1"),
-              argThat(
-                  (Map<String, Object> m) ->
-                      SchemaFields.EMBEDDING_STATUS_COMPLETED.equals(
-                          m.get(SchemaFields.CHUNK_EMBEDDING_STATUS))));
+          .publishEnrichmentBatch(
+              argThat(entries -> {
+                if (entries.size() != 1 || !"chunk1".equals(entries.get(0).getKey())) return false;
+                var m = entries.get(0).getValue();
+                return SchemaFields.EMBEDDING_STATUS_COMPLETED.equals(
+                          m.get(SchemaFields.CHUNK_EMBEDDING_STATUS));
+              }), anyMap());
       verify(indexingCoordinator)
-          .updateDocument(
-              eq("chunk2"),
-              argThat(
-                  (Map<String, Object> m) ->
-                      SchemaFields.EMBEDDING_STATUS_COMPLETED.equals(
-                          m.get(SchemaFields.CHUNK_EMBEDDING_STATUS))));
+          .publishEnrichmentBatch(
+              argThat(entries -> {
+                if (entries.size() != 1 || !"chunk2".equals(entries.get(0).getKey())) return false;
+                var m = entries.get(0).getValue();
+                return SchemaFields.EMBEDDING_STATUS_COMPLETED.equals(
+                          m.get(SchemaFields.CHUNK_EMBEDDING_STATUS));
+              }), anyMap());
     }
 
     @Test
@@ -277,7 +281,8 @@ class EmbeddingBackfillOpsTest {
 
       verify(embeddingProvider).embedDocumentBatch(List.of(first));
       verify(embeddingProvider, never()).embedDocument(eq(large), any(InferenceRequest.class));
-      verify(indexingCoordinator, never()).updateDocument(eq("large"), anyMap());
+      verify(indexingCoordinator, never()).publishEnrichmentBatch(argThat(updates ->
+          updates.stream().anyMatch(entry -> "large".equals(entry.getKey()))), anyMap());
       verify(documentFieldOps, never()).getDocumentContent("later");
     }
 

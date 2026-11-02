@@ -190,6 +190,7 @@ final class WorkerStatusMapper {
                         .spladeAvailable(enrichment.getSpladeAvailable())
                         .nerAvailable(enrichment.getNerAvailable())
                         .enrichmentCompleted(enrichment.getEnrichmentCompletedMap())
+                        .enrichmentOutcomes(enrichment.getEnrichmentOutcomesMap())
                         .batchTiming(new BatchTimingView(
                                 enrichment.getBatchTiming().getBatchCountMap(),
                                 enrichment.getBatchTiming().getTotalMsMap()))

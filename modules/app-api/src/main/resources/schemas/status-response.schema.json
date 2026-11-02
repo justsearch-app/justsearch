@@ -1172,6 +1172,12 @@
                 "type" : "integer"
               }
             },
+            "enrichmentOutcomes" : {
+              "type" : [ "object", "null" ],
+              "additionalProperties" : {
+                "type" : "integer"
+              }
+            },
             "failedNerCount" : {
               "type" : "integer"
             },

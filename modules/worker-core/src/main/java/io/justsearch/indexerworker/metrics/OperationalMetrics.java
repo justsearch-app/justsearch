@@ -47,7 +47,7 @@ public final class OperationalMetrics {
 
   // Map-based batch timing accumulators (354, replacing per-field pattern from 350).
   // Keys are BatchTimingKeys constants. Per-stage timing only accumulates when the
-  // stage processed > 0 docs, so totalMs / batchCount gives meaningful per-batch averages.
+  // stage was attempted, including attempts with no completed documents.
   private final ConcurrentHashMap<String, LongAdder> batchTimingMs = new ConcurrentHashMap<>();
   private final ConcurrentHashMap<String, LongAdder> batchTimingCount =
       new ConcurrentHashMap<>();
@@ -200,8 +200,8 @@ public final class OperationalMetrics {
   }
 
   /**
-   * Record timing for a per-stage operation that may be skipped (354). Only accumulates when
-   * docsProcessed > 0, so totalMs / batchCount gives meaningful per-batch averages.
+   * Record timing for every attempted per-stage operation, including zero-completion attempts.
+   * Callers omit operations that were not attempted.
    *
    * <p>Units (tempdoc 691 A-5): {@code ms} is added to {@code batchTimingMs} directly (a document
    * count is never summed into it — the timing is per CALL, i.e. per batch/cycle), while {@code
@@ -213,10 +213,19 @@ public final class OperationalMetrics {
    * individual paths alike) — see {@link #recordEnrichmentCompleted}'s note.
    */
   public void recordStageTiming(String stage, int docsProcessed, long ms) {
-    if (docsProcessed > 0) {
-      batchTimingMs.computeIfAbsent(stage, k -> new LongAdder()).add(ms);
-      batchTimingCount.computeIfAbsent(stage, k -> new LongAdder()).increment();
-    }
+    recordBatchTiming(stage, ms);
+  }
+
+  private final ConcurrentHashMap<String, LongAdder> enrichmentOutcomes = new ConcurrentHashMap<>();
+
+  /** Additive attempt/disposition counters, independent of completion and commit totals. */
+  public void recordEnrichmentOutcomes(Map<String, Long> counters) {
+    counters.forEach((key, count) -> enrichmentOutcomes.computeIfAbsent(key, k -> new LongAdder()).add(count));
+  }
+
+  public Map<String, Long> getEnrichmentOutcomes() {
+    return enrichmentOutcomes.entrySet().stream()
+        .collect(Collectors.toMap(Map.Entry::getKey, entry -> entry.getValue().sum()));
   }
 
   /**
@@ -572,6 +581,7 @@ public final class OperationalMetrics {
     // Map-based accumulators
     failedByFileKind.clear();
     enrichmentCompleted.clear();
+    enrichmentOutcomes.clear();
     batchTimingMs.clear();
     batchTimingCount.clear();
     backfillMode = "idle";
