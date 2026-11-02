@@ -2136,19 +2136,19 @@ public final class IndexGenerationManager {
           entries
               .filter(
                   path ->
-                      !Set.of(GENERATION_SENTINEL, GENERATION_MANIFEST)
+                      !Set.of(GENERATION_SENTINEL, GENERATION_MANIFEST, DELETE_MARKER)
                           .contains(path.getFileName().toString()))
               .sorted(Comparator.comparing(Path::toString))
               .toList();
     }
     for (Path entry : payload) {
       io.justsearch.configuration.FileOps.deleteRecursivelyBestEffort(entry, log);
-      if (!Files.exists(entry, java.nio.file.LinkOption.NOFOLLOW_LINKS)) {
+      if (Files.notExists(entry, java.nio.file.LinkOption.NOFOLLOW_LINKS)) {
         haltAfterObservedRetirementDeletion(generationId, directory, entry);
       }
     }
     for (Path entry : payload) {
-      if (Files.exists(entry, java.nio.file.LinkOption.NOFOLLOW_LINKS)) {
+      if (!Files.notExists(entry, java.nio.file.LinkOption.NOFOLLOW_LINKS)) {
         throw new IOException(
             "Predecessor payload remains locked after deletion: " + directory);
       }
@@ -2837,79 +2837,63 @@ public final class IndexGenerationManager {
   public GcResult gcBestEffort(int keepLatest, boolean pruneMarkedOnly) {
     try (var ignored = stateControl()) {
       try {
-        if (!Files.isDirectory(indicesDir)) {
-          return new GcResult(0, 0);
-        }
-        State state = readStateBestEffort();
-        if (state == null) {
-          return new GcResult(0, 0);
-        }
+        State state = strictBootLayout(readRecordedState()).state();
         Set<String> protectedIds = protectedGenerationIds(state);
-
+        List<Path> candidates = new ArrayList<>();
+        List<Path> markedPaths = new ArrayList<>();
+        try (var stream = Files.list(indicesDir)) {
+          for (Path path : stream.toList()) {
+            if (!Files.readAttributes(path, java.nio.file.attribute.BasicFileAttributes.class,
+                java.nio.file.LinkOption.NOFOLLOW_LINKS).isDirectory()) continue;
+            String name = path.getFileName().toString();
+            if (protectedIds.contains(name)) continue;
+            try {
+              if (!Files.readAttributes(path.resolve(GENERATION_SENTINEL),
+                  java.nio.file.attribute.BasicFileAttributes.class,
+                  java.nio.file.LinkOption.NOFOLLOW_LINKS).isRegularFile()) continue;
+            } catch (java.nio.file.NoSuchFileException absentSentinel) {
+              continue;
+            }
+            boolean markedForDeletion = name.contains(".del-");
+            if (!markedForDeletion) {
+              try {
+                Files.readAttributes(path.resolve(DELETE_MARKER), java.nio.file.attribute.BasicFileAttributes.class,
+                    java.nio.file.LinkOption.NOFOLLOW_LINKS);
+                markedForDeletion = true;
+              } catch (java.nio.file.NoSuchFileException absentMarker) {
+                markedForDeletion = false;
+              }
+            }
+            if (markedForDeletion) markedPaths.add(path);
+            else candidates.add(path);
+          }
+        }
         int marked = 0;
         if (!pruneMarkedOnly) {
-          List<Path> candidates = new ArrayList<>();
-          try (var stream = Files.list(indicesDir)) {
-            stream
-                .filter(Files::isDirectory)
-                .filter(p -> Files.exists(p.resolve(GENERATION_SENTINEL)))
-                .filter(
-                    p -> {
-                      String name = p.getFileName().toString();
-                      if (protectedIds.contains(name)) return false;
-                      // Never "mark" already-marked dirs; prune step handles them.
-                      if (name.contains(".del-") || Files.exists(p.resolve(DELETE_MARKER))) {
-                        return false;
-                      }
-                      return true;
-                    })
-                .forEach(candidates::add);
-          }
           candidates.sort(Comparator.comparing(p -> p.getFileName().toString()));
-          int keep = Math.max(0, keepLatest);
-          int cutoff = Math.max(0, candidates.size() - keep);
+          int cutoff = Math.max(0, candidates.size() - Math.max(0, keepLatest));
           for (int i = 0; i < cutoff; i++) {
-            Path p = candidates.get(i);
-            try {
-              SafeIndexPathOps.markForDeletion(p, indicesDir);
-              marked++;
-            } catch (Exception e) {
-              log.debug("Failed to mark {} for deletion: {}", p, e.getMessage());
+            var result = SafeIndexPathOps.markForDeletion(candidates.get(i), indicesDir);
+            if (!result.renamedToDel() && !result.wroteMarker()) {
+              throw new IOException("Could not mark generation for deletion: " + candidates.get(i));
             }
+            markedPaths.add(result.effectivePath());
+            marked++;
           }
         }
-
-        // Always try to prune already-marked directories (best-effort).
-        int before = countMarkedDeletableDirsBestEffort(state);
-        pruneMarkedForDeletionBestEffort();
-        int after = countMarkedDeletableDirsBestEffort(state);
-        int pruned = Math.max(0, before - after);
+        int pruned = 0;
+        for (Path path : markedPaths) {
+          deleteRetirementPayloadBeforeOwnership(path, path.getFileName().toString());
+          var result = io.justsearch.configuration.FileOps.deleteRecursivelyBestEffort(path, log);
+          if (result.failed() != 0 || Files.exists(path)) {
+            throw new IOException("Generation cleanup incomplete: " + path);
+          }
+          pruned++;
+        }
         return new GcResult(marked, pruned);
-      } catch (Exception e) {
-        return new GcResult(0, 0);
+      } catch (IOException failure) {
+        throw new java.io.UncheckedIOException("Index GC incomplete", failure);
       }
-    }
-  }
-
-  private int countMarkedDeletableDirsBestEffort(State state) {
-    if (state == null || !Files.isDirectory(indicesDir)) {
-      return 0;
-    }
-    Set<String> protectedIds = protectedGenerationIds(state);
-    try (var stream = Files.list(indicesDir)) {
-      return (int)
-          stream
-              .filter(Files::isDirectory)
-              .filter(
-                  p -> {
-                    String name = p.getFileName().toString();
-                    if (protectedIds.contains(name)) return false;
-                    boolean marked = name.contains(".del-") || Files.exists(p.resolve(DELETE_MARKER));
-                    return marked && Files.exists(p.resolve(GENERATION_SENTINEL));
-                  })
-              .count();
-    } catch (Exception e) {
-      return 0;
     }
   }
 

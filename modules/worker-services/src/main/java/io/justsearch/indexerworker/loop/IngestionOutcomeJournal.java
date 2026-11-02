@@ -146,6 +146,11 @@ public final class IngestionOutcomeJournal {
     // Queue clear removes rows, not issued ownership. The restarted loop must retry these returns.
   }
 
+  boolean publicationComplete() {
+    return pendingMarkDone.isEmpty() && pendingReturns.isEmpty()
+        && commitWriteFailure == null && batchReturnFailure == null;
+  }
+
   // ---- drain ----
 
   /**

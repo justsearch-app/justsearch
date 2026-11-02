@@ -4616,7 +4616,7 @@ public final class WorkerIngestService {
     }
   }
 
-  public ResetIndexResponse resetIndex(ResetIndexRequest request, CallContext ctx) {
+  public synchronized ResetIndexResponse resetIndex(ResetIndexRequest request, CallContext ctx) {
     try (var ignored = openRequestMdc(ctx); var ignoredMutation = mutationLease()) {
       log.info("resetIndex: starting profiling reset");
       if (switchBufferOps.isSwitching() || switchBufferOps.migratingGeneration() != null) {
@@ -4647,6 +4647,7 @@ public final class WorkerIngestService {
       log.info("resetIndex: profiling reset complete");
       return ResetIndexResponse.newBuilder().setSuccess(true).build();
     } catch (Exception e) {
+      if (e instanceof InterruptedException) Thread.currentThread().interrupt();
       log.error("resetIndex failed", e);
       return ResetIndexResponse.newBuilder().setSuccess(false).build();
     }

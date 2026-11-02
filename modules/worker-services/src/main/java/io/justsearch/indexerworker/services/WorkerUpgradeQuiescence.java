@@ -73,7 +73,7 @@ final class WorkerUpgradeQuiescence {
 
   synchronized UpgradeQuiescenceResponse cancel(String requestedId) {
     requireOwner(requestedId);
-    if (loopQuiesced && loopWasRunning && indexingLoop != null) {
+    if (loopWasRunning && indexingLoop != null) {
       indexingLoop.resumeAfterUpgradePreparation();
     }
     preparationId = null;

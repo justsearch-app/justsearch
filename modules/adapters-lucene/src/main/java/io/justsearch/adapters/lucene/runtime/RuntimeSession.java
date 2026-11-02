@@ -220,6 +220,11 @@ final class RuntimeSession implements AutoCloseable {
   private final ReentrantLock closeLock = new ReentrantLock();
   private NrtReopenThreads.CloseAttempt nrtCloseAttempt;
   private int taskOwners;
+  private boolean admissionReaderClosed;
+  private boolean searcherManagerClosed;
+  private boolean writerClosed;
+  private boolean directoryClosed;
+  private boolean writerClosedCleanly;
 
   /** Linearizes one terminal-writer notification against this runtime's intentional retirement. */
   private final Object terminalWriterFailureLock = new Object();
@@ -637,7 +642,8 @@ final class RuntimeSession implements AutoCloseable {
 
       // True corruption auto-recovery (backup-first).
       if (e.reason() == IndexRuntimeIOException.Reason.CORRUPT_INDEX
-          && idx.indexAutoRecovery()) {
+          && idx.indexAutoRecovery()
+          && !"FAIL_CLOSED".equals(idx.indexRecoveryPolicy())) {
         log.warn(
             "Corrupted index detected at {}. Auto-recovery enabled, attempting backup-first"
                 + " rebuild...",
@@ -853,50 +859,38 @@ final class RuntimeSession implements AutoCloseable {
       interrupted |= Thread.interrupted();
       stopNrtUntil(deadlineNanos);
       interrupted |= Thread.interrupted();
-      // Only actual owner exit permits invalidating the snapshot and releasing Lucene resources.
       LifecycleSnapshot snap = snapshot;
-      snapshot = null;
       if (snap != null) {
-        if (commitOps != null) {
-          try { commitOps.closeAdmissionReader(); }
-          catch (IOException e) { log.warn("admission reader close error: {}", e.getMessage()); }
+        if (!admissionReaderClosed) {
+          if (commitOps != null) commitOps.closeAdmissionReader();
+          admissionReaderClosed = true;
         }
-        if (snap.searcherManager() != null) {
-          try {
-            snap.searcherManager().close();
-          } catch (IOException e) {
-            log.warn("searcherManager close error: {}", e.getMessage());
-          }
+        if (!searcherManagerClosed) {
+          if (snap.searcherManager() != null) snap.searcherManager().close();
+          searcherManagerClosed = true;
         }
-        if (snap.writer() != null) {
-          boolean writerWasTerminal =
-              snap.writer().getTragicException() != null || !snap.writer().isOpen();
-          boolean writerClosedCleanly = false;
-          try {
+        if (!writerClosed) {
+          if (snap.writer() != null) {
+            boolean writerWasTerminal =
+                snap.writer().getTragicException() != null || !snap.writer().isOpen();
             snap.writer().close();
-            writerClosedCleanly =
-                !writerWasTerminal && snap.writer().getTragicException() == null;
-          } catch (IOException e) {
-            log.warn("writer close error: {}", e.getMessage());
+            writerClosedCleanly = !writerWasTerminal && snap.writer().getTragicException() == null;
           }
-          // tempdoc 628 Gap 1: record a clean shutdown only when the writer committed + closed cleanly
-          // and this is a persistent (non-ephemeral) index. An absent marker on the next open means the
-          // previous shutdown was unclean (a crash) → escalate to a FULL integrity scan.
-          if (writerClosedCleanly && !snap.ephemeralPath() && snap.indexPath() != null) {
-            CleanShutdownMarker.write(snap.indexPath());
-          }
+          writerClosed = true;
         }
-        if (snap.directory() != null) {
-          try {
-            snap.directory().close();
-          } catch (IOException e) {
-            log.warn("directory close error: {}", e.getMessage());
-          }
+        if (!directoryClosed) {
+          if (snap.directory() != null) snap.directory().close();
+          directoryClosed = true;
         }
         if (snap.ephemeralPath()) {
           ComponentsFactory.deleteOwnedEphemeralPath(snap.indexPath());
+        } else if (writerClosedCleanly && snap.indexPath() != null) {
+          CleanShutdownMarker.write(snap.indexPath());
         }
+        snapshot = null;
       }
+    } catch (IOException failure) {
+      throw IndexRuntimeIOException.fromIndexOperation(failure, "Lucene close incomplete; retained for retry");
     } finally {
       if (interrupted) Thread.currentThread().interrupt();
     }
@@ -933,6 +927,8 @@ final class RuntimeSession implements AutoCloseable {
     // === Not released — synchronization primitive (final, no resources) ===
     //   writeBarrier (ReentrantReadWriteLock — held only during normal ops)
     //   closeLock (ReentrantLock — serializes close attempts outside the admission monitor)
+    //   admissionReaderClosed, searcherManagerClosed, writerClosed, directoryClosed,
+    //   writerClosedCleanly — cleanup progress; a retry never releases a successful stage twice
     //
     // === Not released — ops collaborators ===
     //   readPathOps, writePathOps, hybridSearchOps, textQueryOps, chunkSearchOps,

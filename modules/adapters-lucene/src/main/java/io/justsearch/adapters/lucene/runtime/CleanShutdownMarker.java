@@ -65,11 +65,7 @@ public final class CleanShutdownMarker {
    * shutdown that had not happened and paid a FULL integrity verification for it. Live validation
    * saw one generation do that on five consecutive boots.
    */
-  public static void consume(Path indexDir) {
-    try {
-      Files.deleteIfExists(pathFor(indexDir));
-    } catch (IOException e) {
-      // best-effort: a marker that survives a crash costs a missed FULL scan, never correctness.
-    }
+  public static void consume(Path indexDir) throws IOException {
+    Files.deleteIfExists(pathFor(indexDir));
   }
 }

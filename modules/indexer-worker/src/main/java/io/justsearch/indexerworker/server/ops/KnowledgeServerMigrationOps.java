@@ -886,6 +886,7 @@ public final class KnowledgeServerMigrationOps {
       List<CommittedNativeEffect> effects = new ArrayList<>();
       for (var op : selected) effects.add(decodeCommittedNativeEffect(op, sources));
       active.commitOps().maybeRefreshBlocking();
+      effects = committedRootSyncEffects(scoped, active, effects, policy);
       for (int i = 0; i < effects.size(); i++) {
         effects.set(i, observeCommittedProjection(active, effects.get(i)));
       }
@@ -1013,6 +1014,59 @@ public final class KnowledgeServerMigrationOps {
     return new CommittedNativeEffect(op, file, projection, id, path, collection, false);
   }
 
+  private static List<CommittedNativeEffect> committedRootSyncEffects(
+      SwitchBufferCapableQueue queue, RunningRuntime active, List<CommittedNativeEffect> effects,
+      io.justsearch.indexerworker.services.NativePolicyReplay policy) throws IOException {
+    boolean broadDelete = false;
+    Set<SwitchBufferCapableQueue.SwitchBufferOp> restoringSyncs = new LinkedHashSet<>();
+    for (var effect : effects) {
+      if ("DELETE_PREFIX".equals(effect.op().op()) || "DELETE_COLLECTION".equals(effect.op().op())) {
+        broadDelete = true;
+      } else if (broadDelete && "SYNC_ROOT".equals(effect.op().op())) restoringSyncs.add(effect.op());
+    }
+    if (restoringSyncs.isEmpty()) return effects;
+    var restored = new HashMap<SwitchBufferCapableQueue.SwitchBufferOp, List<CommittedNativeEffect>>();
+    active.documentFieldOps().scanIndexedSources(256, batch -> {
+      for (var source : batch) {
+        String path = source.path();
+        if (path == null || !path.equals(source.docId())) continue;
+        try {
+          var fields = active.documentFieldOps();
+          if (fields.getDocumentFieldOrThrow(path, SchemaFields.PROJECTION_SOURCE_ID) != null
+              || "true".equals(fields.getDocumentFieldOrThrow(path, SchemaFields.IS_CHUNK))) continue;
+          var row = queue.watcherReconciliationRow(path);
+          if (row == null || row.get("ingestion_root") == null) continue;
+          String collection = row.get("collection");
+          String hash = fields.getDocumentFieldOrThrow(path, SchemaFields.SOURCE_SHA256);
+          if (!JobQueue.IngestionLedgerTransition.isSha256(hash)
+              || !Objects.equals(collection, fields.getDocumentFieldOrThrow(path, SchemaFields.COLLECTION))
+              || queue.sourceFileWork(path, hash) != SwitchBufferCapableQueue.SourceFileWork.COMMITTED) continue;
+          for (var op : restoringSyncs) {
+            Path root = Path.of(io.justsearch.indexerworker.queue.SwitchBufferSyncRoot.decode(op.payload()).rootPath())
+                .toAbsolutePath().normalize();
+            Path file = Path.of(path).toAbsolutePath().normalize();
+            if (file.equals(root) || !file.startsWith(root)
+                || !root.equals(Path.of(row.get("ingestion_root")).toAbsolutePath().normalize())
+                || policy != null && (!policy.owns(file, root, collection)
+                    || policy.excludesUnderCurrentOwner(file, root, collection))) continue;
+            var witness = new SwitchBufferUpsert(path, collection, null,
+                row.get("unit_revision"), hash, root);
+            restored.computeIfAbsent(op, ignored -> new ArrayList<>()).add(
+                new CommittedNativeEffect(op, witness, null, path, path, collection, false));
+          }
+        } catch (IOException failure) {
+          throw new java.io.UncheckedIOException(failure);
+        }
+      }
+    });
+    List<CommittedNativeEffect> expanded = new ArrayList<>();
+    for (var effect : effects) {
+      expanded.add(effect);
+      expanded.addAll(restored.getOrDefault(effect.op(), List.of()));
+    }
+    return expanded;
+  }
+
   private static String projectedTerm(Object field) {
     return field == null ? null : String.valueOf(field);
   }
@@ -1084,6 +1138,12 @@ public final class KnowledgeServerMigrationOps {
       if (!Objects.equals(effect.path(), fields.getDocumentFieldOrThrow(effect.id(), SchemaFields.PATH))
           || !Objects.equals(effect.collection(), fields.getDocumentFieldOrThrow(effect.id(), SchemaFields.COLLECTION))) {
         return false;
+      }
+      if ("SYNC_ROOT".equals(effect.op().op())) {
+        return effect.file().sourceSha256().equals(fields.getDocumentFieldOrThrow(
+                effect.id(), SchemaFields.SOURCE_SHA256))
+            && queue.sourceFileWork(effect.id(), effect.file().sourceSha256())
+                == SwitchBufferCapableQueue.SourceFileWork.COMMITTED;
       }
       return queue.matchesAcceptedFileProjection(effect.id(), effect.file().unitRevision(),
           effect.file().sourceSha256(), fields.getDocumentFieldOrThrow(effect.id(), SchemaFields.SOURCE_SHA256));

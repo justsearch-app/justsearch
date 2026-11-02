@@ -6564,7 +6564,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
     } catch (SQLException e) {
       recordDbError();
       log.error("Failed to clear all jobs", e);
-      return 0;
+      throw new IllegalStateException("Failed to clear all jobs", e);
     } finally {
       unlockAfterChanges();
     }
