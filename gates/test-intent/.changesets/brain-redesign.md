@@ -1315,6 +1315,54 @@ axe run remain necessary.
       "newChecks": [
         "modules/ui-web/src/shell-v0/views/BrainSurface.repairRun.test.ts#a runtime-only read failure keeps live install progress and controls"
       ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/views/BrainSurface.repairRun.test.ts"
+      ],
+      "class": "New",
+      "repaired": true,
+      "behaviour": "Pause and Resume update the actual button and headline immediately after the store has synchronized, despite unchanged backend timestamps. Re-emitted snapshots and older polls never revert an operation response; a subsequent equal-timestamp poll wins. While planning, retained downloading records for declined, unavailable and not-in-mode packages never claim Downloading, Waiting to download or Preparing download; included packages still prepare. All six checks fail by assertion on 5caa370624.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "B8",
+          "quote": "Install: the Install AI button shows the selected total size and opens the existing licence/size consent; downloading shows progress, pause/resume, cancel with retained bytes, stalled and blocked stages, and search ready before completion, in the same page (no nested panel). Repair, retry after failure and the working-but-missing / manual fallback stay reachable.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "B2",
+          "quote": "Headline from the shared AI verdict for every lifecycle state it decides today: not installed, download paused/stopped, installing (with progress), install failed, starting/recovering, connecting/unconfirmed, ready, running on the processor instead of the graphics card, activation or reindex required. While status is unknown it says so and never claims ready.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "B4",
+          "quote": "Path: Your files (file count from status), Read the text (built in), Understand meaning (needed, its size, no switch), Best match first, Answer questions (model name and size when installed), with Text in scans and images as a branch off Read the text. Each step shows its known size (registry download/footprint size, never claimed as measured disk use) and its state in words (on, off, not downloaded, downloading x%, unavailable on this computer with the reason).",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "well from now on you can just proceed autonomously accordinglky",
+          "delegationLocation": "task t-20261101-uiimpl, user turn after the WP1 summary",
+          "delegationScope": "Implement the agreed AI Brain redesign and repair its review defects.",
+          "choice": "Keep a successful operation response through re-emissions of the same install observation and older polls; the first subsequent poll object with an equal or newer updatedAtEpochMs wins. During planning ignore all retained package progress; included packages prepare and excluded packages report their own state. Supersedes the earlier timestamp-only tie decision.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/brain-running-ties-repair.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/views/BrainSurface.repairRun.test.ts#Pause immediately replaces a synchronized poll at the same timestamp until a new equal-timestamp poll wins",
+        "modules/ui-web/src/shell-v0/views/BrainSurface.repairRun.test.ts#Resume immediately replaces a synchronized poll at the same timestamp until a new equal-timestamp poll wins",
+        "modules/ui-web/src/shell-v0/views/BrainSurface.repairRun.test.ts#re-emitted and newly polled older observations after Pause never erase its equal-timestamp response",
+        "modules/ui-web/src/shell-v0/views/BrainSurface.repairRun.test.ts#planning ignores retained downloading records for an excluded declined package",
+        "modules/ui-web/src/shell-v0/views/BrainSurface.repairRun.test.ts#planning ignores retained downloading records for an excluded unavailable package",
+        "modules/ui-web/src/shell-v0/views/BrainSurface.repairRun.test.ts#planning ignores retained downloading records for an excluded not-in-mode package"
+      ]
     }
   ]
 }

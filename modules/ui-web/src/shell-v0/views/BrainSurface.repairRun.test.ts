@@ -136,6 +136,58 @@ describe('Brain running repair controls (B2/B8)', () => {
     expect(el.shadowRoot!.querySelector('[label="Pause download"]')).not.toBeNull();
   });
 
+  it.each(['Pause', 'Resume'])('%s immediately replaces a synchronized poll at the same timestamp until a new equal-timestamp poll wins', async action => {
+    run = { ...run, paused: action === 'Resume' };
+    emit({ ...run });
+    const el = await mount();
+    await click(el, `${action} download`);
+    const headline = action === 'Pause' ? 'Paused 25%' : 'Installing… 25%';
+    const nextAction = action === 'Pause' ? 'Resume download' : 'Pause download';
+    expect(el.shadowRoot!.querySelector('.brain-headline')!.textContent).toBe(headline);
+    expect(el.shadowRoot!.querySelector(`[label="${nextAction}"]`)).not.toBeNull();
+    // Other store inputs re-emit the same install observation, not another poll.
+    notify({ runtimeStatus: { onnxFeatures: [] } }); await settle(el);
+    expect(el.shadowRoot!.querySelector('.brain-headline')!.textContent).toBe(headline);
+    // The next poll wins even when it disagrees with the operation at an equal timestamp.
+    emit({ ...run, paused: !run.paused }); await settle(el);
+    expect(el.shadowRoot!.querySelector('.brain-headline')!.textContent).toBe(action === 'Pause' ? 'Installing… 25%' : 'Paused 25%');
+    expect(el.shadowRoot!.querySelector(`[label="${action} download"]`)).not.toBeNull();
+  });
+
+  it('re-emitted and newly polled older observations after Pause never erase its equal-timestamp response', async () => {
+    emit({ ...run });
+    const el = await mount();
+    await click(el, 'Pause download');
+    notify({ runtimeStatus: { onnxFeatures: [] } }); await settle(el);
+    expect(el.shadowRoot!.querySelector('.brain-headline')!.textContent).toBe('Paused 25%');
+    emit({ ...run, paused: false, updatedAtEpochMs: run.updatedAtEpochMs! - 1 }); await settle(el);
+    notify({ runtimeStatus: { onnxFeatures: [] } }); await settle(el);
+    expect(el.shadowRoot!.querySelector('.brain-headline')!.textContent).toBe('Paused 25%');
+    expect(el.shadowRoot!.querySelector('[label="Resume download"]')).not.toBeNull();
+    emit({ ...run, paused: false }); await settle(el);
+    expect(el.shadowRoot!.querySelector('.brain-headline')!.textContent).toBe('Installing… 25%');
+    expect(el.shadowRoot!.querySelector('[label="Pause download"]')).not.toBeNull();
+  });
+
+  it.each(['declined', 'unavailable', 'not-in-mode'])('planning ignores retained downloading records for an excluded %s package', async state => {
+    const fetch = globalThis.fetch;
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      if (String(input).endsWith('/plan-preview')) return json({ totalDownloadBytes: 1024, components: [
+        { id: 'embedding', label: 'Understand meaning', state: 'installed', totalBytes: 1024 },
+        { id: 'reranker', label: 'Best match first', state, declined: state === 'declined', unavailableReason: 'Not available here.', totalBytes: 2048 },
+      ] });
+      return fetch(input, init);
+    }));
+    run = { ...run, phase: 'plan', packages: [
+      ...run.packages!, { packageId: 'reranker', state: 'downloading', bytesDownloaded: 1024, bytesTotal: 2048 },
+    ] }; emit({ ...run });
+    const el = await mount(); await settle(el);
+    expect(el.shadowRoot!.querySelector('[data-feature="meaning"]')!.textContent).toContain('Preparing download');
+    const reranker = el.shadowRoot!.querySelector('[data-feature="reranker"]')!.textContent!;
+    expect(reranker).not.toMatch(/Downloading|Waiting to download|Preparing download/);
+    expect(reranker).toContain(state === 'declined' ? 'Not downloaded' : 'Unavailable on this computer');
+  });
+
   it.each(['download', 'plan'])('a failed install read gates a retained running %s observation and recovery restores it', async phase => {
     run = { ...run, phase }; emit(run);
     const el = await mount();

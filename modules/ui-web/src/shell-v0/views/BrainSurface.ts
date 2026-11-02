@@ -597,6 +597,7 @@ export class BrainSurface extends JfElement {
 
   private clientRef: OperationClient | null = null;
   private _unifiedAiState: UnifiedAiState | null = null;
+  private installResponsePending = false;
   private unsubAi: (() => void) | null = null;
   private uiModeUnsub: (() => void) | null = null;
   private refreshRevision = 0;
@@ -1213,6 +1214,8 @@ export class BrainSurface extends JfElement {
     // for inference + system status (aiStateStore.ts §B7); mirror its snapshots here
     // instead of running a second poll for them.
     this.unsubAi = subscribeAiState((s) => {
+      // Poll results have a new install object; other store inputs retain its identity.
+      const newInstallObservation = s.installStatus !== this._unifiedAiState?.installStatus;
       this._unifiedAiState = s;
       // Adopt only non-null snapshots: the store retains its last-known snapshot when
       // the connection goes stale (aiStateStore §B7), so a null here means "no data
@@ -1224,7 +1227,9 @@ export class BrainSurface extends JfElement {
       // conditionally-armed pollInstall/pollPack/pollRuntime timers (which only ever self-armed
       // AFTER a prior fetch had already succeeded — the structural cause of the "stuck on
       // Connecting… forever" bug, tempdoc 663 §O). Same non-null-adopt rule as inference/status.
-      if (s.installStatus && !this.installResponseNewer()) {
+      if (s.installStatus && (!this.installResponsePending || (newInstallObservation
+        && (s.installStatus.updatedAtEpochMs ?? 0) >= (this.installStatus?.updatedAtEpochMs ?? 0)))) {
+        this.installResponsePending = false;
         const previous = this.installStatus;
         this.installStatus = s.installStatus;
         if ((previous?.state !== s.installStatus.state && previous != null)
@@ -1343,18 +1348,15 @@ export class BrainSurface extends JfElement {
         && ['checking', 'stale-poll'].includes(this._unifiedAiState.aiEngine.stability.cause));
   }
 
-  /** Operation responses bridge the poll only until the store catches up. */
-  private installResponseNewer(status = this.installStatus): boolean {
-    return (status?.updatedAtEpochMs ?? 0)
-      > (this._unifiedAiState?.installStatus?.updatedAtEpochMs ?? 0);
-  }
-
+  /** Pause/Resume need not advance the timestamp. Only a subsequent poll can acknowledge them. */
   private adoptInstallResponse(status: InstallStatus): void {
-    this.installStatus = this.installResponseNewer(status) ? status : this._unifiedAiState?.installStatus ?? status;
+    const observed = this._unifiedAiState?.installStatus;
+    this.installResponsePending = (status.updatedAtEpochMs ?? 0) >= (observed?.updatedAtEpochMs ?? 0);
+    this.installStatus = this.installResponsePending ? status : observed ?? status;
   }
 
   private installKnown(): boolean {
-    return this._unifiedAiState?.installObservationLive === true || this.installResponseNewer();
+    return this._unifiedAiState?.installObservationLive === true || this.installResponsePending;
   }
 
   private hasInstalledAi(): boolean {
@@ -1364,7 +1366,7 @@ export class BrainSurface extends JfElement {
   }
 
   private packagePresent(id: string): boolean {
-    const progress = this.installStatus?.packages?.find(p => p.packageId === id);
+    const progress = this.installPlanPending() ? undefined : this.installStatus?.packages?.find(p => p.packageId === id);
     if (progress?.state === 'installed') return true;
     const files = this.modelPresence?.packages?.find(p => p.id === id);
     if (files) return files.complete || (id === 'chat' && (files.presentVariantFiles?.length ?? 0) > 0);
@@ -1388,7 +1390,7 @@ export class BrainSurface extends JfElement {
     ] as const) {
       const component = this.planPreview?.components?.find(c => c.id === packageId);
       const onnx = this.runtimeStatus?.onnxFeatures?.find(f => f.id === (id === 'meaning' ? 'embed' : id));
-      const packageProgress = this.installStatus?.packages?.find(p => p.packageId === packageId);
+      const packageProgress = this.installPlanPending() ? undefined : this.installStatus?.packages?.find(p => p.packageId === packageId);
       const present = this.packagePresent(packageId) || (id === 'chat'
         ? this._unifiedAiState?.capabilities?.chat === true || this._unifiedAiState?.runtime?.mode === 'online'
         : onnx?.modelActive === true);
