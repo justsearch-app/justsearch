@@ -212,6 +212,15 @@ describe('Brain live redesign repairs', () => {
     const reranker = el.shadowRoot!.querySelector('[data-feature="reranker"]')!.textContent!;
     expect(reranker).not.toContain('Downloading'); expect(reranker).not.toContain('Cancelled'); expect(reranker).toContain('On');
   });
+  it.each(['failed', 'completed'])('D4 a %s run with a package record left downloading shows no step as Downloading', async (runState) => {
+    emit({ installStatus: { state: runState, installedFully: false, packages: [{ packageId: 'embedding', state: 'downloading', bytesDownloaded: 512, bytesTotal: 1024 }, { packageId: 'reranker', state: 'downloading', bytesDownloaded: 512, bytesTotal: 1024 }] }, aiEngine: { kind: 'offline', stability: { kind: 'settled' }, installFailure: null }, runtime: { mode: 'offline', installed: { known: true, value: false } } as AiState['runtime'], runtimeStatus: { onnxFeatures: [{ id: 'reranker', status: 'active', modelActive: true }] } });
+    preview.components = preview.components!.map(c => c.id === 'embedding' ? { ...c, state: 'to-download' } : c);
+    const el = await mount();
+    const meaning = el.shadowRoot!.querySelector('[data-feature="meaning"]')!.textContent!;
+    expect(meaning).not.toContain('Downloading'); expect(meaning).toContain('Not downloaded');
+    const reranker = el.shadowRoot!.querySelector('[data-feature="reranker"]')!.textContent!;
+    expect(reranker).not.toContain('Downloading'); expect(reranker).toContain('On');
+  });
   it('B11 the repair remedy appears once, in the repair alert, not repeated by the status line', async () => {
     emit({ installStatus: { state: 'completed', installedFully: true, repairNeeded: true }, aiEngine: { kind: 'offline', stability: { kind: 'settled' }, installFailure: null } });
     const el = await mount();

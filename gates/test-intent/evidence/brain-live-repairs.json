@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
   },
-  "createdAt": "2026-11-02T11:41:19.397Z",
-  "revision": "ede9bd49edbfc366172944d1f934db1e4e1e7d84",
-  "tree": "15714258caab65182582dbe0f5890796d6271050",
+  "createdAt": "2026-11-02T11:46:58.889Z",
+  "revision": "1dbc9b1762ce29aeb4e243fc0372c8d7d141a4bf",
+  "tree": "eb6b64759755410b45c8b58b18ecf320324e2026",
   "environment": {
     "platform": "linux",
     "arch": "x64",
@@ -18,10 +18,10 @@
   },
   "runs": [
     {
-      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/BrainSurface.repairRemedy.test.ts\" \"src/shell-v0/views/BrainSurface.liveRepairs.test.ts\" --reporter=json --outputFile=\"/tmp/test-intent-vitest-3197787-1793619674814.json\"",
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/BrainSurface.repairRemedy.test.ts\" \"src/shell-v0/views/BrainSurface.liveRepairs.test.ts\" --reporter=json --outputFile=\"/tmp/test-intent-vitest-3214531-1793620013691.json\"",
       "cwd": "modules/ui-web",
       "exitCode": 0,
-      "durationMs": 1391
+      "durationMs": 1740
     }
   ],
   "checks": [
@@ -89,7 +89,7 @@
       "id": "modules/ui-web/src/shell-v0/views/BrainSurface.liveRepairs.test.ts#D2 the whole page waits for live install and verdict: no observation",
       "file": "modules/ui-web/src/shell-v0/views/BrainSurface.liveRepairs.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:e660e4f0ea3a6ca4a8088bdeade866f6f4091c2d968fb841f65dbc4e98ba88e7",
+      "contentDigest": "sha256:52130c24fb07e873f5d2f5f7ace7a528cced82519aba0bfa3da3aab030e73dbf",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -104,7 +104,7 @@
       "id": "modules/ui-web/src/shell-v0/views/BrainSurface.liveRepairs.test.ts#D2 the whole page waits for live install and verdict: retained negative",
       "file": "modules/ui-web/src/shell-v0/views/BrainSurface.liveRepairs.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:e660e4f0ea3a6ca4a8088bdeade866f6f4091c2d968fb841f65dbc4e98ba88e7",
+      "contentDigest": "sha256:52130c24fb07e873f5d2f5f7ace7a528cced82519aba0bfa3da3aab030e73dbf",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -119,7 +119,7 @@
       "id": "modules/ui-web/src/shell-v0/views/BrainSurface.liveRepairs.test.ts#D2 the whole page waits for live install and verdict: unconfirmed verdict",
       "file": "modules/ui-web/src/shell-v0/views/BrainSurface.liveRepairs.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:e660e4f0ea3a6ca4a8088bdeade866f6f4091c2d968fb841f65dbc4e98ba88e7",
+      "contentDigest": "sha256:52130c24fb07e873f5d2f5f7ace7a528cced82519aba0bfa3da3aab030e73dbf",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -134,7 +134,7 @@
       "id": "modules/ui-web/src/shell-v0/views/BrainSurface.liveRepairs.test.ts#D6 repair history is installed and explicit answers-off stays off with Repair as primary",
       "file": "modules/ui-web/src/shell-v0/views/BrainSurface.liveRepairs.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:e660e4f0ea3a6ca4a8088bdeade866f6f4091c2d968fb841f65dbc4e98ba88e7",
+      "contentDigest": "sha256:52130c24fb07e873f5d2f5f7ace7a528cced82519aba0bfa3da3aab030e73dbf",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -149,7 +149,7 @@
       "id": "modules/ui-web/src/shell-v0/views/BrainSurface.liveRepairs.test.ts#D8 a pending idle preview does not block the real answer buttons and cannot overwrite a newer choice",
       "file": "modules/ui-web/src/shell-v0/views/BrainSurface.liveRepairs.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:e660e4f0ea3a6ca4a8088bdeade866f6f4091c2d968fb841f65dbc4e98ba88e7",
+      "contentDigest": "sha256:52130c24fb07e873f5d2f5f7ace7a528cced82519aba0bfa3da3aab030e73dbf",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -164,7 +164,7 @@
       "id": "modules/ui-web/src/shell-v0/views/BrainSurface.liveRepairs.test.ts#D8 a preview begun before an acquisition save cannot overwrite its new choices",
       "file": "modules/ui-web/src/shell-v0/views/BrainSurface.liveRepairs.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:e660e4f0ea3a6ca4a8088bdeade866f6f4091c2d968fb841f65dbc4e98ba88e7",
+      "contentDigest": "sha256:52130c24fb07e873f5d2f5f7ace7a528cced82519aba0bfa3da3aab030e73dbf",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -179,7 +179,7 @@
       "id": "modules/ui-web/src/shell-v0/views/BrainSurface.liveRepairs.test.ts#D10 Automatic GPU layers starts at maximum so the left endpoint can save processor-only zero",
       "file": "modules/ui-web/src/shell-v0/views/BrainSurface.liveRepairs.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:e660e4f0ea3a6ca4a8088bdeade866f6f4091c2d968fb841f65dbc4e98ba88e7",
+      "contentDigest": "sha256:52130c24fb07e873f5d2f5f7ace7a528cced82519aba0bfa3da3aab030e73dbf",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -194,7 +194,7 @@
       "id": "modules/ui-web/src/shell-v0/views/BrainSurface.liveRepairs.test.ts#D10 sliders retain focus and serialize the latest changed value during a pending witnessed save",
       "file": "modules/ui-web/src/shell-v0/views/BrainSurface.liveRepairs.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:e660e4f0ea3a6ca4a8088bdeade866f6f4091c2d968fb841f65dbc4e98ba88e7",
+      "contentDigest": "sha256:52130c24fb07e873f5d2f5f7ace7a528cced82519aba0bfa3da3aab030e73dbf",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -209,7 +209,7 @@
       "id": "modules/ui-web/src/shell-v0/views/BrainSurface.liveRepairs.test.ts#D10 a conflict stops queued slider saves and asks for review without changing the saved value",
       "file": "modules/ui-web/src/shell-v0/views/BrainSurface.liveRepairs.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:e660e4f0ea3a6ca4a8088bdeade866f6f4091c2d968fb841f65dbc4e98ba88e7",
+      "contentDigest": "sha256:52130c24fb07e873f5d2f5f7ace7a528cced82519aba0bfa3da3aab030e73dbf",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -224,7 +224,7 @@
       "id": "modules/ui-web/src/shell-v0/views/BrainSurface.liveRepairs.test.ts#D1 sentence boundaries keep whitespace outside phrase buttons and punctuation attached to preceding prose",
       "file": "modules/ui-web/src/shell-v0/views/BrainSurface.liveRepairs.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:e660e4f0ea3a6ca4a8088bdeade866f6f4091c2d968fb841f65dbc4e98ba88e7",
+      "contentDigest": "sha256:52130c24fb07e873f5d2f5f7ace7a528cced82519aba0bfa3da3aab030e73dbf",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -239,7 +239,7 @@
       "id": "modules/ui-web/src/shell-v0/views/BrainSurface.liveRepairs.test.ts#D3 a pointer gesture on another step opens it in one click without restoring the previous opener or scrolling focus",
       "file": "modules/ui-web/src/shell-v0/views/BrainSurface.liveRepairs.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:e660e4f0ea3a6ca4a8088bdeade866f6f4091c2d968fb841f65dbc4e98ba88e7",
+      "contentDigest": "sha256:52130c24fb07e873f5d2f5f7ace7a528cced82519aba0bfa3da3aab030e73dbf",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -254,7 +254,7 @@
       "id": "modules/ui-web/src/shell-v0/views/BrainSurface.liveRepairs.test.ts#D4 cancelled steps show retained bytes even when the last package record still says downloading",
       "file": "modules/ui-web/src/shell-v0/views/BrainSurface.liveRepairs.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:e660e4f0ea3a6ca4a8088bdeade866f6f4091c2d968fb841f65dbc4e98ba88e7",
+      "contentDigest": "sha256:52130c24fb07e873f5d2f5f7ace7a528cced82519aba0bfa3da3aab030e73dbf",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -269,7 +269,7 @@
       "id": "modules/ui-web/src/shell-v0/views/BrainSurface.liveRepairs.test.ts#D7 the picture branch participates in path layout instead of escaping into preceding alerts",
       "file": "modules/ui-web/src/shell-v0/views/BrainSurface.liveRepairs.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:e660e4f0ea3a6ca4a8088bdeade866f6f4091c2d968fb841f65dbc4e98ba88e7",
+      "contentDigest": "sha256:52130c24fb07e873f5d2f5f7ace7a528cced82519aba0bfa3da3aab030e73dbf",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -284,7 +284,7 @@
       "id": "modules/ui-web/src/shell-v0/views/BrainSurface.liveRepairs.test.ts#D9 repair instructions name the visible page locations",
       "file": "modules/ui-web/src/shell-v0/views/BrainSurface.liveRepairs.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:e660e4f0ea3a6ca4a8088bdeade866f6f4091c2d968fb841f65dbc4e98ba88e7",
+      "contentDigest": "sha256:52130c24fb07e873f5d2f5f7ace7a528cced82519aba0bfa3da3aab030e73dbf",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -303,105 +303,105 @@
     "patches": [],
     "runs": [
       {
-        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/BrainSurface.repairRemedy.test.ts\" \"src/shell-v0/views/BrainSurface.liveRepairs.test.ts\" --reporter=json --outputFile=\"/tmp/test-intent-vitest-3197787-1793619677901.json\"",
+        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/BrainSurface.repairRemedy.test.ts\" \"src/shell-v0/views/BrainSurface.liveRepairs.test.ts\" --reporter=json --outputFile=\"/tmp/test-intent-vitest-3214531-1793620017111.json\"",
         "cwd": "<before-worktree>",
         "exitCode": 1,
-        "durationMs": 1191,
-        "output": "JSON report written to /tmp/test-intent-vitest-3197787-1793619677901.json\n\n"
+        "durationMs": 1463,
+        "output": "JSON report written to /tmp/test-intent-vitest-3214531-1793620017111.json\n\n"
       }
     ],
     "checks": [
       {
         "id": "modules/ui-web/src/shell-v0/views/BrainSurface.repairRemedy.test.ts#repairNeeded ⇒ Repair is the primary action in the alert",
         "classification": "assertion",
-        "detail": "BrainSurface Detailed — the install panel names the same remedy Simple points at repairNeeded ⇒ Repair is the primary action in the alert:  AssertionError: expected 'ghost' to be 'primary' // Object.is equality\n    at /tmp/test-intent-before-2ekFvm/modules/ui-web/src/shell-v0/views/BrainSurface.repairRemedy.test.ts:87:29\n    at processTicksAndRejections (node:internal/process/task_queues:104:5)\n    at file:///tmp/test-intent-before-2ekF"
+        "detail": "BrainSurface Detailed — the install panel names the same remedy Simple points at repairNeeded ⇒ Repair is the primary action in the alert:  AssertionError: expected 'ghost' to be 'primary' // Object.is equality\n    at /tmp/test-intent-before-0iNEIi/modules/ui-web/src/shell-v0/views/BrainSurface.repairRemedy.test.ts:87:29\n    at processTicksAndRejections (node:internal/process/task_queues:104:5)\n    at file:///tmp/test-intent-before-0iNE"
       },
       {
         "id": "modules/ui-web/src/shell-v0/views/BrainSurface.repairRemedy.test.ts#required file missing but the capability is observably running ⇒ the \"working, but\" copy",
         "classification": "assertion",
-        "detail": "BrainSurface — the repair claim names its authority required file missing but the capability is observably running ⇒ the \"working, but\" copy:  AssertionError: expected 'ghost' to be 'primary' // Object.is equality\n    at /tmp/test-intent-before-2ekFvm/modules/ui-web/src/shell-v0/views/BrainSurface.repairRemedy.test.ts:191:29\n    at file:///tmp/test-intent-before-2ekFvm/modules/ui-web/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:"
+        "detail": "BrainSurface — the repair claim names its authority required file missing but the capability is observably running ⇒ the \"working, but\" copy:  AssertionError: expected 'ghost' to be 'primary' // Object.is equality\n    at /tmp/test-intent-before-0iNEIi/modules/ui-web/src/shell-v0/views/BrainSurface.repairRemedy.test.ts:191:29\n    at file:///tmp/test-intent-before-0iNEIi/modules/ui-web/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:"
       },
       {
         "id": "modules/ui-web/src/shell-v0/views/BrainSurface.repairRemedy.test.ts#required file missing and the capability is down ⇒ the full-strength copy is unchanged",
         "classification": "assertion",
-        "detail": "BrainSurface — the repair claim names its authority required file missing and the capability is down ⇒ the full-strength copy is unchanged:  AssertionError: expected 'ghost' to be 'primary' // Object.is equality\n    at /tmp/test-intent-before-2ekFvm/modules/ui-web/src/shell-v0/views/BrainSurface.repairRemedy.test.ts:199:29\n    at file:///tmp/test-intent-before-2ekFvm/modules/ui-web/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:"
+        "detail": "BrainSurface — the repair claim names its authority required file missing and the capability is down ⇒ the full-strength copy is unchanged:  AssertionError: expected 'ghost' to be 'primary' // Object.is equality\n    at /tmp/test-intent-before-0iNEIi/modules/ui-web/src/shell-v0/views/BrainSurface.repairRemedy.test.ts:199:29\n    at file:///tmp/test-intent-before-0iNEIi/modules/ui-web/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:"
       },
       {
         "id": "modules/ui-web/src/shell-v0/views/BrainSurface.repairRemedy.test.ts#three failed repair passes ⇒ the manual fallback, not an unqualified Repair button",
         "classification": "assertion",
-        "detail": "BrainSurface — the repair claim names its authority three failed repair passes ⇒ the manual fallback, not an unqualified Repair button:  AssertionError: expected { kind: 'available' } to match object { kind: 'unavailable' }\n    at Proxy.<anonymous> (file:///tmp/test-intent-before-2ekFvm/modules/ui-web/node_modules/@vitest/expect/dist/index.js:1283:10)\n    at Proxy.<anonymous> (file:///tmp/test-intent-before-2ekFvm/modules/ui-web/node"
+        "detail": "BrainSurface — the repair claim names its authority three failed repair passes ⇒ the manual fallback, not an unqualified Repair button:  AssertionError: expected { kind: 'available' } to match object { kind: 'unavailable' }\n    at Proxy.<anonymous> (file:///tmp/test-intent-before-0iNEIi/modules/ui-web/node_modules/@vitest/expect/dist/index.js:1283:10)\n    at Proxy.<anonymous> (file:///tmp/test-intent-before-0iNEIi/modules/ui-web/node"
       },
       {
         "id": "modules/ui-web/src/shell-v0/views/BrainSurface.liveRepairs.test.ts#D2 the whole page waits for live install and verdict: no observation",
         "classification": "assertion",
-        "detail": "Brain live redesign repairs D2 the whole page waits for live install and verdict: no observation:  AssertionError: expected 'AI is ready' to contain 'Checking AI'\n    at /tmp/test-intent-before-2ekFvm/modules/ui-web/src/shell-v0/views/BrainSurface.liveRepairs.test.ts:82:64\n    at runNextTicks (node:internal/process/task_queues:65:5)\n    at listOnTimeout (node:internal/timers:644:9)\n    at process"
+        "detail": "Brain live redesign repairs D2 the whole page waits for live install and verdict: no observation:  AssertionError: expected 'AI is ready' to contain 'Checking AI'\n    at /tmp/test-intent-before-0iNEIi/modules/ui-web/src/shell-v0/views/BrainSurface.liveRepairs.test.ts:82:64\n    at runNextTicks (node:internal/process/task_queues:65:5)\n    at listOnTimeout (node:internal/timers:644:9)\n    at process"
       },
       {
         "id": "modules/ui-web/src/shell-v0/views/BrainSurface.liveRepairs.test.ts#D2 the whole page waits for live install and verdict: retained negative",
         "classification": "assertion",
-        "detail": "Brain live redesign repairs D2 the whole page waits for live install and verdict: retained negative:  AssertionError: expected 'AI isn\\'t installed yet' to contain 'Checking AI'\n    at /tmp/test-intent-before-2ekFvm/modules/ui-web/src/shell-v0/views/BrainSurface.liveRepairs.test.ts:82:64\n    at runNextTicks (node:internal/process/task_queues:65:5)\n    at listOnTimeout (node:internal/timers:644:9)"
+        "detail": "Brain live redesign repairs D2 the whole page waits for live install and verdict: retained negative:  AssertionError: expected 'AI isn\\'t installed yet' to contain 'Checking AI'\n    at /tmp/test-intent-before-0iNEIi/modules/ui-web/src/shell-v0/views/BrainSurface.liveRepairs.test.ts:82:64\n    at runNextTicks (node:internal/process/task_queues:65:5)\n    at listOnTimeout (node:internal/timers:644:9)"
       },
       {
         "id": "modules/ui-web/src/shell-v0/views/BrainSurface.liveRepairs.test.ts#D2 the whole page waits for live install and verdict: unconfirmed verdict",
         "classification": "assertion",
-        "detail": "Brain live redesign repairs D2 the whole page waits for live install and verdict: unconfirmed verdict:  AssertionError: expected 'Connecting…' to contain 'Checking AI'\n    at /tmp/test-intent-before-2ekFvm/modules/ui-web/src/shell-v0/views/BrainSurface.liveRepairs.test.ts:82:64\n    at runNextTicks (node:internal/process/task_queues:65:5)\n    at listOnTimeout (node:internal/timers:644:9)\n    at process"
+        "detail": "Brain live redesign repairs D2 the whole page waits for live install and verdict: unconfirmed verdict:  AssertionError: expected 'Connecting…' to contain 'Checking AI'\n    at /tmp/test-intent-before-0iNEIi/modules/ui-web/src/shell-v0/views/BrainSurface.liveRepairs.test.ts:82:64\n    at runNextTicks (node:internal/process/task_queues:65:5)\n    at listOnTimeout (node:internal/timers:644:9)\n    at process"
       },
       {
         "id": "modules/ui-web/src/shell-v0/views/BrainSurface.liveRepairs.test.ts#D6 repair history is installed and explicit answers-off stays off with Repair as primary",
         "classification": "assertion",
-        "detail": "Brain live redesign repairs D6 repair history is installed and explicit answers-off stays off with Repair as primary:  AssertionError: expected 'AI isn\\'t installed yet' to be 'Installed — repair available' // Object.is equality\n    at /tmp/test-intent-before-2ekFvm/modules/ui-web/src/shell-v0/views/BrainSurface.liveRepairs.test.ts:100:74\n    at runNextTicks (node:internal/process/task_queues:65:5)\n    at listOnTime"
+        "detail": "Brain live redesign repairs D6 repair history is installed and explicit answers-off stays off with Repair as primary:  AssertionError: expected 'AI isn\\'t installed yet' to be 'Installed — repair available' // Object.is equality\n    at /tmp/test-intent-before-0iNEIi/modules/ui-web/src/shell-v0/views/BrainSurface.liveRepairs.test.ts:100:74\n    at runNextTicks (node:internal/process/task_queues:65:5)\n    at listOnTime"
       },
       {
         "id": "modules/ui-web/src/shell-v0/views/BrainSurface.liveRepairs.test.ts#D8 a pending idle preview does not block the real answer buttons and cannot overwrite a newer choice",
         "classification": "assertion",
-        "detail": "Brain live redesign repairs D8 a pending idle preview does not block the real answer buttons and cannot overwrite a newer choice:  AssertionError: expected [ 'true', 'true' ] to deeply equal [ 'false', 'false' ]\n    at /tmp/test-intent-before-2ekFvm/modules/ui-web/src/shell-v0/views/BrainSurface.liveRepairs.test.ts:110:68\n    at file:///tmp/test-intent-before-2ekFvm/modules/ui-web/node_modules/@vitest/runner/dist/chunk-artifact"
+        "detail": "Brain live redesign repairs D8 a pending idle preview does not block the real answer buttons and cannot overwrite a newer choice:  AssertionError: expected [ 'true', 'true' ] to deeply equal [ 'false', 'false' ]\n    at /tmp/test-intent-before-0iNEIi/modules/ui-web/src/shell-v0/views/BrainSurface.liveRepairs.test.ts:110:68\n    at file:///tmp/test-intent-before-0iNEIi/modules/ui-web/node_modules/@vitest/runner/dist/chunk-artifact"
       },
       {
         "id": "modules/ui-web/src/shell-v0/views/BrainSurface.liveRepairs.test.ts#D8 a preview begun before an acquisition save cannot overwrite its new choices",
         "classification": "assertion",
-        "detail": "Brain live redesign repairs D8 a preview begun before an acquisition save cannot overwrite its new choices:  AssertionError: expected [] to have a length of 1 but got +0\n    at Proxy.<anonymous> (file:///tmp/test-intent-before-2ekFvm/modules/ui-web/node_modules/@vitest/expect/dist/index.js:1389:20)\n    at Proxy.<anonymous> (file:///tmp/test-intent-before-2ekFvm/modules/ui-web/node_modules/@vitest/expect/di"
+        "detail": "Brain live redesign repairs D8 a preview begun before an acquisition save cannot overwrite its new choices:  AssertionError: expected [] to have a length of 1 but got +0\n    at Proxy.<anonymous> (file:///tmp/test-intent-before-0iNEIi/modules/ui-web/node_modules/@vitest/expect/dist/index.js:1389:20)\n    at Proxy.<anonymous> (file:///tmp/test-intent-before-0iNEIi/modules/ui-web/node_modules/@vitest/expect/di"
       },
       {
         "id": "modules/ui-web/src/shell-v0/views/BrainSurface.liveRepairs.test.ts#D10 Automatic GPU layers starts at maximum so the left endpoint can save processor-only zero",
         "classification": "assertion",
-        "detail": "Brain live redesign repairs D10 Automatic GPU layers starts at maximum so the left endpoint can save processor-only zero:  AssertionError: expected '0' to be '256' // Object.is equality\n    at /tmp/test-intent-before-2ekFvm/modules/ui-web/src/shell-v0/views/BrainSurface.liveRepairs.test.ts:133:26\n    at runNextTicks (node:internal/process/task_queues:65:5)\n    at listOnTimeout (node:internal/timers:644:9)\n    at process"
+        "detail": "Brain live redesign repairs D10 Automatic GPU layers starts at maximum so the left endpoint can save processor-only zero:  AssertionError: expected '0' to be '256' // Object.is equality\n    at /tmp/test-intent-before-0iNEIi/modules/ui-web/src/shell-v0/views/BrainSurface.liveRepairs.test.ts:133:26\n    at runNextTicks (node:internal/process/task_queues:65:5)\n    at listOnTimeout (node:internal/timers:644:9)\n    at process"
       },
       {
         "id": "modules/ui-web/src/shell-v0/views/BrainSurface.liveRepairs.test.ts#D10 sliders retain focus and serialize the latest changed value during a pending witnessed save",
         "classification": "assertion",
-        "detail": "Brain live redesign repairs D10 sliders retain focus and serialize the latest changed value during a pending witnessed save:  AssertionError: expected true to be false // Object.is equality\n    at /tmp/test-intent-before-2ekFvm/modules/ui-web/src/shell-v0/views/BrainSurface.liveRepairs.test.ts:142:29\n    at file:///tmp/test-intent-before-2ekFvm/modules/ui-web/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:20"
+        "detail": "Brain live redesign repairs D10 sliders retain focus and serialize the latest changed value during a pending witnessed save:  AssertionError: expected true to be false // Object.is equality\n    at /tmp/test-intent-before-0iNEIi/modules/ui-web/src/shell-v0/views/BrainSurface.liveRepairs.test.ts:142:29\n    at file:///tmp/test-intent-before-0iNEIi/modules/ui-web/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:20"
       },
       {
         "id": "modules/ui-web/src/shell-v0/views/BrainSurface.liveRepairs.test.ts#D10 a conflict stops queued slider saves and asks for review without changing the saved value",
         "classification": "assertion",
-        "detail": "Brain live redesign repairs D10 a conflict stops queued slider saves and asks for review without changing the saved value:  AssertionError: expected [ { gpuLayers: 5 }, { gpuLayers: 6 } ] to deeply equal [ { gpuLayers: 5 } ]\n    at /tmp/test-intent-before-2ekFvm/modules/ui-web/src/shell-v0/views/BrainSurface.liveRepairs.test.ts:154:19\n    at file:///tmp/test-intent-before-2ekFvm/modules/ui-web/node_modules/@vitest/runner"
+        "detail": "Brain live redesign repairs D10 a conflict stops queued slider saves and asks for review without changing the saved value:  AssertionError: expected [ { gpuLayers: 5 }, { gpuLayers: 6 } ] to deeply equal [ { gpuLayers: 5 } ]\n    at /tmp/test-intent-before-0iNEIi/modules/ui-web/src/shell-v0/views/BrainSurface.liveRepairs.test.ts:154:19\n    at file:///tmp/test-intent-before-0iNEIi/modules/ui-web/node_modules/@vitest/runner"
       },
       {
         "id": "modules/ui-web/src/shell-v0/views/BrainSurface.liveRepairs.test.ts#D1 sentence boundaries keep whitespace outside phrase buttons and punctuation attached to preceding prose",
         "classification": "assertion",
-        "detail": "Brain live redesign repairs D1 sentence boundaries keep whitespace outside phrase buttons and punctuation attached to preceding prose:  AssertionError: expected ', puts the best match first' not to match /^\\s|^[.,]/\n    at /tmp/test-intent-before-2ekFvm/modules/ui-web/src/shell-v0/views/BrainSurface.liveRepairs.test.ts:175:121\n    at runNextTicks (node:internal/process/task_queues:65:5)\n    at listOnTimeout (node:internal/timers:644"
+        "detail": "Brain live redesign repairs D1 sentence boundaries keep whitespace outside phrase buttons and punctuation attached to preceding prose:  AssertionError: expected ', puts the best match first' not to match /^\\s|^[.,]/\n    at /tmp/test-intent-before-0iNEIi/modules/ui-web/src/shell-v0/views/BrainSurface.liveRepairs.test.ts:175:121\n    at runNextTicks (node:internal/process/task_queues:65:5)\n    at listOnTimeout (node:internal/timers:644"
       },
       {
         "id": "modules/ui-web/src/shell-v0/views/BrainSurface.liveRepairs.test.ts#D3 a pointer gesture on another step opens it in one click without restoring the previous opener or scrolling focus",
         "classification": "assertion",
-        "detail": "Brain live redesign repairs D3 a pointer gesture on another step opens it in one click without restoring the previous opener or scrolling focus:  AssertionError: expected undefined to be 'About Answer questions' // Object.is equality\n    at /tmp/test-intent-before-2ekFvm/modules/ui-web/src/shell-v0/views/BrainSurface.liveRepairs.test.ts:185:78\n    at runNextTicks (node:internal/process/task_queues:65:5)\n    at listOnTimeout (node:internal/tim"
+        "detail": "Brain live redesign repairs D3 a pointer gesture on another step opens it in one click without restoring the previous opener or scrolling focus:  AssertionError: expected undefined to be 'About Answer questions' // Object.is equality\n    at /tmp/test-intent-before-0iNEIi/modules/ui-web/src/shell-v0/views/BrainSurface.liveRepairs.test.ts:185:78\n    at file:///tmp/test-intent-before-0iNEIi/modules/ui-web/node_modules/@vitest/runner/dist/chunk-a"
       },
       {
         "id": "modules/ui-web/src/shell-v0/views/BrainSurface.liveRepairs.test.ts#D4 cancelled steps show retained bytes even when the last package record still says downloading",
         "classification": "assertion",
-        "detail": "Brain live redesign repairs D4 cancelled steps show retained bytes even when the last package record still says downloading:  AssertionError: expected '\\n        \\n          \\n    \\n  \\n   …' to contain 'Cancelled · 850 B kept'\n    at /tmp/test-intent-before-2ekFvm/modules/ui-web/src/shell-v0/views/BrainSurface.liveRepairs.test.ts:196:83\n    at runNextTicks (node:internal/process/task_queues:65:5)\n    at listOnTimeout (nod"
+        "detail": "Brain live redesign repairs D4 cancelled steps show retained bytes even when the last package record still says downloading:  AssertionError: expected '\\n        \\n          \\n    \\n  \\n   …' to contain 'Cancelled · 850 B kept'\n    at /tmp/test-intent-before-0iNEIi/modules/ui-web/src/shell-v0/views/BrainSurface.liveRepairs.test.ts:196:83\n    at runNextTicks (node:internal/process/task_queues:65:5)\n    at listOnTimeout (nod"
       },
       {
         "id": "modules/ui-web/src/shell-v0/views/BrainSurface.liveRepairs.test.ts#D7 the picture branch participates in path layout instead of escaping into preceding alerts",
         "classification": "assertion",
-        "detail": "Brain live redesign repairs D7 the picture branch participates in path layout instead of escaping into preceding alerts:  AssertionError: expected null not to be null\n    at /tmp/test-intent-before-2ekFvm/modules/ui-web/src/shell-v0/views/BrainSurface.liveRepairs.test.ts:223:64\n    at runNextTicks (node:internal/process/task_queues:65:5)\n    at listOnTimeout (node:internal/timers:644:9)\n    at processTimers (node:inter"
+        "detail": "Brain live redesign repairs D7 the picture branch participates in path layout instead of escaping into preceding alerts:  AssertionError: expected null not to be null\n    at /tmp/test-intent-before-0iNEIi/modules/ui-web/src/shell-v0/views/BrainSurface.liveRepairs.test.ts:232:64\n    at runNextTicks (node:internal/process/task_queues:65:5)\n    at listOnTimeout (node:internal/timers:644:9)\n    at processTimers (node:inter"
       },
       {
         "id": "modules/ui-web/src/shell-v0/views/BrainSurface.liveRepairs.test.ts#D9 repair instructions name the visible page locations",
         "classification": "assertion",
-        "detail": "Brain live redesign repairs D9 repair instructions name the visible page locations:  AssertionError: expected '\\n      \\n        \\n      \\n        \\…' to contain 'use Repair below'\n    at /tmp/test-intent-before-2ekFvm/modules/ui-web/src/shell-v0/views/BrainSurface.liveRepairs.test.ts:228:66\n    at runNextTicks (node:internal/process/task_queues:65:5)\n    at listOnTimeout (node:inte"
+        "detail": "Brain live redesign repairs D9 repair instructions name the visible page locations:  AssertionError: expected '\\n      \\n        \\n      \\n        \\…' to contain 'use Repair below'\n    at /tmp/test-intent-before-0iNEIi/modules/ui-web/src/shell-v0/views/BrainSurface.liveRepairs.test.ts:237:66\n    at runNextTicks (node:internal/process/task_queues:65:5)\n    at listOnTimeout (node:inte"
       }
     ]
   },
-  "digest": "sha256:37006a31dcdb8d3de2a51dda19f79fe5f1aa9804e183ac47ad09ce7d738fe948"
+  "digest": "sha256:d25e6559db4787d74c7d53f2a1eeea5c40329115458ad6c9ddd1f0f494cf174c"
 }

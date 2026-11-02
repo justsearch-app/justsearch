@@ -1147,7 +1147,7 @@ axe run remain necessary.
       ],
       "class": "New",
       "repaired": true,
-      "behaviour": "V12: after a cancelled run only steps whose files are absent and that downloaded bytes say 'Cancelled · N kept'; present, pending and skipped packages keep their real state, and no step of a cancelled run says Downloading (a zero-byte interruption reads Not downloaded; a present package keeps its observed On/Off). The repair alert carries the 'A required component is missing' remedy once; the status line does not repeat it. Both fail by assertion on 2c7f1e8d99 (live check verifier-12: 'Cancelled · 0 B kept' on an active reranker and installed answers; the remedy shown twice).",
+      "behaviour": "V12: after a cancelled run only steps whose files are absent and that downloaded bytes say 'Cancelled · N kept'; present, pending and skipped packages keep their real state, and no step says Downloading unless the run is running (cancelled, failed or completed runs with a leftover downloading record) (a zero-byte interruption reads Not downloaded; a present package keeps its observed On/Off). The repair alert carries the 'A required component is missing' remedy once; the status line does not repeat it. Both fail by assertion on 2c7f1e8d99 (live check verifier-12: 'Cancelled · 0 B kept' on an active reranker and installed answers; the remedy shown twice).",
       "sources": [
         {
           "kind": "owner-adopted-scenario",
@@ -1168,7 +1168,9 @@ axe run remain necessary.
       "newChecks": [
         "modules/ui-web/src/shell-v0/views/BrainSurface.liveRepairs.test.ts#D4 after a cancelled run, steps whose files are present or that never downloaded are not labelled cancelled",
         "modules/ui-web/src/shell-v0/views/BrainSurface.liveRepairs.test.ts#B11 the repair remedy appears once, in the repair alert, not repeated by the status line",
-        "modules/ui-web/src/shell-v0/views/BrainSurface.liveRepairs.test.ts#D4 a cancelled run never leaves a step saying Downloading: zero-byte interruptions are not downloaded, present files keep their observed state"
+        "modules/ui-web/src/shell-v0/views/BrainSurface.liveRepairs.test.ts#D4 a cancelled run never leaves a step saying Downloading: zero-byte interruptions are not downloaded, present files keep their observed state",
+        "modules/ui-web/src/shell-v0/views/BrainSurface.liveRepairs.test.ts#D4 a failed run with a package record left downloading shows no step as Downloading",
+        "modules/ui-web/src/shell-v0/views/BrainSurface.liveRepairs.test.ts#D4 a completed run with a package record left downloading shows no step as Downloading"
       ]
     }
   ]
