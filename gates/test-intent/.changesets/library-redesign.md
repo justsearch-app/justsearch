@@ -1063,7 +1063,8 @@ The old R3c deadline evidence is retired.
         "modules/ui-web/src/shell-v0/components/FailedJobsDrawer.test.ts#R3d live partial refresh replaces the list during retry without dropping unattempted files",
         "modules/ui-web/src/shell-v0/components/FailedJobsDrawer.test.ts#R3d a silent retry followed by a silent listing keeps Try again enabled and rows visible",
         "modules/ui-web/src/shell-v0/components/FailedJobsDrawer.test.ts#R3d a second click while retry is pending retries every listed file again",
-        "modules/ui-web/src/shell-v0/components/FailedJobsDrawer.test.ts#R3d a late listing cannot overwrite a newer count refresh"
+        "modules/ui-web/src/shell-v0/components/FailedJobsDrawer.test.ts#R3d a late listing cannot overwrite a newer count refresh",
+        "modules/ui-web/src/shell-v0/components/FailedJobsDrawer.test.ts#R3d the real Try again button stays operable while a retry never answers"
       ],
       "repaired": true
     },
