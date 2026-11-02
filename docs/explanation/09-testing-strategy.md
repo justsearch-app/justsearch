@@ -202,7 +202,7 @@ retired TS e2e tier described below:
   exercises the same `/api/*` contracts the retired tier drove through a browser, at a faster,
   more deterministic layer.
 * **Visual/measurement verification (`jsharness ui-shot` / `ui-check`)** — a **live, Python**
-  Playwright-driven harness (`scripts/jseval/`), distinct from the retired Node/TypeScript tier
+  Playwright-driven harness (`scripts/jsharness/`), distinct from the retired Node/TypeScript tier
   below. It drives the real Lit `shell-v0` UI (not a mock/demo tree) and produces a screenshot plus
   a structured `.measure.json` fact-sheet — accessibility tree, axe violations, geometry, console
   errors — so correctness is judged from facts, not eyeballing a PNG. `jsharness ui-shot <step>`

@@ -23,7 +23,7 @@
  * the same contract: FREE-PORT scan · `--strictPort` · NEUTRAL vite (no `--mode mock`) ·
  * provenance. They are two native paths bound by this contract (NOT one cross-language
  * process — that would add the very fragility §27 removes); drift is guarded by
- * `scripts/jseval/tests/test_ui_serve.py`.
+ * `scripts/jsharness/tests/test_ui_serve.py`.
  *
  * Tempdoc 861 W3 [A3] — registers a spawn record in the `agent-spawns/` scope so a leaked Vite is
  * reapable and a build-conflict hint can name it. Vite's own `node vite.js` is started directly

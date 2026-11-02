@@ -67,8 +67,8 @@
 # at real install time is not subject to the dry-run/cross-target limitation above).
 #
 # After regenerating, extract the pinned versions from report.json's `install[].metadata`
-# (name + version), drop `jseval` itself (this file constrains its dependencies, not the
-# editable package), and re-add the `colorama` platform marker by hand as this file does.
+# (name + version), drop both local packages (`jseval` and `jsharness`), and re-add the
+# `colorama` platform marker by hand as this file does. Local peers are installed by path.
 # `node scripts/ci/check-jseval-lock.mjs` fails the build if pyproject.toml's floors and
 # this file disagree (a dep added, or a floor raised, without regenerating) — its failure
 # message repeats this regeneration recipe.
@@ -103,6 +103,3 @@ requests==2.34.2
 scipy==1.16.3
 tqdm==4.70.0
 urllib3==2.8.0
-
-# Local peer package: install -e scripts/jsharness alongside -e scripts/jseval.
-jsharness==0.1.0

@@ -126,13 +126,12 @@ For another preparation run, first remove `tmp/ui-checks/` using the cleanup bel
 the generated venv itself contains symlinks. `npm ci` replaces local dependencies.
 
 The venv installs the base and `ui` dependencies declared in
-`scripts/jseval/pyproject.toml` (including `httpx`). It imports jseval from this
-checkout through `PYTHONPATH`, without installing jseval or writing metadata or
+`scripts/jsharness/pyproject.toml` (including `httpx`). It imports jsharness from this
+checkout through `PYTHONPATH`, without installing jsharness or writing metadata or
 bytecode under `scripts/`. Python 3.13 with CI's constraint file,
-`-c scripts/jseval/requirements.lock.txt`, pins the base dependencies as CI does; the
-`ui` extra (Playwright, and with it the Chromium revision) is not pinned there or in CI. Other
-interpreters resolve dependencies freely without that file: its NumPy pin predates
-Python 3.14 wheels.
+`-c scripts/jsharness/requirements.lock.txt`, pins the base and `ui` dependencies
+(Playwright, and with it the Chromium revision) as CI does. Other interpreters
+resolve dependencies freely without that Python 3.13 constraint file.
 
 Preparation and the generated `env.sh` clear every inherited `npm_config_*`,
 `NPM_CONFIG_*`, `PIP_*` and `PYTHON*` setting before setting their own cache,

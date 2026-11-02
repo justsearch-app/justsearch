@@ -16,7 +16,7 @@ LOGIC that sits around the SDK call:
 `ClaudeSDKClient`/the async SDK session itself is NOT mocked here — a live
 smoke test covers the SDK-integration path separately.
 
-`inspect_ai` is an opt-in extra (`pip install jseval[agent]`); skipped if
+`inspect_ai` is an opt-in extra (`pip install -e scripts/jsharness -e 'scripts/jseval[agent]'`); skipped if
 not installed.
 """
 

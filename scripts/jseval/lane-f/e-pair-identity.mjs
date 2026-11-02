@@ -101,8 +101,8 @@ export function instrumentFiles(plan, sourceRoot = SOURCE, executionRoot = sourc
     if (file.endsWith('.sh')) {
       const executableLines = code.split('\n').filter(l => !l.trimStart().startsWith('#')).join('\n');
       for (const m of executableLines.matchAll(/\b(?:node|source|bash)\s+(scripts\/[\w./-]+\.(?:mjs|cjs|sh))/g)) add(path.join(executionRoot, m[1]));
-      for (const m of executableLines.matchAll(/\bfrom\s+(jseval[\w.]*)\s+import/g)) {
-        const base = path.join(executionRoot, 'scripts/jseval', ...m[1].split('.')); add(`${base}.py`);
+      for (const m of executableLines.matchAll(/\bfrom\s+((?:jseval|jsharness)[\w.]*)\s+import/g)) {
+        const base = path.join(executionRoot, 'scripts', m[1].split('.')[0], ...m[1].split('.')); add(`${base}.py`);
       }
       if (/python\s+-m\s+jseval\b/.test(executableLines)) pythonModule('jseval');
       // The request body/query pool is loaded by the supplemental encoder probe.

@@ -928,11 +928,11 @@ def test_execute_run_carries_private_snapshot_through_artifacts_and_projection(
 ):
     from jseval import corpora, run as run_module
     from jseval.projections import staged_recall_accounting
+    from jsharness.types import ReadinessResult
     from jseval.types import (
         AnnProofResult,
         ComparabilityResult,
         QueryRecord,
-        ReadinessResult,
     )
 
     raw_root = tmp_path / "PRIVATE-full-run"

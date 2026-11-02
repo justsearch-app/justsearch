@@ -55,7 +55,7 @@ platform (CPython 3.13 / manylinux2014_x86_64 — check .github/workflows/ci.yml
     -e scripts/jsharness -e scripts/jseval
 
 Then extract name==version pairs from report.json's install[].metadata (dropping
-jseval itself), and re-add the \`colorama==<version>; platform_system == "Windows"\`
+both local packages, jseval and jsharness), and re-add the \`colorama==<version>; platform_system == "Windows"\`
 marker line by hand — pip's target-platform override does not retarget
 platform_system/os_name/sys_platform markers, only python_version-family ones, so that
 one entry needs a manual, metadata-verified marker rather than trusting the dry-run's

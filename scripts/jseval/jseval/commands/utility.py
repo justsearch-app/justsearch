@@ -359,7 +359,7 @@ def cmd_utility_run(ctx, queries, corpus_dir, corpus_root, mcp_config, model, co
                     log_dir, output_dir):
     """Run the agent-utility matrix THROUGH Inspect AI (resumable) and compose (tempdoc 624).
 
-    Requires the `agent` extra: `pip install jseval[agent]`. condition is a sample
+    Requires the `agent` extra: `pip install -e scripts/jsharness -e 'scripts/jseval[agent]'`. condition is a sample
     field, seed=epoch, and cohort=task-args. `eval_set` makes re-runs resume
     (skip completed cells). Then reads the EvalLogs into `utility-comparison.v1`.
     """
