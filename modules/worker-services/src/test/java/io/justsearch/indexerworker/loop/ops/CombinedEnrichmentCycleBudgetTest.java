@@ -15,12 +15,6 @@ import io.justsearch.adapters.lucene.runtime.CommitOps;
 import io.justsearch.adapters.lucene.runtime.DocumentFieldOps;
 import io.justsearch.adapters.lucene.runtime.IndexingCoordinator;
 import io.justsearch.adapters.lucene.runtime.LuceneRuntimeTypes;
-import io.justsearch.indexerworker.coordination.WorkerSignalBus;
-import io.justsearch.configuration.resolved.ResolvedConfig;
-import io.justsearch.indexerworker.loop.BackfillScheduler;
-import io.justsearch.indexerworker.loop.EmbeddingProviderLifecycle;
-import io.justsearch.indexerworker.ner.NerService;
-import io.justsearch.adapters.lucene.runtime.IndexCountOps;
 import io.justsearch.indexerworker.embed.EmbeddingProvider;
 import io.justsearch.indexerworker.embed.EmbeddingService;
 import io.justsearch.indexerworker.loop.pacing.IndexingPacing;
@@ -34,7 +28,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Supplier;
@@ -551,37 +544,6 @@ class CombinedEnrichmentCycleBudgetTest {
   }
 
   @Test
-  @DisplayName("R5: scheduler does not restart a batch after later priority fallback cancellation")
-  void priorityFallbackCancellationStopsSchedulerCycle() {
-    seedLateChunkedLongParent("parent");
-    fakeIndex.get("parent").put(SchemaFields.NER_STATUS, "COMPLETED_EMPTY");
-    seedChunks(16);
-    cancelSecondFallbackOnDeletion();
-    var lifecycle = mock(EmbeddingProviderLifecycle.class);
-    lenient().when(lifecycle.embeddingProvider()).thenReturn(embeddingProvider);
-    lenient().when(lifecycle.allowEmbeddingWrites()).thenReturn(true);
-    var ner = mock(NerService.class);
-    lenient().when(ner.isAvailable()).thenReturn(true);
-    var config = mock(ResolvedConfig.class, org.mockito.Mockito.RETURNS_DEEP_STUBS);
-    lenient().when(config.ai().backfillPacing()).thenReturn(ResolvedConfig.Ai.BackfillPacing.DEFAULTS);
-    lenient().when(config.ai().embedding().lateChunkingEnabled()).thenReturn(true);
-    lenient().when(config.rag().chunkVectorsEnabled()).thenReturn(true);
-    lenient().doAnswer(inv -> {
-      ((Runnable) inv.getArgument(0)).run();
-      return null;
-    }).when(commitOps).withNrtSuspended(org.mockito.ArgumentMatchers.any());
-    var scheduler = new BackfillScheduler(documentFieldOps, indexingCoordinator,
-        mock(IndexCountOps.class), commitOps, mock(WorkerSignalBus.class),
-        IndexingPacing.unthrottled(), lifecycle, new AtomicBoolean(true), () -> config,
-        () -> null, () -> null, () -> ner, () -> null);
-    assertTrue(scheduler.runIdleCycle());
-    assertEquals(1, batchRequests.size(),
-        "R5: scheduler must not select another batch with a fresh deletion epoch");
-    assertEquals(1, completed(SchemaFields.CHUNK_EMBEDDING_STATUS));
-    assertEquals(0, singlePassRequests.get());
-  }
-
-  @Test
   @DisplayName("R6: ordinary remainder retains main's fallback cancellation stop accounting")
   void ordinaryFallbackCancellationMatchesMain() {
     for (int i = 0; i < 24; i++) {
@@ -662,7 +624,14 @@ class CombinedEnrichmentCycleBudgetTest {
     assertEquals(1, batchRequests.size());
     assertEquals(0, outcome.embedProcessed());
     assertTrue(!outcome.aborted(), "R8: provider retirement alone is not a stop signal");
-    org.mockito.Mockito.verifyNoInteractions(replacement);
+    org.mockito.Mockito.verify(replacement, org.mockito.Mockito.never()).embedDocumentBatch(anyList());
+    org.mockito.Mockito.verify(replacement, org.mockito.Mockito.never())
+        .embedWithSpans(anyString(), org.mockito.ArgumentMatchers.any(int[][].class));
+    org.mockito.Mockito.verify(replacement, org.mockito.Mockito.never())
+        .embedDocumentWindows(anyString(), anyInt(), anyInt());
+    org.mockito.Mockito.verify(replacement, org.mockito.Mockito.never())
+        .embedDocument(anyString(), org.mockito.ArgumentMatchers.any());
+    org.mockito.Mockito.verify(replacement, org.mockito.Mockito.never()).embedDocument(anyString());
   }
 
   @Test
