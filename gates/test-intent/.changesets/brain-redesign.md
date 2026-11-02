@@ -16,8 +16,9 @@ written by the builder.
 
 Evidence is generated only by the unmodified run-evidence.mjs, in a shared clone in the session
 temporary directory with its own copied dependencies. Repairs of behaviour broken at main fail by
-assertion on main: the consent checks on aeaa3e0413 (an earlier main) and the B20 graphics-card and
-runtime-variant checks on 344bdaf03c. Repairs of defects introduced and found inside this change
+assertion on main: the consent checks on aeaa3e0413 (an earlier main). The B20 graphics-card and
+runtime-variant checks have no fail-before for the reason under test, because main has no such controls
+(their entry says so). Repairs of defects introduced and found inside this change
 carry their own intermediate before-state in the entry and evidence (e4bb40ed0e, 6680864f7d,
 f2f1945c23, 13a89c28aa, 1b5ceea94b, 234d87ca0b, 2c7f1e8d99, 1489cf0340, 4c6637f1b6, 591a7ad461,
 7f435cfc7e).
@@ -45,7 +46,7 @@ Changed test files against main (all durable product checks):
 - modules/ui-web/src/shell-v0/views/BrainSurface.repairRun.test.ts — B2/B4/B8/B13 — running Repair presentation (new)
 - modules/ui-web/src/shell-v0/views/BrainSurface.skipReason.test.ts — B9/Q5 — Advanced placement
 - modules/ui-web/src/shell-v0/views/BrainSurface.sliceB.test.ts — B3/B9/B13/B20/Q3/Q6 — Advanced controls, sliders, variants, races (new)
-- modules/ui-web/src/shell-v0/views/BrainSurface.snapshotLiveness.test.ts — B2/B9/Q3/Q5 — Stop answers rename, offline Restart AI and answers non-queuing
+- modules/ui-web/src/shell-v0/views/BrainSurface.snapshotLiveness.test.ts — B2/B9/B15/Q3/Q5 — answers action follows the saved choice and is refused while unconfirmed; offline Restart AI and answers non-queuing
 - modules/ui-web/src/shell-v0/views/BrainSurface.sparkline.test.ts — B10/Q5 — sparkline checks at Health
 - modules/ui-web/src/shell-v0/views/BrainSurface.telemetry-mode.test.ts — B10/B21 — Health ownership, empty/unavailable states, Brain no-poll
 - modules/ui-web/src/shell-v0/views/BrainSurface.ui-mode.test.ts — B1/B20 — same page under either mode, Advanced never writes ui.mode
@@ -200,7 +201,7 @@ Changed test files against main (all durable product checks):
         "modules/ui-web/src/shell-v0/state/aiStateStore.restartInference.test.ts"
       ],
       "class": "New",
-      "behaviour": "Wording follows the redesign while the oracles stay. pausedInstall: the paused case asserts \"Download Paused\", the kept-bytes sentence and Resume Download, and that the page does not say \"AI isn't installed yet\" (was \"Not Installed\") or \"Install AI models to get started\"; the fresh case asserts \"AI isn't installed yet\" and \"Install AI models to get started\"; the activation-required case asserts the activation headline and \"Activate downloaded models\" and that it does not say \"AI isn't installed yet\" (was \"Not Installed\"). Mount-versus-click preview freshness is unchanged. snapshotLiveness: with the backend gone the panel does not show \"Chat and summaries ready.\", \"Online\" or the \"AI is ready\" headline, and its first action is not \"Stop answers\" (was \"Shut Down AI\") and is not available; a live observation renders \"AI is ready\" and \"Chat and summaries ready.\"; enrichment liveness, aggregate/scope, the offline Restart AI refusal (unavailable with the disconnection reason, not transient, never queued or replayed through a real jf-control) and its live twin are unchanged. New (Q3): the Start/Stop answers control rendered over a dead backend is unavailable and not transient, and a real jf-control neither fires nor queues it, also after the backend returns. aiStateStore.restartInference: Stop answers (was Shut Down AI) keeps restarted-process freshness.",
+      "behaviour": "Wording follows the redesign while the oracles stay. pausedInstall: the paused case asserts \"Download Paused\", the kept-bytes sentence and Resume Download, and that the page does not say \"AI isn't installed yet\" (was \"Not Installed\") or \"Install AI models to get started\"; the fresh case asserts \"AI isn't installed yet\" and \"Install AI models to get started\"; the activation-required case asserts the activation headline and \"Activate downloaded models\" and that it does not say \"AI isn't installed yet\" (was \"Not Installed\"). Mount-versus-click preview freshness is unchanged. snapshotLiveness: the status-panel fixture has a read, saved \"on\" answer choice (settings read, chatEnabled true) and a retained observation that chat ran, so only liveness differs between its renders. With the backend gone the panel does not show \"Chat and summaries ready.\" or the \"AI is ready\" headline, the Answer questions step reads \"Unknown — checking AI status\" (not the retained \"On\"), and the answers action reads \"Stop answers\" (the saved choice, B15) and is exactly unavailable with the reason \"Checking AI status before changing features.\", not transient; the live twin renders \"AI is ready\", \"Chat and summaries ready.\", the step state \"On\" and \"Stop answers\" available. The retired \"Online\", status-dot and label expectations are in the snapshotLiveness Obsolete entry; enrichment liveness, aggregate/scope, the offline Restart AI refusal (unavailable with the disconnection reason, not transient, never queued or replayed through a real jf-control) and its live twin are unchanged. New (Q3): the Stop answers control rendered over a dead backend is unavailable and not transient, and a real jf-control neither fires nor queues it, also after the backend returns. aiStateStore.restartInference: Stop answers (was Shut Down AI) keeps restarted-process freshness.",
       "sources": [
         {
           "kind": "owner-adopted-scenario",
@@ -214,6 +215,13 @@ Changed test files against main (all durable product checks):
           "task": "t-20261101-uiimpl",
           "scenario": "B2",
           "quote": "Headline from the shared AI verdict for every lifecycle state it decides today: not installed, download paused/stopped, installing (with progress), install failed, starting/recovering, connecting/unconfirmed, ready, running on the processor instead of the graphics card, activation or reindex required. While status is unknown it says so and never claims ready.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "B15",
+          "quote": "(challenger 2) The answer switch shows the saved intent (nullable chatEnabled: unset stays distinct from explicit off); the sentence explains current availability, including answers off while background work continues and answers temporarily unavailable while pictures are being read, and their completion.",
           "label": "agent-drafted, owner-adopted"
         },
         {
@@ -361,7 +369,7 @@ Changed test files against main (all durable product checks):
         "modules/ui-web/src/shell-v0/views/BrainSurface.telemetry-mode.test.ts"
       ],
       "class": "New",
-      "behaviour": "Health owns developer telemetry. Opened first, under either global mode, Health requests /api/inference/transitions?limit=8 and /api/diagnostics/traces?limit=10 and renders in its AI Engine section \"Recent inference transitions\" (never \"Recent mode transitions\"), \"engine generation:\", \"Recent spans\", the sparkline line, two transition rows and one span row. AI Brain makes no transitions or traces request within 10 seconds with Advanced open and renders neither the timeline nor the trace explorer. Empty data keeps both sections visible with \"No inference transitions yet.\" and \"No recent spans.\"; failed reads say \"Inference transitions unavailable.\" and \"Recent spans unavailable\" and show no rows. With tracesAvailable false the timeline stays, no supplied span is shown and the section says \"Recent spans unavailable\". Unmount aborts the pending read, no request follows, and a late response cannot replace the shown transitions. The Engine history link focuses the AI Engine section on a later mount and requestMemberTab focuses it on a mounted Health. Changed against the base: the base hid both sections when there was no data and hid the trace explorer when tracesAvailable was false; B21 replaces that with visible empty/unavailable states. The base Simple-panel absence assertions become the stronger Brain no-poll/no-render check, and the base Detailed label assertions are kept at Health. The S6 request-independence checks in this file are warranted by the step 1 review repair entry.",
+      "behaviour": "Health owns developer telemetry. Opened first, under either global mode, Health requests /api/inference/transitions?limit=8 and /api/diagnostics/traces?limit=10 and renders in its AI Engine section \"Recent inference transitions\", \"engine generation:\", \"Recent spans\", the sparkline line, two transition rows and one span row. AI Brain makes no transitions or traces request within 10 seconds with Advanced open and renders neither the timeline nor the trace explorer. Empty data keeps both sections visible with \"No inference transitions yet.\" and \"No recent spans.\"; failed reads say \"Inference transitions unavailable.\" and \"Recent spans unavailable\" and show no rows. With tracesAvailable false the timeline stays, no supplied span is shown and the section says \"Recent spans unavailable\". Unmount aborts the pending read, no request follows, and a late response cannot replace the shown transitions. The Engine history link focuses the AI Engine section on a later mount and requestMemberTab focuses it on a mounted Health. Changed against the base: the base hid both sections when there was no data and hid the trace explorer when tracesAvailable was false; B21 replaces that with visible empty/unavailable states. The base Simple-panel absence assertions become the stronger Brain no-poll/no-render check, and the base Detailed label assertions are kept at Health. The S6 request-independence checks in this file are warranted by the step 1 review repair entry.",
       "sources": [
         {
           "kind": "owner-adopted-scenario",
@@ -459,7 +467,7 @@ Changed test files against main (all durable product checks):
         "modules/ui-web/src/shell-v0/state/brainPage.test.ts"
       ],
       "class": "New",
-      "behaviour": "Advanced opens in place without writes and retains per-part choices. Range controls retain drafts through refresh/tab changes, commit once per change with witnesses, preserve all untouched settings and null semantics, distinguish automatic GPU allocation from zero, recover from conflicts, and converge across windows. Installed inactive variants activate using the real endpoint fields (that check and the Automatic-versus-zero check are repairs against main, recorded with fail-before evidence in their own entry). Settings reads resolve safely after disconnect and with focus in a sibling shadow tree. The sentence table covers unavailable and excluded packages.",
+      "behaviour": "Advanced opens in place (its four groups and the three sliders are present right after Advanced settings is opened, with no further section to expand) without writes and retains per-part choices. Range controls retain drafts through refresh/tab changes, commit once per change with witnesses, preserve all untouched settings and null semantics, distinguish automatic GPU allocation from zero, recover from conflicts, and converge across windows. Installed inactive variants activate using the real endpoint fields (that check and the Automatic-versus-zero check address defects observed at main and have their own entry, without a fail-before because main has no such controls). Settings reads resolve safely after disconnect and with focus in a sibling shadow tree. The sentence table covers unavailable and excluded packages.",
       "sources": [
         {
           "kind": "owner-adopted-scenario",
@@ -523,8 +531,7 @@ Changed test files against main (all durable product checks):
         "modules/ui-web/src/shell-v0/views/BrainSurface.sliceB.test.ts"
       ],
       "class": "New",
-      "repaired": true,
-      "behaviour": "B20 repairs of behaviour broken at main (344bdaf03c). Graphics card use: with saved llm.gpuLayers null the Advanced slider reads \"Automatic\" (main displayed gpuLayers ?? 0, so Automatic read as 0); moving it to 0 saves exactly { gpuLayers: 0 }, reads \"0 layers · processor only\", and keeps maxTokens null, contextWindow 0 and modelPath. Runtime variants: with runtimeStatus.installedVariants [cuda12] and active.activeVariantId null, Other options offers Activate for the installed inactive variant and invokes core.activate-runtime-variant { variantId: cuda12 } (main read runtimeStatus.variants and activation.activeVariantId, so no installed variant was offered). Opening Advanced and Other options is the means: neither throws when absent, and each check asserts the control it reads, so the before-state fails by assertion. Both fail by assertion on 344bdaf03c and pass on this candidate.",
+      "behaviour": "B20, behaviour broken at main (344bdaf03c). Graphics card use: with saved llm.gpuLayers null the Advanced slider reads \"Automatic\"; moving it to 0 saves exactly { gpuLayers: 0 }, reads \"0 layers · processor only\", and keeps maxTokens null, contextWindow 0 and modelPath. Runtime variants: with runtimeStatus.installedVariants [cuda12] and active.activeVariantId null, Other options offers Activate for the installed inactive variant and invokes core.activate-runtime-variant { variantId: cuda12 }. Main displayed gpuLayers ?? 0 (Automatic read as 0) and read runtimeStatus.variants and activation.activeVariantId; independent verifiers observed both defects live on the running app. A fail-before for the reason under test is not available: main has no graphics-card-use slider and no Other options variant controls, so these checks can fail there only because the controls are missing, which does not show the defect. They are therefore not marked repaired; the evidence records that both pass on this candidate.",
       "sources": [
         {
           "kind": "owner-adopted-scenario",
@@ -702,7 +709,7 @@ Changed test files against main (all durable product checks):
       ],
       "class": "New",
       "repaired": true,
-      "behaviour": "The one-page layout keeps the repair guarantees. The harness supplies a live install observation, opens Advanced, records the alert \"Repair\" (else the Maintenance \"Repair installation\") variant and availability, and records any install action by its label prefix \"Install AI\" or \"Install additions\" (the labels carry the size). Required gap (repairNeeded): Repair in the alert is primary, no install action is primary, and the page says \"A required component is missing\" and \"use Repair\". Required file missing while the capability runs: the \"Working, but an expected file is missing\" copy without the alarm, Repair primary. Required file missing and down: the full-strength copy, Repair primary. No observation fails closed to the full copy. Three failed repair passes: Repair is unavailable and not primary (ghost), no install action is primary, the manual fallback names the URL, file and 12 attempts and never says \"A required component is missing — use Repair.\". Healthy install: Maintenance Repair installation is a ghost text button, no install action is offered, no gap is claimed. Optional-only gap: no repair prompt, Repair ghost, no install action is primary, and \"Optional files not installed\" names splade/config.json. The base expectation that Install stays primary for a healthy install and for an optional-only gap is retired in its own Obsolete entry.",
+      "behaviour": "The one-page layout keeps the repair guarantees. The harness supplies a live install observation, opens Advanced, records the alert \"Repair\" (else the Maintenance \"Repair installation\") variant and availability, and records any install action by its label prefix \"Install AI\" or \"Install additions\" (the labels carry the size). Required gap (repairNeeded): Repair in the alert is primary, no install action is primary, and the page says \"A required component is missing\" and \"use Repair\". Required file missing while the capability runs: the \"Working, but an expected file is missing\" copy without the alarm, Repair primary. Required file missing and down: the full-strength copy, Repair primary. No observation fails closed to the full copy. Three failed repair passes: Repair is unavailable and not primary (ghost), no install action is primary, the manual fallback names the URL, file and 12 attempts and never says \"A required component is missing\" (the start of the repair sentence, \"A required component is missing — use Repair below.\"). The healthy-install and optional-only-gap checks of this file have their own entry with evidence; the base expectation that Install stays primary in those cases is retired in its own Obsolete entry.",
       "sources": [
         {
           "kind": "owner-adopted-scenario",
@@ -732,6 +739,49 @@ Changed test files against main (all durable product checks):
         "modules/ui-web/src/shell-v0/views/BrainSurface.repairRemedy.test.ts#required file missing but the capability is observably running ⇒ the \"working, but\" copy",
         "modules/ui-web/src/shell-v0/views/BrainSurface.repairRemedy.test.ts#required file missing and the capability is down ⇒ the full-strength copy is unchanged",
         "modules/ui-web/src/shell-v0/views/BrainSurface.repairRemedy.test.ts#three failed repair passes ⇒ the manual fallback, not an unqualified Repair button"
+      ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/views/BrainSurface.repairRemedy.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "Replacement expectations for the retired \"Install stays primary\" checks, at the one-page layout with Advanced open. Healthy install (installedFully, no repair needed): Maintenance \"Repair installation\" is a ghost text button, no install action is offered (no button labelled \"Install AI …\" or \"Install additions …\"), and the page does not say \"A required component is missing\". Optional-only gap: deriveRepairRemedy is none and repairRemedySub null, the page does not say \"A required component is missing\", Repair is ghost, no install action is primary, and \"Optional files not installed\" names splade/config.json. These follow a design decision, not a repair, so they are not marked repaired. The evidence also runs them on main (344bdaf03c), where both fail by assertion at the Repair-is-ghost line (expected undefined to be 'ghost'): main keeps Install and Repair in its install accordion, which this harness does not open, so the before-run shows that main's page differs, not main's variant choice (main offered Install as primary and Repair as secondary).",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "B5",
+          "quote": "Switches in step 1 drive only existing behaviour: before install, each optional feature switch selects or declines that package for the install (existing decline/undecline), and the Install button shows the total size of what is selected; after install, Answer questions turns answers on/off (core.set-chat-enabled; files kept). Best match first and Text in scans and images after install show their state with no live switch in step 1 (no control that does nothing); Text in scans and images before install appears only as what it is today (part of the answer model's files or unavailable), not as a separate download. Switches are real switches (role switch, aria-checked, keyboard operable, reachable reason when blocked).",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "B8",
+          "quote": "Install: the Install AI button shows the selected total size and opens the existing licence/size consent; downloading shows progress, pause/resume, cancel with retained bytes, stalled and blocked stages, and search ready before completion, in the same page (no nested panel). Repair, retry after failure and the working-but-missing / manual fallback stay reachable.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "B1",
+          "quote": "The AI Brain tab is one page using the whole window, same visual rules as the Library: headline, one sentence with feature phrases, the path of steps, graphics card bar, then text links (Advanced settings, Stop answers / Start answers, Engine history in Health). No card boxes, no outlined pill buttons, no Simple/Detailed toggle on this page (the title-bar toggle stays for other surfaces). Member tabs (AI Brain, Memory) and their keyboard semantics stay.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "well from now on you can just proceed autonomously accordinglky",
+          "delegationLocation": "task t-20261101-uiimpl, user turn after the WP1 summary",
+          "delegationScope": "Implementing the agreed window designs on existing backend behaviour, AI Brain step 1.",
+          "choice": "Install AI is the one teal main action and appears only while AI is not installed (or while a download is running, paused or awaiting activation); once AI is installed there is no Install AI button: missing additions are offered by the secondary text button \"Install additions · size\", and maintenance repair is the text button \"Repair installation\".",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/brain-repair-remedy-main.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/views/BrainSurface.repairRemedy.test.ts#no repair needed ⇒ Maintenance still offers repair without claiming a gap",
+        "modules/ui-web/src/shell-v0/views/BrainSurface.repairRemedy.test.ts#optional-only gap ⇒ no repair prompt at all, and the gap is still named"
       ]
     },
     {
@@ -770,7 +820,7 @@ Changed test files against main (all durable product checks):
           "label": "agent choice"
         }
       ],
-      "conflictSearch": "decision records searched for a conflict: none (docs/decisions searched for Install, primary action and repair wording). Retired from main 344bdaf03c BrainSurface.repairRemedy.test.ts: \"no repair needed ⇒ Install stays primary (the pre-existing default is untouched)\" (expect(variants.Install).toBe('primary'), expect(variants.Repair).not.toBe('primary')) and, in \"optional-only gap ⇒ no repair prompt at all\", expect(variants.Install).toBe('primary'). Their replacement expectations (no install action for a healthy install, no primary install action for an optional-only gap, Repair a ghost text button) are in the New entry above. All Repair-is-primary, copy and manual-fallback expectations remain."
+      "conflictSearch": "decision records searched for a conflict: none (docs/decisions searched for Install, primary action and repair wording). Retired from main 344bdaf03c BrainSurface.repairRemedy.test.ts: \"no repair needed ⇒ Install stays primary (the pre-existing default is untouched)\" (expect(variants.Install).toBe('primary'), expect(variants.Repair).not.toBe('primary')) and, in \"optional-only gap ⇒ no repair prompt at all\", expect(variants.Install).toBe('primary'). Their replacement expectations (no install action for a healthy install, no primary install action for an optional-only gap, Repair a ghost text button) are the New entry above with evidence gates/test-intent/evidence/brain-repair-remedy-main.json. All Repair-is-primary, copy and manual-fallback expectations remain."
     },
     {
       "items": [
@@ -809,12 +859,26 @@ Changed test files against main (all durable product checks):
         {
           "kind": "owner-adopted-scenario",
           "task": "t-20261101-uiimpl",
+          "scenario": "B2",
+          "quote": "Headline from the shared AI verdict for every lifecycle state it decides today: not installed, download paused/stopped, installing (with progress), install failed, starting/recovering, connecting/unconfirmed, ready, running on the processor instead of the graphics card, activation or reindex required. While status is unknown it says so and never claims ready.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "B15",
+          "quote": "(challenger 2) The answer switch shows the saved intent (nullable chatEnabled: unset stays distinct from explicit off); the sentence explains current availability, including answers off while background work continues and answers temporarily unavailable while pictures are being read, and their completion.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
           "scenario": "Q5",
           "quote": "Existing Brain behaviour tests keep asserting the same behaviour after selector and wording updates; tests of the removed Simple/Detailed toggle and telemetry placement are replaced by tests of the new placement; none is weakened or dropped without a recorded reason.",
           "label": "agent-drafted, owner-adopted"
         }
       ],
-      "conflictSearch": "Searched docs/reference and docs/decisions for core.switch-inference-mode and Online/Indexing/Reload controls; no conflicting decision found. The brief explicitly replaces runtime modes with saved answer intent and permits rewritten removed presentation tests. Only the separate Online and Indexing presentation controls leave the original three-control test: B1 names Start answers / Stop answers; B5 defines their core.set-chat-enabled behavior; B9 retains Restart AI (formerly Reload). The no-offline-queue and positive live witness assertions remain at Restart AI, a new check pins the same non-queuing for the Start/Stop answers control, and the new D2 regression gates every remaining feature switch with its reachable reason. No backend operation, persistence contract or health observation is removed.",
+      "conflictSearch": "Searched docs/reference and docs/decisions for core.switch-inference-mode and Online/Indexing/Reload controls; no conflicting decision found. The brief explicitly replaces runtime modes with saved answer intent and permits rewritten removed presentation tests. Only the separate Online and Indexing presentation controls leave the original three-control test: B1 names Start answers / Stop answers; B5 defines their core.set-chat-enabled behavior; B9 retains Restart AI (formerly Reload). The no-offline-queue and positive live witness assertions remain at Restart AI, a new check pins the same non-queuing for the Start/Stop answers control, and the new D2 regression gates every remaining feature switch with its reachable reason. No backend operation, persistence contract or health observation is removed. Also retired from main 344bdaf03c BrainSurface.snapshotLiveness.test.ts, status card sentence (807 Part A): (a) the \"Online\" status word, expect(dom.textContent).not.toContain('Online') for the dead panel and toContain('Online') for the live one, and (b) the status dot, expect(dot?.getAttribute('tone')).not.toBe('success') dead and toBe('success') live. The page has no status word and no status dot (B1, B2: the headline comes from the shared verdict); the same guarantee is carried by the headline (\"AI is ready\" only when live) and by the Answer questions step state (\"On\" only when live, \"Unknown — checking AI status\" when dead, from the same retained on-observation). (c) expect(action?.label).not.toBe('Shut Down AI'): the action is now Start/Stop answers and its label follows the saved answer choice (B15), so with a saved \"on\" choice a dead backend correctly names \"Stop answers\"; the guarantee that no action presupposing a live backend is offered is carried by its availability, exactly unavailable with \"Checking AI status before changing features.\" when dead and available when live. Conflict search for (a) to (c): docs/decisions searched for status dot, Online status and Shut Down AI; none.",
       "newChecks": []
     },
     {
@@ -1344,7 +1408,7 @@ Changed test files against main (all durable product checks):
       ],
       "class": "New",
       "repaired": true,
-      "behaviour": "During preflight/plan no step says Preparing download, Waiting to download or Downloading, and the headline is Installing… without a percentage. Previous percentages and ready stages remain suppressed. Retained downloading records for declined, unavailable and not-in-mode packages stay ignored. When plan preview excludes an unavailable answer runtime but complete answer files are present, the step keeps its observed Off state rather than claiming preparation.",
+      "behaviour": "During preflight/plan no step says Preparing download, Waiting to download or Downloading, and the headline is Installing… without a percentage. Previous percentages and ready stages remain suppressed. Retained downloading records for declined, unavailable and not-in-mode packages stay ignored. When plan preview excludes an unavailable answer runtime but complete answer files are present, the step keeps its observed Off state; neither that step nor an unavailable one claims preparation or download activity (\"Preparing download\", \"Waiting to download\" or \"Downloading\").",
       "sources": [
         {
           "kind": "owner-adopted-scenario",
@@ -1560,6 +1624,20 @@ component-list and sparkline entries describe the final tests; the B20 graphics-
 repairs carry fail-before evidence on 344bdaf03c; a Start/Stop answers offline non-queuing check is
 added; Obsolete and Adaptation entries for expectations that never existed at main are removed, and
 desktopRecoveryPolling is recorded as a comment-only change.
+
+Repair of the verifier-16 acceptance and reviewer-26 audit (rejects of digest a7f0b419). repairRemedy: the
+manual fallback must not say "A required component is missing" (the live sentence ends "use Repair below.");
+the healthy-install and optional-only-gap replacement checks have their own entry and evidence, run also on
+344bdaf03c. snapshotLiveness: the status-panel fixture carries a read, saved "on" answer choice; the dead panel's
+answers action is "Stop answers" and unavailable with the liveness reason, the live one available; the dead
+"Online" check is replaced by the Answer questions step state; the retired label, "Online" and status-dot
+expectations are recorded in the Obsolete entry. B20: not marked repaired, because main has no such controls.
+Sweep of the Brain test files changed against 344bdaf03c for negatives on text no product code contains: the
+Health telemetry check "Recent mode transitions" is removed (the base's Brain-panel absence check is the
+Brain no-render check), the Advanced ".accordion-header" absence check becomes a presence check of the three
+sliders, and the two repairRun planning negatives add the current download words to "Preparing download" (the
+defect wording the 591a7ad461 repair removed, kept as its fail-before oracle). Evidence the edits staled is
+regenerated with each entry's --before; brain-main-repairs is regenerated without one.
 
 ## Acceptance records
 

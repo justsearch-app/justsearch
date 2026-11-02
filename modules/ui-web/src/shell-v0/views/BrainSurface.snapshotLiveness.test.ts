@@ -310,6 +310,7 @@ describe('BrainSurface — the status card sentence (807 Part A)', () => {
     installStatus: InstallStatus | null;
     inference: unknown;
     _unifiedAiState: unknown;
+    settings: { chatEnabled?: boolean | null };
     renderSimplePanel(): TemplateResult;
   }
 
@@ -325,12 +326,18 @@ describe('BrainSurface — the status card sentence (807 Part A)', () => {
     loadStartedAtMs: null,
   };
 
-  /** A healthy engine observed at some past moment; `live` says whether that observation still holds. */
+  /**
+   * A healthy engine observed at some past moment; `live` says whether that observation still holds.
+   * The saved answer choice is read and on (B15: the answers action follows it), and the retained
+   * observation still says chat ran, so only liveness separates the live and dead renders.
+   */
   function panel(live: boolean): PanelHarness {
     const el = document.createElement('jf-brain-surface') as unknown as PanelHarness;
     el.apiBase = '';
     el.busy = {};
     el.policy = {};
+    el.settings = { chatEnabled: true };
+    (el as unknown as { settingsRead: boolean }).settingsRead = true;
     el.installStatus = { state: 'idle', phase: 'idle', installedFully: true };
     el.inference = { mode: 'online' };
     const aiEngine = computeAiEngineVerdict({
@@ -347,37 +354,47 @@ describe('BrainSurface — the status card sentence (807 Part A)', () => {
       installObservationLive: live, runtimeObservationLive: live, snapshotLive: live,
       aiEngine,
       runtime: RUNTIME,
+      capabilities: { chat: true },
       inference: el.inference,
       status: {},
     } as unknown as AiState;
     return el;
   }
 
+  /** The state words under the "Answer questions" step (its last meta line). */
+  function answersStepState(dom: HTMLElement): string | undefined {
+    const metas = dom.querySelectorAll('.path-step[data-feature="chat"] .step-meta');
+    return metas[metas.length - 1]?.textContent?.trim();
+  }
+
+  /** The Start/Stop answers action in the links below the path. */
+  function answersAction(dom: HTMLElement): { label: string; availability?: Availability } | null {
+    return dom.querySelector('[data-testid="brain-simple-action"]') as unknown as { label: string; availability?: Availability } | null;
+  }
+
   it('THE round-13 photograph: with the backend gone, the card no longer reads "Online / Chat and summaries ready."', () => {
     const dom = domOf(panel(false).renderSimplePanel());
     expect(dom.textContent).not.toContain('Chat and summaries ready.');
-    expect(dom.textContent).not.toContain('Online');
+    // Main's present-tense "Online" status word is gone; its successor is the answers step state,
+    // which must not report the retained "on" observation as current.
+    expect(answersStepState(dom)).toBe('Unknown — checking AI status');
     expect(dom.querySelector('.brain-headline')?.textContent).not.toBe('AI is ready');
   });
 
   it('the card offers no action whose precondition is a live backend (807 A.3)', () => {
     const dom = domOf(panel(false).renderSimplePanel());
-    const action = dom.querySelector('[data-testid="brain-simple-action"]') as unknown as {
-      label: string;
-      availability?: { kind: string };
-    } | null;
-    // "Shut Down AI" is now "Stop answers": the action that presupposes a running engine.
-    expect(action?.label).not.toBe('Stop answers');
-    expect(action?.availability?.kind).not.toBe('available');
+    const action = answersAction(dom);
+    // "Shut Down AI" is now "Stop answers" and its label follows the saved choice (B15), so a dead
+    // backend still names it; what must not happen is offering it while nothing is confirmed.
+    expect(action?.label).toBe('Stop answers');
+    expect(action?.availability).toEqual({ kind: 'unavailable', reason: 'Checking AI status before changing features.' });
   });
 
   it('Q3: an offline click on Start/Stop answers neither queues nor fires when the backend returns', async () => {
     // The REAL gate value the surface produces for the answers control, driven through a REAL jf-control.
     const dom = domOf(panel(false).renderSimplePanel());
-    const answers = Array.from(dom.querySelectorAll('jf-button')).find((b) =>
-      ['Stop answers', 'Start answers'].includes((b as unknown as { label: string }).label),
-    ) as unknown as { label: string; availability?: Availability } | undefined;
-    expect(answers, 'the answers control is rendered').toBeDefined();
+    const answers = answersAction(dom);
+    expect(answers?.label, 'the answers control is rendered').toBe('Stop answers');
     expect(answers!.availability?.kind).toBe('unavailable');
     expect((answers!.availability as { transient?: boolean }).transient).toBeFalsy();
 
@@ -407,7 +424,9 @@ describe('BrainSurface — the status card sentence (807 Part A)', () => {
     const dom = domOf(panel(true).renderSimplePanel());
     expect(dom.querySelector('.brain-headline')?.textContent).toBe('AI is ready');
     expect(dom.textContent).toContain('Chat and summaries ready.');
-
+    expect(answersStepState(dom)).toBe('On');
+    expect(answersAction(dom)?.label).toBe('Stop answers');
+    expect(answersAction(dom)?.availability).toEqual({ kind: 'available' });
   });
 });
 

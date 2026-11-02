@@ -243,7 +243,7 @@ describe('Brain running repair controls (B2/B8)', () => {
     const el = await mount(); await settle(el);
     expectPlanning(el);
     const chat = el.shadowRoot!.querySelector('[data-feature="chat"]')!.textContent!;
-    expect(chat).not.toContain('Preparing download'); expect(chat).toContain('Unavailable on this computer');
+    expect(chat).not.toMatch(/Preparing download|Waiting to download|Downloading/); expect(chat).toContain('Unavailable on this computer');
   });
   it('planning an unavailable answer runtime with complete answer files keeps the observed step state', async () => {
     const fetch = globalThis.fetch;
@@ -259,7 +259,7 @@ describe('Brain running repair controls (B2/B8)', () => {
     run = { ...run, phase: 'plan', packages: [] }; emit(run);
     const el = await mount(); await settle(el);
     const chat = el.shadowRoot!.querySelector('[data-feature="chat"]')!.textContent!;
-    expect(chat).not.toContain('Preparing download');
+    expect(chat).not.toMatch(/Preparing download|Waiting to download|Downloading/);
     expect(chat).toContain('Off — background work can continue');
     expectPlanning(el);
   });

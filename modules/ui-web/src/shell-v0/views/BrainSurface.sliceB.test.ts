@@ -189,7 +189,8 @@ describe('Brain Advanced controls', () => {
     const el = await mount(); await advanced(el);
     for (const label of ['Answer settings', 'Graphics card settings', 'Downloaded files', 'Maintenance']) expect(el.shadowRoot!.querySelector(`section[aria-label="${label}"]`)).not.toBeNull();
     for (const id of ['splade', 'ner', 'citation-scorer']) expect(el.shadowRoot!.querySelector(`[data-testid="component-toggle-${id}"]`)?.getAttribute('role')).toBe('switch');
-    expect(el.shadowRoot!.querySelector('.accordion-header')).toBeNull();
+    // In place: the sliders are there once Advanced is open, with no further section to expand.
+    for (const id of ['brain-contextWindow', 'brain-maxTokens', 'brain-gpuLayers']) expect(el.shadowRoot!.getElementById(id), id).not.toBeNull();
     expect(calls).toEqual([]); expect(vi.mocked(fetch).mock.calls.filter(([, init]) => init?.method === 'POST')).toEqual([]);
   });
   it('sliders keep an unfocused draft across refresh, save once on change with witnesses, and preserve untouched values', async () => {

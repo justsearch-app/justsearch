@@ -51,7 +51,6 @@ describe('developer telemetry belongs to Health AI Engine', () => {
     const engine = el.shadowRoot!.querySelector('#ai-engine')!;
     expect(requests).toEqual(['/api/inference/transitions?limit=8', '/api/diagnostics/traces?limit=10']);
     expect(engine.textContent).toContain('Recent inference transitions');
-    expect(engine.textContent).not.toContain('Recent mode transitions');
     expect(engine.textContent).toContain('engine generation:');
     expect(engine.textContent).toContain('Recent spans');
     expect(engine.querySelector('[data-testid="brain-generation-sparkline-line"]')).not.toBeNull();

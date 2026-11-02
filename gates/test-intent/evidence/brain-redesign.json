@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
   },
-  "createdAt": "2026-11-02T18:08:24.336Z",
-  "revision": "854399acfa8434088aa924cd7805a5278ca6acc9",
-  "tree": "55e4c914ded36a216927fe0306b390300a3d887c",
+  "createdAt": "2026-11-02T18:44:08.902Z",
+  "revision": "ed9b29de09037e95f2aa2cd970ca3956e1887563",
+  "tree": "d1a3f255eb3e5195e8a935683141a2fb40c6db95",
   "environment": {
     "platform": "linux",
     "arch": "x64",
@@ -18,10 +18,10 @@
   },
   "runs": [
     {
-      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/BrainSurface.ui-mode.test.ts\" \"src/shell-v0/views/BrainSurface.pausedInstall.test.ts\" \"src/shell-v0/views/BrainSurface.snapshotLiveness.test.ts\" \"src/shell-v0/state/aiStateStore.restartInference.test.ts\" \"src/shell-v0/views/BrainSurface.telemetry-mode.test.ts\" \"src/shell-v0/views/BrainSurface.sliceB.test.ts\" \"src/shell-v0/state/brainPage.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/gi4g_b2e/tmp/test-intent-vitest-2400-1793642901681.json\"",
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/BrainSurface.ui-mode.test.ts\" \"src/shell-v0/views/BrainSurface.pausedInstall.test.ts\" \"src/shell-v0/views/BrainSurface.snapshotLiveness.test.ts\" \"src/shell-v0/state/aiStateStore.restartInference.test.ts\" \"src/shell-v0/views/BrainSurface.telemetry-mode.test.ts\" \"src/shell-v0/views/BrainSurface.sliceB.test.ts\" \"src/shell-v0/state/brainPage.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/tgk4vsot/tmp/test-intent-vitest-2058-1793645045901.json\"",
       "cwd": "modules/ui-web",
       "exitCode": 0,
-      "durationMs": 2653
+      "durationMs": 3000
     }
   ],
   "checks": [
@@ -87,7 +87,7 @@
       "id": "modules/ui-web/src/shell-v0/views/BrainSurface.snapshotLiveness.test.ts",
       "file": "modules/ui-web/src/shell-v0/views/BrainSurface.snapshotLiveness.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:e4ea78492d48b047e8673e280486d1b4ca72651adfa53a6c244b8170a3bf80d6",
+      "contentDigest": "sha256:751e14ef4b1ad92d9e24dcf751efee4e9a68a3764038bee246af85bba71408f2",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -193,7 +193,7 @@
       "id": "modules/ui-web/src/shell-v0/views/BrainSurface.telemetry-mode.test.ts",
       "file": "modules/ui-web/src/shell-v0/views/BrainSurface.telemetry-mode.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:678369940fe0863cca2707107a567d7abeb7611eed3aefacc3fb13e11e422bf1",
+      "contentDigest": "sha256:03647f706a58ea7a39ad2cab5ec05a95c7779cdd4006ea5fd4e9cf9db3b24296",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -244,7 +244,7 @@
       "id": "modules/ui-web/src/shell-v0/views/BrainSurface.sliceB.test.ts",
       "file": "modules/ui-web/src/shell-v0/views/BrainSurface.sliceB.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:35c1fb3dc3b7987a447a77ca2d904aa59fef278e8fd172f8c4eba02e05faeb78",
+      "contentDigest": "sha256:078fe6e972d488ad4ca5e9d43db8ecf60ee254c75e58d47fd92fee67c6aad032",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -516,5 +516,5 @@
     }
   ],
   "failBefore": null,
-  "digest": "sha256:1e7e8a8215618c245f8967c3c52bf5c5b05aadfbce640c3a7a7a38055a97e13d"
+  "digest": "sha256:0bee0f260744b4ec6258de1109c7130f695437ddbd37951fb01281ec7fcd5681"
 }

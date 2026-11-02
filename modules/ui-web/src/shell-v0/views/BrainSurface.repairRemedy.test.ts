@@ -234,6 +234,6 @@ describe('BrainSurface — the repair claim names its authority', () => {
     expect(text).toContain('https://example/splade-config.json');
     expect(text).toContain('config.json');
     expect(text).toContain('12 attempts');
-    expect(text).not.toContain('A required component is missing — use Repair.');
+    expect(text).not.toContain('A required component is missing');
   });
 });
