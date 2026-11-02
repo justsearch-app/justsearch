@@ -20,6 +20,7 @@
  */
 
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
@@ -61,7 +62,12 @@ for (const file of files) {
   }
   if (VERBOSE) console.log(`RUN   ${rel}`);
   const started = Date.now();
-  const res = spawnSync(process.execPath, [file], { encoding: 'utf8' });
+  // Machine admission: every file gets its own directory, never the machine-wide one, so a real
+  // scoring window neither delays these fixtures nor is refused because of them.
+  const admissionDir = fs.mkdtempSync(path.join(os.tmpdir(), 'dev-runner-admission-'));
+  const res = spawnSync(process.execPath, [file], { encoding: 'utf8',
+    env: { ...process.env, JS_ADMISSION_DIR: admissionDir } });
+  fs.rmSync(admissionDir, { recursive: true, force: true });
   const tookMs = Date.now() - started;
   if (res.status === 0) {
     passed++;

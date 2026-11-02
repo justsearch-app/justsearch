@@ -59,6 +59,8 @@ const WT = path.join(MAIN, '.claude', 'worktrees', 'wt-own');
 const STATE = path.join(MAIN, 'tmp', 'dev-runner');
 const TABLE = path.join(ROOT, 'process-table.json');
 const DATA = path.join(ROOT, 'data');
+// The scratch checkouts run Gradle and starts through machine admission: a private directory.
+process.env.JS_ADMISSION_DIR = path.join(ROOT, 'admission');
 
 function copyCheckout(dest) {
   const items = [

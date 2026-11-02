@@ -110,7 +110,7 @@ def test_backend_start_holds_real_admission_and_releases_on_error(tmp_path, monk
     admission = Path(__file__).resolve().parents[2] / "dev/admission.py"
 
     def status():
-        return json.loads(subprocess.check_output([sys.executable, str(admission), "status"], text=True))
+        return json.loads(subprocess.check_output([sys.executable, "-I", str(admission), "status"], text=True))
 
     def boot(**kwargs):
         assert kwargs["env"]["JS_ADMISSION_TOKEN"]
@@ -125,3 +125,44 @@ def test_backend_start_holds_real_admission_and_releases_on_error(tmp_path, monk
             _boot_and_wait(resolved_root=tmp_path, resolved_data=tmp_path / "data", gradlew=tmp_path / "gradlew",
                            env=dict(os.environ), port=33221, llm=False, health_timeout_sec=1)
     assert status() == []
+
+
+@pytest.mark.skipif(sys.platform != "linux", reason="Linux machine admission")
+def test_backend_start_uses_the_admission_directory_of_the_launch_env(tmp_path, monkeypatch):
+    import json
+    monkeypatch.setenv("JS_ADMISSION_DIR", str(tmp_path / "process-env"))
+    monkeypatch.delenv("JS_ADMISSION_TOKEN", raising=False)
+    admission = Path(__file__).resolve().parents[2] / "dev/admission.py"
+    launch = {**os.environ, "JS_ADMISSION_DIR": str(tmp_path / "launch-env")}
+
+    def status(directory):
+        return json.loads(subprocess.check_output([sys.executable, "-I", str(admission), "status"], text=True,
+                                                  env={**os.environ, "JS_ADMISSION_DIR": str(directory)}))
+
+    def boot(**kwargs):
+        assert [row["purpose"] for row in status(tmp_path / "launch-env")] == ["jseval backend start"]
+        assert status(tmp_path / "process-env") == []
+        return "proc"
+
+    with patch("jseval.backend._boot_admitted", side_effect=boot):
+        assert _boot_and_wait(resolved_root=tmp_path, resolved_data=tmp_path / "data", gradlew=tmp_path / "gradlew",
+                              env=launch, port=33221, llm=False, health_timeout_sec=1) == "proc"
+
+
+@pytest.mark.skipif(sys.platform != "linux" or os.geteuid() == 0, reason="Linux machine admission; not as root")
+def test_backend_start_without_usable_admission_proceeds_with_one_warning(tmp_path, monkeypatch, capsys):
+    blocked = tmp_path / "blocked"
+    blocked.mkdir()
+    blocked.chmod(0o555)
+    monkeypatch.delenv("JS_ADMISSION_TOKEN", raising=False)
+    env = {**os.environ, "JS_ADMISSION_DIR": str(blocked / "admission")}
+    try:
+        with patch("jseval.backend._boot_admitted", return_value="proc") as boot:
+            assert _boot_and_wait(resolved_root=tmp_path, resolved_data=tmp_path / "data",
+                                  gradlew=tmp_path / "gradlew", env=env, port=33221, llm=False,
+                                  health_timeout_sec=1) == "proc"
+        assert "JS_ADMISSION_TOKEN" not in boot.call_args.kwargs["env"]
+        warning = capsys.readouterr().err.strip().splitlines()
+        assert len(warning) == 1 and "without admission" in warning[0]
+    finally:
+        blocked.chmod(0o755)

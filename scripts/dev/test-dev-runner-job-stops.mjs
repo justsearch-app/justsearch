@@ -30,6 +30,8 @@ const tests = [], decoys = [], logged = [];
 const test = (name, fn, windowsOnly = false) => tests.push([name, fn, windowsOnly]);
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 const root = fs.mkdtempSync(path.join(os.tmpdir(), 'job-stops-'));
+// The scratch checkouts run Gradle and starts through machine admission: a private directory.
+process.env.JS_ADMISSION_DIR = path.join(root, 'admission');
 
 const FIXTURE_COMMON = `const cp=require('child_process'),fs=require('fs');
 const native=process.platform==='linux'?require(process.env.FIXTURE_NATIVE_MODULE):null;

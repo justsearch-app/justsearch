@@ -14,6 +14,8 @@ import { createRequire } from 'node:module';
 const require = createRequire(import.meta.url);
 const repo = path.resolve(import.meta.dirname, '../..');
 const root = fs.mkdtempSync(path.join(os.tmpdir(), 'dev-data-folder-'));
+// The scratch checkouts run Gradle and starts through machine admission: a private directory.
+process.env.JS_ADMISSION_DIR = path.join(root, 'admission');
 fs.mkdirSync(path.join(repo, 'tmp'), { recursive: true });
 const inRepo = fs.mkdtempSync(path.join(repo, 'tmp', 'dev-data-folder-'));
 process.env.JUSTSEARCH_DEV_RUNNER_STATE_ROOT = path.join(root, 'unit-state');

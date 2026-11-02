@@ -8,6 +8,7 @@ Builds use the machine Gradle slot.
 import json
 import os
 from pathlib import Path
+import shutil
 import socket
 import subprocess
 import sys
@@ -17,6 +18,8 @@ import test_admission as fixtures
 CLI, PYTHON = fixtures.CLI, fixtures.PYTHON
 
 REPO = CLI.parents[2]
+# The machine Gradle slot queue is outside admission and can be long on a busy machine.
+GRADLE_WAIT = 1500
 
 
 class MachineIntegration(unittest.TestCase):
@@ -28,6 +31,7 @@ class MachineIntegration(unittest.TestCase):
     def tearDown(self):
         self.fixture.tearDown()
 
+    @unittest.skipUnless(shutil.which("js-gradle-slot"), "needs the machine's js-gradle-slot wrapper")
     def test_tool_invoker(self):
         log = open(self.root / "gradle.log", "w+")
         try:
@@ -36,9 +40,9 @@ class MachineIntegration(unittest.TestCase):
                                      cwd=REPO, env=self.env, stdout=log, stderr=log)
             try:
                 row = self.fixture.wait_for(lambda: next((r for r in self.fixture.status()
-                                            if r["mode"] == "heavy" and r["purpose"] == "Gradle"), None), timeout=180)
+                                            if r["mode"] == "heavy" and r["purpose"] == "Gradle"), None), timeout=GRADLE_WAIT)
                 print("tool-invoker heavy: " + json.dumps(row), flush=True)
-                self.assertEqual(child.wait(timeout=180), 0)
+                self.assertEqual(child.wait(timeout=GRADLE_WAIT), 0)
             finally:
                 if child.poll() is None:
                     child.terminate()

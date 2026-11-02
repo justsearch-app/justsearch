@@ -22,18 +22,68 @@ import uuid
 TOKEN = "JS_ADMISSION_TOKEN"
 DEADLINE = 124
 REFUSED = 75
+UNAVAILABLE = 73
 GRACE = 0.2
 POLL = 0.05
+# The agreed budget: the gate never stays closed for long (drain + window <= 12 minutes).
+MAX_DRAIN = 120
+MAX_WINDOW = 600
+MAX_GATE_WAIT = MAX_DRAIN + MAX_WINDOW
+MAX_HOOK = MAX_DRAIN
+DEFAULT_HOOK = 60
 
 
-def directory():
-    return Path(os.environ.get("JS_ADMISSION_DIR", "/tmp/js-linux-port/admission"))
+class Refused(Exception):
+    """The gate stayed closed past the caller's deadline (exit 75)."""
 
 
-def lock_file(name):
-    directory().mkdir(parents=True, exist_ok=True)
+def directory(env=None):
+    env = os.environ if env is None else env
+    return Path(env.get("JS_ADMISSION_DIR") or "/tmp/js-linux-port/admission")
+
+
+def lock_file(root, name):
+    root.mkdir(parents=True, exist_ok=True)
     # Sandbox policy permits flock on read-only descriptors, including LOCK_EX.
-    return os.open(directory() / (name + ".lock"), os.O_RDONLY | os.O_CREAT, 0o644)
+    return os.open(root / (name + ".lock"), os.O_RDONLY | os.O_CREAT, 0o644)
+
+
+def warn(message):
+    print(f"admission: {message}", file=sys.stderr, flush=True)
+
+
+# Signal handling of the CLI: a SIGINT/SIGTERM that arrives while a child is being
+# spawned is held until the child is recorded, so cleanup always knows about it.
+_deferred = None
+
+
+def interrupted(signum, _frame):
+    if _deferred is not None:
+        _deferred.append(signum)
+        return
+    # Do not let a second Ctrl-C interrupt cleanup and release locks too soon.
+    for sig in (signal.SIGINT, signal.SIGTERM):
+        signal.signal(sig, signal.SIG_IGN)
+    raise SystemExit(128 + signum)
+
+
+def spawn(command, **options):
+    """Popen with signals deferred; returns (child, group). Call deliver() inside cleanup scope."""
+    global _deferred
+    _deferred = []
+    try:
+        child = subprocess.Popen(command, start_new_session=True, **options)
+    except BaseException:
+        deliver()
+        raise
+    return child, process(child.pid)
+
+
+def deliver():
+    global _deferred
+    pending, _deferred = _deferred, None
+    if pending:
+        interrupted(pending[0], None)
 
 
 def try_lock(fd, kind):
@@ -54,35 +104,45 @@ def lock(fd, kind, until=None, check=lambda: None):
         time.sleep(POLL)
 
 
-def records():
-    result = []
-    for path in directory().glob("*.json"):
-        try:
-            with path.open("rb") as stream:
-                if try_lock(stream.fileno(), fcntl.LOCK_EX):
-                    path.unlink(missing_ok=True)
-                else:
-                    row = json.load(stream)
-                    if isinstance(row, dict):
-                        result.append(row)
-        except (OSError, ValueError):
-            # A concurrent write may be incomplete; exclusion never reads records.
-            continue
-    return result
+def live_record(path):
+    """The record's row while its owner holds its lock; a dead record is removed."""
+    try:
+        with path.open("rb") as stream:
+            if try_lock(stream.fileno(), fcntl.LOCK_EX):
+                path.unlink(missing_ok=True)
+                return None
+            row = json.load(stream)
+            return row if isinstance(row, dict) else None
+    except (OSError, ValueError):
+        # A concurrent write may be incomplete; exclusion never reads records.
+        return None
+
+
+def records(root=None):
+    root = directory() if root is None else root
+    # Unpublished temporaries of a creator that died before renaming are pruned too.
+    for path in root.glob("*.record"):
+        live_record(path)
+    return [row for path in root.glob("*.json") if (row := live_record(path))]
 
 
 class Record:
-    def __init__(self, mode, purpose, session=None, **extra):
+    def __init__(self, root, mode, purpose, session=None, **extra):
         self.row = {"pid": os.getpid(), "mode": mode, "purpose": purpose,
                     "session": session or os.environ.get("JS_ADMISSION_SESSION", ""),
                     "start": datetime.datetime.now(datetime.timezone.utc).isoformat(), **extra}
-        self.path = directory() / f"{uuid.uuid4().hex}.json"
+        self.path = root / f"{uuid.uuid4().hex}.json"
         # Publish only after locking. Keep this inode throughout updates and pruning.
         temporary = self.path.with_suffix(".record")
         self.stream = temporary.open("w+")
-        fcntl.flock(self.stream, fcntl.LOCK_EX)
-        self.write()
-        temporary.rename(self.path)
+        try:
+            fcntl.flock(self.stream, fcntl.LOCK_EX)
+            self.write()
+            temporary.rename(self.path)
+        except BaseException:
+            self.stream.close()
+            temporary.unlink(missing_ok=True)
+            raise
 
     def write(self, **extra):
         self.row.update(extra)
@@ -92,50 +152,86 @@ class Record:
         self.stream.flush()
 
     def close(self):
-        try:
-            self.path.unlink(missing_ok=True)
-        finally:
-            self.stream.close()
+        # A job that inherited the record (and the work lock) and outlives this tool
+        # keeps it locked, and so visible in status; otherwise it is removed here.
+        self.stream.close()
+        live_record(self.path)
 
 
 def nested(env):
     """An inherited marker is valid only while its original admission is alive."""
     try:
+        root = directory(env)
         token = json.loads(env.get(TOKEN, ""))
-        if token["directory"] != str(directory().resolve()):
+        if token["directory"] != str(root.resolve()):
             return False
         name = token["record"]
         if Path(name).name != name or not name.endswith(".json"):
             return False
-        with (directory() / name).open("rb") as stream:
+        with (root / name).open("rb") as stream:
             return not try_lock(stream.fileno(), fcntl.LOCK_EX)
     except (OSError, ValueError, KeyError, TypeError):
         return False
 
 
-def admitted_env(record, env):
-    return {**env, TOKEN: json.dumps({"directory": str(directory().resolve()), "record": record.path.name})}
+def admitted_env(root, record, env):
+    return {**env, TOKEN: json.dumps({"directory": str(root.resolve()), "record": record.path.name})}
+
+
+def without_token(env):
+    return {key: value for key, value in env.items() if key != TOKEN}
 
 
 @contextlib.contextmanager
-def heavy(purpose, env=None, session=None):
-    """Hold shared admission through a Python caller's launch/readiness scope."""
-    env = dict(os.environ if env is None else env)
+def admission(purpose, env, session=None, gate_timeout=MAX_GATE_WAIT):
+    """Shared admission; yields (env, descriptors a job must inherit to keep it).
+
+    Fail-open: if admission is unavailable here (directory not creatable, read-only
+    view), one warning is printed and the caller proceeds without admission.
+    """
+    env = dict(env)
     if sys.platform != "linux" or nested(env):
-        yield env
+        yield env, ()
         return
+    root = directory(env)
     with contextlib.ExitStack() as stack:
-        gate = lock_file("gate")
-        stack.callback(os.close, gate)
-        work = lock_file("work")
-        stack.callback(os.close, work)
-        record = Record("heavy-waiter", purpose, session)
-        stack.callback(record.close)
-        lock(gate, fcntl.LOCK_SH)
+        try:
+            gate = lock_file(root, "gate")
+            stack.callback(os.close, gate)
+            work = lock_file(root, "work")
+            stack.callback(os.close, work)
+            record = Record(root, "heavy-waiter", purpose, session or env.get("JS_ADMISSION_SESSION"))
+            stack.callback(record.close)
+        except OSError as error:
+            unavailable = error
+        else:
+            unavailable = None
+        if unavailable is not None:
+            stack.close()
+            warn(f"machine admission unavailable in {root} ({unavailable}); {purpose} runs without admission")
+            yield env, ()
+            return
+        if not lock(gate, fcntl.LOCK_SH, time.monotonic() + gate_timeout):
+            raise Refused(f"gate stayed closed for {gate_timeout:g} s; holders: {json.dumps(exclusive_rows(root))}")
         lock(work, fcntl.LOCK_SH)
         record.write(mode="heavy")
         fcntl.flock(gate, fcntl.LOCK_UN)
-        yield admitted_env(record, env)
+        yield admitted_env(root, record, env), (work, record.stream.fileno())
+
+
+@contextlib.contextmanager
+def heavy(purpose, env=None, session=None, gate_timeout=MAX_GATE_WAIT):
+    """Hold shared admission through a Python caller's launch/readiness scope.
+
+    Uses the admission directory of ``env`` (default os.environ); yields the env to pass on.
+    """
+    with admission(purpose, os.environ if env is None else env, session, gate_timeout) as (admitted, _):
+        yield admitted
+
+
+def exclusive_rows(root):
+    return [r for r in records(root) if str(r.get("mode", "")).startswith("exclusive")
+            and r.get("mode") != "exclusive-waiter"]
 
 
 def process(pid):
@@ -239,7 +335,8 @@ def clean_descendants(child):
     signal_descendants(signal.SIGTERM)
     until = time.monotonic() + GRACE
     while True:
-        child.poll()
+        if child is not None:
+            child.poll()
         # ECHILD proves the whole tree is gone. An empty /proc snapshot alone does
         # not: a concurrent reparent/fork can move a child during the scan.
         if not reap():
@@ -254,53 +351,68 @@ def subreaper():
         raise OSError(ctypes.get_errno(), "cannot become child subreaper")
 
 
-def run_command(command, env):
-    child = subprocess.Popen(command, env=env, start_new_session=True)
-    group = process(child.pid)
+def run_command(command, env, keep=()):
+    # The job inherits the work lock and its record: if this tool is SIGKILLed, the
+    # kernel lock lives as long as the job, so an exclusive window drains and refuses
+    # instead of overlapping it. (Java closes inherited descriptors, so a Gradle daemon
+    # left running after a successful build does not keep admission.)
+    child, group = spawn(command, env=env, pass_fds=keep)
     try:
-        # A successful build may leave its Gradle daemon running; it is not heavy work.
+        deliver()
         return child.wait()
     except BaseException:
         clean_group(group, child)
         raise
 
 
+def run_hook(command, env, timeout):
+    # Hooks control only the caller's job/API. No other participant is signalled.
+    # A hook that does not finish in time is a hook failure (exit 73).
+    subprocess.run(shlex.split(command), env=env, check=True, timeout=timeout)
+
+
 def pausable(args):
     if nested(os.environ):
         raise ValueError("pausable cannot be nested inside an admission")
+    root = directory()
+    # No admission marker: heavy work the job starts takes its own shared admission,
+    # so it waits while the job is paused.
+    env = without_token(os.environ)
     with contextlib.ExitStack() as stack:
-        gate = lock_file("gate")
+        gate = lock_file(root, "gate")
         stack.callback(os.close, gate)
-        work = lock_file("work")
+        work = lock_file(root, "work")
         stack.callback(os.close, work)
-        record = Record("pausable", args.purpose, args.session, state="waiting")
+        record = Record(root, "pausable", args.purpose, args.session, state="waiting")
         stack.callback(record.close)
-        lock(gate, fcntl.LOCK_SH)
+        if not lock(gate, fcntl.LOCK_SH, time.monotonic() + args.gate_timeout):
+            raise Refused(f"gate stayed closed for {args.gate_timeout:g} s; holders: {json.dumps(exclusive_rows(root))}")
         lock(work, fcntl.LOCK_SH)
-        env = admitted_env(record, os.environ)
-        child = subprocess.Popen(args.command, env=env, start_new_session=True)
-        group = process(child.pid)
-        record.write(state="working", group=group)
-        fcntl.flock(gate, fcntl.LOCK_UN)
+        # Unlocking on pause applies to the shared open file, so the job's copy pauses too.
+        child, group = spawn(args.command, env=env, pass_fds=(work, record.stream.fileno()))
 
         def running():
             if child.poll() is not None:
                 raise ChildProcessError
 
         try:
+            deliver()
+            record.write(state="working", group=group)
+            fcntl.flock(gate, fcntl.LOCK_UN)
             while child.poll() is None:
                 if try_lock(gate, fcntl.LOCK_SH):
                     fcntl.flock(gate, fcntl.LOCK_UN)
                 else:
-                    # Hooks control only the caller's job/API. No other participant is signalled.
-                    subprocess.run(shlex.split(args.pause_hook), env=env, check=True)
+                    run_hook(args.pause_hook, env, args.hook_timeout)
                     record.write(state="paused")
                     fcntl.flock(work, fcntl.LOCK_UN)
+                    # Paused for as long as the window holds the gate (itself capped).
                     lock(gate, fcntl.LOCK_SH, check=running)
                     lock(work, fcntl.LOCK_SH, check=running)
-                    subprocess.run(shlex.split(args.resume_hook), env=env, check=True)
-                    record.write(state="working")
+                    # Reopen the gate before resuming: a slow resume hook never holds it.
                     fcntl.flock(gate, fcntl.LOCK_UN)
+                    run_hook(args.resume_hook, env, args.hook_timeout)
+                    record.write(state="working")
                 time.sleep(POLL)
             return child.returncode
         except ChildProcessError:
@@ -310,24 +422,28 @@ def pausable(args):
 
 
 def exclusive_window(args, check):
+    root = directory()
     with contextlib.ExitStack() as stack:
-        gate = lock_file("gate")
+        gate = lock_file(root, "gate")
         stack.callback(os.close, gate)
-        work = lock_file("work")
+        work = lock_file(root, "work")
         stack.callback(os.close, work)
-        record = Record("exclusive-waiter", args.purpose, args.session, holder_pid=os.getppid())
+        record = Record(root, "exclusive-waiter", args.purpose, args.session, holder_pid=os.getppid())
         stack.callback(record.close)
-        lock(gate, fcntl.LOCK_EX, check=check)
+        if not lock(gate, fcntl.LOCK_EX, time.monotonic() + args.gate_timeout, check):
+            warn(f"gate stayed closed for {args.gate_timeout:g} s; holders: {json.dumps(exclusive_rows(root))}")
+            return REFUSED
         record.write(mode="exclusive-draining")
         if not lock(work, fcntl.LOCK_EX, time.monotonic() + args.drain_timeout, check):
-            holders = [r for r in records() if r.get("mode") == "heavy" or
-                       (r.get("mode") == "pausable" and r.get("state") != "paused")]
-            print("admission: drain timeout; holders: " + json.dumps(holders), file=sys.stderr, flush=True)
+            holders = [r for r in records(root) if r.get("mode") == "heavy" or
+                       (r.get("mode") == "pausable" and r.get("state") == "working")]
+            warn("drain timeout; holders: " + json.dumps(holders))
             return REFUSED
         acquired = time.monotonic()
         record.write(mode="exclusive", deadline_seconds=args.timeout)
-        child = subprocess.Popen(args.command, env=admitted_env(record, os.environ), start_new_session=True)
+        child = None
         try:
+            child = subprocess.Popen(args.command, env=admitted_env(root, record, os.environ), start_new_session=True)
             # Reserve TERM grace plus KILL/reaping allowance inside the budget.
             until = acquired + args.timeout - 2 * GRACE
             while child.poll() is None and time.monotonic() < until:
@@ -378,11 +494,13 @@ def exclusive(args):
             pass
 
 
-def positive(value):
-    number = float(value)
-    if not math.isfinite(number) or number <= 0:
-        raise argparse.ArgumentTypeError("must be finite and positive")
-    return number
+def seconds(maximum):
+    def parse(value):
+        number = float(value)
+        if not math.isfinite(number) or not 0 < number <= maximum:
+            raise argparse.ArgumentTypeError(f"must be greater than 0 and at most {maximum} seconds")
+        return number
+    return parse
 
 
 def main():
@@ -393,12 +511,14 @@ def main():
         sub = modes.add_parser(mode)
         sub.add_argument("--purpose", required=True)
         sub.add_argument("--session")
+        sub.add_argument("--gate-timeout", type=seconds(MAX_GATE_WAIT), default=MAX_GATE_WAIT)
         if mode == "exclusive":
-            sub.add_argument("--drain-timeout", type=positive, default=120)
-            sub.add_argument("--timeout", type=positive, default=600)
+            sub.add_argument("--drain-timeout", type=seconds(MAX_DRAIN), default=MAX_DRAIN)
+            sub.add_argument("--timeout", type=seconds(MAX_WINDOW), default=MAX_WINDOW)
         if mode == "pausable":
             sub.add_argument("--pause-hook", required=True)
             sub.add_argument("--resume-hook", required=True)
+            sub.add_argument("--hook-timeout", type=seconds(MAX_HOOK), default=DEFAULT_HOOK)
         sub.add_argument("command", nargs=argparse.REMAINDER)
     args = parser.parse_args()
     if sys.platform != "linux":
@@ -410,32 +530,29 @@ def main():
         args.command.pop(0)
     if not args.command:
         parser.error("a command is required after --")
-    if args.mode == "exclusive" and not 2 * GRACE < args.timeout <= 600:
-        parser.error("--timeout must be greater than 0.4 and at most 600 seconds")
+    if args.mode == "exclusive" and not 2 * GRACE < args.timeout:
+        parser.error(f"--timeout must be greater than {2 * GRACE:g} seconds")
     if args.mode == "pausable" and any(not shlex.split(hook) for hook in (args.pause_hook, args.resume_hook)):
         parser.error("pause and resume hooks must be nonempty commands")
     subreaper()
-
-    def interrupted(signum, _frame):
-        # Do not let a second Ctrl-C interrupt cleanup and release locks too soon.
-        for sig in (signal.SIGINT, signal.SIGTERM):
-            signal.signal(sig, signal.SIG_IGN)
-        raise SystemExit(128 + signum)
-
     for sig in (signal.SIGINT, signal.SIGTERM):
         signal.signal(sig, interrupted)
-    if args.mode == "exclusive":
-        return exclusive(args)
-    if args.mode == "pausable":
-        return pausable(args)
-    with heavy(args.purpose, session=args.session) as env:
-        return run_command(args.command, env)
+    try:
+        if args.mode == "exclusive":
+            return exclusive(args)
+        if args.mode == "pausable":
+            return pausable(args)
+        with admission(args.purpose, os.environ, args.session, args.gate_timeout) as (env, keep):
+            return run_command(args.command, env, keep)
+    except Refused as error:
+        warn(str(error))
+        return REFUSED
 
 
 if __name__ == "__main__":
     try:
         rc = main()
         sys.exit(128 - rc if rc < 0 else rc)
-    except (OSError, ValueError, subprocess.CalledProcessError) as error:
-        print(f"admission: {error}", file=sys.stderr)
-        sys.exit(73)
+    except (OSError, ValueError, subprocess.SubprocessError) as error:
+        warn(str(error))
+        sys.exit(UNAVAILABLE)

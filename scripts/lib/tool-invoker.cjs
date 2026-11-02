@@ -40,69 +40,107 @@ function windowsBatchInvocation(command, args, env = process.env) {
     shell: false, windowsVerbatimArguments: true };
 }
 
+const ADMISSION = path.join(ROOT, 'scripts/dev/admission.py');
+const warnUnavailable = reason => process.stderr.write(
+  `[admission] machine admission unavailable (${reason}); continuing without admission\n`);
+
 function invocationForSpawn(tool, args, options = {}) {
   const invocation = toolInvocation(tool, args, options);
-  if (tool === 'gradle' && (options.platform ?? process.platform) === 'linux') {
-    return { command: 'python3', args: [path.join(ROOT, 'scripts/dev/admission.py'),
-      'heavy', '--purpose', 'Gradle', '--', invocation.command, ...invocation.args], shell: false };
+  const platform = options.platform ?? process.platform;
+  // Linux Gradle runs as heavy machine work. A missing wrapper is spawned directly so its own
+  // ENOENT is reported; a missing admission tool or python3 runs Gradle without admission.
+  if (tool === 'gradle' && platform === 'linux' && fs.existsSync(invocation.command)) {
+    if (!fs.existsSync(ADMISSION)) {
+      warnUnavailable(`${ADMISSION} is missing`);
+      return invocation;
+    }
+    return { command: 'python3', args: ['-I', ADMISSION, 'heavy', '--purpose', 'Gradle', '--',
+      invocation.command, ...invocation.args], shell: false, unadmitted: invocation };
   }
-  return (options.platform ?? process.platform) === 'win32' && /\.(cmd|bat)$/i.test(invocation.command)
+  return platform === 'win32' && /\.(cmd|bat)$/i.test(invocation.command)
     ? windowsBatchInvocation(invocation.command, invocation.args, options.env) : invocation;
 }
 
 // A pipe-scoped shared holder: readiness releases it; runner death closes the pipe too.
-// The child emits the nesting token only after acquiring admission.
+// The child emits the nesting token only after acquiring admission. Fail-open: if admission is
+// unavailable the start proceeds with one warning. Release never throws: an abnormal holder exit
+// is logged, so it cannot turn a successful start into a failed one or replace a start's error.
 async function acquireHeavy(purpose) {
-  if (process.platform !== 'linux') return async () => {};
-  const child = spawn('python3', [path.join(ROOT, 'scripts/dev/admission.py'), 'heavy',
-    '--purpose', purpose, '--', 'python3', '-u', '-c',
-    'import os,sys; print(os.environ["JS_ADMISSION_TOKEN"], flush=True); sys.stdin.buffer.read()'],
+  const noop = async () => {};
+  if (process.platform !== 'linux') return noop;
+  if (!fs.existsSync(ADMISSION)) { warnUnavailable(`${ADMISSION} is missing`); return noop; }
+  const child = spawn('python3', ['-I', ADMISSION, 'heavy', '--purpose', purpose, '--', 'python3', '-I', '-u', '-c',
+    'import os,sys; print(os.environ.get("JS_ADMISSION_TOKEN", ""), flush=True); sys.stdin.buffer.read()'],
   { stdio: ['pipe', 'pipe', 'inherit'], env: process.env });
-  const ended = new Promise((resolve, reject) => {
-    child.once('error', reject);
-    child.once('close', code => code === 0 ? resolve() : reject(new Error(`machine admission exited ${code}`)));
+  child.stdin.on('error', () => {});
+  const ended = new Promise(resolve => {
+    child.once('error', error => resolve({ error }));
+    child.once('close', (code, signal) => resolve({ code, signal }));
   });
-  // Attach immediately: a spawn failure must not become an unhandled rejection.
-  ended.catch(() => {});
-  let output = '';
-  const token = await new Promise((resolve, reject) => {
+  const acquired = await new Promise(resolve => {
+    let output = '';
     child.stdout.on('data', data => {
       output += data;
-      if (output.includes('\n')) resolve(output.split('\n')[0]);
+      if (output.includes('\n')) resolve({ token: output.split('\n')[0] });
     });
-    child.once('error', reject);
-    child.once('close', () => reject(new Error('machine admission ended before acquisition')));
+    ended.then(resolve);
   });
+  if (!('token' in acquired)) {
+    const { error, code, signal } = acquired;
+    if (code === 75) throw new Error('machine admission refused: the exclusive gate stayed closed past its deadline');
+    warnUnavailable(error ? `${error.message}` : `admission tool exited ${signal ?? code}`);
+    return noop;
+  }
   const previous = process.env.JS_ADMISSION_TOKEN;
-  process.env.JS_ADMISSION_TOKEN = token;
+  if (acquired.token) process.env.JS_ADMISSION_TOKEN = acquired.token;
   let released = false;
+  let reported = false;
+  const report = ({ error, code, signal }) => {
+    if (reported || (!error && code === 0)) return;
+    reported = true;
+    process.stderr.write(`[admission] machine admission holder ended abnormally (${error?.message ?? signal ?? code})`
+      + `${released ? '' : ' before release; the rest of this start runs without admission'}\n`);
+  };
+  ended.then(result => { if (!released) report(result); });
   return async () => {
     if (released) return;
     released = true;
     if (previous === undefined) delete process.env.JS_ADMISSION_TOKEN;
     else process.env.JS_ADMISSION_TOKEN = previous;
     child.stdin.end();
-    await ended;
+    report(await ended);
   };
 }
 
 function runToolSync(tool, args, options = {}) {
-  const invocation = invocationForSpawn(tool, args, options);
-  const { command, args: argv, ...spawnOptions } = invocation;
-  return spawnSync(command, argv, { windowsHide: true, ...options, ...spawnOptions });
+  const { command, args: argv, unadmitted, ...spawnOptions } = invocationForSpawn(tool, args, options);
+  const result = spawnSync(command, argv, { windowsHide: true, ...options, ...spawnOptions });
+  if (unadmitted && result.error?.code === 'ENOENT') {
+    warnUnavailable('python3 not found');
+    const { command: direct, args: directArgs, ...directOptions } = unadmitted;
+    return spawnSync(direct, directArgs, { windowsHide: true, ...options, ...directOptions });
+  }
+  return result;
 }
 
 if (require.main === module) {
   const [tool, ...args] = process.argv.slice(2);
   try {
-    const { command, args: argv, ...options } = invocationForSpawn(tool, args);
-    const child = spawn(command, argv, { ...options, cwd: process.cwd(), env: process.env, stdio: 'inherit', windowsHide: true });
-    for (const signal of ['SIGINT', 'SIGTERM']) process.on(signal, () => child.kill(signal));
-    child.once('error', error => { console.error(error.message); process.exitCode = 1; });
-    child.once('exit', (code, signal) => {
-      if (signal) { process.removeAllListeners(signal); process.kill(process.pid, signal); }
-      else process.exitCode = code ?? 1;
-    });
+    const run = ({ command, args: argv, unadmitted, ...options }) => {
+      const child = spawn(command, argv, { ...options, cwd: process.cwd(), env: process.env, stdio: 'inherit', windowsHide: true });
+      const forward = signal => child.kill(signal);
+      for (const signal of ['SIGINT', 'SIGTERM']) process.on(signal, forward);
+      child.once('error', error => {
+        for (const signal of ['SIGINT', 'SIGTERM']) process.off(signal, forward);
+        if (unadmitted && error.code === 'ENOENT') { warnUnavailable('python3 not found'); run(unadmitted); return; }
+        console.error(error.message); process.exitCode = 1;
+      });
+      child.once('exit', (code, signal) => {
+        if (signal) { process.removeAllListeners(signal); process.kill(process.pid, signal); }
+        else process.exitCode = code ?? 1;
+      });
+    };
+    run(invocationForSpawn(tool, args));
   } catch (error) { console.error(error.message); process.exitCode = 2; }
 }
 module.exports = { resolveNpmInvocation, toolInvocation, runToolSync, quoteCmdArgument, windowsBatchInvocation, invocationForSpawn, acquireHeavy };

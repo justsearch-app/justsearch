@@ -79,8 +79,8 @@ class AdmissionTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         return json.loads(result.stdout)
 
-    def start(self, mode, command=None, purpose=None, options=()):
-        if mode == "pausable":
+    def start(self, mode, command=None, purpose=None, options=(), hooks=None):
+        if mode == "pausable" and command is None:
             pause, ack, beat = (self.root / name for name in ("pause", "ack", "beat"))
             command = [PYTHON, "-c", f"""from pathlib import Path
 import time
@@ -94,8 +94,10 @@ while True:
 """]
             pause_code = f"from pathlib import Path; import time; Path({str(pause)!r}).touch()\nwhile not Path({str(ack)!r}).exists(): time.sleep(.01)"
             resume_code = f"from pathlib import Path; Path({str(pause)!r}).unlink(missing_ok=True)"
-            options = [*options, "--pause-hook", shlex.join([PYTHON, "-c", pause_code]),
-                       "--resume-hook", shlex.join([PYTHON, "-c", resume_code])]
+            pause_hook, resume_hook = hooks or ([PYTHON, "-c", pause_code], [PYTHON, "-c", resume_code])
+            options = [*options, "--pause-hook", shlex.join(pause_hook), "--resume-hook", shlex.join(resume_hook)]
+        elif mode == "pausable":
+            options = [*options, "--pause-hook", shlex.join(hooks[0]), "--resume-hook", shlex.join(hooks[1])]
         log = open(self.root / f"child-{len(self.children)}.log", "w+")
         self.logs.append(log)
         child = subprocess.Popen([PYTHON, str(CLI), mode, "--purpose", purpose or mode,
@@ -112,8 +114,36 @@ while True:
         child = self.start("heavy", [PYTHON, "-c", "pass"])
         self.assertEqual(child.wait(timeout=2), 0)
 
+    def output(self, child):
+        log = self.logs[[c for c, _ in self.children].index(child)]
+        log.seek(0)
+        return log.read()
+
+    def job(self, name):
+        """A command that reports its own PID, then sleeps; the caller records its identity."""
+        path = self.root / f"{name}.pid"
+        return path, [PYTHON, "-c", "import os,time; from pathlib import Path; "
+                      f"Path({str(path)!r}).write_text(str(os.getpid())); time.sleep(60)"]
+
+    def job_identity(self, path):
+        identity = proc(int(self.wait_for(lambda: path.exists() and path.read_text())))
+        self.descendants.append(identity)
+        return identity
+
+    @staticmethod
+    def gone(identity):
+        current = proc(identity["pid"])
+        return not current or current["birth"] != identity["birth"] or current["state"] == "Z"
+
+    def kill_recorded(self, identity):
+        if not self.gone(identity):
+            os.kill(identity["pid"], signal.SIGKILL)
+        self.wait_for(lambda: self.gone(identity))
+
     def test_shared_holders_coexist_and_new_work_waits_for_exclusive(self):
-        a, b = self.start("heavy", purpose="build a"), self.start("heavy", purpose="build b")
+        (a_pid, a_job), (b_pid, b_job) = self.job("build-a"), self.job("build-b")
+        a, b = self.start("heavy", a_job, purpose="build a"), self.start("heavy", b_job, purpose="build b")
+        jobs = [self.job_identity(a_pid), self.job_identity(b_pid)]
         self.wait_for(lambda: len([r for r in self.status() if r["mode"] == "heavy"]) == 2)
         exclusive = self.start("exclusive", options=["--drain-timeout", "2"])
         self.wait_for(lambda: self.row("exclusive-draining"))
@@ -124,6 +154,7 @@ while True:
         a.terminate(); b.terminate()
         self.assertEqual(a.wait(timeout=2), 143)
         self.assertEqual(b.wait(timeout=2), 143)
+        self.assertTrue(all(self.gone(job) for job in jobs), "heavy cleanup left its job running")
         self.wait_for(lambda: self.row("exclusive"))
         self.assertFalse(marker.exists())
         exclusive.terminate()
@@ -250,7 +281,7 @@ raise SystemExit({ending if type(ending) is int else 0})
                     self.wait_for(lambda: self.row("heavy", blocker.pid))
                 end_file = self.root / f"end-{ending}"
                 command = [PYTHON, "-c", f"import time; from pathlib import Path\nwhile not Path({str(end_file)!r}).exists(): time.sleep(.01)\nraise SystemExit({ending})"] if type(ending) is int else SLEEP
-                holder = self.start("exclusive", command, options=["--timeout", "1", "--drain-timeout", ".3"])
+                holder = self.start("exclusive", command, options=["--timeout", "1", "--drain-timeout", "1"])
                 self.wait_for(lambda: self.row("pausable").get("state") == "paused")
                 beat = self.root / "beat"
                 frozen = beat.read_text()
@@ -277,13 +308,183 @@ raise SystemExit({ending if type(ending) is int else 0})
         group = self.wait_for(lambda: self.row("pausable").get("group"))
         self.groups.append(proc(group["pid"]))
         background.kill(); background.wait(timeout=2)
+        # The surviving job keeps its record (and work lock) locked: visible, not pruned.
+        self.assertTrue(any(r["pid"] == row["pid"] for r in self.status()))
+        self.kill_recorded(proc(group["pid"]))
         self.assertFalse(any(r["pid"] == row["pid"] for r in self.status()))
         self.assertEqual(list(Path(self.env["JS_ADMISSION_DIR"]).glob("*.json")), [])
+        unpublished = Path(self.env["JS_ADMISSION_DIR"]) / "dead-creator.record"
+        unpublished.write_text("{")
+        self.status()
+        self.assertFalse(unpublished.exists(), "an unlocked unpublished record is pruned")
         # A forged diagnostic entry cannot keep a kernel-unlocked machine busy.
         fake = {**row, "pid": os.getpid(), "birth": proc(os.getpid())["birth"], "mode": "heavy"}
         (Path(self.env["JS_ADMISSION_DIR"]) / "forged.json").write_text(json.dumps(fake))
         holder = self.start("exclusive", [PYTHON, "-c", "pass"])
         self.assertEqual(holder.wait(timeout=2), 0)
+
+    def test_sigkilled_heavy_tool_keeps_admission_while_its_job_runs(self):
+        pid_file, command = self.job("orphan")
+        tool = self.start("heavy", command, purpose="orphaned build")
+        job = self.job_identity(pid_file)
+        self.wait_for(lambda: self.row("heavy"))
+        tool.kill()
+        self.assertEqual(tool.wait(timeout=2), -9)
+        self.assertFalse(self.gone(job))
+        refused = self.start("exclusive", [PYTHON, "-c", "pass"], options=["--drain-timeout", ".3"])
+        self.assertEqual(refused.wait(timeout=3), 75)
+        self.assertIn("orphaned build", self.output(refused))
+        self.kill_recorded(job)
+        holder = self.start("exclusive", [PYTHON, "-c", "pass"], options=["--drain-timeout", "1"])
+        self.assertEqual(holder.wait(timeout=3), 0)
+
+    def test_sigkilled_pausable_tool_keeps_admission_while_its_job_works(self):
+        tool = self.start("pausable", purpose="orphaned index rebuild")
+        group = self.wait_for(lambda: (self.row("pausable") or {}).get("group"))
+        job = proc(group["pid"]); self.groups.append(job)
+        tool.kill()
+        self.assertEqual(tool.wait(timeout=2), -9)
+        refused = self.start("exclusive", [PYTHON, "-c", "pass"], options=["--drain-timeout", ".3"])
+        self.assertEqual(refused.wait(timeout=3), 75)
+        self.assertIn("orphaned index rebuild", self.output(refused))
+        self.kill_recorded(job)
+        holder = self.start("exclusive", [PYTHON, "-c", "pass"], options=["--drain-timeout", "1"])
+        self.assertEqual(holder.wait(timeout=3), 0)
+
+    def test_heavy_work_started_by_a_paused_job_waits_for_the_window(self):
+        go, entered = self.root / "go", self.root / "entered"
+        command = [PYTHON, "-c", f"""import subprocess,time; from pathlib import Path
+while not Path({str(go)!r}).exists(): time.sleep(.01)
+subprocess.run({[PYTHON, str(CLI), 'heavy', '--purpose', 'nested in paused job', '--',
+                 PYTHON, '-c', f'from pathlib import Path; Path({str(entered)!r}).touch()']!r}, check=True)
+time.sleep(60)
+"""]
+        noop = [PYTHON, "-c", "pass"]
+        background = self.start("pausable", command, purpose="controller", hooks=(noop, noop))
+        group = self.wait_for(lambda: (self.row("pausable") or {}).get("group"))
+        self.groups.append(proc(group["pid"]))
+        holder = self.start("exclusive", options=["--drain-timeout", "2"])
+        self.wait_for(lambda: self.row("exclusive") and self.row("pausable")["state"] == "paused")
+        go.touch()
+        waiting = self.wait_for(lambda: next((r for r in self.status() if r["purpose"] == "nested in paused job"), None))
+        self.assertEqual(waiting["mode"], "heavy-waiter")
+        time.sleep(.3)
+        self.assertFalse(entered.exists(), "heavy work of a paused job ran inside the exclusive window")
+        holder.terminate()
+        self.assertEqual(holder.wait(timeout=2), 143)
+        self.wait_for(entered.exists, timeout=2)
+        background.terminate(); background.wait(timeout=3)
+
+    def test_budget_caps_are_enforced(self):
+        cases = [("exclusive", "--drain-timeout", "121"), ("exclusive", "--timeout", "601"),
+                 ("exclusive", "--gate-timeout", "721"), ("heavy", "--gate-timeout", "721"),
+                 ("pausable", "--hook-timeout", "121")]
+        for mode, option, value in cases:
+            with self.subTest(option=option, mode=mode):
+                hooks = ["--pause-hook", "true", "--resume-hook", "true"] if mode == "pausable" else []
+                result = subprocess.run([PYTHON, str(CLI), mode, "--purpose", "cap", option, value, *hooks,
+                                         "--", PYTHON, "-c", "pass"], env=self.env, capture_output=True,
+                                        text=True, timeout=5)
+                self.assertEqual(result.returncode, 2, result.stderr)
+                self.assertIn("at most", result.stderr)
+
+    def test_gate_waits_have_deadlines(self):
+        holder = self.start("exclusive", purpose="current scoring")
+        self.wait_for(lambda: self.row("exclusive"))
+        for mode in ("exclusive", "heavy"):
+            with self.subTest(mode=mode):
+                started = time.monotonic()
+                waiter = self.start(mode, [PYTHON, "-c", "pass"], options=["--gate-timeout", ".3"])
+                self.assertEqual(waiter.wait(timeout=3), 75)
+                self.assertLess(time.monotonic() - started, 2)
+                self.assertIn("current scoring", self.output(waiter))
+        holder.terminate()
+        self.assertEqual(holder.wait(timeout=2), 143)
+        self.assert_unblocked()
+
+    def test_hanging_hooks_fail_without_holding_the_gate(self):
+        hang = [PYTHON, "-c", "import time; time.sleep(60)"]
+        for phase in ("pause", "resume"):
+            with self.subTest(phase=phase):
+                for name in ("pause", "ack"):
+                    (self.root / name).unlink(missing_ok=True)
+                pause_code = (f"from pathlib import Path; import time; Path({str(self.root / 'pause')!r}).touch()\n"
+                              f"while not Path({str(self.root / 'ack')!r}).exists(): time.sleep(.01)")
+                hooks = (hang, [PYTHON, "-c", "pass"]) if phase == "pause" else ([PYTHON, "-c", pause_code], hang)
+                background = self.start("pausable", purpose=f"{phase} hangs", hooks=hooks,
+                                        options=["--hook-timeout", ".5"])
+                group = self.wait_for(lambda: (self.row("pausable") or {}).get("group"))
+                job = proc(group["pid"]); self.groups.append(job)
+                first = self.start("exclusive", [PYTHON, "-c", "pass"], options=["--drain-timeout", "3"])
+                self.assertEqual(first.wait(timeout=5), 0)
+                # The resume hook runs after the gate reopened: the next window is not held back.
+                second = self.start("exclusive", [PYTHON, "-c", "pass"], options=["--drain-timeout", "3"])
+                self.assertEqual(second.wait(timeout=5), 0)
+                self.assertEqual(background.wait(timeout=3), 73)
+                self.assertIn("timed out", self.output(background))
+                self.assertTrue(self.gone(job), "a failed hook ends the job")
+
+    def test_waiting_pausable_is_not_listed_as_holder(self):
+        heavy = self.start("heavy", purpose="ongoing build")
+        self.wait_for(lambda: self.row("heavy"))
+        exclusive = self.start("exclusive", [PYTHON, "-c", "pass"], options=["--drain-timeout", "1"])
+        self.wait_for(lambda: self.row("exclusive-draining"))
+        background = self.start("pausable", purpose="queued index rebuild")
+        self.wait_for(lambda: (self.row("pausable") or {}).get("state") == "waiting")
+        self.assertEqual(exclusive.wait(timeout=3), 75)
+        diagnostic = self.output(exclusive)
+        self.assertIn("ongoing build", diagnostic)
+        self.assertNotIn("queued index rebuild", diagnostic)
+        group = self.wait_for(lambda: (self.row("pausable") or {}).get("group"))
+        self.groups.append(proc(group["pid"]))
+        background.terminate(); background.wait(timeout=3)
+        heavy.terminate(); heavy.wait(timeout=3)
+
+    def test_python_heavy_uses_the_directory_of_the_passed_env(self):
+        spec = importlib.util.spec_from_file_location("admission_under_test", CLI)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        passed = self.root / "passed-admission"
+        saved = os.environ.get("JS_ADMISSION_DIR")
+        os.environ["JS_ADMISSION_DIR"] = self.env["JS_ADMISSION_DIR"]
+        try:
+            with module.heavy("python caller", {**self.env, "JS_ADMISSION_DIR": str(passed)}) as admitted:
+                self.assertTrue(admitted["JS_ADMISSION_TOKEN"])
+                self.assertEqual(self.status(), [])
+                rows = json.loads(subprocess.run([PYTHON, str(CLI), "status"], capture_output=True, text=True,
+                                                 env={**self.env, "JS_ADMISSION_DIR": str(passed)}).stdout)
+                self.assertEqual([(r["mode"], r["purpose"]) for r in rows], [("heavy", "python caller")])
+                self.assertTrue(module.nested(admitted))
+        finally:
+            if saved is None:
+                os.environ.pop("JS_ADMISSION_DIR", None)
+            else:
+                os.environ["JS_ADMISSION_DIR"] = saved
+
+    @unittest.skipIf(os.geteuid() == 0, "root bypasses directory permissions")
+    def test_unavailable_admission_fails_open_with_one_warning(self):
+        blocked = self.root / "blocked"; blocked.mkdir()
+        view = self.root / "view"; view.mkdir()
+        for name in ("gate", "work"):
+            (view / f"{name}.lock").touch(mode=0o444)
+        for directory in (blocked, view):
+            directory.chmod(0o555)
+        try:
+            self.check_fail_open(blocked, view)
+        finally:
+            for directory in (blocked, view):
+                directory.chmod(0o755)
+
+    def check_fail_open(self, blocked, view):
+        for label, directory in (("not creatable", blocked / "admission"), ("read-only view", view)):
+            with self.subTest(case=label):
+                result = subprocess.run([PYTHON, str(CLI), "heavy", "--purpose", "Gradle", "--",
+                                         PYTHON, "-c", "print('ran')"], capture_output=True, text=True, timeout=5,
+                                        env={**self.env, "JS_ADMISSION_DIR": str(directory)})
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertEqual(result.stdout, "ran\n")
+                self.assertEqual(len(result.stderr.splitlines()), 1, result.stderr)
+                self.assertIn("without admission", result.stderr)
 
     def test_read_only_lock_files_and_exclusive_waiter_status(self):
         lock_dir = Path(self.env["JS_ADMISSION_DIR"]); lock_dir.mkdir()

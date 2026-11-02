@@ -2732,7 +2732,11 @@ async function runAdmittedStart(opts, ctx) {
           ? `Gradle installDist could not be run: ${buildResult.error.message}`
             + `${buildResult.error.code ? ` (${buildResult.error.code})` : ''} — ${gradlePath}`
           : `Gradle installDist failed with exit code ${buildResult.status}`
-            + `${buildResult.signal ? ` (killed by ${buildResult.signal})` : ''}`);
+            + `${buildResult.signal ? ` (killed by ${buildResult.signal})` : ''}`
+            // Linux Gradle runs through machine admission (scripts/dev/admission.py): 75 is its
+            // refusal (the gate stayed closed past its deadline), 73 its own failure.
+            + `${[73, 75].includes(buildResult.status) && process.platform === 'linux'
+              ? ' (machine admission refused or failed; see the "admission:" line on stderr)' : ''}`);
     }
   }
 
