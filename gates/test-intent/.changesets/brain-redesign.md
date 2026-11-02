@@ -17,8 +17,10 @@ written by the builder.
 Evidence is generated only by the unmodified run-evidence.mjs, in a shared clone in the session
 temporary directory with its own copied dependencies. Repairs of behaviour broken at main fail by
 assertion on main: the consent checks on aeaa3e0413 (an earlier main). The B20 graphics-card and
-runtime-variant checks have no fail-before for the reason under test, because main has no such controls
-(their entry says so). Repairs of defects introduced and found inside this change
+runtime-variant checks are not marked repaired and carry no fail-before: run on main they fail only because
+main lacks the new slider and Other options controls. An independent acceptor demonstrated both defects on
+main through main's own controls; that demonstration is not part of this changeset's evidence (their
+entry says so). Repairs of defects introduced and found inside this change
 carry their own intermediate before-state in the entry and evidence (e4bb40ed0e, 6680864f7d,
 f2f1945c23, 13a89c28aa, 1b5ceea94b, 234d87ca0b, 2c7f1e8d99, 1489cf0340, 4c6637f1b6, 591a7ad461,
 7f435cfc7e).
@@ -66,7 +68,7 @@ Changed test files against main (all durable product checks):
         "input re-encoding",
         "rename"
       ],
-      "whatMoved": "componentList: the harness supplies a live install observation (not_installed verdict) and opens Advanced through the Advanced settings link; the Models accordion no longer exists and the inventory is read in Advanced, Downloaded files. Every original group, description, size, column, unavailable reason and decline request is asserted unchanged. The reranker opt-out is now a native switch: its accessible name reads \"Include Search reranker\" (was \"Search reranker\"), state is read from role switch and aria-checked true (was pressed/aria-pressed), and it is clicked as a real button; the single decline POST is unchanged. The honest-progress harness also supplies the live observation flags. chat-intent: fixtures explicitly supply installed answer files (completed install, installed chat in the plan), saved intent and a successful settings read before the action is read at its new place in the links below the path. All original enable/disable, policy refusal and superseded-operation assertions remain.",
+      "whatMoved": "componentList: the harness supplies a live install observation (not_installed verdict) and opens Advanced through the Advanced settings link; the Models accordion no longer exists and the inventory is read in Advanced, Downloaded files. Every original group, description, size, column, unavailable reason and decline request is asserted unchanged. The reranker opt-out is now a native switch: its accessible name reads \"Include Search reranker\" (was \"Search reranker\"), state is read from role switch and aria-checked true (was pressed/aria-pressed), and it is clicked as a real button; the single decline POST is unchanged. The honest-progress harness also supplies the live observation flags. chat-intent: fixtures supply installed answer files (completed install, installed chat in the plan), a successful settings read and a saved answer choice, and the action is read at its new place in the links below the path. The per-lifecycle-state oracle no longer decides the outcome: the fixture saves answers on for starting and online and off for offline, indexing and background, and the expected core.set-chat-enabled argument follows that saved answer choice (B15), not the lifecycle state; an independent acceptor showed that forcing every state to online still passes all 9 tests. The retired guarantee that each lifecycle state gets its own action has its own Obsolete entry. The expected arguments per case, the plan's unavailable reason, the two online-AI policy refusals and the never-core.switch-inference-mode assertion are unchanged.",
       "sources": [
         {
           "kind": "owner-adopted-scenario",
@@ -531,7 +533,7 @@ Changed test files against main (all durable product checks):
         "modules/ui-web/src/shell-v0/views/BrainSurface.sliceB.test.ts"
       ],
       "class": "New",
-      "behaviour": "B20, behaviour broken at main (344bdaf03c). Graphics card use: with saved llm.gpuLayers null the Advanced slider reads \"Automatic\"; moving it to 0 saves exactly { gpuLayers: 0 }, reads \"0 layers · processor only\", and keeps maxTokens null, contextWindow 0 and modelPath. Runtime variants: with runtimeStatus.installedVariants [cuda12] and active.activeVariantId null, Other options offers Activate for the installed inactive variant and invokes core.activate-runtime-variant { variantId: cuda12 }. Main displayed gpuLayers ?? 0 (Automatic read as 0) and read runtimeStatus.variants and activation.activeVariantId; independent verifiers observed both defects live on the running app. A fail-before for the reason under test is not available: main has no graphics-card-use slider and no Other options variant controls, so these checks can fail there only because the controls are missing, which does not show the defect. They are therefore not marked repaired; the evidence records that both pass on this candidate.",
+      "behaviour": "B20, behaviour broken at main (344bdaf03c). Graphics card use: with saved llm.gpuLayers null the Advanced slider reads \"Automatic\"; moving it to 0 saves exactly { gpuLayers: 0 }, reads \"0 layers · processor only\", and keeps maxTokens null, contextWindow 0 and modelPath. Runtime variants: with runtimeStatus.installedVariants [cuda12] and active.activeVariantId null, Other options offers Activate for the installed inactive variant and invokes core.activate-runtime-variant { variantId: cuda12 }. Main has its own controls for both: a GPU layers number input in its Runtime section, whose value is gpuLayers ?? 0, and GPU runtime variant rows with Activate and Deactivate buttons built from runtimeStatus.variants and activation.activeVariantId. An independent acceptor demonstrated both defects on main by assertion through main's own controls: a saved Automatic (null) is shown as '0', and with the endpoint's real fields main offers no Activate. That demonstration is not part of this changeset's evidence. These checks, run on main, fail only because main lacks the new slider and Other options controls, which does not show the defect, so they are New without repaired; the evidence records that both pass on this candidate.",
       "sources": [
         {
           "kind": "owner-adopted-scenario",
@@ -700,8 +702,24 @@ Changed test files against main (all durable product checks):
       "moved": [
         "input re-encoding"
       ],
-      "whatMoved": "The direct-render harness marks its injected saved settings snapshot as successfully read, matching the new S3 initial-read guard. All lifecycle operation arguments, unavailable-reason and policy assertions stay unchanged. Pending/failed reads are separately pinned by the rendered S3 regression checks.",
+      "whatMoved": "The direct-render harness marks its injected saved settings snapshot as successfully read, matching the new S3 initial-read guard, and saves an answer choice per case: on for starting and online, off for offline, indexing and background. The per-lifecycle-state oracle no longer decides the outcome: the expected action (the core.set-chat-enabled argument) now follows the saved answer choice (B15), not the lifecycle state, so forcing every state to online still passes all 9 tests, as an independent acceptor showed. The retired guarantee that each lifecycle state gets its own action is recorded in the Obsolete entry that follows. The expected argument values per case, the plan's unavailable reason, the online-AI policy refusals and the never-core.switch-inference-mode assertion are unchanged. Pending and failed settings reads are pinned separately by the rendered S3 regression checks.",
       "newChecks": []
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/views/BrainSurface.chat-intent.test.ts"
+      ],
+      "class": "Obsolete",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "B15",
+          "quote": "(challenger 2) The answer switch shows the saved intent (nullable chatEnabled: unset stays distinct from explicit off); the sentence explains current availability, including answers off while background work continues and answers temporarily unavailable while pictures are being read, and their completion.",
+          "label": "agent-drafted, owner-adopted"
+        }
+      ],
+      "conflictSearch": "decision records searched for a conflict: none (docs/decisions searched for set-chat-enabled, chat-enabled, chatEnabled, escape action, lifecycle state, Cancel, Shut Down AI, Start Chat AI and Resume Chat AI; the only hit, the 2026-10-20 amendment of ADR-0008, records that UiSettings persists chatEnabled and says nothing about which action a lifecycle state offers; ADR-0034's rule against enabling actions from stale or inferred backend state is not contradicted, because the saved choice is read from the backend settings). Retired from main 344bdaf03c BrainSurface.chat-intent.test.ts: each lifecycle state gets its own action, decided by the verdict alone (offline Start AI and indexing Resume Chat AI writing enabled true, background Start Chat AI writing enabled true, starting Cancel and online Shut Down AI writing enabled false). Under B15 the answer action shows the saved intent, so the expected core.set-chat-enabled argument now follows the saved answer choice; the test keeps the same five states and expected arguments only through its fixture, which saves the matching choice per state."
     },
     {
       "items": [
@@ -709,7 +727,7 @@ Changed test files against main (all durable product checks):
       ],
       "class": "New",
       "repaired": true,
-      "behaviour": "The one-page layout keeps the repair guarantees. The harness supplies a live install observation, opens Advanced, records the alert \"Repair\" (else the Maintenance \"Repair installation\") variant and availability, and records any install action by its label prefix \"Install AI\" or \"Install additions\" (the labels carry the size). Required gap (repairNeeded): Repair in the alert is primary, no install action is primary, and the page says \"A required component is missing\" and \"use Repair\". Required file missing while the capability runs: the \"Working, but an expected file is missing\" copy without the alarm, Repair primary. Required file missing and down: the full-strength copy, Repair primary. No observation fails closed to the full copy. Three failed repair passes: Repair is unavailable and not primary (ghost), no install action is primary, the manual fallback names the URL, file and 12 attempts and never says \"A required component is missing\" (the start of the repair sentence, \"A required component is missing — use Repair below.\"). The healthy-install and optional-only-gap checks of this file have their own entry with evidence; the base expectation that Install stays primary in those cases is retired in its own Obsolete entry.",
+      "behaviour": "The one-page layout keeps the repair guarantees. The harness supplies a live install observation, opens Advanced, records the alert \"Repair\" (else the Maintenance \"Repair installation\") variant and availability, and records any install action by its label prefix \"Install AI\" or \"Install additions\" (the labels carry the size). Required gap (repairNeeded): Repair in the alert is primary, no install action is offered, and the page says \"A required component is missing\" and \"use Repair\". Required file missing while the capability runs: the \"Working, but an expected file is missing\" copy without the alarm, Repair primary. Required file missing and down: the full-strength copy, Repair primary. No observation fails closed to the full copy. Three failed repair passes: Repair is unavailable and not primary (ghost), no install action is offered, the manual fallback names the URL, file and 12 attempts and never says \"A required component is missing\" (the start of the repair sentence, \"A required component is missing — use Repair below.\"). The healthy-install and optional-only-gap checks of this file have their own entry with evidence; the base expectation that Install stays primary in those cases is retired in its own Obsolete entry.",
       "sources": [
         {
           "kind": "owner-adopted-scenario",
@@ -746,7 +764,7 @@ Changed test files against main (all durable product checks):
         "modules/ui-web/src/shell-v0/views/BrainSurface.repairRemedy.test.ts"
       ],
       "class": "New",
-      "behaviour": "Replacement expectations for the retired \"Install stays primary\" checks, at the one-page layout with Advanced open. Healthy install (installedFully, no repair needed): Maintenance \"Repair installation\" is a ghost text button, no install action is offered (no button labelled \"Install AI …\" or \"Install additions …\"), and the page does not say \"A required component is missing\". Optional-only gap: deriveRepairRemedy is none and repairRemedySub null, the page does not say \"A required component is missing\", Repair is ghost, no install action is primary, and \"Optional files not installed\" names splade/config.json. These follow a design decision, not a repair, so they are not marked repaired. The evidence also runs them on main (344bdaf03c), where both fail by assertion at the Repair-is-ghost line (expected undefined to be 'ghost'): main keeps Install and Repair in its install accordion, which this harness does not open, so the before-run shows that main's page differs, not main's variant choice (main offered Install as primary and Repair as secondary).",
+      "behaviour": "Replacement expectations for the retired \"Install stays primary\" checks, at the one-page layout with Advanced open. Healthy install (installedFully, no repair needed): Maintenance \"Repair installation\" is a ghost text button, no install action is offered (no button labelled \"Install AI …\" or \"Install additions …\"), and the page does not say \"A required component is missing\". Optional-only gap: deriveRepairRemedy is none and repairRemedySub null, the page does not say \"A required component is missing\", Repair is ghost, no install action is offered, and \"Optional files not installed\" names splade/config.json. These follow a design decision, not a repair, so they are not marked repaired. The evidence also runs them on main (344bdaf03c), where both fail by assertion at the Repair-is-ghost line (expected undefined to be 'ghost'): main keeps Install and Repair in its install accordion, which this harness does not open, so the before-run shows that main's page differs, not main's variant choice (main offered Install as primary and Repair as secondary).",
       "sources": [
         {
           "kind": "owner-adopted-scenario",
@@ -820,7 +838,7 @@ Changed test files against main (all durable product checks):
           "label": "agent choice"
         }
       ],
-      "conflictSearch": "decision records searched for a conflict: none (docs/decisions searched for Install, primary action and repair wording). Retired from main 344bdaf03c BrainSurface.repairRemedy.test.ts: \"no repair needed ⇒ Install stays primary (the pre-existing default is untouched)\" (expect(variants.Install).toBe('primary'), expect(variants.Repair).not.toBe('primary')) and, in \"optional-only gap ⇒ no repair prompt at all\", expect(variants.Install).toBe('primary'). Their replacement expectations (no install action for a healthy install, no primary install action for an optional-only gap, Repair a ghost text button) are the New entry above with evidence gates/test-intent/evidence/brain-repair-remedy-main.json. All Repair-is-primary, copy and manual-fallback expectations remain."
+      "conflictSearch": "decision records searched for a conflict: none (docs/decisions searched for Install, primary action and repair wording). Retired from main 344bdaf03c BrainSurface.repairRemedy.test.ts: \"no repair needed ⇒ Install stays primary (the pre-existing default is untouched)\" (expect(variants.Install).toBe('primary'), expect(variants.Repair).not.toBe('primary')) and, in \"optional-only gap ⇒ no repair prompt at all\", expect(variants.Install).toBe('primary'). Their replacement expectations (no install action is offered for a healthy install or an optional-only gap, Repair a ghost text button) are the New entry above with evidence gates/test-intent/evidence/brain-repair-remedy-main.json. All Repair-is-primary, copy and manual-fallback expectations remain."
     },
     {
       "items": [

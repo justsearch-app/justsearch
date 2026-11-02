@@ -60,7 +60,6 @@ async function installButtons(
       variants.Install = b.getAttribute('variant');
     }
     if (label === 'Repair' || (label === 'Repair installation' && variants.Repair == null)) {
-      if (label === 'Repair installation' && variants.Repair != null) continue;
       repairAvailability = (b as unknown as { availability: unknown }).availability;
       variants.Repair = b.getAttribute('variant');
     }
@@ -89,7 +88,7 @@ describe('BrainSurface Detailed — the install panel names the same remedy Simp
   it('repairNeeded ⇒ Repair is the primary action in the alert', async () => {
     const { variants, text } = await installButtons(REPAIR_NEEDED);
     expect(variants.Repair).toBe('primary');
-    expect(variants.Install).not.toBe('primary');
+    expect(variants.Install).toBeUndefined();
     // The panel states the condition in the same words Simple used, so the two read as one story.
     expect(text).toContain('A required component is missing');
     expect(text).toContain('use Repair');
@@ -178,7 +177,7 @@ describe('BrainSurface — the repair claim names its authority', () => {
     const { variants, text } = await installButtons(OPTIONAL_GAP_ONLY);
     expect(text).not.toContain('A required component is missing');
     expect(variants.Repair).toBe('ghost');
-    expect(variants.Install).not.toBe('primary');
+    expect(variants.Install).toBeUndefined();
     expect(text).toContain('Optional files not installed');
     expect(text).toContain('splade/config.json');
   });
@@ -229,7 +228,7 @@ describe('BrainSurface — the repair claim names its authority', () => {
     expect(repairAvailability).toMatchObject({ kind: 'unavailable' });
     // The defect this pins: an affordance that provably cannot succeed presented as THE remedy.
     expect(variants.Repair).toBe('ghost');
-    expect(variants.Install).not.toBe('primary');
+    expect(variants.Install).toBeUndefined();
     expect(text).toContain('Automatic repair could not download');
     expect(text).toContain('https://example/splade-config.json');
     expect(text).toContain('config.json');
