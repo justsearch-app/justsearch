@@ -2102,3 +2102,14 @@ Builder checks for the running Repair follow-up (uncommitted):
 Resources: this worktree's own dependencies, temporary shared clones with dereferenced dependency
 copies, fixture browser contexts and own Vite servers. No owner backend, model or GPU was used.
 Independent verification of a real backend Repair download remains the verifier's work.
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verifier-15c",
+  "verdict": "accept",
+  "digest": "sha256:2abb2bebdf36b2a7f05ee8c9ceb900e124b69f57b5333384fefe21193c03a0b7",
+  "note": "Verdict of independent verifier session verifier-15c (live recheck of 4cc6dfb89f, digest sha256:2abb2beb...a0b7, all entries accepted); recorded by the orchestrator, who transcribed it, after a clean rebase that left the digest unchanged."
+}
+```
