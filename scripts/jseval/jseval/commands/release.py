@@ -257,6 +257,21 @@ def cmd_release(ctx, runs, latest_per_dataset, data_dir, default_mode, external_
                 gate="release", dataset=f"{ds}:leg_union_recall",
                 changesets_dir=changesets_dir,
             )
+        # A measured or leak row that disappears removes that corpus's floor or ceiling, which is a
+        # relaxation too. The loops above only see rows present in the new release, so check the
+        # old rows here: an explicit withhold reason recorded in the new release justifies the
+        # removal; otherwise the same justified changeset is required.
+        new_withheld = release_doc.get("withheld") or {}
+        for section, old_rows, suffix in (("measured", old_measured, "measured"),
+                                          ("leak", old_leak, "leak_rate")):
+            new_rows = release_doc.get(section) or {}
+            for ds in sorted(set(old_rows) - set(new_rows)):
+                reason = (new_withheld.get(ds) or {}).get("reason")
+                if isinstance(reason, str) and reason.strip():
+                    continue
+                _bshift.assert_baseline_not_removed(
+                    gate="release", dataset=f"{ds}:{suffix}", changesets_dir=changesets_dir,
+                )
     except _bshift.BaselineRelaxedWithoutJustificationError as e:
         click.echo(f"release refused: {e}", err=True)
         sys.exit(1)

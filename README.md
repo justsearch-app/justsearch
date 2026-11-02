@@ -164,16 +164,17 @@ reading is "a reproducible offline hybrid system lands in the range of strong pu
 [the methodology](docs/reference/benchmarks/methodology.md#how-to-read-the-comparison-system-vs-component).
 Per-corpus nDCG@10 floors are checked against a pinned baseline at release-composition time
 (`python -m jseval relevance-gate`, `scripts/jseval/relevance-ratchet-baselines.v1.json`); that is a
-local gate run when a release is composed, not an automated CI job. The README table itself is checked
-against the release object in CI (`scripts/ci/check-readme-benchmark-numbers.mjs`).
+local gate run when a release is composed, not an automated CI job.
 
 Reproduce (from `scripts/jseval`): `python -m jseval run --start-backend --dataset beir/scifact --modes hybrid`
 then `python -m jseval relevance-gate --dataset beir/scifact`. Slugs: `beir/scifact`, `mixed/enron-qa`,
 `mixed/legal-clerc-200`, `mixed/miracl-de-2k`, `mixed/miracl-fr-2k`.
 Full methodology, comparison-class caveats, and reproduction:
 [`docs/reference/benchmarks/methodology.md`](docs/reference/benchmarks/methodology.md). The table above is
-hand-written from `scripts/jseval/release.v1.json` (the current Linux release); CI checks every
-number it shows against that file (`scripts/ci/check-readme-benchmark-numbers.mjs`).
+hand-written from `scripts/jseval/release.v1.json` (the current Linux release). CI compares each
+row's nDCG@10 value, or its WITHHELD marker, with that file (`scripts/ci/check-readme-benchmark-numbers.mjs`);
+the note column and the counts and percentages in the prose are copied from the release by hand and are
+not checked by CI.
 For the broader research angle — open questions, what's deferred, and how to get involved — see
 [`RESEARCH.md`](RESEARCH.md).
 

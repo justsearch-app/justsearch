@@ -36,6 +36,7 @@ const RELEASE = {
     "mixed/miracl-fr-2k": nd(0.99),
   },
   withheld: { "mixed/legal-clerc-200": { reason: "degraded-ce" } },
+  ablations: { "mixed/legal-clerc-200": [{ config_mode: "lexical", ...nd(0.691) }, { config_mode: "vector", ...nd(0.617) }] },
 };
 const README = [
   "# Fixture",
@@ -120,6 +121,49 @@ function run(release, readme) {
   const readme = README.replace("| Legal (CLERC", "| Planned corpus | — | not measured |\n| Legal (CLERC");
   const result = run(RELEASE, readme);
   ok("an unrecognised row without a number passes", result.status === 0);
+}
+
+// --- review round 3 should-fix 2: every row is checked, not only the first row with a label ---
+const after = (row) => README.replace("| Legal (CLERC case-retrieval) | WITHHELD | note |", `| Legal (CLERC case-retrieval) | WITHHELD | note |\n${row}`);
+{
+  const result = run(RELEASE, after("| Legal lexical ablation (CLERC) | 0.690 | note |"));
+  ok("a second CLERC row with a wrong ablation number fails", result.status !== 0);
+  ok("the failure names the lexical ablation", /CLERC: lexical ablation row does not show the release value 0\.691/.test(result.stderr));
+}
+{
+  const result = run(RELEASE, after("| Legal lexical ablation (CLERC) | 0.691 | note |"));
+  ok("a declared ablation row showing the release value passes", result.status === 0);
+}
+{
+  const result = run(RELEASE, after("| Legal ablation (CLERC) | 0.691 | note |"));
+  ok("an ablation row naming no recorded mode fails", result.status !== 0);
+}
+{
+  const result = run(RELEASE, README.replace("| Enron-QA", "| SciFact (full) | 0.812 | note |\n| Enron-QA"));
+  ok("a second SciFact row with any number fails", result.status !== 0);
+  ok("the failure names the reused label", /SciFact: a second row reuses this corpus label/.test(result.stderr));
+}
+{
+  const result = run(RELEASE, README.replace("| Enron-QA", "| SciFact (full) | **0.759** | note |\n| Enron-QA"));
+  ok("a second SciFact row repeating the measured number still fails", result.status !== 0);
+}
+{
+  const result = run(RELEASE, README.replace("| Enron-QA | 0.806 |", "| Enron-QA vs SciFact | 0.806 0.759 |"));
+  ok("a row matching two corpus labels fails", result.status !== 0);
+  ok("the failure names the ambiguity", /row matches more than one corpus label/.test(result.stderr));
+}
+{
+  const result = run(RELEASE, README.replace("0.806", "0.8060"));
+  ok("a rounded form only matches as a whole number", result.status !== 0);
+}
+for (const form of ["81%", "0,81", "81 %"]) {
+  const readme = README.replace("| Legal (CLERC", `| NFCorpus | ${form} | new corpus |\n| Legal (CLERC`);
+  const result = run(RELEASE, readme);
+  ok(`an unrecognised row showing ${form} fails`, result.status !== 0);
+}
+for (const form of [".578", "57.8", "57.8%", "0,578"]) {
+  const result = run(RELEASE, README.replace("| WITHHELD |", `| WITHHELD (${form}) |`));
+  ok(`a WITHHELD row that also prints ${form} fails`, result.status !== 0);
 }
 
 // --- a superseded release cannot supply README claims ---

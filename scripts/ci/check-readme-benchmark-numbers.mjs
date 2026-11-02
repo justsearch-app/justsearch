@@ -7,8 +7,9 @@
  * cannot silently go stale.
  *
  * Usage: node scripts/ci/check-readme-benchmark-numbers.mjs
- * Exit 0 = consistent (or skipped); non-zero = a shown row disagrees with, or has no evidence in, the release,
- * or a row no label recognises shows a decimal.
+ * Exit 0 = consistent (or skipped); non-zero = a shown row disagrees with, or has no evidence in, the release;
+ * a row no label recognises shows a number; a row matches two labels; or a label is reused by a row that
+ * is not a declared, checked ablation. Only nDCG@10 values are compared: note cells and prose are not.
  * Unit fixtures: scripts/ci/check-readme-benchmark-numbers.test.mjs (sibling convention).
  *
  * Skip-if-absent (the 632 sidecar local-vs-CI duality): no release, or no README with a "## Benchmarks"
@@ -38,6 +39,11 @@ function nd(entry) {
 // README's rounding varies (3dp for most, 2dp for CourtListener) — accept either form.
 function roundedForms(v) {
   return [v.toFixed(3), v.toFixed(2)];
+}
+
+// The row shows `v` as a whole number in one of its rounded forms ("0.69" must not match inside "0.690").
+function showsValue(row, v) {
+  return roundedForms(v).some((f) => new RegExp(`(?<![\\d.])${f.replace(".", "\\.")}(?![\\d])`).test(row));
 }
 
 // Find the first candidate README that has a "## Benchmarks" section; return {rel, lines} or null.
@@ -84,6 +90,22 @@ const EXPECTATIONS = [
   { token: "CLERC", dataset: "mixed/legal-clerc-200" },
 ];
 
+// A cell that shows a score in any common form: ".578", "0.578", "57.8", "0,578", "81%", "81 %".
+const SCORE_FORM = /\.\d|\d,\d|\d\s*%/;
+
+function rowMatches(row) {
+  const lower = row.toLowerCase();
+  return EXPECTATIONS.filter((exp) => lower.includes(exp.token.toLowerCase()));
+}
+
+// An ablation row declares itself with the word "ablation" and names exactly one mode the release
+// records as an ablation for that corpus; its number is then checked against that ablation.
+function declaredAblation(row, entries) {
+  if (!/\bablation\b/i.test(row)) return null;
+  const modes = (entries || []).filter((a) => new RegExp(`\\b${a.config_mode}\\b`, "i").test(row));
+  return { modes };
+}
+
 /** Pure (unit-tested): compare the README benchmark rows with the release. Returns {failures, checked}. */
 export function checkBenchmarkRows(rows, release) {
   if (release.status === "superseded") throw new Error("superseded release cannot supply current README claims");
@@ -92,20 +114,49 @@ export function checkBenchmarkRows(rows, release) {
   const withheld = release.withheld || {};
   const failures = [];
   let checked = 0;
-  // Rows are matched by label, so a row no label recognises (a renamed or added corpus) would escape
-  // the check entirely. Any such row that shows a decimal fails instead of being skipped.
+  const defaultRowSeen = new Set();
+  // Every row is checked. Rows are matched by label, so a row no label recognises (a renamed or added
+  // corpus) would escape the check: any such row that shows a number fails. A row matching two labels is
+  // ambiguous and fails. Per label, one row is the measured-mode row; any further row must be a declared
+  // ablation whose number is itself checked.
   for (const row of rows) {
-    const known = EXPECTATIONS.some((exp) => row.toLowerCase().includes(exp.token.toLowerCase()));
-    if (!known && /\.\d/.test(row)) {
-      failures.push(`unrecognised Benchmarks row shows a number no release label checks — row: ${row.trim()}`);
+    const matches = rowMatches(row);
+    if (matches.length === 0) {
+      if (SCORE_FORM.test(row)) {
+        failures.push(`unrecognised Benchmarks row shows a number no release label checks — row: ${row.trim()}`);
+      }
+      continue;
     }
-  }
-  for (const exp of EXPECTATIONS) {
-    const row = rows.find((r) => r.toLowerCase().includes(exp.token.toLowerCase()));
-    if (!row) continue; // README chose not to show this corpus — editorial freedom.
+    if (matches.length > 1) {
+      failures.push(`row matches more than one corpus label (${matches.map((m) => m.token).join(", ")}) — row: ${row.trim()}`);
+      continue;
+    }
+    const exp = matches[0];
+    const ablation = declaredAblation(row, ablations[exp.dataset]);
+    if (ablation) {
+      if (ablation.modes.length !== 1) {
+        failures.push(
+          `${exp.token}: ablation row must name exactly one ablation mode the release records for ${exp.dataset} — row: ${row.trim()}`
+        );
+        continue;
+      }
+      const v = nd(ablation.modes[0]);
+      checked += 1;
+      if (v == null || !showsValue(row, v)) {
+        failures.push(
+          `${exp.token}: ${ablation.modes[0].config_mode} ablation row does not show the release value ${v == null ? "(none)" : roundedForms(v).join(" / ")} — row: ${row.trim()}`
+        );
+      }
+      continue;
+    }
+    if (defaultRowSeen.has(exp.token)) {
+      failures.push(`${exp.token}: a second row reuses this corpus label without declaring a checked ablation — row: ${row.trim()}`);
+      continue;
+    }
+    defaultRowSeen.add(exp.token);
     if (withheld[exp.dataset]) {
       checked += 1;
-      if (!/withheld/i.test(row) || /\b0\.\d+/.test(row)) {
+      if (!/withheld/i.test(row) || SCORE_FORM.test(row)) {
         failures.push(`${exp.token}: default-mode row must state WITHHELD without a quality score — row: ${row.trim()}`);
       }
       continue;
@@ -122,7 +173,7 @@ export function checkBenchmarkRows(rows, release) {
       if (v == null) continue;
       checked += 1;
       const forms = roundedForms(v);
-      if (!forms.some((f) => row.includes(f))) {
+      if (!showsValue(row, v)) {
         failures.push(
           `${exp.token}: README row does not show the release value ${forms.join(" / ")} — row: ${row.trim()}`
         );

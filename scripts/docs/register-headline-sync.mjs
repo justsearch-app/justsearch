@@ -8,7 +8,7 @@
  *
  * Only the region between the markers is touched. The per-corpus (config × mode)
  * ABLATION tables in the register stay hand-authored — they are a heterogeneous
- * research log (different git/config per row). Only the production-default
+ * research log (different git/config per row). Only the measured-mode
  * headline number is re-rooted as a PROJECTION of a cohort-identical release,
  * so the hand-typed-fork drift class is removed structurally.
  *
@@ -71,7 +71,7 @@ function buildGenerated(release) {
     "> The (config × mode) ablation tables in each corpus block stay hand-authored. No calibrated reproduction envelope",
     "> is published; compare each run's measured spread directly (see the benchmark methodology).",
     "",
-    `**Release:** \`${relId}\` · default mode \`${release.default_mode}\` · ${hwStr}`,
+    `**Release:** \`${relId}\` · measured mode \`${release.default_mode}\` · ${hwStr}`,
     "",
     `**Coverage:** ${(release.coverage || {}).measures || "retrieval ranking quality"} — **does NOT measure** ${(release.coverage || {}).does_not_measure || "extraction/OCR/route quality"}.`,
     "",

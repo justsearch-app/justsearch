@@ -122,7 +122,7 @@ the `cpu_fallback_counts` projection alongside it. See
 > The (config × mode) ablation tables in each corpus block stay hand-authored. No calibrated reproduction envelope
 > is published; compare each run's measured spread directly (see the benchmark methodology).
 
-**Release:** `linux-complete-qrels-2026-11-02` · default mode `hybrid` · Linux 7.0.0-38-generic x86_64 · NVIDIA GeForce RTX 4070 · driver 580.178.04 · ORT 1.24.3
+**Release:** `linux-complete-qrels-2026-11-02` · measured mode `hybrid` · Linux 7.0.0-38-generic x86_64 · NVIDIA GeForce RTX 4070 · driver 580.178.04 · ORT 1.24.3
 
 **Coverage:** retrieval ranking quality (per-corpus metrics above) — **does NOT measure** document extraction / OCR / VDU routing quality (see tempdoc 623 §F — extraction-quality sibling).
 
@@ -152,14 +152,15 @@ Explicit hybrid mode: keyword + vector + cross-encoder reranking; learned-sparse
 
 <!-- generated:end -->
 
-> **Reading the two numbers (tempdoc 623 ④ / C-4).** The **Release Scorecard** above is the
-> *production-default* (`hybrid`) result — a **projection** of one cohort-identical release, the number a
-> user actually gets and the one the ratchet floors against. The per-corpus **Best known:** lines below
-> are a *hand-authored research log of best-achievable-config ablations* (often `full`-mode), kept for
-> engineering history — **not** the production headline. They differ **by design**: e.g. legal is
-> `full`-mode **0.925** best-achievable vs `hybrid` **0.598** production-default (corpus×config optimality,
-> F-004). When a Scorecard value is present for a corpus, it — not the "Best known" line — is the
-> canonical production number; the "Best known" line is its best-config ablation.
+> **Reading the two numbers (tempdoc 623 ④ / C-4).** The **Release Scorecard** above is the measured,
+> explicit `hybrid` mode — a **projection** of one cohort-identical release and the number the ratchet
+> floors against. It is not the product default: a request that names no mode runs AUTO
+> (`SearchPipelinePresets`). The per-corpus **Best known:** lines below are a *hand-authored research log
+> of best-achievable-config ablations* (often `full`-mode), kept for engineering history — **not** the
+> release headline. They differ **by design** (corpus×config optimality, F-004): e.g. legal's
+> best-achievable is `full`-mode **0.925**, while the current release withholds its `hybrid` result (see
+> its Scorecard row). When a Scorecard value is present for a corpus, it — not the "Best known" line — is
+> the canonical release number; the "Best known" line is its best-config ablation.
 
 ### beir/scifact
 

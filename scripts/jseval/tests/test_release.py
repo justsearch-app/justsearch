@@ -644,3 +644,76 @@ def test_release_help_calls_the_headline_mode_measured_not_production_default():
     assert result.exit_code == 0
     assert 'production-default' not in result.output.lower()
     assert 'Measured search mode' in result.output
+
+
+# --- review round 3 should-fix 3: a measured or leak row that disappears is a relaxation ---
+
+_RID = ["--release-id", "rel-test-2026-01-01"]
+
+
+def _run_with_projection(tmp_path, name, dataset, leak_rate=None):
+    rd = _write_run(tmp_path / name, _summary(dataset=dataset))
+    if leak_rate is not None:
+        (rd / "projections").mkdir()
+        (rd / "projections" / "staged_recall_accounting.json").write_text(
+            json.dumps({"status": "ok", "aggregate": {"leak_rate": leak_rate}}), encoding="utf-8")
+    return rd
+
+
+def test_cmd_release_refuses_dropping_a_measured_row_without_justification(tmp_path):
+    out = tmp_path / "release.v1.json"
+    runner = CliRunner()
+    first = [_run_with_projection(tmp_path, "a1", "beir/scifact"),
+             _run_with_projection(tmp_path, "b1", "mixed/enron-qa")]
+    r1 = runner.invoke(cmd_release, [a for rd in first for a in ("--run", str(rd))] + ["--out", str(out)] + _RID)
+    assert r1.exit_code == 0, r1.output
+    r2 = runner.invoke(cmd_release, ["--run", str(_run_with_projection(tmp_path, "b2", "mixed/enron-qa")),
+                                     "--out", str(out)] + _RID)
+    assert r2.exit_code == 1
+    assert "beir/scifact:measured" in r2.output
+    assert "beir/scifact" in json.loads(out.read_text())["measured"]
+
+
+def test_cmd_release_refuses_dropping_a_leak_row_without_justification(tmp_path):
+    out = tmp_path / "release.v1.json"
+    runner = CliRunner()
+    r1 = runner.invoke(cmd_release, ["--run", str(_run_with_projection(tmp_path, "a1", "beir/scifact", 0.02)),
+                                     "--out", str(out)] + _RID)
+    assert r1.exit_code == 0, r1.output
+    r2 = runner.invoke(cmd_release, ["--run", str(_run_with_projection(tmp_path, "a2", "beir/scifact")),
+                                     "--out", str(out)] + _RID)
+    assert r2.exit_code == 1
+    assert "beir/scifact:leak_rate" in r2.output
+    assert json.loads(out.read_text())["leak"]["beir/scifact"]["leak_rate"] == 0.02
+
+
+def test_cmd_release_accepts_a_withhold_reason_as_justification_for_dropped_rows(tmp_path):
+    out = tmp_path / "release.v1.json"
+    runner = CliRunner()
+    r1 = runner.invoke(cmd_release, ["--run", str(_run_with_projection(tmp_path, "a1", "beir/scifact", 0.02)),
+                                     "--out", str(out)] + _RID)
+    assert r1.exit_code == 0, r1.output
+    r2 = runner.invoke(cmd_release, ["--run", str(_run_with_projection(tmp_path, "a2", "beir/scifact", 0.02)),
+                                     "--withhold-default", "beir/scifact=25 deadline misses",
+                                     "--out", str(out)] + _RID)
+    assert r2.exit_code == 0, r2.output
+    doc = json.loads(out.read_text())
+    assert doc["measured"] == {} and "beir/scifact" not in (doc.get("leak") or {})
+    assert doc["withheld"]["beir/scifact"]["reason"] == "25 deadline misses"
+
+
+def test_cmd_release_accepts_a_changeset_for_a_dropped_measured_row(tmp_path):
+    out = tmp_path / "release.v1.json"
+    runner = CliRunner()
+    first = [_run_with_projection(tmp_path, "a1", "beir/scifact"),
+             _run_with_projection(tmp_path, "b1", "mixed/enron-qa")]
+    assert runner.invoke(cmd_release, [a for rd in first for a in ("--run", str(rd))]
+                         + ["--out", str(out)] + _RID).exit_code == 0
+    changesets_dir = out.resolve().parent / ".changesets"
+    changesets_dir.mkdir()
+    (changesets_dir / "drop.md").write_text(
+        '---\nclassification: "baseline-relaxation"\ngate: "release"\n'
+        'dataset: "beir/scifact:measured"\ntempdoc: "1100"\n---\nretired\n', encoding="utf-8")
+    r2 = runner.invoke(cmd_release, ["--run", str(_run_with_projection(tmp_path, "b2", "mixed/enron-qa")),
+                                     "--out", str(out)] + _RID)
+    assert r2.exit_code == 0, r2.output

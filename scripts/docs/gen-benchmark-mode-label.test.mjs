@@ -15,6 +15,8 @@ import { fileURLToPath } from "node:url";
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const REPO = path.resolve(HERE, "..", "..");
 const START = "<!-- generated:start — do not edit between markers; run: node scripts/docs/gen-public-benchmark.mjs -->";
+const REGISTER_START =
+  "<!-- generated:start — do not edit between markers; run: node scripts/docs/register-headline-sync.mjs -->";
 const END = "<!-- generated:end -->";
 const RELEASE = {
   release_id: "fixture-2026-01-01",
@@ -32,7 +34,10 @@ try {
   fs.mkdirSync(docs, { recursive: true });
   fs.writeFileSync(path.join(docs, "methodology.md"), `before\n${START}\nstale\n${END}\nafter\n`);
 
-  for (const script of ["gen-public-benchmark.mjs", "gen-scorecard.mjs"]) {
+  const register = path.join(root, "docs", "reference", "search-quality-register.md");
+  fs.writeFileSync(register, `before\n${REGISTER_START}\nstale\n${END}\nafter\n`);
+
+  for (const script of ["gen-public-benchmark.mjs", "gen-scorecard.mjs", "register-headline-sync.mjs"]) {
     const result = spawnSync(process.execPath, [path.join(HERE, script)], { cwd: root, encoding: "utf8" });
     assert.equal(result.status, 0, `${script} failed: ${result.stdout}${result.stderr}`);
   }
@@ -41,6 +46,18 @@ try {
     assert.match(text, /measured mode `hybrid`/, `${doc} names the measured mode`);
     assert.doesNotMatch(text, /default mode/i, `${doc} does not call the measured mode the default`);
   }
+  const registerText = fs.readFileSync(register, "utf8");
+  assert.match(registerText, /measured mode `hybrid`/, "register scorecard names the measured mode");
+  assert.doesNotMatch(registerText, /default mode/i, "register scorecard does not call the measured mode the default");
+
+  // The hand-written paragraph that reads the committed register's scorecard must not call it the
+  // product default either, nor cite a production-default score.
+  const committed = fs.readFileSync(path.join(REPO, "docs", "reference", "search-quality-register.md"), "utf8");
+  const tail = committed.slice(committed.indexOf(END, committed.indexOf(REGISTER_START)) + END.length);
+  const reading = tail.slice(0, tail.search(/^#{2,3} /m));
+  assert.match(reading, /Reading the two numbers/, "the scorecard reading note follows the generated block");
+  assert.doesNotMatch(reading, /production[- ]default|default mode/i, "the reading note does not call the scorecard the product default");
+
   const schema = JSON.parse(fs.readFileSync(path.join(REPO, "scripts", "jseval", "release.v1.schema.json"), "utf8"));
   const description = schema.properties.default_mode.description;
   assert.match(description, /measured/i, "schema describes default_mode as the measured mode");
