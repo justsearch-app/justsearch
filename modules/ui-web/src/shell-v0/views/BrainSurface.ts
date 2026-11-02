@@ -1357,6 +1357,12 @@ export class BrainSurface extends JfElement {
     return this.planPreview?.components?.some(c => c.id === id && c.state === 'installed') === true;
   }
 
+  /** The installer replaces the previous run's package records only after planning. */
+  private installPlanPending(): boolean {
+    return this.installStatus?.state === 'running'
+      && (this.installStatus.phase === 'preflight' || this.installStatus.phase === 'plan');
+  }
+
   private brainFeatures(): Record<BrainFeatureId, BrainFeature> {
     const live = this.aiKnown();
     const installed = this.hasInstalledAi();
@@ -1383,10 +1389,13 @@ export class BrainSurface extends JfElement {
       const percent = packageProgress?.bytesTotal && packageProgress.bytesTotal > 0
         ? Math.floor(((packageProgress.bytesDownloaded ?? 0) / packageProgress.bytesTotal) * 100) : null;
       const stopped = this.installStatus?.state === 'cancelled';
-      const state = !live ? 'Unknown — checking AI status'
+      const running = this.installStatus?.state === 'running';
+      const state = this.installPlanPending() ? 'Preparing download'
+        : running && packageProgress?.state === 'pending' ? 'Waiting to download'
+        : running && packageProgress?.state === 'downloading' ? `Downloading${percent === null ? '' : ` ${percent}%`}`
+        : !live ? 'Unknown — checking AI status'
         : stopped && packageProgress != null && !present && (packageProgress.bytesDownloaded ?? 0) > 0 ? `Cancelled · ${formatBytes(packageProgress.bytesDownloaded ?? 0)} kept`
         : unavailable ? `Unavailable on this computer: ${component!.unavailableReason || 'Not available in this install mode.'}`
-        : this.installStatus?.state === 'running' && packageProgress?.state === 'downloading' ? `Downloading${percent === null ? '' : ` ${percent}%`}`
         : !component && !present ? 'Unknown — package status unavailable'
         : !present ? 'Not downloaded'
         : active === null ? 'Unknown — last observed files are downloaded'
@@ -2054,7 +2063,8 @@ export class BrainSurface extends JfElement {
    * Tempdoc 663 Design pass 2 — the OBSERVED half (install/runtime/reachable) is now computed ONCE in
    * `aiStateStore.ts`, exposed as `AiState.aiEngine` (the fourth 594/595/596 sibling, store-level like
    * its siblings, not private to this component). This method is now a thin LOCAL overlay: it applies
-   * only this surface's own optimistic click-intent (`busy['install-start']`/`busy['inference-switch']`)
+   * this surface's own optimistic click-intent (`busy['install-start']`/`busy['inference-switch']`)
+   * and the running status returned directly by install operations, before the store's next poll,
    * on top of that shared observed result — `applyLocalIntent` (state/aiVerdict.ts). The fallback (before
    * the store has ever emitted) mirrors what `computeAiEngineVerdict` itself would compute for "no data,
    * not reachable yet".
@@ -2067,7 +2077,7 @@ export class BrainSurface extends JfElement {
     };
     return applyLocalIntent(observed, {
       switching: !!this.busy['inference-switch'],
-      installStarting: !!this.busy['install-start'],
+      installStarting: this.installStatus?.state === 'running' || !!this.busy['install-start'],
     });
   }
 
@@ -2075,10 +2085,12 @@ export class BrainSurface extends JfElement {
     // Tempdoc 663 — the string `kind` drives this panel's dot/label/sub lookup below, unchanged
     // from before; only its SOURCE changed (the one `computeAiEngineVerdict` derivation, not the
     // old 5-source ladder).
-    const known = this.aiKnown();
+    // Repair/additions responses update installStatus directly; aiEngine may still describe the
+    // preceding poll. A running download owns its headline and controls even if runtime is unknown.
+    const known = this.installStatus?.state === 'running' || this.aiKnown();
     const aiVerdict: AiEngineVerdict = known ? this.deriveAiEngineVerdict() : { kind: 'connecting', stability: { kind: 'provisional', cause: 'checking' }, installFailure: null };
     const aiState = aiVerdict.kind;
-    const activationRequired = known && this.installStatus?.phase === 'activation_required';
+    const activationRequired = known && aiState !== 'installing' && this.installStatus?.phase === 'activation_required';
     const indexingActivity = this.indexingProgress().activity;
     const downloadsDisabled = this.policy?.downloadsEnabled === false;
     const onlineDisabled = this.policy?.onlineAiEnabled === false;
@@ -2192,7 +2204,7 @@ export class BrainSurface extends JfElement {
 
     const bytesDone = this.installStatus?.downloadedBytes ?? 0;
     const bytesTotal = this.installStatus?.totalBytes ?? 0;
-    const pct = bytesTotal > 0 ? Math.min(100, Math.floor((bytesDone / bytesTotal) * 100)) : null;
+    const pct = !this.installPlanPending() && bytesTotal > 0 ? Math.min(100, Math.floor((bytesDone / bytesTotal) * 100)) : null;
 
     // Tempdoc 663 Stage 3 — the primary action's availability is now typed (596), not a bare boolean.
     // Only the two states with a genuine, showable reason (a policy gate) use `unavailableBecause`; the
@@ -2320,9 +2332,10 @@ export class BrainSurface extends JfElement {
     const reindexRequired = this.systemStatus?.embedding?.compatState === 'BLOCKED_LEGACY'
       || this.systemStatus?.embedding?.compatState === 'BLOCKED_MISMATCH';
     const headline = !known ? 'Checking AI status…'
+      : aiState === 'installing' ? sc.label
       : activationRequired ? 'Downloaded — activation required'
       : reindexRequired ? 'Rebuild search to use these models'
-      : aiState !== 'installing' && repairRemedyHeadline(repairRemedy) ? repairRemedyHeadline(repairRemedy)
+      : repairRemedyHeadline(repairRemedy) ? repairRemedyHeadline(repairRemedy)
       : aiState === 'not_installed' ? "AI isn't installed yet"
       : aiState === 'online' && !readingPictures ? processorOnly ? 'AI is running on the processor' : 'AI is ready'
       : sc.label;
@@ -2336,7 +2349,7 @@ export class BrainSurface extends JfElement {
       <div data-testid="brain-simple-panel">
         <h1 class="brain-headline" tabindex="-1">${headline}${aiState === 'installing' && pct !== null ? ` ${pct}%` : ''}</h1>
         <p class="brain-sentence">${this.renderBrainSentence(aiVerdict, installed, features, readingPictures)}</p>
-        <div class="brain-status-detail">${aiState === 'connecting' ? html`<jf-pulse-dots></jf-pulse-dots>` : nothing}${known ? (repairRemedy.kind === 'none' ? sc.sub : repairRemedy.kind === 'manual' ? repairRemedySub(repairRemedy) : nothing) : `Waiting for live install and AI observations. ${indexingActivity.summary}${indexingActivity.detail ? ` — ${indexingActivity.detail}` : ''}`}${this.installStalled() ? html` <span role="status">Download stalled — no recent progress.</span>` : nothing}</div>
+        <div class="brain-status-detail">${aiState === 'connecting' ? html`<jf-pulse-dots></jf-pulse-dots>` : nothing}${known ? (aiState === 'installing' || repairRemedy.kind === 'none' ? sc.sub : repairRemedy.kind === 'manual' ? repairRemedySub(repairRemedy) : nothing) : `Waiting for live install and AI observations. ${indexingActivity.summary}${indexingActivity.detail ? ` — ${indexingActivity.detail}` : ''}`}${this.installStalled() ? html` <span role="status">Download stalled — no recent progress.</span>` : nothing}</div>
         ${known && (!installed || aiState === 'installing' || activationRequired) ? html`<div class="status-row">
           <jf-button class=${primaryAction.primary && !installed ? 'install-action' : ''}
             variant=${primaryAction.primary && !installed ? 'primary' : 'ghost'}
@@ -2381,6 +2394,7 @@ export class BrainSurface extends JfElement {
                       end the run. */ ''}
                 <div class="row" style="margin-top: 0.75rem">
                   <jf-button
+                    variant="ghost"
                     label=${this.installStatus?.paused === true
                       ? 'Resume download'
                       : 'Pause download'}
@@ -2832,6 +2846,8 @@ export class BrainSurface extends JfElement {
    */
   private renderStagedProgress(): TemplateResult | typeof nothing {
     const status = this.installStatus;
+    // Stage records are also retained until the new plan is published after runtime restore.
+    if (this.installPlanPending() || (status?.state === 'running' && status.phase === 'restore_runtime')) return nothing;
     const stages = composeStageRows(status);
     const transfer = composeTransferLine(status);
     const ready = searchReadyNotice(status);

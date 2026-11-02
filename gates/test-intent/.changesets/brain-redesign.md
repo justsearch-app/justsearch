@@ -1172,6 +1172,34 @@ axe run remain necessary.
         "modules/ui-web/src/shell-v0/views/BrainSurface.liveRepairs.test.ts#D4 a failed run with a package record left downloading shows no step as Downloading",
         "modules/ui-web/src/shell-v0/views/BrainSurface.liveRepairs.test.ts#D4 a completed run with a package record left downloading shows no step as Downloading"
       ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/views/BrainSurface.repairRun.test.ts"
+      ],
+      "class": "New",
+      "repaired": true,
+      "behaviour": "A running Repair or additions run owns the Brain installing headline and inline download block even while the shared verdict still describes the preceding poll or the runtime observation is unavailable. The actual Repair, Pause, Resume and Cancel buttons work; retained bytes, stages, blocked/stalled and search-ready notices remain visible. Preflight/planning never reuse the previous run percentage or stages; pending/current package records replace old runtime On claims. Controls survive a second window and remount. The five checks fail by assertion on 1489cf0340.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "B8",
+          "quote": "Install: the Install AI button shows the selected total size and opens the existing licence/size consent; downloading shows progress, pause/resume, cancel with retained bytes, stalled and blocked stages, and search ready before completion, in the same page (no nested panel). Repair, retry after failure and the working-but-missing / manual fallback stay reachable.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "B2",
+          "quote": "Headline from the shared AI verdict for every lifecycle state it decides today: not installed, download paused/stopped, installing (with progress), install failed, starting/recovering, connecting/unconfirmed, ready, running on the processor instead of the graphics card, activation or reindex required. While status is unknown it says so and never claims ready.",
+          "label": "agent-drafted, owner-adopted"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/brain-running-repair.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/views/BrainSurface.repairRun.test.ts"
+      ]
     }
   ]
 }
@@ -1526,3 +1554,46 @@ Validation of the narrowed candidate (2026-11-02; no commit):
 - Aggregate visual checks are incomplete: the builder ran a11y and proportion concurrently in separate process namespaces, which overwrote their shared tmp/ui-shot-server.json with mutually invisible process IDs. Repeated Vite starts exhausted ports 5174–5223. Proportion exited 2 (capture errors); a11y was interrupted (exit 130) after exhaustion. This is a check-infrastructure blocker, not a product assertion. Do not change Search or any baseline to address it.
 - Stopping the a11y command by its recorded session identity stopped that namespace’s Vite children. Completed-command process namespaces are inaccessible from subsequent exec calls; surviving servers observed on odd ports 5177 through 5223 were started by these checks and require host cleanup, then sequential aggregate reruns. Initial owner ports 5173–5175 were untouched. A native cleanup connector was attempted but returned UNAVAILABLE (429) before starting a brief.
 Resources: own temporary shared clones and dereferenced dependency copies; fixture browsers and own Vite servers. No owner backend, model or GPU was used. Candidate code deletes age/unanswered tracking and adds no timer. No acceptance record written.
+
+
+Running Repair follow-up (1489cf0340):
+
+- BrainSurface read `installStatus` from direct Repair/Pause/Cancel responses but read the headline and control gate from `_unifiedAiState.aiEngine`, which still described the preceding shared poll. The page now overlays a running response using the existing installing projection; the shared verdict is unchanged. Runtime-observation failure cannot hide a running download.
+- The backend retains previous packages until planning finishes, and previous stages until runtime restore finishes. The page says Preparing download in preflight/plan and suppresses prior percentages/stages instead of showing stale 98%; current pending packages say Waiting to download, then current downloading records supply the percentage.
+- Tests added or rewritten: modules/ui-web/src/shell-v0/views/BrainSurface.repairRun.test.ts — B2/B8, actual Repair/Pause/Resume/Cancel controls, retained bytes, staged/blocked/stalled/search-ready notices, preflight/plan reset, pending records, missing runtime observation, second window and remount — durable. No existing test was edited.
+
+Repair follow-up capture comparisons (all eight PNGs inspected against the supplied pictures):
+
+- ai-brain — ready layout retains the open sentence/path/graphics-bar/link structure; absent fixture observations stay unknown.
+- ai-brain-light — the same ready structure with light contrast and honest unknown values.
+- ai-brain-advanced — scrolled Answers controls retain the advanced picture's grey headings, hairlines and native sliders.
+- ai-brain-advanced-light — the same expanded Answers controls with light separators and contrast.
+- ai-brain-components — Downloaded files uses known registry sizes and individual include/skip switches, with the advanced picture's open rows.
+- ai-brain-components-light — the same component rows and choices in light mode.
+- ai-brain-consent — the required existing licence/size consent overlays the new-install page, with the selected total and package terms.
+- ai-brain-consent-light — the same consent, total and terms with light contrast.
+
+All eight measurement companions have zero axe violations. A separate Chromium HTTP-fixture
+check used the actual Repair confirmation, Pause, Resume and Cancel controls; it held the shared
+install poll at the previous completed run until after asserting the installing headline and
+controls. It also checked 1280×720, 760×720, 600×400, 300×200 CSS reflow and forced colors: controls
+remain reachable by scrolling and the Brain body has no sideways overflow. This is frontend
+verification with fixture responses; it does not claim a live backend download was exercised.
+
+Builder checks for the running Repair follow-up (uncommitted):
+
+- `.agents/preflight`: absent.
+- `npm --prefix modules/ui-web run lint`: exit 0.
+- `npm --prefix modules/ui-web run typecheck`: exit 0.
+- `npm --prefix modules/ui-web run test:unit:run -- --maxWorkers=4`: final run exit 0; 686 files / 8,804 tests passed, including the final strengthened Repair regression. Existing concurrent-choice, late-response, second-window, remount and tab-switch tests remain unchanged and pass.
+- `npm --prefix modules/ui-web run knip:report`: exit 0, wrote its report (underlying Knip exit 1); `node scripts/governance/run.mjs --gate dead-code --mode gate`: exit 0, pass, 0 failed gates.
+- `node scripts/ci/run-ui-web-gates.mjs`: exit 0, 31/31 passed, including the style-literal ratchet.
+- `jseval ui-shot --affected modules/ui-web/src/shell-v0/views/BrainSurface.ts --fixtures --no-demo`: exit 0; all eight registered Brain captures and measurement companions produced and inspected.
+- The initial concurrent aggregate browser checks exhausted the shared server-record port range (a11y exit 2, proportion interrupted with exit 130). All servers started by these checks were stopped, with process/port/cwd identities recorded in the temporary folder. The temporary stop signal in Vite configuration was restored byte for byte and is absent from the change.
+- Sequential `jseval ui-a11y-gate --ui-url http://127.0.0.1:5173`: exit 0, all 110 states clean, no new or serious/critical violations. Sequential `jseval ui-proportion-gate --ui-url http://127.0.0.1:5173`: exit 0, all 84 captures passed. Both used one owned server with explicit process cleanup; this resolves the aggregate check infrastructure blocker for this candidate.
+- `run-evidence.mjs --check modules/ui-web/src/shell-v0/views/BrainSurface.repairRun.test.ts --before 1489cf0340 --copy-node-modules`: exit 0, all five cases passed; the baseline failure is an assertion with the repair headline instead of Installing… 25%. The producer ran in an isolated shared clone with its own dependencies and before worktree; both temporary clones were removed. Existing test files and their evidence are unchanged.
+- `node scripts/governance/gates/test-intent/cli.mjs`: only `test-intent/acceptance-missing`; no acceptance record written.
+
+Resources: this worktree's own dependencies, temporary shared clones with dereferenced dependency
+copies, fixture browser contexts and own Vite servers. No owner backend, model or GPU was used.
+Independent verification of a real backend Repair download remains the verifier's work.
