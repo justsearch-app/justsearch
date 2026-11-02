@@ -58,15 +58,19 @@ dropped — an absent schema is a reporting failure, not a silent absence of dat
 
 Accepted publication `agent-utility-hero-2026-07-28` (record `c5a75457b264`, policy `agent-utility-public-v4`). Agents adopted JustSearch, but the campaign did not establish an efficiency or accuracy improvement across every required stratum.
 
+Accuracy intervals are recomputed from the published observations under v5 question-level semantics (95% question-cluster bootstrap; seeds are replicates within questions). Point estimates and the historical adoption-only outcome are unchanged. Token and cost intervals remain descriptive cell-level intervals. Provenance: `scripts/jseval/public-agent-utility/question-level.v1.json`; reproduce with `python -m jseval.utility_public_projection --check`. The hash-pinned v4 bundle is unchanged.
+
 ### en-email-enron-raw / mixed/en-email-enron-raw-10k-verbose / 10000 / verbose / sonnet
 
 Stratum outcome: **adoption-only**. Adoption was 100.0% (60/60 eligible cells).
 
 | Measure | Condition A | Condition B (with JustSearch) | Paired delta and interval |
 |---|---:|---:|---:|
-| Accuracy | 40.0% | 28.3% | -11.7 pp (CI -25.0 pp to +0.0 pp) |
+| Accuracy | 40.0% | 28.3% | -11.7 pp (CI -26.7 pp to -1.7 pp) |
 | Provider cache-creation input tokens | unavailable | unavailable | n/a (CI unavailable) |
 | Cost (USD) | unavailable | unavailable | n/a (CI unavailable) |
+
+Accuracy interval: question-cluster BCa, 20 questions; paired sign-flip p=0.1523.
 
 Seeds: 3 (0, 1, 2); queries: 20; expected/observed cells: 120/120; ITT/per-protocol paired observations: 60/60; paired retention: 100.0%.
 
@@ -89,9 +93,11 @@ Stratum outcome: **adoption-only**. Adoption was 100.0% (60/60 eligible cells).
 
 | Measure | Condition A | Condition B (with JustSearch) | Paired delta and interval |
 |---|---:|---:|---:|
-| Accuracy | 46.7% | 28.3% | -18.3 pp (CI -35.0 pp to -1.7 pp) |
+| Accuracy | 46.7% | 28.3% | -18.3 pp (CI -38.3 pp to +5.0 pp) |
 | Provider cache-creation input tokens | unavailable | unavailable | n/a (CI unavailable) |
 | Cost (USD) | unavailable | unavailable | n/a (CI unavailable) |
+
+Accuracy interval: question-cluster BCa, 20 questions; paired sign-flip p=0.1600.
 
 Seeds: 3 (0, 1, 2); queries: 20; expected/observed cells: 120/120; ITT/per-protocol paired observations: 60/60; paired retention: 100.0%.
 
@@ -114,9 +120,11 @@ Stratum outcome: **adoption-only**. Adoption was 100.0% (60/60 eligible cells).
 
 | Measure | Condition A | Condition B (with JustSearch) | Paired delta and interval |
 |---|---:|---:|---:|
-| Accuracy | 28.3% | 26.7% | -1.7 pp (CI -16.7 pp to +13.3 pp) |
+| Accuracy | 28.3% | 26.7% | -1.7 pp (CI -23.3 pp to +13.3 pp) |
 | Provider cache-creation input tokens | unavailable | unavailable | n/a (CI unavailable) |
 | Cost (USD) | unavailable | unavailable | n/a (CI unavailable) |
+
+Accuracy interval: question-cluster BCa, 20 questions; paired sign-flip p=1.0000.
 
 Seeds: 3 (0, 1, 2); queries: 20; expected/observed cells: 120/120; ITT/per-protocol paired observations: 60/60; paired retention: 100.0%.
 

@@ -49,6 +49,7 @@ function nd(metrics) {
 }
 
 function buildGenerated(release) {
+  if (release?.status === "superseded") throw new Error("superseded release cannot supply current public claims");
   const lines = [MARKER_START, ""];
   if (!release || !release.measured) {
     lines.push(
@@ -63,13 +64,17 @@ function buildGenerated(release) {
   const hw = (release.cohort && release.cohort.hardware) || {};
   const vramGib = hw.gpu_vram_bytes ? Math.round(hw.gpu_vram_bytes / 2 ** 30) : null;
   const sha = release.cohort && release.cohort.git_sha ? release.cohort.git_sha.slice(0, 9) : "unknown";
-  const env = [hw.gpu_name, vramGib ? `${vramGib} GiB VRAM` : null, hw.ort_version ? `ORT ${hw.ort_version}` : null]
+  const env = [hw.os, hw.cpu, hw.gpu_name, vramGib ? `${vramGib} GiB VRAM` : null, hw.ort_version ? `ORT ${hw.ort_version}` : null]
     .filter(Boolean)
     .join(", ");
 
   lines.push(
-    `*Default mode \`${release.default_mode || "hybrid"}\`, commit \`${sha}\`${env ? `, ${env}` : ""}. ` +
+    `*Release \`${release.release_id}\`, measured mode \`${release.default_mode || "hybrid"}\`, commit \`${sha}\`${env ? `, ${env}` : ""}. ` +
       `nDCG@10. External baselines are cited published numbers (not re-run by us) — see the comparison-class note above.*`,
+    "",
+    "Explicit hybrid mode uses keyword + vector + cross-encoder reranking; learned-sparse is off in this preset. MIRACL uses dev queries and complete positive judgments in the retained sampled document pool. This Linux measurement is a new release, not a rerun of the superseded Windows release.",
+    "",
+    "Legal caveat: legal-clerc-200 has 198 documents, all judged relevant to at least one query, and queries of roughly 260 words. It is a small citation-retrieval pool, not a representative large legal archive.",
     "",
     "| Corpus | Ours (mode) | nDCG@10 | Ablation | Published baselines (cited) |",
     "|---|---|---|---|---|"
@@ -77,16 +82,26 @@ function buildGenerated(release) {
 
   const ablations = release.ablations || {};
   const ext = release.external_baselines || {};
-  for (const corpus of Object.keys(release.measured).sort()) {
+  for (const corpus of [...new Set([...Object.keys(release.measured), ...Object.keys(release.withheld || {})])].sort()) {
     const m = release.measured[corpus];
+    const withheld = release.withheld?.[corpus];
     const abl = ablations[corpus];
     const ablCell =
       abl && abl.length
         ? abl.map((a) => `${nd(a.metrics)} (${a.config_mode})`).join("; ")
         : "—";
     lines.push(
-      `| ${corpus} | ${m.config_mode} | **${nd(m.metrics)}** | ${ablCell} | ${fmtExternal(ext[corpus])} |`
+      `| ${corpus} | ${m?.config_mode || withheld.config_mode} | ${withheld ? "WITHHELD" : `**${nd(m.metrics)}**`} | ${ablCell} | ${fmtExternal(ext[corpus])} |`
     );
+  }
+  lines.push("", "Cross-encoder coverage (applied / all queries; deterministic skips and deadline drops are reported separately):", "");
+  for (const corpus of Object.keys(release.measured).sort()) {
+    const m = release.measured[corpus];
+    const ce = m.ce_coverage;
+    if (ce) lines.push(`- ${corpus}: ${ce.applied}/${m.corpus_source.query_count}; ${ce.legitimate_skips} deterministic skips; ${ce.silent_drops} deadline drops; harness verdict \`${ce.verdict}\`.`);
+  }
+  for (const [corpus, entry] of Object.entries(release.withheld || {})) {
+    lines.push("", `**${corpus} ${entry.config_mode} withheld:** ${entry.reason}`);
   }
 
   // Engine-performance section (tempdoc 640): rendered generically from the perf metric families the

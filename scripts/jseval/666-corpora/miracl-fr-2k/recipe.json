@@ -2,7 +2,7 @@
   "method": "ir_datasets-sample",
   "source": "miracl/fr/dev",
   "source_revision": "miracl-v1.0",
-  "ir_datasets_version": "0.5.11",
+  "ir_datasets_version": "0.6.3",
   "seed": 666,
   "n_docs": 5407,
   "n_queries": 343

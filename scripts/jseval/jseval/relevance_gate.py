@@ -33,7 +33,8 @@ def project_release_to_baselines(
     """Project a ``release.v1`` object into the ratchet's baselines dict shape.
 
     Tempdoc 623 T-5 (live-read re-rooting): the floor for each corpus is the
-    release's *measured* nDCG@10 in its production config-mode, not a hand-typed
+    release's *measured* nDCG@10 in the mode the release measured (its
+    ``default_mode``, not the product's AUTO default), not a hand-typed
     number. The output is the exact ``{"baselines": {<dataset>: {mode, nDCG@10,
     tolerance_abs, src}}, "tolerance_default_abs": ...}`` shape :func:`evaluate`
     already consumes — so ``evaluate`` is unchanged and the fork becomes

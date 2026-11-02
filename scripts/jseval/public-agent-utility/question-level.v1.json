@@ -1,0 +1,192 @@
+{
+  "schema": "agent-utility-question-level-projection.v1",
+  "publication_id": "agent-utility-hero-2026-07-28",
+  "record_sha256": "17d19d606e44c7083b5d355de6ac1b5d38f236726b2a6fd4a054de9a7e05b94c",
+  "observations_sha256": "5f700796eb4e4735eb61172ad8d6703bd281c009eabd8a455ba6ceea8cb72032",
+  "policy_id": "agent-utility-public-v5",
+  "policy_sha256": "69ee49314409e09be99489ed8dca9160efe7d75febb0cc90f38f641914b1f12d",
+  "outcome": "adoption-only",
+  "status": "recomputed from historical observations; original verdict retained",
+  "strata": [
+    {
+      "stratum_id": "en-email-enron-raw|mixed/en-email-enron-raw-10k-verbose|10000|verbose|sonnet",
+      "question_level": {
+        "method": "paired-signflip-permutation+question-cluster-bootstrap.v1",
+        "unit": "qid",
+        "n_qids": 20,
+        "n_paired_cells": 60,
+        "n_seed_replicates_min": 3,
+        "n_seed_replicates_max": 3,
+        "aggregate_delta": -0.11666666666666665,
+        "signflip_p_two_sided": 0.15234238288085597,
+        "permutation_draws": 20000,
+        "delta_ci": [
+          -0.26666666666666666,
+          -0.016666666666666663
+        ],
+        "ci_alpha": 0.05,
+        "ci_method": "BCa",
+        "delta_ci_percentile": [
+          -0.24999999999999994,
+          0.0
+        ],
+        "bootstrap_draws": 20000,
+        "per_question_delta": {
+          "q0": -0.3333333333333333,
+          "q1": 0.0,
+          "q2": 0.0,
+          "q3": 0.0,
+          "q4": -0.6666666666666666,
+          "q5": 0.0,
+          "q6": 0.3333333333333333,
+          "q7": 0.0,
+          "q8": -0.6666666666666666,
+          "q9": 0.0,
+          "q10": 0.0,
+          "q11": 0.0,
+          "q12": 0.0,
+          "q13": -0.3333333333333333,
+          "q14": 0.0,
+          "q15": -0.6666666666666666,
+          "q16": 0.3333333333333333,
+          "q17": 0.0,
+          "q18": -0.3333333333333333,
+          "q19": 0.0
+        },
+        "rng_seed": 15009614900053995042,
+        "rng_seed_permutation": 15009614900053995042,
+        "rng_seed_bootstrap": 15009614900053995043,
+        "rng_algorithm": "python random.Random(int) (Mersenne Twister)",
+        "rng_seed_recipe": "int(sha256(canonical_json(rng_seed_material)).hexdigest()[:16], 16); permutation stream uses rng_seed, bootstrap stream uses rng_seed + 1",
+        "rng_seed_material": {
+          "method": "paired-signflip-permutation+question-cluster-bootstrap.v1",
+          "stratum_id": "en-email-enron-raw|mixed/en-email-enron-raw-10k-verbose|10000|verbose|sonnet",
+          "corpus_signature": "6a80af3b5bdbb59d578eedfd00a4c35815ffcf07450afce2de73d4dd818399cb",
+          "query_identity_sha256": "1138c58c809859a5fb8e4dcd6fe54845d67834e474d7d49be7a2144db3584352",
+          "n_expected_cells": 120
+        },
+        "cell_level_mcnemar_role": "descriptive"
+      }
+    },
+    {
+      "stratum_id": "en-email-enron-raw|mixed/en-email-enron-raw-1k-verbose|1000|verbose|sonnet",
+      "question_level": {
+        "method": "paired-signflip-permutation+question-cluster-bootstrap.v1",
+        "unit": "qid",
+        "n_qids": 20,
+        "n_paired_cells": 60,
+        "n_seed_replicates_min": 3,
+        "n_seed_replicates_max": 3,
+        "aggregate_delta": -0.18333333333333332,
+        "signflip_p_two_sided": 0.15999200039998,
+        "permutation_draws": 20000,
+        "delta_ci": [
+          -0.38333333333333336,
+          0.05
+        ],
+        "ci_alpha": 0.05,
+        "ci_method": "BCa",
+        "delta_ci_percentile": [
+          -0.39999999999999997,
+          0.03333333333333335
+        ],
+        "bootstrap_draws": 20000,
+        "per_question_delta": {
+          "q0": 0.0,
+          "q1": -0.3333333333333333,
+          "q2": -0.3333333333333333,
+          "q3": 0.0,
+          "q4": -0.6666666666666666,
+          "q5": -0.6666666666666666,
+          "q6": -0.6666666666666666,
+          "q7": -0.3333333333333333,
+          "q8": 1.0,
+          "q9": -0.3333333333333333,
+          "q10": -1.0,
+          "q11": 0.0,
+          "q12": 0.3333333333333333,
+          "q13": 0.0,
+          "q14": -1.0,
+          "q15": -0.3333333333333333,
+          "q16": 0.3333333333333333,
+          "q17": 0.6666666666666666,
+          "q18": -0.3333333333333333,
+          "q19": 0.0
+        },
+        "rng_seed": 9315847401814835572,
+        "rng_seed_permutation": 9315847401814835572,
+        "rng_seed_bootstrap": 9315847401814835573,
+        "rng_algorithm": "python random.Random(int) (Mersenne Twister)",
+        "rng_seed_recipe": "int(sha256(canonical_json(rng_seed_material)).hexdigest()[:16], 16); permutation stream uses rng_seed, bootstrap stream uses rng_seed + 1",
+        "rng_seed_material": {
+          "method": "paired-signflip-permutation+question-cluster-bootstrap.v1",
+          "stratum_id": "en-email-enron-raw|mixed/en-email-enron-raw-1k-verbose|1000|verbose|sonnet",
+          "corpus_signature": "3391fc9781c6dafc4881322337558810b739b1a1d55a4eac5e1f035bec18cff7",
+          "query_identity_sha256": "1138c58c809859a5fb8e4dcd6fe54845d67834e474d7d49be7a2144db3584352",
+          "n_expected_cells": 120
+        },
+        "cell_level_mcnemar_role": "descriptive"
+      }
+    },
+    {
+      "stratum_id": "en-legal-clerc|mixed/en-legal-clerc-1k-verbose|1000|verbose|sonnet",
+      "question_level": {
+        "method": "paired-signflip-permutation+question-cluster-bootstrap.v1",
+        "unit": "qid",
+        "n_qids": 20,
+        "n_paired_cells": 60,
+        "n_seed_replicates_min": 3,
+        "n_seed_replicates_max": 3,
+        "aggregate_delta": -0.01666666666666667,
+        "signflip_p_two_sided": 1.0,
+        "permutation_draws": 20000,
+        "delta_ci": [
+          -0.23333333333333334,
+          0.1333333333333333
+        ],
+        "ci_alpha": 0.05,
+        "ci_method": "BCa",
+        "delta_ci_percentile": [
+          -0.20000000000000004,
+          0.15
+        ],
+        "bootstrap_draws": 20000,
+        "per_question_delta": {
+          "q0": 0.3333333333333333,
+          "q1": 0.0,
+          "q2": -0.3333333333333333,
+          "q3": 0.0,
+          "q4": -0.3333333333333333,
+          "q5": -1.0,
+          "q6": 0.0,
+          "q7": 0.0,
+          "q8": 0.3333333333333333,
+          "q9": 0.3333333333333333,
+          "q10": -1.0,
+          "q11": 0.0,
+          "q12": 0.0,
+          "q13": 0.0,
+          "q14": 0.0,
+          "q15": 0.6666666666666666,
+          "q16": 0.3333333333333333,
+          "q17": 0.3333333333333333,
+          "q18": 0.0,
+          "q19": 0.0
+        },
+        "rng_seed": 10876738271345568828,
+        "rng_seed_permutation": 10876738271345568828,
+        "rng_seed_bootstrap": 10876738271345568829,
+        "rng_algorithm": "python random.Random(int) (Mersenne Twister)",
+        "rng_seed_recipe": "int(sha256(canonical_json(rng_seed_material)).hexdigest()[:16], 16); permutation stream uses rng_seed, bootstrap stream uses rng_seed + 1",
+        "rng_seed_material": {
+          "method": "paired-signflip-permutation+question-cluster-bootstrap.v1",
+          "stratum_id": "en-legal-clerc|mixed/en-legal-clerc-1k-verbose|1000|verbose|sonnet",
+          "corpus_signature": "6df707031abcd296773a0bf8c6a7750bb0b8704ce4ab4035105cf88b8df01fae",
+          "query_identity_sha256": "2797469a5f80aa8881553323880cd910dd83b621dabd935e7d577337f0f3f565",
+          "n_expected_cells": 120
+        },
+        "cell_level_mcnemar_role": "descriptive"
+      }
+    }
+  ]
+}

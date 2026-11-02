@@ -1,0 +1,921 @@
+{
+  "ablations": {
+    "beir/scifact": [
+      {
+        "ann_proof_status": "NOT_APPLICABLE",
+        "comparable": true,
+        "confidence_tier": "A",
+        "config_mode": "lexical",
+        "corpus_source": {
+          "dataset": "scifact",
+          "doc_count": 5183,
+          "query_count": 300,
+          "sha256": "3e10ed87358699465122d137cc8479a586a55736df1dbb19901157c86d0ccb7d",
+          "signature": "3e10ed87358699465122d137cc8479a586a55736df1dbb19901157c86d0ccb7d",
+          "upstream_revision": null
+        },
+        "metrics": {
+          "AP@10": 0.6169080687830689,
+          "P@1": 0.5366666666666666,
+          "R@10": 0.7826111111111111,
+          "RR@10": 0.6306402116402117,
+          "nDCG@10": 0.6616366524939059,
+          "retrieval_p50_ms": 2.0
+        },
+        "qrels_id": "binary",
+        "run_metrics": {
+          "embed_bytes": 627988827.0,
+          "enrich_docs_s": 1.3,
+          "ner_bytes": 269622486.0,
+          "primary_docs_s": 76.1,
+          "reranker_bytes": 629118152.0,
+          "resident_bytes": 2024327753.0,
+          "splade_bytes": 497598288.0
+        },
+        "tolerance_band": null
+      },
+      {
+        "ann_proof_status": "PASS",
+        "comparable": true,
+        "confidence_tier": "A",
+        "config_mode": "vector",
+        "corpus_source": {
+          "dataset": "scifact",
+          "doc_count": 5183,
+          "query_count": 300,
+          "sha256": "3e10ed87358699465122d137cc8479a586a55736df1dbb19901157c86d0ccb7d",
+          "signature": "3e10ed87358699465122d137cc8479a586a55736df1dbb19901157c86d0ccb7d",
+          "upstream_revision": null
+        },
+        "metrics": {
+          "AP@10": 0.6877363756613755,
+          "P@1": 0.6066666666666667,
+          "R@10": 0.8625555555555555,
+          "RR@10": 0.6992394179894177,
+          "nDCG@10": 0.7344277772083551,
+          "retrieval_p50_ms": 2.0
+        },
+        "qrels_id": "binary",
+        "run_metrics": {
+          "embed_bytes": 627988827.0,
+          "enrich_docs_s": 1.3,
+          "ner_bytes": 269622486.0,
+          "primary_docs_s": 76.1,
+          "reranker_bytes": 629118152.0,
+          "resident_bytes": 2024327753.0,
+          "splade_bytes": 497598288.0
+        },
+        "tolerance_band": null
+      },
+      {
+        "ann_proof_status": "PASS",
+        "comparable": true,
+        "confidence_tier": "A",
+        "config_mode": "splade",
+        "corpus_source": {
+          "dataset": "scifact",
+          "doc_count": 5183,
+          "query_count": 300,
+          "sha256": "3e10ed87358699465122d137cc8479a586a55736df1dbb19901157c86d0ccb7d",
+          "signature": "3e10ed87358699465122d137cc8479a586a55736df1dbb19901157c86d0ccb7d",
+          "upstream_revision": null
+        },
+        "metrics": {
+          "AP@10": 0.44054060846560833,
+          "P@1": 0.38,
+          "R@10": 0.6154444444444445,
+          "RR@10": 0.45639153439153435,
+          "nDCG@10": 0.4871303589285201,
+          "retrieval_p50_ms": 6.0
+        },
+        "qrels_id": "binary",
+        "run_metrics": {
+          "embed_bytes": 627988827.0,
+          "enrich_docs_s": 1.3,
+          "ner_bytes": 269622486.0,
+          "primary_docs_s": 76.1,
+          "reranker_bytes": 629118152.0,
+          "resident_bytes": 2024327753.0,
+          "splade_bytes": 497598288.0
+        },
+        "tolerance_band": null
+      }
+    ],
+    "mixed/enron-qa": [
+      {
+        "ann_proof_status": "NOT_APPLICABLE",
+        "comparable": true,
+        "confidence_tier": "A",
+        "config_mode": "lexical",
+        "corpus_source": {
+          "dataset": "mixed/enron-qa",
+          "doc_count": 5485,
+          "query_count": 300,
+          "sha256": "c11e4e0b871ebaaac8aa4ba17b3c6cc02eaf8094b19a59bfb33322ed9d0fe96b",
+          "signature": "c11e4e0b871ebaaac8aa4ba17b3c6cc02eaf8094b19a59bfb33322ed9d0fe96b",
+          "upstream_revision": null
+        },
+        "metrics": {
+          "AP@10": 0.7916507936507937,
+          "P@1": 0.7133333333333334,
+          "R@10": 0.9266666666666666,
+          "RR@10": 0.7916507936507937,
+          "nDCG@10": 0.8247768381872272,
+          "retrieval_p50_ms": 5.0
+        },
+        "qrels_id": "binary",
+        "run_metrics": {
+          "embed_bytes": 627988827.0,
+          "enrich_docs_s": 3.6,
+          "ner_bytes": 269622486.0,
+          "primary_docs_s": 63.8,
+          "reranker_bytes": 629118152.0,
+          "resident_bytes": 2024327753.0,
+          "splade_bytes": 497598288.0
+        },
+        "tolerance_band": null
+      },
+      {
+        "ann_proof_status": "PASS",
+        "comparable": true,
+        "confidence_tier": "A",
+        "config_mode": "vector",
+        "corpus_source": {
+          "dataset": "mixed/enron-qa",
+          "doc_count": 5485,
+          "query_count": 300,
+          "sha256": "c11e4e0b871ebaaac8aa4ba17b3c6cc02eaf8094b19a59bfb33322ed9d0fe96b",
+          "signature": "c11e4e0b871ebaaac8aa4ba17b3c6cc02eaf8094b19a59bfb33322ed9d0fe96b",
+          "upstream_revision": null
+        },
+        "metrics": {
+          "AP@10": 0.5343611111111112,
+          "P@1": 0.4166666666666667,
+          "R@10": 0.77,
+          "RR@10": 0.5343611111111112,
+          "nDCG@10": 0.5913186322858992,
+          "retrieval_p50_ms": 2.0
+        },
+        "qrels_id": "binary",
+        "run_metrics": {
+          "embed_bytes": 627988827.0,
+          "enrich_docs_s": 3.6,
+          "ner_bytes": 269622486.0,
+          "primary_docs_s": 63.8,
+          "reranker_bytes": 629118152.0,
+          "resident_bytes": 2024327753.0,
+          "splade_bytes": 497598288.0
+        },
+        "tolerance_band": null
+      },
+      {
+        "ann_proof_status": "PASS",
+        "comparable": true,
+        "confidence_tier": "A",
+        "config_mode": "splade",
+        "corpus_source": {
+          "dataset": "mixed/enron-qa",
+          "doc_count": 5485,
+          "query_count": 300,
+          "sha256": "c11e4e0b871ebaaac8aa4ba17b3c6cc02eaf8094b19a59bfb33322ed9d0fe96b",
+          "signature": "c11e4e0b871ebaaac8aa4ba17b3c6cc02eaf8094b19a59bfb33322ed9d0fe96b",
+          "upstream_revision": null
+        },
+        "metrics": {
+          "AP@10": 0.13358333333333333,
+          "P@1": 0.12,
+          "R@10": 0.16,
+          "RR@10": 0.13358333333333333,
+          "nDCG@10": 0.14001734437735253,
+          "retrieval_p50_ms": 3.0
+        },
+        "qrels_id": "binary",
+        "run_metrics": {
+          "embed_bytes": 627988827.0,
+          "enrich_docs_s": 3.6,
+          "ner_bytes": 269622486.0,
+          "primary_docs_s": 63.8,
+          "reranker_bytes": 629118152.0,
+          "resident_bytes": 2024327753.0,
+          "splade_bytes": 497598288.0
+        },
+        "tolerance_band": null
+      }
+    ],
+    "mixed/legal-clerc-200": [
+      {
+        "ann_proof_status": "NOT_APPLICABLE",
+        "comparable": true,
+        "confidence_tier": "A",
+        "config_mode": "lexical",
+        "corpus_source": {
+          "dataset": "mixed/legal-clerc-200",
+          "doc_count": 198,
+          "query_count": 200,
+          "sha256": "90d4300d1435c6af00950b6095100fc6b29260385b294dc76896d54308bcfaf1",
+          "signature": "90d4300d1435c6af00950b6095100fc6b29260385b294dc76896d54308bcfaf1",
+          "upstream_revision": null
+        },
+        "metrics": {
+          "AP@10": 0.6307896825396824,
+          "P@1": 0.505,
+          "R@10": 0.855,
+          "RR@10": 0.6307896825396824,
+          "nDCG@10": 0.6854793967815255,
+          "retrieval_p50_ms": 12.0
+        },
+        "qrels_id": "binary",
+        "run_metrics": {
+          "embed_bytes": 627988827.0,
+          "enrich_docs_s": 0.8,
+          "ner_bytes": 269622486.0,
+          "primary_docs_s": 18.6,
+          "reranker_bytes": 629118152.0,
+          "resident_bytes": 2024327753.0,
+          "splade_bytes": 497598288.0
+        },
+        "tolerance_band": null
+      },
+      {
+        "ann_proof_status": "PASS",
+        "comparable": true,
+        "confidence_tier": "A",
+        "config_mode": "vector",
+        "corpus_source": {
+          "dataset": "mixed/legal-clerc-200",
+          "doc_count": 198,
+          "query_count": 200,
+          "sha256": "90d4300d1435c6af00950b6095100fc6b29260385b294dc76896d54308bcfaf1",
+          "signature": "90d4300d1435c6af00950b6095100fc6b29260385b294dc76896d54308bcfaf1",
+          "upstream_revision": null
+        },
+        "metrics": {
+          "AP@10": 0.5560892857142857,
+          "P@1": 0.415,
+          "R@10": 0.835,
+          "RR@10": 0.5560892857142857,
+          "nDCG@10": 0.6237533633256802,
+          "retrieval_p50_ms": 3.0
+        },
+        "qrels_id": "binary",
+        "run_metrics": {
+          "embed_bytes": 627988827.0,
+          "enrich_docs_s": 0.8,
+          "ner_bytes": 269622486.0,
+          "primary_docs_s": 18.6,
+          "reranker_bytes": 629118152.0,
+          "resident_bytes": 2024327753.0,
+          "splade_bytes": 497598288.0
+        },
+        "tolerance_band": null
+      },
+      {
+        "ann_proof_status": "PASS",
+        "comparable": true,
+        "confidence_tier": "A",
+        "config_mode": "splade",
+        "corpus_source": {
+          "dataset": "mixed/legal-clerc-200",
+          "doc_count": 198,
+          "query_count": 200,
+          "sha256": "90d4300d1435c6af00950b6095100fc6b29260385b294dc76896d54308bcfaf1",
+          "signature": "90d4300d1435c6af00950b6095100fc6b29260385b294dc76896d54308bcfaf1",
+          "upstream_revision": null
+        },
+        "metrics": {
+          "AP@10": 0.02332936507936508,
+          "P@1": 0.005,
+          "R@10": 0.12,
+          "RR@10": 0.02332936507936508,
+          "nDCG@10": 0.0447198414444914,
+          "retrieval_p50_ms": 5.0
+        },
+        "qrels_id": "binary",
+        "run_metrics": {
+          "embed_bytes": 627988827.0,
+          "enrich_docs_s": 0.8,
+          "ner_bytes": 269622486.0,
+          "primary_docs_s": 18.6,
+          "reranker_bytes": 629118152.0,
+          "resident_bytes": 2024327753.0,
+          "splade_bytes": 497598288.0
+        },
+        "tolerance_band": null
+      }
+    ],
+    "mixed/miracl-de-2k": [
+      {
+        "ann_proof_status": "NOT_APPLICABLE",
+        "comparable": true,
+        "confidence_tier": "A",
+        "config_mode": "lexical",
+        "corpus_source": {
+          "dataset": "mixed/miracl-de-2k",
+          "doc_count": 3103,
+          "query_count": 305,
+          "sha256": "d6f4026b4b25ac0d117353b830022d77ef3b863b15187907d512d645fae607a1",
+          "signature": "d6f4026b4b25ac0d117353b830022d77ef3b863b15187907d512d645fae607a1",
+          "upstream_revision": null
+        },
+        "metrics": {
+          "AP@10": 0.6443611761644549,
+          "P@1": 0.5049180327868853,
+          "R@10": 0.8721311475409836,
+          "RR@10": 0.6443611761644549,
+          "nDCG@10": 0.7007307843432976,
+          "retrieval_p50_ms": 1.0
+        },
+        "qrels_id": "binary",
+        "run_metrics": {
+          "embed_bytes": 627988827.0,
+          "enrich_docs_s": 34.1,
+          "ner_bytes": 269622486.0,
+          "primary_docs_s": 125.6,
+          "reranker_bytes": 629118152.0,
+          "resident_bytes": 2024327753.0,
+          "splade_bytes": 497598288.0
+        },
+        "tolerance_band": null
+      },
+      {
+        "ann_proof_status": "PASS",
+        "comparable": true,
+        "confidence_tier": "A",
+        "config_mode": "vector",
+        "corpus_source": {
+          "dataset": "mixed/miracl-de-2k",
+          "doc_count": 3103,
+          "query_count": 305,
+          "sha256": "d6f4026b4b25ac0d117353b830022d77ef3b863b15187907d512d645fae607a1",
+          "signature": "d6f4026b4b25ac0d117353b830022d77ef3b863b15187907d512d645fae607a1",
+          "upstream_revision": null
+        },
+        "metrics": {
+          "AP@10": 0.8003278688524591,
+          "P@1": 0.6557377049180327,
+          "R@10": 1.0,
+          "RR@10": 0.8003278688524591,
+          "nDCG@10": 0.8508761496907707,
+          "retrieval_p50_ms": 1.0
+        },
+        "qrels_id": "binary",
+        "run_metrics": {
+          "embed_bytes": 627988827.0,
+          "enrich_docs_s": 34.1,
+          "ner_bytes": 269622486.0,
+          "primary_docs_s": 125.6,
+          "reranker_bytes": 629118152.0,
+          "resident_bytes": 2024327753.0,
+          "splade_bytes": 497598288.0
+        },
+        "tolerance_band": null
+      },
+      {
+        "ann_proof_status": "PASS",
+        "comparable": true,
+        "confidence_tier": "A",
+        "config_mode": "splade",
+        "corpus_source": {
+          "dataset": "mixed/miracl-de-2k",
+          "doc_count": 3103,
+          "query_count": 305,
+          "sha256": "d6f4026b4b25ac0d117353b830022d77ef3b863b15187907d512d645fae607a1",
+          "signature": "d6f4026b4b25ac0d117353b830022d77ef3b863b15187907d512d645fae607a1",
+          "upstream_revision": null
+        },
+        "metrics": {
+          "AP@10": 0.7091282851938591,
+          "P@1": 0.5475409836065573,
+          "R@10": 0.9770491803278688,
+          "RR@10": 0.7091282851938591,
+          "nDCG@10": 0.7755290761324144,
+          "retrieval_p50_ms": 2.0
+        },
+        "qrels_id": "binary",
+        "run_metrics": {
+          "embed_bytes": 627988827.0,
+          "enrich_docs_s": 34.1,
+          "ner_bytes": 269622486.0,
+          "primary_docs_s": 125.6,
+          "reranker_bytes": 629118152.0,
+          "resident_bytes": 2024327753.0,
+          "splade_bytes": 497598288.0
+        },
+        "tolerance_band": null
+      }
+    ],
+    "mixed/miracl-fr-2k": [
+      {
+        "ann_proof_status": "NOT_APPLICABLE",
+        "comparable": true,
+        "confidence_tier": "A",
+        "config_mode": "lexical",
+        "corpus_source": {
+          "dataset": "mixed/miracl-fr-2k",
+          "doc_count": 5407,
+          "query_count": 343,
+          "sha256": "a145edfa38d5a783cea52710f256fcee1c0cb33dc100f094d10175eb49ed3297",
+          "signature": "a145edfa38d5a783cea52710f256fcee1c0cb33dc100f094d10175eb49ed3297",
+          "upstream_revision": null
+        },
+        "metrics": {
+          "AP@10": 0.6516532463325467,
+          "P@1": 0.5364431486880467,
+          "R@10": 0.8600583090379009,
+          "RR@10": 0.6516532463325467,
+          "nDCG@10": 0.7027313152456466,
+          "retrieval_p50_ms": 2.0
+        },
+        "qrels_id": "binary",
+        "run_metrics": {
+          "embed_bytes": 627988827.0,
+          "enrich_docs_s": 46.6,
+          "ner_bytes": 269622486.0,
+          "primary_docs_s": 151.7,
+          "reranker_bytes": 629118152.0,
+          "resident_bytes": 2024327753.0,
+          "splade_bytes": 497598288.0
+        },
+        "tolerance_band": null
+      },
+      {
+        "ann_proof_status": "PASS",
+        "comparable": true,
+        "confidence_tier": "A",
+        "config_mode": "vector",
+        "corpus_source": {
+          "dataset": "mixed/miracl-fr-2k",
+          "doc_count": 5407,
+          "query_count": 343,
+          "sha256": "a145edfa38d5a783cea52710f256fcee1c0cb33dc100f094d10175eb49ed3297",
+          "signature": "a145edfa38d5a783cea52710f256fcee1c0cb33dc100f094d10175eb49ed3297",
+          "upstream_revision": null
+        },
+        "metrics": {
+          "AP@10": 0.8537970290156877,
+          "P@1": 0.7405247813411079,
+          "R@10": 1.0,
+          "RR@10": 0.8537970290156877,
+          "nDCG@10": 0.8911072696247466,
+          "retrieval_p50_ms": 2.0
+        },
+        "qrels_id": "binary",
+        "run_metrics": {
+          "embed_bytes": 627988827.0,
+          "enrich_docs_s": 46.6,
+          "ner_bytes": 269622486.0,
+          "primary_docs_s": 151.7,
+          "reranker_bytes": 629118152.0,
+          "resident_bytes": 2024327753.0,
+          "splade_bytes": 497598288.0
+        },
+        "tolerance_band": null
+      },
+      {
+        "ann_proof_status": "PASS",
+        "comparable": true,
+        "confidence_tier": "A",
+        "config_mode": "splade",
+        "corpus_source": {
+          "dataset": "mixed/miracl-fr-2k",
+          "doc_count": 5407,
+          "query_count": 343,
+          "sha256": "a145edfa38d5a783cea52710f256fcee1c0cb33dc100f094d10175eb49ed3297",
+          "signature": "a145edfa38d5a783cea52710f256fcee1c0cb33dc100f094d10175eb49ed3297",
+          "upstream_revision": null
+        },
+        "metrics": {
+          "AP@10": 0.8147091489657085,
+          "P@1": 0.6938775510204082,
+          "R@10": 0.9854227405247813,
+          "RR@10": 0.8147091489657085,
+          "nDCG@10": 0.8577777486824479,
+          "retrieval_p50_ms": 4.0
+        },
+        "qrels_id": "binary",
+        "run_metrics": {
+          "embed_bytes": 627988827.0,
+          "enrich_docs_s": 46.6,
+          "ner_bytes": 269622486.0,
+          "primary_docs_s": 151.7,
+          "reranker_bytes": 629118152.0,
+          "resident_bytes": 2024327753.0,
+          "splade_bytes": 497598288.0
+        },
+        "tolerance_band": null
+      }
+    ]
+  },
+  "cohort": {
+    "config_cohort_key": "6cc38211db51cc8d9339c67c7a1f55a9450de176feec4b85b13b6c0e317e97dd",
+    "eval_protocol_hash": "24ce3446d4fb0ff5b78c94c53a79f185ee40932dbd8bb379fd6e04cab64df2b6",
+    "git_sha": "32d6a0a0ec8142a37a5383de54cb599e870ae548",
+    "hardware": {
+      "cuda_version": "12",
+      "gpu_driver_version": "610.88",
+      "gpu_name": "NVIDIA GeForce RTX 4070",
+      "gpu_vram_bytes": 12878610432,
+      "ort_version": "1.24.3",
+      "tier": "gpu_12gb_plus"
+    },
+    "hardware_homogeneous": true,
+    "model_identity": {
+      "embed_backend": "onnx",
+      "embed_compat_state": "COMPATIBLE",
+      "embed_fingerprint": "f1d0f4ec988a6c17387d3b256e631deea506a891aed3a6ded4f9bf09386cc38e",
+      "ner_model_path": "F:\\justsearch-public\\models\\onnx\\ner",
+      "realized_engines": [
+        "dense",
+        "reranker",
+        "splade"
+      ],
+      "reranker_model_path": "F:\\justsearch-public\\models\\onnx\\reranker",
+      "splade_model_path": "F:\\justsearch-public\\models\\splade\\naver-splade-v3"
+    },
+    "policy_hash": "1433e44f9a92885556cd341c4e8056ff1f31835f33a6dfd19a1e8a8711161707",
+    "realized_engines": [
+      "dense",
+      "reranker",
+      "splade"
+    ]
+  },
+  "composed_at": "2026-08-14T10:38:19.011180+00:00",
+  "coverage": {
+    "does_not_measure": "document extraction / OCR / VDU routing quality (see tempdoc 623 §F — extraction-quality sibling)",
+    "measures": "retrieval ranking quality (per-corpus metrics above)"
+  },
+  "default_mode": "hybrid",
+  "external_baselines": {
+    "beir/scifact": [
+      {
+        "caveat": "multifield indexing; matches our lexical 0.661 (tempdoc 623 U5). BM25-flat is 0.679. COMPARISON CLASS: single-model retriever — our 0.757 is a full hybrid (BM25+dense+SPLADE)+rerank pipeline, so this is a system-vs-component comparison; hybrid+rerank is expected to exceed single models.",
+        "model": "BM25 (multifield)",
+        "self_reproduced": false,
+        "source_url": "https://arxiv.org/html/2306.07471v1",
+        "split": "test",
+        "value": 0.665,
+        "version": "Brewing BEIR (SIGIR 2024) Table 3 / SPLADE++ paper Table 4"
+      },
+      {
+        "caveat": "SelfDistil variant = 0.702. COMPARISON CLASS: single-model learned-sparse retriever — our 0.757 is a full hybrid+rerank pipeline (system vs component).",
+        "model": "SPLADE++ EnsembleDistil",
+        "self_reproduced": false,
+        "source_url": "https://www.piwowarski.fr/publication/formal_distillation_2022-7YPDA2UJ.pdf",
+        "split": "test",
+        "value": 0.71,
+        "version": "SPLADE++ (Formal et al., SIGIR 2022) Table 4"
+      },
+      {
+        "caveat": "confirmed independently in SPLADE++ and Brewing BEIR tables. COMPARISON CLASS: single-model late-interaction retriever — our 0.757 is a full hybrid+rerank pipeline (system vs component).",
+        "model": "ColBERTv2",
+        "self_reproduced": false,
+        "source_url": "https://people.eecs.berkeley.edu/~matei/papers/2022/naacl_colbert_v2.pdf",
+        "split": "test",
+        "value": 0.693,
+        "version": "ColBERTv2 (Santhanam et al., NAACL 2022) Table 5"
+      }
+    ],
+    "mixed/legal-clerc-200": [
+      {
+        "caveat": "SCALE MISMATCH, not a comparison class issue: CLERC's own retrieval collection is 1.84M documents / 23.7M passages; our mixed/legal-clerc-200 corpus is a 198-document candidate pool (200 queries, following tempdoc 666's construction: one positive + curated negatives per query, mirroring CLERC's own query+positive+20-negatives record shape). nDCG@10 on a ~200-document pool is structurally far easier than on a 1.84M-document collection, so our 0.516 is NOT 'beating published BM25 (0.054)' — it reflects a much smaller candidate set. Cited to establish CLERC as a real, citable academic legal-retrieval benchmark grounding this corpus, not as a head-to-head score comparison.",
+        "model": "BM25",
+        "self_reproduced": false,
+        "source_url": "https://arxiv.org/abs/2406.17186",
+        "split": "test",
+        "value": 0.054,
+        "version": "CLERC (Hou et al., NAACL 2025) Table 3"
+      },
+      {
+        "caveat": "Same scale-mismatch caveat as the BM25 row above — full 1.84M-doc/23.7M-passage collection vs. our 198-document pool. Listed as the strongest zero-shot dense baseline CLERC reports (ahead of E5 v2 0.0367, BGE En v1.5 0.0343, DPR 0.0224).",
+        "model": "Contriever-MSMarco (zero-shot dense)",
+        "self_reproduced": false,
+        "source_url": "https://arxiv.org/abs/2406.17186",
+        "split": "test",
+        "value": 0.0422,
+        "version": "CLERC (Hou et al., NAACL 2025) Table 3"
+      }
+    ],
+    "mixed/miracl-de-2k": [
+      {
+        "caveat": "NON-CANONICAL: German is a MIRACL surprise language with NO baseline row in the MIRACL paper; this is BGE-M3's own reproduction. DEV split. Flag as resting on a single non-canonical source.",
+        "model": "BGE-M3 Dense",
+        "self_reproduced": false,
+        "source_url": "https://arxiv.org/html/2402.03216v4",
+        "split": "dev",
+        "value": 0.567,
+        "version": "BGE-M3 (Chen et al., 2024) Table 1"
+      }
+    ],
+    "mixed/miracl-fr-2k": [
+      {
+        "caveat": "DEV split (≠ our test axis); do not mix with BGE-M3's BM25 (fr=0.458, different impl)",
+        "model": "BM25",
+        "self_reproduced": false,
+        "source_url": "https://arxiv.org/pdf/2210.09984",
+        "split": "dev",
+        "value": 0.183,
+        "version": "MIRACL (Zhang et al., SIGIR 2023) Table 2"
+      },
+      {
+        "caveat": "DEV split",
+        "model": "mDPR (zero-shot)",
+        "self_reproduced": false,
+        "source_url": "https://arxiv.org/pdf/2210.09984",
+        "split": "dev",
+        "value": 0.435,
+        "version": "MIRACL Table 2"
+      },
+      {
+        "caveat": "DEV split",
+        "model": "Hybrid (BM25+mDPR)",
+        "self_reproduced": false,
+        "source_url": "https://arxiv.org/pdf/2210.09984",
+        "split": "dev",
+        "value": 0.523,
+        "version": "MIRACL Table 2"
+      }
+    ],
+    "mixed/miracl-zh-2k": [
+      {
+        "caveat": "DEV split (≠ our test axis)",
+        "model": "BM25",
+        "self_reproduced": false,
+        "source_url": "https://arxiv.org/pdf/2210.09984",
+        "split": "dev",
+        "value": 0.18,
+        "version": "MIRACL Table 2"
+      },
+      {
+        "caveat": "DEV split",
+        "model": "mDPR (zero-shot)",
+        "self_reproduced": false,
+        "source_url": "https://arxiv.org/pdf/2210.09984",
+        "split": "dev",
+        "value": 0.512,
+        "version": "MIRACL Table 2"
+      },
+      {
+        "caveat": "DEV split",
+        "model": "Hybrid (BM25+mDPR)",
+        "self_reproduced": false,
+        "source_url": "https://arxiv.org/pdf/2210.09984",
+        "split": "dev",
+        "value": 0.526,
+        "version": "MIRACL Table 2"
+      }
+    ]
+  },
+  "leak": {
+    "beir/scifact": {
+      "leak_rate": 0.02666666666666667,
+      "src": "staged_recall_accounting projection"
+    },
+    "mixed/enron-qa": {
+      "leak_rate": 0.05,
+      "src": "staged_recall_accounting projection"
+    },
+    "mixed/legal-clerc-200": {
+      "leak_rate": 0.135,
+      "src": "staged_recall_accounting projection"
+    },
+    "mixed/miracl-de-2k": {
+      "leak_rate": 0.003278688524590164,
+      "src": "staged_recall_accounting projection"
+    },
+    "mixed/miracl-fr-2k": {
+      "leak_rate": 0.0,
+      "src": "staged_recall_accounting projection"
+    }
+  },
+  "measured": {
+    "beir/scifact": {
+      "ann_proof_status": "PASS",
+      "comparable": true,
+      "confidence_tier": "A",
+      "config_mode": "hybrid",
+      "corpus_source": {
+        "dataset": "scifact",
+        "doc_count": 5183,
+        "query_count": 300,
+        "sha256": "3e10ed87358699465122d137cc8479a586a55736df1dbb19901157c86d0ccb7d",
+        "signature": "3e10ed87358699465122d137cc8479a586a55736df1dbb19901157c86d0ccb7d",
+        "upstream_revision": null
+      },
+      "metrics": {
+        "AP@10": 0.7090626984126985,
+        "P@1": 0.6266666666666667,
+        "R@10": 0.8942222222222221,
+        "RR@10": 0.7177037037037037,
+        "ce_p50_ms": 142.0,
+        "nDCG@10": 0.7571906055995299,
+        "retrieval_p50_ms": 5.0
+      },
+      "qrels_id": "binary",
+      "run_metrics": {
+        "embed_bytes": 627988827.0,
+        "enrich_docs_s": 1.3,
+        "ner_bytes": 269622486.0,
+        "primary_docs_s": 76.1,
+        "reranker_bytes": 629118152.0,
+        "resident_bytes": 2024327753.0,
+        "splade_bytes": 497598288.0
+      },
+      "tolerance_band": null
+    },
+    "mixed/enron-qa": {
+      "ann_proof_status": "PASS",
+      "comparable": true,
+      "confidence_tier": "A",
+      "config_mode": "hybrid",
+      "corpus_source": {
+        "dataset": "mixed/enron-qa",
+        "doc_count": 5485,
+        "query_count": 300,
+        "sha256": "c11e4e0b871ebaaac8aa4ba17b3c6cc02eaf8094b19a59bfb33322ed9d0fe96b",
+        "signature": "c11e4e0b871ebaaac8aa4ba17b3c6cc02eaf8094b19a59bfb33322ed9d0fe96b",
+        "upstream_revision": null
+      },
+      "metrics": {
+        "AP@10": 0.757123015873016,
+        "P@1": 0.6666666666666666,
+        "R@10": 0.9133333333333333,
+        "RR@10": 0.757123015873016,
+        "ce_p50_ms": 147.0,
+        "nDCG@10": 0.7957031017062095,
+        "retrieval_p50_ms": 11.0
+      },
+      "qrels_id": "binary",
+      "run_metrics": {
+        "embed_bytes": 627988827.0,
+        "enrich_docs_s": 3.6,
+        "ner_bytes": 269622486.0,
+        "primary_docs_s": 63.8,
+        "reranker_bytes": 629118152.0,
+        "resident_bytes": 2024327753.0,
+        "splade_bytes": 497598288.0
+      },
+      "tolerance_band": null
+    },
+    "mixed/legal-clerc-200": {
+      "ann_proof_status": "PASS",
+      "comparable": true,
+      "confidence_tier": "A",
+      "config_mode": "hybrid",
+      "corpus_source": {
+        "dataset": "mixed/legal-clerc-200",
+        "doc_count": 198,
+        "query_count": 200,
+        "sha256": "90d4300d1435c6af00950b6095100fc6b29260385b294dc76896d54308bcfaf1",
+        "signature": "90d4300d1435c6af00950b6095100fc6b29260385b294dc76896d54308bcfaf1",
+        "upstream_revision": null
+      },
+      "metrics": {
+        "AP@10": 0.5044246031746032,
+        "P@1": 0.355,
+        "R@10": 0.81,
+        "RR@10": 0.5044246031746032,
+        "ce_p50_ms": 165.0,
+        "nDCG@10": 0.5779869315064022,
+        "retrieval_p50_ms": 20.0
+      },
+      "qrels_id": "binary",
+      "run_metrics": {
+        "embed_bytes": 627988827.0,
+        "enrich_docs_s": 0.8,
+        "ner_bytes": 269622486.0,
+        "primary_docs_s": 18.6,
+        "reranker_bytes": 629118152.0,
+        "resident_bytes": 2024327753.0,
+        "splade_bytes": 497598288.0
+      },
+      "tolerance_band": null
+    },
+    "mixed/miracl-de-2k": {
+      "ann_proof_status": "PASS",
+      "comparable": true,
+      "confidence_tier": "A",
+      "config_mode": "hybrid",
+      "corpus_source": {
+        "dataset": "mixed/miracl-de-2k",
+        "doc_count": 3103,
+        "query_count": 305,
+        "sha256": "d6f4026b4b25ac0d117353b830022d77ef3b863b15187907d512d645fae607a1",
+        "signature": "d6f4026b4b25ac0d117353b830022d77ef3b863b15187907d512d645fae607a1",
+        "upstream_revision": null
+      },
+      "metrics": {
+        "AP@10": 0.8097267759562843,
+        "P@1": 0.6655737704918033,
+        "R@10": 0.9967213114754099,
+        "RR@10": 0.8097267759562843,
+        "ce_p50_ms": 133.0,
+        "nDCG@10": 0.8574654973441166,
+        "retrieval_p50_ms": 3.0
+      },
+      "qrels_id": "binary",
+      "run_metrics": {
+        "embed_bytes": 627988827.0,
+        "enrich_docs_s": 34.1,
+        "ner_bytes": 269622486.0,
+        "primary_docs_s": 125.6,
+        "reranker_bytes": 629118152.0,
+        "resident_bytes": 2024327753.0,
+        "splade_bytes": 497598288.0
+      },
+      "tolerance_band": null
+    },
+    "mixed/miracl-fr-2k": {
+      "ann_proof_status": "PASS",
+      "comparable": true,
+      "confidence_tier": "A",
+      "config_mode": "hybrid",
+      "corpus_source": {
+        "dataset": "mixed/miracl-fr-2k",
+        "doc_count": 5407,
+        "query_count": 343,
+        "sha256": "a145edfa38d5a783cea52710f256fcee1c0cb33dc100f094d10175eb49ed3297",
+        "signature": "a145edfa38d5a783cea52710f256fcee1c0cb33dc100f094d10175eb49ed3297",
+        "upstream_revision": null
+      },
+      "metrics": {
+        "AP@10": 0.8446341802026934,
+        "P@1": 0.7201166180758017,
+        "R@10": 1.0,
+        "RR@10": 0.8446341802026934,
+        "ce_p50_ms": 143.0,
+        "nDCG@10": 0.884405350195936,
+        "retrieval_p50_ms": 7.0
+      },
+      "qrels_id": "binary",
+      "run_metrics": {
+        "embed_bytes": 627988827.0,
+        "enrich_docs_s": 46.6,
+        "ner_bytes": 269622486.0,
+        "primary_docs_s": 151.7,
+        "reranker_bytes": 629118152.0,
+        "resident_bytes": 2024327753.0,
+        "splade_bytes": 497598288.0
+      },
+      "tolerance_band": null
+    }
+  },
+  "notes": {
+    "missing_default_mode": [],
+    "tolerance_semantics": "reproduction tolerance is the within-machine ±2sigma envelope, scoped to equivalent hardware/setup (tempdoc 623 F-alpha)"
+  },
+  "release_id": "832-rebaseline-2026-08-14",
+  "schema": "release.v1",
+  "schema_version": 1,
+  "sources": [
+    {
+      "dataset": "beir/scifact",
+      "run_dir": "scripts/jseval/tmp/eval-results/20260814T103728_scifact",
+      "summary_sha256": "4dea62018e09c7d0976379a856138b093c4b9ef5d5d14df3a3148f48a7f494c4"
+    },
+    {
+      "dataset": "mixed/enron-qa",
+      "run_dir": "scripts/jseval/tmp/eval-results/20260814T091340_mixed_enron-qa",
+      "summary_sha256": "7042ead506e9996c248e1f54f6c6573e8253152eb9522ff01f64b5d34d093ce2"
+    },
+    {
+      "dataset": "mixed/legal-clerc-200",
+      "run_dir": "scripts/jseval/tmp/eval-results/20260814T091920_mixed_legal-clerc-200",
+      "summary_sha256": "f9868bcddae2eb6cafe3d80f9e407546b2e4f75285454e6eb296f4a815f0e6ca"
+    },
+    {
+      "dataset": "mixed/miracl-de-2k",
+      "run_dir": "scripts/jseval/tmp/eval-results/20260814T092206_mixed_miracl-de-2k",
+      "summary_sha256": "05492eaf83872f33f8639e9a27d9caffb90247da8aff1b3b1c1a06056dd2dc20"
+    },
+    {
+      "dataset": "mixed/miracl-fr-2k",
+      "run_dir": "scripts/jseval/tmp/eval-results/20260814T092546_mixed_miracl-fr-2k",
+      "summary_sha256": "0d3b7f814e7f5ccdb2109c6a1c09be0c57920e1e0ed7691d339602dc1de76fe0"
+    }
+  ],
+  "union_recall": {
+    "beir/scifact": {
+      "leg_union_recall": 0.9333333333333333,
+      "src": "staged_recall_accounting projection"
+    },
+    "mixed/enron-qa": {
+      "leg_union_recall": 0.9633333333333334,
+      "src": "staged_recall_accounting projection"
+    },
+    "mixed/legal-clerc-200": {
+      "leg_union_recall": 0.935,
+      "src": "staged_recall_accounting projection"
+    },
+    "mixed/miracl-de-2k": {
+      "leg_union_recall": 1.0,
+      "src": "staged_recall_accounting projection"
+    },
+    "mixed/miracl-fr-2k": {
+      "leg_union_recall": 1.0,
+      "src": "staged_recall_accounting projection"
+    }
+  },
+  "status": "superseded",
+  "superseded_reason": "Truncated MIRACL judgments (first positive only); hybrid pipeline mislabelled as including learned-sparse. Historical Windows measurement; withdrawn as a current claim and regression floor.",
+  "superseded_by": "linux-complete-qrels-2026-11-02"
+}

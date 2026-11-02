@@ -90,6 +90,17 @@ def build_golden(source_dir: Path | str, dataset_dir: Path | str, *, now: str | 
             unknown = [e for e in evidence if e not in doc_ids]
             if unknown:
                 raise ValueError(f"{qid} references unknown evidence doc(s): {unknown}")
+            # Fetched public judgments are complete graded relevance sets, not a
+            # synthetic reasoning chain. Keep the bridge/agent default below intact.
+            if "relevance_grades" in q:
+                grades = q["relevance_grades"]
+                if not isinstance(grades, dict) or set(grades) != set(evidence):
+                    raise ValueError(f"{qid} relevance_grades must cover exactly its evidence_ids")
+                for ev, grade in grades.items():
+                    if type(grade) is not int or grade <= 0:
+                        raise ValueError(f"{qid} invalid positive relevance grade: {grade!r}")
+                    tf.write(f"{qid}\t{ev}\t{grade}\n")
+                continue
             if evidence:
                 # Bridge/single-fact: first-hop only (the query-targeted entry point) — the
                 # full chain stays the agent's evidence in queries.json. Aggregation (tempdoc

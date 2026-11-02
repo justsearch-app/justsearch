@@ -12,7 +12,7 @@ from pathlib import Path
 import pytest
 from click.testing import CliRunner
 
-from jseval import release
+from jseval import leak_gate, release
 from jseval.commands.release import cmd_release
 
 
@@ -598,3 +598,122 @@ def test_repo_relative_falls_back_to_absolute_outside_repo(tmp_path):
 
     outside = tmp_path / "somewhere" / "run1"
     assert _repo_relative(outside) == str(outside)
+
+
+def test_withheld_default_keeps_ablations_and_source_without_a_floor():
+    from jseval.relevance_gate import project_release_to_baselines
+
+    summary = _summary(dataset='mixed/legal-clerc-200', modes={
+        'hybrid': {'nDCG@10': 0.59}, 'lexical': {'nDCG@10': 0.69},
+    })
+    summary['ce_coverage'] = {'per_mode': {'hybrid': {
+        'verdict': 'degraded-ce', 'applied': 174, 'silent_drops': 25,
+    }}}
+    source = {'run_dir': 'legal-run', 'summary_sha256': 'a' * 64}
+    with pytest.raises(release.ComposeError, match='not comparable'):
+        release.compose([summary], composed_at='2026-11-02')
+    doc = release.compose(
+        [summary], composed_at='2026-11-02', run_sources=[source],
+        withheld_default={'mixed/legal-clerc-200': '25 deadline misses'},
+        leak_by_dataset={'mixed/legal-clerc-200': 0.105},
+        union_recall_by_dataset={'mixed/legal-clerc-200': 0.9},
+    )
+    assert doc['measured'] == {}
+    # Leak is measured against the withheld default-mode list, so it must not set a ceiling;
+    # union recall measures the legs before reranking and stays.
+    assert 'mixed/legal-clerc-200' not in (doc.get('leak') or {})
+    assert leak_gate.project_release_to_baselines(doc)['baselines'] == {}
+    assert doc['union_recall']['mixed/legal-clerc-200']['leg_union_recall'] == 0.9
+    assert doc['withheld']['mixed/legal-clerc-200']['ce_coverage']['silent_drops'] == 25
+    assert doc['ablations']['mixed/legal-clerc-200'][0]['config_mode'] == 'lexical'
+    assert doc['sources'][0]['summary_sha256'] == source['summary_sha256']
+    assert project_release_to_baselines(doc)['baselines'] == {}
+
+
+@pytest.mark.parametrize('withheld', [
+    {'mixed/absent': 'deadline misses'}, {'beir/scifact': ' '},
+])
+def test_withholding_requires_an_included_dataset_and_reason(withheld):
+    with pytest.raises(release.ComposeError, match='included datasets'):
+        release.compose([_summary()], composed_at='2026-11-02', withheld_default=withheld)
+
+
+def test_release_help_calls_the_headline_mode_measured_not_production_default():
+    """The product's default when a request names no mode is AUTO; hybrid is only the measured preset."""
+    result = CliRunner().invoke(cmd_release, ['--help'])
+    assert result.exit_code == 0
+    assert 'production-default' not in result.output.lower()
+    assert 'Measured search mode' in result.output
+
+
+# --- review round 3 should-fix 3: a measured or leak row that disappears is a relaxation ---
+
+_RID = ["--release-id", "rel-test-2026-01-01"]
+
+
+def _run_with_projection(tmp_path, name, dataset, leak_rate=None):
+    rd = _write_run(tmp_path / name, _summary(dataset=dataset))
+    if leak_rate is not None:
+        (rd / "projections").mkdir()
+        (rd / "projections" / "staged_recall_accounting.json").write_text(
+            json.dumps({"status": "ok", "aggregate": {"leak_rate": leak_rate}}), encoding="utf-8")
+    return rd
+
+
+def test_cmd_release_refuses_dropping_a_measured_row_without_justification(tmp_path):
+    out = tmp_path / "release.v1.json"
+    runner = CliRunner()
+    first = [_run_with_projection(tmp_path, "a1", "beir/scifact"),
+             _run_with_projection(tmp_path, "b1", "mixed/enron-qa")]
+    r1 = runner.invoke(cmd_release, [a for rd in first for a in ("--run", str(rd))] + ["--out", str(out)] + _RID)
+    assert r1.exit_code == 0, r1.output
+    r2 = runner.invoke(cmd_release, ["--run", str(_run_with_projection(tmp_path, "b2", "mixed/enron-qa")),
+                                     "--out", str(out)] + _RID)
+    assert r2.exit_code == 1
+    assert "beir/scifact:measured" in r2.output
+    assert "beir/scifact" in json.loads(out.read_text())["measured"]
+
+
+def test_cmd_release_refuses_dropping_a_leak_row_without_justification(tmp_path):
+    out = tmp_path / "release.v1.json"
+    runner = CliRunner()
+    r1 = runner.invoke(cmd_release, ["--run", str(_run_with_projection(tmp_path, "a1", "beir/scifact", 0.02)),
+                                     "--out", str(out)] + _RID)
+    assert r1.exit_code == 0, r1.output
+    r2 = runner.invoke(cmd_release, ["--run", str(_run_with_projection(tmp_path, "a2", "beir/scifact")),
+                                     "--out", str(out)] + _RID)
+    assert r2.exit_code == 1
+    assert "beir/scifact:leak_rate" in r2.output
+    assert json.loads(out.read_text())["leak"]["beir/scifact"]["leak_rate"] == 0.02
+
+
+def test_cmd_release_accepts_a_withhold_reason_as_justification_for_dropped_rows(tmp_path):
+    out = tmp_path / "release.v1.json"
+    runner = CliRunner()
+    r1 = runner.invoke(cmd_release, ["--run", str(_run_with_projection(tmp_path, "a1", "beir/scifact", 0.02)),
+                                     "--out", str(out)] + _RID)
+    assert r1.exit_code == 0, r1.output
+    r2 = runner.invoke(cmd_release, ["--run", str(_run_with_projection(tmp_path, "a2", "beir/scifact", 0.02)),
+                                     "--withhold-default", "beir/scifact=25 deadline misses",
+                                     "--out", str(out)] + _RID)
+    assert r2.exit_code == 0, r2.output
+    doc = json.loads(out.read_text())
+    assert doc["measured"] == {} and "beir/scifact" not in (doc.get("leak") or {})
+    assert doc["withheld"]["beir/scifact"]["reason"] == "25 deadline misses"
+
+
+def test_cmd_release_accepts_a_changeset_for_a_dropped_measured_row(tmp_path):
+    out = tmp_path / "release.v1.json"
+    runner = CliRunner()
+    first = [_run_with_projection(tmp_path, "a1", "beir/scifact"),
+             _run_with_projection(tmp_path, "b1", "mixed/enron-qa")]
+    assert runner.invoke(cmd_release, [a for rd in first for a in ("--run", str(rd))]
+                         + ["--out", str(out)] + _RID).exit_code == 0
+    changesets_dir = out.resolve().parent / ".changesets"
+    changesets_dir.mkdir()
+    (changesets_dir / "drop.md").write_text(
+        '---\nclassification: "baseline-relaxation"\ngate: "release"\n'
+        'dataset: "beir/scifact:measured"\ntempdoc: "1100"\n---\nretired\n', encoding="utf-8")
+    r2 = runner.invoke(cmd_release, ["--run", str(_run_with_projection(tmp_path, "b2", "mixed/enron-qa")),
+                                     "--out", str(out)] + _RID)
+    assert r2.exit_code == 0, r2.output
