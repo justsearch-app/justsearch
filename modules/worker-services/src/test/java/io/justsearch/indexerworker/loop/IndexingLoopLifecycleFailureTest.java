@@ -32,7 +32,7 @@ import org.junit.jupiter.params.provider.ValueSource;
 final class IndexingLoopLifecycleFailureTest {
   @org.junit.jupiter.api.io.TempDir Path temporary;
 
-  @ParameterizedTest
+  @ParameterizedTest(name = "{displayName} [{index}] {arguments}")
   @ValueSource(strings = {"commit", "outcome", "refresh"})
   void cutoverTimeoutReturnsWhileBoundaryPublicationIsHeld(String stage) throws Exception {
     JobQueue queue = mock();
@@ -85,7 +85,7 @@ final class IndexingLoopLifecycleFailureTest {
     }
   }
 
-  @ParameterizedTest
+  @ParameterizedTest(name = "{displayName} [{index}] {arguments}")
   @ValueSource(strings = {"ingest", "lexical", "stamp-lexical", "outcome", "return"})
   void failedFinalPublicationBlocksUpgradeAndCanRetry(String stage) throws Exception {
     JobQueue queue = mock();
@@ -204,7 +204,7 @@ final class IndexingLoopLifecycleFailureTest {
     }
   }
 
-  @ParameterizedTest
+  @ParameterizedTest(name = "{displayName} [{index}] {arguments}")
   @ValueSource(strings = {"timeout", "publication"})
   void cancellationResumesAnIncompletePreparation(String failure) throws Exception {
     JobQueue queue = mock();

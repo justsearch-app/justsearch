@@ -33,7 +33,7 @@ final class CommittedRootSyncSurvivorsTest extends LuceneExecutorTestBase {
   private static final String HASH = "a".repeat(64);
   @TempDir Path temp;
 
-  @ParameterizedTest
+  @ParameterizedTest(name = "{displayName} [{index}] {arguments}")
   @ValueSource(strings = {"prefix", "collection"})
   void restoringSyncRetainsParentAndChunkAcrossTwoRestarts(String deletion) throws Exception {
     Path root = Files.createDirectories(temp.resolve("root"));
@@ -66,7 +66,7 @@ final class CommittedRootSyncSurvivorsTest extends LuceneExecutorTestBase {
     }
   }
 
-  @ParameterizedTest
+  @ParameterizedTest(name = "{displayName} [{index}] {arguments}")
   @ValueSource(strings = {"prefix", "collection"})
   void syncCannotExcuseAFileOutsideItsQueueRoot(String deletion) throws Exception {
     Path root = Files.createDirectories(temp.resolve("root"));

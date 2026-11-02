@@ -23,7 +23,7 @@ import tools.jackson.databind.ObjectMapper;
 import tools.jackson.dataformat.yaml.YAMLFactory;
 
 final class LifecycleDurabilityTest extends RuntimeTestBase {
-  @ParameterizedTest
+  @ParameterizedTest(name = "{displayName} [{index}] {arguments}")
   @ValueSource(strings = {"writable", "read-only", "deferred"})
   void failClosedPreservesCorruptDirectory(String mode) throws Exception {
     Path index = seed();
@@ -48,7 +48,7 @@ final class LifecycleDurabilityTest extends RuntimeTestBase {
     assertDirtyBodyDetected("writable");
   }
 
-  @ParameterizedTest
+  @ParameterizedTest(name = "{displayName} [{index}] {arguments}")
   @ValueSource(strings = {"read-only", "deferred"})
   void dirtyReadOnlyOpenStillDetectsBodyCorruption(String mode) throws Exception {
     assertDirtyBodyDetected(mode);
@@ -66,7 +66,7 @@ final class LifecycleDurabilityTest extends RuntimeTestBase {
     });
   }
 
-  @ParameterizedTest
+  @ParameterizedTest(name = "{displayName} [{index}] {arguments}")
   @ValueSource(strings = {"STRUCTURAL", "OFF"})
   void cleanStructuralAndExplicitOffKeepTheirVerificationTier(String tier) throws Exception {
     Path index = seed();
@@ -95,7 +95,7 @@ final class LifecycleDurabilityTest extends RuntimeTestBase {
     });
   }
 
-  @ParameterizedTest
+  @ParameterizedTest(name = "{displayName} [{index}] {arguments}")
   @ValueSource(strings = {"manager", "writer", "directory"})
   void failedCloseRetainsOwnerAndDoesNotRepeatEarlierStages(String stage) throws Exception {
     var session = new RuntimeSession(buildSchemaWithDim(4));
@@ -144,7 +144,7 @@ final class LifecycleDurabilityTest extends RuntimeTestBase {
     } finally { runtime.close(); }
   }
 
-  @ParameterizedTest
+  @ParameterizedTest(name = "{displayName} [{index}] {arguments}")
   @ValueSource(strings = {"BACKUP_ONLY", "BACKUP_REBUILD"})
   void permittedRecoveryKeepsBackupAndRecoveryMarker(String policy) throws Exception {
     Path index = seed();
@@ -164,7 +164,7 @@ final class LifecycleDurabilityTest extends RuntimeTestBase {
     }
   }
 
-  @ParameterizedTest
+  @ParameterizedTest(name = "{displayName} [{index}] {arguments}")
   @ValueSource(strings = {"locked", "permission", "transient"})
   void nonCorruptionOpenFailuresNeverMoveTheIndex(String kind) throws Exception {
     Path index = seed();

@@ -19,7 +19,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
 final class IndexingLoopResetOwnershipTest {
-  @ParameterizedTest
+  @ParameterizedTest(name = "{displayName} [{index}] {arguments}")
   @ValueSource(booleans = {false, true})
   void concurrentResetsNeverCleanUnderRestartedOwner(boolean failFirst) throws Exception {
     JobQueue queue = mock();
