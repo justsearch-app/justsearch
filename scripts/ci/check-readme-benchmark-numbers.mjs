@@ -8,8 +8,10 @@
  *
  * Usage: node scripts/ci/check-readme-benchmark-numbers.mjs
  * Exit 0 = consistent (or skipped); non-zero = a shown row disagrees with, or has no evidence in, the release;
- * a row no label recognises shows a number; a row matches two labels; or a label is reused by a row that
- * is not a declared, checked ablation. Only nDCG@10 values are compared: note cells and prose are not.
+ * a row no label recognises shows a number; a row matches two labels; a label is reused by a row that
+ * is not a declared, checked ablation; or a withheld corpus's row shows any score other than its declared
+ * ablation's value. Rows are parsed into cells: the label cell routes the row (corpus, "ablation", mode),
+ * and only the nDCG@10 cell is compared with the release; note cells and prose are not compared.
  * Unit fixtures: scripts/ci/check-readme-benchmark-numbers.test.mjs (sibling convention).
  *
  * Skip-if-absent (the 632 sidecar local-vs-CI duality): no release, or no README with a "## Benchmarks"
@@ -92,17 +94,34 @@ const EXPECTATIONS = [
 
 // A cell that shows a score in any common form: ".578", "0.578", "57.8", "0,578", "81%", "81 %".
 const SCORE_FORM = /\.\d|\d,\d|\d\s*%/;
+// Every score token in a cell, in the same forms as SCORE_FORM.
+const SCORE_TOKENS = /\d*[.,]\d+(?:\s*%)?|\d+\s*%/g;
 
-function rowMatches(row) {
-  const lower = row.toLowerCase();
+// Split a Markdown table row into trimmed cells ("| a | b |" -> ["a", "b"]).
+export function rowCells(row) {
+  return row.trim().replace(/^\|/, "").replace(/\|$/, "").split("|").map((c) => c.trim());
+}
+
+const isSeparator = (cells) => cells.every((c) => /^:?-+:?$/.test(c));
+
+// The cell's score tokens that are not a rounded form of any allowed value.
+function otherScores(cell, allowed) {
+  const forms = new Set(allowed.filter((v) => v != null).flatMap(roundedForms));
+  return (cell.match(SCORE_TOKENS) || []).filter((t) => !forms.has(t));
+}
+
+// The corpus labels named in the label cell (the first cell); other cells are prose and never route a row.
+function labelMatches(label) {
+  const lower = label.toLowerCase();
   return EXPECTATIONS.filter((exp) => lower.includes(exp.token.toLowerCase()));
 }
 
-// An ablation row declares itself with the word "ablation" and names exactly one mode the release
-// records as an ablation for that corpus; its number is then checked against that ablation.
-function declaredAblation(row, entries) {
-  if (!/\bablation\b/i.test(row)) return null;
-  const modes = (entries || []).filter((a) => new RegExp(`\\b${a.config_mode}\\b`, "i").test(row));
+// An ablation row declares itself in its label cell with the word "ablation" and names exactly one mode
+// the release records as an ablation for that corpus; its nDCG@10 cell is then checked against that
+// ablation. Words in the note cell never make a row an ablation row.
+function declaredAblation(label, entries) {
+  if (!/\bablation\b/i.test(label)) return null;
+  const modes = (entries || []).filter((a) => new RegExp(`\\b${a.config_mode}\\b`, "i").test(label));
   return { modes };
 }
 
@@ -115,12 +134,23 @@ export function checkBenchmarkRows(rows, release) {
   const failures = [];
   let checked = 0;
   const defaultRowSeen = new Set();
-  // Every row is checked. Rows are matched by label, so a row no label recognises (a renamed or added
-  // corpus) would escape the check: any such row that shows a number fails. A row matching two labels is
-  // ambiguous and fails. Per label, one row is the measured-mode row; any further row must be a declared
-  // ablation whose number is itself checked.
+  let ndcgIndex = null;
+  // Every row is checked, cell by cell. The header row locates the nDCG@10 column; a row is routed by its
+  // label cell only, and only its nDCG@10 cell is compared with the release. A row no label recognises
+  // (a renamed or added corpus) that shows a number fails; a label naming two corpora fails. Per label,
+  // one row is the measured-mode row; any further row must be a declared ablation whose number is itself
+  // checked. A withheld corpus shows no score in any cell of any of its rows other than the declared
+  // ablation's own value.
   for (const row of rows) {
-    const matches = rowMatches(row);
+    const cells = rowCells(row);
+    if (isSeparator(cells)) continue;
+    const header = cells.findIndex((c) => /^ndcg@10$/i.test(c.replace(/\*/g, "")));
+    if (header > 0) {
+      ndcgIndex = header;
+      continue;
+    }
+    const label = cells[0];
+    const matches = labelMatches(label);
     if (matches.length === 0) {
       if (SCORE_FORM.test(row)) {
         failures.push(`unrecognised Benchmarks row shows a number no release label checks — row: ${row.trim()}`);
@@ -132,7 +162,13 @@ export function checkBenchmarkRows(rows, release) {
       continue;
     }
     const exp = matches[0];
-    const ablation = declaredAblation(row, ablations[exp.dataset]);
+    if (ndcgIndex == null || ndcgIndex >= cells.length) {
+      failures.push(`${exp.token}: row has no nDCG@10 cell (no table header names an nDCG@10 column) — row: ${row.trim()}`);
+      continue;
+    }
+    const scoreCell = cells[ndcgIndex];
+    const isWithheld = Boolean(withheld[exp.dataset]);
+    const ablation = declaredAblation(label, ablations[exp.dataset]);
     if (ablation) {
       if (ablation.modes.length !== 1) {
         failures.push(
@@ -142,10 +178,19 @@ export function checkBenchmarkRows(rows, release) {
       }
       const v = nd(ablation.modes[0]);
       checked += 1;
-      if (v == null || !showsValue(row, v)) {
+      if (v == null || !showsValue(scoreCell, v) || otherScores(scoreCell, [v]).length) {
         failures.push(
-          `${exp.token}: ${ablation.modes[0].config_mode} ablation row does not show the release value ${v == null ? "(none)" : roundedForms(v).join(" / ")} — row: ${row.trim()}`
+          `${exp.token}: ${ablation.modes[0].config_mode} ablation row's nDCG@10 cell does not show exactly the release value ${v == null ? "(none)" : roundedForms(v).join(" / ")} — row: ${row.trim()}`
         );
+        continue;
+      }
+      if (isWithheld) {
+        const others = cells.flatMap((c) => otherScores(c, [v]));
+        if (others.length) {
+          failures.push(
+            `${exp.token}: ${exp.dataset} is withheld; its ablation row shows a score other than the ${ablation.modes[0].config_mode} ablation's own value (${others.join(", ")}) — row: ${row.trim()}`
+          );
+        }
       }
       continue;
     }
@@ -154,10 +199,10 @@ export function checkBenchmarkRows(rows, release) {
       continue;
     }
     defaultRowSeen.add(exp.token);
-    if (withheld[exp.dataset]) {
+    if (isWithheld) {
       checked += 1;
-      if (!/withheld/i.test(row) || SCORE_FORM.test(row)) {
-        failures.push(`${exp.token}: default-mode row must state WITHHELD without a quality score — row: ${row.trim()}`);
+      if (!/withheld/i.test(scoreCell) || SCORE_FORM.test(row)) {
+        failures.push(`${exp.token}: measured-mode row must state WITHHELD in its nDCG@10 cell and show no quality score — row: ${row.trim()}`);
       }
       continue;
     }
@@ -169,15 +214,18 @@ export function checkBenchmarkRows(rows, release) {
       continue;
     }
     const full = exp.alsoFullAblation ? nd(ablations[exp.dataset] && ablations[exp.dataset][0]) : null;
-    for (const v of [full, value]) {
-      if (v == null) continue;
+    const allowed = [full, value].filter((v) => v != null);
+    for (const v of allowed) {
       checked += 1;
-      const forms = roundedForms(v);
-      if (!showsValue(row, v)) {
+      if (!showsValue(scoreCell, v)) {
         failures.push(
-          `${exp.token}: README row does not show the release value ${forms.join(" / ")} — row: ${row.trim()}`
+          `${exp.token}: README row's nDCG@10 cell does not show the release value ${roundedForms(v).join(" / ")} — row: ${row.trim()}`
         );
       }
+    }
+    const others = otherScores(scoreCell, allowed);
+    if (others.length) {
+      failures.push(`${exp.token}: README row's nDCG@10 cell shows a score the release does not record (${others.join(", ")}) — row: ${row.trim()}`);
     }
   }
   return { failures, checked };

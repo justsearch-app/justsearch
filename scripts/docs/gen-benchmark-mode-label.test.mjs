@@ -58,6 +58,31 @@ try {
   assert.match(reading, /Reading the two numbers/, "the scorecard reading note follows the generated block");
   assert.doesNotMatch(reading, /production[- ]default|default mode/i, "the reading note does not call the scorecard the product default");
 
+  // Every score the reading note shows is a value the committed release records (a measured headline or
+  // an ablation). A withheld headline (legal's earlier hybrid 0.598) or a retired corpus's number
+  // (CourtListener's full-mode 0.925) has no entry there, so it cannot come back into the note.
+  const release = JSON.parse(fs.readFileSync(path.join(REPO, "scripts", "jseval", "release.v1.json"), "utf8"));
+  const recorded = [
+    ...Object.values(release.measured || {}),
+    ...Object.values(release.ablations || {}).flat(),
+  ]
+    .map((entry) => entry.metrics && entry.metrics["nDCG@10"])
+    .filter((v) => typeof v === "number");
+  const forms = new Set(recorded.flatMap((v) => [v.toFixed(3), v.toFixed(2)]));
+  const shown = reading.match(/\d*[.,]\d+(?:\s*%)?|\d+\s*%/g) || [];
+  for (const score of shown) {
+    assert.ok(forms.has(score), `the reading note shows ${score}, which the current release does not record`);
+  }
+  for (const [dataset, entry] of Object.entries(release.withheld || {})) {
+    if (reading.includes(dataset)) {
+      assert.match(reading, /withholds/, `the reading note says the release withholds ${dataset}'s result`);
+    }
+    assert.equal(entry.metrics, undefined, `withheld ${dataset} carries no headline metric to cite`);
+  }
+  for (const stale of ["0.598", "0.925"]) {
+    assert.ok(!shown.includes(stale), `the reading note does not show ${stale}`);
+  }
+
   const schema = JSON.parse(fs.readFileSync(path.join(REPO, "scripts", "jseval", "release.v1.schema.json"), "utf8"));
   const description = schema.properties.default_mode.description;
   assert.match(description, /measured/i, "schema describes default_mode as the measured mode");

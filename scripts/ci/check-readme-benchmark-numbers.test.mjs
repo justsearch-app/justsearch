@@ -80,7 +80,7 @@ function run(release, readme) {
   const release = { ...RELEASE, measured: rest, withheld: { ...RELEASE.withheld, "beir/scifact": { reason: "x" } } };
   const result = run(release, README);
   ok("a withheld SciFact row that still shows 0.759 fails", result.status !== 0);
-  ok("the failure names SciFact as needing WITHHELD", /SciFact: default-mode row must state WITHHELD/.test(result.stderr));
+  ok("the failure names SciFact as needing WITHHELD", /SciFact: measured-mode row must state WITHHELD/.test(result.stderr));
 }
 
 // --- review counterexample 2: CLERC in neither measured nor withheld, README shows a score ---
@@ -103,7 +103,7 @@ function run(release, readme) {
 {
   const result = run(RELEASE, README.replace("0.806", "0.799"));
   ok("a measured row with a stale number fails", result.status !== 0);
-  ok("the failure names the release value", /Enron: README row does not show the release value 0\.806/.test(result.stderr));
+  ok("the failure names the release value", /Enron: README row's nDCG@10 cell does not show the release value 0\.806/.test(result.stderr));
 }
 
 // --- re-review finding 2: a row whose label matches no expectation is never silently skipped ---
@@ -128,7 +128,7 @@ const after = (row) => README.replace("| Legal (CLERC case-retrieval) | WITHHELD
 {
   const result = run(RELEASE, after("| Legal lexical ablation (CLERC) | 0.690 | note |"));
   ok("a second CLERC row with a wrong ablation number fails", result.status !== 0);
-  ok("the failure names the lexical ablation", /CLERC: lexical ablation row does not show the release value 0\.691/.test(result.stderr));
+  ok("the failure names the lexical ablation", /CLERC: lexical ablation row's nDCG@10 cell does not show exactly the release value 0\.691/.test(result.stderr));
 }
 {
   const result = run(RELEASE, after("| Legal lexical ablation (CLERC) | 0.691 | note |"));
@@ -164,6 +164,54 @@ for (const form of ["81%", "0,81", "81 %"]) {
 for (const form of [".578", "57.8", "57.8%", "0,578"]) {
   const result = run(RELEASE, README.replace("| WITHHELD |", `| WITHHELD (${form}) |`));
   ok(`a WITHHELD row that also prints ${form} fails`, result.status !== 0);
+}
+
+// --- review round 4 must-fix 2: rows are parsed into cells ---
+// "ablation" and the mode are read from the label cell only, so a note cannot route a row as an ablation.
+{
+  const readme = README.replace(
+    "| Legal (CLERC case-retrieval) | WITHHELD | note |",
+    "| Legal (CLERC case-retrieval) | 0.598 | lexical ablation 0.691 in the methodology |"
+  );
+  const result = run(RELEASE, readme);
+  ok("a withheld CLERC row showing 0.598 with 'lexical ablation 0.691' in its note fails", result.status !== 0);
+  ok("the failure requires WITHHELD in the measured-mode row", /CLERC: measured-mode row must state WITHHELD/.test(result.stderr));
+}
+// The release value is compared with the nDCG@10 cell only, never with the note cell.
+{
+  const result = run(RELEASE, README.replace("| Enron-QA | 0.806 | note |", "| Enron-QA | 0.799 | was 0.806 |"));
+  ok("a stale nDCG@10 cell with the release value only in the note fails", result.status !== 0);
+  ok("the failure names the nDCG@10 cell", /Enron: README row's nDCG@10 cell does not show the release value 0\.806/.test(result.stderr));
+}
+{
+  const result = run(RELEASE, README.replace("| Enron-QA | 0.806 | note |", "| Enron-QA | 0.806 / 0.799 | note |"));
+  ok("an nDCG@10 cell showing an extra unrecorded score fails", result.status !== 0);
+}
+{
+  const result = run(RELEASE, README.replace("| Enron-QA | 0.806 | note |", "| Enron-QA | 0.806 | was 0.799 in an earlier run |"));
+  ok("a measured corpus's note cell is not compared", result.status === 0);
+}
+// A withheld corpus shows no score in any of its rows other than the declared ablation's own value.
+{
+  const result = run(RELEASE, after("| Legal lexical ablation (CLERC) | 0.691 | hybrid was 0.598 |"));
+  ok("a withheld corpus's ablation row showing another score in its note fails", result.status !== 0);
+  ok("the failure names the withheld rule", /CLERC: mixed\/legal-clerc-200 is withheld; its ablation row shows a score other than/.test(result.stderr));
+}
+{
+  const result = run(RELEASE, after("| Legal ablation (CLERC) | 0.691 | lexical mode |"));
+  ok("a mode named only in the note cell does not declare an ablation", result.status !== 0);
+}
+{
+  const result = run(RELEASE, after("| Legal lexical ablation (CLERC) | 0.691 0.617 | note |"));
+  ok("a withheld ablation's nDCG@10 cell showing a second score fails", result.status !== 0);
+}
+{
+  const result = run(RELEASE, README.replace("| WITHHELD | note |", "| WITHHELD | hybrid 0.598 before |"));
+  ok("a withheld measured-mode row showing a score in its note fails", result.status !== 0);
+}
+{
+  const result = run(RELEASE, README.replace("| Enron-QA | 0.806 | note |", "| Enron-QA | note | 0.806 |"));
+  ok("the release value in a non-nDCG@10 column fails", result.status !== 0);
 }
 
 // --- a superseded release cannot supply README claims ---

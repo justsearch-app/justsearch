@@ -157,10 +157,11 @@ Explicit hybrid mode: keyword + vector + cross-encoder reranking; learned-sparse
 > floors against. It is not the product default: a request that names no mode runs AUTO
 > (`SearchPipelinePresets`). The per-corpus **Best known:** lines below are a *hand-authored research log
 > of best-achievable-config ablations* (often `full`-mode), kept for engineering history — **not** the
-> release headline. They differ **by design** (corpus×config optimality, F-004): e.g. legal's
-> best-achievable is `full`-mode **0.925**, while the current release withholds its `hybrid` result (see
-> its Scorecard row). When a Scorecard value is present for a corpus, it — not the "Best known" line — is
-> the canonical release number; the "Best known" line is its best-config ablation.
+> release headline. They differ **by design** (corpus×config optimality, F-004): e.g. for legal
+> (`mixed/legal-clerc-200`) the current release withholds its `hybrid` result (see its Scorecard row) and
+> its best recorded ablation is `lexical` **0.691**. When a Scorecard value is present for a corpus, it —
+> not the "Best known" line — is the canonical release number; the "Best known" line is its best-config
+> ablation.
 
 ### beir/scifact
 
