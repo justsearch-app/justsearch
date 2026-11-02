@@ -2113,3 +2113,14 @@ Independent verification of a real backend Repair download remains the verifier'
   "note": "Verdict of independent verifier session verifier-15c (live recheck of 4cc6dfb89f, digest sha256:2abb2beb...a0b7, all entries accepted); recorded by the orchestrator, who transcribed it, after a clean rebase that left the digest unchanged."
 }
 ```
+
+```json
+{
+  "kind": "audit",
+  "role": "reviewer",
+  "session": "reviewer-25",
+  "verdict": "reject",
+  "digest": "sha256:2abb2bebdf36b2a7f05ee8c9ceb900e124b69f57b5333384fefe21193c03a0b7",
+  "note": "Audit by independent reviewer session reviewer-25 (Claude): reject. M1 assertions on old labels can no longer fail (repairRemedy Install checks, pausedInstall 'Not Installed', snapshotLiveness 'Shut Down AI'); M2 superseded entry descriptions (componentList, telemetry slice A, sparkline); M3 B20 repairs recorded without fail-before. Recorded by the orchestrator, who transcribed it."
+}
+```
