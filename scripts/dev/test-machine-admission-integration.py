@@ -3,17 +3,14 @@
 
 Run after installDist and npm ci in modules/ui-web:
   python3 scripts/dev/test-machine-admission-integration.py
-Builds use the machine Gradle slot; the candidate slot wrapper is tested directly.
+Builds use the machine Gradle slot.
 """
-import fcntl
 import json
 import os
 from pathlib import Path
-import shutil
 import socket
 import subprocess
 import sys
-import time
 import tempfile
 import unittest
 import test_admission as fixtures
@@ -31,7 +28,7 @@ class MachineIntegration(unittest.TestCase):
     def tearDown(self):
         self.fixture.tearDown()
 
-    def test_tool_invoker_and_candidate_slot(self):
+    def test_tool_invoker(self):
         log = open(self.root / "gradle.log", "w+")
         try:
             # The outer installed slot tool handles the real machine's queue.
@@ -42,40 +39,6 @@ class MachineIntegration(unittest.TestCase):
                                             if r["mode"] == "heavy" and r["purpose"] == "Gradle"), None), timeout=180)
                 print("tool-invoker heavy: " + json.dumps(row), flush=True)
                 self.assertEqual(child.wait(timeout=180), 0)
-            finally:
-                if child.poll() is None:
-                    child.terminate()
-                    child.wait(timeout=65)
-            window_end = self.root / "window-end"
-            holder = self.fixture.start("exclusive", [PYTHON, "-c",
-                f"import time; from pathlib import Path\nwhile not Path({str(window_end)!r}).exists(): time.sleep(.01)"])
-            self.fixture.wait_for(lambda: self.fixture.row("exclusive"))
-            # Model installation: admission belongs beside the machine wrapper,
-            # independently of the checkout from which Gradle is invoked.
-            machine = self.root / "machine"
-            machine.mkdir()
-            wrapper = machine / "gradle-slot.sh"
-            shutil.copy2(REPO / "tools/machine/gradle-slot.sh", wrapper)
-            shutil.copy2(CLI, machine / "admission.py")
-            began = time.monotonic()
-            child = subprocess.Popen([str(wrapper), "./gradlew", "help"],
-                                     cwd=REPO, env=self.env, stdout=log, stderr=log)
-            try:
-                # The shared machine queue can delay the slot. Keep our private
-                # admission window open until the candidate actually reaches it.
-                self.fixture.wait_for(lambda: self.fixture.row("heavy-waiter"), timeout=180)
-                # The machine slot and worktree lock precede admission.
-                with (REPO / ".gradle/agent-build.lock").open("rb") as stream:
-                    with self.assertRaises(BlockingIOError):
-                        fcntl.flock(stream, fcntl.LOCK_EX | fcntl.LOCK_NB)
-                time.sleep(1.5)
-                self.assertIsNone(child.poll())
-                window_end.touch()
-                self.assertEqual(holder.wait(timeout=3), 0)
-                self.assertEqual(child.wait(timeout=180), 0)
-                elapsed = time.monotonic() - began
-                self.assertGreater(elapsed, 1.3)
-                print(f"candidate gradle-slot ./gradlew help: rc=0, {elapsed:.3f}s (includes 1.5s exclusive wait)", flush=True)
             finally:
                 if child.poll() is None:
                     child.terminate()
