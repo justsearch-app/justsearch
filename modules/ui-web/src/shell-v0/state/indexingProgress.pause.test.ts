@@ -59,7 +59,7 @@ describe('WP3.7 status-owned pause projection', () => {
   });
 
   it('N37.1 automatic holds keep their work-specific explanations and active text indexing', () => {
-    for (const [reason, wording] of [['game_mode', 'game is running'], ['gpu_busy_external', 'another app'], ['energy_saver', 'save energy']]) {
+    for (const [reason, wording] of [['game_mode', 'game is running'], ['gpu_busy_external', 'another app'], ['energy_saver', 'saves energy']]) {
       const p = select(status('PAUSED', reason));
       expect(p.phase).toBe('indexing');
       expect(p.activity.summary).toBe('Text indexing continues');

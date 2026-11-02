@@ -33,7 +33,7 @@ function observe(which: Case, migrationState = 'IDLE'): AiState {
     inference: { mode: 'online', available: true, activeModelId: 'test' } as AiState['inference'],
   });
   if (which === 'age' || which === 'Engine gone') {
-    vi.setSystemTime(now + (which === 'age' ? 30_001 : 120_001));
+    vi.setSystemTime(now + (which === 'age' ? 40_001 : 120_001));
     if (which === 'age') __feedForTest({ inference: { mode: 'online', available: true } as AiState['inference'] });
   }
   __tickClockForTest();
@@ -43,7 +43,12 @@ function library(state: AiState): LibrarySurface {
   const el = document.createElement('jf-library-surface') as LibrarySurface;
   el.loading = false;
   el.provisional = state.stability.kind === 'provisional';
-  el.indexingActivity = selectIndexingProgress(state.status, state.indexingStatusLive, state.episodeMaxPendingJobs, state.enrichSettleSamples).activity;
+  const progress = selectIndexingProgress(state.status, state.indexingStatusLive, state.episodeMaxPendingJobs, state.enrichSettleSamples);
+  el.indexingActivity = progress.activity;
+  const rebuilding = state.stability.kind === 'provisional' &&
+    (state.stability.cause === 'rebuilding' || state.stability.cause === 'generation-switch');
+  Object.assign(el, { indexProgress: progress, rebuilding,
+    provisionalHeadline: rebuilding ? 'Rebuilding your Library' : state.statusLabel });
   return el;
 }
 function dom(template: TemplateResult): HTMLDivElement {
@@ -67,7 +72,7 @@ describe('WP3.3 sixth verifier regressions', () => {
       expect(text.includes('your watched folders will reappear when it finishes'), `${migration}: ${which}`).toBe(which === 'fresh');
       expect(text).not.toContain('No watched folders');
     }
-    expect(dom(library(observe('fresh')).render()).querySelector('.empty')!.textContent).toContain('No watched folders');
+    expect(dom(library(observe('fresh')).render()).querySelector('h2')!.textContent).toBe('Add a folder to start searching');
   });
 
   it('S33.4 Library rebuild controls qualify retained build and activation observations', () => {
@@ -77,6 +82,8 @@ describe('WP3.3 sixth verifier regressions', () => {
       Object.assign(el, { reindexCancelKey: 'g2', observedGapKey: migration === 'AWAITING_ACCEPTANCE' ? 'g2' : null,
         gapDecision: migration === 'AWAITING_ACCEPTANCE' ? { gaps: [{ unitId: 'a.pdf', reason: 'unreadable' }] } : null });
       const control = dom(el.render()).querySelector('.gap-decision')!;
+      const title = control.querySelector('h3')!.textContent!;
+      expect(title.includes(UNKNOWN), `${migration}: ${which}: headline`).toBe(which !== 'fresh');
       expect(control.textContent!.includes(UNKNOWN), `${migration}: ${which}`).toBe(which !== 'fresh');
       if (which !== 'fresh') {
         expect(control.textContent).not.toContain('New index is being built');

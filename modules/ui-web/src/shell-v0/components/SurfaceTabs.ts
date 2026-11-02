@@ -92,12 +92,15 @@ export class SurfaceTabs extends JfElement {
       min-height: 0;
       height: 100%;
     }
+    .tab-bar { display: flex; flex-wrap: wrap; align-items: center; border-bottom: 1px solid var(--border-subtle); }
+    .tab-actions { margin-inline-start: auto; padding: .25rem 1rem; min-width: 0; max-width: 100%; }
+    #surface-tabs-panel { flex: 1; min-height: 0; overflow: hidden; }
     .tabs {
       flex-shrink: 0;
       display: flex;
       gap: 0.25rem;
       padding: 0 1.5rem;
-      border-bottom: 1px solid var(--border-subtle);
+
     }
     .tabs button {
       display: inline-flex;
@@ -237,7 +240,7 @@ export class SurfaceTabs extends JfElement {
     const activeItem = this.items.find((t) => t.id === active) ?? this.items[0];
     if (activeItem === undefined) return html`${nothing}`;
     return html`
-      <div class="tabs" role="tablist" aria-label=${this.tablistLabel} @keydown=${this.onKeydown}>
+      <div class="tab-bar"><div class="tabs" role="tablist" aria-label=${this.tablistLabel} @keydown=${this.onKeydown}>
         ${this.items.map((t) => {
           const isActive = t.id === active;
           const isTrust = t.altitude === 'TRUST';
@@ -260,6 +263,7 @@ export class SurfaceTabs extends JfElement {
           `;
         })}
       </div>
+      <div class="tab-actions"><slot name="actions"></slot></div></div>
       <!-- ids are shadow-root-scoped, so tab↔panel association is unambiguous per instance. -->
       <div id="surface-tabs-panel" role="tabpanel" aria-labelledby="tab-${active}">
         ${this.renderPanel(activeItem)}

@@ -17,6 +17,7 @@ const VISIBLE_GROUPS = 20;
 /** A retained-event summary, deliberately distinct from current per-folder readiness. */
 export class IngestionSummary extends JfElement {
   static properties = {
+    compact: { type: Boolean, reflect: true },
     host_: { attribute: false },
     rows: { state: true },
     loading: { state: true },
@@ -25,6 +26,7 @@ export class IngestionSummary extends JfElement {
     expanded: { state: true },
   };
   static transientState = { loading: false, announceLoading: false, error: false };
+  declare compact: boolean;
   declare host_: PluginHostApi | undefined;
   declare rows: IngestionRollup[] | null;
   declare loading: boolean;
@@ -40,6 +42,7 @@ export class IngestionSummary extends JfElement {
 
   constructor() {
     super();
+    this.compact = false;
     this.rows = null;
     this.loading = true;
     this.announceLoading = true;
@@ -49,6 +52,9 @@ export class IngestionSummary extends JfElement {
 
   static styles = css`
     :host { display: block; margin-top: 1.5rem; }
+    :host([compact]) { margin-top: 0; flex: 1 1 17rem; min-width: 0; font-size: 13px; color: var(--text-secondary); }
+    :host([compact]) section { padding: 1rem 0; border: 0; border-radius: 0; background: transparent; }
+    summary { cursor: pointer; }
     section { padding: 1rem; background: var(--surface-secondary);
       border: 1px solid var(--border-subtle); border-radius: 0.5rem; }
     header { display: flex; flex-wrap: wrap; align-items: center;
@@ -145,6 +151,11 @@ export class IngestionSummary extends JfElement {
   override render(): TemplateResult {
     const total = this.rows?.reduce((sum, row) => sum + row.count, 0) ?? 0;
     const visible = this.expanded ? this.rows : this.rows?.slice(0, VISIBLE_GROUPS);
+    const content = this.renderSummary(total, visible ?? null);
+    return this.compact ? html`<details><summary>Activity · ${this.rows ? `${total.toLocaleString()} recorded events${this.error ? ' · last known' : ''}` : this.loading ? 'Loading…' : 'Unavailable'}</summary>${content}</details>` : content;
+  }
+
+  private renderSummary(total: number, visible: IngestionRollup[] | null): TemplateResult {
     return html`<section aria-labelledby="activity-heading" data-testid="ingestion-summary">
       <header>
         <h3 id="activity-heading">Indexing activity</h3>

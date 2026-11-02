@@ -50,11 +50,13 @@ describe('<jf-folder-card>', () => {
   it('emits jf-folder-card-remove with the pathHash when Remove is activated (intent, not the op)', async () => {
     const el = mount([{ pathHash: 'h1', displayPath: '/x', status: 'indexed', metaText: 'm' }]);
     await el.updateComplete;
+    el.shadowRoot!.querySelector<HTMLButtonElement>('.folder-toggle')!.click();
+    await el.updateComplete;
     const events: string[] = [];
     document.addEventListener('jf-folder-card-remove', (e) => {
       events.push((e as CustomEvent<{ pathHash: string }>).detail.pathHash);
     });
-    const btn = el.shadowRoot?.querySelector('jf-button') as HTMLElement & {
+    const btn = el.shadowRoot?.querySelector('.remove-action') as HTMLElement & {
       onActivate?: () => void;
     };
     btn?.onActivate?.();

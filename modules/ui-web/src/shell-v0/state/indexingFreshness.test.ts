@@ -2,14 +2,15 @@
 // SPDX-License-Identifier: Apache-2.0
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import {
-  __feedForTest, __resetAiStateForTest, getAiState, startAiStateStore, subscribeAiState,
+  __feedForTest, __resetAiStateForTest, __tickClockForTest, getAiState, startAiStateStore, subscribeAiState,
   type AiState, type StatusSnapshot,
 } from './aiStateStore.js';
 import { bumpOriginContact } from './originContact.js';
 import { selectIndexingProgress } from './indexingProgress.js';
 
 // Keep transport quiet so only the store's real staleness interval can announce expiry.
-vi.mock('../utils/statusPoll.js', () => ({
+vi.mock('../utils/statusPoll.js', async original => ({
+  ...await original<typeof import('../utils/statusPoll.js')>(),
   subscribeStatus: () => () => {}, setStatusApiBase: () => {}, refreshStatusNow: async () => {},
 }));
 vi.mock('../utils/inferencePoll.js', () => ({
@@ -49,7 +50,7 @@ it('S33.4 the store timer expires the worker observation while SSE alone keeps t
   try {
     expect(activity(getAiState()).confirmed).toBe(true);
     // No status or inference updates. SSE stamps are deliberately nonreactive, as in production.
-    for (let i = 0; i < 4; i++) {
+    for (let i = 0; i < 6; i++) {
       bumpOriginContact();
       await vi.advanceTimersByTimeAsync(5_000);
     }
@@ -71,7 +72,34 @@ it('S33.4 a status without a worker timestamp expires by receipt age using its r
   startAiStateStore('');
   __feedForTest({ status: observation(undefined, 10_000) });
   expect(activity(getAiState()).confirmed).toBe(true);
+  await vi.advanceTimersByTimeAsync(20_000);
+  expect(activity(getAiState()).confirmed).toBe(true);
+  bumpOriginContact();
+  await vi.advanceTimersByTimeAsync(5_000);
+  expect(getAiState().snapshotLive).toBe(true);
+  expect(activity(getAiState()).confirmed).toBe(false);
+});
+
+
+it('L2 fresh 6-second worker samples remain confirmed between 10-second reads for 40 seconds', async () => {
+  startAiStateStore('');
+  __feedForTest({ status: observation(Date.now(), 6_000) });
+  for (let second = 1; second <= 40; second++) {
+    await vi.advanceTimersByTimeAsync(1_000);
+    if (second % 10 === 0) __feedForTest({ status: observation(Date.now(), 6_000) });
+    __tickClockForTest();
+    expect(activity(getAiState()).confirmed, `second ${second}`).toBe(true);
+  }
+});
+
+it('L2 a frozen worker sample expires after 6 seconds plus one read interval despite successful reads', async () => {
+  const sampledAt = Date.now();
+  startAiStateStore('');
+  __feedForTest({ status: observation(sampledAt, 6_000) });
   await vi.advanceTimersByTimeAsync(10_000);
+  __feedForTest({ status: observation(sampledAt, 6_000) });
+  expect(activity(getAiState()).confirmed).toBe(true);
+  await vi.advanceTimersByTimeAsync(5_000);
   expect(activity(getAiState()).confirmed).toBe(true);
   bumpOriginContact();
   await vi.advanceTimersByTimeAsync(5_000);

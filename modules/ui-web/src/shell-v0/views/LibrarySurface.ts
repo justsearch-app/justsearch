@@ -16,6 +16,10 @@
  */
 
 import { html, css, nothing, type TemplateResult } from 'lit';
+import { createOperationKey } from '../../api/operationKey.js';
+import { settingsV2Schema } from '../../api/generated/schema-types/settings-v2.js';
+import { repeat } from 'lit/directives/repeat.js';
+import { renderFolderRow, folderRowStyles, type FolderRow, type FolderRowIntent } from '../components/folderRow.js';
 import { createSettingsAttempt, executeSettingsAttempt, readSettingsObservation, SettingsAttemptError, type SettingsAttempt, type SettingsWitness } from '../../api/settingsAttempt.js';
 import { describeExactPath, type ExactPathExclusion } from '../../api/exclusionPolicy.js';
 import { decideForget, forgetObservationText, parseForgetPage, publishForgetCompletion } from '../../api/domains/forget.js';
@@ -24,7 +28,7 @@ import type { ForgetPage, ForgetOutcome } from '../../api/generated/schema-types
 import { confirmForget } from '../components/searchResults/forgetConsent.js';
 import { JfElement } from '../primitives/JfElement.js';
 import '../components/OpButton.js';
-import { OperationError } from '../operations/OperationClient.js';
+import { OperationError, type OperationInvocationSuccess } from '../operations/OperationClient.js';
 import type { OpSuccessEventDetail, OpErrorEventDetail } from '../components/OpButton.js';
 import '../components/Button.js';
 import type { JfButton } from '../components/Button.js';
@@ -34,6 +38,7 @@ import '../components/SurfaceTabs.js';
 import type { SurfaceTabItem } from '../components/SurfaceTabs.js';
 import { getSurface } from '../../api/registry/SurfaceCatalogClient.js';
 import { present } from '../display/present.js';
+import { takeIndexingRuleFocus, subscribeIndexingRuleFocus, type IndexingRuleControl } from '../router/indexingRuleIntent.js';
 import { takeMemberTabIntent, subscribeMemberTab } from '../router/memberTabIntent.js';
 import { resolvePathLazy } from '../hooks/resolvePathLazy.js';
 import { icon } from '../components/Icon.js';
@@ -41,6 +46,9 @@ import { icon } from '../components/Icon.js';
 import { activeBodyFor, subscribePresentation } from '../state/presentationRuntime.js';
 import { subscribeAiState } from '../state/aiStateStore.js';
 import '../components/IndexingControls.js';
+import '../components/IndexingRulesEditor.js';
+import type { IndexingRulesEditor, SavedIndexingRules } from '../components/IndexingRulesEditor.js';
+import '../components/FailedJobsDrawer.js';
 import { LIBRARY_CARDS_REGION } from '../themes/builtinPresentations.js';
 import '../components/DeclaredSurface.js';
 import type { PluginHostApi } from '../plugin-api/plugin-types.js';
@@ -57,7 +65,7 @@ import { operationOutcomeViewSchema, type OperationOutcomeView } from '../../api
 import {
   folderStatus,
   rememberFailedCounts,
-  failedChipCopy,
+  rootCoverage,
   type FolderStatus,
 } from '../state/folderStatus.js';
 // Tempdoc 813 §4 — the index-wide progress authority supplies enrichment-stage applicability, which
@@ -65,6 +73,7 @@ import {
 import {
   selectIndexingProgress,
   type EnrichmentApplicability,
+  type IndexingProgress,
 } from '../state/indexingProgress.js';
 // Tempdoc 811 C-2a — the non-root (ad-hoc / MCP) sources the folder rows cannot describe.
 import {
@@ -138,6 +147,48 @@ const excludesResultSchema = z.object({
 });
 type ExcludesResult = z.infer<typeof excludesResultSchema>;
 
+/** Support codes stay on each exact gap; the decision itself uses plain language. */
+function rebuildGapReason(code: string): string {
+  const reasons: Record<string, string> = {
+    CANDIDATE_PROJECTION_MISSING: 'The document was not added to the new index.',
+    PROJECTION_WITNESS_MISSING: 'The document could not be verified in the new index.',
+    DELETE_NOT_APPLIED: 'The document could not be removed from the new index.',
+    PROJECTION_DELETE_NOT_APPLIED: 'The document removal could not be verified.',
+    PROJECTION_SOURCE_INCOMPLETE: 'Documents from this source are not ready.',
+    PROJECTION_SOURCE_MARKER_MISSING: 'This document source could not be verified.',
+    PARSER_FAILED: 'The file could not be read by its parser.',
+    PARSER_TIMEOUT: 'Reading the file took too long.',
+    SANDBOX_FAILED: 'The file reader could not run safely.',
+    UNREADABLE: 'The file could not be read.',
+    SOURCE_UNREADABLE: 'The source file could not be read.',
+    INDEXED_SOURCE_UNREADABLE: 'The indexed source file could not be read again.',
+    ROOT_UNAVAILABLE: 'The containing folder could not be found or read.',
+    IO_ERROR: 'The file could not be accessed.',
+    INPUT_TOO_LARGE: 'The file exceeds the size limit.',
+    OFFICE_INPUT_TOO_LARGE: 'The Office document exceeds the size limit.',
+    WRITE_FAILED: 'The document could not be saved to the new index.',
+    WRITE_UNAVAILABLE_DRAINING: 'The index was unavailable while finishing other work.',
+    MISSING_AT_PROCESSING: 'The source file was missing when processing started.',
+    DELETED_OR_MISSING: 'The source file was deleted or could not be found.',
+    DELETED_AFTER_SNAPSHOT: 'The source file was deleted during the rebuild.',
+    STALE_AFTER_EXTRACTION: 'The source file changed while being read.',
+    SIZE_CHANGED_AFTER_SNAPSHOT: 'The file size changed during the rebuild.',
+    MODIFIED_TIME_CHANGED_AFTER_SNAPSHOT: 'The file was modified during the rebuild.',
+    FILE_KEY_CHANGED_AFTER_SNAPSHOT: 'The source file was replaced during the rebuild.',
+    SOURCE_KIND_CHANGED_AFTER_SNAPSHOT: 'The source is no longer the same kind of file.',
+    LOST_CLAIM_OWNERSHIP: 'Processing ownership changed before the document was ready.',
+    NON_REGULAR_SOURCE: 'The source is not a regular file.',
+    MISSING_INGESTION_BOUNDARY: 'The document could not be tracked through processing.',
+    CLOUD_PLACEHOLDER: 'The file is stored in the cloud and is not available locally.',
+    EXTRACTION_DROPOUT_UNRECOVERED: 'No usable text could be recovered from the file.',
+    EXTRACTION_DROPOUT_PENDING_FALLBACK: 'The file still needs another reading method.',
+    RECOVERY_REFUSED: 'The document could not be recovered after an interruption.',
+    SKIPPED_TEMP_OR_SYSTEM: 'The source is a temporary or system file.',
+    RETRY_EXHAUSTED: 'The file could not be processed after repeated attempts.',
+  };
+  return reasons[code] ?? 'The document could not be included. The support code is available in the tooltip.';
+}
+
 type GapDecisionView = { reindexKey: string; gapListHash: string;
   gaps: readonly { unitId: string; reason: string }[] };
 
@@ -180,6 +231,10 @@ const OP_APPLY = 'core.apply-excludes';
 const LIVE_REFRESH_MIN_MS = 4000;
 
 export class LibrarySurface extends JfElement {
+  private expandedFolders = new Set<string>();
+  private contactUnconfirmed = false;
+  private rebuilding = false;
+  private provisionalHeadline = 'Indexing status unconfirmed';
   private indexProgress = selectIndexingProgress(null, false, 0, []);
   static properties = {
     apiBase: { attribute: 'api-base', type: String },
@@ -384,6 +439,7 @@ export class LibrarySurface extends JfElement {
     this.forgetDecisionKey = null;
     this.forgetMessage = '';
     this.excludesBusy = false;
+    this.pendingIndexingFocus = undefined;
     this.excludesError = null;
     this.excludesNotice = '';
     this.excludesResult = null;
@@ -486,69 +542,9 @@ export class LibrarySurface extends JfElement {
     .gap-decision p { margin: 0 0 0.75rem; font-size: var(--font-size-sm); }
     .gap-decision ul { max-height: 12rem; overflow-y: auto; padding-left: 1.25rem; }
     .gap-decision li { font-size: var(--font-size-sm); overflow-wrap: anywhere; }
-    .cards {
-      display: grid;
-      gap: 0.5rem;
-    }
-    .card {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 1rem;
-      padding: 0.75rem 1rem;
-      background: var(--surface-secondary);
-      border: 1px solid var(--border-subtle);
-      border-radius: 0.5rem;
-    }
-    .card-icon {
-      flex-shrink: 0;
-      color: var(--text-tint);
-    }
-    .card-info {
-      flex: 1;
-      min-width: 0;
-    }
-    .card-path {
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
-      font-family: monospace;
-      font-size: var(--font-size-sm);
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-    }
-    .card-meta {
-      font-size: var(--font-size-xs);
-      color: var(--text-secondary);
-      margin-top: 0.25rem;
-    }
-    .status-icon {
-      flex-shrink: 0;
-    }
-    .status-icon.indexed {
-      color: var(--text-success);
-    }
-    .status-icon.error {
-      color: var(--text-danger);
-    }
-    .status-icon.pending {
-      color: var(--text-warning);
-    }
-    .status-icon.unavailable {
-      color: var(--text-secondary);
-    }
-    .status-icon.unverified {
-      color: var(--text-warning);
-    }
-    .reindex-chip {
-      margin-left: 0.4rem;
-      --jf-button-color: var(--text-secondary);
-      color: var(--text-secondary);
-    }
     .empty {
-      padding: 2rem;
-      text-align: center;
+      padding: .5rem 0;
+      text-align: start;
       color: var(--text-secondary);
     }
     .action-message { margin-bottom: 1rem; overflow-wrap: anywhere; }
@@ -669,6 +665,59 @@ export class LibrarySurface extends JfElement {
     // Tempdoc 914 D3 — the failed chip's look is shared with the declared FolderCardRenderer so the
     // two render sites cannot drift; see failedChipPresentation.ts.
     failedChipStyles,
+    folderRowStyles,
+    css`
+      .folders-scroll { padding: 1.8rem 2.5rem; min-width: 0; }
+      .header-left h2 { font-size: 26px; font-weight: 400; }
+      .header { margin-bottom: 1.5rem; }
+      .subtitle { overflow-wrap: anywhere; }
+      .header-left .subtitle { font-size: 14px; }
+      jf-declared-surface::part(heading) { font-size: 12px; font-weight: 500;
+        text-transform: none; letter-spacing: normal; }
+      .removal-history { margin-top: 1rem; font-size: 12px; color: var(--text-secondary); }
+      .removal-history summary { cursor: pointer; }
+      .window-actions { display: flex; flex-wrap: wrap; gap: .5rem; align-items: center; }
+      .more-actions { position: relative; }
+      .more-actions summary { cursor: pointer; list-style: none; padding: .4rem; color: var(--text-secondary); }
+      .more-actions[open] > div { position: absolute; z-index: 2; right: 0; min-width: 15rem;
+        padding: .5rem; background: var(--surface-2); border: 1px solid var(--border-subtle); }
+      .browser-banner { padding: 0; border: 0; background: transparent; color: var(--text-secondary); font-size: 12px; }
+      .excludes-section, .gap-decision { background: transparent; border: 0; border-radius: 0;
+        border-top: 1px solid var(--border-subtle); padding: 1rem 0; }
+      h3, .excludes-header h3 { color: var(--text-secondary); font-size: 12px; font-weight: 500; text-transform: none; letter-spacing: normal; }
+      .attention { margin-bottom: 1.75rem; }
+      .attention:empty, .action-message:empty { display: none; }
+      .library-rules { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 2.5rem; margin-top: 1.5rem; }
+      .library-rules > .excludes-section { margin: 0; padding: 0; border: 0; }
+      .excludes-header { display: block; }
+      .excludes-header .actions { margin: .5rem 0; }
+      .rules-help { font-size: 12px; color: var(--text-secondary); margin: .5rem 0; }
+      .rules-help summary { cursor: pointer; }
+      .skip-rule { display: flex; align-items: center; border-bottom: 1px solid var(--border-subtle); }
+      .skip-rule input { flex: 1; min-width: 0; padding: .5rem .2rem; font: inherit; font-size: 14px; font-family: monospace;
+        border: 0; background: transparent; color: var(--text-primary); }
+      .skip-rule input:focus-visible { outline: 2px solid var(--accent-tint); outline-offset: 2px; }
+      .add-rule::part(control) { color: var(--accent-tint); }
+      @media (max-width: 800px) { .library-rules { grid-template-columns: minmax(0, 1fr); gap: 1.5rem; } }
+      @media (forced-colors: active) { .skip-rule { border-color: CanvasText; } .skip-rule input:focus-visible { outline-color: Highlight; } }
+      .gap-decision h3 { font-size: 14px; font-weight: 400; color: var(--text-primary); }
+      .attention-item { padding: .85rem 0; border-top: 1px solid var(--border-subtle); }
+      .attention-title { display: flex; gap: .7rem; align-items: center; font-size: 14px; }
+      .attention-title > span { color: var(--text-warning); }
+      .attention-item p { margin: .35rem 0 .3rem 1.7rem; font-size: 13px; color: var(--text-secondary); overflow-wrap: anywhere; }
+      .attention-actions { margin-left: 1.7rem; }
+      .attention-actions jf-failed-jobs-drawer { margin-left: 0; }
+      .bottom-links { display: flex; flex-wrap: wrap; gap: 1.5rem; margin-top: 1.5rem;
+        border-top: 1px solid var(--border-subtle); padding-top: .75rem; font-size: 13px; color: var(--text-secondary); }
+      .bottom-links details { min-width: 0; flex: 1 1 17rem; }
+      .bottom-links summary { cursor: pointer; }
+      .bottom-links .excludes-section { margin-top: .5rem; }
+      .other-source-card { display: flex; gap: .75rem; align-items: center; padding: .65rem 0; border-bottom: 1px solid var(--border-subtle); }
+      .other-source-card .card-info { flex: 1; }
+      @media (max-width: 800px) { .folders-scroll { padding: 1.25rem; } }
+      @media (max-width: 640px) { .folders-scroll { padding: 1rem; } }
+      @media (forced-colors: active) { .attention-item, .bottom-links, .excludes-section { border-color: CanvasText; } }
+    `,
   ];
 
   // 569 §14 — re-render when the active presentation changes (the declared cards region appears
@@ -689,8 +738,25 @@ export class LibrarySurface extends JfElement {
   private lastProbeCap = 0;
   private probing = false;
 
+  private indexingRuleUnsub: (() => void) | undefined;
+  private indexingFocusSerial = 0;
+  private pendingIndexingFocus: IndexingRuleControl | undefined;
+  private lastKnownAttention = new Map<string, { key: string; title: string; detail?: string; actions?: TemplateResult }>();
+  private lastKnownHold: IndexingProgress | undefined;
+
+  private requestIndexingFocus(control: IndexingRuleControl): void {
+    const serial = ++this.indexingFocusSerial;
+    // Coalesce requests in one turn, and never focus after leaving the Library.
+    void Promise.resolve().then(() => {
+      if (this.isConnected && serial === this.indexingFocusSerial) void this.focusIndexingRule(control);
+    });
+  }
+
   override connectedCallback(): void {
     super.connectedCallback();
+    this.indexingRuleUnsub = subscribeIndexingRuleFocus(control => this.requestIndexingFocus(control));
+    const ruleFocus = takeIndexingRuleFocus();
+    if (ruleFocus) this.requestIndexingFocus(ruleFocus);
     void this.loadUnfinishedForgets(0);
     // Tempdoc 571 §11 / 578 — if we were reached via a member deep-link (core.browse-surface →
     // redirected here), open that member's tab. Drain a pending intent (host mounting now) AND
@@ -709,10 +775,15 @@ export class LibrarySurface extends JfElement {
     if (this.reindexOutcomeKey) void this.checkReindexOutcome();
     if (!this.excludesLoadStarted) void this.loadExcludes();
     this.presentationUnsub = subscribePresentation(() => this.requestUpdate());
-    // 595 §4.3 — observe the one Stability axis so an empty roots list during a
-    // transition renders as "Rebuilding…", not "No watched folders".
+    // Keep empty roots provisional during transitions, but only call a real
+    // rebuild/migration "Rebuilding". Other transitions use the status bar's wording.
     this.aiUnsub = subscribeAiState((s) => {
       this.provisional = s.stability.kind === 'provisional';
+      this.rebuilding = s.stability.kind === 'provisional' &&
+        (s.stability.cause === 'rebuilding' || s.stability.cause === 'generation-switch');
+      this.provisionalHeadline = this.rebuilding ? 'Rebuilding your Library' : s.statusLabel;
+      this.contactUnconfirmed = s.stability.kind === 'provisional' &&
+        ['initial-load', 'updating', 'channel-stale'].includes(s.stability.cause);
       this.observeGapDecision(s.status?.worker?.migration);
       // Tempdoc 813 §4 — the per-root second tier needs to know which stages apply; take it from the
       // ONE index-wide progress derivation rather than re-reading the enrichment wire flags here.
@@ -722,6 +793,7 @@ export class LibrarySurface extends JfElement {
         s.episodeMaxPendingJobs,
         s.enrichSettleSamples,
       );
+      if (progress.activity.confirmed) this.lastKnownHold = progress.pause ? progress : undefined;
       this.indexingActivity = progress.activity;
       this.indexProgress = progress;
       this.retryWaiting = progress.activity.confirmed && progress.phase === 'waiting';
@@ -786,6 +858,10 @@ export class LibrarySurface extends JfElement {
   }
 
   override disconnectedCallback(): void {
+    this.indexingRuleUnsub?.();
+    this.indexingRuleUnsub = undefined;
+    this.indexingFocusSerial++;
+    this.shadowRoot?.querySelector<IndexingRulesEditor>('jf-indexing-rules-editor')?.cancelIndexingRuleFocus();
     this.leaveForgetPlacement();
     super.disconnectedCallback();
     this.presentationUnsub?.();
@@ -800,8 +876,42 @@ export class LibrarySurface extends JfElement {
     }
   }
 
+  private focusedFolderToggle: HTMLElement | null = null;
+
+  protected override willUpdate(changed: Map<string, unknown>): void {
+    super.willUpdate(changed);
+    const active = deepActiveElement();
+    this.focusedFolderToggle = active instanceof HTMLElement && active.matches('.folder-toggle')
+      && this.shadowRoot?.activeElement ? active : null;
+  }
+
+  private async restoreFolderToggleFocus(previous: HTMLElement): Promise<void> {
+    // Declared presentations replace nested renderer elements. Wait for each new renderer's
+    // update, then restore only the disclosure that held focus; never steal a later focus move.
+    const controls = previous.getAttribute('aria-controls');
+    const visit = async (root: ShadowRoot): Promise<HTMLElement | null> => {
+      for (const child of root.querySelectorAll<HTMLElement>('*')) {
+        if ('updateComplete' in child) await (child as JfElement).updateComplete;
+        if (child.matches('.folder-toggle') && child.getAttribute('aria-controls') === controls) return child;
+        if (child.shadowRoot) { const found = await visit(child.shadowRoot); if (found) return found; }
+      }
+      return null;
+    };
+    const replacement = await visit(this.shadowRoot!);
+    const active = deepActiveElement();
+    if (this.isConnected && !previous.isConnected && (!active || active === document.body)) {
+      replacement?.focus({ preventScroll: true });
+    }
+  }
+
   protected override updated(changed: Map<string, unknown>): void {
     super.updated(changed);
+    if (!this.loading && this.pendingIndexingFocus) {
+      const control = this.pendingIndexingFocus;
+      this.pendingIndexingFocus = undefined;
+      void this.focusIndexingRule(control);
+    }
+    if (this.focusedFolderToggle) void this.restoreFolderToggleFocus(this.focusedFolderToggle);
     if (changed.has('apiBase') && changed.get('apiBase') !== undefined
         || changed.has('activeTab') && changed.get('activeTab') !== undefined) {
       this.leaveForgetPlacement();
@@ -921,63 +1031,105 @@ export class LibrarySurface extends JfElement {
    * quarantine fallback, degrade-never-fail). The Remove INTENT the renderer emits is handled here
    * (the gated operation + confirm stay surface-owned).
    */
+  private rowStatus(root: IndexedRootView): FolderStatus {
+    return folderStatus(root, {
+      relativeTime: this.host_.utilities.formatRelativeTime(root.lastIndexedIsoTime ?? ''),
+      verifiedRelativeTime: this.host_.utilities.formatRelativeTime(root.lastVerifiedIsoTime ?? ''),
+      provisional: this.provisional,
+      enrichmentStages: this.enrichmentStages,
+      enrichmentPending: this.enrichmentPending,
+      enrichmentBlocked: this.enrichmentBlocked,
+      enrichmentBlockedDetail: this.indexProgress.phase === 'blocked' ? this.indexingActivity.detail : null,
+      retryWaiting: this.retryWaiting,
+      indexingPaused: this.indexProgress.pause?.state === 'paused',
+      indexingPauseReason: this.indexProgress.pause?.reason,
+      indexingPauseReasons: this.indexProgress.pause?.reasons,
+      lastKnownFailed: this.lastKnownFailed[root.pathHash ?? ''],
+    });
+  }
+
+  private projectFolder(root: IndexedRootView): FolderRow {
+    const pathHash = root.pathHash ?? '';
+    const fullPath = this.resolvedPaths[pathHash];
+    const name = folderRowLabel(pathHash, fullPath);
+    const fs = this.rowStatus(root);
+    const progress = rootCoverage(root, this.enrichmentStages);
+    const unknown = !this.indexingActivity.confirmed || this.provisional || fs.state === 'unavailable';
+    const statusText = fs.state === 'ready' ? 'Up to date'
+      : fs.state === 'empty' ? 'No indexable files'
+      : fs.state === 'enriching' ? `Meaning processing${progress?.percent != null ? ` · ${progress.percent}%` : ''}`
+      : fs.state === 'failed' && !root.walkError ? 'Files need review'
+      : fs.metaText.split(' · ').slice(1).join(' · ');
+    return {
+      expanded: this.expandedFolders.has(pathHash),
+      pathHash, displayPath: name.label, fullPath, pathTitle: name.title, walkError: undefined,
+      status: !this.indexingActivity.confirmed && fs.glyph === 'indexed' ? 'pending' : fs.glyph,
+      statusText: !this.indexingActivity.confirmed && fs.state === 'ready' ? this.indexingActivity.summary
+        : statusText + (this.retryWaiting && this.indexingActivity.detail ? ` · ${this.indexingActivity.detail}` : ''),
+      metaText: this.removingHashes.has(pathHash) ? 'Removing folder…' : this.folderActivityText(fs.metaText),
+      removalBusy: this.removingHashes.has(pathHash),
+      failed: fs.failed, failedLastKnown: fs.failedIsLastKnown === true,
+      filesFound: (root.fileCount ?? -1) >= 0
+        ? `${unknown ? 'Last known ' : ''}${(root.fileCount ?? 0).toLocaleString()} files found` : 'Files found: unknown',
+      collection: root.collection ?? 'default',
+      wordsVerdict: fs.state === 'ready' || fs.state === 'enriching' || fs.state === 'keyword-only' || fs.state === 'unverified'
+        ? `${this.indexingActivity.confirmed ? 'Now' : 'Last known'}${fs.state === 'unverified' ? ' · deletions unverified' : ''}`
+        : 'Not yet confirmed; see status',
+      processingPercent: progress?.percent,
+      showProgress: fs.state === 'enriching',
+      indexedAgo: root.lastIndexedIsoTime ? this.host_.utilities.formatRelativeTime(root.lastIndexedIsoTime) : '',
+      verifiedAgo: root.lastVerifiedIsoTime ? this.host_.utilities.formatRelativeTime(root.lastVerifiedIsoTime) : '',
+      canReveal: this.isTauri,
+      revealUnavailable: !fullPath ? 'The folder path could not be resolved.'
+        : fs.state === 'unavailable' ? 'Folder not found. Reconnect the drive or check the folder path.' : '',
+      needsVerification: fs.state === 'unverified',
+    };
+  }
+
+  private folderIntent(intent: FolderRowIntent, pathHash: string): void {
+    if (intent === 'remove') void this.handleRemoveRoot(pathHash);
+    else if (intent === 'show-failed') openFailedJobs(pathHash);
+    else if (intent === 'reindex') void this.handleReindexToVerify();
+    else void this.revealFolder(pathHash);
+  }
+
+  private async revealFolder(pathHash: string): Promise<void> {
+    if (!this.isTauri) return;
+    const root = this.roots.find(r => r.pathHash === pathHash);
+    const path = this.resolvedPaths[pathHash];
+    if (!root || !path || root.status === 'unavailable') {
+      this.error = !root ? 'This folder was removed from the Library.'
+        : !path ? 'The folder path could not be resolved.' : 'Folder not found. Reconnect the drive or check the folder path.';
+      return;
+    }
+    const serial = this.surfaceSerial;
+    try {
+      await this.host_.platform.revealInExplorer(path);
+    } catch (error: unknown) {
+      if (serial === this.surfaceSerial) this.error = `Could not open the folder in Explorer. ${error instanceof Error ? error.message : String(error)}`;
+    }
+  }
+
   private renderCardsRegion(): TemplateResult {
     const body = activeBodyFor(LIBRARY_CARDS_REGION);
-    if (!body) {
-      return html`<div class="cards">${this.roots.map((r) => this.renderCard(r))}</div>`;
-    }
-    const folders = this.roots.map((r) => {
-      const pathHash = r.pathHash ?? '';
-      // Tempdoc 599 §9.1 — project the card's glyph (`status`) + `metaText` from the one seam, so the
-      // declared FolderCardRenderer and the hand renderCard cannot diverge. `status` carries the
-      // glyph token (indexed/error/pending); `metaText` carries the truthful state line. walkError is
-      // already folded into metaText by the seam, so it is not passed again (no duplicate display).
-      const fs = folderStatus(r, {
-        relativeTime: this.host_.utilities.formatRelativeTime(r.lastIndexedIsoTime ?? ''),
-        // Tempdoc 626 §Recency — the freshness heartbeat: when the index↔disk correspondence was last
-        // confirmed (distinct from lastIndexed, the last write). Same host time-ago util, no new formatter.
-        verifiedRelativeTime: this.host_.utilities.formatRelativeTime(r.lastVerifiedIsoTime ?? ''),
-        provisional: this.provisional,
-        // Tempdoc 813 §4 — the enrichment tier of the row's meta line.
-        enrichmentStages: this.enrichmentStages,
-        enrichmentPending: this.enrichmentPending,
-        enrichmentBlocked: this.enrichmentBlocked,
-        enrichmentBlockedDetail: this.indexProgress.phase === 'blocked' ? this.indexingActivity.detail : null,
-        retryWaiting: this.retryWaiting,
-        indexingPaused: this.indexProgress.pause?.state === 'paused',
-        indexingPauseReason: this.indexProgress.pause?.reason,
-        indexingPauseReasons: this.indexProgress.pause?.reasons,
-        // Tempdoc 914 D3 — keeps the failed chip (and its drill-down) reachable across a retry
-        // re-queue window, when the wire row reports the failures as in-flight instead.
-        lastKnownFailed: this.lastKnownFailed[pathHash],
-      });
-      return {
-        pathHash,
-        // Tempdoc 804 §B9 (F8) — never the raw hash as the row's name (see folderRowLabel).
-        displayPath: folderRowLabel(pathHash, this.resolvedPaths[pathHash]).label,
-        status: !this.indexingActivity.confirmed && fs.glyph === 'indexed' ? 'pending' : fs.glyph,
-        metaText: this.removingHashes.has(pathHash) ? 'Removing folder…' : this.folderActivityText(fs.metaText),
-        removalBusy: this.removingHashes.has(pathHash),
-        walkError: undefined,
-        // Tempdoc 599 §16/B1 — the clickable "N failed" chip's count (the declared renderer emits an
-        // intent the surface handles by opening the failed-files drawer). Named `failed` (the seam's
-        // output field), not `failedCount`, to stay clear of the folder-status-derivation gate's
-        // raw-wire-field scan (only the seam reads `row.failedCount`).
-        failed: fs.failed,
-        // Tempdoc 914 D3 — `failed` is being carried across a retry window, so the chip's
-        // accessible name says "last known" instead of asserting it as this tick's count.
-        failedLastKnown: fs.failedIsLastKnown === true,
-      };
-    });
-    return html`<jf-declared-surface
-      .declaration=${body}
-      .data=${{ folders }}
-      .enabled=${true}
-      @jf-folder-card-remove=${(e: Event) =>
-        void this.handleRemoveRoot((e as CustomEvent<{ pathHash: string }>).detail.pathHash)}
-      @jf-folder-card-show-failed=${(e: Event) =>
-        openFailedJobs((e as CustomEvent<{ pathHash: string }>).detail.pathHash)}
+    const folders = this.roots.map(r => this.projectFolder(r));
+    if (!body) return html`<h3>Folders</h3><div class="cards" role="list">${repeat(folders, f => f.pathHash, f => renderFolderRow(f, {
+      expanded: this.expandedFolders.has(f.pathHash ?? ''), enabled: true,
+      toggle: () => this.toggleFolder(f.pathHash ?? ''),
+      invoke: intent => this.folderIntent(intent, f.pathHash ?? ''),
+    }))}</div>`;
+    return html`<jf-declared-surface .declaration=${body} .data=${{ folders }} .enabled=${true}
+      @jf-folder-card-toggle=${(e: CustomEvent<{ pathHash: string }>) => this.toggleFolder(e.detail.pathHash)}
+      @jf-folder-card-remove=${(e: CustomEvent<{ pathHash: string }>) => this.folderIntent('remove', e.detail.pathHash)}
+      @jf-folder-card-show-failed=${(e: CustomEvent<{ pathHash: string }>) => this.folderIntent('show-failed', e.detail.pathHash)}
+      @jf-folder-card-reveal=${(e: CustomEvent<{ pathHash: string }>) => this.folderIntent('reveal', e.detail.pathHash)}
+      @jf-folder-card-reindex=${(e: CustomEvent<{ pathHash: string }>) => this.folderIntent('reindex', e.detail.pathHash)}
     ></jf-declared-surface>`;
+  }
+
+  private toggleFolder(hash: string): void {
+    if (this.expandedFolders.has(hash)) this.expandedFolders.delete(hash); else this.expandedFolders.add(hash);
+    this.requestUpdate();
   }
 
   /**
@@ -1284,8 +1436,8 @@ export class LibrarySurface extends JfElement {
       const body = await readSettingsObservation((path, init) => this.doFetch(path, init));
       const entries = body.ui?.excludePatterns ?? [];
       this.excludesSavedText = entries.filter((entry) => typeof entry === 'string').join('\n');
-      this.excludesLiterals = entries.filter((entry): entry is ExactPathExclusion => typeof entry !== 'string');
-      this.excludesSavedLiterals = [...this.excludesLiterals];
+      this.excludesSavedLiterals = entries.filter((entry): entry is ExactPathExclusion => typeof entry !== 'string');
+      if (!keepDraft) this.excludesLiterals = [...this.excludesSavedLiterals];
       if (!keepDraft) this.excludesText = this.excludesSavedText;
       this.excludesConflict = false;
       this.excludesError = null;
@@ -1304,6 +1456,44 @@ export class LibrarySurface extends JfElement {
       this.excludesBusy = false;
     }
   }
+
+  private settingsWrites: Promise<unknown> = Promise.resolve();
+
+  private queueSettingsWrite<T>(write: () => Promise<T>): Promise<T> {
+    const pending = this.settingsWrites.then(write);
+    this.settingsWrites = pending.catch(() => {});
+    return pending;
+  }
+
+  private async invokeSettingsWrite(write: (operationKey: string) => Promise<OperationInvocationSuccess>): Promise<void> {
+    const operationKey = createOperationKey();
+    const result = await write(operationKey);
+    const receipt = settingsV2Schema.pick({ witness: true }).safeParse({ witness: result.structuredData?.witness });
+    const witness = receipt.success ? receipt.data.witness : null;
+    // Only this write's direct successor can advance a retained draft. A missing receipt
+    // or an intervening writer leaves its original witness to the normal conflict path.
+    if (witness && this.excludesWitness && !this.excludesAttempt && !this.excludesConflict
+        && witness.acceptedRevision === this.excludesWitness.acceptedRevision + 1
+        && witness.lastCommittedOperationKey === operationKey) this.excludesWitness = witness;
+  }
+
+  private readonly saveSettingsOperation = (write: (operationKey: string) => Promise<OperationInvocationSuccess>): Promise<void> =>
+    this.queueSettingsWrite(() => this.invokeSettingsWrite(write));
+
+  private readonly saveIndexingRulesWithSettings = (write: (operationKey: string) => Promise<OperationInvocationSuccess>, saved: SavedIndexingRules): Promise<void> =>
+    this.queueSettingsWrite(async () => {
+      const before = await readSettingsObservation((path, init) => this.doFetch(path, init));
+      const policy = before.ui?.indexingPause;
+      const schedule = policy?.schedule ?? null;
+      const sameSchedule = schedule === null ? saved.schedule === null : saved.schedule !== null
+        && schedule.enabled === saved.schedule.enabled
+        && schedule.startMinute === saved.schedule.startMinute && schedule.endMinute === saved.schedule.endMinute
+        && JSON.stringify(schedule.days) === JSON.stringify(saved.schedule.days);
+      if (this.excludesAttempt || !sameSchedule || (policy?.pauseOnBattery ?? false) !== saved.pauseOnBattery) {
+        throw new Error('Indexing times changed elsewhere. Review saved indexing rules before saving your draft.');
+      }
+      await this.invokeSettingsWrite(write);
+    });
 
   private async persistExcludes(): Promise<boolean> {
     if (!this.excludesLoaded || !this.excludesWitness) return false;
@@ -1664,7 +1854,7 @@ export class LibrarySurface extends JfElement {
     this.excludesError = null;
     this.excludesNotice = '';
     this.excludesResult = null;
-    try { await this.persistExcludes(); }
+    try { await this.queueSettingsWrite(() => this.persistExcludes()); }
     finally { this.excludesBusy = false; }
   }
 
@@ -1707,126 +1897,6 @@ export class LibrarySurface extends JfElement {
     } finally {
       this.excludesBusy = false;
     }
-  }
-
-  private renderStatusIcon(status: string): TemplateResult {
-    if (status === 'indexed') {
-      return html`<span class="status-icon indexed"
-        >${icon({ name: 'check-circle-2', size: 16 })}</span
-      >`;
-    }
-    if (status === 'error') {
-      return html`<span class="status-icon error"
-        >${icon({ name: 'alert-circle', size: 16 })}</span
-      >`;
-    }
-    if (status === 'unavailable') {
-      // Tempdoc 599 §16/A1 — folder path gone: a muted x-circle (not the red error glyph).
-      return html`<span class="status-icon unavailable"
-        >${icon({ name: 'x-circle', size: 16 })}</span
-      >`;
-    }
-    if (status === 'unverified') {
-      // Tempdoc 626 §Axis-C — indexed but deletions couldn't be verified: a muted caution glyph,
-      // never the green ✓ (the folder is searchable but its delete correspondence is unknown).
-      return html`<span class="status-icon unverified"
-        >${icon({ name: 'alert-triangle', size: 16 })}</span
-      >`;
-    }
-    return html`<span class="status-icon pending"
-      >${icon({ name: 'clock', size: 16 })}</span
-    >`;
-  }
-
-  /**
-   * Tempdoc 599 §16/B1 — the clickable "N failed" chip. Tempdoc 914 D3 / review S2-2: when the count
-   * is being carried across a window with no settled answer, the chip says so ON SCREEN (the shared
-   * `failedChipCopy` text plus the muted-italic treatment) and not only to a screen reader. The
-   * `label` it sets always STARTS with that visible text, which is what WCAG 2.5.3 asks for (see
-   * `failedChipCopy` for why the label cannot simply be dropped here).
-   */
-  private renderFailedChip(pathHash: string, status: FolderStatus): TemplateResult {
-    const lastKnown = status.failedIsLastKnown === true;
-    const copy = failedChipCopy(status.failed, lastKnown);
-    return html`<jf-button
-      class="failed-chip"
-      data-last-known=${lastKnown ? 'true' : 'false'}
-      variant="ghost"
-      size="sm"
-      label=${copy.label}
-      title=${copy.title || nothing}
-      .disabled=${this.removingHashes.has(pathHash)}
-      .onActivate=${() => { if (!this.removingHashes.has(pathHash)) openFailedJobs(pathHash); }}
-      >${icon({ name: 'alert-circle', size: 12 })} ${copy.text}</jf-button
-    >`;
-  }
-
-  private renderCard(root: IndexedRootView): TemplateResult {
-    const pathHash = root.pathHash ?? '';
-    // Tempdoc 804 §B9 (F8) — the row's NAME is its folder name (full path on hover), or an honest
-    // "path unavailable"; never the raw hash beside a Remove button.
-    const { label: displayPath, title: displayTitle } = folderRowLabel(
-      pathHash,
-      this.resolvedPaths[pathHash],
-    );
-    // Tempdoc 599 §9.1 — glyph + meta line project from the single folderStatus seam, so the row
-    // reports a truthful state (✓ only on job drain) and a live "Indexing · N remaining" count-down.
-    const status = folderStatus(root, {
-      relativeTime: this.host_.utilities.formatRelativeTime(root.lastIndexedIsoTime ?? ''),
-      // Tempdoc 626 §Recency — the freshness heartbeat (last index↔disk confirmation), distinct from
-      // lastIndexed (last write). Same host time-ago util.
-      verifiedRelativeTime: this.host_.utilities.formatRelativeTime(root.lastVerifiedIsoTime ?? ''),
-      provisional: this.provisional,
-      // Tempdoc 813 §4 — the enrichment tier of the row's meta line.
-      enrichmentStages: this.enrichmentStages,
-      enrichmentPending: this.enrichmentPending,
-      enrichmentBlocked: this.enrichmentBlocked,
-        enrichmentBlockedDetail: this.indexProgress.phase === 'blocked' ? this.indexingActivity.detail : null,
-        retryWaiting: this.retryWaiting,
-        indexingPaused: this.indexProgress.pause?.state === 'paused',
-        indexingPauseReason: this.indexProgress.pause?.reason,
-        indexingPauseReasons: this.indexProgress.pause?.reasons,
-      // Tempdoc 914 D3 — see the declared-renderer projection above: same memory, same reason.
-      lastKnownFailed: this.lastKnownFailed[pathHash],
-    });
-    return html`
-      <div class="card" aria-busy=${this.removingHashes.has(pathHash) ? 'true' : 'false'}>
-        <span class="card-icon">${icon({ name: 'folder', size: 24 })}</span>
-        <div class="card-info">
-          <div class="card-path">
-            ${this.renderStatusIcon(!this.indexingActivity.confirmed && status.glyph === 'indexed' ? 'pending' : status.glyph)}<span
-              class="folder-name"
-              title=${displayTitle}
-              data-testid="library-folder-name"
-              >${displayPath}</span
-            >
-          </div>
-          <div class="card-meta">
-            ${this.removingHashes.has(pathHash) ? 'Removing folder…' : this.folderActivityText(status.metaText)}${status.failed > 0
-              ? this.renderFailedChip(pathHash, status)
-              : nothing}${status.state === 'unverified'
-              ? html`<jf-button
-                  class="reindex-chip"
-                  variant="ghost"
-                  size="sm"
-                  label="Reindex to verify"
-                  .disabled=${this.removingHashes.has(pathHash)}
-                  .onActivate=${() => this.handleReindexToVerify()}
-                  >${icon({ name: 'refresh-cw', size: 12 })} Reindex</jf-button
-                >`
-              : nothing}
-          </div>
-        </div>
-        <jf-button
-          variant="danger"
-          label=${this.removingHashes.has(pathHash) ? 'Removing…' : 'Remove'}
-          .disabled=${this.removingHashes.has(pathHash)}
-          .onActivate=${() => this.handleRemoveRoot(pathHash)}
-        >
-          ${icon({ name: 'trash-2', size: 14 })} ${this.removingHashes.has(pathHash) ? 'Removing…' : 'Remove'}
-        </jf-button>
-      </div>
-    `;
   }
 
   /**
@@ -1884,7 +1954,7 @@ export class LibrarySurface extends JfElement {
   private renderOtherSourceCard(source: OtherSource): TemplateResult {
     const noun = source.docCount === 1 ? 'document' : 'documents';
     return html`
-      <div class="card">
+      <div class="other-source-card">
         <span class="card-icon">${icon({ name: 'hard-drive', size: 24 })}</span>
         <div class="card-info">
           <div class="card-path">
@@ -1903,14 +1973,107 @@ export class LibrarySurface extends JfElement {
     `;
   }
 
+  private attentionItems(): { key: string; title: string; detail?: string; actions?: TemplateResult }[] {
+    const items: { key: string; title: string; detail?: string; actions?: TemplateResult }[] = [];
+    for (const root of this.roots) {
+      const hash = root.pathHash ?? '';
+      const name = folderRowLabel(hash, this.resolvedPaths[hash]).label;
+      const status = this.rowStatus(root);
+      if (status.state === 'unavailable') items.push({ key: `missing:${hash}`, title: `${name} can't be found`,
+        detail: 'Reconnect the drive or remove it. Last-known indexed content may still be searchable; reindex cannot cover this folder while it is offline.',
+        actions: html`<jf-operation context="button" operation-id="core.reconcile-root" .args=${{ pathHash: hash }} api-base=${this.apiBase}
+          @op-success=${() => void this.refresh({ force: true })}></jf-operation>
+          <jf-button variant="ghost" label="Remove from library" .disabled=${this.removingHashes.has(hash)}
+            .onActivate=${() => this.handleRemoveRoot(hash)}>Remove from library</jf-button>` });
+      else if (root.walkError) items.push({ key: `walk:${hash}`, title: `${name} needs attention`, detail: root.walkError,
+        actions: html`<jf-button variant="ghost" .disabled=${this.removingHashes.has(hash)}
+          .onActivate=${() => root.walkError?.startsWith('Removal incomplete.') ? this.handleRemoveRoot(hash) : this.handleReindexToVerify()}
+          >${root.walkError.startsWith('Removal incomplete.') ? 'Retry removal' : 'Reindex'}</jf-button>` });
+      if (status.failed > 0) items.push({ key: `files:${hash}`, title: `${status.failed} ${status.failed === 1 ? 'file needs' : 'files need'} review · ${name}${status.failedIsLastKnown ? ' · last known' : ''}`,
+        detail: 'Review the named files and their reasons, including unreadable sources, exhausted retries and extraction failures.',
+        actions: html`<jf-failed-jobs-drawer inline .folderPathHash=${hash} .observedCount=${status.failed}
+          .lastKnown=${status.failedIsLastKnown === true} .host_=${this.host_} api-base=${this.apiBase}></jf-failed-jobs-drawer>
+          <jf-button variant="ghost" .onActivate=${() => openFailedJobs(hash)}>Open failed-files list</jf-button>` });
+      if (status.state === 'unverified') items.push({ key: `deletions:${hash}`, title: `${name}: deletions not verified`,
+        detail: 'Some stale entries may remain searchable.', actions: html`<jf-button variant="ghost" label="Reindex to verify"
+          .disabled=${this.removingHashes.has(hash)} .onActivate=${() => this.handleReindexToVerify()}>Reindex to verify</jf-button>` });
+    }
+    const hold = this.indexingActivity.confirmed ? this.indexProgress : this.lastKnownHold;
+    if (hold?.pause) items.push({ key: 'hold', title: hold.activity.summary,
+      detail: hold.activity.detail ?? undefined,
+      actions: html`<jf-indexing-controls compact .progress=${this.indexingActivity.confirmed ? hold
+        : { ...hold, live: this.indexProgress.live, activity: { ...hold.activity, confirmed: false } }} api-base=${this.apiBase}
+        .saveWithSettings=${this.saveSettingsOperation}></jf-indexing-controls>` });
+    if (this.reindexCancelKey && !['complete', 'failed', 'unknown', 'expired'].includes(this.bulkOutcome?.state ?? '')) items.push({ key: 'rebuild', title: 'Rebuild in progress' });
+    for (const item of this.unfinishedForgets?.items ?? []) items.push({ key: `forget:${item.operationKey}`, title: 'Unfinished removal' });
+    if (this.bulkOutcome && ['failed', 'unknown', 'expired'].includes(this.bulkOutcome.state)) items.push({ key: 'bulk', title: 'Rebuild outcome needs checking',
+      detail: this.bulkOutcome.message ?? undefined, actions: html`<jf-button variant="ghost" .onActivate=${() => this.bulkOutcomeKey ? this.loadGapDecision(this.bulkOutcomeKey) : undefined}>Check outcome</jf-button>` });
+    // An unconfirmed poll cannot clear an observed problem. Replace the retained
+    // causes only when the shared progress authority confirms an observation.
+    if (this.indexingActivity.confirmed) {
+      this.lastKnownAttention = new Map(items.map(item => [item.key, item]));
+      return items;
+    }
+    for (const item of items) this.lastKnownAttention.set(item.key, item);
+    return [...this.lastKnownAttention.values()].map(item => ({ ...item,
+      title: item.title.includes('last known') ? item.title : `${item.title} · last known`,
+    }));
+  }
+
+  private renderAttention(): TemplateResult {
+    return html`<div class="attention">
+      ${repeat(this.attentionItems().filter(item => item.key !== 'rebuild' && !item.key.startsWith('forget:')), item => item.key, item => html`
+        <section class="attention-item" aria-label=${item.title}>
+          <div class="attention-title"><span>${icon({ name: 'alert-triangle', size: 16 })}</span>${item.title}</div>
+          ${item.detail ? html`<p role=${item.key === 'bulk' ? 'alert' : nothing}>${item.detail}</p>` : nothing}
+          <div class="attention-actions">${item.actions ?? nothing}</div>
+        </section>`)}
+      ${this.renderReindexDecision()}
+      ${(this.unfinishedForgets?.items.length ?? 0) > 0 ? this.renderUnfinishedForgets() : nothing}
+    </div>`;
+  }
+
+  private get activitySentence(): string {
+    const activity = this.indexingActivity;
+    if (!activity.confirmed) return this.indexProgress.live && this.attentionItems().length ? 'Indexing status unconfirmed — details last known' : '';
+    // The detail already names this wait and its cause; announce it once.
+    if (['Meaning processing is waiting to save energy', 'Meaning processing is waiting for the GPU'].includes(activity.summary)
+      && activity.detail) return activity.detail;
+    return [activity.summary, activity.detail].filter(Boolean).join(' — ');
+  }
+
+  async focusIndexingRule(control: 'hours' | 'battery'): Promise<void> {
+    const serial = ++this.indexingFocusSerial;
+    this.activeTab = 'folders';
+    this.pendingIndexingFocus = control;
+    await this.updateComplete;
+    if (this.loading || !this.isConnected || serial !== this.indexingFocusSerial) return;
+    this.pendingIndexingFocus = undefined;
+    const editor = this.shadowRoot?.querySelector<IndexingRulesEditor>('jf-indexing-rules-editor');
+    await editor?.focusIndexingRule(control);
+  }
+
   private renderHeader(): TemplateResult {
-    return html`
-      <div class="header">
-        <div class="header-left">
-          <h2>Library</h2>
-          <p class="subtitle">Manage your indexed folders</p>
-        </div>
-        <div class="actions">
+    const count = this.attentionItems().length;
+    const headline = this.loading ? 'Loading your Library…'
+      : !this.indexProgress.live || this.contactUnconfirmed ? 'Indexing status unconfirmed'
+        : count ? `${count} ${count === 1 ? 'thing needs' : 'things need'} your attention`
+          : this.provisional ? this.provisionalHeadline
+            : !this.indexingActivity.confirmed ? this.indexingActivity.summary
+              : !this.roots.length ? 'Add a folder to start searching'
+                : !this.defaultScopeDocuments.known ? 'Checking your folders'
+                  : this.defaultScopeDocuments.value === 0 ? 'Indexing your files' : 'Your files are searchable';
+    return html`<div class="header"><div class="header-left"><h2>${headline}</h2>
+      <p class="subtitle">${this.defaultScopeDocuments.known ? `${this.defaultScopeDocuments.value.toLocaleString()} searchable documents` : 'Searchable document count unconfirmed'}
+        · ${this.roots.length} ${this.roots.length === 1 ? 'folder' : 'folders'}${this.activitySentence ? ` · ${this.activitySentence}` : ''}</p>
+    </div></div>`;
+  }
+
+  private renderWindowActions(): TemplateResult {
+    return html`        <div slot="actions" class="window-actions">
+          <jf-indexing-controls data-testid="library-indexing-pause" compact toolbar allow-pause .progress=${this.indexProgress} api-base=${this.apiBase}
+            .saveWithSettings=${this.saveSettingsOperation}></jf-indexing-controls>
+          <details class="more-actions"><summary aria-label="More Library actions">${icon({ name: 'more-horizontal', size: 18 })}</summary><div>
           <!-- Tempdoc 511 Phase 9: <jf-operation> aggregate component
                supersedes the slice 509 <jf-op-button>. LibrarySurface
                is user-tier; core.reindex's wire audience=USER passes
@@ -1930,18 +2093,17 @@ export class LibrarySurface extends JfElement {
             operation-id="core.trigger-offline-processing"
             api-base=${this.apiBase}
           ></jf-operation>
+          </div></details>
           <jf-button
             variant="primary"
             data-add-folder
-            label="Add Folder"
+            label="Add folder"
             .disabled=${this.addBusy}
             .onActivate=${() => this.handleAddFolderClick()}
           >
-            ${icon({ name: 'folder-plus', size: 14 })} Add Folder
+            ${icon({ name: 'folder-plus', size: 14 })} Add folder
           </jf-button>
-        </div>
-      </div>
-    `;
+        </div>`;
   }
 
   override render(): TemplateResult {
@@ -1970,6 +2132,7 @@ export class LibrarySurface extends JfElement {
         .items=${items}
         @tab-change=${(e: CustomEvent<{ id: string }>) => (this.activeTab = e.detail.id)}
       >
+        ${this.renderWindowActions()}
         <div slot="tab-folders" class="folders-scroll">${this.renderFolders()}</div>
       </jf-surface-tabs>
     `;
@@ -2003,13 +2166,7 @@ export class LibrarySurface extends JfElement {
   private renderFolders(): TemplateResult {
     return html`
       ${this.renderHeader()}
-      <div data-testid="library-indexing-pause">
-        ${this.indexProgress.pause || !this.indexProgress.activity.confirmed ? html`<p>${this.indexingActivity.summary} — ${this.indexingActivity.detail}</p>` : nothing}
-        <jf-indexing-controls .progress=${this.indexProgress} api-base=${this.apiBase}></jf-indexing-controls>
-      </div>
-      ${this.renderReindexDecision()}
-      ${this.bulkOutcome?.state === 'failed' && this.bulkOutcome.message ? html`
-        <div class="action-message" role="alert">${this.bulkOutcome.message}</div>` : nothing}
+      ${this.renderAttention()}
       <div class="action-message" role="status" aria-live="polite">${this.actionMessage ?? ''}</div>
       ${this.reindexOutcome ? html`<div class="action-message" role=${this.reindexOutcomeError ? 'alert' : 'status'}>
         ${this.reindexOutcome}
@@ -2017,9 +2174,8 @@ export class LibrarySurface extends JfElement {
           .onActivate=${() => this.checkReindexOutcome()}>Check reindex outcome</jf-button>` : nothing}
         <p>${this.indexingActivity.summary}${this.indexingActivity.detail ? ` — ${this.indexingActivity.detail}` : ''}</p>
       </div>` : nothing}
-      ${this.renderUnfinishedForgets()}
-      ${this.roots.some(root => root.status === 'unavailable')
-        ? html`<p>Some watched folders were last observed offline. Reindex cannot cover their files until they are available.</p>` : nothing}
+
+
       ${!this.isTauri
         ? html`<div class="browser-banner">
             ${icon({ name: 'alert-circle', size: 14 })}
@@ -2093,28 +2249,27 @@ export class LibrarySurface extends JfElement {
       ${this.loading
         ? html`<div class="empty">Loading…</div>`
         : this.roots.length === 0
-          ? !this.indexingActivity.confirmed
-            ? html`<div class="empty">${this.indexingActivity.summary}</div>`
-            : this.provisional
+          ? this.contactUnconfirmed || !this.indexProgress.live
+            ? html`<div class="empty">Indexing status unconfirmed. Folder details are last known; current status is unconfirmed.</div>`
+            : this.provisional && !this.rebuilding
+            ? html`<div class="empty">${this.provisionalHeadline} ${!this.indexingActivity.confirmed ? `${this.indexingActivity.summary}. ` : ''}Folder details are unconfirmed.</div>`
+            : !this.indexingActivity.confirmed
+            ? html`<div class="empty">${this.indexingActivity.summary}. Folder details are last known; current status is unconfirmed.</div>`
+            : this.rebuilding
             ? html`<div class="empty">
                 Rebuilding index… your watched folders will reappear when it finishes.
               </div>`
-            : html`<div class="empty">
-              No watched folders. Click "Add Folder" to add one.
-            </div>`
+            : html`<p class="subtitle">Add a folder to make its files searchable.</p>`
           : this.renderCardsRegion()}
 
-      ${this.renderOtherSources()}
 
-      ${this.activeTab === 'folders'
-        ? html`<jf-ingestion-summary .host_=${this.host_}></jf-ingestion-summary>`
-        : nothing}
-
+      <div class="library-rules">
       <section class="excludes-section" aria-label="Exclude patterns">
         <div class="excludes-header">
           <div>
-            <h3>Exclude patterns</h3>
-            <p>
+            <h3>Skip these files</h3>
+            <p>One rule per line. Save to skip future matches.</p>
+            <details class="rules-help"><summary>How rules work</summary><p>
               One glob per line. Bare names like <code>node_modules</code> or
               <code>dist/</code> match at any depth.
               <code>[ab]</code> matches one listed character; <code>[a-z]</code> matches a range;
@@ -2122,41 +2277,28 @@ export class LibrarySurface extends JfElement {
               <code>{draft,final}</code> matches either alternative.
               These meanings also apply to patterns saved by earlier versions.
             </p>
-            ${isOverride(this.excludesPolicy) && this.excludesPolicy ? html`<div id="excludes-override" data-testid="excludes-override" role="note" tabindex="0"
-              aria-label=${`Exclusion override: ${policySource(this.excludesPolicy)}. Effective patterns: ${this.excludesPolicy.patterns.join(', ') || '(none)'}. Save edits the saved list; it has no effect until the override is removed.`}>
-              <p>Exclusion override: ${policySource(this.excludesPolicy)} controls future indexing, Preview and Apply.
-                Save edits the saved list, which has no effect until the override is removed.</p>
-              <p>Effective patterns:</p><pre>${this.excludesPolicy.patterns.join('\n') || '(none)'}</pre>
-            </div>` : nothing}
             ${this.excludesLoaded && !this.excludesBusy && !this.excludesPolicy ? html`<p role="alert">Effective exclusion policy is unavailable. Reload saved patterns before Preview or Apply.</p>` : nothing}
             <p id="excludes-help">${isOverride(this.excludesPolicy) ? html`Preview counts matches on disk using the effective patterns above and removes nothing.
               Apply uses those patterns to remove matches from search. During an index rebuild, removal may wait until the rebuild finishes.
               Missing or offline files cannot be checked.` : html`Save changes what future indexing skips; it does not remove existing search results.
               Preview counts matches on disk using the saved list and removes nothing.
               Apply uses the saved list to remove matches from search. During an index rebuild, removal may wait until the rebuild finishes.
-              Missing or offline files cannot be checked.`}</p>
+              Missing or offline files cannot be checked.`}</p></details>
           </div>
-          <div class="actions">
-            <jf-button label="Save patterns" .disabled=${!this.excludesLoaded || this.excludesBusy || (!this.excludesAttempt && !this.excludesDirty)}
-              .onActivate=${() => void this.handleSaveExcludes()}>Save patterns</jf-button>
-            <jf-button label="Reload saved patterns" .disabled=${this.excludesBusy || this.excludesAttempt !== null}
-              .onActivate=${() => void this.loadExcludes()}>Reload saved patterns</jf-button>
-            <jf-button label="Preview" .disabled=${!this.excludesLoaded || !this.excludesPolicy || this.excludesBusy || this.excludesAttempt !== null || this.excludesDirty}
-              .onActivate=${() => void this.handlePreviewExcludes()}
-              >Preview</jf-button
-            >
-            <jf-button label="Apply" .disabled=${!this.excludesLoaded || !this.excludesPolicy || this.excludesBusy || this.excludesAttempt !== null || this.excludesDirty}
-              .onActivate=${() => void this.handleApplyExcludes()}
-              >Apply</jf-button
-            >
-          </div>
+
         </div>
+            ${isOverride(this.excludesPolicy) && this.excludesPolicy ? html`<div id="excludes-override" data-testid="excludes-override" role="note" tabindex="0"
+              aria-label=${`Exclusion override: ${policySource(this.excludesPolicy)}. Effective patterns: ${this.excludesPolicy.patterns.join(', ') || '(none)'}. Save edits the saved list; it has no effect until the override is removed.`}>
+              <p>Exclusion override: ${policySource(this.excludesPolicy)} controls future indexing, Preview and Apply.
+                Save edits the saved list, which has no effect until the override is removed.</p>
+              <p>Effective patterns:</p><pre>${this.excludesPolicy.patterns.join('\n') || '(none)'}</pre>
+            </div>` : nothing}
         ${this.excludesAttempt && !this.excludesBusy
           ? html`<p>Save completion is unknown. Retry Save patterns to check the same save. Your draft is retained.</p>` : nothing}
-        ${this.excludesConflict ? html`<jf-button label="Review latest settings, keep draft" .disabled=${this.excludesBusy}
+        ${this.excludesConflict ? html`<jf-button variant="ghost" label="Review latest settings, keep draft" .disabled=${this.excludesBusy}
           .onActivate=${() => void this.loadExcludes(true)}>Review latest settings, keep draft</jf-button>` : nothing}
         ${this.excludesLoaded && this.excludesDirty ? html`<p>Unsaved draft. Save before Preview or Apply.</p>
-          <details><summary>Current saved patterns</summary><pre>${this.excludesSavedText || '(none)'}</pre></details>` : nothing}
+          <details class="saved-patterns"><summary>Current saved patterns</summary><pre>${this.excludesSavedText || '(none)'}</pre></details>` : nothing}
         ${this.excludesInvalidPatterns.length > 0
           ? html`<div role="status"><ul>${this.excludesInvalidPatterns.map((pattern) => html`<li>“${pattern}” has invalid pattern syntax and is matched as a literal name. Correct or remove it.</li>`)}</ul></div>`
           : nothing}
@@ -2165,27 +2307,63 @@ export class LibrarySurface extends JfElement {
           <p>These paths are kept out of future indexing. Removing an entry permits a later indexing pass; it does not add a watched folder or index anything automatically. Save patterns to apply your edits.</p>
           <ul>${this.excludesLiterals.map((entry) => html`<li>
             <span>${entry.literal.scope === 'FOLDER' ? 'Folder' : 'File'}: </span><code style="white-space:pre-wrap;overflow-wrap:anywhere">${describeExactPath(entry.literal.path)}</code>
-            <jf-button label=${`Remove keep-out for ${describeExactPath(entry.literal.path)}`}
+            <jf-button variant="ghost" label=${`Remove keep-out for ${describeExactPath(entry.literal.path)}`}
               .disabled=${this.excludesBusy || this.excludesAttempt !== null}
               .onActivate=${() => { this.excludesLiterals = this.excludesLiterals.filter((current) => current.literal.id !== entry.literal.id); }}>Remove keep-out</jf-button>
           </li>`)}</ul>
         </section>` : nothing}
-        <textarea
-          aria-label="Exclude patterns"
-          aria-busy=${this.excludesBusy}
-          aria-describedby=${`excludes-help${isOverride(this.excludesPolicy) ? ' excludes-override' : ''}${this.excludesError ? ' excludes-error' : ''}`}
-          aria-invalid=${this.excludesError ? 'true' : 'false'}
-          ?disabled=${!this.excludesLoaded || this.excludesBusy || this.excludesAttempt !== null}
-          .value=${this.excludesText}
-          @input=${(e: Event) =>
-            (this.excludesText = (e.target as HTMLTextAreaElement).value)}
-          placeholder="**/node_modules/**"
-        ></textarea>
+        <div class="skip-rules" role="group" aria-label="Exclude patterns">
+          ${this.excludesText.split('\n').map((rule, index) => html`<div class="skip-rule">
+            <input type="text" aria-label=${`Skip rule ${index + 1}`}
+              aria-busy=${this.excludesBusy}
+              aria-describedby=${`excludes-help${isOverride(this.excludesPolicy) ? ' excludes-override' : ''}${this.excludesError ? ' excludes-error' : ''}`}
+              aria-invalid=${this.excludesError ? 'true' : 'false'}
+              ?disabled=${!this.excludesLoaded || this.excludesBusy || this.excludesAttempt !== null}
+              .value=${rule} @input=${(event: Event) => {
+                const rules = this.excludesText.split('\n'); rules[index] = (event.target as HTMLInputElement).value;
+                this.excludesText = rules.join('\n');
+              }}>
+            <jf-button variant="ghost" label=${`Remove skip rule ${index + 1}`}
+              .disabled=${!this.excludesLoaded || this.excludesBusy || this.excludesAttempt !== null}
+              .onActivate=${() => { this.excludesText = this.excludesText.split('\n').filter((_, i) => i !== index).join('\n'); }}
+              >${icon({ name: 'x', size: 14 })}</jf-button>
+          </div>`)}
+          <jf-button class="add-rule" variant="ghost" label="Add a rule"
+            .disabled=${!this.excludesLoaded || this.excludesBusy || this.excludesAttempt !== null}
+            .onActivate=${async () => {
+              this.excludesText += '\n'; await this.updateComplete;
+              this.shadowRoot?.querySelector<HTMLInputElement>('.skip-rule:last-of-type input')?.focus();
+            }}><span aria-hidden="true">+</span> Add a rule</jf-button>
+        </div>
+          <div class="actions">
+            <jf-button variant="ghost" label="Save patterns" .disabled=${!this.excludesLoaded || this.excludesBusy || (!this.excludesAttempt && !this.excludesDirty)}
+              .onActivate=${() => void this.handleSaveExcludes()}>Save patterns</jf-button>
+            <jf-button variant="ghost" label="Reload saved patterns" .disabled=${this.excludesBusy || this.excludesAttempt !== null}
+              .onActivate=${() => void this.loadExcludes()}>Reload saved patterns</jf-button>
+            <jf-button variant="ghost" label="Preview" .disabled=${!this.excludesLoaded || !this.excludesPolicy || this.excludesBusy || this.excludesAttempt !== null || this.excludesDirty}
+              .onActivate=${() => void this.handlePreviewExcludes()}
+              >Preview</jf-button
+            >
+            <jf-button variant="ghost" label="Apply" .disabled=${!this.excludesLoaded || !this.excludesPolicy || this.excludesBusy || this.excludesAttempt !== null || this.excludesDirty}
+              .onActivate=${() => void this.handleApplyExcludes()}
+              >Apply</jf-button
+            >
+          </div>
         ${this.excludesError ? html`<p id="excludes-error" role="alert">${this.excludesError}</p>` : nothing}
         <div role="status" aria-live="polite" aria-atomic="true" data-testid="excludes-result">
           ${this.excludesBusy ? 'Working on exclusions…' : this.excludesResult ? this.renderExcludesResult(this.excludesResult) : this.excludesNotice}
         </div>
       </section>
+      <jf-indexing-rules-editor api-base=${this.apiBase} .host_=${this.host_}
+        .saveWithSettings=${this.saveIndexingRulesWithSettings}></jf-indexing-rules-editor>
+      </div>
+      ${!(this.unfinishedForgets?.items.length ?? 0) ? html`<details class="removal-history"><summary>${this.forgetReadStatus === 'unavailable' ? 'Removal history unavailable — check again' : 'Removal history'}</summary>${this.renderUnfinishedForgets()}</details>` : nothing}
+      <div class="bottom-links">
+        ${this.otherSources.sources.length || this.otherSources.truncated ? html`<details><summary>
+          Added by other apps · ${this.otherSources.sources.reduce((sum, source) => sum + source.docCount, 0).toLocaleString()} documents${this.otherSources.truncated ? ' · incomplete list' : ''}
+        </summary>${this.renderOtherSources()}</details>` : nothing}
+        ${this.activeTab === 'folders' ? html`<jf-ingestion-summary compact .host_=${this.host_}></jf-ingestion-summary>` : nothing}
+      </div>
     `;
   }
 
@@ -2207,22 +2385,21 @@ export class LibrarySurface extends JfElement {
     const waitingForGaps = this.observedGapKey === this.reindexCancelKey;
     const confirmed = this.indexingActivity.confirmed;
     return html`<section class="gap-decision" aria-label=${waitingForGaps ? 'Migration gaps' : 'Rebuild control'}>
-      <h3>${!confirmed ? this.indexingActivity.summary
-        : waitingForGaps ? 'New index — activation requires your decision' : 'New index is being built'}</h3>
+      <h3>${!confirmed ? 'Indexing status unconfirmed — rebuild details last observed' : waitingForGaps && decision ? `The new index is ready, but ${decision.gaps.length} document${decision.gaps.length === 1 ? '' : 's'} couldn't be included`
+        : waitingForGaps ? 'The new index needs your decision' : 'New index is being built'}</h3>
       ${!confirmed ? html`<p>Rebuild details are last observed; current progress and index availability are unconfirmed.</p>` : nothing}
       ${waitingForGaps && decision ? html`
-        <p>${decision.gaps.length} document${decision.gaps.length === 1 ? '' : 's'} could not be
-          included in the new index.${confirmed ? ' Your current index stays available until you accept this list.' : nothing}</p>
-        <ul>${decision.gaps.map((gap) => html`<li>${gap.unitId}: ${gap.reason}</li>`)}</ul>
+        ${confirmed ? html`<p>Your current index stays available; activation requires your decision to accept this list.</p>` : nothing}
+        <ul>${decision.gaps.map((gap) => html`<li title=${gap.reason}>${gap.unitId}: ${rebuildGapReason(gap.reason)}</li>`)}</ul>
       ` : !confirmed ? nothing : waitingForGaps ? html`<p>Reading the migration gap list…</p>`
         : html`<p>Your current index stays available during the rebuild.</p>`}
       <div class="actions">
         ${waitingForGaps && decision ? html`
-        <jf-button label="Accept gaps and activate" variant="primary"
+        <jf-button label="Use the new index without them" variant="ghost"
           .disabled=${this.gapDecisionBusy || this.reindexCancelBusy || this.reindexCancelRecorded}
-          .onActivate=${() => void this.acceptCurrentGaps()}>Accept gaps and activate</jf-button>
+          .onActivate=${() => void this.acceptCurrentGaps()}>Use the new index without them</jf-button>
         ` : nothing}
-        <jf-button label="Cancel rebuild" variant="danger"
+        <jf-button label="Cancel rebuild" variant="ghost"
           .disabled=${this.reindexCancelBusy || this.reindexCancelRecorded || this.gapDecisionBusy}
           .onActivate=${() => void this.cancelCurrentReindex()}>Cancel rebuild</jf-button>
       </div>

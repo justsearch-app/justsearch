@@ -1,0 +1,207 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
+  },
+  "createdAt": "2026-11-01T21:48:28.969Z",
+  "revision": "7c124c7c228707305855589b4e151c97cabb277a",
+  "tree": "159f5cbf374cc872af81f4f289e3ca05963181d3",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/LibrarySurface.slice2.test.ts\" \"src/shell-v0/components/indexingStatusSurfaces.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/5iqrcnfb/tmp/test-intent-vitest-177-1793569696356.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 5466
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/views/LibrarySurface.slice2.test.ts#B own Pause then Resume then time save, and time save then Pause then skip save, chain committed witnesses",
+      "file": "modules/ui-web/src/shell-v0/views/LibrarySurface.slice2.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:c90a590026743bd771752df9144a3cb2e307161f61a9e70fc19f6d3886aa2f99",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "B own Pause then Resume then time save, and time save then Pause then skip save, chain committed witnesses",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/LibrarySurface.slice2.test.ts#B unrelated external write conflicts with skip rules, keeps the draft until explicit review, and permits the baseline absolute time save",
+      "file": "modules/ui-web/src/shell-v0/views/LibrarySurface.slice2.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:c90a590026743bd771752df9144a3cb2e307161f61a9e70fc19f6d3886aa2f99",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "B unrelated external write conflicts with skip rules, keeps the draft until explicit review, and permits the baseline absolute time save",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/LibrarySurface.slice2.test.ts#B missing operation witness never refreshes a skip-rule draft",
+      "file": "modules/ui-web/src/shell-v0/views/LibrarySurface.slice2.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:c90a590026743bd771752df9144a3cb2e307161f61a9e70fc19f6d3886aa2f99",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "B missing operation witness never refreshes a skip-rule draft",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/LibrarySurface.slice2.test.ts#B gap operation witness never refreshes a skip-rule draft",
+      "file": "modules/ui-web/src/shell-v0/views/LibrarySurface.slice2.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:c90a590026743bd771752df9144a3cb2e307161f61a9e70fc19f6d3886aa2f99",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "B gap operation witness never refreshes a skip-rule draft",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/LibrarySurface.slice2.test.ts#B wrong key operation witness never refreshes a skip-rule draft",
+      "file": "modules/ui-web/src/shell-v0/views/LibrarySurface.slice2.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:c90a590026743bd771752df9144a3cb2e307161f61a9e70fc19f6d3886aa2f99",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "B wrong key operation witness never refreshes a skip-rule draft",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/indexingStatusSurfaces.test.ts#C distinct energy_saver summary reaches the status chip",
+      "file": "modules/ui-web/src/shell-v0/components/indexingStatusSurfaces.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:d4c3e3fcc282ecfc4b4c8256609cc66af14d294d57e9d98794c1069e1a556e3c",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "C distinct energy_saver summary reaches the status chip",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/indexingStatusSurfaces.test.ts#C distinct game_mode summary reaches the status chip",
+      "file": "modules/ui-web/src/shell-v0/components/indexingStatusSurfaces.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:d4c3e3fcc282ecfc4b4c8256609cc66af14d294d57e9d98794c1069e1a556e3c",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "C distinct game_mode summary reaches the status chip",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/indexingStatusSurfaces.test.ts#C distinct gpu_busy_external summary reaches the status chip",
+      "file": "modules/ui-web/src/shell-v0/components/indexingStatusSurfaces.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:d4c3e3fcc282ecfc4b4c8256609cc66af14d294d57e9d98794c1069e1a556e3c",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "C distinct gpu_busy_external summary reaches the status chip",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "d19aa236c7",
+    "revision": "d19aa236c7fc9359cae03201eb6a1d7d21b53c01",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/LibrarySurface.slice2.test.ts\" \"src/shell-v0/components/indexingStatusSurfaces.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/5iqrcnfb/tmp/test-intent-vitest-177-1793569704403.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 3986,
+        "output": "JSON report written to /home/elias/.cache/am/5iqrcnfb/tmp/test-intent-vitest-177-1793569704403.json\n\n"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui-web/src/shell-v0/views/LibrarySurface.slice2.test.ts#B own Pause then Resume then time save, and time save then Pause then skip save, chain committed witnesses",
+        "classification": "assertion",
+        "detail": "B own Pause then Resume then time save, and time save then Pause then skip save, chain committed witnesses:  AssertionError: expected 'Could not save indexing rules. Settin…' to be '' // Object.is equality\n    at /home/elias/.cache/am/5iqrcnfb/tmp/test-intent-before-Xa5AA3/modules/ui-web/src/shell-v0/views/LibrarySurface.slice2.test.ts:249:60\n    at file:///home/elias/.cache/am/5iqrcnfb/tmp/test-intent-bef"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/LibrarySurface.slice2.test.ts#B unrelated external write conflicts with skip rules, keeps the draft until explicit review, and permits the baseline absolute time save",
+        "classification": "assertion",
+        "detail": "B unrelated external write conflicts with skip rules, keeps the draft until explicit review, and permits the baseline absolute time save:  AssertionError: expected 'Could not save indexing rules. Settin…' to be '' // Object.is equality\n    at /home/elias/.cache/am/5iqrcnfb/tmp/test-intent-before-Xa5AA3/modules/ui-web/src/shell-v0/views/LibrarySurface.slice2.test.ts:267:60\n    at file:///home/elias/.cache/am/5iqrcnfb/tmp/test-intent-bef"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/LibrarySurface.slice2.test.ts#B missing operation witness never refreshes a skip-rule draft",
+        "classification": "assertion",
+        "detail": "B missing operation witness never refreshes a skip-rule draft:  AssertionError: the given combination of arguments (undefined and string) is invalid for this assertion. You can use an array, a map, an object, a set, a string, or a weakset instead of a string\n    at Proxy.<anonymous> (file:///home/elias/.cache/am/5iqrcnfb/tmp/test-intent-before-Xa5AA3/modules/ui-"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/LibrarySurface.slice2.test.ts#B gap operation witness never refreshes a skip-rule draft",
+        "classification": "assertion",
+        "detail": "B gap operation witness never refreshes a skip-rule draft:  AssertionError: the given combination of arguments (undefined and string) is invalid for this assertion. You can use an array, a map, an object, a set, a string, or a weakset instead of a string\n    at Proxy.<anonymous> (file:///home/elias/.cache/am/5iqrcnfb/tmp/test-intent-before-Xa5AA3/modules/ui-"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/LibrarySurface.slice2.test.ts#B wrong key operation witness never refreshes a skip-rule draft",
+        "classification": "assertion",
+        "detail": "B wrong key operation witness never refreshes a skip-rule draft:  AssertionError: the given combination of arguments (undefined and string) is invalid for this assertion. You can use an array, a map, an object, a set, a string, or a weakset instead of a string\n    at Proxy.<anonymous> (file:///home/elias/.cache/am/5iqrcnfb/tmp/test-intent-before-Xa5AA3/modules/ui-"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/indexingStatusSurfaces.test.ts#C distinct energy_saver summary reaches the status chip",
+        "classification": "assertion",
+        "detail": "C distinct energy_saver summary reaches the status chip:  AssertionError: expected 'Meaning processing is waiting' to be 'Meaning processing is waiting to save…' // Object.is equality\n    at /home/elias/.cache/am/5iqrcnfb/tmp/test-intent-before-Xa5AA3/modules/ui-web/src/shell-v0/components/indexingStatusSurfaces.test.ts:237:74\n    at file:///home/elias/.ca"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/indexingStatusSurfaces.test.ts#C distinct game_mode summary reaches the status chip",
+        "classification": "assertion",
+        "detail": "C distinct game_mode summary reaches the status chip:  AssertionError: expected 'Meaning processing is waiting' to be 'Meaning processing is waiting for the…' // Object.is equality\n    at /home/elias/.cache/am/5iqrcnfb/tmp/test-intent-before-Xa5AA3/modules/ui-web/src/shell-v0/components/indexingStatusSurfaces.test.ts:237:74\n    at file:///home/elias/.ca"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/indexingStatusSurfaces.test.ts#C distinct gpu_busy_external summary reaches the status chip",
+        "classification": "assertion",
+        "detail": "C distinct gpu_busy_external summary reaches the status chip:  AssertionError: expected 'Meaning processing is waiting' to be 'Meaning processing is waiting for the…' // Object.is equality\n    at /home/elias/.cache/am/5iqrcnfb/tmp/test-intent-before-Xa5AA3/modules/ui-web/src/shell-v0/components/indexingStatusSurfaces.test.ts:237:74\n    at file:///home/elias/.ca"
+      }
+    ]
+  },
+  "digest": "sha256:2fd680f49e68c8859eeadcad7fd36f3d1b811167d8442b9f0f01337d96d066da"
+}

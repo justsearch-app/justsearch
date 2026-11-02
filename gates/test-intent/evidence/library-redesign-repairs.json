@@ -1,0 +1,167 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
+  },
+  "createdAt": "2026-11-01T21:48:08.883Z",
+  "revision": "7c124c7c228707305855589b4e151c97cabb277a",
+  "tree": "a98a2cdc568d10bdbceffac9cd4fe3e50d92ebe8",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/LibrarySurface.redesign.test.ts\" \"src/shell-v0/views/LibrarySurface.slice2.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/5iqrcnfb/tmp/test-intent-vitest-4-1793569675790.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 4543
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/views/LibrarySurface.redesign.test.ts#V1 themed disclosure retains focus on toggle and live refresh",
+      "file": "modules/ui-web/src/shell-v0/views/LibrarySurface.redesign.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:7694021ebe709affacc1e12975eeace5780d4e1d6ef12359cd8aeb512efadd41",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "V1 themed disclosure retains focus on toggle and live refresh",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/LibrarySurface.slice2.test.ts#L19 rules first saves both editors without a local conflict and keeps edits after reload",
+      "file": "modules/ui-web/src/shell-v0/views/LibrarySurface.slice2.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:c90a590026743bd771752df9144a3cb2e307161f61a9e70fc19f6d3886aa2f99",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "L19 rules first saves both editors without a local conflict and keeps edits after reload",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/LibrarySurface.slice2.test.ts#L19 exclusions first saves both editors without a local conflict and keeps edits after reload",
+      "file": "modules/ui-web/src/shell-v0/views/LibrarySurface.slice2.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:c90a590026743bd771752df9144a3cb2e307161f61a9e70fc19f6d3886aa2f99",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "L19 exclusions first saves both editors without a local conflict and keeps edits after reload",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/LibrarySurface.slice2.test.ts#V3 quick successive saves rules first share only local witnesses",
+      "file": "modules/ui-web/src/shell-v0/views/LibrarySurface.slice2.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:c90a590026743bd771752df9144a3cb2e307161f61a9e70fc19f6d3886aa2f99",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "V3 quick successive saves rules first share only local witnesses",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/LibrarySurface.slice2.test.ts#V3 quick successive saves exclusions first share only local witnesses",
+      "file": "modules/ui-web/src/shell-v0/views/LibrarySurface.slice2.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:c90a590026743bd771752df9144a3cb2e307161f61a9e70fc19f6d3886aa2f99",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "V3 quick successive saves exclusions first share only local witnesses",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/LibrarySurface.slice2.test.ts#L19 configured disabled schedule survives successive rule saves and skip save",
+      "file": "modules/ui-web/src/shell-v0/views/LibrarySurface.slice2.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:c90a590026743bd771752df9144a3cb2e307161f61a9e70fc19f6d3886aa2f99",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "L19 configured disabled schedule survives successive rule saves and skip save",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "7c9a5fe9ce",
+    "revision": "7c9a5fe9ced52ebe97934c563d4c65314df2f468",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/LibrarySurface.redesign.test.ts\" \"src/shell-v0/views/LibrarySurface.slice2.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/5iqrcnfb/tmp/test-intent-vitest-4-1793569682826.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 5487,
+        "output": "JSON report written to /home/elias/.cache/am/5iqrcnfb/tmp/test-intent-vitest-4-1793569682826.json\n\n"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui-web/src/shell-v0/views/LibrarySurface.redesign.test.ts#V1 themed disclosure retains focus on toggle and live refresh",
+        "classification": "assertion",
+        "detail": "V1 themed disclosure retains focus on toggle and live refresh:  AssertionError: expected <body>…(1)</body> to be <button type=\"button\" …(3)>…(3)</button> // Object.is equality\n    at /home/elias/.cache/am/5iqrcnfb/tmp/test-intent-before-OguYTN/modules/ui-web/src/shell-v0/views/LibrarySurface.redesign.test.ts:207:43\n    at Timeout.checkCallback (file:///home/elia"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/LibrarySurface.slice2.test.ts#L19 rules first saves both editors without a local conflict and keeps edits after reload",
+        "classification": "assertion",
+        "detail": "L19 rules first saves both editors without a local conflict and keeps edits after reload:  AssertionError: expected <p id=\"excludes-error\" role=\"alert\"></p> to be null\n    at /home/elias/.cache/am/5iqrcnfb/tmp/test-intent-before-OguYTN/modules/ui-web/src/shell-v0/views/LibrarySurface.slice2.test.ts:111:61\n    at file:///home/elias/.cache/am/5iqrcnfb/tmp/test-intent-before-OguYTN/modules/u"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/LibrarySurface.slice2.test.ts#L19 exclusions first saves both editors without a local conflict and keeps edits after reload",
+        "classification": "assertion",
+        "detail": "L19 exclusions first saves both editors without a local conflict and keeps edits after reload:  AssertionError: expected <p id=\"excludes-error\" role=\"alert\"></p> to be null\n    at /home/elias/.cache/am/5iqrcnfb/tmp/test-intent-before-OguYTN/modules/ui-web/src/shell-v0/views/LibrarySurface.slice2.test.ts:122:59\n    at file:///home/elias/.cache/am/5iqrcnfb/tmp/test-intent-before-OguYTN/modules/u"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/LibrarySurface.slice2.test.ts#V3 quick successive saves rules first share only local witnesses",
+        "classification": "assertion",
+        "detail": "V3 quick successive saves rules first share only local witnesses:  AssertionError: expected <p id=\"excludes-error\" role=\"alert\"></p> to be null\n    at /home/elias/.cache/am/5iqrcnfb/tmp/test-intent-before-OguYTN/modules/ui-web/src/shell-v0/views/LibrarySurface.slice2.test.ts:206:59\n    at file:///home/elias/.cache/am/5iqrcnfb/tmp/test-intent-before-OguYTN/modules/u"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/LibrarySurface.slice2.test.ts#V3 quick successive saves exclusions first share only local witnesses",
+        "classification": "assertion",
+        "detail": "V3 quick successive saves exclusions first share only local witnesses:  AssertionError: expected <p id=\"excludes-error\" role=\"alert\"></p> to be null\n    at /home/elias/.cache/am/5iqrcnfb/tmp/test-intent-before-OguYTN/modules/ui-web/src/shell-v0/views/LibrarySurface.slice2.test.ts:210:59\n    at file:///home/elias/.cache/am/5iqrcnfb/tmp/test-intent-before-OguYTN/modules/u"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/LibrarySurface.slice2.test.ts#L19 configured disabled schedule survives successive rule saves and skip save",
+        "classification": "assertion",
+        "detail": "L19 configured disabled schedule survives successive rule saves and skip save:  AssertionError: expected <p id=\"excludes-error\" role=\"alert\"></p> to be null\n    at /home/elias/.cache/am/5iqrcnfb/tmp/test-intent-before-OguYTN/modules/ui-web/src/shell-v0/views/LibrarySurface.slice2.test.ts:297:59\n    at file:///home/elias/.cache/am/5iqrcnfb/tmp/test-intent-before-OguYTN/modules/u"
+      }
+    ]
+  },
+  "digest": "sha256:472ce26b84e248e05e34b8d783d779a10458e1a9e4b35052c2aafd7af9d1e51c"
+}

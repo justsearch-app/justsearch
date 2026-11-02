@@ -1,4 +1,5 @@
 // @vitest-environment happy-dom
+import { takeIndexingRuleFocus } from '../router/indexingRuleIntent.js';
 
 /**
  * Tempdoc 543 §21.C — palette layers over Action.listActions.
@@ -91,8 +92,9 @@ describe('CommandPaletteProjection (§21.C)', () => {
       expect(operation).not.toHaveBeenCalled();
       expect(entries[0]!.entry.label).toBe('Change indexing rules');
       expect(navigation).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({
-        detail: { surfaceId: 'core.settings-surface', state: { focusIndexingRule: 'hours' } },
+        detail: { surfaceId: 'core.library-surface' },
       }));
+      expect(takeIndexingRuleFocus()).toBe('hours');
       expect(searchPaletteEntries('').some(r => r.entry.id === 'op.core.set-indexing-rules')).toBe(false);
       await invokeCommandWithResult('op.core.set-indexing-rules');
       expect(operation).not.toHaveBeenCalled();
