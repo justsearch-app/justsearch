@@ -1360,7 +1360,7 @@ R9 passes with producer-written evidence in gates/test-intent/evidence/ingfix-wp
           "label": "agent-drafted, owner-adopted"
         }
       ],
-      "behaviour": "Restore R9 readmission after HOT public exclusion removal, keeping its observed new receipt/revision, current bytes, collection/root, completed Forget operation and successor-reopen assertions. Its changed precondition admits the source while eligible, then installs exclusion before consumption; no excluded file is admitted. This is New because the setup/precondition changes, not Adaptation. R2 controls remain.",
+      "behaviour": "Restore R9 readmission after HOT public exclusion removal, keeping its observed new receipt/revision, current bytes, collection/root, completed Forget operation and successor-reopen assertions. Its changed precondition admits the source while eligible, then installs exclusion before consumption; no excluded file is admitted. From START until that HOT Save commits, the setup holds the Engine root-binding owner that native promotion takes first, so the autonomous SWITCHING monitor cannot promote or record a replay refusal under an interim policy. This is New because the setup/precondition changes, not Adaptation. R2 controls remain.",
       "evidence": "gates/test-intent/evidence/ingfix-wp8-r9.json",
       "newChecks": [
         "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineForgetInProcessTest.java#R9HotPublicSaveAfterNativePolicySkipReadmitsCurrentBytesAndKeepsCompletedForgetReceipt"

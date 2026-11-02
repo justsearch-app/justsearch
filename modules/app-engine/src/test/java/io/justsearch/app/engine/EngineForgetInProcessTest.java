@@ -371,7 +371,11 @@ final class EngineForgetInProcessTest {
         } catch (RuntimeException failure) { observationFailure.compareAndSet(null, failure); }
       };
       // Read-only observation of actual queue commits; no notification is blocked or fabricated.
-      try (var ignoredSubscription = f.queue.indexingJobChangeFeed().orElseThrow().subscribe(ignored -> capture.run())) {
+      // R9 changes policy while SWITCHING, where the monitor promotes on its own once the queue
+      // drains. Hold the root-binding owner that native promotion takes before any replay, so its
+      // first attempt starts only after the HOT Save; the setup no longer races that monitor.
+      try (var ignoredSubscription = f.queue.indexingJobChangeFeed().orElseThrow().subscribe(ignored -> capture.run());
+          var promotionHold = removePolicyAfterSkip ? PromotionHold.acquire(f) : null) {
         String predecessor = f.client.getStatus(TestEngineContexts.FOREGROUND).getMigration().getActiveGenerationId();
         var started = f.client.startMigration("forget-native-preservation", TestEngineContexts.FOREGROUND);
         assertTrue(started.accepted(), "SETUP: actual public native migration must be admitted");
@@ -526,6 +530,9 @@ final class EngineForgetInProcessTest {
           assertEquals(completedForgetRecord, f.operations.find(completedForget).orElseThrow());
           System.out.println("R9 actual HOT public Save=" + JSON.writeValueAsString(
               Map.of("response", saved.response(), "record", saved.record())));
+          assertNull(field(((DefaultWorkerAppServices) f.server.appServices()).ingestService(),
+              WorkerIngestService.class, "watcherReplayFailure"), "SETUP: no promotion attempt preceded the HOT Save");
+          promotionHold.close();
         }
         // Publicly requested SWITCHING follows observed enumeration/writer/queue readiness.
         // The monitor still owns replay/drain/certification; automatic timing is not under test.
@@ -640,6 +647,40 @@ final class EngineForgetInProcessTest {
       }
       assertEquals(exactHash, SourceContentHash.sha256(exact));
       assertEquals(siblingHash, SourceContentHash.sha256(sibling));
+    }
+  }
+
+  /** Holds the Engine's root-binding owner on its own thread until closed. */
+  private static final class PromotionHold implements AutoCloseable {
+    private final java.util.concurrent.CountDownLatch release = new java.util.concurrent.CountDownLatch(1);
+    private final Thread holder;
+
+    private PromotionHold(Fixture fixture, java.util.concurrent.CountDownLatch held) {
+      holder = new Thread(() -> fixture.root.authority().roots().withForgetBindings(ignored -> {
+        held.countDown();
+        boolean interrupted = false;
+        while (true) {
+          try { release.await(); break; }
+          catch (InterruptedException again) { interrupted = true; }
+        }
+        if (interrupted) Thread.currentThread().interrupt();
+        return null;
+      }), "r9-promotion-hold");
+      holder.setDaemon(true);
+    }
+
+    static PromotionHold acquire(Fixture fixture) throws InterruptedException {
+      var held = new java.util.concurrent.CountDownLatch(1);
+      var hold = new PromotionHold(fixture, held);
+      hold.holder.start();
+      assertTrue(held.await(10, TimeUnit.SECONDS), "SETUP: hold the root-binding owner before START");
+      return hold;
+    }
+
+    @Override public void close() throws InterruptedException {
+      release.countDown();
+      holder.join(10_000);
+      assertFalse(holder.isAlive(), "SETUP: root-binding owner hold must end");
     }
   }
 
