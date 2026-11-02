@@ -1,0 +1,91 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
+  },
+  "createdAt": "2026-11-02T03:22:37.823Z",
+  "revision": "1aeb529f3faacc04e5e503c74b02e79d75ce4a25",
+  "tree": "11f0a5cdc349bce75cdc2408d844ebe797b0a740",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/components/FailedJobsDrawer.test.ts\" --reporter=json --outputFile=\"/tmp/test-intent-vitest-3168194-1793589756515.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 1305
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/components/FailedJobsDrawer.test.ts#R3d a fresh failure list retries A again along with refused B and newly failed C",
+      "file": "modules/ui-web/src/shell-v0/components/FailedJobsDrawer.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:0b75a4485ddf07cc8784c6840e6cc914ead760d291d6b0081dcc75eaec173281",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "R3d a fresh failure list retries A again along with refused B and newly failed C",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/FailedJobsDrawer.test.ts#R3d late retry results cannot touch a switched target or remounted element (inline: true)",
+      "file": "modules/ui-web/src/shell-v0/components/FailedJobsDrawer.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:0b75a4485ddf07cc8784c6840e6cc914ead760d291d6b0081dcc75eaec173281",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "R3d late retry results cannot touch a switched target or remounted element (inline: true)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/FailedJobsDrawer.test.ts#R3d late retry results cannot touch a switched target or remounted element (inline: false)",
+      "file": "modules/ui-web/src/shell-v0/components/FailedJobsDrawer.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:0b75a4485ddf07cc8784c6840e6cc914ead760d291d6b0081dcc75eaec173281",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "R3d late retry results cannot touch a switched target or remounted element (inline: false)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/FailedJobsDrawer.test.ts#R3d a second window and a reload or tab remount use fresh lists while an old retry is pending",
+      "file": "modules/ui-web/src/shell-v0/components/FailedJobsDrawer.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:0b75a4485ddf07cc8784c6840e6cc914ead760d291d6b0081dcc75eaec173281",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "R3d a second window and a reload or tab remount use fresh lists while an old retry is pending",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:012e3b2b9924cfc35b5211d287c4480831a7a7ec12f429b1ab2afb60a7397ddb"
+}

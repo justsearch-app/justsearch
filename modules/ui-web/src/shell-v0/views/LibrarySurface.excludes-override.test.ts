@@ -45,13 +45,14 @@ for (const [source, sourceDetail, pattern, sourceName] of [
     await el.loadExcludes(); document.body.appendChild(el); await el.updateComplete;
     const notice = el.shadowRoot?.querySelector('[data-testid="excludes-override"]');
     expect(notice, 'OV1: override policy must be visible before Preview or Apply').not.toBeNull();
+    expect(notice?.closest('details'), 'override is visible without opening How rules work').toBeNull();
     expect(notice?.textContent).toContain(sourceName); expect(notice?.textContent).toContain(sourceDetail);
     expect(notice?.textContent).toContain(pattern);
     expect(notice?.getAttribute('tabindex')).toBe('0');
     expect(notice?.getAttribute('aria-label'), 'OV1: the focusable notice needs a screen-reader name').not.toBeNull();
     expect(notice?.getAttribute('aria-label')).toContain(sourceDetail);
     expect(notice?.getAttribute('aria-label')).toContain(pattern);
-    expect(el.shadowRoot?.querySelector('textarea')?.getAttribute('aria-describedby')).toContain('excludes-override');
+    expect(el.shadowRoot?.querySelector<HTMLInputElement>('.skip-rule input')?.getAttribute('aria-describedby')).toContain('excludes-override');
     expect(el.excludesText).toBe('saved-only.txt');
     expect(el.shadowRoot?.querySelector('#excludes-help')?.textContent).not.toContain('using the saved list');
     await el.handlePreviewExcludes(); await el.updateComplete;

@@ -1,0 +1,89 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
+  },
+  "createdAt": "2026-11-02T03:22:34.369Z",
+  "revision": "1aeb529f3faacc04e5e503c74b02e79d75ce4a25",
+  "tree": "c08d9ce7a853b241b8f0e5f97b4b2c82e26882fc",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/components/FailedJobsDrawer.test.ts\" --reporter=json --outputFile=\"/tmp/test-intent-vitest-3164963-1793589749852.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 1257
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/components/FailedJobsDrawer.test.ts#R3d a failed refresh keeps the last-known inline rows visible beside the error",
+      "file": "modules/ui-web/src/shell-v0/components/FailedJobsDrawer.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:0b75a4485ddf07cc8784c6840e6cc914ead760d291d6b0081dcc75eaec173281",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "R3d a failed refresh keeps the last-known inline rows visible beside the error",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/FailedJobsDrawer.test.ts#an inline list torn down never removes the open global drawer registration",
+      "file": "modules/ui-web/src/shell-v0/components/FailedJobsDrawer.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:0b75a4485ddf07cc8784c6840e6cc914ead760d291d6b0081dcc75eaec173281",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "an inline list torn down never removes the open global drawer registration",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "4782c1c218",
+    "revision": "4782c1c2181963286da5a8b4c97b48ae98275839",
+    "overlays": [
+      "modules/ui-web/src/shell-v0/components/FailedJobsDrawer.test.ts"
+    ],
+    "patches": [],
+    "runs": [
+      {
+        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/components/FailedJobsDrawer.test.ts\" --reporter=json --outputFile=\"/tmp/test-intent-vitest-3164963-1793589752807.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 1235,
+        "output": "JSON report written to /tmp/test-intent-vitest-3164963-1793589752807.json\n\n"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui-web/src/shell-v0/components/FailedJobsDrawer.test.ts#R3d a failed refresh keeps the last-known inline rows visible beside the error",
+        "classification": "assertion",
+        "detail": "R3d a failed refresh keeps the last-known inline rows visible beside the error:  AssertionError: expected  to have a length of 1 but got +0\n    at Proxy.<anonymous> (file:///tmp/test-intent-before-5T68cp/modules/ui-web/node_modules/@vitest/expect/dist/index.js:1389:20)\n    at Proxy.<anonymous> (file:///tmp/test-intent-before-5T68cp/modules/ui-web/node_modules/@vitest/expect/dist"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/FailedJobsDrawer.test.ts#an inline list torn down never removes the open global drawer registration",
+        "classification": "assertion",
+        "detail": "an inline list torn down never removes the open global drawer registration:  AssertionError: expected true to be false // Object.is equality\n    at /tmp/test-intent-before-5T68cp/modules/ui-web/src/shell-v0/components/FailedJobsDrawer.test.ts:861:32\n    at file:///tmp/test-intent-before-5T68cp/modules/ui-web/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:20"
+      }
+    ]
+  },
+  "digest": "sha256:74cc6737957836b68d38febdf708546c80dca6f121d5484e734532e7d6308d9c"
+}

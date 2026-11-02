@@ -1,0 +1,127 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
+  },
+  "createdAt": "2026-11-01T20:29:49.919Z",
+  "revision": "9e08da1084b4ed3f335b712592d57fae64a459e7",
+  "tree": "a545eb3d148946efb3612632300f858a66b80ade",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/LibrarySurface.redesign.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/6h90meu0/tmp/test-intent-vitest-351-1793564979572.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 3799
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/views/LibrarySurface.redesign.test.ts#D1 keeps attention and retried files through 25 alternating unconfirmed polls and clears on a settled observation",
+      "file": "modules/ui-web/src/shell-v0/views/LibrarySurface.redesign.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:e8206069ad01ae01ddd70dee11a8f748c1b250f3fb58d8b41b15515878c15d97",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "D1 keeps attention and retried files through 25 alternating unconfirmed polls and clears on a settled observation",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/LibrarySurface.redesign.test.ts#D1 never claims searchable during unconfirmed polls, including 42 seconds past the shared threshold",
+      "file": "modules/ui-web/src/shell-v0/views/LibrarySurface.redesign.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:e8206069ad01ae01ddd70dee11a8f748c1b250f3fb58d8b41b15515878c15d97",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "D1 never claims searchable during unconfirmed polls, including 42 seconds past the shared threshold",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/LibrarySurface.redesign.test.ts#A5 energy_saver waits are stated once through the real projection",
+      "file": "modules/ui-web/src/shell-v0/views/LibrarySurface.redesign.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:e8206069ad01ae01ddd70dee11a8f748c1b250f3fb58d8b41b15515878c15d97",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "A5 energy_saver waits are stated once through the real projection",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/LibrarySurface.redesign.test.ts#A5 gpu_busy_external waits are stated once through the real projection",
+      "file": "modules/ui-web/src/shell-v0/views/LibrarySurface.redesign.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:e8206069ad01ae01ddd70dee11a8f748c1b250f3fb58d8b41b15515878c15d97",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "A5 gpu_busy_external waits are stated once through the real projection",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "9e08da1084",
+    "revision": "9e08da1084b4ed3f335b712592d57fae64a459e7",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/LibrarySurface.redesign.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/6h90meu0/tmp/test-intent-vitest-351-1793564985802.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 3514,
+        "output": "JSON report written to /home/elias/.cache/am/6h90meu0/tmp/test-intent-vitest-351-1793564985802.json\n\n"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui-web/src/shell-v0/views/LibrarySurface.redesign.test.ts#D1 keeps attention and retried files through 25 alternating unconfirmed polls and clears on a settled observation",
+        "classification": "assertion",
+        "detail": "D1 keeps attention and retried files through 25 alternating unconfirmed polls and clears on a settled observation:  AssertionError: expected '\\n      \\n        \\n          \\n    \\…' to contain 'Indexing paused'\n    at /home/elias/.cache/am/6h90meu0/tmp/test-intent-before-V9S7ha/modules/ui-web/src/shell-v0/views/LibrarySurface.redesign.test.ts:234:69\n    at file:///home/elias/.cache/am/6h90meu0/tmp/test-intent-bef"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/LibrarySurface.redesign.test.ts#D1 never claims searchable during unconfirmed polls, including 42 seconds past the shared threshold",
+        "classification": "assertion",
+        "detail": "D1 never claims searchable during unconfirmed polls, including 42 seconds past the shared threshold:  AssertionError: expected 'Your files are searchable' to be 'Indexing status unconfirmed' // Object.is equality\n    at /home/elias/.cache/am/6h90meu0/tmp/test-intent-before-V9S7ha/modules/ui-web/src/shell-v0/views/LibrarySurface.redesign.test.ts:257:61\n    at file:///home/elias/.cache/am/6h90meu0/tmp"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/LibrarySurface.redesign.test.ts#A5 energy_saver waits are stated once through the real projection",
+        "classification": "assertion",
+        "detail": "A5 energy_saver waits are stated once through the real projection:  AssertionError: expected '20 searchable documents\\n        · 2 …' not to contain 'Meaning processing is waiting'\n    at /home/elias/.cache/am/6h90meu0/tmp/test-intent-before-V9S7ha/modules/ui-web/src/shell-v0/views/LibrarySurface.redesign.test.ts:191:23\n    at file:///home/elias/.cache/am/6h90meu0/t"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/LibrarySurface.redesign.test.ts#A5 gpu_busy_external waits are stated once through the real projection",
+        "classification": "assertion",
+        "detail": "A5 gpu_busy_external waits are stated once through the real projection:  AssertionError: expected '20 searchable documents\\n        · 2 …' not to contain 'Meaning processing is waiting'\n    at /home/elias/.cache/am/6h90meu0/tmp/test-intent-before-V9S7ha/modules/ui-web/src/shell-v0/views/LibrarySurface.redesign.test.ts:191:23\n    at file:///home/elias/.cache/am/6h90meu0/t"
+      }
+    ]
+  },
+  "digest": "sha256:d03e75e92a844cb3937c07a312d8b857f3cae750d3104fd3af68d4a3e33614b1"
+}

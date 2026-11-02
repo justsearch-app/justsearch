@@ -43,7 +43,7 @@ it.each(['rebuild', 'cancel', 'accept-gaps'] as const)('Library shows the termin
     vi.spyOn(Date, 'now').mockReturnValue(Date.now() + 4_001);
     feed('IDLE');
   } else {
-    const label = action === 'cancel' ? 'Cancel rebuild' : 'Accept gaps and activate';
+    const label = action === 'cancel' ? 'Cancel rebuild' : 'Use the new index without them';
     const button = [...el.shadowRoot!.querySelectorAll('jf-button')].find(b => b.getAttribute('label') === label);
     expect(button).toBeDefined();
     (button as HTMLElement & { onActivate(): void }).onActivate();

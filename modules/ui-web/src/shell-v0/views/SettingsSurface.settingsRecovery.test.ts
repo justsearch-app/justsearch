@@ -242,7 +242,7 @@ describe('CR37c settings recovery', () => {
       const yes = [...action(surface)!.shadowRoot!.querySelectorAll('button')].find(b => b.textContent!.trim() === 'Yes')!;
       yes.focus();
       const now = Date.now();
-      const clock = vi.spyOn(Date, 'now').mockReturnValue(now + 31_000);
+      const clock = vi.spyOn(Date, 'now').mockReturnValue(now + 41_000);
       try {
         __feedContactForTest(); await settle(surface);
         expect(surface.aiSnapshot?.indexingStatusLive).toBe(false);

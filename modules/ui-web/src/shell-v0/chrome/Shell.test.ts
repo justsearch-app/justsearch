@@ -20,6 +20,7 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import '../chrome/Shell.js';
+import { subscribeIndexingRuleFocus } from '../router/indexingRuleIntent.js';
 import { setAuthorizationPresenter } from '../operations/authorizationBroker.js';
 import {
   __resetForTest as resetSurfaceCatalog,
@@ -227,7 +228,7 @@ describe('Shell — slice 492 substrate integration', () => {
     }
     await feed(['energy_saver']);
     const announcement = deck.shadowRoot!.querySelector('[data-testid="indexing-announcer"]')!;
-    expect(announcement.textContent).toContain('save energy');
+    expect(announcement.textContent).toContain('saves energy');
     const changed = new Set<Element>();
     const observer = new MutationObserver(records => {
       for (const record of records) {
@@ -918,24 +919,49 @@ describe('Shell — settings window close semantics (tempdoc 855 §11.1 D3/D4)',
     }
   });
 
-  it.each(['hours', 'battery'] as const)('WP3.8b routes %s to Settings once without replay on Back and Forward', async (control) => {
-    expect('focusIndexingRule' in SettingsWindow.prototype, 'rule focus destination exists').toBe(true);
+  it.each(['hours', 'battery'] as const)('L14 routes %s to Library once without replay on Back and Forward', async (control) => {
     const shell = await renderShell();
     const win = windowOf(shell);
-    shell.activateSurface('core.library-surface', {}, 'RAIL');
+    shell.activateSurface('core.search-surface', {}, 'RAIL');
     await settle();
-    const focus = vi.spyOn(SettingsWindow.prototype, 'focusIndexingRule');
+    const focus = vi.fn();
+    const unsubscribe = subscribeIndexingRuleFocus(focus);
     try {
-      shell.activateSurface(SETTINGS_ID, { focusIndexingRule: control }, 'BUTTON');
+      shell.activateSurface('core.library-surface', { focusIndexingRule: control }, 'BUTTON');
       await settle();
-      expect(win.open).toBe(true);
+      expect(win.open).toBe(false);
       expect(focus).toHaveBeenCalledExactlyOnceWith(control);
-      expect(window.location.hash).toBe(`#justsearch://surface/${SETTINGS_ID}`);
+      expect(window.location.hash).toBe('#justsearch://surface/core.library-surface');
       expect(getJournalState().entries.every(entry => !entry.url.includes('focusIndexingRule'))).toBe(true);
-      window.history.back(); await settle(); expect(win.open).toBe(false);
-      window.history.forward(); await settle(); expect(win.open).toBe(true);
-      expect(focus).toHaveBeenCalledTimes(1);
-    } finally { focus.mockRestore(); }
+      const libraryEntries = getJournalState().entries.filter(entry => entry.url.includes('core.library-surface'));
+      expect(libraryEntries.length).toBeGreaterThan(0);
+      expect(libraryEntries.every(entry => entry.url === 'justsearch://surface/core.library-surface')).toBe(true);
+      window.history.back(); await settle();
+      expect(window.location.hash).toBe('#justsearch://surface/core.search-surface');
+      expect(shell.activeId).toBe('core.search-surface');
+      // happy-dom drops the forward entry when Shell replaces the address after Back.
+      // Replay the plain Forward arrival through URLSource's real popstate listener.
+      window.history.replaceState(null, '', '/#justsearch://surface/core.library-surface');
+      window.dispatchEvent(new PopStateEvent('popstate'));
+      await settle();
+      expect(window.location.hash).toBe('#justsearch://surface/core.library-surface');
+      expect(shell.activeId).toBe('core.library-surface');
+      expect(focus).toHaveBeenCalledExactlyOnceWith(control);
+      expect(getJournalState().entries.every(entry => !entry.url.includes('focusIndexingRule'))).toBe(true);
+    } finally { unsubscribe(); }
+  });
+
+  it('L14 redirects the legacy Settings rule-focus route to Library', async () => {
+    const shell = await renderShell();
+    const focus = vi.fn();
+    const unsubscribe = subscribeIndexingRuleFocus(focus);
+    try {
+      shell.activateSurface(SETTINGS_ID, { focusIndexingRule: 'battery' }, 'BUTTON');
+      await settle();
+      expect(windowOf(shell).open).toBe(false);
+      expect(window.location.hash).toBe('#justsearch://surface/core.library-surface');
+      expect(focus).toHaveBeenCalledExactlyOnceWith('battery');
+    } finally { unsubscribe(); }
   });
 
   it('R2 does not focus Reset for a false recovery URL flag', async () => {
