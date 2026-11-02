@@ -44,6 +44,7 @@ function fmtExternal(entries) {
 }
 
 function buildGenerated(release) {
+  if (release?.status === "superseded") throw new Error("superseded release cannot supply a current scorecard");
   const lines = [MARKER_START, "", "### Release Scorecard (projected — do not hand-edit)", ""];
   if (!release) {
     lines.push(
@@ -58,7 +59,7 @@ function buildGenerated(release) {
 
   const cohort = release.cohort || {};
   const hw = cohort.hardware || {};
-  const hwStr = [hw.gpu_name, hw.gpu_driver_version && `driver ${hw.gpu_driver_version}`, hw.ort_version && `ORT ${hw.ort_version}`]
+  const hwStr = [hw.os, hw.cpu, hw.gpu_name, hw.gpu_driver_version && `driver ${hw.gpu_driver_version}`, hw.ort_version && `ORT ${hw.ort_version}`]
     .filter(Boolean)
     .join(" · ") || "unstated";
   const relId = release.release_id || (cohort.git_sha || "").slice(0, 10) || "unknown";
@@ -79,11 +80,21 @@ function buildGenerated(release) {
   );
 
   const measured = release.measured || {};
-  for (const ds of Object.keys(measured).sort()) {
+  for (const ds of [...new Set([...Object.keys(measured), ...Object.keys(release.withheld || {})])].sort()) {
+    const withheld = release.withheld?.[ds];
+    if (withheld) {
+      lines.push(`| ${ds} | ${withheld.config_mode} | WITHHELD | ${withheld.reason} |`);
+      continue;
+    }
     const m = measured[ds];
     const ndcg = (m.metrics || {})["nDCG@10"];
     const ndcgStr = typeof ndcg === "number" ? ndcg.toFixed(3) : "—";
     lines.push(`| ${ds} | ${m.config_mode} | ${ndcgStr} | ${fmtExternal(ext[ds])} |`);
+  }
+  lines.push("", "Explicit hybrid mode: keyword + vector + cross-encoder reranking; learned-sparse off. MIRACL: dev split.", "");
+  for (const [ds, m] of Object.entries(measured).sort()) {
+    const ce = m.ce_coverage;
+    if (ce) lines.push(`- ${ds}: CE applied ${ce.applied}/${m.corpus_source.query_count}; ${ce.legitimate_skips} deterministic skips; ${ce.silent_drops} deadline drops (\`${ce.verdict}\`).`);
   }
 
   // Engine-performance scorecard (tempdoc 640): rendered generically from the perf metric families

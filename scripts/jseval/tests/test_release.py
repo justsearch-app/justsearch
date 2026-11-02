@@ -598,3 +598,34 @@ def test_repo_relative_falls_back_to_absolute_outside_repo(tmp_path):
 
     outside = tmp_path / "somewhere" / "run1"
     assert _repo_relative(outside) == str(outside)
+
+
+def test_withheld_default_keeps_ablations_and_source_without_a_floor():
+    from jseval.relevance_gate import project_release_to_baselines
+
+    summary = _summary(dataset='mixed/legal-clerc-200', modes={
+        'hybrid': {'nDCG@10': 0.59}, 'lexical': {'nDCG@10': 0.69},
+    })
+    summary['ce_coverage'] = {'per_mode': {'hybrid': {
+        'verdict': 'degraded-ce', 'applied': 174, 'silent_drops': 25,
+    }}}
+    source = {'run_dir': 'legal-run', 'summary_sha256': 'a' * 64}
+    with pytest.raises(release.ComposeError, match='not comparable'):
+        release.compose([summary], composed_at='2026-11-02')
+    doc = release.compose(
+        [summary], composed_at='2026-11-02', run_sources=[source],
+        withheld_default={'mixed/legal-clerc-200': '25 deadline misses'},
+    )
+    assert doc['measured'] == {}
+    assert doc['withheld']['mixed/legal-clerc-200']['ce_coverage']['silent_drops'] == 25
+    assert doc['ablations']['mixed/legal-clerc-200'][0]['config_mode'] == 'lexical'
+    assert doc['sources'][0]['summary_sha256'] == source['summary_sha256']
+    assert project_release_to_baselines(doc)['baselines'] == {}
+
+
+@pytest.mark.parametrize('withheld', [
+    {'mixed/absent': 'deadline misses'}, {'beir/scifact': ' '},
+])
+def test_withholding_requires_an_included_dataset_and_reason(withheld):
+    with pytest.raises(release.ComposeError, match='included datasets'):
+        release.compose([_summary()], composed_at='2026-11-02', withheld_default=withheld)

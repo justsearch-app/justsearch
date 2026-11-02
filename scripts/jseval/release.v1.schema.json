@@ -76,6 +76,20 @@
         }
       }
     },
+    "withheld": {
+      "type": "object",
+      "description": "Explicitly withheld default-mode claims: no quality metric or regression floor. Source runs and non-default ablations remain in the release.",
+      "additionalProperties": {
+        "type": "object",
+        "required": ["config_mode", "reason", "corpus_source"],
+        "properties": {
+          "config_mode": { "type": "string" },
+          "reason": { "type": "string", "minLength": 1 },
+          "corpus_source": { "type": "object" },
+          "ce_coverage": { "type": ["object", "null"] }
+        }
+      }
+    },
     "ablations": {
       "type": "object",
       "description": "Labelled non-default-mode measurements per dataset (heterogeneous research log; never the headline).",

@@ -3,7 +3,7 @@ title: Search Quality Register
 type: reference
 status: stable
 created: 2026-03-19
-updated: 2026-10-27
+updated: 2026-11-02
 description: "Shared decision register for search quality. Read before starting search work. Update before finishing."
 ---
 
@@ -88,6 +88,12 @@ every committed cell signature. The behavioral count is already derivable withou
 
 ## Canonical Baselines
 
+**Current claims and floors come only from the Linux release `linux-complete-qrels-2026-11-02` below.**
+Windows release `832-rebaseline-2026-08-14` is superseded (truncated MIRACL judgments; mislabelled hybrid
+pipeline). Older hand-authored baseline tables and “Best known” lines are research history, not current
+claims or regression floors. Legal hybrid is withheld; see the methodology for the deadline failure
+and the 198-document, all-relevant, roughly 260-word-query caveat.
+
 One block per dataset. Within each block, one row per measured (config × mode).
 All values are nDCG@10 unless noted. `—` = not yet measured.
 
@@ -116,27 +122,33 @@ the `cpu_fallback_counts` projection alongside it. See
 > The (config × mode) ablation tables in each corpus block stay hand-authored. No calibrated reproduction envelope
 > is published; compare each run's measured spread directly (see the benchmark methodology).
 
-**Release:** `832-rebaseline-2026-08-14` · default mode `hybrid` · NVIDIA GeForce RTX 4070 · driver 610.88 · ORT 1.24.3
+**Release:** `linux-complete-qrels-2026-11-02` · default mode `hybrid` · Linux 7.0.0-38-generic x86_64 · NVIDIA GeForce RTX 4070 · driver 580.178.04 · ORT 1.24.3
 
 **Coverage:** retrieval ranking quality (per-corpus metrics above) — **does NOT measure** document extraction / OCR / VDU routing quality (see tempdoc 623 §F — extraction-quality sibling).
 
 | Corpus | Ours (mode) | nDCG@10 | Published baselines (cited, side-by-side) |
 |---|---|---|---|
-| beir/scifact | hybrid | 0.757 | BM25 (multifield) 0.665, SPLADE++ EnsembleDistil 0.710, ColBERTv2 0.693 |
-| mixed/enron-qa | hybrid | 0.796 | — |
-| mixed/legal-clerc-200 | hybrid | 0.578 | BM25 0.054, Contriever-MSMarco (zero-shot dense) 0.042 |
-| mixed/miracl-de-2k | hybrid | 0.857 | BGE-M3 Dense 0.567 (dev) |
-| mixed/miracl-fr-2k | hybrid | 0.884 | BM25 0.183 (dev), mDPR (zero-shot) 0.435 (dev), Hybrid (BM25+mDPR) 0.523 (dev) |
+| beir/scifact | hybrid | 0.759 | BM25 (multifield) 0.665, SPLADE++ EnsembleDistil 0.710, ColBERTv2 0.693 |
+| mixed/enron-qa | hybrid | 0.806 | — |
+| mixed/legal-clerc-200 | hybrid | WITHHELD | Under the default 200 ms reranker budget, the cross-encoder missed its deadline on 25/200 queries (12.5%) of roughly 260 words on this machine; 174/200 were reranked, with one deterministic navigational skip. Harness verdict: degraded-ce, not comparable. An earlier run under heavier load had 60% deadline misses. Hybrid quality and its regression floor are withheld; lexical/vector/splade ablations remain available for this 198-document pool, all documents judged relevant to at least one query. |
+| mixed/miracl-de-2k | hybrid | 0.986 | BGE-M3 Dense 0.567 (dev) |
+| mixed/miracl-fr-2k | hybrid | 0.990 | BM25 0.183 (dev), mDPR (zero-shot) 0.435 (dev), Hybrid (BM25+mDPR) 0.523 (dev) |
+
+Explicit hybrid mode: keyword + vector + cross-encoder reranking; learned-sparse off. MIRACL: dev split.
+
+- beir/scifact: CE applied 299/300; 0 deterministic skips; 1 deadline drops (`ok`).
+- mixed/enron-qa: CE applied 277/300; 17 deterministic skips; 6 deadline drops (`ok`).
+- mixed/miracl-de-2k: CE applied 305/305; 0 deterministic skips; 0 deadline drops (`ok`).
+- mixed/miracl-fr-2k: CE applied 343/343; 0 deterministic skips; 0 deadline drops (`ok`).
 
 **Engine performance** (relative-ratchet guarded — tempdoc 640):
 
 | Corpus | CE p50 (ms) | Index docs/s | Enrich docs/s | Resident (GB) |
 |---|---|---|---|---|
-| beir/scifact | 142 | 76.1 | 1.3 | 2.02 |
-| mixed/enron-qa | 147 | 63.8 | 3.6 | 2.02 |
-| mixed/legal-clerc-200 | 165 | 18.6 | 0.8 | 2.02 |
-| mixed/miracl-de-2k | 133 | 125.6 | 34.1 | 2.02 |
-| mixed/miracl-fr-2k | 143 | 151.7 | 46.6 | 2.02 |
+| beir/scifact | 159 | 36.7 | 11.5 | 2.02 |
+| mixed/enron-qa | 237 | 25.8 | 2.7 | 2.02 |
+| mixed/miracl-de-2k | 160 | 32.9 | 19.1 | 2.02 |
+| mixed/miracl-fr-2k | 173 | 40.8 | 20.0 | 2.02 |
 
 <!-- generated:end -->
 

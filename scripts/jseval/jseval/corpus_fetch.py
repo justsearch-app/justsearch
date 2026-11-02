@@ -168,12 +168,15 @@ def fetch_miracl_sample(out_dir: Path | str, *, lang: str, seed: int, n_docs: in
     doc_list = [{"_id": did, "title": title, "text": text} for did, (title, text) in docs_by_id.items()]
 
     qrels_by_query: dict[str, list[str]] = {}
+    grades_by_query: dict[str, dict[str, int]] = {}
     for q in qrels:
         qrels_by_query.setdefault(q.query_id, []).append(q.doc_id)
+        grades_by_query.setdefault(q.query_id, {})[q.doc_id] = q.relevance
 
     query_list = [
         {"query": q.text, "answer": "", "question_type": "factoid",
-         "evidence_ids": qrels_by_query[q.query_id]}
+         "evidence_ids": qrels_by_query[q.query_id],
+         "source_query_id": q.query_id, "relevance_grades": grades_by_query[q.query_id]}
         for q in queries if q.query_id in qrels_by_query
     ]
 
@@ -278,12 +281,14 @@ def _sample_clerc_from_raw(
     `fetch_clerc_sample` so the (cache-eligible) raw fetch and the (seed-dependent) sampling are two
     separate concerns; this function has no network access of its own."""
     qrels_by_query: dict[str, list[str]] = {}
+    grades_by_query: dict[str, dict[str, int]] = {}
     for line in qrels_lines:
         if not line.strip():
             continue
         qid, _unused, doc_id, rel = line.split("\t")
         if int(rel) > 0:
             qrels_by_query.setdefault(qid, []).append(doc_id)
+            grades_by_query.setdefault(qid, {})[doc_id] = int(rel)
 
     query_text_by_id: dict[str, str] = {}
     for line in queries_lines:
@@ -346,7 +351,8 @@ def _sample_clerc_from_raw(
     doc_list = [{"_id": did, "title": "", "text": text} for did, text in docs_by_id.items()]
     query_list = [
         {"query": query_text_by_id[qid], "answer": "", "question_type": "citation-retrieval",
-         "evidence_ids": qrels_by_query[qid]}
+         "evidence_ids": qrels_by_query[qid],
+         "source_query_id": qid, "relevance_grades": grades_by_query[qid]}
         for qid in sorted(sampled_qids)
     ]
 

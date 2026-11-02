@@ -78,6 +78,7 @@ function main() {
     return;
   }
   const release = JSON.parse(fs.readFileSync(releasePath, "utf8"));
+  if (release.status === "superseded") throw new Error("superseded release cannot supply current README claims");
   const measured = release.measured || {};
   const ablations = release.ablations || {};
 
@@ -97,7 +98,7 @@ function main() {
     { token: "MIRACL-de", values: [nd(measured["mixed/miracl-de-2k"])] },
     { token: "MIRACL-fr", values: [nd(measured["mixed/miracl-fr-2k"])] },
     { token: "CourtListener", values: [nd(courtFull), nd(measured["mixed/courtlistener-200"])] },
-    { token: "CLERC", values: [nd(measured["mixed/legal-clerc-200"])] },
+    { token: "CLERC", dataset: "mixed/legal-clerc-200", values: [nd(measured["mixed/legal-clerc-200"])] },
   ];
 
   const failures = [];
@@ -105,6 +106,9 @@ function main() {
   for (const exp of expectations) {
     const row = rows.find((r) => r.toLowerCase().includes(exp.token.toLowerCase()));
     if (!row) continue; // README chose not to show this corpus — editorial freedom.
+    if (release.withheld?.[exp.dataset] && (!/withheld/i.test(row) || /\b0\.\d+/.test(row))) {
+      failures.push(`${exp.token}: default-mode row must state WITHHELD without a quality score`);
+    }
     for (const v of exp.values) {
       if (v == null) continue; // release doesn't carry this number — nothing to assert.
       checked += 1;

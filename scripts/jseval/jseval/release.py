@@ -186,7 +186,9 @@ def _hardware_projection(manifest: dict) -> dict:
     # cudaVersion is the pinned toolkit major, captured Head-side (a constant, no ORT init).
     worker = (manifest.get("debug_state_snapshot") or {}).get("worker") or {}
     effective_config = worker.get("effective_config") or {}
+    platform = (manifest.get("env_fingerprint") or {}).get("platform") or {}
     return {
+        "os": " ".join(str(platform[k]) for k in ("system", "release", "machine") if platform.get(k)) or None,
         "gpu_name": gpu_fp.get("name"),
         "gpu_vram_bytes": gpu_inf.get("totalVramBytes") or gpu_fp.get("mem_total_mb"),
         "gpu_driver_version": gpu_inf.get("nvmlDriverVersion") or gpu_fp.get("driver_version"),
@@ -262,6 +264,8 @@ def _measured_for_mode(summary: dict, mode: str) -> dict | None:
         "confidence_tier": _confidence_tier(summary, qsum),
         "corpus_source": _corpus_source(summary),
         "qrels_id": qsum.get("relevance_mode"),
+        **({"ce_coverage": summary["ce_coverage"]["per_mode"][mode]}
+           if mode in (summary.get("ce_coverage") or {}).get("per_mode", {}) else {}),
     }
 
 
@@ -288,6 +292,7 @@ def compose(
     leak_by_dataset: dict | None = None,
     union_recall_by_dataset: dict | None = None,
     run_sources: list[dict] | None = None,
+    withheld_default: dict[str, str] | None = None,
 ) -> dict:
     """Compose cohort-identical run summaries into one benchmark release.
 
@@ -321,6 +326,9 @@ def compose(
         `715-rebaseline-2026-07-16`, whose runs no longer exist anywhere on disk. The
         ``summary_sha256`` is the durable half: paths rot, but it still answers "is this
         candidate directory the one this release was built from?".
+    :param withheld_default: included dataset slugs mapped to publication-withholding reasons.
+        Their default-mode metrics supply neither claims nor floors; sources, CE coverage
+        and non-default ablations remain visible.
     :raises ComposeError: if the runs don't all share one ``config_cohort_key``,
         or ``run_sources`` is present but not the same length as ``run_summaries``,
         or (when ``require_comparable``) a default-mode run isn't ``comparable``.
@@ -328,6 +336,10 @@ def compose(
     """
     if not run_summaries:
         raise ComposeError("no run summaries provided")
+    withheld_default = withheld_default or {}
+    datasets = {canonical_dataset_slug(s.get("dataset")) for s in run_summaries}
+    if set(withheld_default) - datasets or any(not reason.strip() for reason in withheld_default.values()):
+        raise ComposeError("withheld defaults must name included datasets and provide a non-empty reason")
 
     # Fail CLOSED on a mismatched sources list rather than recording provenance that points
     # at the wrong run — a silently misaligned pointer is worse than none, because it looks
@@ -389,11 +401,22 @@ def compose(
     measured: dict[str, dict] = {}
     ablations: dict[str, list] = {}
     missing_default: list[str] = []
+    withheld: dict[str, dict] = {}
     for s in run_summaries:
         ds = canonical_dataset_slug(s.get("dataset"))
         head = _measured_for_mode(s, default_mode)
-        if head is not None:
-            if require_comparable and not head["comparable"]:
+        if ds in withheld_default:
+            if head is None:
+                raise ComposeError(f"cannot withhold absent default-mode run for {ds!r}")
+            withheld[ds] = {
+                "config_mode": default_mode,
+                "reason": withheld_default[ds],
+                "corpus_source": head["corpus_source"],
+                "ce_coverage": head.get("ce_coverage"),
+            }
+        elif head is not None:
+            if require_comparable and (not head["comparable"] or
+                    (head.get("ce_coverage") or {}).get("verdict") == "degraded-ce"):
                 raise ComposeError(
                     f"default-mode run for {ds!r} is not comparable "
                     f"(reasons in summary); refusing to publish",
@@ -447,6 +470,7 @@ def compose(
         "cohort": cohort,
         "measured": measured,
         "ablations": ablations,
+        **({"withheld": withheld} if withheld else {}),
         **({"sources": sources_section} if sources_section else {}),
         **({"leak": leak_section} if leak_section else {}),
         **({"union_recall": union_recall_section} if union_recall_section else {}),
