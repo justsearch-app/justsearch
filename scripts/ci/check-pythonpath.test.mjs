@@ -29,13 +29,15 @@ const planted = {
   'scripts/d.mjs': "const env = { PYTHONPATH: path.join(root, 'scripts', 'jseval') };\n",
   'scripts/e.bat': 'set "PYTHONPATH=%WT%\\scripts\\jseval"\n',
   'scripts/f.py': 'env["PYTHONPATH"] = str(root / "scripts" / "jseval")\n',
+  // jsharness named later on the line, outside the value, must not hide the error.
+  'scripts/g.sh': 'PYTHONPATH=scripts/jseval python -c "from jsharness.readiness import wait_pipeline_complete"\n',
 };
 
 test('every planted jseval-only PYTHONPATH is named', t => {
   const result = scratch(t, planted);
   assert.equal(result.status, 1, result.stdout + result.stderr);
   for (const file of Object.keys(planted)) assert.match(result.stderr, new RegExp(`${file.replace(/[.\\/]/g, '\\$&')}:\\d+:`), file);
-  assert.match(result.stderr, /\(6\)/);
+  assert.match(result.stderr, /\(7\)/);
 });
 
 test('both packages, the helper, a script path after the value, and history pass', t => {

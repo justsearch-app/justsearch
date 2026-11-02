@@ -5,6 +5,7 @@ import path from 'node:path';
 import { ROOT, ARMS, buildPlan, parseArgs, latestRecords } from './e-run.mjs';
 import { measurementIdentity, normalizePlan, instrumentFiles } from './e-pair-identity.mjs';
 
+const posixPath = file => file.replaceAll('\\', '/');
 const values = JSON.parse(fs.readFileSync(path.join(ROOT, 'docs/design/lane-f-engine-jvm/evidence/E/values.json'))).values;
 const options = (arm, group) => ({ sourceRoot: ROOT, outputRoot: ROOT, armTree: ARMS[arm], arm, group,
   machine: { cpu: ['test-cpu'], ramBytes: 1000 }, corpus: [['frozen-corpus.txt', 'fixed-hash']],
@@ -65,6 +66,18 @@ test('quality acquisition includes the moved suite statistics in its identity', 
   const modified = measurementIdentity(plan, opts, file => file.endsWith('suite_stats.py')
     ? Buffer.concat([fs.readFileSync(file), Buffer.from('\n# instrument change')]) : fs.readFileSync(file));
   assert.notEqual(normal.pairIdentity, modified.pairIdentity);
+});
+test('fixture capture identity counts what its shell scripts call from their own checkout', () => {
+  const plan = planFor('main', 'e1-quality'), opts = options('main', 'e1-quality');
+  const normal = measurementIdentity(plan, opts);
+  // fixture-cycle.sh runs `node "$repo/.../fixture-ingest.mjs"` and sources `. "$repo/scripts/lib/python-path.sh"`,
+  // which runs `node "${BASH_SOURCE[0]%/*}/python-path.cjs"`.
+  for (const name of ['scripts/jseval/lane-f/fixture-ingest.mjs', 'scripts/lib/python-path.sh', 'scripts/lib/python-path.cjs']) {
+    assert.ok(normal.pairIdentityInputs.instruments[name], name);
+    const modified = measurementIdentity(plan, opts, file => posixPath(file).endsWith(name)
+      ? Buffer.concat([fs.readFileSync(file), Buffer.from('\n// instrument change')]) : fs.readFileSync(file));
+    assert.notEqual(normal.pairIdentity, modified.pairIdentity, name);
+  }
 });
 test('resolved invocation/session/raw paths and arm-only Worker env normalize away', () => {
   const template = planFor('main', 'e4-memory-soak');
