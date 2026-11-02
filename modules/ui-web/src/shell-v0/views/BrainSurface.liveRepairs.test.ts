@@ -49,10 +49,10 @@ beforeEach(() => {
   preview = { totalDownloadBytes: 1024, components: ['embedding', 'reranker', 'chat'].map(id => ({ id, label: id, state: 'installed', declinable: id !== 'embedding', totalBytes: 1024, downloadBytes: 0 })) };
   previewGet = null; saveWait = null; saveConflict = false; chatEnabled = true; llm = {}; posts = []; operations = []; declines = []; witness = { acceptedRevision: 0, lastCommittedOperationKey: null };
   store.current = {
-    snapshotLive: true, aiEngine: { kind: 'online', stability: { kind: 'settled' }, installFailure: null },
+    installObservationLive: true, runtimeObservationLive: true, snapshotLive: true, aiEngine: { kind: 'online', stability: { kind: 'settled' }, installFailure: null },
     runtime: { mode: 'online', installed: { known: true, value: true }, modelId: 'answer-model' },
     installStatus: { state: 'completed', installedFully: true },
-    runtimeStatus: { active: { mmprojActive: true }, onnxFeatures: [{ id: 'embed', status: 'active', modelActive: true }, { id: 'reranker', status: 'active', modelActive: true }] },
+    runtimeStatus: { installedVariants: [{ variantId: 'cuda' }], active: { activeVariantId: 'cuda', modelPath: '/answer', mmprojActive: true }, onnxFeatures: [{ id: 'embed', status: 'active', modelActive: true }, { id: 'reranker', status: 'active', modelActive: true }] },
     capabilities: { chat: true }, status: { inference: { chatEnabledSpec: true } },
   } as unknown as AiState;
   vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
@@ -158,14 +158,14 @@ describe('Brain live redesign repairs', () => {
     saveConflict = false; slider.dispatchEvent(new Event('change')); await settle(el);
     expect(posts).toEqual([{ gpuLayers: 5 }, { gpuLayers: 6 }]); expect(el.llm.gpuLayers).toBe(6);
   });
-  it('D5 Linux memory uses the status GPU totals across devices without inventing an adapter', async () => {
+  it('G5 Linux memory uses device zero status GPU figures and labels one of several devices', async () => {
     emit({ status: { gpu: { totalVramBytes: 12 * 1024 ** 3, usedVramBytes: 9 * 1024 ** 3, deviceCount: 2 } } as AiState['status'] });
     const el = await mount(); const card = () => el.shadowRoot!.querySelector('.graphics-card')!;
-    expect(card().textContent).toContain('9.00 GB of 12.00 GB in use · all apps · 2 graphics devices');
+    expect(card().textContent).toContain('9.00 GB of 12.00 GB in use · all apps · one of 2 graphics devices');
     expect(card().querySelector('[role="meter"]')?.getAttribute('aria-valuenow')).toBe(String(9 * 1024 ** 3));
     emit({ snapshotLive: false }); await el.updateComplete;
     expect(card().textContent).toContain('Memory use unknown'); expect(card().querySelector('[aria-valuenow]')).toBeNull();
-    emit({ snapshotLive: true, status: { gpu: { totalVramBytes: 12 * 1024 ** 3 } } as AiState['status'] }); await el.updateComplete;
+    emit({ installObservationLive: true, runtimeObservationLive: true, snapshotLive: true, status: { gpu: { totalVramBytes: 12 * 1024 ** 3 } } as AiState['status'] }); await el.updateComplete;
     expect(card().textContent).toContain('Memory use unknown');
   });
   it('D1 sentence boundaries keep whitespace outside phrase buttons and punctuation attached to preceding prose', async () => {
@@ -207,5 +207,60 @@ describe('Brain live redesign repairs', () => {
     expect(el.shadowRoot!.textContent).not.toContain('in Detailed');
     emit({ installStatus: { state: 'completed', installedFully: true, repairNeeded: true, packages: [{ packageId: 'embedding', state: 'failed', terminalReason: 'TRANSPORT_UNAVAILABLE', attempts: 3, url: 'https://example.invalid/model', targetPath: '/model' }] } }); await el.updateComplete;
     expect(el.shadowRoot!.textContent).toContain('use the direct links below');
+  });
+});
+
+
+describe('Brain review repairs', () => {
+  it.each(['install', 'runtime'] as const)('G1 failed %s reads override a reachable origin and settled verdict', async endpoint => {
+    const el = await mount();
+    emit(endpoint === 'install' ? { installObservationLive: false } : { runtimeObservationLive: false });
+    await el.updateComplete;
+    expect(store.current.snapshotLive).toBe(true);
+    expect(el.shadowRoot!.querySelector('.brain-headline')!.textContent).toContain('Checking AI');
+    expect(switches(el).every(b => b.getAttribute('aria-disabled') === 'true')).toBe(true);
+    await advanced(el);
+    expect(el.shadowRoot!.querySelector('[data-testid="brain-observed-features"]')!.textContent).toContain('when last observed');
+    expect(el.shadowRoot!.querySelector('[data-testid="component-row-chat"]')!.textContent).not.toContain('in use');
+  });
+  it.each(['connecting', 'missing install'] as const)('G2 Advanced shares the page gate for %s observations', async state => {
+    emit(state === 'connecting' ? { aiEngine: { kind: 'connecting', stability: { kind: 'provisional', cause: 'checking' }, installFailure: null } } : { installStatus: null });
+    const el = await mount(); await advanced(el); const root = el.shadowRoot!;
+    expect(root.querySelector('[data-testid="brain-observed-features"]')!.textContent).toContain('when last observed');
+    expect(root.querySelector('[data-testid="component-row-chat"]')!.textContent).toContain('last observed');
+    expect(root.querySelector('[data-testid="component-row-chat"]')!.textContent).not.toContain('in use');
+    expect(root.querySelector('[aria-label="Graphics card settings"]')!.textContent).toContain('cuda · active when last observed');
+  });
+  it('G3 selected missing answer files use saved intent while Repair owns acquisition', async () => {
+    emit({ installStatus: { state: 'idle', installedFully: false, repairNeeded: true }, capabilities: { chat: false } as AiState['capabilities'], runtime: { mode: 'offline', installed: { known: true, value: false } } as AiState['runtime'], runtimeStatus: {}, aiEngine: { kind: 'offline', stability: { kind: 'settled' }, installFailure: null } });
+    preview.components = preview.components!.map(c => c.id === 'chat' ? { ...c, state: 'to-download', downloadBytes: 1024 } : c);
+    const el = await mount();
+    expect(switches(el).map(b => b.getAttribute('aria-checked'))).toEqual(['true', 'true']);
+    switches(el)[0]!.click(); await settle(el);
+    expect(operations).toEqual(['core.set-chat-enabled']); expect(declines).toEqual([]);
+    expect(switches(el).map(b => b.getAttribute('aria-checked'))).toEqual(['false', 'false']);
+    switches(el)[1]!.click(); await settle(el);
+    expect(operations).toEqual(['core.set-chat-enabled', 'core.set-chat-enabled']); expect(declines).toEqual([]);
+    expect(switches(el).map(b => b.getAttribute('aria-checked'))).toEqual(['true', 'true']);
+    expect(el.shadowRoot!.querySelector('[role="alert"] [label="Repair"]')).not.toBeNull();
+    expect(el.shadowRoot!.querySelector<HTMLDialogElement>('dialog')!.open).toBe(false);
+  });
+  it('G4 passive previews complete before another batch starts and converge other windows without locking choices', async () => {
+    vi.useFakeTimers(); const mounting = mount(); await vi.advanceTimersByTimeAsync(0); const el = await mounting;
+    let release!: (response: Response) => void;
+    const slow = vi.fn(() => new Promise<Response>(resolve => { release = resolve; })); previewGet = slow;
+    await vi.advanceTimersByTimeAsync(5000);
+    expect(slow).toHaveBeenCalledTimes(1);
+    expect(switches(el).every(b => b.getAttribute('aria-disabled') === 'false')).toBe(true);
+    await vi.advanceTimersByTimeAsync(15000);
+    expect(slow).toHaveBeenCalledTimes(1);
+    previewGet = null;
+    release(json({ ...preview, components: preview.components!.map(c => ({ ...c, totalBytes: 2048 })) }));
+    await vi.advanceTimersByTimeAsync(0); await el.updateComplete;
+    expect(el.shadowRoot!.querySelector('[data-feature="reranker"]')!.textContent).toContain('2.0 KB');
+    await vi.advanceTimersByTimeAsync(4999); expect(slow).toHaveBeenCalledTimes(1);
+    await vi.advanceTimersByTimeAsync(1); await el.updateComplete;
+    expect(el.shadowRoot!.querySelector('[data-feature="reranker"]')!.textContent).toContain('1.0 KB');
+    el.remove(); await vi.advanceTimersByTimeAsync(20000); expect(slow).toHaveBeenCalledTimes(1);
   });
 });

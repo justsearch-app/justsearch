@@ -52,7 +52,7 @@ function renderPanel(kind: AiEngineVerdict['kind'], opts: { onlineAiEnabled?: bo
   el.settingsRead = true; // This harness supplies the successful settings-read snapshot directly.
   el.planPreview = opts.chatUnavailable ? { components: [{ id: 'chat', state: 'unavailable', unavailableReason: opts.chatUnavailable }] } : { components: [{ id: 'embedding', state: 'installed' }, { id: 'chat', state: 'installed', declinable: true }] };
   el.inference = null;
-  el._unifiedAiState = { aiEngine: verdict(kind), snapshotLive: true };
+  el._unifiedAiState = { aiEngine: verdict(kind), installObservationLive: true, runtimeObservationLive: true, snapshotLive: true };
   el.host_ = {
     data: {
       invokeOperation: (operationId: string, args: Record<string, unknown>) => {

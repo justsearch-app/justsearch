@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
   },
-  "createdAt": "2026-11-02T09:57:00.579Z",
-  "revision": "e4bb40ed0ea2251d20450379ed9fb25a9c8627d0",
-  "tree": "1e96041b4957aa520648905cfc6d840c3904e765",
+  "createdAt": "2026-11-02T10:24:09.752Z",
+  "revision": "13a89c28aa49aa1767d5816d29b9c1d2f20b4720",
+  "tree": "5fc8ec3d01866ff6c51af99c608b3ab0c55faa4e",
   "environment": {
     "platform": "linux",
     "arch": "x64",
@@ -18,10 +18,10 @@
   },
   "runs": [
     {
-      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/BrainSurface.redesign.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/s1jdqc91/tmp/test-intent-vitest-339-1793613412120.json\"",
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/BrainSurface.redesign.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/de5l46_l/tmp/test-intent-vitest-219-1793615040946.json\"",
       "cwd": "modules/ui-web",
       "exitCode": 0,
-      "durationMs": 4576
+      "durationMs": 4741
     }
   ],
   "checks": [
@@ -29,7 +29,7 @@
       "id": "modules/ui-web/src/shell-v0/views/BrainSurface.redesign.test.ts#consent lists only planned packages, excluding declined siblings and already installed files",
       "file": "modules/ui-web/src/shell-v0/views/BrainSurface.redesign.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:7cabf5924cc50427610a5f884538d36a62ccbe4773062ed39e9c97091abd4939",
+      "contentDigest": "sha256:0b40fa6a5338a30abc552ef209376cf42e4a4a1de94193c5208580372e043226",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -44,7 +44,7 @@
       "id": "modules/ui-web/src/shell-v0/views/BrainSurface.redesign.test.ts#accept is disabled until the manifest and every download size are known, with retry",
       "file": "modules/ui-web/src/shell-v0/views/BrainSurface.redesign.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:7cabf5924cc50427610a5f884538d36a62ccbe4773062ed39e9c97091abd4939",
+      "contentDigest": "sha256:0b40fa6a5338a30abc552ef209376cf42e4a4a1de94193c5208580372e043226",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -63,25 +63,25 @@
     "patches": [],
     "runs": [
       {
-        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/BrainSurface.redesign.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/s1jdqc91/tmp/test-intent-vitest-339-1793613418662.json\"",
+        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/BrainSurface.redesign.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/de5l46_l/tmp/test-intent-vitest-219-1793615047865.json\"",
         "cwd": "<before-worktree>",
         "exitCode": 1,
-        "durationMs": 1448,
-        "output": "JSON report written to /home/elias/.cache/am/s1jdqc91/tmp/test-intent-vitest-339-1793613418662.json\n\n"
+        "durationMs": 1359,
+        "output": "JSON report written to /home/elias/.cache/am/de5l46_l/tmp/test-intent-vitest-219-1793615047865.json\n\n"
       }
     ],
     "checks": [
       {
         "id": "modules/ui-web/src/shell-v0/views/BrainSurface.redesign.test.ts#consent lists only planned packages, excluding declined siblings and already installed files",
         "classification": "assertion",
-        "detail": "AI Brain redesign behaviour consent lists only planned packages, excluding declined siblings and already installed files:  AssertionError: expected [ 'embedding', 'reranker', …(4) ] to deeply equal [ 'chat' ]\n    at /home/elias/.cache/am/s1jdqc91/tmp/test-intent-before-uSh911/modules/ui-web/src/shell-v0/views/BrainSurface.redesign.test.ts:215:45\n    at file:///home/elias/.cache/am/s1jdqc91/tmp/test-intent-before-uSh911/"
+        "detail": "AI Brain redesign behaviour consent lists only planned packages, excluding declined siblings and already installed files:  AssertionError: expected [ 'embedding', 'reranker', …(4) ] to deeply equal [ 'chat' ]\n    at /home/elias/.cache/am/de5l46_l/tmp/test-intent-before-TPbh8t/modules/ui-web/src/shell-v0/views/BrainSurface.redesign.test.ts:215:45\n    at file:///home/elias/.cache/am/de5l46_l/tmp/test-intent-before-TPbh8t/"
       },
       {
         "id": "modules/ui-web/src/shell-v0/views/BrainSurface.redesign.test.ts#accept is disabled until the manifest and every download size are known, with retry",
         "classification": "assertion",
-        "detail": "AI Brain redesign behaviour accept is disabled until the manifest and every download size are known, with retry:  AssertionError: expected false to be true // Object.is equality\n    at /home/elias/.cache/am/s1jdqc91/tmp/test-intent-before-uSh911/modules/ui-web/src/shell-v0/views/BrainSurface.redesign.test.ts:183:29\n    at file:///home/elias/.cache/am/s1jdqc91/tmp/test-intent-before-uSh911/modules/ui-web/node_mo"
+        "detail": "AI Brain redesign behaviour accept is disabled until the manifest and every download size are known, with retry:  AssertionError: expected false to be true // Object.is equality\n    at /home/elias/.cache/am/de5l46_l/tmp/test-intent-before-TPbh8t/modules/ui-web/src/shell-v0/views/BrainSurface.redesign.test.ts:183:29\n    at file:///home/elias/.cache/am/de5l46_l/tmp/test-intent-before-TPbh8t/modules/ui-web/node_mo"
       }
     ]
   },
-  "digest": "sha256:9d2c16c791981b9c2176075b2c246a0b4f34585faf5ff5ee3d4b258168ca6b9f"
+  "digest": "sha256:607acb5011a0ca291429da6adf81261b05a4f897030bcb2b710bd4a1e63982a6"
 }

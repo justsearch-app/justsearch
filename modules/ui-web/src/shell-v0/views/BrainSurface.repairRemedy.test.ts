@@ -47,7 +47,7 @@ async function installButtons(
   document.body.appendChild(el);
   await el.updateComplete;
   el.installStatus = installStatus;
-  el._unifiedAiState = { snapshotLive: true, aiEngine: { kind: 'offline', stability: { kind: 'settled' }, installFailure: null } };
+  el._unifiedAiState = { installObservationLive: true, runtimeObservationLive: true, snapshotLive: true, aiEngine: { kind: 'offline', stability: { kind: 'settled' }, installFailure: null } };
   el.expanded = { advanced: true };
   el.requestUpdate();
   await el.updateComplete;

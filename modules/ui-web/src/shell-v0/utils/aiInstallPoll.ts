@@ -109,6 +109,9 @@ export interface AiInstallSnapshot {
   install: InstallStatus | null;
   runtime: AiRuntimeStatus | null;
   packs: PackImportStatus | null;
+  /** Latest endpoint reads succeeded and have not exceeded the poll interval. */
+  installLive?: boolean;
+  runtimeLive?: boolean;
 }
 
 type Listener = (snapshot: AiInstallSnapshot) => void;
@@ -117,6 +120,7 @@ const listeners = new Set<Listener>();
 let timer: number | null = null;
 let controller: AbortController | null = null;
 let apiBase = '';
+const expiryTimers = new Map<'install' | 'runtime', number>();
 let last: AiInstallSnapshot = { install: null, runtime: null, packs: null };
 
 // Matches the original per-operation pollers' cadence (1s) while something is actually happening —
@@ -162,25 +166,35 @@ async function fetchJson<T>(path: string, current: AbortController): Promise<T |
   }
 }
 
-async function fetchOnce(current: AbortController): Promise<void> {
-  const [install, runtime, packs] = await Promise.all([
-    fetchJson<InstallStatus>('/api/ai/install/status', current),
-    fetchJson<AiRuntimeStatus>('/api/ai/runtime/status', current),
-    fetchJson<PackImportStatus>('/api/ai/packs/status', current),
-  ]);
-  if (controller !== current) return;
-  // Retain last-known-good per field on a transient failure — a single bad tick must never
-  // regress an already-known field back to null (that regression is what stranded BrainSurface
-  // on "Connecting…" before this module existed).
-  last = {
-    install: install ?? last.install,
-    runtime: runtime ?? last.runtime,
-    packs: packs ?? last.packs,
-  };
-  for (const l of listeners) {
+function publish(current: AbortController): void {
+  for (const listener of listeners) {
     if (controller !== current) return;
-    l(last);
+    listener(last);
   }
+}
+
+async function readStatus<K extends 'install' | 'runtime' | 'packs'>(key: K, current: AbortController): Promise<void> {
+  const value = await fetchJson<NonNullable<AiInstallSnapshot[K]>>(`/api/ai/${key}/status`, current);
+  if (controller !== current) return;
+  // Retain history, but invalidate a failed read independently of origin reachability
+  // and of other endpoints that may still be pending.
+  last = { ...last, [key]: value ?? last[key] };
+  if (key !== 'packs') {
+    window.clearTimeout(expiryTimers.get(key));
+    last = { ...last, [`${key}Live`]: value !== null };
+    if (value !== null) expiryTimers.set(key, window.setTimeout(() => {
+      if (controller !== current) return;
+      last = { ...last, [`${key}Live`]: false };
+      publish(current);
+    }, pollIntervalFor(last)));
+  }
+  publish(current);
+}
+
+async function fetchOnce(current: AbortController): Promise<void> {
+  await Promise.all([
+    readStatus('install', current), readStatus('runtime', current), readStatus('packs', current),
+  ]);
 }
 
 /**
@@ -215,6 +229,8 @@ function stop(): void {
     window.clearTimeout(timer);
     timer = null;
   }
+  for (const timer of expiryTimers.values()) window.clearTimeout(timer);
+  expiryTimers.clear();
   last = { install: null, runtime: null, packs: null };
 }
 

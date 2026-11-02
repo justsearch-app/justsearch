@@ -61,7 +61,7 @@ beforeEach(() => {
   presence = {}; llmValues = {}; settingsConflict = false;
   chatEnabled = true; settingsGet = null; previewGet = null; declineWait = null; operationWait = null; manifestFails = false; calls = []; declines = [];
   store.current = {
-    aiEngine: { kind: 'online', stability: { kind: 'settled' }, installFailure: null }, snapshotLive: true,
+    aiEngine: { kind: 'online', stability: { kind: 'settled' }, installFailure: null }, installObservationLive: true, runtimeObservationLive: true, snapshotLive: true,
     runtime: { mode: 'online', modelId: 'answer-model', modelLabel: 'Answer model', installed: { known: true, value: true } },
     capabilities: { chat: true }, status: { inference: { chatEnabledSpec: true }, operating: { gpu: { stale: false, adapter: 'Test adapter', adapterTotalBytes: 8192, adapterFreeBytes: 4096 } } },
     installStatus: { state: 'completed', phase: 'done', installedFully: true },
@@ -329,7 +329,7 @@ describe('Brain step 1 review repairs', () => {
     emit({ snapshotLive: false }); await el.updateComplete;
     expect(el.shadowRoot!.querySelector('.brain-sentence')!.textContent).not.toContain('while pictures are being read');
     expect(el.shadowRoot!.querySelector('.brain-sentence')!.textContent).toContain('Pictures were being read when last observed');
-    emit({ snapshotLive: true, status: { inference: { chatEnabledSpec: true, procedure: 'NONE' } } as AiState['status'] }); await el.updateComplete;
+    emit({ installObservationLive: true, runtimeObservationLive: true, snapshotLive: true, status: { inference: { chatEnabledSpec: true, procedure: 'NONE' } } as AiState['status'] }); await el.updateComplete;
     expect(el.shadowRoot!.querySelector('.brain-sentence')!.textContent).toContain('answers your questions');
     expect(el.shadowRoot!.querySelector('.brain-sentence')!.textContent).not.toContain('last observed');
   });

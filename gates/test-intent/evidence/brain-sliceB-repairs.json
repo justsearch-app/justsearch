@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
   },
-  "createdAt": "2026-11-02T09:57:12.963Z",
-  "revision": "e4bb40ed0ea2251d20450379ed9fb25a9c8627d0",
-  "tree": "6366da4b43bb44019d439b1ceabb64de5d60f943",
+  "createdAt": "2026-11-02T10:24:43.941Z",
+  "revision": "13a89c28aa49aa1767d5816d29b9c1d2f20b4720",
+  "tree": "d453779bd3efbe9a825238f3e99333aa3326366a",
   "environment": {
     "platform": "linux",
     "arch": "x64",
@@ -18,10 +18,10 @@
   },
   "runs": [
     {
-      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/BrainSurface.sliceB.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/s1jdqc91/tmp/test-intent-vitest-496-1793613426651.json\"",
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/BrainSurface.sliceB.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/de5l46_l/tmp/test-intent-vitest-689-1793615076943.json\"",
       "cwd": "modules/ui-web",
       "exitCode": 0,
-      "durationMs": 1849
+      "durationMs": 2047
     }
   ],
   "checks": [
@@ -29,7 +29,7 @@
       "id": "modules/ui-web/src/shell-v0/views/BrainSurface.sliceB.test.ts#R1 acquisition decline does not hide existing answer files or replace their runtime switch, including after remount",
       "file": "modules/ui-web/src/shell-v0/views/BrainSurface.sliceB.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:136d0b02fa0c3ef58c74b55eb8047e1910af50d9e656831aa6c84ae5b12c91e4",
+      "contentDigest": "sha256:376822a668bb044e1e3ef15acbaa9db5dc80317ebb94f87bdf6aa588f1c6c0c2",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -44,7 +44,7 @@
       "id": "modules/ui-web/src/shell-v0/views/BrainSurface.sliceB.test.ts#R2 unavailable answers are not promised, and pictures use explicit availability",
       "file": "modules/ui-web/src/shell-v0/views/BrainSurface.sliceB.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:136d0b02fa0c3ef58c74b55eb8047e1910af50d9e656831aa6c84ae5b12c91e4",
+      "contentDigest": "sha256:376822a668bb044e1e3ef15acbaa9db5dc80317ebb94f87bdf6aa588f1c6c0c2",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -59,7 +59,7 @@
       "id": "modules/ui-web/src/shell-v0/views/BrainSurface.sliceB.test.ts#R2 not-in-mode answers are not promised, and pictures use explicit availability",
       "file": "modules/ui-web/src/shell-v0/views/BrainSurface.sliceB.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:136d0b02fa0c3ef58c74b55eb8047e1910af50d9e656831aa6c84ae5b12c91e4",
+      "contentDigest": "sha256:376822a668bb044e1e3ef15acbaa9db5dc80317ebb94f87bdf6aa588f1c6c0c2",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -74,7 +74,7 @@
       "id": "modules/ui-web/src/shell-v0/views/BrainSurface.sliceB.test.ts#R3 live installed packages replace stale not-downloaded paths before the staged run ends",
       "file": "modules/ui-web/src/shell-v0/views/BrainSurface.sliceB.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:136d0b02fa0c3ef58c74b55eb8047e1910af50d9e656831aa6c84ae5b12c91e4",
+      "contentDigest": "sha256:376822a668bb044e1e3ef15acbaa9db5dc80317ebb94f87bdf6aa588f1c6c0c2",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -89,7 +89,7 @@
       "id": "modules/ui-web/src/shell-v0/views/BrainSurface.sliceB.test.ts#R4 an unknown runtime observation stays unconfirmed in both sentence and path",
       "file": "modules/ui-web/src/shell-v0/views/BrainSurface.sliceB.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:136d0b02fa0c3ef58c74b55eb8047e1910af50d9e656831aa6c84ae5b12c91e4",
+      "contentDigest": "sha256:376822a668bb044e1e3ef15acbaa9db5dc80317ebb94f87bdf6aa588f1c6c0c2",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -104,7 +104,7 @@
       "id": "modules/ui-web/src/shell-v0/views/BrainSurface.sliceB.test.ts#R5 a settings GET begun before a witnessed LLM save cannot revert the saved value",
       "file": "modules/ui-web/src/shell-v0/views/BrainSurface.sliceB.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:136d0b02fa0c3ef58c74b55eb8047e1910af50d9e656831aa6c84ae5b12c91e4",
+      "contentDigest": "sha256:376822a668bb044e1e3ef15acbaa9db5dc80317ebb94f87bdf6aa588f1c6c0c2",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -119,7 +119,7 @@
       "id": "modules/ui-web/src/shell-v0/views/BrainSurface.sliceB.test.ts#R6 the processor-fallback repair hint remains an accessible alert with its action",
       "file": "modules/ui-web/src/shell-v0/views/BrainSurface.sliceB.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:136d0b02fa0c3ef58c74b55eb8047e1910af50d9e656831aa6c84ae5b12c91e4",
+      "contentDigest": "sha256:376822a668bb044e1e3ef15acbaa9db5dc80317ebb94f87bdf6aa588f1c6c0c2",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -138,50 +138,50 @@
     "patches": [],
     "runs": [
       {
-        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/BrainSurface.sliceB.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/s1jdqc91/tmp/test-intent-vitest-496-1793613430417.json\"",
+        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/BrainSurface.sliceB.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/de5l46_l/tmp/test-intent-vitest-689-1793615081039.json\"",
         "cwd": "<before-worktree>",
         "exitCode": 1,
-        "durationMs": 2061,
-        "output": "JSON report written to /home/elias/.cache/am/s1jdqc91/tmp/test-intent-vitest-496-1793613430417.json\n\n"
+        "durationMs": 2387,
+        "output": "JSON report written to /home/elias/.cache/am/de5l46_l/tmp/test-intent-vitest-689-1793615081039.json\n\n"
       }
     ],
     "checks": [
       {
         "id": "modules/ui-web/src/shell-v0/views/BrainSurface.sliceB.test.ts#R1 acquisition decline does not hide existing answer files or replace their runtime switch, including after remount",
         "classification": "assertion",
-        "detail": "Brain slice A independent review repairs R1 acquisition decline does not hide existing answer files or replace their runtime switch, including after remount:  AssertionError: expected '\\n        \\n          \\n    \\n  \\n   …' not to contain 'Not downloaded'\n    at /home/elias/.cache/am/s1jdqc91/tmp/test-intent-before-oLoXiz/modules/ui-web/src/shell-v0/views/BrainSurface.sliceB.test.ts:111:87\n    at runNextTicks (node:internal/process/task_queues:65:5)"
+        "detail": "Brain slice A independent review repairs R1 acquisition decline does not hide existing answer files or replace their runtime switch, including after remount:  AssertionError: expected '\\n        \\n          \\n    \\n  \\n   …' not to contain 'Not downloaded'\n    at /home/elias/.cache/am/de5l46_l/tmp/test-intent-before-YHfrg9/modules/ui-web/src/shell-v0/views/BrainSurface.sliceB.test.ts:111:87\n    at runNextTicks (node:internal/process/task_queues:65:5)"
       },
       {
         "id": "modules/ui-web/src/shell-v0/views/BrainSurface.sliceB.test.ts#R2 unavailable answers are not promised, and pictures use explicit availability",
         "classification": "assertion",
-        "detail": "Brain slice A independent review repairs R2 unavailable answers are not promised, and pictures use explicit availability:  AssertionError: expected 'Search already works with exact words…' not to contain 'and answer your questions with sources'\n    at /home/elias/.cache/am/s1jdqc91/tmp/test-intent-before-oLoXiz/modules/ui-web/src/shell-v0/views/BrainSurface.sliceB.test.ts:123:78\n    at runNextTicks (node:internal/proces"
+        "detail": "Brain slice A independent review repairs R2 unavailable answers are not promised, and pictures use explicit availability:  AssertionError: expected 'Search already works with exact words…' not to contain 'and answer your questions with sources'\n    at /home/elias/.cache/am/de5l46_l/tmp/test-intent-before-YHfrg9/modules/ui-web/src/shell-v0/views/BrainSurface.sliceB.test.ts:123:78\n    at runNextTicks (node:internal/proces"
       },
       {
         "id": "modules/ui-web/src/shell-v0/views/BrainSurface.sliceB.test.ts#R2 not-in-mode answers are not promised, and pictures use explicit availability",
         "classification": "assertion",
-        "detail": "Brain slice A independent review repairs R2 not-in-mode answers are not promised, and pictures use explicit availability:  AssertionError: expected 'Search already works with exact words…' not to contain 'and answer your questions with sources'\n    at /home/elias/.cache/am/s1jdqc91/tmp/test-intent-before-oLoXiz/modules/ui-web/src/shell-v0/views/BrainSurface.sliceB.test.ts:123:78\n    at runNextTicks (node:internal/proces"
+        "detail": "Brain slice A independent review repairs R2 not-in-mode answers are not promised, and pictures use explicit availability:  AssertionError: expected 'Search already works with exact words…' not to contain 'and answer your questions with sources'\n    at /home/elias/.cache/am/de5l46_l/tmp/test-intent-before-YHfrg9/modules/ui-web/src/shell-v0/views/BrainSurface.sliceB.test.ts:123:78\n    at runNextTicks (node:internal/proces"
       },
       {
         "id": "modules/ui-web/src/shell-v0/views/BrainSurface.sliceB.test.ts#R3 live installed packages replace stale not-downloaded paths before the staged run ends",
         "classification": "assertion",
-        "detail": "Brain slice A independent review repairs R3 live installed packages replace stale not-downloaded paths before the staged run ends:  AssertionError: expected '\\n        \\n          \\n    \\n  \\n   …' not to contain 'Not downloaded'\n    at /home/elias/.cache/am/s1jdqc91/tmp/test-intent-before-oLoXiz/modules/ui-web/src/shell-v0/views/BrainSurface.sliceB.test.ts:133:87\n    at runNextTicks (node:internal/process/task_queues:65:5)"
+        "detail": "Brain slice A independent review repairs R3 live installed packages replace stale not-downloaded paths before the staged run ends:  AssertionError: expected '\\n        \\n          \\n    \\n  \\n   …' not to contain 'Not downloaded'\n    at /home/elias/.cache/am/de5l46_l/tmp/test-intent-before-YHfrg9/modules/ui-web/src/shell-v0/views/BrainSurface.sliceB.test.ts:133:87\n    at runNextTicks (node:internal/process/task_queues:65:5)"
       },
       {
         "id": "modules/ui-web/src/shell-v0/views/BrainSurface.sliceB.test.ts#R4 an unknown runtime observation stays unconfirmed in both sentence and path",
         "classification": "assertion",
-        "detail": "Brain slice A independent review repairs R4 an unknown runtime observation stays unconfirmed in both sentence and path:  AssertionError: expected 'Understanding meaning is not active, …' to contain 'Understanding meaning is unconfirmed'\n    at /home/elias/.cache/am/s1jdqc91/tmp/test-intent-before-oLoXiz/modules/ui-web/src/shell-v0/views/BrainSurface.sliceB.test.ts:140:74\n    at runNextTicks (node:internal/process/task"
+        "detail": "Brain slice A independent review repairs R4 an unknown runtime observation stays unconfirmed in both sentence and path:  AssertionError: expected 'Understanding meaning is not active, …' to contain 'Understanding meaning is unconfirmed'\n    at /home/elias/.cache/am/de5l46_l/tmp/test-intent-before-YHfrg9/modules/ui-web/src/shell-v0/views/BrainSurface.sliceB.test.ts:140:74\n    at runNextTicks (node:internal/process/task"
       },
       {
         "id": "modules/ui-web/src/shell-v0/views/BrainSurface.sliceB.test.ts#R5 a settings GET begun before a witnessed LLM save cannot revert the saved value",
         "classification": "assertion",
-        "detail": "Brain slice A independent review repairs R5 a settings GET begun before a witnessed LLM save cannot revert the saved value:  AssertionError: expected 2048 to be 8192 // Object.is equality\n    at /home/elias/.cache/am/s1jdqc91/tmp/test-intent-before-oLoXiz/modules/ui-web/src/shell-v0/views/BrainSurface.sliceB.test.ts:154:34\n    at file:///home/elias/.cache/am/s1jdqc91/tmp/test-intent-before-oLoXiz/modules/ui-web/node_modul"
+        "detail": "Brain slice A independent review repairs R5 a settings GET begun before a witnessed LLM save cannot revert the saved value:  AssertionError: expected 2048 to be 8192 // Object.is equality\n    at /home/elias/.cache/am/de5l46_l/tmp/test-intent-before-YHfrg9/modules/ui-web/src/shell-v0/views/BrainSurface.sliceB.test.ts:154:34\n    at file:///home/elias/.cache/am/de5l46_l/tmp/test-intent-before-YHfrg9/modules/ui-web/node_modul"
       },
       {
         "id": "modules/ui-web/src/shell-v0/views/BrainSurface.sliceB.test.ts#R6 the processor-fallback repair hint remains an accessible alert with its action",
         "classification": "assertion",
-        "detail": "Brain slice A independent review repairs R6 the processor-fallback repair hint remains an accessible alert with its action:  AssertionError: expected null to be 'alert' // Object.is equality\n    at /home/elias/.cache/am/s1jdqc91/tmp/test-intent-before-oLoXiz/modules/ui-web/src/shell-v0/views/BrainSurface.sliceB.test.ts:159:40\n    at runNextTicks (node:internal/process/task_queues:65:5)\n    at listOnTimeout (node:internal/"
+        "detail": "Brain slice A independent review repairs R6 the processor-fallback repair hint remains an accessible alert with its action:  AssertionError: expected null to be 'alert' // Object.is equality\n    at /home/elias/.cache/am/de5l46_l/tmp/test-intent-before-YHfrg9/modules/ui-web/src/shell-v0/views/BrainSurface.sliceB.test.ts:159:40\n    at runNextTicks (node:internal/process/task_queues:65:5)\n    at listOnTimeout (node:internal/"
       }
     ]
   },
-  "digest": "sha256:a5ef4d2040c7ab7a6ccb925237e2f90b56119fc6b26d2c4a7ad650ad93e2c6b0"
+  "digest": "sha256:e7874da6169912d08fcaf407bca55b16d7d035665f899d5bdab6f7b1fbe840d1"
 }

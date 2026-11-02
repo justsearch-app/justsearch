@@ -346,6 +346,8 @@ export interface AiState {
   installStatus: InstallStatus | null;
   runtimeStatus: AiRuntimeStatus | null;
   packStatus: PackImportStatus | null;
+  installObservationLive: boolean;
+  runtimeObservationLive: boolean;
   /**
    * Tempdoc 663 Design pass 2 - the ONE AI-engine lifecycle verdict, the fourth 594/595/596 sibling.
    * Computed once here from `installStatus`/`runtimeStatus`/`runtime`/`connection.reachable` - every
@@ -377,6 +379,8 @@ const installStateSig = signal<Maybe<{ installed: boolean; installing: boolean }
 // 663 Stage 3 — raw install/runtime/pack snapshots from the shared `aiInstallPoll`.
 const installStatusSig = signal<InstallStatus | null>(null);
 const runtimeStatusSig = signal<AiRuntimeStatus | null>(null);
+const installObservationLiveSig = signal(false);
+const runtimeObservationLiveSig = signal(false);
 const packStatusSig = signal<PackImportStatus | null>(null);
 // 595 §15.3 (E2) — retained last-settled index counts. Written ONLY by the poll
 // callback (`onStatusUpdate`), read by `buildSnapshot`; no computed writes it.
@@ -999,6 +1003,8 @@ function buildSnapshot(): AiState {
     installStatus,
     runtimeStatus,
     packStatus: packStatusSig.get(),
+    installObservationLive: installObservationLiveSig.get(),
+    runtimeObservationLive: runtimeObservationLiveSig.get(),
     aiEngine,
     chatDisabledBySpec,
     chatUnloadedReason: chatUnloadedReason(
@@ -1109,6 +1115,8 @@ function onStatusUpdate(snap: StatusSnapshot | null, invalidated = false): void 
  * as before; this finally wires the (previously dead-in-production) `installStateSig`.
  */
 function onAiInstallUpdate(snap: AiInstallSnapshot): void {
+  installObservationLiveSig.set(snap.installLive === true);
+  runtimeObservationLiveSig.set(snap.runtimeLive === true);
   installStatusSig.set(snap.install);
   runtimeStatusSig.set(snap.runtime);
   packStatusSig.set(snap.packs);
@@ -1329,6 +1337,8 @@ export function __resetAiStateForTest(): void {
   lastStatusSuccessSig.set(null);
   activitySig.set(INITIAL_ACTIVITY);
   installStateSig.set(UNKNOWN);
+  installObservationLiveSig.set(false);
+  runtimeObservationLiveSig.set(false);
   installStatusSig.set(null);
   runtimeStatusSig.set(null);
   packStatusSig.set(null);

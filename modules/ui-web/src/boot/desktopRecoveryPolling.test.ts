@@ -65,7 +65,8 @@ describe('terminal recovery application polling teardown', () => {
     if (phase === 'scheduled') {
       finish.forEach((resolve) => resolve(new Response('{}')));
       await vi.advanceTimersByTimeAsync(0);
-      expect(vi.getTimerCount()).toBe(4);
+      // Four recurring poll/store timers plus install/runtime observation expiry.
+      expect(vi.getTimerCount()).toBe(6);
     }
     supervisorEvent('restarting');
     expect(signals.every((signal) => !signal?.aborted)).toBe(true);

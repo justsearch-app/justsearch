@@ -86,7 +86,7 @@ function harness(live: boolean): Harness {
   };
   el._unifiedAiState = {
     verdict: live ? LIVE_VERDICT : DEAD_VERDICT,
-    snapshotLive: live,
+    installObservationLive: live, runtimeObservationLive: live, snapshotLive: live,
     indexingStatusLive: live,
     aiEngine: { kind: 'online', stability: { kind: 'settled' }, installFailure: null },
     episodeMaxPendingJobs: 0,
@@ -344,7 +344,7 @@ describe('BrainSurface — the status card sentence (807 Part A)', () => {
     });
     el._unifiedAiState = {
       verdict: live ? LIVE_VERDICT : DEAD_VERDICT,
-      snapshotLive: live,
+      installObservationLive: live, runtimeObservationLive: live, snapshotLive: live,
       aiEngine,
       runtime: RUNTIME,
       inference: el.inference,

@@ -19,7 +19,7 @@ function panel(procedure: string | undefined, live = true, engineReason = 'autom
   element.inference = null;
   element._unifiedAiState = {
     aiEngine: { kind: 'online', stability: { kind: 'settled' }, installFailure: null },
-    snapshotLive: live,
+    installObservationLive: live, runtimeObservationLive: live, snapshotLive: live,
     status: { inference: {
       procedure, engineReason, chatEnabledSpec: engineReason !== 'inference.up_for_background',
     } },

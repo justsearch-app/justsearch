@@ -601,6 +601,7 @@ export class BrainSurface extends JfElement {
   private uiModeUnsub: (() => void) | null = null;
   private refreshRevision = 0;
   private planRevision = 0;
+  private planReads = 0;
   private choiceRevision = 0;
   private llmRevision = 0;
   private llmPending = 0;
@@ -1334,7 +1335,9 @@ export class BrainSurface extends JfElement {
 
   /** One observation gate for the page: retained or incomplete observations are not live facts. */
   private aiKnown(): boolean {
-    return this._unifiedAiState?.snapshotLive === true && this.installStatus != null
+    return this._unifiedAiState?.snapshotLive === true
+      && this._unifiedAiState.installObservationLive === true && this._unifiedAiState.runtimeObservationLive === true
+      && this.installStatus != null
       && this._unifiedAiState?.aiEngine != null && this._unifiedAiState.aiEngine.kind !== 'connecting'
       && !(this._unifiedAiState.aiEngine.stability.kind === 'provisional'
         && ['checking', 'stale-poll'].includes(this._unifiedAiState.aiEngine.stability.cause));
@@ -1370,7 +1373,7 @@ export class BrainSurface extends JfElement {
         ? this._unifiedAiState?.capabilities?.chat === true || this._unifiedAiState?.runtime?.mode === 'online'
         : onnx?.modelActive === true);
       const unavailable = !present && (component?.state === 'unavailable' || component?.state === 'not-in-mode');
-      const selected = installed && id === 'chat' && (present || this.installStatus?.repairNeeded === true)
+      const selected = installed && id === 'chat' && (present || (component != null && component.declined !== true && component.state !== 'declined'))
         ? this.settings.chatEnabled ?? (this.systemStatus?.inference?.chatEnabledSpec
           ?? this._unifiedAiState?.status?.inference?.chatEnabledSpec
           ?? this._unifiedAiState?.capabilities?.chat === true)
@@ -1390,18 +1393,18 @@ export class BrainSurface extends JfElement {
         : id === 'chat' && installed && this.settingsRead && !selected ? 'Off — background work can continue'
         : id === 'chat' && selected && active === false ? this.installStatus?.repairNeeded ? 'Unavailable — repair needed; answers are enabled' : 'Unavailable — answers are enabled'
         : active ? 'On' : 'Off';
-      const acquisitionControl = component?.declinable === true && (!installed || !present);
-      const runtimeControl = installed && present && id === 'chat';
+      const runtimeControl = installed && id === 'chat' && (present || (component != null && component.declined !== true && component.state !== 'declined'));
+      const acquisitionControl = !runtimeControl && component?.declinable === true && (!installed || !present);
       const blockedReason = !live ? 'Checking AI status before changing features.' : unavailable ? component?.unavailableReason || state
-        : (id === 'chat' && installed && present && !this.settingsRead ? 'Saved answer choice is not known. Refresh settings before changing answers.' : null)
+        : (runtimeControl && !this.settingsRead ? 'Saved answer choice is not known. Refresh settings before changing answers.' : null)
         ?? this.planLockReason()
         ?? (this.busy['inference-switch'] ? 'Saving the answer choice' : null)
         ?? (installed && !component && !present ? 'Package status is unavailable. Refresh to check the files.' : null)
         ?? (id === 'chat' && installed && !selected && this.policy?.onlineAiEnabled === false ? 'Online AI is disabled by administrator policy.' : null)
-        ?? (!present && this.policy?.downloadsEnabled === false ? 'Downloads are disabled by administrator policy.' : null);
+        ?? (acquisitionControl && !present && this.policy?.downloadsEnabled === false ? 'Downloads are disabled by administrator policy.' : null);
       features[id] = {
         id, label, selected, installed: present, active, availability: unavailable ? 'unavailable' : component ? 'available' : 'unknown',
-        state: id === 'chat' && installed && present ? !this.settingsRead ? `${state} · Saved answer choice is not known` : this.settings.chatEnabled == null ? `${state} · automatic (no saved answer choice)` : state : state,
+        state: runtimeControl ? !this.settingsRead ? `${state} · Saved answer choice is not known` : this.settings.chatEnabled == null ? `${state} · automatic (no saved answer choice)` : state : state,
         size: component?.totalBytes && component.totalBytes > 0 ? formatBytes(component.totalBytes) : null,
         switchable: !unavailable && (acquisitionControl || runtimeControl || (!live && !installed && id !== 'meaning')), blockedReason,
       };
@@ -1470,7 +1473,7 @@ export class BrainSurface extends JfElement {
 
   private async changeFeature(feature: BrainFeature): Promise<void> {
     if (feature.blockedReason || this.planLockReason()) return;
-    if (feature.id === 'chat' && this.hasInstalledAi() && feature.installed) {
+    if (feature.id === 'chat' && this.hasInstalledAi() && (feature.installed || this.planPreview?.components?.some(c => c.id === 'chat' && c.declined !== true && c.state !== 'declined'))) {
       await this.setChatEnabled(!feature.selected);
       return;
     }
@@ -1544,16 +1547,16 @@ export class BrainSurface extends JfElement {
   private renderGraphicsCard(): TemplateResult {
     const gpu = this.systemStatus?.gpu;
     const adapter = this.systemStatus?.operating?.gpu?.adapter;
-    const fresh = this._unifiedAiState?.snapshotLive === true;
+    const fresh = this.aiKnown();
     const total = fresh ? gpu?.totalVramBytes : null;
     const used = fresh ? gpu?.usedVramBytes : null;
     const known = total != null && total > 0 && used != null && used >= 0 && used <= total;
     const devices = this.systemStatus?.gpu?.deviceCount;
     return html`<section class="graphics-card" aria-label="Graphics card memory">
       <span>Graphics card</span><div class="progress" role=${known ? 'meter' : 'img'} aria-label="Graphics memory used by all apps"
-        aria-valuemin=${known ? 0 : nothing} aria-valuemax=${known ? total : nothing} aria-valuenow=${used ?? nothing} aria-valuetext=${known ? `${formatBytes(used!)} of ${formatBytes(total!)} in use by all apps` : nothing}>
+        aria-valuemin=${known ? 0 : nothing} aria-valuemax=${known ? total : nothing} aria-valuenow=${used ?? nothing} aria-valuetext=${known ? `${formatBytes(used!)} of ${formatBytes(total!)} in use by all apps${devices && devices > 1 ? ` · one of ${devices} graphics devices` : ''}` : nothing}>
         ${known ? html`<div class="progress-bar" style=${`width: ${(used! / total!) * 100}%`}></div>` : nothing}
-      </div><span class="step-meta">${known ? `${formatBytes(used!)} of ${formatBytes(total!)} in use · all apps` : 'Memory use unknown'}${adapter ? ` · ${adapter}` : ''}${devices && devices > 1 ? ` · ${devices} graphics devices` : ''}</span>
+      </div><span class="step-meta">${known ? `${formatBytes(used!)} of ${formatBytes(total!)} in use · all apps` : 'Memory use unknown'}${adapter ? ` · ${adapter}` : ''}${devices && devices > 1 ? ` · one of ${devices} graphics devices` : ''}</span>
     </section>`;
   }
 
@@ -1596,18 +1599,22 @@ export class BrainSurface extends JfElement {
   // This page reconciles settings and acquisition preferences across windows.
   private startSettingsPolling(): void {
     if (this.pollSettings !== null) return;
-    this.pollSettings = window.setInterval(() => {
-      // Acquisition preferences have no push event. Reconcile other windows on the
-      // existing idle cadence, keeping an open consent's package set stable.
-      if (!this.planLockReason() && !this.busy['inference-switch']) {
-        void this.refreshSettings();
-        void this.refreshInstallPlanPreview();
+    const timer = window.setTimeout(async () => {
+      // Passive reads never invalidate an unfinished batch or take the choice lock.
+      // Start the next delay only after both reads finish, so slow windows converge.
+      if (!this.planReads && !this.planLockReason() && !this.busy['inference-switch']) {
+        await Promise.all([this.refreshSettings(), this.refreshInstallPlanPreview()]);
+      }
+      if (this.pollSettings === timer && this.isConnected) {
+        this.pollSettings = null;
+        this.startSettingsPolling();
       }
     }, 5000);
+    this.pollSettings = timer;
   }
 
   private stopAllPolling(): void {
-    if (this.pollSettings !== null) window.clearInterval(this.pollSettings);
+    if (this.pollSettings !== null) window.clearTimeout(this.pollSettings);
     this.pollSettings = null;
   }
 
@@ -1745,21 +1752,24 @@ export class BrainSurface extends JfElement {
 
   private async refreshInstallPlanPreview(): Promise<void> {
     if (!this.apiBase && this.apiBase !== '') return;
-    const revision = ++this.planRevision;
-    const choice = this.choiceRevision;
-    this.planLoading = true;
-    this.planError = null;
-    const [preview, manifest, presence] = await Promise.all([
-      this.fetchJson<InstallPlanPreview>('/api/ai/install/plan-preview'),
-      getAiInstallManifest(this.base()).catch(() => null),
-      this.fetchJson<ModelPresence>('/api/ai/models/status'),
-    ]);
-    if (revision !== this.planRevision || choice !== this.choiceRevision) return;
-    this.planPreview = preview;
-    this.modelPresence = presence;
-    this.manifest = manifest;
-    this.planLoading = false;
-    if (!preview || !manifest) this.planError = 'Download sizes and licences could not be loaded. Retry to review the download.';
+    ++this.planReads;
+    try {
+      const revision = ++this.planRevision;
+      const choice = this.choiceRevision;
+      this.planLoading = true;
+      this.planError = null;
+      const [preview, manifest, presence] = await Promise.all([
+        this.fetchJson<InstallPlanPreview>('/api/ai/install/plan-preview'),
+        getAiInstallManifest(this.base()).catch(() => null),
+        this.fetchJson<ModelPresence>('/api/ai/models/status'),
+      ]);
+      if (revision !== this.planRevision || choice !== this.choiceRevision) return;
+      this.planPreview = preview;
+      this.modelPresence = presence;
+      this.manifest = manifest;
+      this.planLoading = false;
+      if (!preview || !manifest) this.planError = 'Download sizes and licences could not be loaded. Retry to review the download.';
+    } finally { --this.planReads; }
   }
 
   private async setComponentDeclined(id: string, declined: boolean): Promise<void> {
@@ -2304,7 +2314,7 @@ export class BrainSurface extends JfElement {
 
     const features = this.brainFeatures();
     const readingPictures = this.systemStatus?.inference?.procedure === 'VDU_BATCH'
-      ? this._unifiedAiState?.snapshotLive === true ? true : null : false;
+      ? this.aiKnown() ? true : null : false;
     const installed = this.hasInstalledAi();
     const processorOnly = this.runtimeStatus?.active?.gpuLayers === 0;
     const reindexRequired = this.systemStatus?.embedding?.compatState === 'BLOCKED_LEGACY'
@@ -2638,7 +2648,7 @@ export class BrainSurface extends JfElement {
     // Tempdoc 807 A.3 — "N/N active" is a PRESENT-tense claim read off the retained runtime snapshot;
     // round 13 photographed "4/4 active" with the backend dead. Not live ⟹ the count is history, and
     // the per-feature green dot (which asserts "running right now") drops to neutral.
-    const live = !this._unifiedAiState || this._unifiedAiState.snapshotLive;
+    const live = this.aiKnown();
     return html`<div data-testid="brain-observed-features"><h4>Observed search features · ${features.length > 0 ? `${activeCount}/${features.length} ${live ? 'active' : 'when last observed'}` : 'Unknown'}</h4>
         <div style="margin-top: 0.625rem; font-size: var(--font-size-sm)">
           ${features.length === 0
@@ -2662,7 +2672,7 @@ export class BrainSurface extends JfElement {
                       ${f.label ?? f.id ?? 'feature'}
                     </span>
                     <span style="color: var(--text-secondary); font-family: monospace; font-size: var(--font-size-xs)"
-                      >${observedEpLabel(f)}</span
+                      >${observedEpLabel(f)}${live ? '' : ' · last observed'}</span
                     >
                   </div>
                 `,
@@ -2782,7 +2792,7 @@ export class BrainSurface extends JfElement {
           <span class="component-label">${r.label}</span>
           ${/* Rendered ONLY when the state deviates from installed — `stateText` is null otherwise, so
                 the absence of text IS "installed" (840 post-review C.2). */ ''}
-          ${this.packagePresent(r.id) ? html`<span class="component-state">Downloaded${this._unifiedAiState?.snapshotLive && (r.id === 'chat' ? this.runtimeStatus?.active?.modelPath != null : this.runtimeStatus?.onnxFeatures?.some(f => f.id === (r.id === 'embedding' ? 'embed' : r.id) && featureInUse(f) === true)) ? ' · in use' : ''}</span>` : nothing}
+          ${this.packagePresent(r.id) ? html`<span class="component-state">${this.aiKnown() ? 'Downloaded' : 'Downloaded — last observed'}${this.aiKnown() && (r.id === 'chat' ? this.runtimeStatus?.active?.modelPath != null : this.runtimeStatus?.onnxFeatures?.some(f => f.id === (r.id === 'embedding' ? 'embed' : r.id) && featureInUse(f) === true)) ? ' · in use' : ''}</span>` : nothing}
           ${r.stateText
             ? html`<span class="component-state" data-testid="component-state-${r.id}"
                 >${r.stateText}</span
@@ -3086,21 +3096,21 @@ export class BrainSurface extends JfElement {
   private renderRuntimeSection(): TemplateResult {
     const variants = this.runtimeStatus?.installedVariants ?? [];
     const activeId = this.runtimeStatus?.active?.activeVariantId;
-    const live = !this._unifiedAiState || this._unifiedAiState.snapshotLive;
+    const live = this.aiKnown();
     const act = this.runtimeStatus?.activation;
     const availability = act?.state === 'running' ? unavailableBecause('Activating an engine variant.') : this.runtimeAvailability();
     const progress = this.indexingProgress();
     return html`<section aria-label="Graphics card settings">
       <h3 class="advanced-heading">Graphics card</h3>
-      ${!live ? html`<p>${reasonFor('binding.unreachable').wording} — these are the last observed readings.</p>` : nothing}
+      ${!live ? html`<p>${this._unifiedAiState?.snapshotLive === false ? reasonFor('binding.unreachable').wording : 'Checking AI status'} — these are the last observed readings.</p>` : nothing}
       ${this.renderSlider('gpuLayers', 'Graphics card use', 'More layers on the card is faster; 0 uses the processor.', 256)}
       <div class="advanced-row"><div>Graphics card support<p>Picked for your hardware</p></div><div>
-        ${activeId ?? 'Built in'}${activeId ? ' · active' : ''}
+        ${activeId ?? 'Built in'}${activeId ? live ? ' · active' : ' · active when last observed' : ''}
         <button type="button" aria-expanded=${!!this.expanded.variants} @click=${() => this.toggleSection('variants')}>${icon({ name: 'chevron-down', size: 14 })} Other options</button>
       </div></div>
       ${this.expanded.variants ? html`<div class="variant-options">
         ${variants.length === 0 ? html`<p>No additional installed runtime variants.</p>` : variants.map(v => html`<div class="variant">
-          <span class="variant-info">${v.variantId}${v.variantId === activeId ? ' · active' : ''}${v.exePath ? html`<small>${v.exePath}</small>` : nothing}</span>
+          <span class="variant-info">${v.variantId}${v.variantId === activeId ? live ? ' · active' : ' · active when last observed' : ''}${v.exePath ? html`<small>${v.exePath}</small>` : nothing}</span>
           ${v.variantId ? html`<jf-button variant="ghost" label=${v.variantId === activeId ? 'Deactivate' : 'Activate'}
             .availability=${availability} .onActivate=${() => void (v.variantId === activeId ? this.deactivateVariant() : this.activateVariant(v.variantId!))}>
             ${icon({ name: 'refresh-cw', size: 14 })} ${v.variantId === activeId ? 'Deactivate' : 'Activate'}</jf-button>` : nothing}
@@ -3119,7 +3129,7 @@ export class BrainSurface extends JfElement {
         ${this.inference.tier ? ` · ${this.inference.tier.replace(/_/g, ' ')}` : ''}
       </p>` : nothing}
       <p class="runtime-observation">
-        ${progress.activity.confirmed ? '' : `${progress.activity.summary} — last observed `}embed queue: ${progress.phase === 'unknown' ? '—' : NUM.format(progress.embeddingPending)}
+        ${live && progress.activity.confirmed ? '' : `${progress.activity.summary} — last observed `}embed queue: ${progress.phase === 'unknown' ? '—' : NUM.format(progress.embeddingPending)}
         · VDU queue: ${progress.phase === 'unknown' ? '—' : NUM.format(progress.vduPending)}
       </p>
     </section>`;
@@ -3133,7 +3143,7 @@ export class BrainSurface extends JfElement {
     return html`<div class="brain-advanced" aria-label="Advanced settings">
       <section aria-label="Answer settings"><h3 class="advanced-heading">Answers</h3>
         <div class="advanced-row"><div>Answer model<p>Writes the answers</p></div><div>
-          ${this._unifiedAiState?.runtime?.modelLabel ?? this.runtimeStatus?.active?.chatProfile ?? 'Automatic'}
+          ${this._unifiedAiState?.runtime?.modelLabel ?? this.runtimeStatus?.active?.chatProfile ?? 'Automatic'}${this.aiKnown() ? '' : ' · last observed'}
           ${this.brainFeatures().chat.size ?? ''}
           <button type="button" aria-expanded=${!!this.expanded.model} @click=${() => this.toggleSection('model')}>${icon({ name: 'folder', size: 14 })} Change</button>
           ${this.expanded.model ? this.settingInput('modelPath', 'Model path') : nothing}

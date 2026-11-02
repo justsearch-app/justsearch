@@ -799,7 +799,7 @@ axe run remain necessary.
       ],
       "class": "New",
       "repaired": true,
-      "behaviour": "D1–D10 live redesign repairs: one confirmed-live page gate and installed repair wording with saved answer intent; passive preview reads never block real switch clicks or overwrite newer saves; sliders keep focus and drafts, serialize/coalesce the latest committed change, stop on conflict and distinguish Automatic-at-maximum from zero; total/all-app status GPU memory; sentence word boundaries; single-gesture panel handoff without focus scrolling; cancelled package bytes; the picture branch takes layout space; repair copy points to existing locations. Geometry and native keyboard behavior are additionally exercised in Chromium across viewport sizes, themes, forced colors and 200% reflow.",
+      "behaviour": "D1–D10 live redesign repairs: one confirmed-live page gate and installed repair wording with saved answer intent; passive preview reads never block real switch clicks or overwrite newer saves; sliders keep focus and drafts, serialize/coalesce the latest committed change, stop on conflict and distinguish Automatic-at-maximum from zero; all-app status GPU memory (device-zero semantics repaired separately in G5); sentence word boundaries; single-gesture panel handoff without focus scrolling; cancelled package bytes; the picture branch takes layout space; repair copy points to existing locations. Geometry and native keyboard behavior are additionally exercised in Chromium across viewport sizes, themes, forced colors and 200% reflow.",
       "sources": [
         {
           "kind": "owner-adopted-scenario",
@@ -898,13 +898,117 @@ axe run remain necessary.
         "modules/ui-web/src/shell-v0/views/BrainSurface.liveRepairs.test.ts#D10 Automatic GPU layers starts at maximum so the left endpoint can save processor-only zero",
         "modules/ui-web/src/shell-v0/views/BrainSurface.liveRepairs.test.ts#D10 sliders retain focus and serialize the latest changed value during a pending witnessed save",
         "modules/ui-web/src/shell-v0/views/BrainSurface.liveRepairs.test.ts#D10 a conflict stops queued slider saves and asks for review without changing the saved value",
-        "modules/ui-web/src/shell-v0/views/BrainSurface.liveRepairs.test.ts#D5 Linux memory uses the status GPU totals across devices without inventing an adapter",
         "modules/ui-web/src/shell-v0/views/BrainSurface.liveRepairs.test.ts#D1 sentence boundaries keep whitespace outside phrase buttons and punctuation attached to preceding prose",
         "modules/ui-web/src/shell-v0/views/BrainSurface.liveRepairs.test.ts#D3 a pointer gesture on another step opens it in one click without restoring the previous opener or scrolling focus",
         "modules/ui-web/src/shell-v0/views/BrainSurface.liveRepairs.test.ts#D4 cancelled steps show retained bytes even when the last package record still says downloading",
         "modules/ui-web/src/shell-v0/views/BrainSurface.liveRepairs.test.ts#D7 the picture branch participates in path layout instead of escaping into preceding alerts",
         "modules/ui-web/src/shell-v0/views/BrainSurface.liveRepairs.test.ts#D9 repair instructions name the visible page locations"
       ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/views/BrainSurface.liveRepairs.test.ts",
+        "modules/ui-web/src/shell-v0/utils/aiInstallPoll.test.ts"
+      ],
+      "class": "New",
+      "repaired": true,
+      "behaviour": "G1–G5 review repairs: successful per-endpoint observations expire within their poll interval and failed reads invalidate retained state while origin stays reachable; Advanced labels retained observations; a selected missing answer package uses runtime intent without package declines or download consent while Repair owns acquisition; passive previews finish before another passive batch starts and do not lock choices; graphics memory is device zero, one of N devices, never an aggregate. The previous D5 aggregate assertion is replaced by G5 because /api/status.gpu produces device-zero memory. B14 declined-package consent remains asserted unchanged.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "B2",
+          "quote": "Headline from the shared AI verdict for every lifecycle state it decides today: not installed, download paused/stopped, installing (with progress), install failed, starting/recovering, connecting/unconfirmed, ready, running on the processor instead of the graphics card, activation or reindex required. While status is unknown it says so and never claims ready.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "B5",
+          "quote": "Switches in step 1 drive only existing behaviour: before install, each optional feature switch selects or declines that package for the install (existing decline/undecline), and the Install button shows the total size of what is selected; after install, Answer questions turns answers on/off (core.set-chat-enabled; files kept). Best match first and Text in scans and images after install show their state with no live switch in step 1 (no control that does nothing); Text in scans and images before install appears only as what it is today (part of the answer model's files or unavailable), not as a separate download. Switches are real switches (role switch, aria-checked, keyboard operable, reachable reason when blocked).",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "B7",
+          "quote": "Graphics card bar: one bar with device memory in use of total (all apps, not attributed to JustSearch), the adapter name only where operating.gpu reports it; no per-feature split; several devices named as such. Absent or stale GPU data says unknown, never 0. (challenger 9)",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "B9",
+          "quote": "Advanced settings expands in place: Answers (answer model with Change, reading memory, longest answer as sliders with values), Graphics card (graphics card use in layers, graphics card support with Other options, engine program with Use another), Downloaded files (each installed component's known size, \"in use\" only where the runtime observes it; Import an offline package), Maintenance (Restart AI, Repair installation, Rebuild search index). Every control keeps today's behaviour: witnessed settings saves with conflict handling, reload, runtime variant activation, pack preflight/import (desktop only), rebuild consent. \"Pause answers while indexing\" and \"Remove files\" are not shown in step 1.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "B13",
+          "quote": "Live behaviour: status, install progress and switch states update without collapsing open panels or Advanced settings, without losing a slider draft; package previews and LLM settings refresh when install state changes and when the window regains focus, ignoring out-of-order responses, so a second window converges; reload or tab switch mid-install keeps the progress and outcome. (challenger 7)",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "B14",
+          "quote": "(challenger 1) An installed AI system is not an installed feature: when a feature's package was declined at install (answers, best match first), switching it on offers the existing download consent for that package with its size and licence, then downloads it; it does not merely write intent. After a restart the choice and files hold.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "Q3",
+          "quote": "Settings saves keep witnesses and conflict review; offline runtime mutations are never queued; unknown/last-observed values stay labelled.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "well from now on you can just proceed autonomously accordinglky",
+          "delegationLocation": "task t-20261101-uiimpl, user turn after the WP1 summary",
+          "delegationScope": "Implement the agreed AI Brain window redesign, step 1.",
+          "choice": "Require successful install/runtime endpoint observations within their poll interval, invalidate failures independently of reachable origin, and use the single gate for Advanced state claims; keep selected missing-answer-files switches on saved intent with Repair owning acquisition, preserve declined-package consent; serialize passive refresh batches; label device-zero graphics memory as one of N devices.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/brain-review-repairs.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/views/BrainSurface.liveRepairs.test.ts#G1 failed install reads override a reachable origin and settled verdict",
+        "modules/ui-web/src/shell-v0/views/BrainSurface.liveRepairs.test.ts#G1 failed runtime reads override a reachable origin and settled verdict",
+        "modules/ui-web/src/shell-v0/views/BrainSurface.liveRepairs.test.ts#G2 Advanced shares the page gate for connecting observations",
+        "modules/ui-web/src/shell-v0/views/BrainSurface.liveRepairs.test.ts#G2 Advanced shares the page gate for missing install observations",
+        "modules/ui-web/src/shell-v0/views/BrainSurface.liveRepairs.test.ts#G3 selected missing answer files use saved intent while Repair owns acquisition",
+        "modules/ui-web/src/shell-v0/views/BrainSurface.liveRepairs.test.ts#G4 passive previews complete before another batch starts and converge other windows without locking choices",
+        "modules/ui-web/src/shell-v0/views/BrainSurface.liveRepairs.test.ts#G5 Linux memory uses device zero status GPU figures and labels one of several devices",
+        "modules/ui-web/src/shell-v0/utils/aiInstallPoll.test.ts#G1 a failed install read invalidates retained observations even with other endpoints reachable",
+        "modules/ui-web/src/shell-v0/utils/aiInstallPoll.test.ts#G1 a failed runtime read invalidates retained observations even with other endpoints reachable",
+        "modules/ui-web/src/shell-v0/utils/aiInstallPoll.test.ts#G1 successful observations expire within the poll interval while the next read is pending"
+      ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/boot/desktopRecoveryPolling.test.ts",
+        "modules/ui-web/src/shell-v0/components/StatusDeck.test.ts",
+        "modules/ui-web/src/shell-v0/utils/aiInstallPoll.test.ts",
+        "modules/ui-web/src/shell-v0/views/BrainSurface.automatic-vdu.test.ts",
+        "modules/ui-web/src/shell-v0/views/BrainSurface.chat-intent.test.ts",
+        "modules/ui-web/src/shell-v0/views/BrainSurface.componentList.test.ts",
+        "modules/ui-web/src/shell-v0/views/BrainSurface.installProgressAggregate.test.ts",
+        "modules/ui-web/src/shell-v0/views/BrainSurface.liveRepairs.test.ts",
+        "modules/ui-web/src/shell-v0/views/BrainSurface.pausedInstall.test.ts",
+        "modules/ui-web/src/shell-v0/views/BrainSurface.redesign.test.ts",
+        "modules/ui-web/src/shell-v0/views/BrainSurface.repairRemedy.test.ts",
+        "modules/ui-web/src/shell-v0/views/BrainSurface.sliceB.test.ts",
+        "modules/ui-web/src/shell-v0/views/BrainSurface.snapshotLiveness.test.ts",
+        "modules/ui-web/src/shell-v0/views/BulkOperationImmediateRefusal.test.ts"
+      ],
+      "class": "Adaptation",
+      "moved": [
+        "instrumentation",
+        "input re-encoding"
+      ],
+      "whatMoved": "Successful-observation fixtures explicitly supply the install/runtime poll owners’ freshness flags. Existing expected outcomes, race injections and operation oracles remain unchanged. aiInstallPoll lifecycle snapshot equality includes the two emitted success flags; StatusDeck’s complete AiState factory supplies false for absent observations. The new G checks and corrected G5 device-zero assertion are separately warranted as repaired behavior. The desktop terminal-recovery check counts the two additional observation-expiry timers before shutdown; it still requires all five requests aborted, no later requests, and zero timers after teardown."
     }
   ]
 }
@@ -1091,5 +1195,85 @@ Resources: fixture browsers, unit-suite temporary HTTP services, and one session
 checks ran from isolated shared clones under the supplied temporary folder with ordinary dependency
 copies; the evidence producer’s worktrees were created inside that isolated clone, so it wrote no
 source-repository Git metadata. The creating exec session stopped the npm launcher with SIGINT (exit 130). Its surviving Vite child was identified by its exact worktree cwd and --port 5173 argv and stopped with SIGTERM from that process; the temporary shutdown config was restored byte-for-byte. The final 5173–5223 port check is empty, matching the initial check.
+
+
+G1–G5 review repair ledger (2026-11-02; uncommitted):
+
+The gate reads the existing poll owner's install/runtime observation freshness. Each endpoint
+publishes success/failure independently; successful observations expire within the adaptive poll
+interval, and failed reads retain history without confirming it. Advanced uses the same gate for
+feature counts, file use, runtime variants, model observations and queue tense. A selected missing
+answer package uses saved answer intent; Repair owns its acquisition. Declined-package B14 consent
+remains unchanged. Passive preview batches finish before the next passive delay starts; unfinished
+initial/focus reads are not superseded by the passive timer, and choice revisions still win. GPU
+memory is explicitly one device's all-app usage, labelled one of N devices for multiple devices.
+
+The D5 aggregate fixture/assertion was replaced by G5 because the producer reports device zero.
+The desktop recovery preservation test now counts both new freshness-expiry timers before
+shutdown; its original aborted requests, no later requests and zero remaining timers stay asserted.
+The Advanced capture deliberately scrolls its first section into view so its controls are captured.
+No Search recipe, baseline, acceptance record, Java source, commit, push or publication was changed.
+
+Tests added or rewritten (all durable):
+
+- Tests added or rewritten: modules/ui-web/src/shell-v0/utils/aiInstallPoll.test.ts — G1/Q3; failed reads, expiry while pending, recovery and retained history; lifecycle snapshot flags — durable.
+- Tests added or rewritten: modules/ui-web/src/shell-v0/views/BrainSurface.liveRepairs.test.ts — G1–G5/B2/B5/B7/B9/B13/Q3; reachable-origin failures, gated Advanced, missing-answer-files intent, slow passive convergence, device-zero memory — durable.
+- Tests added or rewritten: modules/ui-web/src/boot/desktopRecoveryPolling.test.ts — Q3; accounts for two expiry timers while retaining every shutdown/cancellation oracle — durable.
+- Tests added or rewritten: modules/ui-web/src/shell-v0/components/StatusDeck.test.ts — complete AiState fixture; absent install/runtime observations are explicitly unconfirmed — durable.
+- Tests added or rewritten: modules/ui-web/src/shell-v0/views/BrainSurface.automatic-vdu.test.ts — B2/Q5; successful-observation fixture, original picture-reading assertions — durable.
+- Tests added or rewritten: modules/ui-web/src/shell-v0/views/BrainSurface.chat-intent.test.ts — B5/Q2/Q5; successful-observation fixture, original intent and policy assertions — durable.
+- Tests added or rewritten: modules/ui-web/src/shell-v0/views/BrainSurface.componentList.test.ts — B17/Q5; successful-observation fixture, original package/progress/choice assertions — durable.
+- Tests added or rewritten: modules/ui-web/src/shell-v0/views/BrainSurface.installProgressAggregate.test.ts — B8/Q5; successful-observation fixture, original bytes and percentage assertions — durable.
+- Tests added or rewritten: modules/ui-web/src/shell-v0/views/BrainSurface.pausedInstall.test.ts — B8/Q5; successful-observation fixture, original retained-byte/resume/activation assertions — durable.
+- Tests added or rewritten: modules/ui-web/src/shell-v0/views/BrainSurface.redesign.test.ts — B14/B18/B19/Q5; successful-observation fixture, original consent and race assertions — durable.
+- Tests added or rewritten: modules/ui-web/src/shell-v0/views/BrainSurface.repairRemedy.test.ts — B8/B11/Q5; successful-observation fixture, original repair-authority/manual-fallback assertions — durable.
+- Tests added or rewritten: modules/ui-web/src/shell-v0/views/BrainSurface.sliceB.test.ts — B9/B13/B20/Q5; successful-observation fixture, original sliders/conflicts/refresh races — durable.
+- Tests added or rewritten: modules/ui-web/src/shell-v0/views/BrainSurface.snapshotLiveness.test.ts — B2/Q3/Q5; successful-observation fixture, original healthy/stale/refusal/no-replay assertions — durable.
+- Tests added or rewritten: modules/ui-web/src/shell-v0/views/BulkOperationImmediateRefusal.test.ts — Q3/Q5; successful-observation fixture, original immediate/later refusal assertions — durable.
+
+Final registered capture comparisons (all eight PNGs inspected against the agreed pictures):
+
+- ai-brain — ready reference's open headline/sentence/path/memory/link arrangement; absent fixture inventory and runtime observations remain unknown.
+- ai-brain-light — same open arrangement and readable path/hairlines in light colors.
+- ai-brain-advanced — Advanced reference's in-place Answers rows, native sliders and text actions; deliberately scrolled to show the controls.
+- ai-brain-advanced-light — same Answers rows, native sliders and text actions with light contrast.
+- ai-brain-components — Advanced reference's open Downloaded files rows, known registry sizes and individual optional choices.
+- ai-brain-components-light — same inventory and aligned sizes in light colors.
+- ai-brain-consent — existing size/licence consent over the new-install page, naming the exact selected 1.52 GB fixture set.
+- ai-brain-consent-light — same exact consent set and actions in light colors.
+
+
+G1–G5 final validation (2026-11-02 10:32 UTC):
+
+Result: blocked on two unrelated Search aggregate capture errors; G1–G5 are implemented.
+Work remains uncommitted. No `.agents/preflight` exists. No acceptance record, full governance
+run, Gradle run, Search recipe or baseline edit was made.
+
+- `npm --prefix modules/ui-web run lint`: exit 0.
+- `npm --prefix modules/ui-web run typecheck`: exit 0.
+- `npm --prefix modules/ui-web run test:unit:run -- --maxWorkers=4`: exit 0, 684 files / 8,789 tests passed. The final full run follows the fixture/timer adaptations. A subsequent strengthening of G3's closed native-dialog assertion passed all 21 live-repair tests, and both affected evidence files were regenerated again. The dialog is always mounted; its native `open` property, rather than element absence, is the observation.
+- `npm --prefix modules/ui-web run knip:report`: exit 0; the report retains underlying Knip exit 1. `node scripts/governance/run.mjs --gate dead-code --mode gate`: pass, five findings, zero failing gates.
+- `node scripts/ci/run-ui-web-gates.mjs`: exit 0, 31/31 passed, including style literals.
+- All eight registered Brain `ui-shot <step> --fixtures --no-demo` captures: exit 0, zero axe violations, zero real console errors, no sideways overflow. All final PNGs were inspected against the agreed pictures; the Advanced captures now scroll to the Answers controls.
+- `jseval ui-a11y-gate`: exit 2; 108/110 surfaces clean, including every Brain surface. Unchanged Search `home-light` failed with `home-light: expected exactly one visible Search window`; unchanged Search `sv3-hero-forced-colors-light` failed with `no measurement companion (measure disabled?)`. These causes are unverified and returned to the orchestrator; no Search change was attempted.
+- `jseval ui-proportion-gate`: exit 0; all 84 captures completed and every registered geometric constraint held.
+- `run-evidence.mjs`: all six evidence files regenerated; all ten G1–G5 checks pass on the candidate and fail by assertion on 13a89c28aa. The poller failures specifically observe retained true after a failed/expired read in the before-state. Earlier repaired-behavior entries retain their original before refs aeaa3e0413, 6680864f7d, f2f1945c23 and e4bb40ed0e, all passing the evidence producer's assertion-failure requirement.
+- `node scripts/governance/gates/test-intent/cli.mjs`: only independent acceptance missing; no acceptance record written.
+- UI race classes executed in the full suite: concurrent choice/consent and answer actions, late responses, two surfaces, reload/tab switching during install, preview/choice revisions, settings draft/conflict serialization, and Health ownership/unmount behavior.
+
+Additional real Chromium fixture checks passed failed install reads and failed runtime reads
+while the real shared store still reports the origin reachable. The page says Checking AI,
+Advanced labels retained observations, downloaded rows stop saying in use, and GPU memory is
+labelled one of two devices. Nine more measured captures at 1280×720, 760×720 and 600×400,
+each in dark, light and forced colors, passed native slider ArrowRight, zero axe violations,
+zero console errors and no document sideways overflow.
+
+Resources: session-owned fixture browsers, unit-suite temporary HTTP services, isolated shared
+before/candidate/evidence clones under the supplied temporary folder, ordinary dependency copies,
+and one explicitly started Vite server at 127.0.0.1:5173. No owner's app, shared backend stack,
+model or GPU was used. SIGINT stopped the npm launcher; its surviving Vite child recorded its
+own PID, exact worktree cwd and launch argv before stopping itself with SIGTERM through a
+temporary config guard. The config was restored byte-for-byte. The final 5173–5223 listener
+check is empty, matching the initial check. No externally pending process remains.
 
 ## Acceptance records

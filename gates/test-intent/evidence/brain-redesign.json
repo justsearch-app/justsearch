@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
   },
-  "createdAt": "2026-11-02T09:56:45.952Z",
-  "revision": "e4bb40ed0ea2251d20450379ed9fb25a9c8627d0",
-  "tree": "4a81737c750dbe12e79bb55f2c31cb19fa00d06c",
+  "createdAt": "2026-11-02T10:24:18.050Z",
+  "revision": "13a89c28aa49aa1767d5816d29b9c1d2f20b4720",
+  "tree": "18a2e5c1fd64df91d1a7366961fb76b8ec65624f",
   "environment": {
     "platform": "linux",
     "arch": "x64",
@@ -18,10 +18,10 @@
   },
   "runs": [
     {
-      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/BrainSurface.ui-mode.test.ts\" \"src/shell-v0/views/BrainSurface.pausedInstall.test.ts\" \"src/shell-v0/views/BrainSurface.snapshotLiveness.test.ts\" \"src/shell-v0/state/aiStateStore.restartInference.test.ts\" \"src/shell-v0/views/BrainSurface.telemetry-mode.test.ts\" \"src/shell-v0/views/BrainSurface.sliceB.test.ts\" \"src/shell-v0/state/brainPage.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/s1jdqc91/tmp/test-intent-vitest-199-1793613403907.json\"",
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/BrainSurface.ui-mode.test.ts\" \"src/shell-v0/views/BrainSurface.pausedInstall.test.ts\" \"src/shell-v0/views/BrainSurface.snapshotLiveness.test.ts\" \"src/shell-v0/state/aiStateStore.restartInference.test.ts\" \"src/shell-v0/views/BrainSurface.telemetry-mode.test.ts\" \"src/shell-v0/views/BrainSurface.sliceB.test.ts\" \"src/shell-v0/state/brainPage.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/de5l46_l/tmp/test-intent-vitest-376-1793615056125.json\"",
       "cwd": "modules/ui-web",
       "exitCode": 0,
-      "durationMs": 2043
+      "durationMs": 1924
     }
   ],
   "checks": [
@@ -56,7 +56,7 @@
       "id": "modules/ui-web/src/shell-v0/views/BrainSurface.pausedInstall.test.ts",
       "file": "modules/ui-web/src/shell-v0/views/BrainSurface.pausedInstall.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:34202e27240d1b9f9117fee77f081546175023a3167df9e78c5c90ace53f3d2d",
+      "contentDigest": "sha256:adf1a11498205cf1ff87494c1f3e7ffe24452cbbf8cf506c3dfd4b473a2eff5f",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -87,7 +87,7 @@
       "id": "modules/ui-web/src/shell-v0/views/BrainSurface.snapshotLiveness.test.ts",
       "file": "modules/ui-web/src/shell-v0/views/BrainSurface.snapshotLiveness.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:423f27d442a2f152930868d420959572b62658bd63d58eff28474c5d9af4df3a",
+      "contentDigest": "sha256:39dd66d66fc9947a84209eb73a31093bca159c2431e3485aaa00e51270857d14",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -237,10 +237,61 @@
       ]
     },
     {
+      "id": "modules/ui-web/src/shell-v0/views/BrainSurface.telemetry-mode.test.ts",
+      "file": "modules/ui-web/src/shell-v0/views/BrainSurface.telemetry-mode.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:678369940fe0863cca2707107a567d7abeb7611eed3aefacc3fb13e11e422bf1",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "developer telemetry belongs to Health AI Engine Health opened first fetches and renders transitions, generation and spans under simple mode",
+          "status": "passed"
+        },
+        {
+          "name": "developer telemetry belongs to Health AI Engine Health opened first fetches and renders transitions, generation and spans under advanced mode",
+          "status": "passed"
+        },
+        {
+          "name": "developer telemetry belongs to Health AI Engine Brain never polls telemetry, with Advanced closed or open",
+          "status": "passed"
+        },
+        {
+          "name": "developer telemetry belongs to Health AI Engine empty and unavailable states keep their sections visible, without fabricated data",
+          "status": "passed"
+        },
+        {
+          "name": "developer telemetry belongs to Health AI Engine a trace file unavailable flag does not display supplied spans",
+          "status": "passed"
+        },
+        {
+          "name": "developer telemetry belongs to Health AI Engine unmount aborts reads and stops polling; late responses cannot replace the old snapshot",
+          "status": "passed"
+        },
+        {
+          "name": "developer telemetry belongs to Health AI Engine engine history link focuses the section when Health is mounted already and when it mounts later",
+          "status": "passed"
+        },
+        {
+          "name": "Health telemetry request independence S6 slow transitions survives a poll tick while the other endpoint publishes independently",
+          "status": "passed"
+        },
+        {
+          "name": "Health telemetry request independence S6 slow traces survives a poll tick while the other endpoint publishes independently",
+          "status": "passed"
+        },
+        {
+          "name": "Health telemetry request independence S6 a bounded pending read becomes unavailable and can retry, ignoring late results",
+          "status": "passed"
+        }
+      ]
+    },
+    {
       "id": "modules/ui-web/src/shell-v0/views/BrainSurface.sliceB.test.ts",
       "file": "modules/ui-web/src/shell-v0/views/BrainSurface.sliceB.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:136d0b02fa0c3ef58c74b55eb8047e1910af50d9e656831aa6c84ae5b12c91e4",
+      "contentDigest": "sha256:376822a668bb044e1e3ef15acbaa9db5dc80317ebb94f87bdf6aa588f1c6c0c2",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -512,5 +563,5 @@
     }
   ],
   "failBefore": null,
-  "digest": "sha256:c1515c783b8c33b247bfa81ea744022b52a7d4bb6a4e8a8904707ec9e8f7ab66"
+  "digest": "sha256:9a2571f7e1392cfc8b41f9572aae087231ef9cb22d8bef6e0d9619938df14690"
 }
