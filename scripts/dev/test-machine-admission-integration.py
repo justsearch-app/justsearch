@@ -9,6 +9,7 @@ import fcntl
 import json
 import os
 from pathlib import Path
+import shutil
 import socket
 import subprocess
 import sys
@@ -45,18 +46,31 @@ class MachineIntegration(unittest.TestCase):
                 if child.poll() is None:
                     child.terminate()
                     child.wait(timeout=65)
-            holder = self.fixture.start("exclusive", [PYTHON, "-c", "import time; time.sleep(1.5)"])
+            window_end = self.root / "window-end"
+            holder = self.fixture.start("exclusive", [PYTHON, "-c",
+                f"import time; from pathlib import Path\nwhile not Path({str(window_end)!r}).exists(): time.sleep(.01)"])
             self.fixture.wait_for(lambda: self.fixture.row("exclusive"))
+            # Model installation: admission belongs beside the machine wrapper,
+            # independently of the checkout from which Gradle is invoked.
+            machine = self.root / "machine"
+            machine.mkdir()
+            wrapper = machine / "gradle-slot.sh"
+            shutil.copy2(REPO / "tools/machine/gradle-slot.sh", wrapper)
+            shutil.copy2(CLI, machine / "admission.py")
             began = time.monotonic()
-            child = subprocess.Popen([str(REPO / "tools/machine/gradle-slot.sh"), "./gradlew", "help"],
+            child = subprocess.Popen([str(wrapper), "./gradlew", "help"],
                                      cwd=REPO, env=self.env, stdout=log, stderr=log)
             try:
-                self.fixture.wait_for(lambda: self.fixture.row("heavy-waiter"))
-                # Admission must wait BEFORE consuming this worktree's Gradle lock.
+                # The shared machine queue can delay the slot. Keep our private
+                # admission window open until the candidate actually reaches it.
+                self.fixture.wait_for(lambda: self.fixture.row("heavy-waiter"), timeout=180)
+                # The machine slot and worktree lock precede admission.
                 with (REPO / ".gradle/agent-build.lock").open("rb") as stream:
-                    fcntl.flock(stream, fcntl.LOCK_EX | fcntl.LOCK_NB)
-                time.sleep(.15)
+                    with self.assertRaises(BlockingIOError):
+                        fcntl.flock(stream, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                time.sleep(1.5)
                 self.assertIsNone(child.poll())
+                window_end.touch()
                 self.assertEqual(holder.wait(timeout=3), 0)
                 self.assertEqual(child.wait(timeout=180), 0)
                 elapsed = time.monotonic() - began

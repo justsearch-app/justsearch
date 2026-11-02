@@ -72,7 +72,21 @@ through readiness, and jseval backend startup participate automatically. Idle st
 hold no admission. Python callers can use `heavy(purpose, env)` from `admission.py`
 as a context manager and pass the yielded environment to nested launchers.
 The candidate machine wrapper in `tools/machine/gradle-slot.sh` acquires admission
-before its worktree lock and Gradle slots; installing it is a separate machine change.
+after its worktree lock and Gradle slot: queued builds do not hold admission. A build
+that reaches a slot during scoring keeps that slot while waiting at the gate. `-w`
+bounds the total wait across worktree, queue, slot and admission; expiry returns 75.
+The wrapper loads `admission.py` beside its own resolved path, independently of the
+caller's checkout. If the sibling is missing, it prints one warning and runs without
+admission. Installing these candidates is a separate machine change. Copy admission
+first, then the wrapper (Python >= 3.11 is required):
+
+```bash
+install -m 644 scripts/dev/admission.py ~/.local/share/justsearch-tools/admission.py
+install -m 755 tools/machine/gradle-slot.sh ~/.local/share/justsearch-tools/gradle-slot.sh
+```
+
+The wrapper can also be staged with that sibling in a temporary directory for checks.
+Its Gradle queue, two slots, worker cap and signal handling remain in place.
 
 Process checks: `python3 -m unittest discover -s scripts/dev -p test_admission.py -v`.
 Run `test-admission-cross-session.py actor DIR` and `... driver DIR` in separate sandbox
@@ -82,3 +96,6 @@ Gradle calls and a private dev stack with `JUSTSEARCH_GPU_ENABLED=false`, fresh 
 state and ports. It prints heavy status during startup, the ready receipt, released
 admission and successful exclusive entry while that stack idles. All these fixtures
 use their own admission directory.
+Wrapper regression checks (private slots, real processes):
+`python3 scripts/dev/test_gradle_slot.py -v`. Set `SLOT_WRAPPER` to the installed or
+before wrapper and select `SlotPreservation` to compare existing behavior.

@@ -31,13 +31,6 @@ fi
 if [[ ${JS_GRADLE_SLOT_HOLDER:-} =~ ^[1-9][0-9]*$ && -e /proc/$JS_GRADLE_SLOT_HOLDER ]]; then
   echo "gradle-slot: already inside a slot holder (pid $JS_GRADLE_SLOT_HOLDER); run the inner command without js-gradle-slot" >&2; exit 64
 fi
-# Admission precedes both the worktree lock and the global queue/slots. Re-exec only
-# this shell (PID checked), so another invocation still enters admission normally.
-if [ "${JS_GRADLE_ADMISSION_ENTERED:-}" != "$$" ]; then
-  admission_root=$(git rev-parse --show-toplevel 2>/dev/null || pwd)
-  exec python3 "$admission_root/scripts/dev/admission.py" heavy --purpose "Gradle slot: $PWD" -- \
-    bash -c 'export JS_GRADLE_ADMISSION_ENTERED=$$; exec "$@"' gradle-admission "$0" -w "$wait" "$@"
-fi
 dir=${JS_GRADLE_SLOT_DIR:-/tmp/js-linux-port}; start=$(date +%s); deadline=$(( start + wait ))
 mkdir -p "$dir" || { echo "gradle-slot: cannot create $dir" >&2; exit 73; }
 root=$(git rev-parse --show-toplevel 2>/dev/null || pwd); mkdir -p "$root/.gradle"
@@ -89,7 +82,46 @@ while :; do
       got=$(date +%s)
       # One line per call for the queue measurement (t-20261020-a7c3e1): asked, got, done, slot, rc, dir, command.
       record() { printf '%s %s %s %s %s %s %s\n' "$start" "$got" "$(date +%s)" "$i" "$1" "$PWD" "$(printf '%s ' "${args[@]}" | tr '\n' ' ' | cut -c1-200)" >> "$dir/slot.log" 2>/dev/null; }
-      JS_GRADLE_SLOT_HOLDER=$$ setsid "${args[@]}" 8>&- 9>&- & child=$!
+      # Queued builds hold no admission. Once a slot is held, use the installed
+      # sibling module regardless of the caller's checkout (or lack of one).
+      admission=$(dirname -- "$(readlink -f -- "$0")")/admission.py
+      admitted=("${args[@]}")
+      if [ -f "$admission" ]; then
+        admitted=(python3 -c '
+import os, signal, sys, time
+from pathlib import Path
+sys.path.insert(0, str(Path(sys.argv[1]).parent))
+import admission
+
+def interrupted(signum, frame):
+    for sig in (signal.SIGINT, signal.SIGTERM):
+        signal.signal(sig, signal.SIG_IGN)
+    raise SystemExit(128 + signum)
+
+def timed_out(signum, frame):
+    print(f"gradle-slot: no admission in {sys.argv[3]}s total wait", file=sys.stderr)
+    raise SystemExit(75)
+
+try:
+    admission.subreaper()
+    for sig in (signal.SIGINT, signal.SIGTERM):
+        signal.signal(sig, interrupted)
+    signal.signal(signal.SIGALRM, timed_out)
+    # Match the original -w budget, including worktree and slot waiting. An
+    # expired/zero budget still allows one immediate lock attempt (one poll).
+    signal.setitimer(signal.ITIMER_REAL, max(admission.POLL, float(sys.argv[2]) - time.time()))
+    with admission.heavy(f"Gradle slot: {os.getcwd()}") as env:
+        signal.setitimer(signal.ITIMER_REAL, 0)
+        rc = admission.run_command(sys.argv[4:], env)
+    sys.exit(128 - rc if rc < 0 else rc)
+except (OSError, ValueError) as error:
+    print(f"admission: {error}", file=sys.stderr)
+    sys.exit(73)
+' "$admission" "$deadline" "$wait" "${args[@]}")
+      else
+        echo "gradle-slot: warning: $admission missing; running without admission" >&2
+      fi
+      JS_GRADLE_SLOT_HOLDER=$$ setsid "${admitted[@]}" 8>&- 9>&- & child=$!
       trap 'kill -TERM -- -$child 2>/dev/null; wait $child; for _ in $(seq 300); do kill -0 -- -$child 2>/dev/null || break; sleep 0.2; done; record 143; exit 143' TERM INT HUP
       wait $child; rc=$?; record "$rc"; exit $rc
     fi
