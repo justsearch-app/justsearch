@@ -378,7 +378,9 @@ describe('BrainSurface — the status card sentence (807 Part A)', () => {
 
 describe('BrainSurface — Runtime card (807)', () => {
   it('labels the readout as last-known and blocks its controls with a reason when not live', () => {
-    const dom = domOf(harness(false).renderRuntimeSection());
+    const owner = harness(false) as ReturnType<typeof harness> & { expanded: Record<string, boolean>; renderAdvanced(): TemplateResult };
+    owner.expanded = { advanced: true };
+    const dom = domOf(owner.renderAdvanced());
     expect(dom.textContent).toContain(DISCONNECTED);
     expect(dom.textContent).toContain('last observed');
     // Every control whose precondition is a live backend is unavailable-WITH-A-REASON (the 596 soft
@@ -387,8 +389,8 @@ describe('BrainSurface — Runtime card (807)', () => {
       label: string;
       availability?: { kind: string; reason?: string; transient?: boolean };
     }[];
-    const gated = buttons.filter((b) => ['Online', 'Indexing', 'Reload'].includes(b.label));
-    expect(gated.length).toBe(3);
+    const gated = buttons.filter((b) => ['Restart AI'].includes(b.label));
+    expect(gated.length).toBe(1);
     for (const b of gated) {
       expect(b.availability?.kind, b.label).toBe('unavailable');
       expect(b.availability?.reason, b.label).toBe(DISCONNECTED);
@@ -402,9 +404,11 @@ describe('BrainSurface — Runtime card (807)', () => {
 
   it('P2: an offline click on a runtime control neither queues nor fires when the backend returns', async () => {
     // The REAL gate value the surface produces, driven through a REAL jf-control.
-    const dom = domOf(harness(false).renderRuntimeSection());
+    const owner = harness(false) as ReturnType<typeof harness> & { expanded: Record<string, boolean>; renderAdvanced(): TemplateResult };
+    owner.expanded = { advanced: true };
+    const dom = domOf(owner.renderAdvanced());
     const online = Array.from(dom.querySelectorAll('jf-button')).find(
-      (b) => (b as unknown as { label: string }).label === 'Online',
+      (b) => (b as unknown as { label: string }).label === 'Restart AI',
     ) as unknown as { availability?: Availability };
     expect(online?.availability?.kind).toBe('unavailable');
 
@@ -413,7 +417,7 @@ describe('BrainSurface — Runtime card (807)', () => {
     const listener = (e: Event) => toasts.push((e as CustomEvent).detail?.message ?? '');
     document.addEventListener(EPHEMERAL_TOAST_EVENT, listener);
     const el = document.createElement('jf-control') as Control;
-    el.label = 'Online';
+    el.label = 'Restart AI';
     el.availability = online.availability as Availability;
     el.onActivate = onActivate;
     document.body.appendChild(el);
@@ -431,11 +435,12 @@ describe('BrainSurface — Runtime card (807)', () => {
   });
 
   it('ANTI-REGRESSION: a healthy verdict leaves the Runtime readout and its controls alone', () => {
-    const el = harness(true);
+    const el = harness(true) as ReturnType<typeof harness> & { expanded: Record<string, boolean>; renderAdvanced(): TemplateResult };
+    el.expanded = { advanced: true };
     // This preservation case describes one healthy queue observation on both transports.
     const status = el.systemStatus as { worker: { enrichment: { embeddingPendingCount: number } } };
     status.worker.enrichment.embeddingPendingCount = 4789;
-    const dom = domOf(el.renderRuntimeSection());
+    const dom = domOf(el.renderAdvanced());
     expect(dom.textContent).not.toContain(DISCONNECTED);
     expect(dom.textContent).toContain('available'); // CUDA: available
     expect(dom.textContent).toContain(num(4789)); // embed queue, un-caveated
@@ -444,8 +449,8 @@ describe('BrainSurface — Runtime card (807)', () => {
       label: string;
       availability?: { kind: string };
     }[];
-    for (const b of buttons.filter((x) => ['Online', 'Indexing', 'Reload'].includes(x.label))) {
-      expect(b.availability?.kind, b.label).toBe('available');
-    }
+    const gated = buttons.filter((x) => x.label === 'Restart AI');
+    expect(gated).toHaveLength(1);
+    expect(gated[0]!.availability?.kind).toBe('available');
   });
 });

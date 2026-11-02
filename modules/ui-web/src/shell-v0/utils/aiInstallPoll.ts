@@ -68,20 +68,8 @@ export interface InstallPlanPreview {
 export interface AiRuntimeStatus {
   /** Observed engine identity; a downloaded projector is not an attached projector. */
   active?: AiRuntimeStatusResponse['active'];
-  activation?: {
-    state?: string;
-    phase?: string;
-    message?: string;
-    activeVariantId?: string | null;
-  };
-  variants?: Array<{
-    id: string;
-    label?: string;
-    description?: string;
-    requiredVramBytes?: number;
-    available?: boolean;
-    reason?: string;
-  }>;
+  activation?: AiRuntimeStatusResponse['activation'];
+  installedVariants?: AiRuntimeStatusResponse['installedVariants'];
   /**
    * Per-ONNX-feature status from `AiRuntimeStatusResponse.OnnxFeatureStatus`.
    *

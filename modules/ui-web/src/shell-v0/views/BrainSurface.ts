@@ -16,7 +16,6 @@
 import { html, css, nothing, type TemplateResult } from 'lit';
 import { JfElement } from '../primitives/JfElement.js';
 // Tempdoc 571 §11 / 578 — surfaceScrollLayoutStyles dropped: Brain is now a display:contents tab host.
-import { activateOnKey } from '../utils/keyboardHandler.js';
 // Tempdoc 571 §11 / 578 — AI Brain ⊇ Memory: Brain hosts the AI's learned-memory as a tab.
 import '../components/SurfaceTabs.js';
 import type { SurfaceTabItem } from '../components/SurfaceTabs.js';
@@ -26,7 +25,7 @@ import { saveAbsoluteSettings } from '../../api/settingsAttempt.js';
 import { present } from '../display/present.js';
 import { formatBytes } from '../display/format.js';
 import { projectFact } from '../display/facts.js';
-import { takeMemberTabIntent, subscribeMemberTab } from '../router/memberTabIntent.js';
+import { takeMemberTabIntent, subscribeMemberTab, requestMemberTab } from '../router/memberTabIntent.js';
 import '../components/OpButton.js';
 import '../components/Button.js';
 import '../components/ErrorAlert.js';
@@ -101,40 +100,6 @@ import type { EffectivePolicy } from '../../api/generated/schema-types/effective
 // `utils/aiInstallPoll.ts` (re-exported by `state/aiStateStore.ts`), the shared, always-on poller
 // that replaced this surface's one-shot `refreshAll()` fetches. Imported below, not redeclared.
 
-/**
- * Tempdoc 518 Appendix F W3.2 — one row of /api/inference/transitions response.
- */
-interface TransitionRecord {
-  timestampMs: number;
-  fromMode: string;
-  toMode: string;
-  reason: string;
-  success: boolean;
-  durationMs: number;
-  wireCode?: string;
-}
-
-/**
- * Tempdoc 518 Appendix G Wave D.1 — one span row from /api/diagnostics/traces.
- * Mirrors the NdjsonSpanExporter line format.
- */
-interface TraceSpan {
-  trace_id?: string;
-  span_id?: string;
-  parent_span_id?: string;
-  name?: string;
-  start?: string;
-  end?: string;
-  duration_ms?: number;
-  status?: string;
-  attrs?: Record<string, unknown>;
-}
-
-interface TraceExplorerResponse {
-  spans?: TraceSpan[];
-  tracesAvailable?: boolean;
-}
-
 // Tempdoc 586 §3 — local InferenceStatus interface removed; `inference` is now
 // typed as the shared store's snapshot (`UnifiedAiState['inference']`), which was
 // extended with `generation` + `lastStartupDurationMs` (already on the wire).
@@ -150,11 +115,15 @@ interface UiSettings {
 
 interface LlmSettings {
   serverExecutable?: string | null;
-  contextWindow?: number;
-  maxTokens?: number;
-  gpuLayers?: number;
+  contextWindow?: number | null;
+  maxTokens?: number | null;
+  gpuLayers?: number | null;
   modelPath?: string | null;
   llamaLibPath?: string | null;
+}
+
+interface ModelPresence {
+  packages?: Array<{ id: string; complete: boolean; presentVariantFiles?: string[] }>;
 }
 
 const NUM = new Intl.NumberFormat();
@@ -551,6 +520,7 @@ export class BrainSurface extends JfElement {
     inference: { state: true },
     installStatus: { state: true },
     planPreview: { state: true },
+    modelPresence: { state: true },
     manifest: { state: true },
     installConsentOpen: { state: true },
     runtimeStatus: { state: true },
@@ -563,11 +533,6 @@ export class BrainSurface extends JfElement {
     bulkError: { state: true },
     busy: { state: true },
     refreshing: { state: true },
-    // Tempdoc 518 Appendix F W3.2 — mode-transition timeline.
-    transitions: { state: true },
-    // Tempdoc 518 Appendix G Wave D.1 — trace explorer state.
-    recentSpans: { state: true },
-    tracesAvailable: { state: true },
     activeTab: { state: true },
     featureInfo: { state: true },
     planLoading: { state: true },
@@ -591,6 +556,7 @@ export class BrainSurface extends JfElement {
   declare inference: UnifiedAiState['inference'];
   declare installStatus: InstallStatus | null;
   declare planPreview: InstallPlanPreview | null;
+  declare modelPresence: ModelPresence | null;
   /** Registry manifest behind the consent dialog's package/licence/terms list. */
   declare manifest: AiInstallManifest | null;
   declare installConsentOpen: boolean;
@@ -606,11 +572,6 @@ export class BrainSurface extends JfElement {
   declare refreshing: boolean;
   /** Active composition tab id: 'runtime' (own body) or a member surface id. */
   declare activeTab: string;
-  declare transitions: TransitionRecord[];
-  /** Tempdoc 518 Appendix G Wave D.1 — recent spans for the in-product trace explorer. */
-  declare recentSpans: TraceSpan[];
-  declare tracesAvailable: boolean;
-
   /** 574 §22.G — the full modal contract (native `<dialog>` + scroll-lock + focus-restore) for the
    *  install consent dialog, composed rather than hand-wired. */
   private readonly consentModal = new ModalController(this, {
@@ -629,6 +590,9 @@ export class BrainSurface extends JfElement {
   private refreshRevision = 0;
   private planRevision = 0;
   private choiceRevision = 0;
+  private llmRevision = 0;
+  private llmPending = 0;
+  private readonly llmDrafts = new Map<keyof LlmSettings, string>();
   // Render transients reset on hide; the requests themselves still own these locks.
   private readonly pendingActions = new Set<string>();
   private featureOpener: HTMLElement | null = null;
@@ -642,7 +606,7 @@ export class BrainSurface extends JfElement {
   });
   private readonly onWindowFocus = () => { void this.refreshAll(); };
   private memberTabUnsub: (() => void) | null = null;
-  private pollDiagnostics: number | null = null;
+  private pollSettings: number | null = null;
 
   constructor() {
     super();
@@ -652,6 +616,7 @@ export class BrainSurface extends JfElement {
     this.inference = null;
     this.installStatus = null;
     this.planPreview = null;
+    this.modelPresence = null;
     this.manifest = null;
     this.installConsentOpen = false;
     this.runtimeStatus = null;
@@ -667,9 +632,6 @@ export class BrainSurface extends JfElement {
     this.runtimeError = null;
     this.busy = {};
     this.refreshing = false;
-    this.transitions = [];
-    this.recentSpans = [];
-    this.tracesAvailable = false;
     this.activeTab = 'runtime';
     this.featureInfo = null;
     this.planLoading = false;
@@ -1066,7 +1028,7 @@ export class BrainSurface extends JfElement {
     }
     /* The switch: track + thumb, state carried by the thumb's POSITION and the track's fill — not by
        hue — so it survives colour-blindness and the accent-is-not-text rule. */
-    .component-toggle::part(control) {
+    .component-toggle {
       display: inline-flex;
       align-items: center;
       width: 2.25rem;
@@ -1078,8 +1040,8 @@ export class BrainSurface extends JfElement {
       font-size: var(--font-size-xs);
       cursor: pointer;
     }
-    .component-toggle[data-on='true']::part(control) {
-      background: var(--text-muted);
+    .component-toggle[data-on='true'] {
+      background: var(--accent-tint);
       justify-content: flex-end;
     }
     .component-switch-thumb {
@@ -1090,7 +1052,7 @@ export class BrainSurface extends JfElement {
       background: var(--text-primary);
     }
     .component-toggle[data-on='true'] .component-switch-thumb {
-      background: var(--surface-secondary);
+      background: var(--accent-on-tint);
     }
     /* Staged acquisition — which stage is running, and what it is waiting on. */
     .stage-block {
@@ -1155,7 +1117,22 @@ export class BrainSurface extends JfElement {
     .feature-tradeoffs { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
     .feature-tradeoffs h3 { font-size: var(--font-size-xs); color: var(--text-secondary); font-weight: 400; }
     .feature-tradeoffs p { font-size: var(--font-size-sm); line-height: 1.5; }
-    .brain-existing-settings[hidden] { display: none; }
+    .brain-advanced { min-width: 0; }
+    .advanced-heading { margin: 1.5rem 0 0; padding-bottom: 0.5rem; color: var(--text-secondary); font-size: var(--font-size-xs); font-weight: 400; }
+    .advanced-row { display: grid; grid-template-columns: minmax(10rem, 28%) minmax(0, 1fr); align-items: center; gap: 1.5rem; padding: 0.9rem 0; border-top: 1px solid var(--border-subtle); font-size: var(--font-size-sm); }
+    .advanced-row > div { min-width: 0; overflow-wrap: anywhere; }
+    .advanced-row p, .advanced-note, .runtime-observation { margin: 0.25rem 0 0; color: var(--text-secondary); font-size: var(--font-size-xs); }
+    .brain-advanced button:not(.component-toggle) { border: 0; border-radius: 0; background: transparent; padding: 0; color: var(--text-secondary); }
+    .advanced-row button { margin-left: 0.75rem; }
+    .slider-setting { display: flex; flex-wrap: wrap; gap: 0.75rem; align-items: center; }
+    .slider-setting input[type='range'] { flex: 1 1 10rem; min-width: 0; width: 100%; accent-color: var(--accent-tint); }
+    .slider-setting output { min-width: 8rem; color: var(--text-secondary); }
+    .brain-advanced h4 { font-size: var(--font-size-xs); color: var(--text-secondary); font-weight: 400; }
+    .brain-advanced .data-row { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 0.5rem; padding: 0.4rem 0; font-size: var(--font-size-sm); }
+    .variant-info small { display: block; overflow-wrap: anywhere; }
+    .variant-options, .field input { max-width: 100%; box-sizing: border-box; }
+    @media (max-width: 650px) { .advanced-row { grid-template-columns: 1fr; gap: 0.5rem; } .component-row { grid-template-columns: minmax(0, 1fr) max-content; } .component-control { grid-column: 2; } }
+
     .section, .variant { border: 0; border-radius: 0; background: transparent; padding: 1rem 0; border-top: 1px solid var(--border-subtle); }
     jf-button::part(control) { border: 0; border-radius: 0; background: transparent; }
     jf-button.install-action::part(control), jf-button.consent-confirm::part(control) { background: var(--accent-tint); color: var(--accent-on-tint); border-radius: 1rem; }
@@ -1174,9 +1151,10 @@ export class BrainSurface extends JfElement {
       .feature-tradeoffs { grid-template-columns: 1fr; gap: 0; }
     }
     @media (forced-colors: active) {
-      .step-symbol, button.feature-switch, .progress { border: 1px solid CanvasText; }
-      button.feature-switch[aria-checked='true'], .progress-bar { background: Highlight; forced-color-adjust: none; }
-      button.feature-switch span { background: CanvasText; }
+      .step-symbol, button.feature-switch, .component-toggle, .progress { border: 1px solid CanvasText; }
+      button.feature-switch[aria-checked='true'], .component-toggle[data-on='true'], .progress-bar { background: Highlight; forced-color-adjust: none; }
+      button.feature-switch span, .component-switch-thumb { background: CanvasText; }
+      .component-toggle[data-on='true'] .component-switch-thumb { background: HighlightText; }
     }
     .stage-blocked {
       margin-top: 0.25rem;
@@ -1207,7 +1185,7 @@ export class BrainSurface extends JfElement {
     });
     void this.refreshAll();
     window.addEventListener('focus', this.onWindowFocus);
-    this.startDiagnosticsPolling();
+    this.startSettingsPolling();
     // Tempdoc 586 §3 — the shared aiStateStore is the single observed-state authority
     // for inference + system status (aiStateStore.ts §B7); mirror its snapshots here
     // instead of running a second poll for them.
@@ -1305,12 +1283,13 @@ export class BrainSurface extends JfElement {
     if (this.pendingActions.has('inference-switch') && !afterAnswerSave) return;
     const revision = ++this.refreshRevision;
     const choice = this.choiceRevision;
+    const llmRevision = this.llmRevision;
     const settings = await this.fetchJson<{ ui?: UiSettings; llm?: LlmSettings }>('/api/settings/v2');
-    if (revision !== this.refreshRevision || choice !== this.choiceRevision || !settings) return;
+    if (!this.isConnected || revision !== this.refreshRevision || choice !== this.choiceRevision || !settings) return;
     this.settings = { ...(settings.ui ?? {}), mode: getUiMode() };
-    // Updating the observation must not replace a draft in a focused settings input.
-    const focused = this.shadowRoot?.activeElement;
-    if (!(focused instanceof HTMLInputElement)) this.llm = settings.llm ?? {};
+    // Drafts own their values even after focus moves to another surface. Revisions
+    // also cover edits and witnessed saves completed while this read was pending.
+    if (llmRevision === this.llmRevision && this.llmPending === 0 && this.llmDrafts.size === 0) this.llm = settings.llm ?? {};
   }
 
   private async refreshAll(): Promise<void> {
@@ -1341,6 +1320,14 @@ export class BrainSurface extends JfElement {
       || this.planPreview?.components?.some(c => c.id === 'embedding' && c.state === 'installed') === true;
   }
 
+  private packagePresent(id: string): boolean {
+    const progress = this.installStatus?.packages?.find(p => p.packageId === id);
+    if (progress?.state === 'installed') return true;
+    const files = this.modelPresence?.packages?.find(p => p.id === id);
+    if (files) return files.complete || (id === 'chat' && (files.presentVariantFiles?.length ?? 0) > 0);
+    return this.planPreview?.components?.some(c => c.id === id && c.state === 'installed') === true;
+  }
+
   private brainFeatures(): Record<BrainFeatureId, BrainFeature> {
     const live = this._unifiedAiState?.snapshotLive === true;
     const installed = this.hasInstalledAi();
@@ -1352,20 +1339,21 @@ export class BrainSurface extends JfElement {
     ] as const) {
       const component = this.planPreview?.components?.find(c => c.id === packageId);
       const onnx = this.runtimeStatus?.onnxFeatures?.find(f => f.id === (id === 'meaning' ? 'embed' : id));
-      const present = component?.state === 'installed' || (component == null && (id === 'chat'
-        ? this._unifiedAiState?.capabilities?.chat === true || this._unifiedAiState?.runtime?.mode === 'online' : onnx?.modelActive === true));
+      const packageProgress = this.installStatus?.packages?.find(p => p.packageId === packageId);
+      const present = this.packagePresent(packageId) || (id === 'chat'
+        ? this._unifiedAiState?.capabilities?.chat === true || this._unifiedAiState?.runtime?.mode === 'online'
+        : onnx?.modelActive === true);
+      const unavailable = !present && (component?.state === 'unavailable' || component?.state === 'not-in-mode');
       const selected = installed && present && id === 'chat'
         ? this.settings.chatEnabled ?? (this.systemStatus?.inference?.chatEnabledSpec
           ?? this._unifiedAiState?.status?.inference?.chatEnabledSpec
           ?? this._unifiedAiState?.capabilities?.chat === true)
-        : component != null && component.declined !== true && component.state !== 'declined';
-      const active = !live ? null : id === 'chat' ? this._unifiedAiState?.capabilities?.chat ?? false
-        : onnx?.modelActive ?? null;
-      const packageProgress = this.installStatus?.packages?.find(p => p.packageId === packageId);
+        : !unavailable && component != null && component.declined !== true && component.state !== 'declined';
+      const active = !live ? null : id === 'chat' ? this._unifiedAiState?.capabilities?.chat ?? null
+        : onnx?.status === 'unknown' ? null : onnx?.modelActive ?? null;
       const percent = packageProgress?.bytesTotal && packageProgress.bytesTotal > 0
         ? Math.floor(((packageProgress.bytesDownloaded ?? 0) / packageProgress.bytesTotal) * 100) : null;
-      const unavailable = component?.state === 'unavailable' || component?.state === 'not-in-mode';
-      const state = unavailable ? `Unavailable on this computer: ${component.unavailableReason || 'Not available in this install mode.'}`
+      const state = unavailable ? `Unavailable on this computer: ${component!.unavailableReason || 'Not available in this install mode.'}`
         : packageProgress?.state === 'downloading' ? `Downloading${percent === null ? '' : ` ${percent}%`}`
         : !component && !present ? 'Unknown — package status unavailable'
         : !present ? 'Not downloaded'
@@ -1381,7 +1369,7 @@ export class BrainSurface extends JfElement {
         ?? (id === 'chat' && installed && !selected && this.policy?.onlineAiEnabled === false ? 'Online AI is disabled by administrator policy.' : null)
         ?? (!present && this.policy?.downloadsEnabled === false ? 'Downloads are disabled by administrator policy.' : null);
       features[id] = {
-        id, label, selected, installed: present, active,
+        id, label, selected, installed: present, active, availability: unavailable ? 'unavailable' : component ? 'available' : 'unknown',
         state: id === 'chat' && installed && present && this.settings.chatEnabled == null ? `${state} · automatic (no saved answer choice)` : state,
         size: component?.totalBytes && component.totalBytes > 0 ? formatBytes(component.totalBytes) : null,
         switchable: !unavailable && (acquisitionControl || runtimeControl), blockedReason,
@@ -1392,7 +1380,8 @@ export class BrainSurface extends JfElement {
     features.pictures = {
       id: 'pictures', label: 'Text in scans and images', selected: mmproj === true,
       installed: features.chat.installed, active: mmproj,
-      state: !installed ? features.chat.blockedReason?.startsWith('Unavailable')
+      availability: features.chat.availability,
+      state: !installed ? features.chat.availability === 'unavailable'
         ? 'Text in scans and images is unavailable on this computer'
         : 'Text in scans and images comes with the answer model’s files; it is not a separate download'
         : mmproj === true ? 'On' : mmproj === false ? 'Off' : 'Unknown — engine observation unavailable',
@@ -1539,42 +1528,23 @@ export class BrainSurface extends JfElement {
   // unconditionally regardless of prior success/failure — on an adaptive cadence since tempdoc 840
   // Phase 5 (fast while something is in flight or still unknown, slower when settled and idle).
 
-  // Tempdoc 586 §3 — inference status now flows from the shared aiStateStore; this
-  // loop polls only the brain-specific transition timeline + trace explorer, which
-  // have no shared poller. (Renamed from startInferencePolling.)
-  private startDiagnosticsPolling(): void {
-    if (this.pollDiagnostics !== null) return;
-    this.pollDiagnostics = window.setInterval(async () => {
+  // Inference status flows from aiStateStore; Health owns developer telemetry.
+  // This page reconciles settings and acquisition preferences across windows.
+  private startSettingsPolling(): void {
+    if (this.pollSettings !== null) return;
+    this.pollSettings = window.setInterval(() => {
       // Acquisition preferences have no push event. Reconcile other windows on the
       // existing idle cadence, keeping an open consent's package set stable.
       if (!this.planLockReason() && !this.busy['inference-switch']) {
         void this.refreshSettings();
         void this.refreshInstallPlanPreview();
       }
-      // Tempdoc 518 Appendix F W3.2 — poll the transition timeline.
-      // Cheap read (ring buffer snapshot); refreshes whenever a transition fires.
-      const t = await this.fetchJson<{ transitions?: TransitionRecord[] }>(
-        '/api/inference/transitions?limit=8',
-      );
-      if (t && Array.isArray(t.transitions)) {
-        this.transitions = t.transitions;
-      }
-      // Tempdoc 518 Appendix G Wave D.1 — recent spans for the trace explorer panel.
-      // Best-effort: the endpoint reports tracesAvailable=false when no traces.ndjson exists on
-      // disk (a file check, NOT a tracing-level check), in which case we suppress the panel below.
-      const traces = await this.fetchJson<TraceExplorerResponse>(
-        '/api/diagnostics/traces?limit=10',
-      );
-      if (traces && Array.isArray(traces.spans)) {
-        this.recentSpans = traces.spans;
-        this.tracesAvailable = !!traces.tracesAvailable;
-      }
     }, 5000);
   }
 
   private stopAllPolling(): void {
-    if (this.pollDiagnostics !== null) window.clearInterval(this.pollDiagnostics);
-    this.pollDiagnostics = null;
+    if (this.pollSettings !== null) window.clearInterval(this.pollSettings);
+    this.pollSettings = null;
   }
 
   private async withBusy<T>(key: string, fn: () => Promise<T>): Promise<T | null> {
@@ -1713,12 +1683,14 @@ export class BrainSurface extends JfElement {
     const revision = ++this.planRevision;
     this.planLoading = true;
     this.planError = null;
-    const [preview, manifest] = await Promise.all([
+    const [preview, manifest, presence] = await Promise.all([
       this.fetchJson<InstallPlanPreview>('/api/ai/install/plan-preview'),
       getAiInstallManifest(this.base()).catch(() => null),
+      this.fetchJson<ModelPresence>('/api/ai/models/status'),
     ]);
     if (revision !== this.planRevision) return;
     this.planPreview = preview;
+    this.modelPresence = presence;
     this.manifest = manifest;
     this.planLoading = false;
     if (!preview || !manifest) this.planError = 'Download sizes and licences could not be loaded. Retry to review the download.';
@@ -1918,8 +1890,10 @@ export class BrainSurface extends JfElement {
   // ---------- LLM settings persist ----------
 
   private async patchLlm(updates: Partial<LlmSettings>): Promise<void> {
+    ++this.llmRevision;
+    ++this.llmPending;
     const context = updates.contextWindow;
-    const normalized = { ...updates, ...(context == null ? {} : { contextWindow: context > 0 ? Math.max(512, context) : 0 }) };
+    const normalized = { ...updates, ...(context == null ? {} : { contextWindow: context > 0 ? Math.max(512, context) : 0 }), ...(updates.maxTokens != null && updates.maxTokens > 0 ? { maxTokens: Math.max(16, updates.maxTokens) } : {}) };
     try {
       const result = await saveAbsoluteSettings((path, init) => authorizedFetch(this.base() + path, init), { llm: normalized });
       // A first completion may carry normalized values. Receipt-only replay still
@@ -1927,12 +1901,17 @@ export class BrainSurface extends JfElement {
       const committed: Partial<LlmSettings> = { ...normalized };
       for (const key of Object.keys(updates) as Array<keyof LlmSettings>) {
         const value = result.projection.llm?.[key];
-        if (value !== undefined && value !== null) Object.assign(committed, { [key]: value });
+        if (value !== undefined) Object.assign(committed, { [key]: value });
       }
       this.llm = { ...this.llm, ...committed };
       this.runtimeError = null;
     } catch (err) {
       this.runtimeError = err instanceof Error ? err.message : String(err);
+    } finally {
+      ++this.llmRevision;
+      --this.llmPending;
+      for (const key of Object.keys(updates) as Array<keyof LlmSettings>) this.llmDrafts.delete(key);
+      this.requestUpdate();
     }
   }
 
@@ -2321,7 +2300,7 @@ export class BrainSurface extends JfElement {
         ${this.renderAlerts()}
         ${this.renderCompatibilityCallouts()}
         ${this.deriveAiEngineVerdict().kind === 'install_failed' ? html`<jf-error-alert tone="error">Install failed: ${this.deriveAiEngineVerdict().installFailure ?? this.installStatus?.lastError ?? this.installStatus?.message}</jf-error-alert>` : nothing}
-        ${shouldHintRepairForGpuFallback(this.runtimeStatus, this.installStatus) ? html`<div data-testid="brain-gpu-fallback-hint">Search features are running on CPU: a GPU component is missing from disk. <jf-button variant="ghost" .onActivate=${() => void this.repairInstall()}>${icon({ name: 'refresh-cw', size: 14 })} Repair</jf-button></div>` : nothing}
+        ${shouldHintRepairForGpuFallback(this.runtimeStatus, this.installStatus) ? html`<div role="alert" data-testid="brain-gpu-fallback-hint">Search features are running on CPU: a GPU component is missing from disk. <jf-button variant="ghost" .onActivate=${() => void this.repairInstall()}>${icon({ name: 'refresh-cw', size: 14 })} Repair</jf-button></div>` : nothing}
         ${this.renderFeaturePath()}
         ${this.renderGraphicsCard()}
         <div class="row brain-links">
@@ -2330,7 +2309,7 @@ export class BrainSurface extends JfElement {
             label=${features.chat.selected ? 'Stop answers' : 'Start answers'}
             .availability=${features.chat.blockedReason ? unavailableBecause(features.chat.blockedReason) : AVAILABLE}
             .onActivate=${() => void this.changeFeature(features.chat)}>${icon({ name: features.chat.selected ? 'square' : 'play', size: 14 })} ${features.chat.selected ? 'Stop answers' : 'Start answers'}</jf-button>` : nothing}
-          <a href="#justsearch://surface/core.health-surface">${icon({ name: 'history', size: 14 })} Engine history in Health</a>
+          <a href="#justsearch://surface/core.health-surface" @click=${() => requestMemberTab('core.health-surface', 'ai-engine')}>${icon({ name: 'history', size: 14 })} Engine history in Health</a>
           <jf-button variant="ghost" label="Refresh status" .onActivate=${() => void this.refreshAll()}>${icon({ name: 'refresh-cw', size: 14 })}</jf-button>
         </div>
 
@@ -2345,209 +2324,6 @@ export class BrainSurface extends JfElement {
    * Renders the 8 newest from /api/inference/transitions. Hidden when the list is empty
    * so freshly-booted runtimes (no transitions yet) don't show an empty section.
    */
-  /**
-   * Tempdoc 518 Appendix G Wave D.2 — sparkline of inference generation over the recent
-   * transition window. SVG-based, no external charting library. Each transition is a tick
-   * mark on the timeline (failures red, successes teal); the current generation value is
-   * the right-edge label. When generation is 0 or there are no transitions yet, returns
-   * nothing — there's nothing useful to chart.
-   */
-  private renderGenerationSparkline(): TemplateResult | typeof nothing {
-    const rows = this.transitions;
-    const currentGen = typeof this.inference?.generation === 'number' ? this.inference.generation : 0;
-    if (!rows || rows.length === 0 || currentGen === 0) return nothing;
-    // Tempdoc 518 Wave A-E defect Fix-4: render the actual step-function y-line, not just
-    // dots. Each successful transition bumps generation by 1; the line shows the count's
-    // evolution. Failure dots stay on the line (failure does NOT bump generation, so the
-    // step stays flat at that x — visible as a red dot on a horizontal segment).
-    const ascending = [...rows].sort((a, b) => a.timestampMs - b.timestampMs);
-    const first = ascending[0]!.timestampMs;
-    const last = ascending[ascending.length - 1]!.timestampMs;
-    const tsSpan = Math.max(1, last - first);
-    const W = 200;
-    const H = 32;
-    const padX = 4;
-    const padY = 4;
-    const yMax = Math.max(1, currentGen);
-    const xOf = (ts: number) => padX + ((ts - first) / tsSpan) * (W - padX * 2);
-    const yOf = (gen: number) => H - padY - (gen / yMax) * (H - padY * 2);
-
-    // Build the step function. Walk transitions in chronological order; each success bumps
-    // the running gen by 1 (matches the runner's generation counter contract). Each row
-    // contributes two points (horizontal then vertical jump on success) and stamps the
-    // gen-at-that-row for dot positioning.
-    const dotData: Array<{ ts: number; gen: number; row: TransitionRecord }> = [];
-    const points: Array<{ x: number; y: number }> = [];
-    let gen = 0;
-    points.push({ x: padX, y: yOf(gen) });
-    for (const row of ascending) {
-      const px = xOf(row.timestampMs);
-      points.push({ x: px, y: yOf(gen) }); // horizontal segment up to this transition
-      if (row.success) {
-        gen += 1;
-        points.push({ x: px, y: yOf(gen) }); // vertical jump
-      }
-      dotData.push({ ts: row.timestampMs, gen, row });
-    }
-    // Final horizontal segment extending to the right edge (current generation plateau).
-    points.push({ x: W - padX, y: yOf(gen) });
-    const pointsStr = points.map((p) => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ');
-
-    return html`
-      <div
-        data-testid="brain-generation-sparkline"
-        style="margin-top: 0.75rem; display: flex; align-items: center; gap: 0.5rem; font-size: var(--font-size-xs)"
-      >
-        ${/* Round-14 finding 10 — "gen" was unqualified and collided with a DIFFERENT in-product
-              "generation": /api/inference/status `generation` is an int engine-instance counter,
-              while /api/knowledge/status `servingSearchGenerationId` is a string index id. Beside a
-              model filename the abbreviation also read as "1st-generation model" (a version claim).
-              Naming the axis is the whole fix — the value is unchanged. */ ''}
-        <span style="color: var(--text-secondary)">engine generation:</span>
-        <span style="font-weight: 600; font-variant-numeric: tabular-nums">${currentGen}</span>
-        <svg width="${W}" height="${H}" style="display: block">
-          <polyline
-            data-testid="brain-generation-sparkline-line"
-            points="${pointsStr}"
-            fill="none"
-            stroke="var(--accent-tint)"
-            stroke-width="1.5"
-            stroke-linejoin="round"
-          />
-          ${dotData.map(
-            (d) => html`<circle
-              cx="${xOf(d.ts)}"
-              cy="${yOf(d.gen)}"
-              r="3"
-              fill="${d.row.success ? 'var(--accent-tint)' : 'var(--accent-danger)'}"
-            >
-              <title>${new Date(d.row.timestampMs).toLocaleTimeString()} · gen=${d.gen} · ${d.row.fromMode.toLowerCase()} → ${d.row.toMode.toLowerCase()} · ${d.row.reason.toLowerCase().replace(/_/g, ' ')} · ${d.row.durationMs}ms${d.row.wireCode ? ` · ${d.row.wireCode}` : ''}</title>
-            </circle>`,
-          )}
-        </svg>
-      </div>
-    `;
-  }
-
-  private renderTransitionTimeline(): TemplateResult | typeof nothing {
-    const rows = this.transitions;
-    if (!rows || rows.length === 0) return nothing;
-    return html`
-      ${this.renderGenerationSparkline()}
-      <details
-        class="transitions"
-        data-testid="brain-transitions-timeline"
-        style="margin-top: 0.875rem; font-size: var(--font-size-xs)"
-      >
-        ${/* Round-14 finding 10 — "mode" is ambiguous on this very window: the same panel carries a
-              Simple | Detailed disclosure mode and the search surface has rungs. These rows are the
-              INFERENCE state machine's transitions; say so. */ ''}
-        <summary style="cursor: pointer; color: var(--text-secondary)">
-          Recent inference transitions (${rows.length})
-        </summary>
-        <ul
-          style="margin: 0.5rem 0 0 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 0.25rem"
-        >
-          ${rows.map(
-            (r) => html`
-              <li
-                data-testid="brain-transition-row"
-                data-success=${String(r.success)}
-                style="display:flex; gap:0.5rem; align-items: baseline; font-variant-numeric: tabular-nums"
-              >
-                <span
-                  style="display:inline-block; width:0.5rem; height:0.5rem; border-radius:50%; background:${r.success
-                    ? 'var(--accent-tint)'
-                    : 'var(--accent-danger)'}; flex-shrink:0; align-self: center"
-                ></span>
-                <span style="color: var(--text-secondary)"
-                  >${new Date(r.timestampMs).toLocaleTimeString()}</span
-                >
-                <span>${r.fromMode.toLowerCase()} → ${r.toMode.toLowerCase()}</span>
-                <span style="color: var(--text-secondary)"
-                  >· ${r.reason.toLowerCase().replace(/_/g, ' ')}</span
-                >
-                <span style="color: var(--text-secondary)">· ${r.durationMs}ms</span>
-                ${r.wireCode
-                  ? html`<span style="color: var(--text-danger)">· ${r.wireCode}</span>`
-                  : nothing}
-              </li>
-            `,
-          )}
-        </ul>
-      </details>
-    `;
-  }
-
-  /**
-   * Tempdoc 518 Appendix G Wave D.1 — in-product trace explorer panel.
-   * Lists the 10 most recent spans from /api/diagnostics/traces. Hidden when the endpoint reports
-   * `tracesAvailable: false` — which DiagnosticsController derives purely from whether
-   * `<dataDir>/telemetry/traces.ndjson` is a regular file, NOT from the tracing level: with
-   * JUSTSEARCH_HEAD_TRACING_LEVEL=none but a leftover traces file on disk, the panel still renders
-   * (verified empirically). Detailed-mode-only for that reason among others.
-   * Clicking a row copies its trace_id to the clipboard so it can be looked up in
-   * otel-desktop-viewer or grep'd against traces.ndjson.
-   */
-  private renderTraceExplorer(): TemplateResult | typeof nothing {
-    if (!this.tracesAvailable || !this.recentSpans || this.recentSpans.length === 0) {
-      return nothing;
-    }
-    return html`
-      <details
-        class="traces"
-        data-testid="brain-trace-explorer"
-        style="margin-top: 0.875rem; font-size: var(--font-size-xs)"
-      >
-        <summary style="cursor: pointer; color: var(--text-secondary)">
-          Recent spans (${this.recentSpans.length})
-          <span style="color: var(--text-secondary); font-size: var(--font-size-xs)">
-            · click a row to copy trace ID
-          </span>
-        </summary>
-        <ul
-          style="margin: 0.5rem 0 0 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 0.25rem"
-        >
-          ${this.recentSpans.map(
-            (s) => html`
-              <li
-                data-testid="brain-trace-row"
-                role="button"
-                tabindex="0"
-                style="display:flex; gap:0.5rem; align-items: baseline; font-variant-numeric: tabular-nums; cursor: pointer"
-                @click=${() => {
-                  if (s.trace_id) {
-                    void navigator.clipboard?.writeText(s.trace_id);
-                  }
-                }}
-                @keydown=${(e: KeyboardEvent) =>
-                  activateOnKey(e, () => {
-                    if (s.trace_id) void navigator.clipboard?.writeText(s.trace_id);
-                  })}
-                title=${s.trace_id ? `trace_id=${s.trace_id} (click to copy)` : ''}
-              >
-                <span
-                  style="display:inline-block; width:0.5rem; height:0.5rem; border-radius:50%; background:${s.status === 'ERROR'
-                    ? 'var(--accent-danger)'
-                    : 'var(--accent-tint)'}; flex-shrink:0; align-self: center"
-                ></span>
-                <span style="color: var(--text-secondary)">
-                  ${s.start ? new Date(s.start).toLocaleTimeString() : '—'}
-                </span>
-                <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 18rem">
-                  ${s.name ?? '(unnamed)'}
-                </span>
-                <span style="color: var(--text-secondary)">
-                  · ${typeof s.duration_ms === 'number' ? `${Math.round(s.duration_ms)}ms` : '—'}
-                </span>
-              </li>
-            `,
-          )}
-        </ul>
-      </details>
-    `;
-  }
-
   // ---------- Render: compatibility callouts + embedding progress ----------
 
   private renderCompatibilityCallouts(): TemplateResult | typeof nothing {
@@ -2766,41 +2542,6 @@ export class BrainSurface extends JfElement {
     `;
   }
 
-  // ---------- Render: collapsible accordion section helper ----------
-
-  private renderAccordion(
-    key: string,
-    title: string,
-    badgeText: string | null,
-    body: () => TemplateResult,
-  ): TemplateResult {
-    const open = this.expanded[key] === true;
-    return html`
-      <div class="section" style="padding: 0">
-        <button class="accordion-header" type="button" aria-expanded=${open}
-          style="width: 100%; padding: 0.875rem 1rem; background: transparent; border: none; color: inherit; cursor: pointer; display: flex; align-items: center; gap: 0.5rem; font-size: var(--font-size-sm); font-weight: 500"
-          @click=${() => this.toggleSection(key)}
-        >
-          <span style="display: inline-flex; transition: transform var(--duration-fast) var(--ease-standard); ${open ? 'transform: rotate(0deg)' : 'transform: rotate(-90deg)'}"
-            >${icon({ name: 'chevron-down', size: 14 })}</span
-          >
-          <span>${title}</span>
-          ${badgeText
-            ? html`<span
-                style="font-size: var(--font-size-xs); color: var(--text-secondary); margin-left: 0.5rem"
-                >${badgeText}</span
-              >`
-            : nothing}
-        </button>
-        ${open
-          ? html`<div style="padding: 0 1rem 1rem 1rem; border-top: 1px solid var(--border-subtle)">
-              ${body()}
-            </div>`
-          : nothing}
-      </div>
-    `;
-  }
-
   private renderSearchQualityFeatures(): TemplateResult {
     const features = this.runtimeStatus?.onnxFeatures ?? [];
     const activeCount = features.filter((f) => f.modelActive).length;
@@ -2808,17 +2549,7 @@ export class BrainSurface extends JfElement {
     // round 13 photographed "4/4 active" with the backend dead. Not live ⟹ the count is history, and
     // the per-feature green dot (which asserts "running right now") drops to neutral.
     const live = !this._unifiedAiState || this._unifiedAiState.snapshotLive;
-    return this.renderAccordion(
-      'search-quality',
-      'Search Quality Features',
-      features.length > 0
-        ? activeCount > 0
-          ? live
-            ? `${activeCount}/${features.length} active`
-            : `${activeCount}/${features.length} when last observed`
-          : 'optional'
-        : null,
-      () => html`
+    return html`<div data-testid="brain-observed-features"><h4>Observed search features · ${features.length > 0 ? `${activeCount}/${features.length} ${live ? 'active' : 'when last observed'}` : 'Unknown'}</h4>
         <div style="margin-top: 0.625rem; font-size: var(--font-size-sm)">
           ${features.length === 0
             ? html`<div style="color: var(--text-secondary); padding: 0.5rem 0">
@@ -2847,8 +2578,7 @@ export class BrainSurface extends JfElement {
                 `,
               )}
         </div>
-      `,
-    );
+      </div>`;
   }
 
   /**
@@ -2893,11 +2623,12 @@ export class BrainSurface extends JfElement {
    * complete before any install has run.
    */
   private renderComponentList(): TemplateResult | typeof nothing {
-    const groups = composeComponentGroups(this.planPreview?.components);
+    const components = this.planPreview?.components?.map(c => this.packagePresent(c.id ?? '') ? { ...c, state: 'installed' } : c);
+    const groups = composeComponentGroups(components);
     if (groups.length === 0) return nothing;
     // The stock-take that replaced seven repetitions of "Installed" — one line saying how much is on
     // disk instead of seven saying nothing (`composeComponentSummary`).
-    const summary = composeComponentSummary(this.planPreview?.components);
+    const summary = composeComponentSummary(components);
     return html`
       <div class="component-list" data-testid="install-component-list">
         ${summary
@@ -2961,6 +2692,7 @@ export class BrainSurface extends JfElement {
           <span class="component-label">${r.label}</span>
           ${/* Rendered ONLY when the state deviates from installed — `stateText` is null otherwise, so
                 the absence of text IS "installed" (840 post-review C.2). */ ''}
+          ${this.packagePresent(r.id) ? html`<span class="component-state">Downloaded${this._unifiedAiState?.snapshotLive && (r.id === 'chat' ? this.runtimeStatus?.active?.modelPath != null : this.runtimeStatus?.onnxFeatures?.some(f => f.id === (r.id === 'embedding' ? 'embed' : r.id) && f.status !== 'unknown' && f.modelActive)) ? ' · in use' : ''}</span>` : nothing}
           ${r.stateText
             ? html`<span class="component-state" data-testid="component-state-${r.id}"
                 >${r.stateText}</span
@@ -2970,16 +2702,15 @@ export class BrainSurface extends JfElement {
         <span class="component-size">${r.sizeText ?? '—'}</span>
         <div class="component-control">
           ${r.togglable
-            ? html`<jf-control
+            ? html`<button type="button"
                 class="component-toggle"
                 data-testid="component-toggle-${r.id}"
                 data-on=${r.selected ? 'true' : 'false'}
-                .availability=${reason ? unavailableBecause(reason) : AVAILABLE}
-                label=${r.label}
-                .pressed=${r.selected}
-                .onActivate=${() => void this.changeAcquisition(r.id, r.selected, r.state === 'installed')}
-                ><span class="component-switch-thumb"></span
-              ></jf-control>`
+                role="switch" aria-label=${`Include ${r.label}`} aria-checked=${String(r.selected)} aria-disabled=${String(!!reason)}
+                aria-describedby=${reason ? `component-${r.id}-reason` : nothing}
+                @click=${() => { if (!reason) void this.changeAcquisition(r.id, r.selected, r.state === 'installed'); }}
+                ><span class="component-switch-thumb"></span></button>
+                ${reason ? html`<span id=${`component-${r.id}-reason`} class="switch-reason">${reason}</span>` : nothing}`
             : nothing}
         </div>
         ${r.description ? html`<div class="component-desc">${r.description}</div>` : nothing}
@@ -3039,21 +2770,8 @@ export class BrainSurface extends JfElement {
     `;
   }
 
-  private renderModels(): TemplateResult {
-    const features = this.runtimeStatus?.onnxFeatures ?? [];
-    const active = features.filter((f) => f.modelActive).length;
-    // Tempdoc 807 A.3 — "N loaded" is the same present-tense claim as the Search Quality count.
-    const live = !this._unifiedAiState || this._unifiedAiState.snapshotLive;
-    return this.renderAccordion(
-      'models',
-      'Models',
-      active > 0 ? (live ? `${active} loaded` : `${active} when last observed`) : null,
-      () => html`
-        <div style="margin-top: 0.625rem; font-size: var(--font-size-sm)">
-          ${/* Tempdoc 840 Phase 5 — the same component list the Simple panel shows (Simple and
-                Detailed are mutually exclusive, so it is never on screen twice). */ ''}
-          ${this.renderComponentList()} ${this.renderTierBreakdown()}
-          ${this.installStatus?.packages?.length
+  private renderPackageHistory(): TemplateResult {
+    return html`          ${this.installStatus?.packages?.length
             ? this.installStatus.packages.map((p) => {
                 // Tempdoc 941 — a skipped package says so, and says why. Its byte count is the
                 // size of a download that never ran, so showing it in place of the reason made a
@@ -3085,19 +2803,7 @@ export class BrainSurface extends JfElement {
               : html`<div style="color: var(--text-secondary); padding: 0.5rem 0">
                   No model packages yet — install AI to populate this list.
                 </div>`}
-          ${this.llm.modelPath
-            ? html`
-                <div class="data-row">
-                  <span>LLM model</span>
-                  <span style="color: var(--text-secondary); font-family: monospace; font-size: var(--font-size-xs)"
-                    >${this.llm.modelPath}</span
-                  >
-                </div>
-              `
-            : nothing}
-        </div>
-      `,
-    );
+`;
   }
 
   // ---------- Render: install consent ----------
@@ -3201,7 +2907,7 @@ export class BrainSurface extends JfElement {
     const allowlist = this.policy?.packAllowlistConfigured ?? false;
     return html`
       <div class="section">
-        <h3>${icon({ name: 'folder', size: 12 })} Offline pack import</h3>
+        <h4>Import an offline package</h4>
         ${!tauri
           ? html`<jf-error-alert tone="warning">
               <span slot="icon">${icon({ name: 'alert-circle', size: 14 })}</span>
@@ -3249,29 +2955,112 @@ export class BrainSurface extends JfElement {
 
   // ---------- Render: install section advanced ----------
 
-  private renderInstallSection(): TemplateResult {
-    const downloadsDisabled = this.policy?.downloadsEnabled === false;
-    // Tempdoc 663 — consume the one AI-engine verdict instead of re-reading `installStatus.state`
-    // directly (the ai-verdict-derivation gate). Also picks up the instant `busy['install-start']`
-    // feedback the Simple panel already gets, closing the same gap here.
-    const installing = this.deriveAiEngineVerdict().kind === 'installing';
-    // Tempdoc 806 B.2 (round-12): ONE condition, ONE named remedy. The SIMPLE panel points at this
-    // panel by name for `repairNeeded` ("A required component is missing — use Repair in Detailed",
-    // :1310) while this panel offered Install as the primary CTA for the same condition — the user
-    // was sent here for Repair and shown Install. When a required file is missing on disk, Repair is
-    // the primary affordance here too; Install stays available (it is a superset), just not primary.
-    // Tempdoc 824 §3.3c/§3.4 — the same derivation the Simple panel reads, so "use Repair in
-    // Detailed" cannot land on a panel that has stopped believing Repair is the remedy. Repair is
-    // the primary affordance only while it can still succeed: once a file has failed three
-    // consecutive passes at transport, presenting Repair as THE action is the round-16 defect.
+  private settingInput(key: 'modelPath' | 'serverExecutable' | 'llamaLibPath', label: string): TemplateResult {
+    return html`<label class="field">${label}<input type="text" aria-label=${label}
+      .value=${this.llmDrafts.get(key) ?? this.llm[key] ?? ''} ?disabled=${this.llmPending > 0}
+      @input=${(event: Event) => this.editLlm(key, (event.target as HTMLInputElement).value)}
+      @change=${(event: Event) => void this.patchLlm({ [key]: (event.target as HTMLInputElement).value })}></label>`;
+  }
+
+  private editLlm(key: keyof LlmSettings, value: string): void {
+    ++this.llmRevision;
+    this.llmDrafts.set(key, value);
+    this.requestUpdate();
+  }
+
+  private renderSlider(key: 'contextWindow' | 'maxTokens' | 'gpuLayers', label: string, description: string, max: number): TemplateResult {
+    const saved = this.llm[key];
+    const draft = this.llmDrafts.get(key);
+    const value = draft == null ? saved : Number(draft);
+    const automatic = value == null || (key !== 'gpuLayers' && value === 0);
+    const shown = automatic ? 'Automatic' : key === 'gpuLayers' && value === 0 ? '0 layers · processor only' : `${NUM.format(value!)} ${key === 'gpuLayers' ? 'layers' : 'tokens'}`;
+    return html`<div class="advanced-row">
+      <div><label for=${`brain-${key}`}>${label}</label><p>${description}</p></div>
+      <div class="slider-setting"><input id=${`brain-${key}`} type="range" min="0" max=${Math.max(max, saved ?? 0)} step="1"
+        .value=${String(value ?? 0)} aria-label=${label} aria-valuetext=${shown} ?disabled=${this.llmPending > 0}
+        @input=${(event: Event) => this.editLlm(key, (event.target as HTMLInputElement).value)}
+        @change=${(event: Event) => void this.patchLlm({ [key]: Number((event.target as HTMLInputElement).value) })}>
+        <output for=${`brain-${key}`}>${shown}</output>
+        <jf-button variant="ghost" label=${`Automatic ${label.toLowerCase()}`} ?disabled=${this.llmPending > 0 || value == null}
+          .onActivate=${() => void this.patchLlm({ [key]: null })}>${icon({ name: 'refresh-cw', size: 12 })} Automatic</jf-button>
+      </div>
+    </div>`;
+  }
+
+  private runtimeAvailability() {
+    return this._unifiedAiState && !this._unifiedAiState.snapshotLive
+      ? unavailableBecause(reasonFor('binding.unreachable').wording)
+      : this.busy['inference-switch'] || this.busy.variant ? unavailableBecause('An engine change is in progress.') : AVAILABLE;
+  }
+
+  private renderRuntimeSection(): TemplateResult {
+    const variants = this.runtimeStatus?.installedVariants ?? [];
+    const activeId = this.runtimeStatus?.active?.activeVariantId;
+    const live = !this._unifiedAiState || this._unifiedAiState.snapshotLive;
+    const act = this.runtimeStatus?.activation;
+    const availability = act?.state === 'running' ? unavailableBecause('Activating an engine variant.') : this.runtimeAvailability();
+    const progress = this.indexingProgress();
+    return html`<section aria-label="Graphics card settings">
+      <h3 class="advanced-heading">Graphics card</h3>
+      ${!live ? html`<p>${reasonFor('binding.unreachable').wording} — these are the last observed readings.</p>` : nothing}
+      ${this.renderSlider('gpuLayers', 'Graphics card use', 'More layers on the card is faster; 0 uses the processor.', 256)}
+      <div class="advanced-row"><div>Graphics card support<p>Picked for your hardware</p></div><div>
+        ${activeId ?? 'Built in'}${activeId ? ' · active' : ''}
+        <button type="button" aria-expanded=${!!this.expanded.variants} @click=${() => this.toggleSection('variants')}>${icon({ name: 'chevron-down', size: 14 })} Other options</button>
+      </div></div>
+      ${this.expanded.variants ? html`<div class="variant-options">
+        ${variants.length === 0 ? html`<p>No additional installed runtime variants.</p>` : variants.map(v => html`<div class="variant">
+          <span class="variant-info">${v.variantId}${v.variantId === activeId ? ' · active' : ''}${v.exePath ? html`<small>${v.exePath}</small>` : nothing}</span>
+          ${v.variantId ? html`<jf-button variant="ghost" label=${v.variantId === activeId ? 'Deactivate' : 'Activate'}
+            .availability=${availability} .onActivate=${() => void (v.variantId === activeId ? this.deactivateVariant() : this.activateVariant(v.variantId!))}>
+            ${icon({ name: 'refresh-cw', size: 14 })} ${v.variantId === activeId ? 'Deactivate' : 'Activate'}</jf-button>` : nothing}
+        </div>`)}
+        ${act?.state === 'running' ? html`<p role="status">Activating: ${act.phase ?? '…'}</p>` : nothing}
+        ${act?.state === 'failed' ? html`<p role="alert">${act.message} ${act.errorCode}</p>` : nothing}
+      </div>` : nothing}
+      <div class="advanced-row"><div>Engine program<p>Runs the answer model</p></div><div>
+        <span>${this.llm.serverExecutable || 'Built in'}</span>
+        <button type="button" aria-expanded=${!!this.expanded.executable} @click=${() => this.toggleSection('executable')}>${icon({ name: 'folder', size: 14 })} Use another</button>
+        ${this.expanded.executable ? this.settingInput('serverExecutable', 'Server executable') : nothing}
+        ${this.expanded.executable ? this.settingInput('llamaLibPath', 'Llama library path') : nothing}
+      </div></div>
+      ${this.inference?.gpu ? html`<p class="runtime-observation" style=${isGpuReadingProvisional(this._unifiedAiState?.aiEngine?.stability) || !live ? 'opacity: 0.6' : ''}>
+        CUDA: ${this.inference.gpu.cudaAvailable ? 'available' : 'no'} · ${projectFact('core.ai.gpu', this._unifiedAiState).value ?? 'Graphics memory unknown'}
+        ${this.inference.tier ? ` · ${this.inference.tier.replace(/_/g, ' ')}` : ''}
+      </p>` : nothing}
+      <p class="runtime-observation">
+        ${progress.activity.confirmed ? '' : `${progress.activity.summary} — last observed `}embed queue: ${progress.phase === 'unknown' ? '—' : NUM.format(progress.embeddingPending)}
+        · VDU queue: ${progress.phase === 'unknown' ? '—' : NUM.format(progress.vduPending)}
+      </p>
+    </section>`;
+  }
+
+  private renderAdvanced(): TemplateResult | typeof nothing {
+    if (!this.expanded.advanced) return nothing;
     const repairRemedy = deriveRepairRemedy(this.installStatus);
-    const activationRequired = this.installStatus?.phase === 'activation_required';
     const repairNeeded = repairRemedy.kind === 'repair' || repairRemedy.kind === 'repair-soft';
     const manualFallback = repairRemedy.kind === 'manual' ? repairRemedy.packages : [];
     const optionalGaps = this.installStatus?.optionalGaps ?? [];
-    return html`
-      <div class="section">
-        <h3>${icon({ name: 'hard-drive', size: 12 })} AI install</h3>
+    const installing = this.installStatus?.state === 'running';
+    const downloadsDisabled = this.policy?.downloadsEnabled === false;
+    return html`<div class="brain-advanced" aria-label="Advanced settings">
+      <section aria-label="Answer settings"><h3 class="advanced-heading">Answers</h3>
+        <div class="advanced-row"><div>Answer model<p>Writes the answers</p></div><div>
+          ${this._unifiedAiState?.runtime?.modelLabel ?? this.runtimeStatus?.active?.chatProfile ?? 'Automatic'}
+          ${this.brainFeatures().chat.size ?? ''}
+          <button type="button" aria-expanded=${!!this.expanded.model} @click=${() => this.toggleSection('model')}>${icon({ name: 'folder', size: 14 })} Change</button>
+          ${this.expanded.model ? this.settingInput('modelPath', 'Model path') : nothing}
+        </div></div>
+        ${this.renderSlider('contextWindow', 'Reading memory', 'How much text it reads at once', 131072)}
+        ${this.renderSlider('maxTokens', 'Longest answer', 'Upper limit for one answer', 16384)}
+      </section>
+      ${this.renderRuntimeSection()}
+      <section aria-label="Downloaded files"><h3 class="advanced-heading">Downloaded files</h3>
+        <p class="advanced-note">Registry footprints, not measured disk use. Include or skip optional parts for acquisition; existing files are kept.</p>
+        ${this.renderComponentList()}${this.renderTierBreakdown()}${this.renderPackageHistory()}${this.renderSearchQualityFeatures()}
+        ${this.renderPackImport()}
+      </section>
+      <section aria-label="Maintenance"><h3 class="advanced-heading">Maintenance</h3>
         ${repairNeeded
           ? html`<div
               data-testid="install-repair-needed"
@@ -3313,16 +3102,6 @@ export class BrainSurface extends JfElement {
               >
             </div>`
           : nothing}
-        <div style="font-size: var(--font-size-xs); color: var(--text-secondary); margin-bottom: 0.5rem">
-          State: <code>${this.installStatus?.state ?? 'idle'}</code>${this.installStatus?.phase
-            ? html` · phase: <code>${this.installStatus.phase}</code>`
-            : nothing}
-          ${this.installStatus?.installedFully !== undefined
-            ? html` · installedFully: <code>${String(this.installStatus.installedFully)}</code>`
-            : nothing}
-          ${/* Tempdoc 804 §B8 — a newer version's added artifacts are their own state ("extra AI
-                components are available"), not a retroactive un-install of a complete one. */ ''}
-          ${this.renderStagedProgress()}
           ${this.installStatus?.pendingRegistryAdditions?.length
             ? html`<div data-testid="install-pending-registry-additions">
                 New AI components are available since this install:
@@ -3330,306 +3109,19 @@ export class BrainSurface extends JfElement {
                 to add them.
               </div>`
             : nothing}
-        </div>
-        ${activationRequired
-          ? html`<div
-              data-testid="install-activation-required"
-              style="font-size: var(--font-size-sm); color: var(--text-secondary); margin-bottom: 0.75rem"
-            >
-              Downloaded — activation required. Activation rebuilds affected indexes and publishes
-              the downloaded models.
-            </div>`
-          : nothing}
+
         <div class="row">
-          ${activationRequired
-            ? html`<jf-button
-                variant="primary"
-                label="Activate downloaded models"
-                .availability=${this.busy['install-activation']
-                  ? ({ kind: 'blocked' } as const)
-                  : AVAILABLE}
-                .onActivate=${() => void this.activateInstalledModels()}
-              >
-                Activate downloaded models
-              </jf-button>`
-            : nothing}
-          <jf-button
-            variant=${activationRequired || repairNeeded || manualFallback.length > 0 ? 'secondary' : 'primary'}
-            label="Install"
-            .availability=${installing
-              ? unavailableBecause('Already installing.')
-              : downloadsDisabled
-                ? unavailableBecause('Downloads are disabled by administrator policy.')
-                : this.busy['install-start']
-                  ? { kind: 'blocked' }
-                  : AVAILABLE}
-            .onActivate=${() => void this.startInstall()}
-          >
-            Install
-          </jf-button>
-          <jf-button
-            label="Cancel"
-            ?disabled=${!installing || !!this.busy['install-cancel']}
-            .onActivate=${() => void this.cancelInstall()}
-          >
-            Cancel
-          </jf-button>
-          <jf-button
-            variant=${repairNeeded ? 'primary' : 'secondary'}
-            label="Repair"
-            .availability=${installing
-              ? unavailableBecause('Already installing.')
-              : downloadsDisabled
-                ? unavailableBecause('Downloads are disabled by administrator policy.')
-                : this.busy['install-repair']
-                  ? { kind: 'blocked' }
-                  : AVAILABLE}
-            .onActivate=${() => void this.repairInstall()}
-          >
-            Repair
-          </jf-button>
+          <jf-button variant="ghost" label="Restart AI" .availability=${this.runtimeAvailability()}
+            .onActivate=${() => void this.withBusy('inference-switch', () => this.refreshInference())}>${icon({ name: 'refresh-cw', size: 14 })} Restart AI</jf-button>
+          <jf-button variant="ghost" label="Repair installation"
+            .availability=${installing ? unavailableBecause('Already installing.') : downloadsDisabled ? unavailableBecause('Downloads are disabled by administrator policy.') : this.busy['install-repair'] ? unavailableBecause('Repair in progress.') : AVAILABLE}
+            .onActivate=${() => void this.repairInstall()}>${icon({ name: 'refresh-cw', size: 14 })} Repair installation</jf-button>
+          <jf-operation context="button" operation-id="core.rebuild-index" api-base=${this.apiBase}
+            @op-success=${(event: CustomEvent<OpSuccessEventDetail>) => { this.bulkError = null; this.bulkOutcomeKey = String(event.detail.structuredData?.operationKey ?? ''); }}
+            @op-error=${(event: CustomEvent<OpErrorEventDetail>) => this.showBulkError(event.detail)}></jf-operation>
         </div>
-      </div>
-    `;
-  }
-
-  // ---------- Render: runtime / variants / inference / LLM settings ----------
-
-  private renderRuntimeSection(): TemplateResult {
-    const progress = this.indexingProgress();
-    const variants = this.runtimeStatus?.variants ?? [];
-    const activeId = this.runtimeStatus?.activation?.activeVariantId ?? null;
-    const actState = this.runtimeStatus?.activation?.state ?? 'idle';
-    const activating = actState === 'running' || !!this.busy['variant'];
-    const provisional = isGpuReadingProvisional(this._unifiedAiState?.aiEngine?.stability);
-    // Tempdoc 807 A.3 — the whole Runtime card is a readout of the retained snapshot (CUDA, VRAM,
-    // tier, which variant is active), and every control in it POSTs to a backend that must be alive.
-    // Not live ⟹ the readout is labelled as history and the controls become unavailable-with-a-reason
-    // (the 596 soft block: focusable, reason reachable) rather than silently clickable-and-failing.
-    const live = !this._unifiedAiState || this._unifiedAiState.snapshotLive;
-    // The reason is IMPORTED from the one cause vocabulary (`binding.unreachable` — the same row the
-    // verdict and the disconnection banner word themselves from), never re-authored here.
-    // NOT transient (round-13 review): `transient` makes `jf-control` QUEUE the intent and auto-fire
-    // it on reconnect, so an offline click on Online/Indexing/Reload/Activate/Deactivate would land a
-    // burst of conflicting RUNTIME MUTATIONS the moment the backend returns. These controls must be
-    // refused with their reason now, not deferred — the user can re-click once the card is live again.
-    const offlineGate = unavailableBecause(reasonFor('binding.unreachable').wording);
-
-    return html`
-      <div class="section">
-        <h3>${icon({ name: 'hard-drive', size: 12 })} Runtime</h3>
-
-        ${live
-          ? nothing
-          : html`<div style="font-size: var(--font-size-xs); color: var(--text-muted); margin-bottom: 0.5rem">
-              ${reasonFor('binding.unreachable').wording} — the values below are the last observed
-              readings, not live.
-            </div>`}
-
-        ${this.inference?.gpu
-          ? html`
-              <div class="grid" style="margin-bottom: 0.75rem; ${provisional || !live ? 'opacity: 0.6' : ''}">
-                <span class="key">CUDA</span
-                ><span class="val">${this.inference.gpu.cudaAvailable ? 'available' : 'no'}</span>
-                ${(() => {
-                  // Tempdoc 663 — same `core.ai.gpu` fact as renderSimplePanel's grid; the VRAM
-                  // description is one authority, projected wherever it renders.
-                  const gpu = projectFact('core.ai.gpu', this._unifiedAiState);
-                  return gpu.presence === 'present'
-                    ? html`<span class="key">VRAM</span><span class="val">${gpu.value}</span>`
-                    : nothing;
-                })()}
-                ${this.inference.tier
-                  ? html`<span class="key">Tier</span
-                      ><span class="val">${this.inference.tier.replace(/_/g, ' ')}</span>`
-                  : nothing}
-              </div>
-            `
-          : nothing}
-
-        ${variants.length > 0
-          ? html`
-              <div style="font-size: var(--font-size-xs); text-transform: uppercase; color: var(--text-secondary); margin-bottom: 0.375rem">
-                GPU runtime variants
-              </div>
-              ${variants.map(
-                (v) => html`
-                  <div class="variant ${v.id === activeId ? 'active' : ''}">
-                    <div class="variant-info">
-                      <div class="variant-label">${v.label ?? v.id}</div>
-                      <div class="variant-meta">
-                        ${v.description ?? ''}
-                        ${v.requiredVramBytes
-                          ? html` · requires ${formatBytes(v.requiredVramBytes)} VRAM`
-                          : nothing}
-                        ${v.available === false && v.reason
-                          ? html` · <span style="color: var(--text-warning)">${v.reason}</span>`
-                          : nothing}
-                      </div>
-                    </div>
-                    ${v.id === activeId
-                      ? html`<jf-button
-                          label="Deactivate"
-                          .availability=${!live
-                            ? offlineGate
-                            : activating
-                              ? { kind: 'blocked' }
-                              : AVAILABLE}
-                          .onActivate=${() => void this.deactivateVariant()}
-                        >
-                          Deactivate
-                        </jf-button>`
-                      : html`<jf-button
-                          variant="primary"
-                          label="Activate"
-                          .availability=${!live
-                            ? offlineGate
-                            : activating || v.available === false
-                              ? { kind: 'blocked' }
-                              : AVAILABLE}
-                          .onActivate=${() => void this.activateVariant(v.id)}
-                        >
-                          Activate
-                        </jf-button>`}
-                  </div>
-                `,
-              )}
-              ${actState === 'running'
-                ? html`<div style="font-size: var(--font-size-xs); color: var(--text-secondary)">
-                    Activating: ${this.runtimeStatus?.activation?.phase ?? '…'}
-                  </div>`
-                : nothing}
-            `
-          : nothing}
-
-        <!-- Inference mode -->
-        <div style="margin-top: 1rem">
-          <div
-            style="font-size: var(--font-size-xs); text-transform: uppercase; color: var(--text-secondary); margin-bottom: 0.375rem"
-          >
-            Inference mode
-          </div>
-          <div class="row">
-            <jf-button
-              variant=${(this._unifiedAiState?.runtime?.mode ?? this.inference?.mode) === 'online' ? 'primary' : 'secondary'}
-              label="Online"
-              .availability=${!live
-                ? offlineGate
-                : this.policy?.onlineAiEnabled === false
-                  ? unavailableBecause('Online AI is disabled by administrator policy.')
-                  : this.busy['inference-switch']
-                    ? { kind: 'blocked' }
-                    : AVAILABLE}
-              .onActivate=${() => void this.setChatEnabled(true)}
-            >
-              Online
-            </jf-button>
-            <jf-button
-              variant=${(this._unifiedAiState?.runtime?.mode ?? this.inference?.mode) === 'indexing' ? 'primary' : 'secondary'}
-              label="Indexing"
-              .availability=${!live
-                ? offlineGate
-                : this.busy['inference-switch']
-                  ? { kind: 'blocked' }
-                  : AVAILABLE}
-              .onActivate=${() => void this.setChatEnabled(false)}
-            >
-              Indexing
-            </jf-button>
-            <jf-button
-              label="Reload"
-              .availability=${!live
-                ? offlineGate
-                : this.busy['inference-switch']
-                  ? { kind: 'blocked' }
-                  : AVAILABLE}
-              .onActivate=${() =>
-                this.withBusy('inference-switch', () => this.refreshInference())}
-            >
-              Reload
-            </jf-button>
-            ${this.systemStatus
-              ? html`<span style="font-size: var(--font-size-xs); color: var(--text-secondary); align-self: center">
-                  ${progress.activity.confirmed ? nothing : `${progress.activity.summary} — ${progress.phase === 'unknown' ? '' : 'last observed '}`}embed queue: ${progress.phase === 'unknown' ? '—' : NUM.format(progress.embeddingPending)}
-                  · VDU queue: ${progress.phase === 'unknown' ? '—' : NUM.format(progress.vduPending)}
-                </span>`
-              : nothing}
-          </div>
-        </div>
-
-        <!-- LLM settings -->
-        <div style="margin-top: 1rem">
-          <div
-            style="font-size: var(--font-size-xs); text-transform: uppercase; color: var(--text-secondary); margin-bottom: 0.375rem"
-          >
-            LLM settings
-          </div>
-          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem">
-            <label class="field">
-              Model path
-              <input
-                type="text"
-                .value=${this.llm.modelPath ?? ''}
-                @change=${(e: Event) =>
-                  void this.patchLlm({ modelPath: (e.target as HTMLInputElement).value })}
-              />
-            </label>
-            <label class="field">
-              Server executable
-              <input
-                type="text"
-                .value=${this.llm.serverExecutable ?? ''}
-                @change=${(e: Event) =>
-                  void this.patchLlm({
-                    serverExecutable: (e.target as HTMLInputElement).value,
-                  })}
-              />
-            </label>
-            <label class="field">
-              Context window
-              <input
-                type="number"
-                min="0"
-                .value=${String(this.llm.contextWindow ?? 0)}
-                @change=${(e: Event) =>
-                  void this.patchLlm({
-                    contextWindow: Math.max(0, Number.parseInt((e.target as HTMLInputElement).value, 10) || 0),
-                  })}
-              />
-            </label>
-            <label class="field">
-              Max tokens
-              <input
-                type="number"
-                min="0"
-                .value=${String(this.llm.maxTokens ?? 0)}
-                @change=${(e: Event) =>
-                  void this.patchLlm({ maxTokens: Math.max(16, Math.min(16_384, Number.parseInt((e.target as HTMLInputElement).value, 10) || 16)) })}
-              />
-            </label>
-            <label class="field">
-              GPU layers
-              <input
-                type="number"
-                min="0"
-                .value=${String(this.llm.gpuLayers ?? 0)}
-                @change=${(e: Event) =>
-                  void this.patchLlm({ gpuLayers: Math.max(0, Number.parseInt((e.target as HTMLInputElement).value, 10) || 0) })}
-              />
-            </label>
-            <label class="field">
-              Llama lib path
-              <input
-                type="text"
-                .value=${this.llm.llamaLibPath ?? ''}
-                @change=${(e: Event) =>
-                  void this.patchLlm({ llamaLibPath: (e.target as HTMLInputElement).value })}
-              />
-            </label>
-          </div>
-        </div>
-      </div>
-    `;
+      </section>
+    </div>`;
   }
 
   // ---------- Top render ----------
@@ -3670,16 +3162,8 @@ export class BrainSurface extends JfElement {
         if (this.featureInfo && !event.composedPath().some(node => node instanceof HTMLElement && (node.classList.contains('feature-panel') || node === this.featureOpener))) this.closeFeatureInfo();
       }}>
         ${this.renderSimplePanel()}
-        <div class="brain-existing-settings" ?hidden=${!this.expanded.advanced}>
-          ${this.renderEnrichmentProgress()}
-          ${this.renderAccordion('install', 'Install AI', this.installStatus?.state ?? 'idle', () => html`<div>${this.renderInstallSection()}</div>`)}
-          ${this.renderSearchQualityFeatures()}
-          ${this.renderAccordion('runtime', 'Runtime', this._unifiedAiState?.runtime?.mode ?? this.inference?.mode ?? null, () => html`<div>${this.renderRuntimeSection()}</div>`)}
-          ${this.renderModels()}
-          ${this.renderPackImport()}
-          ${this.renderTransitionTimeline()}
-          ${this.renderTraceExplorer()}
-        </div>
+        ${this.renderEnrichmentProgress()}
+        ${this.renderAdvanced()}
         ${this.renderInstallConsent()}
       </div>
     `;

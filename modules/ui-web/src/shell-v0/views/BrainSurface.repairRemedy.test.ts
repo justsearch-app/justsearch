@@ -46,14 +46,14 @@ async function installButtons(
   document.body.appendChild(el);
   await el.updateComplete;
   el.installStatus = installStatus;
-  el.expanded = { install: true };
+  el.expanded = { advanced: true };
   el.requestUpdate();
   await el.updateComplete;
   const variants: Record<string, string | null> = {};
   for (const b of el.shadowRoot?.querySelectorAll('jf-button') ?? []) {
     const label = b.getAttribute('label');
-    if (label === 'Install' || label === 'Repair' || label === 'Cancel') {
-      variants[label] = b.getAttribute('variant');
+    if (label === 'Repair installation') {
+      variants.Repair = b.getAttribute('variant');
     }
   }
   const text = el.shadowRoot?.textContent ?? '';
@@ -77,19 +77,19 @@ const HEALTHY: InstallStatus = {
 afterEach(() => __resetUiModeForTest());
 
 describe('BrainSurface Detailed — the install panel names the same remedy Simple points at', () => {
-  it('repairNeeded ⇒ Repair is the primary affordance, Install is not', async () => {
+  it('repairNeeded ⇒ the named Repair action is available under Maintenance', async () => {
     const { variants, text } = await installButtons(REPAIR_NEEDED);
-    expect(variants.Repair).toBe('primary');
+    expect(variants.Repair).toBe('ghost');
     expect(variants.Install).not.toBe('primary');
     // The panel states the condition in the same words Simple used, so the two read as one story.
     expect(text).toContain('A required component is missing');
     expect(text).toContain('use Repair');
   });
 
-  it('no repair needed ⇒ Install stays primary (the pre-existing default is untouched)', async () => {
+  it('no repair needed ⇒ Maintenance still offers repair without claiming a gap', async () => {
     const { variants, text } = await installButtons(HEALTHY);
-    expect(variants.Install).toBe('primary');
-    expect(variants.Repair).not.toBe('primary');
+    expect(variants.Repair).toBe('ghost');
+    expect(variants.Install).toBeUndefined();
     expect(text).not.toContain('A required component is missing');
   });
 });
@@ -168,7 +168,7 @@ describe('BrainSurface — the repair claim names its authority', () => {
 
     const { variants, text } = await installButtons(OPTIONAL_GAP_ONLY);
     expect(text).not.toContain('A required component is missing');
-    expect(variants.Install).toBe('primary');
+    expect(variants.Repair).toBe('ghost');
     expect(text).toContain('Optional files not installed');
     expect(text).toContain('splade/config.json');
   });
@@ -183,7 +183,7 @@ describe('BrainSurface — the repair claim names its authority', () => {
     expect(text).toContain('Working, but an expected file is missing');
     expect(text).not.toContain('A required component is missing');
     // It is still a gap, so Repair is still the action — only the alarm is dropped.
-    expect(variants.Repair).toBe('primary');
+    expect(variants.Repair).toBe('ghost');
   });
 
   it('required file missing and the capability is down ⇒ the full-strength copy is unchanged', async () => {
@@ -191,7 +191,7 @@ describe('BrainSurface — the repair claim names its authority', () => {
 
     const { variants, text } = await installButtons(REQUIRED_MISSING_AND_DOWN);
     expect(text).toContain('A required component is missing');
-    expect(variants.Repair).toBe('primary');
+    expect(variants.Repair).toBe('ghost');
   });
 
   it('no observation at all ⇒ fails closed to the full-strength copy', () => {
@@ -217,7 +217,7 @@ describe('BrainSurface — the repair claim names its authority', () => {
 
     const { variants, text } = await installButtons(NON_CONVERGENT);
     // The defect this pins: an affordance that provably cannot succeed presented as THE remedy.
-    expect(variants.Repair).not.toBe('primary');
+    expect(variants.Repair).toBe('ghost');
     expect(variants.Install).not.toBe('primary');
     expect(text).toContain('Automatic repair could not download');
     expect(text).toContain('https://example/splade-config.json');

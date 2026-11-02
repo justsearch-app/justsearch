@@ -17,11 +17,11 @@ it('refreshes the standing plan when installation or activation finishes', async
     connectedCallback(): void;
     disconnectedCallback(): void;
     refreshAll(): Promise<void>;
-    startDiagnosticsPolling(): void;
+    startSettingsPolling(): void;
     refreshInstallPlanPreview(): Promise<void>;
   };
   const refreshAll = vi.spyOn(el, 'refreshAll').mockResolvedValue();
-  const diagnostics = vi.spyOn(el, 'startDiagnosticsPolling').mockImplementation(() => {});
+  const diagnostics = vi.spyOn(el, 'startSettingsPolling').mockImplementation(() => {});
   const preview = vi.spyOn(el, 'refreshInstallPlanPreview').mockResolvedValue();
   try {
     el.connectedCallback();

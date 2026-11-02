@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
   },
-  "createdAt": "2026-11-02T06:12:57.786Z",
-  "revision": "aeaa3e0413daedbde92880a6c8a9dd18d37c044d",
-  "tree": "333d3f8a81f89b790c3283916700283570b056d6",
+  "createdAt": "2026-11-02T07:01:10.757Z",
+  "revision": "6680864f7d3dffbafa39f14ad65b6be149b54d36",
+  "tree": "c49913e1a345adb2c8b0929f3009e8d8d0318276",
   "environment": {
     "platform": "linux",
     "arch": "x64",
@@ -18,10 +18,10 @@
   },
   "runs": [
     {
-      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/BrainSurface.ui-mode.test.ts\" \"src/shell-v0/views/BrainSurface.pausedInstall.test.ts\" \"src/shell-v0/views/BrainSurface.snapshotLiveness.test.ts\" \"src/shell-v0/views/BrainSurface.telemetry-mode.test.ts\" \"src/shell-v0/state/aiStateStore.restartInference.test.ts\" \"src/shell-v0/state/brainPage.test.ts\" \"src/shell-v0/views/BrainSurface.redesign.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/1rm1vdgt/tmp/test-intent-vitest-64-1793599971710.json\"",
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/BrainSurface.ui-mode.test.ts\" \"src/shell-v0/views/BrainSurface.pausedInstall.test.ts\" \"src/shell-v0/views/BrainSurface.snapshotLiveness.test.ts\" \"src/shell-v0/views/BrainSurface.telemetry-mode.test.ts\" \"src/shell-v0/state/aiStateStore.restartInference.test.ts\" \"src/shell-v0/state/brainPage.test.ts\" \"src/shell-v0/views/BrainSurface.redesign.test.ts\" \"src/shell-v0/views/BrainSurface.installRefresh.test.ts\" \"src/shell-v0/views/BrainSurface.repairRemedy.test.ts\" \"src/shell-v0/views/BrainSurface.skipReason.test.ts\" \"src/shell-v0/views/BrainSurface.sparkline.test.ts\" \"src/shell-v0/views/BrainSurface.sliceB.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/cdcs43uq/tmp/test-intent-vitest-4-1793602863602.json\"",
       "cwd": "modules/ui-web",
       "exitCode": 0,
-      "durationMs": 6074
+      "durationMs": 7151
     }
   ],
   "checks": [
@@ -29,7 +29,7 @@
       "id": "modules/ui-web/src/shell-v0/views/BrainSurface.ui-mode.test.ts",
       "file": "modules/ui-web/src/shell-v0/views/BrainSurface.ui-mode.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:77e16959abc39fd63080e7cca222bc030f976b53239fcb96f98775b50e91bb98",
+      "contentDigest": "sha256:bd8c3009bcd5892e123eeceb4f35313deabf0b032a8b5813b79af93b832eb787",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -87,7 +87,7 @@
       "id": "modules/ui-web/src/shell-v0/views/BrainSurface.snapshotLiveness.test.ts",
       "file": "modules/ui-web/src/shell-v0/views/BrainSurface.snapshotLiveness.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:febb81b9f5dd13ffcbcc01c5d546507b1aafe3c60af1e5d0e36bb049239e5650",
+      "contentDigest": "sha256:e185f6af49ebc1344bceeffeb9e19b3cc30052983c564076dafbeaf13a0aa86f",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -174,29 +174,37 @@
       "id": "modules/ui-web/src/shell-v0/views/BrainSurface.telemetry-mode.test.ts",
       "file": "modules/ui-web/src/shell-v0/views/BrainSurface.telemetry-mode.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:1028a748d6a22909ae656ea309f2292c0cdee764649451f703ccd5e79a74c0b8",
+      "contentDigest": "sha256:4c127b9b09a53dff053d95cf217effad6ba69b07eb849fccc7ec1763f1af54ee",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
       "cases": [
         {
-          "name": "BrainSurface developer telemetry placement (round 8) collapsed Advanced exposes NO transition timeline and NO trace explorer",
+          "name": "developer telemetry belongs to Health AI Engine Health opened first fetches and renders transitions, generation and spans under simple mode",
           "status": "passed"
         },
         {
-          "name": "BrainSurface developer telemetry placement (round 8) Advanced renders both telemetry panels under simple ui.mode",
+          "name": "developer telemetry belongs to Health AI Engine Health opened first fetches and renders transitions, generation and spans under advanced mode",
           "status": "passed"
         },
         {
-          "name": "BrainSurface developer telemetry placement (round 8) Advanced renders both telemetry panels under advanced ui.mode",
+          "name": "developer telemetry belongs to Health AI Engine Brain never polls telemetry, with Advanced closed or open",
           "status": "passed"
         },
         {
-          "name": "BrainSurface developer telemetry placement (round 8) the Detailed panel keeps the emptiness gates — no telemetry data, no sections",
+          "name": "developer telemetry belongs to Health AI Engine empty and unavailable states keep their sections visible, without fabricated data",
           "status": "passed"
         },
         {
-          "name": "BrainSurface developer telemetry placement (round 8) the trace explorer is gated on tracesAvailable alone — spans present but unavailable stays hidden",
+          "name": "developer telemetry belongs to Health AI Engine a trace file unavailable flag does not display supplied spans",
+          "status": "passed"
+        },
+        {
+          "name": "developer telemetry belongs to Health AI Engine unmount aborts reads and stops polling; late responses cannot replace the old snapshot",
+          "status": "passed"
+        },
+        {
+          "name": "developer telemetry belongs to Health AI Engine engine history link focuses the section when Health is mounted already and when it mounts later",
           "status": "passed"
         }
       ]
@@ -220,7 +228,7 @@
       "id": "modules/ui-web/src/shell-v0/state/brainPage.test.ts",
       "file": "modules/ui-web/src/shell-v0/state/brainPage.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:1aa00b65ef04c4e16d36629c8c59bb4dde6c07febbdf3b1fdf781f58badbac3b",
+      "contentDigest": "sha256:00ed7099c6639a8d8ca642d0a106783abc2d5da59f5db4bab4c7b16f7e5a9067",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -350,6 +358,22 @@
           "status": "passed"
         },
         {
+          "name": "Brain sentence from observed state and saved choice before install never promises excluded answers: unavailable",
+          "status": "passed"
+        },
+        {
+          "name": "Brain sentence from observed state and saved choice before install never promises excluded answers: not-in-mode",
+          "status": "passed"
+        },
+        {
+          "name": "Brain sentence from observed state and saved choice before install never promises excluded answers: declined",
+          "status": "passed"
+        },
+        {
+          "name": "Brain sentence from observed state and saved choice before install never promises excluded answers: selected",
+          "status": "passed"
+        },
+        {
           "name": "Brain sentence from observed state and saved choice unknown status never claims availability or a missing installation",
           "status": "passed"
         },
@@ -367,7 +391,7 @@
       "id": "modules/ui-web/src/shell-v0/views/BrainSurface.redesign.test.ts",
       "file": "modules/ui-web/src/shell-v0/views/BrainSurface.redesign.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:3ed513c11e4abb1228a5a48a26e5d7e5c23a6609734d7f67809b751eaac500f7",
+      "contentDigest": "sha256:ebe4186a91ba984ff4311d72778d60d36b9e70a02b7208c9994b8e373505e68c",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -421,8 +445,207 @@
           "status": "passed"
         }
       ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/BrainSurface.installRefresh.test.ts",
+      "file": "modules/ui-web/src/shell-v0/views/BrainSurface.installRefresh.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:66876e4dca429d219f4579306f6eec3982bd3e419c3bac73caf044bc66f15a4e",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "refreshes the standing plan when installation or activation finishes",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/BrainSurface.repairRemedy.test.ts",
+      "file": "modules/ui-web/src/shell-v0/views/BrainSurface.repairRemedy.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:0197bb565e68a49ef55c54d9d38201dd2d8f92aa21eaf954152a864b0d839fab",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "BrainSurface Detailed — the install panel names the same remedy Simple points at repairNeeded ⇒ the named Repair action is available under Maintenance",
+          "status": "passed"
+        },
+        {
+          "name": "BrainSurface Detailed — the install panel names the same remedy Simple points at no repair needed ⇒ Maintenance still offers repair without claiming a gap",
+          "status": "passed"
+        },
+        {
+          "name": "BrainSurface — the repair claim names its authority optional-only gap ⇒ no repair prompt at all, and the gap is still named",
+          "status": "passed"
+        },
+        {
+          "name": "BrainSurface — the repair claim names its authority required file missing but the capability is observably running ⇒ the \"working, but\" copy",
+          "status": "passed"
+        },
+        {
+          "name": "BrainSurface — the repair claim names its authority required file missing and the capability is down ⇒ the full-strength copy is unchanged",
+          "status": "passed"
+        },
+        {
+          "name": "BrainSurface — the repair claim names its authority no observation at all ⇒ fails closed to the full-strength copy",
+          "status": "passed"
+        },
+        {
+          "name": "BrainSurface — the repair claim names its authority three failed repair passes ⇒ the manual fallback, not an unqualified Repair button",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/BrainSurface.skipReason.test.ts",
+      "file": "modules/ui-web/src/shell-v0/views/BrainSurface.skipReason.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:76081116d682a5b8bb0b61467ac54f789effe3468bae698fd9a58c36fb968fd8",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "skipExplanation (941) returns null for a package that was not skipped",
+          "status": "passed"
+        },
+        {
+          "name": "skipExplanation (941) prefers the planner-authored prose — no derived copy can reconstruct it",
+          "status": "passed"
+        },
+        {
+          "name": "skipExplanation (941) derives a sentence per typed cause when the record carries no prose",
+          "status": "passed"
+        },
+        {
+          "name": "skipExplanation (941) an unknown or empty cause stays neutral — it must not blame the machine",
+          "status": "passed"
+        },
+        {
+          "name": "skipExplanation (941) keeps the authored prose even when the cause is unclassified",
+          "status": "passed"
+        },
+        {
+          "name": "BrainSurface Models list renders the skip reason (941) names each skipped package’s status and reason",
+          "status": "passed"
+        },
+        {
+          "name": "BrainSurface Models list renders the skip reason (941) replaces the never-downloaded byte count with the status word",
+          "status": "passed"
+        },
+        {
+          "name": "BrainSurface Models list renders the skip reason (941) an installed-only list is unchanged (no skip chrome appears)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/BrainSurface.sparkline.test.ts",
+      "file": "modules/ui-web/src/shell-v0/views/BrainSurface.sparkline.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:0534ff2365822acabb3e5190ae3bcd2142a35e38cceb597b100b4c745f445d40",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "HealthSurface.renderGenerationSparkline renders no sparkline when generation is 0",
+          "status": "passed"
+        },
+        {
+          "name": "HealthSurface.renderGenerationSparkline renders no sparkline when no transitions are present",
+          "status": "passed"
+        },
+        {
+          "name": "HealthSurface.renderGenerationSparkline renders polyline + per-row dots when generation > 0",
+          "status": "passed"
+        },
+        {
+          "name": "HealthSurface.renderGenerationSparkline failures contribute dots; failure dot uses the red fill",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/BrainSurface.sliceB.test.ts",
+      "file": "modules/ui-web/src/shell-v0/views/BrainSurface.sliceB.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:6534220433a3d27035687f230d6e1d35ad57f9caef6dc64e033069944248b842",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Brain slice A independent review repairs R1 acquisition decline does not hide existing answer files or replace their runtime switch, including after remount",
+          "status": "passed"
+        },
+        {
+          "name": "Brain slice A independent review repairs R2 unavailable answers are not promised, and pictures use explicit availability",
+          "status": "passed"
+        },
+        {
+          "name": "Brain slice A independent review repairs R2 not-in-mode answers are not promised, and pictures use explicit availability",
+          "status": "passed"
+        },
+        {
+          "name": "Brain slice A independent review repairs R3 live installed packages replace stale not-downloaded paths before the staged run ends",
+          "status": "passed"
+        },
+        {
+          "name": "Brain slice A independent review repairs R4 an unknown runtime observation stays unconfirmed in both sentence and path",
+          "status": "passed"
+        },
+        {
+          "name": "Brain slice A independent review repairs R5 a settings GET begun before a witnessed LLM save cannot revert the saved value",
+          "status": "passed"
+        },
+        {
+          "name": "Brain slice A independent review repairs R6 the processor-fallback repair hint remains an accessible alert with its action",
+          "status": "passed"
+        },
+        {
+          "name": "Brain refresh lifetime a settings refresh resolves when focus moves into a sibling shadow root",
+          "status": "passed"
+        },
+        {
+          "name": "Brain refresh lifetime a pending settings read can resolve after disconnect without rejecting or replacing values",
+          "status": "passed"
+        },
+        {
+          "name": "Brain refresh lifetime a pending settings read can reject after disconnect without rejecting or replacing values",
+          "status": "passed"
+        },
+        {
+          "name": "Brain Advanced controls renders the four groups in place, keeps optional part choices, and never writes on open",
+          "status": "passed"
+        },
+        {
+          "name": "Brain Advanced controls sliders keep an unfocused draft across refresh, save once on change with witnesses, and preserve untouched values",
+          "status": "passed"
+        },
+        {
+          "name": "Brain Advanced controls Automatic stays distinct from processor-only, and changing one slider preserves the other five settings",
+          "status": "passed"
+        },
+        {
+          "name": "Brain Advanced controls a slider conflict shows review guidance, keeps the saved value and allows an explicit retry",
+          "status": "passed"
+        },
+        {
+          "name": "Brain Advanced controls a second window sees a committed slider value on focus, while a draft survives tab switching and refresh",
+          "status": "passed"
+        },
+        {
+          "name": "Brain Advanced controls an installed inactive variant can be activated from the real endpoint fields",
+          "status": "passed"
+        }
+      ]
     }
   ],
   "failBefore": null,
-  "digest": "sha256:fe3553ad0b7d4c17c2f63d56dd4bade8d2f6403735a3ec95a8d5edb59c07d214"
+  "digest": "sha256:d74fb12e59612f4833da6a133eb82056c5ec15c777b51990cdd880209d073b1e"
 }

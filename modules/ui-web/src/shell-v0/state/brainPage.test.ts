@@ -29,6 +29,13 @@ describe('Brain sentence from observed state and saved choice', () => {
     expect(parts.find(part => part.feature === 'chat')?.text).toBe(chat ? ' and answer your questions with sources' : ', without answers to questions');
     expect(parts.find(part => part.feature === 'pictures')?.text).toContain('comes with the answer model’s files');
   });
+  it.each(['unavailable', 'not-in-mode', 'declined', 'selected'] as const)('before install never promises excluded answers: %s', state => {
+    const f = features(true, true, false);
+    f.chat.availability = state === 'unavailable' || state === 'not-in-mode' ? 'unavailable' : 'available';
+    f.chat.selected = state !== 'declined';
+    const text = composeBrainSentence(verdict('not_installed'), false, f, false).find(part => part.feature === 'chat')?.text;
+    expect(text).toBe(state === 'unavailable' || state === 'not-in-mode' ? ', with answers unavailable on this computer' : state === 'declined' ? ', without answers to questions' : ' and answer your questions with sources');
+  });
   it('unknown status never claims availability or a missing installation', () => {
     const text = composeBrainSentence(verdict('connecting'), false, features(null, null, null), false).map(part => part.text).join('');
     expect(text).toBe('AI status and feature availability are still being checked. Everything runs on this computer.');

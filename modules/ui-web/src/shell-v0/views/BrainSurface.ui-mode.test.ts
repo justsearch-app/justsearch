@@ -30,7 +30,7 @@ describe('AI Brain independent of global detail level', () => {
     const advanced = el.shadowRoot!.querySelector<HTMLButtonElement>('.brain-links button')!;
     advanced.click(); await el.updateComplete;
     expect(advanced.getAttribute('aria-expanded')).toBe('true');
-    expect(el.shadowRoot!.querySelector('.brain-existing-settings')!.hasAttribute('hidden')).toBe(false);
+    expect(el.shadowRoot!.querySelector('.brain-advanced')).not.toBeNull();
     expect(getUiMode()).toBe(mode);
     expect(vi.mocked(fetch).mock.calls.filter(([, init]) => init?.method === 'POST')).toEqual([]);
   });

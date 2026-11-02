@@ -45,7 +45,7 @@ async function modelsText(installStatus: InstallStatus): Promise<string> {
   document.body.appendChild(el);
   await el.updateComplete;
   el.installStatus = installStatus;
-  el.expanded = { models: true };
+  el.expanded = { advanced: true };
   el.requestUpdate();
   await el.updateComplete;
   const text = (el.shadowRoot?.textContent ?? '').replace(/\s+/g, ' ');

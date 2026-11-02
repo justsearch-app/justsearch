@@ -141,11 +141,7 @@ describe('BrainSurface — the component list', () => {
     el.installStatus = installStatus;
     document.body.appendChild(el);
     await settle(el);
-    // Acquisition details now live under Advanced settings → Models.
     el.shadowRoot?.querySelector<HTMLButtonElement>('.brain-links button')?.click();
-    await el.updateComplete;
-    const models = Array.from(el.shadowRoot?.querySelectorAll<HTMLButtonElement>('.accordion-header') ?? []).find(button => button.textContent?.includes('Models'));
-    models?.click();
     await el.updateComplete;
     return el;
   }
@@ -280,17 +276,11 @@ describe('BrainSurface — the component list', () => {
 
   it('declining a component POSTs the decline (and the toggle reads as an opt-OUT)', async () => {
     const el = await mount();
-    const toggle = el.shadowRoot?.querySelector('[data-testid="component-toggle-reranker"]') as
-      | (HTMLElement & { onActivate?: () => void; label?: string; pressed?: boolean })
-      | null;
-    // 840 post-review F — the control is a SWITCH now, so its state lives in `aria-pressed` and its
-    // name is stable ("Search reranker") instead of flipping between "Turn off"/"Turn on". What the old
-    // label assertion pinned — that this is an opt-OUT on a selected component, so activating it
-    // DECLINES rather than enables — is pinned below by the POSTed decline plus `pressed === true`.
-    expect(toggle?.label).toBe('Search reranker');
-    expect(toggle?.pressed).toBe(true);
-    expect(toggle?.shadowRoot?.querySelector('button')?.getAttribute('aria-pressed')).toBe('true');
-    toggle?.onActivate?.();
+    const toggle = el.shadowRoot?.querySelector<HTMLButtonElement>('[data-testid="component-toggle-reranker"]');
+    expect(toggle?.getAttribute('aria-label')).toBe('Include Search reranker');
+    expect(toggle?.getAttribute('role')).toBe('switch');
+    expect(toggle?.getAttribute('aria-checked')).toBe('true');
+    toggle?.click();
     await settle(el);
     expect(declineCalls).toHaveLength(1);
     expect(declineCalls[0]!.method).toBe('POST');

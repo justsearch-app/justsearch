@@ -8,6 +8,8 @@ author-session: builder-uiimpl-brain-20261102
 # Test-intent entries
 
 Slice A rebuilds AI Brain presentation and preserves existing state owners and operations.
+Slice B completes in-place Advanced groups/sliders and moves developer telemetry and its fetching to Health.
+The slice A entries below remain as historical intent; slice B entries describe the resulting placement.
 The page-level mode toggle and its dot are deliberately removed. The telemetry and component-grid
 presentation moves below Advanced; slice B owns the later Health move and settings redesign.
 No acceptance records are written by this builder.
@@ -288,9 +290,342 @@ axe run remain necessary.
         "modules/ui-web/src/shell-v0/views/BrainSurface.redesign.test.ts#consent lists only planned packages, excluding declined siblings and already installed files",
         "modules/ui-web/src/shell-v0/views/BrainSurface.redesign.test.ts#accept is disabled until the manifest and every download size are known, with retry"
       ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/views/BrainSurface.componentList.test.ts",
+        "modules/ui-web/src/shell-v0/views/BrainSurface.installRefresh.test.ts",
+        "modules/ui-web/src/shell-v0/views/BrainSurface.skipReason.test.ts",
+        "modules/ui-web/src/shell-v0/views/BrainSurface.repairRemedy.test.ts",
+        "modules/ui-web/src/shell-v0/views/BrainSurface.snapshotLiveness.test.ts",
+        "modules/ui-web/src/shell-v0/views/BrainSurface.ui-mode.test.ts"
+      ],
+      "class": "Adaptation",
+      "moved": [
+        "input re-encoding",
+        "signature"
+      ],
+      "whatMoved": "Slice B replaces the Models/install accordions with in-place Downloaded files and Maintenance. Component tests click the native switch and still assert its decline POST. Install-refresh tests name the settings-only poller; skip reasons keep their original words. Repair tests assert the Maintenance text action and the same required/optional/manual-fallback authority, replacing the removed primary Install styling. Runtime liveness checks exercise Restart AI, preserve offline non-queuing and reason assertions, and require a positive live control witness. Global mode remains unchanged on expansion.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "B9",
+          "quote": "Advanced settings expands in place: Answers (answer model with Change, reading memory, longest answer as sliders with values), Graphics card (graphics card use in layers, graphics card support with Other options, engine program with Use another), Downloaded files (each installed component's known size, \"in use\" only where the runtime observes it; Import an offline package), Maintenance (Restart AI, Repair installation, Rebuild search index). Every control keeps today's behaviour: witnessed settings saves with conflict handling, reload, runtime variant activation, pack preflight/import (desktop only), rebuild consent. \"Pause answers while indexing\" and \"Remove files\" are not shown in step 1.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "B20",
+          "quote": "(challenger 10, 11, broken today) Runtime variant controls read the endpoint's real fields (installedVariants, active.activeVariantId) and work with an installed inactive variant; graphics card use distinguishes Automatic (null) from 0 layers (processor only); sliders keep untouched values, save once per change (not per drag step), are keyboard operable and handle a conflict response. Opening Advanced never writes the global ui.mode; the page is the same under either global mode.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "Q3",
+          "quote": "Settings saves keep witnesses and conflict review; offline runtime mutations are never queued; unknown/last-observed values stay labelled.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "Q5",
+          "quote": "Existing Brain behaviour tests keep asserting the same behaviour after selector and wording updates; tests of the removed Simple/Detailed toggle and telemetry placement are replaced by tests of the new placement; none is weakened or dropped without a recorded reason.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "well from now on you can just proceed autonomously accordinglky",
+          "delegationLocation": "task t-20261101-uiimpl, user turn after the WP1 summary",
+          "delegationScope": "Implement the agreed AI Brain window design, step 1 slice B, and its independent-review repairs.",
+          "choice": "Use in-place grouped controls and native range inputs; keep saved null values until a control is explicitly changed, retain acquisition choices, move telemetry fetching and presentation together to Health, and remove obsolete accordions while preserving their operations and observations.",
+          "label": "agent choice"
+        }
+      ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/views/BrainSurface.sparkline.test.ts"
+      ],
+      "class": "Adaptation",
+      "moved": [
+        "split",
+        "input re-encoding"
+      ],
+      "whatMoved": "The engine-generation sparkline assertions run unchanged against their new Health owner; the same current value, step function, chronological order, success/failure points, accessible label and no-history/zero-generation gates remain.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "B10",
+          "quote": "Developer telemetry (inference transitions, spans, the engine-instance sparkline) is shown in Health's AI Engine section instead of the AI Brain page, with its empty/unavailable states; \"Engine history in Health\" links there.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "Q5",
+          "quote": "Existing Brain behaviour tests keep asserting the same behaviour after selector and wording updates; tests of the removed Simple/Detailed toggle and telemetry placement are replaced by tests of the new placement; none is weakened or dropped without a recorded reason.",
+          "label": "agent-drafted, owner-adopted"
+        }
+      ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/views/BrainSurface.telemetry-mode.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "Health fetches transitions and spans even when opened before Brain, renders them under AI Engine in either global mode, preserves no-data and trace-file-unavailable behavior, exposes explicit empty/unavailable sections, aborts pending reads and stops polling on unmount, ignores late responses, and consumes the engine-history link on initial and retained mounts. Brain never requests telemetry.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "B10",
+          "quote": "Developer telemetry (inference transitions, spans, the engine-instance sparkline) is shown in Health's AI Engine section instead of the AI Brain page, with its empty/unavailable states; \"Engine history in Health\" links there.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "B21",
+          "quote": "(challenger 14) Health owns the telemetry fetching it shows (works when Health is opened before or without AI Brain; stops when Health unmounts; the link works when Health is already mounted), and shows empty/unavailable states instead of hiding the sections. AI Brain no longer polls telemetry.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "Q5",
+          "quote": "Existing Brain behaviour tests keep asserting the same behaviour after selector and wording updates; tests of the removed Simple/Detailed toggle and telemetry placement are replaced by tests of the new placement; none is weakened or dropped without a recorded reason.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "well from now on you can just proceed autonomously accordinglky",
+          "delegationLocation": "task t-20261101-uiimpl, user turn after the WP1 summary",
+          "delegationScope": "Implement the agreed AI Brain window design, step 1 slice B, and its independent-review repairs.",
+          "choice": "Use in-place grouped controls and native range inputs; keep saved null values until a control is explicitly changed, retain acquisition choices, move telemetry fetching and presentation together to Health, and remove obsolete accordions while preserving their operations and observations.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/brain-redesign.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/views/BrainSurface.telemetry-mode.test.ts"
+      ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/views/BrainSurface.sliceB.test.ts"
+      ],
+      "class": "New",
+      "repaired": true,
+      "behaviour": "R1 distinguishes saved acquisition declines from files and runtime enablement across remount. R2 excludes unavailable and not-in-mode answers from promises using explicit availability for pictures. R3 reconciles individual live package completion during a staged run. R4 preserves unknown ONNX observations. R5 rejects an old GET after a witnessed LLM save. R6 retains the alert announcement and Repair action. Each named check fails by assertion on 6680864f7d and passes on this candidate.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "B3",
+          "quote": "The sentence is generated from real state for every combination of install state and switch state; it names only what is true now (for example \"It doesn't read text in scans and images yet\" only when that is off or missing) and ends with where it runs. Feature phrases carry their switch inline where a switch exists; the same switch appears at the step in the path, and both always show the same state and act the same.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "B11",
+          "quote": "Alerts appear once, above the path, in words with their action: runtime or operation failure with code, download or online-policy denial, install failure, repairable processor fallback, compatibility block, activation or reindex required.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "B13",
+          "quote": "Live behaviour: status, install progress and switch states update without collapsing open panels or Advanced settings, without losing a slider draft; package previews and LLM settings refresh when install state changes and when the window regains focus, ignoring out-of-order responses, so a second window converges; reload or tab switch mid-install keeps the progress and outcome. (challenger 7)",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "Q3",
+          "quote": "Settings saves keep witnesses and conflict review; offline runtime mutations are never queued; unknown/last-observed values stay labelled.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "Q6",
+          "quote": "(challenger 12) Backend restart and upgrade: retained bytes survive and resume; explicit answers-off stays off; newly registered packages stay \"available additions\"; optional missing supporting files do not become required repair failures. Saved values keep their meaning: declinedAiPackages is acquisition preference only (never runtime enablement); nullable chatEnabled; the six LLM settings with null semantics.",
+          "label": "agent-drafted, owner-adopted"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/brain-sliceB-repairs.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/views/BrainSurface.sliceB.test.ts#R1 acquisition decline does not hide existing answer files or replace their runtime switch, including after remount",
+        "modules/ui-web/src/shell-v0/views/BrainSurface.sliceB.test.ts#R2 unavailable answers are not promised, and pictures use explicit availability",
+        "modules/ui-web/src/shell-v0/views/BrainSurface.sliceB.test.ts#R2 not-in-mode answers are not promised, and pictures use explicit availability",
+        "modules/ui-web/src/shell-v0/views/BrainSurface.sliceB.test.ts#R3 live installed packages replace stale not-downloaded paths before the staged run ends",
+        "modules/ui-web/src/shell-v0/views/BrainSurface.sliceB.test.ts#R4 an unknown runtime observation stays unconfirmed in both sentence and path",
+        "modules/ui-web/src/shell-v0/views/BrainSurface.sliceB.test.ts#R5 a settings GET begun before a witnessed LLM save cannot revert the saved value",
+        "modules/ui-web/src/shell-v0/views/BrainSurface.sliceB.test.ts#R6 the processor-fallback repair hint remains an accessible alert with its action"
+      ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/views/BrainSurface.sliceB.test.ts",
+        "modules/ui-web/src/shell-v0/state/brainPage.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "Advanced opens in place without writes and retains per-part choices. Range controls retain drafts through refresh/tab changes, commit once per change with witnesses, preserve all untouched settings and null semantics, distinguish automatic GPU allocation from zero, recover from conflicts, and converge across windows. Installed inactive variants activate using the real endpoint fields. Settings reads resolve safely after disconnect and with focus in a sibling shadow tree. The sentence table covers unavailable and excluded packages.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "B3",
+          "quote": "The sentence is generated from real state for every combination of install state and switch state; it names only what is true now (for example \"It doesn't read text in scans and images yet\" only when that is off or missing) and ends with where it runs. Feature phrases carry their switch inline where a switch exists; the same switch appears at the step in the path, and both always show the same state and act the same.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "B9",
+          "quote": "Advanced settings expands in place: Answers (answer model with Change, reading memory, longest answer as sliders with values), Graphics card (graphics card use in layers, graphics card support with Other options, engine program with Use another), Downloaded files (each installed component's known size, \"in use\" only where the runtime observes it; Import an offline package), Maintenance (Restart AI, Repair installation, Rebuild search index). Every control keeps today's behaviour: witnessed settings saves with conflict handling, reload, runtime variant activation, pack preflight/import (desktop only), rebuild consent. \"Pause answers while indexing\" and \"Remove files\" are not shown in step 1.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "B13",
+          "quote": "Live behaviour: status, install progress and switch states update without collapsing open panels or Advanced settings, without losing a slider draft; package previews and LLM settings refresh when install state changes and when the window regains focus, ignoring out-of-order responses, so a second window converges; reload or tab switch mid-install keeps the progress and outcome. (challenger 7)",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "B20",
+          "quote": "(challenger 10, 11, broken today) Runtime variant controls read the endpoint's real fields (installedVariants, active.activeVariantId) and work with an installed inactive variant; graphics card use distinguishes Automatic (null) from 0 layers (processor only); sliders keep untouched values, save once per change (not per drag step), are keyboard operable and handle a conflict response. Opening Advanced never writes the global ui.mode; the page is the same under either global mode.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "Q3",
+          "quote": "Settings saves keep witnesses and conflict review; offline runtime mutations are never queued; unknown/last-observed values stay labelled.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "Q6",
+          "quote": "(challenger 12) Backend restart and upgrade: retained bytes survive and resume; explicit answers-off stays off; newly registered packages stay \"available additions\"; optional missing supporting files do not become required repair failures. Saved values keep their meaning: declinedAiPackages is acquisition preference only (never runtime enablement); nullable chatEnabled; the six LLM settings with null semantics.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "well from now on you can just proceed autonomously accordinglky",
+          "delegationLocation": "task t-20261101-uiimpl, user turn after the WP1 summary",
+          "delegationScope": "Implement the agreed AI Brain window design, step 1 slice B, and its independent-review repairs.",
+          "choice": "Use in-place grouped controls and native range inputs; keep saved null values until a control is explicitly changed, retain acquisition choices, move telemetry fetching and presentation together to Health, and remove obsolete accordions while preserving their operations and observations.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/brain-redesign.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/views/BrainSurface.sliceB.test.ts",
+        "modules/ui-web/src/shell-v0/state/brainPage.test.ts"
+      ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/views/BrainSurface.redesign.test.ts"
+      ],
+      "class": "Adaptation",
+      "moved": [
+        "input re-encoding"
+      ],
+      "whatMoved": "The missing declined answer fixture now explicitly reports an offline engine, no model and no chat capability; it no longer contradicts its missing-file setup by publishing an active answer model. Size/licence consent, acceptance and the start-install assertions are unchanged.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "B9",
+          "quote": "Advanced settings expands in place: Answers (answer model with Change, reading memory, longest answer as sliders with values), Graphics card (graphics card use in layers, graphics card support with Other options, engine program with Use another), Downloaded files (each installed component's known size, \"in use\" only where the runtime observes it; Import an offline package), Maintenance (Restart AI, Repair installation, Rebuild search index). Every control keeps today's behaviour: witnessed settings saves with conflict handling, reload, runtime variant activation, pack preflight/import (desktop only), rebuild consent. \"Pause answers while indexing\" and \"Remove files\" are not shown in step 1.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "Q5",
+          "quote": "Existing Brain behaviour tests keep asserting the same behaviour after selector and wording updates; tests of the removed Simple/Detailed toggle and telemetry placement are replaced by tests of the new placement; none is weakened or dropped without a recorded reason.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "Q6",
+          "quote": "(challenger 12) Backend restart and upgrade: retained bytes survive and resume; explicit answers-off stays off; newly registered packages stay \"available additions\"; optional missing supporting files do not become required repair failures. Saved values keep their meaning: declinedAiPackages is acquisition preference only (never runtime enablement); nullable chatEnabled; the six LLM settings with null semantics.",
+          "label": "agent-drafted, owner-adopted"
+        }
+      ]
     }
   ]
 }
 ```
+
+Slice B test ledger (all durable):
+
+- Tests added or rewritten: modules/ui-web/src/shell-v0/views/BrainSurface.sliceB.test.ts — R1–R6, B9/B13/B20/Q3/Q6; file presence, sentence promises, staged completion, unknown observations, refresh races, announcement, native sliders, conflicts, two windows and refresh lifetime — durable
+- Tests added or rewritten: modules/ui-web/src/shell-v0/state/brainPage.test.ts — R2/B3; explicit unavailable/excluded feature combinations in the sentence table — durable
+- Tests added or rewritten: modules/ui-web/src/shell-v0/views/BrainSurface.componentList.test.ts — B9/B17/Q5; native switches in the new Downloaded files placement, original POST and choice assertions — durable
+- Tests added or rewritten: modules/ui-web/src/shell-v0/views/BrainSurface.installRefresh.test.ts — B13; renamed settings poller with unchanged completion/activation refresh assertions — durable
+- Tests added or rewritten: modules/ui-web/src/shell-v0/views/BrainSurface.redesign.test.ts — B14/Q6; missing files fixture explicitly has no active model or capability; consent and UI race assertions retained — durable
+- Tests added or rewritten: modules/ui-web/src/shell-v0/views/BrainSurface.repairRemedy.test.ts — B9/Q5/Q6; Maintenance placement/text style with original repair authority and fallback copy — durable
+- Tests added or rewritten: modules/ui-web/src/shell-v0/views/BrainSurface.skipReason.test.ts — B9/Q5; Advanced placement with unchanged skip-reason assertions — durable
+- Tests added or rewritten: modules/ui-web/src/shell-v0/views/BrainSurface.snapshotLiveness.test.ts — B9/Q3/Q5; Restart AI at Maintenance, availability reasons, no offline queue, positive live witness — durable
+- Tests added or rewritten: modules/ui-web/src/shell-v0/views/BrainSurface.sparkline.test.ts — B10/Q5; original sparkline contracts at Health — durable
+- Tests added or rewritten: modules/ui-web/src/shell-v0/views/BrainSurface.telemetry-mode.test.ts — B10/B21; Health ownership/lifecycle, initial/retained deep links, empty/unavailable states and Brain no-poll — durable
+- Tests added or rewritten: modules/ui-web/src/shell-v0/views/BrainSurface.ui-mode.test.ts — B20; same non-writing disclosure under both modes at its new selector — durable
+
+The queue observations remain independent of GPU data, checked by the unchanged
+components/indexingMissedSurfaces.test.ts. A sibling-shadow-focus sequence caused the settings
+promise rejection: happy-dom's ShadowRoot.activeElement getter traversed another surface's root.
+Removing that redundant DOM read leaves LLM revision/draft/save ownership as the guard, with
+explicit sibling-focus and late resolve/reject tests. No catch suppresses a rendering error.
+
+Slice B capture comparisons (all eight final PNGs inspected against the supplied pictures):
+
+- ai-brain — same open headline/sentence/path/graphics/link arrangement as ready; missing fixture inventory stays unknown instead of inventing package sizes or active features.
+- ai-brain-light — same arrangement in light colors, readable hairlines and no card boxes.
+- ai-brain-advanced — in-place Answers begins below the links as in brain-advanced; lower groups retain the same hairline row language and native sliders.
+- ai-brain-advanced-light — same expansion and row structure with light contrast.
+- ai-brain-components — Downloaded files replaces the Models accordion; honest sizes, optional choices, teal on switches and text actions match the Advanced design vocabulary.
+- ai-brain-components-light — same acquisition inventory and aligned figures in light colors.
+- ai-brain-consent — existing size/licence consent remains over the not-installed page, with the exact 1.52 GB fixture package set and download action.
+- ai-brain-consent-light — same consent and package total in light colors.
+
+All eight final registered Brain captures have zero axe violations, zero real console errors and
+no sideways overflow. Additional real Chromium captures exercise Advanced at 1280×720, 760×720
+and 600×400 in dark, light and forced colors: all nine are clean with no sideways overflow.
+A native ArrowRight changes the focused range in each capture. At 300×200 CSS pixels and scale 2
+(600×400 physical pixels / 200% reflow), the panel scrolls, Close stays reachable and Escape
+returns focus to the opener in both themes; the expanded Advanced page also measures clean.
+No Search capture or baseline was changed. No acceptance record was written.
+
+Slice B final validation:
+
+- `npm --prefix modules/ui-web run lint` and `typecheck`: exit 0 after final edits.
+- `npm --prefix modules/ui-web run test:unit:run -- --maxWorkers=4`: 683 files / 8,753 tests passed, no unhandled errors.
+- `npm --prefix modules/ui-web run knip:report`: wrapper exit 0 (Knip's report exit 1 is retained in its output); `node scripts/governance/run.mjs --gate dead-code --mode gate`: pass, 5 findings, 0 failing gates.
+- `node scripts/ci/run-ui-web-gates.mjs`: 31/31 passed after the final style edits.
+- `jseval ui-a11y-gate`: exit 0; all 110 registered surfaces clean, including the two previously reported Search captures. No accepted baseline or Search recipe changed.
+- `jseval ui-proportion-gate`: exit 0; all 84 registered captures completed and every geometric constraint held.
+- `run-evidence.mjs`: general checks passed; original slice A consent repairs still fail by assertion on aeaa3e0413 and pass on the candidate; R1–R6 fail by assertion on 6680864f7d and pass on the candidate.
+- `node scripts/governance/gates/test-intent/cli.mjs`: only independent acceptance missing. No acceptance records written. No full governance or Gradle run.
+
+Resources: fixture-only browsers and session-owned Vite processes; no shared backend stack,
+models or GPU used. The initial concurrent aggregate invocations raced over jseval's shared
+server record and exhausted its startup port range. The aggregates were rerun against one
+explicitly owned server, sequentially, without changing gate code or baselines. The final
+server was stopped by its creating process; the final listening-port check matched the two
+pre-existing listeners (5174 and 5175).
 
 ## Acceptance records

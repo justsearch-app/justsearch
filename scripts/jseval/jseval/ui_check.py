@@ -955,8 +955,6 @@ def _build_steps(ui_url: str, cooldown_ms: int, timeout_ms: int) -> list[Step]:
             if view_name in ("ai-brain-advanced", "ai-brain-components"):
                 await page.locator("jf-brain-surface").get_by_role("button", name="Advanced settings", exact=True).click()
             if view_name == "ai-brain-components":
-                await page.locator("jf-brain-surface .accordion-header").filter(has_text="Models").click()
-            if view_name == "ai-brain-components":
                 lst = page.get_by_test_id(S.TID_INSTALL_COMPONENT_LIST)
                 await lst.wait_for(state="visible", timeout=10_000)
                 await lst.scroll_into_view_if_needed(timeout=5_000)
