@@ -11,6 +11,8 @@ import sys
 import time
 import threading
 import io
+import importlib.util
+import contextlib
 from pathlib import Path
 
 import httpx
@@ -248,6 +250,26 @@ def _install_distribution(resolved_root: Path, env: dict[str, str]) -> None:
         raise RuntimeError(f"Backend installDist failed (exit {result.returncode})")
 
 
+def _machine_admission(env: dict[str, str]):
+    """Heavy machine admission for the launch, in the admission directory of ``env``.
+
+    Fail-open: if the admission tool cannot be loaded (or its directory is unusable,
+    handled inside ``heavy``) the launch proceeds with one warning.
+    """
+    if sys.platform != "linux":
+        return contextlib.nullcontext(env)
+    source = Path(__file__).resolve().parents[2] / "dev" / "admission.py"
+    try:
+        spec = importlib.util.spec_from_file_location("js_admission", source)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+    except OSError as error:
+        print(f"admission: machine admission unavailable ({error}); jseval backend start runs without admission",
+              file=sys.stderr, flush=True)
+        return contextlib.nullcontext(env)
+    return module.heavy("jseval backend start", env)
+
+
 def _boot_and_wait(
     *,
     resolved_root: Path,
@@ -257,6 +279,17 @@ def _boot_and_wait(
     port: int,
     llm: bool,
     health_timeout_sec: float,
+) -> subprocess.Popen:
+    with _machine_admission(env) as admitted:
+        return _boot_admitted(
+            resolved_root=resolved_root, resolved_data=resolved_data, gradlew=gradlew,
+            env=admitted, port=port, llm=llm, health_timeout_sec=health_timeout_sec,
+        )
+
+
+def _boot_admitted(
+    *, resolved_root: Path, resolved_data: Path, gradlew: Path,
+    env: dict[str, str], port: int, llm: bool, health_timeout_sec: float,
 ) -> subprocess.Popen:
     """Build installDist, start the bound persistent runner and wait for readiness.
 

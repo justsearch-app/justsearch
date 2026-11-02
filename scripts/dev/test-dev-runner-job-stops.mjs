@@ -30,6 +30,8 @@ const tests = [], decoys = [], logged = [];
 const test = (name, fn, windowsOnly = false) => tests.push([name, fn, windowsOnly]);
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 const root = fs.mkdtempSync(path.join(os.tmpdir(), 'job-stops-'));
+// The scratch checkouts run Gradle and starts through machine admission: a private directory.
+process.env.JS_ADMISSION_DIR = path.join(root, 'admission');
 
 const FIXTURE_COMMON = `const cp=require('child_process'),fs=require('fs');
 const native=process.platform==='linux'?require(process.env.FIXTURE_NATIVE_MODULE):null;
@@ -86,7 +88,7 @@ require('http').createServer((q,s)=>{s.statusCode=q.url.startsWith('/api/status'
 /** A scratch copy of the scripts under test, with fixture Vite and Gradle; plain files only. */
 function fakeRepository(name) {
   const fake = path.join(root, name);
-  for (const dir of ['scripts/dev/lib', 'scripts/lib', 'modules/ui-web/scripts']) {
+  for (const dir of ['scripts/dev/lib', 'scripts/dev/admission.py', 'scripts/lib', 'modules/ui-web/scripts']) {
     fs.cpSync(path.join(repo, dir), path.join(fake, dir), { recursive: true });
   }
   for (const file of ['scripts/dev/serve-worktree-fe.cjs', 'contracts/native-targets/spec.v1.json', 'governance/supervision-contract.v1.json']) {
