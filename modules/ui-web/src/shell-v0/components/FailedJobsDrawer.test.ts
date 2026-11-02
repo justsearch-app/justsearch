@@ -816,3 +816,48 @@ it('R3d a late listing cannot overwrite a newer count refresh', async () => {
     expect(el.rows.map(row => row.pathHash)).toEqual(['newest']);
   } finally { el.remove(); globalThis.fetch = oldFetch; }
 });
+
+it('R3d a failed refresh keeps the last-known inline rows visible beside the error', async () => {
+  let reads = 0;
+  const oldFetch = globalThis.fetch;
+  globalThis.fetch = vi.fn(async (url: unknown) => {
+    if (String(url).includes('by-prefix')) {
+      if (++reads === 1) return new Response(byPrefixBody([job({ pathHash: 'kept', state: 'SOURCE_UNREADABLE', errorMessage: 'Permission denied' })]));
+      return reads === 2 ? new Response('', { status: 503 }) : Promise.reject(new TypeError('network down'));
+    }
+    return Response.json({});
+  }) as typeof fetch;
+  const el = document.createElement('jf-failed-jobs-drawer') as FailedJobsDrawer;
+  el.inline = true; el.folderPathHash = 'folder'; el.observedCount = 1; el.lastKnown = false;
+  try {
+    document.body.append(el); await pump(el);
+    for (const count of [2, 3]) {
+      el.observedCount = count; await pump(el);
+      expect(el.shadowRoot!.querySelectorAll('.row')).toHaveLength(1);
+      expect(el.shadowRoot!.querySelector('[data-state="SOURCE_UNREADABLE"]')).not.toBeNull();
+      expect(el.shadowRoot!.textContent).toContain('Permission denied');
+      expect(el.shadowRoot!.textContent).toContain("Couldn't refresh failed files");
+      expect(inlineRetry(el).disabled).toBe(false);
+    }
+  } finally { el.remove(); globalThis.fetch = oldFetch; }
+});
+
+it('an inline list torn down never removes the open global drawer registration', async () => {
+  const { closeOthersInLayer, registerTransient, __resetTransientArbiter } = await import('../state/transientLayerArbiter.js');
+  __resetTransientArbiter();
+  const oldFetch = globalThis.fetch;
+  globalThis.fetch = vi.fn(async () => new Response(byPrefixBody([job({ pathHash: 'x' })]))) as typeof fetch;
+  const drawer = document.createElement('jf-failed-jobs-drawer') as FailedJobsDrawer;
+  const inline = document.createElement('jf-failed-jobs-drawer') as FailedJobsDrawer;
+  inline.inline = true; inline.folderPathHash = 'folder'; inline.observedCount = 1;
+  try {
+    document.body.append(drawer); openFailedJobs('folder'); await pump(drawer);
+    document.body.append(inline); await pump(inline);
+    inline.remove(); await pump(drawer);
+    expect(isFailedJobsOpen()).toBe(true);
+    // Opening another right drawer must still close the failed-files drawer through its registration.
+    registerTransient('right-drawer', 'other', () => {});
+    closeOthersInLayer('right-drawer', 'other');
+    expect(isFailedJobsOpen()).toBe(false);
+  } finally { drawer.remove(); inline.remove(); globalThis.fetch = oldFetch; __resetTransientArbiter(); }
+});

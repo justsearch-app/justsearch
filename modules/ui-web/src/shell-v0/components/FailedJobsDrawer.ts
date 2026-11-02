@@ -103,11 +103,9 @@ export class FailedJobsDrawer extends JfElement {
   private unsub: (() => void) | null = null;
 
   // 574 §23.B — single-open arbitration by construction; the panel reflects the failedJobsDrawer store.
-  private readonly transient = new TransientController(this, {
-    layer: 'right-drawer',
-    id: 'failed-jobs',
-    close: () => closeFailedJobs(),
-  });
+  // Only the global drawer owns the 'failed-jobs' right-drawer registration: an inline list in a
+  // Library row must never register it, nor unregister the open drawer's on its own teardown.
+  private transient: TransientController | null = null;
 
   constructor() {
     super();
@@ -127,6 +125,11 @@ export class FailedJobsDrawer extends JfElement {
     super.connectedCallback();
     if (this.inline) this.requestUpdate('folderPathHash');
     else {
+      this.transient ??= new TransientController(this, {
+        layer: 'right-drawer',
+        id: 'failed-jobs',
+        close: () => closeFailedJobs(),
+      });
       this.unsub = subscribeFailedJobs(() => this.syncTarget());
       this.syncTarget();
     }
@@ -172,8 +175,8 @@ export class FailedJobsDrawer extends JfElement {
       return;
     }
     if (changed.has('open')) {
-      if (this.open) this.transient.open();
-      else this.transient.close();
+      if (this.open) this.transient?.open();
+      else this.transient?.close();
     }
   }
 
@@ -413,6 +416,11 @@ export class FailedJobsDrawer extends JfElement {
 
   private renderBody(): TemplateResult {
     if (this.loading && (!this.inline || !this.rows.length)) return html`<div class="loading">Loading…</div>`;
+    // An inline list keeps its last-known rows when a refresh fails: the error is shown beside them.
+    if (this.error && this.inline && this.rows.length) {
+      return html`<div class="empty" role="status">Couldn't refresh failed files: ${this.error}. Showing the last known list.</div>
+        ${this.rows.map((r) => this.renderRow(r))}`;
+    }
     if (this.error) return html`<div class="empty">Couldn't load failed files: ${this.error}</div>`;
     if (this.rows.length === 0)
       return html`<div class="empty">No failed files in this folder.</div>`;
