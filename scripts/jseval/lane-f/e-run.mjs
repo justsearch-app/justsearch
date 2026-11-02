@@ -81,7 +81,7 @@ export function buildPlan(options, values, root = ROOT, fixtureDecision) {
   const runner = path.join(tree, 'scripts/dev/dev-runner.cjs');
   const pythonCwd = path.join(root, 'scripts/jseval');
   const env = {
-    PYTHONPATH: pythonCwd, PYTHONUTF8: '1',
+    PYTHONPATH: [pythonCwd, path.join(root, 'scripts/jsharness')].join(path.delimiter), PYTHONUTF8: '1',
     ...(group === 'e4-memory-soak' ? { JUSTSEARCH_EXIT_CENSUS_SCOPE: path.join(raw, 'soak/instruments.json') } : {}),
     // Trust only the selected owner-assigned arm in child processes; no global Git config edits.
     GIT_CONFIG_COUNT: '1', GIT_CONFIG_KEY_0: 'safe.directory', GIT_CONFIG_VALUE_0: tree,

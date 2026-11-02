@@ -230,7 +230,7 @@ try {
   fs.writeFileSync(path.join(datasetDir, 'queries.jsonl'), '{"_id":"q1","text":"linux workflow"}\n{"_id":"q2","text":"worktree reload"}\n');
   fs.writeFileSync(path.join(datasetDir, 'qrels/test.tsv'), 'query-id\tcorpus-id\tscore\nq1\td1\t1\nq2\td1\t1\n');
   fs.writeFileSync(path.join(datasetDir, 'corpus.jsonl'), '{"_id":"d1","text":"Linux workflow fixture"}\n');
-  const evalEnv = { ...env, PYTHONPATH: path.join(root, 'scripts/jseval'), JUSTSEARCH_API_PORT: String(evalPort),
+  const evalEnv = { ...env, PYTHONPATH: [path.join(root, 'scripts/jseval'), path.join(root, 'scripts/jsharness')].join(path.delimiter), JUSTSEARCH_API_PORT: String(evalPort),
     JUSTSEARCH_DATA_DIR: path.join(scratch, 'eval data'), JUSTSEARCH_REPO_ROOT: root };
   const campaign = await command(python, ['-m', 'jseval', 'run',
     '--dataset', datasetName, '--modes', 'lexical', '--max-queries', '2', '--skip-ingest', '--start-backend',
