@@ -603,3 +603,67 @@ it('loads the current target after a drawer is remounted while its store is open
     expect(el.rows.map(row => row.pathHash)).toEqual(['current-file']);
   } finally { el.remove(); globalThis.fetch = oldFetch; }
 });
+
+it.each(['empty', 'partial'])('R3 live %s refresh interrupts a batch without stranding Try again or dropping untried files', async response => {
+  let release!: (response: Response) => void;
+  let listing = [job({ pathHash: 'first' }), job({ pathHash: 'remaining', state: 'SOURCE_UNREADABLE', errorMessage: 'Permission denied' })];
+  const retried: string[] = []; const oldFetch = globalThis.fetch;
+  globalThis.fetch = vi.fn(async (url: unknown, init?: RequestInit) => {
+    if (String(url).includes('by-prefix')) return new Response(byPrefixBody(listing));
+    if (String(url).includes('/invoke')) {
+      retried.push(JSON.parse(String(init?.body)).args.pathHash);
+      if (retried.length === 1) return new Promise<Response>(resolve => { release = resolve; });
+      return Response.json({ success: true });
+    }
+    return Response.json({});
+  }) as typeof fetch;
+  const el = document.createElement('jf-failed-jobs-drawer') as FailedJobsDrawer;
+  el.inline = true; el.folderPathHash = 'folder'; el.observedCount = 2;
+  try {
+    document.body.append(el); await pump(el);
+    const retry = () => el.shadowRoot!.querySelector<HTMLElement & { onActivate(): void; disabled: boolean }>('jf-button[label="Try again"]')!;
+    retry().onActivate(); retry().onActivate(); await pump(el); expect(retried).toEqual(['first']);
+    listing = response === 'empty' ? [] : [job({ pathHash: 'new-failure' })];
+    el.observedCount = listing.length; await pump(el);
+    release(Response.json({ success: true })); await pump(el);
+    expect(retry().disabled).toBe(false);
+    expect(el.rows.map(row => row.pathHash)).toContain('remaining');
+    expect(el.shadowRoot!.textContent).toContain('Permission denied');
+    expect(el.shadowRoot!.querySelector('[data-state="SOURCE_UNREADABLE"]')).not.toBeNull();
+    retry().onActivate(); await pump(el);
+    expect(retried).toEqual(['first', 'remaining', ...(response === 'partial' ? ['new-failure'] : [])]);
+    expect(retry().disabled).toBe(false);
+  } finally { el.remove(); globalThis.fetch = oldFetch; }
+});
+
+it('R3 switching inline targets isolates pending retry batches and ignores late completions after reconnect', async () => {
+  const releases = new Map<string, (response: Response) => void>();
+  const retried: string[] = []; const oldFetch = globalThis.fetch;
+  globalThis.fetch = vi.fn(async (url: unknown, init?: RequestInit) => {
+    if (String(url).includes('by-prefix')) {
+      const folder = new URL(String(url), 'http://test').searchParams.get('pathHash');
+      return new Response(byPrefixBody([job({ pathHash: `${folder}-file` })]));
+    }
+    if (String(url).includes('/invoke')) {
+      const hash = JSON.parse(String(init?.body)).args.pathHash;
+      retried.push(hash); return new Promise<Response>(resolve => releases.set(hash, resolve));
+    }
+    return Response.json({});
+  }) as typeof fetch;
+  const el = document.createElement('jf-failed-jobs-drawer') as FailedJobsDrawer;
+  el.inline = true; el.folderPathHash = 'A'; el.observedCount = 1;
+  const retry = () => el.shadowRoot!.querySelector<HTMLElement & { onActivate(): void; disabled: boolean }>('jf-button[label="Try again"]')!;
+  try {
+    document.body.append(el); await pump(el); retry().onActivate(); await pump(el);
+    el.folderPathHash = 'B'; await pump(el);
+    expect(el.rows.map(row => row.pathHash)).toEqual(['B-file']); expect(retry().disabled).toBe(false);
+    retry().onActivate(); await pump(el);
+    releases.get('A-file')!(Response.json({ success: true })); await pump(el);
+    expect(retry().disabled).toBe(true); expect(el.rows.map(row => row.pathHash)).toEqual(['B-file']);
+    el.remove(); document.body.append(el); await pump(el);
+    expect(retry().disabled).toBe(false);
+    releases.get('B-file')!(Response.json({ success: true })); await pump(el);
+    expect(retry().disabled).toBe(false); expect(el.rows.map(row => row.pathHash)).toEqual(['B-file']);
+    expect(retried).toEqual(['A-file', 'B-file']);
+  } finally { el.remove(); globalThis.fetch = oldFetch; }
+});

@@ -23,6 +23,7 @@ export class IndexingRulesEditor extends JfElement {
     indexingRulesSaving: { state: true },
     indexingRulesError: { state: true },
     indexingRulesMessage: { state: true },
+    conflictingRules: { state: true },
   };
   declare apiBase: string;
   declare host_: PluginHostApi | undefined;
@@ -30,6 +31,7 @@ export class IndexingRulesEditor extends JfElement {
   /** Library serializes its two editors and advances their shared settings witness. */
   declare saveWithSettings: ((write: (operationKey: string) => Promise<OperationInvocationSuccess>, saved: SavedIndexingRules) => Promise<void>) | undefined;
   private savedRules: SavedIndexingRules = { schedule: null, pauseOnBattery: false };
+  declare private conflictingRules: SavedIndexingRules | null;
   private loadSerial = 0;
   private indexingRulesDirty = false;
   private indexingScheduleConfigured = false;
@@ -121,11 +123,14 @@ export class IndexingRulesEditor extends JfElement {
       if (this.saveWithSettings) await this.saveWithSettings(write, this.savedRules); else await write();
       this.savedRules = next;
       this.indexingRulesDirty = false;
+      this.conflictingRules = null;
       this.indexingRulesMessage = 'Indexing rules saved.';
     } catch (error) {
-      this.indexingRulesError = error instanceof OperationError && (error.httpStatus === 409 || error.errorCode === 'VERSION_CONFLICT')
+      const conflict = error instanceof OperationError && (error.httpStatus === 409 || error.errorCode === 'VERSION_CONFLICT');
+      this.indexingRulesError = conflict
         ? `Settings changed before this save. Review your draft and save again. ${error.message}`
         : `Could not save indexing rules. ${error instanceof Error ? error.message : String(error)}`;
+      if (conflict) await this.loadSettings('conflict');
     } finally {
       this.indexingRulesSaving = false;
     }
@@ -141,6 +146,7 @@ export class IndexingRulesEditor extends JfElement {
     this.indexingRulesSaving = false;
     this.indexingRulesError = '';
     this.indexingRulesMessage = '';
+    this.conflictingRules = null;
   }
 
   override connectedCallback(): void {
@@ -150,6 +156,7 @@ export class IndexingRulesEditor extends JfElement {
 
   override disconnectedCallback(): void {
     this.cancelIndexingRuleFocus();
+    ++this.loadSerial;
     super.disconnectedCallback();
   }
 
@@ -158,19 +165,22 @@ export class IndexingRulesEditor extends JfElement {
     if (this.indexingRuleFocus) void this.focusPendingIndexingRule();
   }
 
-  private async loadSettings(): Promise<void> {
+  private async loadSettings(mode: 'preserve' | 'conflict' | 'discard' | 'rebase' = 'preserve'): Promise<boolean> {
     const serial = ++this.loadSerial;
     try {
       const res = this.host_ ? await this.host_.data.fetch('/api/settings/v2')
         : await authorizedFetch(`${this.apiBase}/api/settings/v2`);
       if (!res.ok) throw new Error(`Could not load indexing rules (${res.status}).`);
       const data = settingsV2Schema.parse(await res.json());
-      if (serial !== this.loadSerial) return;
+      if (serial !== this.loadSerial || !this.isConnected) return false;
       this.readOnly = data.settingsMode === 'in_memory';
-      if (!this.indexingRulesDirty && !this.indexingRulesSaving) {
-        const policy = data.ui?.indexingPause;
-        const schedule = policy?.schedule;
-        this.savedRules = { schedule: schedule ?? null, pauseOnBattery: policy?.pauseOnBattery ?? false };
+      const policy = data.ui?.indexingPause;
+      const schedule = policy?.schedule;
+      const saved = { schedule: schedule ?? null, pauseOnBattery: policy?.pauseOnBattery ?? false };
+      if (mode === 'conflict' || mode === 'preserve' && this.indexingRulesDirty
+          && JSON.stringify(saved) !== JSON.stringify(this.savedRules)) this.conflictingRules = saved;
+      if (mode === 'rebase' || mode === 'discard' || !this.indexingRulesDirty && !this.indexingRulesSaving) this.savedRules = saved;
+      if (mode === 'discard' || !this.indexingRulesDirty && !this.indexingRulesSaving) {
         this.indexingScheduleConfigured = schedule != null;
         const time = (minutes: number) => `${String(Math.floor(minutes / 60)).padStart(2, '0')}:${String(minutes % 60).padStart(2, '0')}`;
         this.indexingRules = { enabled: schedule?.enabled ?? false,
@@ -178,10 +188,48 @@ export class IndexingRulesEditor extends JfElement {
           start: time(schedule?.startMinute ?? 540), end: time(schedule?.endMinute ?? 1020),
           pauseOnBattery: policy?.pauseOnBattery ?? false };
       }
+      if (mode === 'discard') {
+        this.indexingRulesDirty = false;
+        this.conflictingRules = null;
+        this.indexingRulesError = '';
+        this.indexingRulesMessage = 'Saved indexing rules loaded.';
+      }
       this.indexingRulesLoaded = true;
+      return true;
     } catch (error) {
-      if (serial === this.loadSerial) this.indexingRulesError = error instanceof Error ? error.message : String(error);
+      if (serial === this.loadSerial) {
+        const message = error instanceof Error ? error.message : String(error);
+        this.indexingRulesError = mode === 'conflict' ? `${this.indexingRulesError} ${message}` : message;
+      }
+      return false;
     }
+  }
+
+  private async resolveConflict(event: Event, keepDraft: boolean): Promise<void> {
+    if (this.indexingRulesSaving || this.readOnly) return;
+    this.indexingRulesSaving = true;
+    const loaded = await this.loadSettings(keepDraft ? 'rebase' : 'discard');
+    this.indexingRulesSaving = false;
+    if (loaded && keepDraft) await this.saveIndexingRules(event);
+  }
+
+  private renderSavedRules() {
+    const saved = this.conflictingRules;
+    if (!saved) return nothing;
+    const schedule = saved.schedule;
+    const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+    const time = (minutes: number) => `${String(Math.floor(minutes / 60)).padStart(2, '0')}:${String(minutes % 60).padStart(2, '0')}`;
+    return html`<section aria-label="Saved indexing rules">
+      <p>Indexing times changed elsewhere. Your draft is kept. Current saved rules:</p>
+      <details open><summary>Current saved indexing rules</summary>
+      <p>${schedule?.enabled ? 'Only between' : 'Any time'}${schedule ? html` · ${time(schedule.startMinute ?? 540)}–${time(schedule.endMinute ?? 1020)}
+        · ${(schedule.days ?? []).map(day => days[day - 1]).join(', ')}${!schedule.enabled ? ' (hours turned off; days and times kept)' : ''}` : nothing}
+        · Pause while on battery: ${saved.pauseOnBattery ? 'on' : 'off'}</p></details>
+      <div class="conflict-actions"><button type="button" ?disabled=${this.indexingRulesSaving || this.readOnly}
+        @click=${(event: Event) => void this.resolveConflict(event, true)}>Save my draft</button>
+      <button type="button" ?disabled=${this.indexingRulesSaving || this.readOnly}
+        @click=${(event: Event) => void this.resolveConflict(event, false)}>Discard my draft</button></div>
+    </section>`;
   }
 
   static styles = css`
@@ -189,6 +237,7 @@ export class IndexingRulesEditor extends JfElement {
     h3 { margin: 0 0 .75rem; font-size: 12px; font-weight: 500; color: var(--text-secondary); }
     fieldset { border: 0; padding: 0; margin: 0; min-width: 0; }
     label { display: inline-flex; align-items: center; gap: .45rem; font-size: 14px; }
+    .conflict-actions { display: flex; flex-wrap: wrap; gap: .5rem 1rem; }
     .rule-choice { display: flex; flex-wrap: wrap; gap: .5rem; align-items: center; margin-bottom: .8rem; }
     .indexing-days { display: flex; flex-wrap: wrap; gap: .5rem .9rem; margin: .5rem 0 1rem; }
     .indexing-days label { font-size: 12px; }
@@ -240,6 +289,7 @@ export class IndexingRulesEditor extends JfElement {
         </details>
         <button type="submit" ?disabled=${!this.indexingRulesLoaded || this.readOnly}
           aria-disabled=${this.indexingRulesSaving ? 'true' : 'false'}>${this.indexingRulesSaving ? 'Saving indexing rules…' : 'Save indexing rules'}</button>
+        ${this.renderSavedRules()}
         <p id="indexing-rules-error" role="alert">${this.indexingRulesError}</p>
         <p role="status">${this.indexingRulesMessage}</p>
         ${!this.indexingRulesLoaded ? html`<p>Waiting for saved indexing rules.</p>` : nothing}

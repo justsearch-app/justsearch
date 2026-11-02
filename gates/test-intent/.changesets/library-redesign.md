@@ -73,6 +73,15 @@ checkouts belong to that clone and do not write into the source repository. VITE
 Failed-files repair compares with 08a63452b2; the verifier's V1/V3 repairs compare with 7c9a5fe9ce. Round-3 B/C checks compare with d19aa236c7. D1 repairs compare with 9e08da1084. V2 geometry is exercised in real Chromium by jseval arrival steps; happy-dom only checks focus intent delivery.
 Browser viewport and actual native-shell verification are independent of these unit checks.
 
+Final-review repairs at e3916fe2db (all durable):
+
+- Tests added or rewritten: modules/ui-web/src/shell-v0/views/LibrarySurface.folderActions.test.ts — R1, L1/P1 — Add from both tabs and modes, focus/cancel, late picker and reconnect — durable
+- Tests added or rewritten: modules/ui-web/src/shell-v0/views/LibrarySurface.slice2.test.ts — R2, L8/L19 — explicit conflict recovery, second window, reconnect, successive saves and reload — durable
+- Tests added or rewritten: modules/ui-web/src/shell-v0/components/FailedJobsDrawer.test.ts — R3, L13/P3 — refresh-interrupted retries, retained untried files and target/lifecycle races — durable
+
+The R1–R3 evidence is produced in a separate shared clone with copied dependencies;
+its detached before-checkout and build outputs belong to that clone. No acceptance record is changed.
+
 ```json
 {
   "entries": [
@@ -934,6 +943,108 @@ Browser viewport and actual native-shell verification are independent of these u
         "modules/ui-web/src/shell-v0/state/indexingFreshness.test.ts#L2 a frozen worker sample expires after 6 seconds plus one read interval despite successful reads",
         "modules/ui-web/src/shell-v0/views/LibrarySurface.redesign.test.ts#L2 lost status contact never describes a rebuild (empty roots: false)",
         "modules/ui-web/src/shell-v0/views/LibrarySurface.redesign.test.ts#L2 lost status contact never describes a rebuild (empty roots: true)"
+      ],
+      "repaired": true
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/views/LibrarySurface.folderActions.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "Add folder from Browse selects Folders and focuses the visible form in browser and desktop modes; Cancel restores Add folder focus. A late picker can reveal the form after a tab switch, but a disconnected placement cannot open a form after reconnect.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "L1",
+          "quote": "The Folders tab is one page using the whole window: headline, one summary line, attention items (when any), folder list, skip rules and indexing times, then one-line links to other apps' documents and Activity. Window actions sit beside the member tabs (Folders, Browse): Pause indexing with until-I-resume / 15 min / 1 h, a ⋯ menu with Reindex everything and Process pending work, and a filled Add folder. No card boxes or outlined pill buttons. Tab semantics, keyboard navigation and focus restoration of SurfaceTabs stay intact.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "P1",
+          "quote": "Add folder: picker or typed path, collection, preview, refusal of missing, non-folder, duplicate, overlapping and reserved-collection entries.",
+          "label": "agent-drafted, owner-adopted"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/library-redesign-r1-r3.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/views/LibrarySurface.folderActions.test.ts#R1 browser Add reveals and focuses Folders from folders and Cancel restores focus",
+        "modules/ui-web/src/shell-v0/views/LibrarySurface.folderActions.test.ts#R1 browser Add reveals and focuses Folders from core.browse-surface and Cancel restores focus",
+        "modules/ui-web/src/shell-v0/views/LibrarySurface.folderActions.test.ts#R1 desktop Add reveals and focuses Folders from folders and Cancel restores focus",
+        "modules/ui-web/src/shell-v0/views/LibrarySurface.folderActions.test.ts#R1 desktop Add reveals and focuses Folders from core.browse-surface and Cancel restores focus",
+        "modules/ui-web/src/shell-v0/views/LibrarySurface.folderActions.test.ts#R1 a late picker selects Folders, but a response from before reconnect cannot open a form"
+      ],
+      "repaired": true
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/views/LibrarySurface.slice2.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "A rules conflict retains the draft and shows current saved hours, days and battery preference in words. Explicit Save my draft re-reads the current baseline and uses the serialized settings guard; Discard my draft loads the current rules. Both recover subsequent saves without reload. Second-window writes, reconnects, disabled or absent schedules, recovery holds, and quick skip/rules saves in both orders preserve saved meaning.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "L8",
+          "quote": "When to index is edited on the Library page only: any time, or only between two times on chosen weekdays (overnight allowed), and pause while on battery; written through core.set-indexing-rules with the existing validation, draft, busy, read-only and conflict handling. Settings no longer edits them and shows a link to this section instead. Saved meaning is unchanged: an absent schedule stays absent (battery-only saves keep schedule null), a disabled schedule keeps its days and times, and the battery preference, manual-pause deadline and recovery reason survive saves and restart.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "L19",
+          "quote": "Exclusion saves and indexing-rule saves never overwrite each other, in either order, including quick successive saves and version conflicts; both read back intact after reload.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "well from now on you can just proceed autonomously accordinglky",
+          "delegationLocation": "task t-20261101-uiimpl, user turn after the WP1 summary",
+          "delegationScope": "Proceed autonomously with implementing the agreed window designs and choosing implementation details within the adopted scenarios.",
+          "choice": "Recover indexing-rule conflicts with a current saved-rules review and explicit Save my draft (fresh baseline plus the existing exclusion-ordering guard) or Discard my draft.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/library-redesign-r1-r3.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/views/LibrarySurface.slice2.test.ts#R2 another window changes saved rules; Save my draft recovers and later saves work",
+        "modules/ui-web/src/shell-v0/views/LibrarySurface.slice2.test.ts#R2 another window changes saved rules; Discard my draft recovers and later saves work",
+        "modules/ui-web/src/shell-v0/views/LibrarySurface.slice2.test.ts#R2 recovered draft and quick skip save (rules first) retain both through reload",
+        "modules/ui-web/src/shell-v0/views/LibrarySurface.slice2.test.ts#R2 recovered draft and quick skip save (exclusions first) retain both through reload",
+        "modules/ui-web/src/shell-v0/views/LibrarySurface.slice2.test.ts#R2 reconnect keeps a dirty battery-only draft and provides a current baseline for recovery"
+      ],
+      "repaired": true
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/components/FailedJobsDrawer.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "Live empty and partial listings interrupt a retry batch without stranding Try again or losing files that have not been retried. The next click retries remaining and newly observed files. Switching inline targets and reconnecting isolate batch ownership, retaining failure distinctions and ignoring old completions.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "L13",
+          "quote": "Repair (broken today): with the failed-files list open for folder A, choosing folder B's problem replaces the rows and retry targets with B's.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "P3",
+          "quote": "Failed-files list and retry for one folder, keeping unreadable / indexed-unreadable / retry-exhausted / parser-failure distinctions (switching folders is L13).",
+          "label": "agent-drafted, owner-adopted"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/library-redesign-r1-r3.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/components/FailedJobsDrawer.test.ts#R3 live empty refresh interrupts a batch without stranding Try again or dropping untried files",
+        "modules/ui-web/src/shell-v0/components/FailedJobsDrawer.test.ts#R3 live partial refresh interrupts a batch without stranding Try again or dropping untried files",
+        "modules/ui-web/src/shell-v0/components/FailedJobsDrawer.test.ts#R3 switching inline targets isolates pending retry batches and ignores late completions after reconnect"
       ],
       "repaired": true
     }

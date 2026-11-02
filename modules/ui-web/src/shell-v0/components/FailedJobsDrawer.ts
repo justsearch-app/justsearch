@@ -99,7 +99,8 @@ export class FailedJobsDrawer extends JfElement {
 
   private targetFolder: string | null = null;
   private requestSerial = 0;
-  private retrying = false;
+  private retryBatch: object | null = null;
+  private pendingRetries: FailedRow[] = [];
   private unsub: (() => void) | null = null;
 
   // 574 §23.B — single-open arbitration by construction; the panel reflects the failedJobsDrawer store.
@@ -125,7 +126,8 @@ export class FailedJobsDrawer extends JfElement {
 
   override connectedCallback(): void {
     super.connectedCallback();
-    if (!this.inline) {
+    if (this.inline) this.requestUpdate('folderPathHash');
+    else {
       this.unsub = subscribeFailedJobs(() => this.syncTarget());
       this.syncTarget();
     }
@@ -143,7 +145,8 @@ export class FailedJobsDrawer extends JfElement {
       this.resolved = {};
       this.error = null;
       this.loading = false;
-      this.retrying = false;
+      this.retryBatch = null;
+      this.pendingRetries = [];
       if (next) void this.refresh();
     }
     this.requestUpdate();
@@ -155,13 +158,17 @@ export class FailedJobsDrawer extends JfElement {
     this.unsub = null;
     this.requestSerial++;
     this.targetFolder = null;
+    this.retryBatch = null;
+    this.pendingRetries = [];
   }
 
   override updated(changed: Map<string, unknown>): void {
     if (this.inline) {
       this.open = true;
       if (changed.has('folderPathHash') || changed.has('observedCount') && !this.lastKnown) {
-        if (this.targetFolder !== this.folderPathHash) { this.rows = []; this.resolved = {}; }
+        if (this.targetFolder !== this.folderPathHash) {
+          this.rows = []; this.resolved = {}; this.retryBatch = null; this.pendingRetries = [];
+        }
         this.targetFolder = this.folderPathHash;
         void this.refresh();
       }
@@ -199,6 +206,19 @@ export class FailedJobsDrawer extends JfElement {
       // parse site (not at each render site) also covers `retryAll` and `onRowActionSuccess`, which
       // key on `pathHash`. Mirrors api/domains/indexing.ts's defensive `(parsed.jobs ?? [])`.
       const rows = (Array.isArray(parsed?.jobs) ? parsed.jobs : []).map(toRow);
+      if (this.inline) {
+        // A count update can interrupt a retry batch. Keep files that never received
+        // a successful retry even when the new listing omits them during requeue.
+        if (this.pendingRetries.length) {
+          for (const row of rows) {
+            if (!this.rows.some(previous => previous.pathHash === row.pathHash)
+                && !this.pendingRetries.some(pending => pending.pathHash === row.pathHash)) this.pendingRetries.push(row);
+          }
+        }
+        for (const pending of this.pendingRetries) {
+          if (!rows.some(row => row.pathHash === pending.pathHash)) rows.push(pending);
+        }
+      }
       if (!this.inline || rows.length > 0 || !this.rows.length) this.rows = rows;
       // Lazy-resolve hashes → display paths (best-effort; deleted files resolve to null → show hash).
       for (const r of this.rows) {
@@ -234,22 +254,33 @@ export class FailedJobsDrawer extends JfElement {
   /** Header bulk action: invoke the existing retry Operation for each listed file, dropping each on
    * success (the "Retry all" analogue of the Advisories drawer's "Mark all read"). */
   private async retryAll(): Promise<void> {
-    if (this.retrying || this.loading) return;
-    this.retrying = true;
+    if (this.retryBatch || this.loading) return;
+    const batch = {};
+    this.retryBatch = batch;
+    const folder = this.targetFolder;
+    const rows = [...(this.pendingRetries.length ? this.pendingRetries : this.rows)];
+    this.pendingRetries = [...rows];
     this.requestUpdate();
     const serial = this.requestSerial;
     const client = getOperationClient(this.apiBase || '');
-    for (const r of [...this.rows]) {
-      if (serial !== this.requestSerial || !this.open) break;
-      try {
-        await client.invoke(RETRY_OP, { args: { pathHash: r.pathHash } });
-        if (serial !== this.requestSerial || !this.open) break;
-        if (!this.inline) this.rows = this.rows.filter((x) => x.pathHash !== r.pathHash);
-      } catch {
-        // Leave the failed row; its error stays visible. (Surfacing a toast is the message channel's job.)
+    try {
+      for (const r of rows) {
+        if (serial !== this.requestSerial || !this.open || this.retryBatch !== batch) break;
+        try {
+          await client.invoke(RETRY_OP, { args: { pathHash: r.pathHash } });
+          if (!this.isConnected || folder !== this.targetFolder || this.retryBatch !== batch) break;
+          this.pendingRetries = this.pendingRetries.filter(row => row.pathHash !== r.pathHash);
+          if (!this.inline) this.rows = this.rows.filter(row => row.pathHash !== r.pathHash);
+          if (serial !== this.requestSerial || !this.open) break;
+        } catch {
+          // Leave the failed row; its error stays visible.
+        }
       }
+    } finally {
+      // A list refresh invalidates response rendering, not ownership of this batch.
+      // A switched folder may already own a new batch, which this one must not clear.
+      if (this.retryBatch === batch) { this.retryBatch = null; this.requestUpdate(); }
     }
-    if (serial === this.requestSerial) { this.retrying = false; this.requestUpdate(); }
   }
 
   static styles = css`
@@ -372,7 +403,7 @@ export class FailedJobsDrawer extends JfElement {
     if (this.inline) return html`<div aria-label="Files needing review" @row-action-success=${(e: Event) => this.onRowActionSuccess(e)}>
       ${this.lastKnown ? html`<p>Last-known failures; retries are in progress.</p>` : nothing}
       ${this.renderBody()}
-      ${this.rows.length ? html`<jf-button variant="ghost" label="Try again" .disabled=${this.loading || this.retrying}
+      ${this.rows.length ? html`<jf-button variant="ghost" label="Try again" .disabled=${this.loading || this.retryBatch !== null}
         .onActivate=${() => this.retryAll()}>${icon({ name: 'refresh-cw', size: 14 })} Try again</jf-button>` : nothing}
     </div>`;
     if (!this.open) return html``;

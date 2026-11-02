@@ -22,7 +22,7 @@ function deferred<T>() {
   const promise = new Promise<T>((yes, no) => { resolve = yes; reject = no; });
   return { promise, resolve, reject };
 }
-async function mount(options: { invoke?: ReturnType<typeof vi.fn>; picks?: (string | null)[] } = {}) {
+async function mount(options: { invoke?: ReturnType<typeof vi.fn>; picks?: (string | null)[]; pick?: () => Promise<string | null> } = {}) {
   vi.spyOn(globalThis, 'fetch').mockImplementation(async () => new Response('{}', { status: 503 }));
   __feedForTest({ status: { worker: { core: { indexState: 'IDLE', indexedDocuments: 0, indexHealthy: true }, migration: { migrationState: 'IDLE' } }, readiness: { composites: { retrieval: { state: 'READY', reasonCodes: [] } } } } as unknown as StatusSnapshot });
   let rows = [root('a'), root('b')];
@@ -36,7 +36,7 @@ async function mount(options: { invoke?: ReturnType<typeof vi.fn>; picks?: (stri
   const confirm = vi.fn().mockResolvedValue(true);
   const el = document.createElement('jf-library-surface') as LibrarySurface;
   el.host_ = { platform: { capabilities: new Set(options.picks ? ['folder-picker'] : []),
-    pickFolder: vi.fn(async () => options.picks?.shift() ?? null) },
+    pickFolder: options.pick ?? vi.fn(async () => options.picks?.shift() ?? null) },
     utilities: { formatRelativeTime: () => 'just now' },
     data: { fetch, invokeOperation: invoke }, ui: { showConfirmDialog: confirm },
   } as unknown as PluginHostApi;
@@ -59,6 +59,16 @@ async function draft(el: LibrarySurface) {
   el.pendingPath = '/new'; el.pendingCollection = 'reports'; await pump(el);
 }
 afterEach(() => { document.body.replaceChildren(); __resetAiStateForTest(); resetSurfaces(); vi.restoreAllMocks(); });
+
+function seedTabs() {
+  const surfaces = ['library', 'browse'].map(name => ({ id: `core.${name}-surface`, mountTag: `jf-${name}-surface`,
+    presentation: { labelKey: name, descriptionKey: '', iconHint: null, category: null }, audience: 'USER',
+    placement: 'DEEPLINK', consumes: { resources: [], operations: [], prompts: [], diagnosticChannels: [] },
+    provenance: { tier: 'CORE', contributorId: 'core', version: '1.0' },
+    ...(name === 'library' ? { members: ['core.browse-surface'] } : {}),
+  } as Surface));
+  __seedForTest({ schemaVersion: '1.0', catalogVersion: 1, namespace: 'core', primitive: 'Surface', entries: surfaces });
+}
 
 it('keeps a refused Add draft reachable and allows correction and retry', async () => {
   const invoke = vi.fn().mockRejectedValueOnce(new Error('Folder overlaps an already watched folder: /docs'))
@@ -118,13 +128,7 @@ it('submits Add once while waiting and announces its outcome', async () => {
 });
 
 it('switching member tabs during Add retains the pending outcome and draft until acceptance', async () => {
-  const surfaces = ['library', 'browse'].map(name => ({ id: `core.${name}-surface`, mountTag: `jf-${name}-surface`,
-    presentation: { labelKey: name, descriptionKey: '', iconHint: null, category: null }, audience: 'USER',
-    placement: 'DEEPLINK', consumes: { resources: [], operations: [], prompts: [], diagnosticChannels: [] },
-    provenance: { tier: 'CORE', contributorId: 'core', version: '1.0' },
-    ...(name === 'library' ? { members: ['core.browse-surface'] } : {}),
-  } as Surface));
-  __seedForTest({ schemaVersion: '1.0', catalogVersion: 1, namespace: 'core', primitive: 'Surface', entries: surfaces });
+  seedTabs();
   const request = deferred<{ success: boolean }>(); const invoke = vi.fn(() => request.promise);
   const { el } = await mount({ invoke }); await draft(el);
   button(el, 'Add').onActivate(); await pump(el);
@@ -232,4 +236,41 @@ it('explains an empty reindex scope and offline folders without claiming a full 
   expect(el.shadowRoot!.querySelector('jf-operation[operation-id="core.reindex"]')).toBeNull();
   el.roots = [{ ...root('a'), status: 'unavailable' }]; await pump(el);
   expect(el.shadowRoot!.textContent).toContain('offline');
+});
+
+for (const mode of ['browser', 'desktop'] as const) {
+  it.each(['folders', 'core.browse-surface'])(`R1 ${mode} Add reveals and focuses Folders from %s and Cancel restores focus`, async tab => {
+    seedTabs();
+    const { el } = await mount(mode === 'desktop' ? { picks: ['/picked'] } : {});
+    const tabs = el.shadowRoot!.querySelector<SurfaceTabs>('jf-surface-tabs')!;
+    el.activeTab = tab; await pump(el); await tabs.updateComplete;
+    button(el, 'Add folder').focus(); button(el, 'Add folder').onActivate();
+    await pump(el); await tabs.updateComplete;
+    expect(el.activeTab).toBe('folders');
+    expect(tabs.shadowRoot!.querySelector('[data-tab-id="folders"]')?.getAttribute('aria-selected')).toBe('true');
+    expect(tabs.shadowRoot!.querySelector('slot[name="tab-folders"]')).not.toBeNull();
+    expect(el.showManualInput).toBe(true);
+    expect(el.shadowRoot!.activeElement?.getAttribute('aria-label')).toBe('Folder path');
+    expect(el.pendingPath).toBe(mode === 'desktop' ? '/picked' : '');
+    button(el, 'Cancel').onActivate(); await pump(el);
+    expect(el.showManualInput).toBe(false);
+    expect(el.shadowRoot!.activeElement).toBe(button(el, 'Add folder'));
+  });
+}
+
+it('R1 a late picker selects Folders, but a response from before reconnect cannot open a form', async () => {
+  seedTabs(); const first = deferred<string | null>(); const obsolete = deferred<string | null>();
+  const pick = vi.fn().mockReturnValueOnce(first.promise).mockReturnValueOnce(obsolete.promise);
+  const { el } = await mount({ picks: [], pick });
+  el.activeTab = 'core.browse-surface'; await pump(el);
+  button(el, 'Add folder').onActivate(); await pump(el);
+  el.activeTab = 'folders'; await pump(el); el.activeTab = 'core.browse-surface'; await pump(el);
+  first.resolve('/late'); await pump(el);
+  expect(el.activeTab).toBe('folders'); expect(el.pendingPath).toBe('/late');
+  expect(el.shadowRoot!.activeElement?.getAttribute('aria-label')).toBe('Folder path');
+  button(el, 'Cancel').onActivate(); await pump(el);
+  button(el, 'Add folder').onActivate(); await pump(el);
+  el.remove(); document.body.append(el); await pump(el);
+  obsolete.resolve('/obsolete'); await pump(el);
+  expect(el.showManualInput).toBe(false); expect(el.pendingPath).not.toBe('/obsolete');
 });

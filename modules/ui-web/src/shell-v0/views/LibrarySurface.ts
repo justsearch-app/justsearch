@@ -35,7 +35,7 @@ import type { JfButton } from '../components/Button.js';
 import '../components/IngestionSummary.js';
 // Tempdoc 571 §11 / 578 — Library ⊇ Browse: Library hosts the Browse file-tree as a tab.
 import '../components/SurfaceTabs.js';
-import type { SurfaceTabItem } from '../components/SurfaceTabs.js';
+import type { SurfaceTabs, SurfaceTabItem } from '../components/SurfaceTabs.js';
 import { getSurface } from '../../api/registry/SurfaceCatalogClient.js';
 import { present } from '../display/present.js';
 import { takeIndexingRuleFocus, subscribeIndexingRuleFocus, type IndexingRuleControl } from '../router/indexingRuleIntent.js';
@@ -1489,8 +1489,10 @@ export class LibrarySurface extends JfElement {
         && schedule.enabled === saved.schedule.enabled
         && schedule.startMinute === saved.schedule.startMinute && schedule.endMinute === saved.schedule.endMinute
         && JSON.stringify(schedule.days) === JSON.stringify(saved.schedule.days);
-      if (this.excludesAttempt || !sameSchedule || (policy?.pauseOnBattery ?? false) !== saved.pauseOnBattery) {
-        throw new Error('Indexing times changed elsewhere. Review saved indexing rules before saving your draft.');
+      if (this.excludesAttempt) throw new Error('Check the pending skip-rule save before saving indexing rules.');
+      if (!sameSchedule || (policy?.pauseOnBattery ?? false) !== saved.pauseOnBattery) {
+        throw new OperationError('Indexing times changed elsewhere. Review saved indexing rules before saving your draft.',
+          'CONFLICT', 409, 'VERSION_CONFLICT');
       }
       await this.invokeSettingsWrite(write);
     });
@@ -1545,17 +1547,30 @@ export class LibrarySurface extends JfElement {
    * where the collection field lives, in both modes. Cancelling the picker leaves the form unchanged.
    */
   private async handleAddFolderClick(): Promise<void> {
+    const serial = this.surfaceSerial;
     if (this.host_.platform.capabilities.has('folder-picker')) {
       const picked = await this.host_.platform.pickFolder();
-      if (picked) {
-        this.showManualInput = true;
-        this.pendingPath = picked;
-        this.pendingPreview = null;
-        void this.fetchPreview(picked);
-      }
-      return;
+      if (!picked || serial !== this.surfaceSerial || !this.isConnected) return;
+      this.pendingPath = picked;
+      this.pendingPreview = null;
+      void this.fetchPreview(picked);
     }
+    this.activeTab = 'folders';
     this.showManualInput = true;
+    await this.updateComplete;
+    await this.shadowRoot?.querySelector<SurfaceTabs>('jf-surface-tabs')?.updateComplete;
+    if (serial === this.surfaceSerial && this.isConnected && this.activeTab === 'folders') {
+      this.renderRoot.querySelector<HTMLInputElement>('[aria-label="Folder path"]')?.focus();
+    }
+  }
+
+  private async cancelAddFolder(): Promise<void> {
+    if (this.addBusy) return;
+    this.showManualInput = false;
+    await this.updateComplete;
+    const button = this.renderRoot.querySelector<JfButton>('[data-add-folder]');
+    await button?.updateComplete;
+    button?.focus();
   }
 
   /** Submit the add form (its Add button, or Enter in either field). */
@@ -2238,7 +2253,7 @@ export class LibrarySurface extends JfElement {
                 .onActivate=${() => this.handleAddRoot()}
                 >Add</jf-button
               >
-              <jf-button label="Cancel" .disabled=${this.addBusy} .onActivate=${() => (this.showManualInput = false)}
+              <jf-button label="Cancel" .disabled=${this.addBusy} .onActivate=${() => void this.cancelAddFolder()}
                 >Cancel</jf-button
               >
             </div>

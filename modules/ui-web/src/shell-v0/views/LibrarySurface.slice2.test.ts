@@ -300,3 +300,65 @@ it('L19 configured disabled schedule survives successive rule saves and skip sav
   expect(editor(reloaded).indexingRules).toEqual({ enabled: false, days: [1, 7], start: '22:00', end: '07:00', pauseOnBattery: false });
   expect(f.read().indexingPause).toEqual({ ...initialPolicy, schedule });
 });
+
+function recoveryButton(rules: IndexingRulesEditor, label: string): HTMLButtonElement {
+  const result = [...rules.shadowRoot!.querySelectorAll<HTMLButtonElement>('button')].find(button => button.textContent?.trim() === label);
+  expect(result, label).toBeDefined(); return result!;
+}
+async function editStart(rules: IndexingRulesEditor, value: string): Promise<void> {
+  const input = rules.shadowRoot!.querySelector<HTMLInputElement>('input[type=time]')!;
+  input.value = value; input.dispatchEvent(new Event('input')); await settle(rules);
+}
+
+it.each(['Save my draft', 'Discard my draft'])('R2 another window changes saved rules; %s recovers and later saves work', async choice => {
+  const schedule = { enabled: false, days: [2, 4], startMinute: 1200, endMinute: 360 };
+  const f = fixture('matching', schedule); const el = await mount(f.host); const other = await mount(f.host);
+  const rules = editor(el); await editStart(rules, '21:00');
+  await editBattery(editor(other), true); await saveRules(editor(other));
+  await saveRules(rules);
+  expect(rules.indexingRules.start).toBe('21:00');
+  expect(rules.indexingRulesError).toContain('Indexing times changed elsewhere');
+  const conflict = rules.shadowRoot!.querySelector('[aria-label="Saved indexing rules"]');
+  expect(conflict?.textContent).toContain('Any time');
+  expect(conflict?.textContent).toContain('Tuesday, Thursday');
+  expect(conflict?.textContent).toContain('20:00'); expect(conflict?.textContent).toContain('06:00');
+  expect(conflict?.textContent).toContain('Pause while on battery: on');
+  recoveryButton(rules, choice).click(); await settle(rules);
+  expect(rules.indexingRulesError).toBe('');
+  expect(rules.indexingRules.start).toBe(choice === 'Save my draft' ? '21:00' : '20:00');
+  expect(f.read().indexingPause).toEqual({ ...initialPolicy, schedule: { ...schedule, startMinute: choice === 'Save my draft' ? 1260 : 1200 }, pauseOnBattery: choice === 'Discard my draft' });
+  await editBattery(rules, false); await saveRules(rules);
+  expect(rules.indexingRulesError).toBe('');
+  expect(f.read().indexingPause.pauseOnBattery).toBe(false);
+  el.remove(); const loaded = await mount(f.host);
+  expect(editor(loaded).indexingRules.start).toBe(choice === 'Save my draft' ? '21:00' : '20:00');
+});
+
+it.each(['rules first', 'exclusions first'] as const)('R2 recovered draft and quick skip save (%s) retain both through reload', async order => {
+  const f = fixture(); const el = await mount(f.host); const rules = editor(el);
+  await editStart(rules, '22:00'); f.externalRules(); await saveRules(rules);
+  // Load the external witness explicitly, preserving the unrelated skip draft.
+  action(el, 'Reload saved patterns').onActivate(); await settle(el); el.excludesText = '*.recovered';
+  f.holdRules();
+  if (order === 'rules first') { recoveryButton(rules, 'Save my draft').click(); action(el, 'Save patterns').onActivate(); }
+  else { action(el, 'Save patterns').onActivate(); recoveryButton(rules, 'Save my draft').click(); }
+  await settle(el); await settle(rules);
+  el.activeTab = 'core.browse-surface'; await settle(el);
+  f.releaseRules(); await settle(rules); await settle(el);
+  expect(rules.indexingRulesError).toBe(''); expect(el.shadowRoot!.querySelector('#excludes-error')).toBeNull();
+  expect(f.read()).toEqual({ excludePatterns: ['*.recovered'], indexingPause: { ...initialPolicy,
+    schedule: { enabled: false, days: [1, 2, 3, 4, 5, 6, 7], startMinute: 1320, endMinute: 1020 } } });
+  el.remove(); const reloaded = await mount(f.host);
+  expect(reloaded.excludesText).toBe('*.recovered'); expect(editor(reloaded).indexingRules.start).toBe('22:00');
+});
+
+it('R2 reconnect keeps a dirty battery-only draft and provides a current baseline for recovery', async () => {
+  const f = fixture(); const el = await mount(f.host); const rules = editor(el);
+  await editBattery(rules, true); f.externalRules();
+  el.remove(); document.body.append(el); await settle(el); await settle(rules);
+  expect(rules.indexingRules.pauseOnBattery).toBe(true);
+  await saveRules(rules); recoveryButton(rules, 'Save my draft').click(); await settle(rules);
+  expect(rules.indexingRulesError).toBe(''); expect(f.read().indexingPause.schedule).toBeNull();
+  await editBattery(rules, false); await saveRules(rules);
+  expect(rules.indexingRulesError).toBe(''); expect(f.read().indexingPause).toEqual(initialPolicy);
+});
