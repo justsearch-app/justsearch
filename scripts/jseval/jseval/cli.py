@@ -15,6 +15,11 @@ import click
 from .commands import JsevalGroup
 
 
+def _python_path(root) -> str:
+    """The PYTHONPATH scripts/lib/python-path.cjs gives for ``root``: both packages."""
+    return os.pathsep.join(str(root / "scripts" / name) for name in ("jseval", "jsharness"))
+
+
 def _assert_matching_checkout() -> None:
     """Refuse to run another checkout's jseval code against this one (tempdoc 716).
 
@@ -43,7 +48,7 @@ def _assert_matching_checkout() -> None:
         "An editable install pins `import jseval` to one checkout; running "
         "from another silently executes stale code against this tree's "
         "paths.\nFix:  set PYTHONPATH before invoking, e.g.\n  "
-        f"PYTHONPATH={cwd_root / 'scripts' / 'jseval'} python -m jseval ...\n"
+        f"PYTHONPATH={_python_path(cwd_root)} python -m jseval ...\n"
         "or set JUSTSEARCH_ALLOW_CROSS_CHECKOUT_JSEVAL=1 to run "
         "cross-checkout deliberately."
     )

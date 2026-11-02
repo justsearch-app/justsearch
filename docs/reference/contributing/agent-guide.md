@@ -126,9 +126,12 @@ For another preparation run, first remove `tmp/ui-checks/` using the cleanup bel
 the generated venv itself contains symlinks. `npm ci` replaces local dependencies.
 
 The venv installs the base and `ui` dependencies declared in
-`scripts/jsharness/pyproject.toml` (including `httpx`). It imports jsharness from this
-checkout through `PYTHONPATH`, without installing jsharness or writing metadata or
-bytecode under `scripts/`. Python 3.13 with CI's constraint file,
+`scripts/jsharness/pyproject.toml` (including `httpx`). It puts this checkout's jsharness
+(and jseval) on `PYTHONPATH`, without installing either or writing metadata or bytecode
+under `scripts/`. The value comes from `scripts/lib/python-path.cjs`, the one
+definition every script uses (shell: source `scripts/lib/python-path.sh` and call
+`js_pythonpath <checkout>`); CI fails a PYTHONPATH that names `scripts/jseval` without
+`scripts/jsharness` (`scripts/ci/check-pythonpath.mjs`). Python 3.13 with CI's constraint file,
 `-c scripts/jsharness/requirements.lock.txt`, pins the base and `ui` dependencies
 (Playwright, and with it the Chromium revision) as CI does. Other interpreters
 resolve dependencies freely without that Python 3.13 constraint file.

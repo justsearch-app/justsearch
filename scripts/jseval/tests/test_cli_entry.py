@@ -8,6 +8,7 @@ checkout's code. `main()` now refuses with the PYTHONPATH remedy inline
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 from click.testing import CliRunner
@@ -39,7 +40,8 @@ class TestCrossCheckoutRefusal:
         assert str(invoking) in result.output
         # The remedy must be inline and exact — the paper-cut's manual fix,
         # delivered at the moment of failure instead of via tribal knowledge.
-        assert f"PYTHONPATH={invoking / 'scripts' / 'jseval'}" in result.output
+        both = os.pathsep.join(str(invoking / "scripts" / name) for name in ("jseval", "jsharness"))
+        assert f"PYTHONPATH={both} python -m jseval" in result.output
         assert "JUSTSEARCH_ALLOW_CROSS_CHECKOUT_JSEVAL" in result.output
 
     def test_escape_hatch_env_allows_cross_checkout(self, tmp_path, monkeypatch):

@@ -22,6 +22,11 @@
 # disagree on the next draw -- so a field counts as noisy when ANY TWO of a side captures
 # disagree, and three draws is the floor at which that question is worth asking.
 set -u
+# The measuring code -- jseval, jsharness and the lane-f helpers -- is this script's own checkout,
+# whichever directory it is invoked from; the stack and the corpus stay the invoking directory's.
+repo=$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)
+. "$repo/scripts/lib/python-path.sh"
+pythonpath=$(js_pythonpath "$repo") || exit 2
 out=${1:?outdir}
 profile=${2:-compact}
 port=${3:-33221}
@@ -126,7 +131,7 @@ cycle() { # n
   # 404s (both effective-config-*.json of the 2026-09-07 pairs are that error). This is the file
   # `provenance.pins` is read from, so a 404 here silently costs the capture its pin proof.
   curl -s -m 5 -H "Host: 127.0.0.1:$port" "$base/api/debug/effective-config" > "$out_abs/effective-config-$n.json" 2>/dev/null || true
-  bash scripts/jseval/lane-f/fixture-cycle.sh "$out_abs/capture-$n.json" "$profile" "$port" 2>&1 | tee -a "$out_abs/pair.log"
+  bash "$repo/scripts/jseval/lane-f/fixture-cycle.sh" "$out_abs/capture-$n.json" "$profile" "$port" 2>&1 | tee -a "$out_abs/pair.log"
   # PIPESTATUS[0], not $? -- the tee above would otherwise report success for a refused capture.
   local cycle_rc=${PIPESTATUS[0]}
   node scripts/dev/dev-runner.cjs stop --active --json > "$out_abs/stop-$n.json" 2>&1 || true
@@ -189,7 +194,7 @@ done
 # here is the thing the gate wants to know about, not a failure of this script. The verdict comes
 # from fixture-gate.sh, which compares two SIDES and excludes what each side own noise pair moves.
 if [[ $cycles -ge 2 ]]; then
-  (cd scripts/jseval && python -m jseval workflow-fixture diff \
+  (cd "$repo/scripts/jseval" && PYTHONPATH=$pythonpath python -m jseval workflow-fixture diff \
       --baseline "$out_abs/capture-1.json" --candidate "$out_abs/capture-2.json" \
       --report-out "$out_abs/noise-diff.json") 2>&1 | tee -a "$out_abs/pair.log"
   log "within-side noise diff written to noise-diff.json (exit ${PIPESTATUS[0]}, informational)"

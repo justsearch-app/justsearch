@@ -932,8 +932,11 @@ so invoking it from a *different* worktree once silently ran the wrong copy. It 
 **fails closed** instead, printing the exact remedy inline:
 
 ```text
-PYTHONPATH=<worktree>/scripts/jseval
+PYTHONPATH=<worktree>/scripts/jseval;<worktree>/scripts/jsharness
 ```
+
+(`:` instead of `;` outside Windows; in a script, take the value from
+`node scripts/lib/python-path.cjs <worktree>`.)
 
 Follow the printed fix. `JUSTSEARCH_ALLOW_CROSS_CHECKOUT_JSEVAL=1` overrides the guard
 deliberately — use it only when you actually intend to run another checkout's copy.

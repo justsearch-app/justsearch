@@ -8,6 +8,9 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { test } from 'node:test';
+import { createRequire } from 'node:module';
+
+const { pythonPath } = createRequire(import.meta.url)('../lib/python-path.cjs');
 
 // The recipe and its stubs (shebang npm/python3, bash) are Linux-only; the shared
 // dev-runner lane also runs on Windows.
@@ -42,6 +45,7 @@ function fixture(t, version = '3.14') {
     fs.mkdirSync(dir, { recursive: true });
   }
   write(path.join(checkout, 'scripts/dev/prepare-ui-checks.cjs'), fs.readFileSync(script));
+  write(path.join(checkout, 'scripts/lib/python-path.cjs'), fs.readFileSync(new URL('../lib/python-path.cjs', import.meta.url)));
   write(path.join(checkout, 'scripts/jsharness/pyproject.toml'), fs.readFileSync(new URL('../jsharness/pyproject.toml', import.meta.url)));
   const pkg = path.join(tools, 'packages/playwright');
   write(path.join(pkg, '__init__.py'));
@@ -182,7 +186,7 @@ test('clears inherited npm and Python settings during preparation and after sour
     assert.equal(env.PIP_CONFIG_FILE, os.devNull);
     assert.equal(env.PYTHONNOUSERSITE, '1');
     assert.equal(env.PYTHONDONTWRITEBYTECODE, '1');
-    assert.equal(env.PYTHONPATH, path.join(f.root, 'scripts', 'jsharness'));
+    assert.equal(env.PYTHONPATH, pythonPath(f.root));
   }
   assert.deepEqual(fs.readdirSync(f.outside), []);
 });
@@ -202,7 +206,7 @@ test('env.sh also clears settings the shell gained after preparation', t => {
   assert.equal(sourced.status, 0, sourced.stderr);
   const env = JSON.parse(sourced.stdout);
   for (const key of Object.keys(later)) assert.equal(env[key], undefined, key);
-  assert.equal(env.PYTHONPATH, path.join(f.root, 'scripts', 'jsharness'));
+  assert.equal(env.PYTHONPATH, pythonPath(f.root));
 });
 
 test('confines state roots in preparation and the sourced environment', t => {

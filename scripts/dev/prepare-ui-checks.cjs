@@ -8,6 +8,7 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const { spawnSync } = require('node:child_process');
+const { pythonPath } = require('../lib/python-path.cjs');
 
 const root = fs.realpathSync(path.resolve(__dirname, '../..'));
 const prep = path.join(root, 'tmp/ui-checks');
@@ -71,7 +72,7 @@ env.PIP_CACHE_DIR = path.join(prep, 'pip-cache');
 // Avoid user-site packages, foreign module paths and redirected bytecode caches.
 env.PYTHONNOUSERSITE = '1';
 env.PYTHONDONTWRITEBYTECODE = '1';
-env.PYTHONPATH = path.join(root, 'scripts/jsharness');
+env.PYTHONPATH = pythonPath(root);
 for (const [key, directory] of Object.entries({
   JUSTSEARCH_DEV_RUNNER_STATE_ROOT: 'dev-runner',
   JUSTSEARCH_HOME: 'home',
@@ -97,7 +98,7 @@ if (version.status !== 0) {
 }
 const constraints = version.stdout.trim() === '3.13' ? ['-c', path.join(root, 'scripts/jsharness/requirements.lock.txt')] : [];
 // Read the declared requirements without asking setuptools to build metadata in
-// the source tree. Import jsharness directly via PYTHONPATH instead of installing it.
+// the source tree. Import this checkout's packages via PYTHONPATH instead of installing them.
 const requirements = spawnSync(python, ['-c', `
 import json, sys, tomllib
 from pathlib import Path

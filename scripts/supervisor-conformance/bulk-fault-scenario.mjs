@@ -5,6 +5,7 @@ import path from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import identity from '../dev/lib/process-identity.cjs';
 import { barrierFiles } from './barrier-files.mjs';
+import { pythonPath } from '../lib/python-path.cjs';
 
 export const BULK_FAULT_CASES = Object.freeze({
   'bulk-live-before-green-open': Object.freeze({
@@ -1338,10 +1339,9 @@ export async function exerciseLiveModelAB({ work, data, indexBase, first, manife
       // jsharness auto-serves this worktree's Lit UI with its proxy pinned to the
       // installed API, then the registered-helper sweep retires that owned server.
       const outputDir = path.join(work, 'ui-shot-semantic-paused');
-      const jsharnessDir = path.join(process.cwd(), 'scripts', 'jsharness');
       const uiSession = `lane-f-semantic-${first.runId}`;
       const uiEnv = { ...process.env,
-        PYTHONPATH: [jsharnessDir, process.env.PYTHONPATH].filter(Boolean).join(path.delimiter),
+        PYTHONPATH: [pythonPath(process.cwd()), process.env.PYTHONPATH].filter(Boolean).join(path.delimiter),
         VITE_JUSTSEARCH_API_PORT: String(apiPort),
         // The helper's owner is the override `override-<uiSession>` (agent-identity.cjs), the same
         // owner the closeout sweep's `--session-id uiSession` names, so the sweep reaps it as its own.

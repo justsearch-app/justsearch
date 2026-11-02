@@ -8,6 +8,8 @@
       "mode": "local-subset",
       "commands": [
         "node scripts/ci/check-lockfile-completeness.mjs",
+        "node scripts/ci/check-pythonpath.mjs",
+        "node --test scripts/ci/check-pythonpath.test.mjs scripts/lib/python-path.test.mjs",
         "npm ci --audit=false",
         "node scripts/agent-analytics/run-all-tests.mjs",
         "node scripts/ci/check-workflow-triggers.mjs",
