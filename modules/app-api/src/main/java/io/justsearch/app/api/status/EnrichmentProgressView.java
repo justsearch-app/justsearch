@@ -55,8 +55,10 @@ public record EnrichmentProgressView(
     // saying the stage is stuck is read as working on it, never as idle.
     Boolean embeddingAvailable,
     Boolean spladeAvailable,
-    Boolean nerAvailable) {
+    Boolean nerAvailable,
+    Map<String, Long> enrichmentOutcomes) {
   public EnrichmentProgressView {
+    enrichmentOutcomes = enrichmentOutcomes == null ? Map.of() : Map.copyOf(enrichmentOutcomes);
     backfillMode = backfillMode == null ? "idle" : backfillMode;
     completeness = completeness == null ? List.of() : List.copyOf(completeness);
     embeddingAvailable = embeddingAvailable == null ? Boolean.TRUE : embeddingAvailable;

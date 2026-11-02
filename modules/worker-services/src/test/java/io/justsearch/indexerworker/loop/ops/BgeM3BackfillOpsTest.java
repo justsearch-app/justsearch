@@ -208,14 +208,15 @@ class BgeM3BackfillOpsTest {
 
     assertTrue(result, "not systemic: one doc in the batch succeeded");
     verify(indexingCoordinator)
-        .updateDocument(
-            eq("chunk-bad"),
-            argThat(
-                (Map<String, Object> updates) ->
-                    "1".equals(updates.get(SchemaFields.CHUNK_EMBEDDING_RETRY_COUNT))
+        .publishEnrichmentBatch(
+              argThat(entries -> {
+                if (entries.size() != 1 || !"chunk-bad".equals(entries.get(0).getKey())) return false;
+                var updates = entries.get(0).getValue();
+                return "1".equals(updates.get(SchemaFields.CHUNK_EMBEDDING_RETRY_COUNT))
                         && !updates.containsKey(SchemaFields.CHUNK_EMBEDDING_STATUS)
                         && !updates.containsKey(SchemaFields.EMBEDDING_RETRY_COUNT)
-                        && !updates.containsKey(SchemaFields.EMBEDDING_STATUS)));
+                        && !updates.containsKey(SchemaFields.EMBEDDING_STATUS);
+              }), anyMap());
   }
 
   @Test
@@ -244,13 +245,14 @@ class BgeM3BackfillOpsTest {
 
     assertTrue(result, "not systemic: one doc in the batch succeeded");
     verify(indexingCoordinator)
-        .updateDocument(
-            eq("parent-bad"),
-            argThat(
-                (Map<String, Object> updates) ->
-                    "1".equals(updates.get(SchemaFields.EMBEDDING_RETRY_COUNT))
+        .publishEnrichmentBatch(
+              argThat(entries -> {
+                if (entries.size() != 1 || !"parent-bad".equals(entries.get(0).getKey())) return false;
+                var updates = entries.get(0).getValue();
+                return "1".equals(updates.get(SchemaFields.EMBEDDING_RETRY_COUNT))
                         && !updates.containsKey(SchemaFields.EMBEDDING_STATUS)
                         && !updates.containsKey(SchemaFields.CHUNK_EMBEDDING_RETRY_COUNT)
-                        && !updates.containsKey(SchemaFields.CHUNK_EMBEDDING_STATUS)));
+                        && !updates.containsKey(SchemaFields.CHUNK_EMBEDDING_STATUS);
+              }), anyMap());
   }
 }

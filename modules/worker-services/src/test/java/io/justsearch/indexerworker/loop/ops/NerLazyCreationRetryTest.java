@@ -34,9 +34,12 @@ final class NerLazyCreationRetryTest {
         IndexingPacing.unthrottled(), () -> ner, () -> true, 10,
         LoggerFactory.getLogger(NerLazyCreationRetryTest.class));
     List<Map<String, Object>> writes = new ArrayList<>();
-    when(index.updateDocument(eq("doc"), anyMap())).thenAnswer(call -> {
-      writes.add(new HashMap<>(call.<Map<String, Object>>getArgument(1)));
-      return true;
+    when(index.updateDocumentsBatch(anyList())).thenAnswer(call -> {
+      List<Map.Entry<String, Map<String, Object>>> updates = call.getArgument(0);
+      assertEquals(1, updates.size());
+      assertEquals("doc", updates.get(0).getKey());
+      writes.add(new HashMap<>(updates.get(0).getValue()));
+      return new io.justsearch.adapters.lucene.runtime.LuceneRuntimeTypes.BatchUpdateResult(1, 0);
     });
     for (int attempt = 0; attempt < SchemaFields.NER_MAX_RETRIES; attempt++) {
       when(fields.getDocumentField("doc", SchemaFields.NER_RETRY_COUNT)).thenReturn(Integer.toString(attempt));
@@ -49,6 +52,8 @@ final class NerLazyCreationRetryTest {
       else assertEquals(SchemaFields.NER_STATUS_FAILED, write.get(SchemaFields.NER_STATUS));
       assertFalse(write.containsKey(SchemaFields.ENTITY_PERSONS_RAW));
     }
-    verify(index, never()).updateDocumentsBatch(anyList());
+    verify(index, never()).publishEnrichmentBatch(argThat(updates -> updates.stream().anyMatch(entry ->
+        SchemaFields.NER_STATUS_COMPLETED.equals(entry.getValue().get(SchemaFields.NER_STATUS))
+            || SchemaFields.NER_STATUS_COMPLETED_EMPTY.equals(entry.getValue().get(SchemaFields.NER_STATUS)))), anyMap());
   }
 }
