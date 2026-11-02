@@ -1152,3 +1152,14 @@ The old R3c deadline evidence is retired.
   "note": "Independent verifier (round 3 of repair sequence 2) accepted all entries at digest sha256:c6cb57af...6690; verdict recorded by the orchestrator from the verifier's report."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verifier10-uiimpl-20261102",
+  "verdict": "accept",
+  "digest": "sha256:bd33dc7336a3ea5f80e142f32843afa478fe35a0b8d21d9331cd47c31c095049",
+  "note": "Independent verifier (seq4 round 3) accepted all entries at digest sha256:bd33dc73...5049; verdict recorded by the orchestrator from the verifier's report."
+}
+```
