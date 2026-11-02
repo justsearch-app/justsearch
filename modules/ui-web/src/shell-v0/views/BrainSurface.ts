@@ -1394,8 +1394,7 @@ export class BrainSurface extends JfElement {
         ? Math.floor(((packageProgress.bytesDownloaded ?? 0) / packageProgress.bytesTotal) * 100) : null;
       const stopped = this.installStatus?.state === 'cancelled';
       const running = this.installKnown() && this.installStatus?.state === 'running';
-      const state = running && this.installPlanPending() && !unavailable && component?.declined !== true && component?.state !== 'declined' ? 'Preparing download'
-        : running && packageProgress?.state === 'pending' ? 'Waiting to download'
+      const state = running && packageProgress?.state === 'pending' ? 'Waiting to download'
         : running && packageProgress?.state === 'downloading' ? `Downloading${percent === null ? '' : ` ${percent}%`}`
         : !live ? 'Unknown — checking AI status'
         : stopped && packageProgress != null && !present && (packageProgress.bytesDownloaded ?? 0) > 0 ? `Cancelled · ${formatBytes(packageProgress.bytesDownloaded ?? 0)} kept`

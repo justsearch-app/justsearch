@@ -28,6 +28,12 @@ let confirmations: string[];
 let repairReply: (() => Promise<InstallStatus>) | null;
 
 async function settle(el: Brain) { await new Promise(resolve => setTimeout(resolve, 0)); await el.updateComplete; }
+function expectPlanning(el: Brain) {
+  expect(el.shadowRoot!.querySelector('.brain-headline')!.textContent).toBe('Installing…');
+  const steps = el.shadowRoot!.querySelectorAll('.path-step');
+  expect(steps.length).toBeGreaterThan(0);
+  for (const step of steps) expect(step.textContent).not.toMatch(/Preparing download|Waiting to download|Downloading/);
+}
 async function mount() {
   const el = document.createElement('jf-brain-surface') as Brain;
   el.apiBase = '';
@@ -191,7 +197,7 @@ describe('Brain running repair controls (B2/B8)', () => {
       ...run.packages!, { packageId: 'reranker', state: 'downloading', bytesDownloaded: 1024, bytesTotal: 2048 },
     ] }; emit({ ...run });
     const el = await mount(); await settle(el);
-    expect(el.shadowRoot!.querySelector('[data-feature="meaning"]')!.textContent).toContain('Preparing download');
+    expectPlanning(el);
     const reranker = el.shadowRoot!.querySelector('[data-feature="reranker"]')!.textContent!;
     expect(reranker).not.toMatch(/Downloading|Waiting to download|Preparing download/);
     expect(reranker).toContain(state === 'declined' ? 'Not downloaded' : 'Unavailable on this computer');
@@ -235,10 +241,29 @@ describe('Brain running repair controls (B2/B8)', () => {
     }));
     run = { ...run, phase: 'plan', packages: [] }; emit(run);
     const el = await mount(); await settle(el);
-    expect(el.shadowRoot!.querySelector('[data-feature="meaning"]')!.textContent).toContain('Preparing download');
+    expectPlanning(el);
     const chat = el.shadowRoot!.querySelector('[data-feature="chat"]')!.textContent!;
     expect(chat).not.toContain('Preparing download'); expect(chat).toContain('Unavailable on this computer');
   });
+  it('planning an unavailable answer runtime with complete answer files keeps the observed step state', async () => {
+    const fetch = globalThis.fetch;
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const path = String(input);
+      if (path.endsWith('/plan-preview')) return json({ totalDownloadBytes: 1024, components: [
+        { id: 'embedding', label: 'Understand meaning', state: 'installed', totalBytes: 1024 },
+        { id: 'chat', label: 'Answer questions', state: 'unavailable', unavailableReason: 'Answer runtime not supplied.', totalBytes: 2048 },
+      ] });
+      if (path.endsWith('/api/ai/models/status')) return json({ packages: [{ id: 'chat', complete: true }] });
+      return fetch(input, init);
+    }));
+    run = { ...run, phase: 'plan', packages: [] }; emit(run);
+    const el = await mount(); await settle(el);
+    const chat = el.shadowRoot!.querySelector('[data-feature="chat"]')!.textContent!;
+    expect(chat).not.toContain('Preparing download');
+    expect(chat).toContain('Off — background work can continue');
+    expectPlanning(el);
+  });
+
   it('a runtime-only read failure keeps live install progress and controls', async () => {
     emit(run); const el = await mount();
     notify({ runtimeObservationLive: false, snapshotLive: false,
@@ -254,7 +279,7 @@ describe('Brain running repair controls (B2/B8)', () => {
     run = { ...run, phase, downloadedBytes: 1004, readyCapabilities: ['retrieval-core'], packages: [{ packageId: 'embedding', state: 'downloading', bytesDownloaded: 1004, bytesTotal: 1024 }] };
     const el = await mount(); await click(el, 'Repair');
     emit(run); await settle(el);
-    expect(el.shadowRoot!.querySelector('[data-feature="meaning"]')!.textContent).toContain('Preparing download');
+    expectPlanning(el);
     expect(el.shadowRoot!.querySelector('.brain-headline')!.textContent).toBe('Installing…');
     expect(el.shadowRoot!.querySelector('.progress-bar')).toBeNull();
     expect(el.shadowRoot!.querySelector('[data-testid="install-staged-progress"]')).toBeNull();

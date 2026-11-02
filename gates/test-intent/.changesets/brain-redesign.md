@@ -1179,7 +1179,7 @@ axe run remain necessary.
       ],
       "class": "New",
       "repaired": true,
-      "behaviour": "Preserved running-install presentation after a shared store observation: planning resets percentages and ready stages, pending packages wait, and missing runtime observations, second windows and remount retain live download controls. Operation-response presentation was retired by the final narrowing decision below.",
+      "behaviour": "Preserved running-install presentation after a shared store observation: packages queued after planning wait, and missing runtime observations, second windows and remount retain live download controls. Operation-response presentation was retired by the final narrowing decision below.",
       "sources": [
         {
           "kind": "owner-adopted-scenario",
@@ -1214,14 +1214,12 @@ axe run remain necessary.
           "delegationQuote": "well from now on you can just proceed autonomously accordinglky",
           "delegationLocation": "task t-20261101-uiimpl, user turn after the WP1 summary",
           "delegationScope": "Implement the agreed AI Brain redesign and repair its review defects.",
-          "choice": "Step wording while a run is starting: 'Preparing download' while the run plans and 'Waiting to download' for a package queued in the run, instead of a stale percentage or 'On' (task t-20261101-uiimpl).",
+          "choice": "Step wording after planning: 'Waiting to download' for a package queued in the current run instead of a stale percentage or 'On' (task t-20261101-uiimpl). Planning uses the run headline and each step\u2019s own state under the later narrowing decision.",
           "label": "agent choice"
         }
       ],
       "evidence": "gates/test-intent/evidence/brain-running-repair.json",
       "newChecks": [
-        "modules/ui-web/src/shell-v0/views/BrainSurface.repairRun.test.ts#a new Repair in preflight never displays the previous run percentage or ready stages",
-        "modules/ui-web/src/shell-v0/views/BrainSurface.repairRun.test.ts#a new Repair in plan never displays the previous run percentage or ready stages",
         "modules/ui-web/src/shell-v0/views/BrainSurface.repairRun.test.ts#a pending package in the current run waits instead of claiming On from the old runtime",
         "modules/ui-web/src/shell-v0/views/BrainSurface.repairRun.test.ts#an additions run keeps controls through a missing runtime observation, a second window and remount"
       ]
@@ -1232,7 +1230,7 @@ axe run remain necessary.
       ],
       "class": "New",
       "repaired": true,
-      "behaviour": "Preserved late-operation-response safety, failed-read gating and recovery, and unavailable packages during planning. Retained-response and timestamp-arbitration guarantees were retired by the final narrowing decision below.",
+      "behaviour": "Preserved late-operation-response safety and failed-read gating and recovery. Retained-response and timestamp-arbitration guarantees were retired by the final narrowing decision below.",
       "sources": [
         {
           "kind": "owner-adopted-scenario",
@@ -1267,8 +1265,7 @@ axe run remain necessary.
       "newChecks": [
         "modules/ui-web/src/shell-v0/views/BrainSurface.repairRun.test.ts#a late Repair response never replaces the store install status with an older timestamp",
         "modules/ui-web/src/shell-v0/views/BrainSurface.repairRun.test.ts#a failed install read gates a retained running download observation and recovery restores it",
-        "modules/ui-web/src/shell-v0/views/BrainSurface.repairRun.test.ts#a failed install read gates a retained running plan observation and recovery restores it",
-        "modules/ui-web/src/shell-v0/views/BrainSurface.repairRun.test.ts#while a Repair run is being planned, a package unavailable on this computer is not said to be preparing"
+        "modules/ui-web/src/shell-v0/views/BrainSurface.repairRun.test.ts#a failed install read gates a retained running plan observation and recovery restores it"
       ]
     },
     {
@@ -1311,7 +1308,7 @@ axe run remain necessary.
       ],
       "class": "New",
       "repaired": true,
-      "behaviour": "Preserved round-3 planning rule: retained downloading records for declined, unavailable and not-in-mode packages never claim Downloading, Waiting to download or Preparing download; included packages still prepare. The operation-response/timestamp guarantees are retired below.",
+      "behaviour": "During preflight/plan no step says Preparing download, Waiting to download or Downloading, and the headline is Installing\u2026 without a percentage. Previous percentages and ready stages remain suppressed. Retained downloading records for declined, unavailable and not-in-mode packages stay ignored. When plan preview excludes an unavailable answer runtime but complete answer files are present, the step keeps its observed Off state rather than claiming preparation.",
       "sources": [
         {
           "kind": "owner-adopted-scenario",
@@ -1333,13 +1330,25 @@ axe run remain necessary.
           "scenario": "B4",
           "quote": "Path: Your files (file count from status), Read the text (built in), Understand meaning (needed, its size, no switch), Best match first, Answer questions (model name and size when installed), with Text in scans and images as a branch off Read the text. Each step shows its known size (registry download/footprint size, never claimed as measured disk use) and its state in words (on, off, not downloaded, downloading x%, unavailable on this computer with the reason).",
           "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "well from now on you can just proceed autonomously accordinglky",
+          "delegationLocation": "task t-20261101-uiimpl, user turn after the WP1 summary",
+          "delegationScope": "Implement the agreed AI Brain redesign and repair its review defects.",
+          "choice": "Planning-label narrowing decision in the builder brief for 591a7ad461: no step ever says 'Preparing download'. Delete that branch of the state chain; while a run is planned, the existing run-level 'Installing\u2026' headline without a percentage carries it and each step shows its own observed state. Keep package progress records ignored during preflight/plan and keep the existing meaning of unavailable, including when answer files are present.",
+          "label": "agent choice"
         }
       ],
       "evidence": "gates/test-intent/evidence/brain-running-ties-repair.json",
       "newChecks": [
+        "modules/ui-web/src/shell-v0/views/BrainSurface.repairRun.test.ts#a new Repair in preflight never displays the previous run percentage or ready stages",
+        "modules/ui-web/src/shell-v0/views/BrainSurface.repairRun.test.ts#a new Repair in plan never displays the previous run percentage or ready stages",
+        "modules/ui-web/src/shell-v0/views/BrainSurface.repairRun.test.ts#while a Repair run is being planned, a package unavailable on this computer is not said to be preparing",
         "modules/ui-web/src/shell-v0/views/BrainSurface.repairRun.test.ts#planning ignores retained downloading records for an excluded declined package",
         "modules/ui-web/src/shell-v0/views/BrainSurface.repairRun.test.ts#planning ignores retained downloading records for an excluded unavailable package",
-        "modules/ui-web/src/shell-v0/views/BrainSurface.repairRun.test.ts#planning ignores retained downloading records for an excluded not-in-mode package"
+        "modules/ui-web/src/shell-v0/views/BrainSurface.repairRun.test.ts#planning ignores retained downloading records for an excluded not-in-mode package",
+        "modules/ui-web/src/shell-v0/views/BrainSurface.repairRun.test.ts#planning an unavailable answer runtime with complete answer files keeps the observed step state"
       ]
     },
     {
@@ -1353,12 +1362,11 @@ axe run remain necessary.
           "delegationQuote": "well from now on you can just proceed autonomously accordinglky",
           "delegationLocation": "task t-20261101-uiimpl, user turn after the WP1 summary",
           "delegationScope": "Implement the agreed AI Brain redesign and repair its review defects.",
-          "choice": "Final narrowing decision in this builder brief: remove retained operation responses and all identity/timestamp arbitration from BrainSurface; aiInstallPoll via aiStateStore alone owns install observations and the live install gate. A successful start, repair, pause, resume or cancel requests refresh now without awaiting it in the busy state. The previous state may remain visible between the operation reply and that read. Keep the round-3 planning rule unchanged.",
+          "choice": "Final narrowing decision in this builder brief: remove retained operation responses and all identity/timestamp arbitration from BrainSurface; aiInstallPoll via aiStateStore alone owns install observations and the live install gate. A successful start, repair, pause, resume or cancel requests refresh now without awaiting it in the busy state. The previous state may remain visible between the operation reply and that read. Keep the round-3 planning rule unchanged. Retired expectation and replacement: Repair response shows installing progress, Pause and Cancel before the shared verdict catches up, and Cancel retains bytes \u2014 operation replies no longer project progress; the new check waits for each shared observation and asserts its immediate refresh request, preserving retained bytes and stage notices",
           "label": "agent choice"
         }
       ],
-      "conflictSearch": "Decision records and the owner-adopted B2/B8/B13/Q3/Q5 scenarios searched for a conflict: none. The final narrowing decision explicitly supersedes prior retained-response choices.",
-      "note": "Repair response shows installing progress, Pause and Cancel before the shared verdict catches up, and Cancel retains bytes \u2014 operation replies no longer project progress; the new check waits for each shared observation and asserts its immediate refresh request, preserving retained bytes and stage notices"
+      "conflictSearch": "Decision records and the owner-adopted B2/B8/B13/Q3/Q5 scenarios searched for a conflict: none. The final narrowing decision explicitly supersedes prior retained-response choices."
     },
     {
       "items": [
@@ -1371,12 +1379,11 @@ axe run remain necessary.
           "delegationQuote": "well from now on you can just proceed autonomously accordinglky",
           "delegationLocation": "task t-20261101-uiimpl, user turn after the WP1 summary",
           "delegationScope": "Implement the agreed AI Brain redesign and repair its review defects.",
-          "choice": "Final narrowing decision in this builder brief: remove retained operation responses and all identity/timestamp arbitration from BrainSurface; aiInstallPoll via aiStateStore alone owns install observations and the live install gate. A successful start, repair, pause, resume or cancel requests refresh now without awaiting it in the busy state. The previous state may remain visible between the operation reply and that read. Keep the round-3 planning rule unchanged.",
+          "choice": "Final narrowing decision in this builder brief: remove retained operation responses and all identity/timestamp arbitration from BrainSurface; aiInstallPoll via aiStateStore alone owns install observations and the live install gate. A successful start, repair, pause, resume or cancel requests refresh now without awaiting it in the busy state. The previous state may remain visible between the operation reply and that read. Keep the round-3 planning rule unchanged. Retired expectation and replacement: a newer Repair response survives unchanged store notifications until an equal or newer install observation wins \u2014 unchanged store notifications remain authoritative; the replacement asserts no progress until the requested store read arrives. The response-based lock against a second Repair is also retired: after busy ends the preceding store state controls availability until that read, the named delay limit",
           "label": "agent choice"
         }
       ],
-      "conflictSearch": "Decision records and the owner-adopted B2/B8/B13/Q3/Q5 scenarios searched for a conflict: none. The final narrowing decision explicitly supersedes prior retained-response choices.",
-      "note": "a newer Repair response survives unchanged store notifications until an equal or newer install observation wins \u2014 unchanged store notifications remain authoritative; the replacement asserts no progress until the requested store read arrives. The response-based lock against a second Repair is also retired: after busy ends the preceding store state controls availability until that read, the named delay limit"
+      "conflictSearch": "Decision records and the owner-adopted B2/B8/B13/Q3/Q5 scenarios searched for a conflict: none. The final narrowing decision explicitly supersedes prior retained-response choices."
     },
     {
       "items": [
@@ -1389,12 +1396,11 @@ axe run remain necessary.
           "delegationQuote": "well from now on you can just proceed autonomously accordinglky",
           "delegationLocation": "task t-20261101-uiimpl, user turn after the WP1 summary",
           "delegationScope": "Implement the agreed AI Brain redesign and repair its review defects.",
-          "choice": "Final narrowing decision in this builder brief: remove retained operation responses and all identity/timestamp arbitration from BrainSurface; aiInstallPoll via aiStateStore alone owns install observations and the live install gate. A successful start, repair, pause, resume or cancel requests refresh now without awaiting it in the busy state. The previous state may remain visible between the operation reply and that read. Keep the round-3 planning rule unchanged.",
+          "choice": "Final narrowing decision in this builder brief: remove retained operation responses and all identity/timestamp arbitration from BrainSurface; aiInstallPoll via aiStateStore alone owns install observations and the live install gate. A successful start, repair, pause, resume or cancel requests refresh now without awaiting it in the busy state. The previous state may remain visible between the operation reply and that read. Keep the round-3 planning rule unchanged. Retired expectation and replacement: Pause immediately replaces a synchronized poll at the same timestamp until a new equal-timestamp poll wins \u2014 Pause now waits for the shared store and requests a read immediately; equal timestamps have no special page meaning",
           "label": "agent choice"
         }
       ],
-      "conflictSearch": "Decision records and the owner-adopted B2/B8/B13/Q3/Q5 scenarios searched for a conflict: none. The final narrowing decision explicitly supersedes prior retained-response choices.",
-      "note": "Pause immediately replaces a synchronized poll at the same timestamp until a new equal-timestamp poll wins \u2014 Pause now waits for the shared store and requests a read immediately; equal timestamps have no special page meaning"
+      "conflictSearch": "Decision records and the owner-adopted B2/B8/B13/Q3/Q5 scenarios searched for a conflict: none. The final narrowing decision explicitly supersedes prior retained-response choices."
     },
     {
       "items": [
@@ -1407,12 +1413,11 @@ axe run remain necessary.
           "delegationQuote": "well from now on you can just proceed autonomously accordinglky",
           "delegationLocation": "task t-20261101-uiimpl, user turn after the WP1 summary",
           "delegationScope": "Implement the agreed AI Brain redesign and repair its review defects.",
-          "choice": "Final narrowing decision in this builder brief: remove retained operation responses and all identity/timestamp arbitration from BrainSurface; aiInstallPoll via aiStateStore alone owns install observations and the live install gate. A successful start, repair, pause, resume or cancel requests refresh now without awaiting it in the busy state. The previous state may remain visible between the operation reply and that read. Keep the round-3 planning rule unchanged.",
+          "choice": "Final narrowing decision in this builder brief: remove retained operation responses and all identity/timestamp arbitration from BrainSurface; aiInstallPoll via aiStateStore alone owns install observations and the live install gate. A successful start, repair, pause, resume or cancel requests refresh now without awaiting it in the busy state. The previous state may remain visible between the operation reply and that read. Keep the round-3 planning rule unchanged. Retired expectation and replacement: Resume immediately replaces a synchronized poll at the same timestamp until a new equal-timestamp poll wins \u2014 Resume now waits for the shared store and requests a read immediately; equal timestamps have no special page meaning",
           "label": "agent choice"
         }
       ],
-      "conflictSearch": "Decision records and the owner-adopted B2/B8/B13/Q3/Q5 scenarios searched for a conflict: none. The final narrowing decision explicitly supersedes prior retained-response choices.",
-      "note": "Resume immediately replaces a synchronized poll at the same timestamp until a new equal-timestamp poll wins \u2014 Resume now waits for the shared store and requests a read immediately; equal timestamps have no special page meaning"
+      "conflictSearch": "Decision records and the owner-adopted B2/B8/B13/Q3/Q5 scenarios searched for a conflict: none. The final narrowing decision explicitly supersedes prior retained-response choices."
     },
     {
       "items": [
@@ -1425,12 +1430,11 @@ axe run remain necessary.
           "delegationQuote": "well from now on you can just proceed autonomously accordinglky",
           "delegationLocation": "task t-20261101-uiimpl, user turn after the WP1 summary",
           "delegationScope": "Implement the agreed AI Brain redesign and repair its review defects.",
-          "choice": "Final narrowing decision in this builder brief: remove retained operation responses and all identity/timestamp arbitration from BrainSurface; aiInstallPoll via aiStateStore alone owns install observations and the live install gate. A successful start, repair, pause, resume or cancel requests refresh now without awaiting it in the busy state. The previous state may remain visible between the operation reply and that read. Keep the round-3 planning rule unchanged.",
+          "choice": "Final narrowing decision in this builder brief: remove retained operation responses and all identity/timestamp arbitration from BrainSurface; aiInstallPoll via aiStateStore alone owns install observations and the live install gate. A successful start, repair, pause, resume or cancel requests refresh now without awaiting it in the busy state. The previous state may remain visible between the operation reply and that read. Keep the round-3 planning rule unchanged. Retired expectation and replacement: re-emitted and newly polled older observations after Pause never erase its equal-timestamp response \u2014 page timestamp arbitration is removed; the replacement asserts that the shared store decides the observation",
           "label": "agent choice"
         }
       ],
-      "conflictSearch": "Decision records and the owner-adopted B2/B8/B13/Q3/Q5 scenarios searched for a conflict: none. The final narrowing decision explicitly supersedes prior retained-response choices.",
-      "note": "re-emitted and newly polled older observations after Pause never erase its equal-timestamp response \u2014 page timestamp arbitration is removed; the replacement asserts that the shared store decides the observation"
+      "conflictSearch": "Decision records and the owner-adopted B2/B8/B13/Q3/Q5 scenarios searched for a conflict: none. The final narrowing decision explicitly supersedes prior retained-response choices."
     },
     {
       "items": [
@@ -1443,12 +1447,11 @@ axe run remain necessary.
           "delegationQuote": "well from now on you can just proceed autonomously accordinglky",
           "delegationLocation": "task t-20261101-uiimpl, user turn after the WP1 summary",
           "delegationScope": "Implement the agreed AI Brain redesign and repair its review defects.",
-          "choice": "Final narrowing decision in this builder brief: remove retained operation responses and all identity/timestamp arbitration from BrainSurface; aiInstallPoll via aiStateStore alone owns install observations and the live install gate. A successful start, repair, pause, resume or cancel requests refresh now without awaiting it in the busy state. The previous state may remain visible between the operation reply and that read. Keep the round-3 planning rule unchanged.",
+          "choice": "Final narrowing decision in this builder brief: remove retained operation responses and all identity/timestamp arbitration from BrainSurface; aiInstallPoll via aiStateStore alone owns install observations and the live install gate. A successful start, repair, pause, resume or cancel requests refresh now without awaiting it in the busy state. The previous state may remain visible between the operation reply and that read. Keep the round-3 planning rule unchanged. Retired expectation and replacement: a Repair response can supersede a failed install read only until the store acknowledges its timestamp \u2014 no operation reply may reopen the failed-observation gate; the replacement asserts recovery only on a live store observation",
           "label": "agent choice"
         }
       ],
-      "conflictSearch": "Decision records and the owner-adopted B2/B8/B13/Q3/Q5 scenarios searched for a conflict: none. The final narrowing decision explicitly supersedes prior retained-response choices.",
-      "note": "a Repair response can supersede a failed install read only until the store acknowledges its timestamp \u2014 no operation reply may reopen the failed-observation gate; the replacement asserts recovery only on a live store observation"
+      "conflictSearch": "Decision records and the owner-adopted B2/B8/B13/Q3/Q5 scenarios searched for a conflict: none. The final narrowing decision explicitly supersedes prior retained-response choices."
     },
     {
       "items": [
@@ -1630,6 +1633,23 @@ axe run remain necessary.
           "label": "agent choice"
         }
       ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/views/BrainSurface.repairRun.test.ts"
+      ],
+      "class": "Obsolete",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "well from now on you can just proceed autonomously accordinglky",
+          "delegationLocation": "task t-20261101-uiimpl, user turn after the WP1 summary",
+          "delegationScope": "Implement the agreed AI Brain redesign and repair its review defects.",
+          "choice": "Planning-label narrowing decision in the builder brief for 591a7ad461: no step ever says 'Preparing download'. Delete that branch of the state chain; while a run is planned, the existing run-level 'Installing\u2026' headline without a percentage carries it and each step shows its own observed state. Keep package progress records ignored during preflight/plan and keep the existing meaning of unavailable, including when answer files are present.",
+          "label": "agent choice"
+        }
+      ],
+      "conflictSearch": "Decision records and owner-adopted B2/B4/B8/Q5 scenarios searched for a conflict: none. The planning-label narrowing decision supersedes the earlier Preparing download wording choice; queued packages after planning keep Waiting to download."
     }
   ]
 }
@@ -2044,7 +2064,7 @@ Resources: own temporary shared clones and dereferenced dependency copies; fixtu
 Running Repair follow-up (1489cf0340):
 
 - BrainSurface read `installStatus` from direct Repair/Pause/Cancel responses but read the headline and control gate from `_unifiedAiState.aiEngine`, which still described the preceding shared poll. The page now overlays a running response using the existing installing projection; the shared verdict is unchanged. Runtime-observation failure cannot hide a running download.
-- The backend retains previous packages until planning finishes, and previous stages until runtime restore finishes. The page says Preparing download in preflight/plan and suppresses prior percentages/stages instead of showing stale 98%; current pending packages say Waiting to download, then current downloading records supply the percentage.
+- The backend retains previous packages until planning finishes, and previous stages until runtime restore finishes. During preflight/plan the headline says Installing… without a percentage, each step keeps its own observed state, and prior package progress/ready stages are suppressed. No step says Preparing download. After planning, current pending packages say Waiting to download, then current downloading records supply the percentage.
 - Tests added or rewritten: modules/ui-web/src/shell-v0/views/BrainSurface.repairRun.test.ts — B2/B8, actual Repair/Pause/Resume/Cancel controls, retained bytes, staged/blocked/stalled/search-ready notices, preflight/plan reset, pending records, missing runtime observation, second window and remount — durable. No existing test was edited.
 
 Repair follow-up capture comparisons (all eight PNGs inspected against the supplied pictures):

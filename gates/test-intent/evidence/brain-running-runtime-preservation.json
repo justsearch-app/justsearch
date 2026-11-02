@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
   },
-  "createdAt": "2026-11-02T14:16:54.463Z",
-  "revision": "7f435cfc7e1b0c393aa38e271859fd4782eddaba",
-  "tree": "ef84f2a21399e6595814b819cd4cdcd814bb5fde",
+  "createdAt": "2026-11-02T15:22:31.615Z",
+  "revision": "591a7ad461fe9efd46f1d58dc9b6c7dbca027dc7",
+  "tree": "344545be65c51b166bce86cc6db796ab1617bb9b",
   "environment": {
     "platform": "linux",
     "arch": "x64",
@@ -18,10 +18,10 @@
   },
   "runs": [
     {
-      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/BrainSurface.repairRun.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/3qbuubiq/tmp/test-intent-vitest-379-1793629011222.json\"",
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/BrainSurface.repairRun.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/97nswpkf/tmp/test-intent-vitest-380-1793632945736.json\"",
       "cwd": "modules/ui-web",
       "exitCode": 0,
-      "durationMs": 3238
+      "durationMs": 5878
     }
   ],
   "checks": [
@@ -29,7 +29,7 @@
       "id": "modules/ui-web/src/shell-v0/views/BrainSurface.repairRun.test.ts#a runtime-only read failure keeps live install progress and controls",
       "file": "modules/ui-web/src/shell-v0/views/BrainSurface.repairRun.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:61e6b629ef4603c8c9596cc3303e4f16fb5bcf1487f9b8bf2c15e3176e48a069",
+      "contentDigest": "sha256:0499e69853a7717e5bf54bb08343facab44b39962ead5a625b6b89d242e861c5",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -42,5 +42,5 @@
     }
   ],
   "failBefore": null,
-  "digest": "sha256:38886b78d8b5df1ae4d24a32b0b5c13e0e65826b4d874dee3f7b57f7a0ac89dd"
+  "digest": "sha256:04e286a52922e5bfc95f78d70a7a9a2169467b587ebb99d5b3725e77f0520bc0"
 }

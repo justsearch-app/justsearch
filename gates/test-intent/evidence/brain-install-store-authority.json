@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
   },
-  "createdAt": "2026-11-02T14:17:37.425Z",
-  "revision": "7f435cfc7e1b0c393aa38e271859fd4782eddaba",
-  "tree": "9d758f1797c22849877183ec239f12d013fe1eae",
+  "createdAt": "2026-11-02T15:23:19.064Z",
+  "revision": "591a7ad461fe9efd46f1d58dc9b6c7dbca027dc7",
+  "tree": "22862e467671104381edcb1c428697b061f1583e",
   "environment": {
     "platform": "linux",
     "arch": "x64",
@@ -18,10 +18,10 @@
   },
   "runs": [
     {
-      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/BrainSurface.repairRun.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/3qbuubiq/tmp/test-intent-vitest-658-1793629046318.json\"",
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/BrainSurface.repairRun.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/97nswpkf/tmp/test-intent-vitest-657-1793632987103.json\"",
       "cwd": "modules/ui-web",
       "exitCode": 0,
-      "durationMs": 4111
+      "durationMs": 3486
     }
   ],
   "checks": [
@@ -29,7 +29,7 @@
       "id": "modules/ui-web/src/shell-v0/views/BrainSurface.repairRun.test.ts#Repair requests a read immediately and only store observations change progress, Pause, Resume and Cancel",
       "file": "modules/ui-web/src/shell-v0/views/BrainSurface.repairRun.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:61e6b629ef4603c8c9596cc3303e4f16fb5bcf1487f9b8bf2c15e3176e48a069",
+      "contentDigest": "sha256:0499e69853a7717e5bf54bb08343facab44b39962ead5a625b6b89d242e861c5",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -44,7 +44,7 @@
       "id": "modules/ui-web/src/shell-v0/views/BrainSurface.repairRun.test.ts#Repair does not override unchanged store notifications while its requested read is pending",
       "file": "modules/ui-web/src/shell-v0/views/BrainSurface.repairRun.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:61e6b629ef4603c8c9596cc3303e4f16fb5bcf1487f9b8bf2c15e3176e48a069",
+      "contentDigest": "sha256:0499e69853a7717e5bf54bb08343facab44b39962ead5a625b6b89d242e861c5",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -59,7 +59,7 @@
       "id": "modules/ui-web/src/shell-v0/views/BrainSurface.repairRun.test.ts#Pause requests an immediate read and waits for the store even at an equal timestamp",
       "file": "modules/ui-web/src/shell-v0/views/BrainSurface.repairRun.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:61e6b629ef4603c8c9596cc3303e4f16fb5bcf1487f9b8bf2c15e3176e48a069",
+      "contentDigest": "sha256:0499e69853a7717e5bf54bb08343facab44b39962ead5a625b6b89d242e861c5",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -74,7 +74,7 @@
       "id": "modules/ui-web/src/shell-v0/views/BrainSurface.repairRun.test.ts#Resume requests an immediate read and waits for the store even at an equal timestamp",
       "file": "modules/ui-web/src/shell-v0/views/BrainSurface.repairRun.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:61e6b629ef4603c8c9596cc3303e4f16fb5bcf1487f9b8bf2c15e3176e48a069",
+      "contentDigest": "sha256:0499e69853a7717e5bf54bb08343facab44b39962ead5a625b6b89d242e861c5",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -89,7 +89,7 @@
       "id": "modules/ui-web/src/shell-v0/views/BrainSurface.repairRun.test.ts#the shared store alone decides which install observation follows Pause regardless of timestamp",
       "file": "modules/ui-web/src/shell-v0/views/BrainSurface.repairRun.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:61e6b629ef4603c8c9596cc3303e4f16fb5bcf1487f9b8bf2c15e3176e48a069",
+      "contentDigest": "sha256:0499e69853a7717e5bf54bb08343facab44b39962ead5a625b6b89d242e861c5",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -104,7 +104,7 @@
       "id": "modules/ui-web/src/shell-v0/views/BrainSurface.repairRun.test.ts#a successful Repair cannot reopen a failed install observation gate before recovery",
       "file": "modules/ui-web/src/shell-v0/views/BrainSurface.repairRun.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:61e6b629ef4603c8c9596cc3303e4f16fb5bcf1487f9b8bf2c15e3176e48a069",
+      "contentDigest": "sha256:0499e69853a7717e5bf54bb08343facab44b39962ead5a625b6b89d242e861c5",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -123,45 +123,45 @@
     "patches": [],
     "runs": [
       {
-        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/BrainSurface.repairRun.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/3qbuubiq/tmp/test-intent-vitest-658-1793629054146.json\"",
+        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/BrainSurface.repairRun.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/97nswpkf/tmp/test-intent-vitest-657-1793632995255.json\"",
         "cwd": "<before-worktree>",
         "exitCode": 1,
-        "durationMs": 2450,
-        "output": "JSON report written to /home/elias/.cache/am/3qbuubiq/tmp/test-intent-vitest-658-1793629054146.json\n\n"
+        "durationMs": 3127,
+        "output": "JSON report written to /home/elias/.cache/am/97nswpkf/tmp/test-intent-vitest-657-1793632995255.json\n\n"
       }
     ],
     "checks": [
       {
         "id": "modules/ui-web/src/shell-v0/views/BrainSurface.repairRun.test.ts#Repair requests a read immediately and only store observations change progress, Pause, Resume and Cancel",
         "classification": "assertion",
-        "detail": "Brain running repair controls (B2/B8) Repair requests a read immediately and only store observations change progress, Pause, Resume and Cancel:  AssertionError: expected \"vi.fn()\" to be called 1 times, but got 0 times\n    at /home/elias/.cache/am/3qbuubiq/tmp/test-intent-before-ElU1qa/modules/ui-web/src/shell-v0/views/BrainSurface.repairRun.test.ts:98:28\n    at runNextTicks (node:internal/process/task_queues:65:5)\n    at listOnTimeout (node:"
+        "detail": "Brain running repair controls (B2/B8) Repair requests a read immediately and only store observations change progress, Pause, Resume and Cancel:  AssertionError: expected \"vi.fn()\" to be called 1 times, but got 0 times\n    at /home/elias/.cache/am/97nswpkf/tmp/test-intent-before-e6USUj/modules/ui-web/src/shell-v0/views/BrainSurface.repairRun.test.ts:104:28\n    at runNextTicks (node:internal/process/task_queues:65:5)\n    at listOnTimeout (node"
       },
       {
         "id": "modules/ui-web/src/shell-v0/views/BrainSurface.repairRun.test.ts#Repair does not override unchanged store notifications while its requested read is pending",
         "classification": "assertion",
-        "detail": "Brain running repair controls (B2/B8) Repair does not override unchanged store notifications while its requested read is pending:  AssertionError: expected \"vi.fn()\" to be called 1 times, but got 0 times\n    at /home/elias/.cache/am/3qbuubiq/tmp/test-intent-before-ElU1qa/modules/ui-web/src/shell-v0/views/BrainSurface.repairRun.test.ts:133:28\n    at runNextTicks (node:internal/process/task_queues:65:5)\n    at listOnTimeout (node"
+        "detail": "Brain running repair controls (B2/B8) Repair does not override unchanged store notifications while its requested read is pending:  AssertionError: expected \"vi.fn()\" to be called 1 times, but got 0 times\n    at /home/elias/.cache/am/97nswpkf/tmp/test-intent-before-e6USUj/modules/ui-web/src/shell-v0/views/BrainSurface.repairRun.test.ts:139:28\n    at runNextTicks (node:internal/process/task_queues:65:5)\n    at listOnTimeout (node"
       },
       {
         "id": "modules/ui-web/src/shell-v0/views/BrainSurface.repairRun.test.ts#Pause requests an immediate read and waits for the store even at an equal timestamp",
         "classification": "assertion",
-        "detail": "Brain running repair controls (B2/B8) Pause requests an immediate read and waits for the store even at an equal timestamp:  AssertionError: expected \"vi.fn()\" to be called 1 times, but got 0 times\n    at /home/elias/.cache/am/3qbuubiq/tmp/test-intent-before-ElU1qa/modules/ui-web/src/shell-v0/views/BrainSurface.repairRun.test.ts:159:28\n    at file:///home/elias/.cache/am/3qbuubiq/tmp/test-intent-before-ElU1qa/modules/ui-w"
+        "detail": "Brain running repair controls (B2/B8) Pause requests an immediate read and waits for the store even at an equal timestamp:  AssertionError: expected \"vi.fn()\" to be called 1 times, but got 0 times\n    at /home/elias/.cache/am/97nswpkf/tmp/test-intent-before-e6USUj/modules/ui-web/src/shell-v0/views/BrainSurface.repairRun.test.ts:165:28\n    at file:///home/elias/.cache/am/97nswpkf/tmp/test-intent-before-e6USUj/modules/ui-w"
       },
       {
         "id": "modules/ui-web/src/shell-v0/views/BrainSurface.repairRun.test.ts#Resume requests an immediate read and waits for the store even at an equal timestamp",
         "classification": "assertion",
-        "detail": "Brain running repair controls (B2/B8) Resume requests an immediate read and waits for the store even at an equal timestamp:  AssertionError: expected \"vi.fn()\" to be called 1 times, but got 0 times\n    at /home/elias/.cache/am/3qbuubiq/tmp/test-intent-before-ElU1qa/modules/ui-web/src/shell-v0/views/BrainSurface.repairRun.test.ts:159:28\n    at file:///home/elias/.cache/am/3qbuubiq/tmp/test-intent-before-ElU1qa/modules/ui-w"
+        "detail": "Brain running repair controls (B2/B8) Resume requests an immediate read and waits for the store even at an equal timestamp:  AssertionError: expected \"vi.fn()\" to be called 1 times, but got 0 times\n    at /home/elias/.cache/am/97nswpkf/tmp/test-intent-before-e6USUj/modules/ui-web/src/shell-v0/views/BrainSurface.repairRun.test.ts:165:28\n    at file:///home/elias/.cache/am/97nswpkf/tmp/test-intent-before-e6USUj/modules/ui-w"
       },
       {
         "id": "modules/ui-web/src/shell-v0/views/BrainSurface.repairRun.test.ts#the shared store alone decides which install observation follows Pause regardless of timestamp",
         "classification": "assertion",
-        "detail": "Brain running repair controls (B2/B8) the shared store alone decides which install observation follows Pause regardless of timestamp:  AssertionError: expected 'Paused 25%' to be 'Installing… 25%' // Object.is equality\n    at /home/elias/.cache/am/3qbuubiq/tmp/test-intent-before-ElU1qa/modules/ui-web/src/shell-v0/views/BrainSurface.repairRun.test.ts:174:74\n    at runNextTicks (node:internal/process/task_queues:65:5)\n    at listOnTi"
+        "detail": "Brain running repair controls (B2/B8) the shared store alone decides which install observation follows Pause regardless of timestamp:  AssertionError: expected 'Paused 25%' to be 'Installing… 25%' // Object.is equality\n    at /home/elias/.cache/am/97nswpkf/tmp/test-intent-before-e6USUj/modules/ui-web/src/shell-v0/views/BrainSurface.repairRun.test.ts:180:74\n    at runNextTicks (node:internal/process/task_queues:65:5)\n    at listOnTi"
       },
       {
         "id": "modules/ui-web/src/shell-v0/views/BrainSurface.repairRun.test.ts#a successful Repair cannot reopen a failed install observation gate before recovery",
         "classification": "assertion",
-        "detail": "Brain running repair controls (B2/B8) a successful Repair cannot reopen a failed install observation gate before recovery:  AssertionError: expected 'Installing… 25%' to be 'Checking AI status…' // Object.is equality\n    at /home/elias/.cache/am/3qbuubiq/tmp/test-intent-before-ElU1qa/modules/ui-web/src/shell-v0/views/BrainSurface.repairRun.test.ts:219:74\n    at runNextTicks (node:internal/process/task_queues:65:5)\n    at"
+        "detail": "Brain running repair controls (B2/B8) a successful Repair cannot reopen a failed install observation gate before recovery:  AssertionError: expected 'Installing… 25%' to be 'Checking AI status…' // Object.is equality\n    at /home/elias/.cache/am/97nswpkf/tmp/test-intent-before-e6USUj/modules/ui-web/src/shell-v0/views/BrainSurface.repairRun.test.ts:225:74\n    at runNextTicks (node:internal/process/task_queues:65:5)\n    at"
       }
     ]
   },
-  "digest": "sha256:023f6704bd7c2902f53f830842dc0b2caba65d1ed7db5b47c7349ea70c2be0d0"
+  "digest": "sha256:35f0c5dff042eaf9bdfceea4b49c2ed4ce9ea03be22ee2d19ec1a9e7224cbbb1"
 }
