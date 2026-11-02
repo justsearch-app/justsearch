@@ -32,29 +32,47 @@ class BioTagDecoderTest {
     return logits;
   }
 
+  @Test
+  void highConfidenceShortNamesSurvive() {
+    for (String name : List.of("Li", "Bo", "An", "吴", "京")) {
+      for (int label : new int[] {B_PER, B_LOC}) {
+        var entities = BioTagDecoder.decode(new float[][] {logitsFor(label)},
+            new String[] {name}, new long[] {0});
+        assertEquals(1, entities.size(), name);
+        assertEquals(name, entities.get(0).text());
+      }
+    }
+    var cjk = BioTagDecoder.decode(new float[][] {logitsFor(B_PER), logitsFor(I_PER)},
+        new String[] {"吴", "京"}, new long[] {0, 1});
+    assertEquals(1, cjk.size());
+    assertEquals("吴 京", cjk.get(0).text());
+  }
+
+  @Test
+  // single-word person entity
+  void singleWordPerson() {
+    float[][] logits = {
+        logitsFor(O),     // [CLS]
+        logitsFor(B_PER), // John
+        logitsFor(O),     // works
+        logitsFor(O),     // [SEP]
+    };
+    String[] tokens = {"[CLS]", "John", "works", "[SEP]"};
+    long[] wordIds = {-1, 0, 1, -1};
+
+    List<BioTagDecoder.Entity> entities = BioTagDecoder.decode(logits, tokens, wordIds);
+
+    assertEquals(1, entities.size());
+    assertEquals("John", entities.get(0).text());
+    assertEquals("person", entities.get(0).type());
+    assertTrue(entities.get(0).confidence() > 0.9f);
+  }
+
+
   @Nested
   @DisplayName("Basic entity extraction")
   class BasicExtraction {
 
-    @Test
-    @DisplayName("single-word person entity")
-    void singleWordPerson() {
-      float[][] logits = {
-          logitsFor(O),     // [CLS]
-          logitsFor(B_PER), // John
-          logitsFor(O),     // works
-          logitsFor(O),     // [SEP]
-      };
-      String[] tokens = {"[CLS]", "John", "works", "[SEP]"};
-      long[] wordIds = {-1, 0, 1, -1};
-
-      List<BioTagDecoder.Entity> entities = BioTagDecoder.decode(logits, tokens, wordIds);
-
-      assertEquals(1, entities.size());
-      assertEquals("John", entities.get(0).text());
-      assertEquals("person", entities.get(0).type());
-      assertTrue(entities.get(0).confidence() > 0.9f);
-    }
 
     @Test
     @DisplayName("multi-word person entity")

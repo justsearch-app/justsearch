@@ -46,6 +46,35 @@ final class BulkWriteChunkDeclarationTest extends LuceneExecutorTestBase {
   @TempDir Path tempDir;
 
   @Test
+  void rejectedInlineVectorsNeverEarnFirstCompatibilityEvidence() throws Exception {
+    io.justsearch.indexerworker.embed.EmbeddingFingerprint.setForTesting("inline-model");
+    try (var runtime = IndexSchema.fromCatalog(FieldCatalogDef.forChunkTesting(4)).atPath(tempDir.resolve("inline"))
+        .withExecutorRegistrations(testLuceneExecutors()).open()) {
+      var ecc = new io.justsearch.indexerworker.embed.EmbeddingCompatibilityController(java.util.Map::of, () -> 0L);
+      ecc.refresh();
+      var lifecycle = mock(EmbeddingProviderLifecycle.class);
+      when(lifecycle.embeddingCompatController()).thenReturn(ecc);
+      var stats = mock(BatchStats.class);
+      var writer = writer(runtime, stats, lifecycle);
+      for (float bad : new float[] {Float.NaN, Float.POSITIVE_INFINITY, Float.NEGATIVE_INFINITY}) {
+        Path file = tempDir.resolve("bad-" + Float.floatToIntBits(bad) + ".txt");
+        writer.write(job(file, "retained lexical text"), new float[] {bad, 1, 0, 0});
+        runtime.commitOps().commitAndTrack(); runtime.commitOps().maybeRefreshBlocking();
+        assertEquals("FAILED", runtime.documentFieldOps().getDocumentField(
+            PathNormalizer.normalizeKey(file), SchemaFields.EMBEDDING_STATUS));
+        assertTrue(ecc.fingerprintToStamp().isEmpty(), "the field mapper rejected the only vector");
+      }
+      writer.write(job(tempDir.resolve("good.txt"), "valid inline vector"), new float[] {1, 0, 0, 0});
+      assertTrue(ecc.fingerprintToStamp().isPresent());
+      writer.write(job(tempDir.resolve("late-bad.txt"), "rejected after success"), new float[] {Float.NaN, 1, 0, 0});
+      assertTrue(ecc.fingerprintToStamp().isPresent(), "later rejection must not erase real success");
+      verify(stats, never()).recordFailed();
+    } finally {
+      io.justsearch.indexerworker.embed.EmbeddingFingerprint.invalidate();
+    }
+  }
+
+  @Test
   void bulkWritesNeedNoPerDocumentRefreshOrParentRewrite() throws Exception {
     Path index = tempDir.resolve("index");
     var ids = new ArrayList<String>();
@@ -97,6 +126,11 @@ final class BulkWriteChunkDeclarationTest extends LuceneExecutorTestBase {
   }
 
   private static JobBatchWriter writer(RunningRuntime runtime, BatchStats batchStats) {
+    return writer(runtime, batchStats, mock(EmbeddingProviderLifecycle.class));
+  }
+
+  private static JobBatchWriter writer(RunningRuntime runtime, BatchStats batchStats,
+      EmbeddingProviderLifecycle lifecycle) {
     var jobQueue = mock(JobQueue.class);
     when(jobQueue.ownsClaimForPublication(any())).thenReturn(true);
     var extractor = mock(TimeboxedContentExtractor.class);
@@ -104,7 +138,7 @@ final class BulkWriteChunkDeclarationTest extends LuceneExecutorTestBase {
     return new JobBatchWriter(new WorkerIngestionAuthority(),
         runtime.indexingCoordinator(),
         mock(WorkerSignalBus.class),
-        mock(EmbeddingProviderLifecycle.class),
+        lifecycle,
         () -> null,
         mock(IngestionOutcomeJournal.class),
         jobQueue,

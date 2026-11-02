@@ -42,6 +42,10 @@ final class EnrichmentQuarantineProgressTest extends LuceneExecutorTestBase {
   }
 
   private void seed(RunningRuntime runtime, String id, String damage) {
+    seed(runtime, id, damage, false);
+  }
+
+  private void seed(RunningRuntime runtime, String id, String damage, boolean terminal) {
     String parent = "/parent-" + id;
     if (!"missing-parent".equals(damage)) runtime.indexingCoordinator().indexSingle(new IndexDocument(Map.of(
         SchemaFields.DOC_ID, parent, SchemaFields.DOC_UID, parent, SchemaFields.PATH, parent, SchemaFields.CONTENT, TEXT)));
@@ -62,7 +66,39 @@ final class EnrichmentQuarantineProgressTest extends LuceneExecutorTestBase {
     if ("reversed-offset".equals(damage)) fields.put(SchemaFields.CHUNK_START_CHAR, "6");
     if ("empty-span".equals(damage)) fields.put(SchemaFields.CHUNK_END_CHAR, "0");
     if ("missing-parent-id".equals(damage)) fields.remove(SchemaFields.PARENT_DOC_ID);
+    if (terminal) {
+      fields.put(SchemaFields.CHUNK_EMBEDDING_RETRY_COUNT, "2");
+      fields.put(SchemaFields.CHUNK_VECTOR, new float[] {0f, 1f});
+    }
     runtime.indexingCoordinator().indexSingle(new IndexDocument(fields));
+  }
+
+  @org.junit.jupiter.api.Test
+  void terminalChunkFailureRemovesPriorVectorEvenWithoutParentProof() throws Exception {
+    try (var runtime = open()) {
+      seed(runtime, "broken", "wrong-revision", true);
+      runtime.commitOps().commitAndTrack(); runtime.commitOps().maybeRefreshBlocking();
+      var embedding = mock(EmbeddingProvider.class); when(embedding.isAvailable()).thenReturn(true);
+      EmbeddingBackfillOps.processChunkEmbeddingBackfill(new EmbeddingBackfillOps.BackfillContext(
+          runtime.documentFieldOps(), runtime.indexingCoordinator(), runtime.commitOps(), mock(WorkerSignalBus.class),
+          IndexingPacing.unthrottled(), () -> embedding, () -> true, () -> true, 1, LoggerFactory.getLogger(getClass())));
+      runtime.commitOps().commitAndTrack(); runtime.commitOps().maybeRefreshBlocking();
+      assertEquals("FAILED", runtime.documentFieldOps().getDocumentField("broken", SchemaFields.CHUNK_EMBEDDING_STATUS));
+      assertEquals("3", runtime.documentFieldOps().getDocumentField("broken", SchemaFields.CHUNK_EMBEDDING_RETRY_COUNT));
+      assertEquals(0, runtime.indexCountOps().countByField(SchemaFields.CHUNK_EMBEDDING_STATUS, "PENDING"));
+    }
+    try (var dir = org.apache.lucene.store.FSDirectory.open(directory.resolve("index"));
+        var reader = org.apache.lucene.index.DirectoryReader.open(dir)) {
+      var hits = new org.apache.lucene.search.IndexSearcher(reader).search(new org.apache.lucene.search.TermQuery(
+          new org.apache.lucene.index.Term(SchemaFields.DOC_ID, "broken")), 1);
+      int doc = hits.scoreDocs[0].doc;
+      var leaf = reader.leaves().get(org.apache.lucene.index.ReaderUtil.subIndex(doc, reader.leaves()));
+      var vectors = leaf.reader().getFloatVectorValues(SchemaFields.CHUNK_VECTOR);
+      if (vectors != null) assertNotEquals(doc - leaf.docBase, vectors.iterator().advance(doc - leaf.docBase));
+    }
+    try (var runtime = open()) {
+      assertEquals("FAILED", runtime.documentFieldOps().getDocumentField("broken", SchemaFields.CHUNK_EMBEDDING_STATUS));
+    }
   }
 
   @ParameterizedTest

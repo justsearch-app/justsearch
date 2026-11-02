@@ -65,6 +65,49 @@ class InPlaceEmbeddingRebuildRecoveryTest extends io.justsearch.adapters.lucene.
   }
 
   @Test
+  void rescueTerminalFailureRemovesOldParentVector() throws Exception {
+    EmbeddingFingerprint.setForTesting(FP);
+    Path dir = Files.createTempDirectory("terminal-parent-recovery");
+    AtomicReference<Supplier<Optional<String>>> holder = new AtomicReference<>(Optional::empty);
+    var metadata = EmbeddingMetadataOverlay.createSupplier(() -> holder.get().get());
+    try (var runtime = openRuntime(dir, metadata)) {
+      for (String id : List.of("good", "bad")) {
+        runtime.indexingCoordinator().indexSingle(new IndexDocument(Map.of(
+            SchemaFields.DOC_ID, id, SchemaFields.DOC_UID, id + "#0",
+            SchemaFields.CONTENT, "retained lexical content",
+            SchemaFields.CONTENT_SHA256, io.justsearch.indexing.chunking.ChunkParentRevision.sha256Hex("retained lexical content"),
+            SchemaFields.VECTOR, VEC,
+            SchemaFields.EMBEDDING_STATUS, SchemaFields.EMBEDDING_STATUS_COMPLETED)));
+      }
+      runtime.commitOps().commitAndTrack();
+      runtime.commitOps().maybeRefreshBlocking();
+      var ecc = new EmbeddingCompatibilityController(runtime::latestCommitUserDataBestEffort,
+          () -> docCountOrThrow(runtime), () -> completedEmbeddingsOrThrow(runtime));
+      ecc.refresh(); holder.set(ecc::fingerprintForCommit);
+      assertTrue(EmbeddingRecoveryOps.rescueBlockedLegacyIndex(ecc, runtime, 20, LOG).rebuildStarted());
+      runtime.indexingCoordinator().updateDocument("good", Map.of(
+          SchemaFields.VECTOR, VEC, SchemaFields.EMBEDDING_STATUS, "COMPLETED"));
+      runtime.indexingCoordinator().updateDocument("bad",
+          io.justsearch.indexerworker.loop.ops.EmbeddingBackfillOps.computeEmbeddingFailureUpdate(
+              SchemaFields.EMBEDDING_MAX_RETRIES - 1));
+      runtime.commitOps().commitAndTrack(); runtime.commitOps().maybeRefreshBlocking();
+      var lifecycle = new EmbeddingProviderLifecycle(null, org.mockito.Mockito.mock(io.justsearch.indexerworker.queue.JobQueue.class),
+          runtime.indexCountOps(), runtime.commitOps());
+      lifecycle.setEmbeddingCompatController(ecc);
+      assertTrue(lifecycle.tryFinalizeRebuildAtShutdown());
+      assertEquals(EmbeddingCompatibilityController.State.COMPATIBLE, ecc.state());
+      assertEquals(1, runtime.readPathOps().searchVector(VEC, 10).hits().size(),
+          "only the successfully re-embedded parent is searchable");
+      assertEquals("FAILED", runtime.documentFieldOps().getDocumentField("bad", SchemaFields.EMBEDDING_STATUS));
+    }
+    try (var reopened = openRuntime(dir, metadata)) {
+      assertEquals(1, reopened.readPathOps().searchVector(VEC, 10).hits().size());
+      assertEquals("retained lexical content",
+          reopened.documentFieldOps().getDocumentField("bad", SchemaFields.CONTENT));
+    }
+  }
+
+  @Test
   @DisplayName(
       "in-place backfill path: BLOCKED_LEGACY (no fingerprint) recovers to COMPATIBLE across restart"
           + " even with a job stuck in PROCESSING")

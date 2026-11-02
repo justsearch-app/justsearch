@@ -163,8 +163,13 @@ public final class CandidateIndexTargetCapture {
     if (!Files.isRegularFile(modelFile)) {
       throw new IOException(role + " model file is missing: " + modelFile);
     }
-    return new CapturedModel(IndexFingerprint.ModelFingerprint.present(sha256(modelFile)),
-        modelFile);
+    var fingerprint = IndexFingerprint.ModelFingerprint.present(sha256(modelFile));
+    String modelRole = role.toLowerCase(java.util.Locale.ROOT);
+    if (List.of("embedding", "splade", "ner").contains(modelRole)) {
+      fingerprint = fingerprint.withAssets(
+          io.justsearch.indexerworker.embed.ModelAssetFingerprint.compute(modelDir, modelRole, modelFile));
+    }
+    return new CapturedModel(fingerprint, modelFile);
   }
 
   private static String sha256(Path file) throws IOException {

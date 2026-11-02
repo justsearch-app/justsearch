@@ -50,6 +50,61 @@ class CommitOpsTest extends LuceneExecutorTestBase {
         null);
   }
 
+  @org.junit.jupiter.params.ParameterizedTest(name = "{displayName} [{index}] {arguments}")
+  @org.junit.jupiter.params.provider.ValueSource(strings = {"embedding", "splade", "ner"})
+  void lexicalCommitPreservesUnresolvedCompanionAndRejectsReplacementAfterReopen(String role) throws Exception {
+    var config = io.justsearch.configuration.resolved.ResolvedConfig.builder().build();
+    var absent = io.justsearch.adapters.lucene.commit.IndexFingerprint.ModelFingerprint.notConfigured();
+    var original = io.justsearch.adapters.lucene.commit.IndexFingerprint.ModelFingerprint.present("a".repeat(64))
+        .withAssets(java.util.Optional.of("b".repeat(64)));
+    var current = new AtomicReference<>(original);
+    java.util.function.Supplier<CommitMetadataSource> sources = () -> new SsotCommitMetadataSource(config,
+        new SsotCommitMetadataSource.RuntimeFingerprintInputs(768,
+            role.equals("embedding") ? current.get() : absent,
+            role.equals("splade") ? current.get() : absent,
+            role.equals("ner") ? current.get() : absent));
+    var schema = IndexSchema.fromCatalog(FieldCatalogDef.forTesting(768), sources, metadata -> {});
+    String key = role + "_model_assets_sha256";
+    String saved;
+    try (var runtime = schema.atPath(tempDir).withExecutorRegistrations(testLuceneExecutors()).open()) {
+      runtime.commitOps().stopCommitTimer();
+      runtime.indexingCoordinator().indexSingle(new IndexDocument(Map.of(
+          SchemaFields.DOC_ID, "parent", SchemaFields.DOC_UID, "parent#0", SchemaFields.CONTENT, "lexical")));
+      runtime.commitOps().commitAndTrack();
+      saved = runtime.latestCommitUserDataBestEffort().get(key);
+      assertNotNull(saved);
+      current.set(original.withAssets(java.util.Optional.empty()));
+      runtime.indexingCoordinator().updateDocument("parent", Map.of(SchemaFields.CONTENT, "changed lexical"));
+      runtime.commitOps().commitAndTrack();
+      assertEquals(saved, runtime.latestCommitUserDataBestEffort().get(key));
+      assertFalse(runtime.latestCommitUserDataBestEffort().containsKey("index_fingerprint"));
+    }
+    var unresolved = sources.get();
+    assertTrue(IndexMetadataParityGuard.inspectCommittedParity(tempDir, unresolved::build,
+        unresolved::indeterminateFingerprintInputs).isEmpty());
+    assertFalse(IndexMetadataParityGuard.certifiesCommittedCompatibility(tempDir, unresolved.build(),
+        unresolved.indeterminateFingerprintInputs()), "unavailable companions cannot certify compatibility");
+    // Restoring identical assets with the original graph remains compatible.
+    current.set(original);
+    assertTrue(IndexMetadataParityGuard.inspectCommittedParity(tempDir, sources.get()::build).isEmpty());
+    current.set(io.justsearch.adapters.lucene.commit.IndexFingerprint.ModelFingerprint.present("d".repeat(64))
+        .withAssets(java.util.Optional.of("b".repeat(64))));
+    var graphDiffs = IndexMetadataParityGuard.inspectCommittedParity(tempDir, sources.get()::build);
+    assertTrue(ParityDiagnostics.requiresRebuild(graphDiffs),
+        "a readable graph identity must survive a companion outage and reject a swapped graph");
+    current.set(original.withAssets(java.util.Optional.of("c".repeat(64))));
+    var diffs = IndexMetadataParityGuard.inspectCommittedParity(tempDir, sources.get()::build);
+    assertTrue(diffs.stream().anyMatch(diff -> diff.key().equals(key)));
+    current.set(io.justsearch.adapters.lucene.commit.IndexFingerprint.ModelFingerprint.indeterminate()
+        .withAssets(java.util.Optional.of("c".repeat(64))));
+    var graphUnavailable = sources.get();
+    assertTrue(IndexMetadataParityGuard.inspectCommittedParity(tempDir, graphUnavailable::build,
+        graphUnavailable::indeterminateFingerprintInputs).stream().anyMatch(diff -> diff.key().equals(key)),
+        "known companions must still be compared while the graph cannot be read");
+    assertFalse(IndexMetadataParityGuard.certifiesCommittedCompatibility(tempDir, graphUnavailable.build(),
+        graphUnavailable.indeterminateFingerprintInputs()));
+  }
+
   // -- buildMetadataSnapshot tests --
 
   @Test

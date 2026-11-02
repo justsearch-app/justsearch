@@ -129,7 +129,7 @@ final class VduReplayFailureRetentionTest {
     IndexingCoordinator indexingCoordinator = mock(IndexingCoordinator.class);
     RuntimeException insertionFailure = new RuntimeException("second chunk insertion failed");
     when(indexingCoordinator.updateDocument(eq(DOC_ID), anyMap())).thenReturn(true);
-    doNothing()
+    doAnswer(invocation -> null)
         .doThrow(insertionFailure)
         .when(indexingCoordinator)
         .indexSingle(any(IndexDocument.class));
@@ -153,7 +153,7 @@ final class VduReplayFailureRetentionTest {
     DocumentFieldOps documentFieldOps = parentFields();
     IndexingCoordinator indexingCoordinator = mock(IndexingCoordinator.class);
     when(indexingCoordinator.updateDocument(eq(DOC_ID), anyMap())).thenReturn(true);
-    doNothing().when(indexingCoordinator).indexSingle(any(IndexDocument.class));
+    doAnswer(invocation -> null).when(indexingCoordinator).indexSingle(any(IndexDocument.class));
     CommitOps commitOps = mock(CommitOps.class);
     RuntimeException commitFailure = new RuntimeException("replay commit failed");
     doThrow(commitFailure)
@@ -186,7 +186,7 @@ final class VduReplayFailureRetentionTest {
     DocumentFieldOps documentFieldOps = parentFields();
     IndexingCoordinator indexingCoordinator = mock(IndexingCoordinator.class);
     when(indexingCoordinator.updateDocument(eq(DOC_ID), anyMap())).thenReturn(true);
-    doNothing().when(indexingCoordinator).indexSingle(any(IndexDocument.class));
+    doAnswer(invocation -> null).when(indexingCoordinator).indexSingle(any(IndexDocument.class));
     CommitOps commitOps = mock(CommitOps.class);
     AtomicBoolean commitSawBufferedOperation = new AtomicBoolean();
     RunningRuntime runtime =

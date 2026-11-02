@@ -51,19 +51,21 @@ public final class TokenWindowsHeapProbe {
   static List<long[][]> eagerOracle(
       long[] ids, long[] mask, long[] types, int chunkSize, int chunkOverlap, int maxSeqLen) {
     List<long[][]> chunks = new ArrayList<>();
-    int stride = Math.max(1, chunkSize - chunkOverlap);
-    int start = 0;
-    while (start < ids.length) {
-      int end = Math.min(start + chunkSize, ids.length);
-      chunks.add(copy(ids, mask, types, start, end));
-      start += stride;
-      if (start < ids.length && ids.length - start < chunkSize / 4) {
-        int lastStart = start - stride;
-        int lastEnd = Math.min(ids.length, lastStart + maxSeqLen);
-        chunks.set(chunks.size() - 1, copy(ids, mask, types, lastStart, lastEnd));
-        break;
+    int capacity = Math.min(chunkSize, maxSeqLen) - 2;
+    int stride = Math.max(1, capacity - chunkOverlap);
+    for (int start = 1; start < ids.length - 1; start += stride) {
+      int end = Math.min(start + capacity, ids.length - 1);
+      long[][] window = new long[3][end - start + 2];
+      long[][] sources = {ids, mask, types};
+      for (int field = 0; field < 3; field++) {
+        window[field][0] = sources[field][0];
+        System.arraycopy(sources[field], start, window[field], 1, end - start);
+        window[field][window[field].length - 1] = sources[field][sources[field].length - 1];
       }
+      chunks.add(window);
+      if (end == ids.length - 1) break;
     }
+    if (ids.length > 0 && ids.length <= 2) chunks.add(copy(ids, mask, types, 0, ids.length));
     return chunks;
   }
 

@@ -57,6 +57,9 @@ public final class WritePathOps {
   // *_status field in the catalog uses this same COMPLETED/PENDING token set.
   private static final String STATUS_COMPLETED = "COMPLETED";
   private static final String STATUS_PENDING = "PENDING";
+  private static final Set<String> EMBEDDING_UPDATE_FIELDS = Set.of(
+      SchemaFields.VECTOR, SchemaFields.EMBEDDING_STATUS, SchemaFields.EMBEDDING_RETRY_COUNT,
+      SchemaFields.CHUNK_VECTOR, SchemaFields.CHUNK_EMBEDDING_STATUS, SchemaFields.CHUNK_EMBEDDING_RETRY_COUNT);
 
   private final RuntimeSession session;
   private final String idField;
@@ -81,7 +84,7 @@ public final class WritePathOps {
    * @param droppedVectors accumulator for vector fields dropped by the mapper (tempdoc 931 §C.3),
    *     or null when the caller does not count them
    */
-  void indexDocument(Map<String, Object> fields, FieldMapper.DroppedVectorReport droppedVectors) {
+  boolean indexDocument(Map<String, Object> fields, FieldMapper.DroppedVectorReport droppedVectors) {
     try {
       LifecycleSnapshot snap = session.snapshot;
       IndexWriter w = snap != null ? snap.writer() : null;
@@ -98,7 +101,7 @@ public final class WritePathOps {
         w.deleteDocuments(new Term(idField, idValue));
         TelemetryEvents te = session.telemetryEvents;
         if (te != null) te.onHardDelete();
-        return;
+        return false;
       }
       Document luceneDoc = session.fieldMapper.toDocument(fields, droppedVectors);
       boolean softDelete = asBoolean(fields.get(session.softDeleteField));
@@ -111,6 +114,8 @@ public final class WritePathOps {
       } else {
         w.updateDocument(new Term(idField, idValue), luceneDoc);
       }
+      return luceneDoc.getField(SchemaFields.VECTOR) != null
+          && SchemaFields.EMBEDDING_STATUS_COMPLETED.equals(luceneDoc.get(SchemaFields.EMBEDDING_STATUS));
     } catch (org.apache.lucene.store.AlreadyClosedException closed) {
       LifecycleSnapshot current = session.snapshot;
       if (current == null || current.writer() == null || !current.writer().isOpen()
@@ -462,6 +467,7 @@ public final class WritePathOps {
   private static final class ParentSliceCache {
     private final Map<String, String> content = new HashMap<>();
     private final Map<String, String> revision = new HashMap<>();
+    private Map<Integer, Map<String, Float>> embeddingSparse;
 
     String content(String parentId) {
       return content.get(parentId);
@@ -567,10 +573,13 @@ public final class WritePathOps {
           && !hasReconstructableChunkProof(input, parentCache)) {
         // Quarantine preserves the captured identity comparison without inventing chunk text.
         // Only failure bookkeeping may use this lane; successful artifacts still require proof.
-        if (updates.isEmpty() || updates.entrySet().stream().anyMatch(entry ->
-            (!ENRICHMENT_STAGE_FIELDS.containsKey(entry.getKey())
+        if ((updates.containsKey(SchemaFields.CHUNK_VECTOR)
+                && !"FAILED".equals(updates.get(SchemaFields.CHUNK_EMBEDDING_STATUS)))
+            || updates.isEmpty() || updates.entrySet().stream().anyMatch(entry ->
+            !(SchemaFields.CHUNK_VECTOR.equals(entry.getKey()) && entry.getValue() == null)
+            && ((!ENRICHMENT_STAGE_FIELDS.containsKey(entry.getKey())
                 && !ENRICHMENT_STAGE_FIELDS.containsValue(entry.getKey()))
-            || (entry.getKey().endsWith("_status") && !"FAILED".equals(entry.getValue())))) return false;
+            || (entry.getKey().endsWith("_status") && !"FAILED".equals(entry.getValue()))))) return false;
         updates = new HashMap<>(updates);
         updates.put(SchemaFields.CHUNK_CONTENT, "");
         for (String status : List.of(SchemaFields.CHUNK_EMBEDDING_STATUS, SchemaFields.SPLADE_STATUS)) {
@@ -636,7 +645,7 @@ public final class WritePathOps {
     // FeatureFields). For each catalog field that declares an rmwPolicy and is absent from the
     // caller's update map, apply its declared disposition so the rewrite preserves it structurally
     // instead of relying on per-call-site discipline.
-    applyRmwPolicies(searcher, globalDocId, updates, fields);
+    applyRmwPolicies(searcher, globalDocId, updates, fields, parentCache);
 
     // Apply updates (overwrites existing values, including anything the engine restored)
     fields.putAll(updates);
@@ -810,6 +819,23 @@ public final class WritePathOps {
     }
   }
 
+  private static boolean embeddingOnlyUpdate(Map<String, Object> updates) {
+    return !updates.isEmpty() && EMBEDDING_UPDATE_FIELDS.containsAll(updates.keySet());
+  }
+
+  /** Reads independent sparse enrichment once for an embedding recovery/backfill batch. */
+  private Map<Integer, Map<String, Float>> embeddingSparseForBatch(IndexSearcher searcher,
+      List<Map.Entry<String, Map<String, Object>>> updates) throws IOException {
+    if (session.fieldMapper.fieldDef(SchemaFields.SPLADE) == null) return Map.of();
+    Set<Integer> documents = new HashSet<>();
+    for (var update : updates) {
+      if (!embeddingOnlyUpdate(update.getValue())) continue;
+      var hits = searcher.search(new TermQuery(new Term(idField, update.getKey())), 1);
+      if (hits.scoreDocs.length > 0) documents.add(hits.scoreDocs[0].doc);
+    }
+    return legacySparseFeatures(searcher, documents);
+  }
+
   /**
    * Applies each catalog field's declared RMW disposition (tempdoc 711) for fields the caller
    * omitted: {@link FieldMapper#RMW_PRESERVE_REREAD} re-reads and carries the field forward;
@@ -817,7 +843,8 @@ public final class WritePathOps {
    * that cannot be cheaply re-read.
    */
   private void applyRmwPolicies(
-      IndexSearcher searcher, int globalDocId, Map<String, Object> updates, Map<String, Object> fields)
+      IndexSearcher searcher, int globalDocId, Map<String, Object> updates, Map<String, Object> fields,
+      ParentSliceCache parentCache)
       throws IOException {
     for (FieldMapper.FieldDef def : session.fieldMapper.rmwPolicyFields()) {
       if (updates.containsKey(def.id)) {
@@ -852,6 +879,16 @@ public final class WritePathOps {
           }
         }
       } else if (policy != null && policy.startsWith(FieldMapper.RMW_RESET_STATUS_PREFIX)) {
+        if (SchemaFields.SPLADE.equals(def.id) && embeddingOnlyUpdate(updates)) {
+          var sparse = parentCache.embeddingSparse == null
+              ? legacySparseFeatures(searcher, Set.of(globalDocId)) : parentCache.embeddingSparse;
+          fields.put(SchemaFields.SPLADE, sparse.getOrDefault(globalDocId, Map.of()));
+          String status = readKeywordDocValue(searcher, globalDocId, SchemaFields.SPLADE_STATUS);
+          if (status != null) fields.put(SchemaFields.SPLADE_STATUS, status);
+          Long retry = readNumericDocValue(searcher, globalDocId, SchemaFields.SPLADE_RETRY_COUNT);
+          if (retry != null) fields.put(SchemaFields.SPLADE_RETRY_COUNT, retry);
+          continue;
+        }
         applyResetStatus(
             searcher,
             globalDocId,
@@ -944,6 +981,7 @@ public final class WritePathOps {
     int notFound = 0;
     long minNs = Long.MAX_VALUE, maxNs = 0, sumNs = 0;
     ParentSliceCache parentCache = new ParentSliceCache();
+    parentCache.embeddingSparse = embeddingSparseForBatch(searcher, batchUpdates);
     for (Map.Entry<String, Map<String, Object>> entry : batchUpdates) {
       long t0 = System.nanoTime();
       if (readModifyWrite(searcher, entry.getKey(), entry.getValue(), parentCache)) {
@@ -1135,6 +1173,7 @@ public final class WritePathOps {
       if (snap != null && snap.searcherManager() != null) snap.searcherManager().maybeRefreshBlocking();
       return bridge.withSearcherNoRefresh(searcher -> {
         var cache = new ParentSliceCache();
+        cache.embeddingSparse = embeddingSparseForBatch(searcher, updates);
         Map<String, Map<String, String>> parents = new HashMap<>();
         Map<String, java.util.IdentityHashMap<Map<String, String>, Boolean>> parentComparisons = new HashMap<>();
         org.apache.lucene.index.StoredFields parentStoredFields = null;

@@ -112,6 +112,14 @@ public final class CommitOps {
           IndexWriter w = snap != null ? snap.writer() : null;
           if (w == null || !w.isOpen()) throw new IndexWriterUnavailableException("IndexWriter not available");
           long pendingAtCommit = session.pendingDocs.get();
+          if (ud != null && DirectoryReader.indexExists(w.getDirectory())) {
+            var commits = DirectoryReader.listCommits(w.getDirectory());
+            var previous = commits.getLast().getUserData();
+            for (String role : java.util.List.of("embedding", "splade", "ner")) {
+              String assetsKey = role + "_model_assets_sha256";
+              if (previous.containsKey(assetsKey)) ud.putIfAbsent(assetsKey, previous.get(assetsKey));
+            }
+          }
           w.setLiveCommitData(ud != null ? ud.entrySet() : Collections.emptyList());
           long start = System.nanoTime();
           w.commit();

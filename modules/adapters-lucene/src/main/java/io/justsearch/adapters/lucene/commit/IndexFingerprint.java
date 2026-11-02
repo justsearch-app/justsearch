@@ -81,9 +81,10 @@ import tools.jackson.databind.node.ObjectNode;
  *
  * <p>A model fingerprint is tri-state. {@code NOT_CONFIGURED} (no model resolvable for this
  * deployment at all) is a determinate answer and hashes as JSON {@code null}. {@code INDETERMINATE}
- * (a model file is configured but its digest could not be read) is <em>not</em> an answer, and
- * {@link #compute} returns {@link Optional#empty()} rather than inventing one. Callers stamp
- * nothing and compare nothing in that case: a transiently unreadable model file must not be
+ * (a model is configured but its graph or companion digest could not be read) is <em>not</em> a
+ * complete answer, and
+ * {@link #compute} returns {@link Optional#empty()} rather than inventing one. Callers omit the
+ * complete digest and compare only readable inputs: a transiently unreadable model file must not be
  * indistinguishable from a swapped one, because the consequence of the latter is a full rebuild
  * (`green-masked-destructive`).
  *
@@ -93,7 +94,8 @@ import tools.jackson.databind.node.ObjectNode;
  * a vector dimension or a chunking change is a rebuild-requiring difference whether or not the NER
  * model file happened to be readable this boot (tempdoc 931 §C.5). {@link #differingInputs} is that
  * comparison; the ignored keys are named by the caller, never inferred from the JSON, because an
- * indeterminate model and an unconfigured one both render as {@code null}.
+ * unreadable graph and an unconfigured model both render as {@code null}. A readable graph
+ * remains in the canonical inputs even when its companion digest is unavailable.
  */
 public final class IndexFingerprint {
 
@@ -140,7 +142,16 @@ public final class IndexFingerprint {
   }
 
   /** Tri-state identity of one model that contributes content to the index. */
-  public record ModelFingerprint(ModelState state, String sha) {
+  public record ModelFingerprint(ModelState state, String sha, String assetsSha) {
+    public ModelFingerprint(ModelState state, String sha) { this(state, sha, null); }
+
+    /** Keeps each readable identity even when the other part is unavailable. */
+    public ModelFingerprint withAssets(Optional<String> assets) {
+      if (state == ModelState.NOT_CONFIGURED) return this;
+      return new ModelFingerprint(sha != null && assets.isPresent()
+          ? ModelState.PRESENT : ModelState.INDETERMINATE, sha, assets.orElse(null));
+    }
+
     public ModelFingerprint {
       Objects.requireNonNull(state, "state");
     }
@@ -337,7 +348,7 @@ public final class IndexFingerprint {
   }
 
   private static String modelValue(ModelFingerprint fp) {
-    return fp.state() == ModelState.PRESENT ? fp.sha() : null;
+    return fp.sha();
   }
 
   /** One input that differs between a stored and an expected canonical rendering. */
@@ -357,8 +368,8 @@ public final class IndexFingerprint {
    * unresolved model keys from BOTH sides and comparing the rest asks exactly the question the
    * runtime can still answer truthfully.
    *
-   * <p>The ignored keys are supplied, not inferred: an {@code INDETERMINATE} model and a
-   * {@code NOT_CONFIGURED} one both render as JSON {@code null} (see {@link #modelValue}), so the
+   * <p>The ignored keys are supplied, not inferred: an unreadable graph and a
+   * {@code NOT_CONFIGURED} model both render as JSON {@code null} (see {@link #modelValue}), so the
    * stored JSON alone cannot say which it was. The caller knows which inputs this runtime could not
    * resolve, and that is the only honest source.
    *
@@ -594,12 +605,14 @@ public final class IndexFingerprint {
     return namedIndeterminate(List.of(embedding, splade, ner));
   }
 
-  /** The {@link #MODEL_INPUT_KEYS} whose positionally-aligned fingerprint is INDETERMINATE. */
+  /** Names the unavailable graph or companion input without excluding a readable graph. */
   private static List<String> namedIndeterminate(List<ModelFingerprint> orderedModels) {
     List<String> out = new ArrayList<>();
     for (int i = 0; i < MODEL_INPUT_KEYS.size(); i++) {
       if (orderedModels.get(i).state() == ModelState.INDETERMINATE) {
-        out.add(MODEL_INPUT_KEYS.get(i));
+        String graphKey = MODEL_INPUT_KEYS.get(i);
+        out.add(orderedModels.get(i).sha() == null ? graphKey
+            : graphKey.replace("_sha256", "_assets_sha256"));
       }
     }
     return List.copyOf(out);

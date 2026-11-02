@@ -303,7 +303,7 @@ final class EnrichmentRevisionRaceTest extends LuceneExecutorTestBase {
   }
 
   @Test
-  void legacyMatchingProofRmwAndRenamePreservePostingsAndDenseVector() throws Exception {
+  void legacyMatchingProofRmwAndRenamePreservePostingsAndRetireFailedDenseVector() throws Exception {
     Map<String, List<Integer>> original;
     long norm;
     try (var runtime = open()) {
@@ -322,22 +322,23 @@ final class EnrichmentRevisionRaceTest extends LuceneExecutorTestBase {
         commit(runtime);
         assertEquals(original, postings("bad-0"), "same-analyzer terms, frequencies and positions survive exact legacy reconstruction");
         assertEquals(norm, norm("bad-0"));
-        assertDenseVector();
-        assertEquals("PENDING", runtime.documentFieldOps().getDocumentField("bad-0", SchemaFields.SPLADE_STATUS),
-            "existing reset-status policy drops omitted sparse weights and resets completed status");
-        assertEquals(0, runtime.readPathOps().search(new TermQuery(new Term(SchemaFields.SPLADE, "oldweight")),
+        if (attempt < SchemaFields.EMBEDDING_MAX_RETRIES) assertDenseVector();
+        else assertNoDenseVector();
+        assertEquals("COMPLETED", runtime.documentFieldOps().getDocumentField("bad-0", SchemaFields.SPLADE_STATUS),
+            "embedding bookkeeping retains independent sparse enrichment");
+        assertEquals(1, runtime.readPathOps().search(new TermQuery(new Term(SchemaFields.SPLADE, "oldweight")),
             10, Set.of(), null, null).hits().size());
       }
       assertEquals("FAILED", runtime.documentFieldOps().getDocumentField("bad-0", SchemaFields.CHUNK_EMBEDDING_STATUS));
       assertEquals("3", runtime.documentFieldOps().getDocumentField("bad-0", SchemaFields.CHUNK_EMBEDDING_RETRY_COUNT));
       assertEquals(5, runtime.indexingCoordinator().updateDocumentPaths("legacy-parent", "renamed-parent"));
       commit(runtime);
-      assertEquals(original, postings("bad-0")); assertEquals(norm, norm("bad-0")); assertDenseVector();
+      assertEquals(original, postings("bad-0")); assertEquals(norm, norm("bad-0")); assertNoDenseVector();
       assertEquals("renamed-parent", runtime.documentFieldOps().getDocumentField("bad-0", SchemaFields.PARENT_DOC_ID));
     }
     try (var runtime = open()) {
       assertEquals(LEGACY, runtime.documentFieldOps().getDocumentContent("renamed-parent"));
-      assertEquals(original, postings("bad-0")); assertEquals(norm, norm("bad-0")); assertDenseVector();
+      assertEquals(original, postings("bad-0")); assertEquals(norm, norm("bad-0")); assertNoDenseVector();
     }
   }
 
@@ -370,6 +371,16 @@ final class EnrichmentRevisionRaceTest extends LuceneExecutorTestBase {
       if (norms == null) return -1;
       assertTrue(norms.advanceExact(doc - leaf.docBase));
       return norms.longValue();
+    }
+  }
+
+  private void assertNoDenseVector() throws Exception {
+    try (var fs = FSDirectory.open(directory); var reader = new org.apache.lucene.index.SoftDeletesDirectoryReaderWrapper(
+        DirectoryReader.open(fs), SchemaFields.SOFT_DELETE)) {
+      int doc = new IndexSearcher(reader).search(new TermQuery(new Term(SchemaFields.DOC_ID, "bad-0")), 1).scoreDocs[0].doc;
+      var leaf = reader.leaves().get(org.apache.lucene.index.ReaderUtil.subIndex(doc, reader.leaves()));
+      var vector = leaf.reader().getFloatVectorValues(SchemaFields.CHUNK_VECTOR);
+      assertTrue(vector == null || vector.iterator().advance(doc - leaf.docBase) != doc - leaf.docBase);
     }
   }
 
