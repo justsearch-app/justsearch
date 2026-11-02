@@ -210,7 +210,7 @@ class _HarnessLocator:
         self._assert_waited_before_use()
         self.page.calls.append(("click", self.selector, kwargs))
         if self.selector == _BRAIN_ADVANCED_TOGGLE:
-            self.page.advanced_open = True
+            self.page.advanced_open = not self.page.advanced_open  # the real button opens and closes
         for label in ("Simple", "Detailed"):
             if f"role=button;name={label};" in self.selector:
                 self.page.checked_labels = {label}
@@ -351,12 +351,14 @@ def test_detail_level_setup_does_not_invent_a_write_when_already_selected():
 
 
 @pytest.mark.parametrize("global_mode", ["Simple", "Detailed"])
-@pytest.mark.parametrize("name", ["ai-brain-components", "ai-brain-consent",
+@pytest.mark.parametrize("name", ["ai-brain", "ai-brain-advanced", "ai-brain-components", "ai-brain-consent",
+                                  "ai-brain-light", "ai-brain-advanced-light",
                                   "ai-brain-components-light", "ai-brain-consent-light"])
-def test_brain_install_drilldowns_open_their_controls_on_the_page_under_either_global_mode(name, global_mode):
+def test_brain_steps_open_their_controls_on_the_page_under_either_global_mode(name, global_mode):
     # B20: the AI Brain page is the same under either app-wide mode and never writes ui.mode.
     step = {step.name: step for step in _build_steps("http://localhost:5186", 0, 1000)}[name]
-    assert step.fixtures_variant == "install-preview"
+    install_step = "components" in name or "consent" in name
+    assert step.fixtures_variant == ("install-preview" if install_step else "default")
     page = _HarnessPage()
     page.checked_labels = {global_mode}
     asyncio.run(step.setup(page))  # the fake asserts each control is awaited (and reachable) before use
@@ -366,7 +368,13 @@ def test_brain_install_drilldowns_open_their_controls_on_the_page_under_either_g
         call[0] == "click" and ("name=Simple;" in call[1] or "name=Detailed;" in call[1])
         for call in page.calls
     )
+    assert not any(call[0] == "evaluate" and "/api/settings" in str(call[1]) for call in page.calls), \
+        "a settings write was made through a script"
     clicks = [call[1] for call in page.calls if call[0] == "click"]
+    if "advanced" in name or "components" in name:
+        assert clicks.count(_BRAIN_ADVANCED_TOGGLE) == 1 and page.advanced_open
+    if not install_step:
+        return
     if "components" in name:
         assert _BRAIN_ADVANCED_TOGGLE in clicks
         assert ("scroll", f"testid={S.TID_INSTALL_COMPONENT_LIST}") in page.calls
