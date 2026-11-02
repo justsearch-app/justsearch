@@ -10,7 +10,7 @@ author-session: builder-uiimpl-lib-20261101
 Structural Library redesign: classify the changed tests by oracle class in one pass against the
 agent-drafted, owner-adopted scenarios. Adaptation entries preserve the prior oracle; New entries
 name their added or intentionally relocated expectations. The preserved portions of mixed files
-are described explicitly. No test is deleted, skipped or disabled.
+are described explicitly. No preservation check is skipped or disabled; R3 busy-batch-only checks are replaced by the R3d contract.
 
 Entries 18 and 19 cite the earlier S33.4 expectation verbatim from
 `gates/test-intent/.changesets/uiux-status.md:60`. The age bound is an agent choice under the
@@ -65,7 +65,7 @@ The continuation's evidence runs use a separate shared clone under the session t
 Its runner-owned before-worktrees and copied dependencies never modify the source repository.
 Entry 17's mutant removes only the arrival scroll's active-element guard; the strengthened check
 fails on the extra scroll call while it passes with the guard. Entry 16 asserts layout settling,
-not an exact one-second product requirement. No test is skipped or deleted.
+not an exact one-second product requirement. No preservation check is skipped or deleted.
 
 Execution evidence was produced by the repository's unmodified run-evidence.mjs in a shared clone
 inside the session temporary directory, with its own copied dependencies. Its detached before
@@ -77,12 +77,17 @@ Final-review repairs at e3916fe2db (all durable):
 
 - Tests added or rewritten: modules/ui-web/src/shell-v0/views/LibrarySurface.folderActions.test.ts — R1, L1/P1 — Add from both tabs and modes, focus/cancel, late picker and reconnect — durable
 - Tests added or rewritten: modules/ui-web/src/shell-v0/views/LibrarySurface.slice2.test.ts — R2, L8/L19 — explicit conflict recovery, second window, reconnect, successive saves and reload — durable
-- Tests added or rewritten: modules/ui-web/src/shell-v0/components/FailedJobsDrawer.test.ts — R3, L13/P3 — count refreshes deferred through retry batches, re-failed files, retained evidence and target/lifecycle races — durable
+- Tests added or rewritten: modules/ui-web/src/shell-v0/components/FailedJobsDrawer.test.ts — R3d, L13/P3 — always-enabled snapshot retries, live refresh during retry, retained evidence and target/lifecycle races — durable
 
-The R1–R3 evidence is produced in a separate shared clone with copied dependencies;
-its detached before-checkout and build outputs belong to that clone. No acceptance record is changed. Re-review repairs R2b/R3b also fail on 48bf54c1b2: Save my draft invokes a third write instead of retaining two, and retry produces A/B/B/C instead of A/B/A/B/C. Discard is a preservation case on that baseline. The combined evidence below retains e3916fe2db as the original R1–R3 before-state and covers the final behavior.
-
-R3c continuation on 9a3d163e1d (durable): the same failed-files check file covers the per-invocation 30-second deadline, retained unattempted files, late success/refusal, resumed count refreshes, second-window isolation and target/remount races. The 30-second bound is an agent choice under the quoted delegation. `gates/test-intent/evidence/library-redesign-r3c.json` records the three new checks failing by assertion on 9a3d163e1d and passing after repair. The combined R1–R3 evidence is refreshed against its original e3916fe2db before-state. Its generator runs in a shared clone with private dependencies.
+The R1–R2 evidence remains generated against e3916fe2db. R3d replaces the busy-batch,
+backlog and deadline checks with origin/main retry semantics: every click loops over its displayed
+snapshot, including a second click during an unanswered invocation. Count refreshes proceed during
+retry; rows stay visible while loading and empty requeue listings retain last-known failures.
+Target/lifecycle and listing serial guards isolate late answers. The unmodified evidence runner
+runs in a separate shared clone with copied dependencies; its before-checkouts write only there.
+No acceptance record is changed. R3d repairs fail by assertion on 528a4342a4; preservation cases
+(target switching, remount/reload, second window, re-failed/refused files) pass before and after.
+The old R3c deadline evidence is retired.
 
 ```json
 {
@@ -1027,7 +1032,7 @@ R3c continuation on 9a3d163e1d (durable): the same failed-files check file cover
         "modules/ui-web/src/shell-v0/components/FailedJobsDrawer.test.ts"
       ],
       "class": "New",
-      "behaviour": "Live count refreshes neither replace the inline list nor cancel a retry batch. The batch attempts every displayed file unless an inline invocation goes unanswered for 30 seconds, then fetches the list once. Every Try again retries every file in the current list, including files that failed again after a successful retry. Empty observations retain last-known failure evidence; no pending retry backlog is kept. Switching inline targets and reconnecting isolate batch ownership, retaining failure distinctions and ignoring old completions. An inline invocation without an answer ends its batch after 30 seconds and shows No answer yet — check again for that file. The unanswered and unattempted files survive the one follow-up fetch, count refreshes resume and Try again is usable. Late successful or refused answers cannot alter a newer list or batch, another window, or a remounted target.",
+      "behaviour": "Inline Try again stays enabled during retry and listing. Each click retries every file in its displayed snapshot; a second click may retry the same files again. Count refreshes can replace the list without dropping unattempted snapshot files. Loading keeps inline rows visible; empty requeue listings retain last-known failure evidence. Target and lifecycle changes reject old results; serial guards reject stale listings. Non-inline retry retains origin/main semantics with the target-switch repair.",
       "sources": [
         {
           "kind": "owner-adopted-scenario",
@@ -1048,21 +1053,58 @@ R3c continuation on 9a3d163e1d (durable): the same failed-files check file cover
           "delegationQuote": "well from now on you can just proceed autonomously accordinglky",
           "delegationLocation": "task t-20261101-uiimpl, user turn after the WP1 summary",
           "delegationScope": "Proceed autonomously with implementing the agreed window designs and choosing implementation details within the adopted scenarios.",
-          "choice": "Stop waiting for an inline retry invocation after 30 seconds, ending its batch with an unknown outcome and retaining the unanswered and unattempted files for another explicit Try again. Race a timer in the drawer through the existing operation client; do not add a transport option.",
+          "choice": "inline Try again keeps origin/main's retry semantics: never disabled, retries the list as shown",
           "label": "agent choice"
         }
       ],
-      "evidence": "gates/test-intent/evidence/library-redesign-r1-r3.json",
+      "evidence": "gates/test-intent/evidence/library-redesign-r3d.json",
       "newChecks": [
-        "modules/ui-web/src/shell-v0/components/FailedJobsDrawer.test.ts#R3 live empty refresh waits for the batch, retains failure evidence and leaves Try again usable",
-        "modules/ui-web/src/shell-v0/components/FailedJobsDrawer.test.ts#R3 live partial refresh waits for the batch, retains failure evidence and leaves Try again usable",
-        "modules/ui-web/src/shell-v0/components/FailedJobsDrawer.test.ts#R3 switching inline targets isolates pending retry batches and ignores late completions after reconnect",
-        "modules/ui-web/src/shell-v0/components/FailedJobsDrawer.test.ts#R3b a fresh failure list retries A again along with refused B and newly failed C",
-        "modules/ui-web/src/shell-v0/components/FailedJobsDrawer.test.ts#R3c a silent retry ends at 30 seconds with a subsequent empty refresh, keeps unattempted files and ignores its late answer",
-        "modules/ui-web/src/shell-v0/components/FailedJobsDrawer.test.ts#R3c a silent retry ends at 30 seconds with a subsequent partial refresh, keeps unattempted files and ignores its late answer",
-        "modules/ui-web/src/shell-v0/components/FailedJobsDrawer.test.ts#R3c a timed-out retry cannot change another window, a switched folder or a remounted list"
+        "modules/ui-web/src/shell-v0/components/FailedJobsDrawer.test.ts#R3d live empty refresh replaces the list during retry without dropping unattempted files",
+        "modules/ui-web/src/shell-v0/components/FailedJobsDrawer.test.ts#R3d live partial refresh replaces the list during retry without dropping unattempted files",
+        "modules/ui-web/src/shell-v0/components/FailedJobsDrawer.test.ts#R3d a silent retry followed by a silent listing keeps Try again enabled and rows visible",
+        "modules/ui-web/src/shell-v0/components/FailedJobsDrawer.test.ts#R3d a second click while retry is pending retries every listed file again",
+        "modules/ui-web/src/shell-v0/components/FailedJobsDrawer.test.ts#R3d a late listing cannot overwrite a newer count refresh"
       ],
       "repaired": true
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/components/FailedJobsDrawer.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "Preserve L13/P3 retry distinctions and targets for inline and non-inline drawers, re-failed/refused files, another window, a fresh instance after reload, and remounting after a tab switch. Late retries do not remove rows, trigger new listings, or continue onto unattempted files after target or lifecycle changes.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "L13",
+          "quote": "Repair (broken today): with the failed-files list open for folder A, choosing folder B's problem replaces the rows and retry targets with B's.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "P3",
+          "quote": "Failed-files list and retry for one folder, keeping unreadable / indexed-unreadable / retry-exhausted / parser-failure distinctions (switching folders is L13).",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "well from now on you can just proceed autonomously accordinglky",
+          "delegationLocation": "task t-20261101-uiimpl, user turn after the WP1 summary",
+          "delegationScope": "Proceed autonomously with implementing the agreed window designs and choosing implementation details within the adopted scenarios.",
+          "choice": "inline Try again keeps origin/main's retry semantics: never disabled, retries the list as shown",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/library-redesign-r3d-preservation.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/components/FailedJobsDrawer.test.ts#R3d a fresh failure list retries A again along with refused B and newly failed C",
+        "modules/ui-web/src/shell-v0/components/FailedJobsDrawer.test.ts#R3d late retry results cannot touch a switched target or remounted element (inline: true)",
+        "modules/ui-web/src/shell-v0/components/FailedJobsDrawer.test.ts#R3d late retry results cannot touch a switched target or remounted element (inline: false)",
+        "modules/ui-web/src/shell-v0/components/FailedJobsDrawer.test.ts#R3d a second window and a reload or tab remount use fresh lists while an old retry is pending"
+      ],
+      "repaired": false
     }
   ]
 }

@@ -604,7 +604,11 @@ it('loads the current target after a drawer is remounted while its store is open
   } finally { el.remove(); globalThis.fetch = oldFetch; }
 });
 
-it.each(['empty', 'partial'])('R3 live %s refresh waits for the batch, retains failure evidence and leaves Try again usable', async response => {
+function inlineRetry(el: FailedJobsDrawer) {
+  return el.shadowRoot!.querySelector<HTMLElement & { onActivate(): void; disabled: boolean }>('jf-button[label="Try again"]')!;
+}
+
+it.each(['empty', 'partial'])('R3d live %s refresh replaces the list during retry without dropping unattempted files', async response => {
   let release!: (response: Response) => void;
   let listing = [job({ pathHash: 'first' }), job({ pathHash: 'remaining', state: 'SOURCE_UNREADABLE', errorMessage: 'Permission denied' })];
   let reads = 0;
@@ -622,65 +626,82 @@ it.each(['empty', 'partial'])('R3 live %s refresh waits for the batch, retains f
   el.inline = true; el.folderPathHash = 'folder'; el.observedCount = 2;
   try {
     document.body.append(el); await pump(el);
-    const retry = () => el.shadowRoot!.querySelector<HTMLElement & { onActivate(): void; disabled: boolean }>('jf-button[label="Try again"]')!;
-    retry().onActivate(); retry().onActivate(); await pump(el); expect(retried).toEqual(['first']);
+    inlineRetry(el).onActivate(); await pump(el);
     listing = response === 'empty' ? [] : [job({ pathHash: 'new-failure' })];
     el.observedCount = listing.length; await pump(el);
-    expect(reads).toBe(1);
-    expect(retry().disabled).toBe(true);
-    expect(el.rows.map(row => row.pathHash)).toEqual(['first', 'remaining']);
-    expect(el.shadowRoot!.textContent).toContain('Permission denied');
-    expect(el.shadowRoot!.querySelector('[data-state="SOURCE_UNREADABLE"]')).not.toBeNull();
+    expect(reads).toBe(2);
+    expect(inlineRetry(el).disabled).toBe(false);
+    expect(el.rows.map(row => row.pathHash)).toEqual(response === 'empty' ? ['first', 'remaining'] : ['new-failure']);
+    if (response === 'empty') {
+      expect(el.shadowRoot!.textContent).toContain('Permission denied');
+      expect(el.shadowRoot!.querySelector('[data-state="SOURCE_UNREADABLE"]')).not.toBeNull();
+    }
     release(Response.json({ success: true })); await pump(el);
     expect(retried).toEqual(['first', 'remaining']);
-    expect(reads).toBe(2);
-    expect(retry().disabled).toBe(false);
-    expect(el.rows.map(row => row.pathHash)).toEqual(response === 'empty' ? ['first', 'remaining'] : ['new-failure']);
-    retry().onActivate(); await pump(el);
+    inlineRetry(el).onActivate(); await pump(el);
     expect(retried).toEqual(['first', 'remaining', ...(response === 'partial' ? ['new-failure'] : ['first', 'remaining'])]);
-    expect(retry().disabled).toBe(false);
   } finally { el.remove(); globalThis.fetch = oldFetch; }
 });
 
-it('R3 switching inline targets isolates pending retry batches and ignores late completions after reconnect', async () => {
-  const releases = new Map<string, (response: Response) => void>();
+it('R3d a silent retry followed by a silent listing keeps Try again enabled and rows visible', async () => {
+  let reads = 0;
+  const oldFetch = globalThis.fetch;
+  globalThis.fetch = vi.fn(async (url: unknown) => {
+    if (String(url).includes('by-prefix') && ++reads === 1) {
+      return new Response(byPrefixBody([job({ pathHash: 'silent', state: 'INDEXED_SOURCE_UNREADABLE', errorMessage: 'Access denied' }),
+        job({ pathHash: 'remaining', state: 'RETRY_EXHAUSTED', errorMessage: 'Drive offline' })]));
+    }
+    if (String(url).includes('by-prefix') || String(url).includes('/invoke')) return new Promise<Response>(() => {});
+    return Response.json({});
+  }) as typeof fetch;
+  const el = document.createElement('jf-failed-jobs-drawer') as FailedJobsDrawer;
+  el.inline = true; el.folderPathHash = 'folder'; el.observedCount = 2;
+  try {
+    document.body.append(el); await pump(el);
+    inlineRetry(el).onActivate(); await pump(el);
+    el.observedCount = 0; await pump(el);
+    expect(inlineRetry(el).disabled).toBe(false);
+    expect(reads).toBe(2);
+    expect(el.shadowRoot!.querySelectorAll('.row')).toHaveLength(2);
+    expect(el.shadowRoot!.textContent).toContain('Access denied');
+    expect(el.shadowRoot!.textContent).toContain('Drive offline');
+    expect(el.shadowRoot!.querySelector('[data-state="INDEXED_SOURCE_UNREADABLE"]')).not.toBeNull();
+    expect(el.shadowRoot!.querySelector('[data-state="RETRY_EXHAUSTED"]')).not.toBeNull();
+  } finally { el.remove(); globalThis.fetch = oldFetch; }
+});
+
+it('R3d a second click while retry is pending retries every listed file again', async () => {
+  const releases: Array<(response: Response) => void> = [];
   const retried: string[] = []; const oldFetch = globalThis.fetch;
   globalThis.fetch = vi.fn(async (url: unknown, init?: RequestInit) => {
-    if (String(url).includes('by-prefix')) {
-      const folder = new URL(String(url), 'http://test').searchParams.get('pathHash');
-      return new Response(byPrefixBody([job({ pathHash: `${folder}-file` })]));
-    }
+    if (String(url).includes('by-prefix')) return new Response(byPrefixBody([job({ pathHash: 'A' }), job({ pathHash: 'B' })]));
     if (String(url).includes('/invoke')) {
       const hash = JSON.parse(String(init?.body)).args.pathHash;
-      retried.push(hash); return new Promise<Response>(resolve => releases.set(hash, resolve));
+      retried.push(hash);
+      if (hash === 'A') return new Promise<Response>(resolve => releases.push(resolve));
+      return Response.json({ success: true });
     }
     return Response.json({});
   }) as typeof fetch;
   const el = document.createElement('jf-failed-jobs-drawer') as FailedJobsDrawer;
-  el.inline = true; el.folderPathHash = 'A'; el.observedCount = 1;
-  const retry = () => el.shadowRoot!.querySelector<HTMLElement & { onActivate(): void; disabled: boolean }>('jf-button[label="Try again"]')!;
+  el.inline = true; el.folderPathHash = 'folder';
   try {
-    document.body.append(el); await pump(el); retry().onActivate(); await pump(el);
-    el.folderPathHash = 'B'; await pump(el);
-    expect(el.rows.map(row => row.pathHash)).toEqual(['B-file']); expect(retry().disabled).toBe(false);
-    retry().onActivate(); await pump(el);
-    releases.get('A-file')!(Response.json({ success: true })); await pump(el);
-    expect(retry().disabled).toBe(true); expect(el.rows.map(row => row.pathHash)).toEqual(['B-file']);
-    el.remove(); document.body.append(el); await pump(el);
-    expect(retry().disabled).toBe(false);
-    releases.get('B-file')!(Response.json({ success: true })); await pump(el);
-    expect(retry().disabled).toBe(false); expect(el.rows.map(row => row.pathHash)).toEqual(['B-file']);
-    expect(retried).toEqual(['A-file', 'B-file']);
+    document.body.append(el); await pump(el);
+    inlineRetry(el).onActivate(); await pump(el);
+    inlineRetry(el).onActivate(); await pump(el);
+    expect(retried).toEqual(['A', 'A']);
+    releases[1]!(Response.json({ success: true })); await pump(el);
+    releases[0]!(Response.json({ success: true })); await pump(el);
+    expect(retried).toEqual(['A', 'A', 'B', 'B']);
+    expect(inlineRetry(el).disabled).toBe(false);
   } finally { el.remove(); globalThis.fetch = oldFetch; }
 });
 
-
-it('R3b a fresh failure list retries A again along with refused B and newly failed C', async () => {
+it('R3d a fresh failure list retries A again along with refused B and newly failed C', async () => {
   let listing = [job({ pathHash: 'A' }), job({ pathHash: 'B', state: 'SOURCE_UNREADABLE' })];
-  let reads = 0;
   const retried: string[] = []; const oldFetch = globalThis.fetch;
   globalThis.fetch = vi.fn(async (url: unknown, init?: RequestInit) => {
-    if (String(url).includes('by-prefix')) { ++reads; return new Response(byPrefixBody(listing)); }
+    if (String(url).includes('by-prefix')) return new Response(byPrefixBody(listing));
     if (String(url).includes('/invoke')) {
       const hash = JSON.parse(String(init?.body)).args.pathHash;
       retried.push(hash);
@@ -691,94 +712,61 @@ it('R3b a fresh failure list retries A again along with refused B and newly fail
   }) as typeof fetch;
   const el = document.createElement('jf-failed-jobs-drawer') as FailedJobsDrawer;
   el.inline = true; el.folderPathHash = 'folder'; el.observedCount = 2;
-  const retry = () => el.shadowRoot!.querySelector<HTMLElement & { onActivate(): void; disabled: boolean }>('jf-button[label="Try again"]')!;
   try {
     document.body.append(el); await pump(el);
-    retry().onActivate(); await pump(el);
-    expect(retried).toEqual(['A', 'B']); expect(retry().disabled).toBe(false);
-    // A fails again after its successful retry; this observation supersedes the old batch.
-    listing = [job({ pathHash: 'A' }), job({ pathHash: 'B', state: 'SOURCE_UNREADABLE' }), job({ pathHash: 'C' })];
+    inlineRetry(el).onActivate(); await pump(el);
+    expect(retried).toEqual(['A', 'B']);
+    listing = [...listing, job({ pathHash: 'C' })];
     el.observedCount = 3; await pump(el);
     expect(el.rows.map(row => row.pathHash)).toEqual(['A', 'B', 'C']);
-    retry().onActivate(); retry().onActivate(); await pump(el);
+    inlineRetry(el).onActivate(); await pump(el);
     expect(retried).toEqual(['A', 'B', 'A', 'B', 'C']);
-    expect(reads).toBe(4); // Initial list, one after each batch, and the count refresh.
-    expect(retry().disabled).toBe(false);
+    expect(inlineRetry(el).disabled).toBe(false);
   } finally { el.remove(); globalThis.fetch = oldFetch; }
 });
 
-it.each(['empty', 'partial'])('R3c a silent retry ends at 30 seconds with a subsequent %s refresh, keeps unattempted files and ignores its late answer', async response => {
-  vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
-  let answerOld!: (response: Response) => void;
-  let answerNew!: (response: Response) => void;
-  const original = [job({ pathHash: 'silent', state: 'INDEXED_SOURCE_UNREADABLE', errorMessage: 'Access denied' }),
-    job({ pathHash: 'unattempted', state: 'RETRY_EXHAUSTED', errorMessage: 'Drive offline' })];
-  let listing = original;
-  let reads = 0;
-  const retried: string[] = []; const oldFetch = globalThis.fetch;
+it.each([true, false])('R3d late retry results cannot touch a switched target or remounted element (inline: %s)', async inline => {
+  const releases = new Map<string, (response: Response) => void>();
+  const retried: string[] = []; const reads: string[] = []; const oldFetch = globalThis.fetch;
   globalThis.fetch = vi.fn(async (url: unknown, init?: RequestInit) => {
-    if (String(url).includes('by-prefix')) { ++reads; return new Response(byPrefixBody(listing)); }
+    if (String(url).includes('by-prefix')) {
+      const folder = new URL(String(url), 'http://test').searchParams.get('pathHash');
+      reads.push(folder!);
+      return new Response(byPrefixBody([job({ pathHash: `${folder}-file` }), job({ pathHash: `${folder}-next` })]));
+    }
     if (String(url).includes('/invoke')) {
-      retried.push(JSON.parse(String(init?.body)).args.pathHash);
-      if (retried.length === 1) return new Promise<Response>(resolve => { answerOld = resolve; });
-      if (retried.length === 2) return new Promise<Response>(resolve => { answerNew = resolve; });
-      return Response.json({ success: true });
+      const hash = JSON.parse(String(init?.body)).args.pathHash;
+      retried.push(hash); return new Promise<Response>(resolve => releases.set(hash, resolve));
     }
     return Response.json({});
   }) as typeof fetch;
   const el = document.createElement('jf-failed-jobs-drawer') as FailedJobsDrawer;
-  el.inline = true; el.folderPathHash = 'folder'; el.observedCount = 2;
-  const retry = () => el.shadowRoot!.querySelector<HTMLElement & { onActivate(): void; disabled: boolean }>('jf-button[label="Try again"]')!;
+  el.inline = inline; el.folderPathHash = 'A';
+  const retry = () => el.shadowRoot!.querySelector<HTMLElement & { onActivate(): void }>(inline ? 'jf-button[label="Try again"]' : 'jf-button[label="Retry all failed files"]')!.onActivate();
   try {
-    document.body.append(el); await pump(el);
-    retry().onActivate(); retry().onActivate(); await pump(el);
-    listing = response === 'empty' ? [] : [job({ pathHash: 'other-failure' })];
-    el.observedCount = listing.length; await pump(el);
-    await vi.advanceTimersByTimeAsync(29_999); await pump(el);
-    expect(reads).toBe(1); expect(retry().disabled).toBe(true);
-    expect(retried).toEqual(['silent']);
-    await vi.advanceTimersByTimeAsync(1); await pump(el);
-    expect(retry().disabled).toBe(false);
-    expect(reads).toBe(2); // Exactly one fetch after abandoning the batch.
-    expect(retried).toEqual(['silent']); // The remaining files stay visible for another choice.
-    expect(el.rows.map(row => row.pathHash)).toEqual(expect.arrayContaining(['silent', 'unattempted']));
-    if (response === 'partial') expect(el.rows.map(row => row.pathHash)).toContain('other-failure');
-    const silent = el.shadowRoot!.querySelector('[data-state="INDEXED_SOURCE_UNREADABLE"]')!;
-    expect(silent.textContent).toContain('No answer yet — check again');
-    expect(silent.textContent).toContain('Access denied');
-    expect(el.shadowRoot!.querySelector('[data-state="RETRY_EXHAUSTED"]')!.textContent).toContain('Drive offline');
-
-    // Count updates resume, and a new list is retried in full, including a new failure.
-    listing = [...original, job({ pathHash: 'new-failure' })];
-    el.observedCount = 3; await pump(el); expect(reads).toBe(3);
-    retry().onActivate(); await pump(el); expect(retry().disabled).toBe(true);
-    answerOld(response === 'empty' ? Response.json({ success: true }) : Response.json({ success: false }, { status: 409 }));
-    await pump(el);
-    expect(retry().disabled).toBe(true); expect(reads).toBe(3);
-    expect(retried).toEqual(['silent', 'silent']);
-    expect(el.rows.map(row => row.pathHash)).toEqual(['silent', 'unattempted', 'new-failure']);
-    expect(el.shadowRoot!.textContent).not.toContain('No answer yet');
-    answerNew(Response.json({ success: true })); await pump(el);
-    expect(retried).toEqual(['silent', 'silent', 'unattempted', 'new-failure']);
-    expect(retry().disabled).toBe(false); expect(reads).toBe(4);
-    // Advancing beyond the retired deadlines must not restart the old batch.
-    await vi.advanceTimersByTimeAsync(30_000); await pump(el);
-    expect(retried).toEqual(['silent', 'silent', 'unattempted', 'new-failure']);
-    expect(reads).toBe(4); expect(retry().disabled).toBe(false);
-    expect(vi.getTimerCount()).toBe(0);
-  } finally { el.remove(); globalThis.fetch = oldFetch; vi.useRealTimers(); }
+    document.body.append(el); if (!inline) openFailedJobs('A'); await pump(el);
+    retry(); await pump(el);
+    if (inline) el.folderPathHash = 'B'; else openFailedJobs('B');
+    await pump(el); retry(); await pump(el);
+    const readsBefore = reads.length;
+    releases.get('A-file')!(Response.json({ success: true })); await pump(el);
+    expect(reads).toHaveLength(readsBefore);
+    expect(el.rows.map(row => row.pathHash)).toEqual(['B-file', 'B-next']);
+    el.remove(); document.body.append(el); await pump(el);
+    const remountedReads = reads.length;
+    releases.get('B-file')!(Response.json({ success: true })); await pump(el);
+    expect(reads).toHaveLength(remountedReads);
+    expect(el.rows.map(row => row.pathHash)).toEqual(['B-file', 'B-next']);
+    expect(retried).toEqual(['A-file', 'B-file']);
+  } finally { el.remove(); globalThis.fetch = oldFetch; }
 });
 
-it('R3c a timed-out retry cannot change another window, a switched folder or a remounted list', async () => {
-  vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+it('R3d a second window and a reload or tab remount use fresh lists while an old retry is pending', async () => {
   let answerOld!: (response: Response) => void;
-  const oldFetch = globalThis.fetch;
-  const retried: string[] = [];
+  let listing = [job({ pathHash: 'old', errorMessage: 'Old failure' })];
+  const retried: string[] = []; const oldFetch = globalThis.fetch;
   globalThis.fetch = vi.fn(async (url: unknown, init?: RequestInit) => {
-    if (String(url).includes('by-prefix')) {
-      const folder = new URL(String(url), 'http://test').searchParams.get('pathHash');
-      return new Response(byPrefixBody([job({ pathHash: `${folder}-file`, errorMessage: `${folder} reason` })]));
-    }
+    if (String(url).includes('by-prefix')) return new Response(byPrefixBody(listing));
     if (String(url).includes('/invoke')) {
       retried.push(JSON.parse(String(init?.body)).args.pathHash);
       if (retried.length === 1) return new Promise<Response>(resolve => { answerOld = resolve; });
@@ -788,31 +776,43 @@ it('R3c a timed-out retry cannot change another window, a switched folder or a r
   }) as typeof fetch;
   const first = document.createElement('jf-failed-jobs-drawer') as FailedJobsDrawer;
   const second = document.createElement('jf-failed-jobs-drawer') as FailedJobsDrawer;
-  for (const el of [first, second]) { el.inline = true; el.folderPathHash = 'A'; el.observedCount = 1; }
-  const retry = (el: FailedJobsDrawer) => el.shadowRoot!.querySelector<HTMLElement & { onActivate(): void; disabled: boolean }>('jf-button[label="Try again"]')!;
+  const reloaded = document.createElement('jf-failed-jobs-drawer') as FailedJobsDrawer;
+  for (const el of [first, second, reloaded]) { el.inline = true; el.folderPathHash = 'folder'; }
   try {
-    document.body.append(first, second); await pump(first); await pump(second);
-    retry(first).onActivate(); await pump(first);
-    retry(second).onActivate(); await pump(second);
-    expect(retry(second).disabled).toBe(false);
-    expect(second.shadowRoot!.textContent).not.toContain('No answer yet');
-    await vi.advanceTimersByTimeAsync(30_000); await pump(first);
-    expect(retry(first).disabled).toBe(false);
-    expect(first.shadowRoot!.textContent).toContain('No answer yet — check again');
-    first.folderPathHash = 'B'; await pump(first);
-    expect(first.rows.map(row => row.pathHash)).toEqual(['B-file']);
-    expect(first.shadowRoot!.textContent).not.toContain('No answer yet');
-    // Switching away and back/remounting uses a fresh list, as does a reload.
-    first.remove(); document.body.append(first); await pump(first);
-    answerOld(Response.json({ success: true })); await pump(first); await pump(second);
-    expect(first.rows.map(row => row.pathHash)).toEqual(['B-file']);
-    expect(second.rows.map(row => row.pathHash)).toEqual(['A-file']);
-    expect(first.shadowRoot!.textContent).not.toContain('No answer yet');
-    retry(first).onActivate(); await pump(first);
-    expect(retried).toEqual(['A-file', 'A-file', 'B-file']);
-    expect(retry(first).disabled).toBe(false);
-    await vi.advanceTimersByTimeAsync(30_000); await pump(first);
-    expect(retried).toEqual(['A-file', 'A-file', 'B-file']);
-    expect(vi.getTimerCount()).toBe(0);
-  } finally { first.remove(); second.remove(); globalThis.fetch = oldFetch; vi.useRealTimers(); }
+    document.body.append(first); await pump(first); inlineRetry(first).onActivate(); await pump(first);
+    listing = [job({ pathHash: 'new', errorMessage: 'New failure' })];
+    document.body.append(second); await pump(second);
+    inlineRetry(second).onActivate(); await pump(second);
+    first.remove(); document.body.append(first, reloaded); await pump(first); await pump(reloaded);
+    answerOld(Response.json({ success: false }, { status: 409 })); await pump(first); await pump(second);
+    for (const el of [first, second, reloaded]) {
+      expect(el.rows.map(row => row.pathHash)).toEqual(['new']);
+      expect(el.shadowRoot!.textContent).toContain('New failure');
+      expect(inlineRetry(el).disabled).toBe(false);
+    }
+    expect(retried).toEqual(['old', 'new']);
+  } finally { first.remove(); second.remove(); reloaded.remove(); globalThis.fetch = oldFetch; }
+});
+
+it('R3d a late listing cannot overwrite a newer count refresh', async () => {
+  let answerOld!: (response: Response) => void;
+  let reads = 0;
+  const oldFetch = globalThis.fetch;
+  globalThis.fetch = vi.fn(async (url: unknown) => {
+    if (String(url).includes('by-prefix')) {
+      if (++reads === 2) return new Promise<Response>(resolve => { answerOld = resolve; });
+      return new Response(byPrefixBody([job({ pathHash: reads === 1 ? 'initial' : 'newest' })]));
+    }
+    return Response.json({});
+  }) as typeof fetch;
+  const el = document.createElement('jf-failed-jobs-drawer') as FailedJobsDrawer;
+  el.inline = true; el.folderPathHash = 'folder'; el.observedCount = 1;
+  try {
+    document.body.append(el); await pump(el);
+    el.observedCount = 2; await pump(el);
+    expect(el.shadowRoot!.querySelectorAll('.row')).toHaveLength(1);
+    el.observedCount = 3; await pump(el);
+    answerOld(new Response(byPrefixBody([job({ pathHash: 'obsolete' })]))); await pump(el);
+    expect(el.rows.map(row => row.pathHash)).toEqual(['newest']);
+  } finally { el.remove(); globalThis.fetch = oldFetch; }
 });
