@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
   },
-  "createdAt": "2026-11-02T02:44:42.336Z",
-  "revision": "528a4342a46bfb4aeed8cd5c85037536ad77f218",
-  "tree": "43328487645b384b1ab2fca04b99158685c9d42f",
+  "createdAt": "2026-11-02T03:07:53.077Z",
+  "revision": "650d13e2232dc8c0b2a89fe873fc0a8fc789a42e",
+  "tree": "5d09d64407bc6cbb10025460a4c4ea042bb80fcd",
   "environment": {
     "platform": "linux",
     "arch": "x64",
@@ -18,10 +18,10 @@
   },
   "runs": [
     {
-      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/LibrarySurface.folderActions.test.ts\" \"src/shell-v0/views/LibrarySurface.slice2.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/hob46ns_/tmp/test-intent-vitest-5-1793587466053.json\"",
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/LibrarySurface.folderActions.test.ts\" \"src/shell-v0/views/LibrarySurface.slice2.test.ts\" --reporter=json --outputFile=\"/tmp/test-intent-vitest-2848094-1793588866204.json\"",
       "cwd": "modules/ui-web",
       "exitCode": 0,
-      "durationMs": 5108
+      "durationMs": 2565
     }
   ],
   "checks": [
@@ -104,7 +104,7 @@
       "id": "modules/ui-web/src/shell-v0/views/LibrarySurface.slice2.test.ts#R2 another window changes saved rules; Save my draft recovers and later saves work",
       "file": "modules/ui-web/src/shell-v0/views/LibrarySurface.slice2.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:4b63aaa008d685ff72617a21d473f18b270b0e940ba885e960c7448cfa1238e8",
+      "contentDigest": "sha256:1d2d1337374961ad7f8ffa385c242724ac40cdaddd72ef509fc02d90b7e3a8f2",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -119,7 +119,7 @@
       "id": "modules/ui-web/src/shell-v0/views/LibrarySurface.slice2.test.ts#R2 another window changes saved rules; Discard my draft recovers and later saves work",
       "file": "modules/ui-web/src/shell-v0/views/LibrarySurface.slice2.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:4b63aaa008d685ff72617a21d473f18b270b0e940ba885e960c7448cfa1238e8",
+      "contentDigest": "sha256:1d2d1337374961ad7f8ffa385c242724ac40cdaddd72ef509fc02d90b7e3a8f2",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -134,7 +134,7 @@
       "id": "modules/ui-web/src/shell-v0/views/LibrarySurface.slice2.test.ts#R2 recovered draft and quick skip save (rules first) retain both through reload",
       "file": "modules/ui-web/src/shell-v0/views/LibrarySurface.slice2.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:4b63aaa008d685ff72617a21d473f18b270b0e940ba885e960c7448cfa1238e8",
+      "contentDigest": "sha256:1d2d1337374961ad7f8ffa385c242724ac40cdaddd72ef509fc02d90b7e3a8f2",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -149,7 +149,7 @@
       "id": "modules/ui-web/src/shell-v0/views/LibrarySurface.slice2.test.ts#R2 recovered draft and quick skip save (exclusions first) retain both through reload",
       "file": "modules/ui-web/src/shell-v0/views/LibrarySurface.slice2.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:4b63aaa008d685ff72617a21d473f18b270b0e940ba885e960c7448cfa1238e8",
+      "contentDigest": "sha256:1d2d1337374961ad7f8ffa385c242724ac40cdaddd72ef509fc02d90b7e3a8f2",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -164,7 +164,7 @@
       "id": "modules/ui-web/src/shell-v0/views/LibrarySurface.slice2.test.ts#R2 reconnect keeps a dirty battery-only draft and provides a current baseline for recovery",
       "file": "modules/ui-web/src/shell-v0/views/LibrarySurface.slice2.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:4b63aaa008d685ff72617a21d473f18b270b0e940ba885e960c7448cfa1238e8",
+      "contentDigest": "sha256:1d2d1337374961ad7f8ffa385c242724ac40cdaddd72ef509fc02d90b7e3a8f2",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -179,7 +179,7 @@
       "id": "modules/ui-web/src/shell-v0/views/LibrarySurface.slice2.test.ts#R2b Save my draft uses the displayed conflict rules despite a later second-window save",
       "file": "modules/ui-web/src/shell-v0/views/LibrarySurface.slice2.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:4b63aaa008d685ff72617a21d473f18b270b0e940ba885e960c7448cfa1238e8",
+      "contentDigest": "sha256:1d2d1337374961ad7f8ffa385c242724ac40cdaddd72ef509fc02d90b7e3a8f2",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -194,7 +194,7 @@
       "id": "modules/ui-web/src/shell-v0/views/LibrarySurface.slice2.test.ts#R2b Discard my draft uses the displayed conflict rules despite a later second-window save",
       "file": "modules/ui-web/src/shell-v0/views/LibrarySurface.slice2.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:4b63aaa008d685ff72617a21d473f18b270b0e940ba885e960c7448cfa1238e8",
+      "contentDigest": "sha256:1d2d1337374961ad7f8ffa385c242724ac40cdaddd72ef509fc02d90b7e3a8f2",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -213,75 +213,75 @@
     "patches": [],
     "runs": [
       {
-        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/LibrarySurface.folderActions.test.ts\" \"src/shell-v0/views/LibrarySurface.slice2.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/hob46ns_/tmp/test-intent-vitest-5-1793587476032.json\"",
+        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/LibrarySurface.folderActions.test.ts\" \"src/shell-v0/views/LibrarySurface.slice2.test.ts\" --reporter=json --outputFile=\"/tmp/test-intent-vitest-2848094-1793588870406.json\"",
         "cwd": "<before-worktree>",
         "exitCode": 1,
-        "durationMs": 5257,
-        "output": "JSON report written to /home/elias/.cache/am/hob46ns_/tmp/test-intent-vitest-5-1793587476032.json\n\n"
+        "durationMs": 2365,
+        "output": "JSON report written to /tmp/test-intent-vitest-2848094-1793588870406.json\n\n"
       }
     ],
     "checks": [
       {
         "id": "modules/ui-web/src/shell-v0/views/LibrarySurface.folderActions.test.ts#R1 browser Add reveals and focuses Folders from folders and Cancel restores focus",
         "classification": "assertion",
-        "detail": "R1 browser Add reveals and focuses Folders from folders and Cancel restores focus:  AssertionError: expected null to be 'Folder path' // Object.is equality\n    at /home/elias/.cache/am/hob46ns_/tmp/test-intent-before-sH9j2U/modules/ui-web/src/shell-v0/views/LibrarySurface.folderActions.test.ts:253:70\n    at file:///home/elias/.cache/am/hob46ns_/tmp/test-intent-before-sH9j2U/modules"
+        "detail": "R1 browser Add reveals and focuses Folders from folders and Cancel restores focus:  AssertionError: expected null to be 'Folder path' // Object.is equality\n    at /tmp/test-intent-before-gwzzks/modules/ui-web/src/shell-v0/views/LibrarySurface.folderActions.test.ts:253:70\n    at file:///tmp/test-intent-before-gwzzks/modules/ui-web/node_modules/@vitest/runner/dist/chunk-artifact.js:1"
       },
       {
         "id": "modules/ui-web/src/shell-v0/views/LibrarySurface.folderActions.test.ts#R1 browser Add reveals and focuses Folders from core.browse-surface and Cancel restores focus",
         "classification": "assertion",
-        "detail": "R1 browser Add reveals and focuses Folders from core.browse-surface and Cancel restores focus:  AssertionError: expected 'core.browse-surface' to be 'folders' // Object.is equality\n    at /home/elias/.cache/am/hob46ns_/tmp/test-intent-before-sH9j2U/modules/ui-web/src/shell-v0/views/LibrarySurface.folderActions.test.ts:249:26\n    at file:///home/elias/.cache/am/hob46ns_/tmp/test-intent-before-s"
+        "detail": "R1 browser Add reveals and focuses Folders from core.browse-surface and Cancel restores focus:  AssertionError: expected 'core.browse-surface' to be 'folders' // Object.is equality\n    at /tmp/test-intent-before-gwzzks/modules/ui-web/src/shell-v0/views/LibrarySurface.folderActions.test.ts:249:26\n    at file:///tmp/test-intent-before-gwzzks/modules/ui-web/node_modules/@vitest/runner/dist/chunk-"
       },
       {
         "id": "modules/ui-web/src/shell-v0/views/LibrarySurface.folderActions.test.ts#R1 desktop Add reveals and focuses Folders from folders and Cancel restores focus",
         "classification": "assertion",
-        "detail": "R1 desktop Add reveals and focuses Folders from folders and Cancel restores focus:  AssertionError: expected null to be 'Folder path' // Object.is equality\n    at /home/elias/.cache/am/hob46ns_/tmp/test-intent-before-sH9j2U/modules/ui-web/src/shell-v0/views/LibrarySurface.folderActions.test.ts:253:70\n    at runNextTicks (node:internal/process/task_queues:65:5)\n    at processTimers"
+        "detail": "R1 desktop Add reveals and focuses Folders from folders and Cancel restores focus:  AssertionError: expected null to be 'Folder path' // Object.is equality\n    at /tmp/test-intent-before-gwzzks/modules/ui-web/src/shell-v0/views/LibrarySurface.folderActions.test.ts:253:70\n    at file:///tmp/test-intent-before-gwzzks/modules/ui-web/node_modules/@vitest/runner/dist/chunk-artifact.js:1"
       },
       {
         "id": "modules/ui-web/src/shell-v0/views/LibrarySurface.folderActions.test.ts#R1 desktop Add reveals and focuses Folders from core.browse-surface and Cancel restores focus",
         "classification": "assertion",
-        "detail": "R1 desktop Add reveals and focuses Folders from core.browse-surface and Cancel restores focus:  AssertionError: expected 'core.browse-surface' to be 'folders' // Object.is equality\n    at /home/elias/.cache/am/hob46ns_/tmp/test-intent-before-sH9j2U/modules/ui-web/src/shell-v0/views/LibrarySurface.folderActions.test.ts:249:26\n    at file:///home/elias/.cache/am/hob46ns_/tmp/test-intent-before-s"
+        "detail": "R1 desktop Add reveals and focuses Folders from core.browse-surface and Cancel restores focus:  AssertionError: expected 'core.browse-surface' to be 'folders' // Object.is equality\n    at /tmp/test-intent-before-gwzzks/modules/ui-web/src/shell-v0/views/LibrarySurface.folderActions.test.ts:249:26\n    at file:///tmp/test-intent-before-gwzzks/modules/ui-web/node_modules/@vitest/runner/dist/chunk-"
       },
       {
         "id": "modules/ui-web/src/shell-v0/views/LibrarySurface.folderActions.test.ts#R1 a late picker selects Folders, but a response from before reconnect cannot open a form",
         "classification": "assertion",
-        "detail": "R1 a late picker selects Folders, but a response from before reconnect cannot open a form:  AssertionError: expected 'core.browse-surface' to be 'folders' // Object.is equality\n    at /home/elias/.cache/am/hob46ns_/tmp/test-intent-before-sH9j2U/modules/ui-web/src/shell-v0/views/LibrarySurface.folderActions.test.ts:269:24\n    at file:///home/elias/.cache/am/hob46ns_/tmp/test-intent-before-s"
+        "detail": "R1 a late picker selects Folders, but a response from before reconnect cannot open a form:  AssertionError: expected 'core.browse-surface' to be 'folders' // Object.is equality\n    at /tmp/test-intent-before-gwzzks/modules/ui-web/src/shell-v0/views/LibrarySurface.folderActions.test.ts:269:24\n    at runNextTicks (node:internal/process/task_queues:65:5)\n    at processTimers (node:internal/ti"
       },
       {
         "id": "modules/ui-web/src/shell-v0/views/LibrarySurface.slice2.test.ts#R2 another window changes saved rules; Save my draft recovers and later saves work",
         "classification": "assertion",
-        "detail": "R2 another window changes saved rules; Save my draft recovers and later saves work:  AssertionError: the given combination of arguments (undefined and string) is invalid for this assertion. You can use an array, a map, an object, a set, a string, or a weakset instead of a string\n    at Proxy.<anonymous> (file:///home/elias/.cache/am/hob46ns_/tmp/test-intent-before-sH9j2U/modules/ui-"
+        "detail": "R2 another window changes saved rules; Save my draft recovers and later saves work:  AssertionError: the given combination of arguments (undefined and string) is invalid for this assertion. You can use an array, a map, an object, a set, a string, or a weakset instead of a string\n    at Proxy.<anonymous> (file:///tmp/test-intent-before-gwzzks/modules/ui-web/node_modules/@vitest/expec"
       },
       {
         "id": "modules/ui-web/src/shell-v0/views/LibrarySurface.slice2.test.ts#R2 another window changes saved rules; Discard my draft recovers and later saves work",
         "classification": "assertion",
-        "detail": "R2 another window changes saved rules; Discard my draft recovers and later saves work:  AssertionError: the given combination of arguments (undefined and string) is invalid for this assertion. You can use an array, a map, an object, a set, a string, or a weakset instead of a string\n    at Proxy.<anonymous> (file:///home/elias/.cache/am/hob46ns_/tmp/test-intent-before-sH9j2U/modules/ui-"
+        "detail": "R2 another window changes saved rules; Discard my draft recovers and later saves work:  AssertionError: the given combination of arguments (undefined and string) is invalid for this assertion. You can use an array, a map, an object, a set, a string, or a weakset instead of a string\n    at Proxy.<anonymous> (file:///tmp/test-intent-before-gwzzks/modules/ui-web/node_modules/@vitest/expec"
       },
       {
         "id": "modules/ui-web/src/shell-v0/views/LibrarySurface.slice2.test.ts#R2 recovered draft and quick skip save (rules first) retain both through reload",
         "classification": "assertion",
-        "detail": "R2 recovered draft and quick skip save (rules first) retain both through reload:  AssertionError: Save my draft: expected undefined to be defined\n    at recoveryButton (/home/elias/.cache/am/hob46ns_/tmp/test-intent-before-sH9j2U/modules/ui-web/src/shell-v0/views/LibrarySurface.slice2.test.ts:306:25)\n    at /home/elias/.cache/am/hob46ns_/tmp/test-intent-before-sH9j2U/modules/ui-w"
+        "detail": "R2 recovered draft and quick skip save (rules first) retain both through reload:  AssertionError: Save my draft: expected undefined to be defined\n    at recoveryButton (/tmp/test-intent-before-gwzzks/modules/ui-web/src/shell-v0/views/LibrarySurface.slice2.test.ts:306:25)\n    at /tmp/test-intent-before-gwzzks/modules/ui-web/src/shell-v0/views/LibrarySurface.slice2.test.ts:343:34"
       },
       {
         "id": "modules/ui-web/src/shell-v0/views/LibrarySurface.slice2.test.ts#R2 recovered draft and quick skip save (exclusions first) retain both through reload",
         "classification": "assertion",
-        "detail": "R2 recovered draft and quick skip save (exclusions first) retain both through reload:  AssertionError: Save my draft: expected undefined to be defined\n    at recoveryButton (/home/elias/.cache/am/hob46ns_/tmp/test-intent-before-sH9j2U/modules/ui-web/src/shell-v0/views/LibrarySurface.slice2.test.ts:306:25)\n    at /home/elias/.cache/am/hob46ns_/tmp/test-intent-before-sH9j2U/modules/ui-w"
+        "detail": "R2 recovered draft and quick skip save (exclusions first) retain both through reload:  AssertionError: Save my draft: expected undefined to be defined\n    at recoveryButton (/tmp/test-intent-before-gwzzks/modules/ui-web/src/shell-v0/views/LibrarySurface.slice2.test.ts:306:25)\n    at /tmp/test-intent-before-gwzzks/modules/ui-web/src/shell-v0/views/LibrarySurface.slice2.test.ts:344:52"
       },
       {
         "id": "modules/ui-web/src/shell-v0/views/LibrarySurface.slice2.test.ts#R2 reconnect keeps a dirty battery-only draft and provides a current baseline for recovery",
         "classification": "assertion",
-        "detail": "R2 reconnect keeps a dirty battery-only draft and provides a current baseline for recovery:  AssertionError: Save my draft: expected undefined to be defined\n    at recoveryButton (/home/elias/.cache/am/hob46ns_/tmp/test-intent-before-sH9j2U/modules/ui-web/src/shell-v0/views/LibrarySurface.slice2.test.ts:306:25)\n    at /home/elias/.cache/am/hob46ns_/tmp/test-intent-before-sH9j2U/modules/ui-w"
+        "detail": "R2 reconnect keeps a dirty battery-only draft and provides a current baseline for recovery:  AssertionError: Save my draft: expected undefined to be defined\n    at recoveryButton (/tmp/test-intent-before-gwzzks/modules/ui-web/src/shell-v0/views/LibrarySurface.slice2.test.ts:306:25)\n    at /tmp/test-intent-before-gwzzks/modules/ui-web/src/shell-v0/views/LibrarySurface.slice2.test.ts:392:27"
       },
       {
         "id": "modules/ui-web/src/shell-v0/views/LibrarySurface.slice2.test.ts#R2b Save my draft uses the displayed conflict rules despite a later second-window save",
         "classification": "assertion",
-        "detail": "R2b Save my draft uses the displayed conflict rules despite a later second-window save:  AssertionError: the given combination of arguments (undefined and string) is invalid for this assertion. You can use an array, a map, an object, a set, a string, or a weakset instead of a string\n    at Proxy.<anonymous> (file:///home/elias/.cache/am/hob46ns_/tmp/test-intent-before-sH9j2U/modules/ui-"
+        "detail": "R2b Save my draft uses the displayed conflict rules despite a later second-window save:  AssertionError: the given combination of arguments (undefined and string) is invalid for this assertion. You can use an array, a map, an object, a set, a string, or a weakset instead of a string\n    at Proxy.<anonymous> (file:///tmp/test-intent-before-gwzzks/modules/ui-web/node_modules/@vitest/expec"
       },
       {
         "id": "modules/ui-web/src/shell-v0/views/LibrarySurface.slice2.test.ts#R2b Discard my draft uses the displayed conflict rules despite a later second-window save",
         "classification": "assertion",
-        "detail": "R2b Discard my draft uses the displayed conflict rules despite a later second-window save:  AssertionError: the given combination of arguments (undefined and string) is invalid for this assertion. You can use an array, a map, an object, a set, a string, or a weakset instead of a string\n    at Proxy.<anonymous> (file:///home/elias/.cache/am/hob46ns_/tmp/test-intent-before-sH9j2U/modules/ui-"
+        "detail": "R2b Discard my draft uses the displayed conflict rules despite a later second-window save:  AssertionError: the given combination of arguments (undefined and string) is invalid for this assertion. You can use an array, a map, an object, a set, a string, or a weakset instead of a string\n    at Proxy.<anonymous> (file:///tmp/test-intent-before-gwzzks/modules/ui-web/node_modules/@vitest/expec"
       }
     ]
   },
-  "digest": "sha256:f922b751f34528ff7604b6b5065c73a789936cfb452e157b6ca072984182055d"
+  "digest": "sha256:b0611b9009a54000682eb0b1ab0b5503b51a2e079efef807622e46d71896c650"
 }

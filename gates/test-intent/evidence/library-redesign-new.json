@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
   },
-  "createdAt": "2026-11-02T03:03:00.872Z",
-  "revision": "d53a24557e5a668898c19cee37db1b6527fafc59",
-  "tree": "ceb00effb923403dcc1f32275adca0886c97c561",
+  "createdAt": "2026-11-02T03:07:25.958Z",
+  "revision": "650d13e2232dc8c0b2a89fe873fc0a8fc789a42e",
+  "tree": "4de2a051b155525bd7326a85eb82c80c6ddc2a14",
   "environment": {
     "platform": "linux",
     "arch": "x64",
@@ -18,10 +18,10 @@
   },
   "runs": [
     {
-      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/chrome/Shell.test.ts\" \"src/shell-v0/commands/CommandPaletteProjection.test.ts\" \"src/shell-v0/views/SettingsSurface.indexingRules.test.ts\" \"src/shell-v0/components/SurfaceTabs.test.ts\" \"src/shell-v0/components/IndexingControls.toolbar.test.ts\" \"src/shell-v0/components/indexingStatusFollowup.test.ts\" \"src/shell-v0/views/LibrarySurface.excludes-override.test.ts\" \"src/shell-v0/views/LibrarySurface.folderActions.test.ts\" \"src/shell-v0/views/LibrarySurface.redesign.test.ts\" \"src/shell-v0/views/LibrarySurface.slice2.test.ts\" \"src/shell-v0/components/IndexingRulesEditor.arrival.test.ts\" --reporter=json --outputFile=\"/tmp/test-intent-vitest-2829182-1793588574432.json\"",
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/chrome/Shell.test.ts\" \"src/shell-v0/commands/CommandPaletteProjection.test.ts\" \"src/shell-v0/views/SettingsSurface.indexingRules.test.ts\" \"src/shell-v0/components/SurfaceTabs.test.ts\" \"src/shell-v0/components/IndexingControls.toolbar.test.ts\" \"src/shell-v0/components/indexingStatusFollowup.test.ts\" \"src/shell-v0/views/LibrarySurface.excludes-override.test.ts\" \"src/shell-v0/views/LibrarySurface.folderActions.test.ts\" \"src/shell-v0/views/LibrarySurface.redesign.test.ts\" \"src/shell-v0/views/LibrarySurface.slice2.test.ts\" \"src/shell-v0/components/IndexingRulesEditor.arrival.test.ts\" --reporter=json --outputFile=\"/tmp/test-intent-vitest-2846350-1793588839504.json\"",
       "cwd": "modules/ui-web",
       "exitCode": 0,
-      "durationMs": 6438
+      "durationMs": 6448
     }
   ],
   "checks": [
@@ -744,7 +744,7 @@
       "id": "modules/ui-web/src/shell-v0/views/LibrarySurface.slice2.test.ts",
       "file": "modules/ui-web/src/shell-v0/views/LibrarySurface.slice2.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:4b63aaa008d685ff72617a21d473f18b270b0e940ba885e960c7448cfa1238e8",
+      "contentDigest": "sha256:1d2d1337374961ad7f8ffa385c242724ac40cdaddd72ef509fc02d90b7e3a8f2",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -872,5 +872,5 @@
     }
   ],
   "failBefore": null,
-  "digest": "sha256:1d454d8efb77f4f93915a1bfcd063ba31b75ae3c907ff6cf15f4b9bb6c8c34e9"
+  "digest": "sha256:65801565b3af0d0fe1a50ad719ea1df6c7f7731d22899d251d356c6d1125f338"
 }

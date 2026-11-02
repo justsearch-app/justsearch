@@ -190,7 +190,7 @@ for (const tab of ['folders', 'core.browse-surface']) {
 it('L14 drains only the latest pending request when Library connects', async () => {
   requestIndexingRuleFocus('hours'); requestIndexingRuleFocus('battery');
   const f = fixture(); const el = await mount(f.host);
-  expect(editor(el).shadowRoot!.activeElement?.id).toBe('indexing-battery');
+  await vi.waitFor(() => expect(editor(el).shadowRoot!.activeElement?.id).toBe('indexing-battery'));
   expect(takeIndexingRuleFocus()).toBeUndefined();
   el.remove(); document.body.append(el); await settle(el);
   expect(editor(el).shadowRoot!.activeElement?.id).not.toBe('indexing-battery');
