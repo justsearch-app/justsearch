@@ -38,6 +38,7 @@ class AdmissionTests(unittest.TestCase):
         self.children = []
         self.logs = []
         self.groups = []
+        self.descendants = []
 
     def tearDown(self):
         # Only spawn-recorded identities, including groups recorded by our child fixtures.
@@ -55,6 +56,10 @@ class AdmissionTests(unittest.TestCase):
             if current and current["birth"] == identity["birth"]:
                 os.killpg(identity["pgid"], signal.SIGCONT)
                 os.killpg(identity["pgid"], signal.SIGKILL)
+        for identity in self.descendants:
+            current = proc(identity["pid"])
+            if current and current["birth"] == identity["birth"]:
+                os.kill(identity["pid"], signal.SIGKILL)
         for log in self.logs:
             log.close()
         self.temp.cleanup()
@@ -187,6 +192,50 @@ Path({str(done)!r}).touch()
         self.assertEqual(holder.wait(timeout=2), 0)
         self.assertEqual(exclusive.wait(timeout=2), 0)
         self.assertTrue(done.exists())
+
+    def test_exclusive_cleans_nested_heavy_and_setsid_descendants_on_every_exit(self):
+        for ending in ("deadline", 0, 17, signal.SIGINT, signal.SIGTERM, signal.SIGKILL):
+            with self.subTest(ending=ending):
+                marker = self.root / f"descendants-{ending}.json"
+                finish = self.root / f"finish-{ending}"
+                worker = f"""import os,signal,time,json
+from pathlib import Path
+signal.signal(signal.SIGTERM, signal.SIG_IGN)
+wrapper = os.getppid()
+grandchild = os.fork()
+if grandchild == 0:
+    os.setsid()
+    Path({str(marker)!r}).write_text(json.dumps([wrapper, os.getppid(), os.getpid()]))
+while True: time.sleep(.01)
+"""
+                nested_command = [PYTHON, str(CLI), "heavy", "--purpose", "nested heavy", "--",
+                                  PYTHON, "-c", worker]
+                command = [PYTHON, "-c", f"""import subprocess,time
+from pathlib import Path
+child = subprocess.Popen({nested_command!r})
+while not Path({str(finish)!r}).exists(): time.sleep(.01)
+raise SystemExit({ending if type(ending) is int else 0})
+"""]
+                holder = self.start("exclusive", command, options=["--timeout", "1.2"])
+                self.wait_for(lambda: marker.exists() and marker.stat().st_size)
+                pids = json.loads(marker.read_text())
+                identities = [proc(pid) for pid in pids]
+                self.descendants.extend(identities)
+                self.assertNotEqual(identities[1]["pgid"], identities[2]["pgid"])
+                check = self.root / f"released-{ending}.json"
+                waiter = self.start("heavy", [PYTHON, "-c",
+                    "import json; from pathlib import Path; "
+                    f"Path({str(check)!r}).write_text(json.dumps([Path('/proc/'+str(p)).exists() for p in {pids!r}]))"])
+                if type(ending) is int:
+                    finish.touch()
+                elif isinstance(ending, signal.Signals):
+                    holder.send_signal(ending)
+                expected = (124 if ending == "deadline" else ending if type(ending) is int else
+                            -9 if ending == signal.SIGKILL else 128 + ending)
+                self.assertEqual(holder.wait(timeout=3), expected)
+                self.assertEqual(waiter.wait(timeout=2), 0)
+                self.assertEqual(json.loads(check.read_text()), [False] * len(pids),
+                                 "admission released with escaped descendants still present")
 
     def test_pausable_resumes_on_all_exits_including_holder_sigkill(self):
         background = self.start("pausable", purpose="index rebuild")

@@ -81,6 +81,7 @@ class MachineIntegration(unittest.TestCase):
         models.mkdir()
         env = {**self.env, "JUSTSEARCH_DEV_RUNNER_STATE_ROOT": str(self.root / "state"),
                "JUSTSEARCH_MODELS_DIR": str(models), "JUSTSEARCH_UI_SETTINGS_MODE": "IN_MEMORY",
+               "JUSTSEARCH_GPU_ENABLED": "false",
                "JUSTSEARCH_HEAD_HEAP": "1g", "JAVA_OPTS": "-Djustsearch.eval.mode=true",
                "JS_ADMISSION_SESSION": "admission-real-stack"}
         output = self.root / "runner.log"
@@ -107,7 +108,10 @@ class MachineIntegration(unittest.TestCase):
                     return None
 
                 result = self.fixture.wait_for(ready, timeout=90)
-                self.assertFalse(any(r["mode"] == "heavy" for r in self.fixture.status()))
+                admitted = self.fixture.status()
+                self.assertFalse(any(r["mode"] == "heavy" for r in admitted))
+                print("ready receipt: " + json.dumps(result), flush=True)
+                print("admission after ready: " + json.dumps(admitted), flush=True)
                 holder = self.fixture.start("exclusive", [PYTHON, "-c", "pass"], options=["--drain-timeout", ".5"])
                 self.assertEqual(holder.wait(timeout=2), 0)
                 self.assertIsNone(child.poll())

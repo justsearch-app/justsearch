@@ -139,7 +139,7 @@ def heavy(purpose, env=None, session=None):
 
 
 def process(pid):
-    """Identity for cleanup of our OWN child group, never participant liveness."""
+    """Identity for cleanup of our OWN children, never participant liveness."""
     try:
         fields = Path(f"/proc/{pid}/stat").read_text().rsplit(")", 1)[1].split()
         return {"pid": int(pid), "state": fields[0], "pgid": int(fields[2]),
@@ -193,8 +193,60 @@ def reap():
     try:
         while os.waitpid(-1, os.WNOHANG)[0]:
             pass
+        return True
     except ChildProcessError:
-        pass
+        return False
+
+
+def descendants():
+    """Only this guardian's command tree; process groups and sessions may change."""
+    pending = [os.getpid()]
+    result, seen = [], set()
+    while pending:
+        parent = pending.pop()
+        # Include every thread's children without inspecting other participants.
+        for path in Path(f"/proc/{parent}/task").glob("*/children"):
+            try:
+                children = path.read_text().split()
+            except FileNotFoundError:
+                continue
+            for pid in map(int, children):
+                if pid not in seen and (row := process(pid)):
+                    seen.add(pid)
+                    result.append(row)
+                    pending.append(pid)
+    return result
+
+
+def signal_descendants(sig):
+    for row in descendants():
+        try:
+            # Pin the identity before signalling: a recycled PID is never a target.
+            fd = os.pidfd_open(row["pid"])
+            try:
+                current = process(row["pid"])
+                if current and current["birth"] == row["birth"]:
+                    signal.pidfd_send_signal(fd, sig)
+            finally:
+                os.close(fd)
+        except ProcessLookupError:
+            pass
+
+
+def clean_descendants(child):
+    # This isolated subreaper has no children except the exclusive command tree.
+    # Orphans (including double forks/setsid and nested subreapers) are adopted here.
+    signal_descendants(signal.SIGTERM)
+    until = time.monotonic() + GRACE
+    while True:
+        child.poll()
+        # ECHILD proves the whole tree is gone. An empty /proc snapshot alone does
+        # not: a concurrent reparent/fork can move a child during the scan.
+        if not reap():
+            return
+        if time.monotonic() >= until:
+            signal_descendants(signal.SIGKILL)
+        time.sleep(.01)
 
 
 def subreaper():
@@ -275,7 +327,6 @@ def exclusive_window(args, check):
         acquired = time.monotonic()
         record.write(mode="exclusive", deadline_seconds=args.timeout)
         child = subprocess.Popen(args.command, env=admitted_env(record, os.environ), start_new_session=True)
-        group = process(child.pid)
         try:
             # Reserve TERM grace plus KILL/reaping allowance inside the budget.
             until = acquired + args.timeout - 2 * GRACE
@@ -285,14 +336,14 @@ def exclusive_window(args, check):
             code = child.poll()
             return DEADLINE if code is None else code
         finally:
-            clean_group(group, child)
+            clean_descendants(child)
 
 
 def exclusive(args):
     if nested(os.environ):
         raise ValueError("exclusive cannot be nested inside an admission")
     # The guardian owns the locks and the child. EOF from the CLI, even on SIGKILL,
-    # triggers group cleanup BEFORE it closes the locks. No timestamp/PID reclaim.
+    # triggers descendant cleanup BEFORE it closes the locks. No timestamp/PID reclaim.
     lifetime_read, lifetime_write = os.pipe()
     guardian = os.fork()
     if guardian == 0:
