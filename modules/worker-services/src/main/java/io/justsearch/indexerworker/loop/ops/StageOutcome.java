@@ -22,8 +22,9 @@ package io.justsearch.indexerworker.loop.ops;
  *     and {@code processNerBackfill} carry it for shape-consistency only — neither caller reads
  *     it today.
  * @param docsProcessed count of documents this call successfully completed (not merely
- *     attempted), excluding output the writer corrected to FAILED. Units are documents, not
- *     batches (contrast {@code batchTimingCount}, which counts batches — see
+ *     attempted) — the same count each op already logged, now surfaced to the caller. Output the
+ *     writer corrected to FAILED is reported only in {@code accounting}. Units are documents,
+ *     not batches (contrast {@code batchTimingCount}, which counts batches — see
  *     {@code OperationalMetrics#recordStageTiming} javadoc).
  * @param elapsedMs wall-clock time for the whole call, in milliseconds.
  * @param accounting final selected-stage dispositions and computed/publication counters
@@ -37,11 +38,8 @@ public record StageOutcome(boolean success, int docsProcessed, long elapsedMs,
 
   static StageOutcome observed(boolean success, int docsProcessed, long startNanos,
       EnrichmentAccounting accounting) {
-    var summary = accounting.snapshot();
-    long rejectedOutputs = summary.tickets().values().stream()
-        .filter(disposition -> disposition == EnrichmentAccounting.Disposition.REJECTED_OUTPUT).count();
-    return new StageOutcome(success, Math.max(0, docsProcessed - (int) rejectedOutputs),
-        (System.nanoTime() - startNanos) / 1_000_000, summary, true);
+    return new StageOutcome(success, docsProcessed, (System.nanoTime() - startNanos) / 1_000_000,
+        accounting.snapshot(), true);
   }
 
   /** A no-op outcome: nothing was pending, nothing to record. */

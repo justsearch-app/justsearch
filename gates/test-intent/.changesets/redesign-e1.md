@@ -7,7 +7,7 @@ author-session: redesign-e1-applied-outcome-continuation
 
 # Test-intent entries
 
-The four isolated new test files are exempt, and are explicitly documented below as New checks. Their fail-before checks are listed in the builder handoff for independent evidence generation at gates/test-intent/evidence/redesign-e1.json. Existing completion, selection, window resumption, artifact and commit-cadence oracles remain preservation checks.
+The five isolated new test files are exempt (EnrichmentReceiptPreservationTest is a preservation/repair check, not a New entry), and are explicitly documented below as New checks. Their fail-before checks are listed in the builder handoff for independent evidence generation at gates/test-intent/evidence/redesign-e1.json. Existing completion, selection, window resumption, artifact and commit-cadence oracles remain preservation checks.
 
 ```json
 {
@@ -16,6 +16,7 @@ The four isolated new test files are exempt, and are explicitly documented below
       "items": [
         "modules/worker-services/src/test/java/io/justsearch/adapters/lucene/runtime/BackfillProbeCommitPersistenceTest.java",
         "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/BackfillSchedulerProviderGateTest.java",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/BackfillSchedulerSlowBatchTest.java",
         "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/CombinedChunkPublicationTest.java",
         "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/BackfillSnapshotTestSupport.java",
         "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/CombinedEnrichmentFailureAccountingTest.java",
@@ -31,7 +32,7 @@ The four isolated new test files are exempt, and are explicitly documented below
         "signature",
         "instrumentation"
       ],
-      "whatMoved": "Mocks and real-writer spies observe publishEnrichmentBatch receipts instead of aggregate or boolean conditional updates. Single-item retry/fallback assertions and their fixture capture now observe the one-entry receipt publication. The fixture adapter translates its existing configured aggregate prefix into IDs. Inputs, faults, ID/status/retry predicates, assertions, tags, and commit/selection expectations are preserved; the blank/failing NER checks still reject completion publication.",
+      "whatMoved": "Mocks and real-writer spies observe publishEnrichmentBatch receipts instead of aggregate or boolean conditional updates. Single-item retry/fallback assertions and their fixture capture now observe the one-entry receipt publication. The fixture adapter translates its existing configured aggregate prefix into IDs. Inputs, faults, ID/status/retry predicates, assertions, tags, and commit/selection expectations are preserved; the blank/failing NER checks still reject completion publication. BackfillSchedulerSlowBatchTest's two no-individual-retry checks (persistentlyFailingPreservationDoesNotPoisonHealthyDocumentsAcrossCycles and the failed-preservation helper) keep their never-updateDocumentIf verification and add never-publishEnrichmentBatch with a one-entry update list and one-entry input map, the call EnrichmentBatch.update now makes; a combined batch publishes against the whole batch's inputs. Inputs, population, encoder faults and all other expectations are unchanged.",
       "sources": [
         {
           "kind": "delegated-choice",
@@ -90,7 +91,7 @@ The four isolated new test files are exempt, and are explicitly documented below
         "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/EnrichmentMapperDispositionTest.java"
       ],
       "class": "New",
-      "behaviour": "E1-1..E1-5: timing survives zero completions; receipts name accepted/stale IDs and mapper-corrected FAILED statuses even on an applied prefix; selected-stage tickets partition cancellation, publication, empty completion, retry-charged failure, deferred work, stale rejection and rejected output. Computed, accepted, completed, failed and window-advance counters stay distinct. Writer-rejected output is computed and stored FAILED without completion/publication or retry charge. Saved-state and commit assertions are preservation checks.",
+      "behaviour": "E1-1..E1-5: timing survives zero completions; receipts name accepted/stale IDs and mapper-corrected FAILED statuses even on an applied prefix; selected-stage tickets partition cancellation, publication, empty completion, retry-charged failure, deferred work, stale rejection and rejected output. Computed, accepted, completed, failed and window-advance counters stay distinct. Writer-rejected output is computed and stored FAILED without completion/publication or retry charge in the outcome accounting; the counts that existed on base (embedProcessed, docsProcessed and the metrics they feed) keep their base inputs, so the two mapper-disposition checks expect the base value 1 there. Saved-state and commit assertions are preservation checks.",
       "sources": [
         {
           "kind": "delegated-choice",
@@ -204,11 +205,44 @@ The compatibility patch adds signatures and neutral empty observations. Its new 
 
 The additional preservation check EnrichmentAttemptAccountingTest#parentPublicationCreditIncludesLateAndSinglePassParentsAlongsideChunks passes on base. It keeps publication credit for the late-chunking parent, ordinary parent and chunk, checks two parent VECTORs and one CHUNK_VECTOR, and checks the chunk/late-parent/ordinary-parent encoder order. It is deliberately excluded from newChecks because it passes before. The first probe used a two-vector stub for a one-document priority slice; the corrected fixture returns one vector per requested input while keeping these expected outcomes.
 
+## Repair after verifier-1 (P2 and P4)
+
+The verifier found two preservation breaks. The second argument of this changeset is a pair of repair checks in the isolated new file modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/EnrichmentReceiptPreservationTest.java. They run a real index under BackfillScheduler on a fixed clock, so no cycle budget ends a loop early:
+
+- #documentRejectedStaleInTheProbeStaysExcludedForTheRestOfTheCycle (P2). While the probe batch is encoded, another writer changes NER_RETRY_COUNT of "conc"; its content is unchanged. The check expects "conc" encoded exactly once in the cycle, EMBEDDING_STATUS and NER_STATUS still PENDING, NER_RETRY_COUNT 1, and "a"/"b" completed.
+- #individualPassWhoseOnlyOutputTheWriterStoredFailedKeepsTheModeGauge (P4). The only pending document encodes to a NaN vector, so the mapper stores FAILED with retry 0. The check expects backfillMode "individual" and enrichmentCompleted embed = 1, as on base.
+
+Both pass on 344bdaf03c, with and without the compatibility patch: these are preservation checks against the base. Both fail by assertion on the branch head 632a399892 ("expected: <individual> but was: <idle>"; "expected: <1> but was: <2>", with calls embedBatch[content a, content b, content conc], embedBatch[content conc]), and pass on the repaired candidate. They are not in newChecks because they pass on the base. The independent run for them uses the branch head as the before-state:
+
+```bash
+env -u DISPLAY -u WAYLAND_DISPLAY js-gradle-slot node scripts/governance/gates/test-intent/run-evidence.mjs \
+  --out <verifier-chosen path for the repair-round evidence> \
+  --before 632a399892 \
+  --check modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/EnrichmentReceiptPreservationTest.java#documentRejectedStaleInTheProbeStaysExcludedForTheRestOfTheCycle \
+  --check modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/EnrichmentReceiptPreservationTest.java#individualPassWhoseOnlyOutputTheWriterStoredFailedKeepsTheModeGauge \
+  --overlay modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/EnrichmentReceiptPreservationTest.java
+```
+
+Four newChecks changed only in assertions that previously asserted the branch's altered legacy inputs. After the repair those inputs are the base values; every accounting/receipt assertion is unchanged:
+
+- EnrichmentMapperDispositionTest#acceptedMutationWhoseVectorIsDroppedIsNotACompletedEmbedding: embedProcessed 0 → 1.
+- EnrichmentMapperDispositionTest#individualFallbackReportsRejectedOutputWithoutChangingCommitOrRetry: docsProcessed 0 → 1.
+- EnrichmentAttemptAccountingTest#receiptSeparatesComputedAcceptedEmptyFailedAndStale: spladeProcessed 1 → 0 (the base's complete-batch rule).
+- EnrichmentAttemptAccountingTest#publicationFailureStillReportsTheAcceptedPrefix: publishedDocIds {accepted} → {} (base adds nothing when publication throws).
+
+On 344bdaf03c with the compatibility patch and overlays, all four still fail by assertion in the check, after the base-valued assertions pass. The two mapper checks fail at assertNotNull(receipt) (:71) and at the REJECTED_OUTPUT count, expected 1 but was 0 (:118). The two accounting checks fail with expected <3> but was <0> and expected <1> but was <0>. The other eight EnrichmentAttemptAccountingTest newChecks also still fail by assertion there, and the P1 preservation check passes. The JSON evidence is now stale for these two files and must be regenerated with the original command below.
+
+BackfillSchedulerSlowBatchTest's two no-individual-retry checks were vacuous on the branch head. EnrichmentBatch.update had stopped calling updateDocumentIf; it publishes one entry against a one-entry input map. They now also verify that call never happens. A mutation, a single-document batch.update in the combined SPLADE slice catch, makes persistentlyFailingPreservationDoesNotPoisonHealthyDocumentsAcrossCycles and all four parameterisations of the failed-preservation helper fail at that verify (NeverWantedButInvoked). The adapted file passes unchanged on 344bdaf03c with the patch (22 tests) and on the candidate.
+
+Repair-round validation: the four-module command (worker-services, worker-core, adapters-lucene, indexer-worker) passes on the candidate with 0 failures: worker-services 3,298 tests (18 skipped), worker-core 590 (15), adapters-lucene 956 (3), indexer-worker 2,499 (31). java-prepush.mjs --unreferenced passes (BUILD SUCCESSFUL in 6m 9s). The verifier probes in tmp/verifier-probes were not modified or run, because they write digests to the verifier's own folder.
+
 ## Applied outcomes
 
 The receipt carries an immutable per-document set of stage status fields corrected to FAILED by the mapper in an accepted mutation. This reuses the existing dropped-vector report during that same write and retains corrections for the accepted prefix on a later failure. No persisted field, write ordering or atomicity changed.
 
-Accounting assigns REJECTED_OUTPUT, records computed output and stored failure, and excludes accepted-publication/completion and retry-charged failure. Individual updates consume the writer receipt rather than synthesizing one from a boolean. Raw writer acceptance still controls the existing commit and loop signals. The real-writer checks preserve FAILED and retry 0; the individual fallback check also preserves the commit and routing signal.
+Accounting assigns REJECTED_OUTPUT, records computed output and stored failure, and excludes accepted-publication/completion and retry-charged failure. Individual updates consume the writer receipt rather than synthesizing one from a boolean. Raw writer acceptance still controls the existing commit and loop signals.
+
+Receipts and writer corrections feed only the new outcome accounting. The counts and gauges that existed on base keep their base inputs: combined embedProcessed/spladeProcessed/nerProcessed use the complete-batch rule and field presence, individual docsProcessed is the raw accepted count (so the backfill mode gauge and enrichmentCompleted see what they saw on base), and the cycle's exclusion set (publishedDocIds) keeps the base members: all IDs on a complete write, the base content-and-unwritten-fields inference on a partial write, nothing when publication throws. A document rejected stale in the probe batch therefore stays excluded for the rest of the cycle exactly as on base. The real-writer checks preserve FAILED and retry 0; the individual fallback check also preserves the commit and routing signal.
 
 Review also found computed outputs lost when a provider retires after returning aligned vectors, or a later individual SPLADE slice is cancelled. Computed tickets are now recorded at those return points before existing guards can withhold publication. No guard, fallback, selection, retry or write decision changed. The retirement fixture uses doAnswer so installing the second mode cannot execute the previous mock answer and retire the provider before selection.
 
@@ -236,6 +270,9 @@ The four baseline-identical Linux failures are LinuxRootMountInfoTest#missingDan
 | P2 | BackfillProbeCommitPersistenceTest (8 tests); CombinedChunkPublicationTest (2 tests) | pass, no skips | pass, no skips |
 | P2/P3 | CombinedEnrichmentCycleBudgetTest (29 tests); CombinedEnrichmentFailureAccountingTest (19 tests) | pass, no skips | pass, no skips |
 | P4 | Existing StatusRecordSchemaTest schema/serialization checks; old fixture fields retained in diff | pass | pass |
+| P2 | EnrichmentReceiptPreservationTest#documentRejectedStaleInTheProbeStaysExcludedForTheRestOfTheCycle | pass (branch head 632a399892: assertion failure) | pass |
+| P4 | EnrichmentReceiptPreservationTest#individualPassWhoseOnlyOutputTheWriterStoredFailedKeepsTheModeGauge | pass (branch head 632a399892: assertion failure) | pass |
+| P2 | BackfillSchedulerSlowBatchTest (22 tests, adapted) | pass | pass |
 
 ## Tests added or rewritten
 
@@ -250,6 +287,10 @@ Tests added or rewritten: modules/worker-services/src/test/java/io/justsearch/in
 Tests added or rewritten: modules/app-api/src/test/java/io/justsearch/app/api/status/StatusRecordSchemaTest.java — E1-4/P4 additive status contract — durable
 
 Tests added or rewritten: modules/ui-web/src/api/__fixtures__/status-response-live.json — E1-4/P4 additive shared fixture — durable
+
+Tests added or rewritten: modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/EnrichmentReceiptPreservationTest.java — P2/P4 exclusion set and mode gauge after receipts (repair checks against 632a399892, preservation against 344bdaf03c) — durable
+
+Tests added or rewritten: modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/BackfillSchedulerSlowBatchTest.java — P2 no individual retry observed at the one-entry publication — durable
 
 Tests added or rewritten: modules/worker-services/src/test/java/io/justsearch/adapters/lucene/runtime/BackfillProbeCommitPersistenceTest.java — P2 commit-cadence receipt instrumentation — durable
 

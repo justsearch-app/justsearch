@@ -66,7 +66,8 @@ class EnrichmentMapperDispositionTest extends LuceneExecutorTestBase {
       runtime.commitOps().maybeRefreshBlocking();
       assertEquals("FAILED", runtime.documentFieldOps().getDocumentField("parent", SchemaFields.EMBEDDING_STATUS));
       assertEquals("0", runtime.documentFieldOps().getDocumentField("parent", SchemaFields.EMBEDDING_RETRY_COUNT));
-      assertEquals(0, outcome.embedProcessed(), "a mapper-rejected vector is not a completed embedding");
+      assertEquals(1, outcome.embedProcessed(),
+          "the existing completion count keeps its input; the correction is reported below");
       assertNotNull(receipt.get());
       assertEquals(Map.of("parent", Set.of(SchemaFields.EMBEDDING_STATUS)),
           receipt.get().correctedFailedStatuses());
@@ -112,7 +113,8 @@ class EnrichmentMapperDispositionTest extends LuceneExecutorTestBase {
       assertEquals("0", runtime.documentFieldOps().getDocumentField("parent", SchemaFields.EMBEDDING_RETRY_COUNT));
       assertTrue(outcome.success(), "preserve the existing routing signal");
       verify(commits).commitAndTrack(io.justsearch.adapters.lucene.runtime.CommitReason.BACKFILL_EMBEDDING);
-      assertEquals(0, outcome.docsProcessed());
+      assertEquals(1, outcome.docsProcessed(),
+          "the existing completion count keeps its input; the correction is reported below");
       assertEquals(1, outcome.accounting().count(
           EnrichmentAccounting.Stage.EMBED, EnrichmentAccounting.Disposition.REJECTED_OUTPUT));
       assertEquals(1L, outcome.accounting().counters().get("embed.computed"));

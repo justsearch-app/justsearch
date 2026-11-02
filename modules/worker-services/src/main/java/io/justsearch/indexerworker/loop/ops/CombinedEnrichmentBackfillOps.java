@@ -345,7 +345,6 @@ public final class CombinedEnrichmentBackfillOps {
     long attemptStart = System.nanoTime();
     long phaseStart = attemptStart;
     String activePhase = "fetch";
-    EnrichmentBatch publicationBatch = null;
     Map<String, Map<String, Object>> updatesByDocId = new LinkedHashMap<>();
     int unitsDone = 0;
     long epochAtSelection;
@@ -474,7 +473,6 @@ public final class CombinedEnrichmentBackfillOps {
 
       // Phase 1: Batch content fetch (single searcher, all docs)
       EnrichmentBatch batch = new EnrichmentBatch(context.documentFieldOps(), context.indexingCoordinator(), pendingIds).accounting(accounting);
-      publicationBatch = batch;
       Map<String, String> contentByDocId = batch.contents();
 
       Map<String, Map<String, String>> batchedFields = batch.fields();
@@ -1377,24 +1375,52 @@ public final class CombinedEnrichmentBackfillOps {
         }
         var result = batch.updateBatch(batchUpdates);
         written = result.updatedCount();
-        context.publishedDocIds().addAll(batch.acceptedIds());
+        // The exclusion set keeps its pre-receipt members: later batches in this cycle exclude
+        // exactly the documents they excluded before publication receipts existed. Receipts feed
+        // only the outcome accounting (docs/tempdocs/711-rmw-preservation-and-followup-designs.md).
+        if (written == batchUpdates.size()) {
+          for (var entry : batchUpdates) context.publishedDocIds().add(entry.getKey());
+        } else {
+          // Do not hide a replacement revision; the writer's existing reader can distinguish it
+          // without an additional NRT refresh.
+          var current = context.documentFieldOps().getEnrichmentInputs(
+              batchUpdates.stream().map(Map.Entry::getKey).toList());
+          for (var entry : batchUpdates) {
+            String id = entry.getKey();
+            var input = current.get(id);
+            if (input == null || !java.util.Objects.equals(contentByDocId.get(id), input.content())) continue;
+            Map<String, String> previousFields = new HashMap<>(batchedFields.getOrDefault(id, Map.of()));
+            Map<String, String> currentFields = new HashMap<>(input.fields());
+            previousFields.keySet().removeAll(entry.getValue().keySet());
+            currentFields.keySet().removeAll(entry.getValue().keySet());
+            if (previousFields.equals(currentFields)) context.publishedDocIds().add(id);
+          }
+        }
       }
       boolean completeBatchWrite = written == batchUpdates.size() && written > 0;
-      Set<String> acceptedIds = batch.acceptedIds();
-      for (String docId : completedWindowDocIds) {
-        if (completeBatchWrite && acceptedIds.contains(docId)) context.windowedEmbedProgress().forget(docId);
+      if (completeBatchWrite) {
+        Set<String> writtenDocIds = new HashSet<>();
+        for (var entry : batchUpdates) {
+          writtenDocIds.add(entry.getKey());
+        }
+        for (String docId : completedWindowDocIds) {
+          if (writtenDocIds.contains(docId)) {
+            context.windowedEmbedProgress().forget(docId);
+          }
+        }
       }
-      int embedProcessed = (int) batchUpdates.stream().filter(entry -> acceptedIds.contains(entry.getKey())
-          && ((entry.getValue().get(SchemaFields.VECTOR) instanceof float[]
-                  && !batch.rejectedOutput(entry.getKey(), SchemaFields.EMBEDDING_STATUS))
-              || (entry.getValue().get(SchemaFields.CHUNK_VECTOR) instanceof float[]
-                  && !batch.rejectedOutput(entry.getKey(), SchemaFields.CHUNK_EMBEDDING_STATUS)))).count();
-      int spladeProcessed = (int) batchUpdates.stream().filter(entry -> acceptedIds.contains(entry.getKey())
-          && (SchemaFields.SPLADE_STATUS_COMPLETED.equals(entry.getValue().get(SchemaFields.SPLADE_STATUS))
-              || SchemaFields.SPLADE_STATUS_COMPLETED_EMPTY.equals(entry.getValue().get(SchemaFields.SPLADE_STATUS)))).count();
-      int nerProcessed = (int) batchUpdates.stream().filter(entry -> acceptedIds.contains(entry.getKey())
-          && (SchemaFields.NER_STATUS_COMPLETED.equals(entry.getValue().get(SchemaFields.NER_STATUS))
-              || SchemaFields.NER_STATUS_COMPLETED_EMPTY.equals(entry.getValue().get(SchemaFields.NER_STATUS)))).count();
+      // These counts feed the metrics that existed before publication receipts, so they keep
+      // their complete-batch inputs; per-document receipts and writer corrections feed only the
+      // outcome accounting.
+      int embedProcessed = completeBatchWrite ? (int) batchUpdates.stream().filter(entry ->
+          entry.getValue().containsKey(SchemaFields.VECTOR)
+              || entry.getValue().containsKey(SchemaFields.CHUNK_VECTOR)).count() : 0;
+      int spladeProcessed = completeBatchWrite ? (int) batchUpdates.stream().filter(entry ->
+          entry.getValue().containsKey(SchemaFields.SPLADE)).count() : 0;
+      int nerProcessed = completeBatchWrite ? (int) batchUpdates.stream().filter(entry ->
+          SchemaFields.NER_STATUS_COMPLETED.equals(entry.getValue().get(SchemaFields.NER_STATUS))
+              || SchemaFields.NER_STATUS_COMPLETED_EMPTY.equals(
+                  entry.getValue().get(SchemaFields.NER_STATUS))).count() : 0;
       if (completeBatchWrite && !spladeTerminalFailures.isEmpty()) {
         context.log().warn("Combined backfill: {} document(s) reached terminal SPLADE FAILED: {}",
             spladeTerminalFailures.size(), spladeTerminalFailures);
@@ -1519,7 +1545,6 @@ public final class CombinedEnrichmentBackfillOps {
         default -> fetchMs = elapsedPhaseMs;
       }
       totalMs = (System.nanoTime() - attemptStart) / 1_000_000;
-      if (publicationBatch != null) context.publishedDocIds().addAll(publicationBatch.acceptedIds());
       context.log().info("Enrichment dispositions: {}", accounting.snapshot().counters());
       context.log().error("Error during combined enrichment backfill", e);
       return attemptStarted

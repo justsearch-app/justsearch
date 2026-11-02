@@ -14,8 +14,6 @@ import java.util.function.IntFunction;
 final class EnrichmentBatch {
   private final IndexingCoordinator coordinator;
   private EnrichmentAccounting accounting;
-  private final java.util.Set<String> acceptedIds = new java.util.HashSet<>();
-  private final Map<String, java.util.Set<String>> correctedFailedStatuses = new HashMap<>();
   private final Map<String, DocumentFieldOps.EnrichmentInput> inputs;
 
   EnrichmentBatch(DocumentFieldOps fields, IndexingCoordinator coordinator, List<String> ids)
@@ -33,12 +31,6 @@ final class EnrichmentBatch {
   EnrichmentBatch accounting(EnrichmentAccounting accounting) {
     this.accounting = accounting;
     return this;
-  }
-
-  java.util.Set<String> acceptedIds() { return java.util.Set.copyOf(acceptedIds); }
-
-  boolean rejectedOutput(String id, String statusField) {
-    return correctedFailedStatuses.getOrDefault(id, java.util.Set.of()).contains(statusField);
   }
 
   java.util.Set<String> ids() {
@@ -81,8 +73,6 @@ final class EnrichmentBatch {
         ? new io.justsearch.adapters.lucene.runtime.LuceneRuntimeTypes.EnrichmentPublicationReceipt(
             List.of(), List.of(id), null)
         : coordinator.publishEnrichmentBatch(List.of(Map.entry(id, updates)), Map.of(id, inputs.get(id)));
-    acceptedIds.addAll(receipt.acceptedIds());
-    correctedFailedStatuses.putAll(receipt.correctedFailedStatuses());
     if (accounting != null) accounting.published(List.of(Map.entry(id, updates)), receipt);
     boolean accepted = receipt.result().updatedCount() == 1;
     return accepted;
@@ -91,8 +81,6 @@ final class EnrichmentBatch {
   BatchUpdateResult updateBatch(List<Map.Entry<String, Map<String, Object>>> updates) {
     if (accounting != null) updates.forEach(entry -> accounting.computed(entry.getKey(), entry.getValue()));
     var receipt = coordinator.publishEnrichmentBatch(updates, inputs);
-    acceptedIds.addAll(receipt.acceptedIds());
-    correctedFailedStatuses.putAll(receipt.correctedFailedStatuses());
     if (accounting != null) accounting.published(updates, receipt);
     return receipt.result();
   }

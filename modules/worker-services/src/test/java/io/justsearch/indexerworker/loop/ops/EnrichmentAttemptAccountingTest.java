@@ -145,7 +145,8 @@ class EnrichmentAttemptAccountingTest {
     assertEquals(2L, outcome.accounting().counters().get("splade.computed"));
     assertEquals(2L, outcome.accounting().counters().get("splade.accepted"));
     assertEquals(1L, outcome.accounting().counters().get("splade.failed"));
-    assertEquals(1, outcome.spladeProcessed());
+    assertEquals(0, outcome.spladeProcessed(),
+        "the existing count keeps its complete-batch rule; the receipt feeds only the accounting");
   }
 
   @Test
@@ -161,7 +162,8 @@ class EnrichmentAttemptAccountingTest {
     assertEquals(1, outcome.accounting().count(EMBED, PUBLISHED));
     assertEquals(2, outcome.accounting().count(EMBED, DEFERRED));
     assertEquals(3L, outcome.accounting().counters().get("embed.computed"));
-    assertEquals(java.util.Set.of("accepted"), context.publishedDocIds());
+    assertEquals(java.util.Set.of(), context.publishedDocIds(),
+        "the cycle's exclusion set keeps its members; the receipt feeds only the accounting");
     assertFalse(outcome.progressed(), "publication failure retains the existing loop stop signal");
     verifyNoInteractions(commits);
   }

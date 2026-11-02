@@ -653,6 +653,17 @@ class BackfillSchedulerSlowBatchTest {
         "pending ingest, rather than the cycle budget, ends the tight loop");
   }
 
+  /**
+   * An individual retry publishes one document against its own one-entry input snapshot
+   * ({@code EnrichmentBatch.update}); combined batches publish against the whole batch's inputs.
+   */
+  private void assertNoIndividualPublication() {
+    verify(indexingCoordinator, never()).publishEnrichmentBatch(
+        argThat(updates -> updates.size() == 1), argThat(inputs -> inputs.size() == 1));
+    verify(indexingCoordinator, never()).updateDocumentIf(
+        anyString(), any(DocumentFieldOps.EnrichmentInput.class), any());
+  }
+
   private void wirePopulation(Map<String, Map<String, Object>> state) {
     embedMsPerDoc = 0;
     lenient().when(documentFieldOps.queryDocIdsByField(anyString(), anyString(), anyInt()))
@@ -762,8 +773,7 @@ class BackfillSchedulerSlowBatchTest {
       for (String id : failedSliceIds) assertTrue(failedTexts.contains("long content for " + id));
       assertFalse(loggedAtLevel(ch.qos.logback.classic.Level.WARN, "ZERO stage advancement"));
     }
-    verify(indexingCoordinator, never()).updateDocumentIf(
-        anyString(), any(DocumentFieldOps.EnrichmentInput.class), any());
+    assertNoIndividualPublication();
   }
 
   @ParameterizedTest(name = "{displayName} [{index}] {arguments}")
@@ -848,8 +858,7 @@ class BackfillSchedulerSlowBatchTest {
         "the failing head must actually reach sparse inference");
     assertTrue(monotonicNanos.get() < CYCLE_BUDGET_MS * 1_000_000L);
     assertFalse(loggedAtLevel(ch.qos.logback.classic.Level.WARN, "ZERO stage advancement"));
-    verify(indexingCoordinator, never()).updateDocumentIf(
-        anyString(), any(DocumentFieldOps.EnrichmentInput.class), any());
+    assertNoIndividualPublication();
     return state;
   }
 
