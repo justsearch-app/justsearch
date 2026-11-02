@@ -323,6 +323,23 @@ final class SyncRootPromotionCrashRecoveryTest {
         "S7 parity, including the collection deleted after its sync: B equals the control");
   }
 
+  @Test
+  void broadDeleteThenRestoringSyncPublishesAfterPromotionCrash(@TempDir Path temporary)
+      throws Exception {
+    Path root = Files.createDirectories(temporary.resolve("crash"));
+    Path control = Files.createDirectories(temporary.resolve("control"));
+    all(() -> migrateAndCut(root, "NATIVE", "restoring-broad", AFTER_POINTER),
+        () -> migrateAndCut(control, "NATIVE", "restoring-broad", UNINTERRUPTED));
+    var restarts = all(() -> restart(root, "NATIVE", "restoring-broad", "restart"),
+        () -> restart(control, "NATIVE", "restoring-broad", "restart"));
+    var restarted = restarts.get(0);
+    assertTrue(restarted.published(), "restoring sync survivors must not hold boot after promotion");
+    assertRootSyncsSettled("ordered delete then restoring sync", restarted);
+    assertHits(restarted, "keeptoken", "watched/keep.txt");
+    assertHits(restarted, "archivekeeptoken", "archive/keep.txt");
+    assertEquals(parity(restarts.get(1)), parity(restarted));
+  }
+
   // ---- parent side ----
 
   private record Restart(Path root, boolean published, boolean settled, boolean halted, long seconds,
@@ -934,6 +951,14 @@ final class SyncRootPromotionCrashRecoveryTest {
         delete(queue, building, root.resolve("watched/d-after.txt"));
         Files.delete(root.resolve("other/o-delete.txt"));
         delete(queue, building, root.resolve("other/o-delete.txt"));
+      }
+      case "restoring-broad" -> {
+        write(root, "watched/keep.txt", "keeptoken");
+        deletePrefix(queue, building, root.resolve("watched"));
+        syncRoot(queue, building, root.resolve("watched"), true, null);
+        write(root, "archive/keep.txt", "archivekeeptoken");
+        assertTrue(queue.putSwitchBufferForGeneration(building, "collection:archive", "DELETE_COLLECTION", "archive"));
+        syncRoot(queue, building, root.resolve("archive"), true, null);
       }
       case "projection" -> {
         // Both broad deletes cover "early", accepted before them; "later" is accepted after

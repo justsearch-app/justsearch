@@ -204,7 +204,8 @@ final class RecordedWalkSealTest {
       var claim = queue.pollPending(1).getFirst();
       execute(db, "CREATE TRIGGER refuse_admin_ledger BEFORE INSERT ON ingestion_ledger "
           + "BEGIN SELECT RAISE(ABORT, 'fixture rollback'); END");
-      assertTrue(removeAdministratively(queue, file, selector) <= 0);
+      if (selector == 0) assertThrows(IllegalStateException.class, queue::clearAll);
+      else assertTrue(removeAdministratively(queue, file, selector) <= 0);
       assertEquals("PROCESSING", string(db, "SELECT state FROM jobs WHERE path = '" + normalized(file) + "'"));
       assertEquals(0, count(db, "SELECT count(*) FROM ingestion_ledger WHERE operation_key = '" + key + "'"));
       execute(db, "DROP TRIGGER refuse_admin_ledger");

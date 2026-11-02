@@ -195,15 +195,11 @@ final class ComponentsFactory {
         boolean fullScan = "FULL".equalsIgnoreCase(integrityTier);
         // Dirty-open escalation (Gap 1): STRUCTURAL is cheap but misses silent body bit-rot. After an
         // *unclean* shutdown (an absent clean-shutdown marker), escalate to a thorough FULL scan once,
-        // so post-crash body corruption is detected without paying FULL on every clean boot. Gated to
-        // the read-only/deferred-first open — the deferred writer-upgrade reopens read-write and must
-        // not re-pay FULL on a healthy index (the read-only open already verified it).
+        // so post-crash body corruption is detected without paying FULL on every clean boot.
         //
-        // Reads the marker without consuming it (tempdoc 915 O14): this open takes no writer, so it
-        // cannot leave the index unclean, and clearing a marker it will never re-write made every
-        // subsequent read-only boot report a crash that did not happen. The clear moves to the
-        // writer open below.
-        if (readOnly && !fullScan) {
+        // Read before opening a writer (tempdoc 915 O14). Read-only opens preserve the marker;
+        // the writer open below invalidates it before allowing any writes.
+        if (!fullScan) {
           boolean cleanLastShutdown = CleanShutdownMarker.wasClean(resolvedPath);
           if (!cleanLastShutdown) {
             log.info(

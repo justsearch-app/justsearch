@@ -135,6 +135,9 @@ public class IndexingLoop implements Closeable {
   private final AtomicBoolean running = new AtomicBoolean(false);
   // Wake cooperative stop without interrupting an owner of Lucene NIO channels.
   private final Object stopMonitor = new Object();
+  private boolean restartRequested;
+  private boolean loopExited = true;
+  private volatile boolean finalPublicationComplete = true;
   private volatile long serviceOutagePausedUntilMs;
   private final BatchServiceFailures queueFailures = new BatchServiceFailures();
   private final WorkerIngestionAuthority ingestionAuthority = new WorkerIngestionAuthority();
@@ -192,7 +195,7 @@ public class IndexingLoop implements Closeable {
   }
 
   private volatile LoopState currentState = LoopState.IDLE;
-  private Thread loopThread;
+  private volatile Thread loopThread;
   private final CountDownLatch activationGate = new CountDownLatch(1);
   private final Object probePublicationMonitor = new Object();
   private final Object cutoverPauseMonitor = new Object();
@@ -573,6 +576,7 @@ public class IndexingLoop implements Closeable {
    */
   private void tryFinalizeEmbeddingRebuild() {
     if (embeddingLifecycle.tryFinalizeRebuild()) {
+      commitActiveLexicalSource(CommitReason.INDEXING_LOOP_REBUILD_STAMP);
       metrics.recordCommit();
       lastCommitTime = System.currentTimeMillis();
       indexedSinceCommit = 0;
@@ -587,6 +591,7 @@ public class IndexingLoop implements Closeable {
    */
   private void tryFinalizeEmbeddingRebuildAtShutdown() {
     if (embeddingLifecycle.tryFinalizeRebuildAtShutdown()) {
+      commitActiveLexicalSource(CommitReason.INDEXING_LOOP_REBUILD_STAMP);
       metrics.recordCommit();
       lastCommitTime = System.currentTimeMillis();
       indexedSinceCommit = 0;
@@ -602,6 +607,7 @@ public class IndexingLoop implements Closeable {
    */
   private void tryFinalizeFreshCompatibleEmbeddingStamp() {
     if (embeddingLifecycle.tryFinalizeFreshCompatibleStamp()) {
+      commitActiveLexicalSource(CommitReason.INDEXING_LOOP_FRESH_STAMP);
       metrics.recordCommit();
       lastCommitTime = System.currentTimeMillis();
       indexedSinceCommit = 0;
@@ -626,17 +632,28 @@ public class IndexingLoop implements Closeable {
 
   /** Starts the thread behind a gate so construction can fail before a successor is published. */
   public void prepareStart() {
-    if (running.compareAndSet(false, true)) {
+    synchronized (stopMonitor) {
+      if (loopThread != null && loopThread.isAlive() && !loopExited) {
+        if (!running.get()) restartRequested = true;
+        return;
+      }
+      loopExited = false;
+      running.set(true);
+      finalPublicationComplete = false;
       currentState = LoopState.IDLE;
-      loopThread = new Thread(this::runLoop, "indexing-loop");
+      loopThread = new Thread(this::runOwnedLoop, "indexing-loop");
       loopThread.setDaemon(true);
       // Tempdoc 588 F-1 defense-in-depth: if the loop thread ever dies uncaught, flip `running`
       // so isRunning() (which ANDs loopThread.isAlive()) doesn't keep advertising a dead loop.
       loopThread.setUncaughtExceptionHandler(
           (thread, ex) -> {
             // Publish before logging: a heap failure can prevent the logger from allocating.
-            currentState = LoopState.FAILED;
-            running.set(false);
+            synchronized (stopMonitor) {
+              if (loopThread == thread) {
+                currentState = LoopState.FAILED;
+                running.set(false);
+              }
+            }
             log.error("Indexing loop thread '{}' died uncaught — indexing has halted", thread.getName(), ex);
           });
       loopThread.start();
@@ -681,6 +698,34 @@ public class IndexingLoop implements Closeable {
     if (normalizedPaths != null && !normalizedPaths.isEmpty()) {
       forcedPaths.addAll(normalizedPaths);
       log.debug("Marked {} paths for force reindex", normalizedPaths.size());
+    }
+  }
+
+  private void runOwnedLoop() {
+    try {
+      do {
+        runLoop();
+        synchronized (stopMonitor) {
+          running.set(false);
+          if (!restartRequested) {
+            loopExited = true;
+            return;
+          }
+          restartRequested = false;
+          finalPublicationComplete = false;
+          running.set(true);
+        }
+      } while (true);
+    } catch (Throwable failure) {
+      currentState = LoopState.FAILED;
+      throw failure;
+    } finally {
+      synchronized (stopMonitor) {
+        if (loopThread == Thread.currentThread()) {
+          running.set(false);
+          loopExited = true;
+        }
+      }
     }
   }
 
@@ -907,7 +952,7 @@ public class IndexingLoop implements Closeable {
       // A failed SQL outcome write can outlive its successful index commit. With no new index
       // work there is nothing to commit, but the exact committed transition still needs retry.
       journal.drainPending();
-      return true;
+      return journal.publicationComplete();
     } catch (RuntimeException e) {
       log.error("Failed to commit index or record outcomes on idle", e);
       return false;
@@ -937,10 +982,10 @@ public class IndexingLoop implements Closeable {
    * {@link EmbeddingProviderLifecycle#tryFinalizeRebuildAtShutdown()}.
    */
   private void finalizeShutdownCommit() {
-    tryFinalizeEmbeddingRebuildAtShutdown();
-    tryFinalizeFreshCompatibleEmbeddingStamp();
-
+    finalPublicationComplete = false;
     try {
+      tryFinalizeEmbeddingRebuildAtShutdown();
+      tryFinalizeFreshCompatibleEmbeddingStamp();
       if (indexedSinceCommit > 0) {
         long commitStart = System.currentTimeMillis();
         commitActiveLexicalSource(CommitReason.INDEXING_LOOP_SHUTDOWN);
@@ -951,6 +996,7 @@ public class IndexingLoop implements Closeable {
         indexedSinceCommit = 0;
       }
       journal.drainPending();
+      finalPublicationComplete = journal.publicationComplete();
     } catch (RuntimeException e) {
       log.error("Failed final commit", e);
     }
@@ -1007,6 +1053,7 @@ public class IndexingLoop implements Closeable {
 
   private void requestStop() {
     synchronized (stopMonitor) {
+      restartRequested = false;
       running.set(false);
       stopMonitor.notifyAll();
     }
@@ -1256,7 +1303,7 @@ public class IndexingLoop implements Closeable {
    * @return true if the loop is running
    */
   public boolean isRunning() {
-    return running.get() && loopThread != null && loopThread.isAlive();
+    return activationGate.getCount() == 0 && running.get() && loopThread != null && loopThread.isAlive();
   }
 
   /** True only after a fatal loop event; an intentional stop or deferred startup is not failure. */
@@ -1276,7 +1323,7 @@ public class IndexingLoop implements Closeable {
     long timeoutNanos = java.util.concurrent.TimeUnit.MILLISECONDS.toNanos(Math.max(1L, timeoutMs));
     long deadline = System.nanoTime() + timeoutNanos;
     synchronized (cutoverPauseMonitor) {
-      if (!isRunning()) return true;
+      if (!isRunning()) return loopThread == null || !loopThread.isAlive();
       cutoverPauseRequested = true;
       cutoverPauseMonitor.notifyAll();
       while (!cutoverPaused && isRunning()) {
@@ -1310,8 +1357,11 @@ public class IndexingLoop implements Closeable {
       throws InterruptedException {
     synchronized (cutoverPauseMonitor) {
       if (!cutoverPauseRequested) return false;
-      if (!finishIdleCommit()) throw new IllegalStateException("Cutover publication failed");
-      commitOps.maybeRefreshBlocking();
+    }
+    if (!finishIdleCommit()) throw new IllegalStateException("Cutover publication failed");
+    commitOps.maybeRefreshBlocking();
+    synchronized (cutoverPauseMonitor) {
+      if (!cutoverPauseRequested || !running.get()) return false;
       if (lease != null) lease.close();
       cutoverPaused = true;
       transitionToPaused();
@@ -1340,33 +1390,26 @@ public class IndexingLoop implements Closeable {
    * {@link #resumeAfterUpgradePreparation()}.
    */
   public synchronized boolean quiesceForUpgrade(long timeoutMs) {
-    if (!isRunning()) {
-      return true;
-    }
     requestStop();
+    resumeAfterCutover();
     Thread thread = loopThread;
     if (thread != null) {
+      activationGate.countDown();
       try {
         thread.join(Math.max(1L, timeoutMs));
       } catch (InterruptedException e) {
         Thread.currentThread().interrupt();
         return false;
       }
-      if (thread.isAlive()) {
-        // Preparation is reversible. Let the current loop continue when its in-flight batch
-        // returns rather than leaving the Worker half-stopped.
-        running.set(true);
-        return false;
-      }
+      if (thread.isAlive()) return false;
     }
-    return true;
+    if (!finalPublicationComplete) finalizeShutdownCommit();
+    return finalPublicationComplete;
   }
 
   /** Resume a loop stopped by {@link #quiesceForUpgrade(long)}. Idempotent. */
   public synchronized void resumeAfterUpgradePreparation() {
-    if (!isRunning()) {
-      start();
-    }
+    start();
   }
 
   /**
@@ -1506,7 +1549,8 @@ public class IndexingLoop implements Closeable {
    * @param externalCleanup runs while the loop is stopped (Lucene wipe, queue clear, etc.)
    * @throws IllegalStateException if the loop thread does not stop within 5 seconds
    */
-  public void resetForProfiling(Runnable externalCleanup) throws InterruptedException {
+  public synchronized void resetForProfiling(Runnable externalCleanup) throws InterruptedException {
+    if (Thread.currentThread().isInterrupted()) throw new InterruptedException("Reset caller interrupted");
     log.info("resetForProfiling: stopping loop...");
 
     // 1. Stop the loop thread by setting running=false and waiting for it to exit.
@@ -1518,12 +1562,19 @@ public class IndexingLoop implements Closeable {
     // observes running=false and exits. This is safe because the externalCleanup
     // callback calls deleteAll() which wipes the index unconditionally.
     requestStop();
+    resumeAfterCutover();
     if (loopThread != null) {
-      loopThread.join(10_000);
+      activationGate.countDown();
+      try {
+        loopThread.join(10_000);
+      } catch (InterruptedException interrupted) {
+        start();
+        throw interrupted;
+      }
       if (loopThread.isAlive()) {
         // Thread stuck in long-running work (e.g. native ORT call). Unsafe to proceed
         // with cleanup — concurrent Lucene writes would corrupt the index.
-        running.set(true); // allow the thread to keep running when it unblocks
+        start();
         throw new IllegalStateException(
             "IndexingLoop thread did not stop within 10s — reset aborted");
       }

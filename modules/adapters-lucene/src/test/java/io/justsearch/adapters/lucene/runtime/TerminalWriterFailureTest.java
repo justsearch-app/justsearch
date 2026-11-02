@@ -2,6 +2,7 @@
 package io.justsearch.adapters.lucene.runtime;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -217,7 +218,7 @@ final class TerminalWriterFailureTest extends LuceneExecutorTestBase {
   }
 
   @Test
-  void claimedRuntimeConsumesLateNrtFailureAfterSnapshotIsCleared() throws Exception {
+  void claimedRuntimeConsumesLateNrtFailureAcrossRetriedCleanup() throws Exception {
     Thread.UncaughtExceptionHandler prior = Thread.getDefaultUncaughtExceptionHandler();
     AtomicInteger fallbacks = new AtomicInteger();
     Thread.setDefaultUncaughtExceptionHandler(
@@ -237,13 +238,19 @@ final class TerminalWriterFailureTest extends LuceneExecutorTestBase {
       runtime.session().reportTerminalWriterFailureIfPresent();
 
       assertThrows(RuntimeException.class, runtime::close);
-      assertTrue(runtime.session().snapshot == null);
+      assertNotNull(runtime.session().snapshot, "failed close retains cleanup owners for retry");
       handler.uncaughtException(nrt, new AlreadyClosedException("late NRT observation"));
 
       assertEquals(1, reports.get());
       assertEquals(0, fallbacks.get());
+      runtime.close();
+      assertTrue(runtime.session().snapshot == null);
+      handler.uncaughtException(nrt, new AlreadyClosedException("observation after retry completed"));
+      assertEquals(1, reports.get());
+      assertEquals(0, fallbacks.get());
     } finally {
-      Thread.setDefaultUncaughtExceptionHandler(prior);
+      try { runtime.close(); }
+      finally { Thread.setDefaultUncaughtExceptionHandler(prior); }
     }
   }
 
