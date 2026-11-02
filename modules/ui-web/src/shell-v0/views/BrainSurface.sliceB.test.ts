@@ -282,6 +282,15 @@ describe('Brain step 1 review repairs', () => {
     emit({ runtimeStatus: { onnxFeatures: [{ id: 'reranker', status: 'unknown', modelActive: true }] } }); await el.updateComplete;
     expect(el.shadowRoot!.querySelector('[data-feature="reranker"]')!.textContent).toContain('Unknown');
   });
+  it('S2 Advanced applies the same rule: a loaded but inactive feature is not in use or counted active', async () => {
+    emit({ runtimeStatus: { onnxFeatures: [{ id: 'embed', status: 'active', modelActive: true }, { id: 'reranker', status: 'inactive', modelActive: true }] } });
+    const el = await mount(); await advanced(el);
+    expect(el.shadowRoot!.querySelector('[data-testid="component-row-embedding"]')!.textContent).toContain('in use');
+    expect(el.shadowRoot!.querySelector('[data-testid="component-row-reranker"]')!.textContent).toContain('Downloaded');
+    expect(el.shadowRoot!.querySelector('[data-testid="component-row-reranker"]')!.textContent).not.toContain('in use');
+    expect(el.shadowRoot!.querySelector('[data-testid="brain-observed-features"] h4')!.textContent).toContain('1/2 active');
+    expect(el.shadowRoot!.querySelector('[data-feature="reranker"]')!.textContent).toContain('Off');
+  });
   it.each(['pending', 'failed'])('S3 saved answer intent is unknown and blocked while initial settings are %s', async outcome => {
     let release!: (value: Response) => void;
     settingsGet = outcome === 'pending' ? () => new Promise(resolve => { release = resolve; }) : async () => json({}, 503);

@@ -219,7 +219,18 @@ export function observedEpLabel(f: OnnxFeatureRow): string {
   // Tempdoc 806 B.2: the Worker-owned encoder rows (embed, splade) can be status:'unknown' before
   // the policy snapshot lands. "inactive" would be a confident negative about a state we cannot see.
   if (f.status === 'unknown') return 'unknown';
-  return f.modelActive ? 'active' : 'inactive';
+  return featureInUse(f) ? 'active' : 'inactive';
+}
+
+/**
+ * Whether the runtime observes this ONNX feature working now: a loaded model whose status is not
+ * 'inactive'. `status:'inactive', modelActive:true` is a disabled feature whose Worker session stays
+ * loaded (RuntimeActivationService), so a loaded model alone is not "in use". 'unknown' is `null`.
+ * The endpoint always sends a status; an absent one keeps the pre-redesign reading of modelActive.
+ */
+export function featureInUse(f: OnnxFeatureRow | undefined): boolean | null {
+  if (f == null || f.status === 'unknown') return null;
+  return f.status !== 'inactive' && f.modelActive === true;
 }
 
 /**
@@ -2557,7 +2568,7 @@ export class BrainSurface extends JfElement {
 
   private renderSearchQualityFeatures(): TemplateResult {
     const features = this.runtimeStatus?.onnxFeatures ?? [];
-    const activeCount = features.filter((f) => f.modelActive).length;
+    const activeCount = features.filter((f) => featureInUse(f) === true).length;
     // Tempdoc 807 A.3 — "N/N active" is a PRESENT-tense claim read off the retained runtime snapshot;
     // round 13 photographed "4/4 active" with the backend dead. Not live ⟹ the count is history, and
     // the per-feature green dot (which asserts "running right now") drops to neutral.
@@ -2577,7 +2588,7 @@ export class BrainSurface extends JfElement {
                           ? 'neutral'
                           : f.gpuFallback
                             ? 'warning'
-                            : f.modelActive
+                            : featureInUse(f) === true
                               ? 'success'
                               : 'neutral'}
                         style="margin-right: 0.5rem; vertical-align: middle"
@@ -2705,7 +2716,7 @@ export class BrainSurface extends JfElement {
           <span class="component-label">${r.label}</span>
           ${/* Rendered ONLY when the state deviates from installed — `stateText` is null otherwise, so
                 the absence of text IS "installed" (840 post-review C.2). */ ''}
-          ${this.packagePresent(r.id) ? html`<span class="component-state">Downloaded${this._unifiedAiState?.snapshotLive && (r.id === 'chat' ? this.runtimeStatus?.active?.modelPath != null : this.runtimeStatus?.onnxFeatures?.some(f => f.id === (r.id === 'embedding' ? 'embed' : r.id) && f.status !== 'unknown' && f.modelActive)) ? ' · in use' : ''}</span>` : nothing}
+          ${this.packagePresent(r.id) ? html`<span class="component-state">Downloaded${this._unifiedAiState?.snapshotLive && (r.id === 'chat' ? this.runtimeStatus?.active?.modelPath != null : this.runtimeStatus?.onnxFeatures?.some(f => f.id === (r.id === 'embedding' ? 'embed' : r.id) && featureInUse(f) === true)) ? ' · in use' : ''}</span>` : nothing}
           ${r.stateText
             ? html`<span class="component-state" data-testid="component-state-${r.id}"
                 >${r.stateText}</span

@@ -653,6 +653,7 @@ axe run remain necessary.
         "modules/ui-web/src/shell-v0/views/BrainSurface.sliceB.test.ts#S1 only reading memory can reset automatically and persists zero through backend merge",
         "modules/ui-web/src/shell-v0/views/BrainSurface.sliceB.test.ts#S1 reading memory Automatic sends zero rather than a null no-op",
         "modules/ui-web/src/shell-v0/views/BrainSurface.sliceB.test.ts#S2 inactive loaded sessions are off and never promised, while unknown remains unknown",
+        "modules/ui-web/src/shell-v0/views/BrainSurface.sliceB.test.ts#S2 Advanced applies the same rule: a loaded but inactive feature is not in use or counted active",
         "modules/ui-web/src/shell-v0/views/BrainSurface.sliceB.test.ts#S4 installed systems retain an additions Install action with selected size and exact consent",
         "modules/ui-web/src/shell-v0/views/BrainSurface.sliceB.test.ts#S5 disconnect during picture reading uses last-observed wording until a live completion",
         "modules/ui-web/src/shell-v0/views/BrainSurface.sliceB.test.ts#S7 every phrase, step and About opener shares expanded state and panel association",

@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
   },
-  "createdAt": "2026-11-02T07:45:38.695Z",
-  "revision": "f2f1945c23e621be24776621de89283e5d2e3d62",
-  "tree": "94c68f2a7a1b52ec0502155f9d9686bc70cb08fc",
+  "createdAt": "2026-11-02T08:04:09.287Z",
+  "revision": "b09df878ec2932dbbdca15fc9bb010e0f55c21da",
+  "tree": "6b5f879ff6b6619fc0cc48b33d686c400b5b7ea1",
   "environment": {
     "platform": "linux",
     "arch": "x64",
@@ -18,10 +18,10 @@
   },
   "runs": [
     {
-      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/BrainSurface.ui-mode.test.ts\" \"src/shell-v0/views/BrainSurface.pausedInstall.test.ts\" \"src/shell-v0/views/BrainSurface.snapshotLiveness.test.ts\" \"src/shell-v0/views/BrainSurface.telemetry-mode.test.ts\" \"src/shell-v0/state/aiStateStore.restartInference.test.ts\" \"src/shell-v0/state/brainPage.test.ts\" \"src/shell-v0/views/BrainSurface.redesign.test.ts\" \"src/shell-v0/views/BrainSurface.installRefresh.test.ts\" \"src/shell-v0/views/BrainSurface.repairRemedy.test.ts\" \"src/shell-v0/views/BrainSurface.skipReason.test.ts\" \"src/shell-v0/views/BrainSurface.sparkline.test.ts\" \"src/shell-v0/views/BrainSurface.sliceB.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/g_6kr5uz/tmp/test-intent-vitest-511-1793605533974.json\"",
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/BrainSurface.ui-mode.test.ts\" \"src/shell-v0/views/BrainSurface.pausedInstall.test.ts\" \"src/shell-v0/views/BrainSurface.snapshotLiveness.test.ts\" \"src/shell-v0/views/BrainSurface.telemetry-mode.test.ts\" \"src/shell-v0/state/aiStateStore.restartInference.test.ts\" \"src/shell-v0/state/brainPage.test.ts\" \"src/shell-v0/views/BrainSurface.redesign.test.ts\" \"src/shell-v0/views/BrainSurface.installRefresh.test.ts\" \"src/shell-v0/views/BrainSurface.repairRemedy.test.ts\" \"src/shell-v0/views/BrainSurface.skipReason.test.ts\" \"src/shell-v0/views/BrainSurface.sparkline.test.ts\" \"src/shell-v0/views/BrainSurface.sliceB.test.ts\" --reporter=json --outputFile=\"/tmp/test-intent-vitest-2596965-1793606644523.json\"",
       "cwd": "modules/ui-web",
       "exitCode": 0,
-      "durationMs": 4720
+      "durationMs": 4762
     }
   ],
   "checks": [
@@ -586,7 +586,7 @@
       "id": "modules/ui-web/src/shell-v0/views/BrainSurface.sliceB.test.ts",
       "file": "modules/ui-web/src/shell-v0/views/BrainSurface.sliceB.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:75eff2e2eda481e4d1ccb3ded748f966fc45433fb8976828ea6c4cd2516279cd",
+      "contentDigest": "sha256:136d0b02fa0c3ef58c74b55eb8047e1910af50d9e656831aa6c84ae5b12c91e4",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -668,6 +668,10 @@
           "status": "passed"
         },
         {
+          "name": "Brain step 1 review repairs S2 Advanced applies the same rule: a loaded but inactive feature is not in use or counted active",
+          "status": "passed"
+        },
+        {
           "name": "Brain step 1 review repairs S3 saved answer intent is unknown and blocked while initial settings are pending",
           "status": "passed"
         },
@@ -691,5 +695,5 @@
     }
   ],
   "failBefore": null,
-  "digest": "sha256:3b480187b852dee17858d525df07de3f57567ca30ff1409aab9dee123d54978a"
+  "digest": "sha256:4a3fdfe3c4a8a6b12c5605d486f6ffb7d21b1a96f3422ba33d27b9492509c0ce"
 }
