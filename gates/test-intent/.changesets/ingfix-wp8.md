@@ -1467,3 +1467,14 @@ R9 passes with producer-written evidence in gates/test-intent/evidence/ingfix-wp
   "note": "Independent verifier session (Claude, no author context) accepted entries 0-50: sources within the owner's delegation; fail-before on 58ff43faa8 with a behaviour-neutral compatibility patch; R9 promotion hold judged sound (observation, outcome and 45 s bound unchanged; 8/8 on 2 cores and 8/8 on 1 core under contention); entries 47-50 reproduced by its own probes."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a199f3-2292-7d41-974c-df88af80ba63",
+  "verdict": "accept",
+  "digest": "sha256:c669defb79c57e9a23e59646079264f17befdf964f9ecaf7bccc367e3a5f0fb9",
+  "note": "Re-acceptance after merging main 5f53e2ae41 (independent Codex session): all 51 entries accepted; merge preserves the covered oracles; compatibility patch behaviour-neutral on 5f53e2ae41; all 43 repair checks fail before by assertion and pass after; six evidence files validate. R9/S55 runtime inconclusive in its sandbox (no /dev/disk/by-uuid); earlier verifier session c0ef77cd verified R9 on the host."
+}
+```
