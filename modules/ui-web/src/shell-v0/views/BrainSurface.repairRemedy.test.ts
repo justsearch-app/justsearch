@@ -55,6 +55,10 @@ async function installButtons(
   let repairAvailability: unknown;
   for (const b of el.shadowRoot?.querySelectorAll('jf-button') ?? []) {
     const label = b.getAttribute('label');
+    // The install action carries its size in its label ("Install AI · 1.2 GB", "Install additions · …").
+    if (label?.startsWith('Install AI') || label?.startsWith('Install additions')) {
+      variants.Install = b.getAttribute('variant');
+    }
     if (label === 'Repair' || (label === 'Repair installation' && variants.Repair == null)) {
       if (label === 'Repair installation' && variants.Repair != null) continue;
       repairAvailability = (b as unknown as { availability: unknown }).availability;
@@ -174,6 +178,7 @@ describe('BrainSurface — the repair claim names its authority', () => {
     const { variants, text } = await installButtons(OPTIONAL_GAP_ONLY);
     expect(text).not.toContain('A required component is missing');
     expect(variants.Repair).toBe('ghost');
+    expect(variants.Install).not.toBe('primary');
     expect(text).toContain('Optional files not installed');
     expect(text).toContain('splade/config.json');
   });

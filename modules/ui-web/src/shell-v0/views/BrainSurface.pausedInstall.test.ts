@@ -90,11 +90,11 @@ const ACTIVATION_REQUIRED: InstallStatus = {
 };
 
 describe('BrainSurface — idle panel over a paused download', () => {
-  it('acknowledges the retained bytes instead of claiming "Not Installed"', async () => {
+  it('acknowledges the retained bytes instead of claiming "AI isn\'t installed yet"', async () => {
     const text = await renderFor(PAUSED);
     expect(text).toContain('Download Paused');
     expect(text).toContain('1.06 GB already downloaded is kept on disk');
-    expect(text).not.toContain('Not Installed');
+    expect(text).not.toContain("AI isn't installed yet");
     expect(text).not.toContain('Install AI models to get started');
   });
 
@@ -103,7 +103,7 @@ describe('BrainSurface — idle panel over a paused download', () => {
     expect(text).toContain('Resume Download');
   });
 
-  it('a genuinely fresh install is untouched — still "Not Installed" / "Install AI"', async () => {
+  it('a genuinely fresh install is untouched — still "AI isn\'t installed yet" / "Install AI"', async () => {
     const text = await renderFor(FRESH);
     expect(text).toContain("AI isn't installed yet");
     expect(text).toContain('Install AI models to get started');
@@ -114,7 +114,7 @@ describe('BrainSurface — idle panel over a paused download', () => {
     const text = await renderFor(ACTIVATION_REQUIRED);
     expect(text).toContain('Downloaded — activation required');
     expect(text).toContain('Activate downloaded models');
-    expect(text).not.toContain('Not Installed');
+    expect(text).not.toContain("AI isn't installed yet");
   });
 });
 

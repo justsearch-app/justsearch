@@ -366,8 +366,41 @@ describe('BrainSurface — the status card sentence (807 Part A)', () => {
       label: string;
       availability?: { kind: string };
     } | null;
-    expect(action?.label).not.toBe('Shut Down AI');
+    // "Shut Down AI" is now "Stop answers": the action that presupposes a running engine.
+    expect(action?.label).not.toBe('Stop answers');
     expect(action?.availability?.kind).not.toBe('available');
+  });
+
+  it('Q3: an offline click on Start/Stop answers neither queues nor fires when the backend returns', async () => {
+    // The REAL gate value the surface produces for the answers control, driven through a REAL jf-control.
+    const dom = domOf(panel(false).renderSimplePanel());
+    const answers = Array.from(dom.querySelectorAll('jf-button')).find((b) =>
+      ['Stop answers', 'Start answers'].includes((b as unknown as { label: string }).label),
+    ) as unknown as { label: string; availability?: Availability } | undefined;
+    expect(answers, 'the answers control is rendered').toBeDefined();
+    expect(answers!.availability?.kind).toBe('unavailable');
+    expect((answers!.availability as { transient?: boolean }).transient).toBeFalsy();
+
+    const onActivate = vi.fn();
+    const toasts: string[] = [];
+    const listener = (e: Event) => toasts.push((e as CustomEvent).detail?.message ?? '');
+    document.addEventListener(EPHEMERAL_TOAST_EVENT, listener);
+    const el = document.createElement('jf-control') as Control;
+    el.label = answers!.label;
+    el.availability = answers!.availability as Availability;
+    el.onActivate = onActivate;
+    document.body.appendChild(el);
+    await el.updateComplete;
+
+    el.shadowRoot!.querySelector('button')!.click();
+    expect(onActivate).not.toHaveBeenCalled();
+    expect(toasts.some((m) => /queued/i.test(m))).toBe(false);
+
+    el.availability = { kind: 'available' }; // the backend comes back
+    await el.updateComplete;
+    document.removeEventListener(EPHEMERAL_TOAST_EVENT, listener);
+    expect(onActivate).not.toHaveBeenCalled(); // no unattended runtime mutation
+    el.remove();
   });
 
   it('ANTI-REGRESSION: a live observation still renders the ready headline and availability', () => {

@@ -99,7 +99,9 @@ function notInstalled() {
     aiEngine: { kind: 'not_installed', stability: { kind: 'settled' }, installFailure: null } });
 }
 async function advanced(el: Brain) {
-  el.shadowRoot!.querySelector<HTMLButtonElement>('.brain-links button')!.click(); await el.updateComplete;
+  // Opening Advanced is the means, not the oracle: each check asserts the controls it reads, so a
+  // page without the link fails at that assertion rather than by a TypeError here.
+  el.shadowRoot!.querySelector<HTMLButtonElement>('.brain-links button')?.click(); await el.updateComplete;
 }
 describe('Brain slice A independent review repairs', () => {
   it('R1 acquisition decline does not hide existing answer files or replace their runtime switch, including after remount', async () => {
@@ -208,8 +210,10 @@ describe('Brain Advanced controls', () => {
   it('Automatic stays distinct from processor-only, and changing one slider preserves the other five settings', async () => {
     llmValues = { gpuLayers: null, contextWindow: 0, maxTokens: null, modelPath: '/model', serverExecutable: null, llamaLibPath: '/libs' };
     const el = await mount(); await advanced(el);
-    const gpu = el.shadowRoot!.querySelector<HTMLInputElement>('#brain-gpuLayers')!;
-    expect(gpu.getAttribute('aria-valuetext')).toBe('Automatic');
+    const found = el.shadowRoot!.querySelector<HTMLInputElement>('#brain-gpuLayers');
+    // A saved null is Automatic, never displayed as 0 layers.
+    expect(found?.getAttribute('aria-valuetext'), 'graphics card use for a saved null').toBe('Automatic');
+    const gpu = found!;
     gpu.value = '0'; gpu.dispatchEvent(new Event('input')); gpu.dispatchEvent(new Event('change')); await settle(el);
     expect(el.llm.gpuLayers).toBe(0);
     expect(gpu.getAttribute('aria-valuetext')).toBe('0 layers · processor only');
@@ -244,7 +248,8 @@ describe('Brain Advanced controls', () => {
   it('an installed inactive variant can be activated from the real endpoint fields', async () => {
     emit({ runtimeStatus: { installedVariants: [{ variantId: 'cuda12', exePath: '/ai/cuda12' }], active: { activeVariantId: null } } });
     const el = await mount(); await advanced(el);
-    [...el.shadowRoot!.querySelectorAll<HTMLButtonElement>('button')].find(b => b.textContent?.includes('Other options'))!.click(); await el.updateComplete;
+    // Other options is the means; the oracle is that the installed variant offers Activate.
+    [...el.shadowRoot!.querySelectorAll<HTMLButtonElement>('button')].find(b => b.textContent?.includes('Other options'))?.click(); await el.updateComplete;
     await clickButton(el, 'Activate');
     expect(calls).toEqual([{ id: 'core.activate-runtime-variant', args: { variantId: 'cuda12' } }]);
   });
