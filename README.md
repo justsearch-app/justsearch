@@ -175,7 +175,7 @@ hand-written from `scripts/jseval/release.v1.json` (the current Linux release). 
 row's nDCG@10 value, or its WITHHELD marker, with that file (`scripts/ci/check-readme-benchmark-numbers.mjs`);
 the note column and the counts and percentages in the prose are copied from the release by hand and are
 not checked by CI.
-For the broader research angle — open questions, what's deferred, and how to get involved — see
+For what JustSearch's research project studies and the evidence published so far, see
 [`RESEARCH.md`](RESEARCH.md).
 
 ### Agent-utility publication status
@@ -284,8 +284,8 @@ commits are co-authored.
 Contributions welcome — see [`CONTRIBUTING.md`](CONTRIBUTING.md) (CLA required). Please read
 [`NON-GOALS.md`](NON-GOALS.md) first so a change fits the project's scope. Security: [`SECURITY.md`](SECURITY.md).
 You **don't** need any of the agent/governance machinery to contribute — it's published as transparency
-([`MAINTAINING.md`](MAINTAINING.md)), not a required path. Interested in the research side (open questions,
-what's deferred, collaboration) rather than contributing code? See [`RESEARCH.md`](RESEARCH.md).
+([`MAINTAINING.md`](MAINTAINING.md)), not a required path. For the research project and its published
+evidence, see [`RESEARCH.md`](RESEARCH.md).
 
 ## License
 
