@@ -31,6 +31,7 @@ interface BrainHost extends HTMLElement {
   settings: { mode?: 'simple' | 'advanced' };
   installStatus: InstallStatus | null;
   expanded: Record<string, boolean>;
+  _unifiedAiState: unknown;
   requestUpdate(): void;
   updateComplete: Promise<boolean>;
 }
@@ -38,7 +39,7 @@ interface BrainHost extends HTMLElement {
 /** Mounts Detailed with the AI-install accordion open and returns the install-section buttons. */
 async function installButtons(
   installStatus: InstallStatus,
-): Promise<{ variants: Record<string, string | null>; text: string }> {
+): Promise<{ variants: Record<string, string | null>; text: string; repairAvailability: unknown }> {
   const el = document.createElement('jf-brain-surface') as BrainHost;
   el.apiBase = '';
   setUiMode('advanced');
@@ -46,19 +47,23 @@ async function installButtons(
   document.body.appendChild(el);
   await el.updateComplete;
   el.installStatus = installStatus;
+  el._unifiedAiState = { snapshotLive: true, aiEngine: { kind: 'offline', stability: { kind: 'settled' }, installFailure: null } };
   el.expanded = { advanced: true };
   el.requestUpdate();
   await el.updateComplete;
   const variants: Record<string, string | null> = {};
+  let repairAvailability: unknown;
   for (const b of el.shadowRoot?.querySelectorAll('jf-button') ?? []) {
     const label = b.getAttribute('label');
-    if (label === 'Repair installation') {
+    if (label === 'Repair' || (label === 'Repair installation' && variants.Repair == null)) {
+      if (label === 'Repair installation' && variants.Repair != null) continue;
+      repairAvailability = (b as unknown as { availability: unknown }).availability;
       variants.Repair = b.getAttribute('variant');
     }
   }
   const text = el.shadowRoot?.textContent ?? '';
   document.body.removeChild(el);
-  return { variants, text };
+  return { variants, text, repairAvailability };
 }
 
 const REPAIR_NEEDED: InstallStatus = {
@@ -77,9 +82,9 @@ const HEALTHY: InstallStatus = {
 afterEach(() => __resetUiModeForTest());
 
 describe('BrainSurface Detailed — the install panel names the same remedy Simple points at', () => {
-  it('repairNeeded ⇒ the named Repair action is available under Maintenance', async () => {
+  it('repairNeeded ⇒ Repair is the primary action in the alert', async () => {
     const { variants, text } = await installButtons(REPAIR_NEEDED);
-    expect(variants.Repair).toBe('ghost');
+    expect(variants.Repair).toBe('primary');
     expect(variants.Install).not.toBe('primary');
     // The panel states the condition in the same words Simple used, so the two read as one story.
     expect(text).toContain('A required component is missing');
@@ -183,7 +188,7 @@ describe('BrainSurface — the repair claim names its authority', () => {
     expect(text).toContain('Working, but an expected file is missing');
     expect(text).not.toContain('A required component is missing');
     // It is still a gap, so Repair is still the action — only the alarm is dropped.
-    expect(variants.Repair).toBe('ghost');
+    expect(variants.Repair).toBe('primary');
   });
 
   it('required file missing and the capability is down ⇒ the full-strength copy is unchanged', async () => {
@@ -191,7 +196,7 @@ describe('BrainSurface — the repair claim names its authority', () => {
 
     const { variants, text } = await installButtons(REQUIRED_MISSING_AND_DOWN);
     expect(text).toContain('A required component is missing');
-    expect(variants.Repair).toBe('ghost');
+    expect(variants.Repair).toBe('primary');
   });
 
   it('no observation at all ⇒ fails closed to the full-strength copy', () => {
@@ -215,7 +220,8 @@ describe('BrainSurface — the repair claim names its authority', () => {
     const remedy = deriveRepairRemedy(NON_CONVERGENT);
     expect(remedy.kind).toBe('manual');
 
-    const { variants, text } = await installButtons(NON_CONVERGENT);
+    const { variants, text, repairAvailability } = await installButtons(NON_CONVERGENT);
+    expect(repairAvailability).toMatchObject({ kind: 'unavailable' });
     // The defect this pins: an affordance that provably cannot succeed presented as THE remedy.
     expect(variants.Repair).toBe('ghost');
     expect(variants.Install).not.toBe('primary');

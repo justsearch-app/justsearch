@@ -141,6 +141,8 @@ describe('BrainSurface — the component list', () => {
     el.installStatus = installStatus;
     document.body.appendChild(el);
     await settle(el);
+    (el as unknown as { _unifiedAiState: unknown })._unifiedAiState = { snapshotLive: true, aiEngine: { kind: 'not_installed', stability: { kind: 'settled' }, installFailure: null } };
+    el.requestUpdate(); await el.updateComplete;
     el.shadowRoot?.querySelector<HTMLButtonElement>('.brain-links button')?.click();
     await el.updateComplete;
     return el;
@@ -351,6 +353,7 @@ describe('BrainSurface — honest install progress', () => {
     // Derive the verdict the way the store does, so a regression in `computeAiEngineVerdict` fails
     // these render assertions too rather than being papered over by a hand-written verdict.
     (el as unknown as { _unifiedAiState: unknown })._unifiedAiState = {
+      snapshotLive: true,
       aiEngine: computeAiEngineVerdict({
         installStatus: status,
         runtimeStatus: null,

@@ -3,7 +3,7 @@
  * BrainSurface — Lit-side Brain rail surface (slice 452 phase 9).
  *
  * Self-mounting Surface with full functional parity to React BrainView:
- * install/cancel/repair AI, Simple/Detailed mode toggle, GPU runtime
+ * install/cancel/repair AI, Advanced settings, GPU runtime
  * variant activation, inference mode switching, pack import (Tauri),
  * LLM settings, policy banners, runtime status display.
  *
@@ -326,9 +326,9 @@ export function repairRemedyHeadline(remedy: RepairRemedy): string | null {
 export function repairRemedySub(remedy: RepairRemedy): string | null {
   switch (remedy.kind) {
     case 'manual':
-      return 'Automatic repair could not download a file — see AI install in Detailed for the direct link.';
+      return 'Automatic repair could not download a file — use the direct links below.';
     case 'repair':
-      return 'A required component is missing — use Repair in Detailed.';
+      return 'A required component is missing — use Repair below.';
     case 'repair-soft':
       return 'Working, but an expected file is missing — Repair will restore it.';
     default:
@@ -604,6 +604,7 @@ export class BrainSurface extends JfElement {
   private choiceRevision = 0;
   private llmRevision = 0;
   private llmPending = 0;
+  private queuedLlm: Partial<LlmSettings> | null = null;
   private readonly llmDrafts = new Map<keyof LlmSettings, string>();
   // Render transients reset on hide; the requests themselves still own these locks.
   private readonly pendingActions = new Set<string>();
@@ -1112,15 +1113,16 @@ export class BrainSurface extends JfElement {
     button.feature-switch[aria-disabled='true'] { opacity: 0.6; cursor: default; }
     .switch-reason { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
     .feature-switch-wrap:focus-within .switch-reason { position: static; width: auto; height: auto; clip-path: none; font-size: var(--font-size-xs); max-width: min(18rem, 100%); }
-    .brain-path { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 0.75rem; padding: 8rem 0 1.5rem; }
+    .brain-path { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); column-gap: 0.75rem; row-gap: 2.5rem; padding: 1.5rem 0; }
+    .brain-path > .path-step { grid-row: 2; }
     .path-step { position: relative; min-width: 0; display: flex; align-items: center; flex-direction: column; text-align: center; gap: 0.35rem; font-size: var(--font-size-sm); }
     .path-step::before { content: ''; position: absolute; height: 1px; background: var(--border-subtle); width: calc(100% + 0.75rem); top: 1.3rem; left: -50%; z-index: 0; }
     .files-step::before, .picture-branch .path-step::before { display: none; }
     .step-symbol { display: flex; align-items: center; justify-content: center; border: 1px solid var(--border-subtle); background: var(--surface-1); border-radius: 50%; width: 2.65rem; height: 2.65rem; margin-bottom: 0.5rem; position: relative; z-index: 1; }
     .step-symbol[data-active='true'] { border-color: var(--accent-tint); color: var(--text-tint); }
     button.step-info { display: flex; flex-direction: column; align-items: center; }
-    .picture-branch { position: absolute; bottom: calc(100% + 2.5rem); width: min(20rem, 200%); }
-    .picture-branch::after { content: ''; height: 2.5rem; position: absolute; bottom: -2.5rem; border-left: 1px dashed var(--border-subtle); }
+    .picture-branch { position: relative; grid-column: 2; grid-row: 1; justify-self: center; width: min(20rem, 200%); }
+    .picture-branch::after { content: ''; left: 50%; height: 2.5rem; position: absolute; bottom: -2.5rem; border-left: 1px dashed var(--border-subtle); }
     .graphics-card { display: grid; grid-template-columns: max-content minmax(3rem, 1fr) minmax(8rem, max-content); align-items: center; gap: 1.5rem; font-size: var(--font-size-sm); }
     .graphics-card .progress-bar { background: var(--accent-tint); }
     .brain-links { align-items: center; font-size: var(--font-size-sm); color: var(--text-secondary); gap: 1.5rem; }
@@ -1148,15 +1150,23 @@ export class BrainSurface extends JfElement {
     .section, .variant { border: 0; border-radius: 0; background: transparent; padding: 1rem 0; border-top: 1px solid var(--border-subtle); }
     jf-button::part(control) { border: 0; border-radius: 0; background: transparent; }
     jf-button.install-action::part(control), jf-button.consent-confirm::part(control) { background: var(--accent-tint); color: var(--accent-on-tint); border-radius: 1rem; }
+    jf-button.repair-action::part(control) { color: var(--text-primary); font-weight: 600; }
     dialog.consent { box-sizing: border-box; width: min(32rem, calc(100vw - 2rem)); max-height: calc(100vh - 2rem); overflow: auto; }
     @media (max-width: 800px) {
       .body { padding: 1.25rem; }
       .brain-path { grid-template-columns: 1fr; padding-top: 0; gap: 1.5rem; }
+      .brain-path > .path-step { grid-row: auto; }
+      .files-step { order: 0; }
+      .read-step { order: 1; }
+      .picture-branch { order: 2; }
+      [data-feature='meaning'] { order: 3; }
+      [data-feature='reranker'] { order: 4; }
+      [data-feature='chat'] { order: 5; }
       .path-step { align-items: flex-start; text-align: left; padding-left: 3.5rem; }
       .path-step::before { display: none; }
       .step-symbol { position: absolute; left: 0; top: 0; }
       button.step-info { align-items: flex-start; }
-      .picture-branch { position: relative; bottom: auto; width: 100%; margin-top: 1rem; }
+      .picture-branch { grid-column: auto; grid-row: auto; width: 100%; }
       .picture-branch::after { display: none; }
       .graphics-card { grid-template-columns: 1fr; gap: 0.5rem; }
       .feature-panel { width: min(25rem, 100%); left: 0; right: auto; }
@@ -1322,15 +1332,18 @@ export class BrainSurface extends JfElement {
     this.expanded = { ...this.expanded, [key]: !this.expanded[key] };
   }
 
+  /** One observation gate for the page: retained or incomplete observations are not live facts. */
+  private aiKnown(): boolean {
+    return this._unifiedAiState?.snapshotLive === true && this.installStatus != null
+      && this._unifiedAiState?.aiEngine != null && this._unifiedAiState.aiEngine.kind !== 'connecting'
+      && !(this._unifiedAiState.aiEngine.stability.kind === 'provisional'
+        && ['checking', 'stale-poll'].includes(this._unifiedAiState.aiEngine.stability.cause));
+  }
+
   private hasInstalledAi(): boolean {
-    return this.installStatus?.installedFully === true
-      || (this._unifiedAiState?.runtime?.installed?.known === true && this._unifiedAiState.runtime.installed.value)
-      || this._unifiedAiState?.runtime?.modelId != null
-      || this._unifiedAiState?.runtime?.mode === 'online'
-      || this._unifiedAiState?.runtime?.mode === 'indexing'
-      || this._unifiedAiState?.aiEngine?.kind === 'online'
-      || this._unifiedAiState?.aiEngine?.kind === 'background'
-      || this.planPreview?.components?.some(c => c.id === 'embedding' && c.state === 'installed') === true;
+    return this.installStatus?.installedFully === true || this.installStatus?.repairNeeded === true
+      || ['online', 'background', 'indexing', 'starting', 'offline'].includes(this._unifiedAiState?.aiEngine?.kind ?? '')
+      || (this._unifiedAiState?.runtime?.installed?.known === true && this._unifiedAiState.runtime.installed.value);
   }
 
   private packagePresent(id: string): boolean {
@@ -1342,7 +1355,7 @@ export class BrainSurface extends JfElement {
   }
 
   private brainFeatures(): Record<BrainFeatureId, BrainFeature> {
-    const live = this._unifiedAiState?.snapshotLive === true;
+    const live = this.aiKnown();
     const installed = this.hasInstalledAi();
     const features = {} as Record<BrainFeatureId, BrainFeature>;
     for (const [id, packageId, label] of [
@@ -1357,7 +1370,7 @@ export class BrainSurface extends JfElement {
         ? this._unifiedAiState?.capabilities?.chat === true || this._unifiedAiState?.runtime?.mode === 'online'
         : onnx?.modelActive === true);
       const unavailable = !present && (component?.state === 'unavailable' || component?.state === 'not-in-mode');
-      const selected = installed && present && id === 'chat'
+      const selected = installed && id === 'chat' && (present || this.installStatus?.repairNeeded === true)
         ? this.settings.chatEnabled ?? (this.systemStatus?.inference?.chatEnabledSpec
           ?? this._unifiedAiState?.status?.inference?.chatEnabledSpec
           ?? this._unifiedAiState?.capabilities?.chat === true)
@@ -1366,19 +1379,23 @@ export class BrainSurface extends JfElement {
         : onnx?.status == null || onnx.status === 'unknown' ? null : onnx.status === 'active' && onnx.modelActive === true;
       const percent = packageProgress?.bytesTotal && packageProgress.bytesTotal > 0
         ? Math.floor(((packageProgress.bytesDownloaded ?? 0) / packageProgress.bytesTotal) * 100) : null;
-      const state = unavailable ? `Unavailable on this computer: ${component!.unavailableReason || 'Not available in this install mode.'}`
+      const stopped = this.installStatus?.state === 'cancelled';
+      const state = !live ? 'Unknown — checking AI status'
+        : stopped && packageProgress != null && packageProgress.state !== 'installed' ? `Cancelled · ${formatBytes(packageProgress.bytesDownloaded ?? 0)} kept`
+        : unavailable ? `Unavailable on this computer: ${component!.unavailableReason || 'Not available in this install mode.'}`
         : packageProgress?.state === 'downloading' ? `Downloading${percent === null ? '' : ` ${percent}%`}`
         : !component && !present ? 'Unknown — package status unavailable'
         : !present ? 'Not downloaded'
         : active === null ? 'Unknown — last observed files are downloaded'
+        : id === 'chat' && installed && this.settingsRead && !selected ? 'Off — background work can continue'
+        : id === 'chat' && selected && active === false ? this.installStatus?.repairNeeded ? 'Unavailable — repair needed; answers are enabled' : 'Unavailable — answers are enabled'
         : active ? 'On' : 'Off';
       const acquisitionControl = component?.declinable === true && (!installed || !present);
       const runtimeControl = installed && present && id === 'chat';
-      const blockedReason = unavailable ? component?.unavailableReason || state
+      const blockedReason = !live ? 'Checking AI status before changing features.' : unavailable ? component?.unavailableReason || state
         : (id === 'chat' && installed && present && !this.settingsRead ? 'Saved answer choice is not known. Refresh settings before changing answers.' : null)
         ?? this.planLockReason()
         ?? (this.busy['inference-switch'] ? 'Saving the answer choice' : null)
-        ?? (installed && !live ? reasonFor('binding.unreachable').wording : null)
         ?? (installed && !component && !present ? 'Package status is unavailable. Refresh to check the files.' : null)
         ?? (id === 'chat' && installed && !selected && this.policy?.onlineAiEnabled === false ? 'Online AI is disabled by administrator policy.' : null)
         ?? (!present && this.policy?.downloadsEnabled === false ? 'Downloads are disabled by administrator policy.' : null);
@@ -1386,7 +1403,7 @@ export class BrainSurface extends JfElement {
         id, label, selected, installed: present, active, availability: unavailable ? 'unavailable' : component ? 'available' : 'unknown',
         state: id === 'chat' && installed && present ? !this.settingsRead ? `${state} · Saved answer choice is not known` : this.settings.chatEnabled == null ? `${state} · automatic (no saved answer choice)` : state : state,
         size: component?.totalBytes && component.totalBytes > 0 ? formatBytes(component.totalBytes) : null,
-        switchable: !unavailable && (acquisitionControl || runtimeControl), blockedReason,
+        switchable: !unavailable && (acquisitionControl || runtimeControl || (!live && !installed && id !== 'meaning')), blockedReason,
       };
     }
     const mmproj = live && this._unifiedAiState?.runtime?.mode === 'online'
@@ -1395,13 +1412,44 @@ export class BrainSurface extends JfElement {
       id: 'pictures', label: 'Text in scans and images', selected: mmproj === true,
       installed: features.chat.installed, active: mmproj,
       availability: features.chat.availability,
-      state: !installed ? features.chat.availability === 'unavailable'
+      state: !live ? 'Unknown — checking AI status' : !installed ? features.chat.availability === 'unavailable'
         ? 'Text in scans and images is unavailable on this computer'
         : 'Text in scans and images comes with the answer model’s files; it is not a separate download'
         : mmproj === true ? 'On' : mmproj === false ? 'Off' : 'Unknown — engine observation unavailable',
       size: null, switchable: false, blockedReason: null,
     };
     return features;
+  }
+
+  private renderBrainSentence(verdict: AiEngineVerdict, installed: boolean, features: Record<BrainFeatureId, BrainFeature>, readingPictures: boolean | null): TemplateResult {
+    const parts = composeBrainSentence(verdict, installed, features, readingPictures, this.aiKnown());
+    for (let i = 1; i < parts.length; ++i) {
+      const punctuation = parts[i]!.text.match(/^[.,]/)?.[0];
+      if (punctuation) {
+        parts[i - 1]!.text += punctuation;
+        parts[i]!.text = parts[i]!.text.slice(1);
+      }
+    }
+    return html`${parts.map(part => {
+      if (!part.feature) return part.text;
+      const text = part.text.trimStart();
+      return html`${part.text.slice(0, part.text.length - text.length)}<button type="button" class="feature-phrase" aria-expanded=${this.featureInfo === part.feature} aria-controls=${`brain-feature-panel-${part.feature}`} @click=${(event: Event) => this.openFeatureInfo(part.feature!, event)}>${text}</button>${this.renderFeatureSwitch(features[part.feature], 'sentence')}`;
+    })}`;
+  }
+
+  private renderRepairAlert(): TemplateResult | typeof nothing {
+    const remedy = deriveRepairRemedy(this.installStatus);
+    if (remedy.kind === 'none') return nothing;
+    if (remedy.kind === 'manual') return html`<div role="alert" data-testid="install-manual-fallback">
+      Automatic repair could not download these files. Download each one and save it to the path shown, then restart AI.
+      ${remedy.packages.map(p => html`<div><strong>${p.label}</strong> — ${p.attempts} attempts${p.error ? ` · ${p.error}` : ''}<div><code>${p.url}</code></div><div>→ <code>${p.targetPath}</code></div></div>`)}
+    </div>`;
+    return html`<div role="alert" data-testid=${shouldHintRepairForGpuFallback(this.runtimeStatus, this.installStatus) ? 'brain-gpu-fallback-hint' : 'install-repair-needed'}>
+      ${shouldHintRepairForGpuFallback(this.runtimeStatus, this.installStatus) ? html`<span>Search features are running on CPU: a GPU component is missing from disk. </span>` : nothing}
+      ${repairRemedySub(remedy)}
+      <jf-button class="repair-action" variant="primary" label="Repair" .availability=${this.installStatus?.state === 'running' ? unavailableBecause('Already installing.') : this.policy?.downloadsEnabled === false ? unavailableBecause('Downloads are disabled by administrator policy.') : this.busy['install-repair'] ? unavailableBecause('Repair in progress.') : this.runtimeAvailability()}
+        .onActivate=${() => void this.repairInstall()}>${icon({ name: 'refresh-cw', size: 14 })} Repair</jf-button>
+    </div>`;
   }
 
   private renderFeatureSwitch(feature: BrainFeature, location: 'sentence' | 'path'): TemplateResult | typeof nothing {
@@ -1438,7 +1486,7 @@ export class BrainSurface extends JfElement {
     this.featureOpener = event.currentTarget as HTMLElement;
     this.featureInfo = id;
     this.featureTransient.open();
-    void this.updateComplete.then(() => this.shadowRoot?.querySelector<HTMLElement>('.feature-panel')?.focus());
+    void this.updateComplete.then(() => this.shadowRoot?.querySelector<HTMLElement>('.feature-panel')?.focus({ preventScroll: true }));
   }
 
   private closeFeatureInfo(): void {
@@ -1484,8 +1532,9 @@ export class BrainSurface extends JfElement {
         ${this.renderFeaturePanel(feature)}
       </div>`;
     return html`<section class="brain-path" aria-label="How AI uses your files">
-      <div class="path-step files-step"><span class="step-symbol">${icon({ name: 'copy', size: 20 })}</span><span>Your files</span><span class="step-meta">${count?.known ? `${NUM.format(count.value)} files` : 'File count unknown'}</span></div>
-      <div class="path-step read-step"><span class="step-symbol">${icon({ name: 'file-text', size: 20 })}</span><span>Read the text</span><span class="step-meta">Built in</span><div class="picture-branch">${renderStep(features.pictures, 'image')}</div></div>
+      <div class="path-step files-step"><span class="step-symbol">${icon({ name: 'copy', size: 20 })}</span><span>Your files</span><span class="step-meta">${!this.aiKnown() ? 'Unknown — checking AI status' : count?.known ? `${NUM.format(count.value)} files` : 'File count unknown'}</span></div>
+      <div class="path-step read-step"><span class="step-symbol">${icon({ name: 'file-text', size: 20 })}</span><span>Read the text</span><span class="step-meta">${this.aiKnown() ? 'Built in' : 'Unknown — checking AI status'}</span></div>
+      <div class="picture-branch">${renderStep(features.pictures, 'image')}</div>
       ${renderStep(features.meaning, 'zap')}
       ${renderStep(features.reranker, 'list')}
       ${renderStep(features.chat, 'message-square')}
@@ -1493,18 +1542,18 @@ export class BrainSurface extends JfElement {
   }
 
   private renderGraphicsCard(): TemplateResult {
-    const gpu = this.systemStatus?.operating?.gpu;
-    const fresh = this._unifiedAiState?.snapshotLive === true && gpu?.stale === false;
-    const total = fresh ? gpu.adapterTotalBytes : null;
-    const free = fresh ? gpu.adapterFreeBytes : null;
-    const known = total != null && total > 0 && free != null && free >= 0 && free <= total;
-    const used = known ? total - free : null;
+    const gpu = this.systemStatus?.gpu;
+    const adapter = this.systemStatus?.operating?.gpu?.adapter;
+    const fresh = this._unifiedAiState?.snapshotLive === true;
+    const total = fresh ? gpu?.totalVramBytes : null;
+    const used = fresh ? gpu?.usedVramBytes : null;
+    const known = total != null && total > 0 && used != null && used >= 0 && used <= total;
     const devices = this.systemStatus?.gpu?.deviceCount;
     return html`<section class="graphics-card" aria-label="Graphics card memory">
       <span>Graphics card</span><div class="progress" role=${known ? 'meter' : 'img'} aria-label="Graphics memory used by all apps"
         aria-valuemin=${known ? 0 : nothing} aria-valuemax=${known ? total : nothing} aria-valuenow=${used ?? nothing} aria-valuetext=${known ? `${formatBytes(used!)} of ${formatBytes(total!)} in use by all apps` : nothing}>
         ${known ? html`<div class="progress-bar" style=${`width: ${(used! / total!) * 100}%`}></div>` : nothing}
-      </div><span class="step-meta">${known ? `${formatBytes(used!)} of ${formatBytes(total!)} in use · all apps` : 'Memory use unknown'}${gpu?.adapter ? ` · ${gpu.adapter}` : ''}${devices && devices > 1 ? ` · ${devices} graphics devices` : ''}</span>
+      </div><span class="step-meta">${known ? `${formatBytes(used!)} of ${formatBytes(total!)} in use · all apps` : 'Memory use unknown'}${adapter ? ` · ${adapter}` : ''}${devices && devices > 1 ? ` · ${devices} graphics devices` : ''}</span>
     </section>`;
   }
 
@@ -1671,11 +1720,12 @@ export class BrainSurface extends JfElement {
    * interface; `AdvisoryInboxDrawer`'s in-template anchors are the precedent followed here.
    */
   private planLockReason(): string | null {
+    if (!this.aiKnown()) return 'Checking AI status before changing features.';
     if (this.installStatus?.state === 'running' || this.installStatus?.paused === true
       || this.installConsentOpen || this.pendingActions.has('install-start') || this.pendingActions.has('install-repair')) {
       return 'Changes apply after this download';
     }
-    if (this.planLoading || [...this.pendingActions].some(key => key.startsWith('component:'))) {
+    if ([...this.pendingActions].some(key => key.startsWith('component:'))) {
       return 'Saving the current download choices';
     }
     if (this.pendingActions.has('inference-switch')) return 'Saving the answer choice';
@@ -1696,6 +1746,7 @@ export class BrainSurface extends JfElement {
   private async refreshInstallPlanPreview(): Promise<void> {
     if (!this.apiBase && this.apiBase !== '') return;
     const revision = ++this.planRevision;
+    const choice = this.choiceRevision;
     this.planLoading = true;
     this.planError = null;
     const [preview, manifest, presence] = await Promise.all([
@@ -1703,7 +1754,7 @@ export class BrainSurface extends JfElement {
       getAiInstallManifest(this.base()).catch(() => null),
       this.fetchJson<ModelPresence>('/api/ai/models/status'),
     ]);
-    if (revision !== this.planRevision) return;
+    if (revision !== this.planRevision || choice !== this.choiceRevision) return;
     this.planPreview = preview;
     this.modelPresence = presence;
     this.manifest = manifest;
@@ -1905,6 +1956,12 @@ export class BrainSurface extends JfElement {
   // ---------- LLM settings persist ----------
 
   private async patchLlm(updates: Partial<LlmSettings>): Promise<void> {
+    if (this.llmPending > 0) {
+      this.queuedLlm = { ...this.queuedLlm, ...updates };
+      return;
+    }
+    const drafts = new Map(this.llmDrafts);
+    let completed = false;
     ++this.llmRevision;
     ++this.llmPending;
     const context = updates.contextWindow;
@@ -1919,14 +1976,20 @@ export class BrainSurface extends JfElement {
         if (value !== undefined) Object.assign(committed, { [key]: value });
       }
       this.llm = { ...this.llm, ...committed };
+      completed = true;
       this.runtimeError = null;
     } catch (err) {
       this.runtimeError = err instanceof Error ? err.message : String(err);
     } finally {
       ++this.llmRevision;
       --this.llmPending;
-      for (const key of Object.keys(updates) as Array<keyof LlmSettings>) this.llmDrafts.delete(key);
+      for (const key of Object.keys(updates) as Array<keyof LlmSettings>) {
+        if (this.llmDrafts.get(key) === drafts.get(key)) this.llmDrafts.delete(key);
+      }
       this.requestUpdate();
+      const queued = this.queuedLlm;
+      this.queuedLlm = null;
+      if (queued && completed) await this.patchLlm(queued);
     }
   }
 
@@ -2002,9 +2065,10 @@ export class BrainSurface extends JfElement {
     // Tempdoc 663 — the string `kind` drives this panel's dot/label/sub lookup below, unchanged
     // from before; only its SOURCE changed (the one `computeAiEngineVerdict` derivation, not the
     // old 5-source ladder).
-    const aiVerdict = this.deriveAiEngineVerdict();
+    const known = this.aiKnown();
+    const aiVerdict: AiEngineVerdict = known ? this.deriveAiEngineVerdict() : { kind: 'connecting', stability: { kind: 'provisional', cause: 'checking' }, installFailure: null };
     const aiState = aiVerdict.kind;
-    const activationRequired = this.installStatus?.phase === 'activation_required';
+    const activationRequired = known && this.installStatus?.phase === 'activation_required';
     const indexingActivity = this.indexingProgress().activity;
     const downloadsDisabled = this.policy?.downloadsEnabled === false;
     const onlineDisabled = this.policy?.onlineAiEnabled === false;
@@ -2245,8 +2309,10 @@ export class BrainSurface extends JfElement {
     const processorOnly = this.runtimeStatus?.active?.gpuLayers === 0;
     const reindexRequired = this.systemStatus?.embedding?.compatState === 'BLOCKED_LEGACY'
       || this.systemStatus?.embedding?.compatState === 'BLOCKED_MISMATCH';
-    const headline = activationRequired ? 'Downloaded — activation required'
+    const headline = !known ? 'Checking AI status…'
+      : activationRequired ? 'Downloaded — activation required'
       : reindexRequired ? 'Rebuild search to use these models'
+      : aiState !== 'installing' && repairRemedyHeadline(repairRemedy) ? repairRemedyHeadline(repairRemedy)
       : aiState === 'not_installed' ? "AI isn't installed yet"
       : aiState === 'online' && !readingPictures ? processorOnly ? 'AI is running on the processor' : 'AI is ready'
       : sc.label;
@@ -2254,14 +2320,14 @@ export class BrainSurface extends JfElement {
     const actionLabel = primaryAction.label === 'Install AI' && typeof installSize === 'number' && installSize >= 0
       ? `Install AI · ${formatBytes(installSize)}` : primaryAction.label;
     const additionsLabel = `Install additions · ${typeof installSize === 'number' && installSize >= 0 ? formatBytes(installSize) : 'size unknown'}`;
-    const additions = installed && !activationRequired && aiState !== 'installing'
+    const additions = known && repairRemedy.kind === 'none' && installed && !activationRequired && aiState !== 'installing'
       && this.planPreview?.components?.some(c => c.state === 'to-download' && !c.declined) === true;
     return html`
       <div data-testid="brain-simple-panel">
         <h1 class="brain-headline" tabindex="-1">${headline}${aiState === 'installing' && pct !== null ? ` ${pct}%` : ''}</h1>
-        <p class="brain-sentence">${composeBrainSentence(aiVerdict, installed, features, readingPictures).map(part => part.feature ? html`<button type="button" class="feature-phrase" aria-expanded=${this.featureInfo === part.feature} aria-controls=${`brain-feature-panel-${part.feature}`} @click=${(event: Event) => this.openFeatureInfo(part.feature!, event)}>${part.text}</button>${this.renderFeatureSwitch(features[part.feature], 'sentence')}` : part.text)}</p>
-        <div class="brain-status-detail">${aiState === 'connecting' ? html`<jf-pulse-dots></jf-pulse-dots>` : nothing}${sc.sub}${this.installStalled() ? html` <span role="status">Download stalled — no recent progress.</span>` : nothing}</div>
-        ${!installed || aiState === 'installing' || activationRequired ? html`<div class="status-row">
+        <p class="brain-sentence">${this.renderBrainSentence(aiVerdict, installed, features, readingPictures)}</p>
+        <div class="brain-status-detail">${aiState === 'connecting' ? html`<jf-pulse-dots></jf-pulse-dots>` : nothing}${known ? repairRemedySub(repairRemedy) ?? sc.sub : `Waiting for live install and AI observations. ${indexingActivity.summary}${indexingActivity.detail ? ` — ${indexingActivity.detail}` : ''}`}${this.installStalled() ? html` <span role="status">Download stalled — no recent progress.</span>` : nothing}</div>
+        ${known && (!installed || aiState === 'installing' || activationRequired) ? html`<div class="status-row">
           <jf-button class=${primaryAction.primary && !installed ? 'install-action' : ''}
             variant=${primaryAction.primary && !installed ? 'primary' : 'ghost'}
             .availability=${primaryAction.availability}
@@ -2323,8 +2389,8 @@ export class BrainSurface extends JfElement {
           : nothing}
         ${this.renderAlerts()}
         ${this.renderCompatibilityCallouts()}
-        ${this.deriveAiEngineVerdict().kind === 'install_failed' ? html`<jf-error-alert tone="error">Install failed: ${this.deriveAiEngineVerdict().installFailure ?? this.installStatus?.lastError ?? this.installStatus?.message}</jf-error-alert>` : nothing}
-        ${shouldHintRepairForGpuFallback(this.runtimeStatus, this.installStatus) ? html`<div role="alert" data-testid="brain-gpu-fallback-hint">Search features are running on CPU: a GPU component is missing from disk. <jf-button variant="ghost" .onActivate=${() => void this.repairInstall()}>${icon({ name: 'refresh-cw', size: 14 })} Repair</jf-button></div>` : nothing}
+        ${known && aiState === 'install_failed' ? html`<jf-error-alert tone="error">Install failed: ${this.deriveAiEngineVerdict().installFailure ?? this.installStatus?.lastError ?? this.installStatus?.message}</jf-error-alert>` : nothing}
+        ${known ? this.renderRepairAlert() : nothing}
         ${this.renderFeaturePath()}
         ${this.renderGraphicsCard()}
         <div class="row brain-links">
@@ -3001,7 +3067,7 @@ export class BrainSurface extends JfElement {
     return html`<div class="advanced-row">
       <div><label for=${`brain-${key}`}>${label}</label><p>${description}</p></div>
       <div class="slider-setting"><input id=${`brain-${key}`} type="range" min=${key === 'maxTokens' ? 16 : 0} max=${Math.max(max, saved ?? 0)} step="1"
-        .value=${String(value ?? 0)} aria-label=${label} aria-valuetext=${shown} ?disabled=${this.llmPending > 0}
+        .value=${String(automatic && key === 'gpuLayers' ? Math.max(max, saved ?? 0) : value ?? 0)} aria-label=${label} aria-valuetext=${shown}
         @input=${(event: Event) => this.editLlm(key, (event.target as HTMLInputElement).value)}
         @change=${(event: Event) => void this.patchLlm({ [key]: Number((event.target as HTMLInputElement).value) })}>
         <output for=${`brain-${key}`}>${shown}</output>
@@ -3012,8 +3078,8 @@ export class BrainSurface extends JfElement {
   }
 
   private runtimeAvailability() {
-    return this._unifiedAiState && !this._unifiedAiState.snapshotLive
-      ? unavailableBecause(reasonFor('binding.unreachable').wording)
+    return !this.aiKnown()
+      ? unavailableBecause(this._unifiedAiState?.snapshotLive === false ? reasonFor('binding.unreachable').wording : 'Checking AI status before changing the engine.')
       : this.busy['inference-switch'] || this.busy.variant ? unavailableBecause('An engine change is in progress.') : AVAILABLE;
   }
 
@@ -3061,9 +3127,6 @@ export class BrainSurface extends JfElement {
 
   private renderAdvanced(): TemplateResult | typeof nothing {
     if (!this.expanded.advanced) return nothing;
-    const repairRemedy = deriveRepairRemedy(this.installStatus);
-    const repairNeeded = repairRemedy.kind === 'repair' || repairRemedy.kind === 'repair-soft';
-    const manualFallback = repairRemedy.kind === 'manual' ? repairRemedy.packages : [];
     const optionalGaps = this.installStatus?.optionalGaps ?? [];
     const installing = this.installStatus?.state === 'running';
     const downloadsDisabled = this.policy?.downloadsEnabled === false;
@@ -3085,34 +3148,6 @@ export class BrainSurface extends JfElement {
         ${this.renderPackImport()}
       </section>
       <section aria-label="Maintenance"><h3 class="advanced-heading">Maintenance</h3>
-        ${repairNeeded
-          ? html`<div
-              data-testid="install-repair-needed"
-              style="font-size: var(--font-size-xs); color: var(--text-secondary); margin-bottom: 0.5rem"
-            >
-              ${repairRemedy.kind === 'repair-soft'
-                ? 'Working, but an expected file is missing — Repair will restore it.'
-                : 'A required component is missing — use Repair.'}
-            </div>`
-          : nothing}
-        ${manualFallback.length > 0
-          ? html`<div
-              data-testid="install-manual-fallback"
-              style="font-size: var(--font-size-xs); color: var(--text-secondary); margin-bottom: 0.5rem"
-            >
-              Automatic repair could not download these files. Download each one and save it to the
-              path shown, then restart AI.
-              ${manualFallback.map(
-                (p) => html`<div>
-                  <strong>${p.label}</strong> — ${p.attempts} attempts${p.error
-                    ? html` · ${p.error}`
-                    : nothing}
-                  <div><code>${p.url}</code></div>
-                  <div>→ <code>${p.targetPath}</code></div>
-                </div>`,
-              )}
-            </div>`
-          : nothing}
         ${optionalGaps.length > 0
           ? html`<div
               data-testid="install-optional-gaps"
@@ -3138,7 +3173,7 @@ export class BrainSurface extends JfElement {
           <jf-button variant="ghost" label="Restart AI" .availability=${this.runtimeAvailability()}
             .onActivate=${() => void this.withBusy('inference-switch', () => this.refreshInference())}>${icon({ name: 'refresh-cw', size: 14 })} Restart AI</jf-button>
           <jf-button variant="ghost" label="Repair installation"
-            .availability=${installing ? unavailableBecause('Already installing.') : downloadsDisabled ? unavailableBecause('Downloads are disabled by administrator policy.') : this.busy['install-repair'] ? unavailableBecause('Repair in progress.') : AVAILABLE}
+            .availability=${installing ? unavailableBecause('Already installing.') : downloadsDisabled ? unavailableBecause('Downloads are disabled by administrator policy.') : deriveRepairRemedy(this.installStatus).kind === 'manual' ? unavailableBecause('Automatic repair could not download these files. Use the direct links above.') : this.busy['install-repair'] ? unavailableBecause('Repair in progress.') : this.runtimeAvailability()}
             .onActivate=${() => void this.repairInstall()}>${icon({ name: 'refresh-cw', size: 14 })} Repair installation</jf-button>
           <jf-operation context="button" operation-id="core.rebuild-index" api-base=${this.apiBase}
             @op-success=${(event: CustomEvent<OpSuccessEventDetail>) => { this.bulkError = null; this.bulkOutcomeKey = String(event.detail.structuredData?.operationKey ?? ''); }}
@@ -3183,7 +3218,7 @@ export class BrainSurface extends JfElement {
     }
     return html`
       <div class="body" @pointerdown=${(event: Event) => {
-        if (this.featureInfo && !event.composedPath().some(node => node instanceof HTMLElement && (node.classList.contains('feature-panel') || node === this.featureOpener))) this.closeFeatureInfo();
+        if (this.featureInfo && !event.composedPath().some(node => node instanceof HTMLElement && (node.classList.contains('feature-panel') || node.getAttribute('aria-controls')?.startsWith('brain-feature-panel-')))) this.closeFeatureInfo();
       }}>
         ${this.renderSimplePanel()}
         ${this.renderEnrichmentProgress()}

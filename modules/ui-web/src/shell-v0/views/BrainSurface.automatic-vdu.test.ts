@@ -15,7 +15,7 @@ function panel(procedure: string | undefined, live = true, engineReason = 'autom
   };
   element.busy = {};
   element.policy = { downloadsEnabled: true, onlineAiEnabled: true };
-  element.installStatus = null;
+  element.installStatus = { state: 'completed', installedFully: true };
   element.inference = null;
   element._unifiedAiState = {
     aiEngine: { kind: 'online', stability: { kind: 'settled' }, installFailure: null },

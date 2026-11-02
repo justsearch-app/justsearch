@@ -32,7 +32,7 @@ interface BrainHost extends HTMLElement {
   apiBase: string;
   settings: { mode?: 'simple' | 'advanced' };
   installStatus: InstallStatus | null;
-  _unifiedAiState: { aiEngine: AiEngineVerdict } | null;
+  _unifiedAiState: { aiEngine: AiEngineVerdict; snapshotLive: boolean } | null;
   requestUpdate(): void;
   updateComplete: Promise<boolean>;
 }
@@ -48,6 +48,7 @@ async function renderFor(installStatus: InstallStatus): Promise<string> {
   // so a regression in the derivation fails these render assertions too.
   el.installStatus = installStatus;
   el._unifiedAiState = {
+    snapshotLive: true,
     aiEngine: computeAiEngineVerdict({
       installStatus,
       runtimeStatus: null,
@@ -158,6 +159,9 @@ describe('BrainSurface — the consent dialog re-asks the backend before opening
     el.installStatus = FRESH;
     document.body.appendChild(el);
     await settle(el);
+    el.installStatus = FRESH;
+    el._unifiedAiState = { snapshotLive: true, aiEngine: { kind: 'not_installed', stability: { kind: 'settled' }, installFailure: null } };
+    el.requestUpdate(); await el.updateComplete;
     expect(previewFetches.length).toBe(1);
     expect(el.shadowRoot?.textContent ?? '').toContain('10.14 GB');
 
@@ -168,6 +172,7 @@ describe('BrainSurface — the consent dialog re-asks the backend before opening
     // Set the observed verdict last: `connectedCallback`'s store subscription overwrites
     // `_unifiedAiState` on mount, and only the not_installed verdict renders the install action.
     el._unifiedAiState = {
+      snapshotLive: true,
       aiEngine: { kind: 'not_installed', stability: { kind: 'settled' }, installFailure: null },
     };
     el.requestUpdate();

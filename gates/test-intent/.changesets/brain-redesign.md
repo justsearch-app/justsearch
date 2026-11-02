@@ -296,8 +296,6 @@ axe run remain necessary.
         "modules/ui-web/src/shell-v0/views/BrainSurface.componentList.test.ts",
         "modules/ui-web/src/shell-v0/views/BrainSurface.installRefresh.test.ts",
         "modules/ui-web/src/shell-v0/views/BrainSurface.skipReason.test.ts",
-        "modules/ui-web/src/shell-v0/views/BrainSurface.repairRemedy.test.ts",
-        "modules/ui-web/src/shell-v0/views/BrainSurface.snapshotLiveness.test.ts",
         "modules/ui-web/src/shell-v0/views/BrainSurface.ui-mode.test.ts"
       ],
       "class": "Adaptation",
@@ -305,7 +303,7 @@ axe run remain necessary.
         "input re-encoding",
         "signature"
       ],
-      "whatMoved": "Slice B replaces the Models/install accordions with in-place Downloaded files and Maintenance. Component tests click the native switch and still assert its decline POST. Install-refresh tests name the settings-only poller; skip reasons keep their original words. Repair tests assert the Maintenance text action and the same required/optional/manual-fallback authority, replacing the removed primary Install styling. Runtime liveness checks exercise Restart AI, preserve offline non-queuing and reason assertions, and require a positive live control witness. Global mode remains unchanged on expansion.",
+      "whatMoved": "Existing install inventory, skip-reason, install refresh and global-mode disclosure checks observe the new Advanced placement. Their operation, persistence, rollback and failure expectations are unchanged. Repair authority and removed runtime-mode controls are classified separately below; they are not presentation-only adaptations.",
       "sources": [
         {
           "kind": "owner-adopted-scenario",
@@ -673,6 +671,240 @@ axe run remain necessary.
         "input re-encoding"
       ],
       "whatMoved": "The direct-render harness marks its injected saved settings snapshot as successfully read, matching the new S3 initial-read guard. All lifecycle operation arguments, unavailable-reason and policy assertions stay unchanged. Pending/failed reads are separately pinned by the rendered S3 regression checks."
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/views/BrainSurface.repairRemedy.test.ts"
+      ],
+      "class": "New",
+      "repaired": true,
+      "behaviour": "Restore the original repair guarantees in the one-page layout: Repair is primary in the alert for a required gap, including a working capability with missing files. An automatic repair proven non-convergent is unavailable as a remedy and the manual download locations remain visible. The successful-read harness explicitly supplies a live install observation. Healthy and optional-gap cases retain secondary maintenance repair. This replaces the erroneous Adaptation classification of changed expected outcomes.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "B8",
+          "quote": "Install: the Install AI button shows the selected total size and opens the existing licence/size consent; downloading shows progress, pause/resume, cancel with retained bytes, stalled and blocked stages, and search ready before completion, in the same page (no nested panel). Repair, retry after failure and the working-but-missing / manual fallback stay reachable.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "B11",
+          "quote": "Alerts appear once, above the path, in words with their action: runtime or operation failure with code, download or online-policy denial, install failure, repairable processor fallback, compatibility block, activation or reindex required.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "Q5",
+          "quote": "Existing Brain behaviour tests keep asserting the same behaviour after selector and wording updates; tests of the removed Simple/Detailed toggle and telemetry placement are replaced by tests of the new placement; none is weakened or dropped without a recorded reason.",
+          "label": "agent-drafted, owner-adopted"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/brain-live-repairs.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/views/BrainSurface.repairRemedy.test.ts#repairNeeded ⇒ Repair is the primary action in the alert",
+        "modules/ui-web/src/shell-v0/views/BrainSurface.repairRemedy.test.ts#required file missing but the capability is observably running ⇒ the \"working, but\" copy",
+        "modules/ui-web/src/shell-v0/views/BrainSurface.repairRemedy.test.ts#required file missing and the capability is down ⇒ the full-strength copy is unchanged",
+        "modules/ui-web/src/shell-v0/views/BrainSurface.repairRemedy.test.ts#three failed repair passes ⇒ the manual fallback, not an unqualified Repair button"
+      ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/views/BrainSurface.snapshotLiveness.test.ts"
+      ],
+      "class": "Obsolete",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "B1",
+          "quote": "The AI Brain tab is one page using the whole window, same visual rules as the Library: headline, one sentence with feature phrases, the path of steps, graphics card bar, then text links (Advanced settings, Stop answers / Start answers, Engine history in Health). No card boxes, no outlined pill buttons, no Simple/Detailed toggle on this page (the title-bar toggle stays for other surfaces). Member tabs (AI Brain, Memory) and their keyboard semantics stay.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "B5",
+          "quote": "Switches in step 1 drive only existing behaviour: before install, each optional feature switch selects or declines that package for the install (existing decline/undecline), and the Install button shows the total size of what is selected; after install, Answer questions turns answers on/off (core.set-chat-enabled; files kept). Best match first and Text in scans and images after install show their state with no live switch in step 1 (no control that does nothing); Text in scans and images before install appears only as what it is today (part of the answer model's files or unavailable), not as a separate download. Switches are real switches (role switch, aria-checked, keyboard operable, reachable reason when blocked).",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "Q2",
+          "quote": "Turning answers off keeps files and does not stop picture reading or other background work that needs the engine; turning on again works without reinstall.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "Q3",
+          "quote": "Settings saves keep witnesses and conflict review; offline runtime mutations are never queued; unknown/last-observed values stay labelled.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "Q5",
+          "quote": "Existing Brain behaviour tests keep asserting the same behaviour after selector and wording updates; tests of the removed Simple/Detailed toggle and telemetry placement are replaced by tests of the new placement; none is weakened or dropped without a recorded reason.",
+          "label": "agent-drafted, owner-adopted"
+        }
+      ],
+      "conflictSearch": "Searched docs/reference and docs/decisions for core.switch-inference-mode and Online/Indexing/Reload controls; no conflicting decision found. The brief explicitly replaces runtime modes with saved answer intent and permits rewritten removed presentation tests. Only the separate Online and Indexing presentation controls leave the original three-control test: B1 names Start answers / Stop answers; B5 defines their core.set-chat-enabled behavior; B9 retains Restart AI (formerly Reload). The no-offline-queue and positive live witness assertions remain at Restart AI, and the new D2 regression gates every remaining feature switch with its reachable reason. No backend operation, persistence contract or health observation is removed."
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/views/BrainSurface.automatic-vdu.test.ts",
+        "modules/ui-web/src/shell-v0/views/BrainSurface.componentList.test.ts",
+        "modules/ui-web/src/shell-v0/views/BrainSurface.installProgressAggregate.test.ts",
+        "modules/ui-web/src/shell-v0/views/BrainSurface.pausedInstall.test.ts",
+        "modules/ui-web/src/shell-v0/views/BrainSurface.redesign.test.ts",
+        "modules/ui-web/src/shell-v0/views/BulkOperationImmediateRefusal.test.ts",
+        "modules/ui-web/src/shell-v0/views/BrainSurface.snapshotLiveness.test.ts"
+      ],
+      "class": "Adaptation",
+      "moved": [
+        "input re-encoding"
+      ],
+      "whatMoved": "Legacy direct-render and activation harnesses explicitly supply the successful live install/verdict observations their scenarios already assume, so they pass through the page-wide observation gate. The GPU fixture supplies the same numeric total/used sample at the actual /api/status.gpu endpoint fields instead of operating.gpu; the adapter fixture stays at operating.gpu. Every existing assertion, refusal injection, retention/activation/consent outcome, saved-choice check and lifecycle operation argument is retained. The snapshot-liveness harness supplies the observed successful install alongside its existing live/dead witness, retaining every positive/negative and no-replay assertion.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "B2",
+          "quote": "Headline from the shared AI verdict for every lifecycle state it decides today: not installed, download paused/stopped, installing (with progress), install failed, starting/recovering, connecting/unconfirmed, ready, running on the processor instead of the graphics card, activation or reindex required. While status is unknown it says so and never claims ready.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "B7",
+          "quote": "Graphics card bar: one bar with device memory in use of total (all apps, not attributed to JustSearch), the adapter name only where operating.gpu reports it; no per-feature split; several devices named as such. Absent or stale GPU data says unknown, never 0. (challenger 9)",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "Q5",
+          "quote": "Existing Brain behaviour tests keep asserting the same behaviour after selector and wording updates; tests of the removed Simple/Detailed toggle and telemetry placement are replaced by tests of the new placement; none is weakened or dropped without a recorded reason.",
+          "label": "agent-drafted, owner-adopted"
+        }
+      ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/views/BrainSurface.liveRepairs.test.ts"
+      ],
+      "class": "New",
+      "repaired": true,
+      "behaviour": "D1–D10 live redesign repairs: one confirmed-live page gate and installed repair wording with saved answer intent; passive preview reads never block real switch clicks or overwrite newer saves; sliders keep focus and drafts, serialize/coalesce the latest committed change, stop on conflict and distinguish Automatic-at-maximum from zero; total/all-app status GPU memory; sentence word boundaries; single-gesture panel handoff without focus scrolling; cancelled package bytes; the picture branch takes layout space; repair copy points to existing locations. Geometry and native keyboard behavior are additionally exercised in Chromium across viewport sizes, themes, forced colors and 200% reflow.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "B2",
+          "quote": "Headline from the shared AI verdict for every lifecycle state it decides today: not installed, download paused/stopped, installing (with progress), install failed, starting/recovering, connecting/unconfirmed, ready, running on the processor instead of the graphics card, activation or reindex required. While status is unknown it says so and never claims ready.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "B3",
+          "quote": "The sentence is generated from real state for every combination of install state and switch state; it names only what is true now (for example \"It doesn't read text in scans and images yet\" only when that is off or missing) and ends with where it runs. Feature phrases carry their switch inline where a switch exists; the same switch appears at the step in the path, and both always show the same state and act the same.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "B6",
+          "quote": "Selecting a feature (its phrase, its step or its switch's info affordance) opens one small panel at that step: \"You get\" and \"It costs\" in plain words, with only known numbers (download size, on-disk size, that it uses graphics memory while working); no made-up per-feature memory figures. Escape and outside click close it, focus returns; only one panel at a time.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "B7",
+          "quote": "Graphics card bar: one bar with device memory in use of total (all apps, not attributed to JustSearch), the adapter name only where operating.gpu reports it; no per-feature split; several devices named as such. Absent or stale GPU data says unknown, never 0. (challenger 9)",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "B8",
+          "quote": "Install: the Install AI button shows the selected total size and opens the existing licence/size consent; downloading shows progress, pause/resume, cancel with retained bytes, stalled and blocked stages, and search ready before completion, in the same page (no nested panel). Repair, retry after failure and the working-but-missing / manual fallback stay reachable.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "B13",
+          "quote": "Live behaviour: status, install progress and switch states update without collapsing open panels or Advanced settings, without losing a slider draft; package previews and LLM settings refresh when install state changes and when the window regains focus, ignoring out-of-order responses, so a second window converges; reload or tab switch mid-install keeps the progress and outcome. (challenger 7)",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "B15",
+          "quote": "(challenger 2) The answer switch shows the saved intent (nullable chatEnabled: unset stays distinct from explicit off); the sentence explains current availability, including answers off while background work continues and answers temporarily unavailable while pictures are being read, and their completion.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "B18",
+          "quote": "(challenger 5) Selection and install races: while a choice is saving, consent is open, or a download is running or paused, feature switches that would change the plan are blocked with a reachable reason (\"Changes apply after this download\"); a late decline response never overwrites a newer choice; a choice made in another window shows here. Consent lists exactly the set that will download. Known limit: the backend start does not bind consent to the previewed set (atomic binding is backend work, deferred).",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "B20",
+          "quote": "(challenger 10, 11, broken today) Runtime variant controls read the endpoint's real fields (installedVariants, active.activeVariantId) and work with an installed inactive variant; graphics card use distinguishes Automatic (null) from 0 layers (processor only); sliders keep untouched values, save once per change (not per drag step), are keyboard operable and handle a conflict response. Opening Advanced never writes the global ui.mode; the page is the same under either global mode.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "Q3",
+          "quote": "Settings saves keep witnesses and conflict review; offline runtime mutations are never queued; unknown/last-observed values stay labelled.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "Q7",
+          "quote": "(challenger 13) Duplicated switches (sentence and path) have distinct ids, one shared busy state and the same accessible name pattern; opening a feature's information never toggles it; at 600x400 and 200% zoom the panel scrolls, long failure and path text wraps, and focus goes somewhere sensible when the opener disappears after an install transition.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "well from now on you can just proceed autonomously accordinglky",
+          "delegationLocation": "task t-20261101-uiimpl, user turn after the WP1 summary",
+          "delegationScope": "Implement the agreed AI Brain window design, step 1, including the specified live-check redesign repairs.",
+          "choice": "Use one observation gate; keep passive previews out of user-choice locks; serialize the latest slider intent while keeping focus; place Automatic at the GPU slider maximum; use /api/status.gpu for total all-app memory; keep the picture branch in normal grid flow and hand panel focus over without scrolling.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/brain-live-repairs.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/views/BrainSurface.liveRepairs.test.ts#D2 the whole page waits for live install and verdict: no observation",
+        "modules/ui-web/src/shell-v0/views/BrainSurface.liveRepairs.test.ts#D2 the whole page waits for live install and verdict: retained negative",
+        "modules/ui-web/src/shell-v0/views/BrainSurface.liveRepairs.test.ts#D2 the whole page waits for live install and verdict: unconfirmed verdict",
+        "modules/ui-web/src/shell-v0/views/BrainSurface.liveRepairs.test.ts#D6 repair history is installed and explicit answers-off stays off with Repair as primary",
+        "modules/ui-web/src/shell-v0/views/BrainSurface.liveRepairs.test.ts#D8 a pending idle preview does not block the real answer buttons and cannot overwrite a newer choice",
+        "modules/ui-web/src/shell-v0/views/BrainSurface.liveRepairs.test.ts#D8 a preview begun before an acquisition save cannot overwrite its new choices",
+        "modules/ui-web/src/shell-v0/views/BrainSurface.liveRepairs.test.ts#D10 Automatic GPU layers starts at maximum so the left endpoint can save processor-only zero",
+        "modules/ui-web/src/shell-v0/views/BrainSurface.liveRepairs.test.ts#D10 sliders retain focus and serialize the latest changed value during a pending witnessed save",
+        "modules/ui-web/src/shell-v0/views/BrainSurface.liveRepairs.test.ts#D10 a conflict stops queued slider saves and asks for review without changing the saved value",
+        "modules/ui-web/src/shell-v0/views/BrainSurface.liveRepairs.test.ts#D5 Linux memory uses the status GPU totals across devices without inventing an adapter",
+        "modules/ui-web/src/shell-v0/views/BrainSurface.liveRepairs.test.ts#D1 sentence boundaries keep whitespace outside phrase buttons and punctuation attached to preceding prose",
+        "modules/ui-web/src/shell-v0/views/BrainSurface.liveRepairs.test.ts#D3 a pointer gesture on another step opens it in one click without restoring the previous opener or scrolling focus",
+        "modules/ui-web/src/shell-v0/views/BrainSurface.liveRepairs.test.ts#D4 cancelled steps show retained bytes even when the last package record still says downloading",
+        "modules/ui-web/src/shell-v0/views/BrainSurface.liveRepairs.test.ts#D7 the picture branch participates in path layout instead of escaping into preceding alerts",
+        "modules/ui-web/src/shell-v0/views/BrainSurface.liveRepairs.test.ts#D9 repair instructions name the visible page locations"
+      ]
     }
   ]
 }
@@ -794,5 +1026,70 @@ was used. The explicitly started Vite at 127.0.0.1:5174 was stopped; the final 5
 check is empty, matching the initial snapshot. Work remains uncommitted. Delivery is blocked
 on the two Search Filters aggregate capture errors above, for the orchestrator to resolve or
 record independently; no further repair outside this assignment was attempted.
+
+
+
+Live redesign repair ledger (2026-11-02; uncommitted):
+
+A6 correction: the previous grouped Adaptation entry incorrectly covered changed repair
+expectations and the removal of Online/Indexing controls. Repair authority is restored and
+classified as repaired New behavior. The removed mode controls are explicitly Obsolete under
+B1/B5; Restart AI keeps its original offline refusal, no-replay and healthy-live assertions.
+The D2 checks require every remaining feature switch to be disabled while observations are unknown.
+No acceptance record is authored by this builder.
+
+Tests added or rewritten (all durable):
+- BrainSurface.liveRepairs.test.ts — D1–D10/Q3/Q7, observation gate, preview races, native-control events, queued slider intent/conflict and panel handoff.
+- BrainSurface.repairRemedy.test.ts — A6/B8/B11/Q5, primary and non-convergent repair guarantees restored at the alert.
+- BrainSurface.automatic-vdu.test.ts — B2/Q5, explicit successful install observation; original picture-reading assertions.
+- BrainSurface.componentList.test.ts — B2/Q5, explicit live observation; original inventory/progress/choice assertions.
+- BrainSurface.installProgressAggregate.test.ts — B2/Q5, explicit live observation; original aggregate byte/percentage assertions.
+- BrainSurface.pausedInstall.test.ts — B2/Q5, explicit live observation; original retained bytes, fresh consent and activation assertions.
+- BrainSurface.redesign.test.ts — D5/B7/Q5, same memory oracle at the real status GPU fields; all race, consent and projector assertions retained.
+- BulkOperationImmediateRefusal.test.ts — B2/Q5, live Brain activation precondition; original immediate/later refusal and hide/return assertions.
+
+- BrainSurface.snapshotLiveness.test.ts — D2/Q3/Q5, explicit live-install fixture; existing offline refusal, no queue/replay and healthy witness assertions retained — durable.
+
+
+Live redesign repair validation (2026-11-02 10:02 UTC):
+
+D1–D10 and A6 are implemented. Work remains uncommitted. There is no `.agents/preflight`.
+No acceptance record, full governance run, Gradle run, Search recipe or baseline edit was made.
+
+- `npm --prefix modules/ui-web run lint`: exit 0.
+- `npm --prefix modules/ui-web run typecheck`: exit 0.
+- `npm --prefix modules/ui-web run test:unit:run -- --maxWorkers=4`: exit 0, 684 files / 8,780 tests passed. This includes concurrent choice/consent actions, late responses, second-window convergence, reload/tab switching during install, continued slider edits and conflict review, and Health telemetry ownership/lifetime checks.
+- `npm --prefix modules/ui-web run knip:report`: exit 0; the wrapper retains Knip’s report status in its output. `node scripts/governance/run.mjs --gate dead-code --mode gate`: pass, five findings, zero failing gates.
+- `node scripts/ci/run-ui-web-gates.mjs`: exit 0, 31/31 passed, including the style-literal ratchet.
+- Every registered Brain `ui-shot` in dark and light: exit 0, zero axe violations, zero real console errors and no sideways overflow. All eight final PNGs were inspected against the supplied design references.
+- `jseval ui-a11y-gate`: exit 2; 109/110 surfaces clean. Unchanged Search Filters step `sv3-filters-hero-1280x720-light` failed its existing `R1a/Y7a requires all eight searches and five conversations` capture assertion. Its cause is unverified; no Search changes were attempted. This is the returned builder blocker for the orchestrator.
+- `jseval ui-proportion-gate`: exit 0; all 84 registered captures completed and every registered geometric constraint held.
+- All evidence was produced with `run-evidence.mjs`. The 19 D1–D10/A6 checks pass on the candidate and fail by assertion on e4bb40ed0e. General evidence and earlier repaired-behaviour evidence were regenerated; earlier fail-before references remain aeaa3e0413, 6680864f7d and f2f1945c23, all assertion failures with candidate passes.
+- `node scripts/governance/gates/test-intent/cli.mjs`: only `test-intent/acceptance-missing`; independent acceptance remains for the orchestrator’s acceptor.
+
+Real Chromium additionally checked Advanced at 1280×720, 760×720 and 600×400, each in dark,
+light and forced colors. All nine checks passed: a long policy/runtime alert stays above the
+picture branch, there is no document sideways overflow, Home from GPU Automatic saves 0,
+and five rapid ArrowRight presses while saves are delayed save 5 without losing focus.
+Desktop pointer clicks hand off the feature panel in one gesture with unchanged scroll position;
+Escape restores the selected opener. At 300×200 CSS / 600×400 physical pixels (200% reflow),
+both themes pass panel scrolling, reachable Close, Escape focus restoration and no sideways overflow.
+
+Final capture comparisons:
+
+- ai-brain — preserves the ready reference’s open headline/sentence/path/memory/link layout; the picture branch now reserves its own row and connects at the center. Missing fixture observations stay unknown.
+- ai-brain-light — same open layout and centered branch in light colors, with readable hairlines and wrapped prose.
+- ai-brain-advanced — expands Answers below the links as in the Advanced reference; normal-flow branch spacing keeps the controls farther down the scrolling page at 720 px height.
+- ai-brain-advanced-light — same in-place expansion, spacing and native slider rows in light colors.
+- ai-brain-components — retains the Advanced reference’s open Downloaded files rows, registry sizes, individual choices and text actions.
+- ai-brain-components-light — same inventory and aligned sizes with light separators and contrast.
+- ai-brain-consent — existing licence/size consent remains above the new-install layout, naming the exact selected 1.52 GB fixture set; centered branch stays below the page’s status and alerts.
+- ai-brain-consent-light — same exact consent set and actions in light colors.
+
+Resources: fixture browsers, unit-suite temporary HTTP services, and one session-owned Vite on
+127.0.0.1:5173. No owner app, shared backend stack, model or GPU was used. Before/evidence
+checks ran from isolated shared clones under the supplied temporary folder with ordinary dependency
+copies; the evidence producer’s worktrees were created inside that isolated clone, so it wrote no
+source-repository Git metadata. The creating exec session stopped the npm launcher with SIGINT (exit 130). Its surviving Vite child was identified by its exact worktree cwd and --port 5173 argv and stopped with SIGTERM from that process; the temporary shutdown config was restored byte-for-byte. The final 5173–5223 port check is empty, matching the initial check.
 
 ## Acceptance records

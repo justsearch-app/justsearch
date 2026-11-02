@@ -59,7 +59,7 @@ beforeEach(() => {
   store.current = {
     aiEngine: { kind: 'online', stability: { kind: 'settled' }, installFailure: null }, snapshotLive: true,
     runtime: { mode: 'online', modelId: 'answer-model', modelLabel: 'Answer model', installed: { known: true, value: true } },
-    capabilities: { chat: true }, status: { inference: { chatEnabledSpec: true }, operating: { gpu: { stale: false, adapter: 'Test adapter', adapterTotalBytes: 8192, adapterFreeBytes: 4096 } } },
+    capabilities: { chat: true }, status: { gpu: { totalVramBytes: 8192, usedVramBytes: 4096 }, inference: { chatEnabledSpec: true }, operating: { gpu: { stale: false, adapter: 'Test adapter', adapterTotalBytes: 8192, adapterFreeBytes: 4096 } } },
     installStatus: { state: 'completed', phase: 'done', installedFully: true },
     runtimeStatus: { active: { mmprojActive: true }, onnxFeatures: [{ id: 'embed', modelActive: true }, { id: 'reranker', modelActive: true }] },
     index: { documentCount: { known: true, value: 24 } },

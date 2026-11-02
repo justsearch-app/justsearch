@@ -27,11 +27,12 @@ export function composeBrainSentence(
   installed: boolean,
   features: Readonly<Record<BrainFeatureId, BrainFeature>>,
   readingPictures: boolean | null,
+  known = verdict.kind !== 'connecting',
 ): BrainSentencePart[] {
   const { meaning, reranker, chat, pictures } = features;
   const parts: BrainSentencePart[] = [];
-  if (!installed && verdict.kind === 'connecting') {
-    return [{ text: 'AI status and feature availability are still being checked. Everything runs on this computer.' }];
+  if (!known) {
+    return [{ text: `AI status and feature availability are still being checked. ${readingPictures === null ? 'Pictures were being read when last observed; current answer availability is unconfirmed. ' : ''}Everything runs on this computer.` }];
   }
   if (!installed) {
     parts.push({ text: 'Search already works with exact words. Installing AI lets it understand what your files are about', feature: 'meaning' });

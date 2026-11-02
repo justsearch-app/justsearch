@@ -36,6 +36,7 @@ interface Harness {
   systemStatus: unknown;
   runtimeStatus: unknown;
   inference: unknown;
+  installStatus: InstallStatus | null;
   policy: unknown;
   busy: Record<string, boolean>;
   _unifiedAiState: unknown;
@@ -57,6 +58,7 @@ function harness(live: boolean): Harness {
   el.apiBase = '';
   el.busy = {};
   el.policy = {};
+  el.installStatus = { state: 'completed', installedFully: true };
   el.systemStatus = {
     embedding: { pendingCount: 5084, completedCount: 104, docCount: 5188, coveragePercent: 2.0 },
     worker: {
