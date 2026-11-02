@@ -679,6 +679,7 @@ def compute_selector(
     spawn_env: Mapping[str, str],
     dataset_name: str | None = None,
     raw_context=None,
+    index_key: str | None = None,
 ) -> SelectorKey:
     """Static candidate selector (751 sec M.2 -- heuristic, never authoritative).
 
@@ -696,17 +697,25 @@ def compute_selector(
     the adopter bind identical corpus components by construction (finding 2). When
     BOTH are ``None`` the caller is axis-less (v0 selector with no corpus) and no
     corpus components are added -- today's behavior for axis-less callers.
+
+    ``index_key`` opts into the quality core's fail-safe source/content key in
+    place of commit + dirt. Other axes and all live confirmation checks remain.
     """
     components: dict = {"schema_version": _SELECTOR_SCHEMA_VERSION}
     try:
-        git_sha = _git_sha_full(repo_root)
+        if index_key is not None and not index_key.strip():
+            raise IdentityUnavailable("index_key: empty")
+        git_sha = _git_sha_full(repo_root) if index_key is None else index_key
         if git_sha is None:
             return SelectorKey(
                 None, components,
                 "git_sha: git rev-parse HEAD unavailable in " + str(repo_root),
             )
-        components["git_sha"] = git_sha
-        components["dirty_state_hash"] = _dirty_state_hash(repo_root)
+        if index_key is None:
+            components["git_sha"] = git_sha
+            components["dirty_state_hash"] = _dirty_state_hash(repo_root)
+        else:
+            components["index_key"] = index_key
 
         models_dir = _resolve_models_dir(repo_root, spawn_env)
         embed = _read_sha256_sidecar(
@@ -772,6 +781,7 @@ def compute_live_identity(
     base_url: str,
     spawn_env: Mapping[str, str],
     timeout: float = 10.0,
+    index_key: str | None = None,
 ) -> IndexIdentity:
     """Authoritative index identity from the running backend (751 sec M.1).
 
@@ -787,14 +797,19 @@ def compute_live_identity(
     build_state / commit_time are deliberately excluded from the key: they vary
     per build and belong to the entry attestation the publish step assembles,
     not to the identity.
+
+    With ``index_key``, replace only commit + dirt with the caller's fail-safe
+    index key. Live model/fingerprint fields are still read and compared.
     """
+    if index_key is not None and not index_key.strip():
+        raise IdentityUnavailable("index_key: empty")
     repo_root = _resolve_repo_root(spawn_env)
-    git_sha = _git_sha_full(repo_root)
+    git_sha = _git_sha_full(repo_root) if index_key is None else index_key
     if git_sha is None:
         raise IdentityUnavailable(
             "git_sha: git rev-parse HEAD unavailable in " + str(repo_root),
         )
-    dirty = _dirty_state_hash(repo_root)
+    dirty = _dirty_state_hash(repo_root) if index_key is None else None
 
     models_dir = _resolve_models_dir(repo_root, spawn_env)
     ner = _ner_model_hash(models_dir)
@@ -814,6 +829,10 @@ def compute_live_identity(
         "vector_format": meta["vector_format"],
         "runtime_config": _runtime_config(spawn_env),
     }
+    if index_key is not None:
+        components.pop("git_sha")
+        components.pop("dirty_state_hash")
+        components["index_key"] = index_key
     return IndexIdentity(_sha256_canonical(components), components)
 
 
@@ -823,6 +842,7 @@ def confirm_adoption(
     adopted_data_dir: Path,
     spawn_env: Mapping[str, str],
     timeout: float = 30.0,
+    index_key: str | None = None,
 ) -> ConfirmResult:
     """Confirm an adopted cache entry against the live backend (751 sec M.2).
 
@@ -831,6 +851,9 @@ def confirm_adoption(
     collected (no short-circuit) and any transport error, timeout, or missing
     key inside a check fails THAT check with a named reason; this function never
     raises out.
+
+    ``index_key`` must be the same fail-safe key used for candidate selection;
+    omitted, existing callers retain commit-and-dirty-state confirmation.
     """
     failures: list[str] = []
     checks: dict = {}
@@ -840,7 +863,8 @@ def confirm_adoption(
 
     # -- Check 1: live identity key equals the entry's recorded key. --------- #
     try:
-        live = compute_live_identity(base_url, spawn_env, timeout=timeout)
+        live = compute_live_identity(base_url, spawn_env, timeout=timeout,
+                                     **({"index_key": index_key} if index_key is not None else {}))
         entry_ident = entry_doc.get("identity") or {}
         entry_key = entry_ident.get("key")
         entry_comps = entry_ident.get("components") or {}

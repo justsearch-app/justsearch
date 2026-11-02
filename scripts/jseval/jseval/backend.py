@@ -245,6 +245,9 @@ def _install_distribution(resolved_root: Path, env: dict[str, str]) -> None:
     """Build the distribution before the lifetime helper or runner is needed."""
     command = ["node", str(resolved_root / "scripts/lib/tool-invoker.cjs"), "gradle",
                ":modules:ui:installDist", "-PskipWebBuild=true", "--quiet"]
+    if env.get("JSEVAL_GRADLE_SLOT"):
+        command = [env["JSEVAL_GRADLE_SLOT"], "-w", "3600", str(resolved_root / "gradlew"),
+                   ":modules:ui:installDist", "-PskipWebBuild=true", "--quiet"]
     result = subprocess.run(command, cwd=str(resolved_root), env=env, check=False)
     if result.returncode != 0:
         raise RuntimeError(f"Backend installDist failed (exit {result.returncode})")
