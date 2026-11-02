@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
   },
-  "createdAt": "2026-11-02T11:36:00.557Z",
-  "revision": "2c7f1e8d99717c245b39651cc3d7f48bc3fba43a",
-  "tree": "0999a57a295144f3c156a86a3bb44e90fb3c803e",
+  "createdAt": "2026-11-02T11:41:26.433Z",
+  "revision": "ede9bd49edbfc366172944d1f934db1e4e1e7d84",
+  "tree": "4b62af472d1fd33a8011b9cfa06289ebd70d1ab5",
   "environment": {
     "platform": "linux",
     "arch": "x64",
@@ -18,10 +18,10 @@
   },
   "runs": [
     {
-      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/BrainSurface.liveRepairs.test.ts\" \"src/shell-v0/utils/aiInstallPoll.test.ts\" --reporter=json --outputFile=\"/tmp/test-intent-vitest-3181191-1793619355373.json\"",
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/BrainSurface.liveRepairs.test.ts\" \"src/shell-v0/utils/aiInstallPoll.test.ts\" --reporter=json --outputFile=\"/tmp/test-intent-vitest-3198049-1793619681449.json\"",
       "cwd": "modules/ui-web",
       "exitCode": 0,
-      "durationMs": 1734
+      "durationMs": 1632
     }
   ],
   "checks": [
@@ -29,7 +29,7 @@
       "id": "modules/ui-web/src/shell-v0/views/BrainSurface.liveRepairs.test.ts#G1 failed install reads override a reachable origin and settled verdict",
       "file": "modules/ui-web/src/shell-v0/views/BrainSurface.liveRepairs.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:499d7fd9bcbfa674c3d90246dc4ec88717fe2ac26c14a92c63b0c4668f90b5dc",
+      "contentDigest": "sha256:e660e4f0ea3a6ca4a8088bdeade866f6f4091c2d968fb841f65dbc4e98ba88e7",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -44,7 +44,7 @@
       "id": "modules/ui-web/src/shell-v0/views/BrainSurface.liveRepairs.test.ts#G1 failed runtime reads override a reachable origin and settled verdict",
       "file": "modules/ui-web/src/shell-v0/views/BrainSurface.liveRepairs.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:499d7fd9bcbfa674c3d90246dc4ec88717fe2ac26c14a92c63b0c4668f90b5dc",
+      "contentDigest": "sha256:e660e4f0ea3a6ca4a8088bdeade866f6f4091c2d968fb841f65dbc4e98ba88e7",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -59,7 +59,7 @@
       "id": "modules/ui-web/src/shell-v0/views/BrainSurface.liveRepairs.test.ts#G2 Advanced shares the page gate for connecting observations",
       "file": "modules/ui-web/src/shell-v0/views/BrainSurface.liveRepairs.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:499d7fd9bcbfa674c3d90246dc4ec88717fe2ac26c14a92c63b0c4668f90b5dc",
+      "contentDigest": "sha256:e660e4f0ea3a6ca4a8088bdeade866f6f4091c2d968fb841f65dbc4e98ba88e7",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -74,7 +74,7 @@
       "id": "modules/ui-web/src/shell-v0/views/BrainSurface.liveRepairs.test.ts#G2 Advanced shares the page gate for missing install observations",
       "file": "modules/ui-web/src/shell-v0/views/BrainSurface.liveRepairs.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:499d7fd9bcbfa674c3d90246dc4ec88717fe2ac26c14a92c63b0c4668f90b5dc",
+      "contentDigest": "sha256:e660e4f0ea3a6ca4a8088bdeade866f6f4091c2d968fb841f65dbc4e98ba88e7",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -89,7 +89,7 @@
       "id": "modules/ui-web/src/shell-v0/views/BrainSurface.liveRepairs.test.ts#G3 selected missing answer files use saved intent while Repair owns acquisition",
       "file": "modules/ui-web/src/shell-v0/views/BrainSurface.liveRepairs.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:499d7fd9bcbfa674c3d90246dc4ec88717fe2ac26c14a92c63b0c4668f90b5dc",
+      "contentDigest": "sha256:e660e4f0ea3a6ca4a8088bdeade866f6f4091c2d968fb841f65dbc4e98ba88e7",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -104,7 +104,7 @@
       "id": "modules/ui-web/src/shell-v0/views/BrainSurface.liveRepairs.test.ts#G4 passive previews complete before another batch starts and converge other windows without locking choices",
       "file": "modules/ui-web/src/shell-v0/views/BrainSurface.liveRepairs.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:499d7fd9bcbfa674c3d90246dc4ec88717fe2ac26c14a92c63b0c4668f90b5dc",
+      "contentDigest": "sha256:e660e4f0ea3a6ca4a8088bdeade866f6f4091c2d968fb841f65dbc4e98ba88e7",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -119,7 +119,7 @@
       "id": "modules/ui-web/src/shell-v0/views/BrainSurface.liveRepairs.test.ts#G5 Linux memory uses device zero status GPU figures and labels one of several devices",
       "file": "modules/ui-web/src/shell-v0/views/BrainSurface.liveRepairs.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:499d7fd9bcbfa674c3d90246dc4ec88717fe2ac26c14a92c63b0c4668f90b5dc",
+      "contentDigest": "sha256:e660e4f0ea3a6ca4a8088bdeade866f6f4091c2d968fb841f65dbc4e98ba88e7",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -168,60 +168,60 @@
     "patches": [],
     "runs": [
       {
-        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/BrainSurface.liveRepairs.test.ts\" \"src/shell-v0/utils/aiInstallPoll.test.ts\" --reporter=json --outputFile=\"/tmp/test-intent-vitest-3181191-1793619358820.json\"",
+        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/BrainSurface.liveRepairs.test.ts\" \"src/shell-v0/utils/aiInstallPoll.test.ts\" --reporter=json --outputFile=\"/tmp/test-intent-vitest-3198049-1793619684770.json\"",
         "cwd": "<before-worktree>",
         "exitCode": 1,
-        "durationMs": 1417,
-        "output": "JSON report written to /tmp/test-intent-vitest-3181191-1793619358820.json\n\n"
+        "durationMs": 1345,
+        "output": "JSON report written to /tmp/test-intent-vitest-3198049-1793619684770.json\n\n"
       }
     ],
     "checks": [
       {
         "id": "modules/ui-web/src/shell-v0/views/BrainSurface.liveRepairs.test.ts#G1 failed install reads override a reachable origin and settled verdict",
         "classification": "assertion",
-        "detail": "Brain review repairs G1 failed install reads override a reachable origin and settled verdict:  AssertionError: expected 'AI is ready' to contain 'Checking AI'\n    at /tmp/test-intent-before-qt6oVW/modules/ui-web/src/shell-v0/views/BrainSurface.liveRepairs.test.ts:233:74\n    at runNextTicks (node:internal/process/task_queues:65:5)\n    at listOnTimeout (node:internal/timers:644:9)\n    at proces"
+        "detail": "Brain review repairs G1 failed install reads override a reachable origin and settled verdict:  AssertionError: expected 'AI is ready' to contain 'Checking AI'\n    at /tmp/test-intent-before-57gK3g/modules/ui-web/src/shell-v0/views/BrainSurface.liveRepairs.test.ts:242:74\n    at runNextTicks (node:internal/process/task_queues:65:5)\n    at listOnTimeout (node:internal/timers:644:9)\n    at proces"
       },
       {
         "id": "modules/ui-web/src/shell-v0/views/BrainSurface.liveRepairs.test.ts#G1 failed runtime reads override a reachable origin and settled verdict",
         "classification": "assertion",
-        "detail": "Brain review repairs G1 failed runtime reads override a reachable origin and settled verdict:  AssertionError: expected 'AI is ready' to contain 'Checking AI'\n    at /tmp/test-intent-before-qt6oVW/modules/ui-web/src/shell-v0/views/BrainSurface.liveRepairs.test.ts:233:74\n    at runNextTicks (node:internal/process/task_queues:65:5)\n    at listOnTimeout (node:internal/timers:644:9)\n    at proces"
+        "detail": "Brain review repairs G1 failed runtime reads override a reachable origin and settled verdict:  AssertionError: expected 'AI is ready' to contain 'Checking AI'\n    at /tmp/test-intent-before-57gK3g/modules/ui-web/src/shell-v0/views/BrainSurface.liveRepairs.test.ts:242:74\n    at runNextTicks (node:internal/process/task_queues:65:5)\n    at listOnTimeout (node:internal/timers:644:9)\n    at proces"
       },
       {
         "id": "modules/ui-web/src/shell-v0/views/BrainSurface.liveRepairs.test.ts#G2 Advanced shares the page gate for connecting observations",
         "classification": "assertion",
-        "detail": "Brain review repairs G2 Advanced shares the page gate for connecting observations:  AssertionError: expected 'Observed search features · 2/2 active…' to contain 'when last observed'\n    at /tmp/test-intent-before-qt6oVW/modules/ui-web/src/shell-v0/views/BrainSurface.liveRepairs.test.ts:242:88\n    at runNextTicks (node:internal/process/task_queues:65:5)\n    at listOnTimeout (node:in"
+        "detail": "Brain review repairs G2 Advanced shares the page gate for connecting observations:  AssertionError: expected 'Observed search features · 2/2 active…' to contain 'when last observed'\n    at /tmp/test-intent-before-57gK3g/modules/ui-web/src/shell-v0/views/BrainSurface.liveRepairs.test.ts:251:88\n    at runNextTicks (node:internal/process/task_queues:65:5)\n    at listOnTimeout (node:in"
       },
       {
         "id": "modules/ui-web/src/shell-v0/views/BrainSurface.liveRepairs.test.ts#G2 Advanced shares the page gate for missing install observations",
         "classification": "assertion",
-        "detail": "Brain review repairs G2 Advanced shares the page gate for missing install observations:  AssertionError: expected 'Observed search features · 2/2 active…' to contain 'when last observed'\n    at /tmp/test-intent-before-qt6oVW/modules/ui-web/src/shell-v0/views/BrainSurface.liveRepairs.test.ts:242:88\n    at runNextTicks (node:internal/process/task_queues:65:5)\n    at listOnTimeout (node:in"
+        "detail": "Brain review repairs G2 Advanced shares the page gate for missing install observations:  AssertionError: expected 'Observed search features · 2/2 active…' to contain 'when last observed'\n    at /tmp/test-intent-before-57gK3g/modules/ui-web/src/shell-v0/views/BrainSurface.liveRepairs.test.ts:251:88\n    at runNextTicks (node:internal/process/task_queues:65:5)\n    at listOnTimeout (node:in"
       },
       {
         "id": "modules/ui-web/src/shell-v0/views/BrainSurface.liveRepairs.test.ts#G3 selected missing answer files use saved intent while Repair owns acquisition",
         "classification": "assertion",
-        "detail": "Brain review repairs G3 selected missing answer files use saved intent while Repair owns acquisition:  AssertionError: expected [] to deeply equal [ 'core.set-chat-enabled' ]\n    at /tmp/test-intent-before-qt6oVW/modules/ui-web/src/shell-v0/views/BrainSurface.liveRepairs.test.ts:253:24\n    at runNextTicks (node:internal/process/task_queues:65:5)\n    at listOnTimeout (node:internal/timers:644:9)\n    a"
+        "detail": "Brain review repairs G3 selected missing answer files use saved intent while Repair owns acquisition:  AssertionError: expected [] to deeply equal [ 'core.set-chat-enabled' ]\n    at /tmp/test-intent-before-57gK3g/modules/ui-web/src/shell-v0/views/BrainSurface.liveRepairs.test.ts:262:24\n    at runNextTicks (node:internal/process/task_queues:65:5)\n    at listOnTimeout (node:internal/timers:644:9)\n    a"
       },
       {
         "id": "modules/ui-web/src/shell-v0/views/BrainSurface.liveRepairs.test.ts#G4 passive previews complete before another batch starts and converge other windows without locking choices",
         "classification": "assertion",
-        "detail": "Brain review repairs G4 passive previews complete before another batch starts and converge other windows without locking choices:  AssertionError: expected \"vi.fn()\" to be called 1 times, but got 4 times\n    at /tmp/test-intent-before-qt6oVW/modules/ui-web/src/shell-v0/views/BrainSurface.liveRepairs.test.ts:269:18\n    at file:///tmp/test-intent-before-qt6oVW/modules/ui-web/node_modules/@vitest/runner/dist/chunk-artifact.js:1903"
+        "detail": "Brain review repairs G4 passive previews complete before another batch starts and converge other windows without locking choices:  AssertionError: expected \"vi.fn()\" to be called 1 times, but got 4 times\n    at /tmp/test-intent-before-57gK3g/modules/ui-web/src/shell-v0/views/BrainSurface.liveRepairs.test.ts:278:18\n    at file:///tmp/test-intent-before-57gK3g/modules/ui-web/node_modules/@vitest/runner/dist/chunk-artifact.js:1903"
       },
       {
         "id": "modules/ui-web/src/shell-v0/views/BrainSurface.liveRepairs.test.ts#G5 Linux memory uses device zero status GPU figures and labels one of several devices",
         "classification": "assertion",
-        "detail": "Brain live redesign repairs G5 Linux memory uses device zero status GPU figures and labels one of several devices:  AssertionError: expected '\\n      Graphics card\\n        \\n    …' to contain '9.00 GB of 12.00 GB in use · all apps…'\n    at /tmp/test-intent-before-qt6oVW/modules/ui-web/src/shell-v0/views/BrainSurface.liveRepairs.test.ts:164:32\n    at runNextTicks (node:internal/process/task_queues:65:5)\n    at li"
+        "detail": "Brain live redesign repairs G5 Linux memory uses device zero status GPU figures and labels one of several devices:  AssertionError: expected '\\n      Graphics card\\n        \\n    …' to contain '9.00 GB of 12.00 GB in use · all apps…'\n    at /tmp/test-intent-before-57gK3g/modules/ui-web/src/shell-v0/views/BrainSurface.liveRepairs.test.ts:164:32\n    at runNextTicks (node:internal/process/task_queues:65:5)\n    at li"
       },
       {
         "id": "modules/ui-web/src/shell-v0/utils/aiInstallPoll.test.ts#G1 a failed install read invalidates retained observations even with other endpoints reachable",
         "classification": "assertion",
-        "detail": "AI observation freshness G1 a failed install read invalidates retained observations even with other endpoints reachable:  AssertionError: expected true to be false // Object.is equality\n    at /tmp/test-intent-before-qt6oVW/modules/ui-web/src/shell-v0/utils/aiInstallPoll.test.ts:288:28\n    at file:///tmp/test-intent-before-qt6oVW/modules/ui-web/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:20"
+        "detail": "AI observation freshness G1 a failed install read invalidates retained observations even with other endpoints reachable:  AssertionError: expected true to be false // Object.is equality\n    at /tmp/test-intent-before-57gK3g/modules/ui-web/src/shell-v0/utils/aiInstallPoll.test.ts:288:28\n    at file:///tmp/test-intent-before-57gK3g/modules/ui-web/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:20"
       },
       {
         "id": "modules/ui-web/src/shell-v0/utils/aiInstallPoll.test.ts#G1 a failed runtime read invalidates retained observations even with other endpoints reachable",
         "classification": "assertion",
-        "detail": "AI observation freshness G1 a failed runtime read invalidates retained observations even with other endpoints reachable:  AssertionError: expected true to be false // Object.is equality\n    at /tmp/test-intent-before-qt6oVW/modules/ui-web/src/shell-v0/utils/aiInstallPoll.test.ts:288:28\n    at file:///tmp/test-intent-before-qt6oVW/modules/ui-web/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:20"
+        "detail": "AI observation freshness G1 a failed runtime read invalidates retained observations even with other endpoints reachable:  AssertionError: expected true to be false // Object.is equality\n    at /tmp/test-intent-before-57gK3g/modules/ui-web/src/shell-v0/utils/aiInstallPoll.test.ts:288:28\n    at file:///tmp/test-intent-before-57gK3g/modules/ui-web/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:20"
       }
     ]
   },
-  "digest": "sha256:b6163a93f8d746aa34bbf00c09367ad6b7a8e35e1b390769d6847386253076f9"
+  "digest": "sha256:badb228ec06858b7002664ee234db343af8bbf60b5b33a8bc00f70ba8aad9bf1"
 }

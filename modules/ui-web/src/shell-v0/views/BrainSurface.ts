@@ -1386,7 +1386,7 @@ export class BrainSurface extends JfElement {
       const state = !live ? 'Unknown — checking AI status'
         : stopped && packageProgress != null && !present && (packageProgress.bytesDownloaded ?? 0) > 0 ? `Cancelled · ${formatBytes(packageProgress.bytesDownloaded ?? 0)} kept`
         : unavailable ? `Unavailable on this computer: ${component!.unavailableReason || 'Not available in this install mode.'}`
-        : packageProgress?.state === 'downloading' ? `Downloading${percent === null ? '' : ` ${percent}%`}`
+        : !stopped && packageProgress?.state === 'downloading' ? `Downloading${percent === null ? '' : ` ${percent}%`}`
         : !component && !present ? 'Unknown — package status unavailable'
         : !present ? 'Not downloaded'
         : active === null ? 'Unknown — last observed files are downloaded'

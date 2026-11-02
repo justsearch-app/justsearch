@@ -203,6 +203,15 @@ describe('Brain live redesign repairs', () => {
     expect(el.shadowRoot!.querySelector('[data-feature="meaning"]')!.textContent).toContain('Cancelled · 850 B kept');
     for (const feature of ['reranker', 'chat']) expect(el.shadowRoot!.querySelector(`[data-feature="${feature}"]`)!.textContent).not.toContain('Cancelled');
   });
+  it('D4 a cancelled run never leaves a step saying Downloading: zero-byte interruptions are not downloaded, present files keep their observed state', async () => {
+    emit({ installStatus: { state: 'cancelled', installedFully: false, resumableBytes: 0, packages: [{ packageId: 'embedding', state: 'downloading', bytesDownloaded: 0, bytesTotal: 1024 }, { packageId: 'reranker', state: 'downloading', bytesDownloaded: 512, bytesTotal: 1024 }] }, aiEngine: { kind: 'paused', stability: { kind: 'settled' }, installFailure: null }, runtime: { mode: 'offline', installed: { known: true, value: false } } as AiState['runtime'], runtimeStatus: { onnxFeatures: [{ id: 'reranker', status: 'active', modelActive: true }] } });
+    preview.components = preview.components!.map(c => c.id === 'embedding' ? { ...c, state: 'to-download' } : c);
+    const el = await mount();
+    const meaning = el.shadowRoot!.querySelector('[data-feature="meaning"]')!.textContent!;
+    expect(meaning).not.toContain('Downloading'); expect(meaning).toContain('Not downloaded');
+    const reranker = el.shadowRoot!.querySelector('[data-feature="reranker"]')!.textContent!;
+    expect(reranker).not.toContain('Downloading'); expect(reranker).not.toContain('Cancelled'); expect(reranker).toContain('On');
+  });
   it('B11 the repair remedy appears once, in the repair alert, not repeated by the status line', async () => {
     emit({ installStatus: { state: 'completed', installedFully: true, repairNeeded: true }, aiEngine: { kind: 'offline', stability: { kind: 'settled' }, installFailure: null } });
     const el = await mount();
