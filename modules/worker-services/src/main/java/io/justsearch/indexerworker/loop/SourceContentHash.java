@@ -53,8 +53,21 @@ public final class SourceContentHash {
     return sha256(path, () -> false);
   }
 
+  public static String sha256WithinRoot(Path path, Path root) throws IOException {
+    return sha256WithinRoot(path, root, () -> false);
+  }
+
+  public static String sha256WithinRoot(Path path, Path root, java.util.function.BooleanSupplier cancelled) throws IOException {
+    Path normalized = path.toAbsolutePath().normalize();
+    SourceAccess.requireContained(normalized, root);
+    return sha256(normalized, cancelled);
+  }
+
   /** The caller may cancel a bounded admission while a large source is being witnessed. */
   public static String sha256(Path path, java.util.function.BooleanSupplier cancelled) throws IOException {
+    if (io.justsearch.indexerworker.ingest.CloudPlaceholderDetector.isCloudPlaceholder(path)) {
+      throw new IOException("Cloud-only placeholder must not be opened");
+    }
     MessageDigest digest;
     try {
       digest = MessageDigest.getInstance("SHA-256");

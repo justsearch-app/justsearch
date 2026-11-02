@@ -335,13 +335,13 @@ final class IndexingLoopStaleDeletionFenceTest extends LuceneExecutorTestBase {
         var a = spy(fixture.a.indexingCoordinator());
         var b = spy(fixture.b.indexingCoordinator());
         doThrow(new IllegalStateException("owned " + failing + " delete failure"))
-            .when(failing.equals("A") ? a : b).deleteByIdAndChunks(fixture.key);
+            .when(failing.equals("A") ? a : b).pruneFile(eq(fixture.key), eq(fixture.root), any());
         var handler = new StaleSourceHandler(b, fixture.identities, () -> a);
-        assertThrows(IllegalStateException.class, () -> handler.deleteMissingSource(fixture.file));
+        assertThrows(IllegalStateException.class, () -> handler.deleteMissingSource(fixture.file, fixture.root, fixture.witness));
         var order = inOrder(a, b);
-        order.verify(a).deleteByIdAndChunks(fixture.key);
-        if (failing.equals("A")) verify(b, never()).deleteByIdAndChunks(anyString());
-        else order.verify(b).deleteByIdAndChunks(fixture.key);
+        order.verify(a).pruneFile(eq(fixture.key), eq(fixture.root), any());
+        if (failing.equals("A")) verify(b, never()).pruneFile(anyString(), any(), any());
+        else order.verify(b).pruneFile(eq(fixture.key), eq(fixture.root), any());
         fixture.a.commitOps().maybeRefreshBlocking(); fixture.b.commitOps().maybeRefreshBlocking();
         assertEquals(failing.equals("A") ? 2 : 0,
             fixture.a.indexCountOps().countByIdAndChunksStrict(fixture.key));
@@ -381,6 +381,7 @@ final class IndexingLoopStaleDeletionFenceTest extends LuceneExecutorTestBase {
     private final IndexingLoop loop;
     private final TimeboxedContentExtractor extraction = mock(TimeboxedContentExtractor.class);
     private final JobQueue.IndexJob claim;
+    private final RootWitness witness = RootWitness.inMemory();
     private final FileEnvelope envelope = FileEnvelope.fromSnapshot(FileFreshnessSnapshot.capture(file));
 
     private FenceFixture() throws Exception { this(true, false); }
@@ -417,7 +418,6 @@ final class IndexingLoopStaleDeletionFenceTest extends LuceneExecutorTestBase {
           mock(WorkerSignalBus.class), IndexingPacing.unthrottled(), null, null, null, null, extraction, null,
           new IndexingLoopOptions(false, null, identities, null, null, null));
       if (projectToA) loop.wireActiveLexicalSource(a);
-      var witness = RootWitness.inMemory();
       assertTrue(witness.admits(root)); assertTrue(witness.vouches(root));
       loop.useRootCheck(witness);
       var runningField = IndexingLoop.class.getDeclaredField("running"); runningField.setAccessible(true);

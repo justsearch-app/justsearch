@@ -380,7 +380,7 @@ public final class NativePolicyReplay {
             var before = Files.readAttributes(path,
                 BasicFileAttributes.class, LinkOption.NOFOLLOW_LINKS);
             if (!before.isRegularFile() || SyncDirectoryOps.isCloudPlaceholder(path)) return false;
-            String hash = SourceContentHash.sha256(path);
+            String hash = SourceContentHash.sha256WithinRoot(path, file.ingestionRoot());
             var after = Files.readAttributes(path,
                 BasicFileAttributes.class, LinkOption.NOFOLLOW_LINKS);
             if (!after.isRegularFile() || before.size() != after.size()

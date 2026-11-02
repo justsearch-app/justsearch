@@ -40,7 +40,7 @@ function observe(which: Case, jobs = 4, migrating = false): AiState {
   } as unknown as StatusSnapshot;
   __feedForTest({ status, inference: { mode: 'indexing', starting: false, embeddingQueueSize: 220, vduQueueSize: 99 } });
   if (which === 'age' || which === 'Engine gone') {
-    vi.setSystemTime(now + (which === 'Engine gone' ? 120_001 : 30_001));
+    vi.setSystemTime(now + (which === 'Engine gone' ? 120_001 : 40_001));
     if (which === 'age') __feedForTest({ inference: { mode: 'indexing', starting: false, embeddingQueueSize: 220, vduQueueSize: 99 } });
   }
   __tickClockForTest();

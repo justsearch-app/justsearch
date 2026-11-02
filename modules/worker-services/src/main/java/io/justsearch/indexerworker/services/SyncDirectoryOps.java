@@ -88,6 +88,7 @@ final class SyncDirectoryOps {
   private final ReadPathOps readPathOps;
   private final PruneOps pruneOps;
   private final CommitOps commitOps;
+
   private final JobQueue jobQueue;
   private final IndexingPacing indexingPacing;
   private final CloudPlaceholderRecorder cloudPlaceholderRecorder;
@@ -100,6 +101,13 @@ final class SyncDirectoryOps {
 
   void setUserExclusions(java.util.function.BiPredicate<Path, Path> exclusions) {
     userExclusions = java.util.Objects.requireNonNull(exclusions, "exclusions");
+  }
+
+  private java.util.function.BiPredicate<Path, Path> directoryExclusions =
+      (dir, root) -> io.justsearch.configuration.excludes.ExclusionPatterns.current().isExcludedDirectory(root, dir);
+
+  void setDirectoryExclusions(java.util.function.BiPredicate<Path, Path> exclusions) {
+    directoryExclusions = java.util.Objects.requireNonNull(exclusions);
   }
 
   private java.util.function.BiPredicate<Path, Path> retirementExclusions = (file, root) -> {
@@ -118,6 +126,7 @@ final class SyncDirectoryOps {
    * Builds the presence authority for one prune of a root (#758). The default
    * knows no registration or recorded volume; the ingest service supplies both.
    */
+  private boolean hasPruneAuthority;
   private volatile java.util.function.Function<Path, PruneOps.PresenceGuard> pruneGuardFactory =
       root -> RootPresenceGuard.capture(root, null);
   /** Holds off file publications while the prune applies a batch; the ingest service supplies it. */
@@ -197,6 +206,7 @@ final class SyncDirectoryOps {
    */
   void setPruneGuardFactory(java.util.function.Function<Path, PruneOps.PresenceGuard> factory) {
     this.pruneGuardFactory = java.util.Objects.requireNonNull(factory, "factory");
+    this.hasPruneAuthority = true;
   }
 
   /**
@@ -283,15 +293,19 @@ final class SyncDirectoryOps {
               if (scope.excludes(dir.toString())) return FileVisitResult.SKIP_SUBTREE;
               if (!dir.equals(root) && nativePolicy != null
                   && nativePolicy.excludesDirectory(dir, root, collection)) return FileVisitResult.SKIP_SUBTREE;
-              if (!Files.isReadable(dir)) {
-                throw new UnreadableWalkMemberException(
-                    "Reconciliation directory is unreadable: " + dir, null);
+              if (!dir.equals(root)
+                  && directoryExclusions.test(dir, root)) {
+                return FileVisitResult.SKIP_SUBTREE;
               }
               if (!dir.equals(root)) {
                 String name = dir.getFileName() != null ? dir.getFileName().toString() : "";
                 if (IngestionSkipPolicy.isSkippedDirectoryName(name)) {
                   return FileVisitResult.SKIP_SUBTREE;
                 }
+              }
+              if (!Files.isReadable(dir)) {
+                throw new UnreadableWalkMemberException(
+                    "Reconciliation directory is unreadable: " + dir, null);
               }
               return FileVisitResult.CONTINUE;
             }
@@ -301,9 +315,6 @@ final class SyncDirectoryOps {
                 throws IOException {
               checkCancelled(cancelled);
               if (scope.excludes(file.toString())) return FileVisitResult.CONTINUE;
-              if (attrs.isSymbolicLink()) {
-                throw new IOException("Reconciliation does not follow symbolic links: " + file);
-              }
               if (!attrs.isRegularFile()) return FileVisitResult.CONTINUE;
               String normalized = PathNormalizer.normalizeKey(file);
               if (!seenDiskPaths.add(normalized)) return FileVisitResult.CONTINUE;
@@ -314,6 +325,10 @@ final class SyncDirectoryOps {
               if (nativePolicy != null && nativePolicy.excludes(file, root, collection)) {
                 return FileVisitResult.CONTINUE;
               }
+              if (nativePolicy == null && (IngestionSkipPolicy.shouldSkipWithinRoot(file, root) || userExclusions.test(file, root))) {
+                return FileVisitResult.CONTINUE;
+              }
+              if (isCloudPlaceholder(file)) return FileVisitResult.CONTINUE;
               if (!Files.isReadable(file)) {
                 throw new UnreadableWalkMemberException(
                     "Reconciliation file is unreadable: " + file, null);
@@ -340,6 +355,14 @@ final class SyncDirectoryOps {
               if (!file.equals(root) && nativePolicy != null
                   && nativePolicy.excludesDirectory(file, root, collection)
                   && Files.isDirectory(file, java.nio.file.LinkOption.NOFOLLOW_LINKS)) return FileVisitResult.CONTINUE;
+              if (Files.isDirectory(file, java.nio.file.LinkOption.NOFOLLOW_LINKS)
+                  && (directoryExclusions.test(file, root)
+                      || (!file.equals(root) && file.getFileName() != null
+                          && IngestionSkipPolicy.isSkippedDirectoryName(file.getFileName().toString())))) {
+                return FileVisitResult.CONTINUE;
+              }
+              if (Files.isRegularFile(file, java.nio.file.LinkOption.NOFOLLOW_LINKS)
+                  && excludedRecoveryPath(file, root)) return FileVisitResult.CONTINUE;
               throw new UnreadableWalkMemberException(
                   "Reconciliation walk could not read: " + file, failure);
             }
@@ -365,7 +388,7 @@ final class SyncDirectoryOps {
             checkCancelledUnchecked(cancelled);
             return PathNormalizer.normalizeKey(first).compareTo(PathNormalizer.normalizeKey(second));
           });
-      List<String> deletions = confirmedAbsentPaths(indexedFiles.keySet(), cancelled);
+      List<String> deletions = confirmedAbsentPaths(indexedFiles.keySet(), root, cancelled);
       checkCancelled(cancelled);
       identityLease.requireCurrent();
       RootDifference difference =
@@ -387,9 +410,10 @@ final class SyncDirectoryOps {
     }
   }
 
-  private static List<String> confirmedAbsentPaths(
-      Set<String> indexedPaths, java.util.function.BooleanSupplier cancelled) throws IOException {
+  private List<String> confirmedAbsentPaths(
+      Set<String> indexedPaths, Path root, java.util.function.BooleanSupplier cancelled) throws IOException {
     List<String> absent = new ArrayList<>();
+    var authority = pruneGuardFactory.apply(root);
     for (String indexedPath : indexedPaths) {
       checkCancelled(cancelled);
       Path path;
@@ -398,9 +422,17 @@ final class SyncDirectoryOps {
       } catch (RuntimeException invalid) {
         throw new IOException("Serving index contains an invalid path", invalid);
       }
-      if (Files.notExists(path)) {
+      var presence = io.justsearch.adapters.lucene.runtime.PathPresence.probeSource(path, root);
+      if (hasPruneAuthority && ((presence == io.justsearch.adapters.lucene.runtime.PathPresence.ABSENT
+              && !authority.rootCurrent())
+          || authority.presence(path) == io.justsearch.adapters.lucene.runtime.PathPresence.UNKNOWN)) {
+        throw new IOException("Indexed source storage is unavailable: " + indexedPath);
+      }
+      if (presence == io.justsearch.adapters.lucene.runtime.PathPresence.ABSENT
+          && io.justsearch.adapters.lucene.runtime.PathPresence.absentBeneathListableFolder(path, root, null)
+              == io.justsearch.adapters.lucene.runtime.PathPresence.ABSENT) {
         absent.add(indexedPath);
-      } else if (!Files.exists(path)) {
+      } else if (presence != io.justsearch.adapters.lucene.runtime.PathPresence.PRESENT) {
         throw new IOException("Could not establish indexed path presence: " + indexedPath);
       }
     }
@@ -776,12 +808,8 @@ final class SyncDirectoryOps {
       if (cancelled.getAsBoolean()) return syncDirectoryErrorResponse(filesDeleted, 0, "Cancelled");
       Map<String, IndexedFileStamp> indexedPaths = indexedPathsForSync(rootPath, force, cancelled, scope);
       if (cancelled.getAsBoolean()) return syncDirectoryErrorResponse(filesDeleted, 0, "Cancelled");
-      SyncDirectoryResponse scanSkip =
-          handleSyncIndexedPathsScanSkipIfNeeded(rootPath, force, indexedPaths, filesDeleted);
-      if (scanSkip != null) {
-        return scanSkip;
-      }
-      if (!force) {
+      pruneIncomplete |= !force && indexedPaths == null;
+      if (!force && indexedPaths != null) {
         log.debug("syncDirectory: found {} indexed paths under {}", indexedPaths.size(), rootPath);
       }
 
@@ -843,20 +871,6 @@ final class SyncDirectoryOps {
     return null;
   }
 
-  private SyncDirectoryResponse handleSyncIndexedPathsScanSkipIfNeeded(
-      String rootPath, boolean force, Map<String, IndexedFileStamp> indexedPaths, int filesDeleted) {
-    if (force || indexedPaths != null) {
-      return null;
-    }
-    log.warn(
-        "syncDirectory: skipping missing-file detection for {} "
-            + "(indexed path budget exceeded; still pruned {} orphans); marking delete-detection UNVERIFIED",
-        rootPath,
-        filesDeleted);
-    // Tempdoc 626 §Axis-B/C — surface the skip instead of returning a silent skipped/healthy result.
-    return syncDirectoryDeleteUnverifiedResponse(filesDeleted, 0);
-  }
-
   private SyncDirectoryResponse handleSyncWalkTerminalState(
       SyncWalkPhaseResult walk, int filesDeleted, int filesAdded) {
     if (walk.walkInterrupted()) {
@@ -869,7 +883,7 @@ final class SyncDirectoryOps {
   /** The validated sync root, or {@code null} when it does not exist or is not a directory. */
   private Path resolveSyncRoot(String rootPath) {
     Path root = Path.of(rootPath);
-    if (!Files.exists(root) || !Files.isDirectory(root)) {
+    if (!Files.isDirectory(root, java.nio.file.LinkOption.NOFOLLOW_LINKS)) {
       log.warn("syncDirectory: root does not exist or is not a directory: {}", rootPath);
       return null;
     }
@@ -945,10 +959,10 @@ final class SyncDirectoryOps {
             public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs) {
               if (stopped()) return FileVisitResult.TERMINATE;
               if (prefixScopeFactory.apply(root).excludes(dir.toString())) return FileVisitResult.SKIP_SUBTREE;
+              if (directoryExclusions.test(dir, root)) return FileVisitResult.SKIP_SUBTREE;
               if (dir.equals(root)) return FileVisitResult.CONTINUE;
               String name = dir.getFileName() != null ? dir.getFileName().toString() : "";
-              if (IngestionSkipPolicy.isSkippedDirectoryName(name)
-                  || (admissionMode == AdmissionMode.UPGRADE_RECOVERY && excludedRecoveryPath(dir, root))) {
+              if (IngestionSkipPolicy.isSkippedDirectoryName(name)) {
                 return FileVisitResult.SKIP_SUBTREE;
               }
               return FileVisitResult.CONTINUE;
@@ -965,6 +979,11 @@ final class SyncDirectoryOps {
               if (admissionMode == AdmissionMode.UPGRADE_RECOVERY && excludedRecoveryPath(file, root)) {
                 return FileVisitResult.CONTINUE;
               }
+              if (IngestionSkipPolicy.shouldSkipWithinRoot(file, root) || userExclusions.test(file, root)) return FileVisitResult.CONTINUE;
+              if (isCloudPlaceholder(file)) {
+                recordCloudPlaceholderObservation(file, provenance);
+                return FileVisitResult.CONTINUE;
+              }
               if (!Files.isReadable(file)) {
                 walkIncomplete[0] = true;
                 return FileVisitResult.CONTINUE;
@@ -972,10 +991,7 @@ final class SyncDirectoryOps {
               if (IngestionSkipPolicy.shouldSkipWithinRoot(file, root)) {
                 return FileVisitResult.CONTINUE;
               }
-              if (isCloudPlaceholder(file)) {
-                recordCloudPlaceholderObservation(file, provenance);
-                return FileVisitResult.CONTINUE;
-              }
+
 
               counters[0]++;
 
@@ -1018,15 +1034,26 @@ final class SyncDirectoryOps {
             public FileVisitResult visitFileFailed(Path file, IOException exc) {
               if (stopped()) return FileVisitResult.TERMINATE;
               if (prefixScopeFactory.apply(root).excludes(file.toString())) return FileVisitResult.CONTINUE;
-              if (admissionMode == AdmissionMode.UPGRADE_RECOVERY && excludedRecoveryPath(file, root)) {
+              boolean directory = Files.isDirectory(file, java.nio.file.LinkOption.NOFOLLOW_LINKS);
+              if (directory && (directoryExclusions.test(file, root)
+                  || (!file.equals(root) && file.getFileName() != null
+                      && IngestionSkipPolicy.isSkippedDirectoryName(file.getFileName().toString())))) {
                 return FileVisitResult.CONTINUE;
               }
+              if (Files.isRegularFile(file, java.nio.file.LinkOption.NOFOLLOW_LINKS)
+                  && excludedRecoveryPath(file, root)) return FileVisitResult.CONTINUE;
               walkIncomplete[0] = true;
               log.debug(
                   "Skipping inaccessible path: {} ({})",
                   file,
                   exc != null ? exc.getMessage() : "unknown");
               return FileVisitResult.CONTINUE;
+            }
+
+            @Override
+            public FileVisitResult postVisitDirectory(Path dir, IOException failure) {
+              if (failure != null) walkIncomplete[0] = true;
+              return stopped() ? FileVisitResult.TERMINATE : FileVisitResult.CONTINUE;
             }
 
             private boolean stopped() {
@@ -1086,7 +1113,7 @@ final class SyncDirectoryOps {
                 try {
                   var before = Files.readAttributes(entry.path(), BasicFileAttributes.class,
                       java.nio.file.LinkOption.NOFOLLOW_LINKS);
-                  source = io.justsearch.indexerworker.loop.SourceContentHash.sha256(entry.path(),
+                  source = io.justsearch.indexerworker.loop.SourceContentHash.sha256WithinRoot(entry.path(), root,
                       () -> cancelled.getAsBoolean() || Thread.currentThread().isInterrupted());
                   var after = Files.readAttributes(entry.path(), BasicFileAttributes.class,
                       java.nio.file.LinkOption.NOFOLLOW_LINKS);
@@ -1243,8 +1270,8 @@ final class SyncDirectoryOps {
             if (paths.put(path, new IndexedFileStamp(Path.of(path),
                 longOrMissing(hit.fields().get(SchemaFields.SIZE_BYTES)),
                 longOrMissing(hit.fields().get(SchemaFields.MODIFIED_AT)), hit.fields().get(SchemaFields.COLLECTION))) == null) pathChars += path.length();
-            if (paths.size() >= MAX_INDEXED_PATHS_FOR_MISSING_SCAN
-                || pathChars >= MAX_INDEXED_PATH_CHARS_FOR_MISSING_SCAN) {
+            if (paths.size() > pathScanCap
+                || pathChars > pathCharCap) {
               return null;
             }
           }
@@ -1257,6 +1284,7 @@ final class SyncDirectoryOps {
       }
     } catch (Exception e) {
       log.warn("Failed to get indexed paths for prefix {}", prefix, e);
+      return null;
     }
 
     return paths;
@@ -1269,7 +1297,7 @@ final class SyncDirectoryOps {
    * network download; skip them during indexing.
    */
   static boolean isCloudPlaceholder(Path file) {
-    return io.justsearch.indexerworker.loop.SourceContentHash.isCloudPlaceholder(file);
+    return io.justsearch.indexerworker.ingest.CloudPlaceholderDetector.isCloudPlaceholder(file);
   }
 
   /** Delegates the observation and its admission attribution to the shared recorder. */

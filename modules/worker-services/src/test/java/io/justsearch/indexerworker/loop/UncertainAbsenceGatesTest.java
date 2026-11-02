@@ -7,6 +7,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
@@ -226,7 +227,7 @@ final class UncertainAbsenceGatesTest {
     assertTrue(resolver.resolver().tryHandleStale(
         file, envelope, "default", null, "before publish", null, rooted(file, root)));
 
-    verify(resolver.staleSourceHandler()).deleteMissingSource(file);
+    verify(resolver.staleSourceHandler()).deleteMissingSource(eq(file), eq(root), any());
     org.junit.jupiter.api.Assertions.assertDoesNotThrow(
         () -> verify(resolver.jobQueue(), never()).markClaimDone(any(), any(), any()));
     verify(resolver.journal()).enqueueTransition(any(), any());

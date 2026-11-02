@@ -667,7 +667,7 @@ export function selectIndexingProgress(
         ? `Until ${new Date(pause.untilEpochMs).toLocaleString()}.` : '',
       pause.waiting && pause.reason !== 'settings_recovery'
         ? pause.reasons?.includes('schedule') || pause.reasons?.includes('on_battery')
-          ? `Work is waiting for ${pause.reasons.includes('schedule') ? 'indexing hours' : 'the battery rule to clear'}${pause.reasons.includes('schedule') && pause.reasons.includes('on_battery') ? ' and the battery rule to clear' : ''}${pause.reasons.includes('user_paused') ? ' and Resume' : ''}.`
+          ? ''
           : 'Work is waiting for Resume.' : '',
     ].filter(Boolean).join(' '),
     confirmed: true, enrichmentDeferred: true,
@@ -758,8 +758,8 @@ function indexingActivity(
   const enrichmentDeferred = enrichingPending > 0 && (energy || gpuCauses.length > 0);
   const details: string[] = [];
   if (energy) {
-    details.push('Idle enrichment deferred to save energy.');
-    if (phase === 'indexing' && gpuCauses.length === 0) details.push('Sparse enrichment can continue between files.');
+    details.push('Meaning search is waiting while the computer saves energy.');
+    if (phase === 'indexing' && gpuCauses.length === 0) details.push('Some meaning processing can continue between files.');
   }
   if (gpuCauses.length > 0) {
     const cause = gpuCauses.join(' and ');
@@ -799,7 +799,7 @@ function indexingActivity(
   const summary = phase === 'indexing'
     ? energy || gpuCauses.length > 0 ? 'Text indexing continues' : 'Indexing'
     : phase === 'enriching'
-      ? energy ? 'Enrichment deferred' : gpuCauses.length > 0 ? 'Enrichment pending' : 'Search is ready — still improving'
+      ? energy ? 'Meaning processing is waiting to save energy' : gpuCauses.length > 0 ? 'Meaning processing is waiting for the GPU' : 'Search is ready — still improving'
       : phase === 'blocked' ? 'Semantic search waiting for AI install'
         : status.worker?.core?.indexHealthy === true ? 'Ready — fully searchable' : 'Indexing queue empty';
   return { summary, detail: details.join(' ') || null, confirmed: true, enrichmentDeferred };

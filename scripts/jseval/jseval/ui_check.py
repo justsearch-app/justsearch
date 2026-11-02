@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import re
 import time
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field, replace
@@ -885,6 +886,18 @@ def _build_steps(ui_url: str, cooldown_ms: int, timeout_ms: int) -> list[Step]:
 
     # === Isolated steps (own browser each) ===
 
+    async def _library_appearance(page):
+        # The archived settings fixture opts into high contrast. These cameras compare the
+        # normal Library design; OS forced colors has its own explicit camera below.
+        if "high-contrast" not in (await page.locator("html").get_attribute("class") or ""):
+            return
+        await page.locator(S.rail_css(S.RAIL_SURFACE_SETTINGS)).click()
+        await page.get_by_text('Accessibility', exact=True).first.click()
+        await page.get_by_role("switch", name="High contrast", exact=True).click()
+        await page.wait_for_function("!document.documentElement.classList.contains('high-contrast')")
+        await page.keyboard.press("Escape")
+
+
     def _view_setup(view_name: str, theme: str = "dark"):
         async def setup(page):
             # tempdoc 840 Phase 5: a view step may drill INTO a surface (advanced mode, the component
@@ -937,6 +950,8 @@ def _build_steps(ui_url: str, cooldown_ms: int, timeout_ms: int) -> list[Step]:
                         )
                 if cooldown_ms > 0:
                     await asyncio.sleep(cooldown_ms / 1000)
+            if base == "library":
+                await _library_appearance(page)
             if view_name == "ai-brain-advanced":
                 await _set_detail_level_in_settings(page, "Detailed")
             if view_name in ("ai-brain-components", "ai-brain-consent"):
@@ -1112,6 +1127,8 @@ def _build_steps(ui_url: str, cooldown_ms: int, timeout_ms: int) -> list[Step]:
             }))
         await page.route("**/api/diagnostics/ingestion/summary*", summary)
         await _goto_surface(page, S.RAIL_SURFACE_LIBRARY)
+        await _library_appearance(page)
+        await page.locator("jf-ingestion-summary summary").click()
         panel = page.locator('[data-testid="ingestion-summary"]')
         await panel.get_by_text("16 recorded indexing outcomes.", exact=True).wait_for(timeout=15_000)
         for label in ("Content indexed", "File unchanged since its last index",
@@ -1121,13 +1138,23 @@ def _build_steps(ui_url: str, cooldown_ms: int, timeout_ms: int) -> list[Step]:
         await panel.scroll_into_view_if_needed()
 
     async def setup_library_gap_decision(page):
+        # The archived gap fixture predates freshness reporting. This camera needs a current
+        # observation to exercise the confirmed decision and its exact gap list.
+        async def current_status(route):
+            body = json.loads(ui_fixtures.fixture_body(route.request.url, variant="gap-decision"))
+            body["meta"]["workerRpcAtMs"] = int(time.time() * 1000)
+            body["worker"]["core"]["indexState"] = "IDLE"
+            await route.fulfill(status=200, content_type="application/json", body=json.dumps(body))
+        await page.route("**/api/status", current_status)
+        await page.reload(wait_until="domcontentloaded")
         await _goto_surface(page, S.RAIL_SURFACE_LIBRARY)
+        await _library_appearance(page)
         decision = page.locator(".gap-decision")
-        await decision.get_by_role("heading", name="New index — activation requires your decision").wait_for(
+        await decision.get_by_role("heading", name="The new index is ready, but 2 documents couldn't be included").wait_for(
             timeout=15_000)
-        await decision.get_by_text("notes/old-draft.txt: CANDIDATE_PROJECTION_MISSING").wait_for()
-        await decision.get_by_text("notes/deleted-draft.txt: DELETE_NOT_APPLIED").wait_for()
-        await decision.get_by_role("button", name="Accept gaps and activate").wait_for()
+        await decision.get_by_text("notes/old-draft.txt: The document was not added to the new index.").wait_for()
+        await decision.get_by_text("notes/deleted-draft.txt: The document could not be removed from the new index.").wait_for()
+        await decision.get_by_role("button", name="Use the new index without them").wait_for()
         await decision.scroll_into_view_if_needed()
 
     def _density_setup(density: str):
@@ -1347,18 +1374,230 @@ def _build_steps(ui_url: str, cooldown_ms: int, timeout_ms: int) -> list[Step]:
 
     _settings_setup = _view_setup("settings")
 
-    def setup_indexing_rules(surface="settings", narrow=False):
+    def setup_indexing_rules(narrow=False, focus_rules=True):
         async def setup(page):
             if narrow:
                 await page.set_viewport_size({"width": 600, "height": 400})
-            await _view_setup(surface)(page)
-            if surface == "settings":
-                await page.locator('[data-settings-category="indexing"]').click()
+            await _view_setup("library")(page)
+            if focus_rules:
+                # Clear transient overlays and hover tips before focusing the rules camera.
+                await page.mouse.move(300, 100)
+                await page.keyboard.press("Escape")
                 await page.locator('#indexing-hours').wait_for(state="visible")
                 await page.locator('#indexing-hours').focus()
             else:
-                await page.get_by_role("button", name="Change hours", exact=True).first.wait_for(state="visible")
+                await page.get_by_role("button", name="Change when to index", exact=True).first.wait_for(state="visible")
             await _settle_focus_marks(page)
+        return setup
+
+    def setup_library_arrival(route, width, height):
+        async def setup(page):
+            # The minimal capture catalog only declares Settings members. Supply the
+            # production Library/Browse composition through the real catalog transport.
+            catalog = json.loads(ui_fixtures._surfaces_catalog_body())
+            catalog["entries"].extend([
+                ui_fixtures._surface_entry("core.library-surface", "jf-library-surface", "RAIL",
+                                           members=["core.browse-surface"]),
+                ui_fixtures._surface_entry("core.browse-surface", "jf-browse-surface", "DEEPLINK"),
+            ])
+            async def library_catalog(request):
+                await request.fulfill(status=200, content_type="application/json", body=json.dumps(catalog))
+            await page.route("**/api/registry/surfaces*", library_catalog)
+            await page.reload(wait_until="domcontentloaded")
+            await _await_app_ready(page)
+            await page.set_viewport_size({"width": width, "height": height})
+            if route == "reduced":
+                await page.emulate_media(reduced_motion="reduce")
+            if route in ("warm", "browse", "attention"):
+                await _view_setup("library")(page)
+            if route == "settings":
+                await _view_setup("settings")(page)
+                await page.get_by_role("button", name="Indexing", exact=True).click()
+            elif route == "browse":
+                await page.get_by_role("tab", name="Browse", exact=True).click()
+            elif route != "attention":
+                await _view_setup("home")(page)
+            if route == "palette":
+                await page.keyboard.press("Control+k")
+                await page.get_by_role("option").filter(has_text="Change indexing rules").click()
+            elif route in ("status", "browse"):
+                control = page.locator('jf-status-deck').get_by_role("button", name="Change hours", exact=True)
+                if not await control.is_visible():
+                    await page.get_by_role("button", name=re.compile(r"more status item")).click()
+                await control.click()
+            elif route in ("tasks", "warm", "reduced"):
+                await page.locator('jf-task-list').get_by_role("button", name="Change hours", exact=True).click()
+            elif route == "settings":
+                await page.locator('jf-settings-surface').get_by_role("button", name="Change when to index", exact=True).click()
+            else:
+                await page.locator('jf-library-surface .attention').get_by_role("button", name="Change when to index", exact=True).first.click()
+            target = page.locator(S.CSS_LIBRARY_INDEXING_HOURS)
+            await target.wait_for(state="visible")
+            # Let navigation, root loading and all finite layout transitions settle without
+            # Playwright's focus/click auto-scroll repairing the result being measured.
+            await page.wait_for_timeout(1500)
+            result = await target.evaluate("""el => {
+                let active = document.activeElement;
+                while (active?.shadowRoot?.activeElement) active = active.shadowRoot.activeElement;
+                const r = el.getBoundingClientRect();
+                const clips = [{top: 0, bottom: innerHeight, left: 0, right: innerWidth}];
+                for (let a = el.parentElement ?? el.getRootNode().host; a;
+                     a = a.assignedSlot ?? a.parentElement ?? a.getRootNode().host) {
+                    if (/(auto|scroll|hidden|clip)/.test(getComputedStyle(a).overflowY)) clips.push(a.getBoundingClientRect());
+                }
+                return {focused: active === el, rect: r.toJSON(), clips: clips.map(b => ({top:b.top,bottom:b.bottom})),
+                    visible: r.height > 0 && clips.every(b => r.top >= b.top - 1 && r.bottom <= b.bottom + 1)};
+            }""")
+            assert result["focused"] and result["visible"], f"Library arrival {route} {width}x{height}: {result}"
+            print(f"Library arrival {route} {width}x{height}: focused and fully visible {result['rect']}")
+        return setup
+
+    async def setup_library_idle_headline(page):
+        await _view_setup("library")(page)
+        heading = page.locator('jf-library-surface h2')
+        await heading.wait_for(state="visible")
+        await page.wait_for_timeout(1500)
+        samples = []
+        for _ in range(25):
+            samples.append(await heading.inner_text())
+            await page.wait_for_timeout(1000)
+        assert len(set(samples)) == 1 and "unconfirmed" not in samples[0], samples
+        print(f"Library idle headline: 25 one-second samples, one headline: {samples[0]}")
+
+    def setup_library_liveness(mode):
+        async def setup(page):
+            polls = 0
+            root_reads = 0
+            clear = False
+            unconfirmed = False
+            last_confirmed_at = int(time.time() * 1000)
+
+            async def status_reply(route):
+                nonlocal polls, last_confirmed_at
+                polls += 1
+                body = json.loads(ui_fixtures._status_body("enriching"))
+                stale = unconfirmed or mode in ("pause", "alternating") and polls % 2 == 0 and not clear
+                # A producer may renew its RPC timestamp even while returning an
+                # unconfirmed worker observation. Successful HTTP/RPC reads must
+                # never keep the searchable headline alive through that case.
+                if not stale or mode == "expiry":
+                    last_confirmed_at = int(time.time() * 1000)
+                body["meta"].update({"workerRpcAtMs": last_confirmed_at, "workerRpcStale": stale and mode != "alternating"})
+                body["operating"]["freshness"].update({"staleAfterMs": 30000,
+                                                       "staleSources": ["indexing"] if stale and mode != "pause" else []})
+                body["worker"]["core"]["searchableDocuments"] = 400
+                if mode in ("pause", "alternating") and not clear:
+                    body["operating"]["indexing"].update({"state": "PAUSED", "reasons": ["user_paused"],
+                        "untilEpochMs": None, "waitingForResume": True})
+                    body["worker"]["core"].update({"indexState": "WAITING", "pendingJobs": 1})
+                await route.fulfill(status=200, content_type="application/json", body=json.dumps(body))
+
+            async def roots_reply(route):
+                nonlocal root_reads
+                root_reads += 1
+                body = json.loads(ui_fixtures._indexed_roots_body("enriching"))
+                if mode in ("pause", "alternating") and not clear:
+                    body["items"][0].update({"failedCount": 1 if root_reads == 1 else 0,
+                                             "inFlightCount": 0 if root_reads == 1 else 1})
+                await route.fulfill(status=200, content_type="application/json", body=json.dumps(body))
+
+            await page.route("**/api/status", status_reply)
+            await page.route("**/api/indexing-roots/substrate*", roots_reply)
+            await page.reload(wait_until="domcontentloaded")
+            await _await_app_ready(page)
+            await _view_setup("library")(page)
+            heading = page.locator('jf-library-surface h2')
+            await heading.wait_for(state="visible")
+            expected = "2 things need your attention" if mode != "expiry" else "Your files are searchable"
+            # Poll only text; focus/click must not change the observed state.
+            for _ in range(100):
+                if await heading.inner_text() == expected:
+                    break
+                await page.wait_for_timeout(100)
+            assert await heading.inner_text() == expected
+            unconfirmed = mode == "expiry"
+            samples = []
+            for second in range(42 if mode == "expiry" else 25):
+                text = await heading.inner_text()
+                samples.append(text)
+                if mode != "expiry":
+                    assert text == expected, samples
+                    attention = await page.locator('jf-library-surface .attention').inner_text()
+                    assert "Indexing paused" in attention and "file needs review" in attention, attention
+                elif second >= 31:
+                    assert text == "Indexing status unconfirmed", samples
+                await page.wait_for_timeout(1000)
+            assert polls >= 4, f"Expected real status polling, observed {polls} reads"
+            clear = True
+            unconfirmed = False
+            for _ in range(150):
+                if await heading.inner_text() == "Your files are searchable":
+                    break
+                await page.wait_for_timeout(100)
+            assert await heading.inner_text() == "Your files are searchable"
+            assert "Indexing paused" not in await page.locator('jf-library-surface .attention').inner_text()
+            print(f"Library liveness {mode}: {len(samples)} one-second samples; confirmed clear restored searchable")
+        return setup
+
+    def setup_library_poll_cadence(mode):
+        async def setup(page):
+            polls = 0
+            fail_reads = False
+            sampled_at = int(time.time() * 1000)
+
+            async def status_reply(route):
+                nonlocal polls, sampled_at
+                polls += 1
+                if fail_reads:
+                    await route.fulfill(status=503, body="Status unavailable")
+                    return
+                body = json.loads(ui_fixtures._status_body("enriching"))
+                if mode != "frozen" or polls == 1:
+                    sampled_at = int(time.time() * 1000) - 2000
+                body["meta"].update({"workerRpcAtMs": sampled_at, "workerRpcStale": False})
+                body["operating"]["freshness"].update({"staleAfterMs": 6000, "staleSources": []})
+                body["worker"]["core"].update({"searchableDocuments": 400,
+                    "indexState": "WAITING" if mode == "fresh" else "IDLE", "pendingJobs": 1 if mode == "fresh" else 0})
+                body["operating"]["indexing"].update({"state": "PAUSED" if mode == "fresh" else "IDLE",
+                    "reasons": ["user_paused"] if mode == "fresh" else [], "untilEpochMs": None,
+                    "waitingForResume": mode == "fresh"})
+                await route.fulfill(status=200, content_type="application/json", body=json.dumps(body))
+
+            await page.route("**/api/status", status_reply)
+            await page.reload(wait_until="domcontentloaded")
+            await _await_app_ready(page)
+            await _view_setup("library")(page)
+            heading = page.locator('jf-library-surface h2')
+            await heading.wait_for(state="visible")
+            expected = "1 thing needs your attention" if mode == "fresh" else "Your files are searchable"
+            for _ in range(100):
+                if await heading.inner_text() == expected:
+                    break
+                await page.wait_for_timeout(100)
+            assert await heading.inner_text() == expected
+            if mode == "failed":
+                fail_reads = True
+            samples = []
+            # Chromium real timers, no clock replacement or action-triggered refresh.
+            for _ in range(40 if mode == "fresh" else 25):
+                text = await heading.inner_text()
+                deck = await page.locator('jf-status-deck').evaluate("el => el.shadowRoot.textContent")
+                samples.append({"ageMs": int(time.time() * 1000) - sampled_at, "headline": text, "deck": deck})
+                assert "Rebuilding" not in text, samples
+                if mode == "fresh":
+                    assert text == expected and "Indexing status unconfirmed" not in deck, samples
+                elif samples[-1]["ageMs"] > 21000:
+                    assert text == "Indexing status unconfirmed" and "Indexing status unconfirmed" in deck, samples
+                await page.wait_for_timeout(1000)
+            assert polls >= (4 if mode == "fresh" else 3), polls
+            print(f"Library poll cadence {mode}: {len(samples)} real one-second samples, {polls} reads; "
+                  f"headlines: {sorted(set(sample['headline'] for sample in samples))}")
+        return setup
+
+    def setup_library_size(width, height):
+        async def setup(page):
+            await page.set_viewport_size({"width": width, "height": height})
+            await _view_setup("library")(page)
         return setup
 
     async def setup_settings_forced_colors(page):
@@ -1536,14 +1775,16 @@ def _build_steps(ui_url: str, cooldown_ms: int, timeout_ms: int) -> list[Step]:
             await page.evaluate(
                 "(id) => { location.hash = `justsearch://surface/${id}`; }", S.RAIL_SURFACE_LIBRARY
             )
-        # BOTH rows, not just the first: a one-row wait would pass on a truncated list and the
-        # capture would silently be about a single arm. `.card-meta` (the meta LINE, which is what
-        # the tier is about) rather than a testid: the row is rendered by the DECLARED path
-        # (FolderCardRenderer, active by default via LIBRARY_CARDS_REGION) whose markup carries no
-        # testid — `library-folder-name` exists only on LibrarySurface's own quarantine fallback, so
-        # waiting on it would time out on the path that actually renders here. Both renderers project
-        # the same `folderStatus` meta text and both use this class.
-        await page.locator(".card-meta").nth(1).wait_for(state="visible", timeout=15_000)
+        await page.mouse.move(600, 120)
+        await page.keyboard.press("Escape")
+        # Confirm both per-folder verdicts, then open only the in-progress folder as in the
+        # agreed everyday design. Collapsed rows expose their status without duplicating details.
+        await _library_appearance(page)
+        await page.locator('.folder-state').nth(1).wait_for(state="visible", timeout=15_000)
+        await page.locator(S.CSS_LIBRARY_FOLDER_TOGGLE).first.click()
+        await page.locator('.folder-details').first.wait_for(state="visible", timeout=15_000)
+        await page.mouse.move(600, 120)
+        await page.keyboard.press("Escape")
         # The aggregate card (not the `jf-task-list` host, which exists whenever the shell is mounted
         # and self-hides via [data-empty]) — the same non-vacuity reasoning as `tasks-occlusion`.
         await page.locator('[data-testid="task-aggregate"]').first.wait_for(
@@ -2136,14 +2377,29 @@ def _build_steps(ui_url: str, cooldown_ms: int, timeout_ms: int) -> list[Step]:
              fixtures_variant="sv3-sources", forced_colors="active"),
         Step("sv3-palette-forced-colors", setup=setup_sv3_palette_forced_colors, isolated=True,
              forced_colors="active"),
-        *[Step(f"settings-indexing-{theme}", setup=setup_indexing_rules(), isolated=True,
+        *[Step(f"library-indexing-rules-{theme}", setup=setup_indexing_rules(), isolated=True,
                fixtures_variant="indexing-rules", color_scheme="light" if theme == "light" else "dark",
                forced_colors="active" if theme == "forced" else None)
           for theme in ("dark", "light", "forced")],
-        Step("settings-indexing-minimum", setup=setup_indexing_rules(narrow=True), isolated=True,
+        Step("library-indexing-rules-minimum", setup=setup_indexing_rules(narrow=True), isolated=True,
              fixtures_variant="indexing-rules"),
-        Step("library-indexing-held", setup=setup_indexing_rules("library"), isolated=True,
+        Step("library-indexing-held", setup=setup_indexing_rules(focus_rules=False), isolated=True,
              fixtures_variant="indexing-rules"),
+        *[Step(f"library-arrival-{route}-{width}x{height}", setup=setup_library_arrival(route, width, height),
+               isolated=True, fixtures_variant="indexing-rules")
+          for route in ("tasks", "palette", "status", "browse", "attention", "settings", "reduced", "warm")
+          for width, height in ((1280, 720), (600, 400))],
+        *[Step(f"library-liveness-{mode}", setup=setup_library_liveness(mode), isolated=True,
+               fixtures_variant="enriching") for mode in ("pause", "alternating", "expiry")],
+        *[Step(f"library-poll-cadence-{mode}", setup=setup_library_poll_cadence(mode), isolated=True,
+               fixtures_variant="enriching") for mode in ("fresh", "frozen", "failed")],
+        Step("library-idle-headline", setup=setup_library_idle_headline, isolated=True, fixtures_variant="enriching"),
+        Step("library-medium", setup=setup_library_size(760, 720), isolated=True,
+             fixtures_variant="enriching"),
+        Step("library-minimum", setup=setup_library_size(600, 400), isolated=True,
+             fixtures_variant="enriching"),
+        Step("library-forced-colors", setup=setup_library_size(1280, 720), isolated=True,
+             fixtures_variant="enriching", forced_colors="active"),
         Step("settings-forced-colors", setup=setup_settings_forced_colors, isolated=True,
              forced_colors="active"),
         *[Step(f"sv3-recents-{state}-{width}-{theme}",

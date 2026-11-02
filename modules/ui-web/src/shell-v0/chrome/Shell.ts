@@ -273,6 +273,7 @@ import { createNavigationHandler } from '../router/navigationHandler.js';
 import { createInvocationHandler } from '../router/invocationHandler.js';
 import { createIntentRouter, type IntentRouter } from '../router/intentRouter.js';
 import { resolveSurface as catalogResolveSurface, resolveOperation as catalogResolveOperation, refreshPromotedAliases } from '../router/catalogResolver.js';
+import { requestIndexingRuleFocus } from '../router/indexingRuleIntent.js';
 import { requestMemberTab } from '../router/memberTabIntent.js';
 import { promoteAlias } from '../router/promotedAliases.js';
 import { resolutionTelemetryListener } from '../router/resolutionTelemetry.js';
@@ -1557,10 +1558,9 @@ export class Shell extends JfElement {
     let navigationHandled = false;
     const persistentAddress = (address: ShellAddressNavigation): ShellAddressNavigation => {
       if (address.target !== SETTINGS_SURFACE_ID || !address.state ||
-          (!('focusSettingsRecovery' in address.state) && !('focusIndexingRule' in address.state))) return address;
+          !('focusSettingsRecovery' in address.state)) return address;
       const state = { ...address.state };
       delete state.focusSettingsRecovery;
-      delete state.focusIndexingRule;
       return { ...address, state };
     };
     const navigationHandler = createNavigationHandler({
@@ -1637,14 +1637,11 @@ export class Shell extends JfElement {
         if (state?.focusSettingsRecovery === true || state?.focusSettingsRecovery === 'true') {
           win.focusSettingsRecovery();
         }
-        if (state?.focusIndexingRule === 'hours' || state?.focusIndexingRule === 'battery') {
-          win.focusIndexingRule(state.focusIndexingRule);
-        }
         // The focus request belongs to this arrival only. Keep the destination in history,
         // but hand focus off to Settings' cancellable pending intent instead of replaying it.
         const current = parseUrl(window.location.hash.slice(1));
         if (current?.kind === 'navigate' && current.target === SETTINGS_SURFACE_ID &&
-            current.state && ('focusSettingsRecovery' in current.state || 'focusIndexingRule' in current.state)) {
+            current.state && 'focusSettingsRecovery' in current.state) {
           window.history.replaceState(window.history.state, '', `#${canonicalize(persistentAddress(current))}`);
         }
       },
@@ -1681,6 +1678,19 @@ export class Shell extends JfElement {
       answerSurfaceId: 'core.search-v3-surface',
       answerStateKey: 'query',
     });
+    // Normalize legacy focus addresses before any subscriber or history writer sees them.
+    const dispatchIntent = this.intentRouter.dispatch;
+    this.intentRouter.dispatch = (intent, options) => {
+      if (intent.address.kind === 'navigate' &&
+          [SETTINGS_SURFACE_ID, 'core.library-surface'].includes(intent.address.target)) {
+        const control = intent.address.state?.focusIndexingRule;
+        if (control === 'hours' || control === 'battery') {
+          requestIndexingRuleFocus(control);
+          intent = { ...intent, address: { kind: 'navigate', target: 'core.library-surface', state: {} } };
+        }
+      }
+      return dispatchIntent(intent, options);
+    };
     this.intentRouter.subscribe(resolutionTelemetryListener);
     this.intentRouter.subscribe((intent, outcome) => {
       const t = intent.transport;
@@ -3097,6 +3107,7 @@ export class Stage extends JfElement {
       if (surface) await this.focusSearch(id);
     }
   }
+
 
   /**
    * Tempdoc 609 (instance-retention) — mounted-surface element cache keyed by resolved surface id.

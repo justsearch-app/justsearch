@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.indexerworker.loop;
 
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.anyLong;
@@ -41,6 +42,65 @@ import org.junit.jupiter.api.io.TempDir;
 /** Real scan admission, durable queue, and batch consumption share the admitting boundary. */
 final class OriginBoundaryAdmissionTest {
   @TempDir Path tempDir;
+
+  @Test
+  void runningLoopRejectsAQueuedAncestorReplacementBeforeOpeningContent() throws Exception {
+    var fixture = new PipelineTestFixture();
+    fixture.temp = tempDir;
+    try {
+      fixture.init();
+      fixture.openStore(false);
+      Path root = Files.createDirectory(tempDir.resolve("root"));
+      Path parent = Files.createDirectory(root.resolve("parent"));
+      Path file = Files.writeString(parent.resolve("notes.txt"), "inside");
+      Path outside = Files.createDirectory(tempDir.resolve("outside"));
+      Files.writeString(outside.resolve("notes.txt"), "outside content");
+      Files.delete(file);
+      Files.delete(parent);
+      Files.createSymbolicLink(parent, outside);
+      var service = new WorkerIngestService(fixture.queue, null, null, IndexingPacing.unthrottled(),
+          null, null, null, null, null, 0L);
+      var registry = new io.justsearch.indexerworker.services.RootWatcherRegistry();
+      service.setRootWatcherRegistry(registry);
+      var watch = registry.getClass().getDeclaredMethod("watch", String.class, String.class);
+      watch.setAccessible(true);
+      watch.invoke(registry, root.toString(), "docs");
+      var subscription = registry.getClass().getDeclaredMethod("subscription", Path.class);
+      subscription.setAccessible(true);
+      var witness = (io.justsearch.indexerworker.services.RootWatcherRegistry.Subscription)
+          subscription.invoke(registry, root);
+      org.junit.jupiter.api.Assertions.assertNotNull(witness);
+      try (var hashes = org.mockito.Mockito.mockStatic(SourceContentHash.class, org.mockito.Mockito.CALLS_REAL_METHODS)) {
+        assertDoesNotThrow(() -> service.acceptWatcherUpsert(witness, "docs", file));
+        assertDoesNotThrow(() -> hashes.verify(() -> SourceContentHash.sha256(file), org.mockito.Mockito.never()));
+      }
+      assertEquals(1, fixture.queue.queueDepth(), "watcher work is retained for safe consumer admission");
+      var content = mock(TimeboxedContentExtractor.class);
+      when(content.extractionPolicy()).thenReturn(TikaExtractionPolicy.defaults());
+      when(content.extractArtifact(org.mockito.ArgumentMatchers.any())).thenAnswer(call ->
+          io.justsearch.indexerworker.extract.ExtractionArtifact.full(
+              new io.justsearch.indexerworker.extract.ContentExtractor.ExtractionResult(
+                  Files.readString(call.getArgument(0)), null, "text/plain"),
+              TikaExtractionPolicy.defaults(), "boundary-test", false));
+      fixture.loop = PipelineTestFixture.withExtractor(fixture, content);
+      fixture.loop.start();
+      fixture.awaitPolicy(10);
+      fixture.stopLoopForOtherAssertions();
+      assertDoesNotThrow(() -> {
+        verify(content, org.mockito.Mockito.never())
+            .extractArtifact(org.mockito.ArgumentMatchers.any());
+      });
+      assertEquals("PENDING", fixture.rows().getFirst().state());
+      try (var connection = java.sql.DriverManager.getConnection("jdbc:sqlite:" + fixture.db);
+          var statement = connection.createStatement();
+          var row = statement.executeQuery("SELECT last_reason_code FROM jobs")) {
+        assertTrue(row.next());
+        assertEquals("SOURCE_UNREADABLE", row.getString(1));
+      }
+    } finally {
+      fixture.close();
+    }
+  }
 
   @AfterEach
   void resetPolicy() {

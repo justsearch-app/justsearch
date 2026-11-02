@@ -161,7 +161,7 @@ final class DeletionCommitObligationTest extends LuceneExecutorTestBase {
       var servingWriter = spy(a.indexingCoordinator());
       var observedServing = spy(a); doReturn(servingWriter).when(observedServing).indexingCoordinator();
       var failing = failServing ? servingWriter : writer;
-      doThrow(new IllegalStateException("injected deletion failure")).when(failing).deleteByIdAndChunks(file.toString());
+      doThrow(new IllegalStateException("injected deletion failure")).when(failing).pruneFile(eq(file.toString()), eq(directory), any());
       var loop = loop(queue, b, writer, file); wireActive(loop, observedServing);
       queue.enqueueEntries(List.of(JobQueue.EnqueueEntry.stat(file).withinRoot(directory)), "docs", "scan");
       var claim = queue.pollPending(1).getFirst();
@@ -169,7 +169,7 @@ final class DeletionCommitObligationTest extends LuceneExecutorTestBase {
       assertNotEquals("DONE", queue.watcherReconciliationRow(file.toString()).get("state"));
       assertFalse(loop.getJournal().ownsPendingCommit(claim), "a failed effect cannot be handed to the commit owner");
       assertEquals(1, b.indexCountOps().countByIdAndChunksStrict(file.toString()));
-      doCallRealMethod().when(failing).deleteByIdAndChunks(file.toString());
+      doCallRealMethod().when(failing).pruneFile(eq(file.toString()), eq(directory), any());
       // Advance only this isolated queue's retry clock; retain the same durable admission.
       try (var connection = java.sql.DriverManager.getConnection("jdbc:sqlite:" + directory.resolve("jobs.db"));
           var reset = connection.prepareStatement("UPDATE jobs SET retry_after=0 WHERE path=?")) {

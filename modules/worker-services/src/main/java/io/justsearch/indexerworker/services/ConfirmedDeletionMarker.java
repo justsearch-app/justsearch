@@ -45,7 +45,7 @@ public final class ConfirmedDeletionMarker {
     if (file == null) {
       return;
     }
-    if (!Files.notExists(file)) {
+    if (!Files.notExists(file, java.nio.file.LinkOption.NOFOLLOW_LINKS)) {
       return;
     }
     mark(PathNormalizer.normalizeKey(file));

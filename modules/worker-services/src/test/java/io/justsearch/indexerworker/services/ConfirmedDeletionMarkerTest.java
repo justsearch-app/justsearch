@@ -66,6 +66,18 @@ final class ConfirmedDeletionMarkerTest {
   }
 
   @Test
+  void replacementLinksAreNotFollowedForIdentityDeletion() throws Exception {
+    Path target = Files.writeString(tempDir.resolve("target.txt"), "live target");
+    Path live = Files.createSymbolicLink(tempDir.resolve("live"), target);
+    Path dangling = Files.createSymbolicLink(tempDir.resolve("dangling"), tempDir.resolve("missing"));
+    var store = new RecordingStore();
+    var marker = new ConfirmedDeletionMarker(store);
+    marker.markIfAbsent(live);
+    marker.markIfAbsent(dangling);
+    assertTrue(store.marked.isEmpty());
+  }
+
+  @Test
   void acceptsTheIndexStoredPathShapeAndKeysItTheSameWayResolveDoes() throws Exception {
     // The prune sink hands over the `path` field as the index stored it, already in
     // PathNormalizer key form. It must hash to the SAME key admission resolves, or the mark lands

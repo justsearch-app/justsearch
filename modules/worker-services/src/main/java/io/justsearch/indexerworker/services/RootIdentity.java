@@ -60,9 +60,10 @@ record RootIdentity(Path realPath, StableFileIdentity stableFileIdentity) {
     }
   }
 
-  /** Return-path comparison only. An operation's held lease still uses strict equality. */
-  boolean sameReturnedFolder(RootIdentity current) {
-    return current != null && matchesReceipt(current.toString());
+  /** Registration recovery may adopt a new directory only on the original proven volume. */
+  boolean sameReturnedVolume(RootIdentity current) {
+    return current != null && (equals(current) || (realPath.equals(current.realPath)
+        && volume() != null && volume().equals(current.volume())));
   }
 
   /** Accepts existing receipt strings; the device number alone may change on a proven Linux UUID. */

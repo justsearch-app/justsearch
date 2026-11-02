@@ -64,9 +64,30 @@ public final class WatchedRootsState {
     return lifecycleLock;
   }
 
+  private final Map<RootProducerFence, Integer> activeProducers = new java.util.HashMap<>();
+
+  void drainRootProducers(Path removed) {
+    boolean interrupted = false;
+    synchronized (lifecycleLock) {
+      while (activeProducers.keySet().stream().anyMatch(fence ->
+          fence.root.startsWith(removed) || removed.startsWith(fence.root))) {
+        try {
+          lifecycleLock.wait();
+        } catch (InterruptedException failure) {
+          interrupted = true;
+        }
+      }
+    }
+    if (interrupted) Thread.currentThread().interrupt();
+  }
+
   private long retirementRevision;
   private final Map<Path, Long> retiredRoots = new java.util.HashMap<>();
   private final Map<Path, Object> initializations = new java.util.HashMap<>();
+
+  synchronized long rootRetirementRevision(Path root) {
+    return retiredRoots.getOrDefault(root, 0L);
+  }
 
   synchronized Object beginInitialization(Path root) {
     if (initializations.containsKey(root)) return null;
@@ -106,7 +127,16 @@ public final class WatchedRootsState {
               || walkErrors.entrySet().stream().anyMatch(entry -> REMOVAL_INCOMPLETE.equals(entry.getValue())
                   && affectedBy(entry.getKey()));
         }
-        return stale ? retired.get() : producer.get();
+        if (stale) return retired.get();
+        activeProducers.merge(this, 1, Integer::sum);
+      }
+      try {
+        return producer.get();
+      } finally {
+        synchronized (lifecycleLock) {
+          activeProducers.compute(this, (fence, count) -> count == null || count == 1 ? null : count - 1);
+          lifecycleLock.notifyAll();
+        }
       }
     }
 
@@ -235,6 +265,7 @@ public final class WatchedRootsState {
 
   /** Terminal walk outcome with zero admitted files: no timestamp, but the walk DID complete. */
   synchronized void markWalkedEmpty(Path root) {
+    if (isRemovalIncomplete(root)) return;
     var statusBefore = statusContent();
     watchedRoots.put(root, WatchedRootsStore.NEVER_INDEXED);
     walkErrors.remove(root);
@@ -243,6 +274,7 @@ public final class WatchedRootsState {
   }
 
   synchronized void markWalkFailed(Path root, String error) {
+    if (isRemovalIncomplete(root)) return;
     var statusBefore = statusContent();
     watchedRoots.put(root, WatchedRootsStore.NEVER_INDEXED);
     walkErrors.put(root, error != null ? error : "unknown");
@@ -289,6 +321,7 @@ public final class WatchedRootsState {
    * kept, so a restart while the root is unavailable still shows when it was last indexed.
    */
   synchronized void markWalkRefused(Path root, String reason) {
+    if (isRemovalIncomplete(root)) return;
     walkErrors.put(root, reason);
     walkCompleted.add(root);
   }

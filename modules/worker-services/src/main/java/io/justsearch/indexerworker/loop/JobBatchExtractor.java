@@ -226,7 +226,8 @@ public final class JobBatchExtractor {
         admission = ingestionAuthority.admit(claim);
         if (admission.action() == SourceAdmissionAction.STALE_DONE) {
           if (!jobQueue.ownsClaimForPublication(claim)) return null;
-          bestEffortDeleteMissingSource(filePath);
+          indexedDelta.accept(staleSourceHandler.deleteMissingSource(
+              filePath, claim.ingestionRoot(), ingestionAuthority.rootCheck()));
         }
       } finally {
         fileMutationFence.unlock();
@@ -235,6 +236,14 @@ public final class JobBatchExtractor {
         log.debug("File not found, treating as delete: {}", filePath);
         journal.enqueueTransition(new JobQueue.IngestionLedgerTransition(
             claim, ledgerEntry(filePath, collection, provenance)), admission.outcome());
+        batchStats.recordSkipped();
+        return null;
+      }
+
+      if (admission.action() == SourceAdmissionAction.RETRYABLE_FAILURE
+          && admission.outcome().retryPolicy() == IngestionRetryPolicy.DEFER_WITHOUT_ATTEMPT) {
+        journal.recordOutcomeSafely(filePath, admission.outcome().outcomeClass().name(),
+            () -> jobQueue.deferClaim(claim, admission.outcome(), ledgerEntry(filePath, collection, provenance)));
         batchStats.recordSkipped();
         return null;
       }
@@ -298,7 +307,8 @@ public final class JobBatchExtractor {
         batchStats.recordFailed();
         return null;
       }
-      String sourceSha256 = SourceContentHash.sha256(filePath);
+      requireReadableSource(claim);
+      String sourceSha256 = SourceContentHash.sha256WithinRoot(filePath, claim.ingestionRoot());
       try {
         String normalizedPath = envelope.normalizedPath();
         boolean forceReindex = claim.plannedSourceSha256() != null
@@ -336,6 +346,7 @@ public final class JobBatchExtractor {
       ValidatedExtractionArtifact artifact;
       try {
         // W1.5 — inlined what used to be extractContent + validateArtifact wrappers.
+        requireReadableSource(claim);
         ExtractionArtifact rawArtifact = contentExtractor.extractArtifact(filePath);
         String sourcePathHash = envelope != null ? envelope.pathHash() : null;
         artifact = rawArtifact.validate(contentExtractor.extractionPolicy(), sourcePathHash);
@@ -346,7 +357,8 @@ public final class JobBatchExtractor {
 
       String sourceSha256AfterExtraction;
       try {
-        sourceSha256AfterExtraction = SourceContentHash.sha256(filePath);
+        requireReadableSource(claim);
+        sourceSha256AfterExtraction = SourceContentHash.sha256WithinRoot(filePath, claim.ingestionRoot());
       } catch (IOException changedDuringExtraction) {
         if (staleResolver.tryHandleStale(
             filePath, envelope, collection, artifact, "after extraction", provenance, claim)) {
@@ -499,6 +511,15 @@ public final class JobBatchExtractor {
         || verdict == SourcePresence.Verdict.SOURCE_UNREADABLE) {
       return ingestionAuthority.notConfirmedAbsent(verdict, claim.path(), failure);
     }
+    if (verdict == SourcePresence.Verdict.PRESENT
+        && io.justsearch.indexerworker.ingest.CloudPlaceholderDetector.isCloudPlaceholder(claim.path())) {
+      return journal.outcome(IngestionOutcomeClass.DEFERRED_POLICY, IngestionReasonCodes.CLOUD_PLACEHOLDER,
+          IngestionRetryPolicy.DEFER_WITHOUT_ATTEMPT, "Cloud-only placeholder");
+    }
+    if (verdict == SourcePresence.Verdict.PRESENT) {
+      try { requireReadableSource(claim); }
+      catch (IOException unavailable) { return ingestionAuthority.sourceUnreadable(claim.path(), unavailable); }
+    }
     if (verdict == SourcePresence.Verdict.PRESENT && !openableForRead(claim.path())) {
       return ingestionAuthority.sourceUnreadable(claim.path(), failure);
     }
@@ -515,16 +536,19 @@ public final class JobBatchExtractor {
     }
   }
 
+  private void requireReadableSource(JobQueue.IndexJob claim) throws IOException {
+    if (io.justsearch.indexerworker.ingest.CloudPlaceholderDetector.isCloudPlaceholder(claim.path())) {
+      throw new IOException("Cloud-only placeholder is unavailable for content access");
+    }
+    SourceAccess.requireContained(claim.path(), claim.ingestionRoot());
+  }
+
   private static boolean openableForRead(Path source) {
     try (var channel = java.nio.file.Files.newByteChannel(source)) {
       return channel.isOpen();
     } catch (IOException | SecurityException | UnsupportedOperationException unreadable) {
       return false;
     }
-  }
-
-  private void bestEffortDeleteMissingSource(Path filePath) {
-    indexedDelta.accept(staleSourceHandler.deleteMissingSource(filePath));
   }
 
   private Span maybeSpan(String name) {

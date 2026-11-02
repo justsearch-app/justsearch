@@ -88,6 +88,20 @@ final class WorkerIngestServiceForceReindexWiringTest {
     verify(loop, never()).markForced(any());
   }
 
+
+  @org.junit.jupiter.params.ParameterizedTest(name = "{displayName} [{index}] {arguments}")
+  @org.junit.jupiter.params.provider.ValueSource(booleans = {false, true})
+  void consecutiveDotsInsideNamesAreAdmitted(boolean force) throws Exception {
+    Path folder = Files.createDirectory(tempDir.resolve("version..notes"));
+    Path file = Files.writeString(folder.resolve("release..notes.txt"), "text");
+    IndexingLoop loop = mock(IndexingLoop.class);
+    RecordingQueue queue = new RecordingQueue();
+    submit(serviceWith(queue, loop), file, force);
+    assertEquals(List.of(file), queue.enqueuedPaths);
+    assertEquals(force, queue.entries.getFirst().forceReindex());
+    verify(loop, never()).markForced(any());
+  }
+
   @Test
   // "submitBatch without force_reindex marks nothing"
   void submitBatchWithoutForceReindexMarksNothing() throws Exception {

@@ -1,0 +1,127 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
+  },
+  "createdAt": "2026-11-01T21:44:39.443Z",
+  "revision": "7c124c7c228707305855589b4e151c97cabb277a",
+  "tree": "c085065fea7409e6712e7fe77c096f1bced9d370",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/state/indexingFreshness.test.ts\" \"src/shell-v0/views/LibrarySurface.redesign.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/5iqrcnfb/tmp/test-intent-vitest-4-1793569469474.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 3879
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/state/indexingFreshness.test.ts#L2 fresh 6-second worker samples remain confirmed between 10-second reads for 40 seconds",
+      "file": "modules/ui-web/src/shell-v0/state/indexingFreshness.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:52831b26ebdc47fc20c6d342b7bcfe6da849f3c5bdcc109ff9d1d38b6fb33383",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "L2 fresh 6-second worker samples remain confirmed between 10-second reads for 40 seconds",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/state/indexingFreshness.test.ts#L2 a frozen worker sample expires after 6 seconds plus one read interval despite successful reads",
+      "file": "modules/ui-web/src/shell-v0/state/indexingFreshness.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:52831b26ebdc47fc20c6d342b7bcfe6da849f3c5bdcc109ff9d1d38b6fb33383",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "L2 a frozen worker sample expires after 6 seconds plus one read interval despite successful reads",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/LibrarySurface.redesign.test.ts#L2 lost status contact never describes a rebuild (empty roots: false)",
+      "file": "modules/ui-web/src/shell-v0/views/LibrarySurface.redesign.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:7694021ebe709affacc1e12975eeace5780d4e1d6ef12359cd8aeb512efadd41",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "L2 lost status contact never describes a rebuild (empty roots: false)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/LibrarySurface.redesign.test.ts#L2 lost status contact never describes a rebuild (empty roots: true)",
+      "file": "modules/ui-web/src/shell-v0/views/LibrarySurface.redesign.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:7694021ebe709affacc1e12975eeace5780d4e1d6ef12359cd8aeb512efadd41",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "L2 lost status contact never describes a rebuild (empty roots: true)",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "7c124c7c22",
+    "revision": "7c124c7c228707305855589b4e151c97cabb277a",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/state/indexingFreshness.test.ts\" \"src/shell-v0/views/LibrarySurface.redesign.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/5iqrcnfb/tmp/test-intent-vitest-4-1793569475984.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 2880,
+        "output": "JSON report written to /home/elias/.cache/am/5iqrcnfb/tmp/test-intent-vitest-4-1793569475984.json\n\n"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui-web/src/shell-v0/state/indexingFreshness.test.ts#L2 fresh 6-second worker samples remain confirmed between 10-second reads for 40 seconds",
+        "classification": "assertion",
+        "detail": "L2 fresh 6-second worker samples remain confirmed between 10-second reads for 40 seconds:  AssertionError: second 7: expected false to be true // Object.is equality\n    at /home/elias/.cache/am/5iqrcnfb/tmp/test-intent-before-yQj0Ja/modules/ui-web/src/shell-v0/state/indexingFreshness.test.ts:91:66\n    at file:///home/elias/.cache/am/5iqrcnfb/tmp/test-intent-before-yQj0Ja/modules/ui-web/no"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/state/indexingFreshness.test.ts#L2 a frozen worker sample expires after 6 seconds plus one read interval despite successful reads",
+        "classification": "assertion",
+        "detail": "L2 a frozen worker sample expires after 6 seconds plus one read interval despite successful reads:  AssertionError: expected false to be true // Object.is equality\n    at /home/elias/.cache/am/5iqrcnfb/tmp/test-intent-before-yQj0Ja/modules/ui-web/src/shell-v0/state/indexingFreshness.test.ts:101:44\n    at file:///home/elias/.cache/am/5iqrcnfb/tmp/test-intent-before-yQj0Ja/modules/ui-web/node_module"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/LibrarySurface.redesign.test.ts#L2 lost status contact never describes a rebuild (empty roots: false)",
+        "classification": "assertion",
+        "detail": "L2 lost status contact never describes a rebuild (empty roots: false):  AssertionError: expected 'Rebuilding your Library' to be 'Indexing status unconfirmed' // Object.is equality\n    at /home/elias/.cache/am/5iqrcnfb/tmp/test-intent-before-yQj0Ja/modules/ui-web/src/shell-v0/views/LibrarySurface.redesign.test.ts:271:61\n    at file:///home/elias/.cache/am/5iqrcnfb/tmp/t"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/LibrarySurface.redesign.test.ts#L2 lost status contact never describes a rebuild (empty roots: true)",
+        "classification": "assertion",
+        "detail": "L2 lost status contact never describes a rebuild (empty roots: true):  AssertionError: expected 'Rebuilding your Library' to be 'Indexing status unconfirmed' // Object.is equality\n    at /home/elias/.cache/am/5iqrcnfb/tmp/test-intent-before-yQj0Ja/modules/ui-web/src/shell-v0/views/LibrarySurface.redesign.test.ts:271:61\n    at file:///home/elias/.cache/am/5iqrcnfb/tmp/t"
+      }
+    ]
+  },
+  "digest": "sha256:d3858983503851d26880a9a223a636cd9b3311b2cc14ac05c98c71602299f9b7"
+}

@@ -1,0 +1,67 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
+  },
+  "createdAt": "2026-11-01T21:45:54.405Z",
+  "revision": "7c124c7c228707305855589b4e151c97cabb277a",
+  "tree": "9555e9288bc75c0a383d2b95a7735b5054e97e7c",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/components/IndexingRulesEditor.arrival.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/5iqrcnfb/tmp/test-intent-vitest-4-1793569546225.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 2292
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/components/IndexingRulesEditor.arrival.test.ts#L14 waits for loaded rules, keeps the destination in view while layout settles",
+      "file": "modules/ui-web/src/shell-v0/components/IndexingRulesEditor.arrival.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:309e35e3da0f302329cdf195d3c1237ebdb23975ec387f31c50b69e2fffaa8ab",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "L14 waits for loaded rules, keeps the destination in view while layout settles",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "9e08da1084",
+    "revision": "9e08da1084b4ed3f335b712592d57fae64a459e7",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/components/IndexingRulesEditor.arrival.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/5iqrcnfb/tmp/test-intent-vitest-4-1793569551780.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 1710,
+        "output": "JSON report written to /home/elias/.cache/am/5iqrcnfb/tmp/test-intent-vitest-4-1793569551780.json\n\n"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui-web/src/shell-v0/components/IndexingRulesEditor.arrival.test.ts#L14 waits for loaded rules, keeps the destination in view while layout settles",
+        "classification": "assertion",
+        "detail": "L14 waits for loaded rules, keeps the destination in view while layout settles:  AssertionError: expected \"scrollIntoView\" to be called with arguments: [ { block: 'center', …(1) } ]\n\nNumber of calls: 0\n\n    at Proxy.<anonymous> (file:///home/elias/.cache/am/5iqrcnfb/tmp/test-intent-before-sCVc1f/modules/ui-web/node_modules/@vitest/expect/dist/index.js:1487:10)\n    at Proxy.<anon"
+      }
+    ]
+  },
+  "digest": "sha256:534ae8884dc4c3d92e4fed632605b0084d5f4b1263fd7581273c86535d1cb805"
+}

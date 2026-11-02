@@ -95,7 +95,9 @@ class WorkerVduExclusionClaimTest extends LuceneExecutorTestBase {
     try (var runtime = open()) {
       String id = seed(runtime, false);
       var queue = mock(JobQueue.class);
-      assertFalse(service(runtime, queue).updateVduResult(result(id, "",
+      var service = service(runtime, queue);
+      clearInvocations(queue);
+      assertFalse(service.updateVduResult(result(id, "",
           VduUpdateOutcome.VDU_UPDATE_OUTCOME_SUCCESS_TEXT), CallContext.none()).getSuccess());
       verifyNoInteractions(queue);
       assertState(runtime, id, "PENDING", "2");

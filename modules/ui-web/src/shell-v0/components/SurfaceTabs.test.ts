@@ -42,6 +42,19 @@ describe('jf-surface-tabs', () => {
     ).toEqual(['Folders', 'Logs', 'Activity Audit']);
   });
 
+  it('projects window actions beside the tablist without adding them to tab keyboard navigation', async () => {
+    const el = await mount(ITEMS);
+    const action = document.createElement('button'); action.slot = 'actions'; action.textContent = 'Add folder';
+    el.append(action); await el.updateComplete;
+    const slot = el.shadowRoot!.querySelector<HTMLSlotElement>('slot[name="actions"]')!;
+    expect(slot.assignedElements()).toEqual([action]);
+    expect(slot.closest('[role="tablist"]')).toBeNull();
+    tabButtons(el)[0]!.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }));
+    await el.updateComplete;
+    expect(el.shadowRoot!.activeElement).toBe(tabButtons(el)[1]);
+    expect(action.getAttribute('role')).toBeNull();
+  });
+
   it('shows the first item active by default and renders its content', async () => {
     const el = await mount(ITEMS);
     const first = tabButtons(el)[0]!;

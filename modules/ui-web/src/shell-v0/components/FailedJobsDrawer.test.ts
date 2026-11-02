@@ -563,3 +563,324 @@ describe('FailedJobsDrawer — PROD posture (drift degrades, it does not freeze 
     }
   });
 });
+
+// L13: replacing a visible target must replace both evidence and retry identities.
+it('switches an open drawer from A to B and ignores A arriving late', async () => {
+  let answerA!: (response: Response) => void;
+  const oldFetch = globalThis.fetch;
+  globalThis.fetch = vi.fn(async (url: unknown) => {
+    const path = String(url);
+    if (path.includes('by-prefix?pathHash=A')) return new Promise<Response>(resolve => { answerA = resolve; });
+    if (path.includes('by-prefix?pathHash=B')) return new Response(byPrefixBody([job({ pathHash: 'B-file', errorMessage: 'B reason' })]));
+    return new Response('{}');
+  }) as typeof fetch;
+  const el = document.createElement('jf-failed-jobs-drawer') as FailedJobsDrawer;
+  try {
+    document.body.append(el); await pump(el);
+    openFailedJobs('A'); await pump(el);
+    openFailedJobs('B'); await pump(el);
+    expect(el.rows.map(row => row.pathHash)).toEqual(['B-file']);
+    expect(el.shadowRoot?.textContent).toContain('B reason');
+    expect(el.shadowRoot?.querySelector('jf-row-actions')?.getAttribute('row-key')).toBe('B-file');
+    answerA(new Response(byPrefixBody([job({ pathHash: 'A-file', errorMessage: 'obsolete A' })])));
+    await pump(el);
+    expect(el.rows.map(row => row.pathHash)).toEqual(['B-file']);
+    expect(el.shadowRoot?.textContent).not.toContain('obsolete A');
+    closeFailedJobs(); openFailedJobs('B'); await pump(el);
+    expect(el.rows.map(row => row.pathHash)).toEqual(['B-file']);
+  } finally { el.remove(); globalThis.fetch = oldFetch; }
+});
+
+it('loads the current target after a drawer is remounted while its store is open', async () => {
+  const oldFetch = globalThis.fetch;
+  globalThis.fetch = vi.fn(async () => new Response(byPrefixBody([job({ pathHash: 'current-file' })]))) as typeof fetch;
+  openFailedJobs('current');
+  const el = document.createElement('jf-failed-jobs-drawer') as FailedJobsDrawer;
+  try {
+    document.body.append(el); await pump(el);
+    expect(el.rows.map(row => row.pathHash)).toEqual(['current-file']);
+    el.remove(); document.body.append(el); await pump(el);
+    expect(el.rows.map(row => row.pathHash)).toEqual(['current-file']);
+  } finally { el.remove(); globalThis.fetch = oldFetch; }
+});
+
+function inlineRetry(el: FailedJobsDrawer) {
+  return el.shadowRoot!.querySelector<HTMLElement & { onActivate(): void; disabled: boolean }>('jf-button[label="Try again"]')!;
+}
+
+it.each(['empty', 'partial'])('R3d live %s refresh replaces the list during retry without dropping unattempted files', async response => {
+  let release!: (response: Response) => void;
+  let listing = [job({ pathHash: 'first' }), job({ pathHash: 'remaining', state: 'SOURCE_UNREADABLE', errorMessage: 'Permission denied' })];
+  let reads = 0;
+  const retried: string[] = []; const oldFetch = globalThis.fetch;
+  globalThis.fetch = vi.fn(async (url: unknown, init?: RequestInit) => {
+    if (String(url).includes('by-prefix')) { ++reads; return new Response(byPrefixBody(listing)); }
+    if (String(url).includes('/invoke')) {
+      retried.push(JSON.parse(String(init?.body)).args.pathHash);
+      if (retried.length === 1) return new Promise<Response>(resolve => { release = resolve; });
+      return Response.json({ success: true });
+    }
+    return Response.json({});
+  }) as typeof fetch;
+  const el = document.createElement('jf-failed-jobs-drawer') as FailedJobsDrawer;
+  el.inline = true; el.folderPathHash = 'folder'; el.observedCount = 2;
+  try {
+    document.body.append(el); await pump(el);
+    inlineRetry(el).onActivate(); await pump(el);
+    listing = response === 'empty' ? [] : [job({ pathHash: 'new-failure' })];
+    el.observedCount = listing.length; await pump(el);
+    expect(reads).toBe(2);
+    expect(inlineRetry(el).disabled).toBe(false);
+    expect(el.rows.map(row => row.pathHash)).toEqual(response === 'empty' ? ['first', 'remaining'] : ['new-failure']);
+    if (response === 'empty') {
+      expect(el.shadowRoot!.textContent).toContain('Permission denied');
+      expect(el.shadowRoot!.querySelector('[data-state="SOURCE_UNREADABLE"]')).not.toBeNull();
+    }
+    release(Response.json({ success: true })); await pump(el);
+    expect(retried).toEqual(['first', 'remaining']);
+    inlineRetry(el).onActivate(); await pump(el);
+    expect(retried).toEqual(['first', 'remaining', ...(response === 'partial' ? ['new-failure'] : ['first', 'remaining'])]);
+  } finally { el.remove(); globalThis.fetch = oldFetch; }
+});
+
+it('R3d a silent retry followed by a silent listing keeps Try again enabled and rows visible', async () => {
+  let reads = 0;
+  const oldFetch = globalThis.fetch;
+  globalThis.fetch = vi.fn(async (url: unknown) => {
+    if (String(url).includes('by-prefix') && ++reads === 1) {
+      return new Response(byPrefixBody([job({ pathHash: 'silent', state: 'INDEXED_SOURCE_UNREADABLE', errorMessage: 'Access denied' }),
+        job({ pathHash: 'remaining', state: 'RETRY_EXHAUSTED', errorMessage: 'Drive offline' })]));
+    }
+    if (String(url).includes('by-prefix') || String(url).includes('/invoke')) return new Promise<Response>(() => {});
+    return Response.json({});
+  }) as typeof fetch;
+  const el = document.createElement('jf-failed-jobs-drawer') as FailedJobsDrawer;
+  el.inline = true; el.folderPathHash = 'folder'; el.observedCount = 2;
+  try {
+    document.body.append(el); await pump(el);
+    inlineRetry(el).onActivate(); await pump(el);
+    el.observedCount = 0; await pump(el);
+    expect(inlineRetry(el).disabled).toBe(false);
+    expect(reads).toBe(2);
+    expect(el.shadowRoot!.querySelectorAll('.row')).toHaveLength(2);
+    expect(el.shadowRoot!.textContent).toContain('Access denied');
+    expect(el.shadowRoot!.textContent).toContain('Drive offline');
+    expect(el.shadowRoot!.querySelector('[data-state="INDEXED_SOURCE_UNREADABLE"]')).not.toBeNull();
+    expect(el.shadowRoot!.querySelector('[data-state="RETRY_EXHAUSTED"]')).not.toBeNull();
+  } finally { el.remove(); globalThis.fetch = oldFetch; }
+});
+
+it('R3d a second click while retry is pending retries every listed file again', async () => {
+  const releases: Array<(response: Response) => void> = [];
+  const retried: string[] = []; const oldFetch = globalThis.fetch;
+  globalThis.fetch = vi.fn(async (url: unknown, init?: RequestInit) => {
+    if (String(url).includes('by-prefix')) return new Response(byPrefixBody([job({ pathHash: 'A' }), job({ pathHash: 'B' })]));
+    if (String(url).includes('/invoke')) {
+      const hash = JSON.parse(String(init?.body)).args.pathHash;
+      retried.push(hash);
+      if (hash === 'A') return new Promise<Response>(resolve => releases.push(resolve));
+      return Response.json({ success: true });
+    }
+    return Response.json({});
+  }) as typeof fetch;
+  const el = document.createElement('jf-failed-jobs-drawer') as FailedJobsDrawer;
+  el.inline = true; el.folderPathHash = 'folder';
+  try {
+    document.body.append(el); await pump(el);
+    inlineRetry(el).onActivate(); await pump(el);
+    inlineRetry(el).onActivate(); await pump(el);
+    expect(retried).toEqual(['A', 'A']);
+    releases[1]!(Response.json({ success: true })); await pump(el);
+    releases[0]!(Response.json({ success: true })); await pump(el);
+    expect(retried).toEqual(['A', 'A', 'B', 'B']);
+    expect(inlineRetry(el).disabled).toBe(false);
+  } finally { el.remove(); globalThis.fetch = oldFetch; }
+});
+
+it('R3d a fresh failure list retries A again along with refused B and newly failed C', async () => {
+  let listing = [job({ pathHash: 'A' }), job({ pathHash: 'B', state: 'SOURCE_UNREADABLE' })];
+  const retried: string[] = []; const oldFetch = globalThis.fetch;
+  globalThis.fetch = vi.fn(async (url: unknown, init?: RequestInit) => {
+    if (String(url).includes('by-prefix')) return new Response(byPrefixBody(listing));
+    if (String(url).includes('/invoke')) {
+      const hash = JSON.parse(String(init?.body)).args.pathHash;
+      retried.push(hash);
+      return hash === 'B' ? Response.json({ success: false, message: 'Retry refused' }, { status: 409 })
+        : Response.json({ success: true });
+    }
+    return Response.json({});
+  }) as typeof fetch;
+  const el = document.createElement('jf-failed-jobs-drawer') as FailedJobsDrawer;
+  el.inline = true; el.folderPathHash = 'folder'; el.observedCount = 2;
+  try {
+    document.body.append(el); await pump(el);
+    inlineRetry(el).onActivate(); await pump(el);
+    expect(retried).toEqual(['A', 'B']);
+    listing = [...listing, job({ pathHash: 'C' })];
+    el.observedCount = 3; await pump(el);
+    expect(el.rows.map(row => row.pathHash)).toEqual(['A', 'B', 'C']);
+    inlineRetry(el).onActivate(); await pump(el);
+    expect(retried).toEqual(['A', 'B', 'A', 'B', 'C']);
+    expect(inlineRetry(el).disabled).toBe(false);
+  } finally { el.remove(); globalThis.fetch = oldFetch; }
+});
+
+it.each([true, false])('R3d late retry results cannot touch a switched target or remounted element (inline: %s)', async inline => {
+  const releases = new Map<string, (response: Response) => void>();
+  const retried: string[] = []; const reads: string[] = []; const oldFetch = globalThis.fetch;
+  globalThis.fetch = vi.fn(async (url: unknown, init?: RequestInit) => {
+    if (String(url).includes('by-prefix')) {
+      const folder = new URL(String(url), 'http://test').searchParams.get('pathHash');
+      reads.push(folder!);
+      return new Response(byPrefixBody([job({ pathHash: `${folder}-file` }), job({ pathHash: `${folder}-next` })]));
+    }
+    if (String(url).includes('/invoke')) {
+      const hash = JSON.parse(String(init?.body)).args.pathHash;
+      retried.push(hash); return new Promise<Response>(resolve => releases.set(hash, resolve));
+    }
+    return Response.json({});
+  }) as typeof fetch;
+  const el = document.createElement('jf-failed-jobs-drawer') as FailedJobsDrawer;
+  el.inline = inline; el.folderPathHash = 'A';
+  const retry = () => el.shadowRoot!.querySelector<HTMLElement & { onActivate(): void }>(inline ? 'jf-button[label="Try again"]' : 'jf-button[label="Retry all failed files"]')!.onActivate();
+  try {
+    document.body.append(el); if (!inline) openFailedJobs('A'); await pump(el);
+    retry(); await pump(el);
+    if (inline) el.folderPathHash = 'B'; else openFailedJobs('B');
+    await pump(el); retry(); await pump(el);
+    const readsBefore = reads.length;
+    releases.get('A-file')!(Response.json({ success: true })); await pump(el);
+    expect(reads).toHaveLength(readsBefore);
+    expect(el.rows.map(row => row.pathHash)).toEqual(['B-file', 'B-next']);
+    el.remove(); document.body.append(el); await pump(el);
+    const remountedReads = reads.length;
+    releases.get('B-file')!(Response.json({ success: true })); await pump(el);
+    expect(reads).toHaveLength(remountedReads);
+    expect(el.rows.map(row => row.pathHash)).toEqual(['B-file', 'B-next']);
+    expect(retried).toEqual(['A-file', 'B-file']);
+  } finally { el.remove(); globalThis.fetch = oldFetch; }
+});
+
+it('R3d a second window and a reload or tab remount use fresh lists while an old retry is pending', async () => {
+  let answerOld!: (response: Response) => void;
+  let listing = [job({ pathHash: 'old', errorMessage: 'Old failure' })];
+  const retried: string[] = []; const oldFetch = globalThis.fetch;
+  globalThis.fetch = vi.fn(async (url: unknown, init?: RequestInit) => {
+    if (String(url).includes('by-prefix')) return new Response(byPrefixBody(listing));
+    if (String(url).includes('/invoke')) {
+      retried.push(JSON.parse(String(init?.body)).args.pathHash);
+      if (retried.length === 1) return new Promise<Response>(resolve => { answerOld = resolve; });
+      return Response.json({ success: true });
+    }
+    return Response.json({});
+  }) as typeof fetch;
+  const first = document.createElement('jf-failed-jobs-drawer') as FailedJobsDrawer;
+  const second = document.createElement('jf-failed-jobs-drawer') as FailedJobsDrawer;
+  const reloaded = document.createElement('jf-failed-jobs-drawer') as FailedJobsDrawer;
+  for (const el of [first, second, reloaded]) { el.inline = true; el.folderPathHash = 'folder'; }
+  try {
+    document.body.append(first); await pump(first); inlineRetry(first).onActivate(); await pump(first);
+    listing = [job({ pathHash: 'new', errorMessage: 'New failure' })];
+    document.body.append(second); await pump(second);
+    inlineRetry(second).onActivate(); await pump(second);
+    first.remove(); document.body.append(first, reloaded); await pump(first); await pump(reloaded);
+    answerOld(Response.json({ success: false }, { status: 409 })); await pump(first); await pump(second);
+    for (const el of [first, second, reloaded]) {
+      expect(el.rows.map(row => row.pathHash)).toEqual(['new']);
+      expect(el.shadowRoot!.textContent).toContain('New failure');
+      expect(inlineRetry(el).disabled).toBe(false);
+    }
+    expect(retried).toEqual(['old', 'new']);
+  } finally { first.remove(); second.remove(); reloaded.remove(); globalThis.fetch = oldFetch; }
+});
+
+it('R3d a late listing cannot overwrite a newer count refresh', async () => {
+  let answerOld!: (response: Response) => void;
+  let reads = 0;
+  const oldFetch = globalThis.fetch;
+  globalThis.fetch = vi.fn(async (url: unknown) => {
+    if (String(url).includes('by-prefix')) {
+      if (++reads === 2) return new Promise<Response>(resolve => { answerOld = resolve; });
+      return new Response(byPrefixBody([job({ pathHash: reads === 1 ? 'initial' : 'newest' })]));
+    }
+    return Response.json({});
+  }) as typeof fetch;
+  const el = document.createElement('jf-failed-jobs-drawer') as FailedJobsDrawer;
+  el.inline = true; el.folderPathHash = 'folder'; el.observedCount = 1;
+  try {
+    document.body.append(el); await pump(el);
+    el.observedCount = 2; await pump(el);
+    expect(el.shadowRoot!.querySelectorAll('.row')).toHaveLength(1);
+    el.observedCount = 3; await pump(el);
+    answerOld(new Response(byPrefixBody([job({ pathHash: 'obsolete' })]))); await pump(el);
+    expect(el.rows.map(row => row.pathHash)).toEqual(['newest']);
+  } finally { el.remove(); globalThis.fetch = oldFetch; }
+});
+
+it('R3d a failed refresh keeps the last-known inline rows visible beside the error', async () => {
+  let reads = 0;
+  const oldFetch = globalThis.fetch;
+  globalThis.fetch = vi.fn(async (url: unknown) => {
+    if (String(url).includes('by-prefix')) {
+      if (++reads === 1) return new Response(byPrefixBody([job({ pathHash: 'kept', state: 'SOURCE_UNREADABLE', errorMessage: 'Permission denied' })]));
+      return reads === 2 ? new Response('', { status: 503 }) : Promise.reject(new TypeError('network down'));
+    }
+    return Response.json({});
+  }) as typeof fetch;
+  const el = document.createElement('jf-failed-jobs-drawer') as FailedJobsDrawer;
+  el.inline = true; el.folderPathHash = 'folder'; el.observedCount = 1; el.lastKnown = false;
+  try {
+    document.body.append(el); await pump(el);
+    for (const count of [2, 3]) {
+      el.observedCount = count; await pump(el);
+      expect(el.shadowRoot!.querySelectorAll('.row')).toHaveLength(1);
+      expect(el.shadowRoot!.querySelector('[data-state="SOURCE_UNREADABLE"]')).not.toBeNull();
+      expect(el.shadowRoot!.textContent).toContain('Permission denied');
+      expect(el.shadowRoot!.textContent).toContain("Couldn't refresh failed files");
+      expect(inlineRetry(el).disabled).toBe(false);
+    }
+  } finally { el.remove(); globalThis.fetch = oldFetch; }
+});
+
+it('an inline list torn down never removes the open global drawer registration', async () => {
+  const { closeOthersInLayer, registerTransient, __resetTransientArbiter } = await import('../state/transientLayerArbiter.js');
+  __resetTransientArbiter();
+  const oldFetch = globalThis.fetch;
+  globalThis.fetch = vi.fn(async () => new Response(byPrefixBody([job({ pathHash: 'x' })]))) as typeof fetch;
+  const drawer = document.createElement('jf-failed-jobs-drawer') as FailedJobsDrawer;
+  const inline = document.createElement('jf-failed-jobs-drawer') as FailedJobsDrawer;
+  inline.inline = true; inline.folderPathHash = 'folder'; inline.observedCount = 1;
+  try {
+    document.body.append(drawer); openFailedJobs('folder'); await pump(drawer);
+    document.body.append(inline); await pump(inline);
+    inline.remove(); await pump(drawer);
+    expect(isFailedJobsOpen()).toBe(true);
+    // Opening another right drawer must still close the failed-files drawer through its registration.
+    registerTransient('right-drawer', 'other', () => {});
+    closeOthersInLayer('right-drawer', 'other');
+    expect(isFailedJobsOpen()).toBe(false);
+  } finally { drawer.remove(); inline.remove(); globalThis.fetch = oldFetch; __resetTransientArbiter(); }
+});
+
+it('R3d the real Try again button stays operable while a retry never answers', async () => {
+  const retried: string[] = []; const oldFetch = globalThis.fetch;
+  globalThis.fetch = vi.fn(async (url: unknown, init?: RequestInit) => {
+    if (String(url).includes('by-prefix')) return new Response(byPrefixBody([job({ pathHash: 'A' })]));
+    if (String(url).includes('/invoke')) { retried.push(JSON.parse(String(init?.body)).args.pathHash); return new Promise<Response>(() => {}); }
+    return Response.json({});
+  }) as typeof fetch;
+  const el = document.createElement('jf-failed-jobs-drawer') as FailedJobsDrawer;
+  el.inline = true; el.folderPathHash = 'folder'; el.observedCount = 1;
+  try {
+    document.body.append(el); await pump(el);
+    const atom = inlineRetry(el); await settle(atom);
+    const control = atom.shadowRoot!.querySelector('jf-control')! as Element & { busy: boolean };
+    await settle(control);
+    const button = () => control.shadowRoot!.querySelector('button')!;
+    button().click(); await pump(el); await new Promise(resolve => setTimeout(resolve, 400)); await settle(control);
+    expect(control.busy).toBe(false);
+    expect(button().getAttribute('aria-disabled')).not.toBe('true');
+    button().click(); await pump(el);
+    expect(retried).toEqual(['A', 'A']);
+  } finally { el.remove(); globalThis.fetch = oldFetch; }
+});

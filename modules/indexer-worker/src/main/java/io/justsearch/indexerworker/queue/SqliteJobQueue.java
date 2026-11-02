@@ -76,6 +76,13 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
     declaredCollectionRoots = Objects.requireNonNull(roots);
   }
 
+  private void requireSourceAccess(EnqueueEntry entry) throws IOException {
+    io.justsearch.indexerworker.loop.SourceAccess.requireContained(entry.path(), entry.ingestionRoot());
+    if (io.justsearch.indexerworker.ingest.CloudPlaceholderDetector.isCloudPlaceholder(entry.path())) {
+      throw new IOException("Cloud-only placeholder is unavailable for content access");
+    }
+  }
+
   private java.util.function.Supplier<List<IngestCollectionPolicy.RootBinding>> frozenCollectionRoots = List::of;
 
   /** In-memory recorded-plan snapshot, owned and retired by the generation publisher. */
@@ -302,8 +309,9 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
     List<EnqueueEntry> witnessedEntries = new ArrayList<>(entries.size());
     try {
       for (EnqueueEntry entry : entries) {
+        if (entry.plannedSourceSha256() == null) requireSourceAccess(entry);
         String hash = entry.plannedSourceSha256() == null
-            ? io.justsearch.indexerworker.loop.SourceContentHash.sha256(entry.path())
+            ? io.justsearch.indexerworker.loop.SourceContentHash.sha256WithinRoot(entry.path(), entry.ingestionRoot())
             : entry.plannedSourceSha256();
         witnessedEntries.add(new EnqueueEntry(
             entry.path(), entry.sizeBytes(), entry.provenance(), hash, entry.ingestionRoot()));
@@ -2859,8 +2867,9 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
           JobQueue.EnqueueEntry admitted = entry;
           if (exact) {
             try {
+              requireSourceAccess(entry);
               admitted = new JobQueue.EnqueueEntry(entry.path(), entry.sizeBytes(), entry.provenance(),
-                  io.justsearch.indexerworker.loop.SourceContentHash.sha256(entry.path(), cancelled),
+                  io.justsearch.indexerworker.loop.SourceContentHash.sha256WithinRoot(entry.path(), entry.ingestionRoot(), cancelled),
                   entry.ingestionRoot());
             } catch (IOException failure) {
               throw new IllegalStateException("Retirement sync source witness unavailable", failure);
@@ -2943,7 +2952,8 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
             boolean exact=refreshable.contains(path);
             JobQueue.EnqueueEntry admitted=entry;
             if(exact&&!replay) {
-              String source=io.justsearch.indexerworker.loop.SourceContentHash.sha256(entry.path(),cancelled);
+              requireSourceAccess(entry);
+              String source=io.justsearch.indexerworker.loop.SourceContentHash.sha256WithinRoot(entry.path(), entry.ingestionRoot(), cancelled);
               admitted=new JobQueue.EnqueueEntry(entry.path(),entry.sizeBytes(),entry.provenance(),source,entry.ingestionRoot());
             }
             String admittedUnit = exact && !replay ? null : root.retirementRootUnit();
@@ -3103,12 +3113,13 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
     }
   }
 
-  record AdmissionSource(AdmissionWitness witness, String sha256) {
+  record AdmissionSource(AdmissionWitness witness, String sha256, Path ingestionRoot) {
     long size() { return witness.size(); }
     long modified() { return witness.modified().toMillis(); }
 
     boolean stillCurrent(Path path) {
       try {
+        io.justsearch.indexerworker.loop.SourceAccess.requireContained(path, ingestionRoot);
         return witness.equals(AdmissionWitness.capture(path));
       } catch (IOException | SecurityException unavailable) {
         return false;
@@ -3116,22 +3127,23 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
     }
   }
 
-  private static AdmissionSource observeAdmissionSource(JobQueue.EnqueueEntry entry) {
+  private AdmissionSource observeAdmissionSource(JobQueue.EnqueueEntry entry) {
     if (entry == null || entry.path() == null || entry.plannedSourceSha256() != null) return null;
     try {
+      requireSourceAccess(entry);
       var before = AdmissionWitness.capture(entry.path());
       if (before == null) return null;
       String hash = io.justsearch.indexerworker.loop.SourceContentHash.admissionIdentity(
           entry.path(), entry.ingestionRoot());
       if (hash == null) return null;
-      var source = new AdmissionSource(before, hash);
+      var source = new AdmissionSource(before, hash, entry.ingestionRoot());
       return source.stillCurrent(entry.path()) ? source : null;
     } catch (IOException | SecurityException unavailable) {
       return null;
     }
   }
 
-  private static Map<JobQueue.EnqueueEntry, AdmissionSource> observeAdmissionSources(
+  private Map<JobQueue.EnqueueEntry, AdmissionSource> observeAdmissionSources(
       List<JobQueue.EnqueueEntry> entries) {
     Map<JobQueue.EnqueueEntry, AdmissionSource> sources = new HashMap<>();
     for (var entry : entries) {
@@ -3360,6 +3372,28 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
       declared = !enumeration && (collection == null || collection.isBlank())
           ? declaredCollectionRoots.get() : List.of();
       for (JobQueue.EnqueueEntry entry : entries) {
+        Path sourcePath = entry.path();
+        Path sourceRoot = entry.ingestionRoot();
+        if (maintenance && Files.isSymbolicLink(sourcePath)) {
+          // Live watcher events retain main's link admission. Validate the ancestors and the
+          // resolved target before hashing, while keeping the event path as the queue identity.
+          io.justsearch.indexerworker.loop.SourceAccess.requireSafeAncestors(sourcePath, entry.ingestionRoot());
+          sourcePath = sourcePath.toRealPath();
+          sourceRoot = sourceRoot == null ? null : sourceRoot.toRealPath();
+        }
+        io.justsearch.indexerworker.loop.SourceAccess.requireContained(sourcePath, sourceRoot);
+        if (io.justsearch.indexerworker.ingest.CloudPlaceholderDetector.isCloudPlaceholder(entry.path())) {
+          recordIngestionEvent(entry.path(), IngestionOutcome.of(
+              IngestionOutcomeClass.DEFERRED_POLICY,
+              io.justsearch.indexerworker.ingest.IngestionReasonCodes.CLOUD_PLACEHOLDER,
+              io.justsearch.indexerworker.ingest.IngestionRetryPolicy.DEFER_WITHOUT_ATTEMPT,
+              "Cloud-only placeholder"), new JobQueue.IngestionLedgerEntry(
+                  sha256(normalizePath(entry.path())), collection, null, null, "CLOUD_PLACEHOLDER",
+                  "NOT_CREATED", "n/a", "n/a",
+                  entry.provenance() == null ? null : entry.provenance().originator(),
+                  entry.provenance() == null ? null : entry.provenance().transport()));
+          return 0;
+        }
         AdmissionWitness before = null;
         try {
           before = AdmissionWitness.capture(entry.path());
@@ -3369,7 +3403,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
         String observedHash = null;
         try {
           observedHash = entry.plannedSourceSha256() == null
-              ? io.justsearch.indexerworker.loop.SourceContentHash.sha256(entry.path())
+              ? io.justsearch.indexerworker.loop.SourceContentHash.sha256WithinRoot(sourcePath, sourceRoot)
               : io.justsearch.indexerworker.loop.SourceContentHash.admissionIdentity(entry.path(), entry.ingestionRoot());
         } catch (IOException unavailable) {
           if (entry.plannedSourceSha256() == null) throw unavailable;
@@ -3382,7 +3416,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
             entry.path(), entry.sizeBytes(), provenance, hash, entry.ingestionRoot(), entry.forceReindex());
         witnessedEntries.add(witnessed);
         var source = before == null || observedHash == null || !observedHash.equals(hash)
-            ? null : new AdmissionSource(before, observedHash);
+            ? null : new AdmissionSource(before, observedHash, entry.ingestionRoot());
         sources.put(witnessed, source != null && source.stillCurrent(entry.path()) ? source : null);
       }
     } catch (IOException | RuntimeException unreadable) {

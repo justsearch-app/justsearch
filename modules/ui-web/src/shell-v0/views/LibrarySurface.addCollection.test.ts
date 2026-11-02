@@ -68,7 +68,7 @@ async function mount(
 /** Open the inline add form the way a user does — the header's Add Folder button. */
 async function openAddForm(el: LibrarySurface): Promise<void> {
   const buttons = Array.from(el.shadowRoot?.querySelectorAll('jf-button') ?? []);
-  const add = buttons.find((b) => b.getAttribute('label') === 'Add Folder') as
+  const add = buttons.find((b) => b.getAttribute('label') === 'Add folder') as
     | (Element & { onActivate?: () => void })
     | undefined;
   expect(add, 'the header must offer Add Folder').toBeTruthy();

@@ -310,6 +310,13 @@ public final class IndexCountOps {
         fileIds, projectionIds);
   }
 
+  /** Completion proof for file-scoped pruning; explicit backing paths override parent IDs. */
+  public int countOwnedFileStrict(String filePath) throws IOException {
+    if (filePath == null || filePath.isBlank()) throw new IllegalArgumentException("Empty file path");
+    return bridge.withSearcher(searcher ->
+        PruneOps.rowsOfFile(searcher, SchemaFields.DOC_ID, filePath).size());
+  }
+
   /** Mirrors exact deletion's identity and chunk ownership scope without changing the writer. */
   public int countByIdAndChunksStrict(String id) throws IOException {
     return countQueryOrThrow(idAndChunksQuery(id));

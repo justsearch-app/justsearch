@@ -10,6 +10,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import io.justsearch.indexerworker.ingest.IngestionOutcome;
 import io.justsearch.indexerworker.queue.JobQueue;
 import io.justsearch.ipc.ScanRootProgress;
+import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -65,6 +66,95 @@ final class WorkerScanOpsTest {
     var failure=assertThrows(IllegalStateException.class,()->new WorkerScanOps(queue).scan(
         new WorkerScanOps.ScanRequest(root,null,WorkerScanOps.ScanMode.INITIAL,List.of()),ignored -> {}));
     assertEquals("unavailable",failure.getMessage());
+  }
+
+
+  @Test
+  void excludedFilesStillEmitIntermediateProgress() throws Exception {
+    Path root = Files.createDirectory(tempDir.resolve("skip-progress"));
+    for (int i = 0; i < 250; i++) Files.writeString(root.resolve("skip-" + i + ".txt"), "text");
+    var emissions = new ArrayList<ScanRootProgress>();
+    var queue = new RecordingQueue();
+    var result = new WorkerScanOps(queue).scan(new WorkerScanOps.ScanRequest(root, null,
+        WorkerScanOps.ScanMode.INITIAL, List.of("*.txt")), emissions::add);
+    assertEquals(250, result.getFilesWalked());
+    assertEquals(250, result.getFilesSkipped());
+    assertTrue(emissions.size() >= 3);
+    assertEquals(100, emissions.get(0).getFilesWalked());
+    assertEquals(200, emissions.get(1).getFilesSkipped());
+    assertFalse(emissions.get(0).getComplete());
+    assertTrue(queue.enqueuedPaths.isEmpty());
+  }
+
+  @Test
+  void capturedScanRejectsAncestorReplacementBeforeHashing() throws Exception {
+    Path root = Files.createDirectory(tempDir.resolve("captured-boundary"));
+    Path parent = Files.createDirectory(root.resolve("parent"));
+    Path file = Files.writeString(parent.resolve("notes.txt"), "inside");
+    Path outside = Files.createDirectory(tempDir.resolve("outside"));
+    Files.writeString(outside.resolve("notes.txt"), "outside");
+    var queue = new RecordingQueue();
+    var scanner = new WorkerScanOps(queue, new CloudPlaceholderRecorder(queue), path -> {
+      try {
+        Files.delete(file);
+        Files.delete(parent);
+        Files.createSymbolicLink(parent, outside);
+      } catch (IOException failure) {
+        throw new java.io.UncheckedIOException(failure);
+      }
+      return false;
+    }, () -> 0L, () -> false, millis -> true, () -> {});
+    try (var hashes = org.mockito.Mockito.mockStatic(
+        io.justsearch.indexerworker.loop.SourceContentHash.class, org.mockito.Mockito.CALLS_REAL_METHODS)) {
+      assertThrows(IOException.class,
+          () -> scanner.scan(capturedRequest(root, "boundary-scan", 1), ignored -> {}));
+      hashes.verify(() -> io.justsearch.indexerworker.loop.SourceContentHash.sha256(file),
+          org.mockito.Mockito.never());
+      assertTrue(queue.enqueuedPaths.isEmpty());
+    }
+  }
+
+  @org.junit.jupiter.params.ParameterizedTest(name = "{displayName} [{index}] {arguments}")
+  @org.junit.jupiter.params.provider.ValueSource(strings = {"vendor/**", "vendor", "**/vendor/**"})
+  void excludedDirectoryIsPrunedWithoutCountingDescendants(String pattern) throws Exception {
+    Path root = Files.createDirectory(tempDir.resolve("pruned"));
+    Path vendor = Files.createDirectory(root.resolve("vendor"));
+    Files.writeString(vendor.resolve("hidden.txt"), "excluded");
+    Path included = Files.writeString(root.resolve("included.txt"), "included");
+    var queue = new RecordingQueue();
+    var result = new WorkerScanOps(queue).scan(new WorkerScanOps.ScanRequest(root, null,
+        WorkerScanOps.ScanMode.INITIAL, List.of(pattern)), ignored -> {});
+    assertEquals(1, result.getFilesWalked(), "The excluded subtree must never be visited");
+    assertEquals(List.of(included), queue.enqueuedPaths);
+  }
+
+  @Test
+  void symbolicDirectoryRootReportsFailureWithoutAdmittingTarget() throws Exception {
+    Path target = Files.createDirectory(tempDir.resolve("target"));
+    Files.writeString(target.resolve("notes.txt"), "outside");
+    Path link = Files.createSymbolicLink(tempDir.resolve("link"), target);
+    var queue = new RecordingQueue();
+    var terminal = new WorkerScanOps(queue).scan(new WorkerScanOps.ScanRequest(link, null,
+        WorkerScanOps.ScanMode.INITIAL, List.of()), ignored -> {});
+    assertEquals("ROOT_NOT_DIRECTORY", terminal.getTerminalReasonCode());
+    assertTrue(queue.enqueuedPaths.isEmpty());
+  }
+
+  @Test
+  @org.junit.jupiter.api.condition.EnabledOnOs(org.junit.jupiter.api.condition.OS.LINUX)
+  void unreadableEligibleFileMakesOrdinaryScanIncomplete() throws Exception {
+    Path root = Files.createDirectory(tempDir.resolve("unreadable"));
+    Path file = Files.writeString(root.resolve("notes.txt"), "text");
+    var permissions = Files.getPosixFilePermissions(file);
+    try {
+      Files.setPosixFilePermissions(file, Set.of());
+      org.junit.jupiter.api.Assumptions.assumeFalse(Files.isReadable(file), "Requires an unprivileged user");
+      var result = new WorkerScanOps(new RecordingQueue()).scan(new WorkerScanOps.ScanRequest(
+          root, null, WorkerScanOps.ScanMode.INITIAL, List.of()), ignored -> {});
+      assertEquals("INCOMPLETE_COVERAGE", result.getTerminalReasonCode());
+    } finally {
+      Files.setPosixFilePermissions(file, permissions);
+    }
   }
 
   @Test
@@ -379,7 +469,7 @@ final class WorkerScanOpsTest {
         queue, recorder, file -> file.equals(placeholder), () -> 0L, () -> false,
         millis -> true, () -> {});
 
-    assertThrows(java.io.IOException.class,
+    assertThrows(IOException.class,
         () -> ops.scan(capturedRequest(root, "captured-cloud", 1), ignored -> {}));
 
     assertTrue(queue.recordedEntries.isEmpty(), "a placeholder cannot enter the captured manifest");

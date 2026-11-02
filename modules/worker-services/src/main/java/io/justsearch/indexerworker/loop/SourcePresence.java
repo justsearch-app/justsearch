@@ -79,6 +79,13 @@ public final class SourcePresence {
       return Verdict.SOURCE_UNREADABLE;
     }
     Path file = source.toAbsolutePath().normalize();
+    if (root != null) {
+      try {
+        SourceAccess.requireSafeAncestors(file, root);
+      } catch (java.io.IOException | SecurityException unsafeAncestor) {
+        return Verdict.SOURCE_UNREADABLE;
+      }
+    }
     PathPresence first = PathPresence.probe(file);
     if (first == PathPresence.PRESENT) {
       return Verdict.PRESENT;

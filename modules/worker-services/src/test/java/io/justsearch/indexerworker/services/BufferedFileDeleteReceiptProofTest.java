@@ -43,11 +43,16 @@ final class BufferedFileDeleteReceiptProofTest {
 
       assertEquals(WorkerIngestService.BufferedDeleteReplay.SETTLED,
           service.replayBufferedFileDelete(runtime, receipt));
-      verify(runtime.indexingCoordinator()).deleteByIdAndChunks(file.toString());
+      var guard = org.mockito.ArgumentCaptor.forClass(
+          io.justsearch.adapters.lucene.runtime.PruneOps.PresenceGuard.class);
+      verify(runtime.pruneOps()).pruneFile(eq(file.toString()), eq(root), guard.capture(),
+          eq(io.justsearch.adapters.lucene.runtime.PruneOps.WriterFence.NONE));
+      assertTrue(guard.getValue().rootCurrent(), "The receipt supplies the volume proof without a ledger");
       Files.writeString(file, "recreated content");
       assertEquals(WorkerIngestService.BufferedDeleteReplay.SETTLED,
           service.replayBufferedFileDelete(runtime, receipt));
-      verify(runtime.indexingCoordinator(), times(1)).deleteByIdAndChunks(file.toString());
+      verify(runtime.pruneOps(), times(1)).pruneFile(eq(file.toString()), eq(root), any(), any());
+      verify(runtime.indexingCoordinator(), never()).deleteByIdAndChunks(any());
       verify(queue).enqueueReappearedFile(any(), nullable(String.class));
     }
   }
@@ -74,6 +79,7 @@ final class BufferedFileDeleteReceiptProofTest {
             service.replayBufferedFileDelete(runtime, receipt(file, invalid)), String.valueOf(invalid));
       }
       verify(runtime.indexingCoordinator(), never()).deleteByIdAndChunks(any());
+      verify(runtime.pruneOps(), never()).pruneFile(any(), any(), any(), any());
     }
     try (var ignoredVolume = NoVolumeIdentityExtension.withVolumeIdentity(false);
          var ignoredReceipt = withReceiptVolume(null)) {
@@ -83,6 +89,7 @@ final class BufferedFileDeleteReceiptProofTest {
               receipt(root.resolve("missing.txt"), RootIdentity.capture(root).toString())),
           "equal folder identities without a volume cannot prove absence");
       verify(runtime.indexingCoordinator(), never()).deleteByIdAndChunks(any());
+      verify(runtime.pruneOps(), never()).pruneFile(any(), any(), any(), any());
     }
   }
 

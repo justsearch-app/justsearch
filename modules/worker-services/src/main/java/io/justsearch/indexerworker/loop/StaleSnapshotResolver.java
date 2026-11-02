@@ -224,7 +224,7 @@ public final class StaleSnapshotResolver {
           return new StaleObservation(validation, null, 0, true);
         }
         return new StaleObservation(FileFreshnessSnapshot.SourceValidationResult.DELETED, null,
-            staleSourceHandler.deleteMissingSource(filePath), false);
+            staleSourceHandler.deleteMissingSource(filePath, claim.ingestionRoot(), ingestionAuthority.rootCheck()), false);
       }
       return new StaleObservation(validation, null, 0, false);
     } finally {

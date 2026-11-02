@@ -1,0 +1,87 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
+  },
+  "createdAt": "2026-11-02T03:22:44.006Z",
+  "revision": "1aeb529f3faacc04e5e503c74b02e79d75ce4a25",
+  "tree": "ee148bd5eb58aca63b7e32f50fbc2b8d0f902559",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/components/FailedJobsDrawer.test.ts\" --reporter=json --outputFile=\"/tmp/test-intent-vitest-3169859-1793589760035.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 1229
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/components/FailedJobsDrawer.test.ts#switches an open drawer from A to B and ignores A arriving late",
+      "file": "modules/ui-web/src/shell-v0/components/FailedJobsDrawer.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:0b75a4485ddf07cc8784c6840e6cc914ead760d291d6b0081dcc75eaec173281",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "switches an open drawer from A to B and ignores A arriving late",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/FailedJobsDrawer.test.ts#loads the current target after a drawer is remounted while its store is open",
+      "file": "modules/ui-web/src/shell-v0/components/FailedJobsDrawer.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:0b75a4485ddf07cc8784c6840e6cc914ead760d291d6b0081dcc75eaec173281",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "loads the current target after a drawer is remounted while its store is open",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "08a63452b2",
+    "revision": "08a63452b2d267c200dfdfc76c9e5f9a9012b52b",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/components/FailedJobsDrawer.test.ts\" --reporter=json --outputFile=\"/tmp/test-intent-vitest-3169859-1793589762925.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 775,
+        "output": "JSON report written to /tmp/test-intent-vitest-3169859-1793589762925.json\n\n"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui-web/src/shell-v0/components/FailedJobsDrawer.test.ts#switches an open drawer from A to B and ignores A arriving late",
+        "classification": "assertion",
+        "detail": "switches an open drawer from A to B and ignores A arriving late:  AssertionError: expected [] to deeply equal [ 'B-file' ]\n    at /tmp/test-intent-before-xMcNhN/modules/ui-web/src/shell-v0/components/FailedJobsDrawer.test.ts:582:46\n    at file:///tmp/test-intent-before-xMcNhN/modules/ui-web/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:20"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/FailedJobsDrawer.test.ts#loads the current target after a drawer is remounted while its store is open",
+        "classification": "assertion",
+        "detail": "loads the current target after a drawer is remounted while its store is open:  AssertionError: expected [] to deeply equal [ 'current-file' ]\n    at /tmp/test-intent-before-xMcNhN/modules/ui-web/src/shell-v0/components/FailedJobsDrawer.test.ts:601:46\n    at file:///tmp/test-intent-before-xMcNhN/modules/ui-web/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:20"
+      }
+    ]
+  },
+  "digest": "sha256:55bd6859d4f72af8cffb498a1b9be3ae7827044523b57dd45cf89ef95bbffa16"
+}
