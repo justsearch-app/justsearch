@@ -196,6 +196,19 @@ describe('Brain live redesign repairs', () => {
     expect(el.shadowRoot!.querySelector('[data-feature="meaning"]')!.textContent).toContain('Cancelled · 850 B kept');
     expect(el.shadowRoot!.querySelector('[data-feature="meaning"]')!.textContent).not.toContain('Downloading 83%');
   });
+  it('D4 after a cancelled run, steps whose files are present or that never downloaded are not labelled cancelled', async () => {
+    emit({ installStatus: { state: 'cancelled', installedFully: false, resumableBytes: 850, packages: [{ packageId: 'embedding', state: 'downloading', bytesDownloaded: 850, bytesTotal: 1024 }, { packageId: 'reranker', state: 'pending', bytesDownloaded: 0 }, { packageId: 'chat', state: 'skipped' }] }, aiEngine: { kind: 'paused', stability: { kind: 'settled' }, installFailure: null }, runtime: { mode: 'offline', installed: { known: true, value: false } } as AiState['runtime'], runtimeStatus: {} });
+    preview.components = preview.components!.map(c => c.id === 'embedding' ? { ...c, state: 'to-download' } : c);
+    const el = await mount();
+    expect(el.shadowRoot!.querySelector('[data-feature="meaning"]')!.textContent).toContain('Cancelled · 850 B kept');
+    for (const feature of ['reranker', 'chat']) expect(el.shadowRoot!.querySelector(`[data-feature="${feature}"]`)!.textContent).not.toContain('Cancelled');
+  });
+  it('B11 the repair remedy appears once, in the repair alert, not repeated by the status line', async () => {
+    emit({ installStatus: { state: 'completed', installedFully: true, repairNeeded: true }, aiEngine: { kind: 'offline', stability: { kind: 'settled' }, installFailure: null } });
+    const el = await mount();
+    expect(el.shadowRoot!.textContent!.split('A required component is missing').length - 1).toBe(1);
+    expect(el.shadowRoot!.querySelector('.brain-status-detail')!.textContent).not.toContain('A required component is missing');
+  });
   it('D7 the picture branch participates in path layout instead of escaping into preceding alerts', async () => {
     const el = await mount(); const path = el.shadowRoot!.querySelector('.brain-path')!;
     expect(path.querySelector(':scope > .picture-branch')).not.toBeNull();
@@ -203,7 +216,7 @@ describe('Brain live redesign repairs', () => {
   });
   it('D9 repair instructions name the visible page locations', async () => {
     emit({ installStatus: { state: 'completed', installedFully: true, repairNeeded: true }, aiEngine: { kind: 'offline', stability: { kind: 'settled' }, installFailure: null } });
-    const el = await mount(); expect(el.shadowRoot!.querySelector('.brain-status-detail')!.textContent).toContain('use Repair below');
+    const el = await mount(); expect(el.shadowRoot!.textContent).toContain('use Repair below');
     expect(el.shadowRoot!.textContent).not.toContain('in Detailed');
     emit({ installStatus: { state: 'completed', installedFully: true, repairNeeded: true, packages: [{ packageId: 'embedding', state: 'failed', terminalReason: 'TRANSPORT_UNAVAILABLE', attempts: 3, url: 'https://example.invalid/model', targetPath: '/model' }] } }); await el.updateComplete;
     expect(el.shadowRoot!.textContent).toContain('use the direct links below');

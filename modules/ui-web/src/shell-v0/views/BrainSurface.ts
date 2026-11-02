@@ -1384,7 +1384,7 @@ export class BrainSurface extends JfElement {
         ? Math.floor(((packageProgress.bytesDownloaded ?? 0) / packageProgress.bytesTotal) * 100) : null;
       const stopped = this.installStatus?.state === 'cancelled';
       const state = !live ? 'Unknown — checking AI status'
-        : stopped && packageProgress != null && packageProgress.state !== 'installed' ? `Cancelled · ${formatBytes(packageProgress.bytesDownloaded ?? 0)} kept`
+        : stopped && packageProgress != null && !present && (packageProgress.bytesDownloaded ?? 0) > 0 ? `Cancelled · ${formatBytes(packageProgress.bytesDownloaded ?? 0)} kept`
         : unavailable ? `Unavailable on this computer: ${component!.unavailableReason || 'Not available in this install mode.'}`
         : packageProgress?.state === 'downloading' ? `Downloading${percent === null ? '' : ` ${percent}%`}`
         : !component && !present ? 'Unknown — package status unavailable'
@@ -2336,7 +2336,7 @@ export class BrainSurface extends JfElement {
       <div data-testid="brain-simple-panel">
         <h1 class="brain-headline" tabindex="-1">${headline}${aiState === 'installing' && pct !== null ? ` ${pct}%` : ''}</h1>
         <p class="brain-sentence">${this.renderBrainSentence(aiVerdict, installed, features, readingPictures)}</p>
-        <div class="brain-status-detail">${aiState === 'connecting' ? html`<jf-pulse-dots></jf-pulse-dots>` : nothing}${known ? repairRemedySub(repairRemedy) ?? sc.sub : `Waiting for live install and AI observations. ${indexingActivity.summary}${indexingActivity.detail ? ` — ${indexingActivity.detail}` : ''}`}${this.installStalled() ? html` <span role="status">Download stalled — no recent progress.</span>` : nothing}</div>
+        <div class="brain-status-detail">${aiState === 'connecting' ? html`<jf-pulse-dots></jf-pulse-dots>` : nothing}${known ? (repairRemedy.kind === 'none' ? sc.sub : repairRemedy.kind === 'manual' ? repairRemedySub(repairRemedy) : nothing) : `Waiting for live install and AI observations. ${indexingActivity.summary}${indexingActivity.detail ? ` — ${indexingActivity.detail}` : ''}`}${this.installStalled() ? html` <span role="status">Download stalled — no recent progress.</span>` : nothing}</div>
         ${known && (!installed || aiState === 'installing' || activationRequired) ? html`<div class="status-row">
           <jf-button class=${primaryAction.primary && !installed ? 'install-action' : ''}
             variant=${primaryAction.primary && !installed ? 'primary' : 'ghost'}

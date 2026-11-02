@@ -1,0 +1,87 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
+  },
+  "createdAt": "2026-11-02T11:35:46.473Z",
+  "revision": "2c7f1e8d99717c245b39651cc3d7f48bc3fba43a",
+  "tree": "4fdf24cbbe24e8c9647a10aa0983e35b34a02438",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/BrainSurface.liveRepairs.test.ts\" --reporter=json --outputFile=\"/tmp/test-intent-vitest-3180518-1793619341438.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 1535
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/views/BrainSurface.liveRepairs.test.ts#D4 after a cancelled run, steps whose files are present or that never downloaded are not labelled cancelled",
+      "file": "modules/ui-web/src/shell-v0/views/BrainSurface.liveRepairs.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:499d7fd9bcbfa674c3d90246dc4ec88717fe2ac26c14a92c63b0c4668f90b5dc",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Brain live redesign repairs D4 after a cancelled run, steps whose files are present or that never downloaded are not labelled cancelled",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/BrainSurface.liveRepairs.test.ts#B11 the repair remedy appears once, in the repair alert, not repeated by the status line",
+      "file": "modules/ui-web/src/shell-v0/views/BrainSurface.liveRepairs.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:499d7fd9bcbfa674c3d90246dc4ec88717fe2ac26c14a92c63b0c4668f90b5dc",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Brain live redesign repairs B11 the repair remedy appears once, in the repair alert, not repeated by the status line",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "2c7f1e8d99",
+    "revision": "2c7f1e8d99717c245b39651cc3d7f48bc3fba43a",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/BrainSurface.liveRepairs.test.ts\" --reporter=json --outputFile=\"/tmp/test-intent-vitest-3180518-1793619344643.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 1518,
+        "output": "JSON report written to /tmp/test-intent-vitest-3180518-1793619344643.json\n\n"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui-web/src/shell-v0/views/BrainSurface.liveRepairs.test.ts#D4 after a cancelled run, steps whose files are present or that never downloaded are not labelled cancelled",
+        "classification": "assertion",
+        "detail": "Brain live redesign repairs D4 after a cancelled run, steps whose files are present or that never downloaded are not labelled cancelled:  AssertionError: expected '\\n        \\n          \\n    \\n  \\n   …' not to contain 'Cancelled'\n    at /tmp/test-intent-before-PUAJ5s/modules/ui-web/src/shell-v0/views/BrainSurface.liveRepairs.test.ts:204:134\n    at runNextTicks (node:internal/process/task_queues:65:5)\n    at listOnTimeout (node:intern"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/BrainSurface.liveRepairs.test.ts#B11 the repair remedy appears once, in the repair alert, not repeated by the status line",
+        "classification": "assertion",
+        "detail": "Brain live redesign repairs B11 the repair remedy appears once, in the repair alert, not repeated by the status line:  AssertionError: expected 2 to be 1 // Object.is equality\n    at /tmp/test-intent-before-PUAJ5s/modules/ui-web/src/shell-v0/views/BrainSurface.liveRepairs.test.ts:209:93\n    at runNextTicks (node:internal/process/task_queues:65:5)\n    at listOnTimeout (node:internal/timers:644:9)\n    at processTimers"
+      }
+    ]
+  },
+  "digest": "sha256:2f5bb79e521da8995c2d7c545c171761f4e575d10a3ec96672b2c27a659488bd"
+}

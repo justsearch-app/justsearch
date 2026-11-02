@@ -1140,6 +1140,35 @@ axe run remain necessary.
       "newChecks": [
         "modules/ui-web/src/shell-v0/views/BrainSurface.observationFreshness.test.ts#H5 a directed admission wait longer than 15 seconds and its successful retry keep the gate open"
       ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/views/BrainSurface.liveRepairs.test.ts"
+      ],
+      "class": "New",
+      "repaired": true,
+      "behaviour": "V12: after a cancelled run only steps whose files are absent and that downloaded bytes say 'Cancelled · N kept'; present, pending and skipped packages keep their real state. The repair alert carries the 'A required component is missing' remedy once; the status line does not repeat it. Both fail by assertion on 2c7f1e8d99 (live check verifier-12: 'Cancelled · 0 B kept' on an active reranker and installed answers; the remedy shown twice).",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "B4",
+          "quote": "Path: Your files (file count from status), Read the text (built in), Understand meaning (needed, its size, no switch), Best match first, Answer questions (model name and size when installed), with Text in scans and images as a branch off Read the text. Each step shows its known size (registry download/footprint size, never claimed as measured disk use) and its state in words (on, off, not downloaded, downloading x%, unavailable on this computer with the reason).",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "B11",
+          "quote": "Alerts appear once, above the path, in words with their action: runtime or operation failure with code, download or online-policy denial, install failure, repairable processor fallback, compatibility block, activation or reindex required.",
+          "label": "agent-drafted, owner-adopted"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/brain-live-check-2.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/views/BrainSurface.liveRepairs.test.ts#D4 after a cancelled run, steps whose files are present or that never downloaded are not labelled cancelled",
+        "modules/ui-web/src/shell-v0/views/BrainSurface.liveRepairs.test.ts#B11 the repair remedy appears once, in the repair alert, not repeated by the status line"
+      ]
     }
   ]
 }
