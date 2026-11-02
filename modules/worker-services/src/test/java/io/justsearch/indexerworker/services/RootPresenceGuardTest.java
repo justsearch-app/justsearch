@@ -37,6 +37,40 @@ final class RootPresenceGuardTest {
 
   @TempDir Path tempDir;
 
+
+  @Test
+  void separatelyRecordedNestedRootUsesItsOwnVolumeEvidence() throws Exception {
+    Path root = Files.createDirectory(tempDir.resolve("ancestor"));
+    Path nested = Files.createDirectory(root.resolve("independent"));
+    Path file = Files.writeString(nested.resolve("notes.txt"), "independent source");
+    Path realNested = nested.toRealPath();
+    var previous = RootIdentity.VOLUME_IDENTITY_LOOKUP;
+    boolean unavailable = RootIdentity.VOLUME_IDENTITY_UNAVAILABLE.getAndSet(false);
+    try {
+      RootIdentity.VOLUME_IDENTITY_LOOKUP = path -> path.startsWith(realNested) ? "test-volume:2" : "test-volume:3";
+      var volumes = RootVolumeLedger.under(tempDir.resolve("ledger"));
+      volumes.record(root, "test-volume:1");
+      volumes.record(nested, "test-volume:2");
+      var guard = RootPresenceGuard.capture(nested, null, volumes);
+      assertTrue(guard.rootCurrent(), "the nested root has its own matching volume record");
+      assertEquals(io.justsearch.adapters.lucene.runtime.PathPresence.PRESENT, guard.presence(file));
+    } finally {
+      RootIdentity.VOLUME_IDENTITY_LOOKUP = previous;
+      RootIdentity.VOLUME_IDENTITY_UNAVAILABLE.set(unavailable);
+    }
+  }
+
+  @Test
+  void danglingAncestorDoesNotProveAnIndexedSourceWasDeleted() throws Exception {
+    Path root = Files.createDirectory(tempDir.resolve("dangling-ancestor"));
+    Path parent = root.resolve("parent");
+    Files.createSymbolicLink(parent, tempDir.resolve("unavailable-target"));
+    var guard = RootPresenceGuard.capture(root, RootIdentity.capture(root), added(root));
+    assertTrue(guard.rootCurrent());
+    assertEquals(io.justsearch.adapters.lucene.runtime.PathPresence.UNKNOWN,
+        guard.presence(parent.resolve("notes.txt")));
+  }
+
   @Test
   void aPresentRootVouchesUntilItIsRenamedAway() throws Exception {
     Path root = Files.createDirectory(tempDir.resolve("root"));

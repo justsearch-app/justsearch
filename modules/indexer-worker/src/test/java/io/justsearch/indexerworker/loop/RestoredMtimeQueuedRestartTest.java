@@ -219,8 +219,10 @@ final class RestoredMtimeQueuedRestartTest extends LuceneExecutorTestBase {
       if (forced) submitForce(queue, file, marks);
       else assertEquals(1, queue.enqueueEntries(List.of(JobQueue.EnqueueEntry.stat(file).withinRoot(temporary))));
       try (var hashes = mockStatic(SourceContentHash.class, CALLS_REAL_METHODS)) {
-        hashes.when(() -> SourceContentHash.sha256(file)).thenThrow(new java.io.IOException("source read failed"));
+        hashes.when(() -> SourceContentHash.sha256WithinRoot(eq(file), any())).thenThrow(new java.io.IOException("source read failed"));
+        hashes.clearInvocations();
         assertEquals(0, processAccepted(queue, false, true, marks));
+        hashes.verify(() -> SourceContentHash.sha256WithinRoot(eq(file), any()), atLeastOnce());
       }
       readyRetry();
       assertEquals(forced ? 1 : 0, processAccepted(queue, false, true, marks));

@@ -714,7 +714,7 @@ public final class KnowledgeServerMigrationOps {
             && deletion.path().equals(fields.getDocumentFieldOrThrow(deletion.path(),SchemaFields.DOC_ID))
             && deletion.path().equals(fields.getDocumentFieldOrThrow(deletion.path(),SchemaFields.PATH))
             && namespace!=null && !namespace.isBlank() && (collection==null || collection.equals(namespace))
-        : indexed==null && context.ingestLifecycle().indexCountOps().countByIdAndChunksStrict(deletion.path())==0;
+        : context.ingestLifecycle().indexCountOps().countOwnedFileStrict(deletion.path())==0;
     String knownCollection=source.kind()==CleanupPathKind.REGULAR?namespace:collection;
     if(knownCollection==null && observedRow!=null)knownCollection=observedRow.get("collection");
     if(matches && queue.matchesRetirementConditionalDelete(receipt,observedRow,knownCollection))return true;
@@ -1436,7 +1436,7 @@ public final class KnowledgeServerMigrationOps {
         var reconciliation = new WatcherReplay(debt, context.ingestLifecycle(), context.jobQueue(),
             context.publisher(), context.indexingPacing(), context.migrationRoots(), admittedPaths,
             () -> Thread.currentThread().isInterrupted() || System.nanoTime() >= context.deadlineNanos(),
-            context.nativePolicy());
+            context.nativePolicy(), (context.publisher() == null ? replayService(context) : context.publisher()).rootCheck());
         reconciliation.bind(context.replayGeneration(), allOps, op);
         reconciliations.put(op, reconciliation);
       }
@@ -2705,9 +2705,9 @@ public final class KnowledgeServerMigrationOps {
   private static final String SOURCE_GONE = "gone";
 
   /** The file's SHA-256 now, {@link #SOURCE_GONE} when it is absent, or null when unreadable. */
-  private static String currentSource(String path) {
+  private static String currentSource(String path, Path root) {
     try {
-      return io.justsearch.indexerworker.loop.SourceContentHash.sha256(Path.of(path));
+      return io.justsearch.indexerworker.loop.SourceContentHash.sha256WithinRoot(Path.of(path), root);
     } catch (NoSuchFileException absent) {
       return SOURCE_GONE;
     } catch (IOException | RuntimeException unreadable) {
@@ -2744,8 +2744,7 @@ public final class KnowledgeServerMigrationOps {
         return false; // Fail-closed: Green and the journal stay until the path can be judged.
       }
       case ABSENT, NON_REGULAR -> {
-        if (indexed == null
-            && context.ingestLifecycle().indexCountOps().countByIdAndChunksStrict(upsert.path()) == 0) {
+        if (context.ingestLifecycle().indexCountOps().countOwnedFileStrict(upsert.path()) == 0) {
           return true; // A shows the retirement.
         }
       }
@@ -2789,7 +2788,7 @@ public final class KnowledgeServerMigrationOps {
       return false;
     }
     String key = io.justsearch.indexerworker.util.PathNormalizer.normalizeKey(file);
-    boolean absent = context.ingestLifecycle().indexCountOps().countByIdAndChunksStrict(key) == 0;
+    boolean absent = context.ingestLifecycle().indexCountOps().countOwnedFileStrict(key) == 0;
     if (!absent) logExcludedRetirementWait(context);
     return absent;
   }
@@ -2840,10 +2839,11 @@ public final class KnowledgeServerMigrationOps {
           && releaseCollection(scope.collection()).equals(releaseCollection(
               namespace));
       targetMatches=source.sha256().equals(indexed) && indexedParentMatches;
-    } else targetMatches = indexed == null
-        && context.ingestLifecycle().indexCountOps().countByIdAndChunksStrict(scope.path()) == 0;
+    } else targetMatches = context.ingestLifecycle().indexCountOps().countOwnedFileStrict(scope.path()) == 0;
     var observation = new SwitchBufferCapableQueue.RetirementSourceObservation(
-        owner,scope,observedRow,source.fileState(),source.sha256(),JobQueue.EnqueueEntry.stat(file).sizeBytes(),targetMatches,indexedParentMatches);
+        owner,scope,observedRow,source.fileState(),source.sha256(),
+        source.kind() == CleanupPathKind.REGULAR ? JobQueue.EnqueueEntry.stat(file).sizeBytes() : JobQueue.UNKNOWN_SIZE_BYTES,
+        targetMatches,indexedParentMatches);
     if (observations != null) {
       observations.add(observation);
       return false; // The caller batches the already observed transitions under one Q reservation.
@@ -2861,11 +2861,17 @@ public final class KnowledgeServerMigrationOps {
     if (result == 3) {
       if (Thread.currentThread().isInterrupted()) throw new IOException("Retirement removal cancelled");
       var scope = observation.scope();
-      var current = observeForCleanup(context.publisher(),Path.of(scope.path()),scope.ingestionRoot());
-      if (Thread.currentThread().isInterrupted()) throw new IOException("Retirement removal cancelled");
-      if (current.kind() != CleanupPathKind.UNCERTAIN && current.kind() != CleanupPathKind.REGULAR
-          && observation.sourceState().equals(current.fileState()))
-        context.ingestLifecycle().indexingCoordinator().deleteByIdAndChunks(scope.path());
+      if (context.publisher() == null) return false;
+      context.publisher().underFileMutationFence(() -> {
+        var current = observeForCleanup(context.publisher(), Path.of(scope.path()), scope.ingestionRoot());
+        if (Thread.currentThread().isInterrupted()) throw new java.util.concurrent.CancellationException("Retirement removal cancelled");
+        if (current.kind() != CleanupPathKind.UNCERTAIN && current.kind() != CleanupPathKind.REGULAR
+            && observation.sourceState().equals(current.fileState())) {
+          new io.justsearch.indexerworker.loop.StaleSourceHandler(context.ingestLifecycle().indexingCoordinator())
+              .deleteMissingSource(Path.of(scope.path()), scope.ingestionRoot(), context.publisher().rootCheck());
+        }
+        return true;
+      });
       // Retirement replay commits A even with an empty journal. Only the next committed,
       // freshly observed absence can settle this obligation.
     }
@@ -2929,6 +2935,11 @@ public final class KnowledgeServerMigrationOps {
     var rootCheck = publisher.rootCheck();
     if (rootCheck == null) return CleanupPathState.UNCERTAIN;
     Path file = path.toAbsolutePath().normalize();
+    try {
+      io.justsearch.indexerworker.loop.SourceAccess.requireSafeAncestors(file, root);
+    } catch (IOException | SecurityException unsafeAncestor) {
+      return CleanupPathState.UNCERTAIN;
+    }
     String before = observedKind(file);
     if (before == null) return CleanupPathState.UNCERTAIN;
     boolean asRoot = io.justsearch.indexerworker.loop.SourcePresence.answersAsRoot(file, root);
@@ -2960,7 +2971,7 @@ public final class KnowledgeServerMigrationOps {
           ? new CleanupPathState(CleanupPathKind.NON_REGULAR, before, null)
           : CleanupPathState.UNCERTAIN;
     }
-    String sha = currentSource(file.toString());
+    String sha = currentSource(file.toString(), root);
     if (SOURCE_GONE.equals(sha) || !before.equals(observedKind(file))) {
       return CleanupPathState.UNCERTAIN; // It changed while it was being read.
     }
@@ -3679,10 +3690,11 @@ public final class KnowledgeServerMigrationOps {
     if (context.jobQueue() instanceof SwitchBufferCapableQueue queue) {
       scopeLegacyPrefixes(queue, null, publisher);
     }
-    int total = 0;
+    int[] total = {0};
     int batchSize = 2_000;
     ArrayList<JobQueue.EnqueueEntry> batch = new ArrayList<>(batchSize);
-    long lastPersistMs = 0L;
+    long[] lastPersistMs = {0L};
+    var excludes = io.justsearch.configuration.excludes.ExclusionPatterns.current();
 
     for (ResolvedConfig.FileSource source : roots) {
       Path root = source.path();
@@ -3705,15 +3717,36 @@ public final class KnowledgeServerMigrationOps {
       requireEnumerationRunning(context);
       requireMigrationRoot(root);
       context.log().info("Migration enumerator scanning root: {}", root);
-      try (Stream<Path> walk = Files.walk(root, help ? 1 : Integer.MAX_VALUE)) {
-        var iterator = walk.iterator();
-        while (iterator.hasNext()) {
-          Path path = iterator.next();
+      Files.walkFileTree(root, java.util.EnumSet.noneOf(java.nio.file.FileVisitOption.class),
+          help ? 1 : Integer.MAX_VALUE, new java.nio.file.SimpleFileVisitor<Path>() {
+        @Override public java.nio.file.FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs)
+            throws IOException {
           requireEnumerationRunning(context);
-          if (scope.excludes(path.toAbsolutePath().normalize().toString())) continue;
-          BasicFileAttributes attributes = Files.readAttributes(path, BasicFileAttributes.class, LinkOption.NOFOLLOW_LINKS);
-          if (attributes.isDirectory()) continue;
-          if (help && !path.toString().endsWith(".md")) continue;
+          if (!dir.equals(root) && (scope.excludes(dir.toAbsolutePath().normalize().toString())
+              || io.justsearch.indexerworker.ingest.IngestionSkipPolicy.isSkippedDirectoryName(dir.getFileName().toString())
+              || excludes.isExcludedDirectory(root, dir)
+              || publisher != null && publisher.isUserExcludedDirectory(dir, root))) return java.nio.file.FileVisitResult.SKIP_SUBTREE;
+          if (!Files.isReadable(dir)) throw new IOException("Unreadable migration directory: " + dir);
+          return java.nio.file.FileVisitResult.CONTINUE;
+        }
+        @Override public java.nio.file.FileVisitResult visitFile(Path path, BasicFileAttributes attributes)
+            throws IOException {
+          requireEnumerationRunning(context);
+          if (scope.excludes(path.toAbsolutePath().normalize().toString())) return java.nio.file.FileVisitResult.CONTINUE;
+          if (!attributes.isRegularFile()) return java.nio.file.FileVisitResult.CONTINUE;
+          if (io.justsearch.indexerworker.ingest.IngestionSkipPolicy.shouldSkipWithinRoot(path, root)
+              || excludes.isExcludedPath(root, path)
+              || publisher != null && publisher.isUserExcluded(path, root)) return java.nio.file.FileVisitResult.CONTINUE;
+          if (io.justsearch.indexerworker.ingest.CloudPlaceholderDetector.isCloudPlaceholder(path)) {
+            context.jobQueue().recordIngestionEvent(path,
+                io.justsearch.indexerworker.ingest.IngestionOutcome.of(
+                    io.justsearch.indexerworker.ingest.IngestionOutcomeClass.DEFERRED_POLICY,
+                    io.justsearch.indexerworker.ingest.IngestionReasonCodes.CLOUD_PLACEHOLDER,
+                    io.justsearch.indexerworker.ingest.IngestionRetryPolicy.DEFER_WITHOUT_ATTEMPT,
+                    "Cloud-only placeholder"), null);
+            return java.nio.file.FileVisitResult.CONTINUE;
+          }
+          if (help && !path.toString().endsWith(".md")) return java.nio.file.FileVisitResult.CONTINUE;
           if (!attributes.isRegularFile() || !Files.isReadable(path)) {
             throw new IOException("Unreadable migration file: " + path);
           }
@@ -3727,8 +3760,8 @@ public final class KnowledgeServerMigrationOps {
           MigrationProgressStore store = context.migrationProgressStoreSupplier().get();
           if (store != null) {
             long now = System.currentTimeMillis();
-            if (now - lastPersistMs >= 1_000L) {
-              lastPersistMs = now;
+            if (now - lastPersistMs[0] >= 1_000L) {
+              lastPersistMs[0] = now;
               persistMigrationProgressSnapshot(context, store);
 
               while (context.runningSupplier().getAsBoolean() && !Thread.currentThread().isInterrupted()) {
@@ -3751,19 +3784,28 @@ public final class KnowledgeServerMigrationOps {
           requireEnumerationRunning(context);
           batch.add(new JobQueue.EnqueueEntry(path, attributes.size()).withinRoot(root));
           if (batch.size() >= batchSize) {
-            total += acceptMigrationBatch(context, batch, source.collection());
+            total[0] += acceptMigrationBatch(context, batch, source.collection());
           }
+          return java.nio.file.FileVisitResult.CONTINUE;
         }
-      }
-      if (!batch.isEmpty()) total += acceptMigrationBatch(context, batch, source.collection());
+        @Override public java.nio.file.FileVisitResult visitFileFailed(Path path, IOException failure) throws IOException {
+          requireEnumerationRunning(context);
+          if (scope.excludes(path.toAbsolutePath().normalize().toString())
+              || io.justsearch.indexerworker.ingest.IngestionSkipPolicy.shouldSkipWithinRoot(path, root)
+              || excludes.isExcludedDirectory(root, path)
+              || publisher != null && publisher.isUserExcludedDirectory(path, root)) return java.nio.file.FileVisitResult.CONTINUE;
+          throw failure;
+        }
+      });
+      if (!batch.isEmpty()) total[0] += acceptMigrationBatch(context, batch, source.collection());
       requireEnumerationRunning(context);
       context.migrationEnumeratorRootsDone().incrementAndGet();
 
       MigrationProgressStore store = context.migrationProgressStoreSupplier().get();
       if (store != null) {
         long now = System.currentTimeMillis();
-        if (now - lastPersistMs >= 250L) {
-          lastPersistMs = now;
+        if (now - lastPersistMs[0] >= 250L) {
+          lastPersistMs[0] = now;
           persistMigrationProgressSnapshot(context, store);
         }
       }
@@ -3774,7 +3816,7 @@ public final class KnowledgeServerMigrationOps {
       persistMigrationProgressSnapshot(context, store);
     }
     requireEnumerationRunning(context);
-    return total;
+    return total[0];
   }
 
   public static MigrationProgressSnapshot migrationProgressSnapshot(

@@ -61,6 +61,112 @@ final class Release030ForgetSourceObservationTest extends LuceneExecutorTestBase
     exercise(true, false, false, true, true);
   }
 
+  @Test void cleanupReplayRejectsOutsideAncestorBeforeObservationOrHashing() throws Exception {
+    Path root = Files.createDirectory(directory.resolve("root"));
+    Path parent = Files.createDirectory(root.resolve("parent"));
+    Path file = Files.writeString(parent.resolve("accepted.txt"), "accepted bytes");
+    var publisher = spy(new WorkerIngestService(null, null, null, IndexingPacing.unthrottled(),
+        directory.resolve("base"), null, null, null, null, 0L));
+    var authority = mock(SourcePresence.RootCheck.class, CALLS_REAL_METHODS);
+    when(authority.vouches(root)).thenReturn(true);
+    doReturn(authority).when(publisher).rootCheck();
+    assertEquals(KnowledgeServerMigrationOps.CleanupPathKind.REGULAR,
+        KnowledgeServerMigrationOps.observeForCleanup(publisher, file, root).kind());
+    Path outside = Files.createDirectory(directory.resolve("outside"));
+    Files.writeString(outside.resolve("accepted.txt"), "outside bytes");
+    Files.delete(file);
+    Files.delete(parent);
+    Files.createSymbolicLink(parent, outside);
+    try (var hashes = mockStatic(SourceContentHash.class, CALLS_REAL_METHODS)) {
+      assertEquals(KnowledgeServerMigrationOps.CleanupPathKind.UNCERTAIN,
+          KnowledgeServerMigrationOps.observeForCleanup(publisher, file, root).kind());
+      hashes.verifyNoInteractions();
+      Files.delete(outside.resolve("accepted.txt"));
+      assertEquals(KnowledgeServerMigrationOps.CleanupPathKind.UNCERTAIN,
+          KnowledgeServerMigrationOps.observeForCleanup(publisher, file, root).kind());
+      hashes.verifyNoInteractions();
+    }
+  }
+
+  @org.junit.jupiter.params.ParameterizedTest(name = "{displayName} [{index}] {arguments}")
+  @org.junit.jupiter.params.provider.ValueSource(strings = {"directory", "link", "dangling"})
+  void releaseRetirementCorrectionPreservesForeignBackedChunks(String replacement) throws Exception {
+    replacementCleanup(replacement);
+  }
+
+  private void replacementCleanup(String replacement) throws Exception {
+    Release030Fixture.unpack("switching", directory);
+    Path root = directory.resolve("roots/alpha");
+    Path file = root.resolve("file-01.txt");
+    Path live = Files.writeString(root.resolve("live.txt"), "live bytes");
+    String key = PathNormalizer.normalizeKey(file);
+    String hash = SourceContentHash.sha256(file);
+    var json = JsonMapper.builder().build();
+    var state = json.readTree(Files.readString(directory.resolve("data/index/default/state.json")));
+    String active = state.path("active_generation").asString();
+    String building = state.path("building_generation").asString();
+    var previous = ConfigStore.globalOrNull();
+    var installed = new ConfigStore(ResolvedConfig.builder()
+        .putDefault("justsearch.ui.exclude_patterns", "[]").build());
+    ConfigStore.setGlobal(installed);
+    try (var queue = new SqliteJobQueue(directory.resolve("data/jobs.db"));
+        var runtime = IndexSchema.fromCatalog(retirementCatalog()).atPath(directory.resolve("replacement-index"))
+            .withExecutorRegistrations(testLuceneExecutors()).open()) {
+      queue.open();
+      var roots = List.of(root, directory.resolve("roots/beta"));
+      queue.release030RecoveryState().prepared(roots, queue.prepareRelease030Recovery(roots, p -> false));
+      queue.prepareRelease030ExplicitFiles();
+      queue.release030RecoveryState().beginRetirement(active, building, Map.of(file, "default"));
+      queue.inventoryRetirementRoots();
+      queue.retainRelease030Retirement(building, List.of(), Map.of(file, "default"));
+      queue.prepareRetirementClaims();
+      runtime.indexingCoordinator().indexSingle(new IndexDocument(Map.of(
+          SchemaFields.DOC_ID, key, SchemaFields.DOC_UID, "original", SchemaFields.PATH, key,
+          SchemaFields.COLLECTION, "default", SchemaFields.CONTENT, "retained text", SchemaFields.SOURCE_SHA256, hash)));
+      for (String id : List.of("own-chunk", "legacy-chunk", "foreign-chunk")) {
+        var fields = new java.util.HashMap<String, Object>(Map.of(
+            SchemaFields.DOC_ID, id, SchemaFields.DOC_UID, id, SchemaFields.PARENT_DOC_ID, key,
+            SchemaFields.IS_CHUNK, "true", SchemaFields.CONTENT, id, SchemaFields.COLLECTION, "default"));
+        if (!id.equals("legacy-chunk")) fields.put(SchemaFields.PATH,
+            id.equals("foreign-chunk") ? live.toString() : key);
+        runtime.indexingCoordinator().indexSingle(new IndexDocument(fields));
+      }
+      runtime.commitOps().commitAndTrack();
+      runtime.commitOps().maybeRefreshBlocking();
+      var fence = new io.justsearch.indexerworker.loop.FileMutationFence();
+      var loop = mock(io.justsearch.indexerworker.loop.IndexingLoop.class);
+      when(loop.withFileMutationFence(any())).thenAnswer(call -> fence.guard(call.getArgument(0)));
+      var publisher = spy(new WorkerIngestService(null, loop, null, IndexingPacing.unthrottled(),
+          directory.resolve("base"), null, runtime, runtime, null, 0L));
+      publisher.setMutationAdmission(new io.justsearch.indexerworker.services.WorkerMutationAdmission(runtime), runtime);
+      var authority = mock(SourcePresence.RootCheck.class, CALLS_REAL_METHODS);
+      when(authority.vouches(root)).thenReturn(true);
+      when(authority.vouchesForFile(root)).thenReturn(true);
+      doReturn(authority).when(publisher).rootCheck();
+      Files.delete(file);
+      if (replacement.equals("directory")) Files.createDirectory(file);
+      else Files.createSymbolicLink(file, replacement.equals("link") ? live : root.resolve("missing"));
+      var context = new KnowledgeServerMigrationOps.DrainSwitchBufferContext(
+          queue, runtime, null, IndexingPacing.unthrottled(), directory.resolve("base"),
+          directory.resolve("active"), json, () -> false, () -> true, mock(Logger.class),
+          Long.MAX_VALUE, building).withPublisher(publisher);
+      try (var hashes = mockStatic(SourceContentHash.class, CALLS_REAL_METHODS)) {
+        assertFalse(KnowledgeServerMigrationOps.reconcileRelease030Path(context, file, root, "default"));
+        runtime.commitOps().commitAndTrack();
+        runtime.commitOps().maybeRefreshBlocking();
+        assertNotNull(runtime.documentFieldOps().getDocumentFieldOrThrow("foreign-chunk", SchemaFields.CONTENT),
+            "retirement must preserve the chunk explicitly backed by another live file");
+        assertEquals(0, runtime.indexCountOps().countOwnedFileStrict(key));
+        assertTrue(
+            KnowledgeServerMigrationOps.reconcileRelease030Path(context, file, root, "default"),
+            "owned-file absence settles even while a foreign chunk keeps the parent ID");
+        hashes.verifyNoInteractions();
+      }
+      verify(publisher).underFileMutationFence(any());
+      verify(loop).withFileMutationFence(any());
+    } finally { ConfigStore.restoreGlobal(installed, previous); }
+  }
+
   private static FieldCatalogDef retirementCatalog() {
     var fields = new java.util.ArrayList<>(FieldCatalogDef.forChunkTesting(0).fields());
     fields.add(new FieldCatalogDef.FieldDef(SchemaFields.SOURCE_SHA256,
@@ -108,7 +214,7 @@ final class Release030ForgetSourceObservationTest extends LuceneExecutorTestBase
       var publisher = spy(new WorkerIngestService(null, null, null, IndexingPacing.unthrottled(),
           directory.resolve("base"), null, null, null, null, 0L));
       publisher.useExclusionRoots(() -> List.of(directory.resolve("roots")));
-      var authority = mock(SourcePresence.RootCheck.class);
+      var authority = mock(SourcePresence.RootCheck.class, CALLS_REAL_METHODS);
       when(authority.vouches(root)).thenReturn(true);
       when(authority.vouchesForFile(root)).thenReturn(true);
       doReturn(authority).when(publisher).rootCheck();
@@ -133,7 +239,7 @@ final class Release030ForgetSourceObservationTest extends LuceneExecutorTestBase
           }
         }
         if (excluded || unknown) assertDoesNotThrow(hashes::verifyNoInteractions, "retirement must not hash excluded or unknown-policy sources");
-        else hashes.verify(() -> SourceContentHash.sha256(file), times(2));
+        else hashes.verify(() -> SourceContentHash.sha256WithinRoot(file, file), times(2));
       }
       assertEquals(row, queue.watcherReconciliationRow(key), "no replacement admission");
       assertEquals(admissions, queue.switchBufferAdmissions(), "no new journal order");

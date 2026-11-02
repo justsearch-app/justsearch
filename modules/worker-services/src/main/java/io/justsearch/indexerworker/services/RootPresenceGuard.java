@@ -80,6 +80,11 @@ final class RootPresenceGuard implements PruneOps.PresenceGuard {
   }
 
   @Override
+  public PathPresence presence(Path file) {
+    return PathPresence.probeSource(file, root);
+  }
+
+  @Override
   public boolean rootCurrent() {
     if (!PathPresence.isReadableDirectory(root)) {
       return false;

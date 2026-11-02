@@ -676,9 +676,8 @@ public final class PruneOps {
       mgr.maybeRefreshBlocking();
       IndexSearcher current = mgr.acquire();
       try {
-        StoredFields storedFields = current.storedFields();
         for (String filePath : files.keySet()) {
-          rows.put(filePath, rowsOf(current, storedFields, filePath));
+          rows.put(filePath, rowsOf(current, filePath));
         }
       } finally {
         mgr.release(current);
@@ -732,34 +731,41 @@ public final class PruneOps {
      * prefix queries are applied to each row's stored fields rather than run again: expanding them
      * per file would cost a pass over every term of the root.
      */
-    private List<String> rowsOf(IndexSearcher searcher, StoredFields storedFields, String filePath)
+    private List<String> rowsOf(IndexSearcher searcher, String filePath)
         throws IOException {
-      // A pathless chunk is backed by its owner's path: find the owners stored under this path.
-      Query withPath = new TermQuery(new Term(SchemaFields.PATH, filePath));
-      List<BytesRef> owners = new ArrayList<>();
-      owners.add(new BytesRef(filePath));
-      for (var hit : allHits(searcher, withPath)) {
-        String ownerId = SearchResultFormatter.extractFromStoredFields(
-            storedFields, hit.doc, false, Set.of(idField)).get(idField);
-        if (ownerId != null && !ownerId.isBlank()) {
-          owners.add(new BytesRef(ownerId));
-        }
-      }
-      Query sameFile = new BooleanQuery.Builder()
-          .add(withPath, BooleanClause.Occur.SHOULD)
-          .add(new TermQuery(new Term(idField, filePath)), BooleanClause.Occur.SHOULD)
-          .add(new TermInSetQuery(SchemaFields.PARENT_DOC_ID, owners), BooleanClause.Occur.SHOULD)
-          .setMinimumNumberShouldMatch(1)
-          .build();
-      List<String> ids = new ArrayList<>();
-      for (var hit : allHits(searcher, sameFile)) {
-        Row row = Row.read(searcher, storedFields, hit.doc, idField);
-        if (row != null && row.filePath().equals(filePath) && row.inScan(prefix)) {
-          ids.add(row.docId());
-        }
-      }
-      return ids;
+      return rowsOfFile(searcher, idField, filePath).stream()
+          .filter(row -> prefix.equals(filePath) || row.inScan(prefix))
+          .map(Row::docId).toList();
     }
+  }
+
+  /** Rows whose resolved backing path is exactly the file, including pathless legacy chunks. */
+  static List<Row> rowsOfFile(IndexSearcher searcher, String idField, String filePath)
+      throws IOException {
+    StoredFields storedFields = searcher.storedFields();
+    // A pathless chunk is backed by its owner's path: find the owners stored under this path.
+    Query withPath = new TermQuery(new Term(SchemaFields.PATH, filePath));
+    List<BytesRef> owners = new ArrayList<>();
+    owners.add(new BytesRef(filePath));
+    for (var hit : allHits(searcher, withPath)) {
+      String ownerId = SearchResultFormatter.extractFromStoredFields(
+          storedFields, hit.doc, false, Set.of(idField)).get(idField);
+      if (ownerId != null && !ownerId.isBlank()) {
+        owners.add(new BytesRef(ownerId));
+      }
+    }
+    Query sameFile = new BooleanQuery.Builder()
+        .add(withPath, BooleanClause.Occur.SHOULD)
+        .add(new TermQuery(new Term(idField, filePath)), BooleanClause.Occur.SHOULD)
+        .add(new TermInSetQuery(SchemaFields.PARENT_DOC_ID, owners), BooleanClause.Occur.SHOULD)
+        .setMinimumNumberShouldMatch(1)
+        .build();
+    List<Row> rows = new ArrayList<>();
+    for (var hit : allHits(searcher, sameFile)) {
+      Row row = Row.read(searcher, storedFields, hit.doc, idField);
+      if (row != null && row.filePath().equals(filePath)) rows.add(row);
+    }
+    return rows;
   }
 
   /**

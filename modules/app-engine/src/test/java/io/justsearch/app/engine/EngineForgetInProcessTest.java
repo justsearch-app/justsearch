@@ -371,7 +371,11 @@ final class EngineForgetInProcessTest {
         } catch (RuntimeException failure) { observationFailure.compareAndSet(null, failure); }
       };
       // Read-only observation of actual queue commits; no notification is blocked or fabricated.
-      try (var ignoredSubscription = f.queue.indexingJobChangeFeed().orElseThrow().subscribe(ignored -> capture.run())) {
+      // R9 changes policy while SWITCHING, where the monitor promotes on its own once the queue
+      // drains. Hold the root-binding owner that native promotion takes before any replay, so its
+      // first attempt starts only after the HOT Save; the setup no longer races that monitor.
+      try (var ignoredSubscription = f.queue.indexingJobChangeFeed().orElseThrow().subscribe(ignored -> capture.run());
+          var promotionHold = removePolicyAfterSkip ? PromotionHold.acquire(f) : null) {
         String predecessor = f.client.getStatus(TestEngineContexts.FOREGROUND).getMigration().getActiveGenerationId();
         var started = f.client.startMigration("forget-native-preservation", TestEngineContexts.FOREGROUND);
         assertTrue(started.accepted(), "SETUP: actual public native migration must be admitted");
@@ -426,6 +430,40 @@ final class EngineForgetInProcessTest {
         } while (!settled && System.nanoTime() < admittedDeadline);
         assertNull(observationFailure.get(), "SETUP: actual queue observation must remain readable");
         assertTrue(settled, "SETUP: actual enumerator receipts and target/sibling writer outcomes are required");
+        if (removePolicyAfterSkip && !admissions.containsKey("path:" + key(exact))) {
+          // P4: the initial walk correctly omits the forgotten source. Hold consumption, remove
+          // the exclusion, and run the real enumerator before restoring the exclusion. The job
+          // was eligible when admitted; its later policy skip is the precondition R9 needs.
+          var producer = (DefaultWorkerAppServices) f.server.appServices();
+          var candidateLoop = (IndexingLoop) field(producer, DefaultWorkerAppServices.class, "indexingLoop");
+          assertTrue(candidateLoop.pauseForCutover(10_000), "SETUP: hold consumption before eligible admission");
+          try {
+            saveExclusions(f, List.of());
+            assertFalse(ExclusionPatterns.fromRawJsonStrict(f.config.currentSnapshot().ui().excludePatterns(), false)
+                .isExcludedPath(watched, exact), "SETUP: source is eligible before enumeration");
+            var enumerate = KnowledgeServer.class.getDeclaredMethod("enqueueAllFilesUnderRoots", List.class);
+            enumerate.setAccessible(true);
+            assertTrue((Integer) enumerate.invoke(f.server,
+                List.of(new ResolvedConfig.FileSource(watched, "documents"))) > 0,
+                "SETUP: actual migration enumeration admits the eligible file");
+            capture.run();
+            assertTrue(admissions.containsKey("path:" + key(exact)), "SETUP: observe the admitted target receipt");
+            assertEquals("PENDING", f.queue.watcherReconciliationRow(key(exact)).get("state"));
+            saveExclusions(f, List.of("report.txt"));
+            assertTrue(ExclusionPatterns.fromRawJsonStrict(f.config.currentSnapshot().ui().excludePatterns(), false)
+                .isExcludedPath(watched, exact), "SETUP: exclusion is installed only after admission");
+          } finally {
+            candidateLoop.resumeAfterCutover();
+          }
+          long skipDeadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(30);
+          do {
+            targetRow = f.queue.watcherReconciliationRow(key(exact));
+            if (targetRow != null && "DONE".equals(targetRow.get("state"))) break;
+            Thread.sleep(20);
+          } while (System.nanoTime() < skipDeadline);
+          assertNotNull(targetRow);
+          assertEquals("SKIPPED_POLICY", targetRow.get("last_outcome_class"));
+        }
         boolean targetAdmitted = admissions.containsKey("path:" + key(exact));
         assertTrue(forgotten || targetAdmitted, "SETUP: nonexcluded control target must actually be admitted");
         for (var path : targetAdmitted ? List.of(exact, sibling) : List.of(sibling)) {
@@ -462,7 +500,9 @@ final class EngineForgetInProcessTest {
           assertEquals("SUCCESS_FULL", targetRow.get("last_outcome_class"));
           assertEquals(exactHash, target.documentFieldOps().getDocumentFieldOrThrow(key(exact), SchemaFields.SOURCE_SHA256));
         }
-        assertSame(config, f.config.currentSnapshot(), "SETUP: current policy remains unchanged");
+        if (!removePolicyAfterSkip) {
+          assertSame(config, f.config.currentSnapshot(), "SETUP: current policy remains unchanged");
+        }
         assertEquals(exactHash, SourceContentHash.sha256(exact));
         assertEquals(siblingHash, SourceContentHash.sha256(sibling));
         assertEquals(0, f.queue.jobStateCountsStrict().pendingCount(), "SETUP: no pending unrelated work");
@@ -490,6 +530,9 @@ final class EngineForgetInProcessTest {
           assertEquals(completedForgetRecord, f.operations.find(completedForget).orElseThrow());
           System.out.println("R9 actual HOT public Save=" + JSON.writeValueAsString(
               Map.of("response", saved.response(), "record", saved.record())));
+          assertNull(field(((DefaultWorkerAppServices) f.server.appServices()).ingestService(),
+              WorkerIngestService.class, "watcherReplayFailure"), "SETUP: no promotion attempt preceded the HOT Save");
+          promotionHold.close();
         }
         // Publicly requested SWITCHING follows observed enumeration/writer/queue readiness.
         // The monitor still owns replay/drain/certification; automatic timing is not under test.
@@ -605,6 +648,53 @@ final class EngineForgetInProcessTest {
       assertEquals(exactHash, SourceContentHash.sha256(exact));
       assertEquals(siblingHash, SourceContentHash.sha256(sibling));
     }
+  }
+
+  /** Holds the Engine's root-binding owner on its own thread until closed. */
+  private static final class PromotionHold implements AutoCloseable {
+    private final java.util.concurrent.CountDownLatch release = new java.util.concurrent.CountDownLatch(1);
+    private final Thread holder;
+
+    private PromotionHold(Fixture fixture, java.util.concurrent.CountDownLatch held) {
+      holder = new Thread(() -> fixture.root.authority().roots().withForgetBindings(ignored -> {
+        held.countDown();
+        boolean interrupted = false;
+        while (true) {
+          try { release.await(); break; }
+          catch (InterruptedException again) { interrupted = true; }
+        }
+        if (interrupted) Thread.currentThread().interrupt();
+        return null;
+      }), "r9-promotion-hold");
+      holder.setDaemon(true);
+    }
+
+    static PromotionHold acquire(Fixture fixture) throws InterruptedException {
+      var held = new java.util.concurrent.CountDownLatch(1);
+      var hold = new PromotionHold(fixture, held);
+      hold.holder.start();
+      assertTrue(held.await(10, TimeUnit.SECONDS), "SETUP: hold the root-binding owner before START");
+      return hold;
+    }
+
+    @Override public void close() throws InterruptedException {
+      release.countDown();
+      holder.join(10_000);
+      assertFalse(holder.isAlive(), "SETUP: root-binding owner hold must end");
+    }
+  }
+
+  private static void saveExclusions(Fixture fixture, List<Object> exclusions) throws Exception {
+    var before = fixture.settings.inspect();
+    String operationKey = OperationKeys.generate(CLOCK);
+    var patch = JSON.readValue(JSON.writeValueAsString(Map.of("ui", Map.of("excludePatterns", exclusions),
+        "witness", before.witness(), "operationKey", operationKey)),
+        io.justsearch.app.api.settings.SettingsV2.class);
+    var saved = new io.justsearch.app.services.settings.SettingsServiceImpl(fixture.settings, fixture.attempts)
+        .applyPublic(patch, null, webview());
+    assertTrue(saved.response().success(), "SETUP: actual public policy Save must commit");
+    assertEquals(OperationState.COMPLETE, saved.record().state());
+    assertEquals(operationKey, fixture.settings.inspect().witness().lastCommittedOperationKey());
   }
 
   static String key(Path path) { return PathNormalizer.normalizeKey(path); }

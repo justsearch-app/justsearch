@@ -116,7 +116,7 @@ final class RecordedRootPreparationTest {
       while (!removal.isDone() && System.nanoTime() < deadline) {
         Thread thread = removing.get();
         var info = thread == null ? null : threads.getThreadInfo(thread.threadId());
-        if (info != null && info.getThreadState() == Thread.State.BLOCKED
+        if (info != null && (info.getThreadState() == Thread.State.BLOCKED || info.getThreadState() == Thread.State.WAITING)
             && info.getLockInfo().getIdentityHashCode()
                 == System.identityHashCode(fixture.state.lifecycleLock())) {
           blockedOnProducer = true;

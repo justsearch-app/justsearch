@@ -22,6 +22,26 @@ class WorkerIngestionAuthorityTest {
     IngestionSkipPolicy.resetToDefaults();
   }
 
+
+  @Test
+  void ancestorReplacementNeverAdmitsOutsideContentOrProvesDeletion() throws Exception {
+    Path root = Files.createDirectory(tempDir.resolve("boundary"));
+    Path parent = Files.createDirectory(root.resolve("parent"));
+    Path file = Files.writeString(parent.resolve("notes.txt"), "inside");
+    var authority = new WorkerIngestionAuthority();
+    var claim = rooted(file, root);
+    assertEquals(SourceAdmissionAction.ADMIT, authority.admit(claim).action());
+    Path outside = Files.createDirectory(tempDir.resolve("outside"));
+    Files.writeString(outside.resolve("notes.txt"), "outside");
+    Files.delete(file);
+    Files.delete(parent);
+    Files.createSymbolicLink(parent, outside);
+    assertEquals(SourceAdmissionAction.RETRYABLE_FAILURE, authority.admit(claim).action());
+    Files.delete(outside.resolve("notes.txt"));
+    assertEquals(SourceAdmissionAction.RETRYABLE_FAILURE, authority.admit(claim).action());
+    assertEquals(SourcePresence.Verdict.SOURCE_UNREADABLE, authority.presence(file, root));
+  }
+
   @Test
   void unrootedLegacyWatcherScanAndReplayRequireFreshAdmission() throws Exception {
     IngestionSkipPolicy.installResolved(new IngestionSkipPolicy(null, null, Set.of("private")));

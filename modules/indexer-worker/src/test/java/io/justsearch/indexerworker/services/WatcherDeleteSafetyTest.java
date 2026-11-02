@@ -70,6 +70,8 @@ final class WatcherDeleteSafetyTest extends LuceneExecutorTestBase {
     runtime.indexingCoordinator().indexSingle(new IndexDocument(Map.of(
         SchemaFields.DOC_ID, id, SchemaFields.PATH, id,
         SchemaFields.DOC_UID, java.util.UUID.randomUUID().toString(),
+        SchemaFields.SIZE_BYTES, Files.size(file),
+        SchemaFields.MODIFIED_AT, Files.getLastModifiedTime(file).toMillis(),
         SchemaFields.CONTENT, "original " + name, SchemaFields.COLLECTION, "docs")));
     runtime.commitOps().commitAndTrack(CommitReason.SWITCH_BUFFER_REPLAY);
     runtime.commitOps().maybeRefreshBlocking();
@@ -110,6 +112,106 @@ final class WatcherDeleteSafetyTest extends LuceneExecutorTestBase {
         "root_identity", RootIdentity.capture(root).toString(), "collection", "docs"));
   }
 
+  @org.junit.jupiter.params.ParameterizedTest(name = "{displayName} [{index}] {arguments}")
+  @org.junit.jupiter.params.provider.ValueSource(strings = {"missing", "directory", "link", "dangling"})
+  void candidateRetirementPreservesCrossFileChunksInBothGenerations(String replacement) throws Exception {
+    Path gone = indexed("candidate-gone.txt");
+    Path kept = indexed("candidate-kept.txt");
+    var manager = new IndexGenerationManager(base);
+    String generation = manager.startMigration("scoped-retirement").building_generation();
+    try (var candidate = IndexSchema.fromCatalog(FieldCatalogDef.forChunkTestingWithVduRetryCount(0))
+        .atPath(manager.resolveGenerationPathStrict(generation))
+        .withExecutorRegistrations(testLuceneExecutors()).open()) {
+      for (RunningRuntime selected : List.of(runtime, candidate)) {
+        selected.indexingCoordinator().indexSingle(new IndexDocument(Map.of(
+            SchemaFields.DOC_ID, gone.toString(), SchemaFields.PATH, gone.toString(),
+            SchemaFields.DOC_UID, "old-parent", SchemaFields.CONTENT, "old text")));
+        for (String id : List.of("own-chunk", "legacy-chunk", "cross-file-chunk")) {
+          var fields = new java.util.HashMap<String, Object>(Map.of(
+              SchemaFields.DOC_ID, id, SchemaFields.DOC_UID, id,
+              SchemaFields.PARENT_DOC_ID, gone.toString(), SchemaFields.IS_CHUNK, "true",
+              SchemaFields.CONTENT, id));
+          if (!id.equals("legacy-chunk")) fields.put(SchemaFields.PATH,
+              id.equals("cross-file-chunk") ? kept.toString() : gone.toString());
+          selected.indexingCoordinator().indexSingle(new IndexDocument(fields));
+        }
+        selected.commitOps().commitAndTrack(CommitReason.DRAIN);
+        selected.commitOps().maybeRefreshBlocking();
+      }
+      var migrating = new WorkerIngestService(queue, null, null, IndexingPacing.unthrottled(),
+          base, index, candidate, runtime, null, 0L);
+      watch(migrating, root);
+      Files.delete(gone);
+      if (replacement.equals("directory")) {
+        Files.createDirectory(gone);
+        Files.writeString(gone.resolve("new.txt"), "new descendant");
+      } else if (!replacement.equals("missing")) {
+        Files.createSymbolicLink(gone, replacement.equals("link")
+            ? Files.writeString(temp.resolve("outside.txt"), "outside text") : temp.resolve("absent"));
+      }
+      var result = assertDoesNotThrow(() -> migrating.syncDirectory(SyncDirectoryRequest.newBuilder()
+          .setRootPath(root.toString()).build(), CallContext.none()));
+      assertEquals("", result.getError());
+      assertFalse(result.getDeleteDetectionUnverified());
+      assertEquals(1, result.getFilesDeleted());
+      for (RunningRuntime selected : List.of(runtime, candidate)) {
+        selected.commitOps().maybeRefreshBlocking();
+        assertEquals("cross-file-chunk", selected.documentFieldOps()
+            .getDocumentField("cross-file-chunk", SchemaFields.CONTENT));
+        assertNull(selected.documentFieldOps().getDocumentField(gone.toString(), SchemaFields.CONTENT));
+        assertNull(selected.documentFieldOps().getDocumentField("own-chunk", SchemaFields.CONTENT));
+        assertNull(selected.documentFieldOps().getDocumentField("legacy-chunk", SchemaFields.CONTENT));
+      }
+      if (replacement.equals("directory")) assertTrue(queue.matchesExpectedCollection(gone.resolve("new.txt"), "docs"));
+      assertTrue(queue.listSwitchBufferOpsStrict().stream().anyMatch(op -> op.op().equals("DELETE")));
+    }
+  }
+
+  @org.junit.jupiter.params.ParameterizedTest(name = "{displayName} [{index}] {arguments}")
+  @org.junit.jupiter.params.provider.ValueSource(booleans = {false, true})
+  void liveDeleteCallbacksPreserveChunksBackedByAnotherFile(boolean witnessed) throws Exception {
+    Path gone = indexed("live-gone.txt");
+    Path kept = indexed("live-kept.txt");
+    for (String id : List.of("own-chunk", "legacy-chunk", "cross-file-chunk")) {
+      var fields = new java.util.HashMap<String, Object>(Map.of(
+          SchemaFields.DOC_ID, id, SchemaFields.DOC_UID, id,
+          SchemaFields.PARENT_DOC_ID, gone.toString(), SchemaFields.IS_CHUNK, "true",
+          SchemaFields.CONTENT, id));
+      if (!id.equals("legacy-chunk")) fields.put(SchemaFields.PATH,
+          id.equals("cross-file-chunk") ? kept.toString() : gone.toString());
+      runtime.indexingCoordinator().indexSingle(new IndexDocument(fields));
+    }
+    runtime.commitOps().commitAndTrack(CommitReason.DRAIN);
+    var registry = new RootWatcherRegistry();
+    service.setRootWatcherRegistry(registry);
+    watch(service, root);
+    var marker = org.mockito.Mockito.mock(ConfirmedDeletionMarker.class);
+    Class<?> callbacks = Class.forName(
+        "io.justsearch.indexerworker.server.DefaultWorkerAppServices$WatcherCallbacks");
+    Class<?> targetType = Class.forName(callbacks.getName() + "$Target");
+    var constructor = targetType.getDeclaredConstructors()[0];
+    constructor.setAccessible(true);
+    Object owner = new Object();
+    var target = constructor.newInstance(runtime, service, marker,
+        new WorkerMutationAdmission(owner), owner);
+    Files.delete(gone);
+    var callback = witnessed
+        ? callbacks.getDeclaredMethod("deleteAt", targetType, RootWatcherRegistry.Subscription.class, String.class)
+        : callbacks.getDeclaredMethod("deleteAt", targetType, String.class);
+    callback.setAccessible(true);
+    if (witnessed) callback.invoke(null, target, registry.subscription(root), gone.toString());
+    else callback.invoke(null, target, gone.toString());
+    runtime.commitOps().maybeRefreshBlocking();
+    assertEquals("cross-file-chunk", runtime.documentFieldOps()
+        .getDocumentField("cross-file-chunk", SchemaFields.CONTENT));
+    assertEquals("original live-kept.txt", runtime.documentFieldOps()
+        .getDocumentField(kept.toString(), SchemaFields.CONTENT));
+    assertNull(runtime.documentFieldOps().getDocumentField(gone.toString(), SchemaFields.CONTENT));
+    assertNull(runtime.documentFieldOps().getDocumentField("own-chunk", SchemaFields.CONTENT));
+    assertNull(runtime.documentFieldOps().getDocumentField("legacy-chunk", SchemaFields.CONTENT));
+    org.mockito.Mockito.verify(marker).markIfAbsent(gone.toString());
+  }
+
   @Test void recreatedBeforeSwitchingAdmissionPreservesExactUpsertReceipt() throws Exception {
     Path file = indexed("recreated.txt");
     switching();
@@ -141,6 +243,27 @@ final class WatcherDeleteSafetyTest extends LuceneExecutorTestBase {
     assertEquals(1, runtime.indexCountOps().countByIdAndChunksStrict(sibling.toString()));
     assertEquals(claimed.unitRevision(), queue.pollPending(1).getFirst().unitRevision(),
         "replay must preserve the admitted UPSERT's exact revision");
+    assertTrue(queue.listSwitchBufferOpsStrict().isEmpty());
+  }
+
+  @org.junit.jupiter.params.ParameterizedTest(name = "{displayName} [{index}] {arguments}")
+  @org.junit.jupiter.params.provider.ValueSource(strings = {"missing", "directory", "link", "dangling"})
+  void bufferedRetirementPreservesChunksBackedByAnotherFile(String replacement) throws Exception {
+    Path gone = indexed("buffered-gone.txt");
+    Path kept = indexed("buffered-kept.txt");
+    runtime.indexingCoordinator().indexSingle(new IndexDocument(Map.of(
+        SchemaFields.DOC_ID, "cross-file-chunk", SchemaFields.DOC_UID, "cross-file-chunk",
+        SchemaFields.PATH, kept.toString(), SchemaFields.PARENT_DOC_ID, gone.toString(),
+        SchemaFields.IS_CHUNK, "true", SchemaFields.CONTENT, "live chunk")));
+    runtime.commitOps().commitAndTrack(CommitReason.DRAIN);
+    receipt(gone, watcherPayload(gone));
+    Files.delete(gone);
+    if (replacement.equals("directory")) Files.createDirectory(gone);
+    else if (!replacement.equals("missing")) Files.createSymbolicLink(gone,
+        replacement.equals("link") ? kept : temp.resolve("absent"));
+    assertTrue(replay(null));
+    assertEquals("live chunk", runtime.documentFieldOps().getDocumentField("cross-file-chunk", SchemaFields.CONTENT));
+    assertNull(runtime.documentFieldOps().getDocumentField(gone.toString(), SchemaFields.CONTENT));
     assertTrue(queue.listSwitchBufferOpsStrict().isEmpty());
   }
 
@@ -288,24 +411,112 @@ final class WatcherDeleteSafetyTest extends LuceneExecutorTestBase {
     assertEquals(1, runtime.indexCountOps().countByIdAndChunksStrict(sibling.toString()));
   }
 
+  @Test
+  void recreatedRootRecoveryFindsMissedFilesAndRetiresObsoleteText() throws Exception {
+    Path obsolete = indexed("obsolete.txt");
+    var active = new java.util.concurrent.atomic.AtomicBoolean();
+    WorkerMethvinWatcher watcher = org.mockito.Mockito.mock(WorkerMethvinWatcher.class);
+    org.mockito.Mockito.when(watcher.registerRoot(org.mockito.ArgumentMatchers.any())).thenAnswer(call -> {
+      active.set(true);
+      return true;
+    });
+    org.mockito.Mockito.when(watcher.activateRoot(org.mockito.ArgumentMatchers.any())).thenReturn(true);
+    org.mockito.Mockito.when(watcher.isActive(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any()))
+        .thenAnswer(call -> active.get());
+    var registry = new RootWatcherRegistry(watcher);
+    service.setRootWatcherRegistry(registry);
+    assertTrue(registry.watch(root.toString(), "docs").watching());
+    var old = registry.subscription(root);
+    active.set(false);
+    Files.move(root, temp.resolve("old-root"));
+    Files.createDirectory(root);
+    Path missed = Files.writeString(root.resolve("missed.txt"), "missed event");
+    service.recoverWatcherRoot(root);
+    assertNotSame(old, registry.subscription(root));
+    assertNull(registry.enterEvent(old));
+    runtime.commitOps().maybeRefreshBlocking();
+    assertEquals(0, runtime.indexCountOps().countByIdAndChunksStrict(obsolete.toString()));
+    assertTrue(queue.pollPending(10).stream().anyMatch(job ->
+        job.path().equals(missed) && "docs".equals(job.collection())));
+  }
+
+  @Test
+  void failedInitialWatcherRegistrationIsRecoveredByTheWorkerTick() throws Exception {
+    var active = new java.util.concurrent.atomic.AtomicBoolean();
+    WorkerMethvinWatcher watcher = org.mockito.Mockito.mock(WorkerMethvinWatcher.class);
+    org.mockito.Mockito.when(watcher.registerRoot(org.mockito.ArgumentMatchers.any())).thenReturn(false, true);
+    org.mockito.Mockito.when(watcher.activateRoot(org.mockito.ArgumentMatchers.any())).thenAnswer(call -> {
+      active.set(true);
+      return true;
+    });
+    org.mockito.Mockito.when(watcher.isActive(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any()))
+        .thenAnswer(call -> active.get());
+    var registry = new RootWatcherRegistry(watcher);
+    service.setRootWatcherRegistry(registry);
+    assertFalse(registry.watch(root.toString(), "docs").watching());
+    assertNull(registry.subscription(root));
+    Path missed = Files.writeString(root.resolve("missed.txt"), "during the registration gap");
+    service.recoverWatcherRoot(root);
+    assertNotNull(registry.subscription(root));
+    assertTrue(queue.pollPending(10).stream().anyMatch(job ->
+        job.path().equals(missed) && "docs".equals(job.collection())));
+  }
+
+  @org.junit.jupiter.params.ParameterizedTest(name = "{displayName} [{index}] {arguments}")
+  @org.junit.jupiter.params.provider.ValueSource(strings = {"directory", "link", "dangling"})
+  void restartReconciliationRetiresNonregularReplacements(String replacement) throws Exception {
+    Path file = indexed("replaced.txt");
+    Path retained = indexed("retained.txt");
+    for (Path source : List.of(file, retained)) {
+      String id = "chunk:" + java.util.UUID.randomUUID();
+      runtime.indexingCoordinator().indexSingle(new IndexDocument(Map.of(
+          SchemaFields.DOC_ID, id, SchemaFields.DOC_UID, id,
+          SchemaFields.PATH, source.toString(), SchemaFields.PARENT_DOC_ID, source.toString(),
+          SchemaFields.IS_CHUNK, "true", SchemaFields.CONTENT, "old chunk")));
+    }
+    runtime.commitOps().commitAndTrack(CommitReason.SWITCH_BUFFER_REPLAY);
+    runtime.close();
+    runtime = null;
+    Files.delete(file);
+    if (replacement.equals("directory")) {
+      Files.createDirectory(file);
+      Files.writeString(file.resolve("new.txt"), "new descendant");
+    } else {
+      Files.createSymbolicLink(file, replacement.equals("link") ? retained : root.resolve("absent"));
+    }
+    reopenRuntime();
+    watch(service, root);
+    var result = service.syncDirectory(SyncDirectoryRequest.newBuilder()
+        .setRootPath(root.toString()).build(), CallContext.none());
+    assertEquals("", result.getError());
+    runtime.commitOps().maybeRefreshBlocking();
+    assertEquals(0, runtime.indexCountOps().countByIdAndChunksStrict(file.toString()));
+    assertEquals(2, runtime.indexCountOps().countByIdAndChunksStrict(retained.toString()));
+    if (replacement.equals("directory")) {
+      assertEquals(1, result.getFilesAdded());
+      assertTrue(queue.pollPending(10).stream().anyMatch(job -> job.path().equals(file.resolve("new.txt"))));
+    }
+  }
+
   @Test void recreationAfterFinalAbsenceProbeKeepsNewerQueuedRevision() throws Exception {
     Path file = indexed("last-probe.txt");
     Files.delete(file);
     // Use the old raw watcher format so the base reaches the actual delete/queue-removal race.
     receipt(file, file.toString());
-    var coordinator = org.mockito.Mockito.spy(runtime.indexingCoordinator());
+    var pruner = org.mockito.Mockito.spy(runtime.pruneOps());
     var target = org.mockito.Mockito.spy(runtime);
-    org.mockito.Mockito.doReturn(coordinator).when(target).indexingCoordinator();
+    org.mockito.Mockito.doReturn(pruner).when(target).pruneOps();
     var newerRevision = new java.util.concurrent.atomic.AtomicReference<String>();
     org.mockito.Mockito.doAnswer(call -> {
-      call.callRealMethod();
+      int removed = (int) call.callRealMethod();
       Files.writeString(file, "recreated after final probe");
       queue.enqueueEntries(List.of(JobQueue.EnqueueEntry.stat(file).withinRoot(root)), "docs");
       var newer = queue.pollPending(1).getFirst();
       newerRevision.set(newer.unitRevision());
       queue.returnUnfinishedClaims(List.of(newer));
-      return null;
-    }).when(coordinator).deleteByIdAndChunks(file.toString());
+      return removed;
+    }).when(pruner).pruneFile(org.mockito.ArgumentMatchers.eq(file.toString()),
+        org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any());
     assertTrue(KnowledgeServerMigrationOps.drainSwitchBufferStrict(
         new KnowledgeServerMigrationOps.DrainSwitchBufferContext(queue, target, null,
             IndexingPacing.unthrottled(), base, index, JsonMapper.builder().build(), () -> false,

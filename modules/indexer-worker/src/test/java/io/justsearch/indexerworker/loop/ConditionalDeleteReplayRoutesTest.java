@@ -44,14 +44,7 @@ import org.junit.jupiter.api.io.TempDir;
 import org.slf4j.LoggerFactory;
 import tools.jackson.databind.ObjectMapper;
 
-/**
- * Task t-20261020-a5fbcb, round 13. The ordinary promotion replay and the promoted-pointer
- * recovery replay an accepted watcher DELETE receipt against the path's state as refusal cleanup
- * confirms it. A watched file is replaced by a folder inside a parent folder that can be traversed
- * but not listed while the root vouches: that state is uncertain, so the receipt stays, nothing is
- * queued and the target keeps the file's text. With a listable parent the same folder is a
- * confirmed non-regular source: the receipt settles and the normal policy removes the text.
- */
+/** Conditional replay preserves uncertain sources and rows backed by other live files. */
 @org.junit.jupiter.api.extension.ExtendWith(io.justsearch.indexerworker.services.NoVolumeIdentityExtension.class)
 final class ConditionalDeleteReplayRoutesTest extends LuceneExecutorTestBase {
   @TempDir Path temp;
@@ -88,7 +81,7 @@ final class ConditionalDeleteReplayRoutesTest extends LuceneExecutorTestBase {
     assertEquals(0, outcome.count(), "a confirmed folder at the file's path retires the text by policy");
     assertTrue(outcome.settled(), "a confirmed folder settles the receipt as before");
     assertEquals(0, outcome.receipts(), "the receipt is acknowledged");
-    assertEquals(1, outcome.queued(), "the folder is queued once for the normal policy");
+    assertEquals(1, outcome.queued(), "the pre-existing claim retains its queue ownership");
   }
 
   /** The replay's answer, what it left owed and queued, and the target's document count for the path. */
@@ -112,6 +105,7 @@ final class ConditionalDeleteReplayRoutesTest extends LuceneExecutorTestBase {
     Path root = Files.createDirectory(temp.resolve("files"));
     Path parent = Files.createDirectory(root.resolve("nested"));
     Path file = Files.writeString(parent.resolve("source.txt"), "original source");
+    Path kept = Files.writeString(root.resolve("kept.txt"), "live file");
     try (var queue = new SqliteJobQueue(temp.resolve("jobs.db"));
         var active = IndexSchema.fromCatalog(new JustSearchConfigurationLoader().loadFieldCatalog())
             .atPath(index).withExecutorRegistrations(testLuceneExecutors()).open()) {
@@ -121,6 +115,10 @@ final class ConditionalDeleteReplayRoutesTest extends LuceneExecutorTestBase {
           SchemaFields.DOC_ID, file.toString(), SchemaFields.PATH, file.toString(),
           SchemaFields.DOC_UID, "original", SchemaFields.CONTENT, "original source",
           SchemaFields.COLLECTION, "docs")));
+      active.indexingCoordinator().indexSingle(new IndexDocument(Map.of(
+          SchemaFields.DOC_ID, "cross-file-chunk", SchemaFields.DOC_UID, "cross-file-chunk",
+          SchemaFields.PATH, kept.toString(), SchemaFields.PARENT_DOC_ID, file.toString(),
+          SchemaFields.IS_CHUNK, "true", SchemaFields.CONTENT, "live chunk")));
       active.commitOps().commitAndTrack(CommitReason.DRAIN);
       active.commitOps().maybeRefreshBlocking();
       var service = new WorkerIngestService(queue, null, null, IndexingPacing.unthrottled(), base,
@@ -131,6 +129,8 @@ final class ConditionalDeleteReplayRoutesTest extends LuceneExecutorTestBase {
           .getDeclaredMethod("capture", Path.class);
       capture.setAccessible(true);
       String identity = capture.invoke(null, root).toString();
+      if (listableParent) assertEquals(1, queue.enqueueEntries(List.of(
+          io.justsearch.indexerworker.queue.JobQueue.EnqueueEntry.stat(file).withinRoot(root)), "docs"));
       assertTrue(queue.putSwitchBufferForGeneration("green", "path:" + file, "DELETE",
           new SwitchBufferDelete(file.toString(), SwitchBufferDelete.Origin.WATCHER,
               root.toString(), identity, "docs").encode()));
@@ -172,8 +172,10 @@ final class ConditionalDeleteReplayRoutesTest extends LuceneExecutorTestBase {
           active.commitOps().commitAndTrack(CommitReason.DRAIN);
           active.commitOps().maybeRefreshBlocking();
         }
-        return new Outcome(settled, receipts, claims.size(),
-            active.indexCountOps().countByIdAndChunksStrict(file.toString()));
+        assertEquals("live chunk", active.documentFieldOps()
+            .getDocumentField("cross-file-chunk", SchemaFields.CONTENT));
+        return new Outcome(settled, receipts, claims.size(), active.documentFieldOps()
+            .getDocumentField(file.toString(), SchemaFields.CONTENT) == null ? 0 : 1);
       } finally {
         Files.setPosixFilePermissions(parent, PosixFilePermissions.fromString("rwx------"));
       }

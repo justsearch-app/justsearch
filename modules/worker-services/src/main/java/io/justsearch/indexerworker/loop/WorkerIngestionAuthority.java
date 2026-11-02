@@ -35,6 +35,10 @@ final class WorkerIngestionAuthority {
     this.rootCheck = java.util.Objects.requireNonNull(check, "check");
   }
 
+  SourcePresence.RootCheck rootCheck() {
+    return rootCheck;
+  }
+
   /** What can be said about {@code source} under {@code root}, with this authority's root check. */
   SourcePresence.Verdict presence(Path source, Path root) {
     return SourcePresence.classify(source, root, rootCheck);
@@ -84,6 +88,12 @@ final class WorkerIngestionAuthority {
     // (no links followed); a failure is classified, and only a confirmed absence — not found while
     // the root that holds it is present — retires the source and its indexed content.
     FileFreshnessSnapshot freshness;
+    try {
+      SourceAccess.requireSafeAncestors(filePath, root);
+    } catch (IOException | SecurityException unsafeAncestor) {
+      return SourceAdmission.terminal(SourceAdmissionAction.RETRYABLE_FAILURE,
+          sourceUnreadable(filePath, unsafeAncestor));
+    }
     try {
       freshness = FileFreshnessSnapshot.capture(filePath);
     } catch (IOException notCaptured) {
@@ -139,11 +149,10 @@ final class WorkerIngestionAuthority {
               "Source is not a regular file"));
     }
 
-    if (SourceContentHash.isCloudPlaceholder(filePath)) {
+    if (io.justsearch.indexerworker.ingest.CloudPlaceholderDetector.isCloudPlaceholder(filePath)) {
       return SourceAdmission.terminal(SourceAdmissionAction.RETRYABLE_FAILURE,
           outcome(IngestionOutcomeClass.DEFERRED_POLICY, IngestionReasonCodes.CLOUD_PLACEHOLDER,
-              IngestionRetryPolicy.DEFER_WITHOUT_ATTEMPT,
-              "Cloud-only placeholder; reading would hydrate over network"));
+              IngestionRetryPolicy.DEFER_WITHOUT_ATTEMPT, "Cloud-only placeholder"));
     }
     if (!Files.isReadable(filePath)) {
       return SourceAdmission.terminal(

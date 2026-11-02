@@ -308,10 +308,11 @@ final class EngineRootRetirementTest {
 
   private static void assertBlocked(Thread thread, FutureTask<?> removal) throws Exception {
     long until = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
-    while (thread.getState() != Thread.State.BLOCKED && !removal.isDone() && System.nanoTime() < until) {
+    while (thread.getState() != Thread.State.BLOCKED && thread.getState() != Thread.State.WAITING && !removal.isDone() && System.nanoTime() < until) {
       Thread.sleep(10);
     }
-    assertEquals(Thread.State.BLOCKED, thread.getState(), "removal must wait for actual producer exit");
+    assertTrue(thread.getState() == Thread.State.BLOCKED || thread.getState() == Thread.State.WAITING,
+        "removal must wait for actual producer exit");
     assertFalse(removal.isDone(), "caller timeout is not safe producer retirement");
   }
 

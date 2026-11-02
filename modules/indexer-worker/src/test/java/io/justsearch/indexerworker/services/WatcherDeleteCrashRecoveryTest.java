@@ -185,12 +185,15 @@ final class WatcherDeleteCrashRecoveryTest extends LuceneExecutorTestBase {
         }
         var queue = spy(realQueue);
         var runtime = spy(realRuntime);
-        var coordinator = spy(realRuntime.indexingCoordinator());
+        var pruner = spy(realRuntime.pruneOps());
         var commits = spy(realRuntime.commitOps());
-        doReturn(coordinator).when(runtime).indexingCoordinator();
+        doReturn(pruner).when(runtime).pruneOps();
         doReturn(commits).when(runtime).commitOps();
-        doAnswer(call -> { call.callRealMethod(); if ("lucene-delete".equals(cut)) Runtime.getRuntime().halt(71); return null; })
-            .when(coordinator).deleteByIdAndChunks(file.toString());
+        doAnswer(call -> {
+          Object result = call.callRealMethod();
+          if ("lucene-delete".equals(cut)) Runtime.getRuntime().halt(71);
+          return result;
+        }).when(pruner).pruneFile(eq(file.toString()), any(), any(), any());
         doAnswer(call -> { call.callRealMethod(); if ("commit".equals(cut)) Runtime.getRuntime().halt(71); return null; })
             .when(commits).commitAndTrack(CommitReason.SWITCH_BUFFER_REPLAY);
         doAnswer(call -> {

@@ -122,9 +122,6 @@ public final class WorkerIngestService {
     return MdcContext.request(ctx.traceId(), ctx.requestId());
   }
 
-  /** Dangerous path components that indicate traversal attempts. */
-  private static final Set<String> DANGEROUS_COMPONENTS = Set.of("..", "..\\", "../");
-
   private final java.util.concurrent.ConcurrentMap<String, Object> collectionRemovals =
       new java.util.concurrent.ConcurrentHashMap<>();
 
@@ -279,6 +276,7 @@ public final class WorkerIngestService {
     this.syncOps.setPruneGuardFactory(this::pruneGuard);
     this.syncOps.setPruneWriterFence(pruneWriterFence);
     this.syncOps.setUserExclusions(this::isUserExcluded);
+    this.syncOps.setDirectoryExclusions(this::isUserExcludedDirectory);
     this.syncOps.setRetirementExclusions(this::isUserExcludedForRetirement);
     this.syncOps.setPrefixScopeFactory(root -> prefixScope(root.toString()));
     this.candidateDiscoveryOps = new SyncDirectoryOps(
@@ -289,6 +287,9 @@ public final class WorkerIngestService {
         this.indexingPacing,
         confirmedDeletionMarker);
     this.candidateDiscoveryOps.setPrefixScopeFactory(root -> prefixScope(root.toString()));
+    this.candidateDiscoveryOps.setPruneGuardFactory(this::pruneGuard);
+    this.candidateDiscoveryOps.setDirectoryExclusions(this::isUserExcludedDirectory);
+    this.candidateDiscoveryOps.setUserExclusions(this::isUserExcluded);
     this.switchBufferOps =
         new IngestSwitchBufferOps(jobQueue, this.indexGenerationManager);
     this.syncOps.useDeclaredCollectionRoots(this::declaredCollectionRoots);
@@ -693,14 +694,21 @@ public final class WorkerIngestService {
    * (the identity a watch registered, the recorded volume) and applied inside {@code publisher}'s
    * file-mutation fence.
    */
+  private WorkerIngestService sourcePublisher;
+
   public void prunesUnder(WorkerIngestService publisher) {
     Objects.requireNonNull(publisher, "publisher");
+    sourcePublisher = publisher;
     syncOps.setForcedPathSink(paths -> publisher.forcedPathSink.accept(paths));
     syncOps.setPruneGuardFactory(publisher::pruneGuard);
     syncOps.setRetirementExclusions(publisher::isUserExcludedForRetirement);
+    syncOps.setDirectoryExclusions(publisher::isUserExcludedDirectory);
     syncOps.setPruneWriterFence(publisher.pruneWriterFence);
     syncOps.setPrefixScopeFactory(root -> publisher.prefixScope(root.toString()));
     candidateDiscoveryOps.setPrefixScopeFactory(root -> publisher.prefixScope(root.toString()));
+    candidateDiscoveryOps.setPruneGuardFactory(publisher::pruneGuard);
+    candidateDiscoveryOps.setDirectoryExclusions(publisher::isUserExcludedDirectory);
+    candidateDiscoveryOps.setUserExclusions(publisher::isUserExcluded);
     declaredRootsDirectory = publisher.declaredRootsDirectory;
     setRootWatcherRegistry(publisher.rootWatcherRegistry.current());
   }
@@ -811,18 +819,23 @@ public final class WorkerIngestService {
                   return rootWitness.admits(folder);
                 }
               };
+      var retirementGuard = new io.justsearch.adapters.lucene.runtime.PruneOps.PresenceGuard() {
+        @Override public boolean rootCurrent() { return deletionProof.vouches(root); }
+        @Override public io.justsearch.adapters.lucene.runtime.PathPresence presence(Path source) {
+          return io.justsearch.adapters.lucene.runtime.PathPresence.probeSource(source, root);
+        }
+      };
       var verdict = io.justsearch.indexerworker.loop.SourcePresence.classify(file, root, deletionProof);
+      if (verdict == io.justsearch.indexerworker.loop.SourcePresence.Verdict.PRESENT
+          && confirmedReconciliationAbsence(deletion.path(), root, retirementGuard)) {
+        verdict = io.justsearch.indexerworker.loop.SourcePresence.Verdict.ABSENT;
+      }
       if (verdict == io.justsearch.indexerworker.loop.SourcePresence.Verdict.PRESENT) {
         if (deletion.origin() == io.justsearch.indexerworker.queue.SwitchBufferDelete.Origin.LEGACY) {
           log.warn("Legacy buffered DELETE skipped because its source exists: {}", file);
         }
         if (!rootWitness.admits(root)) return BufferedDeleteReplay.UNCERTAIN;
-        // A nonregular replacement queues retirement of the indexed file, so present-file
-        // admission alone cannot authorize it when deletion evidence is unavailable.
-        if (!Files.isRegularFile(file, java.nio.file.LinkOption.NOFOLLOW_LINKS)
-            && (!deletionProof.vouches(root)
-                || io.justsearch.adapters.lucene.runtime.PathPresence.absentBeneathListableFolder(
-                    file, root, null) == io.justsearch.adapters.lucene.runtime.PathPresence.UNKNOWN)) {
+        if (!Files.isRegularFile(file, java.nio.file.LinkOption.NOFOLLOW_LINKS)) {
           return BufferedDeleteReplay.UNCERTAIN;
         }
         if (!io.justsearch.indexerworker.ingest.IngestionSkipPolicy.shouldSkipWithinRoot(file, root)) {
@@ -839,22 +852,28 @@ public final class WorkerIngestService {
       if (verdict != io.justsearch.indexerworker.loop.SourcePresence.Verdict.ABSENT) {
         return BufferedDeleteReplay.UNCERTAIN;
       }
-      target.indexingCoordinator().deleteByIdAndChunks(deletion.path());
+      target.pruneOps().pruneFile(deletion.path(), root, retirementGuard,
+          io.justsearch.adapters.lucene.runtime.PruneOps.WriterFence.NONE);
       target.commitOps().commitAndTrack(CommitReason.SWITCH_BUFFER_REPLAY);
       target.commitOps().maybeRefreshBlocking();
       // The filesystem is not locked by the writer fence. Check again after the durable effect;
       // on a crash the retained receipt performs this same admission on the next boot.
-      if (io.justsearch.adapters.lucene.runtime.PathPresence.probe(file)
-          == io.justsearch.adapters.lucene.runtime.PathPresence.PRESENT) {
+      if (Files.isRegularFile(file, java.nio.file.LinkOption.NOFOLLOW_LINKS)
+          && io.justsearch.adapters.lucene.runtime.PathPresence.probeSource(file, root)
+              == io.justsearch.adapters.lucene.runtime.PathPresence.PRESENT) {
         if (!rootWitness.admits(root)) return BufferedDeleteReplay.FAILED;
         var entry = JobQueue.EnqueueEntry.stat(file);
         if (deletion.root() != null || binding != null) entry = entry.withinRoot(root);
         return jobQueue.enqueueReappearedFile(entry, collection)
             ? BufferedDeleteReplay.SETTLED : BufferedDeleteReplay.FAILED;
       }
-      return io.justsearch.indexerworker.loop.SourcePresence.classify(file, root, deletionProof)
-              == io.justsearch.indexerworker.loop.SourcePresence.Verdict.ABSENT
-          ? BufferedDeleteReplay.SETTLED : BufferedDeleteReplay.FAILED;
+      try {
+        return confirmedReconciliationAbsence(deletion.path(), root, retirementGuard)
+                && target.indexCountOps().countOwnedFileStrict(deletion.path()) == 0
+            ? BufferedDeleteReplay.SETTLED : BufferedDeleteReplay.FAILED;
+      } catch (IOException unknown) {
+        return BufferedDeleteReplay.FAILED;
+      }
     });
   }
 
@@ -957,6 +976,11 @@ public final class WorkerIngestService {
         || isUserExcluded(path, root)) {
       return false;
     }
+    if (SyncDirectoryOps.isCloudPlaceholder(path)) {
+      new CloudPlaceholderRecorder(jobQueue).record(path, collection,
+          WorkerMethvinWatcher.entryForLiveEvent(path).provenance());
+      return false;
+    }
     var entry = WorkerMethvinWatcher.entryForLiveEvent(path).withinRoot(root);
     String candidateGeneration = switchBufferOps.buildingGenerationForFileAdmission();
     if (candidateGeneration != null) {
@@ -1011,7 +1035,7 @@ public final class WorkerIngestService {
         log.debug("Watcher delete skipped: absence of {} no longer confirmed", normalizedPath);
         return false;
       }
-      if (requireConfirmedAbsence && !confirmedAbsent(normalizedPath, requiredRoot)) {
+      if (requireConfirmedAbsence && !confirmedReconciliationAbsence(normalizedPath, requiredRoot)) {
         throw WorkerServiceException.unavailable(
             "Candidate reconciliation lacks proven absence on its recorded volume");
       }
@@ -1248,7 +1272,7 @@ public final class WorkerIngestService {
    * the indexing loop and the watcher so every deletion decision asks the same one (#758).
    */
   public io.justsearch.indexerworker.loop.SourcePresence.RootCheck rootCheck() {
-    return rootWitness;
+    return sourcePublisher == null ? rootWitness : sourcePublisher.rootCheck();
   }
 
   /**
@@ -1600,7 +1624,7 @@ public final class WorkerIngestService {
     }
     journalWatcherDelete(path, root, expectedRootIdentity);
     if (active != ingestLifecycle) {
-      active.indexingCoordinator().deleteByIdAndChunks(path);
+      retireReconciledFile(active, path, root);
       active.commitOps().commitAndTrack(CommitReason.WATCHER_DELETE);
     }
   }
@@ -1949,6 +1973,17 @@ public final class WorkerIngestService {
     return false;
   }
 
+  /** Proven whole-subtree exclusions, with the same root-relative ownership as file policy. */
+  public boolean isUserExcludedDirectory(Path directory, Path root) {
+    var patterns = io.justsearch.configuration.excludes.ExclusionPatterns.current();
+    if (patterns.isExcludedDirectory(root, directory)
+        || rootWatcherRegistry.isUserExcludedDirectory(directory)) return true;
+    for (Path watched : exclusionRoots.get()) {
+      if (patterns.isExcludedDirectory(watched, directory)) return true;
+    }
+    return false;
+  }
+
   public static final String RETIREMENT_EXCLUDED_INDEXED =
       "0.3.0 retirement waits on excluded paths still indexed";
 
@@ -2263,25 +2298,12 @@ public final class WorkerIngestService {
       return null;
     }
 
-    // Check for traversal attempts in raw string
-    for (String dangerous : DANGEROUS_COMPONENTS) {
-      if (pathStr.contains(dangerous)) {
-        log.warn("Rejected path with traversal attempt: {}", pathStr);
-        return null;
-      }
-    }
-
     try {
       Path path = Path.of(pathStr);
-
-      // Normalize to resolve any remaining oddities
-      Path normalized = path.normalize();
-
-      // After normalization, double-check for traversal
-      if (normalized.toString().contains("..")) {
-        log.warn("Rejected normalized path with traversal: {}", normalized);
-        return null;
+      for (Path component : path) {
+        if (component.toString().equals("..")) return null;
       }
+      Path normalized = path.normalize();
 
       // Must be absolute path
       if (!normalized.isAbsolute()) {
@@ -3134,7 +3156,7 @@ public final class WorkerIngestService {
           requireCandidateSubscription(registry, root, subscription);
           difference.requireCurrentRootIdentity();
           if (acceptWatcherDeleteUnderLease(
-              path, () -> deleteCandidateAndMark(path), true, false, root,
+              path, () -> deleteCandidateAndMark(path, root), true, false, root,
               difference.rootIdentity())) {
             deleted++;
           }
@@ -3260,7 +3282,7 @@ public final class WorkerIngestService {
           SyncDirectoryOps.checkCancelled(cancelled);
           requireCandidateSubscription(registry, root, subscription);
           difference.requireCurrentRootIdentity();
-          if (!committedBootFileMatches(path, subscription.collection())
+          if (!committedBootFileMatches(path, subscription.collection(), root)
               || !jobQueue.matchesExpectedCollection(path, subscription.collection())) {
             SyncDirectoryOps.checkCancelled(cancelled);
             var liveEntry = WorkerMethvinWatcher.entryForLiveEvent(path);
@@ -3268,7 +3290,7 @@ public final class WorkerIngestService {
             // Reuse the queue's captured source witness so extraction cannot skip this claim.
             var capturedEntry = new JobQueue.EnqueueEntry(
                 liveEntry.path(), liveEntry.sizeBytes(), liveEntry.provenance(),
-                io.justsearch.indexerworker.loop.SourceContentHash.sha256(path)).withinRoot(root);
+                io.justsearch.indexerworker.loop.SourceContentHash.sha256WithinRoot(path, root)).withinRoot(root);
             SyncDirectoryOps.checkCancelled(cancelled);
             if (switchBufferOps.buildingGenerationForFileAdmission() != null
                 || jobQueue.enqueueEntriesWithExactCollection(
@@ -3285,10 +3307,10 @@ public final class WorkerIngestService {
           try {
             requireCandidateSubscription(registry, root, subscription);
             difference.requireCurrentRootIdentity();
-            if (!confirmedAbsent(path, root)) {
+            if (!confirmedReconciliationAbsence(path, root)) {
               throw new IOException("Committed boot delete lacks proven absence on its recorded volume");
             }
-            ingestLifecycle.indexingCoordinator().deleteByIdAndChunks(path);
+            retireReconciledFile(ingestLifecycle, path, root);
             confirmedDeletionMarker.markIfAbsent(path);
           } finally {
             if (fileFence != null) fileFence.unlock();
@@ -3353,7 +3375,7 @@ public final class WorkerIngestService {
           SyncDirectoryOps.checkCancelled(cancelled);
           requireCandidateSubscription(registry, root, subscription);
           difference.requireCurrentRootIdentity();
-          if (!committedBootFileMatches(file, binding.collection())
+          if (!committedBootFileMatches(file, binding.collection(), root)
               || !jobQueue.matchesExpectedCollection(file, binding.collection())) return false;
         }
         SyncDirectoryOps.checkCancelled(cancelled);
@@ -3367,14 +3389,14 @@ public final class WorkerIngestService {
     }
   }
 
-  private boolean committedBootFileMatches(Path file, String collection) throws IOException {
+  private boolean committedBootFileMatches(Path file, String collection, Path root) throws IOException {
     String id = PathNormalizer.normalizeKey(file);
     var fields = ingestLifecycle.documentFieldOps();
     String source = fields.getDocumentField(
         id, SchemaFields.SOURCE_SHA256);
     String indexedCollection = fields.getDocumentField(
         id, SchemaFields.COLLECTION);
-    return io.justsearch.indexerworker.loop.SourceContentHash.sha256(file).equals(source)
+    return io.justsearch.indexerworker.loop.SourceContentHash.sha256WithinRoot(file, root).equals(source)
         && Objects.equals(normalizeRootCollection(collection),
             normalizeRootCollection(indexedCollection));
   }
@@ -3383,15 +3405,51 @@ public final class WorkerIngestService {
     return collection == null || collection.isBlank() ? null : collection;
   }
 
-  private void deleteCandidateAndMark(String path) {
+  private void deleteCandidateAndMark(String path, Path root) {
     if (ingestLifecycle == null
         || ingestLifecycle == searchLifecycle
         || !ingestLifecycle.isAcceptingWrites()) {
       throw WorkerServiceException.unavailable(
           "Candidate writer became unavailable during root reconciliation");
     }
-    ingestLifecycle.indexingCoordinator().deleteByIdAndChunks(path);
+    retireReconciledFile(ingestLifecycle, path, root);
     confirmedDeletionMarker.markIfAbsent(path);
+  }
+
+  private boolean confirmedReconciliationAbsence(String path, Path root) {
+    return confirmedReconciliationAbsence(path, root, pruneGuard(root));
+  }
+
+  private static boolean confirmedReconciliationAbsence(String path, Path root,
+      io.justsearch.adapters.lucene.runtime.PruneOps.PresenceGuard guard) {
+    return guard.rootCurrent()
+        && guard.presence(Path.of(path)) == io.justsearch.adapters.lucene.runtime.PathPresence.ABSENT
+        && io.justsearch.adapters.lucene.runtime.PathPresence.absentBeneathListableFolder(
+            Path.of(path), root, null) == io.justsearch.adapters.lucene.runtime.PathPresence.ABSENT
+        && guard.rootCurrent();
+  }
+
+  /** Called by the watcher callback under its existing file-mutation and admission fences. */
+  public void retireWatcherFile(io.justsearch.adapters.lucene.runtime.RunningRuntime target,
+      String path) {
+    retireReconciledFile(target, path, pruneRootFor(path));
+  }
+
+  /** The caller holds the file-mutation fence and the candidate journal's admission lease. */
+  void retireReconciledFile(io.justsearch.adapters.lucene.runtime.RunningRuntime target,
+      String path, Path root) {
+    var guard = pruneGuard(root);
+    target.pruneOps().pruneFile(path, root, guard,
+        io.justsearch.adapters.lucene.runtime.PruneOps.WriterFence.NONE);
+    try {
+      target.commitOps().maybeRefreshBlocking();
+      if (!confirmedReconciliationAbsence(path, root, guard)
+          || target.indexCountOps().countOwnedFileStrict(path) != 0) {
+        throw WorkerServiceException.unavailable("File-scoped retirement is incomplete: " + path);
+      }
+    } catch (IOException unknown) {
+      throw WorkerServiceException.unavailable("File-scoped retirement could not be verified: " + path);
+    }
   }
 
   private void requireCandidateSubscription(
@@ -3419,7 +3477,7 @@ public final class WorkerIngestService {
    * The presence authority for one prune of {@code root}: present, listable, the registered
    * identity while watched, and the volume recorded at the root's first prune (#758).
    */
-  private io.justsearch.adapters.lucene.runtime.PruneOps.PresenceGuard pruneGuard(Path root) {
+  io.justsearch.adapters.lucene.runtime.PruneOps.PresenceGuard pruneGuard(Path root) {
     var authority = RootPresenceGuard.capture(root, registeredRootIdentity(root), rootVolumes);
     var scope = prefixScope(root.toString());
     return new io.justsearch.adapters.lucene.runtime.PruneOps.PresenceGuard() {
@@ -3742,16 +3800,32 @@ public final class WorkerIngestService {
     ingestLifecycle.commitOps().commitAndTrack(CommitReason.VDU_RECOVERY);
     if (jobQueue == null) return;
     try {
-      Path path = Path.of(docId);
+      Path path = Path.of(docId).toAbsolutePath().normalize();
+      Path root = legacyVduRoot(path);
+      if (root == null) return;
+      io.justsearch.indexerworker.loop.SourceAccess.requireContained(path, root);
+      if (SyncDirectoryOps.isCloudPlaceholder(path)) {
+        new CloudPlaceholderRecorder(jobQueue).record(path, input.fields().get(SchemaFields.COLLECTION),
+            CallContext.none().provenance());
+        return;
+      }
       var stat = JobQueue.EnqueueEntry.stat(path);
       var entry = new JobQueue.EnqueueEntry(path, stat.sizeBytes(), stat.provenance(),
-          io.justsearch.indexerworker.loop.SourceContentHash.sha256(path));
+          io.justsearch.indexerworker.loop.SourceContentHash.sha256WithinRoot(path, root), root);
       if (jobQueue.enqueueEntriesWithExactCollection(List.of(entry), input.fields().get(SchemaFields.COLLECTION)) != 1) {
         throw new IOException("Legacy VDU source refresh was not admitted: " + docId);
       }
-    } catch (java.nio.file.FileSystemException unavailable) {
+    } catch (IOException | SecurityException unavailable) {
       log.info("Legacy VDU source refresh deferred for {}: {}", docId, unavailable.getMessage());
     }
+  }
+
+  private Path legacyVduRoot(Path file) {
+    if (sourcePublisher != null) return sourcePublisher.legacyVduRoot(file);
+    var roots = new java.util.HashSet<Path>(exclusionRoots.get());
+    declaredCollectionRoots().forEach(binding -> roots.add(binding.path()));
+    return roots.stream().map(root -> root.toAbsolutePath().normalize()).filter(file::startsWith)
+        .max(java.util.Comparator.comparingInt(Path::getNameCount)).orElse(null);
   }
 
   private List<String> processingDocIdsForRecovery() throws IOException {
@@ -4437,6 +4511,7 @@ public final class WorkerIngestService {
         var scanner = new WorkerScanOps(jobQueue, queueDepth, isCancelled,
             () -> validateRecordedGeneration(Objects.requireNonNull(recorded), ctx),
             switchBufferOps::buildingGenerationForFileAdmission);
+        scanner.setUserExclusions(this::isUserExcluded, this::isUserExcludedDirectory);
         scanner.setAdmissionFence(admit -> withFileMutationFence(() ->
             isCancelled.getAsBoolean() ? 0 : admit.getAsInt()));
         scanner.scan(scanRequest, sink);

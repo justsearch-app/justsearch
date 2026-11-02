@@ -183,31 +183,15 @@ final class SyncOps {
         try {
             SyncDirectoryResponse response = executeSyncDirectory(rootPath, force, engineContext, watchedOnly);
 
-            // Tempdoc 626 §Axis-C/§Recency — update the per-root verification state from this reconcile.
             if (response.getError().isEmpty()) {
                 Path root = Path.of(rootPath).toAbsolutePath().normalize();
-                if (!force) {
-                    // force=false periodic reconcile: a user-activity skip (skipped + !unverified) leaves
-                    // the prior state untouched (it isn't a verification result); a clean full scan clears
-                    // it (verified, stamping lastVerifiedAt); the cap-skipped scan sets it (UNVERIFIED).
-                    if (response.getDeleteDetectionUnverified()) {
-                        recordUnverified.accept(root, true);
-                    } else if (!response.getSkipped()) {
-                        recordUnverified.accept(root, false);
-                    }
-                    // Tempdoc 626 §Axis-C (drift-corrected) — the reconcile pruned stale entries a live
-                    // DELETE missed: a one-shot "drift was found and corrected" signal for the tap. Kept
-                    // force=false-only — a forced bulk re-prune is not the clean "a live delete was
-                    // missed" signal.
-                    if (response.getFilesDeleted() > 0) {
-                        recordDriftCorrected.accept(root, response.getFilesDeleted());
-                    }
+                if (response.getDeleteDetectionUnverified()) {
+                    recordUnverified.accept(root, true);
                 } else if (!response.getSkipped()) {
-                    // Tempdoc 626 §Recency — a force=true reconcile re-prunes orphans + re-walks the whole
-                    // root (a full re-converge), so a non-skipped success IS a verification: clear the
-                    // unverified flag and stamp the lastVerifiedAt heartbeat. This is what makes the scoped
-                    // "Verify this folder" recovery (core.reconcile-root) refresh the per-root state.
                     recordUnverified.accept(root, false);
+                }
+                if (!force && response.getFilesDeleted() > 0) {
+                    recordDriftCorrected.accept(root, response.getFilesDeleted());
                 }
             }
 

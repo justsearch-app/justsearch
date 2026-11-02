@@ -4,6 +4,7 @@ package io.justsearch.indexerworker.loop;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
+import io.justsearch.indexerworker.ingest.CloudPlaceholderDetector;
 import io.justsearch.indexerworker.ingest.IngestionReasonCodes;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -27,12 +28,17 @@ final class AdmissionSourceHashTest {
   @Test
   void cloudPlaceholdersAreDeferredBeforeAnyContentRead() throws Exception {
     Path file = Files.writeString(temporary.resolve("cloud.txt"), "placeholder");
-    try (var hashes = mockStatic(SourceContentHash.class, CALLS_REAL_METHODS)) {
+    try (var hashes = mockStatic(SourceContentHash.class, CALLS_REAL_METHODS);
+        var placeholders = mockStatic(CloudPlaceholderDetector.class, CALLS_REAL_METHODS)) {
+      // admissionIdentity retains its legacy probe; worker admission uses the shared detector.
       hashes.when(() -> SourceContentHash.isCloudPlaceholder(file)).thenReturn(true);
+      placeholders.when(() -> CloudPlaceholderDetector.isCloudPlaceholder(file)).thenReturn(true);
       assertNull(SourceContentHash.admissionIdentity(file, temporary));
       var admission = new WorkerIngestionAuthority().admit(file, temporary);
       assertEquals(SourceAdmissionAction.RETRYABLE_FAILURE, admission.action());
       assertEquals(IngestionReasonCodes.CLOUD_PLACEHOLDER, admission.outcome().reasonCode());
+      hashes.verify(() -> SourceContentHash.isCloudPlaceholder(file));
+      placeholders.verify(() -> CloudPlaceholderDetector.isCloudPlaceholder(file));
       hashes.verify(() -> SourceContentHash.sha256(file), never());
       hashes.verify(() -> SourceContentHash.sha256(eq(file), any()), never());
     }

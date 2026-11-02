@@ -1,12 +1,14 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.indexerworker.services;
 
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anySet;
 import static org.mockito.ArgumentMatchers.eq;
@@ -59,6 +61,25 @@ final class WorkerIngestServiceCandidateReconciliationTest
   @AfterEach
   void resetPolicy() {
     IngestionSkipPolicy.resetToDefaults();
+  }
+
+  @Test
+  void harmlessLinkDoesNotLatchCandidateReplayUncertainty() throws Exception {
+    Path root = Files.createDirectory(tempDir.resolve("candidate-links"));
+    Path added = Files.writeString(root.resolve("notes.txt"), "new");
+    Files.createSymbolicLink(root.resolve("harmless"), added);
+    Fixture fixture = fixtureBeforeMigration();
+    watch(fixture, root);
+    fixture.generations.startMigration("harmless-link-reconcile");
+    when(fixture.queue.enqueueMaintenanceFileForGeneration(anyString(), any(), nullable(String.class)))
+        .thenReturn(true);
+    assertTrue(fixture.admission.replayCertain());
+    var result = assertDoesNotThrow(() -> fixture.service.syncDirectory(SyncDirectoryRequest.newBuilder()
+        .setRootPath(root.toString()).build(), CallContext.none()));
+    assertEquals("", result.getError());
+    assertEquals(1, result.getFilesAdded());
+    assertFalse(result.getDeleteDetectionUnverified());
+    assertTrue(fixture.admission.replayCertain(), "A deliberate omission must not latch uncertainty");
   }
 
   @Test
@@ -231,8 +252,14 @@ final class WorkerIngestServiceCandidateReconciliationTest
         eq(fixture.buildingGeneration), eq(IngestResponses.switchBufferPathKey(deleted)), eq("DELETE"), deletedReceipt.capture());
     assertEquals(deleted, SwitchBufferDelete.decode(deletedReceipt.getValue()).path());
     assertEquals(SwitchBufferDelete.Origin.WATCHER, SwitchBufferDelete.decode(deletedReceipt.getValue()).origin());
-    verify(fixture.servingWriter).deleteByIdAndChunks(deleted);
-    verify(fixture.candidateWriter).deleteByIdAndChunks(deleted);
+    verify(fixture.servingRuntime.pruneOps()).pruneFile(eq(deleted), eq(root), any(),
+        eq(io.justsearch.adapters.lucene.runtime.PruneOps.WriterFence.NONE));
+    verify(fixture.candidateRuntime.pruneOps()).pruneFile(eq(deleted), eq(root), any(),
+        eq(io.justsearch.adapters.lucene.runtime.PruneOps.WriterFence.NONE));
+    verify(fixture.servingRuntime.indexCountOps()).countOwnedFileStrict(deleted);
+    verify(fixture.candidateRuntime.indexCountOps()).countOwnedFileStrict(deleted);
+    verify(fixture.servingWriter, never()).deleteByIdAndChunks(deleted);
+    verify(fixture.candidateWriter, never()).deleteByIdAndChunks(deleted);
     verify(fixture.servingCommit).commitAndTrack(
         io.justsearch.adapters.lucene.runtime.CommitReason.WATCHER_DELETE);
     assertTrue(fixture.admission.replayCertain());
@@ -627,7 +654,7 @@ final class WorkerIngestServiceCandidateReconciliationTest
         .toList();
     when(reads.search(any(), anyInt(), anySet(), any(), nullable(String.class)))
         .thenReturn(new LuceneRuntimeTypes.SearchResult(hits, hits.size(), 0));
-    RunningRuntime runtime = mock(RunningRuntime.class);
+    RunningRuntime runtime = mock(RunningRuntime.class, org.mockito.Mockito.RETURNS_DEEP_STUBS);
     when(runtime.isAcceptingWrites()).thenReturn(true);
     when(runtime.readPathOps()).thenReturn(reads);
     IndexingCoordinator writer = mock(IndexingCoordinator.class);
@@ -641,7 +668,7 @@ final class WorkerIngestServiceCandidateReconciliationTest
     var admission = new WorkerMutationAdmission(owner);
     service.setMutationAdmission(admission, owner);
     return new Fixture(service, queue, reads, writer, writer, commit, admission, owner,
-        null, generations);
+        null, generations, runtime, runtime);
   }
 
   private Fixture fixtureBeforeMigration() throws Exception {
@@ -654,7 +681,7 @@ final class WorkerIngestServiceCandidateReconciliationTest
     var initial = generations.initializeOrLoad();
     String building = generations.startMigration("same-runtime-unavailable-test").building_generation();
     ReadPathOps reads = mock(ReadPathOps.class);
-    RunningRuntime runtime = mock(RunningRuntime.class);
+    RunningRuntime runtime = mock(RunningRuntime.class, org.mockito.Mockito.RETURNS_DEEP_STUBS);
     when(runtime.isAcceptingWrites()).thenReturn(acceptingWrites);
     IndexingCoordinator writer = mock(IndexingCoordinator.class);
     when(runtime.indexingCoordinator()).thenReturn(writer);
@@ -671,7 +698,7 @@ final class WorkerIngestServiceCandidateReconciliationTest
     var admission = new WorkerMutationAdmission(owner);
     service.setMutationAdmission(admission, owner);
     return new Fixture(
-        service, queue, reads, writer, writer, commit, admission, owner, building, generations);
+        service, queue, reads, writer, writer, commit, admission, owner, building, generations, runtime, runtime);
   }
 
   private Fixture fixture(boolean startMigration, String... indexedPaths) throws Exception {
@@ -695,8 +722,8 @@ final class WorkerIngestServiceCandidateReconciliationTest
     when(reads.search(any(), anyInt(), anySet(), any(), nullable(String.class)))
         .thenReturn(new LuceneRuntimeTypes.SearchResult(hits, hits.size(), 0L));
 
-    RunningRuntime candidate = mock(RunningRuntime.class);
-    RunningRuntime serving = mock(RunningRuntime.class);
+    RunningRuntime candidate = mock(RunningRuntime.class, org.mockito.Mockito.RETURNS_DEEP_STUBS);
+    RunningRuntime serving = mock(RunningRuntime.class, org.mockito.Mockito.RETURNS_DEEP_STUBS);
     when(candidate.isAcceptingWrites()).thenReturn(true);
     IndexingCoordinator candidateWriter = mock(IndexingCoordinator.class);
     when(candidate.indexingCoordinator()).thenReturn(candidateWriter);
@@ -721,7 +748,7 @@ final class WorkerIngestServiceCandidateReconciliationTest
     service.setMutationAdmission(admission, owner);
     return new Fixture(
         service, queue, reads, candidateWriter, servingWriter, servingCommit, admission, owner,
-        building, generations);
+        building, generations, candidate, serving);
   }
 
   private static SyncDirectoryRequest request(Path root) {
@@ -745,5 +772,7 @@ final class WorkerIngestServiceCandidateReconciliationTest
       WorkerMutationAdmission admission,
       Object owner,
       String buildingGeneration,
-      IndexGenerationManager generations) {}
+      IndexGenerationManager generations,
+      RunningRuntime candidateRuntime,
+      RunningRuntime servingRuntime) {}
 }

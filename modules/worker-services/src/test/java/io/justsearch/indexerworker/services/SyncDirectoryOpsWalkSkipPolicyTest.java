@@ -55,7 +55,7 @@ final class SyncDirectoryOpsWalkSkipPolicyTest {
 
     assertTrue(response.getSkipped());
     assertTrue(response.getDeleteDetectionUnverified());
-    assertTrue(queue.enqueuedPaths.isEmpty());
+    assertEquals(List.of(root.resolve("missing.md")), queue.enqueuedPaths);
   }
 
   @Test

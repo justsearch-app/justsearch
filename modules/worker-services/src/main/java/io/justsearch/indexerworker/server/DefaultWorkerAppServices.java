@@ -311,7 +311,7 @@ public final class DefaultWorkerAppServices implements WorkerAppServices {
         if (selected.runtime() == null || !selected.runtime().isAcceptingWrites()) {
           throw new IllegalStateException("Watcher deletion lost its writable runtime");
         }
-        selected.runtime().indexingCoordinator().deleteByIdAndChunks(path);
+        selected.ingest().retireWatcherFile(selected.runtime(), path);
         selected.deletionMarker().markIfAbsent(path);
       });
     }
@@ -324,7 +324,7 @@ public final class DefaultWorkerAppServices implements WorkerAppServices {
         if (selected.runtime() == null || !selected.runtime().isAcceptingWrites()) {
           throw new IllegalStateException("Watcher deletion lost its writable runtime");
         }
-        selected.runtime().indexingCoordinator().deleteByIdAndChunks(path);
+        selected.ingest().retireWatcherFile(selected.runtime(), path);
         selected.deletionMarker().markIfAbsent(path);
       });
     }

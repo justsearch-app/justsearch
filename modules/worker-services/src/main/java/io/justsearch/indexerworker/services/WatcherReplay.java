@@ -28,6 +28,9 @@ public final class WatcherReplay implements AutoCloseable {
   private final RunningRuntime target;
   private final JobQueue queue;
   private final WorkerIngestService publisher;
+  private final io.justsearch.indexerworker.loop.SourcePresence.RootCheck sourceAuthority;
+  private final io.justsearch.indexerworker.loop.FileMutationFence standaloneFence =
+      new io.justsearch.indexerworker.loop.FileMutationFence();
   private final List<WorkerMutationAdmission.RootUncertainty> uncertainties;
   private final SyncDirectoryOps.RootDifference difference;
   private final BooleanSupplier cancelled;
@@ -51,6 +54,16 @@ public final class WatcherReplay implements AutoCloseable {
       WorkerIngestService publisher, IndexingPacing pacing,
       List<ResolvedConfig.FileSource> declarations, List<String> admittedPaths,
       BooleanSupplier cancelled, NativePolicyReplay nativePolicy) throws IOException {
+    this(debt, target, queue, publisher, pacing, declarations, admittedPaths, cancelled, nativePolicy,
+        publisher == null ? null : publisher.rootCheck());
+  }
+
+  public WatcherReplay(WatcherRootReconciliation debt, RunningRuntime target, JobQueue queue,
+      WorkerIngestService publisher, IndexingPacing pacing,
+      List<ResolvedConfig.FileSource> declarations, List<String> admittedPaths,
+      BooleanSupplier cancelled, NativePolicyReplay nativePolicy,
+      io.justsearch.indexerworker.loop.SourcePresence.RootCheck sourceAuthority) throws IOException {
+    this.sourceAuthority = sourceAuthority;
     this.nativePolicy = nativePolicy;
     this.debt = debt;
     this.target = Objects.requireNonNull(target);
@@ -79,6 +92,9 @@ public final class WatcherReplay implements AutoCloseable {
         .filter(path -> !path.equals(root) && path.startsWith(root)).map(Path::toString).toList());
     var discovery = new SyncDirectoryOps(target.readPathOps(), null, null, queue, pacing);
     discovery.setPrefixScopeFactory(ignored -> scope);
+    if (publisher != null) {
+      discovery.setPruneGuardFactory(publisher::pruneGuard);
+    }
     difference = discovery.discoverCandidateDifference(debt.root(), true, cancelled, nativePolicy, debt.collection());
     try {
       requireIdentity();
@@ -187,12 +203,12 @@ public final class WatcherReplay implements AutoCloseable {
               } catch (IOException failure) { throw new java.io.UncheckedIOException(failure); }
             };
             boolean applied = conditional.reconcileWatcherFile(file, proof,
-                () -> target.indexingCoordinator().deleteByIdAndChunks(path));
+                () -> retire(path));
             outcomes.put(path, source);
             return applied;
           } catch (IOException failure) { throw new java.io.UncheckedIOException(failure); }
         };
-        boolean applied = publisher == null ? transition.get() : publisher.underFileMutationFence(transition);
+        boolean applied = publisher == null ? standaloneFence.guard(transition) : publisher.underFileMutationFence(transition);
         if (orderedApply && !applied) throw new IOException("Watcher file has independent or issued ownership: " + path);
       } catch (java.io.UncheckedIOException failure) { throw failure.getCause(); }
     }
@@ -248,7 +264,7 @@ public final class WatcherReplay implements AutoCloseable {
       try {
         requireIdentity();
         target.commitOps().maybeRefreshBlocking();
-        if (!excluded(path) || target.indexCountOps().countByIdAndChunksStrict(path) != 0) return false;
+        if (!excluded(path) || target.indexCountOps().countOwnedFileStrict(path) != 0) return false;
         var expected = conditional.watcherReconciliationRow(path);
         var file = new io.justsearch.indexerworker.queue.WatcherReconciliationFile(candidate,
             journal, receipt, path, null, 0, orderedApply, true, expected, true);
@@ -258,7 +274,7 @@ public final class WatcherReplay implements AutoCloseable {
   }
 
   private boolean matches(String path, String source) throws IOException {
-    if (source.isEmpty()) return target.indexCountOps().countByIdAndChunksStrict(path) == 0;
+    if (source.isEmpty()) return target.indexCountOps().countOwnedFileStrict(path) == 0;
     var fields = target.documentFieldOps();
     return source.equals(fields.getDocumentFieldOrThrow(path, SchemaFields.SOURCE_SHA256))
         && Objects.equals(rootOwnerCollection(debt.collection()),
@@ -268,7 +284,9 @@ public final class WatcherReplay implements AutoCloseable {
   private String observe(String path) throws IOException {
     requireIdentity();
     Path file = Path.of(path);
-    if (Files.notExists(file) && io.justsearch.adapters.lucene.runtime.PathPresence
+    io.justsearch.indexerworker.loop.SourceAccess.requireSafeAncestors(file, Path.of(debt.root()));
+    if (io.justsearch.adapters.lucene.runtime.PathPresence.probeSource(file, Path.of(debt.root()))
+        == io.justsearch.adapters.lucene.runtime.PathPresence.ABSENT && io.justsearch.adapters.lucene.runtime.PathPresence
         .absentBeneathListableFolder(file, Path.of(debt.root()), null)
             == io.justsearch.adapters.lucene.runtime.PathPresence.ABSENT) return "";
     if (!Files.isRegularFile(file, java.nio.file.LinkOption.NOFOLLOW_LINKS)) {
@@ -280,7 +298,24 @@ public final class WatcherReplay implements AutoCloseable {
         || SyncDirectoryOps.isCloudPlaceholder(file)) {
       throw new IOException("Watcher reconciliation cannot certify an ineligible source: " + path);
     }
-    return SourceContentHash.sha256(file);
+    return SourceContentHash.sha256WithinRoot(file, Path.of(debt.root()));
+  }
+
+  private void retire(String path) {
+    if (publisher != null) {
+      publisher.retireReconciledFile(target, path, Path.of(debt.root()));
+      return;
+    }
+    var guard = new io.justsearch.adapters.lucene.runtime.PruneOps.PresenceGuard() {
+      @Override public boolean rootCurrent() {
+        try { requireIdentity(); return sourceAuthority != null && sourceAuthority.vouches(Path.of(debt.root())); }
+        catch (IOException | RuntimeException unknown) { return false; }
+      }
+      @Override public io.justsearch.adapters.lucene.runtime.PathPresence presence(Path file) {
+        return io.justsearch.adapters.lucene.runtime.PathPresence.probeSource(file, Path.of(debt.root()));
+      }
+    };
+    target.indexingCoordinator().pruneFile(path, Path.of(debt.root()), guard);
   }
 
   private void requireIdentity() throws IOException {

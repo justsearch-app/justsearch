@@ -1,0 +1,106 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
+  },
+  "createdAt": "2026-11-01T21:20:00.733Z",
+  "revision": "d152f159282e0fc7ba9827834d9902b3ff7dbb1f",
+  "tree": "d11b2fc72b64e16b1b42fefb501ccac51994efdc",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": "openjdk version \"25.0.4.1\" 2026-08-18 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "./gradlew :modules:indexer-worker:test --tests \"io.justsearch.indexerworker.services.WatcherMigrationAdmissionTest.inRootLinkKeepsMainAdmissionWithoutReplayLatch\" --tests \"io.justsearch.indexerworker.services.WatcherMigrationAdmissionTest.symlinkedParentRootKeepsMainLinkAdmissionWithoutReplayLatch\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 5478
+    },
+    {
+      "command": "./gradlew :modules:worker-services:test --tests \"io.justsearch.indexerworker.services.WatcherUpsertCompatibilityTest.watcherSourcesKeepMainAdmissionBehaviour\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 5058
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/WatcherMigrationAdmissionTest.java#inRootLinkKeepsMainAdmissionWithoutReplayLatch",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/WatcherMigrationAdmissionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:2f4dd067c456bfbd6a28f3ed5ce96b539703f85d7f7a9d1c9e24849e2d9799a9",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "inRootLinkKeepsMainAdmissionWithoutReplayLatch(String) [1] CREATE",
+          "status": "passed"
+        },
+        {
+          "name": "inRootLinkKeepsMainAdmissionWithoutReplayLatch(String) [2] MODIFY",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WatcherUpsertCompatibilityTest.java#watcherSourcesKeepMainAdmissionBehaviour",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WatcherUpsertCompatibilityTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:375ec0a35d502019e238c64e54779d56ff3d87afcde758e3c6021d3926e4eb27",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "watcherSourcesKeepMainAdmissionBehaviour(String) [1] folder",
+          "status": "passed"
+        },
+        {
+          "name": "watcherSourcesKeepMainAdmissionBehaviour(String) [2] in-root-link",
+          "status": "passed"
+        },
+        {
+          "name": "watcherSourcesKeepMainAdmissionBehaviour(String) [3] vanished",
+          "status": "passed"
+        },
+        {
+          "name": "watcherSourcesKeepMainAdmissionBehaviour(String) [4] atomic-temp",
+          "status": "passed"
+        },
+        {
+          "name": "watcherSourcesKeepMainAdmissionBehaviour(String) [5] ordinary",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/WatcherMigrationAdmissionTest.java#symlinkedParentRootKeepsMainLinkAdmissionWithoutReplayLatch",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/WatcherMigrationAdmissionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:2f4dd067c456bfbd6a28f3ed5ce96b539703f85d7f7a9d1c9e24849e2d9799a9",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "symlinkedParentRootKeepsMainLinkAdmissionWithoutReplayLatch(String) [1] CREATE",
+          "status": "passed"
+        },
+        {
+          "name": "symlinkedParentRootKeepsMainLinkAdmissionWithoutReplayLatch(String) [2] MODIFY",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:eec3b13a22aa337c5840f7fabbfe21980a2fb901f216c66314bd9df3e041b020"
+}

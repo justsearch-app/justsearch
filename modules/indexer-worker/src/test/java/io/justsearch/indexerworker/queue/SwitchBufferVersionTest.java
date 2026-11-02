@@ -141,7 +141,7 @@ final class SwitchBufferVersionTest {
   @Test
   void atomicFileAdmissionCommitsJobAndScopedUpsertTogether() throws Exception {
     Path db = tempDir.resolve("atomic-file-admission.db");
-    Path file = tempDir.resolve("atomic.txt").toAbsolutePath();
+    Path file = Files.writeString(tempDir.resolve("atomic.txt").toAbsolutePath(), "x".repeat(17));
     String normalized = PathNormalizer.normalizeKey(file);
     var provenance = new JobQueue.EnqueueProvenance("agent", "atomic-test");
     var entry = new JobQueue.EnqueueEntry(file, 17L, provenance, "a".repeat(64));

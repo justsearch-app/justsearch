@@ -26,6 +26,40 @@ final class WatchedRootsStateTest {
 
   @TempDir Path tempDir;
 
+
+  @Test
+  void blockedRootProducerDoesNotHoldUnrelatedLifecycleMutations() throws Exception {
+    Path root = tempDir.resolve("a");
+    var roots = new ConcurrentHashMap<Path, Instant>();
+    roots.put(root, Instant.EPOCH);
+    var state = new WatchedRootsState(roots, new WatchedRootsStore(tempDir.resolve("roots.json"), null));
+    var entered = new java.util.concurrent.CountDownLatch(1);
+    var release = new java.util.concurrent.CountDownLatch(1);
+    var executor = java.util.concurrent.Executors.newFixedThreadPool(2);
+    try {
+      var scan = executor.submit(() -> state.captureRootProducer(root, true).run(() -> {
+        entered.countDown();
+        try { assertTrue(release.await(10, java.util.concurrent.TimeUnit.SECONDS)); }
+        catch (InterruptedException interrupted) { throw new AssertionError(interrupted); }
+        return true;
+      }, () -> false));
+      assertTrue(entered.await(5, java.util.concurrent.TimeUnit.SECONDS));
+      var mutation = executor.submit(() -> {
+        synchronized (state.lifecycleLock()) {
+          return state.register(tempDir.resolve("b"), null, false);
+        }
+      });
+      assertTrue(org.junit.jupiter.api.Assertions.assertDoesNotThrow(
+          () -> mutation.get(2, java.util.concurrent.TimeUnit.SECONDS)));
+      release.countDown();
+      assertTrue(scan.get(5, java.util.concurrent.TimeUnit.SECONDS));
+    } finally {
+      release.countDown();
+      executor.shutdownNow();
+      assertTrue(executor.awaitTermination(10, java.util.concurrent.TimeUnit.SECONDS));
+    }
+  }
+
   @Test
   @DisplayName("markIndexed uses the injected clock and persists timestamp")
   void markIndexedPersistsClockInstant() throws Exception {

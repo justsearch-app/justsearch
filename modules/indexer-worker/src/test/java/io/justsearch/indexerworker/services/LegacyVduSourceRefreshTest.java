@@ -42,6 +42,7 @@ final class LegacyVduSourceRefreshTest extends LuceneExecutorTestBase {
       runtime.commitOps().stopCommitTimer();
       var pending=queue.pollPending(10);
       assertEquals(1,pending.size());assertEquals(file,pending.getFirst().path());
+      assertEquals(directory, pending.getFirst().ingestionRoot(), "refresh retains its owning boundary across restart");
       assertEquals(SourceContentHash.sha256(file),pending.getFirst().plannedSourceSha256(),"source proof is durable across restart");
       // The source refresh's ordinary native publication records that witnessed revision.
       seed(runtime,id,"legacy-uid",SourceContentHash.sha256(file),"refreshed text");
@@ -69,9 +70,48 @@ final class LegacyVduSourceRefreshTest extends LuceneExecutorTestBase {
       }
     }
   }
+  @org.junit.jupiter.params.ParameterizedTest(name = "{displayName} [{index}] {arguments}")
+  @org.junit.jupiter.params.provider.ValueSource(strings = {"outside-ancestor", "unknown-root", "placeholder"})
+  void legacyVduProcessingDefersBeforeAnyHash(String condition) throws Exception {
+    Path root = Files.createDirectory(directory.resolve("root"));
+    Path parent = Files.createDirectory(root.resolve("parent"));
+    Path file = Files.writeString(parent.resolve("image.png"), "original source");
+    var schema = IndexSchema.fromCatalog(FieldCatalogDef.forChunkTestingWithVduRetryCount(0));
+    Path base = directory.resolve("base");
+    var layout = new io.justsearch.indexerworker.index.IndexGenerationManager(base).initializeOrLoad();
+    try (var runtime = schema.atPath(layout.activeGenerationPath())
+            .withExecutorRegistrations(testLuceneExecutors()).open();
+        var queue = openQueue(directory.resolve("jobs.db"))) {
+      seed(runtime, file.toString(), "legacy", null, "retained text");
+      var service = new WorkerIngestService(queue, null, null, IndexingPacing.unthrottled(),
+          base, layout.activeGenerationPath(), runtime, runtime, null, 0L);
+      if (!condition.equals("unknown-root")) service.useExclusionRoots(() -> List.of(root));
+      if (condition.equals("outside-ancestor")) {
+        Path outside = Files.createDirectory(directory.resolve("outside"));
+        Files.writeString(outside.resolve("image.png"), "outside secret");
+        Files.delete(file); Files.delete(parent); Files.createSymbolicLink(parent, outside);
+      }
+      try (var hashes = org.mockito.Mockito.mockStatic(SourceContentHash.class, org.mockito.Mockito.CALLS_REAL_METHODS);
+          var detector = org.mockito.Mockito.mockStatic(SyncDirectoryOps.class, org.mockito.Mockito.CALLS_REAL_METHODS)) {
+        detector.when(() -> SyncDirectoryOps.isCloudPlaceholder(file)).thenReturn(condition.equals("placeholder"));
+        var request = MarkVduProcessingRequest.newBuilder().setDocId(file.toString()).setMaxRetries(3);
+        optional(request, "setAttemptId", UUID.randomUUID().toString());
+        assertFalse(service.markVduProcessing(request.build(), context()).getSuccess());
+        assertEquals(0, queue.queueDepth(), "unsafe source cannot acquire a source witness or queue admission");
+        hashes.verifyNoInteractions();
+        assertEquals("retained text", runtime.documentFieldOps().getDocumentContent(file.toString()));
+        assertEquals("2", runtime.documentFieldOps().getDocumentField(file.toString(), SchemaFields.VDU_RETRY_COUNT));
+        if (condition.equals("placeholder")) assertTrue(queue.hasRecentLedgerEvent(
+            io.justsearch.indexerworker.identity.PathHash.sha256(file.toString()), "CLOUD_PLACEHOLDER", 0));
+      }
+    }
+  }
+
   private static SqliteJobQueue openQueue(Path db) throws Exception { var queue=new SqliteJobQueue(db);queue.open();return queue; }
-  private static WorkerIngestService service(RunningRuntime runtime,SqliteJobQueue queue) {
-    return new WorkerIngestService(queue,null,null,IndexingPacing.unthrottled(),null,null,runtime,runtime,null,0L);
+  private WorkerIngestService service(RunningRuntime runtime,SqliteJobQueue queue) {
+    var service = new WorkerIngestService(queue,null,null,IndexingPacing.unthrottled(),null,null,runtime,runtime,null,0L);
+    service.useExclusionRoots(() -> List.of(directory));
+    return service;
   }
   private static CallContext context() { var base=CallContext.none();return new CallContext(null,null,null,base.engineContext().withWorkId(UUID.randomUUID()),base.provenance(),base.childLifetime()); }
   private static void optional(Object builder,String name,String value) throws Exception {
