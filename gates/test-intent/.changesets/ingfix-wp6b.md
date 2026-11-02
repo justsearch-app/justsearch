@@ -184,3 +184,16 @@ Execution evidence and independent acceptance are left to the verifier as reques
   ]
 }
 ```
+
+## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a19aba-7b4d-7580-8755-4a2ac9a9bd77",
+  "verdict": "accept",
+  "digest": "sha256:e7cdac3b56e37ba7bde5ed662b0713d306584ad17cefad329719b75501e8c9d0",
+  "note": "Independent verifier (Codex) accepted all four entries and the four exempt files: 23 repair cases fail before by assertion and pass after, 25 preservation cases pass before and after; policy identity deterministic and unchanged from main; no parent-write path drops identity or source hash."
+}
+```
