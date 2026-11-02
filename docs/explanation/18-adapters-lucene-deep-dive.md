@@ -713,6 +713,6 @@ writer from a lifecycle snapshot and rejects a missing writer. See
 ## 13. Related Documentation
 
 - `docs/explanation/04-storage-engine.md` - Storage layer overview
-- `docs/explanation/17-ai-bridge-deep-dive.md` - AI/embedding integration
+- `docs/explanation/05-ai-architecture.md` - AI/embedding integration
 - `docs/explanation/11-index-schema-migration.md` - Blue/green migration
 - Historical Lucene JNI bridge analysis was removed from the public canonical corpus.

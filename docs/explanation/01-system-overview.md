@@ -232,9 +232,6 @@ The system is designed to work even if parts fail:
 *   **Process-fatal failure:** an Engine OOM or other process-fatal error follows the host-supervisor path, outside the component retry budget.
 *   **Index-half failure is now Engine failure.** This is the honest cost ADR-0049 records: recovery isolation is gone. An OOM or wedge in indexing takes the API with it, where before the API survived to report it. Engine host supervision now provides crash detection, a bounded restart budget, and cooldown; component recovery can escalate an essential failure through the Engine's counted restart path. Admission control and per-operation budgets still protect the shared address space.
 
-## Current implementation notes / living docs
+## Related docs
 
-Some detailed “current state” docs live under `docs/reference/` while the design is still evolving:
-
-- **Schema migration architecture (stable)**: `docs/explanation/11-index-schema-migration.md`
-- **UI user readiness verification notes (living checklist)**: `docs/reference/ui-user-readiness.md`
+- **Schema migration architecture**: `docs/explanation/11-index-schema-migration.md`
