@@ -56,7 +56,7 @@ function build(release, relBase, leakBase) {
   }
   const relTol = (relBase && relBase.tolerance_default_abs) || 0.02;
   const sha = ((release.cohort && release.cohort.git_sha) || "unknown").slice(0, 10);
-  L.push(`*Release \`${release.release_id || sha}\`, default mode \`${release.default_mode || "hybrid"}\`.*`, "");
+  L.push(`*Release \`${release.release_id || sha}\`, measured mode \`${release.default_mode || "hybrid"}\`.*`, "");
   const hw = release.cohort?.hardware || {};
   L.push([hw.os, hw.gpu_name, hw.gpu_driver_version && `driver ${hw.gpu_driver_version}`, hw.ort_version && `ORT ${hw.ort_version}`].filter(Boolean).join(" · "), "");
   L.push("Explicit hybrid mode uses keyword + vector + cross-encoder reranking; learned-sparse is off. MIRACL: dev split.", "");

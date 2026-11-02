@@ -105,6 +105,23 @@ function run(release, readme) {
   ok("the failure names the release value", /Enron: README row does not show the release value 0\.806/.test(result.stderr));
 }
 
+// --- re-review finding 2: a row whose label matches no expectation is never silently skipped ---
+{
+  const result = run(RELEASE, README.replace("MIRACL-de (German)", "MIRACL German").replace("0.986", "0.999"));
+  ok("a renamed row showing a decimal fails", result.status !== 0);
+  ok("the failure names the unrecognised row", /unrecognised Benchmarks row shows a number/.test(result.stderr));
+}
+{
+  const readme = README.replace("| Legal (CLERC", "| NFCorpus | 0.412 | new corpus |\n| Legal (CLERC");
+  const result = run(RELEASE, readme);
+  ok("a new corpus row showing a decimal fails", result.status !== 0);
+}
+{
+  const readme = README.replace("| Legal (CLERC", "| Planned corpus | — | not measured |\n| Legal (CLERC");
+  const result = run(RELEASE, readme);
+  ok("an unrecognised row without a number passes", result.status === 0);
+}
+
 // --- a superseded release cannot supply README claims ---
 {
   const result = run({ ...RELEASE, status: "superseded" }, README);

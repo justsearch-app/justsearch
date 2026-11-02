@@ -12,7 +12,7 @@ from pathlib import Path
 import pytest
 from click.testing import CliRunner
 
-from jseval import release
+from jseval import leak_gate, release
 from jseval.commands.release import cmd_release
 
 
@@ -615,8 +615,15 @@ def test_withheld_default_keeps_ablations_and_source_without_a_floor():
     doc = release.compose(
         [summary], composed_at='2026-11-02', run_sources=[source],
         withheld_default={'mixed/legal-clerc-200': '25 deadline misses'},
+        leak_by_dataset={'mixed/legal-clerc-200': 0.105},
+        union_recall_by_dataset={'mixed/legal-clerc-200': 0.9},
     )
     assert doc['measured'] == {}
+    # Leak is measured against the withheld default-mode list, so it must not set a ceiling;
+    # union recall measures the legs before reranking and stays.
+    assert 'mixed/legal-clerc-200' not in (doc.get('leak') or {})
+    assert leak_gate.project_release_to_baselines(doc)['baselines'] == {}
+    assert doc['union_recall']['mixed/legal-clerc-200']['leg_union_recall'] == 0.9
     assert doc['withheld']['mixed/legal-clerc-200']['ce_coverage']['silent_drops'] == 25
     assert doc['ablations']['mixed/legal-clerc-200'][0]['config_mode'] == 'lexical'
     assert doc['sources'][0]['summary_sha256'] == source['summary_sha256']
@@ -629,3 +636,11 @@ def test_withheld_default_keeps_ablations_and_source_without_a_floor():
 def test_withholding_requires_an_included_dataset_and_reason(withheld):
     with pytest.raises(release.ComposeError, match='included datasets'):
         release.compose([_summary()], composed_at='2026-11-02', withheld_default=withheld)
+
+
+def test_release_help_calls_the_headline_mode_measured_not_production_default():
+    """The product's default when a request names no mode is AUTO; hybrid is only the measured preset."""
+    result = CliRunner().invoke(cmd_release, ['--help'])
+    assert result.exit_code == 0
+    assert 'production-default' not in result.output.lower()
+    assert 'Measured search mode' in result.output

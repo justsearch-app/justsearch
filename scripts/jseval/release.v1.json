@@ -870,10 +870,6 @@
       "leak_rate": 0.03666666666666667,
       "src": "staged_recall_accounting projection"
     },
-    "mixed/legal-clerc-200": {
-      "leak_rate": 0.105,
-      "src": "staged_recall_accounting projection"
-    },
     "mixed/miracl-de-2k": {
       "leak_rate": 0.0,
       "src": "staged_recall_accounting projection"

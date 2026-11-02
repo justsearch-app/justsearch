@@ -298,8 +298,9 @@ def compose(
 
     :param run_summaries: parsed ``summary.json`` dicts (each carries an embedded
         ``manifest`` — verified present, U4), one or more per corpus.
-    :param default_mode: the production-default search mode whose metrics are the
-        per-corpus headline; other modes become labelled ablations.
+    :param default_mode: the measured search mode whose metrics are the per-corpus
+        headline; other modes become labelled ablations. Not the product default: a
+        request that names no mode runs AUTO.
     :param composed_at: ISO timestamp (passed in — scripts can't call ``Date.now``).
     :param external_baselines: optional ``{dataset: [{model, value, source, ...}]}``
         cited (immutable) references shown side-by-side; never a projection of ours.
@@ -327,8 +328,8 @@ def compose(
         ``summary_sha256`` is the durable half: paths rot, but it still answers "is this
         candidate directory the one this release was built from?".
     :param withheld_default: included dataset slugs mapped to publication-withholding reasons.
-        Their default-mode metrics supply neither claims nor floors; sources, CE coverage
-        and non-default ablations remain visible.
+        Their default-mode metrics supply neither claims, floors nor leak ceilings; sources,
+        CE coverage, union recall and non-default ablations remain visible.
     :raises ComposeError: if the runs don't all share one ``config_cohort_key``,
         or ``run_sources`` is present but not the same length as ``run_summaries``,
         or (when ``require_comparable``) a default-mode run isn't ``comparable``.
@@ -432,13 +433,16 @@ def compose(
             if abl is not None:
                 ablations.setdefault(ds, []).append(abl)
 
+    # Leak compares each retrieval leg against the default-mode final list, so a withheld
+    # default run would set a ceiling from the very blend that was judged not comparable.
+    # Union recall measures the legs before reranking and stays.
     leak_section = {
         canonical_dataset_slug(ds): {
             "leak_rate": float(rate),
             "src": "staged_recall_accounting projection",
         }
         for ds, rate in (leak_by_dataset or {}).items()
-        if isinstance(rate, (int, float))
+        if isinstance(rate, (int, float)) and canonical_dataset_slug(ds) not in withheld
     }
 
     union_recall_section = {

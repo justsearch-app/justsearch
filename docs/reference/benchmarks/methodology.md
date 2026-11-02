@@ -61,7 +61,7 @@ everywhere) — and they are **not directly apples-to-apples**. Read them honest
 
 <!-- generated:start — do not edit between markers; run: node scripts/docs/gen-public-benchmark.mjs -->
 
-*Release `linux-complete-qrels-2026-11-02`, default mode `hybrid`, commit `c2892448e`, Linux 7.0.0-38-generic x86_64, NVIDIA GeForce RTX 4070, 12 GiB VRAM, ORT 1.24.3. nDCG@10. External baselines are cited published numbers (not re-run by us) — see the comparison-class note above.*
+*Release `linux-complete-qrels-2026-11-02`, measured mode `hybrid`, commit `c2892448e`, Linux 7.0.0-38-generic x86_64, NVIDIA GeForce RTX 4070, 12 GiB VRAM, ORT 1.24.3. nDCG@10. External baselines are cited published numbers (not re-run by us) — see the comparison-class note above.*
 
 Explicit hybrid mode uses keyword + vector + cross-encoder reranking; learned-sparse is off in this preset. MIRACL uses dev queries and complete positive judgments in the retained sampled document pool. This Linux measurement is a new release, not a rerun of the superseded Windows release.
 

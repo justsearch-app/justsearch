@@ -614,6 +614,9 @@ jobs:
       - name: Test agent-utility projection lifecycle and drift
         run: node scripts/docs/gen-public-agent-utility.test.mjs
 
+      - name: Benchmark pages name the measured mode, not a product default (tests)
+        run: node scripts/docs/gen-benchmark-mode-label.test.mjs
+
       - name: Test agent-utility publication pointer gate
         run: node scripts/ci/check-public-agent-utility.test.mjs
 

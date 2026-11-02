@@ -15,7 +15,7 @@
       "description": "Required, date-suffixed human label (e.g. 667-external-baselines-2026-07-01). `jseval release` refuses to compose without one matching this pattern (tempdoc 683)."
     },
     "composed_at": { "type": "string", "description": "ISO-8601 UTC; passed in by the caller (scripts cannot call Date.now)." },
-    "default_mode": { "type": "string", "description": "The production-default search mode whose metrics are the per-corpus headline." },
+    "default_mode": { "type": "string", "description": "The search mode the release measured, whose metrics are the per-corpus headline. Not the product default: a request that names no mode runs AUTO." },
     "cohort": {
       "type": "object",
       "required": ["config_cohort_key", "git_sha", "hardware"],

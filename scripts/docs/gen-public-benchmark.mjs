@@ -69,7 +69,7 @@ function buildGenerated(release) {
     .join(", ");
 
   lines.push(
-    `*Release \`${release.release_id}\`, default mode \`${release.default_mode || "hybrid"}\`, commit \`${sha}\`${env ? `, ${env}` : ""}. ` +
+    `*Release \`${release.release_id}\`, measured mode \`${release.default_mode || "hybrid"}\`, commit \`${sha}\`${env ? `, ${env}` : ""}. ` +
       `nDCG@10. External baselines are cited published numbers (not re-run by us) — see the comparison-class note above.*`,
     "",
     "Explicit hybrid mode uses keyword + vector + cross-encoder reranking; learned-sparse is off in this preset. MIRACL uses dev queries and complete positive judgments in the retained sampled document pool. This Linux measurement is a new release, not a rerun of the superseded Windows release.",

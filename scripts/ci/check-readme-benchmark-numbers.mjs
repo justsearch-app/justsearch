@@ -7,7 +7,8 @@
  * cannot silently go stale.
  *
  * Usage: node scripts/ci/check-readme-benchmark-numbers.mjs
- * Exit 0 = consistent (or skipped); non-zero = a shown row disagrees with, or has no evidence in, the release.
+ * Exit 0 = consistent (or skipped); non-zero = a shown row disagrees with, or has no evidence in, the release,
+ * or a row no label recognises shows a decimal.
  * Unit fixtures: scripts/ci/check-readme-benchmark-numbers.test.mjs (sibling convention).
  *
  * Skip-if-absent (the 632 sidecar local-vs-CI duality): no release, or no README with a "## Benchmarks"
@@ -91,6 +92,14 @@ export function checkBenchmarkRows(rows, release) {
   const withheld = release.withheld || {};
   const failures = [];
   let checked = 0;
+  // Rows are matched by label, so a row no label recognises (a renamed or added corpus) would escape
+  // the check entirely. Any such row that shows a decimal fails instead of being skipped.
+  for (const row of rows) {
+    const known = EXPECTATIONS.some((exp) => row.toLowerCase().includes(exp.token.toLowerCase()));
+    if (!known && /\.\d/.test(row)) {
+      failures.push(`unrecognised Benchmarks row shows a number no release label checks — row: ${row.trim()}`);
+    }
+  }
   for (const exp of EXPECTATIONS) {
     const row = rows.find((r) => r.toLowerCase().includes(exp.token.toLowerCase()));
     if (!row) continue; // README chose not to show this corpus — editorial freedom.

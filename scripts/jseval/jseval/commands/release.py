@@ -39,7 +39,7 @@ def _repo_relative(p: Path) -> str:
 @click.option("--data-dir", type=click.Path(), default=lambda: str(DEFAULT_JSEVAL_DATA_DIR),
               help="Data dir whose eval-results/ holds runs (for --latest-per-dataset).")
 @click.option("--default-mode", default="hybrid", show_default=True,
-              help="Production-default search mode whose metrics are the per-corpus headline.")
+              help="Measured search mode whose metrics are the per-corpus headline (not the product default, AUTO).")
 @click.option("--external-baselines", type=click.Path(exists=True, resolve_path=True), default=None,
               help="Path to external-baselines.v1.json (cited published baselines, side-by-side).")
 @click.option("--release-id", default=None, help="Optional human label for this release.")

@@ -15,16 +15,23 @@ from .utility_evidence import read_evidence
 from .utility_recompose import _intention_to_treat_estimand
 
 
+def _require_sha256(name: str, data: bytes, expected: str) -> None:
+    # A real error, not ``assert``: ``python -O`` strips asserts and would project tampered bytes.
+    actual = hashlib.sha256(data).hexdigest()
+    if actual != expected:
+        raise ValueError(f'{name} sha256 mismatch: expected {expected}, got {actual}')
+
+
 def projection(root: Path = REPO_ROOT) -> dict:
     public = root / 'scripts/jseval/public-agent-utility'
     pointer = json.loads((public / 'current.v1.json').read_text())
     manifest_path = public / pointer['current']['path']
     manifest_bytes = manifest_path.read_bytes()
-    assert hashlib.sha256(manifest_bytes).hexdigest() == pointer['current']['manifest_sha256']
+    _require_sha256('manifest', manifest_bytes, pointer['current']['manifest_sha256'])
     manifest = json.loads(manifest_bytes)
     paths = {name: manifest_path.parent / manifest[name]['path'] for name in ('record', 'observations')}
     for name, path in paths.items():
-        assert hashlib.sha256(path.read_bytes()).hexdigest() == manifest[name]['sha256']
+        _require_sha256(name, path.read_bytes(), manifest[name]['sha256'])
     record = json.loads(paths['record'].read_text())
     policy_path = root / 'scripts/jseval/utility-claim-policy.v5.json'
     policy = json.loads(policy_path.read_text())

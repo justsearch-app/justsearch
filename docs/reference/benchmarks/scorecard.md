@@ -12,7 +12,7 @@ description: "Generated delta-vs-guard scorecard co-locating all engine-quality 
 > ratchet guards. **Relevance is the constraint; perf + footprint are the tracked score** (the MLPerf split).
 > Status is direction-aware vs each axis's guard (floor / budget-ratio / ceiling).
 
-*Release `linux-complete-qrels-2026-11-02`, default mode `hybrid`.*
+*Release `linux-complete-qrels-2026-11-02`, measured mode `hybrid`.*
 
 Linux 7.0.0-38-generic x86_64 · NVIDIA GeForce RTX 4070 · driver 580.178.04 · ORT 1.24.3
 
