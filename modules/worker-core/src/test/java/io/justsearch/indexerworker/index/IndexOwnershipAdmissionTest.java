@@ -330,6 +330,132 @@ final class IndexOwnershipAdmissionTest {
     assertFalse(Files.exists(marked));
   }
 
+  // Releases up to v0.3.0 rebuilt the index in place during recovery: the pointer names <id>,
+  // <id> holds only Lucene files, and the sentinel and manifest survive only in <id>.bak-<ts>.
+  @Test void release030InPlaceRecoveredActiveStartsWithMetadataFromBackup() throws Exception {
+    String id = "g-20250701-000000";
+    Path indices = Files.createDirectories(temp.resolve("indices"));
+    Path backup = Files.createDirectory(indices.resolve(id + ".bak-20250801-000000"));
+    Files.writeString(backup.resolve(SENTINEL), sentinel(id));
+    Files.writeString(backup.resolve(MANIFEST), v010Manifest(id));
+    Path active = luceneOnly(indices.resolve(id));
+    Files.writeString(temp.resolve("state.json"), v010State(id));
+    var manager = new IndexGenerationManager(temp);
+    assertTrue(assertDoesNotThrow(() -> manager.reconcileActiveRecoveryOwnership()));
+    assertEquals(id, assertDoesNotThrow(manager::initializeOrLoad).activeGenerationId());
+    assertEquals(Files.readString(backup.resolve(SENTINEL)), Files.readString(active.resolve(SENTINEL)));
+    assertEquals(Files.readString(backup.resolve(MANIFEST)), Files.readString(active.resolve(MANIFEST)));
+    assertTrue(Files.isRegularFile(active.resolve("segments_1")));
+  }
+
+  @Test void inPlaceRecoveredActiveWithCurrentStateStartsThroughBoot() throws Exception {
+    var manager = new IndexGenerationManager(temp);
+    Path active = manager.initializeOrLoad().activeGenerationPath();
+    String sentinelBytes = Files.readString(active.resolve(SENTINEL));
+    SafeIndexPathOps.backupDirectory(active, temp.resolve("indices"));
+    luceneOnly(active);
+    var restarted = new IndexGenerationManager(temp);
+    assertTrue(assertDoesNotThrow(() -> restarted.reconcileActiveRecoveryOwnership()));
+    var boot = assertDoesNotThrow(() -> restarted.initializeForBoot(
+        new IndexGenerationManager.BootOwnership.Native(), null));
+    assertEquals(active, boot.layout().activeGenerationPath());
+    assertEquals(sentinelBytes, Files.readString(active.resolve(SENTINEL)));
+  }
+
+  @Test void inPlaceRecoveredLayoutWithForeignFileIsRefusedUnchanged() throws Exception {
+    String id = "g-20250701-000000";
+    Path indices = Files.createDirectories(temp.resolve("indices"));
+    Path backup = Files.createDirectory(indices.resolve(id + ".bak-20250801-000000"));
+    Files.writeString(backup.resolve(SENTINEL), sentinel(id));
+    Files.writeString(backup.resolve(MANIFEST), v010Manifest(id));
+    Path active = luceneOnly(indices.resolve(id));
+    Files.writeString(active.resolve("foreign.txt"), "foreign bytes");
+    Files.writeString(temp.resolve("state.json"), v010State(id));
+    var manager = new IndexGenerationManager(temp);
+    var before = snapshot(temp);
+    var refusal = assertThrows(IOException.class, () -> manager.reconcileActiveRecoveryOwnership());
+    assertTrue(refusal.getMessage().contains("index.ownership_unproven"), refusal.toString());
+    assertThrows(IOException.class, manager::initializeOrLoad);
+    assertEquals(before, snapshot(temp));
+  }
+
+  // Releases up to v0.1.0 wrote the sentinel with a plain truncating write, so a crash could leave it empty.
+  @Test void emptySentinelBesideValidManifestStillStarts() throws Exception {
+    Path active = emptySentinelLayout("g-20250701-000000");
+    assertEquals("g-20250701-000000", assertDoesNotThrow(() -> new IndexGenerationManager(temp).initializeOrLoad())
+        .activeGenerationId());
+    assertTrue(Files.isRegularFile(active.resolve("segments_1")));
+  }
+
+  @Test void emptySentinelIsRewrittenFromTheManifestIdentity() throws Exception {
+    Path active = emptySentinelLayout("g-20250701-000000");
+    assertDoesNotThrow(() -> new IndexGenerationManager(temp).initializeOrLoad());
+    assertEquals("justsearch_generation_sentinel_v1\ngeneration_id=g-20250701-000000\ncreated_at_ms=1751328000000\n",
+        Files.readString(active.resolve(SENTINEL)));
+  }
+
+  private Path emptySentinelLayout(String id) throws Exception {
+    Path active = Files.createDirectories(temp.resolve("indices").resolve(id));
+    Files.write(active.resolve(SENTINEL), new byte[0]);
+    Files.writeString(active.resolve(MANIFEST), v010Manifest(id));
+    Files.writeString(active.resolve("segments_1"), "x");
+    Files.writeString(temp.resolve("state.json"), v010State(id));
+    return active;
+  }
+
+  @Test void emptySentinelWithoutManifestProofStaysRefused() throws Exception {
+    String id = "g-20250701-000000";
+    for (String shape : List.of("no-manifest", "other-identity", "no-pointer")) {
+      Path base = Files.createDirectory(temp.resolve(shape));
+      Path active = Files.createDirectories(base.resolve("indices").resolve(id));
+      Files.write(active.resolve(SENTINEL), new byte[0]);
+      if (!shape.equals("no-manifest")) {
+        Files.writeString(active.resolve(MANIFEST), v010Manifest(shape.equals("other-identity") ? "g-other" : id));
+      }
+      Files.writeString(active.resolve("segments_1"), "x");
+      if (!shape.equals("no-pointer")) Files.writeString(base.resolve("state.json"), v010State(id));
+      assertReadOnlyRefusal(new IndexGenerationManager(base), active);
+    }
+  }
+
+  @Test void indexBaseBelowOrAtASymlinkStartsFreshAndExisting() throws Exception {
+    Path real = Files.createDirectories(temp.resolve("real"));
+    Path link = Files.createSymbolicLink(temp.resolve("link"), real);
+    assertDoesNotThrow(() -> new IndexGenerationManager(link.resolve("data/fresh-index")).initializeOrLoad(),
+        "fresh install below a linked ancestor");
+    String id = "g-20250615-120000";
+    Path generation = Files.createDirectories(real.resolve("data/index/indices").resolve(id));
+    Files.writeString(generation.resolve(SENTINEL), sentinel(id));
+    Files.writeString(generation.resolve(MANIFEST), v010Manifest(id));
+    Files.writeString(real.resolve("data/index/state.json"), v010State(id));
+    assertEquals(id, assertDoesNotThrow(() -> new IndexGenerationManager(link.resolve("data/index"))
+        .initializeOrLoad()).activeGenerationId(), "existing index below a linked ancestor");
+    Path movedBase = Files.createSymbolicLink(temp.resolve("moved-index"), real.resolve("data/index"));
+    assertEquals(id, assertDoesNotThrow(() -> new IndexGenerationManager(movedBase).initializeOrLoad())
+        .activeGenerationId(), "index base that is itself a link");
+  }
+
+  private static Path luceneOnly(Path directory) throws Exception {
+    Files.createDirectories(directory);
+    for (String name : List.of("segments_1", "write.lock", "_0.cfs", "_0.cfe", "_0.si", "_0_1.liv")) {
+      Files.writeString(directory.resolve(name), "rebuilt in place");
+    }
+    return directory;
+  }
+
+  /** Manifest as written by the v0.1.0 writer (Jackson default pretty printer, format 1). */
+  private static String v010Manifest(String identity) {
+    return "{\n  \"format_version\" : 1,\n  \"generation_id\" : \"" + identity
+        + "\",\n  \"source\" : \"new\",\n  \"created_at_ms\" : 1751328000000\n}";
+  }
+
+  /** State pointer as written by the v0.1.0 writer (format 2, null fields omitted). */
+  private static String v010State(String active) {
+    return "{\n  \"format_version\" : 2,\n  \"active_generation\" : \"" + active
+        + "\",\n  \"migration_state\" : \"IDLE\",\n  \"migration_paused\" : false,\n"
+        + "  \"updated_at_ms\" : 1751328000000\n}";
+  }
+
   private Path foreign(String name) throws Exception {
     Path folder = Files.createDirectories(temp.resolve("indices").resolve(name));
     Files.writeString(folder.resolve("payload"), "foreign bytes");

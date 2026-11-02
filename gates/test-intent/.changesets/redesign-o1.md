@@ -148,7 +148,7 @@ check list at handoff; they restore static mocks and use only their temporary re
         "modules/worker-core/src/test/java/io/justsearch/indexerworker/index/IndexGenerationManagerRestartTest.java"
       ],
       "class": "New",
-      "behaviour": "Unproven marked payload is left and excluded from retained counts and build capacity; foreign non-marked payload refuses further startup without being changed. Other restart/pointer checks remain unchanged.",
+      "behaviour": "Unproven marked payload is left and excluded from retained counts and build capacity; foreign non-marked payload refuses further startup without being changed. The existing assertion that diagnostic backups are excluded from the retained count is kept; its backup now carries the full historical v1 sentinel and a manifest, so the exclusion is tested on a genuine owned backup rather than on a folder the ownership rule would exclude anyway. Other restart/pointer checks remain unchanged.",
       "repaired": true,
       "sources": [
         {
@@ -284,13 +284,13 @@ The changed retirement expectations are exactly:
 
 ## Tests added or rewritten
 
-- Tests added or rewritten: `modules/worker-core/src/test/java/io/justsearch/indexerworker/index/IndexOwnershipAdmissionTest.java` — S1-S10, S12-S14, S17; P1-P3, P5, P8-P9 — durable.
+- Tests added or rewritten: `modules/worker-core/src/test/java/io/justsearch/indexerworker/index/IndexOwnershipAdmissionTest.java` — S1-S10, S12-S14, S17, U1-U3; P1-P3, P5, P8-P9 — durable.
 - Tests added or rewritten: `modules/worker-core/src/test/java/io/justsearch/indexerworker/index/IndexGenerationPublicationTest.java` — S12, S14 — durable.
 - Tests added or rewritten: `modules/worker-core/src/test/java/io/justsearch/indexerworker/index/IndexGenerationCleanupAuthorityTest.java` — S15, P4, P10; explicit GC only for unreferenced recorded empty remnants after IDLE/no-building; boot and automatic cleanup keep the orphan fence — durable.
 - Tests added or rewritten: `modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/IndexOwnershipDeletionTest.java` — S11 — durable.
 - Tests added or rewritten: `modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/IndexOwnershipRuntimeAdmissionTest.java` — S5, S13 — durable.
 - Tests added or rewritten: `modules/worker-core/src/test/java/io/justsearch/indexerworker/index/IndexGenerationGcFailureTest.java` — P5, P10; full historical v1 sentinel input — durable.
-- Tests added or rewritten: `modules/worker-core/src/test/java/io/justsearch/indexerworker/index/IndexGenerationManagerRestartTest.java` — S1, S17 — durable.
+- Tests added or rewritten: `modules/worker-core/src/test/java/io/justsearch/indexerworker/index/IndexGenerationManagerRestartTest.java` — S1, S17; diagnostic-backup exclusion from the retained count kept — durable.
 - Tests added or rewritten: `modules/worker-core/src/test/java/io/justsearch/indexerworker/index/IndexGenerationRetirementTest.java` — S17; P5 owned retained-capacity fixture — durable.
 - Tests added or rewritten: `modules/worker-core/src/test/java/io/justsearch/indexerworker/index/GenerationPointerDurabilityTest.java` — control-file ownership; pointer/process-kill preservation — durable.
 - Tests added or rewritten: `modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/LifecycleDurabilityTest.java` — P7; owned recovery fixture — durable.
@@ -626,5 +626,82 @@ Web tests remain unrun by instruction. The orchestrator/verifier must create
 `gates/test-intent/evidence/redesign-o1.json`, run the listed frontend check, independently verify
 and append the acceptance record. No run-evidence invocation or acceptance record was authored
 by the builder. No commit, push, publish, dev stack or GPU inference was performed.
+
+## Repair round after verifier-1 (2026-11-02)
+
+Agent choices (U1-U3 and the narrowed S7) quoted from the decision that followed the first verification:
+
+- S7 narrowed: "a valid exact backup plus a non-empty active replacement is refused only when the
+  active directory holds anything other than Lucene index files (strict allowlist of Lucene
+  file-name patterns, real regular files, no links, no subdirectories)."
+- U1: "the v0.3.0-and-earlier recovered layout (state pointer names `<id>`; `<id>` holds only
+  Lucene files; `<id>.bak-<ts>` holds a valid sentinel/manifest for `<id>`) starts, with metadata
+  restored from the backup, in every state format where the base accepts it. A foreign file (for
+  example `foreign.txt`) beside the Lucene files in that same layout: refused, unchanged (S7)."
+- U2: "an active directory whose sentinel is a zero-length regular file and whose manifest is fully
+  valid for the directory's own id (pointer names it) is owned: the sentinel is rewritten
+  atomically from the manifest's identity before anything else writes. A zero-length sentinel
+  without a valid manifest stays refused (S3)."
+- U3: "the index base reached through a symbolic link anywhere above or at the base (data
+  directory moved and linked) starts, fresh and existing."
+
+Every released state pointer (v0.1.0 to v0.3.x) uses state format 2, so U1 is checked with the
+v0.1.0 writer's state and manifest bytes and with a current-format state.
+
+IndexOwnershipAdmissionTest is a new isolated file ([exempt]); its added checks are listed here.
+
+Regression/preservation checks against the base (pass on 344bdaf03c, fail on the branch head
+63d01df3f9 by assertion inside `assertDoesNotThrow`, pass on the candidate):
+
+- `IndexOwnershipAdmissionTest#release030InPlaceRecoveredActiveStartsWithMetadataFromBackup` (U1)
+- `IndexOwnershipAdmissionTest#inPlaceRecoveredActiveWithCurrentStateStartsThroughBoot` (U1)
+- `IndexOwnershipAdmissionTest#emptySentinelBesideValidManifestStillStarts` (U2)
+- `IndexOwnershipAdmissionTest#indexBaseBelowOrAtASymlinkStartsFreshAndExisting` (U3)
+
+New checks (fail on 344bdaf03c by assertion, pass on the head and the candidate except where noted):
+
+- `IndexOwnershipAdmissionTest#inPlaceRecoveredLayoutWithForeignFileIsRefusedUnchanged` (S7 narrowed;
+  base restores metadata into the foreign layout)
+- `IndexOwnershipAdmissionTest#emptySentinelWithoutManifestProofStaysRefused` (S3; base starts all three shapes)
+- `IndexOwnershipAdmissionTest#emptySentinelIsRewrittenFromTheManifestIdentity` (U2; base leaves the
+  sentinel empty; the head also fails it, by refusing)
+
+`IndexGenerationManagerRestartTest#unprovenMarkedRepresentationDoesNotConsumeCapacityAndForeignPayloadRefusesStart`
+again asserts "Admission excludes diagnostic backups" (on a genuine owned backup). On the base the
+restored assertion passes and the check still fails by assertion at the later `.del-` count
+(expected 1, was 2).
+
+Extra verifier arguments for this round (the overlays above are unchanged):
+
+```text
+--check modules/worker-core/src/test/java/io/justsearch/indexerworker/index/IndexOwnershipAdmissionTest.java#inPlaceRecoveredLayoutWithForeignFileIsRefusedUnchanged
+--check modules/worker-core/src/test/java/io/justsearch/indexerworker/index/IndexOwnershipAdmissionTest.java#emptySentinelWithoutManifestProofStaysRefused
+--check modules/worker-core/src/test/java/io/justsearch/indexerworker/index/IndexOwnershipAdmissionTest.java#emptySentinelIsRewrittenFromTheManifestIdentity
+```
+
+Implementation summary: the namespace gate checks only the base and the entries below it without
+following links, after one resolution of the base to its real path (the nearest existing ancestor's
+real path plus any missing tail). It receives the active identity from the current-format state
+pointer, bounded and read without following links, and admits only that directory in two
+narrow cases: Lucene files only with agreeing owned exact backups (restored in place by
+`reconcileActiveRecoveryOwnership`, rebuild obligation first, then sentinel and manifest by atomic
+replace), or an empty regular sentinel with a valid manifest for the same identity (sentinel
+rewritten atomically by the first initializer that may write; read-only guards never write).
+Other initializers refuse an unrestored in-place layout. The runtime gate (no pointer) admits neither case.
+
+Observed in this round (builder observations, not evidence): on 344bdaf03c with the unchanged
+compatibility patch, the four regression checks passed, the three new checks failed by
+AssertionFailedError, and the restart check failed at the later `.del-` count. On 63d01df3f9 the four
+regression checks and the U2 rewrite check failed by AssertionFailedError (an unexpected
+`index.ownership_unproven` inside `assertDoesNotThrow`). On the candidate, all 30 admission checks
+and 7 restart checks passed. Final full module run (exit 1, 28m08s): worker-core 637/0,
+adapters-lucene 960/0, indexer-worker 2500/1, app-services 5030/0, UI 2374/0, ipc-common 4/0. The
+one failure, `ExtractionInfrastructureTest#snapshotStorage(readonly-child)`, was a 5000 ms
+extraction-sandbox timeout in the fixture; focused replays passed on 344bdaf03c (8/0) and on the
+candidate (8/0). An earlier full run of this round found that reading the pointer through the
+lock-retrying reader delayed state publication under a held lock
+(`IndexGenerationVduEligibilityTest#strictReadReopensAfterLockWaitAndRefusesAStateChangedByTheGenerationOwner`);
+the pointer is now read lazily and without lock waits, and that check passes.
+`node scripts/dev/java-prepush.mjs --unreferenced` passed (exit 0).
 
 ## Acceptance records

@@ -53,6 +53,13 @@ class IndexGenerationManagerRestartTest {
       @org.junit.jupiter.api.io.TempDir Path base) throws Exception {
     var manager = new IndexGenerationManager(base);
     manager.initializeOrLoad();
+    // A genuine (owned) diagnostic backup: under the ownership rule an unproven one is excluded anyway.
+    Path backup = Files.createDirectory(base.resolve("indices/g-damaged.bak-20261001-120000"));
+    Files.writeString(backup.resolve(".justsearch-generation.sentinel"),
+        "justsearch_generation_sentinel_v1\ngeneration_id=g-damaged\ncreated_at_ms=1\n");
+    Files.writeString(backup.resolve(".justsearch-index-generation.json"),
+        "{\"format_version\":1,\"generation_id\":\"g-damaged\",\"source\":\"new\",\"created_at_ms\":1}");
+    assertEquals(1, manager.retainedGenerationCount(), "Admission excludes diagnostic backups");
     Path marked = Files.createDirectory(base.resolve("indices/g-abandoned.del-20261001-120000"));
     Files.writeString(marked.resolve("foreign"), "foreign bytes");
     assertEquals(1, manager.retainedGenerationCount());

@@ -311,10 +311,52 @@ public final class IndexGenerationManager {
 
   /** Read-only admission before journals, pointer recovery, normalization or allocation. */
   public IndexOwnership.NamespaceInspection inspectNamespace() throws IOException {
+    return admitNamespace(Admission.READ_ONLY);
+  }
+
+  /**
+   * READ_ONLY accepts the two pointer-bound historical layouts without writing; RECOVERY repairs
+   * an empty sentinel and leaves the in-place recovered layout to its restoration; INITIALIZE
+   * repairs the sentinel and refuses an unrestored in-place layout.
+   */
+  private enum Admission { READ_ONLY, RECOVERY, INITIALIZE }
+
+  private IndexOwnership.NamespaceInspection admitNamespace(Admission admission) throws IOException {
     cleanupWarnings = List.of();
-    var inspection = IndexOwnership.inspectNamespace(basePath);
+    var inspection = IndexOwnership.inspectNamespace(basePath, this::pointedActiveForAdmission);
     for (var warning : inspection.warnings()) warnCleanup(warning.path(), warning.reason());
+    if (admission != Admission.READ_ONLY && inspection.sentinelRepair() != null) {
+      // Before anything else writes: releases up to v0.1.0 wrote the sentinel non-atomically.
+      IndexOwnership.repairEmptySentinel(
+          indicesDir.resolve(inspection.sentinelRepair().getFileName().toString()), indicesDir);
+    }
+    if (admission == Admission.INITIALIZE && inspection.restorableActive() != null) {
+      throw new IndexOwnership.Unproven(inspection.restorableActive(), "missing");
+    }
     return inspection;
+  }
+
+  /**
+   * The current-format state pointer's active identity, else null. Read bounded through a
+   * non-following handle without waiting for locks: an unavailable pointer selects no repair.
+   */
+  private String pointedActiveForAdmission() {
+    try {
+      if (!IndexOwnership.plainAttributes(statePath).isRegularFile()) return null;
+      byte[] bytes;
+      try (FileChannel channel = FileChannel.open(statePath, StandardOpenOption.READ, LinkOption.NOFOLLOW_LINKS)) {
+        var buffer = java.nio.ByteBuffer.allocate(16_385);
+        while (buffer.hasRemaining() && channel.read(buffer) != -1) { }
+        if (buffer.position() > 16_384) return null;
+        bytes = java.util.Arrays.copyOf(buffer.array(), buffer.position());
+      }
+      State state = JSON.readValue(bytes, State.class);
+      if (state == null || state.format_version() != STATE_FORMAT_VERSION) return null;
+      return requireSafeGenerationId(state.active_generation(), "state.json active_generation");
+    } catch (IOException | RuntimeException unavailable) {
+      // The gate itself refuses non-regular pointers; an unreadable pointer selects no repair.
+      return null;
+    }
   }
 
   private int removeEmptyLeftovers() throws IOException {
@@ -370,7 +412,7 @@ public final class IndexGenerationManager {
    */
   public IndexLayout initializeOrLoad() throws IOException {
     try (var ignored = stateControl()) {
-      var inspection = inspectNamespace();
+      var inspection = admitNamespace(Admission.INITIALIZE);
       Files.createDirectories(basePath);
 
       State state = loadStateBestEffort();
@@ -481,7 +523,7 @@ public final class IndexGenerationManager {
   public BootLayout initializeForBoot(BootOwnership ownership, String effectiveFingerprint) throws IOException {
     Objects.requireNonNull(ownership, "ownership");
     try (var ignored = stateControl()) {
-      inspectNamespace();
+      admitNamespace(Admission.INITIALIZE);
       if (ownership instanceof BootOwnership.Native) {
         State observed = null;
         try { observed = readRecordedState(); }
@@ -780,7 +822,7 @@ public final class IndexGenerationManager {
       throws IOException {
     Objects.requireNonNull(preparation, "preparation");
     try (var ignored = stateControl()) {
-      inspectNamespace();
+      var inspection = admitNamespace(Admission.RECOVERY);
       if (Files.notExists(statePath, LinkOption.NOFOLLOW_LINKS)) {
         return false;
       }
@@ -818,7 +860,11 @@ public final class IndexGenerationManager {
       Path exact = resolveGenerationPathReadOnly(generationId);
 
       IndexOwnership.Evidence existing = null;
-      if (Files.exists(exact, LinkOption.NOFOLLOW_LINKS)) {
+      // Releases up to v0.3.0 rebuilt the index in place during recovery and left the sentinel
+      // and manifest only in <id>.bak-<ts>; the gate admits that layout only for Lucene files.
+      boolean inPlace = inspection.restorableActive() != null
+          && generationId.equals(inspection.restorableActive().getFileName().toString());
+      if (!inPlace && Files.exists(exact, LinkOption.NOFOLLOW_LINKS)) {
         existing = IndexOwnership.inspect(exact, indicesDir);
         if (existing.manifest() != null) return false;
       }
@@ -838,7 +884,14 @@ public final class IndexGenerationManager {
       }
       if (!IndexRecoveryMarker.exists(exact)) IndexRecoveryMarker.write(exact, "interrupted_backup_first");
       preparation.prepare(exact);
-      if (existing != null) {
+      if (inPlace) {
+        if (!IndexOwnership.holdsOnlyLuceneFiles(exact)) throw new IndexOwnership.Unproven(exact, "missing");
+        IndexOwnership.replaceControl(exact.resolve(GENERATION_SENTINEL),
+            authority.sentinel().getBytes(StandardCharsets.UTF_8));
+        IndexOwnership.replaceControl(exact.resolve(GENERATION_MANIFEST),
+            authority.manifest().getBytes(StandardCharsets.UTF_8));
+        IndexOwnership.inspectCanonical(exact, indicesDir);
+      } else if (existing != null) {
         io.justsearch.configuration.persistence.AtomicFileWrites.replaceStrict(
             exact.resolve(GENERATION_MANIFEST), authority.manifest().getBytes(StandardCharsets.UTF_8));
         IndexOwnership.forceDirectory(exact);
@@ -1000,7 +1053,7 @@ public final class IndexGenerationManager {
     List<String> expectedSources = projectionSourceIds == null ? null
         : checkedProjectionSourceIds(projectionSourceIds);
     try (var ignored = stateControl()) {
-      inspectNamespace();
+      admitNamespace(Admission.INITIALIZE);
       String target = recordedGenerationId(operationKey);
       if (source == null || source.isBlank() || source.length() > 256
           || source.chars().anyMatch(Character::isISOControl)
@@ -1333,7 +1386,7 @@ public final class IndexGenerationManager {
   /** Sets operator pause intent for migration orchestration (best-effort). */
   public State setMigrationPaused(boolean paused, String reason) throws IOException {
     try (var ignored = stateControl()) {
-      inspectNamespace();
+      admitNamespace(Admission.INITIALIZE);
       State current = readStateBestEffort();
       if (current == null) {
         // Ensure layout exists
@@ -1380,7 +1433,7 @@ public final class IndexGenerationManager {
    */
   public void updateMigrationState(MigrationState state) throws IOException {
     try (var ignored = stateControl()) {
-      inspectNamespace();
+      admitNamespace(Admission.INITIALIZE);
       Objects.requireNonNull(state, "state");
       State current = readStateBestEffort();
       if (current == null) {
@@ -1451,7 +1504,7 @@ public final class IndexGenerationManager {
    */
   public int recordAutoRebuildAttempt(String targetKey) throws IOException {
     try (var ignored = stateControl()) {
-      inspectNamespace();
+      admitNamespace(Admission.INITIALIZE);
       State current = readStateBestEffort();
       if (current == null) {
         // #758: a state record that exists but cannot be read holds a brake this
@@ -2474,7 +2527,7 @@ public final class IndexGenerationManager {
             state.auto_rebuild_first_ms());
 
     if (v != STATE_FORMAT_VERSION) {
-      inspectNamespace();
+      admitNamespace(Admission.INITIALIZE);
       // Upgrade v1 -> v2 in-place (best-effort).
       try {
         writeState(normalized);
@@ -2602,7 +2655,7 @@ public final class IndexGenerationManager {
   }
 
   private void writeState(State state) throws IOException {
-    inspectNamespace();
+    admitNamespace(Admission.INITIALIZE);
     Objects.requireNonNull(state, "state");
     Files.createDirectories(basePath);
     haltAtPointerPublication("before-backup", state);

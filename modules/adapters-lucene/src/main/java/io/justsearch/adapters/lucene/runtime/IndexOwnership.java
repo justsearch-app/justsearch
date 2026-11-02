@@ -104,12 +104,22 @@ public final class IndexOwnership {
     if (!plainAttributes(directory).isDirectory()) throw new Unproven(directory, "missing");
   }
 
-  public static void validateParents(Path directory) throws IOException {
-    Path absolute = directory.toAbsolutePath().normalize();
-    for (Path component = absolute; component != null; component = component.getParent()) {
-      try { requireDirectory(component); }
-      catch (NoSuchFileException absent) { /* A missing parent is created only after inspection. */ }
-    }
+  /**
+   * No-follow rules apply from the index base downward only; the base and its ancestors may be
+   * links (a data directory moved and linked), so only the entry itself is checked.
+   */
+  private static void requirePlainDirectoryIfPresent(Path directory) throws IOException {
+    try { requireDirectory(directory); }
+    catch (NoSuchFileException absent) { /* A missing entry is created only after inspection. */ }
+  }
+
+  /** Resolves the index base once: the nearest existing ancestor's real path plus the missing tail. */
+  public static Path realBase(Path basePath) throws IOException {
+    Path absolute = basePath.toAbsolutePath().normalize();
+    Path existing = absolute;
+    while (existing != null && Files.notExists(existing)) existing = existing.getParent();
+    if (existing == null) return absolute;
+    return existing.toRealPath().resolve(existing.relativize(absolute)).normalize();
   }
 
   /** Reads at most limit+1 bytes from the same non-following handle used for the read. */
@@ -233,7 +243,7 @@ public final class IndexOwnership {
     Path exact = directory.toAbsolutePath().normalize();
     Path parent = root.toAbsolutePath().normalize();
     if (!parent.equals(exact.getParent())) throw new Unproven(exact, "wrong identity");
-    validateParents(parent);
+    requirePlainDirectoryIfPresent(parent);
     Representation representation;
     try { representation = representation(exact.getFileName().toString()); }
     catch (IOException invalid) { throw new Unproven(exact, "wrong identity"); }
@@ -275,7 +285,15 @@ public final class IndexOwnership {
   }
 
   public record Warning(Path path, String reason) {}
-  public record NamespaceInspection(java.util.List<Path> canonicalOwned, java.util.List<Warning> warnings) {
+  /**
+   * Result of the read-only gate. Both nullable paths are only ever the directory the state
+   * pointer names: {@code restorableActive} holds only Lucene files beside agreeing owned
+   * {@code <id>.bak-<ts>} backups (the layout in-place recovery left in releases up to v0.3.0);
+   * {@code sentinelRepair} has an empty sentinel from the pre-atomic writer and a manifest that
+   * proves its identity. Their owner restores the evidence before anything else uses them.
+   */
+  public record NamespaceInspection(java.util.List<Path> canonicalOwned, java.util.List<Warning> warnings,
+      Path restorableActive, Path sentinelRepair) {
     public NamespaceInspection {
       canonicalOwned = java.util.List.copyOf(canonicalOwned);
       warnings = java.util.List.copyOf(warnings);
@@ -284,18 +302,107 @@ public final class IndexOwnership {
 
   /** Common read-only physical gate; pointer and recorded-operation decisions remain with their owner. */
   public static NamespaceInspection inspectNamespace(Path basePath) throws IOException {
-    try { return inspectNamespaceEntries(basePath); }
+    return inspectNamespace(basePath, () -> null);
+  }
+
+  /**
+   * Like {@link #inspectNamespace(Path)}; {@code pointedActive} supplies the active identity the
+   * authoritative state pointer names, or null, and is asked only when an unproven canonical
+   * directory is found. Pointers never prove ownership: they only select which directory the two
+   * narrow historical repairs may apply to.
+   */
+  public static NamespaceInspection inspectNamespace(Path basePath,
+      java.util.function.Supplier<String> pointedActive) throws IOException {
+    try { return inspectNamespaceEntries(realBase(basePath), pointedActive); }
     catch (Unproven refusal) { throw refusal; }
     catch (IOException unreadable) { throw new Unproven(basePath, "unreadable"); }
   }
 
-  private static NamespaceInspection inspectNamespaceEntries(Path basePath) throws IOException {
+  // Lucene index file names: segments_N, pending_segments_N, write.lock, and per-segment files
+  // such as _0.cfs, _0_1.liv or _0_Lucene99HnswVectorsFormat_0.vem.
+  private static final Pattern LUCENE_FILE = Pattern.compile(
+      "segments_[0-9a-z]+|pending_segments_[0-9a-z]+|segments\\.gen|write\\.lock"
+          + "|_[0-9a-z]+(_[A-Za-z0-9-]+)*\\.[A-Za-z0-9]+");
+
+  /** True only for a non-empty directory of real regular Lucene files: no links, subdirectories or other names. */
+  public static boolean holdsOnlyLuceneFiles(Path directory) throws IOException {
+    requireDirectory(directory);
+    boolean any = false;
+    try (var entries = Files.list(directory)) {
+      for (Path entry : entries.toList()) {
+        if (!LUCENE_FILE.matcher(entry.getFileName().toString()).matches()) return false;
+        BasicFileAttributes attributes;
+        try { attributes = plainAttributes(entry); }
+        catch (Unproven link) { return false; }
+        if (!attributes.isRegularFile()) return false;
+        any = true;
+      }
+    }
+    return any;
+  }
+
+  /** The single evidence every exact {@code <id>.bak-<ts>} backup agrees on, or null when absent or ambiguous. */
+  private static Evidence agreedBackupEvidence(Path indicesDir, String identity) throws IOException {
+    Pattern exact = Pattern.compile(Pattern.quote(identity) + "\\.bak-[0-9]{8}-[0-9]{6}");
+    Evidence agreed = null;
+    try (var entries = Files.list(indicesDir)) {
+      for (Path backup : entries.sorted().toList()) {
+        if (!exact.matcher(backup.getFileName().toString()).matches()) continue;
+        Evidence evidence;
+        try { evidence = inspect(backup, indicesDir); }
+        catch (Unproven invalid) { return null; }
+        if (evidence.manifest() == null) return null;
+        if (agreed != null && !(java.util.Arrays.equals(agreed.sentinel(), evidence.sentinel())
+            && java.util.Arrays.equals(agreed.manifest(), evidence.manifest()))) return null;
+        agreed = evidence;
+      }
+    }
+    return agreed;
+  }
+
+  /** Created time from a valid manifest beside an empty regular sentinel, or -1. */
+  private static long emptySentinelManifestTime(Path directory, String identity) throws IOException {
+    Path sentinel = directory.resolve(SENTINEL);
+    Path manifest = directory.resolve(MANIFEST);
+    try {
+      if (!plainAttributes(sentinel).isRegularFile() || readBounded(sentinel, 1_024).length != 0
+          || !entryExists(manifest)) return -1;
+      return JSON.readTree(validateManifest(manifest, identity)).path("created_at_ms").asLong();
+    } catch (Unproven | NoSuchFileException unproven) { return -1; }
+  }
+
+  /**
+   * Rewrites an empty sentinel left by the pre-atomic writer (releases up to v0.1.0 wrote it with a
+   * plain truncating write) from the identity and time of the manifest that proves the directory.
+   * The atomic rename replaces the entry; nothing is written through it.
+   */
+  public static Evidence repairEmptySentinel(Path directory, Path root) throws IOException {
+    Path exact = directory.toAbsolutePath().normalize();
+    if (!root.toAbsolutePath().normalize().equals(exact.getParent())
+        || representation(exact.getFileName().toString()).role() != Role.CANONICAL) {
+      throw new Unproven(exact, "wrong identity");
+    }
+    requireDirectory(exact);
+    String identity = exact.getFileName().toString();
+    long created = emptySentinelManifestTime(exact, identity);
+    if (created <= 0) throw new Unproven(exact.resolve(SENTINEL), "malformed");
+    replaceControl(exact.resolve(SENTINEL), ("justsearch_generation_sentinel_v1\ngeneration_id=" + identity
+        + "\ncreated_at_ms=" + created + "\n").getBytes(StandardCharsets.UTF_8));
+    return inspectIdentity(exact, identity);
+  }
+
+  private static NamespaceInspection inspectNamespaceEntries(Path basePath,
+      java.util.function.Supplier<String> pointedActive) throws IOException {
     Path indicesDir = basePath.resolve("indices");
     Path statePath = basePath.resolve("state.json");
     Path statePrevPath = basePath.resolve("state.json.prev");
     var warnings = new java.util.ArrayList<Warning>();
-    validateParents(basePath);
-    if (Files.notExists(basePath, LinkOption.NOFOLLOW_LINKS)) return new NamespaceInspection(java.util.List.of(), java.util.List.of());
+    Path restorableActive = null;
+    Path sentinelRepair = null;
+    if (Files.notExists(basePath, LinkOption.NOFOLLOW_LINKS)) {
+      return new NamespaceInspection(java.util.List.of(), java.util.List.of(), null, null);
+    }
+    requireDirectory(basePath);
     if (flatLegacy(basePath)) throw new IndexOwnership.Unproven(basePath, "missing");
     for (Path pointer : java.util.List.of(statePath, statePrevPath, basePath.resolve("migration-journal-admissions"))) {
       if (entryExists(pointer)
@@ -312,7 +419,7 @@ public final class IndexOwnership {
         }
       }
     }
-    validateParents(indicesDir);
+    requirePlainDirectoryIfPresent(indicesDir);
     java.util.List<Path> ownedCanonical = new java.util.ArrayList<>();
     if (entryExists(indicesDir)) {
       try (var entries = Files.list(indicesDir)) {
@@ -350,6 +457,18 @@ public final class IndexOwnership {
           } catch (IOException unproven) {
             if (marked) { addWarning(warnings, entry, unproven.getMessage()); continue; }
             if (unproven instanceof Unproven refusal && "link".equals(refusal.evidenceClass())) throw refusal;
+            if (unproven instanceof Unproven && representation != null && representation.role() == Role.CANONICAL
+                && attributes.isDirectory() && !attributes.isOther() && name.equals(pointedActive.get())) {
+              if (restorableActive == null && holdsOnlyLuceneFiles(entry)
+                  && agreedBackupEvidence(indicesDir, name) != null) {
+                restorableActive = entry;
+                continue;
+              }
+              if (sentinelRepair == null && emptySentinelManifestTime(entry, name) > 0) {
+                sentinelRepair = entry;
+                continue;
+              }
+            }
             if (!attributes.isSymbolicLink() && !attributes.isOther() && attributes.isDirectory()) {
               try (var contents = Files.list(entry)) {
                 if (contents.findAny().isEmpty()) continue;
@@ -362,7 +481,7 @@ public final class IndexOwnership {
       }
     }
     Path staging = basePath.resolve("staging");
-    validateParents(staging);
+    requirePlainDirectoryIfPresent(staging);
     if (entryExists(staging)) {
       try (var entries = Files.list(staging)) {
         for (Path path : entries.toList()) {
@@ -371,7 +490,7 @@ public final class IndexOwnership {
         }
       }
     }
-    return new NamespaceInspection(ownedCanonical, warnings);
+    return new NamespaceInspection(ownedCanonical, warnings, restorableActive, sentinelRepair);
   }
 
   private static void addWarning(java.util.List<Warning> warnings, Path path, String reason) {
@@ -390,8 +509,8 @@ public final class IndexOwnership {
     if (representation(identity).role() != Role.CANONICAL) throw new Unproven(base.resolve(identity), "wrong identity");
     Path indices = base.resolve("indices");
     Path staging = base.resolve("staging");
-    validateParents(indices);
-    validateParents(staging);
+    requirePlainDirectoryIfPresent(indices);
+    requirePlainDirectoryIfPresent(staging);
     Files.createDirectories(indices);
     Files.createDirectories(staging);
     Path candidate = Files.createDirectory(staging.resolve(identity + "." + UUID.randomUUID()));
