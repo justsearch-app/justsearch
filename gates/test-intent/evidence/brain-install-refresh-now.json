@@ -1,0 +1,127 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
+  },
+  "createdAt": "2026-11-02T14:17:52.516Z",
+  "revision": "7f435cfc7e1b0c393aa38e271859fd4782eddaba",
+  "tree": "dc3329f6e2cef8a9717fae2113ef3f230fcb496b",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/utils/aiInstallPoll.refresh.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/3qbuubiq/tmp/test-intent-vitest-842-1793629066123.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 1115
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/utils/aiInstallPoll.refresh.test.ts#reads immediately between ticks and resumes the regular schedule",
+      "file": "modules/ui-web/src/shell-v0/utils/aiInstallPoll.refresh.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:a919e9a0771b1f16135fc49e2498bfa24cf9f064e8da911794c68b2971642ab2",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "install refresh now reads immediately between ticks and resumes the regular schedule",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/utils/aiInstallPoll.refresh.test.ts#shares one queued read among concurrent callers without overlapping any endpoint",
+      "file": "modules/ui-web/src/shell-v0/utils/aiInstallPoll.refresh.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:a919e9a0771b1f16135fc49e2498bfa24cf9f064e8da911794c68b2971642ab2",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "install refresh now shares one queued read among concurrent callers without overlapping any endpoint",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/utils/aiInstallPoll.refresh.test.ts#does nothing without subscribers and drops queued reads when the last subscriber leaves",
+      "file": "modules/ui-web/src/shell-v0/utils/aiInstallPoll.refresh.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:a919e9a0771b1f16135fc49e2498bfa24cf9f064e8da911794c68b2971642ab2",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "install refresh now does nothing without subscribers and drops queued reads when the last subscriber leaves",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/utils/aiInstallPoll.refresh.test.ts#an obsolete queued read cannot refresh a replacement API base",
+      "file": "modules/ui-web/src/shell-v0/utils/aiInstallPoll.refresh.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:a919e9a0771b1f16135fc49e2498bfa24cf9f064e8da911794c68b2971642ab2",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "install refresh now an obsolete queued read cannot refresh a replacement API base",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "7f435cfc7e",
+    "revision": "7f435cfc7e1b0c393aa38e271859fd4782eddaba",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/utils/aiInstallPoll.refresh.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/3qbuubiq/tmp/test-intent-vitest-842-1793629070404.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 1288,
+        "output": "JSON report written to /home/elias/.cache/am/3qbuubiq/tmp/test-intent-vitest-842-1793629070404.json\n\n"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui-web/src/shell-v0/utils/aiInstallPoll.refresh.test.ts#reads immediately between ticks and resumes the regular schedule",
+        "classification": "assertion",
+        "detail": "install refresh now reads immediately between ticks and resumes the regular schedule:  AssertionError: expected 'undefined' to be 'function' // Object.is equality\n    at /home/elias/.cache/am/3qbuubiq/tmp/test-intent-before-ClZRiS/modules/ui-web/src/shell-v0/utils/aiInstallPoll.refresh.test.ts:16:45\n    at file:///home/elias/.cache/am/3qbuubiq/tmp/test-intent-before-ClZRiS/modules/ui-"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/utils/aiInstallPoll.refresh.test.ts#shares one queued read among concurrent callers without overlapping any endpoint",
+        "classification": "assertion",
+        "detail": "install refresh now shares one queued read among concurrent callers without overlapping any endpoint:  AssertionError: expected 'undefined' to be 'function' // Object.is equality\n    at /home/elias/.cache/am/3qbuubiq/tmp/test-intent-before-ClZRiS/modules/ui-web/src/shell-v0/utils/aiInstallPoll.refresh.test.ts:29:45\n    at file:///home/elias/.cache/am/3qbuubiq/tmp/test-intent-before-ClZRiS/modules/ui-"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/utils/aiInstallPoll.refresh.test.ts#does nothing without subscribers and drops queued reads when the last subscriber leaves",
+        "classification": "assertion",
+        "detail": "install refresh now does nothing without subscribers and drops queued reads when the last subscriber leaves:  AssertionError: expected 'undefined' to be 'function' // Object.is equality\n    at /home/elias/.cache/am/3qbuubiq/tmp/test-intent-before-ClZRiS/modules/ui-web/src/shell-v0/utils/aiInstallPoll.refresh.test.ts:47:45\n    at file:///home/elias/.cache/am/3qbuubiq/tmp/test-intent-before-ClZRiS/modules/ui-"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/utils/aiInstallPoll.refresh.test.ts#an obsolete queued read cannot refresh a replacement API base",
+        "classification": "assertion",
+        "detail": "install refresh now an obsolete queued read cannot refresh a replacement API base:  AssertionError: expected 'undefined' to be 'function' // Object.is equality\n    at /home/elias/.cache/am/3qbuubiq/tmp/test-intent-before-ClZRiS/modules/ui-web/src/shell-v0/utils/aiInstallPoll.refresh.test.ts:62:45\n    at file:///home/elias/.cache/am/3qbuubiq/tmp/test-intent-before-ClZRiS/modules/ui-"
+      }
+    ]
+  },
+  "digest": "sha256:d645e9a15c36d441fdfb6082a12dbb73e9d233aeae8ed72d5dfb7a753edf045b"
+}

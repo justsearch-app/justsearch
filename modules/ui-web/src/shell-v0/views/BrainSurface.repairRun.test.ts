@@ -12,6 +12,11 @@ vi.mock('../state/aiStateStore.js', async original => ({
     return () => store.listeners.delete(listener);
   },
 }));
+const refreshInstall = vi.hoisted(() => vi.fn(async () => {}));
+vi.mock('../utils/aiInstallPoll.js', async original => ({
+  ...await original<typeof import('../utils/aiInstallPoll.js')>(),
+  refreshAiInstallNow: refreshInstall,
+}));
 import './BrainSurface.js';
 
 interface Brain extends HTMLElement { apiBase: string; host_: unknown; updateComplete: Promise<boolean> }
@@ -55,7 +60,7 @@ function notify(patch: Partial<AiState> = {}) {
 function emit(installStatus: InstallStatus) { notify({ installStatus }); }
 
 beforeEach(() => {
-  operations = []; confirmations = []; repairReply = null;
+  operations = []; confirmations = []; repairReply = null; refreshInstall.mockClear();
   run = {
     state: 'running', phase: 'download', installedFully: true, repairNeeded: true,
     startedAtEpochMs: 200, updatedAtEpochMs: Date.now(), downloadedBytes: 256, totalBytes: 1024,
@@ -84,12 +89,15 @@ beforeEach(() => {
 afterEach(() => { document.body.innerHTML = ''; store.listeners.clear(); vi.unstubAllGlobals(); });
 
 describe('Brain running repair controls (B2/B8)', () => {
-  it('Repair response shows installing progress, Pause and Cancel before the shared verdict catches up, and Cancel retains bytes', async () => {
+  it('Repair requests a read immediately and only store observations change progress, Pause, Resume and Cancel', async () => {
     run = { ...run, updatedAtEpochMs: Date.now() - 120_000, readyCapabilities: ['retrieval-core'],
       stages: [...run.stages!, { stage: 'answers', label: 'Answers', state: 'blocked', blockedReason: 'Not enough disk space.' }] };
     const el = await mount();
     await click(el, 'Repair');
     expect(operations).toEqual(['core.repair-ai-install']);
+    expect(refreshInstall).toHaveBeenCalledTimes(1);
+    expect(el.shadowRoot!.querySelector('.brain-headline')!.textContent).not.toContain('Installing');
+    emit(run); await settle(el);
     expect(store.current.aiEngine.kind).toBe('offline');
     expect(el.shadowRoot!.querySelector('.brain-headline')!.textContent).toBe('Installing… 25%');
     expect(el.shadowRoot!.querySelector<HTMLElement>('.progress-bar')!.style.width).toBe('25%');
@@ -100,10 +108,19 @@ describe('Brain running repair controls (B2/B8)', () => {
     expect(el.shadowRoot!.textContent).toContain('Download stalled');
     expect(el.shadowRoot!.querySelector('[label="Pause download"]')).not.toBeNull();
     await click(el, 'Pause download');
+    expect(refreshInstall).toHaveBeenCalledTimes(2);
+    expect(el.shadowRoot!.querySelector('.brain-headline')!.textContent).toBe('Installing… 25%');
+    emit(run); await settle(el);
     expect(el.shadowRoot!.querySelector('.brain-headline')!.textContent).toBe('Paused 25%');
     await click(el, 'Resume download');
+    expect(refreshInstall).toHaveBeenCalledTimes(3);
+    expect(el.shadowRoot!.querySelector('.brain-headline')!.textContent).toBe('Paused 25%');
+    emit(run); await settle(el);
     expect(el.shadowRoot!.querySelector('.brain-headline')!.textContent).toBe('Installing… 25%');
     await click(el, 'Cancel');
+    expect(refreshInstall).toHaveBeenCalledTimes(4);
+    expect(el.shadowRoot!.querySelector('[data-testid="brain-simple-action"][label="Cancel"]')).not.toBeNull();
+    emit(run); await settle(el);
     expect(operations).toEqual(['core.repair-ai-install', 'core.cancel-ai-install']);
     expect(confirmations).toEqual(['Repair', 'Pause download']);
     expect(run.resumableBytes).toBe(256);
@@ -111,14 +128,12 @@ describe('Brain running repair controls (B2/B8)', () => {
     expect(el.shadowRoot!.textContent).not.toContain('Downloading 25%');
   });
 
-  it('a newer Repair response survives unchanged store notifications until an equal or newer install observation wins', async () => {
+  it('Repair does not override unchanged store notifications while its requested read is pending', async () => {
     const el = await mount(); await click(el, 'Repair');
+    expect(refreshInstall).toHaveBeenCalledTimes(1);
     notify({ runtimeStatus: { onnxFeatures: [] } }); await settle(el);
-    expect(el.shadowRoot!.querySelector('.brain-headline')!.textContent).toBe('Installing… 25%');
-    expect(el.shadowRoot!.querySelector('[label="Pause download"]')).not.toBeNull();
-    expect(el.shadowRoot!.querySelector('[data-testid="brain-simple-action"][label="Cancel"]')).not.toBeNull();
-    await click(el, 'Repair');
-    expect(operations).toEqual(['core.repair-ai-install']);
+    expect(el.shadowRoot!.querySelector('.brain-headline')!.textContent).not.toContain('Installing');
+    expect(el.shadowRoot!.querySelector('[label="Pause download"]')).toBeNull();
     emit({ ...run, downloadedBytes: 512 }); await settle(el);
     expect(el.shadowRoot!.querySelector('.brain-headline')!.textContent).toBe('Installing… 50%');
     emit({ ...run, updatedAtEpochMs: run.updatedAtEpochMs! + 1, state: 'completed' }); await settle(el);
@@ -136,37 +151,31 @@ describe('Brain running repair controls (B2/B8)', () => {
     expect(el.shadowRoot!.querySelector('[label="Pause download"]')).not.toBeNull();
   });
 
-  it.each(['Pause', 'Resume'])('%s immediately replaces a synchronized poll at the same timestamp until a new equal-timestamp poll wins', async action => {
+  it.each(['Pause', 'Resume'])('%s requests an immediate read and waits for the store even at an equal timestamp', async action => {
     run = { ...run, paused: action === 'Resume' };
     emit({ ...run });
     const el = await mount();
     await click(el, `${action} download`);
-    const headline = action === 'Pause' ? 'Paused 25%' : 'Installing… 25%';
-    const nextAction = action === 'Pause' ? 'Resume download' : 'Pause download';
-    expect(el.shadowRoot!.querySelector('.brain-headline')!.textContent).toBe(headline);
-    expect(el.shadowRoot!.querySelector(`[label="${nextAction}"]`)).not.toBeNull();
-    // Other store inputs re-emit the same install observation, not another poll.
+    expect(refreshInstall).toHaveBeenCalledTimes(1);
+    const previous = action === 'Pause' ? 'Installing… 25%' : 'Paused 25%';
+    expect(el.shadowRoot!.querySelector('.brain-headline')!.textContent).toBe(previous);
     notify({ runtimeStatus: { onnxFeatures: [] } }); await settle(el);
-    expect(el.shadowRoot!.querySelector('.brain-headline')!.textContent).toBe(headline);
-    // The next poll wins even when it disagrees with the operation at an equal timestamp.
-    emit({ ...run, paused: !run.paused }); await settle(el);
-    expect(el.shadowRoot!.querySelector('.brain-headline')!.textContent).toBe(action === 'Pause' ? 'Installing… 25%' : 'Paused 25%');
-    expect(el.shadowRoot!.querySelector(`[label="${action} download"]`)).not.toBeNull();
+    expect(el.shadowRoot!.querySelector('.brain-headline')!.textContent).toBe(previous);
+    emit({ ...run }); await settle(el);
+    expect(el.shadowRoot!.querySelector('.brain-headline')!.textContent).toBe(action === 'Pause' ? 'Paused 25%' : 'Installing… 25%');
+    expect(el.shadowRoot!.querySelector(`[label="${action === 'Pause' ? 'Resume' : 'Pause'} download"]`)).not.toBeNull();
   });
 
-  it('re-emitted and newly polled older observations after Pause never erase its equal-timestamp response', async () => {
+  it('the shared store alone decides which install observation follows Pause regardless of timestamp', async () => {
     emit({ ...run });
     const el = await mount();
     await click(el, 'Pause download');
-    notify({ runtimeStatus: { onnxFeatures: [] } }); await settle(el);
-    expect(el.shadowRoot!.querySelector('.brain-headline')!.textContent).toBe('Paused 25%');
     emit({ ...run, paused: false, updatedAtEpochMs: run.updatedAtEpochMs! - 1 }); await settle(el);
-    notify({ runtimeStatus: { onnxFeatures: [] } }); await settle(el);
-    expect(el.shadowRoot!.querySelector('.brain-headline')!.textContent).toBe('Paused 25%');
-    expect(el.shadowRoot!.querySelector('[label="Resume download"]')).not.toBeNull();
-    emit({ ...run, paused: false }); await settle(el);
     expect(el.shadowRoot!.querySelector('.brain-headline')!.textContent).toBe('Installing… 25%');
     expect(el.shadowRoot!.querySelector('[label="Pause download"]')).not.toBeNull();
+    emit({ ...run }); await settle(el);
+    expect(el.shadowRoot!.querySelector('.brain-headline')!.textContent).toBe('Paused 25%');
+    expect(el.shadowRoot!.querySelector('[label="Resume download"]')).not.toBeNull();
   });
 
   it.each(['declined', 'unavailable', 'not-in-mode'])('planning ignores retained downloading records for an excluded %s package', async state => {
@@ -204,14 +213,16 @@ describe('Brain running repair controls (B2/B8)', () => {
     expect(el.shadowRoot!.querySelector('[data-testid="brain-simple-action"][label="Cancel"]')).not.toBeNull();
   });
 
-  it('a Repair response can supersede a failed install read only until the store acknowledges its timestamp', async () => {
+  it('a successful Repair cannot reopen a failed install observation gate before recovery', async () => {
     const el = await mount(); await click(el, 'Repair');
     notify({ installObservationLive: false, snapshotLive: false }); await settle(el);
-    expect(el.shadowRoot!.querySelector('.brain-headline')!.textContent).toBe('Installing… 25%');
-    emit(run); await settle(el);
     expect(el.shadowRoot!.querySelector('.brain-headline')!.textContent).toBe('Checking AI status…');
     expect(el.shadowRoot!.querySelector('[label="Pause download"]')).toBeNull();
     expect(el.shadowRoot!.querySelector('[data-testid="brain-simple-action"][label="Cancel"]')).toBeNull();
+    emit(run); await settle(el);
+    expect(el.shadowRoot!.querySelector('.brain-headline')!.textContent).toBe('Checking AI status…');
+    notify({ installObservationLive: true, snapshotLive: true }); await settle(el);
+    expect(el.shadowRoot!.querySelector('[label="Pause download"]')).not.toBeNull();
   });
 
   it('while a Repair run is being planned, a package unavailable on this computer is not said to be preparing', async () => {
@@ -242,6 +253,7 @@ describe('Brain running repair controls (B2/B8)', () => {
   it.each(['preflight', 'plan'])('a new Repair in %s never displays the previous run percentage or ready stages', async phase => {
     run = { ...run, phase, downloadedBytes: 1004, readyCapabilities: ['retrieval-core'], packages: [{ packageId: 'embedding', state: 'downloading', bytesDownloaded: 1004, bytesTotal: 1024 }] };
     const el = await mount(); await click(el, 'Repair');
+    emit(run); await settle(el);
     expect(el.shadowRoot!.querySelector('[data-feature="meaning"]')!.textContent).toContain('Preparing download');
     expect(el.shadowRoot!.querySelector('.brain-headline')!.textContent).toBe('Installing…');
     expect(el.shadowRoot!.querySelector('.progress-bar')).toBeNull();
@@ -256,6 +268,7 @@ describe('Brain running repair controls (B2/B8)', () => {
   it('a pending package in the current run waits instead of claiming On from the old runtime', async () => {
     run = { ...run, packages: [{ packageId: 'embedding', state: 'pending', bytesDownloaded: 0, bytesTotal: 1024 }] };
     const el = await mount(); await click(el, 'Repair');
+    emit(run); await settle(el);
     expect(el.shadowRoot!.querySelector('[data-feature="meaning"]')!.textContent).toContain('Waiting to download');
     emit({ ...run, packages: [{ packageId: 'embedding', state: 'downloading', bytesDownloaded: 128, bytesTotal: 1024 }] }); await el.updateComplete;
     expect(el.shadowRoot!.querySelector('[data-feature="meaning"]')!.textContent).toContain('Downloading 12%');

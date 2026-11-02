@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
   },
-  "createdAt": "2026-11-02T13:25:20.264Z",
-  "revision": "5caa37062480341a2546e1022689801789217b58",
-  "tree": "d66af1000e0c859a05ecc175d23fd8076a53fef7",
+  "createdAt": "2026-11-02T14:16:21.104Z",
+  "revision": "7f435cfc7e1b0c393aa38e271859fd4782eddaba",
+  "tree": "abf35b5df2ed13dd9640a3b3b641bf3206df8271",
   "environment": {
     "platform": "linux",
     "arch": "x64",
@@ -18,33 +18,18 @@
   },
   "runs": [
     {
-      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/BrainSurface.repairRun.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/00ajvm2s/tmp/test-intent-vitest-40-1793625907674.json\"",
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/BrainSurface.repairRun.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/3qbuubiq/tmp/test-intent-vitest-5-1793628968262.json\"",
       "cwd": "modules/ui-web",
       "exitCode": 0,
-      "durationMs": 4609
+      "durationMs": 3715
     }
   ],
   "checks": [
     {
-      "id": "modules/ui-web/src/shell-v0/views/BrainSurface.repairRun.test.ts#Repair response shows installing progress, Pause and Cancel before the shared verdict catches up, and Cancel retains bytes",
-      "file": "modules/ui-web/src/shell-v0/views/BrainSurface.repairRun.test.ts",
-      "runner": "vitest",
-      "contentDigest": "sha256:2d179c0d2274a781d1286fc4aa59a2082e200df79072248e336c0bcc9b1204d4",
-      "executed": true,
-      "skipped": false,
-      "outcome": "passed",
-      "cases": [
-        {
-          "name": "Brain running repair controls (B2/B8) Repair response shows installing progress, Pause and Cancel before the shared verdict catches up, and Cancel retains bytes",
-          "status": "passed"
-        }
-      ]
-    },
-    {
       "id": "modules/ui-web/src/shell-v0/views/BrainSurface.repairRun.test.ts#a new Repair in preflight never displays the previous run percentage or ready stages",
       "file": "modules/ui-web/src/shell-v0/views/BrainSurface.repairRun.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:2d179c0d2274a781d1286fc4aa59a2082e200df79072248e336c0bcc9b1204d4",
+      "contentDigest": "sha256:61e6b629ef4603c8c9596cc3303e4f16fb5bcf1487f9b8bf2c15e3176e48a069",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -59,7 +44,7 @@
       "id": "modules/ui-web/src/shell-v0/views/BrainSurface.repairRun.test.ts#a new Repair in plan never displays the previous run percentage or ready stages",
       "file": "modules/ui-web/src/shell-v0/views/BrainSurface.repairRun.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:2d179c0d2274a781d1286fc4aa59a2082e200df79072248e336c0bcc9b1204d4",
+      "contentDigest": "sha256:61e6b629ef4603c8c9596cc3303e4f16fb5bcf1487f9b8bf2c15e3176e48a069",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -74,7 +59,7 @@
       "id": "modules/ui-web/src/shell-v0/views/BrainSurface.repairRun.test.ts#a pending package in the current run waits instead of claiming On from the old runtime",
       "file": "modules/ui-web/src/shell-v0/views/BrainSurface.repairRun.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:2d179c0d2274a781d1286fc4aa59a2082e200df79072248e336c0bcc9b1204d4",
+      "contentDigest": "sha256:61e6b629ef4603c8c9596cc3303e4f16fb5bcf1487f9b8bf2c15e3176e48a069",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -89,7 +74,7 @@
       "id": "modules/ui-web/src/shell-v0/views/BrainSurface.repairRun.test.ts#an additions run keeps controls through a missing runtime observation, a second window and remount",
       "file": "modules/ui-web/src/shell-v0/views/BrainSurface.repairRun.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:2d179c0d2274a781d1286fc4aa59a2082e200df79072248e336c0bcc9b1204d4",
+      "contentDigest": "sha256:61e6b629ef4603c8c9596cc3303e4f16fb5bcf1487f9b8bf2c15e3176e48a069",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -108,40 +93,35 @@
     "patches": [],
     "runs": [
       {
-        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/BrainSurface.repairRun.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/00ajvm2s/tmp/test-intent-vitest-40-1793625915425.json\"",
+        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/BrainSurface.repairRun.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/3qbuubiq/tmp/test-intent-vitest-5-1793628976167.json\"",
         "cwd": "<before-worktree>",
         "exitCode": 1,
-        "durationMs": 4134,
-        "output": "JSON report written to /home/elias/.cache/am/00ajvm2s/tmp/test-intent-vitest-40-1793625915425.json\n\n"
+        "durationMs": 4181,
+        "output": "JSON report written to /home/elias/.cache/am/3qbuubiq/tmp/test-intent-vitest-5-1793628976167.json\n\n"
       }
     ],
     "checks": [
       {
-        "id": "modules/ui-web/src/shell-v0/views/BrainSurface.repairRun.test.ts#Repair response shows installing progress, Pause and Cancel before the shared verdict catches up, and Cancel retains bytes",
-        "classification": "assertion",
-        "detail": "Brain running repair controls (B2/B8) Repair response shows installing progress, Pause and Cancel before the shared verdict catches up, and Cancel retains bytes:  AssertionError: expected 'Installed — repair available' to be 'Installing… 25%' // Object.is equality\n    at /home/elias/.cache/am/00ajvm2s/tmp/test-intent-before-0V43AP/modules/ui-web/src/shell-v0/views/BrainSurface.repairRun.test.ts:94:74\n    at runNextTicks (node:internal/process/task_queues:65:5"
-      },
-      {
         "id": "modules/ui-web/src/shell-v0/views/BrainSurface.repairRun.test.ts#a new Repair in preflight never displays the previous run percentage or ready stages",
         "classification": "assertion",
-        "detail": "Brain running repair controls (B2/B8) a new Repair in preflight never displays the previous run percentage or ready stages:  AssertionError: expected '\\n        \\n          \\n    \\n  \\n   …' to contain 'Preparing download'\n    at /home/elias/.cache/am/00ajvm2s/tmp/test-intent-before-0V43AP/modules/ui-web/src/shell-v0/views/BrainSurface.repairRun.test.ts:245:83\n    at runNextTicks (node:internal/process/task_queues:65:5)"
+        "detail": "Brain running repair controls (B2/B8) a new Repair in preflight never displays the previous run percentage or ready stages:  AssertionError: expected '\\n        \\n          \\n    \\n  \\n   …' to contain 'Preparing download'\n    at /home/elias/.cache/am/3qbuubiq/tmp/test-intent-before-bhQlvs/modules/ui-web/src/shell-v0/views/BrainSurface.repairRun.test.ts:257:83\n    at runNextTicks (node:internal/process/task_queues:65:5)"
       },
       {
         "id": "modules/ui-web/src/shell-v0/views/BrainSurface.repairRun.test.ts#a new Repair in plan never displays the previous run percentage or ready stages",
         "classification": "assertion",
-        "detail": "Brain running repair controls (B2/B8) a new Repair in plan never displays the previous run percentage or ready stages:  AssertionError: expected '\\n        \\n          \\n    \\n  \\n   …' to contain 'Preparing download'\n    at /home/elias/.cache/am/00ajvm2s/tmp/test-intent-before-0V43AP/modules/ui-web/src/shell-v0/views/BrainSurface.repairRun.test.ts:245:83\n    at runNextTicks (node:internal/process/task_queues:65:5)"
+        "detail": "Brain running repair controls (B2/B8) a new Repair in plan never displays the previous run percentage or ready stages:  AssertionError: expected '\\n        \\n          \\n    \\n  \\n   …' to contain 'Preparing download'\n    at /home/elias/.cache/am/3qbuubiq/tmp/test-intent-before-bhQlvs/modules/ui-web/src/shell-v0/views/BrainSurface.repairRun.test.ts:257:83\n    at runNextTicks (node:internal/process/task_queues:65:5)"
       },
       {
         "id": "modules/ui-web/src/shell-v0/views/BrainSurface.repairRun.test.ts#a pending package in the current run waits instead of claiming On from the old runtime",
         "classification": "assertion",
-        "detail": "Brain running repair controls (B2/B8) a pending package in the current run waits instead of claiming On from the old runtime:  AssertionError: expected '\\n        \\n          \\n    \\n  \\n   …' to contain 'Waiting to download'\n    at /home/elias/.cache/am/00ajvm2s/tmp/test-intent-before-0V43AP/modules/ui-web/src/shell-v0/views/BrainSurface.repairRun.test.ts:259:83\n    at runNextTicks (node:internal/process/task_queues:65:5)"
+        "detail": "Brain running repair controls (B2/B8) a pending package in the current run waits instead of claiming On from the old runtime:  AssertionError: expected '\\n        \\n          \\n    \\n  \\n   …' to contain 'Waiting to download'\n    at /home/elias/.cache/am/3qbuubiq/tmp/test-intent-before-bhQlvs/modules/ui-web/src/shell-v0/views/BrainSurface.repairRun.test.ts:272:83\n    at runNextTicks (node:internal/process/task_queues:65:5)"
       },
       {
         "id": "modules/ui-web/src/shell-v0/views/BrainSurface.repairRun.test.ts#an additions run keeps controls through a missing runtime observation, a second window and remount",
         "classification": "assertion",
-        "detail": "Brain running repair controls (B2/B8) an additions run keeps controls through a missing runtime observation, a second window and remount:  AssertionError: expected 'Checking AI status…' to be 'Installing… 25%' // Object.is equality\n    at /home/elias/.cache/am/00ajvm2s/tmp/test-intent-before-0V43AP/modules/ui-web/src/shell-v0/views/BrainSurface.repairRun.test.ts:269:76\n    at runNextTicks (node:internal/process/task_queues:65:5)\n    at"
+        "detail": "Brain running repair controls (B2/B8) an additions run keeps controls through a missing runtime observation, a second window and remount:  AssertionError: expected 'Checking AI status…' to be 'Installing… 25%' // Object.is equality\n    at /home/elias/.cache/am/3qbuubiq/tmp/test-intent-before-bhQlvs/modules/ui-web/src/shell-v0/views/BrainSurface.repairRun.test.ts:282:76\n    at runNextTicks (node:internal/process/task_queues:65:5)\n    at"
       }
     ]
   },
-  "digest": "sha256:05cc08c0273ea5876641df721e5bb345fb3ffaa3799b90b3c35951b7655dfac5"
+  "digest": "sha256:1d66c917791073c37b2f18c3193ba4c3f27844d9ee42a64592759cba039bbf36"
 }

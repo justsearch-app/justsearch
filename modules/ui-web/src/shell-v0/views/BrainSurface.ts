@@ -49,7 +49,7 @@ import {
   type UiMode,
 } from '../state/uiModeState.js';
 // Tempdoc 657 — pre-install per-tier weight breakdown (GET /api/ai/install/plan-preview).
-import type { InstallPlanPreview } from '../utils/aiInstallPoll.js';
+import { refreshAiInstallNow, type InstallPlanPreview } from '../utils/aiInstallPoll.js';
 import {
   aiEngineBody,
   aiEngineHeadline,
@@ -597,7 +597,6 @@ export class BrainSurface extends JfElement {
 
   private clientRef: OperationClient | null = null;
   private _unifiedAiState: UnifiedAiState | null = null;
-  private installResponsePending = false;
   private unsubAi: (() => void) | null = null;
   private uiModeUnsub: (() => void) | null = null;
   private refreshRevision = 0;
@@ -1214,8 +1213,6 @@ export class BrainSurface extends JfElement {
     // for inference + system status (aiStateStore.ts §B7); mirror its snapshots here
     // instead of running a second poll for them.
     this.unsubAi = subscribeAiState((s) => {
-      // Poll results have a new install object; other store inputs retain its identity.
-      const newInstallObservation = s.installStatus !== this._unifiedAiState?.installStatus;
       this._unifiedAiState = s;
       // Adopt only non-null snapshots: the store retains its last-known snapshot when
       // the connection goes stale (aiStateStore §B7), so a null here means "no data
@@ -1227,9 +1224,7 @@ export class BrainSurface extends JfElement {
       // conditionally-armed pollInstall/pollPack/pollRuntime timers (which only ever self-armed
       // AFTER a prior fetch had already succeeded — the structural cause of the "stuck on
       // Connecting… forever" bug, tempdoc 663 §O). Same non-null-adopt rule as inference/status.
-      if (s.installStatus && (!this.installResponsePending || (newInstallObservation
-        && (s.installStatus.updatedAtEpochMs ?? 0) >= (this.installStatus?.updatedAtEpochMs ?? 0)))) {
-        this.installResponsePending = false;
+      if (s.installStatus) {
         const previous = this.installStatus;
         this.installStatus = s.installStatus;
         if ((previous?.state !== s.installStatus.state && previous != null)
@@ -1348,15 +1343,8 @@ export class BrainSurface extends JfElement {
         && ['checking', 'stale-poll'].includes(this._unifiedAiState.aiEngine.stability.cause));
   }
 
-  /** Pause/Resume need not advance the timestamp. Only a subsequent poll can acknowledge them. */
-  private adoptInstallResponse(status: InstallStatus): void {
-    const observed = this._unifiedAiState?.installStatus;
-    this.installResponsePending = (status.updatedAtEpochMs ?? 0) >= (observed?.updatedAtEpochMs ?? 0);
-    this.installStatus = this.installResponsePending ? status : observed ?? status;
-  }
-
   private installKnown(): boolean {
-    return this._unifiedAiState?.installObservationLive === true || this.installResponsePending;
+    return this._unifiedAiState?.installObservationLive === true;
   }
 
   private hasInstalledAi(): boolean {
@@ -1829,7 +1817,7 @@ export class BrainSurface extends JfElement {
       );
       // Both endpoints answer with the post-call status, so a null here is a REFUSAL (or an
       // unreachable backend) — say so rather than leaving a button that looks like it worked.
-      if (data) this.adoptInstallResponse(data);
+      if (data) void refreshAiInstallNow();
       else this.runtimeError = `Could not ${paused ? 'pause' : 'resume'} the download.`;
     });
   }
@@ -1842,7 +1830,7 @@ export class BrainSurface extends JfElement {
       this.runtimeError = null;
       const data = (await this.invokeOp('core.start-ai-install', { acceptTerms: true })) as InstallStatus;
       if (data) {
-        this.adoptInstallResponse(data);
+        void refreshAiInstallNow();
         if (feature === 'chat') await this.setChatEnabled(true);
       }
     });
@@ -1889,7 +1877,7 @@ export class BrainSurface extends JfElement {
     if (!ok) return;
     await this.withBusy('install-cancel', async () => {
       const data = (await this.invokeOp('core.cancel-ai-install', {})) as InstallStatus;
-      if (data) this.adoptInstallResponse(data);
+      if (data) void refreshAiInstallNow();
     });
   }
 
@@ -1908,7 +1896,7 @@ export class BrainSurface extends JfElement {
       });
       if (!ok) return;
       const data = (await this.invokeOp('core.repair-ai-install', { acceptTerms: true })) as InstallStatus;
-      if (data) this.adoptInstallResponse(data);
+      if (data) void refreshAiInstallNow();
     });
   }
 
@@ -2101,8 +2089,7 @@ export class BrainSurface extends JfElement {
     // Tempdoc 663 — the string `kind` drives this panel's dot/label/sub lookup below, unchanged
     // from before; only its SOURCE changed (the one `computeAiEngineVerdict` derivation, not the
     // old 5-source ladder).
-    // Repair/additions responses update installStatus directly; aiEngine may still describe the
-    // preceding poll. A live install (or newer operation response) needs no runtime observation.
+    // A live install observation needs no runtime observation to show download progress.
     const known = (this.installKnown() && this.installStatus?.state === 'running') || this.aiKnown();
     const aiVerdict: AiEngineVerdict = known ? this.deriveAiEngineVerdict() : { kind: 'connecting', stability: { kind: 'provisional', cause: 'checking' }, installFailure: null };
     const aiState = aiVerdict.kind;

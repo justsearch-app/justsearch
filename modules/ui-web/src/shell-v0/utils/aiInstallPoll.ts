@@ -122,6 +122,8 @@ type Listener = (snapshot: AiInstallSnapshot) => void;
 const listeners = new Set<Listener>();
 let timer: number | null = null;
 let controller: AbortController | null = null;
+let inFlight: Promise<void> | null = null;
+let queuedRefresh: Promise<void> | null = null;
 let apiBase = '';
 let last: AiInstallSnapshot = { install: null, runtime: null, packs: null };
 
@@ -194,10 +196,15 @@ async function readStatus(key: 'install' | 'runtime' | 'packs', current: AbortCo
   publish(current);
 }
 
-async function fetchOnce(current: AbortController): Promise<void> {
-  await Promise.all([
+function fetchOnce(current: AbortController): Promise<void> {
+  if (inFlight) return inFlight;
+  const pending = Promise.all([
     readStatus('install', current), readStatus('runtime', current), readStatus('packs', current),
-  ]);
+  ]).then(() => undefined).finally(() => {
+    if (controller === current && inFlight === pending) inFlight = null;
+  });
+  inFlight = pending;
+  return pending;
 }
 
 /**
@@ -227,12 +234,38 @@ function ensureRunning(): void {
 function stop(): void {
   const obsolete = controller;
   controller = null;
+  inFlight = null;
+  queuedRefresh = null;
   obsolete?.abort();
   if (timer !== null) {
     window.clearTimeout(timer);
     timer = null;
   }
   last = { install: null, runtime: null, packs: null };
+}
+
+/**
+ * Read now after an install operation, or share one queued read after the current batch.
+ * No reads overlap, and the ordinary adaptive schedule resumes after the refreshed batch.
+ * Without subscribers there is nothing to refresh.
+ */
+export function refreshAiInstallNow(): Promise<void> {
+  if (listeners.size === 0 || !controller) return Promise.resolve();
+  if (inFlight) {
+    if (queuedRefresh) return queuedRefresh;
+    const current = controller;
+    queuedRefresh = inFlight.then(() => {
+      if (controller !== current) return;
+      queuedRefresh = null;
+      return refreshAiInstallNow();
+    });
+    return queuedRefresh;
+  }
+  if (timer !== null) {
+    window.clearTimeout(timer);
+    timer = null;
+  }
+  return tick(controller);
 }
 
 /**

@@ -577,7 +577,7 @@ axe run remain necessary.
       ],
       "class": "New",
       "repaired": true,
-      "behaviour": "S1–S7 review repairs: supported Automatic semantics (GPU null display without a reset; context reset writes zero; no longest-answer reset), mock null-as-keep merge matching SettingsPatch, active status plus active model for On, initial settings-read uncertainty with reachable blocked reasons, selected additions Install action and exact consent, last-observed picture-reading wording on disconnect, independent bounded Health endpoint requests that skip overlapping ticks and ignore timed-out late results, and shared expanded/controls semantics for every feature opener. The GPU slider preservation check retires its impossible null-reset assertion while retaining its untouched-value and processor-only assertions.",
+      "behaviour": "S1\u2013S7 review repairs: supported Automatic semantics (GPU null display without a reset; context reset writes zero; no longest-answer reset), mock null-as-keep merge matching SettingsPatch, active status plus active model for On, initial settings-read uncertainty with reachable blocked reasons, selected additions Install action and exact consent, last-observed picture-reading wording on disconnect, independent bounded Health endpoint requests that skip overlapping ticks and ignore timed-out late results, and shared expanded/controls semantics for every feature opener. The GPU slider preservation check retires its impossible null-reset assertion while retaining its untouched-value and processor-only assertions.",
       "sources": [
         {
           "kind": "owner-adopted-scenario",
@@ -710,10 +710,10 @@ axe run remain necessary.
       ],
       "evidence": "gates/test-intent/evidence/brain-live-repairs.json",
       "newChecks": [
-        "modules/ui-web/src/shell-v0/views/BrainSurface.repairRemedy.test.ts#repairNeeded ⇒ Repair is the primary action in the alert",
-        "modules/ui-web/src/shell-v0/views/BrainSurface.repairRemedy.test.ts#required file missing but the capability is observably running ⇒ the \"working, but\" copy",
-        "modules/ui-web/src/shell-v0/views/BrainSurface.repairRemedy.test.ts#required file missing and the capability is down ⇒ the full-strength copy is unchanged",
-        "modules/ui-web/src/shell-v0/views/BrainSurface.repairRemedy.test.ts#three failed repair passes ⇒ the manual fallback, not an unqualified Repair button"
+        "modules/ui-web/src/shell-v0/views/BrainSurface.repairRemedy.test.ts#repairNeeded \u21d2 Repair is the primary action in the alert",
+        "modules/ui-web/src/shell-v0/views/BrainSurface.repairRemedy.test.ts#required file missing but the capability is observably running \u21d2 the \"working, but\" copy",
+        "modules/ui-web/src/shell-v0/views/BrainSurface.repairRemedy.test.ts#required file missing and the capability is down \u21d2 the full-strength copy is unchanged",
+        "modules/ui-web/src/shell-v0/views/BrainSurface.repairRemedy.test.ts#three failed repair passes \u21d2 the manual fallback, not an unqualified Repair button"
       ]
     },
     {
@@ -807,7 +807,7 @@ axe run remain necessary.
       ],
       "class": "New",
       "repaired": true,
-      "behaviour": "D1–D10 live redesign repairs: one confirmed-live page gate and installed repair wording with saved answer intent; passive preview reads never block real switch clicks or overwrite newer saves; sliders keep focus and drafts, serialize/coalesce the latest committed change, stop on conflict and distinguish Automatic-at-maximum from zero; all-app status GPU memory (device-zero semantics repaired separately in G5); sentence word boundaries; single-gesture panel handoff without focus scrolling; cancelled package bytes; the picture branch takes layout space; repair copy points to existing locations. Geometry and native keyboard behavior are additionally exercised in Chromium across viewport sizes, themes, forced colors and 200% reflow.",
+      "behaviour": "D1\u2013D10 live redesign repairs: one confirmed-live page gate and installed repair wording with saved answer intent; passive preview reads never block real switch clicks or overwrite newer saves; sliders keep focus and drafts, serialize/coalesce the latest committed change, stop on conflict and distinguish Automatic-at-maximum from zero; all-app status GPU memory (device-zero semantics repaired separately in G5); sentence word boundaries; single-gesture panel handoff without focus scrolling; cancelled package bytes; the picture branch takes layout space; repair copy points to existing locations. Geometry and native keyboard behavior are additionally exercised in Chromium across viewport sizes, themes, forced colors and 200% reflow.",
       "sources": [
         {
           "kind": "owner-adopted-scenario",
@@ -920,7 +920,7 @@ axe run remain necessary.
       ],
       "class": "New",
       "repaired": true,
-      "behaviour": "G1–G5 review repairs: failed reads independently invalidate retained state while origin stays reachable; successful observations have no age, with the page gate also requiring app-wide snapshotLive; Advanced labels retained observations; a selected missing answer package uses runtime intent without package declines or download consent while Repair owns acquisition; passive previews finish before another passive batch starts and do not lock choices; graphics memory is device zero, one of N devices, never an aggregate. The previous D5 aggregate assertion is replaced by G5 because /api/status.gpu produces device-zero memory. B14 declined-package consent remains asserted unchanged.",
+      "behaviour": "G1\u2013G5 review repairs: failed reads independently invalidate retained state while origin stays reachable; successful observations have no age, with the page gate also requiring app-wide snapshotLive; Advanced labels retained observations; a selected missing answer package uses runtime intent without package declines or download consent while Repair owns acquisition; passive previews finish before another passive batch starts and do not lock choices; graphics memory is device zero, one of N devices, never an aggregate. The previous D5 aggregate assertion is replaced by G5 because /api/status.gpu produces device-zero memory. B14 declined-package consent remains asserted unchanged.",
       "sources": [
         {
           "kind": "owner-adopted-scenario",
@@ -1015,7 +1015,7 @@ axe run remain necessary.
         "instrumentation",
         "input re-encoding"
       ],
-      "whatMoved": "Successful-observation fixtures explicitly supply the install/runtime poll owners’ freshness flags. Existing expected outcomes, race injections and operation oracles remain unchanged. aiInstallPoll lifecycle snapshot equality includes completed-read outcomes; StatusDeck’s complete AiState factory supplies false for absent observations. The new G checks and corrected G5 device-zero assertion are separately warranted as repaired behavior. The desktop terminal-recovery check again expects four recurring timers, because observation freshness adds no timers; it still requires all five requests aborted, no later requests, and zero timers after teardown.",
+      "whatMoved": "Successful-observation fixtures explicitly supply the install/runtime poll owners\u2019 freshness flags. Existing expected outcomes, race injections and operation oracles remain unchanged. aiInstallPoll lifecycle snapshot equality includes completed-read outcomes; StatusDeck\u2019s complete AiState factory supplies false for absent observations. The new G checks and corrected G5 device-zero assertion are separately warranted as repaired behavior. The desktop terminal-recovery check again expects four recurring timers, because observation freshness adds no timers; it still requires all five requests aborted, no later requests, and zero timers after teardown.",
       "newChecks": []
     },
     {
@@ -1103,7 +1103,7 @@ axe run remain necessary.
           "label": "agent choice"
         }
       ],
-      "conflictSearch": "Searched docs/decisions and the task’s prior freshness choices for conflict: the current narrowing explicitly supersedes time-based freshness. Retired G1 unanswered reads invalidate observations within the fixed liveness bound; H4 unanswered install/runtime reads invalidate at the status read bound; H6 successful observations age out after 15 seconds; and H5’s admission-wait deadline-extension expectation. Their production age/deadline tracking is deleted. Failed-read invalidation, focus preservation, successful cadence/response-order behavior and desktop recovery’s four timers remain checked."
+      "conflictSearch": "Searched docs/decisions and the task\u2019s prior freshness choices for conflict: the current narrowing explicitly supersedes time-based freshness. Retired G1 unanswered reads invalidate observations within the fixed liveness bound; H4 unanswered install/runtime reads invalidate at the status read bound; H6 successful observations age out after 15 seconds; and H5\u2019s admission-wait deadline-extension expectation. Their production age/deadline tracking is deleted. Failed-read invalidation, focus preservation, successful cadence/response-order behavior and desktop recovery\u2019s four timers remain checked."
     },
     {
       "items": [
@@ -1147,7 +1147,7 @@ axe run remain necessary.
       ],
       "class": "New",
       "repaired": true,
-      "behaviour": "V12: after a cancelled run only steps whose files are absent and that downloaded bytes say 'Cancelled · N kept'; present, pending and skipped packages keep their real state, and no step says Downloading unless the run is running (cancelled, failed or completed runs with a leftover downloading record) (a zero-byte interruption reads Not downloaded; a present package keeps its observed On/Off). The repair alert carries the 'A required component is missing' remedy once; the status line does not repeat it. These checks fail by assertion on 2c7f1e8d99 (live check verifier-12: 'Cancelled · 0 B kept' on an active reranker and installed answers; the remedy shown twice).",
+      "behaviour": "V12: after a cancelled run only steps whose files are absent and that downloaded bytes say 'Cancelled \u00b7 N kept'; present, pending and skipped packages keep their real state, and no step says Downloading unless the run is running (cancelled, failed or completed runs with a leftover downloading record) (a zero-byte interruption reads Not downloaded; a present package keeps its observed On/Off). The repair alert carries the 'A required component is missing' remedy once; the status line does not repeat it. These checks fail by assertion on 2c7f1e8d99 (live check verifier-12: 'Cancelled \u00b7 0 B kept' on an active reranker and installed answers; the remedy shown twice).",
       "sources": [
         {
           "kind": "owner-adopted-scenario",
@@ -1179,7 +1179,7 @@ axe run remain necessary.
       ],
       "class": "New",
       "repaired": true,
-      "behaviour": "A running Repair or additions run owns the Brain installing headline and inline download block even while the shared verdict still describes the preceding poll or the runtime observation is unavailable. The actual Repair, Pause, Resume and Cancel buttons work; retained bytes, stages, blocked/stalled and search-ready notices remain visible. Preflight/planning never reuse the previous run percentage or stages; pending/current package records replace old runtime On claims. Controls survive a second window and remount. The five checks fail by assertion on 1489cf0340.",
+      "behaviour": "Preserved running-install presentation after a shared store observation: planning resets percentages and ready stages, pending packages wait, and missing runtime observations, second windows and remount retain live download controls. Operation-response presentation was retired by the final narrowing decision below.",
       "sources": [
         {
           "kind": "owner-adopted-scenario",
@@ -1220,7 +1220,6 @@ axe run remain necessary.
       ],
       "evidence": "gates/test-intent/evidence/brain-running-repair.json",
       "newChecks": [
-        "modules/ui-web/src/shell-v0/views/BrainSurface.repairRun.test.ts#Repair response shows installing progress, Pause and Cancel before the shared verdict catches up, and Cancel retains bytes",
         "modules/ui-web/src/shell-v0/views/BrainSurface.repairRun.test.ts#a new Repair in preflight never displays the previous run percentage or ready stages",
         "modules/ui-web/src/shell-v0/views/BrainSurface.repairRun.test.ts#a new Repair in plan never displays the previous run percentage or ready stages",
         "modules/ui-web/src/shell-v0/views/BrainSurface.repairRun.test.ts#a pending package in the current run waits instead of claiming On from the old runtime",
@@ -1233,7 +1232,7 @@ axe run remain necessary.
       ],
       "class": "New",
       "repaired": true,
-      "behaviour": "Unchanged prior store snapshots do not erase a newer Repair response or unlock Repair. Equal/newer store observations win, including when an older operation reply arrives late. Failed install reads gate retained download/planning progress, stages and controls and successful reads recover them. A newer operation response bridges a failed observation only until the store catches up. Each selected check fails by assertion on 4c6637f1b6. While a Repair run is being planned, a package unavailable on this computer or declined keeps its own state instead of 'Preparing download' (live check verifier-14).",
+      "behaviour": "Preserved late-operation-response safety, failed-read gating and recovery, and unavailable packages during planning. Retained-response and timestamp-arbitration guarantees were retired by the final narrowing decision below.",
       "sources": [
         {
           "kind": "owner-adopted-scenario",
@@ -1257,14 +1256,6 @@ axe run remain necessary.
           "label": "agent-drafted, owner-adopted"
         },
         {
-          "kind": "delegated-choice",
-          "delegationQuote": "well from now on you can just proceed autonomously accordinglky",
-          "delegationLocation": "task t-20261101-uiimpl, user turn after the WP1 summary",
-          "delegationScope": "Implement the agreed AI Brain redesign and repair its review defects.",
-          "choice": "Compare updatedAtEpochMs only: keep an operation response while newer than the store; equal or newer store status wins. Current download facts and controls require live install observation or that newer response; runtime-only failure does not hide the download block.",
-          "label": "agent choice"
-        },
-        {
           "kind": "owner-adopted-scenario",
           "task": "t-20261101-uiimpl",
           "scenario": "B4",
@@ -1274,11 +1265,9 @@ axe run remain necessary.
       ],
       "evidence": "gates/test-intent/evidence/brain-running-observation-repair.json",
       "newChecks": [
-        "modules/ui-web/src/shell-v0/views/BrainSurface.repairRun.test.ts#a newer Repair response survives unchanged store notifications until an equal or newer install observation wins",
         "modules/ui-web/src/shell-v0/views/BrainSurface.repairRun.test.ts#a late Repair response never replaces the store install status with an older timestamp",
         "modules/ui-web/src/shell-v0/views/BrainSurface.repairRun.test.ts#a failed install read gates a retained running download observation and recovery restores it",
         "modules/ui-web/src/shell-v0/views/BrainSurface.repairRun.test.ts#a failed install read gates a retained running plan observation and recovery restores it",
-        "modules/ui-web/src/shell-v0/views/BrainSurface.repairRun.test.ts#a Repair response can supersede a failed install read only until the store acknowledges its timestamp",
         "modules/ui-web/src/shell-v0/views/BrainSurface.repairRun.test.ts#while a Repair run is being planned, a package unavailable on this computer is not said to be preparing"
       ]
     },
@@ -1322,7 +1311,7 @@ axe run remain necessary.
       ],
       "class": "New",
       "repaired": true,
-      "behaviour": "Pause and Resume update the actual button and headline immediately after the store has synchronized, despite unchanged backend timestamps. Re-emitted snapshots and older polls never revert an operation response; a subsequent equal-timestamp poll wins. While planning, retained downloading records for declined, unavailable and not-in-mode packages never claim Downloading, Waiting to download or Preparing download; included packages still prepare. All six checks fail by assertion on 5caa370624.",
+      "behaviour": "Preserved round-3 planning rule: retained downloading records for declined, unavailable and not-in-mode packages never claim Downloading, Waiting to download or Preparing download; included packages still prepare. The operation-response/timestamp guarantees are retired below.",
       "sources": [
         {
           "kind": "owner-adopted-scenario",
@@ -1344,24 +1333,302 @@ axe run remain necessary.
           "scenario": "B4",
           "quote": "Path: Your files (file count from status), Read the text (built in), Understand meaning (needed, its size, no switch), Best match first, Answer questions (model name and size when installed), with Text in scans and images as a branch off Read the text. Each step shows its known size (registry download/footprint size, never claimed as measured disk use) and its state in words (on, off, not downloaded, downloading x%, unavailable on this computer with the reason).",
           "label": "agent-drafted, owner-adopted"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/brain-running-ties-repair.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/views/BrainSurface.repairRun.test.ts#planning ignores retained downloading records for an excluded declined package",
+        "modules/ui-web/src/shell-v0/views/BrainSurface.repairRun.test.ts#planning ignores retained downloading records for an excluded unavailable package",
+        "modules/ui-web/src/shell-v0/views/BrainSurface.repairRun.test.ts#planning ignores retained downloading records for an excluded not-in-mode package"
+      ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/views/BrainSurface.repairRun.test.ts"
+      ],
+      "class": "Obsolete",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "well from now on you can just proceed autonomously accordinglky",
+          "delegationLocation": "task t-20261101-uiimpl, user turn after the WP1 summary",
+          "delegationScope": "Implement the agreed AI Brain redesign and repair its review defects.",
+          "choice": "Final narrowing decision in this builder brief: remove retained operation responses and all identity/timestamp arbitration from BrainSurface; aiInstallPoll via aiStateStore alone owns install observations and the live install gate. A successful start, repair, pause, resume or cancel requests refresh now without awaiting it in the busy state. The previous state may remain visible between the operation reply and that read. Keep the round-3 planning rule unchanged.",
+          "label": "agent choice"
+        }
+      ],
+      "conflictSearch": "Decision records and the owner-adopted B2/B8/B13/Q3/Q5 scenarios searched for a conflict: none. The final narrowing decision explicitly supersedes prior retained-response choices.",
+      "note": "Repair response shows installing progress, Pause and Cancel before the shared verdict catches up, and Cancel retains bytes \u2014 operation replies no longer project progress; the new check waits for each shared observation and asserts its immediate refresh request, preserving retained bytes and stage notices"
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/views/BrainSurface.repairRun.test.ts"
+      ],
+      "class": "Obsolete",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "well from now on you can just proceed autonomously accordinglky",
+          "delegationLocation": "task t-20261101-uiimpl, user turn after the WP1 summary",
+          "delegationScope": "Implement the agreed AI Brain redesign and repair its review defects.",
+          "choice": "Final narrowing decision in this builder brief: remove retained operation responses and all identity/timestamp arbitration from BrainSurface; aiInstallPoll via aiStateStore alone owns install observations and the live install gate. A successful start, repair, pause, resume or cancel requests refresh now without awaiting it in the busy state. The previous state may remain visible between the operation reply and that read. Keep the round-3 planning rule unchanged.",
+          "label": "agent choice"
+        }
+      ],
+      "conflictSearch": "Decision records and the owner-adopted B2/B8/B13/Q3/Q5 scenarios searched for a conflict: none. The final narrowing decision explicitly supersedes prior retained-response choices.",
+      "note": "a newer Repair response survives unchanged store notifications until an equal or newer install observation wins \u2014 unchanged store notifications remain authoritative; the replacement asserts no progress until the requested store read arrives. The response-based lock against a second Repair is also retired: after busy ends the preceding store state controls availability until that read, the named delay limit"
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/views/BrainSurface.repairRun.test.ts"
+      ],
+      "class": "Obsolete",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "well from now on you can just proceed autonomously accordinglky",
+          "delegationLocation": "task t-20261101-uiimpl, user turn after the WP1 summary",
+          "delegationScope": "Implement the agreed AI Brain redesign and repair its review defects.",
+          "choice": "Final narrowing decision in this builder brief: remove retained operation responses and all identity/timestamp arbitration from BrainSurface; aiInstallPoll via aiStateStore alone owns install observations and the live install gate. A successful start, repair, pause, resume or cancel requests refresh now without awaiting it in the busy state. The previous state may remain visible between the operation reply and that read. Keep the round-3 planning rule unchanged.",
+          "label": "agent choice"
+        }
+      ],
+      "conflictSearch": "Decision records and the owner-adopted B2/B8/B13/Q3/Q5 scenarios searched for a conflict: none. The final narrowing decision explicitly supersedes prior retained-response choices.",
+      "note": "Pause immediately replaces a synchronized poll at the same timestamp until a new equal-timestamp poll wins \u2014 Pause now waits for the shared store and requests a read immediately; equal timestamps have no special page meaning"
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/views/BrainSurface.repairRun.test.ts"
+      ],
+      "class": "Obsolete",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "well from now on you can just proceed autonomously accordinglky",
+          "delegationLocation": "task t-20261101-uiimpl, user turn after the WP1 summary",
+          "delegationScope": "Implement the agreed AI Brain redesign and repair its review defects.",
+          "choice": "Final narrowing decision in this builder brief: remove retained operation responses and all identity/timestamp arbitration from BrainSurface; aiInstallPoll via aiStateStore alone owns install observations and the live install gate. A successful start, repair, pause, resume or cancel requests refresh now without awaiting it in the busy state. The previous state may remain visible between the operation reply and that read. Keep the round-3 planning rule unchanged.",
+          "label": "agent choice"
+        }
+      ],
+      "conflictSearch": "Decision records and the owner-adopted B2/B8/B13/Q3/Q5 scenarios searched for a conflict: none. The final narrowing decision explicitly supersedes prior retained-response choices.",
+      "note": "Resume immediately replaces a synchronized poll at the same timestamp until a new equal-timestamp poll wins \u2014 Resume now waits for the shared store and requests a read immediately; equal timestamps have no special page meaning"
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/views/BrainSurface.repairRun.test.ts"
+      ],
+      "class": "Obsolete",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "well from now on you can just proceed autonomously accordinglky",
+          "delegationLocation": "task t-20261101-uiimpl, user turn after the WP1 summary",
+          "delegationScope": "Implement the agreed AI Brain redesign and repair its review defects.",
+          "choice": "Final narrowing decision in this builder brief: remove retained operation responses and all identity/timestamp arbitration from BrainSurface; aiInstallPoll via aiStateStore alone owns install observations and the live install gate. A successful start, repair, pause, resume or cancel requests refresh now without awaiting it in the busy state. The previous state may remain visible between the operation reply and that read. Keep the round-3 planning rule unchanged.",
+          "label": "agent choice"
+        }
+      ],
+      "conflictSearch": "Decision records and the owner-adopted B2/B8/B13/Q3/Q5 scenarios searched for a conflict: none. The final narrowing decision explicitly supersedes prior retained-response choices.",
+      "note": "re-emitted and newly polled older observations after Pause never erase its equal-timestamp response \u2014 page timestamp arbitration is removed; the replacement asserts that the shared store decides the observation"
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/views/BrainSurface.repairRun.test.ts"
+      ],
+      "class": "Obsolete",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "well from now on you can just proceed autonomously accordinglky",
+          "delegationLocation": "task t-20261101-uiimpl, user turn after the WP1 summary",
+          "delegationScope": "Implement the agreed AI Brain redesign and repair its review defects.",
+          "choice": "Final narrowing decision in this builder brief: remove retained operation responses and all identity/timestamp arbitration from BrainSurface; aiInstallPoll via aiStateStore alone owns install observations and the live install gate. A successful start, repair, pause, resume or cancel requests refresh now without awaiting it in the busy state. The previous state may remain visible between the operation reply and that read. Keep the round-3 planning rule unchanged.",
+          "label": "agent choice"
+        }
+      ],
+      "conflictSearch": "Decision records and the owner-adopted B2/B8/B13/Q3/Q5 scenarios searched for a conflict: none. The final narrowing decision explicitly supersedes prior retained-response choices.",
+      "note": "a Repair response can supersede a failed install read only until the store acknowledges its timestamp \u2014 no operation reply may reopen the failed-observation gate; the replacement asserts recovery only on a live store observation"
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/views/BrainSurface.repairRun.test.ts"
+      ],
+      "class": "New",
+      "repaired": true,
+      "behaviour": "Only the shared store changes install presentation after operations. Successful Repair/Pause/Resume/Cancel request a read at once, without timestamp arbitration or an exception to failed-read gating. Previous observations remain until the shared read arrives. Refusal and retained-byte guarantees stay at their existing owners.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "B2",
+          "quote": "Headline from the shared AI verdict for every lifecycle state it decides today: not installed, download paused/stopped, installing (with progress), install failed, starting/recovering, connecting/unconfirmed, ready, running on the processor instead of the graphics card, activation or reindex required. While status is unknown it says so and never claims ready.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "B8",
+          "quote": "Install: the Install AI button shows the selected total size and opens the existing licence/size consent; downloading shows progress, pause/resume, cancel with retained bytes, stalled and blocked stages, and search ready before completion, in the same page (no nested panel). Repair, retry after failure and the working-but-missing / manual fallback stay reachable.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "B13",
+          "quote": "Live behaviour: status, install progress and switch states update without collapsing open panels or Advanced settings, without losing a slider draft; package previews and LLM settings refresh when install state changes and when the window regains focus, ignoring out-of-order responses, so a second window converges; reload or tab switch mid-install keeps the progress and outcome. (challenger 7)",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "Q3",
+          "quote": "Settings saves keep witnesses and conflict review; offline runtime mutations are never queued; unknown/last-observed values stay labelled.",
+          "label": "agent-drafted, owner-adopted"
         },
         {
           "kind": "delegated-choice",
           "delegationQuote": "well from now on you can just proceed autonomously accordinglky",
           "delegationLocation": "task t-20261101-uiimpl, user turn after the WP1 summary",
           "delegationScope": "Implement the agreed AI Brain redesign and repair its review defects.",
-          "choice": "Keep a successful operation response through re-emissions of the same install observation and older polls; the first subsequent poll object with an equal or newer updatedAtEpochMs wins. During planning ignore all retained package progress; included packages prepare and excluded packages report their own state. Supersedes the earlier timestamp-only tie decision.",
+          "choice": "Final narrowing decision in this builder brief: remove retained operation responses and all identity/timestamp arbitration from BrainSurface; aiInstallPoll via aiStateStore alone owns install observations and the live install gate. A successful start, repair, pause, resume or cancel requests refresh now without awaiting it in the busy state. The previous state may remain visible between the operation reply and that read. Keep the round-3 planning rule unchanged.",
           "label": "agent choice"
         }
       ],
-      "evidence": "gates/test-intent/evidence/brain-running-ties-repair.json",
+      "evidence": "gates/test-intent/evidence/brain-install-store-authority.json",
       "newChecks": [
-        "modules/ui-web/src/shell-v0/views/BrainSurface.repairRun.test.ts#Pause immediately replaces a synchronized poll at the same timestamp until a new equal-timestamp poll wins",
-        "modules/ui-web/src/shell-v0/views/BrainSurface.repairRun.test.ts#Resume immediately replaces a synchronized poll at the same timestamp until a new equal-timestamp poll wins",
-        "modules/ui-web/src/shell-v0/views/BrainSurface.repairRun.test.ts#re-emitted and newly polled older observations after Pause never erase its equal-timestamp response",
-        "modules/ui-web/src/shell-v0/views/BrainSurface.repairRun.test.ts#planning ignores retained downloading records for an excluded declined package",
-        "modules/ui-web/src/shell-v0/views/BrainSurface.repairRun.test.ts#planning ignores retained downloading records for an excluded unavailable package",
-        "modules/ui-web/src/shell-v0/views/BrainSurface.repairRun.test.ts#planning ignores retained downloading records for an excluded not-in-mode package"
+        "modules/ui-web/src/shell-v0/views/BrainSurface.repairRun.test.ts#Repair requests a read immediately and only store observations change progress, Pause, Resume and Cancel",
+        "modules/ui-web/src/shell-v0/views/BrainSurface.repairRun.test.ts#Repair does not override unchanged store notifications while its requested read is pending",
+        "modules/ui-web/src/shell-v0/views/BrainSurface.repairRun.test.ts#Pause requests an immediate read and waits for the store even at an equal timestamp",
+        "modules/ui-web/src/shell-v0/views/BrainSurface.repairRun.test.ts#Resume requests an immediate read and waits for the store even at an equal timestamp",
+        "modules/ui-web/src/shell-v0/views/BrainSurface.repairRun.test.ts#the shared store alone decides which install observation follows Pause regardless of timestamp",
+        "modules/ui-web/src/shell-v0/views/BrainSurface.repairRun.test.ts#a successful Repair cannot reopen a failed install observation gate before recovery"
+      ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/utils/aiInstallPoll.refresh.test.ts"
+      ],
+      "class": "New",
+      "repaired": true,
+      "behaviour": "Refresh immediately or share one queued batch after the active batch; never overlap endpoint reads; continue the regular schedule; no-op with no subscribers; cancelled queued reads cannot affect a replacement lifecycle.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "B2",
+          "quote": "Headline from the shared AI verdict for every lifecycle state it decides today: not installed, download paused/stopped, installing (with progress), install failed, starting/recovering, connecting/unconfirmed, ready, running on the processor instead of the graphics card, activation or reindex required. While status is unknown it says so and never claims ready.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "B8",
+          "quote": "Install: the Install AI button shows the selected total size and opens the existing licence/size consent; downloading shows progress, pause/resume, cancel with retained bytes, stalled and blocked stages, and search ready before completion, in the same page (no nested panel). Repair, retry after failure and the working-but-missing / manual fallback stay reachable.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "B13",
+          "quote": "Live behaviour: status, install progress and switch states update without collapsing open panels or Advanced settings, without losing a slider draft; package previews and LLM settings refresh when install state changes and when the window regains focus, ignoring out-of-order responses, so a second window converges; reload or tab switch mid-install keeps the progress and outcome. (challenger 7)",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "Q3",
+          "quote": "Settings saves keep witnesses and conflict review; offline runtime mutations are never queued; unknown/last-observed values stay labelled.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "well from now on you can just proceed autonomously accordinglky",
+          "delegationLocation": "task t-20261101-uiimpl, user turn after the WP1 summary",
+          "delegationScope": "Implement the agreed AI Brain redesign and repair its review defects.",
+          "choice": "Final narrowing decision in this builder brief: remove retained operation responses and all identity/timestamp arbitration from BrainSurface; aiInstallPoll via aiStateStore alone owns install observations and the live install gate. A successful start, repair, pause, resume or cancel requests refresh now without awaiting it in the busy state. The previous state may remain visible between the operation reply and that read. Keep the round-3 planning rule unchanged.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/brain-install-refresh-now.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/utils/aiInstallPoll.refresh.test.ts#reads immediately between ticks and resumes the regular schedule",
+        "modules/ui-web/src/shell-v0/utils/aiInstallPoll.refresh.test.ts#shares one queued read among concurrent callers without overlapping any endpoint",
+        "modules/ui-web/src/shell-v0/utils/aiInstallPoll.refresh.test.ts#does nothing without subscribers and drops queued reads when the last subscriber leaves",
+        "modules/ui-web/src/shell-v0/utils/aiInstallPoll.refresh.test.ts#an obsolete queued read cannot refresh a replacement API base"
+      ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/views/BrainSurface.installOperations.test.ts"
+      ],
+      "class": "New",
+      "repaired": true,
+      "behaviour": "Real aiInstallPoll/aiStateStore with fetch mocked: successful Pause/Resume followed by failed install reads hide current-tense progress and Pause/Resume/Cancel until recovery, including other windows/remount. Separate checks prove immediate read requests, store-only presentation and actual button busy release during a hung read.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "B2",
+          "quote": "Headline from the shared AI verdict for every lifecycle state it decides today: not installed, download paused/stopped, installing (with progress), install failed, starting/recovering, connecting/unconfirmed, ready, running on the processor instead of the graphics card, activation or reindex required. While status is unknown it says so and never claims ready.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "B8",
+          "quote": "Install: the Install AI button shows the selected total size and opens the existing licence/size consent; downloading shows progress, pause/resume, cancel with retained bytes, stalled and blocked stages, and search ready before completion, in the same page (no nested panel). Repair, retry after failure and the working-but-missing / manual fallback stay reachable.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "B13",
+          "quote": "Live behaviour: status, install progress and switch states update without collapsing open panels or Advanced settings, without losing a slider draft; package previews and LLM settings refresh when install state changes and when the window regains focus, ignoring out-of-order responses, so a second window converges; reload or tab switch mid-install keeps the progress and outcome. (challenger 7)",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "Q3",
+          "quote": "Settings saves keep witnesses and conflict review; offline runtime mutations are never queued; unknown/last-observed values stay labelled.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "well from now on you can just proceed autonomously accordinglky",
+          "delegationLocation": "task t-20261101-uiimpl, user turn after the WP1 summary",
+          "delegationScope": "Implement the agreed AI Brain redesign and repair its review defects.",
+          "choice": "Final narrowing decision in this builder brief: remove retained operation responses and all identity/timestamp arbitration from BrainSurface; aiInstallPoll via aiStateStore alone owns install observations and the live install gate. A successful start, repair, pause, resume or cancel requests refresh now without awaiting it in the busy state. The previous state may remain visible between the operation reply and that read. Keep the round-3 planning rule unchanged.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/brain-install-operation-observations.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/views/BrainSurface.installOperations.test.ts#Pause waits for the requested store read and releases busy state while it hangs",
+        "modules/ui-web/src/shell-v0/views/BrainSurface.installOperations.test.ts#Resume waits for the requested store read and releases busy state while it hangs",
+        "modules/ui-web/src/shell-v0/views/BrainSurface.installOperations.test.ts#Pause success then failed install reads close the gate until recovery across windows and remount",
+        "modules/ui-web/src/shell-v0/views/BrainSurface.installOperations.test.ts#Resume success then failed install reads close the gate until recovery across windows and remount"
+      ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/views/BrainSurface.repairRun.test.ts"
+      ],
+      "class": "Adaptation",
+      "moved": [
+        "input re-encoding"
+      ],
+      "whatMoved": "The existing a new Repair in preflight, a new Repair in plan, and a pending package in the current run checks now emit the shared install observation after Repair. Their planning percentage/stage reset, pending wording and later progress oracles are unchanged. The first Repair workflow retains all stage/stalled/search-ready and retained-byte oracles, with each operation followed by its shared observation; its retired immediate-response assertions and new refresh/store-only assertions are accounted for separately above. The late Repair reply, failed-read download/plan, planning exclusion, runtime-only failure and second-window/remount checks retain their original oracles.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "well from now on you can just proceed autonomously accordinglky",
+          "delegationLocation": "task t-20261101-uiimpl, user turn after the WP1 summary",
+          "delegationScope": "Implement the agreed AI Brain redesign and repair its review defects.",
+          "choice": "Final narrowing decision in this builder brief: remove retained operation responses and all identity/timestamp arbitration from BrainSurface; aiInstallPoll via aiStateStore alone owns install observations and the live install gate. A successful start, repair, pause, resume or cancel requests refresh now without awaiting it in the busy state. The previous state may remain visible between the operation reply and that read. Keep the round-3 planning rule unchanged.",
+          "label": "agent choice"
+        }
       ]
     }
   ]
@@ -1688,6 +1955,61 @@ Final registered capture runner finished; no process remains pending. Final list
 for ports 5173–5223 is empty, matching the initial check. Before/evidence shared clones were
 removed after their checks; validation logs and PNGs remain beneath the supplied temporary folder.
 Elapsed repair/validation window: 2026-11-02 10:43–11:00 UTC.
+
+
+Final operation-response narrowing (2026-11-02; builder, uncommitted):
+
+The final narrowing decision above replaces the earlier response-retention decisions. The page
+uses shared install observations only; failed install reads close its gate immediately. Successful
+operations request the existing poll batch now; a pending batch gets one shared follow-up. The
+busy state ends without waiting for that read. Named limit: the preceding state remains between
+an operation reply and the shared read. Round-3 planning/package exclusions are unchanged.
+
+Tests added or rewritten:
+
+- modules/ui-web/src/shell-v0/views/BrainSurface.repairRun.test.ts — B2/B8/B13/Q3/Q5; six retired guarantees each have an Obsolete entry and replacement above. Preflight/plan and pending-package checks now supply the store observation before their unchanged oracles; stage notices, retained bytes, late response safety, second windows and remount remain — durable.
+- modules/ui-web/src/shell-v0/views/BrainSurface.installOperations.test.ts — B2/B8/B13/Q3; real poller/store failed reads after successful operations, recovery, two windows/remount, actual buttons and hung-read busy release — durable.
+- modules/ui-web/src/shell-v0/utils/aiInstallPoll.refresh.test.ts — refresh-now contract; immediate/queued reads, concurrent callers, no overlap, continued scheduling, no subscribers and lifecycle cancellation — durable.
+
+
+Final narrowing validation (builder, uncommitted; supersedes historical response-retention reports):
+
+- `.agents/preflight`: absent.
+- `npm --prefix modules/ui-web run lint`: exit 0; `npm --prefix modules/ui-web run typecheck`: exit 0, including the final integration-test assertions.
+- `npm --prefix modules/ui-web run test:unit:run -- --maxWorkers=4`: final run after the integration-test strengthening: exit 0, 688 files / 8,825 tests passed (194.91 seconds). The earlier full run also passed.
+- `npm --prefix modules/ui-web run knip:report`: exit 0; report retains Knip's underlying exit 1. `node scripts/governance/run.mjs --gate dead-code --mode gate`: exit 0, pass, five findings, zero failing gates.
+- `node scripts/ci/run-ui-web-gates.mjs`: exit 0, 31/31 passed, including style-literal ratchet.
+- All seven affected/new evidence files were produced only by `run-evidence.mjs` in the temporary shared clone, with private dependency copies and temporary before worktrees. Rewritten store-authority checks, refresh-now checks, and real poller/store operation checks pass on the candidate and fail by assertion on 7f435cfc7e. The two failed-read checks fail specifically with the old Paused/Installing headline instead of Checking AI status. The first evidence attempt exposed a test gap: it had removed the action-owning window before the gate assertions. The corrected test checks that window too; its evidence was regenerated. Earlier preserved repair/planning/runtime checks were regenerated at their original before refs (1489cf0340, 4c6637f1b6, 5caa370624), with the runtime-only preservation check passing. No other test file was edited or evidence invalidated.
+- Existing concurrent-choice, late settings/plan and operation-response, second-window/focus, tab-switch/remount-during-install, settings conflict and Health ownership checks run in the full suite unchanged.
+- `node scripts/governance/gates/test-intent/cli.mjs`: exit 1, only `test-intent/acceptance-missing`; no acceptance record written.
+
+Registered capture comparisons (each `ui-shot <step> --fixtures --no-demo` exited 0;
+all eight PNGs were inspected against all four reference pictures):
+
+- ai-brain — ready picture's open headline/sentence/path/graphics/links layout; fixture-missing observations remain honestly unknown.
+- ai-brain-light — the same ready layout with readable light separators and text.
+- ai-brain-advanced — Advanced picture's in-place Answers rows, grey heading, hairlines and native sliders, scrolled to the controls.
+- ai-brain-advanced-light — the same expanded controls with light contrast and separators.
+- ai-brain-components — Advanced picture's Downloaded files placement; registry footprints and individual acquisition choices replace made-up measured sizes.
+- ai-brain-components-light — the same open inventory and optional switches with readable light hairlines.
+- ai-brain-consent — not-installed picture's open page behind the existing licence/size consent; the exact selected fixture download is 1.52 GB.
+- ai-brain-consent-light — the same consent, selected packages and size in light mode.
+
+Each registered Brain measurement has zero axe violations and zero console errors.
+Only temporary fixture Chromium/Vite processes, unit-suite HTTP services, isolated shared clones
+and ordinary dependency copies were used. No owner's app, backend stack, model or GPU was used.
+Ports 5174 and 5175 were already listening before this session and were left alone. The capture
+runner owns port 5173, records its Popen PID/process group, and stops it in a finally block.
+No Search capture recipe/baseline, acceptance record, Java file, commit, push, publication or
+full governance run was changed/performed.
+
+
+Final aggregate results and cleanup:
+
+- Sequential `jseval ui-a11y-gate --ui-url http://127.0.0.1:5173`: exit 0, all 110 states clean, including the previously flaky unchanged Search captures; no new or serious/critical violations.
+- Sequential `jseval ui-proportion-gate --ui-url http://127.0.0.1:5173`: exit 0, all 84 captures and registered geometric constraints passed.
+- The capture runner printed its completed finally-block server-stop notice; its enclosing exec session returned 143 during that cleanup. Every requested ui-shot/a11y/proportion subprocess had already returned 0, as recorded individually above. Final ss shows only the original owner listeners on 5174 and 5175; the owned 5173 listener is gone. Both owned temporary shared clones were removed after their evidence was copied back. No check or external process remains pending.
+- Repair/validation window observed by `date -u`: 2026-11-02 14:10–14:32 UTC. No acceptance record or commit was written.
 
 ## Acceptance records
 
