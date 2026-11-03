@@ -63,6 +63,7 @@ import io.justsearch.configuration.EnvRegistry;
 import io.justsearch.configuration.resolved.ResolvedConfig;
 import io.justsearch.configuration.RepoRootLocator;
 import io.justsearch.configuration.SystemAccess;
+import io.justsearch.ort.EncoderRole;
 import io.justsearch.ort.GpuSessionConfig;
 import io.justsearch.ort.NativeSessionHandle;
 import io.justsearch.telemetry.JvmRuntimeGauges;
@@ -92,6 +93,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
+import java.util.function.Function;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -235,7 +237,7 @@ public final class KnowledgeServer implements Closeable {
   private final ConfigStore nativePolicyConfiguration;
   /** The official Head lifecycle owner, composed before start; never a ready-client RPC. */
   public interface NativePolicyRootBindings {
-    <T> T withBindings(java.util.function.Function<List<RootBinding>, T> action);
+    <T> T withBindings(Function<List<RootBinding>, T> action);
   }
   private NativePolicyRootBindings nativePolicyRootBindings;
 
@@ -616,7 +618,7 @@ public final class KnowledgeServer implements Closeable {
     private final IndexCompositionPlan plan;
     private final EncoderConfigurationProjection queryProjection;
     private final InferenceSurface.ComponentObservation queryObservation;
-    private final Set<io.justsearch.ort.EncoderRole> knownMissingRoles;
+    private final Set<EncoderRole> knownMissingRoles;
     private final ResolvedConfig configuration;
     private final GenerationModelSelection generationSelection;
     private final IndexStartContext indexContext;
@@ -631,7 +633,7 @@ public final class KnowledgeServer implements Closeable {
         QueryRoleSet sourceQueryOwner, EncoderSet.ModelIdentity modelIdentity,
         IndexCompositionPlan plan, EncoderConfigurationProjection queryProjection,
         InferenceSurface.ComponentObservation queryObservation,
-        Set<io.justsearch.ort.EncoderRole> knownMissingRoles, ResolvedConfig configuration,
+        Set<EncoderRole> knownMissingRoles, ResolvedConfig configuration,
         GenerationModelSelection generationSelection, IndexStartContext indexContext) {
       this.nativeView = nativeView;
       this.producer = producer;
@@ -2934,7 +2936,7 @@ public final class KnowledgeServer implements Closeable {
     EncoderSet.ModelIdentity identity = ownerlessInitial
         ? Objects.requireNonNull(initialModelIdentity,
             "Failed initial composition model identity") : owner.modelIdentity();
-    var knownMissing = java.util.EnumSet.noneOf(io.justsearch.ort.EncoderRole.class);
+    var knownMissing = java.util.EnumSet.noneOf(EncoderRole.class);
     if (ownerlessInitial) {
       plan.roles().forEach((role, rolePlan) -> {
         if (rolePlan.requested() && rolePlan.variant() == null && !rolePlan.captureFailed()) {
@@ -4677,7 +4679,7 @@ public final class KnowledgeServer implements Closeable {
         if (config.isIdfQueryMode()) {
           Path table = exactPlan == null
               ? config.modelPath().resolve("idf.json")
-              : Objects.requireNonNull(exactPlan.role(io.justsearch.ort.EncoderRole.SPLADE)
+              : Objects.requireNonNull(exactPlan.role(EncoderRole.SPLADE)
                   .metadataDirectory(), "Captured SPLADE metadata directory").resolve("idf.json");
           if (Files.isRegularFile(table)) {
             var idf = new io.justsearch.indexerworker.splade.SpladeIdfQueryEncoder(
@@ -4723,16 +4725,16 @@ public final class KnowledgeServer implements Closeable {
     }
   }
 
-  private static Set<io.justsearch.ort.EncoderRole> unresolvedQueryRoles(
+  private static Set<EncoderRole> unresolvedQueryRoles(
       InferenceSurface.ComponentObservation observation, QueryRoleSelection selection) {
-    var unresolved = java.util.EnumSet.noneOf(io.justsearch.ort.EncoderRole.class);
-    if (observation.missingRoles().contains(io.justsearch.ort.EncoderRole.RERANKER)
+    var unresolved = java.util.EnumSet.noneOf(EncoderRole.class);
+    if (observation.missingRoles().contains(EncoderRole.RERANKER)
         && selection.reranker().state() == QueryRoleSelection.State.DISABLED) {
-      unresolved.add(io.justsearch.ort.EncoderRole.RERANKER);
+      unresolved.add(EncoderRole.RERANKER);
     }
-    if (observation.missingRoles().contains(io.justsearch.ort.EncoderRole.CITATION)
+    if (observation.missingRoles().contains(EncoderRole.CITATION)
         && selection.citation().state() == QueryRoleSelection.State.DISABLED) {
-      unresolved.add(io.justsearch.ort.EncoderRole.CITATION);
+      unresolved.add(EncoderRole.CITATION);
     }
     return unresolved;
   }
@@ -4824,9 +4826,9 @@ public final class KnowledgeServer implements Closeable {
               selection,
               effectiveQuerySelection,
               observation -> {
-                var requested = java.util.EnumSet.noneOf(io.justsearch.ort.EncoderRole.class);
+                var requested = java.util.EnumSet.noneOf(EncoderRole.class);
                 requested.addAll(observation.requestedRoles());
-                var missing = java.util.EnumSet.noneOf(io.justsearch.ort.EncoderRole.class);
+                var missing = java.util.EnumSet.noneOf(EncoderRole.class);
                 missing.addAll(observation.missingRoles());
                 requested.addAll(bootQueryResolution.unavailableRoles().keySet());
                 missing.addAll(bootQueryResolution.unavailableRoles().keySet());
@@ -5253,13 +5255,13 @@ public final class KnowledgeServer implements Closeable {
     QueryEncoderPrewarm.QueryPrewarmListener completion =
         new QueryEncoderPrewarm.QueryPrewarmListener() {
           @Override
-          public void onReady(Set<io.justsearch.ort.EncoderRole> warmed,
+          public void onReady(Set<EncoderRole> warmed,
               io.justsearch.ort.QueryDevice device) {
             passFinished.countDown();
           }
 
           @Override
-          public void onFailed(io.justsearch.ort.EncoderRole role, String reason) {
+          public void onFailed(EncoderRole role, String reason) {
             passFinished.countDown();
           }
         };
@@ -5335,13 +5337,13 @@ public final class KnowledgeServer implements Closeable {
       List<QueryEncoderPrewarm.Target> targets = new ArrayList<>(index.targets());
       var reranker = queryOwner.reranker();
       if (reranker != null) {
-        targets.add(new QueryEncoderPrewarm.Target(io.justsearch.ort.EncoderRole.RERANKER, reranker,
+        targets.add(new QueryEncoderPrewarm.Target(EncoderRole.RERANKER, reranker,
             reranker::isQueryWarm, reranker::queryDevice, reranker::addSessionGenerationListener,
             reranker::prewarm, reranker::prewarmCpuForQueries, reranker::isGpuRetryDue));
       }
       var citation = queryOwner.citation();
       if (citation != null) {
-        targets.add(new QueryEncoderPrewarm.Target(io.justsearch.ort.EncoderRole.CITATION, citation,
+        targets.add(new QueryEncoderPrewarm.Target(EncoderRole.CITATION, citation,
             citation::isQueryWarm, citation::queryDevice, citation::addSessionGenerationListener,
             citation::prewarm, citation::prewarmCpuForQueries, citation::isGpuRetryDue));
       }
@@ -5360,14 +5362,14 @@ public final class KnowledgeServer implements Closeable {
       List<QueryEncoderPrewarm.Target> targets = new ArrayList<>();
       var bgeM3 = owner.bgeM3();
       if (bgeM3 != null) {
-        targets.add(new QueryEncoderPrewarm.Target(io.justsearch.ort.EncoderRole.BGE_M3, bgeM3,
+        targets.add(new QueryEncoderPrewarm.Target(EncoderRole.BGE_M3, bgeM3,
             bgeM3::isQueryWarm, bgeM3::queryDevice, bgeM3::addSessionGenerationListener,
             (text, request) -> bgeM3.encode(text, request) != null,
             bgeM3::prewarmCpuForQueries, bgeM3::isGpuRetryDue));
       }
       var embedding = owner.embedding();
       if (embedding != null && embedding.isAvailable()) {
-        targets.add(new QueryEncoderPrewarm.Target(io.justsearch.ort.EncoderRole.EMBEDDING,
+        targets.add(new QueryEncoderPrewarm.Target(EncoderRole.EMBEDDING,
             embedding, embedding::isQueryWarm, embedding::queryDevice,
             embedding::addSessionGenerationListener,
             (text, request) -> embedding.embedQuery(text, request) != null,
@@ -5375,7 +5377,7 @@ public final class KnowledgeServer implements Closeable {
       }
       var splade = owner.splade();
       if (splade != null && owner.spladeIdf() == null) {
-        targets.add(new QueryEncoderPrewarm.Target(io.justsearch.ort.EncoderRole.SPLADE, splade,
+        targets.add(new QueryEncoderPrewarm.Target(EncoderRole.SPLADE, splade,
             splade::isQueryWarm, splade::queryDevice, splade::addSessionGenerationListener,
             splade::prewarm,
             splade::prewarmCpuForQueries, splade::isGpuRetryDue));
@@ -5435,7 +5437,7 @@ public final class KnowledgeServer implements Closeable {
 
   private record EncoderPublication(io.justsearch.core.component.ComponentState state,
       String desiredVersion, String appliedVersion, String evidence, String reasonCode,
-      Set<io.justsearch.ort.EncoderRole> missingRoles, boolean coherent) {}
+      Set<EncoderRole> missingRoles, boolean coherent) {}
 
   private io.justsearch.core.component.EngineComponentSnapshot.Component encoderCompositionObservation(
       EncoderSet owner, QueryRoleSet queryOwner, ResolvedConfig configuration,
@@ -5449,10 +5451,10 @@ public final class KnowledgeServer implements Closeable {
       ResolvedConfig configuration, GenerationModelSelection selection) {
     var indexObservation = owner.surfaceForOwner().componentObservation();
     var queryObservation = queryOwner.surfaceForOwner().componentObservation();
-    var requested = java.util.EnumSet.noneOf(io.justsearch.ort.EncoderRole.class);
+    var requested = java.util.EnumSet.noneOf(EncoderRole.class);
     requested.addAll(indexObservation.requestedRoles());
     requested.addAll(queryObservation.requestedRoles());
-    var missing = java.util.EnumSet.noneOf(io.justsearch.ort.EncoderRole.class);
+    var missing = java.util.EnumSet.noneOf(EncoderRole.class);
     missing.addAll(indexObservation.missingRoles());
     missing.addAll(queryObservation.missingRoles());
     for (var role : requested) {
@@ -5494,7 +5496,7 @@ public final class KnowledgeServer implements Closeable {
         : "missing_roles=" + missing.stream()
             .map(Enum::name).sorted().collect(java.util.stream.Collectors.joining(","));
     boolean selectedModelMissing = selection != null && missing.stream()
-        .map(io.justsearch.ort.EncoderRole::packageId)
+        .map(EncoderRole::packageId)
         .distinct()
         .anyMatch(id -> selection.includes(id) && selection.verify(id).isEmpty());
     String reasonCode = selectedModelMissing
@@ -5509,6 +5511,25 @@ public final class KnowledgeServer implements Closeable {
   /** Builds a private query successor while retaining the exact currently issued A view. */
   public PreparedQueryRoleSettings prepareQueryRoleSettings(UiSettings candidate,
       ResolvedConfig desired, Set<String> changedKeys, QueryRoleSelection prior) {
+    return prepareQueryRoleSettings(candidate, desired, changedKeys, prior, weights -> () -> {});
+  }
+
+  /**
+   * {@link #prepareQueryRoleSettings(UiSettings, ResolvedConfig, Set, QueryRoleSelection)} where
+   * {@code stageCandidatePlan} puts in effect the device-memory plan of {@code desired} with the
+   * given encoder weights, makes it the plan the commit publishes, and returns the action that puts
+   * the published plan back. A reranker the serving view does not run (Best match first switched
+   * on) is warmed under that plan once memory admission passed: the published plan of a
+   * configuration without it has no reranker budget, and a planned CUDA session sends calls without
+   * a budget to the CPU. The weights are those of the exact selection prepared here (model, variant
+   * and size; a retained custom file too), never a model discovery would pick instead. A refused or
+   * abandoned preparation puts the published plan back.
+   */
+  public PreparedQueryRoleSettings prepareQueryRoleSettings(UiSettings candidate,
+      ResolvedConfig desired, Set<String> changedKeys, QueryRoleSelection prior,
+      Function<Map<EncoderRole, Double>, Runnable>
+          stageCandidatePlan) {
+    Objects.requireNonNull(stageCandidatePlan, "stageCandidatePlan");
     Objects.requireNonNull(candidate, "candidate");
     Objects.requireNonNull(desired, "desired");
     Objects.requireNonNull(changedKeys, "changedKeys");
@@ -5546,9 +5567,18 @@ public final class KnowledgeServer implements Closeable {
           ? null : projection.reranker().modelPath();
       Path citationDirectory = citationPathChanged && candidate.getCitationScorerModelPath().isBlank()
           ? null : projection.citation().modelPath();
+      var observed = old.queryRoleSet.surfaceForOwner().componentObservation().querySelection()
+          .orElse(prior);
+      // A failed session may publish an absent role. Its durable selection still owns the
+      // exact files to restore after Repair, even though no native session is currently wired.
+      var retainedReranker = observed == null ? null : observed.reranker();
+      if ((retainedReranker == null || retainedReranker.state() == QueryRoleSelection.State.DISABLED)
+          && prior != null && prior.reranker().state() == QueryRoleSelection.State.SELECTED) {
+        retainedReranker = prior.reranker();
+      }
       QueryRoleSelection selection = new QueryRoleSelection(
-          QueryRoleSelectionResolver.select("reranker", rerankerPathChanged, rerankerDirectory,
-              prior == null ? null : prior.reranker(), initialModelSelection,
+          QueryRoleSelectionResolver.selectReranker(candidate, rerankerPathChanged, rerankerDirectory,
+              retainedReranker, initialModelSelection,
               old.queryRoleSet.reranker() != null, projection.reranker().gpuEnabled()),
           QueryRoleSelectionResolver.select("citation-scorer", citationPathChanged,
               citationDirectory, prior == null ? null : prior.citation(), initialModelSelection,
@@ -5584,6 +5614,14 @@ public final class KnowledgeServer implements Closeable {
       }
       prepared = new PreparedQueryRoleSettings(source, old, selection, desired, hardware,
           composition, refreshedPlan);
+      boolean switchedOn = changedKeys.contains("rerankerEnabled")
+          && Boolean.TRUE.equals(candidate.getRerankerEnabled());
+      if (selection.reranker().state() == QueryRoleSelection.State.SELECTED
+          && (switchedOn || old.queryRoleSet.reranker() == null)) {
+        prepared.candidatePlanRestore = Objects.requireNonNull(stageCandidatePlan.apply(
+            InferenceCompositionRoot.gpuRoleWeightsMiB(desired, selection.reranker())),
+            "Candidate plan restore");
+      }
       prepared.captureSource();
       if (replaceIndex) {
         prepared.beginBulkInPlace();
@@ -5669,6 +5707,8 @@ public final class KnowledgeServer implements Closeable {
     private CandidateModels models;
     private boolean producerPaused;
     private boolean producerParked;
+    // Puts the published device-memory plan back after a staged candidate plan; null otherwise.
+    private Runnable candidatePlanRestore;
 
     private PreparedQueryRoleSettings(ServingLease source, ServingView old,
         QueryRoleSelection selection, ResolvedConfig configuration, HardwareProfile hardware,
@@ -5691,13 +5731,13 @@ public final class KnowledgeServer implements Closeable {
     }
 
     private QueryRoleSet composeQuery(EncoderConfigurationProjection projection,
-        QueryRoleSelection selected, Set<io.justsearch.ort.EncoderRole> allowedMissing,
+        QueryRoleSelection selected, Set<EncoderRole> allowedMissing,
         boolean requireRerankerGpu) {
       return composeQuery(projection, selected, allowedMissing, requireRerankerGpu, false);
     }
 
     private QueryRoleSet composeQuery(EncoderConfigurationProjection projection,
-        QueryRoleSelection selected, Set<io.justsearch.ort.EncoderRole> allowedMissing,
+        QueryRoleSelection selected, Set<EncoderRole> allowedMissing,
         boolean requireRerankerGpu, boolean acceptIntentionalCpu) {
       runtimeSwapLock.lock();
       try {
@@ -5713,7 +5753,7 @@ public final class KnowledgeServer implements Closeable {
     }
 
     private QueryRoleSet composeQueryAdmitted(EncoderConfigurationProjection projection,
-        QueryRoleSelection selected, Set<io.justsearch.ort.EncoderRole> allowedMissing,
+        QueryRoleSelection selected, Set<EncoderRole> allowedMissing,
         boolean requireRerankerGpu, boolean acceptIntentionalCpu) {
       InferenceSurface surface = composeRetainingFailures(() -> InferenceCompositionRoot.composeQueryRoles(projection, selected,
           hardware, () -> !signalBus.isMainGpuActive(), ortSessionEvents));
@@ -5736,7 +5776,7 @@ public final class KnowledgeServer implements Closeable {
               + surface.componentObservation().missingRoles());
         }
         if (selected.reranker().state() == QueryRoleSelection.State.SELECTED
-            && result.reranker() == null && !allowedMissing.contains(io.justsearch.ort.EncoderRole.RERANKER)) {
+            && result.reranker() == null && !allowedMissing.contains(EncoderRole.RERANKER)) {
           throw new IllegalStateException("Prepared reranker assembly is missing");
         }
         if (result.reranker() != null) {
@@ -5771,7 +5811,7 @@ public final class KnowledgeServer implements Closeable {
       if (!requestedGpu) return false;
       var policies = roles.surfaceForOwner().policies();
       var policy = policies == null ? null
-          : policies.models().get(io.justsearch.ort.EncoderRole.RERANKER);
+          : policies.models().get(EncoderRole.RERANKER);
       return policy == null || policy.gpu() == null || policy.gpu().arenaCapBytes() > 0;
     }
 
@@ -5869,12 +5909,12 @@ public final class KnowledgeServer implements Closeable {
           throw new IllegalStateException("Prior query preparation still owns resources");
         }
         preparedQueryRoles = this;
-        var requested = java.util.EnumSet.noneOf(io.justsearch.ort.EncoderRole.class);
+        var requested = java.util.EnumSet.noneOf(EncoderRole.class);
         if (selected.reranker().state() == QueryRoleSelection.State.SELECTED) {
-          requested.add(io.justsearch.ort.EncoderRole.RERANKER);
+          requested.add(EncoderRole.RERANKER);
         }
         if (selected.citation().state() == QueryRoleSelection.State.SELECTED) {
-          requested.add(io.justsearch.ort.EncoderRole.CITATION);
+          requested.add(EncoderRole.CITATION);
         }
         var desiredQuery = new InferenceSurface.ComponentObservation(
             java.util.Optional.of(projection.queryDigest()), requested, Set.of(),
@@ -6116,6 +6156,8 @@ public final class KnowledgeServer implements Closeable {
         }
         startupConfiguration = configuration;
         installed = true;
+        // The commit publishes this configuration's plan, the one staged for its preparation.
+        candidatePlanRestore = null;
         servingViewMonitor.notifyAll();
       }
       awaitQueryPublicationBarrier();
@@ -6159,6 +6201,20 @@ public final class KnowledgeServer implements Closeable {
 
     public void abort(Throwable cause) {
       if (installed || aborted) return;
+      try { abortCandidate(cause); }
+      finally {
+        Runnable restore = candidatePlanRestore;
+        candidatePlanRestore = null;
+        if (restore != null) {
+          try { restore.run(); }
+          catch (RuntimeException | Error failure) {
+            if (cause != failure) cause.addSuppressed(failure);
+          }
+        }
+      }
+    }
+
+    private void abortCandidate(Throwable cause) {
       try { closeCandidate(); }
       catch (RuntimeException | Error cleanup) {
         retainQueryRecovery(cause, cleanup);
@@ -8051,7 +8107,7 @@ public final class KnowledgeServer implements Closeable {
       DefaultWorkerAppServices producer, boolean nativeOwner, long deadline) throws IOException {
     if (!nativeOwner) return settleCommittedNativeBootAttempt(expectedActive, active, producer, false, deadline, null);
     if (runtimeSwapLock.isHeldByCurrentThread()) throw new IOException("Native root owner must precede runtime ownership");
-    java.util.function.Function<List<RootBinding>, Boolean> attempt = official -> {
+    Function<List<RootBinding>, Boolean> attempt = official -> {
       runtimeSwapLock.lock();
       try { return settleCommittedNativeBootAttempt(expectedActive, active, producer, nativeOwner, deadline, official); }
       catch (IOException failure) { throw new java.io.UncheckedIOException(failure); }
@@ -9131,7 +9187,7 @@ public final class KnowledgeServer implements Closeable {
 
   /** An approval is stamped only against the Green witness held stable by this physical fence. */
   io.justsearch.app.api.operations.OperationStore.BulkGapAcceptance
-      withCandidateGapAcceptanceFence(java.util.function.Function<
+      withCandidateGapAcceptanceFence(Function<
           RecordedIngestionLifecycle.JournalWitness,
           io.justsearch.app.api.operations.OperationStore.BulkGapAcceptance> decision)
           throws IOException, InterruptedException {
@@ -10771,7 +10827,7 @@ public final class KnowledgeServer implements Closeable {
    * Narrow same-thread Engine callback. No RPC/task hop or observer is permitted inside it.
    * Caller holds stable root bindings; this scope orders runtime → mutation → generation → config.
    */
-  public <T> T withForgetAuthority(java.util.function.Function<
+  public <T> T withForgetAuthority(Function<
       io.justsearch.indexerworker.services.WorkerIngestService, T> action) {
     if (!forgetEntryAllowed()) throw new IllegalStateException("Forget cannot enter from a queue owner or callback");
     runtimeSwapLock.lock();

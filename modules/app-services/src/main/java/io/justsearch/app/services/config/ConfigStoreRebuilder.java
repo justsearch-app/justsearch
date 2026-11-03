@@ -159,6 +159,17 @@ public final class ConfigStoreRebuilder {
   @FunctionalInterface
   public interface DevicePlanner {
     GpuProfileResolver.Resolution plan(ResolvedConfig selected);
+
+    /**
+     * The plan of {@code selected} placing exactly {@code gpuRoleWeightsMiB} on the GPU, the
+     * encoder files a preparation selected, instead of the ones this planner finds for it.
+     *
+     * @throws UnsupportedOperationException when this planner cannot take given weights
+     */
+    default GpuProfileResolver.Resolution plan(ResolvedConfig selected,
+        Map<io.justsearch.ort.EncoderRole, Double> gpuRoleWeightsMiB) {
+      throw new UnsupportedOperationException("This device planner takes no encoder weights");
+    }
   }
 
   private static volatile DevicePlanner devicePlanner;
@@ -170,6 +181,33 @@ public final class ConfigStoreRebuilder {
   private static final int PREPARED_PLANS_KEPT = 16;
   private static final java.util.ArrayDeque<ResolvedConfig> PREPARED_ORDER =
       new java.util.ArrayDeque<>();
+
+  /**
+   * Stages on {@code state} the plan of {@code desired} with exactly {@code gpuRoleWeightsMiB} on
+   * the GPU (the model files a query preparation selected) and makes it the plan published with
+   * {@code desired}, so its commit publishes the plan the preparation warmed under. Returns the
+   * action that puts the published plan back when the preparation is refused or abandoned. Without
+   * a plan state or a planner that takes weights nothing is staged.
+   */
+  public static Runnable stagePlan(io.justsearch.app.services.gpu.DevicePlanState state,
+      ResolvedConfig desired, Map<io.justsearch.ort.EncoderRole, Double> gpuRoleWeightsMiB) {
+    java.util.Objects.requireNonNull(desired, "desired");
+    java.util.Objects.requireNonNull(gpuRoleWeightsMiB, "gpuRoleWeightsMiB");
+    DevicePlanner planner = devicePlanner;
+    if (state == null || planner == null) return () -> {};
+    GpuProfileResolver.Resolution plan;
+    try {
+      plan = planner.plan(desired, Map.copyOf(gpuRoleWeightsMiB));
+    } catch (UnsupportedOperationException noWeights) {
+      LOG.debug("The device planner takes no encoder weights; no candidate plan is staged");
+      return () -> {};
+    } catch (RuntimeException | LinkageError unavailable) {
+      LOG.debug("GPU planning unavailable; no candidate plan is staged", unavailable);
+      return () -> {};
+    }
+    rememberPlan(desired, plan);
+    return state.stage(plan);
+  }
 
   /** Installs the device-memory planner (the Engine does, at boot); null removes it. */
   public static void rememberDevicePlanner(DevicePlanner planner) {
@@ -192,7 +230,7 @@ public final class ConfigStoreRebuilder {
 
   private static void rememberPlan(ResolvedConfig prepared, GpuProfileResolver.Resolution plan) {
     synchronized (PREPARED_PLANS) {
-      PREPARED_PLANS.put(prepared, plan);
+      if (PREPARED_PLANS.put(prepared, plan) != null) return;
       PREPARED_ORDER.addLast(prepared);
       while (PREPARED_ORDER.size() > PREPARED_PLANS_KEPT) {
         PREPARED_PLANS.remove(PREPARED_ORDER.removeFirst());
@@ -245,6 +283,9 @@ public final class ConfigStoreRebuilder {
     putSettingIfPresent(
         builder, "justsearch.embed.onnx.model_path", settings.getEmbedOnnxModelPath());
     putSettingIfPresent(builder, "justsearch.rerank.model_path", settings.getRerankerModelPath());
+    if (settings.getRerankerEnabled() != null) {
+      builder.putSettings(EnvRegistry.RERANK_ENABLED.configKey(), settings.getRerankerEnabled().toString());
+    }
     putSettingIfPresent(builder, "justsearch.ner.model_path", settings.getNerModelPath());
     putSettingIfPresent(builder, "justsearch.splade.model_path", settings.getSpladeModelPath());
     putSettingIfPresent(

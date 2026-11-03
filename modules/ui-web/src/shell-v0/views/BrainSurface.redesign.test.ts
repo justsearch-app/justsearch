@@ -103,7 +103,8 @@ describe('AI Brain redesign behaviour', () => {
     expect(el.shadowRoot!.textContent).toContain("It doesn't read text in scans and images yet");
     emit({ snapshotLive: false }); await el.updateComplete;
     expect(el.shadowRoot!.querySelector('[data-feature="pictures"]')!.textContent).toContain('Unknown');
-    expect(switches(el, 'Best match first')).toHaveLength(0);
+    expect(switches(el, 'Best match first')).toHaveLength(1);
+    expect(switches(el, 'Best match first')[0]!.getAttribute('aria-disabled')).toBe('true');
     expect(switches(el, 'Text in scans and images')).toHaveLength(0);
   });
   it('preserves null answer intent as automatic rather than saving false', async () => {

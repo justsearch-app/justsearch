@@ -38,6 +38,11 @@ public final class BrainInstallServiceImpl implements BrainInstallService {
   }
 
   @Override
+  public AiInstallService.Attempt startInstall(boolean acceptTerms, boolean enableRerankerOnCompletion) {
+    return helper.startInstall(acceptTerms, enableRerankerOnCompletion);
+  }
+
+  @Override
   public Map<String, Object> cancelInstall() throws Exception {
     helper.cancel();
     return statusAsMap();

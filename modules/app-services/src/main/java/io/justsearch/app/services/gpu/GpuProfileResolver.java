@@ -364,12 +364,19 @@ public final class GpuProfileResolver {
       java.util.function.Function<ResolvedConfig, Map<EncoderRole, Double>> gpuRoleWeightsMiB) {
     Objects.requireNonNull(device, "device");
     Objects.requireNonNull(gpuRoleWeightsMiB, "gpuRoleWeightsMiB");
-    return cfg -> {
-      java.nio.file.Path modelsDir = io.justsearch.configuration.resolved.ResolvedPathResolver
-          .resolveModelsDir(cfg, io.justsearch.configuration.resolved.ResolvedPathResolver
-              .resolveBaseDir(cfg, io.justsearch.configuration.SystemAccess.sysProp("user.dir")));
-      return resolve(cfg, device.get(), gpuRoleWeightsMiB.apply(cfg),
-          installedChatModels(modelsDir));
+    return new io.justsearch.app.services.config.ConfigStoreRebuilder.DevicePlanner() {
+      @Override
+      public Resolution plan(ResolvedConfig cfg) {
+        return plan(cfg, gpuRoleWeightsMiB.apply(cfg));
+      }
+
+      @Override
+      public Resolution plan(ResolvedConfig cfg, Map<EncoderRole, Double> weights) {
+        java.nio.file.Path modelsDir = io.justsearch.configuration.resolved.ResolvedPathResolver
+            .resolveModelsDir(cfg, io.justsearch.configuration.resolved.ResolvedPathResolver
+                .resolveBaseDir(cfg, io.justsearch.configuration.SystemAccess.sysProp("user.dir")));
+        return resolve(cfg, device.get(), weights, installedChatModels(modelsDir));
+      }
     };
   }
 

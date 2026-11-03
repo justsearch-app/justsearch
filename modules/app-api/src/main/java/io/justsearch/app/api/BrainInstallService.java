@@ -40,6 +40,15 @@ public interface BrainInstallService {
    */
   AiInstallService.Attempt startInstall(boolean acceptTerms) throws Exception;
 
+  /** Starts an install carrying the consented Best match first enable intent to completion. */
+  default AiInstallService.Attempt startInstall(boolean acceptTerms,
+      boolean enableRerankerOnCompletion) throws Exception {
+    if (enableRerankerOnCompletion) {
+      throw new UnsupportedOperationException("Reranker install intent unavailable");
+    }
+    return startInstall(acceptTerms);
+  }
+
   /**
    * Cancel a running install. Idempotent if no install is running. Returns
    * the post-cancel install status snapshot.

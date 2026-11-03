@@ -30,7 +30,9 @@ export interface SettingsV2 {
     serverExecutable?: string | null;
   } | null;
   operationKey?: string | null;
+  rerankerEnabled?: boolean | null;
   rerankerModelPath?: string | null;
+  rerankerSwitchIntent?: boolean;
   restartScheduled?: boolean | null;
   settingsMode?: string | null;
   state?: string | null;
@@ -91,7 +93,9 @@ export const settingsV2Schema = z.strictObject({
     "serverExecutable": z.string().nullable().optional(),
   }).nullable().optional(),
   "operationKey": z.string().nullable().optional(),
+  "rerankerEnabled": z.boolean().nullable().optional(),
   "rerankerModelPath": z.string().nullable().optional(),
+  "rerankerSwitchIntent": z.boolean().optional(),
   "restartScheduled": z.boolean().nullable().optional(),
   "settingsMode": z.string().nullable().optional(),
   "state": z.string().nullable().optional(),

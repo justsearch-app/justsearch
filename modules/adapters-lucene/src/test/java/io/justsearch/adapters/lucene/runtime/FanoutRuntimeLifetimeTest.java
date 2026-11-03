@@ -64,7 +64,7 @@ final class FanoutRuntimeLifetimeTest extends RuntimeTestBase {
           }, (vector, limit) -> {
             refusedBodies.incrementAndGet();
             return new LuceneRuntimeTypes.SearchResult(java.util.List.of(), 0, 0);
-          }, "needle", new float[] {1, 0, 0, 0}, 10, false, "lifetime-test",
+          }, "needle", new float[] {1, 0, 0, 0}, 10, false, "lifetime-test", true,
               EngineContext.Urgency.FOREGROUND, () -> callerReleases::incrementAndGet);
           refusalResult.complete(new AssertionError("second leg was not refused"));
         } catch (Throwable failure) { refusalResult.complete(failure); }

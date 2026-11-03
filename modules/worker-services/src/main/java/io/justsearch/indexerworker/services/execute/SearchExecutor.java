@@ -341,6 +341,9 @@ public final class SearchExecutor {
     // the transitional alias. Either drives fusion-time detail computation (some keys are only
     // computed when on — Slice-1 interrogation finding), so widen the flag end-to-end here.
     boolean debug = request.getDebug() || request.getIncludeDetail();
+    // Leg-top splices exist for the cross-encoder's window. Without a cross-encoder the returned
+    // list is what the user sees, so it must keep its fused order.
+    boolean rerankPool = rerankPool(request);
     String effectiveMode = decision.legs().effectiveModeLabel();
     var syntax = decision.runtimeSyntax();
     // Tempdoc 821 §P: the lexical leg honours the request's query_syntax, so a malformed LUCENE
@@ -389,6 +392,7 @@ public final class SearchExecutor {
                         bd.retrievalLimit(),
                         runtimeFilters,
                         syntax,
+                        rerankPool,
                         ctx.engineContext().urgency(), ctx.childLifetime())
                     : hybridSearchOps.searchHybridFiltered(
                         queryString,
@@ -396,6 +400,7 @@ public final class SearchExecutor {
                         bd.retrievalLimit(),
                         QueryFilterBuilder.buildFilterQueryOnly(runtimeFilters),
                         syntax,
+                        rerankPool,
                         ctx.engineContext().urgency(), ctx.childLifetime());
             case LegSet.DenseOnly d ->
                 // Tempdoc 549 Slice 3c (U2): single dense leg, no fusion.
@@ -478,6 +483,13 @@ public final class SearchExecutor {
         chunkOutcome.chunkSpladeNs(),
         chunkOutcome.chunkRetry(),
         chunkOutcome.branchFusionNs());
+  }
+
+  private static boolean rerankPool(io.justsearch.ipc.SearchRequest request) {
+    var pipeline = request.hasPipeline() ? request.getPipeline()
+        : io.justsearch.indexerworker.services.plan.SearchPlanner.modeToDefaultPipeline(
+            request.getMode());
+    return pipeline.getCrossEncoderEnabled();
   }
 
   private LuceneRuntimeTypes.SearchResult runThreeWay(
@@ -616,11 +628,27 @@ public final class SearchExecutor {
       LuceneRuntimeTypes.SearchResult baseResult,
       SearchInputs inputs,
       String chunkQueryText) {
+    int pageLimit = inputs.request().getLimit() > 0 ? inputs.request().getLimit() : 10;
     if (directive instanceof ChunkMergeDirective.Skip s) {
-      var trimmed = trimSearchResult(baseResult, inputs.request().getLimit() > 0 ? inputs.request().getLimit() : 10);
+      var trimmed = trimSearchResult(baseResult, pageLimit);
       return new ChunkRunOutcome(trimmed, false, s.reason(), null, false, 0L, 0L, 0L, 0L, false, 0L);
     }
-    var apply = (ChunkMergeDirective.EligibleApply) directive;
+    // Without a cross-encoder SearchPlanner ranks to the depth of a ten-result page;
+    // the page is the prefix of that ranking.
+    var outcome = applyChunkMerge(
+        (ChunkMergeDirective.EligibleApply) directive, baseResult, inputs, chunkQueryText);
+    var page = trimSearchResult(outcome.result(), pageLimit);
+    return page == outcome.result() ? outcome : new ChunkRunOutcome(page, outcome.applied(),
+        outcome.reason(), outcome.branchFusionStrategy(), outcome.branchFusionContributed(),
+        outcome.chunkMergeMs(), outcome.chunkBm25Ns(), outcome.chunkKnnNs(),
+        outcome.chunkSpladeNs(), outcome.chunkRetry(), outcome.branchFusionNs());
+  }
+
+  private ChunkRunOutcome applyChunkMerge(
+      ChunkMergeDirective.EligibleApply apply,
+      LuceneRuntimeTypes.SearchResult baseResult,
+      SearchInputs inputs,
+      String chunkQueryText) {
     boolean hasBaseResults = baseResult.hits() != null && !baseResult.hits().isEmpty();
     // Tempdoc 774 Stage 1 — base-results gate lever. Default true reproduces today's behavior
     // (chunk merge is a recall gate on the doc legs). When false, the chunk branch runs even when
@@ -777,8 +805,11 @@ public final class SearchExecutor {
 
     // Tempdoc 774 Stage 1 — chunk-side recall-complete per-leg top-N to protect (0 = disabled, so no
     // per-leg protected-set work is done in executeChunkBranchFusion when the lever is off).
+    // Like the doc-side splice, it exists for the cross-encoder's window: without one the protected
+    // set is neither collected nor spliced, so the page keeps its fused order.
+    boolean rerankPool = pipeline.getCrossEncoderEnabled();
     int chunkRecallTopN =
-        hybridConfig != null && hybridConfig.chunkLegRecallCompleteEnabled()
+        rerankPool && hybridConfig != null && hybridConfig.chunkLegRecallCompleteEnabled()
             ? hybridConfig.chunkLegRecallCompleteTopN()
             : 0;
 
@@ -939,7 +970,7 @@ public final class SearchExecutor {
     // Head cross-encoder ever sees it. Re-assert the guarantee on the branch-fused list, identifying
     // the protected docs by the dense/bm25 leg rank carried in their whole-doc provenance (presence,
     // not score — keyword-neutral). Spliced before attachBranchFusion so provenance is re-mapped.
-    if (hybridConfig != null && hybridConfig.legRecallCompleteEnabled()) {
+    if (rerankPool && hybridConfig != null && hybridConfig.legRecallCompleteEnabled()) {
       int topN = hybridConfig.legRecallCompleteTopN();
       List<LuceneRuntimeTypes.SearchHit> protectedHits = new ArrayList<>();
       for (LuceneRuntimeTypes.SearchHit h : wholeDocResult.hits()) {
@@ -969,7 +1000,7 @@ public final class SearchExecutor {
     // whose fused rank fell outside the collapse cap is still rescued (the collapse is itself a
     // "stage that may not drop a passage-leg top-N candidate", §I.2). Spliced before attachBranchFusion
     // so provenance is re-mapped — same ordering as the doc-side block.
-    if (hybridConfig != null && hybridConfig.chunkLegRecallCompleteEnabled()) {
+    if (rerankPool && hybridConfig != null && hybridConfig.chunkLegRecallCompleteEnabled()) {
       List<LuceneRuntimeTypes.SearchHit> spliced =
           HybridFusionUtils.spliceRecallComplete(
               merged.hits(), chunkBranchResult.legTopNParents(), limit);

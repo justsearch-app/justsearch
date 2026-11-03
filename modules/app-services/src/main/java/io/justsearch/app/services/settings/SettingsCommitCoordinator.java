@@ -434,8 +434,10 @@ public final class SettingsCommitCoordinator implements SettingsCommitOwner {
       switch (model.packageId()) {
         case "citation-scorer" -> requireInstallerEncoderPath("encoders", model.packageId(),
             desired.ai().citationScorer().modelPath(), plan);
-        case "reranker" -> requireInstallerEncoderPath("encoders", model.packageId(),
-            desired.ai().reranker().modelPath(), plan);
+        case "reranker" -> {
+          if (!Boolean.FALSE.equals(desired.ai().reranker().enabled())) requireInstallerEncoderPath("encoders", model.packageId(),
+              desired.ai().reranker().modelPath(), plan);
+        }
         default -> { }
       }
     }
@@ -1007,6 +1009,29 @@ public final class SettingsCommitCoordinator implements SettingsCommitOwner {
             Map.of("keys", List.copyOf(changedKeys.generationBound()),
                 "operation", "core.bulk-reindex"));
       }
+      boolean rerankerChoiceChanged = !active.recoveryReset() && !Objects.equals(
+          active.priorSettings.getRerankerEnabled(), preparedCandidate.getRerankerEnabled());
+      boolean rerankerChoiceRequested = !active.recoveryReset()
+          && preparedCandidate.getRerankerPreferenceRevision() == next.acceptedRevision();
+      // A true preference is not proof of a working session: recovery may have retained a
+      // disabled query selection. Explicit enables must still go through the physical owner.
+      boolean prepareReranker = rerankerChoiceChanged
+          || (rerankerChoiceRequested && Boolean.TRUE.equals(preparedCandidate.getRerankerEnabled()));
+      preparedCandidate.setRerankerPreferenceRevision(rerankerChoiceChanged || rerankerChoiceRequested
+          ? next.acceptedRevision() : active.recoveryReset() ? 0
+              : active.priorSettings.getRerankerPreferenceRevision());
+      if (prepareReranker) {
+        for (var key : List.of(io.justsearch.configuration.EnvRegistry.RERANK_MODEL_PATH.configKey(),
+            io.justsearch.configuration.EnvRegistry.RERANK_ENABLED.configKey())) {
+          var source = resolved.resolution(key);
+          if (source != null && source.isResolved() && source.sourceOrdinal()
+              >= io.justsearch.configuration.resolved.ResolvedConfigBuilder.ORDINAL_ENV_VAR) {
+            throw refused("QUERY_ROLE_PATH_OVERRIDDEN",
+                "Best match first is controlled by an operator override; change that override first",
+                Map.of("component", "encoders", "key", key));
+          }
+        }
+      }
       boolean queryPathChanged = !active.recoveryReset() && (
           !Objects.equals(active.priorSettings.getRerankerModelPath(),
               preparedCandidate.getRerankerModelPath())
@@ -1031,9 +1056,18 @@ public final class SettingsCommitCoordinator implements SettingsCommitOwner {
       if (changedKeys.restartRequired().contains("justsearch.index.base_path")) {
         servingResolved = servingResolved.retainingIndexBasePathFrom(serving);
       }
-      if (!changedKeys.component().isEmpty() || chatComponentChanged
+      if (!changedKeys.component().isEmpty() || prepareReranker || chatComponentChanged
           || candidateContext.hasChatProfile() || candidateContext.forceGenerativeRefresh()) {
         var affected = new java.util.TreeMap<String, Set<String>>(changedKeys.component());
+        if (prepareReranker) {
+          // The switch is not a model-path change: On restores the retained selection, Off only
+          // disables the role. A path the same save changes arrives as its own key.
+          affected.merge("encoders", Set.of("rerankerEnabled"), (left, right) -> {
+            var keys = new java.util.TreeSet<>(left);
+            keys.addAll(right);
+            return Set.copyOf(keys);
+          });
+        }
         if (chatComponentChanged) {
           affected.merge("generative", Set.of("ui.chatEnabled"), (left, right) -> {
             var keys = new java.util.TreeSet<>(left);
@@ -1063,7 +1097,7 @@ public final class SettingsCommitCoordinator implements SettingsCommitOwner {
             "Prepared component transaction");
       }
       QueryRoleSelection queryRoles = reset ? null : active.priorQueryRoles;
-      if (changedKeys.component().containsKey("encoders")) {
+      if (changedKeys.component().containsKey("encoders") || prepareReranker) {
         if (preparedComponents == null || preparedComponents.queryRoleSelection().isEmpty()) {
           throw refused("ENCODER_SELECTION_REQUIRED",
               "Encoder owner did not prepare a query-role selection", Map.of());

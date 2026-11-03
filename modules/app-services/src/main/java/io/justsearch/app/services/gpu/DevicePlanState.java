@@ -26,6 +26,7 @@ public final class DevicePlanState {
       new CopyOnWriteArrayList<>();
   private volatile GpuProfileResolver.Resolution current = GpuProfileResolver.Resolution.unresolved();
   private int publishedDevice = -1; // Guarded by this.
+  private long publications; // Guarded by this.
 
   /** The process's plan state. */
   public static DevicePlanState process() {
@@ -49,18 +50,8 @@ public final class DevicePlanState {
   public void publish(GpuProfileResolver.Resolution resolution) {
     Objects.requireNonNull(resolution, "resolution");
     synchronized (this) {
-      if (publishedDevice >= 0 && publishedDevice != resolution.cudaDeviceId()) {
-        DeviceArenaPlans.withdraw(publishedDevice);
-        publishedDevice = -1;
-      }
-      GpuArenaPlan plan = resolution.plan().filter(GpuArenaPlan::planned).orElse(null);
-      if (plan != null && resolution.cudaDeviceId() >= 0) {
-        DeviceArenaPlans.publish(resolution.cudaDeviceId(), plan);
-        publishedDevice = resolution.cudaDeviceId();
-      } else if (publishedDevice >= 0) {
-        DeviceArenaPlans.withdraw(publishedDevice);
-        publishedDevice = -1;
-      }
+      publications++;
+      applyArenaPlan(resolution);
       var before = current;
       current = resolution;
       io.justsearch.core.status.StatusChangeCounter.process().changed(
@@ -69,6 +60,52 @@ public final class DevicePlanState {
           java.util.Arrays.asList(resolution.statusProfile(), resolution.source(), resolution.unmetSettings(),
               resolution.diagnosticReasons()));
       for (Consumer<GpuProfileResolver.Resolution> consumer : consumers) deliver(consumer, resolution);
+    }
+  }
+
+  /**
+   * Puts {@code candidate}'s plan in effect for its device's sessions while a configuration that
+   * carries it is prepared, so a role the published plan has no budget for (Best match first
+   * switched on) warms on the device. Nothing is published: the profile and the consumers keep the
+   * current resolution. The candidate becomes the published plan only with the commit that
+   * publishes its configuration; the returned action, run when the preparation is refused or
+   * abandoned, puts the published plan back unless a publication has superseded the stage.
+   */
+  public Runnable stage(GpuProfileResolver.Resolution candidate) {
+    Objects.requireNonNull(candidate, "candidate");
+    synchronized (this) {
+      GpuArenaPlan plan = candidate.plan().filter(GpuArenaPlan::planned).orElse(null);
+      if (plan == null || candidate.cudaDeviceId() < 0) return () -> {};
+      long staged = publications;
+      if (publishedDevice >= 0 && publishedDevice != candidate.cudaDeviceId()) {
+        DeviceArenaPlans.withdraw(publishedDevice);
+      }
+      DeviceArenaPlans.publish(candidate.cudaDeviceId(), plan);
+      int stagedDevice = candidate.cudaDeviceId();
+      return () -> {
+        synchronized (this) {
+          if (publications != staged) return;
+          DeviceArenaPlans.withdraw(stagedDevice);
+          if (publishedDevice == stagedDevice) publishedDevice = -1;
+          applyArenaPlan(current);
+        }
+      };
+    }
+  }
+
+  /** Makes {@code resolution}'s plan its device's current plan, or withdraws it. Guarded by this. */
+  private void applyArenaPlan(GpuProfileResolver.Resolution resolution) {
+    if (publishedDevice >= 0 && publishedDevice != resolution.cudaDeviceId()) {
+      DeviceArenaPlans.withdraw(publishedDevice);
+      publishedDevice = -1;
+    }
+    GpuArenaPlan plan = resolution.plan().filter(GpuArenaPlan::planned).orElse(null);
+    if (plan != null && resolution.cudaDeviceId() >= 0) {
+      DeviceArenaPlans.publish(resolution.cudaDeviceId(), plan);
+      publishedDevice = resolution.cudaDeviceId();
+    } else if (publishedDevice >= 0) {
+      DeviceArenaPlans.withdraw(publishedDevice);
+      publishedDevice = -1;
     }
   }
 

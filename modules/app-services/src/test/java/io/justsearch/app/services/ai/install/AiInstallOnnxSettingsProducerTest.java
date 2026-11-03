@@ -66,6 +66,42 @@ import org.junit.jupiter.api.io.TempDir;
 class AiInstallOnnxSettingsProducerTest {
   @TempDir Path directory;
 
+  @org.junit.jupiter.params.ParameterizedTest
+  @org.junit.jupiter.params.provider.ValueSource(booleans = {false, true})
+  void installedAdditionsPreserveOffAndCustomPathIncludingLegacyDisable(boolean legacy)
+      throws Exception {
+    var store = new UiSettingsStore(UiSettingsStore.PersistenceMode.READ_WRITE,
+        directory.resolve("settings.json"));
+    var saved = new UiSettings();
+    saved.setRerankerModelPath(directory.resolve("custom-ranker").toString());
+    if (!legacy) saved.setRerankerEnabled(false);
+    var disabled = new io.justsearch.app.api.settings.QueryRoleSelection(
+        io.justsearch.app.api.settings.QueryRoleSelection.Role.disabled(),
+        io.justsearch.app.api.settings.QueryRoleSelection.Role.disabled());
+    store.replacePrepared(store.prepare(saved, new SettingsWitness(0, null), disabled));
+    var embedding = packageWith("embedding", "model.onnx", "tokenizer.json");
+    var reranker = packageWith("reranker", "model.onnx", "tokenizer.json");
+    var root = directory.resolve("models");
+    stagePackage(root, embedding);
+    stagePackage(root, reranker);
+    writeContract(root, embedding, reranker);
+    var prior = ConfigStore.globalOrNull();
+    var current = new ConfigStore(ConfigStoreRebuilder.prepare(store.load()));
+    ConfigStore.setGlobal(current);
+    try {
+      var candidate = new AiInstallService(null, store, null, null, directory)
+          .prepareInstalledGenerationCandidate(new ModelRegistry(2, "test", List.of(embedding, reranker)))
+          .orElseThrow();
+      assertEquals(Boolean.FALSE, candidate.candidateSettings().getRerankerEnabled());
+      assertEquals(saved.getRerankerModelPath(), candidate.candidateSettings().getRerankerModelPath());
+      assertFalse(ConfigStoreRebuilder.prepare(candidate.candidateSettings()).ai().reranker().enabled());
+      assertTrue(Files.isRegularFile(root.resolve(reranker.targetDir()).resolve("model.onnx")));
+      assertEquals(disabled, store.inspect().queryRoles());
+    } finally {
+      ConfigStore.restoreGlobal(current, prior);
+    }
+  }
+
   @Test
   void mixedActivationBindsSelectedChatAndRefusesSameSizeDriftBeforeIngestion()
       throws Exception {

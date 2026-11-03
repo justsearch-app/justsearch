@@ -24,7 +24,8 @@ import org.slf4j.LoggerFactory;
  * Delegates to {@link BrainInstallService#startInstall(boolean)} via lazy
  * supplier.
  *
- * <p>Args shape: {@code {"acceptTerms"?: boolean}}. Returns the post-start
+ * <p>Args shape: {@code {"acceptTerms"?: boolean, "enableRerankerOnCompletion"?: boolean}}.
+ * Returns the post-start
  * install status snapshot in {@code structuredData}.
  */
 public final class StartAiInstallHandler implements OperationHandler {
@@ -59,7 +60,10 @@ public final class StartAiInstallHandler implements OperationHandler {
     }
 
     try {
-      return BrainInstallHandlerSupport.execution("AI install started", svc.startInstall(acceptTerms));
+      boolean enableReranker = BrainInstallHandlerSupport.parseBoolean(
+          argumentsJson, "enableRerankerOnCompletion");
+      return BrainInstallHandlerSupport.execution("AI install started", enableReranker
+          ? svc.startInstall(acceptTerms, true) : svc.startInstall(acceptTerms));
     } catch (Exception e) {
       log.error("StartAiInstallHandler: startInstall threw", e);
       return finished(OperationResult.failure(

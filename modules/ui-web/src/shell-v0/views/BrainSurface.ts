@@ -21,7 +21,8 @@ import '../components/SurfaceTabs.js';
 import type { SurfaceTabItem } from '../components/SurfaceTabs.js';
 import { getSurface } from '../../api/registry/SurfaceCatalogClient.js';
 import { authorizedFetch } from '../api/authorizedFetch.js';
-import { saveAbsoluteSettings } from '../../api/settingsAttempt.js';
+import { saveAbsoluteSettings, createSettingsAttempt, executeSettingsAttempt, requireSettingsWitness, SettingsAttemptError } from '../../api/settingsAttempt.js';
+import type { SettingsV2 } from '../../api/generated/schema-types/settings-v2.js';
 import { present } from '../display/present.js';
 import { formatBytes } from '../display/format.js';
 import { projectFact } from '../display/facts.js';
@@ -599,6 +600,9 @@ export class BrainSurface extends JfElement {
   private _unifiedAiState: UnifiedAiState | null = null;
   private unsubAi: (() => void) | null = null;
   private uiModeUnsub: (() => void) | null = null;
+  private rerankerSettings: SettingsV2 | null = null;
+  private rerankerApplied: boolean | null = null;
+  private rerankerUncertain = false;
   private refreshRevision = 0;
   private planRevision = 0;
   private planReads = 0;
@@ -1233,7 +1237,18 @@ export class BrainSurface extends JfElement {
           void this.refreshSettings();
         }
       }
-      if (s.runtimeStatus) this.runtimeStatus = s.runtimeStatus;
+      if (s.runtimeStatus) {
+        const changed = s.runtimeStatus !== this.runtimeStatus;
+        this.runtimeStatus = s.runtimeStatus;
+        if (changed && !this.pendingActions.has('reranker-switch')) this.rerankerApplied = null;
+        const reranker = s.runtimeStatus.onnxFeatures?.find(feature => feature.id === 'reranker');
+        if (changed && !this.pendingActions.has('reranker-switch')
+            && reranker?.status !== 'unknown' && reranker?.modelActive != null
+            && this.settingsRead && (this.rerankerSettings?.rerankerEnabled == null
+              || this.rerankerSettings.rerankerEnabled === (reranker.status === 'active' && reranker.modelActive))) {
+          this.rerankerUncertain = false;
+        }
+      }
       if (s.packStatus) this.packStatus = s.packStatus;
       this.requestUpdate();
     });
@@ -1303,17 +1318,22 @@ export class BrainSurface extends JfElement {
   }
 
   private async refreshSettings(afterAnswerSave = false): Promise<void> {
-    if (this.pendingActions.has('inference-switch') && !afterAnswerSave) return;
+    if ((this.pendingActions.has('inference-switch') || this.pendingActions.has('reranker-switch')) && !afterAnswerSave) return;
     const revision = ++this.refreshRevision;
     const choice = this.choiceRevision;
     const llmRevision = this.llmRevision;
-    const settings = await this.fetchJson<{ ui?: UiSettings; llm?: LlmSettings }>('/api/settings/v2');
+    const settings = await this.fetchJson<SettingsV2>('/api/settings/v2');
     if (!this.isConnected || revision !== this.refreshRevision || choice !== this.choiceRevision || !settings) return;
     this.settingsRead = true;
-    this.settings = { ...(settings.ui ?? {}), mode: getUiMode() };
+    if (this.rerankerSettings?.witness?.acceptedRevision !== settings.witness?.acceptedRevision
+        || this.rerankerSettings?.witness?.lastCommittedOperationKey !== settings.witness?.lastCommittedOperationKey) {
+      this.rerankerApplied = null;
+    }
+    this.rerankerSettings = settings;
+    this.settings = { ...(settings.ui ?? {}), mode: getUiMode() } as UiSettings;
     // Drafts own their values even after focus moves to another surface. Revisions
     // also cover edits and witnessed saves completed while this read was pending.
-    if (llmRevision === this.llmRevision && this.llmPending === 0 && this.llmDrafts.size === 0) this.llm = settings.llm ?? {};
+    if (llmRevision === this.llmRevision && this.llmPending === 0 && this.llmDrafts.size === 0) this.llm = (settings.llm ?? {}) as LlmSettings;
   }
 
   private async refreshAll(): Promise<void> {
@@ -1383,18 +1403,23 @@ export class BrainSurface extends JfElement {
         ? this._unifiedAiState?.capabilities?.chat === true || this._unifiedAiState?.runtime?.mode === 'online'
         : onnx?.modelActive === true);
       const unavailable = !present && (component?.state === 'unavailable' || component?.state === 'not-in-mode');
-      const selected = installed && id === 'chat' && (present || (component != null && component.declined !== true && component.state !== 'declined'))
+      const selected = installed && id === 'reranker'
+        ? this.rerankerApplied ?? (onnx?.status === 'active' && onnx.modelActive === true
+          ? true : this.rerankerSettings?.rerankerEnabled ?? onnx?.status === 'active')
+        : installed && id === 'chat' && (present || (component != null && component.declined !== true && component.state !== 'declined'))
         ? this.settings.chatEnabled ?? (this.systemStatus?.inference?.chatEnabledSpec
           ?? this._unifiedAiState?.status?.inference?.chatEnabledSpec
           ?? this._unifiedAiState?.capabilities?.chat === true)
         : !unavailable && component != null && component.declined !== true && component.state !== 'declined';
-      const active = !live ? null : id === 'chat' ? this._unifiedAiState?.capabilities?.chat ?? null
+      const active = !live ? null : id === 'reranker' && this.rerankerApplied !== null ? this.rerankerApplied : id === 'chat' ? this._unifiedAiState?.capabilities?.chat ?? null
         : onnx?.status == null || onnx.status === 'unknown' ? null : onnx.status === 'active' && onnx.modelActive === true;
       const percent = packageProgress?.bytesTotal && packageProgress.bytesTotal > 0
         ? Math.floor(((packageProgress.bytesDownloaded ?? 0) / packageProgress.bytesTotal) * 100) : null;
       const stopped = this.installStatus?.state === 'cancelled';
       const running = this.installKnown() && this.installStatus?.state === 'running';
-      const state = running && packageProgress?.state === 'pending' ? 'Waiting to download'
+      const state = id === 'reranker' && this.busy['reranker-switch'] ? 'Changing…'
+        : id === 'reranker' && this.rerankerUncertain ? 'Unknown — checking Best match first after an interrupted change'
+        : running && packageProgress?.state === 'pending' ? 'Waiting to download'
         : running && packageProgress?.state === 'downloading' ? `Downloading${percent === null ? '' : ` ${percent}%`}`
         : !live ? 'Unknown — checking AI status'
         : stopped && packageProgress != null && !present && (packageProgress.bytesDownloaded ?? 0) > 0 ? `Cancelled · ${formatBytes(packageProgress.bytesDownloaded ?? 0)} kept`
@@ -1404,11 +1429,13 @@ export class BrainSurface extends JfElement {
         : active === null ? 'Unknown — last observed files are downloaded'
         : id === 'chat' && installed && this.settingsRead && !selected ? 'Off — background work can continue'
         : id === 'chat' && selected && active === false ? this.installStatus?.repairNeeded ? 'Unavailable — repair needed; answers are enabled' : 'Unavailable — answers are enabled'
+        : id === 'reranker' && installed && active === true && this.rerankerSettings?.rerankerEnabled === false && this.rerankerApplied === null ? 'On — the saved Off choice is not applied'
+        : id === 'reranker' && installed && active === false ? selected ? 'Unavailable — Best match first is enabled' : 'Off — files kept'
         : active ? 'On' : 'Off';
-      const runtimeControl = installed && id === 'chat' && (present || (component != null && component.declined !== true && component.state !== 'declined'));
+      const runtimeControl = installed && (id === 'reranker' || id === 'chat' && (present || (component != null && component.declined !== true && component.state !== 'declined')));
       const acquisitionControl = !runtimeControl && component?.declinable === true && (!installed || !present);
       const blockedReason = !live ? 'Checking AI status before changing features.' : unavailable ? component?.unavailableReason || state
-        : (runtimeControl && !this.settingsRead ? 'Saved answer choice is not known. Refresh settings before changing answers.' : null)
+        : (runtimeControl && (!this.settingsRead || id === 'reranker' && !this.rerankerSettings?.witness) ? id === 'reranker' ? 'Saved Best match first choice is not known. Refresh settings before changing it.' : 'Saved answer choice is not known. Refresh settings before changing answers.' : null)
         ?? this.planLockReason()
         ?? (this.busy['inference-switch'] ? 'Saving the answer choice' : null)
         ?? (installed && !component && !present ? 'Package status is unavailable. Refresh to check the files.' : null)
@@ -1416,7 +1443,7 @@ export class BrainSurface extends JfElement {
         ?? (acquisitionControl && !present && this.policy?.downloadsEnabled === false ? 'Downloads are disabled by administrator policy.' : null);
       features[id] = {
         id, label, selected, installed: present, active, availability: unavailable ? 'unavailable' : component ? 'available' : 'unknown',
-        state: runtimeControl ? !this.settingsRead ? `${state} · Saved answer choice is not known` : this.settings.chatEnabled == null ? `${state} · automatic (no saved answer choice)` : state : state,
+        state: runtimeControl && id === 'chat' ? !this.settingsRead ? `${state} · Saved answer choice is not known` : this.settings.chatEnabled == null ? `${state} · automatic (no saved answer choice)` : state : state,
         size: component?.totalBytes && component.totalBytes > 0 ? formatBytes(component.totalBytes) : null,
         switchable: !unavailable && (acquisitionControl || runtimeControl || (!live && !installed && id !== 'meaning')), blockedReason,
       };
@@ -1470,21 +1497,25 @@ export class BrainSurface extends JfElement {
   private renderFeatureSwitch(feature: BrainFeature, location: 'sentence' | 'path'): TemplateResult | typeof nothing {
     if (!feature.switchable) return nothing;
     const id = `brain-${location}-${feature.id}`;
-    return html`<span class="feature-switch-wrap">
-      <button type="button" id=${id} class="feature-switch" role="switch"
+    return html`<span class="feature-switch-wrap"><button type="button" id=${id} class="feature-switch" role="switch"
         aria-label=${`Use ${feature.label}`} aria-checked=${feature.selected ? 'true' : 'false'}
         aria-disabled=${feature.blockedReason ? 'true' : 'false'} aria-describedby=${feature.blockedReason ? `${id}-reason` : nothing}
         @click=${() => { if (!feature.blockedReason) void this.changeFeature(feature); }}
-      ><span></span></button>
-      <button type="button" class="feature-phrase" aria-label=${`About ${feature.label}`}
+      ><span></span></button>${location === 'sentence' && feature.id === 'reranker' ? nothing : html`<button type="button" class="feature-phrase" aria-label=${`About ${feature.label}`}
         aria-expanded=${this.featureInfo === feature.id} aria-controls=${`brain-feature-panel-${feature.id}`}
-        @click=${(event: Event) => this.openFeatureInfo(feature.id, event)}>${icon({ name: 'help-circle', size: 12 })}</button>
-      ${feature.blockedReason ? html`<span id=${`${id}-reason`} class="switch-reason">${feature.blockedReason}</span>` : nothing}
-    </span>`;
+        @click=${(event: Event) => this.openFeatureInfo(feature.id, event)}>${icon({ name: 'help-circle', size: 12 })}</button>`}${feature.blockedReason ? html`<span id=${`${id}-reason`} class="switch-reason">${feature.blockedReason}</span>` : nothing}</span>`;
   }
 
   private async changeFeature(feature: BrainFeature): Promise<void> {
     if (feature.blockedReason || this.planLockReason()) return;
+    if (feature.id === 'reranker' && this.hasInstalledAi()) {
+      if (!feature.selected && !feature.installed) {
+        const component = this.planPreview?.components?.find(c => c.id === 'reranker');
+        if (component?.declined || component?.state === 'declined') await this.setComponentDeclined('reranker', false);
+        if (!this.runtimeError) await this.startInstall('reranker');
+      } else await this.setRerankerEnabled(!feature.selected);
+      return;
+    }
     if (feature.id === 'chat' && this.hasInstalledAi() && (feature.installed || this.planPreview?.components?.some(c => c.id === 'chat' && c.declined !== true && c.state !== 'declined'))) {
       await this.setChatEnabled(!feature.selected);
       return;
@@ -1748,6 +1779,7 @@ export class BrainSurface extends JfElement {
       return 'Saving the current download choices';
     }
     if (this.pendingActions.has('inference-switch')) return 'Saving the answer choice';
+    if (this.pendingActions.has('reranker-switch')) return 'Changing…';
     return null;
   }
 
@@ -1827,7 +1859,9 @@ export class BrainSurface extends JfElement {
     this.installConsentOpen = false;
     await this.withBusy('install-start', async () => {
       this.runtimeError = null;
-      const data = (await this.invokeOp('core.start-ai-install', { acceptTerms: true })) as InstallStatus;
+      const data = (await this.invokeOp('core.start-ai-install', { acceptTerms: true,
+        ...(feature === 'reranker' ? { enableRerankerOnCompletion: true } : {}),
+      })) as InstallStatus;
       if (data) {
         void refreshAiInstallNow();
         if (feature === 'chat') await this.setChatEnabled(true);
@@ -1921,6 +1955,29 @@ export class BrainSurface extends JfElement {
       this.runtimeError = null;
       ++this.choiceRevision;
       await this.invokeOp('core.set-chat-enabled', { enabled });
+      await this.refreshSettings(true);
+    });
+  }
+
+  private async setRerankerEnabled(enabled: boolean): Promise<void> {
+    await this.withBusy('reranker-switch', async () => {
+      this.runtimeError = null;
+      ++this.choiceRevision;
+      const attempt = createSettingsAttempt({ rerankerEnabled: enabled, rerankerSwitchIntent: true }, requireSettingsWitness(this.rerankerSettings?.witness));
+      let result;
+      try {
+        result = await executeSettingsAttempt(
+          (path, init) => authorizedFetch(this.base() + path, init), attempt, { timeoutMs: 180_000 });
+      } catch (error) {
+        if (error instanceof SettingsAttemptError
+            && ['SETTINGS_COMPLETION_UNKNOWN', 'SETTINGS_RECEIPT_INVALID'].includes(error.code)) {
+          this.rerankerUncertain = true;
+        }
+        throw error;
+      }
+      this.rerankerUncertain = false;
+      this.rerankerApplied = enabled ? null : false;
+      this.rerankerSettings = { ...this.rerankerSettings, rerankerEnabled: enabled, witness: result.witness };
       await this.refreshSettings(true);
     });
   }

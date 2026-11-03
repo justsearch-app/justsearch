@@ -40,6 +40,7 @@ public final class HybridSearchOps {
   // ResolvedConfigBuilder counterpart (tempdoc-driven drift fix: two of these had silently
   // diverged from the builder defaults they claim to mirror).
   static final int DEFAULT_CANDIDATE_LIMIT_MAX = 100;
+
   static final int DEFAULT_TEXT_CANDIDATE_MULTIPLIER = 10;
   static final int DEFAULT_VECTOR_CANDIDATE_MULTIPLIER = 10;
   static final double DEFAULT_VECTOR_RRF_WEIGHT = 0.75;
@@ -292,6 +293,10 @@ public final class HybridSearchOps {
    * using virtual threads. The caller binds concrete search implementations via the functional
    * interfaces (e.g., unfiltered, filtered by Query, filtered by RuntimeSearchFilters).
    *
+   * <p>{@code rerankPool} says whether a cross-encoder reranks the
+   * returned list. Only then are leg-top candidates spliced in: without a reranker the returned
+   * list is what the user sees, and the splice would displace fused hits from it.
+   *
    * @param textLeg the text/BM25 search leg (bound by caller with any filter)
    * @param vectorLeg the vector/KNN search leg (bound by caller with any filter)
    * @param queryText the text query (used for skip heuristic and logging)
@@ -309,6 +314,7 @@ public final class HybridSearchOps {
       int limit,
       boolean debug,
       String logPrefix,
+      boolean rerankPool,
       EngineContext.Urgency urgency, io.justsearch.core.execution.EngineTaskLifetime childLifetime) {
     long startTime = System.currentTimeMillis();
 
@@ -402,7 +408,7 @@ public final class HybridSearchOps {
     // top-N candidates survive into the returned list so the Head cross-encoder's rerank window
     // sees them, even when fused-score truncation would otherwise bury a confident dense answer
     // (the demonstrated buried-signal failure). Keyword-neutral: it never down-weights a leg.
-    if (hs != null && hs.legRecallCompleteEnabled()) {
+    if (rerankPool && hs != null && hs.legRecallCompleteEnabled()) {
       int topN = hs.legRecallCompleteTopN();
       List<SearchHit> protectedHits = new ArrayList<>(HybridFusionUtils.topN(textResult, topN));
       protectedHits.addAll(HybridFusionUtils.topN(vectorResult, topN));
@@ -443,7 +449,8 @@ public final class HybridSearchOps {
    * @return search results ordered by fused RRF score
    */
   SearchResult searchHybrid(String queryText, float[] queryVector, int limit, QuerySyntax syntax,
-      EngineContext.Urgency urgency, io.justsearch.core.execution.EngineTaskLifetime childLifetime) {
+      boolean rerankPool, EngineContext.Urgency urgency,
+      io.justsearch.core.execution.EngineTaskLifetime childLifetime) {
     if (queryText == null || queryText.isBlank()) {
       throw new IllegalArgumentException("queryText must not be null or blank");
     }
@@ -456,7 +463,7 @@ public final class HybridSearchOps {
     return executeHybrid(
         (t, l) -> textQueryOps.searchText(t, l, null, null, syntax),
         (v, l) -> readPathOps.searchVector(v, l),
-        queryText, queryVector, limit, false, "Hybrid", urgency, childLifetime);
+        queryText, queryVector, limit, false, "Hybrid", rerankPool, urgency, childLifetime);
   }
 
   /**
@@ -477,8 +484,18 @@ public final class HybridSearchOps {
   public SearchResult searchHybridFiltered(
       String queryText, float[] queryVector, int limit, Query filter, QuerySyntax syntax,
       EngineContext.Urgency urgency, io.justsearch.core.execution.EngineTaskLifetime childLifetime) {
+    return searchHybridFiltered(queryText, queryVector, limit, filter, syntax, true, urgency,
+        childLifetime);
+  }
+
+  /** Filtered hybrid search; {@code rerankPool} as in {@link #executeHybrid}. */
+  public SearchResult searchHybridFiltered(
+      String queryText, float[] queryVector, int limit, Query filter, QuerySyntax syntax,
+      boolean rerankPool, EngineContext.Urgency urgency,
+      io.justsearch.core.execution.EngineTaskLifetime childLifetime) {
     if (filter == null) {
-      return searchHybrid(queryText, queryVector, limit, syntax, urgency, childLifetime);
+      return searchHybrid(queryText, queryVector, limit, syntax, rerankPool, urgency,
+          childLifetime);
     }
     if (queryText == null || queryText.isBlank()) {
       throw new IllegalArgumentException("queryText must not be null or blank");
@@ -497,6 +514,7 @@ public final class HybridSearchOps {
         limit,
         false,
         "Filtered hybrid",
+        rerankPool,
         urgency, childLifetime);
   }
 
@@ -517,6 +535,19 @@ public final class HybridSearchOps {
       RuntimeSearchFilters filters,
       QuerySyntax syntax,
       EngineContext.Urgency urgency, io.justsearch.core.execution.EngineTaskLifetime childLifetime) {
+    return searchHybridWithDebug(queryText, queryVector, limit, filters, syntax, true, urgency,
+        childLifetime);
+  }
+
+  /** Debug hybrid search; {@code rerankPool} as in {@link #executeHybrid}. */
+  public SearchResult searchHybridWithDebug(
+      String queryText,
+      float[] queryVector,
+      int limit,
+      RuntimeSearchFilters filters,
+      QuerySyntax syntax,
+      boolean rerankPool,
+      EngineContext.Urgency urgency, io.justsearch.core.execution.EngineTaskLifetime childLifetime) {
     if (queryText == null || queryText.isBlank()) {
       throw new IllegalArgumentException("queryText must not be null or blank");
     }
@@ -534,6 +565,7 @@ public final class HybridSearchOps {
         limit,
         true,
         "Hybrid(debug)",
+        rerankPool,
         urgency, childLifetime);
   }
 
