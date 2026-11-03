@@ -14,9 +14,11 @@ link started were classed as a click (shown by mutation in the builder report). 
 source-document regression check in `scripts/sandbox/window-credential-docs.test.mjs` (outside
 product test-intent scope).
 
-The four new test files are isolated new sources (exempt); their entries are kept so their
-fail-before evidence is recorded by the script. Only the Rust test module and the register count
-need entries. For Rust fail-before, the compatibility patch exposes only new API shapes, keeps the
+The five new test files are isolated new sources (exempt); their entries are kept so their
+fail-before evidence is recorded by the script. Only the Rust test module, the register count and
+the add-watched-root risk value (catalog test and operation-wire golden) need entries. The golden
+is overlaid onto the before-state so its conformance check compares the base catalog with the new
+value. N1 for the raised operation already held on the base, so its check has no fail-before. For Rust fail-before, the compatibility patch exposes only new API shapes, keeps the
 old session-only stdout filtering and supplies no window authority; the overlaid
 `justsearch-bound-exec` helper is the CI-built native fixture the shell's spawn tests need.
 
@@ -122,6 +124,58 @@ old session-only stdout filtering and supplies no window authority; the overlaid
       "evidence": "gates/test-intent/evidence/window-credential-java-s6.json",
       "newChecks": [
         "modules/ui/src/test/java/io/justsearch/ui/api/WindowAuthorityBoundaryTest.java#s6DeepLinksFromTheWindowKeepUrlProvenanceAndStillPrompt"
+      ]
+    },
+    {
+      "items": [
+        "modules/ui/src/test/java/io/justsearch/ui/api/WatchedRootRiskBoundaryTest.java",
+        "modules/app-services/src/test/java/io/justsearch/app/services/registry/operations/CoreOperationCatalogTest.java",
+        "modules/app-services/src/test/resources/registry/emitter/ui-operation-wire.golden.json"
+      ],
+      "class": "New",
+      "behaviour": "S4 through the generic operation route: core.add-watched-root is declared MEDIUM risk (it was LOW, which the lattice runs without a prompt at every trust level). A token-only caller invoking it via POST /api/operations/core.add-watched-root/invoke, with no, forged trusted or MCP transport, gets 428 with a pending id and the folder is not added; approving that pending in the app window adds it (N2); the window's own click with no, BUTTON, PALETTE or RAIL transport still adds it with no prompt (N1). The catalog test and the operation-wire golden carry the same one value: risk MEDIUM, confirm None, executors UI and AGENT unchanged.",
+      "sources": [
+        {
+          "kind": "owner-words",
+          "quote": "Without a grant that covers it, an outside caller invokes a medium-risk operation (e.g. add a folder, ingest) with no transport header, blank, unknown, or forged BUTTON/RAIL/PALETTE/SYSTEM_INTERNAL and any client header: it does not run unprompted; it becomes a pending action shown in the app (or is refused where the path has no pending flow).",
+          "location": "task t-20261102-agent-approval request"
+        },
+        {
+          "kind": "owner-words",
+          "quote": "Outside caller adds a folder through POST /api/indexing/roots (the direct path): no watched root added, no scan admitted, nothing persisted after restart, unless approved in the app.",
+          "location": "task t-20261102-agent-approval request"
+        },
+        {
+          "kind": "owner-words",
+          "location": "task t-20261102-agent-approval request",
+          "quote": "In the app: button, rail and palette actions behave as today (medium risk runs, high risk asks typed confirm); approve with and without \"allow always\"; grants list in Settings; revoke; Global Hard Stop."
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/window-credential-java-watched-root.json",
+      "newChecks": [
+        "modules/ui/src/test/java/io/justsearch/ui/api/WatchedRootRiskBoundaryTest.java#s4OutsideCallerAddingAFolderGetsAPendingAndNothingIsAdded",
+        "modules/ui/src/test/java/io/justsearch/ui/api/WatchedRootRiskBoundaryTest.java#n2ApprovingTheOutsideRequestInTheAppAddsTheFolder",
+        "modules/app-services/src/test/java/io/justsearch/app/services/registry/operations/CoreOperationCatalogTest.java#addWatchedRootHasMediumRiskNoConfirmUiAndAgent",
+        "modules/app-services/src/test/java/io/justsearch/app/services/registry/emitter/UIOperationViewConformanceTest.java"
+      ],
+      "repaired": true
+    },
+    {
+      "items": [
+        "modules/ui/src/test/java/io/justsearch/ui/api/WatchedRootRiskBoundaryTest.java"
+      ],
+      "class": "New",
+      "behaviour": "N1 for the raised operation: a click in the app window (no transport, BUTTON, PALETTE or RAIL, with the window credential) adds the folder through the real lattice and executor with no prompt and no pending. This already held on the base (LOW ran automatically everywhere); the check guards that raising the risk adds no prompt to the person's own click.",
+      "sources": [
+        {
+          "kind": "owner-words",
+          "location": "task t-20261102-agent-approval request",
+          "quote": "In the app: button, rail and palette actions behave as today (medium risk runs, high risk asks typed confirm); approve with and without \"allow always\"; grants list in Settings; revoke; Global Hard Stop."
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/window-credential-java-watched-root-n1.json",
+      "newChecks": [
+        "modules/ui/src/test/java/io/justsearch/ui/api/WatchedRootRiskBoundaryTest.java#n1WindowClickAddsTheFolderWithoutAPrompt"
       ]
     },
     {

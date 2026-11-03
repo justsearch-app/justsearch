@@ -257,9 +257,10 @@ final class CoreOperationCatalogTest {
   }
 
   @Test
-  void addWatchedRootHasLowRiskNoConfirmUiAndAgent() {
+  void addWatchedRootHasMediumRiskNoConfirmUiAndAgent() {
     Operation op = catalog.findById(CoreOperationCatalog.ADD_WATCHED_ROOT).orElseThrow();
-    assertEquals(RiskTier.LOW, op.policy().risk());
+    // MEDIUM so untrusted callers are prompted; None so a trusted click stays prompt-free.
+    assertEquals(RiskTier.MEDIUM, op.policy().risk());
     assertInstanceOf(ConfirmStrategy.None.class, op.policy().confirm());
     assertEquals(Set.of(ExecutorTag.UI, ExecutorTag.AGENT), op.executors());
     // Required arg: path

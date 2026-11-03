@@ -147,9 +147,15 @@ public final class CoreOperationCatalog implements OperationCatalog {
       new OperationRef("core.copy-diagnostic-summary");
 
   /**
-   * Slice 3a-2-c LibraryView Add Folder migration. LOW risk (additive). Args:
+   * Slice 3a-2-c LibraryView Add Folder migration. Args:
    * {@code {"path": string, "collection"?: string}}. Maps to
    * IndexingService.addWatchedRoot.
+   *
+   * <p>MEDIUM risk: adding a folder widens what JustSearch indexes and what assistants can search,
+   * and it persists. At MEDIUM the lattice keeps a trusted click (the app window's Add Folder
+   * button, drop or palette) automatic while an untrusted caller (a program holding only the
+   * manifest token, MCP, the agent) and a received link are prompted in the app. {@code None}
+   * confirm keeps the in-window gesture prompt-free; the prompt comes from the lattice.
    */
   public static final OperationRef ADD_WATCHED_ROOT =
       new OperationRef("core.add-watched-root");
@@ -847,7 +853,7 @@ public final class CoreOperationCatalog implements OperationCatalog {
             "{\"type\":\"object\",\"properties\":{\"path\":{\"type\":\"string\"},\"collection\":{\"type\":\"string\"}},\"required\":[\"path\"]}",
             "{\"type\":\"object\",\"properties\":{\"path\":{\"type\":\"string\"},\"collection\":{\"type\":\"string\"}}}"),
         new OperationPolicy(
-                RiskTier.LOW,
+                RiskTier.MEDIUM,
                 ConfirmStrategy.None.INSTANCE,
                 AuditPolicy.METADATA_ONLY,
                 RetryPolicy.noRetry(),

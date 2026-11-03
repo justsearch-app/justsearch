@@ -695,7 +695,7 @@
     "uiHints" : { }
   },
   "policy" : {
-    "risk" : "LOW",
+    "risk" : "MEDIUM",
     "confirm" : {
       "kind" : "NONE"
     },
