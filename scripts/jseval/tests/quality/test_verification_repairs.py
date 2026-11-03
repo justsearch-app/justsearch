@@ -1,6 +1,7 @@
 """Regressions reported by the independent core verification (2026-11-03)."""
 from dataclasses import replace
 import fcntl
+import contextlib
 import json
 import os
 from pathlib import Path
@@ -103,7 +104,7 @@ def test_admission_refusal_is_the_command_outcome(tmp_path, monkeypatch, real_ad
 
 
 @pytest.mark.parametrize('result', [0, 1])
-def test_waiting_install_keeps_receipt_until_build_completes(tmp_path, monkeypatch, result):
+def test_waiting_install_keeps_receipt_until_build_admitted(tmp_path, monkeypatch, result):
     (tmp_path/'.git').mkdir()
     dist = tmp_path/'modules/ui/build/install/ui'
     (dist/'bin').mkdir(parents=True)
@@ -111,9 +112,15 @@ def test_waiting_install_keeps_receipt_until_build_completes(tmp_path, monkeypat
     receipt = dist/'.jseval-source.json'
     receipt.write_text(json.dumps(['commit', None]))
     monkeypatch.setattr(backend, 'source_identity', lambda _: ('commit', None))
-    def build(*a, **kw):
-        # This is also the interval spent waiting for the Gradle slot.
+    @contextlib.contextmanager
+    def admission(env):
+        # A queued builder has not acquired permission to modify the install.
         backend.require_prepared(tmp_path)
+        yield env
+    monkeypatch.setattr(backend, '_machine_admission', admission)
+    def build(*a, **kw):
+        # Once admitted, even abrupt termination must leave no attestation.
+        assert not receipt.exists()
         return Mock(returncode=result)
     monkeypatch.setattr(backend.subprocess, 'run', build)
     if result:

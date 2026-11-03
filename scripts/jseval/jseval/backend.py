@@ -255,6 +255,24 @@ def start_backend(
 
 def _install_distribution(resolved_root: Path, env: dict[str, str]) -> None:
     """Build the distribution before the lifetime helper or runner is needed."""
+    command = ["node", str(resolved_root / "scripts/lib/tool-invoker.cjs"), "gradle",
+               ":modules:ui:installDist", "-PskipWebBuild=true", "--quiet", "--no-daemon"]
+    if env.get("JSEVAL_GRADLE_SLOT"):
+        # Queue without invalidating the usable distribution. The child takes
+        # build admission and changes the receipt only after the slot is held.
+        script = ("import os,sys; from pathlib import Path; from jseval.backend import "
+                  "_install_distribution_admitted; "
+                  "_install_distribution_admitted(Path(sys.argv[1]), dict(os.environ), sys.argv[2:])")
+        result = subprocess.run([env["JSEVAL_GRADLE_SLOT"], "-w", "3600", sys.executable,
+                                 "-c", script, str(resolved_root), *command],
+                                cwd=str(resolved_root), env=env, check=False)
+        if result.returncode != 0:
+            raise RuntimeError(f"Backend installDist failed (exit {result.returncode})")
+        return
+    _install_distribution_admitted(resolved_root, env, command)
+
+
+def _install_distribution_admitted(resolved_root: Path, env: dict[str, str], command: list[str]) -> None:
     identity = None
     if (resolved_root / ".git").exists():
         try:
@@ -263,18 +281,11 @@ def _install_distribution(resolved_root: Path, env: dict[str, str]) -> None:
             log.warning("Cannot attest install distribution source; prepared-only start will refuse it")
     dist = resolved_root / "modules/ui/build/install/ui"
     receipt = dist / ".jseval-source.json"
-    command = ["node", str(resolved_root / "scripts/lib/tool-invoker.cjs"), "gradle",
-               ":modules:ui:installDist", "-PskipWebBuild=true", "--quiet", "--no-daemon"]
-    if env.get("JSEVAL_GRADLE_SLOT"):
-        # Keep the checked-in heavy admission too: a pausable controller cannot
-        # suspend work executed by a pre-existing Gradle daemon. The slot wrapper
-        # may itself join admission; tool-invoker recognizes that live token.
-        command = [env["JSEVAL_GRADLE_SLOT"], "-w", "3600", *command]
-    # The old install remains usable while this call queues for Gradle. Heavy
-    # admission excludes scoring during the actual install. Failed installs must
-    # invalidate the receipt, since they may have changed distribution files.
-    try:
-        result = subprocess.run(command, cwd=str(resolved_root), env=env, check=False)
+    # Admission covers receipt invalidation, every distribution write, and the
+    # replacement attestation. Abrupt death during Gradle must leave no receipt.
+    with _machine_admission(env) as admitted:
+        receipt.unlink(missing_ok=True)
+        result = subprocess.run(command, cwd=str(resolved_root), env=admitted, check=False)
         if result.returncode != 0:
             raise RuntimeError(f"Backend installDist failed (exit {result.returncode})")
         if (identity is not None and source_identity(resolved_root) == identity
@@ -290,11 +301,7 @@ def _install_distribution(resolved_root: Path, env: dict[str, str]) -> None:
                 finally:
                     pending.unlink(missing_ok=True)
         else:
-            receipt.unlink(missing_ok=True)
             log.warning("Install distribution source unavailable or changed; prepared-only start will refuse it")
-    except BaseException:
-        receipt.unlink(missing_ok=True)
-        raise
 
 
 def source_identity(root: Path) -> tuple[str, str | None]:

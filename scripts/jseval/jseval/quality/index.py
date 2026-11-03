@@ -384,6 +384,28 @@ def _ready_reasons(status: dict, c: Collection, sparse: bool) -> list[str]:
     return reasons
 
 
+def _readiness_refusal(status: dict, reasons: list[str]) -> IndexRefused:
+    """Readiness alone proves bad content only from fresh, settled observations."""
+    s = readiness.flatten_status(status)
+    fresh = not (s.get("meta") or {}).get("workerRpcStale")
+    observations = s.get("countObservations") or {}
+    known_count = (s.get("indexedDocumentsUnknown") is False
+                   and isinstance(s.get("indexedDocuments"), int)
+                   and s["indexedDocuments"] >= 0
+                   and all(observations.get(name, {}).get("state") not in ("unknown", "stale")
+                           for name in ("active", "searchable")))
+    bad_population = fresh and known_count and "population.count differs from collection" in reasons
+    # Do not infer corruption from missing coverage, queued work, unavailable
+    # audits, or the default enable flags published before the worker is ready.
+    idle = (s.get("indexState") == "IDLE" and s.get("pendingJobs", 0) == 0
+            and not readiness._check_index_idle_conditions(s, -1))
+    failed_content = (fresh and idle
+                      and s.get("completenessKnown") is True
+                      and any(reason.startswith("enrichment_failed(") for reason in reasons))
+    refusal = IndexRefused if bad_population or failed_content else TransientIndexRefused
+    return refusal("; ".join(reasons))
+
+
 def _probe(client: httpx.Client, query: str, request: Mapping, materialized: Collection,
            docs: Path, expected: str) -> dict:
     # Adoption proves stored retrieval, independently of fusion/reranker scores.
@@ -443,9 +465,7 @@ def witness(base_url: str, c: Collection, m: Collection, docs: Path,
             # Health can precede the worker's resolved enable flags and audits
             # on cached startup. Keep the gate, but retry serving readiness;
             # it is not evidence that the stored index bytes are corrupt.
-            refusal = (IndexRefused if "population.count differs from collection" in reasons
-                       else TransientIndexRefused)
-            raise refusal("; ".join(reasons))
+            raise _readiness_refusal(status, reasons)
         page = _post(client, "/api/debug/eval/document-ids", {"offset": 0, "limit": 50000})
         ids = page["docIds"]
         if page["totalCount"] != len(c.documents) or len(ids) != len(c.documents) or len(set(ids)) != len(ids):
