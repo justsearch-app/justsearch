@@ -76,7 +76,8 @@ final class SparsePayload {
           .decode(termBytes).toString();
       in.position(in.position() + length);
       float weight = in.getFloat();
-      if (!Float.isFinite(weight) || weight < Float.MIN_NORMAL || features.putIfAbsent(term, weight) != null) {
+      if (!Float.isFinite(weight) || weight < Float.MIN_NORMAL || weight > 64.0f
+          || features.putIfAbsent(term, weight) != null) {
         throw new IOException("Invalid or duplicate sparse payload feature");
       }
     }

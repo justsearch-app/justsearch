@@ -116,7 +116,9 @@ class SparsePayloadPreservationTest extends LuceneExecutorTestBase {
         java.util.Arrays.copyOf(valid, valid.length - 1), trailing,
         payload(1, new String[]{"x", "x"}, new float[]{1f, 2f}), invalidUtf8,
         payload(1, new String[]{"x"}, new float[]{Float.MIN_VALUE}),
-        payload(1, new String[]{"x"}, new float[]{0f}));
+        payload(1, new String[]{"x"}, new float[]{0f}),
+        payload(1, new String[]{"original"}, new float[]{Math.nextUp(64f)}),
+        payload(1, new String[]{"original"}, new float[]{Float.MAX_VALUE}));
     try (var runtime = open()) {
       var ids = new ArrayList<String>();
       var updates = new ArrayList<Map.Entry<String, Map<String, Object>>>();
@@ -124,7 +126,7 @@ class SparsePayloadPreservationTest extends LuceneExecutorTestBase {
         String id = "bad-" + i;
         replacePayload(runtime, id, malformed.get(i)); ids.add(id); updates.add(update(id));
         String good = "good-" + i;
-        seed(runtime, good, "COMPLETED", Map.of("healthy", 2f)); ids.add(good); updates.add(update(good));
+        seed(runtime, good, "COMPLETED", Map.of("healthy", 64f)); ids.add(good); updates.add(update(good));
       }
       commit(runtime);
       var receipt = assertDoesNotThrow(() -> runtime.session().writePathOps.publishEnrichmentBatch(updates,
@@ -133,12 +135,20 @@ class SparsePayloadPreservationTest extends LuceneExecutorTestBase {
       assertEquals(malformed.size(), receipt.acceptedIds().size());
       assertTrue(receipt.rejectedIds().isEmpty()); assertNull(receipt.failure());
       commit(runtime);
+    }
+    try (var runtime = open()) {
       for (int i = 0; i < malformed.size(); i++) {
         String id = "bad-" + i;
         assertArrayEquals(malformed.get(i), bytes(stored(runtime, id)));
         assertNull(runtime.documentFieldOps().getDocumentField(id, SchemaFields.NER_STATUS));
+        assertEquals("COMPLETED", runtime.documentFieldOps().getDocumentField(id, SchemaFields.SPLADE_STATUS));
         assertEquals("2", runtime.documentFieldOps().getDocumentField(id, SchemaFields.SPLADE_RETRY_COUNT));
         assertEquals("COMPLETED_EMPTY", runtime.documentFieldOps().getDocumentField("good-" + i, SchemaFields.NER_STATUS));
+        try (var reader = DirectoryReader.open(runtime.session().snapshot.writer())) {
+          var searcher = new IndexSearcher(reader);
+          assertEquals(Map.of("original", Float.floatToIntBits(1f) >>> 15), postings(searcher, id));
+          assertEquals(Map.of("healthy", Float.floatToIntBits(64f) >>> 15), postings(searcher, "good-" + i));
+        }
       }
     }
   }

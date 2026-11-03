@@ -282,7 +282,7 @@ class BatchUpdateIntegrationTest extends LuceneExecutorTestBase {
     }
   }
 
-  // Sparse status and retry values stay unchanged unless explicitly updated.
+  // Sparse status and retry values survive unrelated updates; missing statuses enroll as PENDING.
 
   /** doc=FAILED, updates=entity — FAILED must survive (resurrecting it would mask real failures). */
   @Test
@@ -432,9 +432,9 @@ class BatchUpdateIntegrationTest extends LuceneExecutorTestBase {
     }
   }
 
-  /** doc=none (no status anywhere), updates=entity — a missing status stays absent. */
+  /** doc=none (no status anywhere), updates=entity — enroll the missing sparse stage. */
   @Test
-  void rmwKeepsMissingSpladeStatusAbsent() throws Exception {
+  void rmwHealsMissingSpladeStatusToPending() throws Exception {
     String prev = System.getProperty("justsearch.config");
     Path base = null;
     Path cfg = null;
@@ -445,12 +445,13 @@ class BatchUpdateIntegrationTest extends LuceneExecutorTestBase {
 
       var runtime = createRuntimeWithNonStoredSpladeStatus();
 
-      // Index without a SPLADE status; unrelated updates must not enroll a new stage.
+      // Legacy rows without a SPLADE status retain the reset lane's enrollment behavior.
       Map<String, Object> fields = new HashMap<>();
       fields.put(SchemaFields.DOC_ID, "doc-0");
       fields.put(SchemaFields.DOC_UID, "doc-0#0");
       fields.put(SchemaFields.PATH, "test/doc-0.txt");
       fields.put(SchemaFields.CONTENT, "corrupted doc with no splade_status");
+      fields.put(SchemaFields.SPLADE_RETRY_COUNT, 7);
       runtime.indexingCoordinator().indexSingle(new IndexDocument(fields));
       runtime.commitOps().commitAndTrack();
       runtime.commitOps().maybeRefreshBlocking();
@@ -466,9 +467,10 @@ class BatchUpdateIntegrationTest extends LuceneExecutorTestBase {
       String statusAfter =
           runtime.documentFieldOps().getDocumentField("doc-0", SchemaFields.SPLADE_STATUS);
       assertEquals(
-          null,
+          SchemaFields.SPLADE_STATUS_PENDING,
           statusAfter,
-          "an unrelated update keeps the missing status absent");
+          "an unrelated update enrolls a legacy row with no SPLADE status");
+      assertEquals("0", runtime.documentFieldOps().getDocumentField("doc-0", SchemaFields.SPLADE_RETRY_COUNT));
 
       runtime.close();
     } finally {

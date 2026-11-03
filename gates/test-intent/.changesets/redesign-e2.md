@@ -7,7 +7,7 @@ author-session: redesign-e2-builder-continuation
 
 # Test-intent entries
 
-Existing assertions expecting reset-to-PENDING, absent-status healing, regenerated postings,
+Existing assertions expecting completed-status reset-to-PENDING, regenerated postings,
 preservation attempts/retries or withheld dense/window outcomes are replaced by the settled
 preservation contract. Other expectations remain preservation checks, including vector/chunk/NER
 retention, failure escalation for genuinely pending SPLADE, conditional revision rejection,
@@ -19,8 +19,9 @@ index, doc-value-only sparse companions, encoded posting frequencies, reopen and
 read error. EnrichmentStorageDispositionTest covers E2-3 E1 accounting. Neither changes global state.
 Their repair checks are listed below even though the files are exempt. The embedding-only method
 is a P1 preservation check, excluded from newChecks because it passes before and after.
-The supplied-sparse/content check also exercises P2 no healing: base actually heals an absent sparse
-status on an unrelated rewrite, so this aspect cannot satisfy the brief's pass-before label.
+P2 preserves the base enrollment rule: an omitted, absent SPLADE status heals to PENDING with retry 0
+on parents and on chunks only when chunk SPLADE is enabled. The supplied-sparse/content, parent
+enrollment and chunk-configuration methods are preservation checks, excluded from newChecks.
 
 SparsePreservationBenchmarkTest remains isolated, opt-in (`experiment`, `-PincludeExperiment=true`),
 and temporary-index-only. It extends the previous harness to 5,000/50,000 documents, at least ten
@@ -42,7 +43,7 @@ behavior. No acceptance records or run-evidence output are authored by this buil
         "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/RemovalAndRenameDurabilityTest.java"
       ],
       "class": "New",
-      "behaviour": "Partial and metadata rewrites carry existing sparse artifacts and status/retry values without enrolling absent stages.",
+      "behaviour": "Partial and metadata rewrites carry existing sparse artifacts and status/retry values. Missing SPLADE statuses retain the base enrollment behavior: PENDING with retry 0 on parents and on chunks only when chunk SPLADE is enabled; PENDING and FAILED keep their status and retry.",
       "sources": [
         {
           "kind": "delegated-choice",
@@ -57,19 +58,17 @@ behavior. No acceptance records or run-evidence output are authored by this buil
           "delegationQuote": "now proceed autonomusly with remaining design work and potentially some research. once done, you can proceed with the implementations of the remaining work you proposed and designed",
           "delegationLocation": "task t-20261102-redesign request",
           "delegationScope": "implement the redesigns and fixes the orchestrator proposed and designed after the ingestion defect list",
-          "choice": "P2 A caller that supplies SPLADE fields itself (SPLADE backfill, isolation pass) still writes exactly its own values; a document whose SPLADE is PENDING, FAILED or absent stays as it is (no healing, no invented COMPLETED).",
+          "choice": "P2 corrected (scenario error, orchestrator): an RMW that omits SPLADE on a row with no SPLADE status keeps the base behaviour: the status is healed to PENDING with retry 0 (parents; chunks only when chunk SPLADE is enabled), exactly as the base reset lane does, so legacy rows without a status are still enrolled. PENDING and FAILED keep their status and retry; no row gains an invented COMPLETED. Precedence row 6 still drops postings and payload for these rows.",
           "label": "agent choice"
         }
       ],
       "evidence": "gates/test-intent/evidence/redesign-e2.json",
       "newChecks": [
         "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/BatchUpdateIntegrationTest.java#rmwPreservesCompletedSpladeStatusAndRetry",
-        "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/BatchUpdateIntegrationTest.java#rmwKeepsMissingSpladeStatusAbsent",
         "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/BatchUpdateIntegrationTest.java#rmwBatchPreservesCompletedSpladeStatus",
         "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/RmwFieldPreservationTest.java#spladePostingsSurvivePartialUpdate",
         "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/RmwFieldPreservationTest.java#chunkSpladeRemainsSearchableAfterRmw",
-        "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/RemovalAndRenameDurabilityTest.java#sparseStatesAndRetriesSurviveMetadataUpdate",
-        "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/RemovalAndRenameDurabilityTest.java#sparseAbsenceSurvivesMetadataUpdateAfterChunkConfigurationChange"
+        "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/RemovalAndRenameDurabilityTest.java#sparseStatesAndRetriesSurviveMetadataUpdate"
       ],
       "repaired": true
     },
@@ -163,12 +162,10 @@ The acceptor's execution inputs are:
 --overlay modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/SparseRmwPreservationTest.java
 --overlay modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/EnrichmentStorageDispositionTest.java
 --check modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/BatchUpdateIntegrationTest.java#rmwPreservesCompletedSpladeStatusAndRetry
---check modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/BatchUpdateIntegrationTest.java#rmwKeepsMissingSpladeStatusAbsent
 --check modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/BatchUpdateIntegrationTest.java#rmwBatchPreservesCompletedSpladeStatus
 --check modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/RmwFieldPreservationTest.java#spladePostingsSurvivePartialUpdate
 --check modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/RmwFieldPreservationTest.java#chunkSpladeRemainsSearchableAfterRmw
 --check modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/RemovalAndRenameDurabilityTest.java#sparseStatesAndRetriesSurviveMetadataUpdate
---check modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/RemovalAndRenameDurabilityTest.java#sparseAbsenceSurvivesMetadataUpdateAfterChunkConfigurationChange
 --check modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/CombinedEnrichmentBackfillOpsTest.java#completedParentSplade_withPendingEmbedding_isPreservedWithoutReencoding
 --check modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/CombinedEnrichmentBackfillOpsTest.java#completedParentSplade_withPendingNer_isPreservedWithoutReencoding
 --check modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/CombinedEnrichmentBackfillOpsTest.java#completedParentSplade_deadlineAfterEmbedding_preservesAndPublishes
@@ -193,7 +190,6 @@ The acceptor's execution inputs are:
 --check modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/SparseRmwPreservationTest.java#partialUpdatesRetainPostingsStatusAndRetryAfterReopen
 --check modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/SparseRmwPreservationTest.java#batchTraversesSparseDictionaryOncePerLeaf
 --check modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/SparseRmwPreservationTest.java#unreadableSparseDocumentIsWithheldWhileOtherDocumentsPublish
---check modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/SparseRmwPreservationTest.java#suppliedSparseAndContentReplacementKeepTheirOwnSemantics
 --check modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/EnrichmentStorageDispositionTest.java#unreadableArtifactDefersEarnedOutcomeWithoutRetryCharge
 --overlay modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/SparsePayloadPreservationTest.java
 --check modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/SparsePayloadPreservationTest.java#mapperDerivesAllAcceptedFeaturesAndRewritesKeepFrequencies
@@ -277,12 +273,10 @@ Each before outcome below was observed in the shared clone of 049e79a46f with th
 | Check ID | Before | Final candidate |
 | --- | --- | --- |
 | modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/BatchUpdateIntegrationTest.java#rmwPreservesCompletedSpladeStatusAndRetry | Assertion failed | Passed, executed |
-| modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/BatchUpdateIntegrationTest.java#rmwKeepsMissingSpladeStatusAbsent | Assertion failed | Passed, executed |
 | modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/BatchUpdateIntegrationTest.java#rmwBatchPreservesCompletedSpladeStatus | Assertion failed | Passed, executed |
 | modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/RmwFieldPreservationTest.java#spladePostingsSurvivePartialUpdate | Assertion failed | Passed, executed |
 | modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/RmwFieldPreservationTest.java#chunkSpladeRemainsSearchableAfterRmw | Assertion failed | Passed, executed |
 | modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/RemovalAndRenameDurabilityTest.java#sparseStatesAndRetriesSurviveMetadataUpdate | Assertion failed | Passed, executed |
-| modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/RemovalAndRenameDurabilityTest.java#sparseAbsenceSurvivesMetadataUpdateAfterChunkConfigurationChange | Assertion failed | Passed, executed |
 | modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/CombinedEnrichmentBackfillOpsTest.java#completedParentSplade_withPendingEmbedding_isPreservedWithoutReencoding | Assertion failed | Passed, executed |
 | modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/CombinedEnrichmentBackfillOpsTest.java#completedParentSplade_withPendingNer_isPreservedWithoutReencoding | Assertion failed | Passed, executed |
 | modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/CombinedEnrichmentBackfillOpsTest.java#completedParentSplade_deadlineAfterEmbedding_preservesAndPublishes | Assertion failed | Passed, executed |
@@ -307,7 +301,6 @@ Each before outcome below was observed in the shared clone of 049e79a46f with th
 | modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/SparseRmwPreservationTest.java#partialUpdatesRetainPostingsStatusAndRetryAfterReopen | Assertion failed | Passed, executed |
 | modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/SparseRmwPreservationTest.java#batchTraversesSparseDictionaryOncePerLeaf | Assertion failed | Passed, executed |
 | modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/SparseRmwPreservationTest.java#unreadableSparseDocumentIsWithheldWhileOtherDocumentsPublish | Assertion failed | Passed, executed |
-| modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/SparseRmwPreservationTest.java#suppliedSparseAndContentReplacementKeepTheirOwnSemantics | Assertion failed | Passed, executed |
 | modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/EnrichmentStorageDispositionTest.java#unreadableArtifactDefersEarnedOutcomeWithoutRetryCharge | Assertion failed | Passed, executed |
 | modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/SparsePayloadPreservationTest.java#mapperDerivesAllAcceptedFeaturesAndRewritesKeepFrequencies | Assertion failed | Passed, executed |
 | modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/SparsePayloadPreservationTest.java#legacyScanRunsOnceAndEmptyOrFailedRowsNeverDecodeOldPayload | Assertion failed | Passed, executed |
@@ -375,6 +368,89 @@ Initial source-checkout pre-push exited 1 for the displaced unused three-argumen
 
 `env -u DISPLAY -u WAYLAND_DISPLAY node scripts/dev/java-prepush.mjs --unreferenced` was started in the isolated candidate clone. At handoff it is still waiting for the shared Gradle slot, not reported as passed. A live background waiter owns session 76119, reports every completion/error outcome, and reports a stall after a 65-minute deadline. It updates this section when the command exits. The storage guard is the reason for handing the assignment back while that final check is pending.
 
-PREPUSH_RESULT_PENDING
+The original pending pre-push claim is superseded by the repaired-candidate run recorded below.
+
+## Revision after verifier-1: bounded repair
+
+The decoder now rejects weights above FieldMapper's 64 cap. The malformed-payload check includes
+Math.nextUp(64f) and Float.MAX_VALUE beside healthy weight-64 rows; after reopen it checks the
+withheld rows' unchanged payload, postings, status and retry and the healthy rows' publication.
+Its expectation is E2-8: "the decoder accepts exactly what FieldMapper can emit, including its
+weight cap: a stored weight above 64 (for example Math.nextUp(64f) or Float.MAX_VALUE), like any
+other value the writer cannot produce, makes the row a storage failure (withheld, reported,
+postings/payload/status/retries unchanged, no encoder call); healthy rows in the same publication
+are accepted." Source kind is delegated-choice, with the delegationQuote, delegationLocation,
+delegationScope and label recorded in the entries above. This isolated new file remains exempt.
+It retains its existing New evidence check ID in the extra check list; no acceptance record or
+run-evidence output is authored here.
+
+The P2 source above supersedes the earlier no-healing scenario. The parent, chunk-configuration
+and supplied-sparse/content methods now check the base's enrollment rule. These are preservation
+checks against 049e79a46f and repair checks against 71f5cd2597, so they do not belong in the
+049e79a46f newChecks list or its repaired-evidence claims. Earlier evidence files are historical
+until the verifier regenerates evidence for this candidate; the removed IDs no longer name checks.
+
+Tests added or rewritten: modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/SparsePayloadPreservationTest.java — E2-8 weight cap and E2-3 row isolation — durable
+Tests added or rewritten: modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/BatchUpdateIntegrationTest.java — corrected P2 parent enrollment and retry reset — durable
+Tests added or rewritten: modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/RemovalAndRenameDurabilityTest.java — corrected P2 chunk configuration and reopen — durable
+Tests added or rewritten: modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/SparseRmwPreservationTest.java — corrected P2 absent/PENDING/FAILED state matrix — durable
+
+Repair comparison arguments (builder did not run run-evidence.mjs):
+
+```text
+--before 71f5cd2597
+--overlay modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/SparsePayloadPreservationTest.java
+--overlay modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/BatchUpdateIntegrationTest.java
+--overlay modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/RemovalAndRenameDurabilityTest.java
+--overlay modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/SparseRmwPreservationTest.java
+--check modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/SparsePayloadPreservationTest.java#malformedPayloadsWithholdOnlyTheirRowsWithoutChangingStoredWork
+--check modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/BatchUpdateIntegrationTest.java#rmwHealsMissingSpladeStatusToPending
+--check modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/RemovalAndRenameDurabilityTest.java#missingChunkSpladeStatusIsHealedOnlyWhenChunkSpladeIsEnabled
+--check modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/SparseRmwPreservationTest.java#suppliedSparseAndContentReplacementKeepTheirOwnSemantics
+```
+
+No before-patch is needed for 71f5cd2597. For the main comparison, use exactly the same overlays
+and checks above, replacing the before argument and adding the neutral compatibility patch:
+
+```text
+--before 049e79a46f
+--before-patch gates/test-intent/compatibility/redesign-e2-before.patch
+```
+
+Both checkouts are shared clones inside $TMPDIR; each has its own build folders and temporary
+Lucene indexes. Shared resources touched: the two-slot Gradle admission queue and Gradle caches.
+No shared running application, dev stack or GPU was used.
+
+Repair observations (fresh checks, not an acceptance record):
+
+| Exact check ID (runtime directory below) | 71f5cd2597 | 049e79a46f | Repaired candidate |
+| --- | --- | --- | --- |
+| SparsePayloadPreservationTest.java#malformedPayloadsWithholdOnlyTheirRowsWithoutChangingStoredWork | Assertion failure: expected 9 storage failures, got 7 (the two over-cap payloads accepted) | Assertion failure: expected 9 storage failures, got 0 | Passed, executed |
+| BatchUpdateIntegrationTest.java#rmwHealsMissingSpladeStatusToPending | Assertion failure: expected PENDING, got null | Passed, executed | Passed, executed |
+| RemovalAndRenameDurabilityTest.java#missingChunkSpladeStatusIsHealedOnlyWhenChunkSpladeIsEnabled | Assertion failure: expected PENDING, got null | Passed, executed | Passed, executed |
+| SparseRmwPreservationTest.java#suppliedSparseAndContentReplacementKeepTheirOwnSemantics | Assertion failure: expected PENDING, got null | Passed, executed | Passed, executed |
+
+The full prefix for every table check is
+`modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/`.
+The main status pair ran without any compatibility patch; the later main payload/state-matrix
+run used only the existing neutral compatibility patch. Neither compile failures nor unrelated
+exceptions count as fail-before. No new production signatures were needed.
+
+Commands (each Gradle command used `env -u DISPLAY -u WAYLAND_DISPLAY js-gradle-slot ./gradlew -PskipWebBuild=true`):
+
+- Candidate `--continue :modules:adapters-lucene:test :modules:worker-services:test` exited 1 in 5m 56s. Adapters: 969 tests, 0 failed, 3 skipped (966 passed). Worker-services: 3,300 tests, 4 failed, 24 skipped (3,272 passed). All four repaired adapter check IDs above passed and executed.
+- Before 71f5cd2597 `:modules:adapters-lucene:test` filtered to the payload, parent and chunk methods above exited 1: all three failed by the stated assertions. Its separate state-matrix method run exited 1 with the stated assertion.
+- Main 049e79a46f `:modules:adapters-lucene:test` filtered to the parent and chunk methods exited 0: both passed. The later `--continue :modules:adapters-lucene:test` filtered to the payload and state-matrix methods, followed by `:modules:worker-services:test --tests '*LinuxRootMountInfoTest' --tests '*WatcherUnavailabilityScopeTest'`, exited 1: payload assertion failed, state matrix passed, and four worker failures matched the candidate.
+- `.agents/preflight` does not exist in this checkout. `git diff --check` passes.
+- Test-intent CLI reports the existing evidence digests stale for the two modified gated adapter files and the absent independent acceptance record. All 11 flagged items have classifications; the four previously new files remain exempt. The verifier must regenerate evidence after this repair. No evidence or acceptance record was fabricated.
+
+Matching environmental failures, observed freshly on main and candidate:
+
+- LinuxRootMountInfoTest#missingDanglingAndAmbiguousUuidMappingsAreUnknown: NoSuchFileException `/dev/disk/by-uuid` at line 100.
+- WatcherUnavailabilityScopeTest#aNewerUnavailableIncarnationCannotBeClearedByAnOlderReconciliation: expected true, got false at line 63.
+- WatcherUnavailabilityScopeTest#endedUnavailableIncarnationIsRecoverableOnlyByItsOwnReconciliation: attributed root loss must not set the runtime-wide latch; expected true, got false at line 29.
+- WatcherUnavailabilityScopeTest#inaccessibleRootWhoseAbsenceIsUnknownIsStillRootScoped: an unreadable root must retain root-scoped uncertainty; expected true, got false at line 49.
+
+`env -u DISPLAY -u WAYLAND_DISPLAY node scripts/dev/java-prepush.mjs --unreferenced` exited 0: BUILD SUCCESSFUL in 5m 40s; 251 actionable tasks (27 executed, 5 from cache, 219 up-to-date). It used the required Gradle slot wrapper and -PskipWebBuild=true. Compilation, PMD, indexing/UI integration checks and the unreferenced-code check passed; unchanged integration tasks reused their prior results. No acceptance record was written. Repository tmp/ was not edited; no commit, push or publication was made.
 
 ## Acceptance records

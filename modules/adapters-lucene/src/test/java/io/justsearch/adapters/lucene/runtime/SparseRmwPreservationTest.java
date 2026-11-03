@@ -143,8 +143,8 @@ class SparseRmwPreservationTest extends LuceneExecutorTestBase {
       assertEquals("PENDING", runtime.documentFieldOps().getDocumentField("changed", SchemaFields.SPLADE_STATUS));
       assertEquals("0", runtime.documentFieldOps().getDocumentField("changed", SchemaFields.SPLADE_RETRY_COUNT));
       for (String state : List.of("PENDING", "FAILED", "absent")) {
-        assertEquals(state.equals("absent") ? null : state, runtime.documentFieldOps().getDocumentField(state, SchemaFields.SPLADE_STATUS));
-        assertEquals("2", runtime.documentFieldOps().getDocumentField(state, SchemaFields.SPLADE_RETRY_COUNT));
+        assertEquals(state.equals("absent") ? "PENDING" : state, runtime.documentFieldOps().getDocumentField(state, SchemaFields.SPLADE_STATUS));
+        assertEquals(state.equals("absent") ? "0" : "2", runtime.documentFieldOps().getDocumentField(state, SchemaFields.SPLADE_RETRY_COUNT));
       }
       try (var reader = DirectoryReader.open(runtime.session().snapshot.writer())) {
         assertEquals(Map.of("new", Float.floatToIntBits(3f) >>> 15), postings(new IndexSearcher(reader), "supplied"));

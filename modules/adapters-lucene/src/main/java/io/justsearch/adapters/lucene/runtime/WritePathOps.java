@@ -923,7 +923,9 @@ public final class WritePathOps {
           Object status = updates.containsKey(SchemaFields.SPLADE_STATUS)
               ? updates.get(SchemaFields.SPLADE_STATUS) : fields.get(SchemaFields.SPLADE_STATUS);
           fields.remove(SchemaFields.SPLADE);
-          if (STATUS_COMPLETED.equals(status)) {
+          if (status == null) {
+            applyResetStatus(searcher, globalDocId, SchemaFields.SPLADE_STATUS, updates, fields);
+          } else if (STATUS_COMPLETED.equals(status)) {
             try {
               Object payload = fields.get(SparsePayload.FIELD);
               if (payload instanceof org.apache.lucene.util.BytesRef bytes) {
