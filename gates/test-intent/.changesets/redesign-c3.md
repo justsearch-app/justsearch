@@ -196,3 +196,14 @@ No run-evidence files or acceptance records were created. These are builder obse
 handover; independent verification remains with the orchestrator.
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a1a101-3d04-7bc0-aa0f-47f3e1482ba2",
+  "verdict": "accept",
+  "digest": "sha256:1e4ac76af0df8921ddbc4880bb3672bd96145aa8a4a6c7d291f92bd8b2e202b2",
+  "note": "Independent Codex verifier on ffb8f43b1e: all three entries and both exempt files accepted; 18 repair assertions fail on fb9b1ffdc0 and pass after; preservation controls pass on both; four baseline-identical environment failures."
+}
+```
