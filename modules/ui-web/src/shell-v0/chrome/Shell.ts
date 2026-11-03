@@ -917,23 +917,25 @@ export class Shell extends JfElement {
     } catch {
       /* idempotent — second registration noop */
     }
-    // §28.W8 — register the toggle-agent-emitter Action.
-    try {
-      registerKernelAction({
-        id: 'core.action.shell.show-agent-emitter',
-        title: 'Show Synthetic Agent Emitter',
-        category: 'Diagnostics',
-        provenance: CORE_PROVENANCE,
-        handler: () => {
-          const demo = this.shadowRoot?.querySelector(
-            'jf-agent-emitter-demo',
-          ) as AgentEmitterDemo | null;
-          if (demo) demo.open = !demo.open;
-          return { kind: 'noop' as const };
-        },
-      });
-    } catch {
-      /* idempotent */
+    if (import.meta.env.DEV) {
+      // §28.W8 — register the toggle-agent-emitter Action.
+      try {
+        registerKernelAction({
+          id: 'core.action.shell.show-agent-emitter',
+          title: 'Show Synthetic Agent Emitter',
+          category: 'Diagnostics',
+          provenance: CORE_PROVENANCE,
+          handler: () => {
+            const demo = this.shadowRoot?.querySelector(
+              'jf-agent-emitter-demo',
+            ) as AgentEmitterDemo | null;
+            if (demo) demo.open = !demo.open;
+            return { kind: 'noop' as const };
+          },
+        });
+      } catch {
+        /* idempotent */
+      }
     }
     // §32 U5 — register the toggle-agent-activity Action.
     try {
@@ -2657,7 +2659,7 @@ export class Shell extends JfElement {
         <jf-authorization-host slot="center"></jf-authorization-host>
         <jf-macro-dry-run slot="center"></jf-macro-dry-run>
         <jf-plugin-error-overlay slot="top-right"></jf-plugin-error-overlay>
-        <jf-agent-emitter-demo slot="bottom-center"></jf-agent-emitter-demo>
+        ${import.meta.env.DEV ? html`<jf-agent-emitter-demo slot="bottom-center"></jf-agent-emitter-demo>` : nothing}
         <jf-agent-activity-panel slot="right-drawer"></jf-agent-activity-panel>
         ${/* Tempdoc 561 surface tier: the agent retrospective (Sessions/Timeline/History) folded into
               the one window as a right-drawer panel — replaces the retired standalone agent surface. */ ''}
