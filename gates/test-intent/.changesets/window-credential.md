@@ -56,6 +56,12 @@ and directly launched headless JVM commands are unchanged.
 The GPU journey mock correction exercises window_api on success and rejection. Original GPU tests
 fail at fff9c9f9d0 with Mock serialization errors and pass at 81f1b00072; repaired tests pass here.
 
+Entry 14's refreshed lifecycle evidence includes the ignored installed-Engine reconciliation
+check. The testing reference and runner supply no ignored-Rust-test option; the exact temporary
+runner adaptation, CI-built native-helper setup and entry 16 Adaptation review are recorded in
+`gates/test-intent/evidence/window-credential-installed-audit.md` and
+`gates/test-intent/evidence/window-credential-installed-runner.patch`.
+
 ```json
 {
   "entries": [
@@ -526,10 +532,10 @@ fail at fff9c9f9d0 with Mock serialization errors and pass at 81f1b00072; repair
         },
         {
           "kind": "delegated-choice",
-          "delegationQuote": "Decision: when the Engine runs in window-credential mode, the shell's Engine readiness (for updater reconciliation and any other shell->Engine call gated on readiness) also requires the window credential for the current incarnation to have arrived; it waits for it within the existing bounded readiness wait, and if it does not arrive in time it reports the same transient/not-ready state it reports today for a missing token, not repair-required.",
+          "delegationQuote": "open a task record and proceed accordingly with the remainign work",
           "delegationLocation": "task t-20261102-agent-approval request",
-          "delegationScope": "Finish the readiness race repair, keep the existing shell lifecycle transport repair, and rerun its checks without committing.",
-          "choice": "N5/N11: Require the current incarnation's port, token and window credential before shell readiness. Delayed stdout stays not-ready within the existing wait; expiration leaves the durable update reconciling. Existing fake-Engine launch fixtures supply their synthetic incarnation credential without changing their readiness or restart oracles.",
+          "delegationScope": "start the fix for the self-approval defect (any same-user program holding the session token can approve its own pending actions or create grants without the person seeing a prompt) as its own task, answering the orchestrator's question 'Should I start that fix as its own task?'",
+          "choice": "N5: Readiness waits for the current incarnation's window credential within the existing bounded wait. If it does not arrive, timeout reports today's transient/not-ready state, never repair-required. Existing fake-Engine launch fixtures supply their synthetic incarnation credential while retaining their readiness and restart oracles.",
           "label": "agent choice"
         }
       ],
@@ -540,7 +546,8 @@ fail at fff9c9f9d0 with Mock serialization errors and pass at 81f1b00072; repair
         "modules/shell/src-tauri/src/shell_connection_tests.rs#shell_actuator::connection_tests::window_credential_authorizes_quit_without_request_file",
         "modules/shell/src-tauri/src/shell_connection_tests.rs#shell_actuator::connection_tests::supervisor_successors_use_the_new_pid_and_coherent_binding_on_same_and_new_ports",
         "modules/shell/src-tauri/src/updater_reconciliation_tests.rs#updater::reconciliation_tests::delayed_window_credential_waits_before_reconciliation",
-        "modules/shell/src-tauri/src/updater_reconciliation_tests.rs#updater::reconciliation_tests::shell_readiness_waits_for_current_window_credential"
+        "modules/shell/src-tauri/src/updater_reconciliation_tests.rs#updater::reconciliation_tests::shell_readiness_waits_for_current_window_credential",
+        "modules/shell/src-tauri/src/shell_connection_tests.rs#shell_actuator::connection_tests::installed_engine_shutdown_upgrade_and_released_port"
       ],
       "repaired": true
     },
@@ -577,10 +584,10 @@ fail at fff9c9f9d0 with Mock serialization errors and pass at 81f1b00072; repair
       "sources": [
         {
           "kind": "delegated-choice",
-          "delegationQuote": "Decision: when the Engine runs in window-credential mode, the shell's Engine readiness (for updater reconciliation and any other shell->Engine call gated on readiness) also requires the window credential for the current incarnation to have arrived; it waits for it within the existing bounded readiness wait, and if it does not arrive in time it reports the same transient/not-ready state it reports today for a missing token, not repair-required.",
+          "delegationQuote": "open a task record and proceed accordingly with the remainign work",
           "delegationLocation": "task t-20261102-agent-approval request",
-          "delegationScope": "Finish the readiness race repair, keep the existing shell lifecycle transport repair, and rerun its checks without committing.",
-          "choice": "N5/N11: Require the current incarnation's port, token and window credential before shell readiness. Delayed stdout stays not-ready within the existing wait; expiration leaves the durable update reconciling. Existing fake-Engine launch fixtures supply their synthetic incarnation credential without changing their readiness or restart oracles.",
+          "delegationScope": "start the fix for the self-approval defect (any same-user program holding the session token can approve its own pending actions or create grants without the person seeing a prompt) as its own task, answering the orchestrator's question 'Should I start that fix as its own task?'",
+          "choice": "N5: Readiness waits for the current incarnation's window credential within the existing bounded wait. If it does not arrive, timeout reports today's transient/not-ready state, never repair-required. Existing fake-Engine launch fixtures supply their synthetic incarnation credential while retaining their readiness and restart oracles.",
           "label": "agent choice"
         }
       ]

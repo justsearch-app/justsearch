@@ -270,8 +270,8 @@ fn installed_engine_shutdown_upgrade_and_released_port() {
                 assert_eq!(response["ready"], true);
                 break;
             }
-            assert!(result.as_ref().unwrap_err().contains("(503)")
-                && std::time::Instant::now() < deadline,
+            assert_eq!(result.as_ref().unwrap_err().contains("(503)")
+                && std::time::Instant::now() < deadline, true,
                 "installed Engine reconciliation failed: {result:?}");
             std::thread::sleep(Duration::from_millis(100));
         }
