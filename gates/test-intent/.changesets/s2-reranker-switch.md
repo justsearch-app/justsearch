@@ -935,3 +935,25 @@ verifier supplies acceptance after reviewing the final candidate. No acceptance 
   "note": "Audit by independent reviewer session reviewer-39 (Codex): reject entry 13 only (wire evidence recorded before the rebase). Transcribed by the orchestrator."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verifier-s2r-acc3",
+  "verdict": "accept",
+  "digest": "sha256:4075ed90d86f2c93d4a847cde0dbf7cf134d4901cb04effa4a0d13a102f4e629",
+  "note": "Acceptance by independent verifier session verifier-s2r-acc3 (Codex): accept, all entries. Transcribed by the orchestrator."
+}
+```
+
+```json
+{
+  "kind": "audit",
+  "role": "reviewer",
+  "session": "reviewer-40",
+  "verdict": "accept",
+  "digest": "sha256:4075ed90d86f2c93d4a847cde0dbf7cf134d4901cb04effa4a0d13a102f4e629",
+  "note": "Audit by independent reviewer session reviewer-40 (Codex): accept, no must-fix. Transcribed by the orchestrator."
+}
+```
