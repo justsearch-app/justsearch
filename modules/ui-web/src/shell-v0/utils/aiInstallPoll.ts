@@ -13,11 +13,15 @@
  * This module fixes that structurally, mirroring `inferencePoll.ts`'s proven shape: ONE shared,
  * always-on poller (first fetch is eager, then on an ADAPTIVE cadence — see `pollIntervalFor`),
  * fanning out to every subscriber.
+ * Each read gets one poll interval to answer, including its response body; unanswered reads are
+ * aborted and count as failed, so even a held request lets the batch finish and schedule a retry.
+ * An explicit admission retry delay is an answer and is honoured, as in `statusPoll.ts`.
  * A failed tick retains the last-known-good value per field (never regresses a known field to
- * `null`) and simply tries again on the next tick — "stuck forever" becomes structurally impossible.
+ * `null`) and invalidates its observation until a later read succeeds.
  */
 
 import { authorizedFetch } from '../api/authorizedFetch.js';
+import { observeAdmissionWait } from '../../api/admissionFetch.js';
 import type { AiInstallStatus } from '../../api/generated/schema-types/ai-install-status.js';
 import type { AiRuntimeStatusResponse } from '../../api/generated/schema-types/ai-runtime-status-response.js';
 import type { InstallComponentEstimate } from '../state/installComponents.js';
@@ -165,13 +169,40 @@ export function isAiObservationLive(observation: AiObservation | undefined): boo
   return observation !== undefined && !observation.latestReadFailed;
 }
 
-async function fetchJson<T>(path: string, signal: AbortSignal): Promise<T | null> {
+/** Settles on abort even when the awaited fetch or response body ignores the signal. */
+function untilAbandoned<T>(step: Promise<T>, signal: AbortSignal): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const abandoned = () => reject(new DOMException('AI status read abandoned', 'AbortError'));
+    if (signal.aborted) abandoned();
+    signal.addEventListener('abort', abandoned, { once: true });
+    step.then(resolve, reject).finally(() => signal.removeEventListener('abort', abandoned));
+  });
+}
+
+async function fetchJson<T>(path: string, currentSignal: AbortSignal): Promise<T | null> {
+  const read = new AbortController();
+  const signal = AbortSignal.any([currentSignal, read.signal]);
+  const interval = pollIntervalFor(last);
+  let bound: ReturnType<typeof setTimeout>;
+  const clearBound = () => clearTimeout(bound);
+  const arm = (ms: number) => {
+    clearBound();
+    bound = setTimeout(() => read.abort(), ms);
+  };
+  // A server-directed wait is an answer, not silence; its retry gets one interval to answer.
+  observeAdmissionWait(signal, delay => { if (!read.signal.aborted) arm(delay + interval); });
+  arm(interval);
+  // Stop releases timers synchronously, including when a fetch ignores cancellation.
+  signal.addEventListener('abort', clearBound, { once: true });
   try {
-    const res = await authorizedFetch((apiBase || '') + path, { signal });
+    const res = await untilAbandoned(authorizedFetch((apiBase || '') + path, { signal }), signal);
     if (!res.ok) return null;
-    return (await res.json()) as T;
+    return await untilAbandoned(res.json() as Promise<T>, signal);
   } catch {
     return null;
+  } finally {
+    clearBound();
+    signal.removeEventListener('abort', clearBound);
   }
 }
 

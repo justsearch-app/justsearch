@@ -29,12 +29,13 @@ describe('install refresh now', () => {
     expect(typeof poll.refreshAiInstallNow).toBe('function');
     const first = poll.refreshAiInstallNow(); const second = poll.refreshAiInstallNow();
     expect(second).toBe(first);
-    await vi.advanceTimersByTimeAsync(20_000); expect(fetch).toHaveBeenCalledTimes(3);
+    // A live read holds the batch until it answers or reaches its one-interval deadline.
+    await vi.advanceTimersByTimeAsync(999); expect(fetch).toHaveBeenCalledTimes(3);
     finish[0]!(); finish[1]!(); await vi.advanceTimersByTimeAsync(0);
     expect(fetch).toHaveBeenCalledTimes(3); // Even a different endpoint's pending read holds the batch.
     finish[2]!(); await vi.advanceTimersByTimeAsync(0);
     expect(fetch).toHaveBeenCalledTimes(6);
-    await vi.advanceTimersByTimeAsync(20_000); expect(fetch).toHaveBeenCalledTimes(6);
+    await vi.advanceTimersByTimeAsync(4999); expect(fetch).toHaveBeenCalledTimes(6);
     finish.slice(3).forEach(resolve => resolve()); await Promise.all([first, second]);
     await vi.advanceTimersByTimeAsync(5000); expect(fetch).toHaveBeenCalledTimes(9);
   });
