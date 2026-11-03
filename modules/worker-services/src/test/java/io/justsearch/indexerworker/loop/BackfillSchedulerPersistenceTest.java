@@ -171,7 +171,7 @@ class BackfillSchedulerPersistenceTest extends LuceneExecutorTestBase {
           SchemaFields.SPLADE_STATUS, "COMPLETED", SchemaFields.SPLADE, Map.of("old", 2f)));
       commit(runtime);
       assertTrue(scheduler(runtime, embedding, splade).runIdleCycle());
-      verify(splade, never()).encodeBatch(anyList());
+      assertDoesNotThrow(() -> verify(splade, never()).encodeBatch(anyList()));
     }
     try (var runtime = open()) {
       assertEquals("COMPLETED", runtime.documentFieldOps().getDocumentField("sparse", SchemaFields.EMBEDDING_STATUS));
