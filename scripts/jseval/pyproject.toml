@@ -7,6 +7,8 @@ name = "jseval"
 version = "0.1.0"
 description = "JustSearch search evaluation toolkit"
 requires-python = ">=3.11"
+# Local peer: install -e scripts/jsharness alongside this package. Never resolve
+# jsharness from a package index; it is repository tooling, not a published dependency.
 dependencies = [
     "ir-measures>=0.3.1",
     "ir-datasets>=0.5.0",
@@ -18,15 +20,14 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-ui = ["playwright>=1.40"]
 config = ["pyyaml>=6.0"]
 ner = ["onnxruntime>=1.17", "tokenizers>=0.15"]
 # Degraded-scan corpus renderer (tempdoc 624 §T.2, axis="scan"). Opt-in so core
-# jseval stays lean -- only lands for `pip install jseval[scan]`.
+# jseval stays lean -- only lands for `pip install -e scripts/jsharness -e 'scripts/jseval[scan]'`.
 scan = ["Pillow>=10.1"]
 # Agent-utility eval (tempdoc 624): runs the cell matrix THROUGH Inspect AI
 # (claude -p solver, condition-as-task, seed-as-epoch). Opt-in so core jseval
-# stays lean — the ~80 transitive deps only land for `pip install jseval[agent]`.
+# stays lean — install via `pip install -e scripts/jsharness -e 'scripts/jseval[agent]'`.
 agent = ["inspect-ai>=0.3.240", "claude-agent-sdk>=0.2.111"]
 dev = ["pytest>=7.0", "pyyaml>=6.0", "hypothesis>=6.0", "jsonschema>=4.0"]
 

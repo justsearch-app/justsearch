@@ -49,6 +49,7 @@ function main() {
     } else {
       const schema = JSON.parse(fs.readFileSync(schemaPath, "utf8"));
       const release = JSON.parse(fs.readFileSync(releasePath, "utf8"));
+      if (release.status === "superseded") failures.push("current release is superseded and cannot supply claims or floors");
       const ajv = new Ajv({ allErrors: true, strict: false });
       const validate = ajv.compile(schema);
       if (!validate(release)) {
@@ -71,6 +72,9 @@ function main() {
     const hasFallback = ptr.fallback_baselines && Object.keys(ptr.fallback_baselines).length > 0;
     if (ptr.current_release) {
       const rp = path.join(path.dirname(pointerPath), ptr.current_release);
+      if (fs.existsSync(rp) && JSON.parse(fs.readFileSync(rp, "utf8")).status === "superseded") {
+        failures.push("relevance-ratchet pointer selects a superseded release");
+      }
       if (!fs.existsSync(rp) && !hasFallback && !hasInline) {
         failures.push(
           `ratchet pointer current_release=${ptr.current_release} does not exist and there is no ` +

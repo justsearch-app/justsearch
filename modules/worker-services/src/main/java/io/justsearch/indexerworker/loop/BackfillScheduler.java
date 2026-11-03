@@ -397,20 +397,30 @@ public final class BackfillScheduler {
    * Records one {@link CombinedEnrichmentBackfillOps.CombinedOutcome}'s per-stage counts/timing
    * into {@link OperationalMetrics} (tempdoc 710 Move 2 item 4 — replaces the {@code finally}
    * block that used to live inside {@code CombinedEnrichmentBackfillOps.processCombinedBackfill}).
-   * A no-op when {@code outcome.recordTiming()} is false (nothing ran this call).
+   * A no-op when {@code outcome.attempted()} is false (nothing ran this call).
    */
   private static void recordCombinedOutcome(CombinedEnrichmentBackfillOps.CombinedOutcome outcome) {
-    if (!outcome.recordTiming()) {
+    OperationalMetrics.getInstance().recordEnrichmentOutcomes(outcome.accounting().counters());
+    if (!outcome.attempted()) {
       return;
     }
     OperationalMetrics metrics = OperationalMetrics.getInstance();
     metrics.recordEnrichmentCompleted(BatchTimingKeys.EMBED, outcome.embedProcessed());
     metrics.recordEnrichmentCompleted(BatchTimingKeys.SPLADE, outcome.spladeProcessed());
     metrics.recordEnrichmentCompleted(BatchTimingKeys.NER, outcome.nerProcessed());
-    metrics.recordStageTiming(BatchTimingKeys.EMBED, outcome.embedProcessed(), outcome.embedMs());
-    metrics.recordStageTiming(
-        BatchTimingKeys.SPLADE, outcome.spladeProcessed(), outcome.spladeMs());
-    metrics.recordStageTiming(BatchTimingKeys.NER, outcome.nerProcessed(), outcome.nerMs());
+    var counters = outcome.accounting().counters();
+    if (counters.containsKey("embed.selected") || counters.containsKey("chunk_embed.selected")
+        || outcome.embedProcessed() > 0) {
+      metrics.recordStageTiming(BatchTimingKeys.EMBED, outcome.embedProcessed(), outcome.embedMs());
+    }
+    if (counters.containsKey("splade.selected") || counters.containsKey("splade.attempts")
+        || counters.containsKey("splade.computed")
+        || outcome.spladeProcessed() > 0) {
+      metrics.recordStageTiming(BatchTimingKeys.SPLADE, outcome.spladeProcessed(), outcome.spladeMs());
+    }
+    if (counters.containsKey("ner.selected") || outcome.nerProcessed() > 0) {
+      metrics.recordStageTiming(BatchTimingKeys.NER, outcome.nerProcessed(), outcome.nerMs());
+    }
     metrics.recordBatchTiming(BatchTimingKeys.FETCH, outcome.fetchMs());
     metrics.recordBatchTiming(BatchTimingKeys.WRITE, outcome.writeMs());
     metrics.recordBatchTiming(BatchTimingKeys.TOTAL, outcome.totalMs());
@@ -424,8 +434,11 @@ public final class BackfillScheduler {
    */
   private static void recordStageOutcome(String stageKey, StageOutcome outcome) {
     OperationalMetrics metrics = OperationalMetrics.getInstance();
+    metrics.recordEnrichmentOutcomes(outcome.accounting().counters());
     metrics.recordEnrichmentCompleted(stageKey, outcome.docsProcessed());
-    metrics.recordStageTiming(stageKey, outcome.docsProcessed(), outcome.elapsedMs());
+    if (outcome.attempted()) {
+      metrics.recordStageTiming(stageKey, outcome.docsProcessed(), outcome.elapsedMs());
+    }
   }
 
   /**

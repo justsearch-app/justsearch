@@ -905,6 +905,7 @@ final class IndexStatusOps {
         .setSpladeAvailable(available.sparse())
         .setNerAvailable(available.ner())
         .putAllEnrichmentCompleted(metrics.getEnrichmentCompleted())
+        .putAllEnrichmentOutcomes(metrics.getEnrichmentOutcomes())
         .setBatchTiming(
             PipelineBatchTiming.newBuilder()
                 .putAllBatchCount(metrics.getBatchTimingCount())

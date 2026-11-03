@@ -1,0 +1,46 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
+  },
+  "createdAt": "2026-11-02T18:44:22.151Z",
+  "revision": "ed9b29de09037e95f2aa2cd970ca3956e1887563",
+  "tree": "e164fbd2f02f9704de417e461eb292913b6fa18b",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/BrainSurface.repairRun.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/tgk4vsot/tmp/test-intent-vitest-2298-1793645058930.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 3219
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/views/BrainSurface.repairRun.test.ts#a runtime-only read failure keeps live install progress and controls",
+      "file": "modules/ui-web/src/shell-v0/views/BrainSurface.repairRun.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:e4998e9391ff8c284b4858565928458cb04f2bb91c2777339aef4f504549426e",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Brain running repair controls (B2/B8) a runtime-only read failure keeps live install progress and controls",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:0452f05321445b9c70e04260a1c4af09a8c7c1ebeb4287565481f8096ec44151"
+}

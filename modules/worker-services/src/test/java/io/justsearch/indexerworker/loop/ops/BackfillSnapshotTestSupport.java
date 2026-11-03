@@ -50,8 +50,21 @@ public final class BackfillSnapshotTestSupport {
       return result;
   }
 
+  /** The fake writer accepts the submitted prefix, matching these fixtures' aggregate stubs. */
+  public static void installReceipts(IndexingCoordinator coordinator) {
+    lenient().doAnswer(call -> {
+      List<Map.Entry<String, Map<String, Object>>> updates = call.getArgument(0);
+      var result = coordinator.updateDocumentsBatchIf(updates, call.getArgument(1));
+      int accepted = result == null ? updates.size() : result.updatedCount();
+      List<String> ids = updates.stream().map(Map.Entry::getKey).toList();
+      return new io.justsearch.adapters.lucene.runtime.LuceneRuntimeTypes.EnrichmentPublicationReceipt(
+          ids.subList(0, accepted), ids.subList(accepted, ids.size()), null);
+    }).when(coordinator).publishEnrichmentBatch(anyList(), anyMap());
+  }
+
   private static void installChecked(DocumentFieldOps fields,IndexingCoordinator coordinator,
       boolean individualContent,Set<String> batchedFields) throws Exception {
+    installReceipts(coordinator);
     lenient().when(fields.getEnrichmentInputs(anyList())).thenAnswer(call ->
         capture(fields,call.getArgument(0),individualContent,batchedFields));
     lenient().when(fields.getEnrichmentInputs(anyList(), anyLong())).thenAnswer(call -> {
@@ -75,10 +88,6 @@ public final class BackfillSnapshotTestSupport {
       var result = coordinator.updateDocumentsBatch(updates);
       return result == null ? new BatchUpdateResult(updates.size(), 0) : result;
     });
-    lenient().when(coordinator.updateDocumentIf(anyString(), any(DocumentFieldOps.EnrichmentInput.class), anyMap()))
-        .thenAnswer(call -> {
-          coordinator.updateDocument(call.getArgument(0), call.getArgument(2));
-          return true;
-        });
+
   }
 }

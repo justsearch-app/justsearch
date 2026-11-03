@@ -32,7 +32,7 @@ const processIdentity = require('./lib/process-identity.cjs');
 
 const repoRoot = path.resolve(__dirname, '..', '..');
 const uiWebDir = path.resolve(repoRoot, 'modules', 'ui-web');
-const { runToolSync, toolInvocation } = require('../lib/tool-invoker.cjs');
+const { runToolSync, toolInvocation, acquireHeavy } = require('../lib/tool-invoker.cjs');
 const gradlePath = toolInvocation('gradle', [], { repoRoot }).command;
 
 const resolveMainRepoRoot = () => require('./lib/dev-runtime.cjs').resolveMainRepoRoot(repoRoot);
@@ -2462,6 +2462,15 @@ async function removeOwnStartRecords(runId, runPath) {
 }
 
 async function cmdStart(opts) {
+  const releaseHeavy = await acquireHeavy('dev-runner engine start');
+  try {
+    return await cmdStartHeavy(opts, releaseHeavy);
+  } finally {
+    await releaseHeavy();
+  }
+}
+
+async function cmdStartHeavy(opts, releaseHeavy) {
   const callerIdentity = opts.callerIdentity ?? resolveCallerIdentity(opts.sessionId);
   const runId = crypto.randomUUID();
   const startedAt = nowIso();
@@ -2610,6 +2619,7 @@ async function cmdStart(opts) {
     // A stop request taken while starting: its handler ends the process.
     stopHandling: null,
     heartbeat: null,
+    releaseHeavy,
   };
   // Spec F §5.3 item 3: while starting, the lease is renewed at the running cadence, so a slow
   // start never reads as an expired one.
@@ -2722,7 +2732,11 @@ async function runAdmittedStart(opts, ctx) {
           ? `Gradle installDist could not be run: ${buildResult.error.message}`
             + `${buildResult.error.code ? ` (${buildResult.error.code})` : ''} — ${gradlePath}`
           : `Gradle installDist failed with exit code ${buildResult.status}`
-            + `${buildResult.signal ? ` (killed by ${buildResult.signal})` : ''}`);
+            + `${buildResult.signal ? ` (killed by ${buildResult.signal})` : ''}`
+            // Linux Gradle runs through machine admission (scripts/dev/admission.py): 75 is its
+            // refusal (the gate stayed closed past its deadline), 73 its own failure.
+            + `${[73, 75].includes(buildResult.status) && process.platform === 'linux'
+              ? ' (machine admission refused or failed; see the "admission:" line on stderr)' : ''}`);
     }
   }
 
@@ -3546,6 +3560,8 @@ async function runAdmittedStart(opts, ctx) {
     pids: runJson.pids,
     readiness: { ready_http: true },
   };
+
+  await ctx.releaseHeavy();
 
   if (opts.json) {
     process.stdout.write(JSON.stringify(startResult) + '\n');

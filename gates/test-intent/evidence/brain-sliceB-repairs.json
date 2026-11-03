@@ -1,0 +1,187 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
+  },
+  "createdAt": "2026-11-02T18:44:43.161Z",
+  "revision": "ed9b29de09037e95f2aa2cd970ca3956e1887563",
+  "tree": "f6af8c7d6d2cb7b5d5b9945e564bb8798f42ec9a",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/BrainSurface.sliceB.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/tgk4vsot/tmp/test-intent-vitest-2606-1793645078153.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 1705
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/views/BrainSurface.sliceB.test.ts#R1 acquisition decline does not hide existing answer files or replace their runtime switch, including after remount",
+      "file": "modules/ui-web/src/shell-v0/views/BrainSurface.sliceB.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:078fe6e972d488ad4ca5e9d43db8ecf60ee254c75e58d47fd92fee67c6aad032",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Brain slice A independent review repairs R1 acquisition decline does not hide existing answer files or replace their runtime switch, including after remount",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/BrainSurface.sliceB.test.ts#R2 unavailable answers are not promised, and pictures use explicit availability",
+      "file": "modules/ui-web/src/shell-v0/views/BrainSurface.sliceB.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:078fe6e972d488ad4ca5e9d43db8ecf60ee254c75e58d47fd92fee67c6aad032",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Brain slice A independent review repairs R2 unavailable answers are not promised, and pictures use explicit availability",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/BrainSurface.sliceB.test.ts#R2 not-in-mode answers are not promised, and pictures use explicit availability",
+      "file": "modules/ui-web/src/shell-v0/views/BrainSurface.sliceB.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:078fe6e972d488ad4ca5e9d43db8ecf60ee254c75e58d47fd92fee67c6aad032",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Brain slice A independent review repairs R2 not-in-mode answers are not promised, and pictures use explicit availability",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/BrainSurface.sliceB.test.ts#R3 live installed packages replace stale not-downloaded paths before the staged run ends",
+      "file": "modules/ui-web/src/shell-v0/views/BrainSurface.sliceB.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:078fe6e972d488ad4ca5e9d43db8ecf60ee254c75e58d47fd92fee67c6aad032",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Brain slice A independent review repairs R3 live installed packages replace stale not-downloaded paths before the staged run ends",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/BrainSurface.sliceB.test.ts#R4 an unknown runtime observation stays unconfirmed in both sentence and path",
+      "file": "modules/ui-web/src/shell-v0/views/BrainSurface.sliceB.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:078fe6e972d488ad4ca5e9d43db8ecf60ee254c75e58d47fd92fee67c6aad032",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Brain slice A independent review repairs R4 an unknown runtime observation stays unconfirmed in both sentence and path",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/BrainSurface.sliceB.test.ts#R5 a settings GET begun before a witnessed LLM save cannot revert the saved value",
+      "file": "modules/ui-web/src/shell-v0/views/BrainSurface.sliceB.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:078fe6e972d488ad4ca5e9d43db8ecf60ee254c75e58d47fd92fee67c6aad032",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Brain slice A independent review repairs R5 a settings GET begun before a witnessed LLM save cannot revert the saved value",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/BrainSurface.sliceB.test.ts#R6 the processor-fallback repair hint remains an accessible alert with its action",
+      "file": "modules/ui-web/src/shell-v0/views/BrainSurface.sliceB.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:078fe6e972d488ad4ca5e9d43db8ecf60ee254c75e58d47fd92fee67c6aad032",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Brain slice A independent review repairs R6 the processor-fallback repair hint remains an accessible alert with its action",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "6680864f7d",
+    "revision": "6680864f7d3dffbafa39f14ad65b6be149b54d36",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/BrainSurface.sliceB.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/tgk4vsot/tmp/test-intent-vitest-2606-1793645081302.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 1616,
+        "output": "JSON report written to /home/elias/.cache/am/tgk4vsot/tmp/test-intent-vitest-2606-1793645081302.json\n\n"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui-web/src/shell-v0/views/BrainSurface.sliceB.test.ts#R1 acquisition decline does not hide existing answer files or replace their runtime switch, including after remount",
+        "classification": "assertion",
+        "detail": "Brain slice A independent review repairs R1 acquisition decline does not hide existing answer files or replace their runtime switch, including after remount:  AssertionError: expected '\\n        \\n          \\n    \\n  \\n   …' not to contain 'Not downloaded'\n    at /home/elias/.cache/am/tgk4vsot/tmp/test-intent-before-srAjFv/modules/ui-web/src/shell-v0/views/BrainSurface.sliceB.test.ts:113:87\n    at runNextTicks (node:internal/process/task_queues:65:5)"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/BrainSurface.sliceB.test.ts#R2 unavailable answers are not promised, and pictures use explicit availability",
+        "classification": "assertion",
+        "detail": "Brain slice A independent review repairs R2 unavailable answers are not promised, and pictures use explicit availability:  AssertionError: expected 'Search already works with exact words…' not to contain 'and answer your questions with sources'\n    at /home/elias/.cache/am/tgk4vsot/tmp/test-intent-before-srAjFv/modules/ui-web/src/shell-v0/views/BrainSurface.sliceB.test.ts:125:78\n    at runNextTicks (node:internal/proces"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/BrainSurface.sliceB.test.ts#R2 not-in-mode answers are not promised, and pictures use explicit availability",
+        "classification": "assertion",
+        "detail": "Brain slice A independent review repairs R2 not-in-mode answers are not promised, and pictures use explicit availability:  AssertionError: expected 'Search already works with exact words…' not to contain 'and answer your questions with sources'\n    at /home/elias/.cache/am/tgk4vsot/tmp/test-intent-before-srAjFv/modules/ui-web/src/shell-v0/views/BrainSurface.sliceB.test.ts:125:78\n    at runNextTicks (node:internal/proces"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/BrainSurface.sliceB.test.ts#R3 live installed packages replace stale not-downloaded paths before the staged run ends",
+        "classification": "assertion",
+        "detail": "Brain slice A independent review repairs R3 live installed packages replace stale not-downloaded paths before the staged run ends:  AssertionError: expected '\\n        \\n          \\n    \\n  \\n   …' not to contain 'Not downloaded'\n    at /home/elias/.cache/am/tgk4vsot/tmp/test-intent-before-srAjFv/modules/ui-web/src/shell-v0/views/BrainSurface.sliceB.test.ts:135:87\n    at runNextTicks (node:internal/process/task_queues:65:5)"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/BrainSurface.sliceB.test.ts#R4 an unknown runtime observation stays unconfirmed in both sentence and path",
+        "classification": "assertion",
+        "detail": "Brain slice A independent review repairs R4 an unknown runtime observation stays unconfirmed in both sentence and path:  AssertionError: expected 'Understanding meaning is not active, …' to contain 'Understanding meaning is unconfirmed'\n    at /home/elias/.cache/am/tgk4vsot/tmp/test-intent-before-srAjFv/modules/ui-web/src/shell-v0/views/BrainSurface.sliceB.test.ts:142:74\n    at runNextTicks (node:internal/process/task"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/BrainSurface.sliceB.test.ts#R5 a settings GET begun before a witnessed LLM save cannot revert the saved value",
+        "classification": "assertion",
+        "detail": "Brain slice A independent review repairs R5 a settings GET begun before a witnessed LLM save cannot revert the saved value:  AssertionError: expected 2048 to be 8192 // Object.is equality\n    at /home/elias/.cache/am/tgk4vsot/tmp/test-intent-before-srAjFv/modules/ui-web/src/shell-v0/views/BrainSurface.sliceB.test.ts:156:34\n    at file:///home/elias/.cache/am/tgk4vsot/tmp/cand/modules/ui-web/node_modules/@vitest/runner/dis"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/BrainSurface.sliceB.test.ts#R6 the processor-fallback repair hint remains an accessible alert with its action",
+        "classification": "assertion",
+        "detail": "Brain slice A independent review repairs R6 the processor-fallback repair hint remains an accessible alert with its action:  AssertionError: expected null to be 'alert' // Object.is equality\n    at /home/elias/.cache/am/tgk4vsot/tmp/test-intent-before-srAjFv/modules/ui-web/src/shell-v0/views/BrainSurface.sliceB.test.ts:161:40\n    at runNextTicks (node:internal/process/task_queues:65:5)\n    at listOnTimeout (node:internal/"
+      }
+    ]
+  },
+  "digest": "sha256:631589ce157a5e1afe4665a4eb349e8cd5322eac17702d8c153cc1c5893fa9ad"
+}

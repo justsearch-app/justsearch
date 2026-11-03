@@ -16,6 +16,8 @@
  * Side-effect registers `<jf-health-surface>`.
  */
 
+import { activateOnKey } from '../utils/keyboardHandler.js';
+import { takeMemberTabIntent, subscribeMemberTab } from '../router/memberTabIntent.js';
 import { html, css, nothing, type TemplateResult } from 'lit';
 import { JfElement } from '../primitives/JfElement.js';
 import { surfaceLayoutStyles } from '../primitives/surfaceLayout.js';
@@ -83,6 +85,40 @@ import './SystemSelfView.js';
 
 // QueueDbStatus interface elided — derived inline from status response.
 
+/**
+ * Tempdoc 518 Appendix F W3.2 — one row of /api/inference/transitions response.
+ */
+interface TransitionRecord {
+  timestampMs: number;
+  fromMode: string;
+  toMode: string;
+  reason: string;
+  success: boolean;
+  durationMs: number;
+  wireCode?: string;
+}
+
+/**
+ * Tempdoc 518 Appendix G Wave D.1 — one span row from /api/diagnostics/traces.
+ * Mirrors the NdjsonSpanExporter line format.
+ */
+interface TraceSpan {
+  trace_id?: string;
+  span_id?: string;
+  parent_span_id?: string;
+  name?: string;
+  start?: string;
+  end?: string;
+  duration_ms?: number;
+  status?: string;
+  attrs?: Record<string, unknown>;
+}
+
+interface TraceExplorerResponse {
+  spans?: TraceSpan[];
+  tracesAvailable?: boolean;
+}
+
 interface RecoveryAction {
   target: string;
   args: Record<string, unknown>;
@@ -149,6 +185,10 @@ function formatUptime(ms: number | undefined): string {
 
 export class HealthSurface extends JfElement {
   static properties = {
+    transitions: { state: true },
+    transitionsAvailable: { state: true },
+    recentSpans: { state: true },
+    tracesAvailable: { state: true },
     apiBase: { attribute: 'api-base', type: String },
     host_: { attribute: false },
     status: { state: true },
@@ -169,6 +209,13 @@ export class HealthSurface extends JfElement {
     recommendedActions: { state: true },
   };
 
+  declare transitions: TransitionRecord[];
+  declare transitionsAvailable: boolean;
+  declare recentSpans: TraceSpan[];
+  declare tracesAvailable: boolean;
+  private telemetryTimer: number | null = null;
+  private telemetryRequests = new Map<string, AbortController>();
+  private sectionUnsub: (() => void) | null = null;
   declare apiBase: string;
   declare host_: PluginHostApi;
   /** Which tab is shown: the Health overview, or the embedded Logs view (§11.8). */
@@ -226,6 +273,10 @@ export class HealthSurface extends JfElement {
   constructor() {
     super();
     this.apiBase = '';
+    this.transitions = [];
+    this.transitionsAvailable = false;
+    this.recentSpans = [];
+    this.tracesAvailable = false;
     this.host_ = undefined as unknown as PluginHostApi;
     this.status = null;
     this.aiState = null;
@@ -575,6 +626,14 @@ export class HealthSurface extends JfElement {
       this.verdict = s.verdict;
       this.provisional = s.stability.kind === 'provisional';
     });
+    void this.refreshTelemetry();
+    this.telemetryTimer = window.setInterval(() => { if (this.autoRefresh) void this.refreshTelemetry(); }, 5000);
+    this.sectionUnsub = subscribeMemberTab((hostId, section) => {
+      if (hostId !== 'core.health-surface' || section !== 'ai-engine') return false;
+      void this.focusAiEngine();
+      return true;
+    });
+    if (takeMemberTabIntent('core.health-surface') === 'ai-engine') void this.focusAiEngine();
     void this.refresh();
     this.startPolling();
     this.startEventStream();
@@ -601,6 +660,12 @@ export class HealthSurface extends JfElement {
       window.clearInterval(this.pollStatus);
       this.pollStatus = null;
     }
+    for (const controller of this.telemetryRequests.values()) controller.abort();
+    this.telemetryRequests.clear();
+    if (this.telemetryTimer !== null) window.clearInterval(this.telemetryTimer);
+    this.telemetryTimer = null;
+    this.sectionUnsub?.();
+    this.sectionUnsub = null;
     this.unsubAi?.();
     this.unsubAi = null;
     this.presentationUnsub?.();
@@ -1177,15 +1242,265 @@ export class HealthSurface extends JfElement {
     `;
   }
 
+  private async focusAiEngine(): Promise<void> {
+    await this.updateComplete;
+    const section = this.shadowRoot?.querySelector<HTMLElement>('#ai-engine');
+    section?.scrollIntoView?.({ block: 'start' });
+    section?.focus({ preventScroll: true });
+  }
+
+  private async refreshTelemetry(): Promise<void> {
+    // Each endpoint owns its bounded request. Slow traces must not hold back
+    // transitions, and a polling tick must not cancel work still in progress.
+    const read = async <T,>(path: string, publish: (value: T | null) => void): Promise<void> => {
+      if (this.telemetryRequests.has(path)) return;
+      const controller = new AbortController();
+      this.telemetryRequests.set(path, controller);
+      let onAbort!: () => void;
+      const aborted = new Promise<null>(resolve => {
+        onAbort = () => resolve(null);
+        controller.signal.addEventListener('abort', onAbort, { once: true });
+      });
+      const timeout = window.setTimeout(() => controller.abort(), 15000);
+      try {
+        const response = (async () => {
+          try {
+            const result = await this.doFetch(path, { signal: controller.signal });
+            return result.ok ? await result.json() as T : null;
+          } catch { return null; }
+        })();
+        const value = await Promise.race([response, aborted]);
+        if (this.isConnected && this.telemetryRequests.get(path) === controller) publish(value);
+      } finally {
+        window.clearTimeout(timeout);
+        controller.signal.removeEventListener('abort', onAbort);
+        if (this.telemetryRequests.get(path) === controller) this.telemetryRequests.delete(path);
+      }
+    };
+    await Promise.all([
+      read<{ transitions?: TransitionRecord[] }>('/api/inference/transitions?limit=8', value => {
+        this.transitionsAvailable = Array.isArray(value?.transitions);
+        this.transitions = value?.transitions ?? [];
+      }),
+      read<TraceExplorerResponse>('/api/diagnostics/traces?limit=10', value => {
+        this.tracesAvailable = value?.tracesAvailable === true;
+        this.recentSpans = value?.spans ?? [];
+      }),
+    ]);
+  }
+
+  /**
+   * Tempdoc 518 Appendix G Wave D.2 — sparkline of inference generation over the recent
+   * transition window. SVG-based, no external charting library. Each transition is a tick
+   * mark on the timeline (failures red, successes teal); the current generation value is
+   * the right-edge label. When generation is 0 or there are no transitions yet, returns
+   * nothing — there's nothing useful to chart.
+   */
+  private renderGenerationSparkline(): TemplateResult | typeof nothing {
+    const rows = this.transitions;
+    const currentGen = typeof this.inference?.generation === 'number' ? this.inference.generation : 0;
+    if (!rows || rows.length === 0 || currentGen === 0) return nothing;
+    // Tempdoc 518 Wave A-E defect Fix-4: render the actual step-function y-line, not just
+    // dots. Each successful transition bumps generation by 1; the line shows the count's
+    // evolution. Failure dots stay on the line (failure does NOT bump generation, so the
+    // step stays flat at that x — visible as a red dot on a horizontal segment).
+    const ascending = [...rows].sort((a, b) => a.timestampMs - b.timestampMs);
+    const first = ascending[0]!.timestampMs;
+    const last = ascending[ascending.length - 1]!.timestampMs;
+    const tsSpan = Math.max(1, last - first);
+    const W = 200;
+    const H = 32;
+    const padX = 4;
+    const padY = 4;
+    const yMax = Math.max(1, currentGen);
+    const xOf = (ts: number) => padX + ((ts - first) / tsSpan) * (W - padX * 2);
+    const yOf = (gen: number) => H - padY - (gen / yMax) * (H - padY * 2);
+
+    // Build the step function. Walk transitions in chronological order; each success bumps
+    // the running gen by 1 (matches the runner's generation counter contract). Each row
+    // contributes two points (horizontal then vertical jump on success) and stamps the
+    // gen-at-that-row for dot positioning.
+    const dotData: Array<{ ts: number; gen: number; row: TransitionRecord }> = [];
+    const points: Array<{ x: number; y: number }> = [];
+    let gen = 0;
+    points.push({ x: padX, y: yOf(gen) });
+    for (const row of ascending) {
+      const px = xOf(row.timestampMs);
+      points.push({ x: px, y: yOf(gen) }); // horizontal segment up to this transition
+      if (row.success) {
+        gen += 1;
+        points.push({ x: px, y: yOf(gen) }); // vertical jump
+      }
+      dotData.push({ ts: row.timestampMs, gen, row });
+    }
+    // Final horizontal segment extending to the right edge (current generation plateau).
+    points.push({ x: W - padX, y: yOf(gen) });
+    const pointsStr = points.map((p) => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ');
+
+    return html`
+      <div
+        data-testid="brain-generation-sparkline"
+        style="margin-top: 0.75rem; display: flex; align-items: center; gap: 0.5rem; font-size: var(--font-size-xs)"
+      >
+        ${/* Round-14 finding 10 — "gen" was unqualified and collided with a DIFFERENT in-product
+              "generation": /api/inference/status `generation` is an int engine-instance counter,
+              while /api/knowledge/status `servingSearchGenerationId` is a string index id. Beside a
+              model filename the abbreviation also read as "1st-generation model" (a version claim).
+              Naming the axis is the whole fix — the value is unchanged. */ ''}
+        <span style="color: var(--text-secondary)">engine generation:</span>
+        <span style="font-weight: 600; font-variant-numeric: tabular-nums">${currentGen}</span>
+        <svg role="img" aria-label="Engine instance history" width="${W}" height="${H}" style="display: block">
+          <polyline
+            data-testid="brain-generation-sparkline-line"
+            points="${pointsStr}"
+            fill="none"
+            stroke="var(--accent-tint)"
+            stroke-width="1.5"
+            stroke-linejoin="round"
+          />
+          ${dotData.map(
+            (d) => html`<circle
+              cx="${xOf(d.ts)}"
+              cy="${yOf(d.gen)}"
+              r="3"
+              fill="${d.row.success ? 'var(--accent-tint)' : 'var(--accent-danger)'}"
+            >
+              <title>${new Date(d.row.timestampMs).toLocaleTimeString()} · gen=${d.gen} · ${d.row.fromMode.toLowerCase()} → ${d.row.toMode.toLowerCase()} · ${d.row.reason.toLowerCase().replace(/_/g, ' ')} · ${d.row.durationMs}ms${d.row.wireCode ? ` · ${d.row.wireCode}` : ''}</title>
+            </circle>`,
+          )}
+        </svg>
+      </div>
+    `;
+  }
+
+  private renderTransitionTimeline(): TemplateResult | typeof nothing {
+    const rows = this.transitions;
+    if (!rows || rows.length === 0) return html`<p data-testid="health-transitions-empty">${this.transitionsAvailable ? 'No inference transitions yet.' : 'Inference transitions unavailable.'}</p>`;
+    return html`
+      ${this.renderGenerationSparkline()}
+      <details
+        class="transitions"
+        data-testid="brain-transitions-timeline"
+        style="margin-top: 0.875rem; font-size: var(--font-size-xs)"
+      >
+        ${/* Round-14 finding 10 — "mode" is ambiguous on this very window: the same panel carries a
+              Simple | Detailed disclosure mode and the search surface has rungs. These rows are the
+              INFERENCE state machine's transitions; say so. */ ''}
+        <summary style="cursor: pointer; color: var(--text-secondary)">
+          Recent inference transitions (${rows.length})
+        </summary>
+        <ul
+          style="margin: 0.5rem 0 0 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 0.25rem"
+        >
+          ${rows.map(
+            (r) => html`
+              <li
+                data-testid="brain-transition-row"
+                data-success=${String(r.success)}
+                style="display:flex; gap:0.5rem; align-items: baseline; font-variant-numeric: tabular-nums"
+              >
+                <span
+                  style="display:inline-block; width:0.5rem; height:0.5rem; border-radius:50%; background:${r.success
+                    ? 'var(--accent-tint)'
+                    : 'var(--accent-danger)'}; flex-shrink:0; align-self: center"
+                ></span>
+                <span style="color: var(--text-secondary)"
+                  >${new Date(r.timestampMs).toLocaleTimeString()}</span
+                >
+                <span>${r.fromMode.toLowerCase()} → ${r.toMode.toLowerCase()}</span>
+                <span style="color: var(--text-secondary)"
+                  >· ${r.reason.toLowerCase().replace(/_/g, ' ')}</span
+                >
+                <span style="color: var(--text-secondary)">· ${r.durationMs}ms</span>
+                ${r.wireCode
+                  ? html`<span style="color: var(--text-danger)">· ${r.wireCode}</span>`
+                  : nothing}
+              </li>
+            `,
+          )}
+        </ul>
+      </details>
+    `;
+  }
+
+  /**
+   * Tempdoc 518 Appendix G Wave D.1 — in-product trace explorer panel.
+   * Lists the 10 most recent spans from /api/diagnostics/traces. Hidden when the endpoint reports
+   * `tracesAvailable: false` — which DiagnosticsController derives purely from whether
+   * `<dataDir>/telemetry/traces.ndjson` is a regular file, NOT from the tracing level: with
+   * JUSTSEARCH_HEAD_TRACING_LEVEL=none but a leftover traces file on disk, the panel still renders
+   * (verified empirically). Detailed-mode-only for that reason among others.
+   * Clicking a row copies its trace_id to the clipboard so it can be looked up in
+   * otel-desktop-viewer or grep'd against traces.ndjson.
+   */
+  private renderTraceExplorer(): TemplateResult | typeof nothing {
+    if (!this.tracesAvailable || !this.recentSpans || this.recentSpans.length === 0) {
+      return html`<p data-testid="health-spans-empty">${this.tracesAvailable ? 'No recent spans.' : 'Recent spans unavailable — no trace file or endpoint available.'}</p>`;
+    }
+    return html`
+      <details
+        class="traces"
+        data-testid="brain-trace-explorer"
+        style="margin-top: 0.875rem; font-size: var(--font-size-xs)"
+      >
+        <summary style="cursor: pointer; color: var(--text-secondary)">
+          Recent spans (${this.recentSpans.length})
+          <span style="color: var(--text-secondary); font-size: var(--font-size-xs)">
+            · click a row to copy trace ID
+          </span>
+        </summary>
+        <ul
+          style="margin: 0.5rem 0 0 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 0.25rem"
+        >
+          ${this.recentSpans.map(
+            (s) => html`
+              <li
+                data-testid="brain-trace-row"
+                role="button"
+                tabindex="0"
+                style="display:flex; gap:0.5rem; align-items: baseline; font-variant-numeric: tabular-nums; cursor: pointer"
+                @click=${() => {
+                  if (s.trace_id) {
+                    void navigator.clipboard?.writeText(s.trace_id);
+                  }
+                }}
+                @keydown=${(e: KeyboardEvent) =>
+                  activateOnKey(e, () => {
+                    if (s.trace_id) void navigator.clipboard?.writeText(s.trace_id);
+                  })}
+                title=${s.trace_id ? `trace_id=${s.trace_id} (click to copy)` : ''}
+              >
+                <span
+                  style="display:inline-block; width:0.5rem; height:0.5rem; border-radius:50%; background:${s.status === 'ERROR'
+                    ? 'var(--accent-danger)'
+                    : 'var(--accent-tint)'}; flex-shrink:0; align-self: center"
+                ></span>
+                <span style="color: var(--text-secondary)">
+                  ${s.start ? new Date(s.start).toLocaleTimeString() : '—'}
+                </span>
+                <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 18rem">
+                  ${s.name ?? '(unnamed)'}
+                </span>
+                <span style="color: var(--text-secondary)">
+                  · ${typeof s.duration_ms === 'number' ? `${Math.round(s.duration_ms)}ms` : '—'}
+                </span>
+              </li>
+            `,
+          )}
+        </ul>
+      </details>
+    `;
+  }
+
   private renderAiEngine(): TemplateResult | typeof nothing {
-    if (!this.inference) return nothing;
+    if (!this.inference) return html`<section id="ai-engine" tabindex="-1" class="card section"><h3>AI Engine</h3><p>Engine status unavailable.</p>${this.renderTransitionTimeline()}${this.renderTraceExplorer()}</section>`;
     const mode = this.aiState?.runtime?.mode ?? this.inference.mode ?? 'unknown';
     const isOnline = mode === 'online';
     const failure = this.aiState?.chatFailureReason ?? null;
     const progress = this.indexingProgress();
     const activity = progress.activity;
     return html`
-      <div class="card section">
+      <div id="ai-engine" tabindex="-1" class="card section">
         <h3>
           ${icon({ name: 'cpu', size: 12 })} AI Engine
           <span
@@ -1239,6 +1554,8 @@ export class HealthSurface extends JfElement {
           >
         </div>
         ${this.renderRealizedEngines()}
+        ${this.renderTransitionTimeline()}
+        ${this.renderTraceExplorer()}
       </div>
     `;
   }

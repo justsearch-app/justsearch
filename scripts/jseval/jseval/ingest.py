@@ -10,7 +10,7 @@ from pathlib import Path
 
 import httpx
 
-from .readiness import (
+from jsharness.readiness import (
     flatten_status,
     wait_embed_compat_settled,
     wait_index_idle,

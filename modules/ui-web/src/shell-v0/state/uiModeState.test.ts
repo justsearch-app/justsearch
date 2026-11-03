@@ -3,6 +3,8 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import {
   enqueueUiModePersistence,
+  enqueueUiModeSettings,
+  UI_MODE_INTENT_HEADER,
   getUiMode,
   getUiModeRevision,
   isAdvancedMode,
@@ -161,5 +163,51 @@ describe('uiModeState', () => {
     await expect(second).resolves.toBeUndefined();
     expect(firstWriter).not.toHaveBeenCalled();
     expect(secondWriter).toHaveBeenCalledOnce();
+  });
+});
+
+// These transport guarantees moved from the removed Brain page toggle to its owner.
+describe('uiModeState witnessed settings writer', () => {
+  beforeEach(() => __resetUiModeForTest());
+  it('persists the compatible wire value and serializes rapid choices with fresh witnesses', async () => {
+    let acceptedRevision = 0;
+    let lastCommittedOperationKey: string | null = null;
+    const posts: Array<{ body: Record<string, unknown>; intent: string | null }> = [];
+    const releases: Array<() => void> = [];
+    const send = async (_path: string, init?: RequestInit) => {
+      if (init?.method !== 'POST') return new Response(JSON.stringify({ witness: { acceptedRevision, lastCommittedOperationKey } }));
+      const body = JSON.parse(String(init.body));
+      posts.push({ body, intent: new Headers(init.headers).get(UI_MODE_INTENT_HEADER) });
+      await new Promise<void>(resolve => releases.push(resolve));
+      acceptedRevision++;
+      lastCommittedOperationKey = body.operationKey;
+      return new Response(JSON.stringify({ state: 'COMPLETE', operationKey: body.operationKey, witness: { acceptedRevision, lastCommittedOperationKey } }));
+    };
+    const first = enqueueUiModeSettings(send, { ui: { mode: 'advanced' } });
+    const second = enqueueUiModeSettings(send, { ui: { mode: 'simple' } });
+    await vi.waitFor(() => expect(posts).toHaveLength(1));
+    const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
+    expect(posts[0]?.body).toEqual({ ui: { mode: 'advanced' }, witness: { acceptedRevision: 0, lastCommittedOperationKey: null }, operationKey: expect.stringMatching(uuid) });
+    expect(posts[0]?.intent).toMatch(/:1$/);
+    releases.shift()?.(); await first;
+    await vi.waitFor(() => expect(posts).toHaveLength(2));
+    expect(posts[1]?.body).toEqual({ ui: { mode: 'simple' }, witness: { acceptedRevision: 1, lastCommittedOperationKey: posts[0]!.body.operationKey }, operationKey: expect.stringMatching(uuid) });
+    expect(posts[1]?.intent).toMatch(/:2$/);
+    releases.shift()?.(); await second;
+  });
+  it('aborts a hung settings save and releases later intent', async () => {
+    let aborted = false;
+    const send = async (_path: string, init?: RequestInit) => {
+      if (init?.method !== 'POST') return new Response(JSON.stringify({ witness: { acceptedRevision: 0, lastCommittedOperationKey: null } }));
+      return new Promise<Response>((_resolve, reject) => init.signal?.addEventListener('abort', () => {
+        aborted = true; reject(init.signal?.reason);
+      }, { once: true }));
+    };
+    const first = enqueueUiModeSettings(send, { ui: { mode: 'advanced' } }, { timeoutMs: 10 });
+    const later = vi.fn(async () => undefined);
+    const second = enqueueUiModePersistence(later);
+    await expect(first).rejects.toMatchObject({ code: 'SETTINGS_COMPLETION_UNKNOWN', message: 'Settings request timed out.' });
+    await second;
+    expect(aborted).toBe(true); expect(later).toHaveBeenCalledOnce();
   });
 });

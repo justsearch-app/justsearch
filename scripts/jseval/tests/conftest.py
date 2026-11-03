@@ -32,7 +32,7 @@ def simulate_identity(monkeypatch, tmp_path):
     # Imported defensively so a checkout without the identity module reports each test's own
     # assertion instead of a setup error.
     try:
-        from jseval import agent_identity
+        from jsharness import agent_identity
     except ImportError:  # pragma: no cover - only on a checkout that predates the module
         agent_identity = None
 
@@ -56,6 +56,7 @@ def simulate_identity(monkeypatch, tmp_path):
         return {"harness": "claude", "pid": pid, "creationTime": ct, "key": f"claude-{pid}-{ct}"}
 
     return simulate
+
 
 
 def _write_json(path: Path, doc) -> None:

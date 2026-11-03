@@ -32,7 +32,7 @@ interface BrainHost extends HTMLElement {
   apiBase: string;
   settings: { mode?: 'simple' | 'advanced' };
   installStatus: InstallStatus | null;
-  _unifiedAiState: { aiEngine: AiEngineVerdict } | null;
+  _unifiedAiState: { aiEngine: AiEngineVerdict; snapshotLive: boolean; installObservationLive: boolean; runtimeObservationLive: boolean } | null;
   requestUpdate(): void;
   updateComplete: Promise<boolean>;
 }
@@ -48,6 +48,7 @@ async function renderFor(installStatus: InstallStatus): Promise<string> {
   // so a regression in the derivation fails these render assertions too.
   el.installStatus = installStatus;
   el._unifiedAiState = {
+    installObservationLive: true, runtimeObservationLive: true, snapshotLive: true,
     aiEngine: computeAiEngineVerdict({
       installStatus,
       runtimeStatus: null,
@@ -89,11 +90,11 @@ const ACTIVATION_REQUIRED: InstallStatus = {
 };
 
 describe('BrainSurface — idle panel over a paused download', () => {
-  it('acknowledges the retained bytes instead of claiming "Not Installed"', async () => {
+  it('acknowledges the retained bytes instead of claiming "AI isn\'t installed yet"', async () => {
     const text = await renderFor(PAUSED);
     expect(text).toContain('Download Paused');
     expect(text).toContain('1.06 GB already downloaded is kept on disk');
-    expect(text).not.toContain('Not Installed');
+    expect(text).not.toContain("AI isn't installed yet");
     expect(text).not.toContain('Install AI models to get started');
   });
 
@@ -102,9 +103,9 @@ describe('BrainSurface — idle panel over a paused download', () => {
     expect(text).toContain('Resume Download');
   });
 
-  it('a genuinely fresh install is untouched — still "Not Installed" / "Install AI"', async () => {
+  it('a genuinely fresh install is untouched — still "AI isn\'t installed yet" / "Install AI"', async () => {
     const text = await renderFor(FRESH);
-    expect(text).toContain('Not Installed');
+    expect(text).toContain("AI isn't installed yet");
     expect(text).toContain('Install AI models to get started');
     expect(text).not.toContain('Download Paused');
   });
@@ -113,7 +114,7 @@ describe('BrainSurface — idle panel over a paused download', () => {
     const text = await renderFor(ACTIVATION_REQUIRED);
     expect(text).toContain('Downloaded — activation required');
     expect(text).toContain('Activate downloaded models');
-    expect(text).not.toContain('Not Installed');
+    expect(text).not.toContain("AI isn't installed yet");
   });
 });
 
@@ -158,6 +159,9 @@ describe('BrainSurface — the consent dialog re-asks the backend before opening
     el.installStatus = FRESH;
     document.body.appendChild(el);
     await settle(el);
+    el.installStatus = FRESH;
+    el._unifiedAiState = { installObservationLive: true, runtimeObservationLive: true, snapshotLive: true, aiEngine: { kind: 'not_installed', stability: { kind: 'settled' }, installFailure: null } };
+    el.requestUpdate(); await el.updateComplete;
     expect(previewFetches.length).toBe(1);
     expect(el.shadowRoot?.textContent ?? '').toContain('10.14 GB');
 
@@ -168,6 +172,7 @@ describe('BrainSurface — the consent dialog re-asks the backend before opening
     // Set the observed verdict last: `connectedCallback`'s store subscription overwrites
     // `_unifiedAiState` on mount, and only the not_installed verdict renders the install action.
     el._unifiedAiState = {
+      installObservationLive: true, runtimeObservationLive: true, snapshotLive: true,
       aiEngine: { kind: 'not_installed', stability: { kind: 'settled' }, installFailure: null },
     };
     el.requestUpdate();

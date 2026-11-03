@@ -76,13 +76,15 @@ class NerBackfillOpsTest {
 
       // NER never ran, so nothing may claim COMPLETED: the doc takes the retry-count escalation.
       verify(indexingCoordinator)
-          .updateDocument(
-              eq("doc1"),
-              argThat(
-                  (Map<String, Object> map) ->
-                      "1".equals(map.get(SchemaFields.NER_RETRY_COUNT))
-                          && !map.containsKey(SchemaFields.NER_STATUS)));
-      verify(indexingCoordinator, never()).updateDocumentsBatch(anyList());
+          .publishEnrichmentBatch(
+              argThat(entries -> {
+                if (entries.size() != 1 || !"doc1".equals(entries.get(0).getKey())) return false;
+                var map = entries.get(0).getValue();
+                return "1".equals(map.get(SchemaFields.NER_RETRY_COUNT))
+                          && !map.containsKey(SchemaFields.NER_STATUS);
+              }), anyMap());
+      verify(indexingCoordinator, never()).publishEnrichmentBatch(argThat(updates ->
+          updates.stream().anyMatch(entry -> entry.getValue().containsKey(SchemaFields.NER_STATUS))), anyMap());
       verify(nerService, never()).extractEntities(anyString());
     }
 
@@ -188,17 +190,20 @@ class NerBackfillOpsTest {
     @DisplayName("increments retry count on first failure")
     void incrementsRetryCount() {
       lenient().when(documentFieldOps.getDocumentField("doc1", SchemaFields.NER_RETRY_COUNT)).thenReturn(null);
-      when(indexingCoordinator.updateDocument(anyString(), anyMap())).thenReturn(true);
+      when(indexingCoordinator.updateDocumentsBatch(anyList()))
+          .thenReturn(new LuceneRuntimeTypes.BatchUpdateResult(1, 0));
 
       int result =
           assertDoesNotThrow(() -> new EnrichmentBatch(documentFieldOps,indexingCoordinator,List.of("doc1")).failure("doc1",SchemaFields.NER_RETRY_COUNT,NerBackfillOps::computeNerFailureUpdate));
 
       assertEquals(0, result); // not permanently failed
       verify(indexingCoordinator)
-          .updateDocument(
-              eq("doc1"),
-              argThat(
-                  (Map<String, Object> map) -> "1".equals(map.get(SchemaFields.NER_RETRY_COUNT))));
+          .publishEnrichmentBatch(
+              argThat(entries -> {
+                if (entries.size() != 1 || !"doc1".equals(entries.get(0).getKey())) return false;
+                var map = entries.get(0).getValue();
+                return "1".equals(map.get(SchemaFields.NER_RETRY_COUNT));
+              }), anyMap());
     }
 
     @Test
@@ -206,18 +211,20 @@ class NerBackfillOpsTest {
     void marksFailedAfterMaxRetries() {
       lenient().when(documentFieldOps.getDocumentField("doc1", SchemaFields.NER_RETRY_COUNT))
           .thenReturn(String.valueOf(SchemaFields.NER_MAX_RETRIES - 1));
-      when(indexingCoordinator.updateDocument(anyString(), anyMap())).thenReturn(true);
+      when(indexingCoordinator.updateDocumentsBatch(anyList()))
+          .thenReturn(new LuceneRuntimeTypes.BatchUpdateResult(1, 0));
 
       int result =
           assertDoesNotThrow(() -> new EnrichmentBatch(documentFieldOps,indexingCoordinator,List.of("doc1")).failure("doc1",SchemaFields.NER_RETRY_COUNT,NerBackfillOps::computeNerFailureUpdate));
 
       assertEquals(1, result); // permanently failed
       verify(indexingCoordinator)
-          .updateDocument(
-              eq("doc1"),
-              argThat(
-                  (Map<String, Object> map) ->
-                      SchemaFields.NER_STATUS_FAILED.equals(map.get(SchemaFields.NER_STATUS))));
+          .publishEnrichmentBatch(
+              argThat(entries -> {
+                if (entries.size() != 1 || !"doc1".equals(entries.get(0).getKey())) return false;
+                var map = entries.get(0).getValue();
+                return SchemaFields.NER_STATUS_FAILED.equals(map.get(SchemaFields.NER_STATUS));
+              }), anyMap());
     }
   }
 

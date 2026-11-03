@@ -3,6 +3,20 @@
     "beir/scifact": [
       {
         "ann_proof_status": "NOT_APPLICABLE",
+        "ce_coverage": {
+          "applied": 0,
+          "coverage": null,
+          "eligible": 0,
+          "legitimate_skip_reason_counts": {},
+          "legitimate_skips": 0,
+          "not_in_play": 300,
+          "reasons": [
+            "no CE-eligible query in 300 — every one reports a cross-encoder-off state (['DISABLED', 'MODEL_NOT_CONFIGURED', 'MODEL_NOT_LOADED', 'PIPELINE_NOT_ELIGIBLE']), so there is no coverage to gate"
+          ],
+          "silent_drop_reason_counts": {},
+          "silent_drops": 0,
+          "verdict": "not-applicable"
+        },
         "comparable": true,
         "confidence_tier": "A",
         "config_mode": "lexical",
@@ -15,27 +29,40 @@
           "upstream_revision": null
         },
         "metrics": {
-          "AP@10": 0.6169080687830689,
-          "P@1": 0.5366666666666666,
-          "R@10": 0.7826111111111111,
-          "RR@10": 0.6306402116402117,
-          "nDCG@10": 0.6616366524939059,
-          "retrieval_p50_ms": 2.0
+          "AP@10": 0.6145429894179895,
+          "P@1": 0.5333333333333333,
+          "R@10": 0.7759444444444444,
+          "RR@10": 0.6282751322751323,
+          "nDCG@10": 0.6584534136091854,
+          "retrieval_p50_ms": 3.0
         },
         "qrels_id": "binary",
         "run_metrics": {
           "embed_bytes": 627988827.0,
-          "enrich_docs_s": 1.3,
+          "enrich_docs_s": 11.5,
           "ner_bytes": 269622486.0,
-          "primary_docs_s": 76.1,
+          "primary_docs_s": 36.7,
           "reranker_bytes": 629118152.0,
           "resident_bytes": 2024327753.0,
           "splade_bytes": 497598288.0
-        },
-        "tolerance_band": null
+        }
       },
       {
         "ann_proof_status": "PASS",
+        "ce_coverage": {
+          "applied": 0,
+          "coverage": null,
+          "eligible": 0,
+          "legitimate_skip_reason_counts": {},
+          "legitimate_skips": 0,
+          "not_in_play": 300,
+          "reasons": [
+            "no CE-eligible query in 300 — every one reports a cross-encoder-off state (['DISABLED', 'MODEL_NOT_CONFIGURED', 'MODEL_NOT_LOADED', 'PIPELINE_NOT_ELIGIBLE']), so there is no coverage to gate"
+          ],
+          "silent_drop_reason_counts": {},
+          "silent_drops": 0,
+          "verdict": "not-applicable"
+        },
         "comparable": true,
         "confidence_tier": "A",
         "config_mode": "vector",
@@ -48,474 +75,643 @@
           "upstream_revision": null
         },
         "metrics": {
-          "AP@10": 0.6877363756613755,
+          "AP@10": 0.687791931216931,
           "P@1": 0.6066666666666667,
           "R@10": 0.8625555555555555,
-          "RR@10": 0.6992394179894177,
-          "nDCG@10": 0.7344277772083551,
-          "retrieval_p50_ms": 2.0
-        },
-        "qrels_id": "binary",
-        "run_metrics": {
-          "embed_bytes": 627988827.0,
-          "enrich_docs_s": 1.3,
-          "ner_bytes": 269622486.0,
-          "primary_docs_s": 76.1,
-          "reranker_bytes": 629118152.0,
-          "resident_bytes": 2024327753.0,
-          "splade_bytes": 497598288.0
-        },
-        "tolerance_band": null
-      },
-      {
-        "ann_proof_status": "PASS",
-        "comparable": true,
-        "confidence_tier": "A",
-        "config_mode": "splade",
-        "corpus_source": {
-          "dataset": "scifact",
-          "doc_count": 5183,
-          "query_count": 300,
-          "sha256": "3e10ed87358699465122d137cc8479a586a55736df1dbb19901157c86d0ccb7d",
-          "signature": "3e10ed87358699465122d137cc8479a586a55736df1dbb19901157c86d0ccb7d",
-          "upstream_revision": null
-        },
-        "metrics": {
-          "AP@10": 0.44054060846560833,
-          "P@1": 0.38,
-          "R@10": 0.6154444444444445,
-          "RR@10": 0.45639153439153435,
-          "nDCG@10": 0.4871303589285201,
-          "retrieval_p50_ms": 6.0
-        },
-        "qrels_id": "binary",
-        "run_metrics": {
-          "embed_bytes": 627988827.0,
-          "enrich_docs_s": 1.3,
-          "ner_bytes": 269622486.0,
-          "primary_docs_s": 76.1,
-          "reranker_bytes": 629118152.0,
-          "resident_bytes": 2024327753.0,
-          "splade_bytes": 497598288.0
-        },
-        "tolerance_band": null
-      }
-    ],
-    "mixed/enron-qa": [
-      {
-        "ann_proof_status": "NOT_APPLICABLE",
-        "comparable": true,
-        "confidence_tier": "A",
-        "config_mode": "lexical",
-        "corpus_source": {
-          "dataset": "mixed/enron-qa",
-          "doc_count": 5485,
-          "query_count": 300,
-          "sha256": "c11e4e0b871ebaaac8aa4ba17b3c6cc02eaf8094b19a59bfb33322ed9d0fe96b",
-          "signature": "c11e4e0b871ebaaac8aa4ba17b3c6cc02eaf8094b19a59bfb33322ed9d0fe96b",
-          "upstream_revision": null
-        },
-        "metrics": {
-          "AP@10": 0.7916507936507937,
-          "P@1": 0.7133333333333334,
-          "R@10": 0.9266666666666666,
-          "RR@10": 0.7916507936507937,
-          "nDCG@10": 0.8247768381872272,
-          "retrieval_p50_ms": 5.0
-        },
-        "qrels_id": "binary",
-        "run_metrics": {
-          "embed_bytes": 627988827.0,
-          "enrich_docs_s": 3.6,
-          "ner_bytes": 269622486.0,
-          "primary_docs_s": 63.8,
-          "reranker_bytes": 629118152.0,
-          "resident_bytes": 2024327753.0,
-          "splade_bytes": 497598288.0
-        },
-        "tolerance_band": null
-      },
-      {
-        "ann_proof_status": "PASS",
-        "comparable": true,
-        "confidence_tier": "A",
-        "config_mode": "vector",
-        "corpus_source": {
-          "dataset": "mixed/enron-qa",
-          "doc_count": 5485,
-          "query_count": 300,
-          "sha256": "c11e4e0b871ebaaac8aa4ba17b3c6cc02eaf8094b19a59bfb33322ed9d0fe96b",
-          "signature": "c11e4e0b871ebaaac8aa4ba17b3c6cc02eaf8094b19a59bfb33322ed9d0fe96b",
-          "upstream_revision": null
-        },
-        "metrics": {
-          "AP@10": 0.5343611111111112,
-          "P@1": 0.4166666666666667,
-          "R@10": 0.77,
-          "RR@10": 0.5343611111111112,
-          "nDCG@10": 0.5913186322858992,
-          "retrieval_p50_ms": 2.0
-        },
-        "qrels_id": "binary",
-        "run_metrics": {
-          "embed_bytes": 627988827.0,
-          "enrich_docs_s": 3.6,
-          "ner_bytes": 269622486.0,
-          "primary_docs_s": 63.8,
-          "reranker_bytes": 629118152.0,
-          "resident_bytes": 2024327753.0,
-          "splade_bytes": 497598288.0
-        },
-        "tolerance_band": null
-      },
-      {
-        "ann_proof_status": "PASS",
-        "comparable": true,
-        "confidence_tier": "A",
-        "config_mode": "splade",
-        "corpus_source": {
-          "dataset": "mixed/enron-qa",
-          "doc_count": 5485,
-          "query_count": 300,
-          "sha256": "c11e4e0b871ebaaac8aa4ba17b3c6cc02eaf8094b19a59bfb33322ed9d0fe96b",
-          "signature": "c11e4e0b871ebaaac8aa4ba17b3c6cc02eaf8094b19a59bfb33322ed9d0fe96b",
-          "upstream_revision": null
-        },
-        "metrics": {
-          "AP@10": 0.13358333333333333,
-          "P@1": 0.12,
-          "R@10": 0.16,
-          "RR@10": 0.13358333333333333,
-          "nDCG@10": 0.14001734437735253,
-          "retrieval_p50_ms": 3.0
-        },
-        "qrels_id": "binary",
-        "run_metrics": {
-          "embed_bytes": 627988827.0,
-          "enrich_docs_s": 3.6,
-          "ner_bytes": 269622486.0,
-          "primary_docs_s": 63.8,
-          "reranker_bytes": 629118152.0,
-          "resident_bytes": 2024327753.0,
-          "splade_bytes": 497598288.0
-        },
-        "tolerance_band": null
-      }
-    ],
-    "mixed/legal-clerc-200": [
-      {
-        "ann_proof_status": "NOT_APPLICABLE",
-        "comparable": true,
-        "confidence_tier": "A",
-        "config_mode": "lexical",
-        "corpus_source": {
-          "dataset": "mixed/legal-clerc-200",
-          "doc_count": 198,
-          "query_count": 200,
-          "sha256": "90d4300d1435c6af00950b6095100fc6b29260385b294dc76896d54308bcfaf1",
-          "signature": "90d4300d1435c6af00950b6095100fc6b29260385b294dc76896d54308bcfaf1",
-          "upstream_revision": null
-        },
-        "metrics": {
-          "AP@10": 0.6307896825396824,
-          "P@1": 0.505,
-          "R@10": 0.855,
-          "RR@10": 0.6307896825396824,
-          "nDCG@10": 0.6854793967815255,
-          "retrieval_p50_ms": 12.0
-        },
-        "qrels_id": "binary",
-        "run_metrics": {
-          "embed_bytes": 627988827.0,
-          "enrich_docs_s": 0.8,
-          "ner_bytes": 269622486.0,
-          "primary_docs_s": 18.6,
-          "reranker_bytes": 629118152.0,
-          "resident_bytes": 2024327753.0,
-          "splade_bytes": 497598288.0
-        },
-        "tolerance_band": null
-      },
-      {
-        "ann_proof_status": "PASS",
-        "comparable": true,
-        "confidence_tier": "A",
-        "config_mode": "vector",
-        "corpus_source": {
-          "dataset": "mixed/legal-clerc-200",
-          "doc_count": 198,
-          "query_count": 200,
-          "sha256": "90d4300d1435c6af00950b6095100fc6b29260385b294dc76896d54308bcfaf1",
-          "signature": "90d4300d1435c6af00950b6095100fc6b29260385b294dc76896d54308bcfaf1",
-          "upstream_revision": null
-        },
-        "metrics": {
-          "AP@10": 0.5560892857142857,
-          "P@1": 0.415,
-          "R@10": 0.835,
-          "RR@10": 0.5560892857142857,
-          "nDCG@10": 0.6237533633256802,
-          "retrieval_p50_ms": 3.0
-        },
-        "qrels_id": "binary",
-        "run_metrics": {
-          "embed_bytes": 627988827.0,
-          "enrich_docs_s": 0.8,
-          "ner_bytes": 269622486.0,
-          "primary_docs_s": 18.6,
-          "reranker_bytes": 629118152.0,
-          "resident_bytes": 2024327753.0,
-          "splade_bytes": 497598288.0
-        },
-        "tolerance_band": null
-      },
-      {
-        "ann_proof_status": "PASS",
-        "comparable": true,
-        "confidence_tier": "A",
-        "config_mode": "splade",
-        "corpus_source": {
-          "dataset": "mixed/legal-clerc-200",
-          "doc_count": 198,
-          "query_count": 200,
-          "sha256": "90d4300d1435c6af00950b6095100fc6b29260385b294dc76896d54308bcfaf1",
-          "signature": "90d4300d1435c6af00950b6095100fc6b29260385b294dc76896d54308bcfaf1",
-          "upstream_revision": null
-        },
-        "metrics": {
-          "AP@10": 0.02332936507936508,
-          "P@1": 0.005,
-          "R@10": 0.12,
-          "RR@10": 0.02332936507936508,
-          "nDCG@10": 0.0447198414444914,
-          "retrieval_p50_ms": 5.0
-        },
-        "qrels_id": "binary",
-        "run_metrics": {
-          "embed_bytes": 627988827.0,
-          "enrich_docs_s": 0.8,
-          "ner_bytes": 269622486.0,
-          "primary_docs_s": 18.6,
-          "reranker_bytes": 629118152.0,
-          "resident_bytes": 2024327753.0,
-          "splade_bytes": 497598288.0
-        },
-        "tolerance_band": null
-      }
-    ],
-    "mixed/miracl-de-2k": [
-      {
-        "ann_proof_status": "NOT_APPLICABLE",
-        "comparable": true,
-        "confidence_tier": "A",
-        "config_mode": "lexical",
-        "corpus_source": {
-          "dataset": "mixed/miracl-de-2k",
-          "doc_count": 3103,
-          "query_count": 305,
-          "sha256": "d6f4026b4b25ac0d117353b830022d77ef3b863b15187907d512d645fae607a1",
-          "signature": "d6f4026b4b25ac0d117353b830022d77ef3b863b15187907d512d645fae607a1",
-          "upstream_revision": null
-        },
-        "metrics": {
-          "AP@10": 0.6443611761644549,
-          "P@1": 0.5049180327868853,
-          "R@10": 0.8721311475409836,
-          "RR@10": 0.6443611761644549,
-          "nDCG@10": 0.7007307843432976,
-          "retrieval_p50_ms": 1.0
-        },
-        "qrels_id": "binary",
-        "run_metrics": {
-          "embed_bytes": 627988827.0,
-          "enrich_docs_s": 34.1,
-          "ner_bytes": 269622486.0,
-          "primary_docs_s": 125.6,
-          "reranker_bytes": 629118152.0,
-          "resident_bytes": 2024327753.0,
-          "splade_bytes": 497598288.0
-        },
-        "tolerance_band": null
-      },
-      {
-        "ann_proof_status": "PASS",
-        "comparable": true,
-        "confidence_tier": "A",
-        "config_mode": "vector",
-        "corpus_source": {
-          "dataset": "mixed/miracl-de-2k",
-          "doc_count": 3103,
-          "query_count": 305,
-          "sha256": "d6f4026b4b25ac0d117353b830022d77ef3b863b15187907d512d645fae607a1",
-          "signature": "d6f4026b4b25ac0d117353b830022d77ef3b863b15187907d512d645fae607a1",
-          "upstream_revision": null
-        },
-        "metrics": {
-          "AP@10": 0.8003278688524591,
-          "P@1": 0.6557377049180327,
-          "R@10": 1.0,
-          "RR@10": 0.8003278688524591,
-          "nDCG@10": 0.8508761496907707,
-          "retrieval_p50_ms": 1.0
-        },
-        "qrels_id": "binary",
-        "run_metrics": {
-          "embed_bytes": 627988827.0,
-          "enrich_docs_s": 34.1,
-          "ner_bytes": 269622486.0,
-          "primary_docs_s": 125.6,
-          "reranker_bytes": 629118152.0,
-          "resident_bytes": 2024327753.0,
-          "splade_bytes": 497598288.0
-        },
-        "tolerance_band": null
-      },
-      {
-        "ann_proof_status": "PASS",
-        "comparable": true,
-        "confidence_tier": "A",
-        "config_mode": "splade",
-        "corpus_source": {
-          "dataset": "mixed/miracl-de-2k",
-          "doc_count": 3103,
-          "query_count": 305,
-          "sha256": "d6f4026b4b25ac0d117353b830022d77ef3b863b15187907d512d645fae607a1",
-          "signature": "d6f4026b4b25ac0d117353b830022d77ef3b863b15187907d512d645fae607a1",
-          "upstream_revision": null
-        },
-        "metrics": {
-          "AP@10": 0.7091282851938591,
-          "P@1": 0.5475409836065573,
-          "R@10": 0.9770491803278688,
-          "RR@10": 0.7091282851938591,
-          "nDCG@10": 0.7755290761324144,
-          "retrieval_p50_ms": 2.0
-        },
-        "qrels_id": "binary",
-        "run_metrics": {
-          "embed_bytes": 627988827.0,
-          "enrich_docs_s": 34.1,
-          "ner_bytes": 269622486.0,
-          "primary_docs_s": 125.6,
-          "reranker_bytes": 629118152.0,
-          "resident_bytes": 2024327753.0,
-          "splade_bytes": 497598288.0
-        },
-        "tolerance_band": null
-      }
-    ],
-    "mixed/miracl-fr-2k": [
-      {
-        "ann_proof_status": "NOT_APPLICABLE",
-        "comparable": true,
-        "confidence_tier": "A",
-        "config_mode": "lexical",
-        "corpus_source": {
-          "dataset": "mixed/miracl-fr-2k",
-          "doc_count": 5407,
-          "query_count": 343,
-          "sha256": "a145edfa38d5a783cea52710f256fcee1c0cb33dc100f094d10175eb49ed3297",
-          "signature": "a145edfa38d5a783cea52710f256fcee1c0cb33dc100f094d10175eb49ed3297",
-          "upstream_revision": null
-        },
-        "metrics": {
-          "AP@10": 0.6516532463325467,
-          "P@1": 0.5364431486880467,
-          "R@10": 0.8600583090379009,
-          "RR@10": 0.6516532463325467,
-          "nDCG@10": 0.7027313152456466,
-          "retrieval_p50_ms": 2.0
-        },
-        "qrels_id": "binary",
-        "run_metrics": {
-          "embed_bytes": 627988827.0,
-          "enrich_docs_s": 46.6,
-          "ner_bytes": 269622486.0,
-          "primary_docs_s": 151.7,
-          "reranker_bytes": 629118152.0,
-          "resident_bytes": 2024327753.0,
-          "splade_bytes": 497598288.0
-        },
-        "tolerance_band": null
-      },
-      {
-        "ann_proof_status": "PASS",
-        "comparable": true,
-        "confidence_tier": "A",
-        "config_mode": "vector",
-        "corpus_source": {
-          "dataset": "mixed/miracl-fr-2k",
-          "doc_count": 5407,
-          "query_count": 343,
-          "sha256": "a145edfa38d5a783cea52710f256fcee1c0cb33dc100f094d10175eb49ed3297",
-          "signature": "a145edfa38d5a783cea52710f256fcee1c0cb33dc100f094d10175eb49ed3297",
-          "upstream_revision": null
-        },
-        "metrics": {
-          "AP@10": 0.8537970290156877,
-          "P@1": 0.7405247813411079,
-          "R@10": 1.0,
-          "RR@10": 0.8537970290156877,
-          "nDCG@10": 0.8911072696247466,
-          "retrieval_p50_ms": 2.0
-        },
-        "qrels_id": "binary",
-        "run_metrics": {
-          "embed_bytes": 627988827.0,
-          "enrich_docs_s": 46.6,
-          "ner_bytes": 269622486.0,
-          "primary_docs_s": 151.7,
-          "reranker_bytes": 629118152.0,
-          "resident_bytes": 2024327753.0,
-          "splade_bytes": 497598288.0
-        },
-        "tolerance_band": null
-      },
-      {
-        "ann_proof_status": "PASS",
-        "comparable": true,
-        "confidence_tier": "A",
-        "config_mode": "splade",
-        "corpus_source": {
-          "dataset": "mixed/miracl-fr-2k",
-          "doc_count": 5407,
-          "query_count": 343,
-          "sha256": "a145edfa38d5a783cea52710f256fcee1c0cb33dc100f094d10175eb49ed3297",
-          "signature": "a145edfa38d5a783cea52710f256fcee1c0cb33dc100f094d10175eb49ed3297",
-          "upstream_revision": null
-        },
-        "metrics": {
-          "AP@10": 0.8147091489657085,
-          "P@1": 0.6938775510204082,
-          "R@10": 0.9854227405247813,
-          "RR@10": 0.8147091489657085,
-          "nDCG@10": 0.8577777486824479,
+          "RR@10": 0.6992949735449732,
+          "nDCG@10": 0.7344717043107295,
           "retrieval_p50_ms": 4.0
         },
         "qrels_id": "binary",
         "run_metrics": {
           "embed_bytes": 627988827.0,
-          "enrich_docs_s": 46.6,
+          "enrich_docs_s": 11.5,
           "ner_bytes": 269622486.0,
-          "primary_docs_s": 151.7,
+          "primary_docs_s": 36.7,
           "reranker_bytes": 629118152.0,
           "resident_bytes": 2024327753.0,
           "splade_bytes": 497598288.0
+        }
+      },
+      {
+        "ann_proof_status": "PASS",
+        "ce_coverage": {
+          "applied": 0,
+          "coverage": null,
+          "eligible": 0,
+          "legitimate_skip_reason_counts": {},
+          "legitimate_skips": 0,
+          "not_in_play": 300,
+          "reasons": [
+            "no CE-eligible query in 300 — every one reports a cross-encoder-off state (['DISABLED', 'MODEL_NOT_CONFIGURED', 'MODEL_NOT_LOADED', 'PIPELINE_NOT_ELIGIBLE']), so there is no coverage to gate"
+          ],
+          "silent_drop_reason_counts": {},
+          "silent_drops": 0,
+          "verdict": "not-applicable"
         },
-        "tolerance_band": null
+        "comparable": true,
+        "confidence_tier": "A",
+        "config_mode": "splade",
+        "corpus_source": {
+          "dataset": "scifact",
+          "doc_count": 5183,
+          "query_count": 300,
+          "sha256": "3e10ed87358699465122d137cc8479a586a55736df1dbb19901157c86d0ccb7d",
+          "signature": "3e10ed87358699465122d137cc8479a586a55736df1dbb19901157c86d0ccb7d",
+          "upstream_revision": null
+        },
+        "metrics": {
+          "AP@10": 0.5186375661375663,
+          "P@1": 0.45,
+          "R@10": 0.7082222222222221,
+          "RR@10": 0.5322513227513227,
+          "nDCG@10": 0.5682898808499731,
+          "retrieval_p50_ms": 7.0
+        },
+        "qrels_id": "binary",
+        "run_metrics": {
+          "embed_bytes": 627988827.0,
+          "enrich_docs_s": 11.5,
+          "ner_bytes": 269622486.0,
+          "primary_docs_s": 36.7,
+          "reranker_bytes": 629118152.0,
+          "resident_bytes": 2024327753.0,
+          "splade_bytes": 497598288.0
+        }
+      }
+    ],
+    "mixed/enron-qa": [
+      {
+        "ann_proof_status": "NOT_APPLICABLE",
+        "ce_coverage": {
+          "applied": 0,
+          "coverage": null,
+          "eligible": 0,
+          "legitimate_skip_reason_counts": {},
+          "legitimate_skips": 0,
+          "not_in_play": 300,
+          "reasons": [
+            "no CE-eligible query in 300 — every one reports a cross-encoder-off state (['DISABLED', 'MODEL_NOT_CONFIGURED', 'MODEL_NOT_LOADED', 'PIPELINE_NOT_ELIGIBLE']), so there is no coverage to gate"
+          ],
+          "silent_drop_reason_counts": {},
+          "silent_drops": 0,
+          "verdict": "not-applicable"
+        },
+        "comparable": true,
+        "confidence_tier": "A",
+        "config_mode": "lexical",
+        "corpus_source": {
+          "dataset": "mixed/enron-qa",
+          "doc_count": 5485,
+          "query_count": 300,
+          "sha256": "c11e4e0b871ebaaac8aa4ba17b3c6cc02eaf8094b19a59bfb33322ed9d0fe96b",
+          "signature": "c11e4e0b871ebaaac8aa4ba17b3c6cc02eaf8094b19a59bfb33322ed9d0fe96b",
+          "upstream_revision": null
+        },
+        "metrics": {
+          "AP@10": 0.7990119047619048,
+          "P@1": 0.7266666666666667,
+          "R@10": 0.9266666666666666,
+          "RR@10": 0.7990119047619048,
+          "nDCG@10": 0.8302252803574768,
+          "retrieval_p50_ms": 9.0
+        },
+        "qrels_id": "binary",
+        "run_metrics": {
+          "embed_bytes": 627988827.0,
+          "enrich_docs_s": 2.7,
+          "ner_bytes": 269622486.0,
+          "primary_docs_s": 25.8,
+          "reranker_bytes": 629118152.0,
+          "resident_bytes": 2024327753.0,
+          "splade_bytes": 497598288.0
+        }
+      },
+      {
+        "ann_proof_status": "PASS",
+        "ce_coverage": {
+          "applied": 0,
+          "coverage": null,
+          "eligible": 0,
+          "legitimate_skip_reason_counts": {},
+          "legitimate_skips": 0,
+          "not_in_play": 300,
+          "reasons": [
+            "no CE-eligible query in 300 — every one reports a cross-encoder-off state (['DISABLED', 'MODEL_NOT_CONFIGURED', 'MODEL_NOT_LOADED', 'PIPELINE_NOT_ELIGIBLE']), so there is no coverage to gate"
+          ],
+          "silent_drop_reason_counts": {},
+          "silent_drops": 0,
+          "verdict": "not-applicable"
+        },
+        "comparable": true,
+        "confidence_tier": "A",
+        "config_mode": "vector",
+        "corpus_source": {
+          "dataset": "mixed/enron-qa",
+          "doc_count": 5485,
+          "query_count": 300,
+          "sha256": "c11e4e0b871ebaaac8aa4ba17b3c6cc02eaf8094b19a59bfb33322ed9d0fe96b",
+          "signature": "c11e4e0b871ebaaac8aa4ba17b3c6cc02eaf8094b19a59bfb33322ed9d0fe96b",
+          "upstream_revision": null
+        },
+        "metrics": {
+          "AP@10": 0.5045291005291006,
+          "P@1": 0.4066666666666667,
+          "R@10": 0.7066666666666667,
+          "RR@10": 0.5045291005291006,
+          "nDCG@10": 0.5533755041885954,
+          "retrieval_p50_ms": 9.0
+        },
+        "qrels_id": "binary",
+        "run_metrics": {
+          "embed_bytes": 627988827.0,
+          "enrich_docs_s": 2.7,
+          "ner_bytes": 269622486.0,
+          "primary_docs_s": 25.8,
+          "reranker_bytes": 629118152.0,
+          "resident_bytes": 2024327753.0,
+          "splade_bytes": 497598288.0
+        }
+      },
+      {
+        "ann_proof_status": "PASS",
+        "ce_coverage": {
+          "applied": 0,
+          "coverage": null,
+          "eligible": 0,
+          "legitimate_skip_reason_counts": {},
+          "legitimate_skips": 0,
+          "not_in_play": 300,
+          "reasons": [
+            "no CE-eligible query in 300 — every one reports a cross-encoder-off state (['DISABLED', 'MODEL_NOT_CONFIGURED', 'MODEL_NOT_LOADED', 'PIPELINE_NOT_ELIGIBLE']), so there is no coverage to gate"
+          ],
+          "silent_drop_reason_counts": {},
+          "silent_drops": 0,
+          "verdict": "not-applicable"
+        },
+        "comparable": true,
+        "confidence_tier": "A",
+        "config_mode": "splade",
+        "corpus_source": {
+          "dataset": "mixed/enron-qa",
+          "doc_count": 5485,
+          "query_count": 300,
+          "sha256": "c11e4e0b871ebaaac8aa4ba17b3c6cc02eaf8094b19a59bfb33322ed9d0fe96b",
+          "signature": "c11e4e0b871ebaaac8aa4ba17b3c6cc02eaf8094b19a59bfb33322ed9d0fe96b",
+          "upstream_revision": null
+        },
+        "metrics": {
+          "AP@10": 0.30548280423280433,
+          "P@1": 0.23666666666666666,
+          "R@10": 0.47333333333333333,
+          "RR@10": 0.30548280423280433,
+          "nDCG@10": 0.34536578035914306,
+          "retrieval_p50_ms": 22.0
+        },
+        "qrels_id": "binary",
+        "run_metrics": {
+          "embed_bytes": 627988827.0,
+          "enrich_docs_s": 2.7,
+          "ner_bytes": 269622486.0,
+          "primary_docs_s": 25.8,
+          "reranker_bytes": 629118152.0,
+          "resident_bytes": 2024327753.0,
+          "splade_bytes": 497598288.0
+        }
+      }
+    ],
+    "mixed/legal-clerc-200": [
+      {
+        "ann_proof_status": "NOT_APPLICABLE",
+        "ce_coverage": {
+          "applied": 0,
+          "coverage": null,
+          "eligible": 0,
+          "legitimate_skip_reason_counts": {},
+          "legitimate_skips": 0,
+          "not_in_play": 200,
+          "reasons": [
+            "no CE-eligible query in 200 — every one reports a cross-encoder-off state (['DISABLED', 'MODEL_NOT_CONFIGURED', 'MODEL_NOT_LOADED', 'PIPELINE_NOT_ELIGIBLE']), so there is no coverage to gate"
+          ],
+          "silent_drop_reason_counts": {},
+          "silent_drops": 0,
+          "verdict": "not-applicable"
+        },
+        "comparable": true,
+        "confidence_tier": "A",
+        "config_mode": "lexical",
+        "corpus_source": {
+          "dataset": "mixed/legal-clerc-200",
+          "doc_count": 198,
+          "query_count": 200,
+          "sha256": "90d4300d1435c6af00950b6095100fc6b29260385b294dc76896d54308bcfaf1",
+          "signature": "90d4300d1435c6af00950b6095100fc6b29260385b294dc76896d54308bcfaf1",
+          "upstream_revision": null
+        },
+        "metrics": {
+          "AP@10": 0.6320317460317461,
+          "P@1": 0.5,
+          "R@10": 0.875,
+          "RR@10": 0.6320317460317461,
+          "nDCG@10": 0.6910195241896021,
+          "retrieval_p50_ms": 18.0
+        },
+        "qrels_id": "binary",
+        "run_metrics": {
+          "embed_bytes": 627988827.0,
+          "enrich_docs_s": 0.6,
+          "ner_bytes": 269622486.0,
+          "primary_docs_s": 22.5,
+          "reranker_bytes": 629118152.0,
+          "resident_bytes": 2024327753.0,
+          "splade_bytes": 497598288.0
+        }
+      },
+      {
+        "ann_proof_status": "PASS",
+        "ce_coverage": {
+          "applied": 0,
+          "coverage": null,
+          "eligible": 0,
+          "legitimate_skip_reason_counts": {},
+          "legitimate_skips": 0,
+          "not_in_play": 200,
+          "reasons": [
+            "no CE-eligible query in 200 — every one reports a cross-encoder-off state (['DISABLED', 'MODEL_NOT_CONFIGURED', 'MODEL_NOT_LOADED', 'PIPELINE_NOT_ELIGIBLE']), so there is no coverage to gate"
+          ],
+          "silent_drop_reason_counts": {},
+          "silent_drops": 0,
+          "verdict": "not-applicable"
+        },
+        "comparable": true,
+        "confidence_tier": "A",
+        "config_mode": "vector",
+        "corpus_source": {
+          "dataset": "mixed/legal-clerc-200",
+          "doc_count": 198,
+          "query_count": 200,
+          "sha256": "90d4300d1435c6af00950b6095100fc6b29260385b294dc76896d54308bcfaf1",
+          "signature": "90d4300d1435c6af00950b6095100fc6b29260385b294dc76896d54308bcfaf1",
+          "upstream_revision": null
+        },
+        "metrics": {
+          "AP@10": 0.5515158730158728,
+          "P@1": 0.425,
+          "R@10": 0.82,
+          "RR@10": 0.5515158730158728,
+          "nDCG@10": 0.6166192290630724,
+          "retrieval_p50_ms": 7.0
+        },
+        "qrels_id": "binary",
+        "run_metrics": {
+          "embed_bytes": 627988827.0,
+          "enrich_docs_s": 0.6,
+          "ner_bytes": 269622486.0,
+          "primary_docs_s": 22.5,
+          "reranker_bytes": 629118152.0,
+          "resident_bytes": 2024327753.0,
+          "splade_bytes": 497598288.0
+        }
+      },
+      {
+        "ann_proof_status": "PASS",
+        "ce_coverage": {
+          "applied": 0,
+          "coverage": null,
+          "eligible": 0,
+          "legitimate_skip_reason_counts": {},
+          "legitimate_skips": 0,
+          "not_in_play": 200,
+          "reasons": [
+            "no CE-eligible query in 200 — every one reports a cross-encoder-off state (['DISABLED', 'MODEL_NOT_CONFIGURED', 'MODEL_NOT_LOADED', 'PIPELINE_NOT_ELIGIBLE']), so there is no coverage to gate"
+          ],
+          "silent_drop_reason_counts": {},
+          "silent_drops": 0,
+          "verdict": "not-applicable"
+        },
+        "comparable": true,
+        "confidence_tier": "A",
+        "config_mode": "splade",
+        "corpus_source": {
+          "dataset": "mixed/legal-clerc-200",
+          "doc_count": 198,
+          "query_count": 200,
+          "sha256": "90d4300d1435c6af00950b6095100fc6b29260385b294dc76896d54308bcfaf1",
+          "signature": "90d4300d1435c6af00950b6095100fc6b29260385b294dc76896d54308bcfaf1",
+          "upstream_revision": null
+        },
+        "metrics": {
+          "AP@10": 0.32094444444444464,
+          "P@1": 0.205,
+          "R@10": 0.605,
+          "RR@10": 0.32094444444444464,
+          "nDCG@10": 0.38806832502296734,
+          "retrieval_p50_ms": 13.0
+        },
+        "qrels_id": "binary",
+        "run_metrics": {
+          "embed_bytes": 627988827.0,
+          "enrich_docs_s": 0.6,
+          "ner_bytes": 269622486.0,
+          "primary_docs_s": 22.5,
+          "reranker_bytes": 629118152.0,
+          "resident_bytes": 2024327753.0,
+          "splade_bytes": 497598288.0
+        }
+      }
+    ],
+    "mixed/miracl-de-2k": [
+      {
+        "ann_proof_status": "NOT_APPLICABLE",
+        "ce_coverage": {
+          "applied": 0,
+          "coverage": null,
+          "eligible": 0,
+          "legitimate_skip_reason_counts": {},
+          "legitimate_skips": 0,
+          "not_in_play": 305,
+          "reasons": [
+            "no CE-eligible query in 305 — every one reports a cross-encoder-off state (['DISABLED', 'MODEL_NOT_CONFIGURED', 'MODEL_NOT_LOADED', 'PIPELINE_NOT_ELIGIBLE']), so there is no coverage to gate"
+          ],
+          "silent_drop_reason_counts": {},
+          "silent_drops": 0,
+          "verdict": "not-applicable"
+        },
+        "comparable": true,
+        "confidence_tier": "A",
+        "config_mode": "lexical",
+        "corpus_source": {
+          "dataset": "mixed/miracl-de-2k",
+          "doc_count": 3103,
+          "query_count": 305,
+          "sha256": "ef53f32710f693d7c6564c6f5ebd9ae89f16dffc8f91e3f40f0e5103b7c2213b",
+          "signature": "ef53f32710f693d7c6564c6f5ebd9ae89f16dffc8f91e3f40f0e5103b7c2213b",
+          "upstream_revision": null
+        },
+        "metrics": {
+          "AP@10": 0.7326254502104419,
+          "P@1": 0.7737704918032787,
+          "R@10": 0.8351314077543586,
+          "RR@10": 0.8257962529274006,
+          "nDCG@10": 0.7858050606081132,
+          "retrieval_p50_ms": 1.0
+        },
+        "qrels_id": "binary",
+        "run_metrics": {
+          "embed_bytes": 627988827.0,
+          "enrich_docs_s": 19.1,
+          "ner_bytes": 269622486.0,
+          "primary_docs_s": 32.9,
+          "reranker_bytes": 629118152.0,
+          "resident_bytes": 2024327753.0,
+          "splade_bytes": 497598288.0
+        }
+      },
+      {
+        "ann_proof_status": "PASS",
+        "ce_coverage": {
+          "applied": 0,
+          "coverage": null,
+          "eligible": 0,
+          "legitimate_skip_reason_counts": {},
+          "legitimate_skips": 0,
+          "not_in_play": 305,
+          "reasons": [
+            "no CE-eligible query in 305 — every one reports a cross-encoder-off state (['DISABLED', 'MODEL_NOT_CONFIGURED', 'MODEL_NOT_LOADED', 'PIPELINE_NOT_ELIGIBLE']), so there is no coverage to gate"
+          ],
+          "silent_drop_reason_counts": {},
+          "silent_drops": 0,
+          "verdict": "not-applicable"
+        },
+        "comparable": true,
+        "confidence_tier": "A",
+        "config_mode": "vector",
+        "corpus_source": {
+          "dataset": "mixed/miracl-de-2k",
+          "doc_count": 3103,
+          "query_count": 305,
+          "sha256": "ef53f32710f693d7c6564c6f5ebd9ae89f16dffc8f91e3f40f0e5103b7c2213b",
+          "signature": "ef53f32710f693d7c6564c6f5ebd9ae89f16dffc8f91e3f40f0e5103b7c2213b",
+          "upstream_revision": null
+        },
+        "metrics": {
+          "AP@10": 0.9669799263967878,
+          "P@1": 0.9672131147540983,
+          "R@10": 0.9944964871194378,
+          "RR@10": 0.9804371584699453,
+          "nDCG@10": 0.9785788810069456,
+          "retrieval_p50_ms": 2.0
+        },
+        "qrels_id": "binary",
+        "run_metrics": {
+          "embed_bytes": 627988827.0,
+          "enrich_docs_s": 19.1,
+          "ner_bytes": 269622486.0,
+          "primary_docs_s": 32.9,
+          "reranker_bytes": 629118152.0,
+          "resident_bytes": 2024327753.0,
+          "splade_bytes": 497598288.0
+        }
+      },
+      {
+        "ann_proof_status": "PASS",
+        "ce_coverage": {
+          "applied": 0,
+          "coverage": null,
+          "eligible": 0,
+          "legitimate_skip_reason_counts": {},
+          "legitimate_skips": 0,
+          "not_in_play": 305,
+          "reasons": [
+            "no CE-eligible query in 305 — every one reports a cross-encoder-off state (['DISABLED', 'MODEL_NOT_CONFIGURED', 'MODEL_NOT_LOADED', 'PIPELINE_NOT_ELIGIBLE']), so there is no coverage to gate"
+          ],
+          "silent_drop_reason_counts": {},
+          "silent_drops": 0,
+          "verdict": "not-applicable"
+        },
+        "comparable": true,
+        "confidence_tier": "A",
+        "config_mode": "splade",
+        "corpus_source": {
+          "dataset": "mixed/miracl-de-2k",
+          "doc_count": 3103,
+          "query_count": 305,
+          "sha256": "ef53f32710f693d7c6564c6f5ebd9ae89f16dffc8f91e3f40f0e5103b7c2213b",
+          "signature": "ef53f32710f693d7c6564c6f5ebd9ae89f16dffc8f91e3f40f0e5103b7c2213b",
+          "upstream_revision": null
+        },
+        "metrics": {
+          "AP@10": 0.8819858369577338,
+          "P@1": 0.8655737704918033,
+          "R@10": 0.9714246682279469,
+          "RR@10": 0.9141894353369764,
+          "nDCG@10": 0.9166969096675397,
+          "retrieval_p50_ms": 2.0
+        },
+        "qrels_id": "binary",
+        "run_metrics": {
+          "embed_bytes": 627988827.0,
+          "enrich_docs_s": 19.1,
+          "ner_bytes": 269622486.0,
+          "primary_docs_s": 32.9,
+          "reranker_bytes": 629118152.0,
+          "resident_bytes": 2024327753.0,
+          "splade_bytes": 497598288.0
+        }
+      }
+    ],
+    "mixed/miracl-fr-2k": [
+      {
+        "ann_proof_status": "NOT_APPLICABLE",
+        "ce_coverage": {
+          "applied": 0,
+          "coverage": null,
+          "eligible": 0,
+          "legitimate_skip_reason_counts": {},
+          "legitimate_skips": 0,
+          "not_in_play": 343,
+          "reasons": [
+            "no CE-eligible query in 343 — every one reports a cross-encoder-off state (['DISABLED', 'MODEL_NOT_CONFIGURED', 'MODEL_NOT_LOADED', 'PIPELINE_NOT_ELIGIBLE']), so there is no coverage to gate"
+          ],
+          "silent_drop_reason_counts": {},
+          "silent_drops": 0,
+          "verdict": "not-applicable"
+        },
+        "comparable": true,
+        "confidence_tier": "A",
+        "config_mode": "lexical",
+        "corpus_source": {
+          "dataset": "mixed/miracl-fr-2k",
+          "doc_count": 5407,
+          "query_count": 343,
+          "sha256": "756b9d9e42bf6bd2dd01bb472564bf8c17884cc05c3f1425c66bb3ed809d3da6",
+          "signature": "756b9d9e42bf6bd2dd01bb472564bf8c17884cc05c3f1425c66bb3ed809d3da6",
+          "upstream_revision": null
+        },
+        "metrics": {
+          "AP@10": 0.7339518063461211,
+          "P@1": 0.7638483965014577,
+          "R@10": 0.8459877828682494,
+          "RR@10": 0.8198632514230181,
+          "nDCG@10": 0.7852542929242885,
+          "retrieval_p50_ms": 2.0
+        },
+        "qrels_id": "binary",
+        "run_metrics": {
+          "embed_bytes": 627988827.0,
+          "enrich_docs_s": 20.0,
+          "ner_bytes": 269622486.0,
+          "primary_docs_s": 40.8,
+          "reranker_bytes": 629118152.0,
+          "resident_bytes": 2024327753.0,
+          "splade_bytes": 497598288.0
+        }
+      },
+      {
+        "ann_proof_status": "PASS",
+        "ce_coverage": {
+          "applied": 0,
+          "coverage": null,
+          "eligible": 0,
+          "legitimate_skip_reason_counts": {},
+          "legitimate_skips": 0,
+          "not_in_play": 343,
+          "reasons": [
+            "no CE-eligible query in 343 — every one reports a cross-encoder-off state (['DISABLED', 'MODEL_NOT_CONFIGURED', 'MODEL_NOT_LOADED', 'PIPELINE_NOT_ELIGIBLE']), so there is no coverage to gate"
+          ],
+          "silent_drop_reason_counts": {},
+          "silent_drops": 0,
+          "verdict": "not-applicable"
+        },
+        "comparable": true,
+        "confidence_tier": "A",
+        "config_mode": "vector",
+        "corpus_source": {
+          "dataset": "mixed/miracl-fr-2k",
+          "doc_count": 5407,
+          "query_count": 343,
+          "sha256": "756b9d9e42bf6bd2dd01bb472564bf8c17884cc05c3f1425c66bb3ed809d3da6",
+          "signature": "756b9d9e42bf6bd2dd01bb472564bf8c17884cc05c3f1425c66bb3ed809d3da6",
+          "upstream_revision": null
+        },
+        "metrics": {
+          "AP@10": 0.9786599333610995,
+          "P@1": 0.9766763848396501,
+          "R@10": 0.999271137026239,
+          "RR@10": 0.9868110509509926,
+          "nDCG@10": 0.9864536883605081,
+          "retrieval_p50_ms": 3.0
+        },
+        "qrels_id": "binary",
+        "run_metrics": {
+          "embed_bytes": 627988827.0,
+          "enrich_docs_s": 20.0,
+          "ner_bytes": 269622486.0,
+          "primary_docs_s": 40.8,
+          "reranker_bytes": 629118152.0,
+          "resident_bytes": 2024327753.0,
+          "splade_bytes": 497598288.0
+        }
+      },
+      {
+        "ann_proof_status": "PASS",
+        "ce_coverage": {
+          "applied": 0,
+          "coverage": null,
+          "eligible": 0,
+          "legitimate_skip_reason_counts": {},
+          "legitimate_skips": 0,
+          "not_in_play": 343,
+          "reasons": [
+            "no CE-eligible query in 343 — every one reports a cross-encoder-off state (['DISABLED', 'MODEL_NOT_CONFIGURED', 'MODEL_NOT_LOADED', 'PIPELINE_NOT_ELIGIBLE']), so there is no coverage to gate"
+          ],
+          "silent_drop_reason_counts": {},
+          "silent_drops": 0,
+          "verdict": "not-applicable"
+        },
+        "comparable": true,
+        "confidence_tier": "A",
+        "config_mode": "splade",
+        "corpus_source": {
+          "dataset": "mixed/miracl-fr-2k",
+          "doc_count": 5407,
+          "query_count": 343,
+          "sha256": "756b9d9e42bf6bd2dd01bb472564bf8c17884cc05c3f1425c66bb3ed809d3da6",
+          "signature": "756b9d9e42bf6bd2dd01bb472564bf8c17884cc05c3f1425c66bb3ed809d3da6",
+          "upstream_revision": null
+        },
+        "metrics": {
+          "AP@10": 0.945348812994586,
+          "P@1": 0.9358600583090378,
+          "R@10": 0.9917395529640427,
+          "RR@10": 0.9617173399972233,
+          "nDCG@10": 0.9623153202541576,
+          "retrieval_p50_ms": 3.0
+        },
+        "qrels_id": "binary",
+        "run_metrics": {
+          "embed_bytes": 627988827.0,
+          "enrich_docs_s": 20.0,
+          "ner_bytes": 269622486.0,
+          "primary_docs_s": 40.8,
+          "reranker_bytes": 629118152.0,
+          "resident_bytes": 2024327753.0,
+          "splade_bytes": 497598288.0
+        }
       }
     ]
   },
   "cohort": {
-    "config_cohort_key": "6cc38211db51cc8d9339c67c7a1f55a9450de176feec4b85b13b6c0e317e97dd",
+    "config_cohort_key": "d5f5ef5ce6929a9ad88a8a1abc3d0ff6644ffe309da3374601e249fa792b228f",
     "eval_protocol_hash": "24ce3446d4fb0ff5b78c94c53a79f185ee40932dbd8bb379fd6e04cab64df2b6",
-    "git_sha": "32d6a0a0ec8142a37a5383de54cb599e870ae548",
+    "git_sha": "c2892448eadbf81d97fc507af1a8b666fd6c7896",
     "hardware": {
       "cuda_version": "12",
-      "gpu_driver_version": "610.88",
+      "gpu_driver_version": "580.178.04",
       "gpu_name": "NVIDIA GeForce RTX 4070",
       "gpu_vram_bytes": 12878610432,
       "ort_version": "1.24.3",
+      "os": "Linux 7.0.0-38-generic x86_64",
       "tier": "gpu_12gb_plus"
     },
     "hardware_homogeneous": true,
@@ -523,23 +719,23 @@
       "embed_backend": "onnx",
       "embed_compat_state": "COMPATIBLE",
       "embed_fingerprint": "f1d0f4ec988a6c17387d3b256e631deea506a891aed3a6ded4f9bf09386cc38e",
-      "ner_model_path": "F:\\justsearch-public\\models\\onnx\\ner",
+      "ner_model_path": "/home/elias/dev/justsearch/models/onnx/ner",
       "realized_engines": [
         "dense",
         "reranker",
         "splade"
       ],
-      "reranker_model_path": "F:\\justsearch-public\\models\\onnx\\reranker",
-      "splade_model_path": "F:\\justsearch-public\\models\\splade\\naver-splade-v3"
+      "reranker_model_path": "/home/elias/dev/justsearch/models/onnx/reranker",
+      "splade_model_path": "/home/elias/dev/justsearch/models/splade/naver-splade-v3"
     },
-    "policy_hash": "1433e44f9a92885556cd341c4e8056ff1f31835f33a6dfd19a1e8a8711161707",
+    "policy_hash": "007c1ac759fc74c7cb7e380dc595edce599aae610618f74003177859e0ed9e7a",
     "realized_engines": [
       "dense",
       "reranker",
       "splade"
     ]
   },
-  "composed_at": "2026-08-14T10:38:19.011180+00:00",
+  "composed_at": "2026-11-02T14:41:45.857697+00:00",
   "coverage": {
     "does_not_measure": "document extraction / OCR / VDU routing quality (see tempdoc 623 §F — extraction-quality sibling)",
     "measures": "retrieval ranking quality (per-corpus metrics above)"
@@ -548,120 +744,120 @@
   "external_baselines": {
     "beir/scifact": [
       {
-        "caveat": "multifield indexing; matches our lexical 0.661 (tempdoc 623 U5). BM25-flat is 0.679. COMPARISON CLASS: single-model retriever — our 0.757 is a full hybrid (BM25+dense+SPLADE)+rerank pipeline, so this is a system-vs-component comparison; hybrid+rerank is expected to exceed single models.",
         "model": "BM25 (multifield)",
-        "self_reproduced": false,
-        "source_url": "https://arxiv.org/html/2306.07471v1",
-        "split": "test",
         "value": 0.665,
-        "version": "Brewing BEIR (SIGIR 2024) Table 3 / SPLADE++ paper Table 4"
+        "source_url": "https://arxiv.org/html/2306.07471v1",
+        "version": "Brewing BEIR (SIGIR 2024) Table 3 / SPLADE++ paper Table 4",
+        "split": "test",
+        "self_reproduced": false,
+        "caveat": "multifield indexing; BM25-flat is 0.679. COMPARISON CLASS: single-model retriever — our measured system is a keyword + vector + cross-encoder pipeline, so this is a system-vs-component comparison; hybrid+rerank is expected to exceed single models."
       },
       {
-        "caveat": "SelfDistil variant = 0.702. COMPARISON CLASS: single-model learned-sparse retriever — our 0.757 is a full hybrid+rerank pipeline (system vs component).",
         "model": "SPLADE++ EnsembleDistil",
-        "self_reproduced": false,
-        "source_url": "https://www.piwowarski.fr/publication/formal_distillation_2022-7YPDA2UJ.pdf",
-        "split": "test",
         "value": 0.71,
-        "version": "SPLADE++ (Formal et al., SIGIR 2022) Table 4"
+        "source_url": "https://www.piwowarski.fr/publication/formal_distillation_2022-7YPDA2UJ.pdf",
+        "version": "SPLADE++ (Formal et al., SIGIR 2022) Table 4",
+        "split": "test",
+        "self_reproduced": false,
+        "caveat": "SelfDistil variant = 0.702. COMPARISON CLASS: single-model learned-sparse retriever — our measured system is a keyword + vector + cross-encoder pipeline (system vs component)."
       },
       {
-        "caveat": "confirmed independently in SPLADE++ and Brewing BEIR tables. COMPARISON CLASS: single-model late-interaction retriever — our 0.757 is a full hybrid+rerank pipeline (system vs component).",
         "model": "ColBERTv2",
-        "self_reproduced": false,
-        "source_url": "https://people.eecs.berkeley.edu/~matei/papers/2022/naacl_colbert_v2.pdf",
-        "split": "test",
         "value": 0.693,
-        "version": "ColBERTv2 (Santhanam et al., NAACL 2022) Table 5"
-      }
-    ],
-    "mixed/legal-clerc-200": [
-      {
-        "caveat": "SCALE MISMATCH, not a comparison class issue: CLERC's own retrieval collection is 1.84M documents / 23.7M passages; our mixed/legal-clerc-200 corpus is a 198-document candidate pool (200 queries, following tempdoc 666's construction: one positive + curated negatives per query, mirroring CLERC's own query+positive+20-negatives record shape). nDCG@10 on a ~200-document pool is structurally far easier than on a 1.84M-document collection, so our 0.516 is NOT 'beating published BM25 (0.054)' — it reflects a much smaller candidate set. Cited to establish CLERC as a real, citable academic legal-retrieval benchmark grounding this corpus, not as a head-to-head score comparison.",
-        "model": "BM25",
-        "self_reproduced": false,
-        "source_url": "https://arxiv.org/abs/2406.17186",
+        "source_url": "https://people.eecs.berkeley.edu/~matei/papers/2022/naacl_colbert_v2.pdf",
+        "version": "ColBERTv2 (Santhanam et al., NAACL 2022) Table 5",
         "split": "test",
-        "value": 0.054,
-        "version": "CLERC (Hou et al., NAACL 2025) Table 3"
-      },
-      {
-        "caveat": "Same scale-mismatch caveat as the BM25 row above — full 1.84M-doc/23.7M-passage collection vs. our 198-document pool. Listed as the strongest zero-shot dense baseline CLERC reports (ahead of E5 v2 0.0367, BGE En v1.5 0.0343, DPR 0.0224).",
-        "model": "Contriever-MSMarco (zero-shot dense)",
         "self_reproduced": false,
-        "source_url": "https://arxiv.org/abs/2406.17186",
-        "split": "test",
-        "value": 0.0422,
-        "version": "CLERC (Hou et al., NAACL 2025) Table 3"
-      }
-    ],
-    "mixed/miracl-de-2k": [
-      {
-        "caveat": "NON-CANONICAL: German is a MIRACL surprise language with NO baseline row in the MIRACL paper; this is BGE-M3's own reproduction. DEV split. Flag as resting on a single non-canonical source.",
-        "model": "BGE-M3 Dense",
-        "self_reproduced": false,
-        "source_url": "https://arxiv.org/html/2402.03216v4",
-        "split": "dev",
-        "value": 0.567,
-        "version": "BGE-M3 (Chen et al., 2024) Table 1"
+        "caveat": "confirmed independently in SPLADE++ and Brewing BEIR tables. COMPARISON CLASS: single-model late-interaction retriever — our measured system is a keyword + vector + cross-encoder pipeline (system vs component)."
       }
     ],
     "mixed/miracl-fr-2k": [
       {
-        "caveat": "DEV split (≠ our test axis); do not mix with BGE-M3's BM25 (fr=0.458, different impl)",
         "model": "BM25",
-        "self_reproduced": false,
-        "source_url": "https://arxiv.org/pdf/2210.09984",
-        "split": "dev",
         "value": 0.183,
-        "version": "MIRACL (Zhang et al., SIGIR 2023) Table 2"
+        "source_url": "https://arxiv.org/pdf/2210.09984",
+        "version": "MIRACL (Zhang et al., SIGIR 2023) Table 2",
+        "split": "dev",
+        "self_reproduced": false,
+        "caveat": "DEV split; our sampled document pool is much smaller; do not mix with BGE-M3's BM25 (fr=0.458, different impl)"
       },
       {
-        "caveat": "DEV split",
         "model": "mDPR (zero-shot)",
-        "self_reproduced": false,
-        "source_url": "https://arxiv.org/pdf/2210.09984",
-        "split": "dev",
         "value": 0.435,
-        "version": "MIRACL Table 2"
+        "source_url": "https://arxiv.org/pdf/2210.09984",
+        "version": "MIRACL Table 2",
+        "split": "dev",
+        "self_reproduced": false,
+        "caveat": "DEV split"
       },
       {
-        "caveat": "DEV split",
         "model": "Hybrid (BM25+mDPR)",
-        "self_reproduced": false,
-        "source_url": "https://arxiv.org/pdf/2210.09984",
-        "split": "dev",
         "value": 0.523,
-        "version": "MIRACL Table 2"
+        "source_url": "https://arxiv.org/pdf/2210.09984",
+        "version": "MIRACL Table 2",
+        "split": "dev",
+        "self_reproduced": false,
+        "caveat": "DEV split"
       }
     ],
     "mixed/miracl-zh-2k": [
       {
-        "caveat": "DEV split (≠ our test axis)",
         "model": "BM25",
-        "self_reproduced": false,
-        "source_url": "https://arxiv.org/pdf/2210.09984",
-        "split": "dev",
         "value": 0.18,
-        "version": "MIRACL Table 2"
+        "source_url": "https://arxiv.org/pdf/2210.09984",
+        "version": "MIRACL Table 2",
+        "split": "dev",
+        "self_reproduced": false,
+        "caveat": "DEV split; our sampled document pool is much smaller"
       },
       {
-        "caveat": "DEV split",
         "model": "mDPR (zero-shot)",
-        "self_reproduced": false,
-        "source_url": "https://arxiv.org/pdf/2210.09984",
-        "split": "dev",
         "value": 0.512,
-        "version": "MIRACL Table 2"
+        "source_url": "https://arxiv.org/pdf/2210.09984",
+        "version": "MIRACL Table 2",
+        "split": "dev",
+        "self_reproduced": false,
+        "caveat": "DEV split"
       },
       {
-        "caveat": "DEV split",
         "model": "Hybrid (BM25+mDPR)",
-        "self_reproduced": false,
-        "source_url": "https://arxiv.org/pdf/2210.09984",
-        "split": "dev",
         "value": 0.526,
-        "version": "MIRACL Table 2"
+        "source_url": "https://arxiv.org/pdf/2210.09984",
+        "version": "MIRACL Table 2",
+        "split": "dev",
+        "self_reproduced": false,
+        "caveat": "DEV split"
+      }
+    ],
+    "mixed/miracl-de-2k": [
+      {
+        "model": "BGE-M3 Dense",
+        "value": 0.567,
+        "source_url": "https://arxiv.org/html/2402.03216v4",
+        "version": "BGE-M3 (Chen et al., 2024) Table 1",
+        "split": "dev",
+        "self_reproduced": false,
+        "caveat": "NON-CANONICAL: German is a MIRACL surprise language with NO baseline row in the MIRACL paper; this is BGE-M3's own reproduction. DEV split. Flag as resting on a single non-canonical source."
+      }
+    ],
+    "mixed/legal-clerc-200": [
+      {
+        "model": "BM25",
+        "value": 0.054,
+        "source_url": "https://arxiv.org/abs/2406.17186",
+        "version": "CLERC (Hou et al., NAACL 2025) Table 3",
+        "split": "test",
+        "self_reproduced": false,
+        "caveat": "SCALE MISMATCH, not a comparison class issue: CLERC's own retrieval collection is 1.84M documents / 23.7M passages; our mixed/legal-clerc-200 corpus is a 198-document candidate pool (200 roughly 260-word citation queries; every retained document is judged relevant to at least one query). nDCG@10 on a ~200-document pool is structurally far easier than on a 1.84M-document collection, so a score on our pool is NOT 'beating published BM25 (0.054)' — it reflects a much smaller candidate set. Cited to establish CLERC as a real, citable academic legal-retrieval benchmark grounding this corpus, not as a head-to-head score comparison."
+      },
+      {
+        "model": "Contriever-MSMarco (zero-shot dense)",
+        "value": 0.0422,
+        "source_url": "https://arxiv.org/abs/2406.17186",
+        "version": "CLERC (Hou et al., NAACL 2025) Table 3",
+        "split": "test",
+        "self_reproduced": false,
+        "caveat": "Same scale-mismatch caveat as the BM25 row above — full 1.84M-doc/23.7M-passage collection vs. our 198-document pool. Listed as the strongest zero-shot dense baseline CLERC reports (ahead of E5 v2 0.0367, BGE En v1.5 0.0343, DPR 0.0224)."
       }
     ]
   },
@@ -671,15 +867,11 @@
       "src": "staged_recall_accounting projection"
     },
     "mixed/enron-qa": {
-      "leak_rate": 0.05,
-      "src": "staged_recall_accounting projection"
-    },
-    "mixed/legal-clerc-200": {
-      "leak_rate": 0.135,
+      "leak_rate": 0.03666666666666667,
       "src": "staged_recall_accounting projection"
     },
     "mixed/miracl-de-2k": {
-      "leak_rate": 0.003278688524590164,
+      "leak_rate": 0.0,
       "src": "staged_recall_accounting projection"
     },
     "mixed/miracl-fr-2k": {
@@ -690,6 +882,23 @@
   "measured": {
     "beir/scifact": {
       "ann_proof_status": "PASS",
+      "ce_coverage": {
+        "applied": 299,
+        "coverage": 0.9966666666666667,
+        "eligible": 300,
+        "legitimate_skip_reason_counts": {},
+        "legitimate_skips": 0,
+        "not_in_play": 0,
+        "reasons": [
+          "cross-encoder applied to 299/300 CE-eligible queries (coverage=0.9967); 0 deterministic skip(s) {}; 1 silent drop(s) {'DEADLINE_EXCEEDED': 1}",
+          "silent-drop rate 0.0033 <= tolerance 0.02"
+        ],
+        "silent_drop_reason_counts": {
+          "DEADLINE_EXCEEDED": 1
+        },
+        "silent_drops": 1,
+        "verdict": "ok"
+      },
       "comparable": true,
       "confidence_tier": "A",
       "config_mode": "hybrid",
@@ -702,28 +911,46 @@
         "upstream_revision": null
       },
       "metrics": {
-        "AP@10": 0.7090626984126985,
-        "P@1": 0.6266666666666667,
-        "R@10": 0.8942222222222221,
-        "RR@10": 0.7177037037037037,
-        "ce_p50_ms": 142.0,
-        "nDCG@10": 0.7571906055995299,
-        "retrieval_p50_ms": 5.0
+        "AP@10": 0.7118656084656085,
+        "P@1": 0.63,
+        "R@10": 0.8908888888888888,
+        "RR@10": 0.7205806878306878,
+        "ce_p50_ms": 159.0,
+        "nDCG@10": 0.7585688824202715,
+        "retrieval_p50_ms": 6.0
       },
       "qrels_id": "binary",
       "run_metrics": {
         "embed_bytes": 627988827.0,
-        "enrich_docs_s": 1.3,
+        "enrich_docs_s": 11.5,
         "ner_bytes": 269622486.0,
-        "primary_docs_s": 76.1,
+        "primary_docs_s": 36.7,
         "reranker_bytes": 629118152.0,
         "resident_bytes": 2024327753.0,
         "splade_bytes": 497598288.0
-      },
-      "tolerance_band": null
+      }
     },
     "mixed/enron-qa": {
       "ann_proof_status": "PASS",
+      "ce_coverage": {
+        "applied": 277,
+        "coverage": 0.9233333333333333,
+        "eligible": 300,
+        "legitimate_skip_reason_counts": {
+          "NAVIGATIONAL_QUERY": 17
+        },
+        "legitimate_skips": 17,
+        "not_in_play": 0,
+        "reasons": [
+          "cross-encoder applied to 277/300 CE-eligible queries (coverage=0.9233); 17 deterministic skip(s) {'NAVIGATIONAL_QUERY': 17}; 6 silent drop(s) {'DEADLINE_EXCEEDED': 6}",
+          "silent-drop rate 0.0200 <= tolerance 0.02"
+        ],
+        "silent_drop_reason_counts": {
+          "DEADLINE_EXCEEDED": 6
+        },
+        "silent_drops": 6,
+        "verdict": "ok"
+      },
       "comparable": true,
       "confidence_tier": "A",
       "config_mode": "hybrid",
@@ -736,62 +963,42 @@
         "upstream_revision": null
       },
       "metrics": {
-        "AP@10": 0.757123015873016,
-        "P@1": 0.6666666666666666,
-        "R@10": 0.9133333333333333,
-        "RR@10": 0.757123015873016,
-        "ce_p50_ms": 147.0,
-        "nDCG@10": 0.7957031017062095,
-        "retrieval_p50_ms": 11.0
+        "AP@10": 0.7672103174603175,
+        "P@1": 0.68,
+        "R@10": 0.9266666666666666,
+        "RR@10": 0.7672103174603175,
+        "ce_p50_ms": 237.0,
+        "nDCG@10": 0.8061446765674611,
+        "retrieval_p50_ms": 26.0
       },
       "qrels_id": "binary",
       "run_metrics": {
         "embed_bytes": 627988827.0,
-        "enrich_docs_s": 3.6,
+        "enrich_docs_s": 2.7,
         "ner_bytes": 269622486.0,
-        "primary_docs_s": 63.8,
+        "primary_docs_s": 25.8,
         "reranker_bytes": 629118152.0,
         "resident_bytes": 2024327753.0,
         "splade_bytes": 497598288.0
-      },
-      "tolerance_band": null
-    },
-    "mixed/legal-clerc-200": {
-      "ann_proof_status": "PASS",
-      "comparable": true,
-      "confidence_tier": "A",
-      "config_mode": "hybrid",
-      "corpus_source": {
-        "dataset": "mixed/legal-clerc-200",
-        "doc_count": 198,
-        "query_count": 200,
-        "sha256": "90d4300d1435c6af00950b6095100fc6b29260385b294dc76896d54308bcfaf1",
-        "signature": "90d4300d1435c6af00950b6095100fc6b29260385b294dc76896d54308bcfaf1",
-        "upstream_revision": null
-      },
-      "metrics": {
-        "AP@10": 0.5044246031746032,
-        "P@1": 0.355,
-        "R@10": 0.81,
-        "RR@10": 0.5044246031746032,
-        "ce_p50_ms": 165.0,
-        "nDCG@10": 0.5779869315064022,
-        "retrieval_p50_ms": 20.0
-      },
-      "qrels_id": "binary",
-      "run_metrics": {
-        "embed_bytes": 627988827.0,
-        "enrich_docs_s": 0.8,
-        "ner_bytes": 269622486.0,
-        "primary_docs_s": 18.6,
-        "reranker_bytes": 629118152.0,
-        "resident_bytes": 2024327753.0,
-        "splade_bytes": 497598288.0
-      },
-      "tolerance_band": null
+      }
     },
     "mixed/miracl-de-2k": {
       "ann_proof_status": "PASS",
+      "ce_coverage": {
+        "applied": 305,
+        "coverage": 1.0,
+        "eligible": 305,
+        "legitimate_skip_reason_counts": {},
+        "legitimate_skips": 0,
+        "not_in_play": 0,
+        "reasons": [
+          "cross-encoder applied to 305/305 CE-eligible queries (coverage=1.0000); 0 deterministic skip(s) {}; 0 silent drop(s) {}",
+          "silent-drop rate 0.0000 <= tolerance 0.02"
+        ],
+        "silent_drop_reason_counts": {},
+        "silent_drops": 0,
+        "verdict": "ok"
+      },
       "comparable": true,
       "confidence_tier": "A",
       "config_mode": "hybrid",
@@ -799,33 +1006,47 @@
         "dataset": "mixed/miracl-de-2k",
         "doc_count": 3103,
         "query_count": 305,
-        "sha256": "d6f4026b4b25ac0d117353b830022d77ef3b863b15187907d512d645fae607a1",
-        "signature": "d6f4026b4b25ac0d117353b830022d77ef3b863b15187907d512d645fae607a1",
+        "sha256": "ef53f32710f693d7c6564c6f5ebd9ae89f16dffc8f91e3f40f0e5103b7c2213b",
+        "signature": "ef53f32710f693d7c6564c6f5ebd9ae89f16dffc8f91e3f40f0e5103b7c2213b",
         "upstream_revision": null
       },
       "metrics": {
-        "AP@10": 0.8097267759562843,
-        "P@1": 0.6655737704918033,
-        "R@10": 0.9967213114754099,
-        "RR@10": 0.8097267759562843,
-        "ce_p50_ms": 133.0,
-        "nDCG@10": 0.8574654973441166,
-        "retrieval_p50_ms": 3.0
+        "AP@10": 0.9780404115501693,
+        "P@1": 0.980327868852459,
+        "R@10": 0.993208430913349,
+        "RR@10": 0.989071038251366,
+        "ce_p50_ms": 160.0,
+        "nDCG@10": 0.9856678436569526,
+        "retrieval_p50_ms": 5.0
       },
       "qrels_id": "binary",
       "run_metrics": {
         "embed_bytes": 627988827.0,
-        "enrich_docs_s": 34.1,
+        "enrich_docs_s": 19.1,
         "ner_bytes": 269622486.0,
-        "primary_docs_s": 125.6,
+        "primary_docs_s": 32.9,
         "reranker_bytes": 629118152.0,
         "resident_bytes": 2024327753.0,
         "splade_bytes": 497598288.0
-      },
-      "tolerance_band": null
+      }
     },
     "mixed/miracl-fr-2k": {
       "ann_proof_status": "PASS",
+      "ce_coverage": {
+        "applied": 343,
+        "coverage": 1.0,
+        "eligible": 343,
+        "legitimate_skip_reason_counts": {},
+        "legitimate_skips": 0,
+        "not_in_play": 0,
+        "reasons": [
+          "cross-encoder applied to 343/343 CE-eligible queries (coverage=1.0000); 0 deterministic skip(s) {}; 0 silent drop(s) {}",
+          "silent-drop rate 0.0000 <= tolerance 0.02"
+        ],
+        "silent_drop_reason_counts": {},
+        "silent_drops": 0,
+        "verdict": "ok"
+      },
       "comparable": true,
       "confidence_tier": "A",
       "config_mode": "hybrid",
@@ -833,73 +1054,78 @@
         "dataset": "mixed/miracl-fr-2k",
         "doc_count": 5407,
         "query_count": 343,
-        "sha256": "a145edfa38d5a783cea52710f256fcee1c0cb33dc100f094d10175eb49ed3297",
-        "signature": "a145edfa38d5a783cea52710f256fcee1c0cb33dc100f094d10175eb49ed3297",
+        "sha256": "756b9d9e42bf6bd2dd01bb472564bf8c17884cc05c3f1425c66bb3ed809d3da6",
+        "signature": "756b9d9e42bf6bd2dd01bb472564bf8c17884cc05c3f1425c66bb3ed809d3da6",
         "upstream_revision": null
       },
       "metrics": {
-        "AP@10": 0.8446341802026934,
-        "P@1": 0.7201166180758017,
-        "R@10": 1.0,
-        "RR@10": 0.8446341802026934,
-        "ce_p50_ms": 143.0,
-        "nDCG@10": 0.884405350195936,
-        "retrieval_p50_ms": 7.0
+        "AP@10": 0.9835869313711879,
+        "P@1": 0.9854227405247813,
+        "R@10": 0.9978134110787172,
+        "RR@10": 0.9911078717201166,
+        "ce_p50_ms": 173.0,
+        "nDCG@10": 0.9895091148724209,
+        "retrieval_p50_ms": 6.0
       },
       "qrels_id": "binary",
       "run_metrics": {
         "embed_bytes": 627988827.0,
-        "enrich_docs_s": 46.6,
+        "enrich_docs_s": 20.0,
         "ner_bytes": 269622486.0,
-        "primary_docs_s": 151.7,
+        "primary_docs_s": 40.8,
         "reranker_bytes": 629118152.0,
         "resident_bytes": 2024327753.0,
         "splade_bytes": 497598288.0
-      },
-      "tolerance_band": null
+      }
     }
   },
   "notes": {
     "missing_default_mode": [],
-    "tolerance_semantics": "reproduction tolerance is the within-machine ±2sigma envelope, scoped to equivalent hardware/setup (tempdoc 623 F-alpha)"
+    "tolerance_semantics": "reproduction tolerance is the within-machine ±2sigma envelope, scoped to equivalent hardware/setup (tempdoc 623 F-alpha)",
+    "supersedes": {
+      "release_id": "832-rebaseline-2026-08-14",
+      "path": "releases/832-rebaseline-2026-08-14.v1.json",
+      "reason": "Truncated MIRACL judgments; mislabelled hybrid pipeline. Windows history cannot supply current claims or floors."
+    },
+    "measurement_provenance": "Measured on this worktree at c2892448eadbf81d97fc507af1a8b666fd6c7896 with the uncommitted complete-judgment import fix; summary hashes pin the five source runs. Includes #1092 windowed SPLADE encoding. Host CUDA 12.9 and cuDNN 9; ORT 1.24.3; clean data folder per collection, sequential low-priority execution."
   },
-  "release_id": "832-rebaseline-2026-08-14",
+  "release_id": "linux-complete-qrels-2026-11-02",
   "schema": "release.v1",
   "schema_version": 1,
   "sources": [
     {
       "dataset": "beir/scifact",
-      "run_dir": "scripts/jseval/tmp/eval-results/20260814T103728_scifact",
-      "summary_sha256": "4dea62018e09c7d0976379a856138b093c4b9ef5d5d14df3a3148f48a7f494c4"
+      "run_dir": "scripts/jseval/tmp/eval-results/20261102T142955_scifact",
+      "summary_sha256": "c3567ca6d73ac82e1c1c8d7640c19869ad4b6dac34866d2a8e2adc84c84f3496"
     },
     {
       "dataset": "mixed/enron-qa",
-      "run_dir": "scripts/jseval/tmp/eval-results/20260814T091340_mixed_enron-qa",
-      "summary_sha256": "7042ead506e9996c248e1f54f6c6573e8253152eb9522ff01f64b5d34d093ce2"
-    },
-    {
-      "dataset": "mixed/legal-clerc-200",
-      "run_dir": "scripts/jseval/tmp/eval-results/20260814T091920_mixed_legal-clerc-200",
-      "summary_sha256": "f9868bcddae2eb6cafe3d80f9e407546b2e4f75285454e6eb296f4a815f0e6ca"
+      "run_dir": "scripts/jseval/tmp/eval-results/20261102T142028_mixed_enron-qa",
+      "summary_sha256": "319634f5331a1b903ebec65b02c5ff735298f74c8a8448c005c0de6ab8178804"
     },
     {
       "dataset": "mixed/miracl-de-2k",
-      "run_dir": "scripts/jseval/tmp/eval-results/20260814T092206_mixed_miracl-de-2k",
-      "summary_sha256": "05492eaf83872f33f8639e9a27d9caffb90247da8aff1b3b1c1a06056dd2dc20"
+      "run_dir": "scripts/jseval/tmp/eval-results/20261102T133659_mixed_miracl-de-2k",
+      "summary_sha256": "a3017ad7336bc274d228c2beea5296c090a9a82dbbe51eeeaa858c38cd2b37a8"
     },
     {
       "dataset": "mixed/miracl-fr-2k",
-      "run_dir": "scripts/jseval/tmp/eval-results/20260814T092546_mixed_miracl-fr-2k",
-      "summary_sha256": "0d3b7f814e7f5ccdb2109c6a1c09be0c57920e1e0ed7691d339602dc1de76fe0"
+      "run_dir": "scripts/jseval/tmp/eval-results/20261102T134320_mixed_miracl-fr-2k",
+      "summary_sha256": "7fcf4c85b09cef52ce4b10d63cc71bc9317404cb5130bf73160aa1acbf8ec3ac"
+    },
+    {
+      "dataset": "mixed/legal-clerc-200",
+      "run_dir": "scripts/jseval/tmp/eval-results/20261102T143837_mixed_legal-clerc-200",
+      "summary_sha256": "ae9d242bc6e0ff10dddb059d5c483af2a9eff1705311069282ad4c942302bb63"
     }
   ],
   "union_recall": {
     "beir/scifact": {
-      "leg_union_recall": 0.9333333333333333,
+      "leg_union_recall": 0.93,
       "src": "staged_recall_accounting projection"
     },
     "mixed/enron-qa": {
-      "leg_union_recall": 0.9633333333333334,
+      "leg_union_recall": 0.96,
       "src": "staged_recall_accounting projection"
     },
     "mixed/legal-clerc-200": {
@@ -913,6 +1139,39 @@
     "mixed/miracl-fr-2k": {
       "leg_union_recall": 1.0,
       "src": "staged_recall_accounting projection"
+    }
+  },
+  "withheld": {
+    "mixed/legal-clerc-200": {
+      "ce_coverage": {
+        "applied": 174,
+        "coverage": 0.87,
+        "eligible": 200,
+        "legitimate_skip_reason_counts": {
+          "NAVIGATIONAL_QUERY": 1
+        },
+        "legitimate_skips": 1,
+        "not_in_play": 0,
+        "reasons": [
+          "cross-encoder applied to 174/200 CE-eligible queries (coverage=0.8700); 1 deterministic skip(s) {'NAVIGATIONAL_QUERY': 1}; 25 silent drop(s) {'DEADLINE_EXCEEDED': 25}",
+          "silent-drop rate 0.1250 > tolerance 0.02 — these queries were delivered in pure fusion order with no deterministic reason, so this run's ranking is a blend of two pipelines and its metrics are not comparable"
+        ],
+        "silent_drop_reason_counts": {
+          "DEADLINE_EXCEEDED": 25
+        },
+        "silent_drops": 25,
+        "verdict": "degraded-ce"
+      },
+      "config_mode": "hybrid",
+      "corpus_source": {
+        "dataset": "mixed/legal-clerc-200",
+        "doc_count": 198,
+        "query_count": 200,
+        "sha256": "90d4300d1435c6af00950b6095100fc6b29260385b294dc76896d54308bcfaf1",
+        "signature": "90d4300d1435c6af00950b6095100fc6b29260385b294dc76896d54308bcfaf1",
+        "upstream_revision": null
+      },
+      "reason": "Under the default 200 ms reranker budget, the cross-encoder missed its deadline on 25/200 queries (12.5%) of roughly 260 words on this machine; 174/200 were reranked, with one deterministic navigational skip. Harness verdict: degraded-ce, not comparable. An earlier run under heavier load had 60% deadline misses. Hybrid quality and its regression floor are withheld; lexical/vector/splade ablations remain available for this 198-document pool, all documents judged relevant to at least one query."
     }
   }
 }

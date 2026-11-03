@@ -173,6 +173,10 @@ public final class FieldMapper {
             droppedStatusTargets.containsValue(def.id)
                 ? SchemaFields.EMBEDDING_STATUS_FAILED
                 : e.getValue();
+        if (report != null && droppedStatusTargets.containsValue(def.id)
+            && !SchemaFields.EMBEDDING_STATUS_FAILED.equals(e.getValue())) {
+          report.correctedFailedStatuses.add(def.id);
+        }
         added += addFields(doc, def, value);
       }
     }
@@ -254,7 +258,8 @@ public final class FieldMapper {
 
   /**
    * Per-write accumulator for dropped dense-vector fields: a count for the metric, a bounded sample
-   * of document ids for one WARN, and the last rejection reason. Not thread-safe by design — each
+   * of document ids for one WARN, the last rejection reason, and corrected stage status fields.
+   * Not thread-safe by design — each
    * write lane creates its own and reads it on the same thread.
    */
   static final class DroppedVectorReport {
@@ -263,6 +268,7 @@ public final class FieldMapper {
     private int count;
     private final List<String> sampleDocIds = new ArrayList<>(MAX_SAMPLE);
     private String lastReason;
+    private final java.util.Set<String> correctedFailedStatuses = new java.util.HashSet<>();
 
     void record(String docId, String fieldId, String reason) {
       count++;
@@ -270,6 +276,10 @@ public final class FieldMapper {
       if (sampleDocIds.size() < MAX_SAMPLE) {
         sampleDocIds.add((docId == null ? "<no id>" : docId) + "/" + fieldId);
       }
+    }
+
+    java.util.Set<String> correctedFailedStatuses() {
+      return java.util.Set.copyOf(correctedFailedStatuses);
     }
 
     int count() {

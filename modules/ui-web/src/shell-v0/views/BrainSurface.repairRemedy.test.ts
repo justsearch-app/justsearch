@@ -31,6 +31,7 @@ interface BrainHost extends HTMLElement {
   settings: { mode?: 'simple' | 'advanced' };
   installStatus: InstallStatus | null;
   expanded: Record<string, boolean>;
+  _unifiedAiState: unknown;
   requestUpdate(): void;
   updateComplete: Promise<boolean>;
 }
@@ -38,7 +39,7 @@ interface BrainHost extends HTMLElement {
 /** Mounts Detailed with the AI-install accordion open and returns the install-section buttons. */
 async function installButtons(
   installStatus: InstallStatus,
-): Promise<{ variants: Record<string, string | null>; text: string }> {
+): Promise<{ variants: Record<string, string | null>; text: string; repairAvailability: unknown }> {
   const el = document.createElement('jf-brain-surface') as BrainHost;
   el.apiBase = '';
   setUiMode('advanced');
@@ -46,19 +47,26 @@ async function installButtons(
   document.body.appendChild(el);
   await el.updateComplete;
   el.installStatus = installStatus;
-  el.expanded = { install: true };
+  el._unifiedAiState = { installObservationLive: true, runtimeObservationLive: true, snapshotLive: true, aiEngine: { kind: 'offline', stability: { kind: 'settled' }, installFailure: null } };
+  el.expanded = { advanced: true };
   el.requestUpdate();
   await el.updateComplete;
   const variants: Record<string, string | null> = {};
+  let repairAvailability: unknown;
   for (const b of el.shadowRoot?.querySelectorAll('jf-button') ?? []) {
     const label = b.getAttribute('label');
-    if (label === 'Install' || label === 'Repair' || label === 'Cancel') {
-      variants[label] = b.getAttribute('variant');
+    // The install action carries its size in its label ("Install AI · 1.2 GB", "Install additions · …").
+    if (label?.startsWith('Install AI') || label?.startsWith('Install additions')) {
+      variants.Install = b.getAttribute('variant');
+    }
+    if (label === 'Repair' || (label === 'Repair installation' && variants.Repair == null)) {
+      repairAvailability = (b as unknown as { availability: unknown }).availability;
+      variants.Repair = b.getAttribute('variant');
     }
   }
   const text = el.shadowRoot?.textContent ?? '';
   document.body.removeChild(el);
-  return { variants, text };
+  return { variants, text, repairAvailability };
 }
 
 const REPAIR_NEEDED: InstallStatus = {
@@ -77,19 +85,19 @@ const HEALTHY: InstallStatus = {
 afterEach(() => __resetUiModeForTest());
 
 describe('BrainSurface Detailed — the install panel names the same remedy Simple points at', () => {
-  it('repairNeeded ⇒ Repair is the primary affordance, Install is not', async () => {
+  it('repairNeeded ⇒ Repair is the primary action in the alert', async () => {
     const { variants, text } = await installButtons(REPAIR_NEEDED);
     expect(variants.Repair).toBe('primary');
-    expect(variants.Install).not.toBe('primary');
+    expect(variants.Install).toBeUndefined();
     // The panel states the condition in the same words Simple used, so the two read as one story.
     expect(text).toContain('A required component is missing');
     expect(text).toContain('use Repair');
   });
 
-  it('no repair needed ⇒ Install stays primary (the pre-existing default is untouched)', async () => {
+  it('no repair needed ⇒ Maintenance still offers repair without claiming a gap', async () => {
     const { variants, text } = await installButtons(HEALTHY);
-    expect(variants.Install).toBe('primary');
-    expect(variants.Repair).not.toBe('primary');
+    expect(variants.Repair).toBe('ghost');
+    expect(variants.Install).toBeUndefined();
     expect(text).not.toContain('A required component is missing');
   });
 });
@@ -168,7 +176,8 @@ describe('BrainSurface — the repair claim names its authority', () => {
 
     const { variants, text } = await installButtons(OPTIONAL_GAP_ONLY);
     expect(text).not.toContain('A required component is missing');
-    expect(variants.Install).toBe('primary');
+    expect(variants.Repair).toBe('ghost');
+    expect(variants.Install).toBeUndefined();
     expect(text).toContain('Optional files not installed');
     expect(text).toContain('splade/config.json');
   });
@@ -215,14 +224,15 @@ describe('BrainSurface — the repair claim names its authority', () => {
     const remedy = deriveRepairRemedy(NON_CONVERGENT);
     expect(remedy.kind).toBe('manual');
 
-    const { variants, text } = await installButtons(NON_CONVERGENT);
+    const { variants, text, repairAvailability } = await installButtons(NON_CONVERGENT);
+    expect(repairAvailability).toMatchObject({ kind: 'unavailable' });
     // The defect this pins: an affordance that provably cannot succeed presented as THE remedy.
-    expect(variants.Repair).not.toBe('primary');
-    expect(variants.Install).not.toBe('primary');
+    expect(variants.Repair).toBe('ghost');
+    expect(variants.Install).toBeUndefined();
     expect(text).toContain('Automatic repair could not download');
     expect(text).toContain('https://example/splade-config.json');
     expect(text).toContain('config.json');
     expect(text).toContain('12 attempts');
-    expect(text).not.toContain('A required component is missing — use Repair.');
+    expect(text).not.toContain('A required component is missing');
   });
 });

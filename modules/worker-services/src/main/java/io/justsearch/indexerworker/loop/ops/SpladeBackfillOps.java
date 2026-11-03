@@ -56,6 +56,7 @@ public final class SpladeBackfillOps {
    */
   public static StageOutcome processSpladeBackfill(BackfillContext context) {
     long t0 = System.nanoTime();
+    EnrichmentAccounting accounting = new EnrichmentAccounting();
     try {
       List<String> pendingIds =
           context.chunkSpladeEnabled()
@@ -73,6 +74,7 @@ public final class SpladeBackfillOps {
                       context.batchSize());
       long queryMs = (System.nanoTime() - t0) / 1_000_000;
 
+      accounting.select(pendingIds, EnrichmentAccounting.Stage.SPLADE);
       if (pendingIds.isEmpty()) {
         return StageOutcome.none();
       }
@@ -80,7 +82,7 @@ public final class SpladeBackfillOps {
       SpladeEncoder encoder = context.spladeEncoderSupplier().get();
       if (encoder == null) {
         context.log().debug("SPLADE backfill: encoder unavailable, stopping batch");
-        return StageOutcome.none();
+        return StageOutcome.observed(true, 0, t0, accounting);
       }
 
       context.log().info("Processing SPLADE backfill for {} documents", pendingIds.size());
@@ -90,12 +92,13 @@ public final class SpladeBackfillOps {
 
       // Check for interruption before batch work
       if (paceAndCheckInterrupt(context)) {
-        return StageOutcome.elapsedSince(t0);
+        accounting.cancelRemaining();
+        return StageOutcome.observed(true, 0, t0, accounting);
       }
 
       // Phase 1: collect parent content or reconstructed chunk slices in one batch.
       long t1 = System.nanoTime();
-      EnrichmentBatch batch = new EnrichmentBatch(context.documentFieldOps(), context.indexingCoordinator(), pendingIds);
+      EnrichmentBatch batch = new EnrichmentBatch(context.documentFieldOps(), context.indexingCoordinator(), pendingIds).accounting(accounting);
       Map<String, String> contentByDocId = batch.contents();
       List<String> batchDocIds = new ArrayList<>(pendingIds.size());
       List<String> batchContents = new ArrayList<>(pendingIds.size());
@@ -119,6 +122,7 @@ public final class SpladeBackfillOps {
           batchDocIds.add(docId);
           batchContents.add(content);
         } catch (Exception e) {
+          accounting.cancelled(EnrichmentAccounting.Stage.SPLADE, e);
           context.log().error("SPLADE content fetch failed for {}: {}", docId, e.getMessage());
           markedFailed +=
               batch.failure(docId, SchemaFields.SPLADE_RETRY_COUNT, SpladeBackfillOps::computeSpladeFailureUpdate);
@@ -129,12 +133,13 @@ public final class SpladeBackfillOps {
 
       if (batchContents.isEmpty()) {
         commitIfNeeded(context, processed, failed, markedFailed);
-        return new StageOutcome(true, processed, (System.nanoTime() - t0) / 1_000_000);
+        return StageOutcome.observed(true, processed, t0, accounting);
       }
 
       // Re-check interruption after content collection
       if (paceAndCheckInterrupt(context)) {
-        return new StageOutcome(true, processed, (System.nanoTime() - t0) / 1_000_000);
+        accounting.cancelRemaining();
+        return StageOutcome.observed(true, processed, t0, accounting);
       }
 
       // Phase 2: Batch encode with SPLADE. Spec D §3.3: the idle-branch batch is 200 documents
@@ -172,19 +177,23 @@ public final class SpladeBackfillOps {
                     + (sliceVecs == null ? "null" : sliceVecs.size())
                     + ")");
           }
+          for (int i = sliceStart; i < sliceEnd; i++) {
+            accounting.computed(batchDocIds.get(i), EnrichmentAccounting.Stage.SPLADE);
+          }
           sparseVecs.addAll(sliceVecs);
         }
       } catch (Exception e) {
+        accounting.cancelled(EnrichmentAccounting.Stage.SPLADE, e);
         context.log().error("SPLADE batch encoding failed: {}", e.getMessage());
         if (context.spladeEncoderSupplier().get() != encoder || isSystemicFailure(e)) {
           commitIfNeeded(context, processed, failed, markedFailed);
-          return new StageOutcome(false, processed, (System.nanoTime() - t0) / 1_000_000);
+          return StageOutcome.observed(false, processed, t0, accounting);
         }
         // Fallback to per-doc encoding
         for (int i = 0; i < batchDocIds.size(); i++) {
           if (context.spladeEncoderSupplier().get() != encoder) {
             commitIfNeeded(context, processed, failed, markedFailed);
-            return new StageOutcome(false, processed, (System.nanoTime() - t0) / 1_000_000);
+            return StageOutcome.observed(false, processed, t0, accounting);
           }
           pacer.beforeUnit(1);
           try {
@@ -196,9 +205,10 @@ public final class SpladeBackfillOps {
             updates.put(SchemaFields.SPLADE_RETRY_COUNT, "0");
             if (batch.update(batchDocIds.get(i), updates)) processed++;
           } catch (Exception e2) {
+            accounting.cancelled(EnrichmentAccounting.Stage.SPLADE, e2);
             if (context.spladeEncoderSupplier().get() != encoder || isSystemicFailure(e2)) {
               commitIfNeeded(context, processed, failed, markedFailed);
-              return new StageOutcome(false, processed, (System.nanoTime() - t0) / 1_000_000);
+              return StageOutcome.observed(false, processed, t0, accounting);
             }
             markedFailed +=
                 batch.failure(batchDocIds.get(i), SchemaFields.SPLADE_RETRY_COUNT, SpladeBackfillOps::computeSpladeFailureUpdate);
@@ -219,9 +229,9 @@ public final class SpladeBackfillOps {
                   "SPLADE encoding unavailable: entire batch of {} docs failed — {}",
                   failed,
                   e.getMessage());
-          return new StageOutcome(false, processed, (System.nanoTime() - t0) / 1_000_000);
+          return StageOutcome.observed(false, processed, t0, accounting);
         }
-        return new StageOutcome(true, processed, (System.nanoTime() - t0) / 1_000_000);
+        return StageOutcome.observed(true, processed, t0, accounting);
       }
 
       long encodeMs = (System.nanoTime() - t2) / 1_000_000;
@@ -260,11 +270,12 @@ public final class SpladeBackfillOps {
               writeMs,
               commitMs,
               docs > 0 ? totalMs / docs : 0);
-      return new StageOutcome(true, processed, totalMs);
+      return StageOutcome.observed(true, processed, t0, accounting);
 
     } catch (Exception e) {
+      accounting.cancelled(EnrichmentAccounting.Stage.SPLADE, e);
       context.log().error("Error during SPLADE backfill", e);
-      return new StageOutcome(false, 0, (System.nanoTime() - t0) / 1_000_000);
+      return StageOutcome.observed(false, 0, t0, accounting);
     }
   }
 

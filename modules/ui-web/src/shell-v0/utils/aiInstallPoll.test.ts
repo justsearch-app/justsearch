@@ -14,6 +14,7 @@ import {
   subscribeAiInstall,
   setAiInstallApiBase,
   pollIntervalFor,
+  isAiObservationLive,
   __resetAiInstallPollForTest,
   type AiInstallSnapshot,
 } from './aiInstallPoll.js';
@@ -260,8 +261,33 @@ describe('aiInstallPoll lifecycle cancellation', () => {
     await vi.advanceTimersByTimeAsync(0);
     expect(listener).toHaveBeenLastCalledWith({
       install: { state: 'idle' }, runtime: { state: 'idle' }, packs: { state: 'idle' },
+      installObservation: { latestReadFailed: false },
+      runtimeObservation: { latestReadFailed: false },
     });
     await vi.advanceTimersByTimeAsync(5_000);
     expect(fetchMock).toHaveBeenCalledTimes(9);
+  });
+});
+
+
+describe('AI observation freshness', () => {
+  afterEach(() => { __resetAiInstallPollForTest(); vi.useRealTimers(); vi.unstubAllGlobals(); });
+  it.each(['install', 'runtime'] as const)('G1 a failed %s read invalidates retained observations even with other endpoints reachable', async endpoint => {
+    vi.useFakeTimers(); let failed = false;
+    vi.stubGlobal('fetch', vi.fn(async (url: string) => failed && url.includes(`/ai/${endpoint}/`)
+      ? new Response('', { status: 503 }) : jsonResponse({ state: 'idle' })));
+    let last: AiInstallSnapshot | undefined;
+    const unsub = subscribeAiInstall(s => { last = s; });
+    // Compatibility with the before-state: it treated every retained value as current.
+    const live = (key: 'install' | 'runtime') => last?.[`${key}Observation`] ? isAiObservationLive(last[`${key}Observation`])
+      : (last as AiInstallSnapshot & { installLive?: boolean; runtimeLive?: boolean })?.[`${key}Live`] ?? (last?.[key] != null);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(live(endpoint)).toBe(true);
+    failed = true; await vi.advanceTimersByTimeAsync(5000);
+    expect(last?.[endpoint]).toEqual({ state: 'idle' });
+    expect(live(endpoint)).toBe(false);
+    expect(live(endpoint === 'install' ? 'runtime' : 'install')).toBe(true);
+    failed = false; await vi.advanceTimersByTimeAsync(5000);
+    expect(live(endpoint)).toBe(true); unsub();
   });
 });

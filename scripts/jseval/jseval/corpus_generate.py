@@ -910,7 +910,7 @@ def render_scan_image(text, *, width=900, font_size=13, bg_gray=210, text_gray=7
     except ImportError:
         raise ImportError(
             "Pillow is required for the 'scan' corpus axis. "
-            "Install with: pip install jseval[scan]"
+            "Install with: pip install -e scripts/jsharness -e 'scripts/jseval[scan]'"
         )
 
     if len(text) > MAX_SCAN_TEXT_CHARS:

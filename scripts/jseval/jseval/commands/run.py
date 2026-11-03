@@ -618,7 +618,7 @@ def _check_build_freshness(base_url: str) -> None:
         return
 
     try:
-        from ..readiness import flatten_status
+        from jsharness.readiness import flatten_status
         resp = httpx.get(f"{base_url}/api/status", timeout=5)
         resp.raise_for_status()
         running_stamp = flatten_status(resp.json()).get("buildStamp")

@@ -142,6 +142,7 @@ async function startPendingControl(surface: typeof bulkControls[number]) {
     const b = el as BrainSurface;
     b.expanded = { ...b.expanded, install: true };
     b.installStatus = { state: 'idle', phase: 'activation_required' } as NonNullable<BrainSurface['installStatus']>;
+    (b as unknown as { _unifiedAiState: unknown })._unifiedAiState = { installObservationLive: true, runtimeObservationLive: true, snapshotLive: true, aiEngine: { kind: 'offline', stability: { kind: 'settled' }, installFailure: null } };
   }
   await pump(el);
   const invoke = vi.spyOn(getOperationClient(base), 'invokeWithConsent');
@@ -211,6 +212,7 @@ it.each(['health', 'brain', 'health-recommended', 'activation'] as const)(
       const b = el as BrainSurface;
       b.expanded = { ...b.expanded, install: true };
       b.installStatus = { state: 'idle', phase: 'activation_required' } as NonNullable<BrainSurface['installStatus']>;
+      (b as unknown as { _unifiedAiState: unknown })._unifiedAiState = { installObservationLive: true, runtimeObservationLive: true, snapshotLive: true, aiEngine: { kind: 'offline', stability: { kind: 'settled' }, installFailure: null } };
     }
     await pump(el);
     const click = async () => {

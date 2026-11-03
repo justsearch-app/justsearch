@@ -1,0 +1,107 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
+  },
+  "createdAt": "2026-11-02T18:45:07.666Z",
+  "revision": "ed9b29de09037e95f2aa2cd970ca3956e1887563",
+  "tree": "9e638bfdbf19b34e94b699fabac0c95d9b0ca77e",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/BrainSurface.repairRun.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/tgk4vsot/tmp/test-intent-vitest-3193-1793645101569.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 2382
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/views/BrainSurface.repairRun.test.ts#a late Repair response never replaces the store install status with an older timestamp",
+      "file": "modules/ui-web/src/shell-v0/views/BrainSurface.repairRun.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:e4998e9391ff8c284b4858565928458cb04f2bb91c2777339aef4f504549426e",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Brain running repair controls (B2/B8) a late Repair response never replaces the store install status with an older timestamp",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/BrainSurface.repairRun.test.ts#a failed install read gates a retained running download observation and recovery restores it",
+      "file": "modules/ui-web/src/shell-v0/views/BrainSurface.repairRun.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:e4998e9391ff8c284b4858565928458cb04f2bb91c2777339aef4f504549426e",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Brain running repair controls (B2/B8) a failed install read gates a retained running download observation and recovery restores it",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/BrainSurface.repairRun.test.ts#a failed install read gates a retained running plan observation and recovery restores it",
+      "file": "modules/ui-web/src/shell-v0/views/BrainSurface.repairRun.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:e4998e9391ff8c284b4858565928458cb04f2bb91c2777339aef4f504549426e",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Brain running repair controls (B2/B8) a failed install read gates a retained running plan observation and recovery restores it",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "4c6637f1b6",
+    "revision": "4c6637f1b613417c4499d0df3a956b42ce376da4",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/BrainSurface.repairRun.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/tgk4vsot/tmp/test-intent-vitest-3193-1793645105432.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 1943,
+        "output": "JSON report written to /home/elias/.cache/am/tgk4vsot/tmp/test-intent-vitest-3193-1793645105432.json\n\n"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui-web/src/shell-v0/views/BrainSurface.repairRun.test.ts#a late Repair response never replaces the store install status with an older timestamp",
+        "classification": "assertion",
+        "detail": "Brain running repair controls (B2/B8) a late Repair response never replaces the store install status with an older timestamp:  AssertionError: expected 'Installing… 25%' to be 'Installing… 75%' // Object.is equality\n    at /home/elias/.cache/am/tgk4vsot/tmp/test-intent-before-FPzgcy/modules/ui-web/src/shell-v0/views/BrainSurface.repairRun.test.ts:156:74\n    at file:///home/elias/.cache/am/tgk4vsot/tmp/cand/modules/ui-web/no"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/BrainSurface.repairRun.test.ts#a failed install read gates a retained running download observation and recovery restores it",
+        "classification": "assertion",
+        "detail": "Brain running repair controls (B2/B8) a failed install read gates a retained running download observation and recovery restores it:  AssertionError: expected 'Installing… 25%' to be 'Checking AI status…' // Object.is equality\n    at /home/elias/.cache/am/tgk4vsot/tmp/test-intent-before-FPzgcy/modules/ui-web/src/shell-v0/views/BrainSurface.repairRun.test.ts:210:74\n    at file:///home/elias/.cache/am/tgk4vsot/tmp/cand/modules/ui-we"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/BrainSurface.repairRun.test.ts#a failed install read gates a retained running plan observation and recovery restores it",
+        "classification": "assertion",
+        "detail": "Brain running repair controls (B2/B8) a failed install read gates a retained running plan observation and recovery restores it:  AssertionError: expected 'Installing…' to be 'Checking AI status…' // Object.is equality\n    at /home/elias/.cache/am/tgk4vsot/tmp/test-intent-before-FPzgcy/modules/ui-web/src/shell-v0/views/BrainSurface.repairRun.test.ts:210:74\n    at file:///home/elias/.cache/am/tgk4vsot/tmp/cand/modules/ui-web/no"
+      }
+    ]
+  },
+  "digest": "sha256:308f22adfcee3c852daafb65b0fe169821a6f54aa7c3d91154036c090346979e"
+}

@@ -1,0 +1,5 @@
+# UI-check artifacts and venv (paths are relative to this .gitignore,
+# not repo root)
+tmp/
+.venv/
+.pytest_cache/

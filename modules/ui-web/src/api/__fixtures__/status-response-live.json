@@ -163,7 +163,8 @@
       "embeddedAndSparseCount" : 0,
       "embeddingAvailable" : true,
       "spladeAvailable" : true,
-      "nerAvailable" : true
+      "nerAvailable" : true,
+      "enrichmentOutcomes" : { }
     },
     "gpu" : {
       "rerankerOrtCuda" : {

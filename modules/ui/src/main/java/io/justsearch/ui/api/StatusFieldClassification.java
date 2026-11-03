@@ -174,7 +174,7 @@ final class StatusFieldClassification {
             "embeddingFailedCount", "embeddingCoveragePercent", "spladeDocCount",
             "spladeCompletedCount", "spladePendingCount", "spladeFailedCount",
             "spladeCoveragePercent", "pendingNerCount", "completedNerCount", "failedNerCount",
-            "vectorReadyPercent", "enrichmentCompleted", "batchTiming", "encoderProfiles",
+            "vectorReadyPercent", "enrichmentCompleted", "enrichmentOutcomes", "batchTiming", "encoderProfiles",
             "embeddedAndSparseCount"));
     put(table, ChunkCoverageView.class,
         state("chunkVectorsReady", "chunkSpladeEnabled", "chunkingNotRequired"),

@@ -1,0 +1,87 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
+  },
+  "createdAt": "2026-11-02T10:24:09.752Z",
+  "revision": "13a89c28aa49aa1767d5816d29b9c1d2f20b4720",
+  "tree": "5fc8ec3d01866ff6c51af99c608b3ab0c55faa4e",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/BrainSurface.redesign.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/de5l46_l/tmp/test-intent-vitest-219-1793615040946.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 4741
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/views/BrainSurface.redesign.test.ts#consent lists only planned packages, excluding declined siblings and already installed files",
+      "file": "modules/ui-web/src/shell-v0/views/BrainSurface.redesign.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:0b40fa6a5338a30abc552ef209376cf42e4a4a1de94193c5208580372e043226",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "AI Brain redesign behaviour consent lists only planned packages, excluding declined siblings and already installed files",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/BrainSurface.redesign.test.ts#accept is disabled until the manifest and every download size are known, with retry",
+      "file": "modules/ui-web/src/shell-v0/views/BrainSurface.redesign.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:0b40fa6a5338a30abc552ef209376cf42e4a4a1de94193c5208580372e043226",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "AI Brain redesign behaviour accept is disabled until the manifest and every download size are known, with retry",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "aeaa3e0413",
+    "revision": "aeaa3e0413daedbde92880a6c8a9dd18d37c044d",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/BrainSurface.redesign.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/de5l46_l/tmp/test-intent-vitest-219-1793615047865.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 1359,
+        "output": "JSON report written to /home/elias/.cache/am/de5l46_l/tmp/test-intent-vitest-219-1793615047865.json\n\n"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui-web/src/shell-v0/views/BrainSurface.redesign.test.ts#consent lists only planned packages, excluding declined siblings and already installed files",
+        "classification": "assertion",
+        "detail": "AI Brain redesign behaviour consent lists only planned packages, excluding declined siblings and already installed files:  AssertionError: expected [ 'embedding', 'reranker', …(4) ] to deeply equal [ 'chat' ]\n    at /home/elias/.cache/am/de5l46_l/tmp/test-intent-before-TPbh8t/modules/ui-web/src/shell-v0/views/BrainSurface.redesign.test.ts:215:45\n    at file:///home/elias/.cache/am/de5l46_l/tmp/test-intent-before-TPbh8t/"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/BrainSurface.redesign.test.ts#accept is disabled until the manifest and every download size are known, with retry",
+        "classification": "assertion",
+        "detail": "AI Brain redesign behaviour accept is disabled until the manifest and every download size are known, with retry:  AssertionError: expected false to be true // Object.is equality\n    at /home/elias/.cache/am/de5l46_l/tmp/test-intent-before-TPbh8t/modules/ui-web/src/shell-v0/views/BrainSurface.redesign.test.ts:183:29\n    at file:///home/elias/.cache/am/de5l46_l/tmp/test-intent-before-TPbh8t/modules/ui-web/node_mo"
+      }
+    ]
+  },
+  "digest": "sha256:607acb5011a0ca291429da6adf81261b05a4f897030bcb2b710bd4a1e63982a6"
+}

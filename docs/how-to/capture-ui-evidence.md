@@ -7,7 +7,7 @@ description: "Screenshot capture for UI verification and agent visual feedback."
 
 # Capture UI Evidence
 
-Capture UI screenshots **and a structured `<step>.measure.json` fact-sheet** for verification using the jseval
+Capture UI screenshots **and a structured `<step>.measure.json` fact-sheet** for verification using the jsharness
 toolkit (tempdoc 615). The harness drives the **live Lit `shell-v0`** UI.
 
 For deterministic data without a backend, use `ui-shot --fixtures`: the harness intercepts API
@@ -21,17 +21,17 @@ unless disabled; use those facts alongside the PNG.
 Capture a targeted screenshot during development:
 
 ```bash
-cd scripts/jseval
+cd scripts/jsharness
 
 # Capture one step (prints the PNG path + a one-line MEASURE fact summary)
-python -m jseval ui-shot home
-python -m jseval ui-shot search-results --fixtures
+python -m jsharness ui-shot home
+python -m jsharness ui-shot search-results --fixtures
 
 # List all available steps
-python -m jseval ui-shot --list
+python -m jsharness ui-shot --list
 
 # Capture steps affected by a file edit (live shell-v0 paths)
-python -m jseval ui-shot --affected modules/ui-web/src/shell-v0/components/searchResults/ResultsCard.ts
+python -m jsharness ui-shot --affected modules/ui-web/src/shell-v0/components/searchResults/ResultsCard.ts
 ```
 
 Output: PNG path + the measurement fact summary to stdout; `<step>.measure.json` next to the PNG. Read the
@@ -42,16 +42,16 @@ In a worktree, `ui-shot` auto-starts a Vite dev server on port 5174 (no backend 
 
 ## Batch Verification (CI Gate)
 
-Capture all steps (`jseval ui-shot --list` for the current count) for pre-merge verification:
+Capture all steps (`jsharness ui-shot --list` for the current count) for pre-merge verification:
 
 ```bash
-cd scripts/jseval
+cd scripts/jsharness
 
 # Against a served frontend (view/chrome steps); data/AI steps need the dev stack
-python -m jseval ui-check --ui-url http://127.0.0.1:5173
+python -m jsharness ui-check --ui-url http://127.0.0.1:5173
 
 # JSON output (per-step measurement summary included)
-python -m jseval --json ui-check
+python -m jsharness --json ui-check
 ```
 
 (`--no-demo` is legacy — the `?demo=true` mock path is orphaned; data comes from the live backend.)
@@ -62,12 +62,12 @@ drift between runs.
 
 ## Prerequisites
 
-Use Python 3.11+ with the jseval package and its `ui` extra installed
-(`scripts/jseval/pyproject.toml`), Playwright's Chromium browser, and the frontend npm dependencies.
+Use Python 3.11+ with the jsharness package and its `ui` extra installed
+(`scripts/jsharness/pyproject.toml`), Playwright's Chromium browser, and the frontend npm dependencies.
 From repo root in your Python environment:
 
 ```bash
-python -m pip install -e 'scripts/jseval[ui]' -c scripts/jseval/requirements.lock.txt
+python -m pip install -e 'scripts/jsharness[ui]' -c scripts/jsharness/requirements.lock.txt
 python -m playwright install chromium
 npm ci --prefix modules/ui-web --audit=false
 ```
@@ -79,8 +79,8 @@ npm ci --prefix modules/ui-web --audit=false
 cd modules/ui-web && npm run dev
 ```
 
-**Deterministic data captures:** `python -m jseval ui-shot search-results --fixtures` from
-`scripts/jseval` auto-serves Vite and installs request fixtures.
+**Deterministic data captures:** `python -m jsharness ui-shot search-results --fixtures` from
+`scripts/jsharness` auto-serves Vite and installs request fixtures.
 
 **Real-backend mode:** Use jseval to start the backend:
 
@@ -92,10 +92,10 @@ cd scripts/jseval && python -m jseval dev --clean
 
 | File | Purpose |
 |------|---------|
-| `scripts/jseval/jseval/ui_shot.py` | Single-step capture |
-| `scripts/jseval/jseval/ui_check.py` | Batch capture (`ui-shot --list` for current steps) |
-| `scripts/jseval/jseval/ui_selectors.py` | Shared testid selectors |
-| `scripts/jseval/jseval/ui_step_index.json` | File-to-step mapping |
+| `scripts/jsharness/jsharness/ui_shot.py` | Single-step capture |
+| `scripts/jsharness/jsharness/ui_check.py` | Batch capture (`ui-shot --list` for current steps) |
+| `scripts/jsharness/jsharness/ui_selectors.py` | Shared testid selectors |
+| `scripts/jsharness/jsharness/ui_step_index.json` | File-to-step mapping |
 
 ## Known Limitations
 

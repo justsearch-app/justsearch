@@ -10,7 +10,7 @@ from __future__ import annotations
 from hypothesis import HealthCheck, given, settings
 from hypothesis import strategies as st
 
-from jseval.suite_stats import compute_stats, percentile
+from jsharness.suite_stats import compute_stats, percentile
 
 _finite = st.floats(min_value=-1e6, max_value=1e6, allow_nan=False, allow_infinity=False)
 

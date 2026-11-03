@@ -81,11 +81,15 @@ _CANARY_WARMUP_SEC = 90.0
 # ``git_sha``, runtime knobs and corpus content are pinned as their own key
 # components -- and hashing it made routine multi-agent dirt (tempdoc edits)
 # zero the hit rate. ``scripts/jseval/`` IS in scope because corpus
-# materialization/derivation code is not otherwise pinned (751 sec I.5).
+# materialization/derivation code is not otherwise pinned (751 sec I.5);
+# ``scripts/jsharness/`` too, because its readiness wait decides when an
+# ingest counts as complete before the built index is published.
 # Residual risk (accepted, documented): dirt outside these prefixes that
 # somehow shapes the index is not covered; blast radius is small because
 # ``git_sha`` still pins every committed file.
-_DIRT_SCOPE_PREFIXES = ("modules/", "SSOT/", "contracts/", "scripts/jseval/")
+_DIRT_SCOPE_PREFIXES = (
+    "modules/", "SSOT/", "contracts/", "scripts/jseval/", "scripts/jsharness/",
+)
 # Untracked files under the same prefixes are content-hashed into the
 # dirty-state component (their content appears in neither porcelain nor
 # ``git diff HEAD``, only their name in porcelain).
@@ -285,7 +289,7 @@ def _dirty_state_hash(repo_root: Path) -> str:
     Scoped (review fix F-B) to :data:`_DIRT_SCOPE_PREFIXES`: porcelain lines and
     the tracked diff are filtered/pathspec-limited to those prefixes, so routine
     non-index dirt (docs/tempdocs edits) leaves the key unchanged while any
-    engine/SSOT/contracts/jseval dirt still changes it.
+    engine/SSOT/contracts/jseval/jsharness dirt still changes it.
 
     Raises :class:`IdentityUnavailable` if git is unavailable, or if any such
     untracked source file exceeds 10 MB (fail closed -- never skip it).

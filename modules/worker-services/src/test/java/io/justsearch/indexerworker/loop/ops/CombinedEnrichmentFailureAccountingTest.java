@@ -46,6 +46,7 @@ class CombinedEnrichmentFailureAccountingTest {
 
   @BeforeEach
   void wire() throws Exception {
+    BackfillSnapshotTestSupport.installReceipts(coordinator);
     when(embedding.isAvailable()).thenAnswer(call -> embeddingReady.get());
     when(embedding.embedDocumentBatch(anyList())).thenAnswer(call ->
         Collections.nCopies(((List<?>) call.getArgument(0)).size(), new float[] {1, 0}));

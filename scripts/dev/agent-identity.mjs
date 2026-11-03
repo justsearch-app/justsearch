@@ -4,7 +4,7 @@
  *
  *   node scripts/dev/agent-identity.mjs --json [--session-id <id>]
  *
- * The Python registers (`scripts/jseval/jseval/agent_spawn_register.py`, `run_register.py`) call
+ * The Python registers (`scripts/jsharness/jsharness/agent_spawn_register.py`, `run_register.py`) call
  * this so both languages resolve identity by one rule. Output (one JSON line):
  *   { "harness": "claude"|"codex"|"ci"|"unknown", "owner": {...}|null, "sessionId": "..."|null,
  *     "source": "...", "elapsedMs": <n> }

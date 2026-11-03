@@ -419,6 +419,7 @@ message EnrichmentProgressView {
   bool splade_available = 27 [json_name = "spladeAvailable"];
   bool ner_available = 28 [json_name = "nerAvailable"];
   optional bool completeness_known = 29 [json_name = "completenessKnown"];
+  map<string, int64> enrichment_outcomes = 30 [json_name = "enrichmentOutcomes"];
 }
 
 message StageCompletenessView {

@@ -37,6 +37,7 @@ class BackfillSchedulerProviderGateTest {
 
   @BeforeEach
   void wire() throws Exception {
+    io.justsearch.indexerworker.loop.ops.BackfillSnapshotTestSupport.installReceipts(coordinator);
     when(lifecycle.embeddingProvider()).thenReturn(embedding);
     when(lifecycle.allowEmbeddingWrites()).thenAnswer(call -> allowed.get());
     when(embedding.isAvailable()).thenAnswer(call -> available.get());
@@ -48,10 +49,6 @@ class BackfillSchedulerProviderGateTest {
       var metadata = new HashMap<String, String>();
       state.forEach((key, value) -> metadata.put(key, value.toString()));
       return Map.of("doc", new DocumentFieldOps.EnrichmentInput("content", metadata, null, Map.of()));
-    });
-    when(coordinator.updateDocumentIf(anyString(), any(DocumentFieldOps.EnrichmentInput.class), anyMap())).thenAnswer(call -> {
-      state.putAll(call.getArgument(2));
-      return true;
     });
     when(coordinator.updateDocumentsBatchIf(anyList(), anyMap())).thenAnswer(call -> {
       List<Map.Entry<String, Map<String, Object>>> updates = call.getArgument(0);

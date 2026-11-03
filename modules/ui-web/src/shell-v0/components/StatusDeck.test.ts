@@ -37,6 +37,8 @@ function makeAiState(overrides: Partial<AiState> = {}): AiState {
     lastSettledIndex: null,
     episodeMaxPendingJobs: 0,
     enrichSettleSamples: [],
+    installObservationLive: false,
+    runtimeObservationLive: false,
     installStatus: null,
     runtimeStatus: null,
     packStatus: null,

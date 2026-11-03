@@ -31,6 +31,33 @@ public final class LuceneRuntimeTypes {
    */
   public record BatchUpdateResult(int updatedCount, int notFoundCount) {}
 
+  /**
+   * In-memory receipt for ordered conditional publication; failure leaves the suffix unattempted.
+   * correctedFailedStatuses names the stage status fields the mapper corrected to FAILED in each
+   * accepted mutation, without changing that mutation or charging a retry.
+   */
+  public record EnrichmentPublicationReceipt(
+      List<String> acceptedIds, List<String> rejectedIds,
+      Map<String, java.util.Set<String>> correctedFailedStatuses, RuntimeException failure) {
+    public EnrichmentPublicationReceipt {
+      acceptedIds = List.copyOf(acceptedIds);
+      rejectedIds = List.copyOf(rejectedIds);
+      correctedFailedStatuses = correctedFailedStatuses.entrySet().stream().collect(
+          java.util.stream.Collectors.toUnmodifiableMap(Map.Entry::getKey,
+              entry -> java.util.Set.copyOf(entry.getValue())));
+    }
+
+    public EnrichmentPublicationReceipt(List<String> acceptedIds, List<String> rejectedIds,
+        RuntimeException failure) {
+      this(acceptedIds, rejectedIds, Map.of(), failure);
+    }
+
+    public BatchUpdateResult result() {
+      if (failure != null) throw failure;
+      return new BatchUpdateResult(acceptedIds.size(), rejectedIds.size());
+    }
+  }
+
   // ==========================================================================
   // Build State
   // ==========================================================================

@@ -29,7 +29,10 @@
       "name": "AiRuntimeStatusResponse",
       "schema": "SSOT/schemas/ai-runtime-status-response.v1.json",
       "outFile": "ai-runtime-status-response.ts",
-      "consumers": ["modules/ui-web/src/api/domains/inference.ts"]
+      "consumers": [
+        "modules/ui-web/src/api/domains/inference.ts",
+        "modules/ui-web/src/shell-v0/utils/aiInstallPoll.ts"
+      ]
     },
     {
       "name": "EffectivePolicy",

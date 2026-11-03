@@ -75,4 +75,4 @@ surface must not overwrite a newer shared choice with a slower local settings re
 `uiModeState.test.ts` pins normalization, subscription, queued-write, timeout, and reload-persistence
 behavior. Surface tests pin the visible
 Simple/Detailed labels and mode-specific disclosure. Changes to a projecting surface also require the
-affected `jseval ui-shot` measurement and the shell-v0 UI coverage check.
+affected `jsharness ui-shot` measurement and the shell-v0 UI coverage check.

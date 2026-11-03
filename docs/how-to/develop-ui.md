@@ -17,7 +17,7 @@ npm run dev          # starts Vite
 
 Open `http://127.0.0.1:5173/`. The Lit shell renders its chrome, rail, and surfaces with no backend,
 but data views remain empty or show `Connecting…`. `?demo=true` does not supply data to the current
-shell. For deterministic browser captures with data, use `jseval ui-shot --fixtures`; for real
+shell. For deterministic browser captures with data, use `jsharness ui-shot --fixtures`; for real
 search, indexing, and AI behavior, run a backend.
 
 ## When to use each mode
@@ -25,7 +25,7 @@ search, indexing, and AI behavior, run a backend.
 | Mode | Command | Backend needed? | Use for |
 |------|---------|----------------|---------|
 | Layout | `npm run dev` in `modules/ui-web` | No | Chrome, styling, and layout without data |
-| Fixture capture | `python -m jseval ui-shot search-results --fixtures` from `scripts/jseval` | No; the harness serves Vite and intercepts API requests | Deterministic visual and accessibility checks |
+| Fixture capture | `python -m jsharness ui-shot search-results --fixtures` from `scripts/jsharness` | No; the harness serves Vite and intercepts API requests | Deterministic visual and accessibility checks |
 | Real backend | `npm --prefix modules/ui-web run dev:all` from repo root | Starts one; the UI receives its port | Real search and integration work |
 | Worktree FE | `node scripts/dev/serve-worktree-fe.cjs` from repo root | Borrows a running stack (read-only) | Validating this worktree's frontend without starting another backend |
 
@@ -55,8 +55,8 @@ the page context, and verify that UI changes look correct.
 | `npm run test:unit:run` | Vitest unit tests (single run) |
 | `npm run lint` | ESLint rules |
 
-**Minimum for a UI PR:** `typecheck` + `test:unit:run`. Use `jseval ui-shot` or
-`jseval ui-check` for browser checks of affected search or navigation flows
+**Minimum for a UI PR:** `typecheck` + `test:unit:run`. Use `jsharness ui-shot` or
+`jsharness ui-check` for browser checks of affected search or navigation flows
 (see [Capture UI Evidence](capture-ui-evidence.md)).
 
 ## Architecture overview

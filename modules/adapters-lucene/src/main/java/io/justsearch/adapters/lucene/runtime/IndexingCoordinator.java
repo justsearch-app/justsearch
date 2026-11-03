@@ -283,13 +283,22 @@ public final class IndexingCoordinator {
   public BatchUpdateResult updateDocumentsBatchIf(
       List<Map.Entry<String, Map<String, Object>>> updates,
       Map<String, DocumentFieldOps.EnrichmentInput> inputs) {
-    if (updates == null || updates.isEmpty()) return new BatchUpdateResult(0, 0);
+    return publishEnrichmentBatch(updates, inputs).result();
+  }
+
+  /** Returns exact accepted/rejected IDs, retaining the accepted prefix if publication fails. */
+  public LuceneRuntimeTypes.EnrichmentPublicationReceipt publishEnrichmentBatch(
+      List<Map.Entry<String, Map<String, Object>>> updates,
+      Map<String, DocumentFieldOps.EnrichmentInput> inputs) {
+    if (updates == null || updates.isEmpty()) {
+      return new LuceneRuntimeTypes.EnrichmentPublicationReceipt(List.of(), List.of(), null);
+    }
     acquireReadLockTimed();
     try {
       guardBackpressure();
       try {
         dispatchLock.lock();
-        try { return writeOps.get().updateDocumentsBatchIf(updates, inputs); }
+        try { return writeOps.get().publishEnrichmentBatch(updates, inputs); }
         finally { dispatchLock.unlock(); }
       } finally { session.queueDepth.decrementAndGet(); }
     } finally { releaseWriteBarrierAndReport(); }
