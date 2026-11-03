@@ -34,7 +34,7 @@ function seed(risk: string) {
 beforeEach(async () => {
   vi.stubGlobal('fetch', vi.fn(async () => new Response('{}', { status: 503 })));
   __resetAiStateForTest(); __resetPendingForTest(); __resetJournalForTest(); resetOps();
-  host = new AuthorizationHost(); host.statusPanel = true; document.body.append(host);
+  host = new AuthorizationHost(); document.body.append(host);
   pill = new StatusPill(); pill.authorizationHost = () => host; document.body.append(pill); await flush();
 });
 afterEach(() => { pill.remove(); host.remove(); __resetAiStateForTest(); __resetPendingForTest(); __resetJournalForTest(); resetOps();

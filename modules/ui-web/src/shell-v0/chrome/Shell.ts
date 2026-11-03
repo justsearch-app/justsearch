@@ -2617,7 +2617,7 @@ export class Shell extends JfElement {
           @settings-window-close=${() => this.onSettingsWindowClose()}
         ></jf-settings-window>
         <jf-elicit-host slot="center"></jf-elicit-host>
-        <jf-authorization-host slot="center" status-panel
+        <jf-authorization-host slot="center"
           @status-requests-changed=${() => this.shadowRoot?.querySelector<StatusPill>('jf-status-pill')?.status.refresh()}></jf-authorization-host>
         <jf-macro-dry-run slot="center"></jf-macro-dry-run>
         ${import.meta.env.DEV ? html`<jf-agent-emitter-demo slot="bottom-center"></jf-agent-emitter-demo>` : nothing}

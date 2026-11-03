@@ -1,0 +1,107 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
+  },
+  "createdAt": "2026-11-03T23:18:45.657Z",
+  "revision": "902b99b8ce7f100860b42085b2539faeb8477885",
+  "tree": "5044f3c2107791dab6efa0f1b2864163fa7e7de0",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/chrome/Shell.status.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/p4e0hp68/tmp/test-intent-vitest-6956-1793747914897.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 3800
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/chrome/Shell.status.test.ts#C12 a lightweight ceremony opens on arrival in the shell, is listed in Needs you, and Review returns to it",
+      "file": "modules/ui-web/src/shell-v0/chrome/Shell.status.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:6bb127165ff12eaff7a326defc3563921e22da76799da59d909f2e82efae9895",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "C12 a lightweight ceremony opens on arrival in the shell, is listed in Needs you, and Review returns to it",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/chrome/Shell.status.test.ts#C12 a typed ceremony opens on arrival in the shell, is listed in Needs you, and Review returns to it",
+      "file": "modules/ui-web/src/shell-v0/chrome/Shell.status.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:6bb127165ff12eaff7a326defc3563921e22da76799da59d909f2e82efae9895",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "C12 a typed ceremony opens on arrival in the shell, is listed in Needs you, and Review returns to it",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/chrome/Shell.status.test.ts#C12 a capability ceremony opens on arrival in the shell, is listed in Needs you, and Review returns to it",
+      "file": "modules/ui-web/src/shell-v0/chrome/Shell.status.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:6bb127165ff12eaff7a326defc3563921e22da76799da59d909f2e82efae9895",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "C12 a capability ceremony opens on arrival in the shell, is listed in Needs you, and Review returns to it",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "902b99b8ce",
+    "revision": "902b99b8ce7f100860b42085b2539faeb8477885",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/chrome/Shell.status.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/p4e0hp68/tmp/test-intent-vitest-6956-1793747921448.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 3933,
+        "output": "JSON report written to /home/elias/.cache/am/p4e0hp68/tmp/test-intent-vitest-6956-1793747921448.json\n\n"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui-web/src/shell-v0/chrome/Shell.status.test.ts#C12 a lightweight ceremony opens on arrival in the shell, is listed in Needs you, and Review returns to it",
+        "classification": "assertion",
+        "detail": "C12 a lightweight ceremony opens on arrival in the shell, is listed in Needs you, and Review returns to it:  AssertionError: opens on arrival, before any Review: expected false to be true // Object.is equality\n    at /home/elias/.cache/am/p4e0hp68/tmp/test-intent-before-bRTGz9/modules/ui-web/src/shell-v0/chrome/Shell.status.test.ts:72:64\n    at file:///home/elias/dev/justsearch/modules/ui-web/node_modules/"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/chrome/Shell.status.test.ts#C12 a typed ceremony opens on arrival in the shell, is listed in Needs you, and Review returns to it",
+        "classification": "assertion",
+        "detail": "C12 a typed ceremony opens on arrival in the shell, is listed in Needs you, and Review returns to it:  AssertionError: opens on arrival, before any Review: expected false to be true // Object.is equality\n    at /home/elias/.cache/am/p4e0hp68/tmp/test-intent-before-bRTGz9/modules/ui-web/src/shell-v0/chrome/Shell.status.test.ts:72:64\n    at file:///home/elias/dev/justsearch/modules/ui-web/node_modules/"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/chrome/Shell.status.test.ts#C12 a capability ceremony opens on arrival in the shell, is listed in Needs you, and Review returns to it",
+        "classification": "assertion",
+        "detail": "C12 a capability ceremony opens on arrival in the shell, is listed in Needs you, and Review returns to it:  AssertionError: opens on arrival, before any Review: expected false to be true // Object.is equality\n    at /home/elias/.cache/am/p4e0hp68/tmp/test-intent-before-bRTGz9/modules/ui-web/src/shell-v0/chrome/Shell.status.test.ts:72:64\n    at file:///home/elias/dev/justsearch/modules/ui-web/node_modules/"
+      }
+    ]
+  },
+  "digest": "sha256:a11a31e1d94180d92993b09f9adc7f7798bcd7fb84bd46657ed39e07a64c46b4"
+}

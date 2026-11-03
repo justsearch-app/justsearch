@@ -66,16 +66,12 @@ type CeremonyItem = AuthorizeItem | CapabilityItem;
 
 export class AuthorizationHost extends JfElement {
   static properties = {
-    statusPanel: { type: Boolean, attribute: 'status-panel' },
-    reviewingId: { state: true },
     active: { attribute: false },
     typed: { attribute: false },
     allowAlways: { attribute: false },
   } as const;
 
   /** The item currently being presented, or null when idle. One at a time (FIFO). */
-  declare statusPanel: boolean;
-  declare reviewingId: string | null;
   declare active: CeremonyItem | null;
   declare typed: string;
   /** Tempdoc 550 thesis IV: the "always allow this action" checkbox state for the active prompt. */
@@ -89,8 +85,6 @@ export class AuthorizationHost extends JfElement {
 
   constructor() {
     super();
-    this.statusPanel = false;
-    this.reviewingId = null;
     this.active = null;
     this.typed = '';
     this.allowAlways = false;
@@ -232,6 +226,11 @@ export class AuthorizationHost extends JfElement {
     return [...(this.active ? [this.active] : []), ...this.queue];
   }
 
+  /**
+   * The status panel's Review action. Every ceremony already opened on arrival; this brings the
+   * selected one to the front: a queued prompt replaces the open one (which returns to the head of
+   * the queue, undecided), and the ceremony is reopened if it was closed and given focus.
+   */
   reviewStatusRequest(id: string): void {
     const matches = (item: CeremonyItem): boolean => item.kind === 'authorize'
       ? item.prompt.pendingId === id : String(item.request.id) === id;
@@ -248,8 +247,15 @@ export class AuthorizationHost extends JfElement {
       this.allowAlways = false;
       this.active = next;
     }
-    this.reviewingId = id;
     this.requestUpdate();
+    void this.updateComplete.then(() => {
+      const dialog = this.dialogRef.value;
+      if (!dialog?.open || !this.active || !matches(this.active)) return;
+      // Typed ceremonies land in their confirmation field; others on Deny, never on Approve.
+      const target = dialog.querySelector<HTMLElement>('input[type="text"]')
+        ?? dialog.querySelector<HTMLElement>('jf-button.deny');
+      target?.focus();
+    });
   }
 
   private enqueueCapability(request: ConsentRequest): void {
@@ -361,7 +367,6 @@ export class AuthorizationHost extends JfElement {
       current?.kind === 'authorize' ? AuthorizationHost.honoursAllowAlways(current.prompt) : true;
     const allowAlways = approved && honoured && this.allowAlways;
     this.active = null;
-    this.reviewingId = null;
     this.typed = '';
     this.allowAlways = false;
     if (current?.kind === 'authorize') current.resolve({ approved, allowAlways });
@@ -372,7 +377,6 @@ export class AuthorizationHost extends JfElement {
   private decideCapability(decision: ConsentDecision): void {
     const current = this.active;
     this.active = null;
-    this.reviewingId = null;
     this.typed = '';
     if (current?.kind === 'capability') resolveConsentRequest(current.request.id, decision);
     this.requestUpdate();
@@ -399,7 +403,7 @@ export class AuthorizationHost extends JfElement {
     // (high-risk typed-confirm + capability) open MODAL → the browser Top Layer, which no
     // skin overlay can occlude. Low/medium authorize opens non-modal (565 §3.D non-blocking).
     this.dispatchEvent(new CustomEvent('status-requests-changed', { bubbles: true, composed: true }));
-    if (this.active && (!this.statusPanel || this.reviewingId)) this.modal.open({ nonBlocking: this.isLightweight() });
+    if (this.active) this.modal.open({ nonBlocking: this.isLightweight() });
     else this.modal.close();
   }
 

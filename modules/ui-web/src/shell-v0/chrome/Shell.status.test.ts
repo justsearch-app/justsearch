@@ -47,3 +47,49 @@ it('ref-07 the shell Undo command (Ctrl+Z) reverses the undo notice showing in t
     shell.remove();
   }
 });
+it.each(['lightweight', 'typed', 'capability'] as const)('C12 a %s ceremony opens on arrival in the shell, is listed in Needs you, and Review returns to it', async (kind) => {
+  vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ entries: [] }), { status: 200 })));
+  const { requestAuthorization } = await import('../operations/authorizationBroker.js');
+  const { requestCapability, listPendingConsentRequests, resolveConsentRequest } = await import('../substrates/consent/index.js');
+  type Updating = HTMLElement & { updateComplete: Promise<unknown> };
+  const shell = document.createElement('jf-shell') as Updating;
+  document.body.append(shell); await shell.updateComplete;
+  await new Promise(resolve => setTimeout(resolve, 30)); await shell.updateComplete;
+  const host = shell.shadowRoot!.querySelector('jf-authorization-host') as Updating;
+  const pill = shell.shadowRoot!.querySelector('jf-status-pill') as Updating & { status: { refresh(): void } };
+  const settle = async () => {
+    await host.updateComplete; await Promise.resolve(); await host.updateComplete;
+    pill.status.refresh(); await pill.updateComplete;
+    await (pill.shadowRoot!.querySelector('jf-status-panel') as Updating).updateComplete;
+  };
+  try {
+    const decision = kind === 'capability'
+      ? requestCapability({ contributorId: 'plugin.arrival', capability: 'net.fetch' })
+      : requestAuthorization({ pendingId: 'arrival', operationId: 'core.arrival',
+        gateBehavior: kind === 'typed' ? 'TYPED_CONFIRM' : 'INLINE_CONFIRM' });
+    await settle();
+    const dialog = host.shadowRoot!.querySelector('dialog')!;
+    expect(dialog.open, 'opens on arrival, before any Review').toBe(true);
+    expect(dialog.getAttribute('data-testid')).toBe(kind === 'capability' ? 'capability-ceremony' : 'authorization-ceremony');
+    expect(dialog.classList.contains('lightweight')).toBe(kind === 'lightweight');
+    const { modalOwnsFocus } = await import('../primitives/modality.js');
+    expect(modalOwnsFocus(), 'typed and capability ceremonies are modal').toBe(kind !== 'lightweight');
+    const panel = pill.shadowRoot!.querySelector('jf-status-panel')!;
+    const row = panel.shadowRoot!.querySelector(kind === 'capability' ? '[data-fact^="consent:"]' : '[data-fact="authorization:arrival"]');
+    expect(row, 'listed in Needs you').not.toBeNull();
+    // Dismissed by some other path: Review reopens the same ceremony and focuses it.
+    dialog.close(); expect(dialog.open).toBe(false);
+    [...row!.querySelectorAll('button')].find(b => b.textContent!.trim().startsWith('Review'))!.click();
+    await settle();
+    expect(host.shadowRoot!.querySelector('dialog')).toBe(dialog);
+    expect(dialog.open, 'Review reopens it').toBe(true);
+    expect(modalOwnsFocus()).toBe(kind !== 'lightweight');
+    const focused = host.shadowRoot!.activeElement;
+    expect(focused && dialog.contains(focused), 'Review focuses it').toBe(true);
+    expect(focused?.getAttribute('data-testid')).toBe(kind === 'typed' ? 'authorization-typed-input' : kind === 'capability' ? 'capability-deny' : 'authorization-deny');
+    void decision;
+  } finally {
+    for (const request of listPendingConsentRequests()) resolveConsentRequest(request.id, 'deny');
+    shell.remove();
+  }
+});

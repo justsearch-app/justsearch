@@ -93,10 +93,6 @@ describe('Move 4 — trusted ceremony on the Top Layer', () => {
 
   it.each(kinds.flatMap(first => kinds.filter(second => second !== first).map(second => [first, second] as const)))(
     'A1 selecting %s → %s from the status panel applies the selected prompt’s own modality', async (first, second) => {
-      host.remove();
-      host = document.createElement('jf-authorization-host') as AuthorizationHost;
-      host.setAttribute('status-panel', '');
-      document.body.appendChild(host);
       await settle();
       const dialog = host.shadowRoot!.querySelector('dialog')!;
       const modal = vi.spyOn(dialog, 'showModal');
@@ -106,8 +102,11 @@ describe('Move 4 — trusted ceremony on the Top Layer', () => {
       enqueue(first, 'first');
       enqueue(second, 'second');
       await settle();
-      // The status panel lists both; nothing opens until one is selected.
-      expect(dialog.open).toBe(false);
+      // The first opens on arrival in its own modality; the status panel lists both.
+      expect(dialog.open).toBe(true);
+      expect(modalOwnsFocus()).toBe(first !== 'lightweight');
+      expect(host.statusRequests()).toHaveLength(2);
+      // Reviewing the open one keeps it open in the same modality.
       host.reviewStatusRequest(id(first, 'first'));
       await settle();
       expect(dialog.open).toBe(true);

@@ -70,6 +70,18 @@ checks of this slice read a notice; R4 changes what names a folder row. No asser
 | StatusPill.design "below 1000 px the pill is an icon…" | the C1 notice is asserted beside the icon, and the pill's name is asserted to stay "1 needs you" | R1, as above |
 | frameStatus "B1 a folder whose scan errored…" | supplies the resolved folder path; same title assertions | R4: folder rows are named by folder, not by collection |
 
+## Round 8 changes to this slice's own checks
+
+The status panel no longer holds a ceremony back until Review: every authorization ceremony opens on
+arrival as on main (CI Measured axe, `ui_agent_flows.setup_run_approval`), stays listed in Needs you,
+and Review focuses it or reopens it if it was closed. The host's `status-panel` switch is retired with
+the gate it carried. No assertion is dropped:
+
+| Check | Change | Reason |
+| --- | --- | --- |
+| AuthorizationHost.toplayer "A1 selecting … from the status panel …" (6 cases) | uses the host as the shell mounts it (no `status-panel` attribute); "nothing opens until one is selected" becomes "the first opens on arrival in its own modality, both are listed", and reviewing the open one keeps it open in that modality; the selection and modality assertions are unchanged | opening on arrival is the restored behaviour; the cases still fail before for the A1 reason (`<second> modality`) |
+| StatusPanel.approvals (8 cases) | the fixture no longer sets the retired `statusPanel` property; assertions unchanged | the property is removed |
+
 ```json
 {
   "entries": [
@@ -687,7 +699,7 @@ checks of this slice read a notice; R4 changes what names a folder row. No asser
         "modules/ui-web/src/shell-v0/components/AuthorizationHost.toplayer.test.ts"
       ],
       "class": "New",
-      "behaviour": "Selecting a request from the status panel while another prompt is open presents the selected one in its own modality: typed approvals and plugin capability requests modal in the top layer (scroll lock, modality authority), lightweight approvals non-modal.",
+      "behaviour": "Every ceremony opens on arrival in its own modality; selecting another request from the status panel while one is open presents the selected one in its own modality: typed approvals and plugin capability requests modal in the top layer (scroll lock, modality authority), lightweight approvals non-modal.",
       "sources": [
         {
           "kind": "delegated-choice",
@@ -728,6 +740,30 @@ checks of this slice read a notice; R4 changes what names a folder row. No asser
       "newChecks": [
         "modules/ui-web/src/shell-v0/components/AuthorizationHost.toplayer.test.ts#Move 4 — trusted ceremony on the Top Layer A1 selecting typed → capability from the status panel applies the selected prompt’s own modality",
         "modules/ui-web/src/shell-v0/components/AuthorizationHost.toplayer.test.ts#Move 4 — trusted ceremony on the Top Layer A1 selecting capability → typed from the status panel applies the selected prompt’s own modality"
+      ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/chrome/Shell.status.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "In the shell as mounted, a lightweight approval, a typed approval and a plugin capability request each open on arrival in their own modality (typed and capability modal, lightweight non-modal), are listed in Needs you, and the panel's Review reopens a closed ceremony and focuses it (typed field, otherwise Deny).",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed accordingly",
+          "delegationLocation": "task t-20261103-shell user turn 2026-11-03 ~16:20Z (reply to the orchestrator's plan)",
+          "delegationScope": "the frame-build plan: S1 · Status: the pill and status panel, built on the existing data, replacing about a dozen old pieces (the status bar, bell, pop-ups, task list and others)",
+          "choice": "C12 (must not break) One decision, one execution: the same authorization reached from the panel, a dialog and an MCP announcement executes once; repeated clicks are idempotent; expired, withdrawn or superseded requests (run cancelled, engine restart, answered elsewhere) cannot execute and leave the panel. | Repair round 8 (CI Measured axe, ui_agent_flows setup_run_approval; regression against main): every authorization ceremony (backend operation approvals, live agent tool approvals, plugin capability consent) opens on arrival exactly as on main, typed approvals and capability consent modal in the browser top layer and lightweight approvals non-modal; the request is also listed in the panel's Needs you, and the panel's Review action focuses (or reopens if dismissed) the same ceremony.",
+          "label": "agent choice"
+        }
+      ],
+      "repaired": true,
+      "evidence": "gates/test-intent/evidence/shell-s1-frame-status-round8-repair.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/chrome/Shell.status.test.ts#C12 a lightweight ceremony opens on arrival in the shell, is listed in Needs you, and Review returns to it",
+        "modules/ui-web/src/shell-v0/chrome/Shell.status.test.ts#C12 a typed ceremony opens on arrival in the shell, is listed in Needs you, and Review returns to it",
+        "modules/ui-web/src/shell-v0/chrome/Shell.status.test.ts#C12 a capability ceremony opens on arrival in the shell, is listed in Needs you, and Review returns to it"
       ]
     },
     {
