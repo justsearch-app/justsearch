@@ -1,0 +1,177 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
+  },
+  "createdAt": "2026-11-03T18:55:18.914Z",
+  "revision": "60939ee924ea5d7d21aa8f87405aba13d48f3f9b",
+  "tree": "39209293b7c277e4a5871cb93159f54da2e83bd6",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": "openjdk version \"25.0.4.1\" 2026-08-18 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "./gradlew :modules:indexer-worker:test --tests \"io.justsearch.indexerworker.queue.RediscoveryAdmissionTest.maintenanceWithoutCapturedProofKeepsExistingAdmission\" --tests \"io.justsearch.indexerworker.queue.RediscoveryAdmissionTest.identicalCandidateEnumerationRetainsRevisionAndReplayWitness\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 7896
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/RediscoveryAdmissionTest.java#maintenanceWithoutCapturedProofKeepsExistingAdmission",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/RediscoveryAdmissionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:0b6d668e74a80faafebe927d54cb8c36fb884d3ce346e594883033e1c72b9dcd",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "maintenanceWithoutCapturedProofKeepsExistingAdmission(String) [1] bytes",
+          "status": "passed"
+        },
+        {
+          "name": "maintenanceWithoutCapturedProofKeepsExistingAdmission(String) [2] collection",
+          "status": "passed"
+        },
+        {
+          "name": "maintenanceWithoutCapturedProofKeepsExistingAdmission(String) [3] collection-null",
+          "status": "passed"
+        },
+        {
+          "name": "maintenanceWithoutCapturedProofKeepsExistingAdmission(String) [4] retained-collection-null",
+          "status": "passed"
+        },
+        {
+          "name": "maintenanceWithoutCapturedProofKeepsExistingAdmission(String) [5] root",
+          "status": "passed"
+        },
+        {
+          "name": "maintenanceWithoutCapturedProofKeepsExistingAdmission(String) [6] root-null",
+          "status": "passed"
+        },
+        {
+          "name": "maintenanceWithoutCapturedProofKeepsExistingAdmission(String) [7] retained-root-null",
+          "status": "passed"
+        },
+        {
+          "name": "maintenanceWithoutCapturedProofKeepsExistingAdmission(String) [8] generation",
+          "status": "passed"
+        },
+        {
+          "name": "maintenanceWithoutCapturedProofKeepsExistingAdmission(String) [9] native-target",
+          "status": "passed"
+        },
+        {
+          "name": "maintenanceWithoutCapturedProofKeepsExistingAdmission(String) [10] force",
+          "status": "passed"
+        },
+        {
+          "name": "maintenanceWithoutCapturedProofKeepsExistingAdmission(String) [11] planned-hash",
+          "status": "passed"
+        },
+        {
+          "name": "maintenanceWithoutCapturedProofKeepsExistingAdmission(String) [12] admitted-hash",
+          "status": "passed"
+        },
+        {
+          "name": "maintenanceWithoutCapturedProofKeepsExistingAdmission(String) [13] DONE",
+          "status": "passed"
+        },
+        {
+          "name": "maintenanceWithoutCapturedProofKeepsExistingAdmission(String) [14] FAILED",
+          "status": "passed"
+        },
+        {
+          "name": "maintenanceWithoutCapturedProofKeepsExistingAdmission(String) [15] RETRY_EXHAUSTED",
+          "status": "passed"
+        },
+        {
+          "name": "maintenanceWithoutCapturedProofKeepsExistingAdmission(String) [16] cancelled",
+          "status": "passed"
+        },
+        {
+          "name": "maintenanceWithoutCapturedProofKeepsExistingAdmission(String) [17] open",
+          "status": "passed"
+        },
+        {
+          "name": "maintenanceWithoutCapturedProofKeepsExistingAdmission(String) [18] streaming",
+          "status": "passed"
+        },
+        {
+          "name": "maintenanceWithoutCapturedProofKeepsExistingAdmission(String) [19] sealed",
+          "status": "passed"
+        },
+        {
+          "name": "maintenanceWithoutCapturedProofKeepsExistingAdmission(String) [20] unseen-resumed",
+          "status": "passed"
+        },
+        {
+          "name": "maintenanceWithoutCapturedProofKeepsExistingAdmission(String) [21] missing-manifest",
+          "status": "passed"
+        },
+        {
+          "name": "maintenanceWithoutCapturedProofKeepsExistingAdmission(String) [22] missing-membership",
+          "status": "passed"
+        },
+        {
+          "name": "maintenanceWithoutCapturedProofKeepsExistingAdmission(String) [23] future-epoch",
+          "status": "passed"
+        },
+        {
+          "name": "maintenanceWithoutCapturedProofKeepsExistingAdmission(String) [24] zero-epoch",
+          "status": "passed"
+        },
+        {
+          "name": "maintenanceWithoutCapturedProofKeepsExistingAdmission(String) [25] release-revision",
+          "status": "passed"
+        },
+        {
+          "name": "maintenanceWithoutCapturedProofKeepsExistingAdmission(String) [26] root-revision",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/RediscoveryAdmissionTest.java#identicalCandidateEnumerationRetainsRevisionAndReplayWitness",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/RediscoveryAdmissionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:0b6d668e74a80faafebe927d54cb8c36fb884d3ce346e594883033e1c72b9dcd",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "identicalCandidateEnumerationRetainsRevisionAndReplayWitness(String) [1] PENDING",
+          "status": "passed"
+        },
+        {
+          "name": "identicalCandidateEnumerationRetainsRevisionAndReplayWitness(String) [2] PROCESSING",
+          "status": "passed"
+        },
+        {
+          "name": "identicalCandidateEnumerationRetainsRevisionAndReplayWitness(String) [3] DONE",
+          "status": "passed"
+        },
+        {
+          "name": "identicalCandidateEnumerationRetainsRevisionAndReplayWitness(String) [4] FAILED",
+          "status": "passed"
+        },
+        {
+          "name": "identicalCandidateEnumerationRetainsRevisionAndReplayWitness(String) [5] RETRY_EXHAUSTED",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:f24854eca5d9727a43a3e53a207058bf6ebd831735acdb8c9d979f2dce05b5b6"
+}
