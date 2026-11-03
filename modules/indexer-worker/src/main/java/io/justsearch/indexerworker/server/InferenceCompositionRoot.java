@@ -137,15 +137,7 @@ public final class InferenceCompositionRoot {
         modelsDir);
     putGpuWeight(weights, EncoderRole.NER, "ner", projection.ner().isReady(),
         projection.ner().modelPath(), projection.ner().gpuEnabled(), contract, hardware, modelsDir);
-    // Best match first switched off keeps its files and its device budget. Otherwise the plan
-    // published while off has no reranker role, and switching on warms the session against it:
-    // GpuCallPacker sends a planned-profile call with no role budget to the CPU, so the prepared
-    // CUDA session never realizes CUDA and the switch is refused. Switching also leaves the other
-    // roles' planned caps, and so the index session, unchanged.
-    boolean rerankerPlanned = projection.reranker().isReady()
-        || (EncoderConfigurationProjection.rerankerOffBySavedPreference(cfg)
-            && projection.reranker().modelPath() != null);
-    putGpuWeight(weights, EncoderRole.RERANKER, "reranker", rerankerPlanned,
+    putGpuWeight(weights, EncoderRole.RERANKER, "reranker", projection.reranker().isReady(),
         projection.reranker().modelPath(), projection.reranker().gpuEnabled(), contract, hardware,
         modelsDir);
     return weights;

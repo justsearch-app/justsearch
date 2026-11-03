@@ -5509,6 +5509,22 @@ public final class KnowledgeServer implements Closeable {
   /** Builds a private query successor while retaining the exact currently issued A view. */
   public PreparedQueryRoleSettings prepareQueryRoleSettings(UiSettings candidate,
       ResolvedConfig desired, Set<String> changedKeys, QueryRoleSelection prior) {
+    return prepareQueryRoleSettings(candidate, desired, changedKeys, prior, () -> () -> {});
+  }
+
+  /**
+   * {@link #prepareQueryRoleSettings(UiSettings, ResolvedConfig, Set, QueryRoleSelection)} where
+   * {@code stageCandidatePlan} puts {@code desired}'s device-memory plan in effect and returns the
+   * action that puts the published plan back. A reranker the serving view does not run (Best match
+   * first switched on) is warmed under that plan once memory admission passed: the published plan
+   * of a configuration without it has no reranker budget, and a planned CUDA session sends calls
+   * without a budget to the CPU. A refused or abandoned preparation puts the published plan back;
+   * the commit publishes the candidate's own.
+   */
+  public PreparedQueryRoleSettings prepareQueryRoleSettings(UiSettings candidate,
+      ResolvedConfig desired, Set<String> changedKeys, QueryRoleSelection prior,
+      java.util.function.Supplier<Runnable> stageCandidatePlan) {
+    Objects.requireNonNull(stageCandidatePlan, "stageCandidatePlan");
     Objects.requireNonNull(candidate, "candidate");
     Objects.requireNonNull(desired, "desired");
     Objects.requireNonNull(changedKeys, "changedKeys");
@@ -5542,12 +5558,7 @@ public final class KnowledgeServer implements Closeable {
       boolean rerankerPathChanged = changedKeys.contains(EnvRegistry.RERANK_MODEL_PATH.configKey());
       boolean citationPathChanged = changedKeys.contains(
           EnvRegistry.CITATION_SCORER_MODEL_PATH.configKey());
-      // Switching Best match first on is a path change to the retained (or discovered) model,
-      // never the blank-path disablement of an ordinary settings save.
-      boolean switchedOn = changedKeys.contains("rerankerEnabled")
-          && Boolean.TRUE.equals(candidate.getRerankerEnabled());
-      Path rerankerDirectory = rerankerPathChanged && !switchedOn
-          && candidate.getRerankerModelPath().isBlank()
+      Path rerankerDirectory = rerankerPathChanged && candidate.getRerankerModelPath().isBlank()
           ? null : projection.reranker().modelPath();
       Path citationDirectory = citationPathChanged && candidate.getCitationScorerModelPath().isBlank()
           ? null : projection.citation().modelPath();
@@ -5598,6 +5609,13 @@ public final class KnowledgeServer implements Closeable {
       }
       prepared = new PreparedQueryRoleSettings(source, old, selection, desired, hardware,
           composition, refreshedPlan);
+      boolean switchedOn = changedKeys.contains("rerankerEnabled")
+          && Boolean.TRUE.equals(candidate.getRerankerEnabled());
+      if (selection.reranker().state() == QueryRoleSelection.State.SELECTED
+          && (switchedOn || old.queryRoleSet.reranker() == null)) {
+        prepared.candidatePlanRestore = Objects.requireNonNull(stageCandidatePlan.get(),
+            "Candidate plan restore");
+      }
       prepared.captureSource();
       if (replaceIndex) {
         prepared.beginBulkInPlace();
@@ -5683,6 +5701,8 @@ public final class KnowledgeServer implements Closeable {
     private CandidateModels models;
     private boolean producerPaused;
     private boolean producerParked;
+    // Puts the published device-memory plan back after a staged candidate plan; null otherwise.
+    private Runnable candidatePlanRestore;
 
     private PreparedQueryRoleSettings(ServingLease source, ServingView old,
         QueryRoleSelection selection, ResolvedConfig configuration, HardwareProfile hardware,
@@ -6130,6 +6150,8 @@ public final class KnowledgeServer implements Closeable {
         }
         startupConfiguration = configuration;
         installed = true;
+        // The commit publishes this configuration's plan, the one staged for its preparation.
+        candidatePlanRestore = null;
         servingViewMonitor.notifyAll();
       }
       awaitQueryPublicationBarrier();
@@ -6173,6 +6195,20 @@ public final class KnowledgeServer implements Closeable {
 
     public void abort(Throwable cause) {
       if (installed || aborted) return;
+      try { abortCandidate(cause); }
+      finally {
+        Runnable restore = candidatePlanRestore;
+        candidatePlanRestore = null;
+        if (restore != null) {
+          try { restore.run(); }
+          catch (RuntimeException | Error failure) {
+            if (cause != failure) cause.addSuppressed(failure);
+          }
+        }
+      }
+    }
+
+    private void abortCandidate(Throwable cause) {
       try { closeCandidate(); }
       catch (RuntimeException | Error cleanup) {
         retainQueryRecovery(cause, cleanup);

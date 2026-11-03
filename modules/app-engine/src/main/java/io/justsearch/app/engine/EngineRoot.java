@@ -501,10 +501,12 @@ public final class EngineRoot implements WorkerHost {
 
   /**
    * Spec E step E7b: the bulk-work gate and the chat controller follow {@code state}'s profile from
-   * now on (the current one is delivered at once).
+   * now on (the current one is delivered at once), and query-role preparations stage their
+   * candidate plans on it.
    */
   public void followDevicePlan(io.justsearch.app.services.gpu.DevicePlanState state) {
     Objects.requireNonNull(state, "state");
+    followedPlanState = state;
     state.subscribe(resolution -> {
       java.util.function.Consumer<io.justsearch.app.api.status.operating.Profile> receiver;
       synchronized (profileLock) {
@@ -528,6 +530,8 @@ public final class EngineRoot implements WorkerHost {
     if (plan != null) receiver.accept(plan.statusProfile());
   }
 
+  // The plan state followDevicePlan follows; query preparations stage candidate plans on it.
+  private volatile io.justsearch.app.services.gpu.DevicePlanState followedPlanState;
   private final Object profileLock = new Object();
   private io.justsearch.app.services.gpu.GpuProfileResolver.Resolution devicePlan; // Guarded.
   private java.util.function.Consumer<io.justsearch.app.api.status.operating.Profile>
@@ -670,7 +674,14 @@ public final class EngineRoot implements WorkerHost {
       if (current == null) {
         throw new IllegalStateException("Physical encoder owner is unavailable");
       }
-      var prepared = current.prepareQueryRoleSettings(candidate, desired, changedKeys, prior.get());
+      // A switch-on warms its reranker under the candidate's admitted device-memory plan.
+      var prepared = current.prepareQueryRoleSettings(candidate, desired, changedKeys, prior.get(),
+          () -> {
+            var state = followedPlanState;
+            return state == null ? () -> {} : state.stage(
+                io.justsearch.app.services.config.ConfigStoreRebuilder.planOf(desired).orElse(
+                    io.justsearch.app.services.gpu.GpuProfileResolver.Resolution.unresolved()));
+          });
       return new io.justsearch.app.services.settings.FixedSettingsComponentComposer.QueryRolePreparedOwner() {
         @Override public io.justsearch.app.api.settings.QueryRoleSelection selection() {
           return prepared.selection();

@@ -28,15 +28,15 @@ import org.junit.jupiter.api.io.TempDir;
 import tools.jackson.databind.json.JsonMapper;
 
 /**
- * The Best match first switch through the settings HTTP route: On is handed to the encoder owner
- * as a change of the reranker model path (the live preparation a new model path already uses);
- * Off is not a path change.
+ * The Best match first switch through the settings HTTP route reaches the encoder owner as the
+ * switch, never as a change of the reranker model path: On restores the retained selection, and
+ * only an actual model-path change selects from a directory again (R4).
  */
 final class RerankerSwitchRouteHttpTest {
   private static final String MODEL_PATH = "justsearch.rerank.model_path";
 
   @Test
-  void onIsPreparedAsAModelPathChange(@TempDir Path dir) throws Exception {
+  void onIsTheSwitchNotAModelPathChange(@TempDir Path dir) throws Exception {
     switchReachesTheEncoderOwner(true, dir);
   }
 
@@ -89,8 +89,8 @@ final class RerankerSwitchRouteHttpTest {
       Set<String> encoders = affectedKeys.get().get("encoders");
       assertNotNull(encoders, "the switch is prepared by the encoder owner");
       assertTrue(encoders.contains("rerankerEnabled"));
-      assertEquals(on, encoders.contains(MODEL_PATH),
-          on ? "On is prepared as a model path change" : "Off is not a model path change");
+      assertFalse(encoders.contains(MODEL_PATH),
+          (on ? "On" : "Off") + " is the switch, not a model path change");
       assertEquals(on, store.load().getRerankerEnabled());
       assertEquals(dir.resolve("reranker").toString(), store.load().getRerankerModelPath(),
           "the switch keeps the saved model path");

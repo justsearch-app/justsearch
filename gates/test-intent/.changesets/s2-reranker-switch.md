@@ -515,7 +515,7 @@ verifier supplies acceptance after reviewing the final candidate. No acceptance 
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/RerankerSwitchOnCudaTest.java"
       ],
       "class": "New",
-      "behaviour": "Root cause of the live CUDA refusal on switching on: while off, the device-memory plan had no reranker role, so the On warm-up ran on a CPU lease and the CUDA session never realized CUDA. The plan while off now keeps the reranker budget of the plan while on, and an On preparation under the plan published while off realizes CUDA and selects the retained files.",
+      "behaviour": "Switching on with a CUDA reranker from a published device-memory plan without a reranker budget: once memory admission passed, the preparation warms under the candidate configuration's staged plan and realizes CUDA with the retained files; an abandoned or refused switch-on puts the published plan back.",
       "sources": [
         {
           "kind": "owner-adopted-scenario",
@@ -527,25 +527,31 @@ verifier supplies acceptance after reviewing the final candidate. No acceptance 
         {
           "kind": "owner-adopted-scenario",
           "task": "t-20261101-uiimpl",
-          "scenario": "R4",
-          "quote": "Off then restart then On restores the exact earlier reranker selection (same model and variant, a custom model too) unless the user changed it; an install whose query role was already explicitly disabled stays disabled when no new choice exists.",
+          "scenario": "R3",
+          "quote": "Switching Best match first while searches and answers run: in-flight work completes, new work uses the new setting; a second window shows the change; a stale save cannot overwrite a newer one (settings witness). Failures (missing or corrupt files, warm-up failure, low memory, crash mid-change) leave a truthful state, never a false On/Off. Missing files: the existing consent with size and licence, no transfer if declined.",
           "label": "agent-drafted, owner-adopted"
         }
       ],
-      "evidence": "gates/test-intent/evidence/s2-reranker-redesign2.json",
+      "evidence": "gates/test-intent/evidence/s2-reranker-round2-new.json",
       "newChecks": [
-        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/RerankerSwitchOnCudaTest.java#thePlanWhileOffKeepsTheRerankerBudgetOfThePlanWhileOn",
-        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/RerankerSwitchOnCudaTest.java#switchingOnRealizesCudaUnderThePlanPublishedWhileOff"
-      ],
-      "repaired": true
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/RerankerSwitchOnCudaTest.java#switchingOnRealizesCudaUnderTheStagedCandidatePlan",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/RerankerSwitchOnCudaTest.java#aRefusedSwitchOnPutsThePublishedPlanBack"
+      ]
     },
     {
       "items": [
         "modules/ui/src/test/java/io/justsearch/ui/api/RerankerSwitchRouteHttpTest.java"
       ],
       "class": "New",
-      "behaviour": "Through the settings HTTP route, switching on is handed to the encoder owner as a change of the reranker model path (the live preparation a new model path uses) and keeps the saved path. The Off case of the same file (not a model path change) passes on 8613d76e02 too and runs in the module suite.",
+      "behaviour": "Through the settings HTTP route, the Best match first switch reaches the encoder owner as the switch (rerankerEnabled), never as a reranker model-path change, and keeps the saved path. The Off case of the same file passes on 6f770ee77d too and runs in the module suite.",
       "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "R4",
+          "quote": "Off then restart then On restores the exact earlier reranker selection (same model and variant, a custom model too) unless the user changed it; an install whose query role was already explicitly disabled stays disabled when no new choice exists.",
+          "label": "agent-drafted, owner-adopted"
+        },
         {
           "kind": "owner-adopted-scenario",
           "task": "t-20261101-uiimpl",
@@ -554,9 +560,9 @@ verifier supplies acceptance after reviewing the final candidate. No acceptance 
           "label": "agent-drafted, owner-adopted"
         }
       ],
-      "evidence": "gates/test-intent/evidence/s2-reranker-redesign2.json",
+      "evidence": "gates/test-intent/evidence/s2-reranker-round2-repairs.json",
       "newChecks": [
-        "modules/ui/src/test/java/io/justsearch/ui/api/RerankerSwitchRouteHttpTest.java#onIsPreparedAsAModelPathChange"
+        "modules/ui/src/test/java/io/justsearch/ui/api/RerankerSwitchRouteHttpTest.java#onIsTheSwitchNotAModelPathChange"
       ],
       "repaired": true
     },
@@ -580,6 +586,180 @@ verifier supplies acceptance after reviewing the final candidate. No acceptance 
         "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/ShortPageFusionOrderTest.java#everyLimitWithoutCrossEncoderIsAPrefixOfTheLongPage"
       ],
       "repaired": true
+    },
+    {
+      "items": [
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/ShortPageRankingDepthTest.java"
+      ],
+      "class": "New",
+      "behaviour": "Without a cross-encoder, a chunked corpus's hybrid and keyword pages for limits 1, 5 and 9 are the prefix of the ten-result page and a 50-result page keeps every ten-page result; the chunk-side recall-complete splice changes no page without a cross-encoder but still feeds a cross-encoder's window; with a cross-encoder, the round-1 and chunked corpora return the pages they returned on 8613d76e02 (limits 1, 5, 9).",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "R1",
+          "quote": "After install, Best match first has a live switch (sentence and path). Off: searches and the answer context stop using the reranker within one change, no Engine restart, results stay usable (earlier ordering); files kept; the page says \"Off - files kept\". On: reranking returns with the same model files.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "N1",
+          "quote": "Answers on/off (core.set-chat-enabled) keeps files and its meaning; search by exact words and by meaning, indexing and its pacing, energy and manual pause rules, GPU-pressure handling and picture-reading back-off work as today; installs, consent, decline and Repair of parts not switched keep today’s behaviour.",
+          "label": "agent-drafted, owner-adopted"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/s2-reranker-round2-repairs.json",
+      "newChecks": [
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/ShortPageRankingDepthTest.java#chunkedShortPagesWithoutCrossEncoderArePrefixesOfTheTenResultPage",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/ShortPageRankingDepthTest.java#chunkRecallCompleteLeavesPagesWithoutCrossEncoderAlone",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/ShortPageRankingDepthTest.java#pagesWithCrossEncoderKeepTheirRankingBeforeTheSwitch"
+      ],
+      "repaired": true
+    },
+    {
+      "items": [
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/RerankerSwitchRetainedSelectionTest.java"
+      ],
+      "class": "New",
+      "behaviour": "Switching on through the settings owner into the Worker's query-role preparation, with a blank saved path and custom retained files while a different installed model sits where discovery looks, selects the exact retained model and tokenizer and keeps the saved path blank.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "R4",
+          "quote": "Off then restart then On restores the exact earlier reranker selection (same model and variant, a custom model too) unless the user changed it; an install whose query role was already explicitly disabled stays disabled when no new choice exists.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "R2",
+          "quote": "The Best match first choice survives Engine restart, app upgrade and a legacy install whose reranker was found by discovery; an explicit off survives Repair, installing additions and runtime activation (none silently turns it back on). Absent choice keeps today’s behaviour.",
+          "label": "agent-drafted, owner-adopted"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/s2-reranker-round2-repairs.json",
+      "newChecks": [
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/RerankerSwitchRetainedSelectionTest.java#switchingOnSelectsTheRetainedCustomFilesNotTheDiscoveredModel"
+      ],
+      "repaired": true
+    },
+    {
+      "items": [
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/RerankerSwitchRetainedSelectionTest.java"
+      ],
+      "class": "New",
+      "behaviour": "Switching on when the retained reranker files changed refuses with a reason naming the kept files instead of selecting other files.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "R3",
+          "quote": "Switching Best match first while searches and answers run: in-flight work completes, new work uses the new setting; a second window shows the change; a stale save cannot overwrite a newer one (settings witness). Failures (missing or corrupt files, warm-up failure, low memory, crash mid-change) leave a truthful state, never a false On/Off. Missing files: the existing consent with size and licence, no transfer if declined.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "R4",
+          "quote": "Off then restart then On restores the exact earlier reranker selection (same model and variant, a custom model too) unless the user changed it; an install whose query role was already explicitly disabled stays disabled when no new choice exists.",
+          "label": "agent-drafted, owner-adopted"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/s2-reranker-round2-new.json",
+      "newChecks": [
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/RerankerSwitchRetainedSelectionTest.java#switchingOnRefusesWhenTheRetainedFilesChanged"
+      ]
+    },
+    {
+      "items": [
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/RerankerOffDevicePlanTest.java"
+      ],
+      "class": "New",
+      "behaviour": "The device-memory plan weights of the configuration saved with Best match first off have no reranker entry (no budget reserved while off); with it on and the same files, the reranker is planned.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "R1",
+          "quote": "After install, Best match first has a live switch (sentence and path). Off: searches and the answer context stop using the reranker within one change, no Engine restart, results stay usable (earlier ordering); files kept; the page says \"Off - files kept\". On: reranking returns with the same model files.",
+          "label": "agent-drafted, owner-adopted"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/s2-reranker-round2-repairs.json",
+      "newChecks": [
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/RerankerOffDevicePlanTest.java#offReleasesTheRerankerBudget"
+      ],
+      "repaired": true
+    },
+    {
+      "items": [
+        "modules/app-engine/src/test/java/io/justsearch/app/engine/RerankerSwitchOnDevicePlanTest.java"
+      ],
+      "class": "New",
+      "behaviour": "From a published plan without a reranker budget, the Engine's query-role owner runs the switch-on preparation under the candidate configuration's own plan (with a reranker budget), and a refused preparation leaves the published plan in effect.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "R1",
+          "quote": "After install, Best match first has a live switch (sentence and path). Off: searches and the answer context stop using the reranker within one change, no Engine restart, results stay usable (earlier ordering); files kept; the page says \"Off - files kept\". On: reranking returns with the same model files.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "R3",
+          "quote": "Switching Best match first while searches and answers run: in-flight work completes, new work uses the new setting; a second window shows the change; a stale save cannot overwrite a newer one (settings witness). Failures (missing or corrupt files, warm-up failure, low memory, crash mid-change) leave a truthful state, never a false On/Off. Missing files: the existing consent with size and licence, no transfer if declined.",
+          "label": "agent-drafted, owner-adopted"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/s2-reranker-round2-repairs.json",
+      "newChecks": [
+        "modules/app-engine/src/test/java/io/justsearch/app/engine/RerankerSwitchOnDevicePlanTest.java#switchOnPreparesUnderTheCandidatePlanAndARefusalKeepsThePublishedPlan"
+      ],
+      "repaired": true
+    },
+    {
+      "items": [
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceReasonCodeContractTest.java"
+      ],
+      "class": "Adaptation",
+      "moved": [
+        "input re-encoding"
+      ],
+      "whatMoved": "The chunk-side recall-complete gap case now names the cross-encoder its splice exists for: the search request sets cross_encoder_enabled, which is what a Head search with a reranker sends. The corpus, the collapse multiplier, the flag off/on comparison, the limit and both assertions (collapse-dropped parent absent with the flag off, rescued into the judge window with it on) are unchanged.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "N1",
+          "quote": "Answers on/off (core.set-chat-enabled) keeps files and its meaning; search by exact words and by meaning, indexing and its pacing, energy and manual pause rules, GPU-pressure handling and picture-reading back-off work as today; installs, consent, decline and Repair of parts not switched keep today’s behaviour.",
+          "label": "agent-drafted, owner-adopted"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/s2-reranker-round2-new.json"
+    },
+    {
+      "items": [
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/RerankerSwitchTest.java"
+      ],
+      "class": "New",
+      "behaviour": "After Off retained a custom selection and a new process reopens the saved candidate, switching on (the switch, not a model-path change) restores that exact selection even though another available variant now sits in its directory.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "R4",
+          "quote": "Off then restart then On restores the exact earlier reranker selection (same model and variant, a custom model too) unless the user changed it; an install whose query role was already explicitly disabled stays disabled when no new choice exists.",
+          "label": "agent-drafted, owner-adopted"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/s2-reranker-round2-new.json",
+      "newChecks": [
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/RerankerSwitchTest.java#onRestoresExactCustomIdentityInsteadOfProbingAnotherVariant"
+      ]
     }
   ]
 }

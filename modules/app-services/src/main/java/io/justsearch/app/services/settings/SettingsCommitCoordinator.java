@@ -1060,13 +1060,9 @@ public final class SettingsCommitCoordinator implements SettingsCommitOwner {
           || candidateContext.hasChatProfile() || candidateContext.forceGenerativeRefresh()) {
         var affected = new java.util.TreeMap<String, Set<String>>(changedKeys.component());
         if (prepareReranker) {
-          // On restores the retained model through the same live preparation as a new model
-          // path; Off is not a path change and only disables the role.
-          Set<String> switched = Boolean.TRUE.equals(preparedCandidate.getRerankerEnabled())
-              ? Set.of("rerankerEnabled",
-                  io.justsearch.configuration.EnvRegistry.RERANK_MODEL_PATH.configKey())
-              : Set.of("rerankerEnabled");
-          affected.merge("encoders", switched, (left, right) -> {
+          // The switch is not a model-path change: On restores the retained selection, Off only
+          // disables the role. A path the same save changes arrives as its own key.
+          affected.merge("encoders", Set.of("rerankerEnabled"), (left, right) -> {
             var keys = new java.util.TreeSet<>(left);
             keys.addAll(right);
             return Set.copyOf(keys);

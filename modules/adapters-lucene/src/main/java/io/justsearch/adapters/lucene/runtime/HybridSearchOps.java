@@ -41,12 +41,6 @@ public final class HybridSearchOps {
   // diverged from the builder defaults they claim to mirror).
   static final int DEFAULT_CANDIDATE_LIMIT_MAX = 100;
 
-  /**
-   * The shallowest ranking depth the candidate pools are sized for. A shorter page ranks the same
-   * pools as the default ten-result page, so with the default limits it is that page's prefix
-   * instead of a fusion over a few candidates per leg.
-   */
-  public static final int MIN_FUSION_DEPTH = 10;
   static final int DEFAULT_TEXT_CANDIDATE_MULTIPLIER = 10;
   static final int DEFAULT_VECTOR_CANDIDATE_MULTIPLIER = 10;
   static final double DEFAULT_VECTOR_RRF_WEIGHT = 0.75;
@@ -352,9 +346,8 @@ public final class HybridSearchOps {
 
     // Ensure caps never undercut the user-visible limit
     candidateMax = Math.max(candidateMax, limit);
-    int depth = Math.max(limit, MIN_FUSION_DEPTH);
-    int textCandidateLimit = Math.min(depth * Math.max(1, textMult), candidateMax);
-    int vectorCandidateLimit = Math.min(depth * Math.max(1, vectorMult), textCandidateLimit);
+    int textCandidateLimit = Math.min(limit * Math.max(1, textMult), candidateMax);
+    int vectorCandidateLimit = Math.min(limit * Math.max(1, vectorMult), textCandidateLimit);
 
     // Execute both searches in parallel using virtual threads
     SearchResult textResult;

@@ -134,21 +134,24 @@ final class QueryRoleSelectionResolver {
       }
       return QueryRoleSelection.Role.disabled();
     }
-    // Switching on arrives as a path change. The exact serving or earlier selection (variant,
-    // custom file) is kept when it names that directory with unchanged bytes; otherwise the
-    // directory is probed like any new model path.
-    if (pathChanged && desiredDirectory != null) {
-      for (var exact : java.util.Arrays.asList(prior, candidate.getRerankerRestoreSelection())) {
-        if (exact != null && exact.state() == QueryRoleSelection.State.SELECTED
-            && desiredDirectory.toAbsolutePath().normalize().equals(
-                exact.model().path().toAbsolutePath().normalize().getParent())
-            && GenerationModelSelection.verifyIdentity(exact.model())
-            && GenerationModelSelection.verifyIdentity(exact.tokenizer())) {
-          return enrich("reranker", exact);
+    boolean probe = pathChanged;
+    if (Boolean.TRUE.equals(candidate.getRerankerEnabled()) && !pathChanged
+        && (prior == null || prior.state() != QueryRoleSelection.State.SELECTED)) {
+      // Switching on restores the exact retained selection (model, tokenizer, variant, custom
+      // file). Only an actual model-path change selects from a directory again.
+      var retained = candidate.getRerankerRestoreSelection();
+      if (retained != null) {
+        if (!GenerationModelSelection.verifyIdentity(retained.model())
+            || !GenerationModelSelection.verifyIdentity(retained.tokenizer())) {
+          throw new IOException("The kept Best match first files changed or are missing: "
+              + retained.model().path());
         }
+        return enrich("reranker", retained);
       }
+      // Nothing retained (a role disabled before the switch existed): the installed directory.
+      probe = true;
     }
-    var selected = select("reranker", pathChanged, desiredDirectory, prior,
+    var selected = select("reranker", probe, desiredDirectory, prior,
         generation, currentlyWired, gpuEnabled);
     if (Boolean.TRUE.equals(candidate.getRerankerEnabled())
         && selected.state() != QueryRoleSelection.State.SELECTED) {

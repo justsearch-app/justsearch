@@ -35,6 +35,8 @@ public final class SearchPlanner {
   private static final Logger log = LoggerFactory.getLogger(SearchPlanner.class);
   static final int DEFAULT_LIMIT = 10;
   static final int MAX_LIMIT = 100;
+  /** The ranking depth of a page without a cross-encoder: the default ten-result page. */
+  static final int STABLE_RANK_DEPTH = 10;
   static final int MIN_DF_SKIP_FIELD_DOCS = 100;
   static final int DEFAULT_VECTOR_SKIP_MIN_CHARS = 4;
   static final double DEFAULT_VECTOR_SKIP_MIN_DF_FRACTION = 0.25;
@@ -115,7 +117,20 @@ public final class SearchPlanner {
       }
     }
 
-    int retrievalLimit = computeRetrievalLimit(limit, inputs);
+    // Without a cross-encoder the fused order is the page itself. Fusion then ranks to the depth of
+    // a ten-result page before the page is cut, so a short page is that page's prefix: the leg
+    // pools, the chunk pools, the parent collapse and the branch-fusion normalisation stop scaling
+    // with the visible limit. The executor cuts the ranked list back to the requested limit. With a
+    // cross-encoder the Head asks for its window and the ranking keeps the requested limit.
+    int rankLimit = pipeline.getCrossEncoderEnabled() ? limit : Math.max(limit, STABLE_RANK_DEPTH);
+    boolean chunkBranchRanks = rankLimit > limit
+        && planChunkMerge(inputs, limit, queryString, false)
+            instanceof ChunkMergeDirective.EligibleApply;
+    // Keyword-only and single-leg retrieval keep the page boundary (and so the next-page cursor)
+    // unless the chunk branch is fused into the page.
+    int retrievalLimit = computeRetrievalLimit(chunkBranchRanks ? rankLimit : limit, inputs);
+    int fusedRetrievalLimit = computeRetrievalLimit(rankLimit, inputs);
+    int chunkLimit = chunkBranchRanks ? rankLimit : limit;
 
     // SparseShortcut path (sparse-only request).
     if (sparseOnlyRequest) {
@@ -147,7 +162,7 @@ public final class SearchPlanner {
         }
       }
       ChunkMergeDirective chunkMerge =
-          planChunkMerge(inputs, limit, queryString, false);
+          planChunkMerge(inputs, chunkLimit, queryString, false);
       return new SearchDecision.SparseShortcut(
           runtimeSyntax, retrievalLimit, correctionRetryEnabled, facets, chunkMerge);
     }
@@ -156,7 +171,8 @@ public final class SearchPlanner {
     Optional<SearchReasonCode> denseSkipReason =
         planDenseSkip(inputs, queryString, canSparse, canDense, canSplade);
     boolean runDense = canDense && denseSkipReason.isEmpty();
-    LegSet legs = selectLegSet(inputs, canSparse, runDense, canSplade, retrievalLimit);
+    LegSet legs = selectLegSet(inputs, canSparse, runDense, canSplade, retrievalLimit,
+        fusedRetrievalLimit);
     if (legs == null) {
       // No legs runnable → empty result (Bm25Only with empty query).
       return new SearchDecision.EmptyQueryDecision(
@@ -195,7 +211,7 @@ public final class SearchPlanner {
     }
 
     ChunkMergeDirective chunkMerge =
-        planChunkMerge(inputs, limit, queryString, runDense);
+        planChunkMerge(inputs, chunkLimit, queryString, runDense);
 
     return new SearchDecision.MultiLegDecision(
         inputs.runtimeSyntax(),
@@ -254,17 +270,18 @@ public final class SearchPlanner {
       boolean canSparse,
       boolean canDense,
       boolean canSplade,
-      int retrievalLimit) {
+      int retrievalLimit,
+      int fusedRetrievalLimit) {
     var vec =
         inputs.encoding().vector() instanceof VectorEncoding.Success vs ? vs : null;
     var spl =
         inputs.encoding().splade() instanceof SpladeEncoding.Success ss ? ss : null;
     double hybridWeight = 1.0;
     if (canSparse && canDense && canSplade && vec != null && spl != null) {
-      return new LegSet.ThreeWay(vec, spl, retrievalLimit, hybridWeight);
+      return new LegSet.ThreeWay(vec, spl, fusedRetrievalLimit, hybridWeight);
     }
     if (canSparse && canDense && vec != null) {
-      return new LegSet.Bm25Dense(vec, retrievalLimit, hybridWeight);
+      return new LegSet.Bm25Dense(vec, fusedRetrievalLimit, hybridWeight);
     }
     if (canDense && !canSparse && !canSplade && vec != null) {
       return new LegSet.DenseOnly(vec, retrievalLimit);

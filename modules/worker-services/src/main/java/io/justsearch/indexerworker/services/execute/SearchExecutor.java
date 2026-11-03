@@ -506,10 +506,8 @@ public final class SearchExecutor {
     int candidateMax = Math.max(hs3 != null ? hs3.candidateLimitMax() : 100, tw.retrievalLimit());
     int textMult = hs3 != null ? hs3.textCandidateMultiplier() : 10;
     int vectorMult = hs3 != null ? hs3.vectorCandidateMultiplier() : 10;
-    // Same ranking depth as two-leg hybrid fusion: a short page ranks the default page's pools.
-    int depth = Math.max(tw.retrievalLimit(), HybridSearchOps.MIN_FUSION_DEPTH);
-    int textCandLimit = Math.min(depth * Math.max(1, textMult), candidateMax);
-    int vectorCandLimit = Math.min(depth * Math.max(1, vectorMult), candidateMax);
+    int textCandLimit = Math.min(tw.retrievalLimit() * Math.max(1, textMult), candidateMax);
+    int vectorCandLimit = Math.min(tw.retrievalLimit() * Math.max(1, vectorMult), candidateMax);
 
     Context otelCtx = Context.current().with(retrievalSpan);
     LuceneRuntimeTypes.SearchResult result;
@@ -630,11 +628,27 @@ public final class SearchExecutor {
       LuceneRuntimeTypes.SearchResult baseResult,
       SearchInputs inputs,
       String chunkQueryText) {
+    int pageLimit = inputs.request().getLimit() > 0 ? inputs.request().getLimit() : 10;
     if (directive instanceof ChunkMergeDirective.Skip s) {
-      var trimmed = trimSearchResult(baseResult, inputs.request().getLimit() > 0 ? inputs.request().getLimit() : 10);
+      var trimmed = trimSearchResult(baseResult, pageLimit);
       return new ChunkRunOutcome(trimmed, false, s.reason(), null, false, 0L, 0L, 0L, 0L, false, 0L);
     }
-    var apply = (ChunkMergeDirective.EligibleApply) directive;
+    // Without a cross-encoder SearchPlanner ranks to the depth of a ten-result page;
+    // the page is the prefix of that ranking.
+    var outcome = applyChunkMerge(
+        (ChunkMergeDirective.EligibleApply) directive, baseResult, inputs, chunkQueryText);
+    var page = trimSearchResult(outcome.result(), pageLimit);
+    return page == outcome.result() ? outcome : new ChunkRunOutcome(page, outcome.applied(),
+        outcome.reason(), outcome.branchFusionStrategy(), outcome.branchFusionContributed(),
+        outcome.chunkMergeMs(), outcome.chunkBm25Ns(), outcome.chunkKnnNs(),
+        outcome.chunkSpladeNs(), outcome.chunkRetry(), outcome.branchFusionNs());
+  }
+
+  private ChunkRunOutcome applyChunkMerge(
+      ChunkMergeDirective.EligibleApply apply,
+      LuceneRuntimeTypes.SearchResult baseResult,
+      SearchInputs inputs,
+      String chunkQueryText) {
     boolean hasBaseResults = baseResult.hits() != null && !baseResult.hits().isEmpty();
     // Tempdoc 774 Stage 1 — base-results gate lever. Default true reproduces today's behavior
     // (chunk merge is a recall gate on the doc legs). When false, the chunk branch runs even when
@@ -791,8 +805,11 @@ public final class SearchExecutor {
 
     // Tempdoc 774 Stage 1 — chunk-side recall-complete per-leg top-N to protect (0 = disabled, so no
     // per-leg protected-set work is done in executeChunkBranchFusion when the lever is off).
+    // Like the doc-side splice, it exists for the cross-encoder's window: without one the protected
+    // set is neither collected nor spliced, so the page keeps its fused order.
+    boolean rerankPool = pipeline.getCrossEncoderEnabled();
     int chunkRecallTopN =
-        hybridConfig != null && hybridConfig.chunkLegRecallCompleteEnabled()
+        rerankPool && hybridConfig != null && hybridConfig.chunkLegRecallCompleteEnabled()
             ? hybridConfig.chunkLegRecallCompleteTopN()
             : 0;
 
@@ -953,7 +970,6 @@ public final class SearchExecutor {
     // Head cross-encoder ever sees it. Re-assert the guarantee on the branch-fused list, identifying
     // the protected docs by the dense/bm25 leg rank carried in their whole-doc provenance (presence,
     // not score — keyword-neutral). Spliced before attachBranchFusion so provenance is re-mapped.
-    boolean rerankPool = pipeline.getCrossEncoderEnabled();
     if (rerankPool && hybridConfig != null && hybridConfig.legRecallCompleteEnabled()) {
       int topN = hybridConfig.legRecallCompleteTopN();
       List<LuceneRuntimeTypes.SearchHit> protectedHits = new ArrayList<>();
@@ -984,7 +1000,7 @@ public final class SearchExecutor {
     // whose fused rank fell outside the collapse cap is still rescued (the collapse is itself a
     // "stage that may not drop a passage-leg top-N candidate", §I.2). Spliced before attachBranchFusion
     // so provenance is re-mapped — same ordering as the doc-side block.
-    if (hybridConfig != null && hybridConfig.chunkLegRecallCompleteEnabled()) {
+    if (rerankPool && hybridConfig != null && hybridConfig.chunkLegRecallCompleteEnabled()) {
       List<LuceneRuntimeTypes.SearchHit> spliced =
           HybridFusionUtils.spliceRecallComplete(
               merged.hits(), chunkBranchResult.legTopNParents(), limit);
