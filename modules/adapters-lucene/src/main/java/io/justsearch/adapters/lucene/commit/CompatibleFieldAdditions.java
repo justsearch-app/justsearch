@@ -12,7 +12,7 @@ import java.util.HashSet;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
-/** Explicit catalog permission to open an older index missing optional stored keywords. */
+/** Explicit catalog permission to open an older index missing optional stored keywords or binary fields. */
 public final class CompatibleFieldAdditions {
   private static final ObjectMapper JSON = new ObjectMapper();
 
@@ -45,8 +45,9 @@ public final class CompatibleFieldAdditions {
           // Conservative structural guard: role-bearing, indexed and vector additions still
           // require rebuilding, even if someone mistakenly marks them compatible in the catalog.
           if (field.path("id").equals(shape.path("id"))
-              && optionalKeyword(field, "docValues", "multiValued")
-              && optionalKeyword(shape, "doc_values", "multi_valued")) {
+              && field.path("type").equals(shape.path("type"))
+              && optionalStored(field, "docValues", "multiValued")
+              && optionalStored(shape, "doc_values", "multi_valued")) {
             optional.add("fields[" + shape.path("id").asText() + "]");
           }
         }
@@ -58,8 +59,9 @@ public final class CompatibleFieldAdditions {
         !"<absent>".equals(difference.stored()) || !optional.contains(difference.path())).toList();
   }
 
-  private static boolean optionalKeyword(JsonNode field, String docValues, String multiValued) {
-    return "keyword".equals(field.path("type").asText())
+  private static boolean optionalStored(JsonNode field, String docValues, String multiValued) {
+    return ("keyword".equals(field.path("type").asText())
+        || "binary-stored".equals(field.path("type").asText()))
         && field.path("stored").asBoolean(false)
         && !field.path(docValues).asBoolean(false)
         && !field.path(multiValued).asBoolean(false)

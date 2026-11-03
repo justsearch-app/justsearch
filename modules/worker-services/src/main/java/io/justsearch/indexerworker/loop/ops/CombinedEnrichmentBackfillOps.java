@@ -487,9 +487,6 @@ public final class CombinedEnrichmentBackfillOps {
       // pay documentWindowCount's second tokenization before reaching the window seam.
       Set<String> directWindowedDocIds = new HashSet<>();
       List<String> spladeDocIds = new ArrayList<>();
-      // Non-stored postings must accompany any other stage's RMW of a completed document.
-      // Enrollment is deferred until those other outcomes exist.
-      Set<String> completedSpladeIds = new HashSet<>();
 
       Set<String> stageAdvancedDocIds = new HashSet<>();
       Set<String> completedWindowDocIds = new HashSet<>();
@@ -582,10 +579,6 @@ public final class CombinedEnrichmentBackfillOps {
           if (spladeAvailable && context.chunkSpladeEnabled()
               && SchemaFields.SPLADE_STATUS_PENDING.equals(chunkSpladeStatus)) {
             spladeDocIds.add(docId);
-          }
-          if (context.chunkSpladeEnabled()
-              && SchemaFields.SPLADE_STATUS_COMPLETED.equals(chunkSpladeStatus)) {
-            completedSpladeIds.add(docId);
           }
           continue;
         }
@@ -683,9 +676,6 @@ public final class CombinedEnrichmentBackfillOps {
         }
         if (spladeAvailable && SchemaFields.SPLADE_STATUS_PENDING.equals(spladeStatus)) {
           spladeDocIds.add(docId);
-        }
-        if (SchemaFields.SPLADE_STATUS_COMPLETED.equals(spladeStatus)) {
-          completedSpladeIds.add(docId);
         }
         if (nerAvailable
             && SchemaFields.NER_STATUS_PENDING.equals(
@@ -1260,16 +1250,7 @@ public final class CombinedEnrichmentBackfillOps {
       }
       nerMs = (System.nanoTime() - tNer) / 1_000_000;
 
-      // Completed postings are non-stored: derive them only for documents with another outcome.
-      // The write depends on preservation, so its deadline cannot discard an earned stage outcome.
-      List<String> preservationIds = new ArrayList<>();
-      for (String docId : pendingIds) {
-        if (spladeConfigured && completedSpladeIds.contains(docId)
-            && !updatesByDocId.get(docId).isEmpty()) {
-          preservationIds.add(docId);
-        }
-      }
-      // Phase 3c: SPLADE preservation, followed by pending SPLADE slices.
+      // Phase 3c: pending SPLADE slices. Untouched artifacts are carried by the writer.
       long tSplade = System.nanoTime();
       phaseStart = tSplade;
       activePhase = "splade";
@@ -1277,86 +1258,71 @@ public final class CombinedEnrichmentBackfillOps {
       boolean systemicSpladeFailure = false;
       boolean attemptedSplade = false;
       pacer.startPhase(bulkPace.spladePhaseDocs());
-      for (List<String> candidates : List.of(preservationIds, spladeDocIds)) {
-        if (systemicSpladeFailure) break;
-        boolean preserving = candidates == preservationIds;
-        for (int start = 0; start < candidates.size(); start += bulkPace.spladePhaseDocs()) {
-          if (context.hardStopRequestedSupplier().getAsBoolean()
-              || context.indexingCoordinator().bulkDeleteEpoch() != epochAtSelection
-              || (!preserving && stopRequested(context, unitsDone, epochAtSelection))) {
-            aborted = true;
+      for (int start = 0; start < spladeDocIds.size(); start += bulkPace.spladePhaseDocs()) {
+        if (context.hardStopRequestedSupplier().getAsBoolean()
+            || context.indexingCoordinator().bulkDeleteEpoch() != epochAtSelection
+            || stopRequested(context, unitsDone, epochAtSelection)) {
+          aborted = true;
 
-            break;
+          break;
+        }
+        if (!context.spladeAllowedSupplier().getAsBoolean()) break;
+        SpladeEncoder encoder = context.spladeEncoderSupplier().get();
+        if (encoder == null) {
+          systemicSpladeFailure = true;
+          context.spladeBackfillResult().accept(false);
+          break;
+        }
+        int end = Math.min(start + bulkPace.spladePhaseDocs(), spladeDocIds.size());
+        List<String> sliceIds = spladeDocIds.subList(start, end);
+        List<String> texts = sliceIds.stream().map(contentByDocId::get).toList();
+        pacer.beforeUnit(sliceIds.size());
+        try {
+          attemptedSplade = true;
+          accounting.attempted(EnrichmentAccounting.Stage.SPLADE);
+          List<Map<String, Float>> vectors = encoder.encodeBatch(texts);
+          if (vectors == null || vectors.size() != sliceIds.size()) {
+            throw new IllegalStateException("SPLADE batch result size mismatch");
           }
-          if (!context.spladeAllowedSupplier().getAsBoolean()) break;
-          SpladeEncoder encoder = context.spladeEncoderSupplier().get();
-          if (encoder == null) {
+          for (int i = 0; i < sliceIds.size(); i++) {
+            String id = sliceIds.get(i);
+            Map<String, Float> vector = vectors.get(i);
+            String status = SpladeBackfillOps.spladeStatusFor(vector);
+            Map<String, Object> updates = updatesByDocId.get(id);
+            updates.put(SchemaFields.SPLADE, vector);
+            updates.put(SchemaFields.SPLADE_STATUS, status);
+            updates.put(SchemaFields.SPLADE_RETRY_COUNT, "0");
+            stageAdvancedDocIds.add(id);
+          }
+        } catch (Exception failure) {
+          accounting.cancelled(EnrichmentAccounting.Stage.SPLADE, failure);
+          context.log().warn("Combined backfill: SPLADE slice failed: {}", failure.getMessage());
+          if (context.spladeEncoderSupplier().get() != encoder || SpladeBackfillOps.isSystemicFailure(failure)) {
             systemicSpladeFailure = true;
             context.spladeBackfillResult().accept(false);
-            break;
-          }
-          int end = Math.min(start + bulkPace.spladePhaseDocs(), candidates.size());
-          List<String> sliceIds = candidates.subList(start, end);
-          List<String> texts = sliceIds.stream().map(contentByDocId::get).toList();
-          pacer.beforeUnit(sliceIds.size());
-          try {
-            attemptedSplade = true;
-            accounting.attempted(EnrichmentAccounting.Stage.SPLADE);
-            List<Map<String, Float>> vectors = encoder.encodeBatch(texts);
-            if (vectors == null || vectors.size() != sliceIds.size()) {
-              throw new IllegalStateException("SPLADE batch result size mismatch");
-            }
-            for (int i = 0; i < sliceIds.size(); i++) {
-              String id = sliceIds.get(i);
-              Map<String, Float> vector = vectors.get(i);
-              String status = SpladeBackfillOps.spladeStatusFor(vector);
-              Map<String, Object> updates = updatesByDocId.get(id);
-              updates.put(SchemaFields.SPLADE, vector);
-              updates.put(SchemaFields.SPLADE_STATUS, status);
-              updates.put(SchemaFields.SPLADE_RETRY_COUNT, "0");
+          } else {
+            for (String id : sliceIds) {
+              if (updatesByDocId.get(id).containsKey(SchemaFields.SPLADE)) continue;
+              var escalation = SpladeBackfillOps.computeSpladeFailureUpdate(
+                  parseRetryCountOrZero(batchedFields.getOrDefault(id, Map.of())
+                      .get(SchemaFields.SPLADE_RETRY_COUNT)));
+              updatesByDocId.get(id).putAll(escalation);
               stageAdvancedDocIds.add(id);
-            }
-          } catch (Exception failure) {
-            accounting.cancelled(EnrichmentAccounting.Stage.SPLADE, failure);
-            context.log().warn("Combined backfill: SPLADE slice failed: {}", failure.getMessage());
-            if (context.spladeEncoderSupplier().get() != encoder || SpladeBackfillOps.isSystemicFailure(failure)) {
-              systemicSpladeFailure = true;
-              context.spladeBackfillResult().accept(false);
-            } else {
-              for (String id : sliceIds) {
-                if (updatesByDocId.get(id).containsKey(SchemaFields.SPLADE)) continue;
-                var escalation = SpladeBackfillOps.computeSpladeFailureUpdate(
-                    parseRetryCountOrZero(batchedFields.getOrDefault(id, Map.of())
-                        .get(SchemaFields.SPLADE_RETRY_COUNT)));
-                updatesByDocId.get(id).putAll(escalation);
-                stageAdvancedDocIds.add(id);
-                if (escalation.containsKey(SchemaFields.SPLADE_STATUS)) {
-                  spladeTerminalFailures.add(id + "(encode-failure)");
-                }
-                spladeFailed++;
+              if (escalation.containsKey(SchemaFields.SPLADE_STATUS)) {
+                spladeTerminalFailures.add(id + "(encode-failure)");
               }
+              spladeFailed++;
             }
-            if (systemicSpladeFailure || !preserving) break;
-          } finally {
-            pacer.afterUnit(sliceIds.size());
-            unitsDone++;
           }
+          break;
+        } finally {
+          pacer.afterUnit(sliceIds.size());
+          unitsDone++;
         }
       }
       if (attemptedSplade && !systemicSpladeFailure) context.spladeBackfillResult().accept(true);
       spladeMs = (System.nanoTime() - tSplade) / 1_000_000;
       updatesByDocId.forEach(accounting::computed);
-      for (String id : preservationIds) {
-        Map<String, Object> updates = updatesByDocId.get(id);
-        // docs/tempdocs/711-rmw-preservation-and-followup-designs.md: an attempted
-        // non-systemic failure uses the writer's reset lane with the other earned outcomes.
-        // Systemic failures, backoff and unattempted preservation still defer publication.
-        if (!updates.containsKey(SchemaFields.SPLADE)
-            && !updates.containsKey(SchemaFields.SPLADE_RETRY_COUNT)) {
-          updates.clear();
-        }
-      }
-
       // Phase 4: Single batch write (one RMW per doc with all enrichments)
       long tWrite = System.nanoTime();
       phaseStart = tWrite;

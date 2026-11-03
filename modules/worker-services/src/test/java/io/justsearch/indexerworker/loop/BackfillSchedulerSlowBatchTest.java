@@ -4,6 +4,7 @@ package io.justsearch.indexerworker.loop;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTimeoutPreemptively;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
@@ -666,6 +667,8 @@ class BackfillSchedulerSlowBatchTest {
 
   private void wirePopulation(Map<String, Map<String, Object>> state) {
     embedMsPerDoc = 0;
+    lenient().when(documentFieldOps.getDocumentContent(anyString()))
+        .thenAnswer(call -> "long content for " + call.getArgument(0));
     lenient().when(documentFieldOps.queryDocIdsByField(anyString(), anyString(), anyInt()))
         .thenAnswer(call -> state.entrySet().stream()
             .filter(entry -> call.getArgument(1).equals(entry.getValue().get(call.getArgument(0))))
@@ -701,17 +704,16 @@ class BackfillSchedulerSlowBatchTest {
   }
 
   @Test
-  void persistentlyFailingPreservationDoesNotPoisonHealthyDocumentsAcrossCycles() throws Exception {
+  void failingSparseEncoderCannotAffectCompletedSparseDocumentsAcrossCycles() throws Exception {
     Map<String, Map<String, Object>> state = new java.util.LinkedHashMap<>();
     Map<String, Object> failingState = new HashMap<>();
     state.put("poison", failingState);
     wirePopulation(state);
-    combinedBatchDocs = 128; // Two preservation slices, then another combined batch.
+    combinedBatchDocs = 128; // Two dense slices, then another combined batch.
     modeledNanosPerEncode = 10_000_000L;
     List<List<String>> sparseAttempts = new ArrayList<>();
-    Set<String> failedSliceIds = new java.util.HashSet<>();
     sparseEncoder = mock(io.justsearch.indexerworker.splade.SpladeEncoder.class);
-    when(sparseEncoder.encodeBatch(anyList())).thenAnswer(call -> {
+    lenient().when(sparseEncoder.encodeBatch(anyList())).thenAnswer(call -> {
       List<String> texts = call.getArgument(0);
       sparseAttempts.add(List.copyOf(texts));
       monotonicNanos.addAndGet(10_000_000L);
@@ -725,15 +727,9 @@ class BackfillSchedulerSlowBatchTest {
       for (var entry : updates) {
         Map<String, Object> fields = entry.getValue();
         Map<String, Object> current = state.get(entry.getKey());
-        if ("1".equals(fields.get(SchemaFields.SPLADE_RETRY_COUNT))) {
-          assertFalse(fields.containsKey(SchemaFields.SPLADE));
-          failedSliceIds.add(entry.getKey());
-          current.remove(SchemaFields.SPLADE);
-          current.put(SchemaFields.SPLADE_STATUS, "PENDING");
-        } else {
-          assertEquals(Map.of("preserved", 1f), fields.get(SchemaFields.SPLADE),
-              "documents outside the failing slice retain regenerated postings");
-        }
+        assertFalse(fields.containsKey(SchemaFields.SPLADE));
+        assertFalse(fields.containsKey(SchemaFields.SPLADE_STATUS));
+        assertFalse(fields.containsKey(SchemaFields.SPLADE_RETRY_COUNT));
         current.putAll(fields);
       }
       return new LuceneRuntimeTypes.BatchUpdateResult(updates.size(), 0);
@@ -741,7 +737,6 @@ class BackfillSchedulerSlowBatchTest {
     BackfillScheduler scheduler = scheduler(monotonicNanos::get);
     for (int cycle = 1; cycle <= 3; cycle++) {
       sparseAttempts.clear();
-      failedSliceIds.clear();
       failingState.clear();
       failingState.putAll(Map.of(
           SchemaFields.EMBEDDING_STATUS, "PENDING", SchemaFields.SPLADE_STATUS, "COMPLETED",
@@ -763,14 +758,10 @@ class BackfillSchedulerSlowBatchTest {
       }
       assertEquals("COMPLETED", failingState.get(SchemaFields.EMBEDDING_STATUS));
       assertEquals("COMPLETED_EMPTY", failingState.get(SchemaFields.NER_STATUS));
-      assertEquals("PENDING", failingState.get(SchemaFields.SPLADE_STATUS));
-      assertEquals("1", failingState.get(SchemaFields.SPLADE_RETRY_COUNT));
-      assertFalse(failingState.containsKey(SchemaFields.SPLADE));
-      List<String> failedTexts = sparseAttempts.stream()
-          .filter(texts -> texts.contains("long content for poison")).findFirst().orElseThrow();
-      assertEquals(failedTexts.size(), failedSliceIds.size(),
-          "only the attempted failing slice uses the reset lane, with no individual retry");
-      for (String id : failedSliceIds) assertTrue(failedTexts.contains("long content for " + id));
+      assertEquals("COMPLETED", failingState.get(SchemaFields.SPLADE_STATUS));
+      assertNull(failingState.get(SchemaFields.SPLADE_RETRY_COUNT));
+      assertEquals(Map.of("original", 1f), failingState.get(SchemaFields.SPLADE));
+      assertTrue(sparseAttempts.isEmpty(), "finished sparse work must never invoke inference");
       assertFalse(loggedAtLevel(ch.qos.logback.classic.Level.WARN, "ZERO stage advancement"));
     }
     assertNoIndividualPublication();
@@ -778,7 +769,7 @@ class BackfillSchedulerSlowBatchTest {
 
   @ParameterizedTest(name = "{displayName} [{index}] {arguments}")
   @ValueSource(ints = {0, BATCH_DOCS})
-  void wholeBatchOfFailingPreservationDoesNotStarveFollowingHealthyParents(int leadingHealthy)
+  void completedSparseBatchPublishesWithoutCallingFailingEncoder(int leadingHealthy)
       throws Exception {
     Map<String, Map<String, Object>> state =
         runFailedPreservationWithFollowingHealthyParents(leadingHealthy, 1L);
@@ -788,9 +779,9 @@ class BackfillSchedulerSlowBatchTest {
       assertEquals("COMPLETED", current.get(SchemaFields.EMBEDDING_STATUS));
       assertEquals("0", current.get(SchemaFields.EMBEDDING_RETRY_COUNT));
       assertArrayEquals(new float[] {0.1f, 0.2f}, (float[]) current.get(SchemaFields.VECTOR));
-      assertEquals("PENDING", current.get(SchemaFields.SPLADE_STATUS));
-      assertEquals("1", current.get(SchemaFields.SPLADE_RETRY_COUNT));
-      assertFalse(current.containsKey(SchemaFields.SPLADE));
+      assertEquals("COMPLETED", current.get(SchemaFields.SPLADE_STATUS));
+      assertNull(current.get(SchemaFields.SPLADE_RETRY_COUNT));
+      assertEquals(Map.of("original", 1f), current.get(SchemaFields.SPLADE));
       assertEquals("COMPLETED_EMPTY", current.get(SchemaFields.NER_STATUS));
       assertEquals("0", current.get(SchemaFields.NER_RETRY_COUNT));
     }
@@ -799,7 +790,7 @@ class BackfillSchedulerSlowBatchTest {
 
   @ParameterizedTest(name = "{displayName} [{index}] {arguments}")
   @ValueSource(ints = {0, BATCH_DOCS})
-  void slowFailedPreservationDoesNotStarveFollowingHealthyParents(int leadingHealthy)
+  void completedSparseBatchDoesNotCallSlowFailingEncoder(int leadingHealthy)
       throws Exception {
     runFailedPreservationWithFollowingHealthyParents(leadingHealthy, 150L);
   }
@@ -820,7 +811,7 @@ class BackfillSchedulerSlowBatchTest {
     modeledNanosPerEncode = 1_000_000L;
     List<List<String>> sparseAttempts = new ArrayList<>();
     sparseEncoder = mock(io.justsearch.indexerworker.splade.SpladeEncoder.class);
-    when(sparseEncoder.encodeBatch(anyList())).thenAnswer(call -> {
+    lenient().when(sparseEncoder.encodeBatch(anyList())).thenAnswer(call -> {
       List<String> texts = call.getArgument(0);
       sparseAttempts.add(List.copyOf(texts));
       monotonicNanos.addAndGet(sparseCallMillis * 1_000_000L);
@@ -834,13 +825,9 @@ class BackfillSchedulerSlowBatchTest {
       for (var entry : updates) {
         Map<String, Object> fields = entry.getValue();
         Map<String, Object> current = state.get(entry.getKey());
-        if (healthy.contains(entry.getKey())) {
-          assertEquals(Map.of("preserved", 1f), fields.get(SchemaFields.SPLADE));
-        } else {
-          assertFalse(fields.containsKey(SchemaFields.SPLADE));
-          current.remove(SchemaFields.SPLADE);
-          current.put(SchemaFields.SPLADE_STATUS, "PENDING");
-        }
+        assertFalse(fields.containsKey(SchemaFields.SPLADE));
+        assertFalse(fields.containsKey(SchemaFields.SPLADE_STATUS));
+        assertFalse(fields.containsKey(SchemaFields.SPLADE_RETRY_COUNT));
         current.putAll(fields);
       }
       return new LuceneRuntimeTypes.BatchUpdateResult(updates.size(), 0);
@@ -853,9 +840,7 @@ class BackfillSchedulerSlowBatchTest {
           id + " must advance in the same idle cycle despite a failing preservation batch");
       assertEquals("COMPLETED_EMPTY", state.get(id).get(SchemaFields.NER_STATUS));
     }
-    assertTrue(sparseAttempts.stream()
-        .anyMatch(texts -> texts.stream().anyMatch(text -> text.contains("poison-"))),
-        "the failing head must actually reach sparse inference");
+    assertTrue(sparseAttempts.isEmpty(), "finished sparse work must never invoke inference");
     assertTrue(monotonicNanos.get() < CYCLE_BUDGET_MS * 1_000_000L);
     assertFalse(loggedAtLevel(ch.qos.logback.classic.Level.WARN, "ZERO stage advancement"));
     assertNoIndividualPublication();
@@ -863,7 +848,7 @@ class BackfillSchedulerSlowBatchTest {
   }
 
   @Test
-  void costlyCompletedSpladePreservationCannotStarveNerOrDiscardEarnedVectors() throws Exception {
+  void costlySparseEncoderIsNotCalledForFinishedWorkWhileDenseAndNerAdvance() throws Exception {
     Map<String, Map<String, Object>> state = new java.util.LinkedHashMap<>();
     for (int i = 0; i < 100; i++) state.put("long-" + i, new HashMap<>(Map.of(
         SchemaFields.EMBEDDING_STATUS, "PENDING", SchemaFields.SPLADE_STATUS, "COMPLETED",
@@ -902,7 +887,7 @@ class BackfillSchedulerSlowBatchTest {
       previousNer = nerDone;
       previousEmbed = embedDone;
     }
-    assertTrue(sparseEncodes.get() > 0);
+    assertEquals(0, sparseEncodes.get());
   }
 
   @Test
@@ -926,42 +911,31 @@ class BackfillSchedulerSlowBatchTest {
 
   @ParameterizedTest(name = "{displayName} [{index}] {arguments}")
   @ValueSource(booleans = {false, true})
-  void deferredPreservationNeverFallsThroughToIndividualEmbeddingIncludingBackoff(boolean encoderRetires) throws Exception {
+  void completedSparsePublishesEmbeddingDuringSparseBackoffOrEncoderRetirement(boolean encoderRetires) throws Exception {
     Map<String, Map<String, Object>> state = new java.util.LinkedHashMap<>();
     state.put("doc", new HashMap<>(Map.of(
-        SchemaFields.SPLADE_STATUS, "COMPLETED",
-        SchemaFields.NER_STATUS, "COMPLETED_EMPTY",
-        SchemaFields.EMBEDDING_STATUS, "PENDING")));
+        SchemaFields.SPLADE_STATUS, "COMPLETED", SchemaFields.SPLADE, Map.of("original", 1f),
+        SchemaFields.NER_STATUS, "COMPLETED_EMPTY", SchemaFields.EMBEDDING_STATUS, "PENDING")));
     wirePopulation(state);
     lenient().when(nerService.isAvailable()).thenReturn(false);
-    lenient().when(documentFieldOps.getDocumentContent("doc")).thenReturn("long content for doc");
     sparseEncoder = mock(io.justsearch.indexerworker.splade.SpladeEncoder.class);
-    when(sparseEncoder.encodeBatch(anyList()))
-        .thenThrow(new io.justsearch.ort.SessionTemporarilyUnavailableException("encoder unavailable"))
-        .thenReturn(List.of(Map.of("preserved", 1f)));
+    var failingEncoder = sparseEncoder;
+    lenient().when(sparseEncoder.encodeBatch(anyList()))
+        .thenThrow(new io.justsearch.ort.SessionTemporarilyUnavailableException("encoder unavailable"));
     BackfillScheduler scheduler = scheduler(monotonicNanos::get);
-    timeIdleCycle(scheduler);
-    assertEquals("PENDING", state.get("doc").get(SchemaFields.EMBEDDING_STATUS));
-    verify(indexingCoordinator, never()).updateDocumentsBatch(anyList());
-    var recoveringEncoder = sparseEncoder;
     if (encoderRetires) sparseEncoder = null;
-    timeIdleCycle(scheduler);
-    sparseEncoder = recoveringEncoder;
-    if (encoderRetires) {
-      assertEquals("COMPLETED", state.get("doc").get(SchemaFields.EMBEDDING_STATUS),
-          "an absent sparse encoder must not withhold another stage's outcome");
-      verify(indexingCoordinator, atLeastOnce()).updateDocumentsBatch(anyList());
-    } else {
-      assertEquals("PENDING", state.get("doc").get(SchemaFields.EMBEDDING_STATUS));
-      verify(indexingCoordinator, never()).updateDocumentsBatch(anyList());
+    else {
+      var retryTime = BackfillScheduler.class.getDeclaredField("nextSpladeRetryTime");
+      retryTime.setAccessible(true);
+      retryTime.setLong(scheduler, Long.MAX_VALUE);
     }
-    verify(sparseEncoder).encodeBatch(anyList());
-    var retryTime = BackfillScheduler.class.getDeclaredField("nextSpladeRetryTime");
-    retryTime.setAccessible(true);
-    retryTime.setLong(scheduler, 0);
     timeIdleCycle(scheduler);
     assertEquals("COMPLETED", state.get("doc").get(SchemaFields.EMBEDDING_STATUS));
     assertEquals("COMPLETED", state.get("doc").get(SchemaFields.SPLADE_STATUS));
+    assertEquals(Map.of("original", 1f), state.get("doc").get(SchemaFields.SPLADE));
+    assertNull(state.get("doc").get(SchemaFields.SPLADE_RETRY_COUNT));
+    verify(failingEncoder, never()).encodeBatch(anyList());
+    verify(indexingCoordinator, atLeastOnce()).updateDocumentsBatch(anyList());
   }
 
   @ParameterizedTest(name = "{displayName} [{index}] {arguments}")

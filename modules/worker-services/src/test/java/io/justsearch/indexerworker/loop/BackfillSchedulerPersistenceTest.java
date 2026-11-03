@@ -154,9 +154,12 @@ class BackfillSchedulerPersistenceTest extends LuceneExecutorTestBase {
   }
 
   @Test
-  void deadlineAfterSparseRederivationPublishesTheCompleteConditionalBundle() throws Exception {
+  void deadlineAfterEmbeddingPublishesWithoutSparseRederivation() throws Exception {
     EmbeddingProvider embedding = embedding();
-    when(embedding.embedDocumentBatch(anyList())).thenReturn(List.of(new float[] {1, 0, 0, 0}));
+    when(embedding.embedDocumentBatch(anyList())).thenAnswer(inv -> {
+      spend(5_100_000_000L);
+      return List.of(new float[] {1, 0, 0, 0});
+    });
     SpladeEncoder splade = mock(SpladeEncoder.class);
     when(splade.encodeBatch(anyList())).thenAnswer(inv -> {
       spend(5_100_000_000L);
@@ -168,11 +171,12 @@ class BackfillSchedulerPersistenceTest extends LuceneExecutorTestBase {
           SchemaFields.SPLADE_STATUS, "COMPLETED", SchemaFields.SPLADE, Map.of("old", 2f)));
       commit(runtime);
       assertTrue(scheduler(runtime, embedding, splade).runIdleCycle());
+      verify(splade, never()).encodeBatch(anyList());
     }
     try (var runtime = open()) {
       assertEquals("COMPLETED", runtime.documentFieldOps().getDocumentField("sparse", SchemaFields.EMBEDDING_STATUS));
       assertEquals("COMPLETED", runtime.documentFieldOps().getDocumentField("sparse", SchemaFields.SPLADE_STATUS));
-      var query = runtime.textQueryOps().buildSpladeQuery(Map.of("fresh", 1f), null);
+      var query = runtime.textQueryOps().buildSpladeQuery(Map.of("old", 1f), null);
       var hits = runtime.readPathOps().search(query, 10, Set.of(SchemaFields.DOC_ID),
           LuceneRuntimeTypes.RuntimeSearchSort.RELEVANCE, null);
       assertTrue(hits.hits().stream().anyMatch(hit -> "sparse".equals(hit.fields().get(SchemaFields.DOC_ID)))) ;

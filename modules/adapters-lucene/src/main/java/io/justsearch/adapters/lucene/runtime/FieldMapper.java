@@ -159,6 +159,7 @@ public final class FieldMapper {
     if (fields != null) {
       Map<String, String> droppedStatusTargets = detectUnusableVectors(fields, report);
       for (Map.Entry<String, Object> e : fields.entrySet()) {
+        if (SparsePayload.FIELD.equals(e.getKey())) continue; // Derived only from accepted features.
         FieldDef def = byId.get(e.getKey());
         if (def == null) {
           // Warn once per unknown field name to help diagnose silent data loss
@@ -178,6 +179,15 @@ public final class FieldMapper {
           report.correctedFailedStatuses.add(def.id);
         }
         added += addFields(doc, def, value);
+      }
+    }
+    if (fields != null && byId.containsKey(SparsePayload.FIELD)) {
+      int features = doc.getFields(SchemaFields.SPLADE).length;
+      String status = asString(fields.get(SchemaFields.SPLADE_STATUS));
+      boolean completed = SchemaFields.SPLADE_STATUS_COMPLETED.equals(status);
+      if (completed != (features > 0)
+          || (features > 0) != (doc.getBinaryValue(SparsePayload.FIELD) != null)) {
+        throw new IllegalArgumentException("SPLADE status, postings and derived payload disagree");
       }
     }
     if (added == 0) {
@@ -209,6 +219,8 @@ public final class FieldMapper {
       };
       fields.put(def.id, value);
     }
+    if (byId.containsKey(SchemaFields.SPLADE_STATUS))
+      fields.put(SchemaFields.SPLADE_STATUS, SchemaFields.SPLADE_STATUS_COMPLETED);
     return toDocument(fields, null);
   }
 
@@ -599,16 +611,30 @@ public final class FieldMapper {
           count++;
         }
       }
+      case "binary-stored" -> {
+        if (value instanceof byte[] bytes) {
+          doc.add(new StoredField(def.id, bytes));
+          count++;
+        } else if (value instanceof BytesRef bytes) {
+          doc.add(new StoredField(def.id, bytes));
+          count++;
+        }
+      }
       case "splade" -> {
         @SuppressWarnings("unchecked")
         Map<String, Float> sparseVec = (Map<String, Float>) value;
         if (sparseVec != null) {
+          Map<String, Float> accepted = new java.util.LinkedHashMap<>();
           for (var entry : sparseVec.entrySet()) {
             float weight = Math.min(entry.getValue(), 64.0f);
             if (weight > 0.0f) {
               doc.add(new FeatureField(def.id, entry.getKey(), weight));
+              accepted.put(entry.getKey(), weight);
               count++;
             }
+          }
+          if (!accepted.isEmpty() && byId.containsKey(SparsePayload.FIELD)) {
+            doc.add(new StoredField(SparsePayload.FIELD, SparsePayload.encode(accepted)));
           }
         }
       }

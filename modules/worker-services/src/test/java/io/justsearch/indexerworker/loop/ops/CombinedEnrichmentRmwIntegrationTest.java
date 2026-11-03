@@ -2,7 +2,6 @@
 package io.justsearch.indexerworker.loop.ops;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.Mockito.mock;
@@ -52,8 +51,7 @@ class CombinedEnrichmentRmwIntegrationTest extends io.justsearch.adapters.lucene
   }
 
   @Test
-  @DisplayName("pending embedding keeps completed parent's sparse postings in one real RMW")
-  void pendingEmbedding_rederivesCompletedParentSplade_andKeepsPosting() throws Exception {
+  void pendingEmbedding_preservesCompletedParentSplade_withoutEncoderCall() throws Exception {
     EmbeddingProvider embedding = mock(EmbeddingProvider.class);
     SpladeEncoder splade = mock(SpladeEncoder.class);
     when(embedding.isAvailable()).thenReturn(true);
@@ -88,12 +86,12 @@ class CombinedEnrichmentRmwIntegrationTest extends io.justsearch.adapters.lucene
     assertEquals(
         SchemaFields.EMBEDDING_STATUS_COMPLETED,
         runtime.documentFieldOps().getDocumentField(docId, SchemaFields.EMBEDDING_STATUS));
-    assertTrue(hasSparseHit("fresh", docId), "the newly derived FeatureField posting must survive RMW");
+    assertTrue(hasSparseHit("old", docId), "the existing FeatureField posting must survive RMW");
+    verify(splade, never()).encodeBatch(anyList());
   }
 
   @Test
-  @DisplayName("pending NER keeps completed parent's sparse postings in one real RMW")
-  void pendingNer_rederivesCompletedParentSplade_andKeepsPosting() throws Exception {
+  void pendingNer_preservesCompletedParentSplade_withoutEncoderCall() throws Exception {
     SpladeEncoder splade = mock(SpladeEncoder.class);
     NerService ner = mock(NerService.class);
     when(splade.encodeBatch(anyList())).thenReturn(List.of(Map.of("fresh", 2.0f)));
@@ -120,7 +118,8 @@ class CombinedEnrichmentRmwIntegrationTest extends io.justsearch.adapters.lucene
     assertEquals(
         SchemaFields.NER_STATUS_COMPLETED_EMPTY,
         runtime.documentFieldOps().getDocumentField(docId, SchemaFields.NER_STATUS));
-    assertTrue(hasSparseHit("fresh", docId), "the newly derived FeatureField posting must survive RMW");
+    assertTrue(hasSparseHit("old", docId), "the existing FeatureField posting must survive RMW");
+    verify(splade, never()).encodeBatch(anyList());
   }
 
   @Test
@@ -153,7 +152,25 @@ class CombinedEnrichmentRmwIntegrationTest extends io.justsearch.adapters.lucene
   }
 
   @Test
-  void failedPreservationPublishesEmbeddingAndResetsSplade() throws Exception {
+  void absentSpladeEncoderPublishesNerAndRetainsCompletedSplade() throws Exception {
+    NerService ner = mock(NerService.class);
+    when(ner.isAvailable()).thenReturn(true);
+    when(ner.extractEntitiesBatch(anyList())).thenReturn(List.of(NerResult.EMPTY));
+    String docId = "ner-without-sparse-encoder";
+    index(Map.of(SchemaFields.DOC_ID, docId, SchemaFields.DOC_UID, docId,
+        SchemaFields.CONTENT, "content for NER", SchemaFields.NER_STATUS, "PENDING",
+        SchemaFields.SPLADE_STATUS, "COMPLETED", SchemaFields.SPLADE_RETRY_COUNT, "2",
+        SchemaFields.SPLADE, Map.of("old", 2f)));
+    CombinedEnrichmentBackfillOps.processCombinedBackfill(context(null, null, ner));
+    refresh();
+    assertEquals("COMPLETED", runtime.documentFieldOps().getDocumentField(docId, SchemaFields.SPLADE_STATUS));
+    assertEquals("2", runtime.documentFieldOps().getDocumentField(docId, SchemaFields.SPLADE_RETRY_COUNT));
+    assertEquals("COMPLETED_EMPTY", runtime.documentFieldOps().getDocumentField(docId, SchemaFields.NER_STATUS));
+    assertTrue(hasSparseHit("old", docId));
+  }
+
+  @Test
+  void failingSpladeEncoderIsNotCalledAndEmbeddingPublishes() throws Exception {
     EmbeddingProvider embedding = mock(EmbeddingProvider.class);
     SpladeEncoder splade = mock(SpladeEncoder.class);
     when(embedding.isAvailable()).thenReturn(true);
@@ -173,15 +190,16 @@ class CombinedEnrichmentRmwIntegrationTest extends io.justsearch.adapters.lucene
     CombinedEnrichmentBackfillOps.processCombinedBackfill(context(embedding, splade, null));
     refresh();
 
-    assertFalse(hasSparseHit("old", docId), "failed preservation uses the baseline reset lane");
+    assertTrue(hasSparseHit("old", docId), "a failing encoder must not affect existing sparse work");
+    verify(splade, never()).encodeBatch(anyList());
     assertEquals(
         SchemaFields.EMBEDDING_STATUS_COMPLETED,
         runtime.documentFieldOps().getDocumentField(docId, SchemaFields.EMBEDDING_STATUS));
     assertEquals(
-        SchemaFields.SPLADE_STATUS_PENDING,
+        SchemaFields.SPLADE_STATUS_COMPLETED,
         runtime.documentFieldOps().getDocumentField(docId, SchemaFields.SPLADE_STATUS));
     assertEquals(
-        "1",
+        null,
         runtime.documentFieldOps().getDocumentField(docId, SchemaFields.SPLADE_RETRY_COUNT));
   }
 

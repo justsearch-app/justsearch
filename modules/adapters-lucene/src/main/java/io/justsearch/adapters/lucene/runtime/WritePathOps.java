@@ -57,9 +57,6 @@ public final class WritePathOps {
   // *_status field in the catalog uses this same COMPLETED/PENDING token set.
   private static final String STATUS_COMPLETED = "COMPLETED";
   private static final String STATUS_PENDING = "PENDING";
-  private static final Set<String> EMBEDDING_UPDATE_FIELDS = Set.of(
-      SchemaFields.VECTOR, SchemaFields.EMBEDDING_STATUS, SchemaFields.EMBEDDING_RETRY_COUNT,
-      SchemaFields.CHUNK_VECTOR, SchemaFields.CHUNK_EMBEDDING_STATUS, SchemaFields.CHUNK_EMBEDDING_RETRY_COUNT);
 
   private final RuntimeSession session;
   private final String idField;
@@ -350,20 +347,6 @@ public final class WritePathOps {
     }
   }
 
-  /**
-   * Read-modify-write: loads existing stored fields, applies the caller's updates, and re-indexes.
-   * Non-stored, non-docValues data-bearing fields the caller omits (vectors, SPLADE) are preserved
-   * per their declared {@code rmwPolicy} in the field catalog (tempdoc 711) — a subset-field RMW can
-   * no longer silently destroy the rest. The caller provides a leased searcher (via
-   * ReadPathOps.withSearcher) so it stays valid for the read and the subsequent write.
-   *
-   * @return true if the document was found and updated, false if not found
-   */
-  boolean readModifyWrite(IndexSearcher searcher, String docId, Map<String, Object> updates)
-      throws IOException {
-    return readModifyWrite(searcher, docId, updates, new ParentSliceCache());
-  }
-
   boolean backfillChunkDeclarations(
       IndexSearcher searcher, int parent, String docId, ChunkSetCompleteness.Declaration declaration)
       throws IOException {
@@ -388,74 +371,73 @@ public final class WritePathOps {
       // complete legacy parent shares its child summaries and the one subsequent refresh.
       // A partial set remains undeclared and therefore follows normal repair admission.
       var complete = new LinkedHashMap<String, ChunkSetCompleteness.Declaration>();
-      var docNumbers = new HashMap<String, Integer>();
       for (var entry : session.chunkCompleteness.legacyParents(current, idField).entrySet()) {
         var assessment = session.chunkCompleteness.assess(current, entry.getValue(), entry.getKey());
         if (assessment.complete() && assessment.backfill() != null) {
           complete.put(entry.getKey(), assessment.backfill());
-          docNumbers.put(entry.getKey(), entry.getValue());
         }
       }
-      var sparse = legacySparseFeatures(current, new HashSet<>(docNumbers.values()));
-      for (var entry : complete.entrySet())
-        installChunkDeclaration(current, docNumbers.get(entry.getKey()), entry.getKey(), entry.getValue(), sparse.get(docNumbers.get(entry.getKey())));
+      var updates = new ArrayList<Map.Entry<String, Map<String, Object>>>();
+      for (var entry : complete.entrySet()) {
+        updates.add(Map.entry(entry.getKey(), Map.of(
+            SchemaFields.CHUNK_TOTAL, entry.getValue().total(),
+            SchemaFields.CHUNK_PARENT_CONTENT_SHA256, entry.getValue().revision(),
+            SchemaFields.CONTENT_SHA256, entry.getValue().revision())));
+      }
+      readModifyWriteBatch(current, updates);
       return true;
     }
   }
 
-  private boolean installChunkDeclaration(IndexSearcher searcher, int parent, String docId,
-      ChunkSetCompleteness.Declaration declaration, Map<String, Float> sparse) throws IOException {
-    var updates = new HashMap<String, Object>();
-    updates.put(SchemaFields.CHUNK_TOTAL, declaration.total());
-    updates.put(SchemaFields.CHUNK_PARENT_CONTENT_SHA256, declaration.revision());
-    updates.put(SchemaFields.CONTENT_SHA256, declaration.revision());
-    // A declaration migration must retain completed sparse artifacts. Supplying the existing
-    // features bypasses the ordinary RMW reset-status lane, which would schedule re-encoding.
-    if (session.fieldMapper.fieldDef(SchemaFields.SPLADE) != null) {
-      updates.put(SchemaFields.SPLADE, sparse == null ? Map.of() : sparse);
-      // These companions are doc-values-only in the production catalog. Reconstructing stored
-      // fields cannot retain them once the ordinary reset-status policy has been bypassed.
-      String status = readKeywordDocValue(searcher, parent, SchemaFields.SPLADE_STATUS);
-      if (status != null) updates.put(SchemaFields.SPLADE_STATUS, status);
-      Long retry = readNumericDocValue(searcher, parent, SchemaFields.SPLADE_RETRY_COUNT);
-      if (retry != null) updates.put(SchemaFields.SPLADE_RETRY_COUNT, retry);
-    }
-    return readModifyWrite(searcher, docId, updates);
-  }
+  private record SparseRead(Map<Integer, Map<String, Float>> features,
+      Map<Integer, IOException> failures) {}
 
-  /** One sparse term pass for the whole migration, using Lucene's public feature decoder. */
-  private Map<Integer, Map<String, Float>> legacySparseFeatures(IndexSearcher searcher,
-      Set<Integer> parents) throws IOException {
+  private SparseRead sparseFeatures(IndexSearcher searcher, Set<Integer> documents) {
     var result = new HashMap<Integer, Map<String, Float>>();
-    if (parents.isEmpty()) return result;
+    var failures = new HashMap<Integer, IOException>();
     long started = System.nanoTime();
     long termsVisited = 0;
     long featuresRead = 0;
     for (var context : searcher.getIndexReader().leaves()) {
-      var localParents = parents.stream().mapToInt(doc -> doc - context.docBase)
+      var localDocuments = documents.stream().mapToInt(doc -> doc - context.docBase)
           .filter(doc -> doc >= 0 && doc < context.reader().maxDoc()).sorted().toArray();
-      if (localParents.length == 0) continue;
-      var terms = context.reader().terms(SchemaFields.SPLADE);
-      if (terms == null) continue;
-      var iterator = terms.iterator();
-      for (var term = iterator.next(); term != null; term = iterator.next()) {
-        termsVisited++;
-        String feature = term.utf8ToString();
-        var values = org.apache.lucene.document.FeatureField.newDoubleValues(SchemaFields.SPLADE, feature)
-            .getValues(context, null);
-        for (int parent : localParents) {
-          if (values.advanceExact(parent)) {
-            result.computeIfAbsent(context.docBase + parent, ignored -> new HashMap<>())
-                .put(feature, (float) values.doubleValue());
-            featuresRead++;
+      if (localDocuments.length == 0) continue;
+      try {
+        var terms = context.reader().terms(SchemaFields.SPLADE);
+        if (terms == null) continue;
+        var iterator = terms.iterator();
+        for (var term = iterator.next(); term != null; term = iterator.next()) {
+          termsVisited++;
+          String feature = term.utf8ToString();
+          var values = org.apache.lucene.document.FeatureField.newDoubleValues(SchemaFields.SPLADE, feature)
+              .getValues(context, null);
+          for (int doc : localDocuments) {
+            int globalDoc = context.docBase + doc;
+            if (failures.containsKey(globalDoc)) continue;
+            try {
+              if (values.advanceExact(doc)) {
+                result.computeIfAbsent(globalDoc, ignored -> new HashMap<>())
+                    .put(feature, (float) values.doubleValue());
+                featuresRead++;
+              }
+            } catch (IOException failure) {
+              failures.put(globalDoc, failure);
+            }
           }
         }
+      } catch (IOException failure) {
+        // A dictionary failure makes every requested artifact in this leaf unreadable.
+        for (int doc : localDocuments) failures.put(context.docBase + doc, failure);
       }
     }
-    if (termsVisited > 0) log.debug(
-        "Prepared legacy sparse preservation: parents={}, termsVisited={}, featuresRead={}, elapsedMs={}",
-        parents.size(), termsVisited, featuresRead, (System.nanoTime() - started) / 1_000_000.0);
-    return result;
+    failures.keySet().forEach(result::remove);
+    log.debug("Prepared sparse preservation: documents={}, termsVisited={}, featuresRead={}, failures={}, elapsedMs={}",
+        documents.size(), termsVisited, featuresRead, failures.size(), (System.nanoTime() - started) / 1_000_000.0);
+    return new SparseRead(result, failures);
+  }
+
+  private static final class SparsePreservationException extends IOException {
+    SparsePreservationException(IOException cause) { super("Sparse artifact storage read failed", cause); }
   }
 
   /**
@@ -467,7 +449,8 @@ public final class WritePathOps {
   private static final class ParentSliceCache {
     private final Map<String, String> content = new HashMap<>();
     private final Map<String, String> revision = new HashMap<>();
-    private Map<Integer, Map<String, Float>> embeddingSparse;
+    private SparseRead sparse;
+    private final Map<Integer, Document> stored = new HashMap<>();
 
     String content(String parentId) {
       return content.get(parentId);
@@ -526,11 +509,22 @@ public final class WritePathOps {
     int globalDocId = topDocs.scoreDocs[0].doc;
 
     // Load all stored fields from existing document, accumulating multi-valued fields into Lists
-    Document oldDoc = searcher.storedFields().document(globalDocId);
+    if (parentCache.sparse != null && parentCache.sparse.failures().containsKey(globalDocId)) {
+      throw new SparsePreservationException(parentCache.sparse.failures().get(globalDocId));
+    }
+    Document oldDoc = parentCache.stored.get(globalDocId);
+    if (oldDoc == null) {
+      try {
+        oldDoc = searcher.storedFields().document(globalDocId);
+      } catch (IOException failure) {
+        throw new SparsePreservationException(failure);
+      }
+    }
     Map<String, Object> fields = new HashMap<>();
     for (IndexableField field : oldDoc.getFields()) {
       String name = field.name();
-      Object val = field.stringValue() != null ? field.stringValue() : field.numericValue();
+      Object val = field.binaryValue() != null ? org.apache.lucene.util.BytesRef.deepCopyOf(field.binaryValue())
+          : field.stringValue() != null ? field.stringValue() : field.numericValue();
       if (val == null) continue;
       if (fields.containsKey(name)) {
         // Multi-valued field: accumulate into a mutable List
@@ -554,6 +548,21 @@ public final class WritePathOps {
       if ("double".equals(def.type) && def.docValues) {
         Long bits = readNumericDocValue(searcher, globalDocId, def.id);
         if (bits != null) fields.put(def.id, Double.longBitsToDouble(bits));
+      }
+    }
+
+    if (session.fieldMapper.fieldDef(SchemaFields.SPLADE) != null) {
+      try {
+        if (!updates.containsKey(SchemaFields.SPLADE_STATUS)) {
+          String status = readKeywordDocValue(searcher, globalDocId, SchemaFields.SPLADE_STATUS);
+          if (status != null) fields.put(SchemaFields.SPLADE_STATUS, status);
+        }
+        if (!updates.containsKey(SchemaFields.SPLADE_RETRY_COUNT)) {
+          Long retry = readNumericDocValue(searcher, globalDocId, SchemaFields.SPLADE_RETRY_COUNT);
+          if (retry != null) fields.put(SchemaFields.SPLADE_RETRY_COUNT, retry);
+        }
+      } catch (IOException failure) {
+        throw new SparsePreservationException(failure);
       }
     }
 
@@ -612,8 +621,11 @@ public final class WritePathOps {
       }
     }
 
-    if (updates.containsKey(SchemaFields.CONTENT)
-        && !java.util.Objects.equals(fields.get(SchemaFields.CONTENT), updates.get(SchemaFields.CONTENT))) {
+    if ((updates.containsKey(SchemaFields.CONTENT)
+        && !java.util.Objects.equals(fields.get(SchemaFields.CONTENT), updates.get(SchemaFields.CONTENT)))
+        || (updates.containsKey(SchemaFields.CONTENT_SHA256)
+        && !java.util.Objects.equals(ChunkParentRevision.sha256Hex(asString(fields.get(SchemaFields.CONTENT)) == null
+            ? "" : asString(fields.get(SchemaFields.CONTENT))), updates.get(SchemaFields.CONTENT_SHA256)))) {
       updates = new HashMap<>(updates);
       // An explicit new artifact belongs to the replacement text; omitted artifacts belong
       // to the old text and must bypass the ordinary RMW preservation policies.
@@ -625,6 +637,8 @@ public final class WritePathOps {
           ? List.of("chunk_embedding", "splade") : List.of("embedding", "splade", "ner")) {
         String status = stage + "_status";
         if (session.fieldMapper.fieldDef(status) != null) {
+          if (stage.equals("splade") && updates.get(SchemaFields.SPLADE) instanceof Map<?, ?> sparse
+              && !sparse.isEmpty()) continue;
           updates.putIfAbsent(status, STATUS_PENDING);
           String retry=stage + "_retry_count";
           if (session.fieldMapper.fieldDef(retry) != null && !updates.containsKey(retry)) updates.put(retry,"0");
@@ -648,6 +662,12 @@ public final class WritePathOps {
     // caller's update map, apply its declared disposition so the rewrite preserves it structurally
     // instead of relying on per-call-site discipline.
     applyRmwPolicies(searcher, globalDocId, updates, fields, parentCache);
+    if (session.fieldMapper.fieldDef(SchemaFields.SPLADE) != null && updates.containsKey(SchemaFields.SPLADE)
+        && (updates.get(SchemaFields.SPLADE) == null
+            || updates.get(SchemaFields.SPLADE) instanceof Map<?, ?> sparse && sparse.isEmpty())
+        && !updates.containsKey(SchemaFields.SPLADE_STATUS)) {
+      applyResetStatus(searcher, globalDocId, SchemaFields.SPLADE_STATUS, updates, fields);
+    }
 
     // Apply updates (overwrites existing values, including anything the engine restored)
     fields.putAll(updates);
@@ -820,28 +840,47 @@ public final class WritePathOps {
     }
   }
 
-  private static boolean embeddingOnlyUpdate(Map<String, Object> updates) {
-    return !updates.isEmpty() && EMBEDDING_UPDATE_FIELDS.containsAll(updates.keySet());
-  }
-
-  /** Reads independent sparse enrichment once for an embedding recovery/backfill batch. */
-  private Map<Integer, Map<String, Float>> embeddingSparseForBatch(IndexSearcher searcher,
-      List<Map.Entry<String, Map<String, Object>>> updates) throws IOException {
-    if (session.fieldMapper.fieldDef(SchemaFields.SPLADE) == null) return Map.of();
+  /** Load stored fields once, then scan only completed legacy rows lacking a payload. */
+  private SparseRead sparseForBatch(IndexSearcher searcher,
+      List<Map.Entry<String, Map<String, Object>>> updates, ParentSliceCache cache) throws IOException {
+    if (session.fieldMapper.fieldDef(SchemaFields.SPLADE) == null)
+      return new SparseRead(Map.of(), Map.of());
     Set<Integer> documents = new HashSet<>();
+    Map<Integer, IOException> failures = new HashMap<>();
     for (var update : updates) {
-      if (!embeddingOnlyUpdate(update.getValue())) continue;
+      if (update.getValue().containsKey(SchemaFields.SPLADE)) continue;
       var hits = searcher.search(new TermQuery(new Term(idField, update.getKey())), 1);
-      if (hits.scoreDocs.length > 0) documents.add(hits.scoreDocs[0].doc);
+      if (hits.scoreDocs.length == 0) continue;
+      int doc = hits.scoreDocs[0].doc;
+      try {
+        Document stored = searcher.storedFields().document(doc);
+        cache.stored.put(doc, stored);
+        var patch = update.getValue();
+        String content = stored.get(SchemaFields.CONTENT);
+        if ((patch.containsKey(SchemaFields.CONTENT)
+                && !java.util.Objects.equals(content, patch.get(SchemaFields.CONTENT)))
+            || (patch.containsKey(SchemaFields.CONTENT_SHA256)
+                && !java.util.Objects.equals(ChunkParentRevision.sha256Hex(content == null ? "" : content),
+                    patch.get(SchemaFields.CONTENT_SHA256)))) continue;
+        Object status = patch.containsKey(SchemaFields.SPLADE_STATUS)
+            ? patch.get(SchemaFields.SPLADE_STATUS)
+            : readKeywordDocValue(searcher, doc, SchemaFields.SPLADE_STATUS);
+        if (STATUS_COMPLETED.equals(status) && stored.getBinaryValue(SparsePayload.FIELD) == null)
+          documents.add(doc);
+      } catch (IOException failure) {
+        failures.put(doc, failure);
+      }
     }
-    return legacySparseFeatures(searcher, documents);
+    var legacy = sparseFeatures(searcher, documents);
+    failures.putAll(legacy.failures());
+    return new SparseRead(legacy.features(), failures);
   }
 
   /**
    * Applies each catalog field's declared RMW disposition (tempdoc 711) for fields the caller
    * omitted: {@link FieldMapper#RMW_PRESERVE_REREAD} re-reads and carries the field forward;
-   * {@code reset-status:<statusField>} drives the named status field so a backfill re-derives data
-   * that cannot be cheaply re-read.
+   * sparse postings and their doc-value companions are carried forward as well. Content changes
+   * invalidate omitted artifacts before these policies run.
    */
   private void applyRmwPolicies(
       IndexSearcher searcher, int globalDocId, Map<String, Object> updates, Map<String, Object> fields,
@@ -880,14 +919,28 @@ public final class WritePathOps {
           }
         }
       } else if (policy != null && policy.startsWith(FieldMapper.RMW_RESET_STATUS_PREFIX)) {
-        if (SchemaFields.SPLADE.equals(def.id) && embeddingOnlyUpdate(updates)) {
-          var sparse = parentCache.embeddingSparse == null
-              ? legacySparseFeatures(searcher, Set.of(globalDocId)) : parentCache.embeddingSparse;
-          fields.put(SchemaFields.SPLADE, sparse.getOrDefault(globalDocId, Map.of()));
-          String status = readKeywordDocValue(searcher, globalDocId, SchemaFields.SPLADE_STATUS);
-          if (status != null) fields.put(SchemaFields.SPLADE_STATUS, status);
-          Long retry = readNumericDocValue(searcher, globalDocId, SchemaFields.SPLADE_RETRY_COUNT);
-          if (retry != null) fields.put(SchemaFields.SPLADE_RETRY_COUNT, retry);
+        if (SchemaFields.SPLADE.equals(def.id)) {
+          Object status = updates.containsKey(SchemaFields.SPLADE_STATUS)
+              ? updates.get(SchemaFields.SPLADE_STATUS) : fields.get(SchemaFields.SPLADE_STATUS);
+          fields.remove(SchemaFields.SPLADE);
+          if (STATUS_COMPLETED.equals(status)) {
+            try {
+              Object payload = fields.get(SparsePayload.FIELD);
+              if (payload instanceof org.apache.lucene.util.BytesRef bytes) {
+                var features = SparsePayload.decode(bytes);
+                fields.put(SchemaFields.SPLADE, features);
+                log.debug("Sparse payload preservation: bytesRead={}, featuresRead={}, termsVisited=0", bytes.length, features.size());
+              } else {
+                var sparse = parentCache.sparse == null
+                    ? sparseFeatures(searcher, Set.of(globalDocId)) : parentCache.sparse;
+                if (sparse.failures().containsKey(globalDocId)) throw sparse.failures().get(globalDocId);
+                fields.put(SchemaFields.SPLADE, sparse.features().getOrDefault(globalDocId, Map.of()));
+              }
+            } catch (IOException failure) {
+              throw new SparsePreservationException(failure);
+            }
+          }
+          fields.remove(SparsePayload.FIELD);
           continue;
         }
         applyResetStatus(
@@ -907,8 +960,8 @@ public final class WritePathOps {
   }
 
   /**
-   * reset-status lane: the field's data cannot be cheaply re-read (SPLADE weights live in postings),
-   * so on drop we drive its declared status field. A COMPLETED status is downgraded to PENDING (the
+   * reset-status fallback: content replacement invalidates the old artifact, so drive its
+   * declared status field. A COMPLETED status is downgraded to PENDING (the
    * data was just dropped; a backfill must re-derive it) and its retry counter reset; a missing
    * status is healed to PENDING; a non-terminal / FAILED status is preserved as-is (resurrecting
    * FAILED as PENDING would mask real failures). A caller-supplied status always wins.
@@ -982,13 +1035,15 @@ public final class WritePathOps {
     int notFound = 0;
     long minNs = Long.MAX_VALUE, maxNs = 0, sumNs = 0;
     ParentSliceCache parentCache = new ParentSliceCache();
-    parentCache.embeddingSparse = embeddingSparseForBatch(searcher, batchUpdates);
+    parentCache.sparse = sparseForBatch(searcher, batchUpdates, parentCache);
+    IOException storageFailure = null;
     for (Map.Entry<String, Map<String, Object>> entry : batchUpdates) {
       long t0 = System.nanoTime();
-      if (readModifyWrite(searcher, entry.getKey(), entry.getValue(), parentCache)) {
-        updated++;
-      } else {
-        notFound++;
+      try {
+        if (readModifyWrite(searcher, entry.getKey(), entry.getValue(), parentCache)) updated++;
+        else notFound++;
+      } catch (SparsePreservationException failure) {
+        storageFailure = failure;
       }
       long elapsed = System.nanoTime() - t0;
       sumNs += elapsed;
@@ -1005,6 +1060,7 @@ public final class WritePathOps {
           (sumNs / total) / 1_000_000,
           sumNs / 1_000_000);
     }
+    if (storageFailure != null) throw storageFailure;
     return new LuceneRuntimeTypes.BatchUpdateResult(updated, notFound);
   }
 
@@ -1169,39 +1225,53 @@ public final class WritePathOps {
       List<Map.Entry<String, Map<String, Object>>> updates,
       Map<String, DocumentFieldOps.EnrichmentInput> inputs) {
     guardWritable();
-    List<String> accepted = new ArrayList<>();
-    List<String> rejected = new ArrayList<>();
-    Map<String, Set<String>> correctedFailedStatuses = new HashMap<>();
     try {
       var snap = session.snapshot;
       if (snap != null && snap.searcherManager() != null) snap.searcherManager().maybeRefreshBlocking();
-      return bridge.withSearcherNoRefresh(searcher -> {
-        var cache = new ParentSliceCache();
-        cache.embeddingSparse = embeddingSparseForBatch(searcher, updates);
-        Map<String, Map<String, String>> parents = new HashMap<>();
-        Map<String, java.util.IdentityHashMap<Map<String, String>, Boolean>> parentComparisons = new HashMap<>();
-        org.apache.lucene.index.StoredFields parentStoredFields = null;
-        for (var update : updates) {
-          var input = inputs.get(update.getKey());
-          if (input == null) { rejected.add(update.getKey()); continue; }
-          if (input.parentId() != null && !input.parentId().isBlank()) {
-            if (!parents.containsKey(input.parentId())) {
-              if (parentStoredFields == null) parentStoredFields = searcher.storedFields();
-              parents.put(input.parentId(), session.documentFieldOps.enrichmentFields(
-                  searcher, parentStoredFields, input.parentId(), DocumentFieldOps.PARENT_REVISION_FIELDS));
-            }
-            // Shared captured proof is compared once per parent, including hashless full text.
-            // Different expectations for the same parent retain independent comparisons.
-            if (!parentComparisons
-                .computeIfAbsent(input.parentId(), ignored -> new java.util.IdentityHashMap<>())
-                .computeIfAbsent(input.parentFields(), expected -> java.util.Objects.equals(expected, parents.get(input.parentId())))) {
-              rejected.add(update.getKey());
-              continue;
-            }
-            var parent = parents.get(input.parentId());
-            if (parent != null) cache.putContentIfAbsent(input.parentId(), parent.get(SchemaFields.CONTENT));
+      return bridge.withSearcherNoRefresh(searcher -> publishEnrichmentBatch(searcher, updates, inputs));
+    } catch (IOException e) {
+      return new LuceneRuntimeTypes.EnrichmentPublicationReceipt(List.of(), List.of(),
+          IndexRuntimeIOException.fromIndexOperation(e, "Failed conditional batch update"));
+    } catch (RuntimeException e) {
+      return new LuceneRuntimeTypes.EnrichmentPublicationReceipt(List.of(), List.of(), e);
+    }
+  }
+
+  LuceneRuntimeTypes.EnrichmentPublicationReceipt publishEnrichmentBatch(IndexSearcher searcher,
+      List<Map.Entry<String, Map<String, Object>>> updates,
+      Map<String, DocumentFieldOps.EnrichmentInput> inputs) {
+    List<String> accepted = new ArrayList<>();
+    List<String> rejected = new ArrayList<>();
+    Map<String, Set<String>> correctedFailedStatuses = new HashMap<>();
+    Map<String, String> storageFailures = new HashMap<>();
+    try {
+      var cache = new ParentSliceCache();
+      cache.sparse = sparseForBatch(searcher, updates, cache);
+      Map<String, Map<String, String>> parents = new HashMap<>();
+      Map<String, java.util.IdentityHashMap<Map<String, String>, Boolean>> parentComparisons = new HashMap<>();
+      org.apache.lucene.index.StoredFields parentStoredFields = null;
+      for (var update : updates) {
+        var input = inputs.get(update.getKey());
+        if (input == null) { rejected.add(update.getKey()); continue; }
+        if (input.parentId() != null && !input.parentId().isBlank()) {
+          if (!parents.containsKey(input.parentId())) {
+            if (parentStoredFields == null) parentStoredFields = searcher.storedFields();
+            parents.put(input.parentId(), session.documentFieldOps.enrichmentFields(
+                searcher, parentStoredFields, input.parentId(), DocumentFieldOps.PARENT_REVISION_FIELDS));
           }
-          var droppedVectors = new FieldMapper.DroppedVectorReport();
+          // Shared captured proof is compared once per parent, including hashless full text.
+          // Different expectations for the same parent retain independent comparisons.
+          if (!parentComparisons
+              .computeIfAbsent(input.parentId(), ignored -> new java.util.IdentityHashMap<>())
+              .computeIfAbsent(input.parentFields(), expected -> java.util.Objects.equals(expected, parents.get(input.parentId())))) {
+            rejected.add(update.getKey());
+            continue;
+          }
+          var parent = parents.get(input.parentId());
+          if (parent != null) cache.putContentIfAbsent(input.parentId(), parent.get(SchemaFields.CONTENT));
+        }
+        var droppedVectors = new FieldMapper.DroppedVectorReport();
+        try {
           if (readModifyWrite(searcher, update.getKey(), update.getValue(), cache, Map.of(), input, droppedVectors)) {
             accepted.add(update.getKey());
             if (!droppedVectors.correctedFailedStatuses().isEmpty()) {
@@ -1210,14 +1280,17 @@ public final class WritePathOps {
           } else {
             rejected.add(update.getKey());
           }
+        } catch (SparsePreservationException failure) {
+          storageFailures.put(update.getKey(), "sparse_artifact_read");
+          log.warn("Withheld enrichment publication for {}: sparse artifact storage read failed", update.getKey(), failure);
         }
-        return new LuceneRuntimeTypes.EnrichmentPublicationReceipt(accepted, rejected, correctedFailedStatuses, null);
-      });
+      }
+      return new LuceneRuntimeTypes.EnrichmentPublicationReceipt(accepted, rejected, correctedFailedStatuses, storageFailures, null);
     } catch (IOException e) {
-      return new LuceneRuntimeTypes.EnrichmentPublicationReceipt(accepted, rejected, correctedFailedStatuses,
+      return new LuceneRuntimeTypes.EnrichmentPublicationReceipt(accepted, rejected, correctedFailedStatuses, storageFailures,
           IndexRuntimeIOException.fromIndexOperation(e, "Failed conditional batch update"));
     } catch (RuntimeException e) {
-      return new LuceneRuntimeTypes.EnrichmentPublicationReceipt(accepted, rejected, correctedFailedStatuses, e);
+      return new LuceneRuntimeTypes.EnrichmentPublicationReceipt(accepted, rejected, correctedFailedStatuses, storageFailures, e);
     }
   }
 

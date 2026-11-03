@@ -653,9 +653,7 @@ class CombinedEnrichmentBackfillOpsTest {
   }
 
   @Test
-  @DisplayName(
-      "parent COMPLETED SPLADE is re-derived with pending embedding before the bundled RMW")
-  void completedParentSplade_withPendingEmbedding_isReencodedInSameWrite() throws Exception {
+  void completedParentSplade_withPendingEmbedding_isPreservedWithoutReencoding() throws Exception {
     seedDoc(
         "parent-embed",
         "parent content",
@@ -664,24 +662,21 @@ class CombinedEnrichmentBackfillOpsTest {
             SchemaFields.EMBEDDING_STATUS_PENDING,
             SchemaFields.SPLADE_STATUS,
             SchemaFields.SPLADE_STATUS_COMPLETED));
-    when(spladeEncoder.encodeBatch(anyList()))
-        .thenReturn(List.of(Map.of("parent", 1.0f)));
 
     var outcome =
         CombinedEnrichmentBackfillOps.processCombinedBackfill(context(true, true, false));
 
     assertTrue(outcome.wroteAnything());
-    verify(spladeEncoder).encodeBatch(List.of("parent content"));
+    assertDoesNotThrow(() -> verify(spladeEncoder, never()).encodeBatch(anyList()));
     Map<String, Object> state = fakeIndex.get("parent-embed");
     assertEquals(SchemaFields.EMBEDDING_STATUS_COMPLETED, state.get(SchemaFields.EMBEDDING_STATUS));
     assertEquals(SchemaFields.SPLADE_STATUS_COMPLETED, state.get(SchemaFields.SPLADE_STATUS));
-    assertEquals(Map.of("parent", 1.0f), state.get(SchemaFields.SPLADE));
+    assertNull(state.get(SchemaFields.SPLADE), "the worker supplies no replacement sparse artifact");
     verify(indexingCoordinator, times(1)).updateDocumentsBatch(anyList());
   }
 
   @Test
-  @DisplayName("parent COMPLETED SPLADE is re-derived with pending NER before the bundled RMW")
-  void completedParentSplade_withPendingNer_isReencodedInSameWrite() throws Exception {
+  void completedParentSplade_withPendingNer_isPreservedWithoutReencoding() throws Exception {
     seedDoc(
         "parent-ner",
         "parent content",
@@ -690,15 +685,14 @@ class CombinedEnrichmentBackfillOpsTest {
             SchemaFields.SPLADE_STATUS_COMPLETED,
             SchemaFields.NER_STATUS,
             SchemaFields.NER_STATUS_PENDING));
-    when(spladeEncoder.encodeBatch(anyList())).thenReturn(List.of(Map.of("parent", 1.0f)));
     when(nerService.extractEntitiesBatch(anyList())).thenReturn(List.of(NerResult.EMPTY));
 
     CombinedEnrichmentBackfillOps.processCombinedBackfill(context(false, true, true));
 
-    verify(spladeEncoder).encodeBatch(List.of("parent content"));
+    assertDoesNotThrow(() -> verify(spladeEncoder, never()).encodeBatch(anyList()));
     Map<String, Object> state = fakeIndex.get("parent-ner");
     assertEquals(SchemaFields.SPLADE_STATUS_COMPLETED, state.get(SchemaFields.SPLADE_STATUS));
-    assertEquals(Map.of("parent", 1.0f), state.get(SchemaFields.SPLADE));
+    assertNull(state.get(SchemaFields.SPLADE), "the worker supplies no replacement sparse artifact");
     assertEquals(SchemaFields.NER_STATUS_COMPLETED_EMPTY, state.get(SchemaFields.NER_STATUS));
   }
 
@@ -721,13 +715,12 @@ class CombinedEnrichmentBackfillOpsTest {
               return List.of(new float[] {3f, 4f});
             });
 
-    when(spladeEncoder.encodeBatch(anyList())).thenReturn(List.of(Map.of("fresh", 1f)));
     var outcome =
         CombinedEnrichmentBackfillOps.processCombinedBackfill(
             context(true, true, false, false, false, false, stop::get));
 
     assertTrue(outcome.progressed());
-    verify(spladeEncoder).encodeBatch(List.of("parent content"));
+    assertDoesNotThrow(() -> verify(spladeEncoder, never()).encodeBatch(anyList()));
     Map<String, Object> state = fakeIndex.get("parent-stop");
     assertEquals(SchemaFields.EMBEDDING_STATUS_COMPLETED, state.get(SchemaFields.EMBEDDING_STATUS));
     assertEquals(SchemaFields.SPLADE_STATUS_COMPLETED, state.get(SchemaFields.SPLADE_STATUS));
@@ -744,11 +737,11 @@ class CombinedEnrichmentBackfillOpsTest {
             SchemaFields.NER_STATUS,
             SchemaFields.NER_STATUS_PENDING));
     java.util.concurrent.atomic.AtomicBoolean stop = new java.util.concurrent.atomic.AtomicBoolean();
-    when(spladeEncoder.encodeBatch(anyList()))
+    when(nerService.extractEntitiesBatch(anyList()))
         .thenAnswer(
             ignored -> {
               stop.set(true);
-              return List.of(Map.of("fresh", 1.0f));
+              return List.of(NerResult.EMPTY);
             });
 
     var outcome =
@@ -759,11 +752,11 @@ class CombinedEnrichmentBackfillOpsTest {
     verify(nerService).extractEntitiesBatch(List.of("parent content"));
     assertEquals(SchemaFields.NER_STATUS_COMPLETED_EMPTY,
         fakeIndex.get("parent-stop-ner").get(SchemaFields.NER_STATUS));
-    assertEquals(Map.of("fresh", 1f), fakeIndex.get("parent-stop-ner").get(SchemaFields.SPLADE));
+    assertNull(fakeIndex.get("parent-stop-ner").get(SchemaFields.SPLADE));
+    assertDoesNotThrow(() -> verify(spladeEncoder, never()).encodeBatch(anyList()));
   }
 
   @Test
-  @DisplayName("preservation-only SPLADE does not reserve the embedding share")
   void completedParentPreservationDoesNotDeferItsOwnPendingEmbedding() throws Exception {
     for (String id : List.of("first", "second")) {
       seedDoc(id, id + " content", Map.of(
@@ -774,8 +767,6 @@ class CombinedEnrichmentBackfillOpsTest {
     when(embeddingProvider.embedDocumentWindows(anyString(), anyInt(), anyInt()))
         .thenReturn(new EmbeddingProvider.WindowSlice(
             List.of(new float[] {1f, 0f}, new float[] {0f, 1f}), 0, 2));
-    when(spladeEncoder.encodeBatch(anyList()))
-        .thenReturn(List.of(Map.of("fresh", 1.0f), Map.of("fresh", 1.0f)));
 
     var outcome = CombinedEnrichmentBackfillOps.processCombinedBackfill(
         context(true, true, false, false, false, false,
@@ -786,7 +777,8 @@ class CombinedEnrichmentBackfillOpsTest {
     verify(embeddingProvider).embedDocumentWindows(eq("second content"), eq(0), anyInt());
     assertEquals(SchemaFields.EMBEDDING_STATUS_COMPLETED,
         fakeIndex.get("second").get(SchemaFields.EMBEDDING_STATUS));
-    assertTrue(fakeIndex.get("second").containsKey(SchemaFields.SPLADE));
+    assertFalse(fakeIndex.get("second").containsKey(SchemaFields.SPLADE));
+    assertDoesNotThrow(() -> verify(spladeEncoder, never()).encodeBatch(anyList()));
   }
 
   @Test
@@ -829,10 +821,6 @@ class CombinedEnrichmentBackfillOpsTest {
     when(embeddingProvider.embedDocumentWindows(anyString(), anyInt(), anyInt()))
         .thenReturn(new EmbeddingProvider.WindowSlice(
             List.of(new float[] {1f, 0f}, new float[] {0f, 1f}), 0, 2));
-    when(spladeEncoder.encodeBatch(anyList())).thenAnswer(invocation -> {
-      List<String> content = invocation.getArgument(0);
-      return content.stream().map(ignored -> Map.of("fresh", 1.0f)).toList();
-    });
     var writes = new java.util.concurrent.atomic.AtomicInteger();
     when(indexingCoordinator.updateDocumentsBatch(anyList())).thenAnswer(invocation -> {
       List<Map.Entry<String, Map<String, Object>>> batch = invocation.getArgument(0);
@@ -868,86 +856,45 @@ class CombinedEnrichmentBackfillOpsTest {
   }
 
   @Test
-  @DisplayName("a withheld completed window is reused without another encoder call")
-  void completedWindowWithheld_thenRetryUsesCachedPooledVector() throws Exception {
-    seedDoc(
-        "parent-window",
-        "window content",
-        Map.of(
-            SchemaFields.EMBEDDING_STATUS,
-            SchemaFields.EMBEDDING_STATUS_PENDING,
-            SchemaFields.SPLADE_STATUS,
-            SchemaFields.SPLADE_STATUS_COMPLETED));
+  void completedWindowPublishesWithoutPreservationInference() throws Exception {
+    seedDoc("parent-window", "window content", Map.of(
+        SchemaFields.EMBEDDING_STATUS, SchemaFields.EMBEDDING_STATUS_PENDING,
+        SchemaFields.SPLADE_STATUS, SchemaFields.SPLADE_STATUS_COMPLETED));
     WindowedEmbedProgress progress = new WindowedEmbedProgress();
     java.util.concurrent.atomic.AtomicBoolean stop = new java.util.concurrent.atomic.AtomicBoolean();
     when(embeddingProvider.documentWindowCount("window content")).thenReturn(2);
-    when(embeddingProvider.embedDocumentWindows("window content", 0, 32))
-        .thenAnswer(
-            ignored -> {
-              stop.set(true);
-              return new EmbeddingProvider.WindowSlice(
-                  List.of(new float[] {1f, 0f}, new float[] {0f, 1f}), 0, 2);
-            });
-    when(spladeEncoder.encodeBatch(anyList()))
-        .thenThrow(new io.justsearch.ort.SessionTemporarilyUnavailableException("temporarily unavailable"))
-        .thenReturn(List.of(Map.of("fresh", 1.0f)));
-
-    var withheld =
-        CombinedEnrichmentBackfillOps.processCombinedBackfill(
-            context(
-                true, true, false, false, false, false, stop::get, () -> false, progress));
-    assertFalse(withheld.progressed());
-    assertEquals(1, progress.trackedDocuments());
-    verify(indexingCoordinator, never()).updateDocumentsBatch(anyList());
-
-    stop.set(false);
-    var committed =
-        CombinedEnrichmentBackfillOps.processCombinedBackfill(
-            context(
-                true, true, false, false, false, false, stop::get, () -> false, progress));
-
-    assertTrue(committed.progressed());
+    when(embeddingProvider.embedDocumentWindows("window content", 0, 32)).thenAnswer(ignored -> {
+      stop.set(true);
+      return new EmbeddingProvider.WindowSlice(
+          List.of(new float[] {1f, 0f}, new float[] {0f, 1f}), 0, 2);
+    });
+    lenient().when(spladeEncoder.encodeBatch(anyList())).thenThrow(
+        new io.justsearch.ort.SessionTemporarilyUnavailableException("temporarily unavailable"));
+    var outcome = CombinedEnrichmentBackfillOps.processCombinedBackfill(
+        context(true, true, false, false, false, false, stop::get, () -> false, progress));
+    assertTrue(outcome.progressed());
     assertEquals(0, progress.trackedDocuments());
-    verify(embeddingProvider, times(1)).embedDocumentWindows("window content", 0, 32);
-    assertEquals(
-        SchemaFields.EMBEDDING_STATUS_COMPLETED,
+    assertEquals(SchemaFields.EMBEDDING_STATUS_COMPLETED,
         fakeIndex.get("parent-window").get(SchemaFields.EMBEDDING_STATUS));
+    verify(spladeEncoder, never()).encodeBatch(anyList());
+    verify(embeddingProvider, times(1)).embedDocumentWindows("window content", 0, 32);
   }
 
   @Test
-  void completedParentSplade_encoderFailure_publishesEarnedOutcomeThroughResetLane() throws Exception {
-    seedDoc(
-        "parent-failure",
-        "parent content",
-        Map.of(
-            SchemaFields.EMBEDDING_STATUS,
-            SchemaFields.EMBEDDING_STATUS_PENDING,
-            SchemaFields.SPLADE_STATUS,
-            SchemaFields.SPLADE_STATUS_COMPLETED));
-    when(spladeEncoder.encodeBatch(anyList())).thenThrow(new RuntimeException("encoder boom"));
+  void completedParentSplade_encoderFailure_doesNotChargeRetryOrReplaceArtifact() throws Exception {
+    seedDoc("parent-failure", "parent content", Map.of(
+        SchemaFields.EMBEDDING_STATUS, SchemaFields.EMBEDDING_STATUS_PENDING,
+        SchemaFields.SPLADE_STATUS, SchemaFields.SPLADE_STATUS_COMPLETED));
+    lenient().when(spladeEncoder.encodeBatch(anyList())).thenThrow(new RuntimeException("encoder boom"));
     fakeIndex.get("parent-failure").put(SchemaFields.SPLADE, Map.of("old", 1f));
-
-    when(indexingCoordinator.updateDocumentsBatch(anyList())).thenAnswer(call -> {
-      List<Map.Entry<String, Map<String, Object>>> updates = call.getArgument(0);
-      for (var entry : updates) {
-        assertFalse(entry.getValue().containsKey(SchemaFields.SPLADE));
-        Map<String, Object> state = fakeIndex.get(entry.getKey());
-        state.putAll(entry.getValue());
-        state.remove(SchemaFields.SPLADE);
-        state.put(SchemaFields.SPLADE_STATUS, SchemaFields.SPLADE_STATUS_PENDING);
-      }
-      return new LuceneRuntimeTypes.BatchUpdateResult(updates.size(), 0);
-    });
-
     var outcome = CombinedEnrichmentBackfillOps.processCombinedBackfill(context(true, true, false));
-
-    assertTrue(outcome.wroteAnything(), "an earned embedding must publish despite failed preservation");
-    verify(spladeEncoder).encodeBatch(List.of("parent content"));
+    assertTrue(outcome.wroteAnything());
     Map<String, Object> state = fakeIndex.get("parent-failure");
     assertEquals(SchemaFields.EMBEDDING_STATUS_COMPLETED, state.get(SchemaFields.EMBEDDING_STATUS));
-    assertEquals(SchemaFields.SPLADE_STATUS_PENDING, state.get(SchemaFields.SPLADE_STATUS));
-    assertEquals("1", state.get(SchemaFields.SPLADE_RETRY_COUNT));
-    assertNull(state.get(SchemaFields.SPLADE));
+    assertEquals(SchemaFields.SPLADE_STATUS_COMPLETED, state.get(SchemaFields.SPLADE_STATUS));
+    assertNull(state.get(SchemaFields.SPLADE_RETRY_COUNT));
+    assertEquals(Map.of("old", 1f), state.get(SchemaFields.SPLADE));
+    verify(spladeEncoder, never()).encodeBatch(anyList());
     verify(indexingCoordinator).updateDocumentsBatch(anyList());
   }
 
@@ -1412,11 +1359,7 @@ class CombinedEnrichmentBackfillOpsTest {
   }
 
   @Test
-  @DisplayName(
-      "chunk-SPLADE flag ON, chunk-lane pickup: CHUNK_VECTOR and SPLADE land in the SAME single"
-          + " bundled write; a COMPLETED splade is re-derived rather than destroyed-and-requeued"
-          + " (the RMW cannot carry postings it does not re-derive — tempdoc 711 reset-status)")
-  void chunkSpladeOn_chunkLane_denseAndSpladeOneBundledWrite_reDerivesCompletedSplade()
+  void chunkSpladeOn_chunkLane_preservesCompletedSpladeWithoutReencoding()
       throws Exception {
     seedSpladeChunkDoc(
         "chunk-1",
@@ -1424,8 +1367,6 @@ class CombinedEnrichmentBackfillOpsTest {
         "chunk body text",
         SchemaFields.SPLADE_STATUS_COMPLETED,
         SchemaFields.EMBEDDING_STATUS_PENDING);
-    when(spladeEncoder.encodeBatch(anyList()))
-        .thenReturn(new ArrayList<>(List.of(Map.of("tok", 2.0f))));
 
     boolean didWork =
         CombinedEnrichmentBackfillOps.processCombinedBackfill(
@@ -1437,7 +1378,8 @@ class CombinedEnrichmentBackfillOpsTest {
     assertNotNull(state.get(SchemaFields.CHUNK_VECTOR));
     assertEquals(
         SchemaFields.EMBEDDING_STATUS_COMPLETED, state.get(SchemaFields.CHUNK_EMBEDDING_STATUS));
-    assertEquals(Map.of("tok", 2.0f), state.get(SchemaFields.SPLADE));
+    assertNull(state.get(SchemaFields.SPLADE));
+    assertDoesNotThrow(() -> verify(spladeEncoder, never()).encodeBatch(anyList()));
     assertEquals(SchemaFields.SPLADE_STATUS_COMPLETED, state.get(SchemaFields.SPLADE_STATUS));
     verify(indexingCoordinator, times(1))
         .updateDocumentsBatch(
@@ -1446,7 +1388,7 @@ class CombinedEnrichmentBackfillOpsTest {
                     list.size() == 1
                         && list.get(0).getKey().equals("chunk-1")
                         && list.get(0).getValue().containsKey(SchemaFields.CHUNK_VECTOR)
-                        && list.get(0).getValue().containsKey(SchemaFields.SPLADE)));
+                        && !list.get(0).getValue().containsKey(SchemaFields.SPLADE)));
   }
 
   @Test

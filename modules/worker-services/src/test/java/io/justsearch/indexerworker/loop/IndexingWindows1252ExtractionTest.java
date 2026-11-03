@@ -111,9 +111,11 @@ class IndexingWindows1252ExtractionTest extends LuceneExecutorTestBase {
     }
   }
   @Test
-  void enN3IndexFingerprintStillMatchesTheUnchangedCatalogBaseline() {
+  void enN3LegacyCatalogFingerprintStillMatchesBaseline() {
     var catalog = new JustSearchConfigurationLoader().loadFieldCatalog();
-    var shapes = catalog.fields().stream().map(def -> new FieldShape(def.id(), def.type(), def.stored(),
+    var shapes = catalog.fields().stream()
+        .filter(def -> !"splade_payload".equals(def.id()))
+        .map(def -> new FieldShape(def.id(), def.type(), def.stored(),
         def.docValues(), def.multiValued(), def.analyzer(), def.roles(), def.vectorDimension(), null)).toList();
     var input = new Inputs(catalog.version(), shapes, "fixed-analyzers", "float32", new Hnsw(16, 200),
         new Chunking(500, 50, 100, 2000, "v1"), 4096, new Analysis("fixed-lucene", "fixed-icu"),
