@@ -635,9 +635,9 @@ class IndexHandle:
         try:
             if self._worker:
                 # Admission owns, identifies and cleans this worker's whole process tree.
-                ready = (self.root / "prepared.json").exists()
+                ready = self._backend is not None or (self.root / "prepared.json").exists()
                 (self.root / "stop").touch()
-                # Give a ready worker time to stop its writer and publish before
+                # Give a ready worker time to stop its writer and attest completion before
                 # asking admission to cancel an unfinished preparation.
                 if ready:
                     try:
@@ -652,6 +652,12 @@ class IndexHandle:
                 if self._worker.poll() != 0:
                     raise IndexRefused(f"preparation teardown failed: exit {self._worker.returncode}; "
                                        f"{(self.root / 'build.log').read_text()[-6000:]}")
+                # Only a successfully reaped admission supervisor can authorize
+                # publication. An orphan worker can never publish a failed build.
+                if ready:
+                    completed = _json(self.root / "completed.json")
+                    _check_owner(completed["owner"], self.collection, self.index_key)
+                    _write(self.root / "entry.json", completed)
             if self._backend:
                 backend.stop_backend(self._backend.proc, data_dir=self.data_dir)
                 self._backend = None
@@ -713,6 +719,7 @@ def prepare_index(collection: Collection, config: IndexConfig, *, prepared_only:
         (root / "worker.json").unlink(missing_ok=True)
         (root / "engine-ready").unlink(missing_ok=True)
         (root / "prepared.json").unlink(missing_ok=True)
+        (root / "completed.json").unlink(missing_ok=True)
         (root / "stop").unlink(missing_ok=True)
         serial = dataclasses.asdict(config)
         for k in ("repo_root", "models_dir", "documents_dir", "cache_root", "data_dir"):
@@ -907,10 +914,11 @@ def _build(root: Path) -> None:
             if info.proc.poll() is not None:
                 raise IndexRefused("preparation engine exited before close")
             time.sleep(.05)
-        # Close the writer before publishing; failed/interrupted close never publishes.
+        # Close the writer before attesting completion. The caller publishes only
+        # after the admission supervisor confirms successful teardown by exiting 0.
         backend.stop_backend(info.proc, data_dir=data)
         info = None
-        _write(root / "entry.json", entry)
+        _write(root / "completed.json", entry)
     except BaseException as e:
         if info:
             backend.stop_backend(info.proc, data_dir=data)

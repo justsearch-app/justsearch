@@ -262,7 +262,7 @@ def _install_distribution(resolved_root: Path, env: dict[str, str]) -> None:
         except (OSError, subprocess.CalledProcessError):
             log.warning("Cannot attest install distribution source; prepared-only start will refuse it")
     dist = resolved_root / "modules/ui/build/install/ui"
-    (dist / ".jseval-source.json").unlink(missing_ok=True)
+    receipt = dist / ".jseval-source.json"
     command = ["node", str(resolved_root / "scripts/lib/tool-invoker.cjs"), "gradle",
                ":modules:ui:installDist", "-PskipWebBuild=true", "--quiet"]
     if env.get("JSEVAL_GRADLE_SLOT"):
@@ -270,17 +270,31 @@ def _install_distribution(resolved_root: Path, env: dict[str, str]) -> None:
         # suspend work executed by a pre-existing Gradle daemon. The slot wrapper
         # may itself join admission; tool-invoker recognizes that live token.
         command = [env["JSEVAL_GRADLE_SLOT"], "-w", "3600", *command]
-    result = subprocess.run(command, cwd=str(resolved_root), env=env, check=False)
-    if result.returncode != 0:
-        raise RuntimeError(f"Backend installDist failed (exit {result.returncode})")
-
-    dist = resolved_root / "modules/ui/build/install/ui"
-    if identity is not None and (dist / "bin" / ("ui.bat" if sys.platform == "win32" else "ui")).is_file():
-        import json
-        if source_identity(resolved_root) == identity:
-            (dist / ".jseval-source.json").write_text(json.dumps(identity))
+    # The old install remains usable while this call queues for Gradle. Heavy
+    # admission excludes scoring during the actual install. Failed installs must
+    # invalidate the receipt, since they may have changed distribution files.
+    try:
+        result = subprocess.run(command, cwd=str(resolved_root), env=env, check=False)
+        if result.returncode != 0:
+            raise RuntimeError(f"Backend installDist failed (exit {result.returncode})")
+        if (identity is not None and source_identity(resolved_root) == identity
+                and (dist / "bin" / ("ui.bat" if sys.platform == "win32" else "ui")).is_file()):
+            import json
+            import tempfile
+            with tempfile.NamedTemporaryFile(mode="w", dir=dist, delete=False) as out:
+                pending = Path(out.name)
+                try:
+                    out.write(json.dumps(identity))
+                    out.close()
+                    pending.replace(receipt)
+                finally:
+                    pending.unlink(missing_ok=True)
         else:
-            log.warning("Source changed during installDist; prepared-only start will refuse it")
+            receipt.unlink(missing_ok=True)
+            log.warning("Install distribution source unavailable or changed; prepared-only start will refuse it")
+    except BaseException:
+        receipt.unlink(missing_ok=True)
+        raise
 
 
 def source_identity(root: Path) -> tuple[str, str | None]:

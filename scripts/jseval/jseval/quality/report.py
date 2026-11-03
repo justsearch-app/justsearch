@@ -21,7 +21,19 @@ def outcome_line(cmp: Comparison) -> str:
             f"{cmp.unjudged['candidate_share']:.1%}")
     if v.reasons:
         line += f"; {v.reasons[0]}"
+    if cmp.judgment_requests:
+        line += "; needs judgment: " + "; ".join(
+            f"qid={qid} doc_id={doc} arm={arm}" for qid, doc, arm in judgment_rows(cmp))
     return line
+
+
+def judgment_rows(cmp: Comparison):
+    """Keep arm provenance even when the same pair appears in both rankings."""
+    arms = {arm: cmp.results(arm) for arm in ('baseline', 'candidate')}
+    for qid, doc in cmp.judgment_requests:
+        for arm, results in arms.items():
+            if qid in results and doc in results[qid].ranked[:10]:
+                yield qid, doc, arm
 
 
 def _headline_group(groups: tuple[GroupVerdict, ...]) -> GroupVerdict:
@@ -113,6 +125,9 @@ def render(cmp: Comparison) -> str:
         if cmp.judgment_requests:
             out += [f"{len(cmp.judgment_requests)} pairs go to judgment with the collection's "
                     "rubric; both arms are then rescored against the new label version.", ""]
+            out += ["| query id | document id | arm |", "|---|---|---|"]
+            out += [f"| {qid} | {doc} | {arm} |" for qid, doc, arm in judgment_rows(cmp)]
+            out.append("")
     if cmp.per_query:
         out += _most_changed(cmp)
     return "\n".join(out).rstrip() + "\n"

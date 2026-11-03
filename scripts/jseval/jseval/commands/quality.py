@@ -148,7 +148,9 @@ def cmd_compare(ctx, collection: str, baseline_path: Path, candidate_path: Path,
         except OSError as e:  # the verdict without its report is an incomplete outcome
             _invalid(ctx, f"{c.name}: cannot write the report {report_path}: {e}")
     if ctx.find_root().obj and ctx.find_root().obj.get("json"):
-        click.echo(json.dumps(result.verdict.to_dict(), indent=1))
+        click.echo(json.dumps({**result.verdict.to_dict(), "unjudged": result.unjudged,
+                               "judgment_requests": [dict(qid=qid, doc_id=doc, arm=arm)
+                                   for qid, doc, arm in report.judgment_rows(result)]}, indent=1))
     else:
         click.echo(report.outcome_line(result))
     ctx.exit(result.verdict.exit_code)

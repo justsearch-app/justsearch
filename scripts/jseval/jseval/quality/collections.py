@@ -263,8 +263,9 @@ def build(cfg: QualityConfig, *, path: str | os.PathLike | None = None) -> Colle
     if kind == "beir-dir":
         src = path or cfg.source.get("path")
         if src and path is None and not Path(src).is_absolute():
-            from .._paths import main_repo_root
-            src = main_repo_root() / src
+            from .._paths import REPO_ROOT, main_repo_root
+            local = REPO_ROOT / src
+            src = local if local.is_dir() else main_repo_root() / src
         if not src:
             raise CollectionError(f"{cfg.collection}: a beir-dir collection needs its directory")
         return from_beir_dir(src, cfg)

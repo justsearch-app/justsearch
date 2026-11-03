@@ -426,7 +426,9 @@ def execute(action: str, refs: tuple[str, ...], *, baseline_dir: Path,
     comparisons, times, records, refusals = [], {}, [], {}
     for item, (c, qc, cfg, baseline, models) in zip(plan['items'], loaded):
         record, errors = compare.load_run_or_reason(item['run'], c.name)
-        errors += problems
+        # The reservation/startup failure explains missing output. Lead with it
+        # so the command names the holders/deadline instead of an absent file.
+        errors = problems + errors
         if record:
             refusals[c.name] = [r.qid for r in record.results if compare.syntax_refused(r)]
             errors += compare.validate_run(c, record, {c.version}, c.name)
