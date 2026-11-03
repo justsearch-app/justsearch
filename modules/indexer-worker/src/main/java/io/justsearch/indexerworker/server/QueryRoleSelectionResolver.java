@@ -37,10 +37,8 @@ final class QueryRoleSelectionResolver {
         EnvRegistry.RERANK_MODEL_PATH.configKey());
     boolean citationOverride = isOperatorOverride(resolved,
         EnvRegistry.CITATION_SCORER_MODEL_PATH.configKey());
-    var enabledSource = resolved.resolution(EnvRegistry.RERANK_ENABLED.configKey());
-    boolean explicitlyOff = !rerankerOverride && enabledSource != null
-        && enabledSource.sourceOrdinal() == ResolvedConfigBuilder.ORDINAL_SETTINGS_JSON
-        && "false".equalsIgnoreCase(enabledSource.value());
+    boolean explicitlyOff = !rerankerOverride
+        && EncoderConfigurationProjection.rerankerOffBySavedPreference(resolved);
     if (!rerankerOverride && !citationOverride && !explicitlyOff) {
       return new BootResolution(enrich(committed), Map.of());
     }
@@ -136,11 +134,21 @@ final class QueryRoleSelectionResolver {
       }
       return QueryRoleSelection.Role.disabled();
     }
-    boolean enabling = Boolean.TRUE.equals(candidate.getRerankerEnabled())
-        && (prior == null || prior.state() == QueryRoleSelection.State.DISABLED);
-    var retained = candidate.getRerankerRestoreSelection();
-    if (enabling && !pathChanged && retained != null) return enrich("reranker", retained);
-    var selected = select("reranker", pathChanged || enabling, desiredDirectory, prior,
+    // Switching on arrives as a path change. The exact serving or earlier selection (variant,
+    // custom file) is kept when it names that directory with unchanged bytes; otherwise the
+    // directory is probed like any new model path.
+    if (pathChanged && desiredDirectory != null) {
+      for (var exact : java.util.Arrays.asList(prior, candidate.getRerankerRestoreSelection())) {
+        if (exact != null && exact.state() == QueryRoleSelection.State.SELECTED
+            && desiredDirectory.toAbsolutePath().normalize().equals(
+                exact.model().path().toAbsolutePath().normalize().getParent())
+            && GenerationModelSelection.verifyIdentity(exact.model())
+            && GenerationModelSelection.verifyIdentity(exact.tokenizer())) {
+          return enrich("reranker", exact);
+        }
+      }
+    }
+    var selected = select("reranker", pathChanged, desiredDirectory, prior,
         generation, currentlyWired, gpuEnabled);
     if (Boolean.TRUE.equals(candidate.getRerankerEnabled())
         && selected.state() != QueryRoleSelection.State.SELECTED) {

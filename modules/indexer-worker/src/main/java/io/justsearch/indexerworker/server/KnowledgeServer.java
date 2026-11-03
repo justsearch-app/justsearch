@@ -5542,7 +5542,12 @@ public final class KnowledgeServer implements Closeable {
       boolean rerankerPathChanged = changedKeys.contains(EnvRegistry.RERANK_MODEL_PATH.configKey());
       boolean citationPathChanged = changedKeys.contains(
           EnvRegistry.CITATION_SCORER_MODEL_PATH.configKey());
-      Path rerankerDirectory = rerankerPathChanged && candidate.getRerankerModelPath().isBlank()
+      // Switching Best match first on is a path change to the retained (or discovered) model,
+      // never the blank-path disablement of an ordinary settings save.
+      boolean switchedOn = changedKeys.contains("rerankerEnabled")
+          && Boolean.TRUE.equals(candidate.getRerankerEnabled());
+      Path rerankerDirectory = rerankerPathChanged && !switchedOn
+          && candidate.getRerankerModelPath().isBlank()
           ? null : projection.reranker().modelPath();
       Path citationDirectory = citationPathChanged && candidate.getCitationScorerModelPath().isBlank()
           ? null : projection.citation().modelPath();

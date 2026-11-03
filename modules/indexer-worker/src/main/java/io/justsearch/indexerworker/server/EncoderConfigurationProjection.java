@@ -159,14 +159,7 @@ final class EncoderConfigurationProjection {
     var b = desired.bgeM3;
     var r = desired.reranker;
     var c = desired.citation;
-    var enabledSource = cfg.resolution(key(EnvRegistry.RERANK_ENABLED));
-    var pathSource = cfg.resolution(key(EnvRegistry.RERANK_MODEL_PATH));
-    boolean savedOff = enabledSource != null
-        && enabledSource.sourceOrdinal()
-            == io.justsearch.configuration.resolved.ResolvedConfigBuilder.ORDINAL_SETTINGS_JSON
-        && "false".equalsIgnoreCase(enabledSource.value())
-        && (pathSource == null || pathSource.sourceOrdinal()
-            < io.justsearch.configuration.resolved.ResolvedConfigBuilder.ORDINAL_ENV_VAR);
+    boolean savedOff = rerankerOffBySavedPreference(cfg);
     if (savedOff) rerankerDir = r.modelPath();
     return new EncoderConfigurationProjection(cfg, mode,
         new EmbeddingConfig(embeddingDir != null, embeddingDir, e.backend(), e.gpuEnabled(),
@@ -358,6 +351,21 @@ final class EncoderConfigurationProjection {
 
   private static String key(EnvRegistry key) {
     return key.configKey();
+  }
+
+  /**
+   * Whether only the saved Best match first choice keeps the reranker unused: the settings file
+   * says off and no operator source names its model. The retained files still own their place.
+   */
+  static boolean rerankerOffBySavedPreference(ResolvedConfig cfg) {
+    var enabledSource = cfg.resolution(key(EnvRegistry.RERANK_ENABLED));
+    var pathSource = cfg.resolution(key(EnvRegistry.RERANK_MODEL_PATH));
+    return enabledSource != null
+        && enabledSource.sourceOrdinal()
+            == io.justsearch.configuration.resolved.ResolvedConfigBuilder.ORDINAL_SETTINGS_JSON
+        && "false".equalsIgnoreCase(enabledSource.value())
+        && (pathSource == null || pathSource.sourceOrdinal()
+            < io.justsearch.configuration.resolved.ResolvedConfigBuilder.ORDINAL_ENV_VAR);
   }
 
   private static void put(Map<String, Object> values, EnvRegistry key, Object value) {

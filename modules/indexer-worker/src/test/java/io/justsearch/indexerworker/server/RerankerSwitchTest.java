@@ -131,7 +131,8 @@ final class RerankerSwitchTest {
       Files.writeString(f.selection.reranker().model().path().getParent().resolve("model.onnx"),
           "another available variant");
       candidate.setRerankerEnabled(true);
-      var restored = QueryRoleSelectionResolver.selectReranker(candidate, false,
+      // On arrives through the path-change route with the retained directory.
+      var restored = QueryRoleSelectionResolver.selectReranker(candidate, true,
           f.selection.reranker().model().path().getParent(), disabled, null, false, false);
       assertEquals(f.selection.reranker(), restored);
     }

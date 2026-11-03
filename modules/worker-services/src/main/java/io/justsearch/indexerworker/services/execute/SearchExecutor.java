@@ -341,6 +341,9 @@ public final class SearchExecutor {
     // the transitional alias. Either drives fusion-time detail computation (some keys are only
     // computed when on — Slice-1 interrogation finding), so widen the flag end-to-end here.
     boolean debug = request.getDebug() || request.getIncludeDetail();
+    // Leg-top splices exist for the cross-encoder's window. Without a cross-encoder the returned
+    // list is what the user sees, so it must keep its fused order.
+    boolean rerankPool = rerankPool(request);
     String effectiveMode = decision.legs().effectiveModeLabel();
     var syntax = decision.runtimeSyntax();
     // Tempdoc 821 §P: the lexical leg honours the request's query_syntax, so a malformed LUCENE
@@ -389,6 +392,7 @@ public final class SearchExecutor {
                         bd.retrievalLimit(),
                         runtimeFilters,
                         syntax,
+                        rerankPool,
                         ctx.engineContext().urgency(), ctx.childLifetime())
                     : hybridSearchOps.searchHybridFiltered(
                         queryString,
@@ -396,6 +400,7 @@ public final class SearchExecutor {
                         bd.retrievalLimit(),
                         QueryFilterBuilder.buildFilterQueryOnly(runtimeFilters),
                         syntax,
+                        rerankPool,
                         ctx.engineContext().urgency(), ctx.childLifetime());
             case LegSet.DenseOnly d ->
                 // Tempdoc 549 Slice 3c (U2): single dense leg, no fusion.
@@ -480,6 +485,13 @@ public final class SearchExecutor {
         chunkOutcome.branchFusionNs());
   }
 
+  private static boolean rerankPool(io.justsearch.ipc.SearchRequest request) {
+    var pipeline = request.hasPipeline() ? request.getPipeline()
+        : io.justsearch.indexerworker.services.plan.SearchPlanner.modeToDefaultPipeline(
+            request.getMode());
+    return pipeline.getCrossEncoderEnabled();
+  }
+
   private LuceneRuntimeTypes.SearchResult runThreeWay(
       LegSet.ThreeWay tw,
       String queryString,
@@ -494,8 +506,10 @@ public final class SearchExecutor {
     int candidateMax = Math.max(hs3 != null ? hs3.candidateLimitMax() : 100, tw.retrievalLimit());
     int textMult = hs3 != null ? hs3.textCandidateMultiplier() : 10;
     int vectorMult = hs3 != null ? hs3.vectorCandidateMultiplier() : 10;
-    int textCandLimit = Math.min(tw.retrievalLimit() * Math.max(1, textMult), candidateMax);
-    int vectorCandLimit = Math.min(tw.retrievalLimit() * Math.max(1, vectorMult), candidateMax);
+    // Same ranking depth as two-leg hybrid fusion: a short page ranks the default page's pools.
+    int depth = Math.max(tw.retrievalLimit(), HybridSearchOps.MIN_FUSION_DEPTH);
+    int textCandLimit = Math.min(depth * Math.max(1, textMult), candidateMax);
+    int vectorCandLimit = Math.min(depth * Math.max(1, vectorMult), candidateMax);
 
     Context otelCtx = Context.current().with(retrievalSpan);
     LuceneRuntimeTypes.SearchResult result;
@@ -939,7 +953,8 @@ public final class SearchExecutor {
     // Head cross-encoder ever sees it. Re-assert the guarantee on the branch-fused list, identifying
     // the protected docs by the dense/bm25 leg rank carried in their whole-doc provenance (presence,
     // not score — keyword-neutral). Spliced before attachBranchFusion so provenance is re-mapped.
-    if (hybridConfig != null && hybridConfig.legRecallCompleteEnabled()) {
+    boolean rerankPool = pipeline.getCrossEncoderEnabled();
+    if (rerankPool && hybridConfig != null && hybridConfig.legRecallCompleteEnabled()) {
       int topN = hybridConfig.legRecallCompleteTopN();
       List<LuceneRuntimeTypes.SearchHit> protectedHits = new ArrayList<>();
       for (LuceneRuntimeTypes.SearchHit h : wholeDocResult.hits()) {
