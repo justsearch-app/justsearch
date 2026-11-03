@@ -241,9 +241,15 @@ def cmd_ablate(ctx, **kwargs):
 @_never_crash
 def cmd_prepare(ctx, collection, documents_dir, models_dir, cache_root):
     """Build/confirm an index through pausable background admission, outside scoring."""
-    from ..quality.index import IndexConfig, prepare_index
+    from ..quality.index import IndexConfig, IndexRefused, prepare_index
     c, _cfg, _ka = _checked_collection(ctx, collection)
     cfg = IndexConfig(documents_dir=documents_dir, models_dir=models_dir, cache_root=cache_root)
-    with prepare_index(c, cfg) as handle:
-        handle.wait()
+    try:
+        with prepare_index(c, cfg) as handle:
+            handle.wait()
+    except IndexRefused as error:
+        # Preparation has no comparison report. Preserve the worker's complete
+        # actionable reason instead of truncating it with a nonexistent pointer.
+        click.echo('INVALID ' + ' '.join(str(error).split()))
+        ctx.exit(Outcome.INVALID.exit_code)
     click.echo(f'PASS {c.name} prepared index ready')

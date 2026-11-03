@@ -119,7 +119,7 @@ class IndexConfig:
             env["JUSTSEARCH_SPLADE_ENABLED"] = "true"
         models = self.models_dir or shared_models_dir()
         if models is None or not Path(models).is_dir():
-            raise IndexRefused("models directory unavailable")
+            raise IndexRefused("models directory unavailable; pass --models-dir /path/to/shared/models")
         env["JUSTSEARCH_MODELS_DIR"] = str(Path(models).resolve())
         env["JUSTSEARCH_REPO_ROOT"] = str(self.repo_root.resolve())
         slot = shutil.which("js-gradle-slot")
@@ -166,7 +166,11 @@ def model_hashes(models: Path) -> dict[str, str]:
     roots = [models / "onnx", models / "splade"]
     files = sorted({p for root in roots for p in root.rglob("*") if p.is_file()})
     if not files:
-        raise IndexRefused(f"no model inputs under {models}")
+        raise IndexRefused(f"no model inputs under {models}; pass --models-dir /path/to/shared/models")
+    for path in files:
+        with path.open("rb") as stream:
+            if stream.read(128).startswith(b"version https://git-lfs.github.com/spec/v1\n"):
+                raise IndexRefused(f"model is an LFS pointer: {path}; pass --models-dir /path/to/shared/models")
     return {p.relative_to(models).as_posix(): _file_hash(p) for p in files}
 
 
@@ -577,8 +581,7 @@ class IndexHandle:
             while time.monotonic() < until:
                 code = self._worker.poll()
                 if code is not None:
-                    raise IndexRefused(f"background preparation exited {code}: "
-                                       f"{(self.root / 'build.log').read_text()[-6000:]}")
+                    raise self._preparation_failure(f"background preparation exited {code}")
                 ready = self.root / "prepared.json"
                 if ready.exists():
                     prepared = _json(ready)
@@ -644,8 +647,7 @@ class IndexHandle:
                     self._worker.wait(timeout=150)
                 self._backend = None
                 if self._worker.poll() != 0:
-                    raise IndexRefused(f"preparation teardown failed: exit {self._worker.returncode}; "
-                                       f"{(self.root / 'build.log').read_text()[-6000:]}")
+                    raise self._preparation_failure(f"preparation teardown failed: exit {self._worker.returncode}")
                 # Only a successfully reaped admission supervisor can authorize
                 # publication. An orphan worker can never publish a failed build.
                 if ready:
@@ -658,6 +660,17 @@ class IndexHandle:
         finally:
             if not self._lock.closed:
                 self._lock.close()
+
+    def _preparation_failure(self, fallback: str) -> IndexRefused:
+        try:
+            failure = _json(self.root / "failure.json")
+            reason = failure["reason"]
+            if isinstance(reason, str) and reason:
+                kind = TransientIndexRefused if failure.get("transient") is True else IndexRefused
+                return kind(reason)
+        except (OSError, ValueError, KeyError, TypeError):
+            pass
+        return IndexRefused(f"{fallback}: {(self.root / 'build.log').read_text()[-6000:]}")
 
     def __enter__(self) -> "IndexHandle":
         return self
@@ -714,6 +727,7 @@ def prepare_index(collection: Collection, config: IndexConfig, *, prepared_only:
         (root / "engine-ready").unlink(missing_ok=True)
         (root / "prepared.json").unlink(missing_ok=True)
         (root / "completed.json").unlink(missing_ok=True)
+        (root / "failure.json").unlink(missing_ok=True)
         (root / "stop").unlink(missing_ok=True)
         serial = dataclasses.asdict(config)
         for k in ("repo_root", "models_dir", "documents_dir", "cache_root", "data_dir"):
@@ -797,11 +811,9 @@ def _confirm(handle: IndexHandle, entry: dict | None = None) -> index_identity.C
 
 def _confirm_ready(handle: IndexHandle, deadline: float, *, entry: dict | None = None,
                    external: bool = False) -> index_identity.ConfirmResult:
-    """Three serving attempts; a content/identity mismatch settles immediately."""
+    """Retry serving readiness until the deadline; settle content/identity failures immediately."""
     last = None
-    for attempt in range(3):
-        if time.monotonic() >= deadline:
-            raise TransientIndexRefused("not ready, transient: confirmation deadline expired")
+    while time.monotonic() < deadline:
         result = confirm(handle) if external else _confirm(handle, entry)
         if result.ok:
             return result
@@ -811,9 +823,8 @@ def _confirm_ready(handle: IndexHandle, deadline: float, *, entry: dict | None =
         if not isinstance(transient, list) or set(result.failures) - set(transient):
             return result
         last = result.failures
-        if attempt < 2:
-            time.sleep(min(2**attempt, max(0, deadline-time.monotonic())))
-    raise TransientIndexRefused(f"not ready, transient: serving confirmation failed after 3 attempts: {last}")
+        time.sleep(min(2, max(0, deadline-time.monotonic())))
+    raise TransientIndexRefused(f"not ready, transient: serving confirmation deadline expired: {last}")
 
 
 def _start_serving(config: IndexConfig, data: Path, env: dict, port: int,
@@ -991,7 +1002,13 @@ def main() -> None:
     p.add_argument("--cache-root", type=Path, required=True, help="a new directory under ~/.cache/justsearch-quality")
     args = parser.parse_args()
     if args.command == "build":
-        _build(args.root)
+        try:
+            _build(args.root)
+        except IndexRefused as error:
+            _write(args.root / "failure.json", {"reason": str(error),
+                "transient": isinstance(error, TransientIndexRefused)})
+            print(str(error), file=sys.stderr, flush=True)
+            raise SystemExit(1) from None
     elif args.command == "hook":
         _hook(args.root, args.action)
     else:

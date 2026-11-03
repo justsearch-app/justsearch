@@ -406,8 +406,8 @@ def execute(action: str, refs: tuple[str, ...], *, baseline_dir: Path,
                               'ready': str(folder/'ready'), 'go': str(folder/'go'), 'done': str(folder/'done.json')})
     _write_json(out/'plan.json', plan)
     command = [sys.executable, str(repo_root/'scripts/dev/admission.py'), 'exclusive',
-               '--purpose', 'search quality ' + action, '--gate-timeout', '120',
-               '--drain-timeout', '120', '--timeout', str(window_seconds), '--',
+               '--purpose', 'search quality ' + action, '--gate-timeout', '1200',
+               '--drain-timeout', '600', '--timeout', str(window_seconds), '--',
                sys.executable, '-m', 'jseval.quality.run', 'window', plan['path']]
     # Capture logs to disk: stdout has exactly one outcome, only AFTER safe cleanup.
     with (out/'window.log').open('w') as log:

@@ -30,6 +30,16 @@ def test_real_cpu_baseline_check_errors_and_window(monkeypatch):
     engine = Path(os.environ.get('JSEVAL_QUALITY_ENGINE_ROOT', index.REPO_ROOT))
     assert backend.source_identity(engine)[1] is None, 'real acceptance needs a clean engine checkout'
     backend.require_prepared(engine)
+    # The clean checkout supplies engine binaries; exercise this harness's
+    # admission implementation even when that checkout predates the new caps.
+    bind_command = backend.bind_command
+    admission_under_test = Path(__file__).resolve().parents[4]/'scripts/dev/admission.py'
+    def bind_current_admission(repo, command):
+        command = list(command)
+        if len(command) > 1 and command[1] == str(engine/'scripts/dev/admission.py'):
+            command[1] = str(admission_under_test)
+        return bind_command(repo, command)
+    monkeypatch.setattr(backend, 'bind_command', bind_current_admission)
     root = Path(tempfile.mkdtemp(prefix='lane-c-real-', dir=Path.home()/'.cache/justsearch-quality'))
     monkeypatch.setenv('JS_ADMISSION_DIR', str(root/'admission'))
     monkeypatch.delenv('JS_ADMISSION_TOKEN', raising=False)

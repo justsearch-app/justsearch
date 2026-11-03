@@ -87,9 +87,9 @@ Scoring estimates its cost before reserving the machine through
 `scripts/dev/admission.py exclusive`. The default window is 600 seconds,
 including backend startup, scoring and cleanup. `--window-seconds` may shorten
 it; there is no override for work that does not fit. Gate waiting and draining
-each stop after 120 seconds. The admission guardian owns and reaps all children,
-including hung inference. The next collection starts warming while the current
-one is queried.
+stop after 1200 and 600 seconds respectively. The admission guardian owns and
+reaps all children, including hung inference. The next collection starts warming
+while the current one is queried.
 
 Each command prints one outcome line. Exit codes: PASS 0, REGRESSION 1,
 INCONCLUSIVE/INVALID 2. Reports name the measured surface, request, candidate,

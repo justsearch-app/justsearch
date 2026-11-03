@@ -17,6 +17,14 @@ from jseval.quality import compare, index, report
 from .helpers import config_for, make_collection, make_run
 
 
+@pytest.fixture
+def serving_clock(monkeypatch):
+    now = [100.0]
+    monkeypatch.setattr(index.time, 'monotonic', lambda: now[0])
+    monkeypatch.setattr(index.time, 'sleep', lambda seconds: now.__setitem__(0, now[0]+seconds))
+    return now
+
+
 def cached_handle(tmp_path, monkeypatch):
     c = make_collection()
     data = tmp_path/'data'
@@ -37,7 +45,7 @@ def cached_handle(tmp_path, monkeypatch):
 
 @pytest.mark.parametrize('reason', ['DEADLINE_EXCEEDED', 'ACQUIRE_BUDGET_EXCEEDED',
                                    'MODEL_LOADING', 'INFERENCE_FAILED'])
-def test_transient_canary_failure_preserves_cache_and_retries(tmp_path, monkeypatch, reason):
+def test_transient_canary_failure_preserves_cache_and_retries(tmp_path, monkeypatch, reason, serving_clock):
     h = cached_handle(tmp_path, monkeypatch)
     # Exercise the real canary decoder and the quality confirmation, not a synthetic flag.
     response = {'totalHits': 2, 'searchTrace': {'stages': [
@@ -56,9 +64,8 @@ def test_transient_canary_failure_preserves_cache_and_retries(tmp_path, monkeypa
     monkeypatch.setattr(index_identity, 'confirm_adoption', lambda *a, **kw: adopted)
     confirmation = Mock(wraps=index.confirm)
     monkeypatch.setattr(index, 'confirm', confirmation)
-    monkeypatch.setattr(index.time, 'sleep', lambda _: None)
     with pytest.raises(index.IndexRefused, match='not ready, transient:') as error:
-        h.wait(prepared_only=True, deadline=time.monotonic()+.1)
+        h.wait(prepared_only=True, deadline=time.monotonic()+5)
     assert reason in str(error.value)
     assert confirmation.call_count == 3
     assert (h.root/'entry.json').exists() and h.data_dir.exists()
@@ -66,15 +73,14 @@ def test_transient_canary_failure_preserves_cache_and_retries(tmp_path, monkeypa
     assert h._lock.closed
 
 
-def test_transient_confirmation_recovers_without_quarantining(tmp_path, monkeypatch):
+def test_transient_confirmation_recovers_without_quarantining(tmp_path, monkeypatch, serving_clock):
     h = cached_handle(tmp_path, monkeypatch)
     bad = index_identity.ConfirmResult(False, ['canary.stage.cross-encoder: status=skipped reason=DEADLINE_EXCEEDED'],
                                        {'canary': {'transient': True}})
     confirmation = Mock(side_effect=[bad, index_identity.ConfirmResult(True, [], {})])
     monkeypatch.setattr(index, 'confirm', confirmation)
-    monkeypatch.setattr(index.time, 'sleep', lambda _: None)
     try:
-        assert h.wait(prepared_only=True, deadline=time.monotonic()+.1) is h
+        assert h.wait(prepared_only=True, deadline=time.monotonic()+5) is h
         assert confirmation.call_count == 2
         assert (h.root/'entry.json').exists()
     finally:
@@ -93,7 +99,7 @@ def test_health_failure_retries_without_quarantining(tmp_path, monkeypatch):
 
 
 @pytest.mark.parametrize('recovers', [False, True])
-def test_cached_worker_configuration_snapshot_is_serving_not_corruption(tmp_path, monkeypatch, recovers):
+def test_cached_worker_configuration_snapshot_is_serving_not_corruption(tmp_path, monkeypatch, recovers, serving_clock):
     h = cached_handle(tmp_path, monkeypatch)
     # Cached startup can answer health before the worker's resolved enable flags
     # arrive. This is the real readiness failure from the CPU acceptance run.
@@ -123,13 +129,12 @@ def test_cached_worker_configuration_snapshot_is_serving_not_corruption(tmp_path
     monkeypatch.setattr(index, 'witness', witness)
     confirmation = Mock(wraps=index.confirm)
     monkeypatch.setattr(index, 'confirm', confirmation)
-    monkeypatch.setattr(index.time, 'sleep', lambda _: None)
     try:
         if recovers:
-            assert h.wait(prepared_only=True, deadline=time.monotonic()+1) is h
+            assert h.wait(prepared_only=True, deadline=time.monotonic()+5) is h
         else:
             with pytest.raises(index.IndexRefused, match='not ready, transient:.*splade_not_complete; unused sparse stages are enabled'):
-                h.wait(prepared_only=True, deadline=time.monotonic()+1)
+                h.wait(prepared_only=True, deadline=time.monotonic()+5)
         assert confirmation.call_count == (2 if recovers else 3)
         assert (h.root/'entry.json').exists() and h.data_dir.exists()
         assert not (h.root/'quarantine').exists()
@@ -222,7 +227,7 @@ time.sleep(60)
 
 
 @pytest.mark.parametrize('failure', ['health', 'canary', 'content', 'queued-start'])
-def test_background_adoption_quarantines_only_content_failure(tmp_path, monkeypatch, failure):
+def test_background_adoption_quarantines_only_content_failure(tmp_path, monkeypatch, failure, serving_clock):
     from .test_index import env_for
     from jseval.quality.run import _serial_config
     c = make_collection(n_docs=4)
@@ -261,7 +266,6 @@ def test_background_adoption_quarantines_only_content_failure(tmp_path, monkeypa
         confirmation.return_value = index_identity.ConfirmResult(True, [])
         (root/'stop').touch()
     monkeypatch.setattr(index, '_confirm', confirmation)
-    monkeypatch.setattr(index.time, 'sleep', lambda _: None)
     # On the old tree this is reached before confirmation; it must not become
     # the reason the regression test fails.
     monkeypatch.setattr(index, 'witness', lambda *a: {})
@@ -276,5 +280,9 @@ def test_background_adoption_quarantines_only_content_failure(tmp_path, monkeypa
     if failure == 'health':
         assert launch.call_count == 3
     else:
-        assert confirmation.call_count == (3 if failure == 'canary' else 1)
+        if failure == 'canary':
+            assert serving_clock[0] == 130  # Full readiness deadline, not a retry count.
+            assert confirmation.call_count > 3
+        else:
+            assert confirmation.call_count == 1
     assert not (root/'prepared.json').exists()

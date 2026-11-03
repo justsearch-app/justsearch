@@ -372,8 +372,8 @@ time.sleep(60)
         background.terminate(); background.wait(timeout=3)
 
     def test_budget_caps_are_enforced(self):
-        cases = [("exclusive", "--drain-timeout", "121"), ("exclusive", "--timeout", "601"),
-                 ("exclusive", "--gate-timeout", "721"), ("heavy", "--gate-timeout", "721"),
+        cases = [("exclusive", "--drain-timeout", "601"), ("exclusive", "--timeout", "601"),
+                 ("exclusive", "--gate-timeout", "1201"), ("heavy", "--gate-timeout", "1201"),
                  ("pausable", "--hook-timeout", "121")]
         for mode, option, value in cases:
             with self.subTest(option=option, mode=mode):

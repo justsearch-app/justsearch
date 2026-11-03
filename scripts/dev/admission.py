@@ -25,11 +25,11 @@ REFUSED = 75
 UNAVAILABLE = 73
 GRACE = 0.2
 POLL = 0.05
-# The agreed budget: the gate never stays closed for long (drain + window <= 12 minutes).
-MAX_DRAIN = 120
+# The agreed budget: drain + scoring window <= 20 minutes.
+MAX_DRAIN = 600
 MAX_WINDOW = 600
 MAX_GATE_WAIT = MAX_DRAIN + MAX_WINDOW
-MAX_HOOK = MAX_DRAIN
+MAX_HOOK = 120
 DEFAULT_HOOK = 60
 
 

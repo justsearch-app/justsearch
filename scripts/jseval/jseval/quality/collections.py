@@ -268,6 +268,10 @@ def build(cfg: QualityConfig, *, path: str | os.PathLike | None = None) -> Colle
             src = local if local.is_dir() else main_repo_root() / src
         if not src:
             raise CollectionError(f"{cfg.collection}: a beir-dir collection needs its directory")
+        if not Path(src).is_dir():
+            raise CollectionError(f"{cfg.collection}: Enron/BEIR data unavailable at {src}; "
+                "run quality check /path/to/stored/collection with quality.config.json "
+                "source.path pointing to the prepared BEIR directory")
         return from_beir_dir(src, cfg)
     raise CollectionError(f"{cfg.collection}: unknown source kind {kind!r}")
 
