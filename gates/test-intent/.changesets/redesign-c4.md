@@ -142,6 +142,19 @@ in the acceptance module suite. The shared dev-stack check is reserved for the o
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/RediscoveryAdmissionTest.java#maintenanceWithoutCapturedProofKeepsExistingAdmission",
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/RediscoveryAdmissionTest.java#identicalCandidateEnumerationRetainsRevisionAndReplayWitness"
       ]
+    },
+    {
+      "items": [
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/ExplicitIngestRecords.java"
+      ],
+      "class": "Incidental",
+      "assessment": {
+        "purpose": "Test fixture helper. Adds recordRoot, which records the volume a root is on in the Worker's volume record under indexBase, as an explicit ingest of that root does, so the C4 end-to-end fixture leaves the same volume evidence a real recorded ingest leaves. Without it admission refuses the captured files wherever the run cannot establish the root's volume.",
+        "callersAndStateOwners": "Only test code calls this helper; the new method is called only by KnowledgeServerRecordedIngestionTest#firstMaintenanceDuringRecordedMigrationExtractsEachCapturedFileOnce. It writes to the test's own temporary indexBase through RootVolumeLedger.",
+        "indirectBehaviours": "The existing recordFileFolder method and its callers are unchanged in inputs, behaviour and assertions; only its Javadoc now also mentions roots.",
+        "evidence": "gates/test-intent/evidence/redesign-c4-repair.json: the end-to-end check that uses the helper fails before by its duplicate-extraction assertion and passes after; the full indexer-worker suite, which runs every existing caller of recordFileFolder, is run by the verifier on both trees.",
+        "unresolvedRisks": "None known: the helper adds a record only for the root the test names, under the test's temporary directory."
+      }
     }
   ]
 }
