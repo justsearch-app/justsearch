@@ -28,7 +28,7 @@ import org.junit.jupiter.params.provider.ValueSource;
 final class UnchangedSourceReadFailureTest {
   @TempDir Path temporary;
 
-  @ParameterizedTest
+  @ParameterizedTest(name = "{displayName} [{index}] {arguments}")
   @ValueSource(strings = {"mutated", "deleted", "read-failed"})
   void freshnessReadCannotAcknowledgeAnUnstableOrUnreadableSource(String change) throws Exception {
     check(change);
@@ -51,6 +51,7 @@ final class UnchangedSourceReadFailureTest {
     when(parser.extractionPolicy()).thenReturn(TikaExtractionPolicy.defaults());
     when(parser.extractArtifact(any())).thenThrow(new IOException("injected unavailable source"));
     var queue = mock(JobQueue.class);
+    when(queue.ownsClaimForPublication(any())).thenReturn(true);
     var journal = mock(IngestionOutcomeJournal.class);
     when(journal.outcome(any(), any(), any(), any())).thenCallRealMethod();
     doCallRealMethod().when(journal).recordOutcomeSafely(any(), any(), any());
@@ -62,11 +63,14 @@ final class UnchangedSourceReadFailureTest {
     when(roots.admits(any())).thenReturn(true);
     when(roots.vouches(any())).thenReturn(true);
     authority.useRootCheck(roots);
+    var fence = new FileMutationFence();
+    var stale = new StaleSnapshotResolver(authority, mock(StaleSourceHandler.class), journal, queue, parser,
+        ignored -> {}, fence);
     var extractor = new JobBatchExtractor(authority, journal, queue, parser,
-        fields, counts, new BatchStats(), mock(StaleSnapshotResolver.class), mock(StaleSourceHandler.class),
+        fields, counts, new BatchStats(), stale, mock(StaleSourceHandler.class),
         IndexingPacing.unthrottled(), new AtomicBoolean(true), new java.util.HashSet<>(),
         () -> mock(PathResolutionStore.class), () -> identity, (stage, ms, reason) -> {},
-        () -> false, delta -> {}, new FileMutationFence());
+        () -> false, delta -> {}, fence);
     var claim = new JobQueue.IndexJob(file, null, null, null, null, null, false,
         change.equals("planned-hash") ? SourceContentHash.sha256(file) : null, temporary);
     try (var hashes = mockStatic(SourceContentHash.class, CALLS_REAL_METHODS)) {
@@ -80,8 +84,18 @@ final class UnchangedSourceReadFailureTest {
       assertTrue(assertDoesNotThrow(() -> extractor.extractAll(List.of(claim))).isEmpty());
     }
     var outcome = org.mockito.ArgumentCaptor.forClass(IngestionOutcome.class);
-    verify(queue).markClaimFailed(eq(claim), outcome.capture(), any());
-    assertEquals(IngestionRetryPolicy.RETRY_WITH_BACKOFF, outcome.getValue().retryPolicy());
+    if (change.equals("mutated")) {
+      verify(queue).deferClaim(eq(claim), outcome.capture(), any());
+      assertEquals(IngestionRetryPolicy.DEFER_WITHOUT_ATTEMPT, outcome.getValue().retryPolicy());
+      verify(parser, never()).extractArtifact(any());
+    } else if (change.equals("deleted")) {
+      verify(journal).enqueueTransition(any(), outcome.capture());
+      assertEquals(IngestionRetryPolicy.NONE, outcome.getValue().retryPolicy());
+      verify(parser, never()).extractArtifact(any());
+    } else {
+      verify(queue).markClaimFailed(eq(claim), outcome.capture(), any());
+      assertEquals(IngestionRetryPolicy.RETRY_WITH_BACKOFF, outcome.getValue().retryPolicy());
+    }
     if (change.equals("planned-hash")) {
       assertTrue(mockingDetails(fields).getInvocations().stream()
           .noneMatch(call -> call.getMethod().getName().equals("isUnmodified")),

@@ -377,21 +377,16 @@ public final class NativePolicyReplay {
             Path path = Path.of(file.path());
             if (!allows(path, file.ingestionRoot(), file.collection()) || !ordinaryIndexOwner(path)) return false;
             var ancestors = currentAncestors(file.ingestionRoot(), path);
-            var before = Files.readAttributes(path,
-                BasicFileAttributes.class, LinkOption.NOFOLLOW_LINKS);
-            if (!before.isRegularFile() || SyncDirectoryOps.isCloudPlaceholder(path)) return false;
+            var before = io.justsearch.indexerworker.loop.FileFreshnessSnapshot.capture(path);
+            if (!before.regularFile() || SyncDirectoryOps.isCloudPlaceholder(path)) return false;
             String hash = SourceContentHash.sha256WithinRoot(path, file.ingestionRoot());
-            var after = Files.readAttributes(path,
-                BasicFileAttributes.class, LinkOption.NOFOLLOW_LINKS);
-            if (!after.isRegularFile() || before.size() != after.size()
-                || !before.lastModifiedTime().equals(after.lastModifiedTime())
-                || !Objects.equals(before.fileKey(), after.fileKey())
+            if (before.validateNow() != io.justsearch.indexerworker.loop.FileFreshnessSnapshot.SourceValidationResult.FRESH
                 || !ancestors.equals(currentAncestors(file.ingestionRoot(), path))) {
               throw new IOException("Native policy source changed during normal witness capture");
             }
             ancestry.put(path, ancestors);
             entries.add(new NativePolicyReadmission(old.op(),
-                old.row(), new JobQueue.EnqueueEntry(path, after.size(), file.provenance(),
+                old.row(), new JobQueue.EnqueueEntry(path, before.sizeBytes(), file.provenance(),
                     hash, file.ingestionRoot()), group.getKey().collection()));
           }
           if (!current()) return false;

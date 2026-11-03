@@ -3031,8 +3031,17 @@ public final class KnowledgeServerMigrationOps {
           ? new CleanupPathState(CleanupPathKind.NON_REGULAR, before, null)
           : CleanupPathState.UNCERTAIN;
     }
+    io.justsearch.indexerworker.loop.FileFreshnessSnapshot witness;
+    try {
+      witness = io.justsearch.indexerworker.loop.FileFreshnessSnapshot.capture(file);
+    } catch (IOException | SecurityException unavailable) {
+      return CleanupPathState.UNCERTAIN;
+    }
+    if (!witness.regularFile() || !before.equals("file/" + witness.sizeBytes() + "/"
+        + witness.modifiedAtMs() + "/" + witness.fileKey())) return CleanupPathState.UNCERTAIN;
     String sha = currentSource(file.toString(), root);
-    if (SOURCE_GONE.equals(sha) || !before.equals(observedKind(file))) {
+    if (SOURCE_GONE.equals(sha) || witness.validateNow()
+            != io.justsearch.indexerworker.loop.FileFreshnessSnapshot.SourceValidationResult.FRESH) {
       return CleanupPathState.UNCERTAIN; // It changed while it was being read.
     }
     return new CleanupPathState(CleanupPathKind.REGULAR,

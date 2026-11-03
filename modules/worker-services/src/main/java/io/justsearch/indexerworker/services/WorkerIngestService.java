@@ -947,12 +947,11 @@ public final class WorkerIngestService {
     if (!ingestIsServing || ingestLifecycle == null || !ingestLifecycle.isAcceptingWrites()
         || isUserExcluded(path, root)) return false;
     try {
-      var source = Files.readAttributes(path, java.nio.file.attribute.BasicFileAttributes.class,
-          java.nio.file.LinkOption.NOFOLLOW_LINKS);
+      var source = io.justsearch.indexerworker.loop.FileFreshnessSnapshot.capture(path);
       var fields = ingestLifecycle.documentFieldOps();
       String key = PathNormalizer.normalizeKey(path);
-      if (!source.isRegularFile()
-          || !fields.isUnmodified(key, source.lastModifiedTime().toMillis(), source.size(), null, extractionPolicyId)
+      if (!source.regularFile()
+          || !fields.isUnmodified(key, source.modifiedAtMs(), source.sizeBytes(), null, extractionPolicyId)
           || !Objects.equals(normalizeRootCollection(collection),
               normalizeRootCollection(fields.getDocumentFieldOrThrow(key, SchemaFields.COLLECTION)))) return false;
       // A metadata-only event cannot replace accepted work while the source is deferred.
@@ -960,11 +959,8 @@ public final class WorkerIngestService {
       String storedHash = fields.getDocumentFieldOrThrow(key, SchemaFields.SOURCE_SHA256);
       if (storedHash == null
           || !storedHash.equals(io.justsearch.indexerworker.loop.SourceContentHash.admissionIdentity(path, root))) return false;
-      var current = Files.readAttributes(path, java.nio.file.attribute.BasicFileAttributes.class,
-          java.nio.file.LinkOption.NOFOLLOW_LINKS);
-      return current.isRegularFile() && source.size() == current.size()
-          && source.lastModifiedTime().equals(current.lastModifiedTime())
-          && Objects.equals(source.fileKey(), current.fileKey());
+      return source.validateNow()
+          == io.justsearch.indexerworker.loop.FileFreshnessSnapshot.SourceValidationResult.FRESH;
     } catch (IOException unreadable) {
       return false;
     }
@@ -3405,9 +3401,12 @@ public final class WorkerIngestService {
         id, SchemaFields.SOURCE_SHA256);
     String indexedCollection = fields.getDocumentField(
         id, SchemaFields.COLLECTION);
-    return io.justsearch.indexerworker.loop.SourceContentHash.sha256WithinRoot(file, root).equals(source)
-        && Objects.equals(normalizeRootCollection(collection),
-            normalizeRootCollection(indexedCollection));
+    var before = io.justsearch.indexerworker.loop.FileFreshnessSnapshot.capture(file);
+    return before.regularFile()
+        && io.justsearch.indexerworker.loop.SourceContentHash.sha256WithinRoot(file, root).equals(source)
+        && Objects.equals(normalizeRootCollection(collection), normalizeRootCollection(indexedCollection))
+        && before.validateNow()
+            == io.justsearch.indexerworker.loop.FileFreshnessSnapshot.SourceValidationResult.FRESH;
   }
 
   private static String normalizeRootCollection(String collection) {

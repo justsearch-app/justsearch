@@ -298,7 +298,13 @@ public final class WatcherReplay implements AutoCloseable {
         || SyncDirectoryOps.isCloudPlaceholder(file)) {
       throw new IOException("Watcher reconciliation cannot certify an ineligible source: " + path);
     }
-    return SourceContentHash.sha256WithinRoot(file, Path.of(debt.root()));
+    var before = io.justsearch.indexerworker.loop.FileFreshnessSnapshot.capture(file);
+    String hash = SourceContentHash.sha256WithinRoot(file, Path.of(debt.root()));
+    if (!before.regularFile() || before.validateNow()
+        != io.justsearch.indexerworker.loop.FileFreshnessSnapshot.SourceValidationResult.FRESH) {
+      throw new IOException("Watcher reconciliation source changed during hashing: " + path);
+    }
+    return hash;
   }
 
   private void retire(String path) {

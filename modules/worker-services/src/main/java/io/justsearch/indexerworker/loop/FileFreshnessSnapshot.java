@@ -8,20 +8,22 @@ import java.nio.file.Files;
 import java.nio.file.LinkOption;
 import java.nio.file.Path;
 import java.nio.file.attribute.BasicFileAttributes;
+import java.nio.file.attribute.FileTime;
 import java.util.Objects;
 
 /** Lightweight file identity and metadata snapshot for Worker-side stale-source detection. */
-record FileFreshnessSnapshot(
+public record FileFreshnessSnapshot(
     Path originalPath,
     String normalizedPath,
     String pathHash,
     Object fileKey,
     long sizeBytes,
-    long modifiedAtMs,
+    FileTime modifiedTime,
+    FileTime changedTime,
     boolean regularFile,
     long observedAtMs) {
 
-  static FileFreshnessSnapshot capture(Path path) throws IOException {
+  public static FileFreshnessSnapshot capture(Path path) throws IOException {
     Objects.requireNonNull(path, "path");
     Path absolute = path.toAbsolutePath().normalize();
     // The one derivation of this key, shared with every site that MARKS a path by it
@@ -35,21 +37,26 @@ record FileFreshnessSnapshot(
         pathHash(key),
         attrs.fileKey(),
         attrs.size(),
-        attrs.lastModifiedTime().toMillis(),
+        attrs.lastModifiedTime(),
+        changeTime(absolute),
         attrs.isRegularFile(),
         System.currentTimeMillis());
   }
 
   static FileFreshnessSnapshot fromEnvelope(FileEnvelope envelope) {
-    return new FileFreshnessSnapshot(
-        envelope.originalPath(),
-        envelope.normalizedPath(),
-        envelope.pathHash(),
-        envelope.fileKey(),
-        envelope.sizeBytes(),
-        envelope.modifiedAtMs(),
-        envelope.regularFile(),
-        envelope.observedAtMs());
+    return envelope.snapshot();
+  }
+
+  public long modifiedAtMs() {
+    return modifiedTime.toMillis();
+  }
+
+  private static FileTime changeTime(Path path) throws IOException {
+    try {
+      return (FileTime) Files.getAttribute(path, "unix:ctime", LinkOption.NOFOLLOW_LINKS);
+    } catch (UnsupportedOperationException | IllegalArgumentException unsupported) {
+      return null;
+    }
   }
 
   /**
@@ -58,7 +65,7 @@ record FileFreshnessSnapshot(
    * {@code DELETED} is only a candidate: a deletion additionally needs {@link SourcePresence} to
    * confirm the folder holding the source is present.
    */
-  SourceValidationResult validateNow() {
+  public SourceValidationResult validateNow() {
     try {
       FileFreshnessSnapshot current = capture(originalPath);
       return compare(current);
@@ -74,7 +81,7 @@ record FileFreshnessSnapshot(
     return FileFreshness.classify(this, current);
   }
 
-  enum SourceValidationResult {
+  public enum SourceValidationResult {
     FRESH,
     DELETED,
     SIZE_CHANGED,

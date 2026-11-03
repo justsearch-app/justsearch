@@ -3095,32 +3095,14 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
     }
   }
 
-  record AdmissionWitness(long size, java.nio.file.attribute.FileTime modified, Object fileKey,
-      java.nio.file.attribute.FileTime changed) {
-    static AdmissionWitness capture(Path path) throws IOException {
-      var attrs = Files.readAttributes(path, java.nio.file.attribute.BasicFileAttributes.class,
-          LinkOption.NOFOLLOW_LINKS);
-      return attrs.isRegularFile()
-          ? new AdmissionWitness(attrs.size(), attrs.lastModifiedTime(), attrs.fileKey(), admissionChangeTime(path)) : null;
-    }
-  }
-
-  private static java.nio.file.attribute.FileTime admissionChangeTime(Path path) throws IOException {
-    try {
-      return (java.nio.file.attribute.FileTime) Files.getAttribute(path, "unix:ctime", LinkOption.NOFOLLOW_LINKS);
-    } catch (UnsupportedOperationException | IllegalArgumentException unsupported) {
-      return null;
-    }
-  }
-
-  record AdmissionSource(AdmissionWitness witness, String sha256, Path ingestionRoot) {
-    long size() { return witness.size(); }
-    long modified() { return witness.modified().toMillis(); }
+  record AdmissionSource(io.justsearch.indexerworker.loop.FileFreshnessSnapshot witness, String sha256, Path ingestionRoot) {
+    long size() { return witness.sizeBytes(); }
+    long modified() { return witness.modifiedAtMs(); }
 
     boolean stillCurrent(Path path) {
       try {
         io.justsearch.indexerworker.loop.SourceAccess.requireContained(path, ingestionRoot);
-        return witness.equals(AdmissionWitness.capture(path));
+        return witness.validateNow() == io.justsearch.indexerworker.loop.FileFreshnessSnapshot.SourceValidationResult.FRESH;
       } catch (IOException | SecurityException unavailable) {
         return false;
       }
@@ -3131,8 +3113,8 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
     if (entry == null || entry.path() == null || entry.plannedSourceSha256() != null) return null;
     try {
       requireSourceAccess(entry);
-      var before = AdmissionWitness.capture(entry.path());
-      if (before == null) return null;
+      var before = io.justsearch.indexerworker.loop.FileFreshnessSnapshot.capture(entry.path());
+      if (!before.regularFile()) return null;
       String hash = io.justsearch.indexerworker.loop.SourceContentHash.admissionIdentity(
           entry.path(), entry.ingestionRoot());
       if (hash == null) return null;
@@ -3394,9 +3376,9 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
                   entry.provenance() == null ? null : entry.provenance().transport()));
           return 0;
         }
-        AdmissionWitness before = null;
+        io.justsearch.indexerworker.loop.FileFreshnessSnapshot before = null;
         try {
-          before = AdmissionWitness.capture(entry.path());
+          before = io.justsearch.indexerworker.loop.FileFreshnessSnapshot.capture(entry.path());
         } catch (IOException | SecurityException unavailable) {
           // A supplied plan still admits retryable work without certifying current source bytes.
         }
@@ -3415,7 +3397,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
         var witnessed = new JobQueue.EnqueueEntry(
             entry.path(), entry.sizeBytes(), provenance, hash, entry.ingestionRoot(), entry.forceReindex());
         witnessedEntries.add(witnessed);
-        var source = before == null || observedHash == null || !observedHash.equals(hash)
+        var source = before == null || !before.regularFile() || observedHash == null || !observedHash.equals(hash)
             ? null : new AdmissionSource(before, observedHash, entry.ingestionRoot());
         sources.put(witnessed, source != null && source.stillCurrent(entry.path()) ? source : null);
       }

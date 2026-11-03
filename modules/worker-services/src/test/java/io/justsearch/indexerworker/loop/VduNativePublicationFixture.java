@@ -12,9 +12,10 @@ public final class VduNativePublicationFixture {
     var artifact=io.justsearch.indexerworker.fixtures.TestDocumentBuilder.validatedArtifact(
         new io.justsearch.indexerworker.extract.ContentExtractor.ExtractionResult(content,file.getFileName().toString(),"image/png"));
     long modified=java.nio.file.Files.getLastModifiedTime(file).toMillis();
-    var envelope=new FileEnvelope(file,
-        io.justsearch.indexerworker.util.PathNormalizer.normalizeKey(file),"path-hash",null,
-        java.nio.file.Files.size(file),modified,true,modified);
+    var envelope=FileEnvelope.fromSnapshot(new FileFreshnessSnapshot(file,
+        io.justsearch.indexerworker.util.PathNormalizer.normalizeKey(file), "path-hash", null,
+        java.nio.file.Files.size(file), java.nio.file.attribute.FileTime.fromMillis(modified),
+        null, true, modified));
     var job=new ExtractedJob(file,null,artifact,System.currentTimeMillis(),envelope,
         SourceContentHash.sha256(file),uid);
     var writer=new JobBatchWriter(new WorkerIngestionAuthority(),runtime.indexingCoordinator(),
