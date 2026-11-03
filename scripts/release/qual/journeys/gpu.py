@@ -664,7 +664,7 @@ def gpu_install(run):
                'body': {'args': {'acceptTerms': True}},
                'source': 'modules/ui-web/src/shell-v0/views/BrainSurface.ts confirmInstall'}
     run.evidence('J3-install-request', request)
-    response = run.api(request['endpoint'], request['body'])
+    response = run.window_api(request['endpoint'], request['body'])
     run.evidence('J3-install-response', response)
     if response.get('success') is not True:
         raise ProductFailure('GPU AI install operation rejected: ' + json.dumps(response))
@@ -768,7 +768,7 @@ window.__qualChat={pending:true};
 (async()=>{try {
  const credential=await window.__TAURI_INTERNALS__.invoke('session_token');
  if(!credential)throw new Error('No production shell session credential');
- const response=await fetch(credential.origin+'/api/chat/dispatch',{method:'POST',headers:{'Content-Type':'application/json','X-JustSearch-Session':credential.token},
+ const response=await fetch(credential.origin+'/api/chat/dispatch',{method:'POST',headers:{'Content-Type':'application/json','X-JustSearch-Session':credential.token,'X-JustSearch-Window':credential.windowCredential},
  body:JSON.stringify({shapeId:'core.rag-ask',question:'What colour is the telescope mentioned in the inspection message?',allowLoad:true})});
  const text=await response.text();window.__qualChat={status:response.status,text};
 }catch(e){window.__qualChat={error:String(e)}}})();return true;
@@ -879,7 +879,7 @@ def soak(run):
     baseline = progress_stages(run.api('/api/status'))['indexing']['completed']
     tracker = SoakProgress(time.monotonic())
     ingestion = SoakIngestion(tracker.started, baseline, manifest['longDocuments'], root)
-    run.api('/api/indexing/roots', {'path': root, 'collection': 'default'})
+    run.window_api('/api/indexing/roots', {'path': root, 'collection': 'default'})
     gpu_tracker = SoakGpu()
     started_epoch = time.time()
     samples = []

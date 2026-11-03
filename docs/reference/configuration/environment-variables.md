@@ -39,6 +39,7 @@ Scope:
 | `JUSTSEARCH_TESSDATA_PATH` | `justsearch.tessdata.path` | Path | Explicit tessdata directory for the Engine's extraction services. Overrides packaged/runtime-adjacent tessdata discovery. |
 | **API & Runtime** | | | |
 | `JUSTSEARCH_API_PORT` | `justsearch.api.port` | Int | Port for the local loopback API. `0` means “ephemeral”. |
+| `JUSTSEARCH_WINDOW_CREDENTIAL` | `justsearch.windowCredential` | Bool | Shell-only launch request for a separate per-boot approval credential; ignored outside production. Headless operators leave this unset. |
 | `JUSTSEARCH_PROD` | `justsearch.prod` | Bool | Enables desktop/prod posture (e.g., session token enforcement for non-GET endpoints). |
 | `JUSTSEARCH_EGRESS_BLOCK_ALL` | `egress.block_all` | Bool | Isolated-test configuration flag checked by the launcher smoke driver. It is not a network firewall and does not disable the desktop update check or OTLP export. |
 | **Telemetry** | | | |

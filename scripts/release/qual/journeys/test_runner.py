@@ -384,10 +384,13 @@ class RunnerTests(unittest.TestCase):
         run = Mock()
         run.require.return_value = '/tmp/own-corpus'
         run.facts = {}
-        run.api.side_effect = [{}, {'roots': ['/tmp/own-corpus']}]
+        run.window_api.return_value = {}
+        run.api.side_effect = [{'roots': ['/tmp/own-corpus']}]
         linux.add_folder_api(run)
-        self.assertEqual(run.api.call_args_list[0].args,
+        # Packaged app: the folder add goes through the owned window, the read back uses the token.
+        self.assertEqual(run.window_api.call_args_list[0].args,
                          ('/api/indexing/roots', {'path': '/tmp/own-corpus', 'collection': 'default'}))
+        self.assertEqual(run.api.call_args_list[0].args, ('/api/indexing/roots',))
         run.wd.click.assert_not_called()
 
     def test_vm_launch_waits_for_native_dialog_and_acknowledgment(self):

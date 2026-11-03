@@ -231,6 +231,7 @@ The declaration, environment and constant names below retain their pre-merge spe
 | EnvRegistry.ORT_VERBOSE_LOGGING | permanent | - | JUSTSEARCH_ORT_VERBOSE | justsearch.ort.verbose | ORT_VERBOSE_LOGGING | modules/configuration (ResolvedConfigBuilder) | sysprop > env > default |
 | EnvRegistry.PATH_RESOLUTION_RETENTION_DAYS | permanent | - | JUSTSEARCH_PATH_RESOLUTION_RETENTION_DAYS | justsearch.path_resolution.retention_days | PATH_RESOLUTION_RETENTION_DAYS | modules/configuration (ResolvedConfigBuilder) | sysprop > env > default |
 | EnvRegistry.POWER_FORCE_ENERGY_STATE | permanent | - | JUSTSEARCH_POWER_FORCE_ENERGY_STATE | justsearch.power.force_energy_state | POWER_FORCE_ENERGY_STATE | modules/configuration (ResolvedConfigBuilder) | sysprop > env > default |
+| EnvRegistry.WINDOW_CREDENTIAL | permanent | - | JUSTSEARCH_WINDOW_CREDENTIAL | justsearch.windowCredential | WINDOW_CREDENTIAL | modules/ui (HeadlessApp) | sysprop > env > default |
 | EnvRegistry.PROD_MODE | permanent | - | JUSTSEARCH_PROD | justsearch.prod | PROD_MODE | modules/configuration (ResolvedConfigBuilder) | sysprop > env > default |
 | EnvRegistry.QU_ENABLED | experimental | - | JUSTSEARCH_QU_ENABLED | justsearch.qu.enabled | QU_ENABLED | modules/configuration (ResolvedConfigBuilder) | sysprop > env > default |
 | EnvRegistry.RAG_TOP_K | permanent | - | JUSTSEARCH_RAG_TOP_K | justsearch.rag.top_k | RAG_TOP_K | modules/configuration (ResolvedConfigBuilder) | sysprop > env > default |

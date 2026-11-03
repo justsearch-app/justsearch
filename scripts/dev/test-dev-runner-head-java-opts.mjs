@@ -82,6 +82,9 @@ const PACKAGED_ONLY_FLAGS = [
   '--sun-misc-unsafe-memory-access=warn',
   '--enable-native-access=ALL-UNNAMED',
   '-Djustsearch.prod=true',
+  // Only the packaged shell exchanges a window credential and must block JVM heap extraction.
+  '-Djustsearch.windowCredential=true',
+  '-XX:+DisableAttachMechanism',
 ];
 
 function flags(opts) {

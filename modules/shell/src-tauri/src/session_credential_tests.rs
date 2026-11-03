@@ -12,6 +12,7 @@ fn credential_waits_for_both_fields_and_keeps_their_incarnation_together() {
         fixture.host.admit(PreparedCommand { command }).unwrap().pid
     };
     let first_pid = admit();
+    fixture.host.consume_credential_line(1, "JUSTSEARCH_WINDOW_CREDENTIAL=first-window");
     assert!(session_credential(&state).is_none());
     state.observe_manifest(&ManifestFields {
         incarnation: Some((fixture.host.session(), u64::from(fixture.host.incarnation_number()))),
@@ -34,10 +35,13 @@ fn credential_waits_for_both_fields_and_keeps_their_incarnation_together() {
     let credential = session_credential(&state).unwrap();
     assert_eq!(credential.origin, "http://127.0.0.1:43311");
     assert_eq!(credential.token, "first-token");
+    assert_eq!(credential.window_credential, "first-window");
 
     fixture.host.fixture_kill_and_reap();
     fixture.host.reset_for_successor().unwrap();
     let next_pid = admit();
+    // A delayed predecessor drain must not install its secret on the next process.
+    fixture.host.consume_credential_line(1, "JUSTSEARCH_WINDOW_CREDENTIAL=stale-window");
     state.observe_manifest(&ManifestFields {
         incarnation: Some((fixture.host.session(), u64::from(fixture.host.incarnation_number()))),
         instance_id: Some("next".into()),
@@ -56,7 +60,38 @@ fn credential_waits_for_both_fields_and_keeps_their_incarnation_together() {
         session_token: Some("next-token".into()),
         ..Default::default()
     });
+    assert!(session_credential(&state).is_none(), "manifest alone must not issue a window credential");
+    fixture.host.consume_credential_line(2, "JUSTSEARCH_WINDOW_CREDENTIAL=next-window");
     let credential = session_credential(&state).unwrap();
+    assert_eq!(credential.window_credential, "next-window");
     assert_eq!(credential.origin, "http://127.0.0.1:43312");
     assert_eq!(credential.token, "next-token");
+}
+
+#[test]
+fn secret_stdout_lines_are_consumed_before_logging_even_without_a_live_child() {
+    let host = EngineHost::default();
+    let lines = ["ordinary stdout", "JUSTSEARCH_SESSION_TOKEN=manifest-secret",
+        "JUSTSEARCH_WINDOW_CREDENTIAL=window-secret", "JUSTSEARCH_API_PORT=33221"];
+    let mut log = Vec::new();
+    for line in lines {
+        if !host.consume_credential_line(1, line) { log.push(line); }
+    }
+    assert_eq!(log, ["ordinary stdout", "JUSTSEARCH_API_PORT=33221"]);
+    assert!(host.window_session_binding().is_none());
+    // The production drain uses this filter before the file write.
+    let source = include_str!("lib.rs");
+    let drain = source.split("if let Some(stdout) = admitted.stdout").nth(1).unwrap()
+        .split("if let Some(stderr)").next().unwrap();
+    assert!(drain.find("consume_credential_line").unwrap() < drain.find("writeln!").unwrap());
+}
+
+#[test]
+fn production_engine_spawn_disables_jvm_attach() {
+    let source = include_str!("lib.rs");
+    let spawn = source.split("let mut cmd = containment::engine_command(&java_bin)")
+        .nth(1).unwrap().split("// GPU acceleration:").next().unwrap();
+    assert!(spawn.contains(".arg(\"-XX:+DisableAttachMechanism\")"),
+        "assertion failed: packaged Engine must disable same-user JVM attach");
+    assert!(spawn.contains(".arg(\"-Djustsearch.windowCredential=true\")"));
 }

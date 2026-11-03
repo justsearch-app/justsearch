@@ -516,6 +516,13 @@ public class HeadlessApp {
 
       boolean prodMode = configStore.get().policy().prodMode();
       String sessionToken = prodMode ? LocalApiServer.generateSessionToken() : null;
+      String windowCredential = prodMode && EnvRegistry.WINDOW_CREDENTIAL.getBoolean(false)
+          ? LocalApiServer.generateSessionToken() : null;
+      if (windowCredential != null) {
+        // One delivery to the owning shell pipe. Never publish this in discovery or diagnostics.
+        System.out.println("JUSTSEARCH_WINDOW_CREDENTIAL=" + windowCredential);
+        System.out.flush();
+      }
 
       Path userHome = Path.of(System.getProperty("user.home", ""));
       LocalApiServer apiServer =
@@ -531,6 +538,7 @@ public class HeadlessApp {
               .knowledgeServerStartError(null)
               .telemetry(telemetry)
               .sessionToken(sessionToken)
+              .windowCredential(windowCredential)
               .userHome(userHome.toString().isEmpty() ? null : userHome)
               .workerFeatureCache(bootstrap.workerFeatureCache())
               .gplJobCoordinator(gplCoordinator)

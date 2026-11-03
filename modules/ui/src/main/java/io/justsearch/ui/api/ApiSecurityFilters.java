@@ -169,6 +169,7 @@ final class ApiSecurityFilters {
     setupMcpOriginValidation(app);
     setupCors(app, prodMode);
     setupSessionTokenEnforcement(app);
+    WindowAuthority.installMutationGuard(app);
     app.before(ctx -> RequestEngineContext.get(ctx, mcpClientIdentity));
     var releases = RequestReleaseOwner.install(app);
     app.before(ctx -> {

@@ -71,6 +71,9 @@ public enum EnvRegistry {
     /** Production mode flag. */
     PROD_MODE("justsearch.prod", "JUSTSEARCH_PROD", LifecycleStage.PERMANENT),
 
+    /** Packaged shell requests a separate, memory-only window credential at Engine spawn. */
+    WINDOW_CREDENTIAL("justsearch.windowCredential", "JUSTSEARCH_WINDOW_CREDENTIAL", LifecycleStage.PERMANENT),
+
     /** Egress block-all flag for isolated testing. */
     EGRESS_BLOCK_ALL("egress.block_all", "JUSTSEARCH_EGRESS_BLOCK_ALL", LifecycleStage.PERMANENT),
 

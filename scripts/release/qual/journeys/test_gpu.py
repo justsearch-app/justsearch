@@ -297,14 +297,14 @@ class GpuTests(unittest.TestCase):
             {'packageId': x, 'state': 'installed'} for x in ('chat', 'cuda-runtime-linux')]}
         run = Mock(facts={}, args=types.SimpleNamespace(resume=None))
         responses = {'/api/ai/install/plan-preview': preview, '/api/ai/install/manifest': {},
-                     '/api/operations/core.start-ai-install/invoke': {'success': True},
                      '/api/ai/install/status': installed, '/api/ai/runtime/status': {}}
         run.api.side_effect = lambda path, body=None: responses[path]
+        run.window_api.return_value = {'success': True}
         run.wd.execute.return_value = []
         with patch.object(gpu.linux, 'activate_downloaded') as activate, \
                 patch.object(gpu, 'gpu_installed_checks', return_value={'chat': 'checked'}) as remaining:
             self.assertEqual(gpu.gpu_install(run), {'chat': 'checked'})
-        run.api.assert_any_call('/api/operations/core.start-ai-install/invoke', {'args': {'acceptTerms': True}})
+        run.window_api.assert_called_once_with('/api/operations/core.start-ai-install/invoke', {'args': {'acceptTerms': True}})
         run.api.assert_any_call('/api/ai/install/status')
         run.evidence.assert_any_call('J3-install-response', {'success': True})
         request = next(c.args[1] for c in run.evidence.call_args_list if c.args[0] == 'J3-install-request')
@@ -318,13 +318,16 @@ class GpuTests(unittest.TestCase):
 
     def test_gpu_install_rejection_never_waits_for_download_or_activates(self):
         run = Mock(facts={}, args=types.SimpleNamespace(resume=None))
-        run.api.side_effect = lambda path, body=None: (
-            {'success': False, 'message': 'rejected'} if path.endswith('/invoke')
-            else {'state': 'failed'} if path.endswith('/status') else {})
+        run.api.return_value = {}
+        run.window_api.return_value = {'success': False, 'message': 'rejected'}
         with patch.object(gpu, 'require_gpu_plan'), patch.object(gpu.linux, 'activate_downloaded') as activate:
             with self.assertRaisesRegex(runner.ProductFailure, 'install operation rejected'):
                 gpu.gpu_install(run)
-        self.assertEqual(run.api.call_count, 3)
+        self.assertEqual(run.api.call_count, 2)
+        run.api.assert_any_call('/api/ai/install/plan-preview')
+        run.api.assert_any_call('/api/ai/install/manifest')
+        run.window_api.assert_called_once_with(
+            '/api/operations/core.start-ai-install/invoke', {'args': {'acceptTerms': True}})
         activate.assert_not_called()
         run.evidence.assert_any_call('J3-install-response', {'success': False, 'message': 'rejected'})
 

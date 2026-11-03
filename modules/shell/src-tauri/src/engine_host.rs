@@ -24,6 +24,7 @@ enum Discovery {
 struct OwnedChild {
     child: Child,
     generation: u64,
+    window_credential: Option<String>,
     /// The incarnation's job (Spec F §2.1). `None` only when the job could not be created and the
     /// Engine was started uncontained.
     job: Option<IncarnationJob>,
@@ -213,6 +214,7 @@ impl EngineHost {
         inner.child = Some(OwnedChild {
             child,
             generation,
+            window_credential: None,
             job,
         });
         Ok(AdmittedChild {
@@ -307,11 +309,51 @@ impl EngineHost {
             .clone()
     }
 
-    /// One incarnation supplies the port, token and PID. Recheck the owned child after proof:
-    /// on Unix try_wait also detects an exited child whose numeric PID could have been reused.
+    /// Consume secret stdout records before either logger sees them. A predecessor pipe cannot
+    /// install a credential on its successor, even if its drain thread runs late.
+    pub(crate) fn consume_credential_line(&self, generation: u64, line: &str) -> bool {
+        if line.starts_with("JUSTSEARCH_SESSION_TOKEN=") { return true; }
+        let Some(credential) = line.strip_prefix("JUSTSEARCH_WINDOW_CREDENTIAL=") else {
+            return false;
+        };
+        let mut inner = self.inner.lock().expect("engine host mutex poisoned");
+        if let Some(child) = inner.child.as_mut().filter(|child| child.generation == generation) {
+            if child.window_credential.is_none() && !credential.is_empty() {
+                child.window_credential = Some(credential.to_string());
+            }
+        }
+        true
+    }
+
+    /// Take the window credential and manifest binding atomically, after validating their owner.
+    /// This secret deliberately lives outside Binding/ManifestFields (which implement Debug).
+    pub(crate) fn window_session_binding(&self) -> Option<(Binding, String)> {
+        let inner = self.inner.lock().expect("engine host mutex poisoned");
+        let Discovery::Bound { pid, .. } = inner.discovery else { return None; };
+        let child = inner.child.as_ref().filter(|child| child.child.id() == pid)?;
+        Some((inner.binding.clone(), child.window_credential.clone()?))
+    }
+
+    /// Shell launches require window authority. Manifest discovery alone is not readiness:
+    /// the stdout drain may still be delivering this incarnation's credential.
+    pub(crate) fn authenticated_pid(&self) -> Option<u32> {
+        let inner = self.inner.lock().expect("engine host mutex poisoned");
+        let Discovery::Bound { pid, ref instance_id } = inner.discovery else { return None; };
+        let child = inner.child.as_ref()?;
+        (!inner.closing
+            && child.child.id() == pid
+            && inner.binding.instance_id.as_ref() == Some(instance_id)
+            && inner.binding.port.is_some()
+            && inner.binding.token.is_some()
+            && child.window_credential.is_some())
+            .then_some(pid)
+    }
+
+    /// One incarnation supplies the port, token, window credential and PID. Recheck the owned
+    /// child after proof: on Unix try_wait also detects an exited child whose PID was reused.
     /// Once proven, this connected socket cannot be transferred to a new listener on the port.
-    pub(crate) fn connect_engine(&self, timeout: Duration) -> Result<(std::net::TcpStream, Binding), String> {
-        let (generation, pid, binding) = {
+    pub(crate) fn connect_engine(&self, timeout: Duration) -> Result<(std::net::TcpStream, Binding, String), String> {
+        let (generation, pid, binding, window_credential) = {
             let inner = self.inner.lock().expect("engine host mutex poisoned");
             let child = inner.child.as_ref()
                 .ok_or_else(|| crate::engine_conn::not_proven("no owned Engine"))?;
@@ -320,7 +362,9 @@ impl EngineHost {
             {
                 return Err(crate::engine_conn::not_proven("Engine binding unavailable"));
             }
-            (child.generation, child.child.id(), inner.binding.clone())
+            let credential = child.window_credential.clone()
+                .ok_or_else(|| crate::engine_conn::not_proven("window credential unavailable"))?;
+            (child.generation, child.child.id(), inner.binding.clone(), credential)
         };
         let port = binding.port.ok_or_else(|| crate::engine_conn::not_proven("port unavailable"))?;
         if binding.token.is_none() {
@@ -337,7 +381,7 @@ impl EngineHost {
         if !matches!(child.child.try_wait(), Ok(None)) {
             return Err(crate::engine_conn::not_proven("Engine exited or identity unavailable"));
         }
-        Ok((stream, binding))
+        Ok((stream, binding, window_credential))
     }
 
     /// Attribute an HTTP observation only to the same admitted child and binding throughout it.
@@ -773,12 +817,15 @@ impl EngineHost {
         mut responds: impl FnMut(u16) -> bool,
     ) -> Result<supervisor::Ready, String> {
         let _ = (deadline_ms, monotonic_ms());
+        let pid = self.authenticated_pid().ok_or("not responsive yet")?;
         if let Some(binding) = self.observe_current_binding(&mut responds) {
-            return Ok(supervisor::Ready {
-                pid: self.child_pid(),
-                api_port: binding.port,
-                instance_id: binding.instance_id,
-            });
+            if self.authenticated_pid() == Some(pid) {
+                return Ok(supervisor::Ready {
+                    pid: Some(pid),
+                    api_port: binding.port,
+                    instance_id: binding.instance_id,
+                });
+            }
         }
         Err("not responsive yet".into())
     }
@@ -1114,7 +1161,10 @@ mod tests {
                         .env("JUSTSEARCH_FAKE_ENGINE_PLAN", "")
                         .stdout(std::process::Stdio::null())
                         .stderr(std::process::Stdio::null());
-                    spawn_host.admit(PreparedCommand { command }).map(|c| c.pid)
+                    let child = spawn_host.admit(PreparedCommand { command })?;
+                    spawn_host.consume_credential_line(child.generation,
+                        "JUSTSEARCH_WINDOW_CREDENTIAL=fake-engine-window");
+                    Ok(child.pid)
                 },
                 |_| {},
             );

@@ -187,7 +187,7 @@ final class AgentController {
 
     try {
       @SuppressWarnings("unchecked")
-      Map<String, Object> body = MAPPER.readValue(ctx.body(), Map.class);
+      Map<String, Object> body = WindowAuthority.limitAutonomy(ctx, MAPPER.readValue(ctx.body(), Map.class));
       StoreIdRequest.normalizeOptionalIds(body);
       Audience audience = readAudience(ctx);
       ConversationShapeRef shapeRef = resolveShapeRef(body);
@@ -322,6 +322,7 @@ final class AgentController {
    * else 404 — so the FE no longer branches the URL by run shape.
    */
   void handleApprove(Context ctx) {
+    if (!WindowAuthority.require(ctx)) return;
     dispatchGate(ctx, true);
   }
 
@@ -427,6 +428,7 @@ final class AgentController {
    * policy reads the session's dial on the next gated tool call; the FE no longer re-derives.
    */
   void handleAutonomy(Context ctx) {
+    if (!WindowAuthority.require(ctx)) return;
     handleControl(ctx, "Failed to set session autonomy", body -> {
       String sessionId = body.path("sessionId").asText();
       if (StoreIdRequest.rejectUnsafe(ctx, sessionId)) return;

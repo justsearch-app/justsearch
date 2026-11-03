@@ -64,6 +64,8 @@ public final class CoreIntentSourceCatalog {
   public static final IntentSourceRef MCP_EXTERNAL =
       new IntentSourceRef("core.mcp-external");
 
+  public static final IntentSourceRef HTTP_API = new IntentSourceRef("core.http-api");
+
   // ===== System ingresses =====
 
   public static final IntentSourceRef SYSTEM_INTERNAL =
@@ -154,6 +156,8 @@ public final class CoreIntentSourceCatalog {
                 SourceTier.UNTRUSTED,
                 "core.mcp-json-rpc",
                 TransportTag.MCP),
+            source(HTTP_API, "http-api", core, SourceTier.UNTRUSTED,
+                "core.http-api", TransportTag.HTTP_API),
             // System-internal: TRUSTED. Backend-originated, deterministic, no user
             // payload (e.g., legacy 2-arg OperationDispatcher.dispatch fallback).
             source(

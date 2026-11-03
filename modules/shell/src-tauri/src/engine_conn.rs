@@ -96,6 +96,7 @@ pub(crate) fn post_connected(
     mut stream: TcpStream,
     port: u16,
     token: &str,
+    window_credential: &str,
     path: &str,
     body: &serde_json::Value,
     timeout: Duration,
@@ -104,7 +105,11 @@ pub(crate) fn post_connected(
     use std::io::{Read, Write};
     let mut sent = false;
     let result = (|| {
-        if token.contains(['\r', '\n']) || path.contains(['\r', '\n', ' ']) {
+        if token.contains(['\r', '\n'])
+            || window_credential.is_empty()
+            || window_credential.contains(['\r', '\n'])
+            || path.contains(['\r', '\n', ' '])
+        {
             return Err("Invalid Engine request".into());
         }
         stream
@@ -118,7 +123,7 @@ pub(crate) fn post_connected(
             return Err("Engine exited or quit before upgrade commit request".into());
         }
         sent = true;
-        write!(stream,"POST {path} HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\nX-JustSearch-Session: {token}\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",body.len()).map_err(|e|e.to_string())?;
+        write!(stream,"POST {path} HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\nX-JustSearch-Session: {token}\r\nX-JustSearch-Window: {window_credential}\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",body.len()).map_err(|e|e.to_string())?;
         let mut response = Vec::new();
         stream
             .take(1024 * 1024 + 1)

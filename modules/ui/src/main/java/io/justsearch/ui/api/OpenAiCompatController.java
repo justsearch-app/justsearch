@@ -71,6 +71,9 @@ public final class OpenAiCompatController implements AutoCloseable {
           "upgrade",
           "proxy-authenticate",
           "proxy-authorization",
+          // Engine credentials must never reach inference (which may echo or log headers).
+          "x-justsearch-session",
+          "x-justsearch-window",
           "content-length");
 
   /**

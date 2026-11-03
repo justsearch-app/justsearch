@@ -28,8 +28,8 @@ export interface OperationInvocationRequest {
   /**
    * Slice 489 §17.5 — transport hint sent as the `X-JustSearch-Transport`
    * header. The backend constructs the {@code InvocationProvenance} from this
-   * hint; unknown values fall back to BUTTON. Optional — absent means BUTTON
-   * (preserves prior behavior).
+   * hint. In the packaged app only requests carrying the window credential
+   * may claim a click; other callers default to untrusted HTTP_API.
    */
   transport?: string;
 }

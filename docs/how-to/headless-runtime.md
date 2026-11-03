@@ -96,6 +96,21 @@ No HTTP endpoint or stdout line provides this token. `OPTIONS` and `GET`/`HEAD` 
 All other requests, including streams, require the header. An MCP bridge with an explicit
 `--port` or `JUSTSEARCH_API_PORT` override also requires `JUSTSEARCH_SESSION_TOKEN`.
 
+In the packaged desktop app, the manifest token gives read/search and untrusted requests only.
+Curl changes that require approval need a click in the app: the separate window credential stays
+in shell/webview memory and is not available from the manifest or HTTP API. A medium-risk operation
+without a covering grant becomes pending; approve it in the app while the approval bridge is
+connected. Routes with no pending flow, the direct `POST /api/indexing/roots` and
+`POST /api/settings/v2`, instead return 403 `WINDOW_CREDENTIAL_REQUIRED`; make the change in the app. Closing or disconnecting the window never
+implies consent. Deep links keep URL provenance and prompt where required.
+
+A production headless Engine launched without the shell retains **token-as-operator**: the token
+can approve actions, create grants and trust plugins. This remains exposed to same-user processes
+that can read the manifest. Existing grants and plugin allowlist entries survive unchanged.
+Same-user edits of saved files, credentials in process memory, release devtools, and a Linux race
+to read the shell's one-time stdout delivery remain residuals; see the
+[threat model](../reference/security/threat-model.md).
+
 Use the Engine's actual API port in place of `33221` if different. The token changes
 on each boot; missing or incorrect tokens receive HTTP `401` on protected requests.
 

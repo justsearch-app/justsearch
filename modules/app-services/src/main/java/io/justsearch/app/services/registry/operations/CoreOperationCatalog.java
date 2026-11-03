@@ -147,9 +147,15 @@ public final class CoreOperationCatalog implements OperationCatalog {
       new OperationRef("core.copy-diagnostic-summary");
 
   /**
-   * Slice 3a-2-c LibraryView Add Folder migration. LOW risk (additive). Args:
+   * Slice 3a-2-c LibraryView Add Folder migration. Args:
    * {@code {"path": string, "collection"?: string}}. Maps to
    * IndexingService.addWatchedRoot.
+   *
+   * <p>MEDIUM risk: adding a folder widens what JustSearch indexes and what assistants can search,
+   * and it persists. At MEDIUM the lattice keeps a trusted click (the app window's Add Folder
+   * button, drop or palette) automatic while an untrusted caller (a program holding only the
+   * manifest token, MCP, the agent) and a received link are prompted in the app. {@code None}
+   * confirm keeps the in-window gesture prompt-free; the prompt comes from the lattice.
    */
   public static final OperationRef ADD_WATCHED_ROOT =
       new OperationRef("core.add-watched-root");
@@ -847,7 +853,7 @@ public final class CoreOperationCatalog implements OperationCatalog {
             "{\"type\":\"object\",\"properties\":{\"path\":{\"type\":\"string\"},\"collection\":{\"type\":\"string\"}},\"required\":[\"path\"]}",
             "{\"type\":\"object\",\"properties\":{\"path\":{\"type\":\"string\"},\"collection\":{\"type\":\"string\"}}}"),
         new OperationPolicy(
-                RiskTier.LOW,
+                RiskTier.MEDIUM,
                 ConfirmStrategy.None.INSTANCE,
                 AuditPolicy.METADATA_ONLY,
                 RetryPolicy.noRetry(),
@@ -969,11 +975,9 @@ public final class CoreOperationCatalog implements OperationCatalog {
             "{\"type\":\"object\",\"properties\":{\"enabled\":{\"type\":\"boolean\"}},\"required\":[\"enabled\"]}",
             "{\"type\":\"object\",\"properties\":{\"chatEnabled\":{\"type\":\"boolean\"},\"engineState\":{\"type\":\"string\"}}}"),
         new OperationPolicy(
-            // Tempdoc 737 §12b: LOW + None — a reversible intent write with NO preconditions (the
-            // whole point: an intent to enable/disable chat cannot be denied for being off). The
-            // primary escape action from every runtime state; gating it with a confirm or a
-            // capability would re-introduce §3b's dead-button class.
-            RiskTier.LOW,
+            // Persisted intent needs approval from outside callers. None keeps trusted window
+            // clicks automatic; no capability precondition may prevent the escape action.
+            RiskTier.MEDIUM,
             ConfirmStrategy.None.INSTANCE,
             AuditPolicy.METADATA_ONLY,
             RetryPolicy.noRetry(),
@@ -994,7 +998,7 @@ public final class CoreOperationCatalog implements OperationCatalog {
             + "\"properties\":{\"schedule\":{\"type\":[\"object\",\"null\"]},"
             + "\"pauseOnBattery\":{\"type\":\"boolean\"}},\"additionalProperties\":false}",
             "{\"type\":\"object\"}"),
-        new OperationPolicy(RiskTier.LOW, ConfirmStrategy.None.INSTANCE,
+        new OperationPolicy(RiskTier.MEDIUM, ConfirmStrategy.None.INSTANCE,
             AuditPolicy.METADATA_ONLY, RetryPolicy.noRetry(), Set.of(), false)
             .withRecordKind(io.justsearch.agent.api.registry.OperationKind.SETTINGS_APPLY),
         OperationAvailability.empty(), OperationLineage.empty(), Binding.of(SET_INDEXING_RULES),
@@ -1007,7 +1011,7 @@ public final class CoreOperationCatalog implements OperationCatalog {
             ? "{\"type\":\"object\",\"properties\":{\"untilEpochMs\":{\"type\":[\"integer\",\"null\"],\"minimum\":0}},\"additionalProperties\":false}"
             : "{\"type\":\"object\",\"properties\":{},\"additionalProperties\":false}",
             "{\"type\":\"object\"}"),
-        new OperationPolicy(RiskTier.LOW, ConfirmStrategy.None.INSTANCE,
+        new OperationPolicy(RiskTier.MEDIUM, ConfirmStrategy.None.INSTANCE,
             AuditPolicy.METADATA_ONLY, RetryPolicy.noRetry(), Set.of(), false)
             .withRecordKind(io.justsearch.agent.api.registry.OperationKind.SETTINGS_APPLY),
         OperationAvailability.empty(), OperationLineage.empty(), Binding.of(ref),

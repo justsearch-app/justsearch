@@ -201,19 +201,15 @@ impl Actuator for ShellActuator {
         self.append("engine-start", start);
         Ok(pid)
     }
-    fn await_ready(&mut self, _deadline: u64) -> Result<Ready, String> {
+    fn await_ready(&mut self, deadline: u64) -> Result<Ready, String> {
         self.refresh_binding();
-        let binding = self
-            .host
-            .observe_current_binding(|port| {
+        self.host.await_ready(
+            deadline,
+            || self.host.now_ms(),
+            |port| {
                 engine_probe::responds(port, "/api/health", Duration::from_millis(100))
-            })
-            .ok_or("not responsive yet")?;
-        Ok(Ready {
-            pid: self.host.child_pid(),
-            api_port: binding.port,
-            instance_id: binding.instance_id,
-        })
+            },
+        )
     }
     fn poll_exit(&mut self) -> Option<i32> {
         self.host.try_reap()
@@ -636,7 +632,7 @@ fn post_before_send(
     before_send: impl FnOnce() -> bool,
 ) -> (Result<Value, String>, bool) {
     let timeout = Duration::from_millis(timeout_ms);
-    let (stream, binding) = match host.connect_engine(timeout) {
+    let (stream, binding, window_credential) = match host.connect_engine(timeout) {
         Ok(endpoint) => endpoint,
         Err(error) => return (Err(error), false),
     };
@@ -644,6 +640,7 @@ fn post_before_send(
         stream,
         binding.port.unwrap(),
         binding.token.as_deref().unwrap(),
+        &window_credential,
         path,
         body,
         timeout,

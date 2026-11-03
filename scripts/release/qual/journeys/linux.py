@@ -181,7 +181,7 @@ def search_api(run, query=QUERY, filename=OPEN_FILE):
 def add_folder_api(run):
     run.require('ui')
     corpus = run.require('corpus')
-    run.api('/api/indexing/roots', {'path': corpus, 'collection': 'default'})
+    run.window_api('/api/indexing/roots', {'path': corpus, 'collection': 'default'})
     roots = wait_for(lambda: (v if corpus in json.dumps(v) else None)
                      if (v := run.api('/api/indexing/roots')) else None,
                      'Production API added watched folder', seconds=45)

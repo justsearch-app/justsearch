@@ -257,9 +257,10 @@ final class CoreOperationCatalogTest {
   }
 
   @Test
-  void addWatchedRootHasLowRiskNoConfirmUiAndAgent() {
+  void addWatchedRootHasMediumRiskNoConfirmUiAndAgent() {
     Operation op = catalog.findById(CoreOperationCatalog.ADD_WATCHED_ROOT).orElseThrow();
-    assertEquals(RiskTier.LOW, op.policy().risk());
+    // MEDIUM so untrusted callers are prompted; None so a trusted click stays prompt-free.
+    assertEquals(RiskTier.MEDIUM, op.policy().risk());
     assertInstanceOf(ConfirmStrategy.None.class, op.policy().confirm());
     assertEquals(Set.of(ExecutorTag.UI, ExecutorTag.AGENT), op.executors());
     // Required arg: path
@@ -322,12 +323,12 @@ final class CoreOperationCatalogTest {
   /**
    * Tempdoc 737 §12b: the intent-write op that supersedes switch-inference-mode. Pin its
    * no-precondition / no-confirm shape, its enabled arg, its executors, and the supersedes edge —
-   * the properties the design turns on (an intent write cannot be gated or denied).
+   * trusted clicks stay automatic while untrusted settings writes require approval.
    */
   @Test
-  void setChatEnabledIsLowRiskNoConfirmNoPreconditionsAndSupersedesSwitchMode() {
+  void setChatEnabledIsMediumRiskNoConfirmNoPreconditionsAndSupersedesSwitchMode() {
     Operation op = catalog.findById(CoreOperationCatalog.SET_CHAT_ENABLED).orElseThrow();
-    assertEquals(RiskTier.LOW, op.policy().risk());
+    assertEquals(RiskTier.MEDIUM, op.policy().risk());
     assertInstanceOf(ConfirmStrategy.None.class, op.policy().confirm());
     assertTrue(
         op.policy().requiredCapabilities().isEmpty(),

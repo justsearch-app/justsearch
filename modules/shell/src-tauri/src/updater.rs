@@ -366,8 +366,22 @@ impl UpdateCoordinator {
             return;
         }
 
+        let readiness = match tokio::time::timeout(
+            BACKEND_READY_TIMEOUT,
+            wait_for_backend_ready(&backend),
+        ).await {
+            Ok(readiness) => readiness,
+            Err(_) => {
+                // No reconciliation request was possible. Keep the durable intent retryable;
+                // late manifest/stdout delivery is not evidence of a broken installation.
+                set_state(self, "reconciling", Some(
+                    "Target Head did not become authenticated and ready before timeout".into(),
+                ));
+                return;
+            }
+        };
         let result = async {
-            let head_pid = wait_for_backend_ready(&backend).await?;
+            let head_pid = readiness?;
             let request = ReconciliationRequest {
                 schema_version: 1,
                 attempt_id: intent.attempt_id.clone(),
@@ -1800,18 +1814,12 @@ fn validate_head_shutdown_receipt(
 }
 
 async fn wait_for_backend_ready(backend: &BackendState) -> Result<u32, String> {
-    let deadline = std::time::Instant::now() + BACKEND_READY_TIMEOUT;
     loop {
         if backend.has_spawn_error() {
             return Err("Target Head failed during startup".into());
         }
-        if backend.get_port().is_some() && backend.get_session_token().is_some() {
-            if let Some(pid) = backend.child_pid() {
-                return Ok(pid);
-            }
-        }
-        if std::time::Instant::now() >= deadline {
-            return Err("Target Head did not become authenticated and ready before timeout".into());
+        if let Some(pid) = backend.host.authenticated_pid() {
+            return Ok(pid);
         }
         tokio::time::sleep(Duration::from_millis(100)).await;
     }

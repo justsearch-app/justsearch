@@ -166,6 +166,12 @@ public class SettingsController {
       } else {
         ctx.json(MAPPER.convertValue(data, SettingsV2.class));
       }
+    } catch (io.justsearch.agent.api.registry.ConfirmationRequiredException gated) {
+      // Settings has no pending-approval flow: an uncovered untrusted caller is refused before
+      // any operation record or settings write, never reported as a recovery failure.
+      if (!WindowAuthority.require(ctx)) return;
+      ctx.status(428).json(Map.of("errorCode", ApiErrorCode.CONFIRMATION_REQUIRED.name(),
+          "error", "Change this setting in the JustSearch app"));
     } catch (io.justsearch.agent.api.registry.OperationPreparationRefused failure) {
       writeRefusal(ctx, failure.refusal());
     } catch (io.justsearch.app.api.settings.SettingsCommitOwner.Refused failure) {
