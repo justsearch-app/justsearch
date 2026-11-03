@@ -56,7 +56,8 @@ def test_refined_request_and_delivered_order():
     assert body['includeExcerpts'] and body['facets']['include']
     assert [f['field'] for f in body['facets']['fields']] == ['file_kind', 'mime_base', 'language', 'meta_author']
     assert set(body) == {'query', 'querySyntax', 'limit', 'includeExcerpts', 'facets'}
-    assert r.ranked == ('d001', 'd000') and r.served == Served(('lexical', 'dense'), 'executed')
+    assert r.ranked == ('d001', 'd000') and r.served == Served(('lexical', 'dense'), 'executed',
+        leg_details={leg: {'status': 'executed', 'reason': None} for leg in ('lexical', 'dense')})
 
 
 @pytest.mark.parametrize('wire,status,error', [(response('SEARCH_DEADLINE_EXCEEDED'), 200, False), ({'error':'bad syntax'}, 400, True), ({'results':[]}, 200, True)])

@@ -26,6 +26,7 @@ import socket
 import subprocess
 import sys
 import time
+import uuid
 from typing import Any, Mapping
 
 import httpx
@@ -49,6 +50,19 @@ QUERY_TIME_ONLY = frozenset({
         "RerankerTokenizer", "AssemblyBuildFailure", "RerankerAssembly", "CitationScorer",
         "RerankSkipCause", "OnnxModelDiscovery", "WorkerModelDiscovery", "CitationScorerConfig",
         "CrossEncoderReranker", "NumericConsistency", "RerankerShape", "RerankerConfig")],
+    # Scoring orchestration and request collection; never materializes/ingests documents.
+    "scripts/jseval/jseval/quality/run.py",
+    # Compares stored rankings/metrics; never starts an index writer.
+    "scripts/jseval/jseval/quality/compare.py",
+    # Renders stored evidence; no engine or document writes.
+    "scripts/jseval/jseval/quality/report.py",
+    # Pure ranking metric/statistics calculations.
+    "scripts/jseval/jseval/quality/scoring.py",
+    # Validates collection counts and constructed rankings, without ingesting.
+    "scripts/jseval/jseval/quality/known_answers.py",
+    # Dispatches actions; all materialization/ingestion remains in index.py and
+    # collections.py, which (along with types.py) deliberately stay in the key.
+    "scripts/jseval/jseval/commands/quality.py",
 })
 SCHEMA = "jseval.quality.index.v1"
 CACHE_ROOT = Path.home() / ".cache/justsearch-quality/indexes"
@@ -211,6 +225,34 @@ def _population_owner(c: Collection, key: str) -> dict:
 def _check_owner(owner: dict, c: Collection, key: str) -> None:
     if owner != _population_owner(c, key):
         raise IndexRefused("data folder belongs to another collection, key or population")
+
+
+def _quarantine(root: Path, data: Path, c: Collection, key: str, reason: str) -> Path | None:
+    """Retire a refused, owned entry under its data lock. Never delete evidence.
+
+    Keep the root and lock file in place: moving the lock would let a second
+    preparer acquire a different inode while the first still owns this one.
+    """
+    entry = root / "entry.json"
+    if not entry.exists() or root.is_relative_to(data):
+        return None
+    try:
+        if data.exists():
+            _check_owner(_json(data / "quality-owner.json"), c, key)
+        else:
+            _check_owner(_json(entry)["owner"], c, key)
+    except (OSError, ValueError, KeyError, IndexRefused):
+        return None  # Unknown/foreign state remains untouched.
+    destination = root / "quarantine" / uuid.uuid4().hex
+    destination.mkdir(parents=True)
+    _write(destination / "reason.json", {"reason": reason, "at_unix": time.time()})
+    entry.rename(destination / "entry.json")
+    for name, path in [("data", data), *[(n, root / n) for n in (
+            "documents", "materialized.json", "manifest.tsv", "salt",
+            "documents.partial", "documents.opaque")]]:
+        if path.exists():
+            path.rename(destination / name)
+    return destination
 
 
 def _materialize(c: Collection, config: IndexConfig, root: Path) -> Collection:
@@ -549,19 +591,31 @@ class IndexHandle:
             if self._backend.proc.poll() is not None:
                 break
             time.sleep(2)
-        self.close()
-        raise IndexRefused(f"not ready: serving backend not confirmed: {last}")
+        reason = f"not ready: serving backend not confirmed: {last}; run quality prepare outside the scoring window"
+        try:
+            # The engine must release its files before quarantine, and the data
+            # lock stays held until all refused state has been moved aside.
+            if self._backend:
+                backend.stop_backend(self._backend.proc, data_dir=self.data_dir)
+                self._backend = None
+            if self.index_build == "cached":
+                _quarantine(self.root, self.data_dir, self.collection, self.index_key, reason)
+        finally:
+            self.close()
+        raise IndexRefused(reason)
 
     def close(self) -> None:
-        if self._worker and self._worker.poll() is None:
-            # Admission owns, identifies and cleans this worker's whole process tree.
-            self._worker.terminate()
-            self._worker.wait(timeout=150)
-        if self._backend:
-            backend.stop_backend(self._backend.proc, data_dir=self.data_dir)
-            self._backend = None
-        if not self._lock.closed:
-            self._lock.close()
+        try:
+            if self._worker and self._worker.poll() is None:
+                # Admission owns, identifies and cleans this worker's whole process tree.
+                self._worker.terminate()
+                self._worker.wait(timeout=150)
+            if self._backend:
+                backend.stop_backend(self._backend.proc, data_dir=self.data_dir)
+                self._backend = None
+        finally:
+            if not self._lock.closed:
+                self._lock.close()
 
     def __enter__(self) -> "IndexHandle":
         return self
@@ -579,7 +633,7 @@ def prepare_index(collection: Collection, config: IndexConfig, *, prepared_only:
     root = _under_cache(config.cache_root) / sha256_text(collection.name) / key
     data = _under_cache(config.data_dir) if config.data_dir else root / "data"
     if prepared_only:
-        backend.require_prepared(config.repo_root, data)
+        backend.require_prepared(config.repo_root)
         if not (root / "entry.json").is_file():
             raise IndexRefused("not ready: no complete prepared index; run quality prepare outside the scoring window")
     root.mkdir(parents=True, exist_ok=True)
@@ -599,6 +653,8 @@ def prepare_index(collection: Collection, config: IndexConfig, *, prepared_only:
             _check_owner(_json(entry_path)["owner"], collection, key)
             if not owner_path.exists():
                 raise IndexRefused("cache entry has no owned index")
+            if prepared_only:
+                backend.require_prepared(config.repo_root, data)
         else:
             # Only our exact owner's interrupted data may be replaced.
             if data.exists():
@@ -626,13 +682,23 @@ def prepare_index(collection: Collection, config: IndexConfig, *, prepared_only:
                    "nice", "-n", "19", "ionice", "-c3", sys.executable, "-m", "jseval.quality.index", "build", str(root)]
         worker_env = os.environ.copy()
         worker_env.pop("JS_ADMISSION_TOKEN", None)
-        worker_env["PYTHONPATH"] = str(config.repo_root / "scripts/jseval")
+        # Use the orchestrating harness version in the worker too. repo_root is
+        # the engine candidate; CPU acceptance may point it at a clean engine
+        # clone while running this uncommitted harness from another checkout.
+        worker_env["PYTHONPATH"] = os.pathsep.join(filter(None, (
+            str(Path(__file__).resolve().parents[2]), worker_env.get("PYTHONPATH"))))
         with (root / "build.log").open("w") as out:
             handle._worker = subprocess.Popen(command, cwd=config.repo_root, env=worker_env,
                                               stdout=out, stderr=subprocess.STDOUT)
         return handle
     except BaseException as e:
-        lock.close()
+        try:
+            # A held data lock is required; lock contention must not mutate
+            # another preparer's cache. Only our exact owned data can move.
+            if not isinstance(e, BlockingIOError):
+                _quarantine(root, data, collection, key, f"{type(e).__name__}: {e}")
+        finally:
+            lock.close()
         if prepared_only and isinstance(e, Exception):
             raise IndexRefused(f"not ready: prepared index refused ({e}); run quality prepare outside the scoring window") from e
         raise

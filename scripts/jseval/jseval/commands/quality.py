@@ -157,14 +157,17 @@ def cmd_compare(ctx, collection: str, baseline_path: Path, candidate_path: Path,
 COMMANDS = [quality_group]
 
 
-def _run_options(command):
+def _run_options(command=None, *, full_suite=False):
+    if command is None:
+        return lambda cmd: _run_options(cmd, full_suite=full_suite)
     for option in reversed([
         click.argument('collections', nargs=-1),
         click.option('--baseline-dir', type=click.Path(file_okay=False, path_type=Path),
                      default=Path('scripts/jseval/runs/quality/baselines'), show_default=True),
         click.option('--runs-dir', type=click.Path(file_okay=False, path_type=Path),
                      default=Path('scripts/jseval/runs/quality'), show_default=True),
-        click.option('--window-seconds', type=click.FloatRange(min=45, max=600, min_open=True), default=600,
+        click.option('--window-seconds', type=click.FloatRange(min=45, max=720 if full_suite else 600, min_open=True),
+                     **({'required': True} if full_suite else {'default': 600}),
                      help='Exclusive window including startup and cleanup; estimate must fit.'),
         click.option('--models-dir', type=click.Path(file_okay=False, path_type=Path)),
         click.option('--documents-dir', type=click.Path(file_okay=False, path_type=Path)),
@@ -193,8 +196,17 @@ def _execute_quality(ctx, action, **kwargs):
 @click.pass_context
 @_never_crash
 def cmd_check(ctx, **kwargs):
-    """Run the Search window's refined request on COLLECTIONS (default: all four)."""
+    """Run the refined Search request (default: SciFact, MIRACL de, Enron)."""
     _execute_quality(ctx, 'check', **kwargs)
+
+
+@quality_group.command('full-suite')
+@_run_options(full_suite=True)
+@click.pass_context
+@_never_crash
+def cmd_full_suite(ctx, **kwargs):
+    """Check the full suite, including MIRACL fr, in an explicitly set window."""
+    _execute_quality(ctx, 'check', full_suite=True, **kwargs)
 
 
 @quality_group.command('baseline')

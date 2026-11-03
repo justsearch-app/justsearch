@@ -335,25 +335,41 @@ def _legs(value: Any, name: str) -> tuple[str, ...]:
 
 @dataclass(frozen=True)
 class Served:
-    """Which legs actually served a query (S13); ``reranker`` is ``executed`` or ``skipped``."""
+    """Delivered legs and their trace evidence, plus reranker status/reason.
+
+    Older records can lack ``leg_details``; they cannot prove a legitimate leg reduction.
+    """
 
     legs: tuple[str, ...] = ()
     reranker: str = "skipped"
     reason: str | None = None
+    leg_details: Mapping[str, Mapping[str, str | None]] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "legs", _legs(self.legs, "served.legs"))
         _need(self.reranker in RERANKER_STATUSES,
               f"served.reranker must be 'executed' or 'skipped': {self.reranker!r}")
         _text(self.reason, "served.reason", optional=True)
+        details = _mapping(self.leg_details, "served.leg_details")
+        for leg, value in details.items():
+            _text(leg, "served.leg_details leg")
+            value = _mapping(value, f"served.leg_details.{leg}")
+            _need(value.get("status") in ("executed", "skipped", "disabled"),
+                  f"served.leg_details.{leg}: invalid status")
+            _text(value.get("reason"), f"served.leg_details.{leg}.reason", optional=True)
+        object.__setattr__(self, "leg_details", {
+            leg: {"status": value["status"], "reason": value.get("reason")}
+            for leg, value in details.items()})
 
     def to_dict(self) -> dict:
-        return {"legs": list(self.legs), "reranker": self.reranker, "reason": self.reason}
+        return {"legs": list(self.legs), "reranker": self.reranker, "reason": self.reason,
+                "leg_details": {k: dict(v) for k, v in self.leg_details.items()}}
 
     @classmethod
     def from_dict(cls, d: Mapping) -> "Served":
         d = _mapping(d, "served")
-        return cls(_legs(d.get("legs") or [], "served.legs"), d.get("reranker"), d.get("reason"))
+        return cls(_legs(d.get("legs") or [], "served.legs"), d.get("reranker"), d.get("reason"),
+                   d.get("leg_details", {}))
 
 
 @dataclass(frozen=True)
@@ -390,8 +406,8 @@ class RunHeader:
     """Effective inputs and index state of one arm (S18/S19).
 
     ``expected_legs`` / ``expected_reranker`` declare what every query is meant to be served by;
-    a query served by fewer legs makes the run INVALID, one whose reranker was skipped although it
-    was declared ``executed`` makes the comparison INCONCLUSIVE. ``index_population`` is
+    a query served by fewer legs without explicit by-design trace evidence makes the run INVALID.
+    Identical by-design reductions/skips in both arms remain comparable. ``index_population`` is
     ``{"count", "manifest_sha256", "content_sha256"}`` of what was actually indexed (compare
     :meth:`Collection.index_population`). ``index_build`` says whether the index was built
     ``fresh`` for this run or ``cached`` (adopted from a cache, under ``index_cache_key``).

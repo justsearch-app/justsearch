@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Mapping
 
-from .compare import Comparison
+from .compare import Comparison, syntax_refused
 from .types import Collection, GroupVerdict, Outcome, RunHeader
 
 
@@ -72,6 +72,10 @@ def render(cmp: Comparison) -> str:
            ""]
     if v.reasons:
         out += ["## Reasons", ""] + [f"- {r}" for r in v.reasons] + [""]
+    for arm, record in (("baseline", cmp.baseline), ("candidate", cmp.candidate)):
+        if record:
+            ids = [r.qid for r in record.results if syntax_refused(r)]
+            out += [f"{arm} syntax refusals ({len(ids)}): " + (", ".join(ids) or "none"), ""]
     if cmp.baseline and cmp.candidate:
         b, n = _identity_rows(cmp.baseline.header), _identity_rows(cmp.candidate.header)
         out += ["## Effective inputs and index state", "", "| | baseline | candidate | |",

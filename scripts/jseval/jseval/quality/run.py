@@ -21,6 +21,7 @@ import time
 import uuid
 
 import httpx
+import psutil
 
 from .. import backend
 from .._paths import REPO_ROOT
@@ -28,8 +29,10 @@ from . import collections, compare, index, known_answers, report, scoring
 from .types import (Outcome, QueryResult, RunHeader, RunRecord, Served,
                     atomic_write_text, canonical_json, sha256_text)
 
-DEFAULT_COLLECTIONS = ('scifact', 'miracl-de', 'miracl-fr', 'enron-email')
+DEFAULT_COLLECTIONS = ('scifact', 'miracl-de', 'enron-email')
+FULL_COLLECTIONS = ('scifact', 'miracl-de', 'miracl-fr', 'enron-email')
 CLEANUP_SECONDS = 45
+GPU_MARGIN_MIB = 2048
 
 
 class RunRefused(RuntimeError):
@@ -67,6 +70,9 @@ def search_query(client: httpx.Client, handle: index.IndexHandle, qid, query,
     try:
         resp = client.post('/api/knowledge/search', json={**request, 'query': query.text},
                            timeout=max(.001, timeout))
+        if resp.status_code == 400 and resp.json().get('errorCode') == compare.SYNTAX_REFUSAL:
+            return QueryResult(qid, query.sha256, (), Served((), 'skipped', compare.SYNTAX_REFUSAL),
+                               timings={'elapsed_seconds': time.monotonic()-start, 'http_status': 400})
         resp.raise_for_status()
         body = resp.json()
         if body.get('error'):
@@ -75,11 +81,13 @@ def search_query(client: httpx.Client, handle: index.IndexHandle, qid, query,
         stages = {s['id']: s for s in trace.get('stages', [])}
         if not all(s in stages for s in ('sparse-retrieval', 'dense-retrieval', 'cross-encoder')):
             raise ValueError('missing retrieval/reranker trace evidence')
-        legs = tuple(leg for stage, leg in (('sparse-retrieval', 'lexical'),
-                     ('dense-retrieval', 'dense'), ('splade-retrieval', 'splade'))
-                     if stages.get(stage, {}).get('status') == 'executed')
+        leg_details = {leg: {'status': stages[stage]['status'], 'reason': stages[stage].get('reason')}
+                       for stage, leg in (('sparse-retrieval', 'lexical'),
+                           ('dense-retrieval', 'dense'), ('splade-retrieval', 'splade'))
+                       if stage in stages}
+        legs = tuple(leg for leg, detail in leg_details.items() if detail['status'] == 'executed')
         ce = stages['cross-encoder']
-        served = Served(legs, ce['status'], ce.get('reason'))
+        served = Served(legs, ce['status'], ce.get('reason'), leg_details)
         hits = body.get('results')
         if not isinstance(hits, list):
             raise ValueError('missing delivered results')
@@ -88,20 +96,21 @@ def search_query(client: httpx.Client, handle: index.IndexHandle, qid, query,
             raise ValueError('delivered hit has no full document identity')
         ranked = tuple(handle.ranked_doc_ids(locations))
     except Exception as e:
-        # Preserve a 400, transport failure or malformed trace as this query's error.
+        # All other HTTP errors, transport failures and malformed traces stay errors.
         error = f'{type(e).__name__}: {e}'
     return QueryResult(qid, query.sha256, ranked, served, error,
                        {'elapsed_seconds': time.monotonic() - start})
 
 
-def require_budget(estimate: float, budget: float) -> None:
-    if not math.isfinite(budget) or not CLEANUP_SECONDS < budget <= 600:
-        raise RunRefused(f'window must be greater than {CLEANUP_SECONDS} and at most 600 seconds')
+def require_budget(estimate: float, budget: float, *, full_suite: bool = False) -> None:
+    maximum = 720 if full_suite else 600
+    if not math.isfinite(budget) or not CLEANUP_SECONDS < budget <= maximum:
+        raise RunRefused(f'window must be greater than {CLEANUP_SECONDS} and at most {maximum} seconds')
     if not math.isfinite(estimate) or estimate > budget:
         raise RunRefused(f'estimate {estimate:.1f}s exceeds budget {budget:g}s; prepare a smaller collection set for this window')
 
 
-def estimate_seconds(c, request: dict, models: dict, runs: Path) -> float:
+def _history(c, request: dict, models: dict, runs: Path):
     observed = []
     for path in runs.glob('*/**/*.jsonl'):
         try:
@@ -113,11 +122,86 @@ def estimate_seconds(c, request: dict, models: dict, runs: Path) -> float:
                 continue
             elapsed = (datetime.fromisoformat(h.ended) - datetime.fromisoformat(h.started)).total_seconds()
             if elapsed > 0:
-                observed.append(elapsed)
+                done_path = path.parent/'done.json'
+                done = json.loads(done_path.read_text()) if done_path.exists() else {}
+                if not isinstance(done, dict) or not isinstance(done.get('phase_seconds', {}), dict):
+                    continue
+                query_times = [q.timings.get('elapsed_seconds') for q in r.results]
+                if all(isinstance(v, (int, float)) and math.isfinite(v) and v >= 0 for v in query_times):
+                    done = {**done, 'query_seconds': sum(query_times)}
+                observed.append((h.started, elapsed, done))
         except (ValueError, OSError, KeyError, TypeError):
             continue
+    return sorted(observed, key=lambda row: row[0])[-5:]
+
+
+def estimate_seconds(c, request: dict, models: dict, runs: Path) -> float:
+    observed = []
+    for _, elapsed, done in _history(c, request, models, runs):
+        if not done.get('phase_seconds') and 'query_seconds' in done:
+            # Legacy overlapped records do not say how long a ready engine sat
+            # waiting for its predecessor. Use measured query work plus the cold
+            # startup/witness/teardown allowance, rather than summing that wait.
+            observed.append(45 + done['query_seconds'])
+            continue
+        waiting = done.get('phase_seconds', {}).get('waiting', 0)
+        if isinstance(waiting, (int, float)) and math.isfinite(waiting) and 0 <= waiting < elapsed:
+            observed.append(elapsed-waiting)
     # Cold estimate includes model warmup, witnesses and process teardown, never indexing.
     return max(observed[-5:]) * 1.25 + 5 if observed else 45 + .35 * len(c.queries)
+
+
+def estimate_startup_seconds(c, request, models, runs) -> float:
+    values = [d.get('phase_seconds', {}).get('startup') for _, _, d in _history(c, request, models, runs)]
+    values = [v for v in values if isinstance(v, (int, float)) and math.isfinite(v) and v > 0]
+    return max(values)*1.25 if values else 45
+
+
+def estimate_window(totals, startups, overlap: bool) -> float:
+    """Startup of i+1 can overlap only the scoring/cleanup of i, never its startup."""
+    finished = score_start = 0
+    for total, startup in zip(totals, startups):
+        startup = min(total, startup)
+        ready = (score_start if overlap else finished) + startup
+        score_start = max(ready, finished)
+        finished = score_start + total - startup
+    return finished + CLEANUP_SECONDS
+
+
+def gpu_memory(pid: int | None) -> tuple[float | None, float | None]:
+    """Read-only GPU evidence. Unknown/multi-GPU placement refuses overlap."""
+    try:
+        def query(kind, fields):
+            return subprocess.check_output(['nvidia-smi', f'--query-{kind}={fields}',
+                '--format=csv,noheader,nounits'], text=True, timeout=2).strip().splitlines()
+        devices = query('gpu', 'uuid,memory.free')
+        if len(devices) != 1:
+            return None, None
+        device, free = [v.strip() for v in devices[0].split(',')]
+        footprint = None
+        if pid is not None:
+            owned = {pid, *(p.pid for p in psutil.Process(pid).children(recursive=True))}
+            sizes = [float(size) for row in query('compute-apps', 'gpu_uuid,pid,used_gpu_memory')
+                     for gpu, proc, size in [[v.strip() for v in row.split(',')]]
+                     if gpu == device and int(proc) in owned]
+            footprint = sum(sizes) if sizes else None
+        free = float(free)
+        if not math.isfinite(free) or free < 0 or (footprint is not None and
+                (not math.isfinite(footprint) or footprint <= 0)):
+            return None, None
+        return free, footprint
+    except (OSError, ValueError, subprocess.SubprocessError, psutil.Error):
+        return None, None
+
+
+def can_overlap(enabled: bool, pid: int | None, footprint: float | None = None) -> bool:
+    if not enabled:
+        return False
+    free, measured = gpu_memory(pid)
+    required = max(measured or 0, footprint or 0)
+    # Before any engine starts, reserve space for both. With an engine running,
+    # free memory already excludes its allocations; reserve one more plus margin.
+    return free is not None and required > 0 and free >= required*(2 if pid is None else 1) + GPU_MARGIN_MIB
 
 
 def _write_json(path: Path, value) -> None:
@@ -159,6 +243,9 @@ def _collection_worker(plan: dict, item: dict, deadline: float) -> None:
     handle = None
     failure = None
     start = time.monotonic()
+    ready = scoring_start = scoring_end = None
+    gpu_peak = None
+    gpu_enabled = str(plan['hardware'].get('gpu_enabled', '')).lower() == 'true'
     try:
         handle = index.prepare_index(c, cfg, prepared_only=True)
         handle.wait(prepared_only=True, deadline=deadline)
@@ -178,11 +265,13 @@ def _collection_worker(plan: dict, item: dict, deadline: float) -> None:
         header = replace(header, started=datetime.fromtimestamp(
             time.time() - (time.monotonic()-start), timezone.utc).isoformat())
         RunRecord(header, ()).write(path)
+        ready = time.monotonic()
         Path(item['ready']).touch()
         while not Path(item['go']).exists():
             if time.monotonic() >= deadline:
                 raise RunRefused('window deadline before scoring')
             time.sleep(.02)
+        scoring_start = time.monotonic()
         with httpx.Client(base_url=handle.base_url) as client:
             for qid, query in sorted(c.queries.items()):
                 remaining = deadline - time.monotonic()
@@ -190,9 +279,13 @@ def _collection_worker(plan: dict, item: dict, deadline: float) -> None:
                     raise RunRefused(f'window deadline at query {qid}')
                 results.append(search_query(client, handle, qid, query, plan['request'], min(90, remaining)))
                 RunRecord(header, tuple(results)).write(path)
+                if gpu_enabled and len(results) in (1, len(c.queries)):
+                    _, measured = gpu_memory(os.getpid())
+                    gpu_peak = max(gpu_peak or 0, measured or 0) or None
         confirmed = index.confirm(handle)
         if not confirmed.ok:
             raise RunRefused('not ready: index changed during scoring: ' + '; '.join(confirmed.failures))
+        scoring_end = time.monotonic()
     except BaseException as e:
         failure = f'{type(e).__name__}: {e}'
     finally:
@@ -204,7 +297,12 @@ def _collection_worker(plan: dict, item: dict, deadline: float) -> None:
         # A completion marker is written only after backend teardown succeeded.
         if header and failure is None:
             RunRecord(replace(header, ended=utc()), tuple(results)).write(path)
-        _write_json(Path(item['done']), {'error': failure, 'elapsed_seconds': time.monotonic()-start})
+        ended = time.monotonic()
+        phases = ({'startup': ready-start, 'waiting': scoring_start-ready,
+                   'scoring': scoring_end-scoring_start, 'cleanup': ended-scoring_end}
+                  if None not in (ready, scoring_start, scoring_end) else {})
+        _write_json(Path(item['done']), {'error': failure, 'elapsed_seconds': ended-start,
+                    'phase_seconds': phases, 'gpu_engine_mib': gpu_peak})
 
 
 def _window(plan: dict) -> None:
@@ -216,6 +314,8 @@ def _window(plan: dict) -> None:
                                   'collection', plan['path'], str(item['number']), str(deadline)])
         return child
     items = plan['items']
+    if not items:
+        raise RunRefused('zero collections')
     child = start(items[0])
     for n, item in enumerate(items):
         while not Path(item['ready']).exists() and child.poll() is None:
@@ -224,8 +324,11 @@ def _window(plan: dict) -> None:
             time.sleep(.02)
         if not Path(item['ready']).exists():
             raise RunRefused(f"{item['name']}: backend did not become ready")
-        # The next model load/confirmation overlaps current scoring, as measured in feasibility.
-        following = start(items[n+1]) if n+1 < len(items) else None
+        # Recheck immediately before loading another engine: another GPU user
+        # may have consumed memory since planning. Unknown evidence is sequential.
+        overlap = (plan.get('overlap', False) and can_overlap(
+            True, child.pid, plan.get('gpu_engine_mib')))
+        following = start(items[n+1]) if n+1 < len(items) and overlap else None
         Path(item['go']).touch()
         while child.poll() is None:
             if time.monotonic() >= deadline:
@@ -234,14 +337,15 @@ def _window(plan: dict) -> None:
         done = json.loads(Path(item['done']).read_text())
         if done['error']:
             raise RunRefused(done['error'])
-        child = following
+        child = following or (start(items[n+1]) if n+1 < len(items) else None)
     # admission still owns and reaps all descendants before returning to the caller.
 
 
 def execute(action: str, refs: tuple[str, ...], *, baseline_dir: Path,
             runs_dir: Path, window_seconds: float = 600, mode: str | None = None,
             models_dir: Path | None = None, documents_dir: Path | None = None,
-            cache_root: Path = index.CACHE_ROOT, repo_root: Path = REPO_ROOT) -> tuple[Outcome, str]:
+            cache_root: Path = index.CACHE_ROOT, repo_root: Path = REPO_ROOT,
+            full_suite: bool = False) -> tuple[Outcome, str]:
     """Plan -> reserve -> run -> reap -> validate -> publish; no successful partial verdict."""
     request = request_for(mode)
     if action == 'ablate' and mode is None:
@@ -251,12 +355,14 @@ def execute(action: str, refs: tuple[str, ...], *, baseline_dir: Path,
     commit, dirty = backend.source_identity(repo_root)
     if dirty:
         raise RunRefused(f'candidate tree is dirty ({dirty[:12]}); no trusted quality verdict')
-    require_budget(CLEANUP_SECONDS, window_seconds)
+    require_budget(CLEANUP_SECONDS, window_seconds, full_suite=full_suite)
     backend.require_prepared(repo_root)
     loaded = []
-    estimate = CLEANUP_SECONDS
-    for ref in refs or DEFAULT_COLLECTIONS:
+    totals, startups, footprints = [], [], []
+    for ref in refs or (FULL_COLLECTIONS if full_suite else DEFAULT_COLLECTIONS):
         c, qc = collections.resolve_collection(ref)
+        if action == 'check' and not full_suite and c.name == 'miracl-fr':
+            raise RunRefused('MIRACL fr belongs to quality full-suite with an explicit window')
         known_answers.check(c, qc)
         if not c.queries:
             raise RunRefused(f'{c.name}: zero queries')
@@ -268,15 +374,25 @@ def execute(action: str, refs: tuple[str, ...], *, baseline_dir: Path,
         baseline = baseline_dir / (sha256_text(c.name) + '.baseline.json')
         if action == 'check':
             compare.load_baseline(baseline)  # refuse an absent/corrupt baseline before scoring
-        estimate += estimate_seconds(c, request, models, runs_dir)
+        totals.append(estimate_seconds(c, request, models, runs_dir))
+        startups.append(estimate_startup_seconds(c, request, models, runs_dir))
+        for _, _, done in _history(c, request, models, runs_dir):
+            footprint = done.get('gpu_engine_mib')
+            if isinstance(footprint, (int, float)) and math.isfinite(footprint) and footprint > 0:
+                footprints.append(footprint)
         loaded.append((c, qc, cfg, baseline, models))
     if len({c.name for c, *_ in loaded}) != len(loaded):
         raise RunRefused('duplicate collection names')
-    require_budget(estimate, window_seconds)
+    gpu_enabled = str(loaded[0][2].environment().get('JUSTSEARCH_GPU_ENABLED', '')).lower() == 'true'
+    footprint = max(footprints) if footprints else None
+    overlap = bool(footprint and can_overlap(gpu_enabled, None, footprint))
+    estimate = estimate_window(totals, startups, overlap)
+    require_budget(estimate, window_seconds, full_suite=full_suite)
     out = runs_dir.resolve() / (datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%S') + '-' + uuid.uuid4().hex[:8])
     out.mkdir(parents=True)
     plan = {'path': str(out/'plan.json'), 'repo_root': str(repo_root), 'action': action, 'budget': window_seconds,
             'estimate_seconds': estimate, 'request': request, 'mode': mode,
+            'overlap': overlap, 'gpu_engine_mib': footprint,
             'commit': commit, 'dirty_hash': dirty,
             'hardware': {'system': platform.system(), 'machine': platform.machine(),
                          'cpu': platform.processor(), 'cpu_count': os.cpu_count(),
@@ -307,11 +423,12 @@ def execute(action: str, refs: tuple[str, ...], *, baseline_dir: Path,
         problems.append(f'exclusive window exited {code}: {(out/"window.log").read_text()[-2000:]}')
     if backend.source_identity(repo_root) != (commit, dirty):
         problems.append('candidate changed during scoring')
-    comparisons, times, records = [], {}, []
+    comparisons, times, records, refusals = [], {}, [], {}
     for item, (c, qc, cfg, baseline, models) in zip(plan['items'], loaded):
         record, errors = compare.load_run_or_reason(item['run'], c.name)
         errors += problems
         if record:
+            refusals[c.name] = [r.qid for r in record.results if compare.syntax_refused(r)]
             errors += compare.validate_run(c, record, {c.version}, c.name)
             if dict(record.header.model_hashes) != models or index.model_hashes(Path(cfg.environment()['JUSTSEARCH_MODELS_DIR'])) != models:
                 errors.append(f'{c.name}: result is from another model set')
@@ -351,7 +468,8 @@ def execute(action: str, refs: tuple[str, ...], *, baseline_dir: Path,
                 compare.write_baseline(item['run'], c, baseline)
     surface = 'Search window refined request' if mode is None else f'explicit-mode ablation {mode}'
     summary = {'outcome': outcome.value, 'surface': surface, 'request': request,
-               'estimate_seconds': estimate, 'collection_seconds': times, 'details': details}
+               'estimate_seconds': estimate, 'collection_seconds': times, 'details': details,
+               'overlap_planned': overlap, 'syntax_refusals': refusals}
     _write_json(out/'summary.json', summary)
     atomic_write_text(out/'summary.md',
         f"# {outcome.value}: {surface}\n\n{details}\n\n"
@@ -359,6 +477,8 @@ def execute(action: str, refs: tuple[str, ...], *, baseline_dir: Path,
         + "Request (engine mode/pipeline defaults apply when omitted):\n\n```json\n"
         + json.dumps(request, indent=2) + "\n```\n\n"
         + "\n".join(f"- {name}: {elapsed:.1f}s" for name, elapsed in times.items())
+        + "\n\n" + "\n".join(f"{name} syntax refusals ({len(ids)}): " + (', '.join(ids) or 'none')
+                                  for name, ids in refusals.items())
         + "\n\nPer-query rankings, served legs, reranker status/reason and errors: `*/run.jsonl`.\n"
         + "Comparison reports: `*/run.md`. Effective runtime and model hashes are in each run header.\n")
     line = f'{outcome.value} {surface}: {details}; ' + ', '.join(f'{c} {s:.1f}s' for c,s in times.items()) + f'; report {out}'

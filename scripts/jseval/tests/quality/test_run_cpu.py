@@ -40,7 +40,8 @@ def test_real_cpu_baseline_check_errors_and_window(monkeypatch):
     ds = ir_datasets.load('beir/scifact/test')
     docs = sorted(ds.docs_iter(), key=lambda d: (-len(d.text), d.doc_id))[:8]
     queries = {f'q{i}': QueryText(q, {'lang':'en','kind':'vague'}) for i,q in enumerate([
-        'scientific evidence', 'immune response to human infection', 'cell growth cancer genes'])}
+        'scientific evidence', 'immune response to human infection', 'cell growth cancer genes',
+        '"unterminated', '"immune response"'])}
     c = Collection('scifact-cpu-quick', 'en', queries,
         {q:{docs[0].doc_id:1} for q in queries},
         {d.doc_id:f'docs/{d.doc_id}.txt' for d in docs},
@@ -84,6 +85,16 @@ while not Path(sys.argv[3]).exists():
         record = RunRecord.read(record_path)
         assert record.header.request_config == run.refined_request()
         assert all(r.error is None for r in record.results)
+        syntax = next(r for r in record.results if r.qid == 'q3')
+        phrase = next(r for r in record.results if r.qid == 'q4')
+        assert compare.syntax_refused(syntax), syntax
+        # With no matching candidates the engine names the rerank threshold,
+        # while dense retrieval was independently skipped as sparse-shortcut.
+        assert phrase.served.legs == ('lexical',), phrase
+        assert (phrase.served.reranker, phrase.served.reason) == ('skipped', 'BELOW_MIN_THRESHOLD'), phrase
+        assert phrase.served.leg_details['dense'] == {'status': 'skipped', 'reason': 'sparse-shortcut'}, phrase
+        summary = json.loads(record_path.parents[1].joinpath('summary.json').read_text())
+        assert summary['syntax_refusals'][c.name] == ['q3']
         qc = collections.resolve_collection(folder)[1]
         # An actual HTTP 400 from the CPU engine, passed through the same collector.
         # Inject at the request boundary, not by editing the resulting RunRecord.

@@ -5,14 +5,15 @@ decisions is fixed:
 
 1. INVALID — either arm is not a complete, valid result for this collection and candidate: wrong
    collection or label version, interrupted, zero queries, missing / duplicate / extra query ids,
-   query text changed under the same id, failed queries, queries served by fewer legs than the
-   run declared, documents outside the manifest, an index population that is not exactly the
+   query text changed under the same id, failed queries, queries served by fewer legs without
+   explicit by-design trace evidence, retrieval/reranker drops, documents outside the manifest,
+   an index population that is not exactly the
    manifest and its content, a dirty tree, a candidate from another commit or model set, a stored
    baseline whose metrics disagree with its own rescoring, non-finite metrics.
 2. INCONCLUSIVE — the arms differ in something other than the declared change (models, request
    settings, budget, index key, fresh or cached index, index state such as freshness, enrichment
    or merge state, the legs or reranker status that served each query — the affected queries are
-   named), an arm skipped the reranker on queries it declared it for, or — for a collection with
+   named; identical by-design skips remain comparable), or — for a collection with
    pooled judgments only — the labels are too incomplete for this pair of rankings (the unjudged
    pairs to judge are listed). With official, fixed judgments an unjudged document counts as
    non-relevant and the unjudged share is reported, never changing the verdict.
@@ -53,6 +54,7 @@ from .types import (
     QueryResult,
     RunHeader,
     RunRecord,
+    Served,
     RunRecordError,
     Verdict,
     atomic_write_text,
@@ -112,6 +114,7 @@ def load_baseline(path: str | os.PathLike) -> tuple[RunRecord, dict]:
 # --------------------------------------------------------------------------- validity
 
 
+# modules/app-api/src/main/java/io/justsearch/app/api/knowledge/
 # CrossEncoderSkipReason.java:33-48; isDrop():102-119 explicitly classifies these
 # seven reasons as by-design. RerankSkipCause.java:36-66 has no legitimate skip:
 # all its non-NONE causes are budget/loading/inference drops. Unknown stays invalid.
@@ -119,6 +122,22 @@ BY_DESIGN_RERANK_SKIPS = frozenset({
     "NAVIGATIONAL_QUERY", "DISABLED", "BELOW_MIN_THRESHOLD", "DOCS_TOO_LONG",
     "PIPELINE_NOT_ELIGIBLE", "MODEL_NOT_CONFIGURED", "FUSION_CONFIDENT",
 })
+# modules/worker-services/src/main/java/io/justsearch/indexerworker/services/
+# respond/SearchTraceProjector.java:157-185 emits these routing selections;
+# plan/SearchPlanner.java:222-236 emits the two deliberate dense-query shortcuts.
+# PIPELINE_NOT_ELIGIBLE is a reranker reason, never evidence for a missing leg.
+BY_DESIGN_LEG_SKIPS = frozenset({
+    "sparse-shortcut", "not-selected", "dense-only", "splade-only", "dense-splade",
+    "SKIPPED_SHORT_QUERY", "SKIPPED_NO_DISCRIMINATIVE_TERM",
+})
+# KnowledgeSearchController.java:527-529: a deliberate syntax refusal is the
+# Search window's zero-result product outcome, not a failed evaluation request.
+SYNTAX_REFUSAL = "SEARCH_SYNTAX_INVALID"
+
+
+def syntax_refused(result: QueryResult) -> bool:
+    return (result.error is None and not result.ranked
+            and result.served == Served((), "skipped", SYNTAX_REFUSAL))
 
 
 def validate_run(c: Collection, run: RunRecord, label_versions: set[str], arm: str) -> list[str]:
@@ -163,11 +182,23 @@ def validate_run(c: Collection, run: RunRecord, label_versions: set[str], arm: s
     if failed:
         out.append(f"{arm}: {len(failed)} queries failed (e.g. {failed[0].qid}: {failed[0].error})")
     short = sorted(r.qid for r in run.results
-                   if r.error is None and not set(h.expected_legs) <= set(r.served.legs))
+                   if r.error is None and not syntax_refused(r)
+                   and any(r.served.leg_details.get(leg, {}).get('status') != 'skipped'
+                           or r.served.leg_details[leg].get('reason') not in BY_DESIGN_LEG_SKIPS
+                           for leg in set(h.expected_legs) - set(r.served.legs)))
     if short:
         out.append(f"{arm}: {len(short)} queries were served by fewer legs than the declared "
                    f"{', '.join(h.expected_legs)} ({_ids(short)})")
+    for r in run.results:
+        if r.error is not None or syntax_refused(r):
+            continue
+        for leg, detail in r.served.leg_details.items():
+            if (detail['status'] == 'executed') != (leg in r.served.legs):
+                out.append(f"{arm}: {r.qid}: {leg} trace disagrees with served legs")
+            elif detail['status'] != 'executed' and detail.get('reason') not in BY_DESIGN_LEG_SKIPS:
+                out.append(f"{arm}: {r.qid}: {leg} dropped: {detail.get('reason') or 'missing reason'}")
     drops = [r for r in run.results if r.error is None
+             and not syntax_refused(r)
              and r.served.reranker == "skipped"
              and r.served.reason not in BY_DESIGN_RERANK_SKIPS]
     if drops:
@@ -219,13 +250,17 @@ def identity_differences(b: RunHeader, n: RunHeader) -> dict[str, str]:
 
 def served_differences(baseline: RunRecord, candidate: RunRecord) -> dict[str, list[str]]:
     """Queries served differently between the arms, or short of their arm's declared reranker
-    use: ``served.legs`` / ``served.reranker`` (the arms differ on the query) and
+    use: ``served.legs`` (including each leg's trace status/reason) / ``served.reranker`` and
     ``served.reranker_skipped`` (declared ``executed``, skipped in at least one arm)."""
     b = {r.qid: r.served for r in baseline.results}
     n = {r.qid: r.served for r in candidate.results}
-    qids = sorted(set(b) & set(n))
+    # Refusals have no execution trace. Their quality change is scored as zero
+    # results, rather than treated as an uncontrolled execution difference.
+    refusals = {r.qid for arm in (baseline, candidate) for r in arm.results if syntax_refused(r)}
+    qids = sorted((set(b) & set(n)) - refusals)
     out = {
-        "served.legs": [q for q in qids if set(b[q].legs) != set(n[q].legs)],
+        "served.legs": [q for q in qids if set(b[q].legs) != set(n[q].legs)
+                        or b[q].leg_details != n[q].leg_details],
         "served.reranker": [q for q in qids if (b[q].reranker, b[q].reason) != (n[q].reranker, n[q].reason)],
         "served.reranker_skipped": [
             q for q in qids
