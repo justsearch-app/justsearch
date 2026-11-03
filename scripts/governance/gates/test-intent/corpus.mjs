@@ -1355,7 +1355,6 @@ export const CASES = [
     ['snapshot', 'modules/ui-web/src/__snapshots__/new.test.ts.snap', 'snapshot\n'],
     ['testFixtures source', 'modules/core/src/testFixtures/java/io/justsearch/x/HelperTest.java', 'class HelperTest {}\n'],
     ['modules/test-support source', 'modules/test-support/src/test/java/io/justsearch/x/HelperTest.java', 'class HelperTest {}\n'],
-    ['app-api TCK source', 'modules/app-api-tck/src/test/java/io/justsearch/x/HelperTest.java', 'class HelperTest {}\n'],
     ['mock with a test name', 'modules/ui-web/src/mocks/new.test.ts', 'export const rows = [];\n'],
     ['setup with a test name', 'modules/ui-web/src/__test-setup__/new.test.ts', 'export {};\n'],
     ['system-tests source', 'modules/system-tests/src/test/java/io/justsearch/x/JudgeTest.java', 'class JudgeTest {}\n'],

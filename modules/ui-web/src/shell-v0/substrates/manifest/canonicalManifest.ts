@@ -1,69 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
-/**
- * Canonical first-party ContributionManifest — proves the §13.2.3
- * end-to-end path on main.
- *
- * Demonstrates declarative registration: instead of imperative
- * `registerAction(...)` calls, the feature ships a single typed
- * manifest, the kernel installs it atomically, and the Action
- * substrate exposes the registered entry through `getAction` /
- * `listActions`.
- *
- * Installed at boot from Shell.ts. The manifest's `provenance` flows
- * through to every contained Action / StatusBarItem / etc. — no
- * per-entry provenance plumbing required.
- */
+/** First-party welcome walkthrough, installed at boot through ContributionManifest. */
 
 import { installContributionManifest } from './index.js';
 import { makeCoreProvenance } from '../../primitives/provenance.js';
-
-const CORE_PROVENANCE_FOR_DEMO = makeCoreProvenance();
-
-let installed = false;
-
-/** Install the canonical demo manifest. Idempotent. */
-export async function installCoreDemoManifest(): Promise<void> {
-  if (installed) return;
-  installed = true;
-  await installContributionManifest({
-    id: 'core.substrate-demo',
-    version: '1.0.0',
-    provenance: CORE_PROVENANCE_FOR_DEMO,
-    contributes: {
-      actions: [
-        {
-          id: 'core.action.demo-echo',
-          title: 'Demo Echo Action',
-          category: 'demo',
-          appliesTo: null,
-          priority: 0,
-          handler: (_args, _addressable) => ({
-            kind: 'toast' as const,
-            message: 'core.substrate-demo manifest installed',
-            severity: 'info' as const,
-          }),
-        },
-      ],
-    },
-  });
-}
-
-/** Test-only reset. */
-export function __resetCanonicalManifestInstalledForTest(): void {
-  installed = false;
-}
-
-// ---------------------------------------------------------------------------
-// 548 §4.3(d) — the ContributionManifest as the canonical declaration root for
-// a REAL first-party feature. The "Welcome to JustSearch" walkthrough (521
-// §16.4) used to be declared imperatively inside CorePlugin.register()'s
-// returned PluginContribution. It now ships as its own ContributionManifest
-// installed at boot: the manifest's single `provenance` flows through the
-// `walkthroughs` coordinator (manifest/index.ts) onto the registered entry —
-// no per-entry provenance/source plumbing — and uninstall rolls it back
-// atomically. This proves the manifest derives provenance + lifecycle for a
-// user-visible feature, not just the demo action above.
-// ---------------------------------------------------------------------------
 
 /**
  * "Welcome to JustSearch" walkthrough (moved here from CorePlugin as part of

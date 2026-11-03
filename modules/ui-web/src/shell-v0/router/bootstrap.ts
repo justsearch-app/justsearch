@@ -31,16 +31,6 @@ import {
   subscribeFilters,
 } from '../state/searchFiltersState.js';
 import {
-  serializeAskChat,
-  restoreAskChat,
-  subscribeAskChat,
-} from '../state/askChatState.js';
-import {
-  serializeAgentChat,
-  restoreAgentChat,
-  subscribeAgentChat,
-} from '../state/agentChatState.js';
-import {
   getConversationListState,
   restoreActiveConversation,
   subscribeConversationList,
@@ -77,8 +67,6 @@ export function registerCoreStores(): void {
   storesRegistered = true;
   registerStore(buildSearchAdapter());
   registerStore(buildSearchFiltersAdapter());
-  registerStore(buildAskChatAdapter());
-  registerStore(buildAgentChatAdapter());
   registerStore(buildSv3ConversationAdapter());
   registerFrontendSurfaceSchemas();
 }
@@ -202,56 +190,6 @@ function buildSearchFiltersAdapter(): StoreAdapter {
         if (typeof s.modifiedToMs === 'number') {
           out.modifiedToMs = String(s.modifiedToMs);
         }
-        listener(out);
-      });
-    },
-  };
-}
-
-function buildAgentChatAdapter(): StoreAdapter {
-  return {
-    storeId: 'agent',
-    serialize(): StateSnapshot {
-      return serializeAgentChat();
-    },
-    restore(snapshot: StateSnapshot): void {
-      restoreAgentChat({
-        initialMessage: snapshot.initialMessage as string | string[] | undefined,
-        sessionId: snapshot.sessionId as string | string[] | undefined,
-      });
-    },
-    subscribe(listener: (s: StateSnapshot) => void): () => void {
-      return subscribeAgentChat((s) => {
-        const out: StateSnapshot = {};
-        if (s.initialMessage) out.initialMessage = s.initialMessage;
-        if (s.sessionId) out.sessionId = s.sessionId;
-        listener(out);
-      });
-    },
-  };
-}
-
-function buildAskChatAdapter(): StoreAdapter {
-  return {
-    storeId: 'ask',
-    serialize(): StateSnapshot {
-      const s = serializeAskChat();
-      const out: StateSnapshot = {};
-      if (s.query) out.query = s.query;
-      if (s.docIds && s.docIds.length > 0) out.docIds = s.docIds;
-      return out;
-    },
-    restore(snapshot: StateSnapshot): void {
-      restoreAskChat({
-        query: snapshot.query as string | string[] | undefined,
-        docIds: snapshot.docIds as string | string[] | undefined,
-      });
-    },
-    subscribe(listener: (s: StateSnapshot) => void): () => void {
-      return subscribeAskChat((s) => {
-        const out: StateSnapshot = {};
-        if (s.query) out.query = s.query;
-        if (s.docIds.length > 0) out.docIds = s.docIds;
         listener(out);
       });
     },

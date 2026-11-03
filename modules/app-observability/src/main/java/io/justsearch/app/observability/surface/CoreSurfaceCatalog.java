@@ -529,18 +529,9 @@ public final class CoreSurfaceCatalog implements SurfaceCatalog {
                   /* conversationShapes */ Set.of(SHAPE_RAG_ASK)),
               CHAT_SHAPE_MOUNT_TAG,
               Provenance.core("1.0"),
-              // Slice 496 §3.A: state schema so the Ask compatibility surface accepts
-              // pre-filled context from other surfaces via the existing
-              // store/snapshot/NavigationHandler system. The FE 'ask' store
-              // (askChatState.ts) receives {query, docIds} from the snapshot.
+              // Compatibility context is lowered to Search before schema hydration in the frontend.
               java.util.Optional.of(
-                  SurfaceStateSchemaLoader.require(
-                      ASK_SURFACE_ID,
-                      List.of(
-                          new io.justsearch.agent.api.registry.StateBinding(
-                              "/query", "ask", "query"),
-                          new io.justsearch.agent.api.registry.StateBinding(
-                              "/docIds", "ask", "docIds"))))),
+                  SurfaceStateSchemaLoader.require(ASK_SURFACE_ID, List.of()))),
           // Tempdoc 855 §9.2 — Settings opens as a centered window over the stage
           // (<jf-settings-window>), not as a rail surface; it keeps a fixed bottom rail affordance.
           // The placement must stay in step with CorePlugin.ts (check-surface-composition LEG-2).

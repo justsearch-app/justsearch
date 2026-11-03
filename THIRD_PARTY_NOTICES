@@ -230,19 +230,6 @@ Licenses of third-party components redistributed with JustSearch.
   @lit-labs/ssr-dom-shim 1.5.1 — BSD-3-Clause
   @lit-labs/virtualizer 2.1.1 — BSD-3-Clause
   @lit/reactive-element 2.1.2 — BSD-3-Clause
-  @lumino/algorithm 2.0.4 — BSD-3-Clause
-  @lumino/collections 2.0.4 — BSD-3-Clause
-  @lumino/commands 2.3.3 — BSD-3-Clause
-  @lumino/coreutils 2.2.2 — BSD-3-Clause
-  @lumino/disposable 2.1.5 — BSD-3-Clause
-  @lumino/domutils 2.0.4 — BSD-3-Clause
-  @lumino/dragdrop 2.1.8 — BSD-3-Clause
-  @lumino/keyboard 2.0.4 — BSD-3-Clause
-  @lumino/messaging 2.0.4 — BSD-3-Clause
-  @lumino/properties 2.0.4 — BSD-3-Clause
-  @lumino/signaling 2.1.5 — BSD-3-Clause
-  @lumino/virtualdom 2.0.4 — BSD-3-Clause
-  @lumino/widgets 2.8.0 — BSD-3-Clause
   @tanstack/table-core 8.21.3 — MIT
   @tauri-apps/api 2.11.1 — Apache-2.0 OR MIT
   @tauri-apps/plugin-autostart 2.5.1 — MIT OR Apache-2.0

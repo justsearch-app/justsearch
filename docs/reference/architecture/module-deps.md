@@ -27,7 +27,7 @@ node scripts/architecture/module-deps.mjs --check-canonical
 ### A1. Gradle project inventory
 
 **Included in `settings.gradle.kts`:**
-- `:modules:*` (35 JVM projects)
+- `:modules:*` (34 JVM projects)
 
 **Not Gradle projects (invoked by the build):**
 - `modules/ui-web` (Lit/Vite/TailwindCSS frontend)
@@ -39,7 +39,6 @@ Legend: `A -> B` means `A` declares a direct Gradle project dependency on `B` in
 
 **Foundation (no internal deps)**
 - `:modules:api-contract-projection-java`
-- `:modules:app-api-tck`
 - `:modules:core`
 - `:modules:core-contracts`
 - `:modules:dead-code-audit`
@@ -81,7 +80,6 @@ Legend: `A -> B` means `A` declares a direct Gradle project dependency on `B` in
 These edges exist only in test suites and should not be treated as production layering:
 
 - `:modules:app-agent` has test dependencies on `:modules:app-observability`
-- `:modules:app-api-tck` has test dependencies on `:modules:ai-backend`
 - `:modules:app-engine` has test dependencies on `:modules:app-agent`, `:modules:indexing`
 - `:modules:app-launcher` has test dependencies on `:modules:core`, `:modules:gpu-bridge`
 - `:modules:app-observability` has test dependencies on `:modules:core`
@@ -97,7 +95,6 @@ These edges exist only in test suites and should not be treated as production la
 
 ```mermaid
 graph TD
-  app-api-tck["app-api-tck"]
   dead-code-audit["dead-code-audit"]
   ssot-tools["ssot-tools"]
   test-support["test-support"]

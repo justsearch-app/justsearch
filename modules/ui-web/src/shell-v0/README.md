@@ -44,9 +44,6 @@ shell-v0/
 ├── substrates/              — kernel substrate primitives ("plugins request,
 │                           kernel renders"); has its own README — see
 │                           `substrates/README.md`
-├── shell/                  — Lumino-backed dock + pane registry (a distinct
-│                           `Shell` class from `chrome/Shell.ts`; exported as
-│                           `Shell`/`LitWidget` from `index.ts`)
 ├── layout/                  — declarative layout manifest (LayoutManifest)
 ├── commands/                — command palette + context-action / empty-state /
 │                           inspector-tab registries
@@ -94,11 +91,7 @@ shell-v0/
   `node scripts/ci/gen-component-vocabulary.mjs`; do not hand-edit.
   `npm run check:component-vocabulary` (`modules/ui-web/package.json:28`)
   fails CI if it drifts.
-- **Two distinct "Shell" classes.** `chrome/Shell.ts` is the production
-  chrome (`<jf-shell>`). `shell/Shell.ts` is an unrelated Lumino-backed
-  dock + pane registry, exported as `Shell`/`LitWidget` from
-  `index.ts` (`index.ts:100-111`). Don't conflate the two when
-  searching for "Shell".
+- **Production chrome.** `chrome/Shell.ts` defines `<jf-shell>`.
 - **substrates/ has its own README** (`substrates/README.md`) covering
   the substrate contract in depth — not duplicated here.
 

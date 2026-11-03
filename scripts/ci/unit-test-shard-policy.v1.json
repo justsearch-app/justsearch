@@ -119,10 +119,9 @@
         ":modules:app-agent:test",
         ":modules:app-util:test",
         ":modules:app-agent-api:test",
-        ":modules:app-config:test",
-        ":modules:app-api-tck:test"
+        ":modules:app-config:test"
       ],
-      "localCommand": "node scripts/lib/tool-invoker.cjs gradle :modules:app-launcher:ciUnitTest3 :modules:app-services:ciUnitTest3 :modules:app-agent:test :modules:app-util:test :modules:app-agent-api:test :modules:app-config:test :modules:app-api-tck:test -PskipWebBuild=true --console=plain",
+      "localCommand": "node scripts/lib/tool-invoker.cjs gradle :modules:app-launcher:ciUnitTest3 :modules:app-services:ciUnitTest3 :modules:app-agent:test :modules:app-util:test :modules:app-agent-api:test :modules:app-config:test -PskipWebBuild=true --console=plain",
       "advisoryBudgets": {
         "maxSummedSuiteSeconds": 300,
         "slowSuiteWarnSeconds": 60,
@@ -425,7 +424,6 @@
     "app-agent",
     "app-agent-api",
     "app-api",
-    "app-api-tck",
     "app-config",
     "app-engine",
     "app-inference",
