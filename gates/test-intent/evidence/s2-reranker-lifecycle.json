@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
   },
-  "createdAt": "2026-11-03T02:43:13.644Z",
-  "revision": "29783766b8a599a6e37ee33d4b072693f0e252fb",
-  "tree": "5a201b4cd2b17ec9f0105509a3d54aba2a138d02",
+  "createdAt": "2026-11-03T13:02:05.571Z",
+  "revision": "14fdbf6157523d89068873b62de6bc14601851ef",
+  "tree": "99773026c60fa0920e8afaca7b6a5f6809452202",
   "environment": {
     "platform": "linux",
     "arch": "x64",
@@ -21,13 +21,13 @@
       "command": "./gradlew :modules:app-services:test --tests \"io.justsearch.app.services.ai.install.RerankerInstallConcurrentChoiceTest.followUpInstallAfterAFencedEnable\" --tests \"io.justsearch.app.services.ai.install.RerankerInstallConcurrentChoiceTest.interruptedConsentedInstallDoesNotEnableAfterRestart\" --tests \"io.justsearch.app.services.ai.install.RerankerInstallConcurrentChoiceTest.unrelatedSettingsWriteDuringDownloadStillAllowsConsentedEnable\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 13925
+      "durationMs": 13906
     },
     {
       "command": "./gradlew :modules:ui:test --tests \"io.justsearch.ui.api.RerankerRepeatedEnableHttpTest.plainEnableChangeStillPreparesOrRefuses\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 8043
+      "durationMs": 8100
     }
   ],
   "checks": [
@@ -105,5 +105,5 @@
     }
   ],
   "failBefore": null,
-  "digest": "sha256:afe991dc3c05a6921978dcb7b2675e4aae98c8b750ce3361a3f3ff5f33adc18b"
+  "digest": "sha256:78e3afa1bd3b4e47088efa841919628cfd2fc695ff7f5b021189881f213b09c0"
 }

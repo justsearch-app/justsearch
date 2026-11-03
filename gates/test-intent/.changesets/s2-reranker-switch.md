@@ -7,7 +7,7 @@ author-session: s2-reranker-builder-20261102
 
 # Test-intent entries
 
-The before-only patches add inert scaffolding so checks can execute on their before-states: `s2-reranker-settings-api.patch` adds a nullable wire property on 551357f754, and `s2-reranker-preference-revision.patch` adds an always-zero, unserialized choice revision accessor on 9a81be19f4. The CUDA before-only patch `s2-reranker-candidate-plan-api.patch` adds a preparation overload that delegates to the historical method without invoking its new callback, plus an inert stage method, on 8613d76e02. These patches change no historical installer, resolution, activation, settings or device-plan behavior. The independent
+The before-only patches add inert scaffolding so checks can execute on their before-states: `s2-reranker-settings-api.patch` adds a nullable wire property on 7f3be184b6, and `s2-reranker-preference-revision.patch` adds an always-zero, unserialized choice revision accessor on 9a81be19f4. The CUDA before-only patch `s2-reranker-candidate-plan-api.patch` adds a preparation overload that delegates to the historical method without invoking its new callback, plus an inert stage method, on 8613d76e02. These patches change no historical installer, resolution, activation, settings or device-plan behavior. The independent
 verifier supplies acceptance after reviewing the final candidate. No acceptance is recorded here.
 
 ```json

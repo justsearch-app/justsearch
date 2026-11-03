@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
   },
-  "createdAt": "2026-11-02T22:24:46.800Z",
-  "revision": "551357f754d603ff9691d9c80f3cb02e850d8b86",
-  "tree": "1f68fea2ca4998d7a6ba7602ae67f0bd656bed02",
+  "createdAt": "2026-11-03T13:00:01.919Z",
+  "revision": "14fdbf6157523d89068873b62de6bc14601851ef",
+  "tree": "78b210814750417fbef249962095cef04dc8d58e",
   "environment": {
     "platform": "linux",
     "arch": "x64",
@@ -21,7 +21,7 @@
       "command": "./gradlew :modules:app-services:test --tests \"io.justsearch.app.services.settings.LiteralExclusionSettingsTest\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 14928
+      "durationMs": 9127
     }
   ],
   "checks": [
@@ -54,5 +54,5 @@
     }
   ],
   "failBefore": null,
-  "digest": "sha256:0f21b80340c9582a086574fc6ecfaf12979f26e01b42d044b2b5aabf73af3e36"
+  "digest": "sha256:b70b4e7f8f28248d5d39f69fa3963d232aff3299e87fb64c609f4f35ac9d899d"
 }
