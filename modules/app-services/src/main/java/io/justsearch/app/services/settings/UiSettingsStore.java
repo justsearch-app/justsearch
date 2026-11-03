@@ -356,6 +356,9 @@ public final class UiSettingsStore {
         }
         witness = new SettingsWitness(revision.longValue(), key.isNull() ? null : key.asText());
       }
+      if (settings.getRerankerPreferenceRevision() > witness.acceptedRevision()) {
+        throw new CorruptDurableStoreException("ui-settings", "reranker preference is ahead of settings revision");
+      }
       QueryRoleSelection queryRoles = null;
       JsonNode queryNode = root.get("queryRoles");
       if (queryNode != null) {

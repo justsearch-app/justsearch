@@ -1011,7 +1011,16 @@ public final class SettingsCommitCoordinator implements SettingsCommitOwner {
       }
       boolean rerankerChoiceChanged = !active.recoveryReset() && !Objects.equals(
           active.priorSettings.getRerankerEnabled(), preparedCandidate.getRerankerEnabled());
-      if (rerankerChoiceChanged) {
+      boolean rerankerChoiceRequested = !active.recoveryReset()
+          && preparedCandidate.getRerankerPreferenceRevision() == next.acceptedRevision();
+      // A true preference is not proof of a working session: recovery may have retained a
+      // disabled query selection. Explicit enables must still go through the physical owner.
+      boolean prepareReranker = rerankerChoiceChanged
+          || (rerankerChoiceRequested && Boolean.TRUE.equals(preparedCandidate.getRerankerEnabled()));
+      preparedCandidate.setRerankerPreferenceRevision(rerankerChoiceChanged || rerankerChoiceRequested
+          ? next.acceptedRevision() : active.recoveryReset() ? 0
+              : active.priorSettings.getRerankerPreferenceRevision());
+      if (prepareReranker) {
         for (var key : List.of(io.justsearch.configuration.EnvRegistry.RERANK_MODEL_PATH.configKey(),
             io.justsearch.configuration.EnvRegistry.RERANK_ENABLED.configKey())) {
           var source = resolved.resolution(key);
@@ -1047,10 +1056,10 @@ public final class SettingsCommitCoordinator implements SettingsCommitOwner {
       if (changedKeys.restartRequired().contains("justsearch.index.base_path")) {
         servingResolved = servingResolved.retainingIndexBasePathFrom(serving);
       }
-      if (!changedKeys.component().isEmpty() || rerankerChoiceChanged || chatComponentChanged
+      if (!changedKeys.component().isEmpty() || prepareReranker || chatComponentChanged
           || candidateContext.hasChatProfile() || candidateContext.forceGenerativeRefresh()) {
         var affected = new java.util.TreeMap<String, Set<String>>(changedKeys.component());
-        if (rerankerChoiceChanged) {
+        if (prepareReranker) {
           affected.merge("encoders", Set.of("rerankerEnabled"), (left, right) -> {
             var keys = new java.util.TreeSet<>(left);
             keys.addAll(right);
@@ -1086,7 +1095,7 @@ public final class SettingsCommitCoordinator implements SettingsCommitOwner {
             "Prepared component transaction");
       }
       QueryRoleSelection queryRoles = reset ? null : active.priorQueryRoles;
-      if (changedKeys.component().containsKey("encoders") || rerankerChoiceChanged) {
+      if (changedKeys.component().containsKey("encoders") || prepareReranker) {
         if (preparedComponents == null || preparedComponents.queryRoleSelection().isEmpty()) {
           throw refused("ENCODER_SELECTION_REQUIRED",
               "Encoder owner did not prepare a query-role selection", Map.of());

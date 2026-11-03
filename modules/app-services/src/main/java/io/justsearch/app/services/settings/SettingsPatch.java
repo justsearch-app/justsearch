@@ -75,6 +75,12 @@ final class SettingsPatch {
     }
     if (incoming.rerankerEnabled() != null) {
       base.setRerankerEnabled(incoming.rerankerEnabled());
+      // An explicit choice still supersedes a pending install when its value is unchanged.
+      // The coordinator validates the witness and owns the final revision stamp.
+      if (incoming.witness() != null) {
+        base.setRerankerPreferenceRevision(
+            Math.addExact(incoming.witness().acceptedRevision(), 1));
+      }
     }
     if (incoming.citationScorerModelPath() != null) {
       base.setCitationScorerModelPath(incoming.citationScorerModelPath());

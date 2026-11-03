@@ -315,6 +315,48 @@ verifier supplies acceptance after reviewing the final candidate. No acceptance 
         "modules/app-services/src/test/java/io/justsearch/app/services/registry/emitter/UIOperationViewConformanceTest.java"
       ],
       "repaired": true
+    },
+    {
+      "items": [
+        "modules/app-services/src/test/java/io/justsearch/app/services/ai/install/RerankerInstallConcurrentChoiceTest.java"
+      ],
+      "class": "New",
+      "behaviour": "Install completion preserves an Off saved through the settings coordinator during a real local HTTP download, including an unchanged Off and Off/On/Off. It reports that the newer choice was kept, persists Off across reload and keeps the downloaded bytes. An unrelated chat setting still permits the consented enable.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "R3",
+          "quote": "Switching Best match first while searches and answers run: in-flight work completes, new work uses the new setting; a second window shows the change; a stale save cannot overwrite a newer one (settings witness). Failures (missing or corrupt files, warm-up failure, low memory, crash mid-change) leave a truthful state, never a false On/Off. Missing files: the existing consent with size and licence, no transfer if declined.",
+          "label": "agent-drafted, owner-adopted"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/s2-reranker-repair2.json",
+      "newChecks": [
+        "modules/app-services/src/test/java/io/justsearch/app/services/ai/install/RerankerInstallConcurrentChoiceTest.java"
+      ],
+      "repaired": true
+    },
+    {
+      "items": [
+        "modules/ui/src/test/java/io/justsearch/ui/api/RerankerRepeatedEnableHttpTest.java"
+      ],
+      "class": "New",
+      "behaviour": "A repeated true through the settings HTTP controller and real coordinator prepares a working reranker when the saved preference is already true and the durable role is disabled. Unavailable files refuse without replacing settings bytes or their witness; a prepared selection commits COMPLETE.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "R3",
+          "quote": "Switching Best match first while searches and answers run: in-flight work completes, new work uses the new setting; a second window shows the change; a stale save cannot overwrite a newer one (settings witness). Failures (missing or corrupt files, warm-up failure, low memory, crash mid-change) leave a truthful state, never a false On/Off. Missing files: the existing consent with size and licence, no transfer if declined.",
+          "label": "agent-drafted, owner-adopted"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/s2-reranker-repair2.json",
+      "newChecks": [
+        "modules/ui/src/test/java/io/justsearch/ui/api/RerankerRepeatedEnableHttpTest.java#repeatedEnablePreparesDisabledRoleOrRefusesWithoutCommitting"
+      ],
+      "repaired": true
     }
   ]
 }
