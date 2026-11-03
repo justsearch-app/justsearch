@@ -1192,3 +1192,14 @@ check lists. Execution observations for this round follow after all checks finis
   "note": "Transcribed by the orchestrator from verifier-4 (Codex, session 01a19f13-e442-7c13-98b2-b94e53537f73) on 92a6c6e04c: accept E1-E9."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a1a03e-494a-7d43-af1f-99e90c2e36c7",
+  "verdict": "accept",
+  "digest": "sha256:1aa21572b351929ee60bb8f5d91ad00fa20ceeeee9bcadb0bd8eb9c208ba4f32",
+  "note": "Focused verifier-5 on 005051b428 after the merge of origin/main: entries E1-E9 accepted; entries, checks and evidence unchanged against 1d3284e105; the merged status fixture keeps main's enrichment outcome field and the ownership cleanup-warning fields, no assertion weakened."
+}
+```
