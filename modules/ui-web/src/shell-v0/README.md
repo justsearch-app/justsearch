@@ -62,8 +62,6 @@ shell-v0/
 ├── strategies/                 — diagnostic-channel / subscription strategies
 ├── hooks/                       — small reusable hooks (resolvePathLazy)
 ├── hover/                       — HoverPreviewHost
-├── demo/                        — standalone debug-route demos gated by
-│                           `main.jsx` URL params (`?shell-demo=1`, etc.)
 ├── utils/                       — shell-v0-local shared utilities
 └── __tests__/                    — cross-cutting tests (custom-element tag prefix)
 ```

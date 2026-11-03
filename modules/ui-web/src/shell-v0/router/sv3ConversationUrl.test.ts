@@ -187,6 +187,9 @@ describe('sv3 conversation identity in the URL (864 PR C)', () => {
   afterEach(() => {
     stopSource?.();
     deactivateProjection();
+    // The Search control adapter schedules a debounced fetch on restore. Cancel it while the
+    // browser environment is still alive, after disconnecting the URL listeners.
+    resetSearchState();
     history.restore();
     vi.restoreAllMocks();
   });

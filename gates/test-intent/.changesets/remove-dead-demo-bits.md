@@ -63,7 +63,7 @@ and retired Ask/Agent stores on 2026-11-03. Compatibility navigation and saved d
         "modules/ui-web/src/shell-v0/themes/theme-coverage.test.ts"
       ],
       "class": "Structural rule kept",
-      "rule": "I1–I5 continue to check catalog coverage, resolved fallback values, no orphan tokens, component layering and semantic resolution over every remaining renderer.",
+      "rule": "I1\u2013I5 continue to check catalog coverage, resolved fallback values, no orphan tokens, component layering and semantic resolution over every remaining renderer.",
       "whySurvives": "Only the deleted Lumino overlay leaves COVERED_FILES. Its component-only defaults are deleted with it; no predicate or exception list changes.",
       "sources": [
         {
@@ -80,9 +80,10 @@ and retired Ask/Agent stores on 2026-11-03. Compatibility navigation and saved d
       "class": "Adaptation",
       "moved": [
         "signature",
-        "input re-encoding"
+        "input re-encoding",
+        "instrumentation"
       ],
-      "whatMoved": "The generic non-conversation projection control uses the retained Search query store instead of the removed Ask query store; fixture.ask-control becomes fixture.search-control and its schema binding becomes search. Both expose restore({query}) and query subscriptions. All inputs, history-stack assertions, replaceState/pushState observations, reload scenarios and fault conditions remain, with only the literal control-surface name re-encoded.",
+      "whatMoved": "The generic non-conversation projection control uses the retained Search query store instead of the removed Ask query store; fixture.ask-control becomes fixture.search-control and its schema binding becomes search. Both expose restore({query}) and query subscriptions. All inputs, history-stack assertions, replaceState/pushState observations, reload scenarios and fault conditions remain, with only the literal control-surface name re-encoded. Teardown now calls resetSearchState after stopping URL ingress and deactivating projection, cancelling the Search adapter debounce and aborting any pending request before happy-dom is torn down. The fixture owns the transient Search state; cancellation does not change inputs, assertions or failure handling and no unhandled-rejection suppression is installed.",
       "sources": [
         {
           "kind": "owner-words",
@@ -90,6 +91,24 @@ and retired Ask/Agent stores on 2026-11-03. Compatibility navigation and saved d
           "location": "task t-20261103-remove-dead-demo-bits user turn 2026-11-03"
         }
       ]
+    },
+    {
+      "items": [
+        "gates/dead-code/baseline.txt"
+      ],
+      "class": "Structural rule kept",
+      "rule": "The dead-code gate continues to reject new unused exports relative to the baseline for every retained module.",
+      "whySurvives": "Only the two allowance rows for the deleted retired chat stores leave the baseline. Their files are absent at HEAD; no allowance for any retained file, unused-export threshold or gate predicate changes. Removing obsolete allowances narrows the baseline."
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/views/HealthLitView.test.ts"
+      ],
+      "class": "Adaptation",
+      "moved": [
+        "instrumentation"
+      ],
+      "whatMoved": "Only a setup explanation comment changes: it now states that HealthLitView does not start the AI singleton rather than referring to a deleted debug entry point. The backendReachable assignment, SSE open/error sequence, debounce advance, badge assertions and every other test statement are unchanged."
     }
   ]
 }
