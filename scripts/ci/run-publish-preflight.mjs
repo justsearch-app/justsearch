@@ -152,6 +152,7 @@ export function buildPreparedPlan(manifest, { cwd = ROOT, context, lanes, regist
         command = `node scripts/governance/gates/test-intent/cli.mjs --base ${context.base} --pr ${context.pr ?? '<unavailable>'}`;
         if (!context.pr) reason = context.reason;
       }
+      if (command === 'node scripts/ci/check-tempdoc-size.mjs') command += ` --base ${context.base}`;
       if (/playwright install --with-deps/.test(command)) reason = 'system browser dependencies require changes to the shared host; isolated Chromium is prepared separately';
       const windows = /^cmd \/c\b|^\.\/gradlew\.bat\b/.test(command);
       const pythonVersion = /python -m (?:pip|pytest)/.test(command) ? '3.13' : undefined;
@@ -159,10 +160,10 @@ export function buildPreparedPlan(manifest, { cwd = ROOT, context, lanes, regist
         platform: windows ? 'win32' : undefined, pythonVersion,
         network: /npm (?:ci|.*install)|pip install|playwright install/.test(command) });
       // Only setup failures stop the rest of this context. Checks stay independent.
-      if (windows || /npm (?:ci|.*install)|pip install|playwright install|(?:gradle|gradlew).*\b(?:assemble|build|checkLicense)\b/.test(original)) setup.push(id);
+      if (!reason && (windows || /npm (?:ci|.*install)|pip install|playwright install|(?:gradle|gradlew).*\b(?:assemble|build|checkLicense)\b/.test(original))) setup.push(id);
     }
   }
-  steps.push({ id: 'hosted-parity', reason: 'The inventory reproduces local subsets; display/GPU product checks and hosted toolchain parity remain unverified.' });
+  steps.push({ id: 'hosted-parity', reason: 'The inventory reproduces local subsets; CI steps outside the inventory are not claimed. Display/GPU product checks and hosted toolchain parity remain unverified.' });
   return steps;
 }
 
@@ -244,7 +245,14 @@ export async function executePreparedPlan(steps, {
 export function formatPreparedSummary(results, context) {
   const counts = Object.fromEntries(['passed', 'failed', 'blocked', 'not checked here'].map(status => [status, [...results.values()].filter(r => r.status === status).length]));
   const complete = !counts.failed && !counts.blocked && !counts['not checked here'];
+  const checks = [...new Set([...results.values()].map(result => result.check).filter(Boolean))];
+  const subsets = checks.map(check => {
+    const outcomes = [...results.values()].filter(result => result.check === check);
+    return `${check}: ${!outcomes.some(result => result.label) ? 'hosted-only' : outcomes.every(result => result.status === 'passed') ? 'ran its local subset' : 'local subset incomplete'}`;
+  });
   return `Candidate ${context.candidate}; PR ${context.pr ?? 'unknown'}${context.provisional ? ' (provisional)' : ''}; base ${context.base}\n` +
+    'CI steps outside the inventory are not claimed.\n' +
+    (subsets.length ? subsets.join('\n') + '\n' : '') +
     [...results].map(([id, result]) => `${result.status}: ${id}${result.label ? ` (${result.label.replace(/\s+/g, ' ')})` : ''}${result.reason ? ` — ${result.reason}` : ''}`).join('\n') +
     `\n${Object.entries(counts).map(([status, count]) => `${status}: ${count}`).join(' / ')} — ${complete ? 'complete' : 'incomplete'}`;
 }

@@ -18,6 +18,12 @@
         "node scripts/ci/test-check-lockfile-completeness.mjs",
         "node scripts/ci/verify-test-evidence-policy.mjs",
         "node scripts/ci/check-root-readme.mjs",
+        "node scripts/ci/check-suppression-ratchet.mjs",
+        "node scripts/ci/check-tempdoc-size.mjs",
+        "node scripts/governance/run.mjs --gate consumer-drift --gate contract-projection --gate contribution-surface --gate interaction-surface --gate observed-happening --gate runtime-state --gate ssot-catalog-sync --gate stage-completeness --gate surface-altitude --gate engine-port --mode gate",
+        "node scripts/governance/run.mjs --gate operation-surface --gate execution-surface --gate register-guard-resolution --mode gate",
+        "npm --prefix modules/ui-web run lint",
+        "npm run lint:scripts",
         "node scripts/governance/run-all-tests.mjs",
         "node scripts/governance/run.mjs --self-test --mode gate",
         "node scripts/ci/run-node-tests.mjs scripts/lib/engine-discovery.test.mjs",
@@ -69,7 +75,8 @@
       "commands": [
         "npm run test:unit:run --prefix modules/ui-web -- --maxWorkers=4",
         "npm run test:unit:lockdown --prefix modules/ui-web -- --maxWorkers=4",
-        "node scripts/lib/tool-invoker.cjs gradle :modules:app-agent:test :modules:app-agent-api:test :modules:app-api:test :modules:app-api-tck:test :modules:app-config:test :modules:app-launcher:test :modules:app-observability:test :modules:app-services:test :modules:app-util:test :modules:ui:test -PskipWebBuild=true --console=plain"
+        "node scripts/lib/tool-invoker.cjs gradle :modules:app-agent:test :modules:app-agent-api:test :modules:app-api:test :modules:app-api-tck:test :modules:app-config:test :modules:app-launcher:test :modules:app-observability:test :modules:app-services:test :modules:app-util:test :modules:ui:test -PskipWebBuild=true --console=plain",
+        "node scripts/lib/tool-invoker.cjs gradle :modules:app-services:exportRegistrySnapshot -PskipWebBuild=true --console=plain && node scripts/governance/run.mjs --gate consumer-presence --gate host-owns-truth --gate runtime-witness --mode gate --out tmp/snapshot-gates.sarif && node -e \"if (require('fs').readFileSync('tmp/snapshot-gates.sarif','utf8').includes('snapshot-missing')) { console.error('registry snapshot absent: these three gates inspected nothing'); process.exit(1); }\""
       ],
       "lanes": [
         "ui",

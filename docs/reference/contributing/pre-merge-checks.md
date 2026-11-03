@@ -25,7 +25,8 @@ node scripts/dev/prepare-worktree.cjs --preflight --pr 123
 This opt-in mode prepares isolated npm/Python tools with `prepare-ui-checks.cjs`,
 builds this candidate's distribution, regenerates required governance inputs on every
 run, and executes the existing local reproductions of required checks selected by the CI
-change classifier. The single command inventory is `contexts[].commands` in
+change classifier. Each check reports whether its local subset ran; CI steps outside
+the inventory are not claimed. The single command inventory is `contexts[].commands` in
 `scripts/ci/public-ci-local-repro.v1.json`; optional context lanes select checks.
 Preparation stays in `prepare-worktree.cjs`; execution and the versioned inventory
 stay in `run-publish-preflight.mjs`. Ordinary preparation and `--no-dist` keep their
@@ -51,10 +52,13 @@ advisory API evidence, Windows-specific commands, unreproduced display/GPU cases
 and hosted identity/toolchain checks count as incomplete, never passed. A complete run requires every
 selected step to pass; incomplete runs exit nonzero. Logs and `summary.json` are
 written under ignored `tmp/preflight/`. The disposable virtualenv and scratch files
-are recreated each run; private download caches are retained. Generated inputs are discarded before their
+are recreated each run; private download caches are retained. Check commands use the
+operating system temporary directory for scratch repositories, outside the checkout
+and its installed TypeScript. Generated inputs are discarded before their
 producers run, including when prerequisites fail, so old reports cannot count as
-current evidence. No shared Python environment or application configuration is installed;
-Playwright browser installation disables shared-cache garbage collection. The existing Gitleaks command requires an installed CLI. Gradle commands require
+current evidence. No shared Python environment or application configuration is installed.
+Both lockfile-pinned Playwright installations (Node and Python) prepare their matching
+Chromium revisions in checkout-local storage with browser garbage collection disabled. The existing Gitleaks command requires an installed CLI. Gradle commands require
 `js-gradle-slot` on the shared machine. System browser-package installation is
 reported unverified; the prepared isolated Chromium is used by the browser check.
 

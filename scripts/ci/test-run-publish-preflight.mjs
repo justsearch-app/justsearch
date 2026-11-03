@@ -6,6 +6,9 @@ import os from 'node:os';
 import path from 'node:path';
 import vm from 'node:vm';
 import { spawnSync, execFileSync } from 'node:child_process';
+import { fileURLToPath, pathToFileURL } from 'node:url';
+import { test } from 'node:test';
+import { createRequire } from 'node:module';
 
 import {
   assertCleanCandidate,
@@ -224,10 +227,11 @@ const windowsResults = await executePreparedPlan(windowsPlan.map(step => step.id
 assert.equal(windowsResults.get('native-producer-0').status, 'not checked here');
 assert.equal(windowsResults.get('native-producer-1').status, 'blocked');
 
-// All prepared check commands come from the inventory, with only the test-intent CLI adapter.
+// Prepared commands come from the inventory; the two diff-aware checks receive PR context.
 for (const step of frontendPlan.filter(step => step.check && step.command)) {
   const entry = repositoryManifest.contexts.find(entry => entry.check === step.check);
-  assert.ok(entry.commands.includes(step.command) || step.command.includes('test-intent/cli.mjs'));
+  assert.ok(entry.commands.includes(step.command) || step.command.includes('test-intent/cli.mjs') ||
+    step.command === `node scripts/ci/check-tempdoc-size.mjs --base ${context.base}`);
 }
 const prelude = docsPlan.filter(step => !step.check && step.command);
 assert.ok(prelude.some(step => step.command === 'npm --prefix scripts/wire-contract install'));
@@ -329,3 +333,77 @@ const forwarded = prepareCalls(['--preflight', '--pr', '105', '--list']);
 assert.deepEqual([...forwarded[0][1]].slice(1), ['--prepare', '--pr', '105', '--list']);
 assert.deepEqual(prepareCalls(['--preflight', '--no-dist']), [['exit', 2]]);
 console.log('prepare-worktree compatibility: PASS');
+
+// Regressions for the independent preflight findings.
+{
+  // Point at a shared before checkout to exercise the same assertions before repair.
+  const root = process.env.PREFLIGHT_REPAIR_ROOT || fileURLToPath(new URL('../../', import.meta.url));
+  const manifest = JSON.parse(fs.readFileSync(path.join(root, 'scripts/ci/public-ci-local-repro.v1.json'), 'utf8'));
+  const { buildPreparedPlan, executePreparedPlan, formatPreparedSummary } = await import(pathToFileURL(path.join(root, 'scripts/ci/run-publish-preflight.mjs')));
+  const yaml = createRequire(import.meta.url)('js-yaml');
+  const workflow = yaml.load(fs.readFileSync(path.join(root, '.github/workflows/ci.yml'), 'utf8'));
+  const context = { candidate: 'candidate', base: 'base', pr: 123 };
+  const plan = buildPreparedPlan(manifest, { context, lanes: { frontend: true, ui: true, services: true }, registry: { gates: [] } });
+  const normalize = command => command.replace(/\\\r?\n/g, ' ').replace(/\s+/g, ' ').trim();
+
+  // The CI step names are regression assertions, not another execution inventory.
+  for (const name of [
+    'Frontend lint (ts-any + todo-fixme successors)',
+    'Suppression ratchet (@Disabled / noinspection baseline)',
+    'Hermetic kernel gates (10, no produced inputs, no install)',
+    'Register-family gates (operation-surface, execution-surface, guard resolution)',
+  ]) {
+    test(`Public claims inventory retains CI's ${name}`, () => {
+      const command = workflow.jobs['public-claims'].steps.find(step => step.name === name)?.run;
+      assert.ok(command, `CI must still declare ${name}`);
+      assert.ok(manifest.contexts.find(entry => entry.check === 'Public claims').commands.some(candidate => normalize(candidate) === normalize(command)), `${name} must run in Public claims`);
+    });
+  }
+
+  test('Public claims inventory retains script lint and the touched-tempdoc cap with PR base', () => {
+    const commands = manifest.contexts.find(entry => entry.check === 'Public claims').commands;
+    assert.ok(commands.includes('npm run lint:scripts'), 'Script lint must run in Public claims');
+    assert.ok(commands.includes('node scripts/ci/check-tempdoc-size.mjs'), 'Tempdoc size cap must run in Public claims');
+    assert.ok(plan.some(step => step.command === `node scripts/ci/check-tempdoc-size.mjs --base ${context.base}`), 'Tempdoc size cap must honor the prepared PR base');
+  });
+
+  test('app-ui inventory exports a fresh registry snapshot, runs all three gates, and refuses missing input', () => {
+    const commands = manifest.contexts.find(entry => entry.check === 'Unit tests (app-ui)').commands;
+    const snapshot = commands.find(command => command.includes(':modules:app-services:exportRegistrySnapshot'));
+    assert.ok(snapshot, 'Registry-snapshot gates need their always-run Gradle producer');
+    assert.match(snapshot, /exportRegistrySnapshot.*&&.*--gate consumer-presence --gate host-owns-truth --gate runtime-witness.*&&.*snapshot-missing.*process\.exit\(1\)/);
+    const step = plan.find(step => step.command === snapshot);
+    assert.equal(step.check, 'Unit tests (app-ui)');
+    assert.ok(step.needs.includes('candidate-dist'));
+  });
+
+  test('unavailable system package installation does not block Measured axe on isolated Chromium', async () => {
+    const dispatched = [];
+    const results = await executePreparedPlan(plan.map(step => !step.check && !step.reason ? { id: step.id, virtual: true } : step), {
+      platform: 'linux', report() {}, invalidate() {},
+      run(step) { dispatched.push(step.command); return { status: 0 }; },
+    });
+    const system = plan.find(step => step.command?.includes('playwright install --with-deps'));
+    const axe = plan.find(step => step.command?.includes('jsharness ui-a11y-gate'));
+    assert.equal(results.get(system.id).status, 'not checked here');
+    assert.equal(results.get(axe.id).status, 'passed');
+    assert.ok(dispatched.includes(axe.command));
+    assert.ok(axe.needs.includes('isolated-tools'), 'axe still requires usable isolated Chromium');
+  });
+
+  test('summary reports local-subset coverage per check and excludes uninventoried CI steps', () => {
+    const results = new Map([
+      ['lint', { status: 'passed', check: 'Public claims', label: 'npm run lint:scripts' }],
+      ['unit', { status: 'passed', check: 'Unit tests (app-ui)', label: 'unit checks' }],
+      ['axe', { status: 'failed', check: 'Measured axe', label: 'axe check' }],
+      ['cla', { status: 'not checked here', check: 'cla-assistant' }],
+    ]);
+    const summary = formatPreparedSummary(results, context);
+    assert.match(summary, /Public claims: ran its local subset/);
+    assert.match(summary, /Unit tests \(app-ui\): ran its local subset/);
+    assert.match(summary, /Measured axe: local subset incomplete/);
+    assert.match(summary, /cla-assistant: hosted-only/);
+    assert.match(summary, /CI steps outside the inventory are not claimed/);
+  });
+
+}
