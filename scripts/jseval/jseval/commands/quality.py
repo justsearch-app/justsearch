@@ -22,7 +22,7 @@ from ..quality.types import Outcome, RunRecordError, atomic_write_text
 
 
 def _invalid(ctx, message: str) -> None:
-    click.echo("INVALID " + " ".join(message.split()))
+    click.echo("INVALID " + report.compact(message))
     ctx.exit(Outcome.INVALID.exit_code)
 
 

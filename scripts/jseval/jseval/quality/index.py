@@ -78,6 +78,10 @@ class IndexRefused(RuntimeError):
     """Inputs or live evidence do not authorize scoring/adoption."""
 
 
+class TransientIndexRefused(IndexRefused):
+    """Serving is unavailable; stored index content has not been shown corrupt."""
+
+
 @dataclasses.dataclass(frozen=True)
 class IndexConfig:
     repo_root: Path = REPO_ROOT
@@ -432,7 +436,12 @@ def witness(base_url: str, c: Collection, m: Collection, docs: Path,
         status = _get(client, "/api/status")
         reasons = _ready_reasons(status, c, config.request.get("mode") == "splade")
         if reasons:
-            raise IndexRefused("; ".join(reasons))
+            # Health can precede the worker's resolved enable flags and audits
+            # on cached startup. Keep the gate, but retry serving readiness;
+            # it is not evidence that the stored index bytes are corrupt.
+            refusal = (IndexRefused if "population.count differs from collection" in reasons
+                       else TransientIndexRefused)
+            raise refusal("; ".join(reasons))
         page = _post(client, "/api/debug/eval/document-ids", {"offset": 0, "limit": 50000})
         ids = page["docIds"]
         if page["totalCount"] != len(c.documents) or len(ids) != len(c.documents) or len(set(ids)) != len(ids):
@@ -486,16 +495,16 @@ def witness(base_url: str, c: Collection, m: Collection, docs: Path,
                 probes.append(probe)
         meta = _get(client, "/api/debug/commit-metadata")
         if meta.get("build_state") != "COMPLETE":
-            raise IndexRefused(f"index commit not COMPLETE: {meta.get('build_state')}")
+            raise TransientIndexRefused(f"index commit not COMPLETE: {meta.get('build_state')}")
         s = readiness.flatten_status(status)
         generation = index_identity._deep_find(status, "activeGenerationId")
         if not isinstance(generation, str) or not generation:
-            raise IndexRefused("serving generation unavailable")
+            raise TransientIndexRefused("serving generation unavailable")
         final_status = _get(client, "/api/status")
         final_reasons = _ready_reasons(final_status, c, config.request.get("mode") == "splade")
         if (final_reasons or generation != index_identity._deep_find(final_status, "activeGenerationId")
                 or index_identity._deep_find(final_status, "buildingGenerationId") not in (None, "", index_identity._MISSING)):
-            raise IndexRefused(f"index changed during witness: {final_reasons}")
+            raise TransientIndexRefused(f"index changed during witness: {final_reasons}")
         return {"index_population": c.index_population(), "content": dict(c.content),
                 "extracted_content": hashes,
                 "samples": sample, "probes": probes, "generation": generation,
@@ -593,43 +602,28 @@ class IndexHandle:
         except BaseException:
             self.close()
             raise
+        failure = None
         try:
-            self._backend = backend.start_backend(repo_root=self.config.repo_root, data_dir=self.data_dir,
-                                             port=port, env_overrides=_launch_env(self.config, self.data_dir, self.env),
-                                             health_timeout_sec=max(.001, min(180, deadline - time.monotonic())),
-                                             **({"prepared_only": True, "startup_admission": False}
-                                                if prepared_only else {}))
-        except BaseException as e:
-            # start_backend tears down an unsuccessful start before raising.
+            self._backend = _start_serving(self.config, self.data_dir, self.env, port, deadline,
+                prepared_only=prepared_only, startup_admission=not prepared_only)
+            self.base_url = f"http://127.0.0.1:{port}"
+            result = _confirm_ready(self, deadline, external=True)
+            if result.ok:
+                return self
+            failure = "not ready: serving backend not confirmed: " + str(result.failures)
+            raise IndexRefused(failure)
+        except BaseException:
             try:
-                if self.index_build == "cached":
-                    _quarantine(self.root, self.data_dir, self.collection, self.index_key, str(e))
+                # Stop the writer before moving proven-bad content; transient
+                # serving failures leave the entry available for a later run.
+                if self._backend:
+                    backend.stop_backend(self._backend.proc, data_dir=self.data_dir)
+                    self._backend = None
+                if failure and self.index_build == "cached":
+                    _quarantine(self.root, self.data_dir, self.collection, self.index_key, failure)
             finally:
                 self.close()
             raise
-        self.base_url = f"http://127.0.0.1:{port}"
-        # Warm-up/readiness is behavioral, not the launcher's health check.
-        last = None
-        while time.monotonic() < deadline:
-            result = confirm(self)
-            if result.ok:
-                return self
-            last = result.failures
-            if self._backend.proc.poll() is not None:
-                break
-            time.sleep(2)
-        reason = f"not ready: serving backend not confirmed: {last}; run quality prepare outside the scoring window"
-        try:
-            # The engine must release its files before quarantine, and the data
-            # lock stays held until all refused state has been moved aside.
-            if self._backend:
-                backend.stop_backend(self._backend.proc, data_dir=self.data_dir)
-                self._backend = None
-            if self.index_build == "cached":
-                _quarantine(self.root, self.data_dir, self.collection, self.index_key, reason)
-        finally:
-            self.close()
-        raise IndexRefused(reason)
 
     def close(self) -> None:
         try:
@@ -749,7 +743,7 @@ def prepare_index(collection: Collection, config: IndexConfig, *, prepared_only:
         try:
             # A held data lock is required; lock contention must not mutate
             # another preparer's cache. Only our exact owned data can move.
-            if not isinstance(e, BlockingIOError):
+            if not isinstance(e, (BlockingIOError, TransientIndexRefused, httpx.HTTPError)):
                 _quarantine(root, data, collection, key, f"{type(e).__name__}: {e}")
         finally:
             lock.close()
@@ -773,7 +767,7 @@ def _confirm(handle: IndexHandle, entry: dict | None = None) -> index_identity.C
     checks = {}
     try:
         if not handle.base_url or not handle._backend or handle._backend.proc.poll() is not None:
-            raise IndexRefused("no live serving backend")
+            raise TransientIndexRefused("no live serving backend")
         key, _ = compute_index_key(handle.collection, handle.config, handle.env)
         if key != handle.index_key:
             raise IndexRefused("index-shaping inputs changed since preparation")
@@ -791,11 +785,55 @@ def _confirm(handle: IndexHandle, entry: dict | None = None) -> index_identity.C
         checks.update(adopted.checks)
         if not failures:
             handle.index_state = {**current, "settled": True, "index_cache_key": handle.index_cache_key}
+    except (httpx.HTTPError, TransientIndexRefused) as e:
+        failures.append(f"serving.error: {type(e).__name__}: {e}")
+        checks["serving"] = {"ok": False, "transient": True}
     except Exception as e:
         failures.append(f"{type(e).__name__}: {e}")
     if failures:
         handle.index_state["confirmation_failures"] = failures
     return index_identity.ConfirmResult(not failures, failures, checks)
+
+
+def _confirm_ready(handle: IndexHandle, deadline: float, *, entry: dict | None = None,
+                   external: bool = False) -> index_identity.ConfirmResult:
+    """Three serving attempts; a content/identity mismatch settles immediately."""
+    last = None
+    for attempt in range(3):
+        if time.monotonic() >= deadline:
+            raise TransientIndexRefused("not ready, transient: confirmation deadline expired")
+        result = confirm(handle) if external else _confirm(handle, entry)
+        if result.ok:
+            return result
+        # Every failure must be classified as transient. A simultaneous content
+        # mismatch is still evidence against the cached entry.
+        transient = result.transient_failures
+        if not isinstance(transient, list) or set(result.failures) - set(transient):
+            return result
+        last = result.failures
+        if attempt < 2:
+            time.sleep(min(2**attempt, max(0, deadline-time.monotonic())))
+    raise TransientIndexRefused(f"not ready, transient: serving confirmation failed after 3 attempts: {last}")
+
+
+def _start_serving(config: IndexConfig, data: Path, env: dict, port: int,
+                   deadline: float, *, prepared_only: bool, startup_admission: bool):
+    last = None
+    for attempt in range(3):
+        if time.monotonic() >= deadline:
+            break
+        try:
+            return backend.start_backend(repo_root=config.repo_root, data_dir=data, port=port,
+                env_overrides=_launch_env(config, data, env),
+                health_timeout_sec=max(.001, min(180, deadline-time.monotonic())),
+                startup_admission=startup_admission, prepared_only=prepared_only)
+        except Exception as e:
+            # A start/health/admission failure proves nothing about stored bytes.
+            # start_backend tears down each unsuccessful engine before raising.
+            last = f"{type(e).__name__}: {e}"
+            if attempt < 2:
+                time.sleep(min(2**attempt, max(0, deadline-time.monotonic())))
+    raise TransientIndexRefused(f"not ready, transient: engine startup failed: {last}")
 
 
 def _process(pid: int) -> dict:
@@ -846,7 +884,7 @@ def _build(root: Path) -> None:
     port = _free_port()
     info = None
     adopted = spec.get("adopted", False)
-    attempted = False
+    invalid_content = False
     try:
         if adopted:
             try:
@@ -855,20 +893,24 @@ def _build(root: Path) -> None:
                 # Preparation may refresh query-only code without reindexing.
                 # The Gradle invoker takes heavy admission of its own; this
                 # pausable worker never holds an exclusive scoring window.
-                backend._install_distribution(cfg.repo_root, {
-                    **os.environ, **_launch_env(cfg, data, spec["env"])})
+                try:
+                    backend._install_distribution(cfg.repo_root, {
+                        **os.environ, **_launch_env(cfg, data, spec["env"])})
+                except Exception as e:
+                    raise TransientIndexRefused(f"not ready, transient: distribution preparation failed: {e}") from e
                 backend.require_prepared(cfg.repo_root)
-        attempted = True
-        info = backend.start_backend(repo_root=cfg.repo_root, data_dir=data, port=port,
-                                     env_overrides=_launch_env(cfg, data, spec["env"]), health_timeout_sec=180,
-                                     startup_admission=False, prepared_only=adopted)
+        deadline = time.monotonic() + cfg.timeout_sec
+        info = _start_serving(cfg, data, spec["env"], port, deadline,
+                              startup_admission=False, prepared_only=adopted)
+        # Preparation is outside scoring. A queued Gradle slot must not consume
+        # the index-readiness timeout; scoring's wait() keeps its single deadline.
+        deadline = time.monotonic() + cfg.timeout_sec
         url = f"http://127.0.0.1:{port}"
         _write(root / "engine-ready", {"url": url})
         if not adopted:
             add_watched_root(url, root / "documents")
-        deadline = time.monotonic() + cfg.timeout_sec
         last = None
-        while time.monotonic() < deadline:
+        while not adopted and time.monotonic() < deadline:
             try:
                 w = witness(url, c, m, root / "documents", cfg)
                 break
@@ -878,9 +920,11 @@ def _build(root: Path) -> None:
                 raise IndexRefused(f"build engine exited: {info.proc.returncode}")
             time.sleep(2)
         else:
-            raise IndexRefused(f"build readiness deadline: {last}")
+            if not adopted:
+                raise TransientIndexRefused(f"not ready, transient: build readiness deadline: {last}")
         key, components = compute_index_key(c, cfg, spec["env"])
         if key != spec["key"]:
+            invalid_content = True
             raise IndexRefused("index-shaping inputs changed during build")
         if adopted:
             entry = _json(root / "entry.json")
@@ -897,8 +941,9 @@ def _build(root: Path) -> None:
                                      "canary": {"query": canary, "required_stages": list(CANARY_STAGES)}}}
         handle = IndexHandle(c, cfg, key, root, data, "cached" if adopted else "fresh",
                              components, spec["env"], None, _backend=info, base_url=url)
-        result = _confirm(handle, entry)
+        result = _confirm_ready(handle, deadline, entry=entry)
         if not result.ok:
+            invalid_content = True
             raise IndexRefused(f"not ready: preparation confirmation failed: {result.failures}")
         _write(root / "prepared.json", {"url": url, "index_state": handle.index_state, "entry": entry})
         # Keep this same engine under pausable admission until its caller closes
@@ -912,7 +957,7 @@ def _build(root: Path) -> None:
             if current["birth"] != parent["birth"] or current["state"] == "Z":
                 break
             if info.proc.poll() is not None:
-                raise IndexRefused("preparation engine exited before close")
+                raise TransientIndexRefused("not ready, transient: preparation engine exited before close")
             time.sleep(.05)
         # Close the writer before attesting completion. The caller publishes only
         # after the admission supervisor confirms successful teardown by exiting 0.
@@ -923,7 +968,7 @@ def _build(root: Path) -> None:
         if info:
             backend.stop_backend(info.proc, data_dir=data)
             info = None
-        if adopted and attempted:
+        if adopted and invalid_content:
             _quarantine(root, data, c, spec["key"], str(e))
         raise
     finally:

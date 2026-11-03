@@ -71,7 +71,7 @@ class AdmissionTests(unittest.TestCase):
             if value:
                 return value
             time.sleep(.01)
-        self.fail("fixture deadline exceeded")
+        self.fail("fixture deadline exceeded; child logs: " + " | ".join(self.output(c) for c, _ in self.children))
 
     def status(self):
         result = subprocess.run([PYTHON, str(CLI), "status"], env=self.env,
@@ -308,9 +308,8 @@ raise SystemExit({ending if type(ending) is int else 0})
         group = self.wait_for(lambda: self.row("pausable").get("group"))
         self.groups.append(proc(group["pid"]))
         background.kill(); background.wait(timeout=2)
-        # The surviving job keeps its record (and work lock) locked: visible, not pruned.
-        self.assertTrue(any(r["pid"] == row["pid"] for r in self.status()))
-        self.kill_recorded(proc(group["pid"]))
+        # The guardian reaps the owned job, then releases its record and locks.
+        self.wait_for(lambda: not proc(group["pid"]))
         self.assertFalse(any(r["pid"] == row["pid"] for r in self.status()))
         self.assertEqual(list(Path(self.env["JS_ADMISSION_DIR"]).glob("*.json")), [])
         unpublished = Path(self.env["JS_ADMISSION_DIR"]) / "dead-creator.record"
@@ -338,18 +337,15 @@ raise SystemExit({ending if type(ending) is int else 0})
         holder = self.start("exclusive", [PYTHON, "-c", "pass"], options=["--drain-timeout", "1"])
         self.assertEqual(holder.wait(timeout=3), 0)
 
-    def test_sigkilled_pausable_tool_keeps_admission_while_its_job_works(self):
+    def test_sigkilled_pausable_tool_stops_its_job_before_waiting_work_proceeds(self):
         tool = self.start("pausable", purpose="orphaned index rebuild")
         group = self.wait_for(lambda: (self.row("pausable") or {}).get("group"))
         job = proc(group["pid"]); self.groups.append(job)
         tool.kill()
         self.assertEqual(tool.wait(timeout=2), -9)
-        refused = self.start("exclusive", [PYTHON, "-c", "pass"], options=["--drain-timeout", ".3"])
-        self.assertEqual(refused.wait(timeout=3), 75)
-        self.assertIn("orphaned index rebuild", self.output(refused))
-        self.kill_recorded(job)
         holder = self.start("exclusive", [PYTHON, "-c", "pass"], options=["--drain-timeout", "1"])
         self.assertEqual(holder.wait(timeout=3), 0)
+        self.assertIsNone(proc(job["pid"]), "owned job survived admission cleanup")
 
     def test_heavy_work_started_by_a_paused_job_waits_for_the_window(self):
         go, entered = self.root / "go", self.root / "entered"

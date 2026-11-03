@@ -325,7 +325,7 @@ os._exit(0)
 
 
 @pytest.mark.parametrize('distribution_missing', [False, True])
-def test_owned_startup_failure_quarantines_only_index_failures(tmp_path, monkeypatch, distribution_missing):
+def test_owned_startup_failure_preserves_index_on_health_failure(tmp_path, monkeypatch, distribution_missing):
     c = make_collection()
     root = tmp_path/'entry'
     data = root/'data'
@@ -340,5 +340,5 @@ def test_owned_startup_failure_quarantines_only_index_failures(tmp_path, monkeyp
     monkeypatch.setattr(backend, 'start_backend', Mock(side_effect=RuntimeError('engine failed health')))
     with pytest.raises((RuntimeError, index.IndexRefused)):
         h.wait(prepared_only=True)
-    assert (root/'entry.json').exists() is distribution_missing
+    assert (root/'entry.json').exists()
     assert lock.closed

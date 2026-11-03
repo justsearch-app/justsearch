@@ -264,7 +264,7 @@ def _install_distribution(resolved_root: Path, env: dict[str, str]) -> None:
     dist = resolved_root / "modules/ui/build/install/ui"
     receipt = dist / ".jseval-source.json"
     command = ["node", str(resolved_root / "scripts/lib/tool-invoker.cjs"), "gradle",
-               ":modules:ui:installDist", "-PskipWebBuild=true", "--quiet"]
+               ":modules:ui:installDist", "-PskipWebBuild=true", "--quiet", "--no-daemon"]
     if env.get("JSEVAL_GRADLE_SLOT"):
         # Keep the checked-in heavy admission too: a pausable controller cannot
         # suspend work executed by a pre-existing Gradle daemon. The slot wrapper

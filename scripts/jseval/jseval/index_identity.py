@@ -209,6 +209,13 @@ class ConfirmResult:
     failures: list[str]
     checks: dict = field(default_factory=dict)
 
+    @property
+    def transient_failures(self) -> list[str]:
+        """Serving failures are not evidence that stored index content is corrupt."""
+        prefixes = tuple(name + "." for name, detail in self.checks.items()
+                         if isinstance(detail, dict) and detail.get("transient") is True)
+        return [f for f in self.failures if f.startswith(prefixes)]
+
 
 # --------------------------------------------------------------------------- #
 # Canonical hashing (mirrors jseval/manifest.py::_sha256_canonical).
@@ -890,10 +897,10 @@ def confirm_adoption(
             checks["identity"] = {"ok": False, "diffs": diffs}
     except IdentityUnavailable as e:
         fail("identity.unavailable: " + e.reason)
-        checks["identity"] = {"ok": False, "reason": e.reason}
+        checks["identity"] = {"ok": False, "reason": e.reason, "transient": True}
     except Exception as e:  # pragma: no cover - defensive last resort
         fail("identity.error: " + type(e).__name__)
-        checks["identity"] = {"ok": False, "reason": str(e)}
+        checks["identity"] = {"ok": False, "reason": str(e), "transient": True}
 
     # -- Checks 2-5 share one client; each guards its own transport. --------- #
     try:
@@ -905,6 +912,7 @@ def confirm_adoption(
             _confirm_canary(client, entry_doc, fail, checks)
     except Exception as e:  # pragma: no cover - defensive last resort
         fail("confirm.error: " + type(e).__name__)
+        checks["confirm"] = {"ok": False, "transient": True}
 
     # -- Check 6: watched roots match the entry's recorded roots (fix F-A). --- #
     _confirm_watched_roots(adopted_data_dir, entry_doc, fail, checks)
@@ -979,7 +987,7 @@ def _confirm_binding(client, adopted_data_dir, fail, checks) -> None:
     doc, err = _get_json(client, "/api/debug/state")
     if err is not None:
         fail("binding.debug_state: " + err)
-        checks["binding"] = {"ok": False, "reason": err}
+        checks["binding"] = {"ok": False, "reason": err, "transient": True}
         return
     bound = _deep_find(doc, "justsearch.data.dir")
     if bound is _MISSING or not isinstance(bound, str):
@@ -997,7 +1005,7 @@ def _confirm_generation(status, status_err, entry_doc, fail, checks) -> None:
     """Check 3: adopted generation serving, no migration in flight (751 sec M.2)."""
     if status_err is not None:
         fail("generation.status: " + status_err)
-        checks["generation"] = {"ok": False, "reason": status_err}
+        checks["generation"] = {"ok": False, "reason": status_err, "transient": True}
         return
     detail: dict = {}
     ok = True
@@ -1033,7 +1041,7 @@ def _confirm_counts(status, status_err, entry_doc, fail, checks) -> None:
     """Check 4: attestation counts match; chunk-vector coverage >= 99.9%."""
     if status_err is not None:
         fail("counts.status: " + status_err)
-        checks["counts"] = {"ok": False, "reason": status_err}
+        checks["counts"] = {"ok": False, "reason": status_err, "transient": True}
         return
     entry_counts = ((entry_doc.get("attestation") or {}).get("counts")) or {}
     ok = True
@@ -1115,22 +1123,24 @@ def _confirm_canary(client, entry_doc, fail, checks) -> None:
         time.sleep(2.0)
     if resp is None or resp.status_code != 200:
         fail("canary.http: " + str(last_err))
-        checks["canary"] = {"ok": False, "reason": last_err}
+        checks["canary"] = {"ok": False, "reason": last_err, "transient": True}
         return
     try:
         body = resp.json()
     except ValueError:
         fail("canary.body: non-JSON search response")
-        checks["canary"] = {"ok": False, "reason": "non-JSON"}
+        checks["canary"] = {"ok": False, "reason": "non-JSON", "transient": True}
         return
 
     ok = True
     trace = body.get("searchTrace") or {}
-    stages = {s.get("id"): s.get("status") for s in (trace.get("stages") or [])}
+    details = {s.get("id"): s for s in (trace.get("stages") or [])}
+    stages = {sid: s.get("status") for sid, s in details.items()}
     for sid in required:
         st = stages.get(sid)
         if st != "executed":
-            fail("canary.stage." + str(sid) + ": status=" + str(st))
+            fail("canary.stage." + str(sid) + ": status=" + str(st)
+                 + " reason=" + str(details.get(sid, {}).get("reason")))
             ok = False
     degr = trace.get("degradation") or {}
     truthy = sorted(k for k, v in degr.items() if v)
@@ -1141,7 +1151,8 @@ def _confirm_canary(client, entry_doc, fail, checks) -> None:
     if not isinstance(total, int) or total <= 0:
         fail("canary.totalHits: " + str(total))
         ok = False
-    checks["canary"] = {"ok": ok, "stages": stages, "totalHits": total}
+    checks["canary"] = {"ok": ok, "stages": stages, "totalHits": total,
+                        "transient": not ok}
 
 
 # --------------------------------------------------------------------------- #

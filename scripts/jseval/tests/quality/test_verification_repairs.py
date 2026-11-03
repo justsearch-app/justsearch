@@ -21,7 +21,7 @@ from .helpers import config_for, make_collection, make_run
 from .test_index import collection, config, env_for
 
 
-def test_pooled_judgment_requests_name_every_pair_and_arm_in_output_and_report(tmp_path):
+def test_pooled_judgment_requests_preview_output_and_name_every_pair_in_report(tmp_path):
     c = make_collection()
     base = make_run(c)
     cand = replace(base, results=tuple(replace(r, ranked=r.ranked[:2] + tuple(
@@ -33,9 +33,10 @@ def test_pooled_judgment_requests_name_every_pair_and_arm_in_output_and_report(t
     for qid, doc in cmp.judgment_requests:
         for arm, record in [('baseline', base), ('candidate', cand)]:
             if doc in next(r for r in record.results if r.qid == qid).ranked[:10]:
-                assert f'qid={qid} doc_id={doc} arm={arm}' in line
                 assert f'| {qid} | {doc} | {arm} |' in text
     assert '\n' not in line
+    assert len(line) < 1500
+    assert str(len(list(report.judgment_rows(cmp)))) in line
     official = compare.compare(c, config_for(c, judgments='official'), base, cand)
     assert 'unjudged@10' in report.outcome_line(official)
     assert 'needs judgment:' not in report.outcome_line(official)
@@ -218,10 +219,12 @@ def test_killed_prepare_supervisor_cannot_publish(collection, config, tmp_path, 
     monkeypatch.setattr(index, '_under_cache', lambda p: p)
     # Keep the real pausable supervisor and worker, replacing only engine calls.
     script = '''
-import sys
+import sys,signal
 from pathlib import Path
 from types import SimpleNamespace as NS
 from jseval.quality import index as ix
+def terminate(*_): raise SystemExit(143)
+signal.signal(signal.SIGTERM,terminate)
 root=Path(sys.argv[1])
 ix.backend.start_backend=lambda **kw:NS(proc=NS(poll=lambda:None))
 ix.backend.require_prepared=lambda *a:None

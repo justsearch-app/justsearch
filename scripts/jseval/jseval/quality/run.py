@@ -483,7 +483,7 @@ def execute(action: str, refs: tuple[str, ...], *, baseline_dir: Path,
                                   for name, ids in refusals.items())
         + "\n\nPer-query rankings, served legs, reranker status/reason and errors: `*/run.jsonl`.\n"
         + "Comparison reports: `*/run.md`. Effective runtime and model hashes are in each run header.\n")
-    line = f'{outcome.value} {surface}: {details}; ' + ', '.join(f'{c} {s:.1f}s' for c,s in times.items()) + f'; report {out}'
+    line = f'{outcome.value} {surface}: {report.compact(details, 3000)}; ' + ', '.join(f'{c} {s:.1f}s' for c,s in times.items()) + f'; report {out}'
     return outcome, ' '.join(line.split())
 
 

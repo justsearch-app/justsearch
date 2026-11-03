@@ -8,11 +8,17 @@ from .compare import Comparison, syntax_refused
 from .types import Collection, GroupVerdict, Outcome, RunHeader
 
 
+def compact(text: str, limit: int = 1000) -> str:
+    """Bound terminal diagnostics; the report/JSON retains complete evidence."""
+    text = " ".join(text.split())
+    return text if len(text) <= limit else text[:limit] + "… (full details in report/JSON)"
+
+
 def outcome_line(cmp: Comparison) -> str:
     v = cmp.verdict
     head = f"{v.outcome.value} {cmp.collection.name}"
     if v.outcome is Outcome.INVALID:
-        return f"{head}: {v.reasons[0]}" + (f" (+{len(v.reasons) - 1} more)" if len(v.reasons) > 1 else "")
+        return compact(f"{head}: {v.reasons[0]}") + (f" (+{len(v.reasons) - 1} more)" if len(v.reasons) > 1 else "")
     g = _headline_group(v.groups)
     line = (f"{head} {g.metric} {g.baseline_mean:.4f} -> {g.candidate_mean:.4f} "
             f"({g.mean_delta:+.4f}, 95% [{g.ci_low:+.4f}, {g.ci_high:+.4f}]) "
@@ -22,9 +28,12 @@ def outcome_line(cmp: Comparison) -> str:
     if v.reasons:
         line += f"; {v.reasons[0]}"
     if cmp.judgment_requests:
-        line += "; needs judgment: " + "; ".join(
-            f"qid={qid} doc_id={doc} arm={arm}" for qid, doc, arm in judgment_rows(cmp))
-    return line
+        rows = list(judgment_rows(cmp))
+        line += f"; needs judgment: {len(rows)} query/document/arm rows; " + "; ".join(
+            f"qid={qid} doc_id={doc} arm={arm}" for qid, doc, arm in rows[:3])
+        if len(rows) > 3:
+            line += f" (+{len(rows)-3} more; full list in report/JSON)"
+    return compact(line)
 
 
 def judgment_rows(cmp: Comparison):

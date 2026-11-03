@@ -204,7 +204,7 @@ def validate_run(c: Collection, run: RunRecord, label_versions: set[str], arm: s
              and r.served.reranker == "skipped"
              and r.served.reason not in BY_DESIGN_RERANK_SKIPS]
     if drops:
-        out.append(f"{arm}: reranker dropped: " + "; ".join(
+        out.append(f"{arm}: reranker dropped for {len(drops)} queries: " + "; ".join(
             f"{r.qid}: {r.served.reason or 'missing reason'}" for r in drops))
     outside = sorted({d for r in run.results for d in r.ranked if d not in c.documents})
     if outside:
