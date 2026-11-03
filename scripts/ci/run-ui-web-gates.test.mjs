@@ -63,7 +63,8 @@ try {
   });
 
   const marker = path.join(root, 'executed');
-  const sentinel = ['node', '-e', "require('node:fs').writeFileSync('executed', 'ran')"];
+  fs.writeFileSync(path.join(root, 'sentinel.cjs'), "require('node:fs').writeFileSync('executed', 'ran');\n");
+  const sentinel = ['node', 'sentinel.cjs'];
   for (const [label, commands] of [
     ['missing commands', undefined],
     ['null commands', null],
@@ -90,9 +91,46 @@ try {
     });
   }
 
+  const plainTokenMessage = /ui-web-gates\.commands\[1\] must contain only non-empty plain tokens/;
+  const gateCommand = ['node', 'scripts/governance/run.mjs', '--gate', 'ambient-purity'];
+  for (const [label, command] of [
+    ['Windows output argument exposing --help', [...gateCommand, '--mode', 'gate', '--out', 'report --help']],
+    ['POSIX output argument containing --mode gate', [...gateCommand, '--out', 'report --mode gate']],
+    ...[
+      ['empty', ''],
+      ['space', 'two words'],
+      ['tab', 'two\twords'],
+      ['newline', 'word\n'],
+      ['carriage return', 'word\r'],
+      ['non-breaking space', 'two\u00a0words'],
+      ['control character', 'word\0'],
+      ['single quote', "'word'"],
+      ['double quote', '"word"'],
+      ...[';', '&', '|', '<', '>', '`', '$', '\\', '(', ')', '%', '!', '^', '*', '?', '[', ']', '{', '}', '~', '#']
+        .map((char) => [`shell character ${char}`, `word${char}`]),
+      ['non-ASCII letter', 'caf\u00e9'],
+      ['non-ASCII symbol', '\u2603'],
+    ].map(([label, arg]) => [label, [...gateCommand, '--mode', 'gate', '--out', arg]]),
+  ]) {
+    run(`${label} fails before execution and coverage credit`, () => {
+      const invalid = fixture([sentinel, command]);
+      assert.throws(() => readUiWebGateCommands(invalid), plainTokenMessage);
+      assert.throws(() => coverage(invalid), plainTokenMessage);
+      save(invalid);
+      for (const args of [[], ['--list']]) {
+        const result = cli(args);
+        assert.equal(result.status, 1, result.stdout + result.stderr);
+        assert.match(result.stderr, plainTokenMessage);
+        assert.equal(fs.existsSync(marker), false, 'no command may run before the entire list is valid');
+      }
+    });
+  }
+
   run('argv order and argument boundaries are executed exactly', () => {
-    const commands = ['first with spaces', 'second'].map((value) => [
-      'node', '-e', "require('node:fs').appendFileSync('executed', JSON.stringify(process.argv.slice(1)) + '\\n')", value,
+    fs.writeFileSync(path.join(root, 'record-argv.cjs'),
+      "require('node:fs').appendFileSync('executed', JSON.stringify(process.argv.slice(2)) + '\\n');\n");
+    const commands = ['azAZ09_./=:,@+-', 'second'].map((value) => [
+      'node', 'record-argv.cjs', value, '--mode', 'gate',
     ]);
     const value = fixture(commands);
     assert.deepEqual(readUiWebGateCommands(value), commands);
@@ -100,7 +138,7 @@ try {
     const result = cli();
     assert.equal(result.status, 0, result.stdout + result.stderr);
     const executed = fs.readFileSync(marker, 'utf8');
-    assert.equal(executed, '["first with spaces"]\n["second"]\n');
+    assert.equal(executed, '["azAZ09_./=:,@+-","--mode","gate"]\n["second","--mode","gate"]\n');
     fs.rmSync(marker);
     value.regions[0].recipe = [];
     save(value);
@@ -135,16 +173,9 @@ try {
     }
   });
 
-  run('register output argument containing --mode gate cannot claim production enforcement', () => {
-    const command = ['node', 'scripts/governance/run.mjs', '--gate', 'ambient-purity', '--out', 'report --mode gate'];
-    const result = coverage(fixture([command]));
-    assert.equal(result.rows[0].production, false);
-    assert.match(result.issues[0], /ambient-purity: no required hosted production invocation/);
-  });
-
   run('register gate-mode arguments retain production enforcement', () => {
     const command = ['node', 'scripts/governance/run.mjs', '--gate', 'ambient-purity', '--mode', 'gate'];
-    for (const argv of [command, [...command, '--out', 'report; --mode warn']]) {
+    for (const argv of [command, [...command, '--out', 'report.sarif'], [...command, '--out', '--help']]) {
       const result = coverage(fixture([argv]));
       assert.equal(result.rows[0].production, true);
       assert.deepEqual(result.issues, []);

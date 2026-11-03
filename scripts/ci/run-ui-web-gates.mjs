@@ -35,6 +35,10 @@ export function readUiWebGateCommands(register) {
         || command.some((arg) => typeof arg !== 'string') || command[0] !== 'node') {
       throw new Error(`consult-register: ui-web-gates.commands[${index}] must be a non-empty array of strings starting with "node"`);
     }
+    // Plain tokens keep argv boundaries identical when Windows joins them for its shell.
+    if (command.some((arg) => arg.length === 0 || /[^A-Za-z0-9_./=:,@+-]/.test(arg))) {
+      throw new Error(`consult-register: ui-web-gates.commands[${index}] must contain only non-empty plain tokens ([A-Za-z0-9_./=:,@+-])`);
+    }
   }
   return commands;
 }
