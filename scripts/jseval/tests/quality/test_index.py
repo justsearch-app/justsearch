@@ -3,6 +3,7 @@ from dataclasses import replace
 import os
 from pathlib import Path
 import subprocess
+import sys
 import tempfile
 import time
 
@@ -126,10 +127,12 @@ def test_foreign_and_unowned_data_folders_refused_before_launcher(collection, co
     assert (data / "foreign-index").exists()
 
 
-def test_interrupted_build_is_fresh_and_partial_data_is_not_adopted(collection, config, tmp_path, monkeypatch):
+@pytest.mark.parametrize("module_name", ["jseval.quality.index", "__main__"])
+def test_interrupted_build_is_fresh_and_partial_data_is_not_adopted(collection, config, tmp_path, monkeypatch, module_name):
     c, _ = collection
     monkeypatch.setattr(ix.IndexConfig, "environment", lambda _: env_for(config))
     monkeypatch.setattr(ix, "_under_cache", lambda p: p)
+    monkeypatch.setattr(ix, "__name__", module_name)
     captured = []
     real_popen = subprocess.Popen
     class FakeProcess:
@@ -149,7 +152,10 @@ def test_interrupted_build_is_fresh_and_partial_data_is_not_adopted(collection, 
         assert not (data / "partial").exists()
         assert not (handle.root / "entry.json").exists()
     assert "pausable" in captured[0]
-    assert captured[0][-10:-4] != []
+    assert captured[0][-5:-2] == [sys.executable, "-m", "jseval.quality.index"]
+    for flag in ("--pause-hook", "--resume-hook"):
+        assert ix.shlex.split(captured[0][captured[0].index(flag) + 1])[:3] == [
+            sys.executable, "-m", "jseval.quality.index"]
     assert ["nice", "-n", "19", "ionice", "-c3"] == captured[0][captured[0].index("nice"):captured[0].index("nice") + 5]
 
 
@@ -197,9 +203,86 @@ def test_confirm_without_running_backend_refuses(collection, config, tmp_path):
     assert not result.ok and "no live serving backend" in result.failures[0]
 
 
+def _wait_for_file(path, worker, timeout=30):
+    deadline = time.monotonic() + timeout
+    while not path.exists():
+        assert worker.poll() is None, f"worker exited {worker.returncode} before {path}"
+        assert time.monotonic() < deadline, f"deadline waiting for {path}"
+        time.sleep(.05)
+
+
+def _startup_queue(monkeypatch, *, real):
+    """Hold this build at its launcher boundary, before installDist/engine start.
+
+    The real variant continues through the normal CPU launcher after admission
+    resumes it. The small process check ends at that boundary without an engine.
+    """
+    popen = subprocess.Popen
+    script = '''
+import sys, time
+from pathlib import Path
+from jseval.quality import index as ix
+root = Path(sys.argv[1])
+real = sys.argv[2] == "True"
+original = ix.backend._install_distribution
+def queued(repo, env):
+    (root / "startup-queued").touch()
+    while not (root / "startup-release").exists():
+        time.sleep(.05)
+    if real:
+        original(repo, env)
+    else:
+        raise RuntimeError("fixture resumed queued startup")
+ix.backend._install_distribution = queued
+ix._build(root)
+'''
+    def launch(command, **kwargs):
+        if "pausable" in command and command[-2] == "build":
+            command = command[:-5] + [sys.executable, "-c", script, command[-1], str(real)]
+        return popen(command, **kwargs)
+    monkeypatch.setattr(ix.subprocess, "Popen", launch)
+
+
+def _startup_pause_exclusive(handle, admission_dir):
+    _wait_for_file(handle.root / "startup-queued", handle._worker, 4200)
+    # Gate closure must stop the queued controller and release ALL its work
+    # admission. The exclusive command then releases its queue while stopped.
+    result = subprocess.run([
+        sys.executable, "-I", str(ix.REPO_ROOT / "scripts/dev/admission.py"),
+        "exclusive", "--purpose", "startup-pause-exclusive", "--drain-timeout", "3",
+        "--timeout", "10", "--", sys.executable, "-c",
+        "from pathlib import Path; import sys; "
+        "from jseval.quality.index import _json, _process; "
+        "root=Path(sys.argv[1]); owner=_json(root/'worker.json'); "
+        "assert _process(owner['pid'])['state'] in ('T','t'); "
+        "(root/'startup-release').touch()", str(handle.root)],
+        env={**os.environ, "JS_ADMISSION_DIR": str(admission_dir),
+             "PYTHONPATH": str(ix.REPO_ROOT / "scripts/jseval")},
+        capture_output=True, text=True, timeout=30)
+    assert result.returncode == 0, result.stdout + result.stderr
+
+
+@pytest.mark.skipif(sys.platform != "linux", reason="Linux process-group admission")
+def test_startup_pause_exclusive_drains_queued_backend(collection, config, tmp_path, monkeypatch):
+    c, source = collection
+    admission_dir = tmp_path / "admission"
+    monkeypatch.setenv("JS_ADMISSION_DIR", str(admission_dir))
+    monkeypatch.delenv("JS_ADMISSION_TOKEN", raising=False)
+    # Real launcher and admission processes; only installDist is a controlled queue.
+    cfg = replace(config, repo_root=ix.REPO_ROOT, documents_dir=source,
+                  cache_root=tmp_path / "cache")
+    monkeypatch.setattr(ix, "_under_cache", lambda p: p)
+    _startup_queue(monkeypatch, real=False)
+    with ix.prepare_index(c, cfg) as handle:
+        _startup_pause_exclusive(handle, admission_dir)
+        assert handle._worker.wait(timeout=30) == 1
+        assert "fixture resumed queued startup" in (handle.root / "build.log").read_text()
+        assert not (handle.root / "entry.json").exists()
+
+
 @pytest.mark.skipif(os.environ.get("JSEVAL_QUALITY_INDEX_REAL") != "1",
                     reason="set JSEVAL_QUALITY_INDEX_REAL=1 for the real CPU engine lifecycle")
-def test_real_cpu_official_subset_agreement_pause_and_foreign_population():
+def test_real_cpu_official_subset_agreement_pause_and_foreign_population(monkeypatch):
     import ir_datasets
     from jseval.quality.collections import write_collection
     from jseval.quality.types import document_text
@@ -217,6 +300,9 @@ def test_real_cpu_official_subset_agreement_pause_and_foreign_population():
     parent.mkdir(parents=True, exist_ok=True)
     root = Path(tempfile.mkdtemp(prefix="lane-b-real-", dir=parent))
     cfg = ix.IndexConfig(cache_root=root / "indexes", timeout_sec=600)
+    admission_dir = root / "admission"
+    monkeypatch.setenv("JS_ADMISSION_DIR", str(admission_dir))
+    monkeypatch.delenv("JS_ADMISSION_TOKEN", raising=False)
     write_collection(c, root / "collection")
     # Interrupt only after installDist/startup: queued shared Gradle slots are
     # waited for, never cancelled. No COMPLETE entry may survive interruption.
@@ -229,21 +315,27 @@ def test_real_cpu_official_subset_agreement_pause_and_foreign_population():
             time.sleep(.1)
         interrupted_root = interrupted.root
     assert not (interrupted_root / "entry.json").exists()
+    _startup_queue(monkeypatch, real=True)
     states, timings = [], {}
     for mode in ("build", "adopt", "restart"):
         start = time.monotonic()
         with ix.prepare_index(c, cfg) as handle:
             assert handle.index_build == ("fresh" if mode == "build" else "cached")
             if mode == "build":
+                _startup_pause_exclusive(handle, admission_dir)
                 # Let the launcher reach healthy before exercising build-only suspension.
                 deadline = time.monotonic() + 3720
-                while not (handle.root / "engine-ready").exists():
+                # Suspend while indexing: after the engine accepted the watched root.
+                while not (handle.data_dir / "watched_roots.json").exists():
                     if handle._worker.poll() is not None:
                         handle.wait()  # report the real build failure
                     assert time.monotonic() < deadline, "engine startup deadline"
                     time.sleep(.1)
                 ix._hook(handle.root, "pause")
-                time.sleep(.2)
+                owner = ix._json(handle.root / "worker.json")
+                assert ix._process(owner["pid"])["state"] in ("T", "t")
+                # A real suspend gap while indexing; the engine must not read it as a hang.
+                time.sleep(10)
                 ix._hook(handle.root, "resume")
             handle.wait()
             assert ix.confirm(handle).ok
@@ -268,10 +360,17 @@ def test_real_cpu_official_subset_agreement_pause_and_foreign_population():
                 assert not refused.ok and any("population.count" in r for r in refused.failures)
     with pytest.raises(ix.IndexRefused, match="another collection"):
         ix.prepare_index(foreign, replace(cfg, data_dir=data))
+    ix._write(root / "timings.json", timings)
     assert not ix._agreement(states[0], states[1])
     assert not ix._agreement(states[0], states[2])
     assert max(s["chunks"] for s in states[0]["samples"].values()) > 1
-    ix._write(root / "timings.json", timings)
+    assert any(p["source_word_offset"] >= p["source_word_count"] * .89
+               for p in states[0]["probes"])
+    # spladeDocCount is the total parent population, even with that stage off
+    # (IndexCountOps.querySpladeFeatureCounts). Audit completion measures encoding.
+    for state in states:
+        assert next(a for a in state["completeness"] if a["stageId"] == "splade")["present"] == 0
+        assert all(p["stages"]["splade-retrieval"] == "skipped" for p in state["probes"])
     print(f"CPU lifecycle evidence: {root}; timings={timings}")
 
 

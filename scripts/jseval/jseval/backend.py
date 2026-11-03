@@ -107,12 +107,17 @@ def start_backend(
     dataset_name: str | None = None,
     pin_selector_key: str | None = None,
     raw_context=None,
+    startup_admission: bool = True,
 ) -> BackendInfo:
     """Build and launch the installed eval Engine, then wait for backend readiness.
 
     Returns a BackendInfo with the Popen handle and data directory path.
     llm=True is refused because the shared eval contract uses read-only settings.
     Uses a single deadline for all readiness checks.
+
+    ``startup_admission=False`` is for a quality build whose engine startup and
+    lifetime already belong to its pausable work lock. Nested build tools still
+    acquire their own admission; no admission token is supplied to bypass them.
 
     health_timeout_sec=None resolves JSEVAL_HEALTH_TIMEOUT_SEC from the
     environment before falling back to the 120s default — the only lever that
@@ -237,6 +242,7 @@ def start_backend(
         port=port,
         llm=llm,
         health_timeout_sec=health_timeout_sec,
+        **({"startup_admission": False} if not startup_admission else {}),
     )
     return BackendInfo(proc=proc, data_dir=resolved_data, spawn_env=env)
 
@@ -282,8 +288,10 @@ def _boot_and_wait(
     port: int,
     llm: bool,
     health_timeout_sec: float,
+    startup_admission: bool = True,
 ) -> subprocess.Popen:
-    with _machine_admission(env) as admitted:
+    scope = _machine_admission(env) if startup_admission else contextlib.nullcontext(env)
+    with scope as admitted:
         return _boot_admitted(
             resolved_root=resolved_root, resolved_data=resolved_data, gradlew=gradlew,
             env=admitted, port=port, llm=llm, health_timeout_sec=health_timeout_sec,

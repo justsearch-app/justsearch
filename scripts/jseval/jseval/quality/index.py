@@ -567,12 +567,13 @@ def prepare_index(collection: Collection, config: IndexConfig) -> IndexHandle:
         for k in ("repo_root", "models_dir", "documents_dir", "cache_root", "data_dir"):
             serial[k] = str(serial[k]) if serial[k] is not None else None
         _write(root / "build.json", {"config": serial, "env": env, "key": key, "data": str(data)})
-        hook = [sys.executable, "-m", __name__, "hook", str(root)]
+        # __name__ is __main__ when the agreement command runs via python -m.
+        hook = [sys.executable, "-m", "jseval.quality.index", "hook", str(root)]
         command = [sys.executable, str(config.repo_root / "scripts/dev/admission.py"), "pausable",
                    "--purpose", f"quality index {collection.name}",
                    "--pause-hook", shlex.join(hook + ["pause"]),
                    "--resume-hook", shlex.join(hook + ["resume"]), "--",
-                   "nice", "-n", "19", "ionice", "-c3", sys.executable, "-m", __name__, "build", str(root)]
+                   "nice", "-n", "19", "ionice", "-c3", sys.executable, "-m", "jseval.quality.index", "build", str(root)]
         worker_env = os.environ.copy()
         worker_env.pop("JS_ADMISSION_TOKEN", None)
         worker_env["PYTHONPATH"] = str(config.repo_root / "scripts/jseval")
@@ -663,7 +664,8 @@ def _build(root: Path) -> None:
     info = None
     try:
         info = backend.start_backend(repo_root=cfg.repo_root, data_dir=data, port=port,
-                                     env_overrides=_launch_env(cfg, data, spec["env"]), health_timeout_sec=180)
+                                     env_overrides=_launch_env(cfg, data, spec["env"]), health_timeout_sec=180,
+                                     startup_admission=False)
         url = f"http://127.0.0.1:{port}"
         _write(root / "engine-ready", {"url": url})
         add_watched_root(url, root / "documents")
