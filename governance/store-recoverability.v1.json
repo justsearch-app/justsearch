@@ -2311,6 +2311,10 @@
       "reason": "Included by updater_linux.rs only under cfg(test). It writes a fake pkexec script into the test's own temporary directory to classify install outcomes; no production path includes these writes, and losing the fixture costs only a rerun."
     },
     {
+      "path": "modules/shell/src-tauri/src/shell_connection_tests.rs",
+      "reason": "Included by shell_actuator.rs only under cfg(test). Its fixtures write shutdown requests and an upgrade intent into each case's own tempfile::TempDir (engine_conn_test_support.rs); no production path includes these writes, and losing the fixture costs only a rerun."
+    },
+    {
       "path": "modules/shell/src-tauri/src/shell_commit_transport_tests.rs",
       "reason": "Included by shell_actuator.rs only under cfg(test). Its fixtures write runtime manifests, predecessor evidence and a competing writer's manifest into each case's own tempfile::TempDir; no production path includes these writes, and losing the fixture costs only a rerun."
     },
