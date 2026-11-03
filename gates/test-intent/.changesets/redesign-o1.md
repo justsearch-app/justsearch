@@ -1181,3 +1181,14 @@ gates/test-intent/compatibility/redesign-o1-before.patch` only for the original 
 check lists. Execution observations for this round follow after all checks finish.
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a19f13-e442-7c13-98b2-b94e53537f73",
+  "verdict": "accept",
+  "digest": "sha256:0b3f2ccdc8edb64a0036fab30c15dd0efb05842b6e94ae32e48e59f3613ecdad",
+  "note": "Transcribed by the orchestrator from verifier-4 (Codex, session 01a19f13-e442-7c13-98b2-b94e53537f73) on 92a6c6e04c: accept E1-E9."
+}
+```
