@@ -193,6 +193,13 @@ test('S3: data and runner-state folders overlapping the shared models or graph c
   assert.doesNotThrow(() => isolated.validateOverrides(path.join(root, 'fresh-ok'), {}));
 });
 
+test('S3: CI\'s JUSTSEARCH_PR_CI is allowed, but does not admit other inherited variables', () => {
+  for (const value of ['true', 'false']) {
+    assert.doesNotThrow(() => isolated.validateOverrides(path.join(root, `pr-ci-${value}`), { JUSTSEARCH_PR_CI: value }));
+  }
+  conflict(() => isolated.validateOverrides(path.join(root, 'pr-ci-conflict'), { JUSTSEARCH_PR_CI: 'true', JUSTSEARCH_REPO_ROOT: repo }));
+});
+
 let failed = 0;
 try {
   for (const [name, run] of tests) {
