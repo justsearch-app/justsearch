@@ -267,7 +267,8 @@ try {
     const plan = buildPreparedPlan(repositoryManifest, { context: resolved, lanes: {}, registry });
     const command = plan.find(step => step.command?.includes('test-intent/cli.mjs')).command;
     const result = spawnSync('bash', ['-c', `${command} --repo "$PREFLIGHT_FIXTURE_REPO"`], {
-      encoding: 'utf8', env: { ...process.env, PREFLIGHT_FIXTURE_REPO: auditFixture.root },
+      // Hosted CI's own pull-request context must not override the fixture's --pr.
+      encoding: 'utf8', env: { ...Object.fromEntries(Object.entries(process.env).filter(([key]) => !/^GITHUB_(?:EVENT_NAME|EVENT_PATH|BASE_REF|HEAD_REF|REF|STEP_SUMMARY)$/.test(key))), PREFLIGHT_FIXTURE_REPO: auditFixture.root },
     });
     assert.equal(result.status, pr === 40 ? 1 : 0, result.stdout + result.stderr);
     assert.equal(/audit-required/.test(result.stdout), pr === 40);
