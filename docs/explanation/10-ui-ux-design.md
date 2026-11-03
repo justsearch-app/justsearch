@@ -130,11 +130,9 @@ snapshot (`shell-v0/state/indexingProgress.ts`). Numbers may differ between surf
     semantic layers — embeddings, SPLADE, entities, passage vectors — catching up on
     already-indexed documents) → **Ready**. Blocked or unconfirmed work must say so rather than imply readiness.
 *   **Two tiers of "done":** job drain makes a folder keyword-searchable, which is not the
-    same fact as fully searchable. A Library folder row therefore reads
-    `Meaning processing · 40%` while semantic coverage climbs and `Up to date` once coverage
-    is complete or, where a folder has no coverage counts, once nothing is pending for it
-    (`views/LibrarySurface.ts`, from `shell-v0/state/folderStatus.ts` and the per-root
-    coverage counts on `IndexedRootView`). "Up to date" in Health is likewise reserved for
+    same fact as fully searchable. A Library folder row therefore shows
+    `Meaning processing · 40%` while semantic coverage climbs (`views/LibrarySurface.ts`, from
+    `shell-v0/state/folderStatus.ts` and the per-root coverage counts on `IndexedRootView`). "Up to date" in Health is likewise reserved for
     coverage-complete, not job-drain.
 *   **No fabricated numbers:** a percent is rendered only when the denominator is
     faithful (at least one applicable stage with documents to enrich). With no
