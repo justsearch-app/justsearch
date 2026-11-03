@@ -160,7 +160,10 @@ The `/api/registry/{operations,resources}` wire is a generated projection of a t
 
 ## Worktree mechanics (tempdoc 681)
 
-The full worktree mechanics live here.
+The full worktree mechanics live here. When changing a lifecycle state, finalization phase,
+ownership marker key, landing-receipt verdict or archive policy, update this section and
+`governance/worktree-lifecycle.v1.json` in the same change. The commands, receipt test and
+preservation rules below must match the scripts.
 
 **Config-file seeding.** `.mcp.json` is gitignored and maintainer-local. Do not rely on a new
 worktree already having it. `node scripts/dev/prepare-worktree.cjs` seeds it from the committed

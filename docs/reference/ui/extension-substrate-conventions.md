@@ -7,6 +7,9 @@ description: "Parameter-level conventions of the extension substrate: profile-fo
 
 # Extension Substrate Conventions
 
+> Customization (themes, skins, layouts, plugins and macros) is frozen for now.
+> What exists keeps working and gets fixes, but no new extension features are being added.
+
 This is the **parameter-level** companion to
 [The Extension Substrate](../../explanation/26-extension-substrate.md). The
 explanation doc states the invariants (one declaration model, one composer,

@@ -46,6 +46,15 @@ and body focused on the durable change because they become the squash commit;
 maintainers keep mutable verification and review state in a separate managed PR
 comment.
 
+## Product rules
+
+Every change keeps these rules:
+
+- Never delete indexed content on uncertainty. An unreadable source, an unknown count, or a missing
+  or different drive or volume leaves the index as it is.
+- A new outbound network call from the product needs the maintainer's approval; see
+  [Privacy & locality in NON-GOALS.md](NON-GOALS.md#privacy--locality-design-decision).
+
 ## Development Setup
 
 Choose either contributor environment:

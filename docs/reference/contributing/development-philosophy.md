@@ -9,26 +9,26 @@ description: "Issue tracking tiers, observation workflow, and documentation upda
 
 This project follows **organic development**: issues and rough edges are captured as they're noticed, not as separate investigation tasks.
 
-The observations conditions store (`docs/observations.md` / `docs/observations.d/`) was **retired** (tempdoc 872) in favor of **route, don't log**: an out-of-scope finding is routed to its destination at the moment it's discovered, not appended to a pile for later triage. During any task, if you notice a behavioral issue — something that affects users, causes bugs, or creates friction — route it immediately: (a) a wrong doc/comment with a verified one-line fix → fix it in place, ride-along in the same PR; (b) a red/flaky verification command on main → fix it, or quarantine the flaky test in its own runner with a tracked item (tempdoc 930 retired the expected-state pin mechanism: a pin made red-on-main cheaper to live with than to fix); (c) a platform/process lesson → a check (must/never) or agent-system project knowledge; (d) a product defect you won't fix now → the owning tempdoc's open-items section, or a domain register for its domain. Don't stop to investigate unless explicitly asked — route and continue.
+The observations conditions store (`docs/observations.md` / `docs/observations.d/`) was **retired** (tempdoc 872) in favor of **route, don't log**: an out-of-scope finding is routed to its destination at the moment it's discovered, not appended to a pile for later triage. During any task, if you notice a behavioral issue — something that affects users, causes bugs, or creates friction — route it immediately: (a) a wrong doc/comment with a verified one-line fix → fix it in place, ride-along in the same PR; (b) a red/flaky verification command on main → fix it, or quarantine the flaky test in its own runner with a tracked item (tempdoc 930 retired the expected-state pin mechanism: a pin made red-on-main cheaper to live with than to fix); (c) a platform/process lesson → a check (must/never) or agent-system project knowledge; (d) a product defect you won't fix now → an issue as described in [CONTRIBUTING.md](../../../CONTRIBUTING.md#reporting-bugs), or the PR description if it belongs to the current change; empirical findings may also belong in a domain register. Don't stop to investigate unless explicitly asked — route and continue.
 
 ## Two tiers of issue tracking
 
 | Tier | Location | Friction | Lifetime | When to use |
 |------|----------|----------|----------|-------------|
-| Routed finding | Owning tempdoc's open-items section, a fix in place, or agent-system project knowledge, per the routing rule above | Low (route at discovery, no separate triage pass) | Until the destination item is resolved | Notice something mid-task |
+| Routed finding | An issue or the PR description, a fix in place, or agent-system project knowledge, per the routing rule above | Low (route at discovery, no separate triage pass) | Until the destination item is resolved | Notice something mid-task |
 | Domain registers | `docs/reference/search-quality-register.md`, `docs/reference/inference-runtime-register.md` | High (ID, evidence, verification date) | Until the finding is superseded by shipped work | Empirical findings and standing trade-offs in a register's domain |
 
 The standing per-domain issue registers under `docs/reference/issues/` were **retired** (tempdoc 821 §7 D5, 2026-08-12) — most had not been stamped since 2026-02/04 and real tracking had already migrated to the (then-live, now also retired) observations store, the two domain registers, and tempdocs. The deleted files' content is recoverable from git history, as is the observations store's (last full snapshot: commit 7b85a5a6).
 
-Architectural trade-offs and conscious design tensions belong in an ADR (`docs/decisions/`) when the "why not X?" answer is worth preserving, or as a register entry with its revisit trigger. A trade-off that is neither belongs as a parked item in its owning tempdoc.
+Architectural trade-offs and conscious design tensions belong in an ADR (`docs/decisions/`) when the "why not X?" answer is worth preserving, or as a register entry with its revisit trigger. A trade-off that is neither belongs in an issue or the PR description.
 
-**Tempdocs** (`docs/tempdocs/`) are for active implementation work — investigation logs, planning docs, and session-scoped notes. They are not part of the issue tracking system.
+**Tempdocs** (`docs/tempdocs/`) have been frozen since 2026-10-05. Do not edit or add tempdocs. Report new findings in issues or the PR description, following [CONTRIBUTING.md](../../../CONTRIBUTING.md#how-to-contribute).
 
 ## Issue lifecycle rules
 
-- A fixed finding is **deleted** from its register, or closed out in its owning tempdoc, not marked closed in a separate list — the commit that fixed it is the permanent record.
-- An item evaluated and intentionally closed (won't-fix, deferred, accepted) needs a durable home for its rationale: an ADR, a register entry with a revisit trigger, or a parked item in its owning tempdoc. Do not leave closed items sitting in an active list.
-- Registers and tempdoc open-items sections hold only items someone could act on. If it is not something to fix or revisit, it belongs in an ADR or nowhere.
+- A fixed finding is **deleted** from its register, or closed in its issue, not marked closed in a separate list — the commit that fixed it is the permanent record.
+- An item evaluated and intentionally closed (won't-fix, deferred, accepted) needs a durable home for its rationale: an ADR, a register entry with a revisit trigger, or an issue or PR description. Do not leave closed items sitting in an active list.
+- Registers and open issues hold only items someone could act on. If it is not something to fix or revisit, it belongs in an ADR or nowhere.
 
 ## Softness portfolio
 
@@ -60,5 +60,5 @@ Without this, operators see "unset" when the runtime is silently using the defau
 - When you record an architectural decision with alternatives: create an ADR in `docs/decisions/`.
 - After adding/changing canonical docs: run `node scripts/docs/llmstxt-generate.mjs` to regenerate the index.
 - When the Gradle module graph changes (`settings.gradle.kts` or `modules/**/build.gradle.kts`): run `node scripts/architecture/module-deps.mjs --update-canonical` and verify with `--check-canonical`.
-- When you write notes/ideas: use `docs/tempdocs/` (noncanonical).
+- When you report findings, notes or ideas: use an issue or the PR description, following [CONTRIBUTING.md](../../../CONTRIBUTING.md#how-to-contribute).
 - Full guide (frontmatter, CI checks, doc types): `docs/reference/contributing/writing-docs-for-ai.md`

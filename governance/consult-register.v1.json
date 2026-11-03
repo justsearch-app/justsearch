@@ -344,7 +344,7 @@
         }
       ],
       "recipe": [
-        "Changing a state, phase, marker key, receipt verdict, or archive policy: update governance/worktree-lifecycle.v1.json and docs/tempdocs/952 §5 in the same change, then run `node scripts/agent-analytics/run-all-tests.mjs` (the 952-*.test.mjs files) and `npm run lint:scripts`.",
+        "Changing a state, phase, marker key, receipt verdict, or archive policy: update governance/worktree-lifecycle.v1.json and docs/reference/contributing/common-workflows.md §Worktree mechanics in the same change, then run `node scripts/agent-analytics/run-all-tests.mjs` (the 952-*.test.mjs files) and `npm run lint:scripts`.",
         "Standing rules: the reconciler never executes a removal from a PreToolUse hook (861 [A4]); an UNKNOWN receipt never authorizes branch retirement; archive failure means quarantine, not removal; reading never writes."
       ]
     },
