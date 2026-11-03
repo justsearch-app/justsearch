@@ -108,7 +108,7 @@ export class Table<T extends Record<string, unknown> = Record<string, unknown>>
   declare userConfig: RendererUserConfig | undefined;
   /**
    * Pane id used to look up this table's slice of userConfig.paneConfig.
-   * The Lumino Shell sets this when the table is mounted as a pane;
+   * A host can set this when the table is mounted as a pane;
    * standalone use can leave it empty (then no userConfig overrides
    * apply).
    */

@@ -4,10 +4,8 @@ package io.justsearch.agent.api.registry;
 /**
  * Chrome-zone placement axis on a {@link Surface}.
  *
- * <p>Per slice 449 §4: closed enum mapping to today's React {@code <GlassShell>}
- * 5-zone layout. Lumino-class placement values land when the 3a.6+ runtime
- * cutover ships; until then this enum is sized to the React chrome's zones
- * plus a few audience-specific values (DEEPLINK, HEADLESS_AGENT_TOOL).
+ * <p>Closed enum mapping to the shell chrome's zones plus audience-specific
+ * values (DEEPLINK, HEADLESS_AGENT_TOOL).
  *
  * <p>The chrome's per-zone dispatchers filter the SurfaceCatalog by
  * {@code placement} + {@code audience ∈ visibleAudienceSet}.

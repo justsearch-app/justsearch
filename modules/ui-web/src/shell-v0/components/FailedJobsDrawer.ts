@@ -25,6 +25,7 @@ import {
 import { resolvePathLazy } from '../hooks/resolvePathLazy.js';
 import { authorizedFetch } from '../api/authorizedFetch.js';
 import { getOperationClient } from '../operations/OperationClient.js';
+import { emitEphemeralToast } from './advisory/ephemeralToast.js';
 // Tempdoc 911 (885 UL.9) — the by-prefix wire has a contract now: the generated
 // record → JSON Schema → {type, Zod} projection of `FailedIndexingJobsResponse`. `state` (the
 // RETRY_EXHAUSTED discriminator below) is a declared, required field rather than a String() cast
@@ -253,8 +254,14 @@ export class FailedJobsDrawer extends JfElement {
         await client.invoke(RETRY_OP, { args: { pathHash: r.pathHash } });
         if (!current()) return;
         if (!this.inline) this.rows = this.rows.filter(row => row.pathHash !== r.pathHash);
-      } catch {
-        // Leave the failed row; its error stays visible.
+      } catch (err) {
+        if (!current()) return;
+        // Leave the failed row and its original error visible, and report the retry failure.
+        const reason = err instanceof Error ? err.message : String(err ?? '');
+        emitEphemeralToast({
+          message: `Could not retry failed file.${reason ? ` ${reason}` : ''}`,
+          severity: 'error',
+        });
       }
     }
     if (this.inline && current()) await this.refresh();

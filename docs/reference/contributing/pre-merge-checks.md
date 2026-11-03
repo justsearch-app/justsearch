@@ -14,7 +14,63 @@ Hosted CI runs affected checks on the pull request and the full suite on main
 ([ADR-0044](../../decisions/0044-public-hosted-ci-fact-lanes.md)). This table moved here from
 the retired root `CLAUDE.md` when JustSearch adopted agent-system (2026-10-05).
 
-Always: `node scripts/lib/tool-invoker.cjs gradle build -x test` from the candidate worktree.
+## One-command candidate preflight
+
+From a clean, committed worktree, run:
+
+```bash
+node scripts/dev/prepare-worktree.cjs --preflight --pr 123
+```
+
+This opt-in mode prepares isolated npm/Python tools with `prepare-ui-checks.cjs`,
+builds this candidate's distribution, regenerates required governance inputs on every
+run, and executes the existing local reproductions of required checks selected by the CI
+change classifier. Each check reports whether its local subset ran; CI steps outside
+the inventory are not claimed. The single command inventory is `contexts[].commands` in
+`scripts/ci/public-ci-local-repro.v1.json`; optional context lanes select checks.
+Preparation stays in `prepare-worktree.cjs`; execution and the versioned inventory
+stay in `run-publish-preflight.mjs`. Ordinary preparation and `--no-dist` keep their
+existing behavior and do not start these checks.
+
+Use `--pr N` for the number whose audit-selection rules should apply. The base is
+merge-base with `origin/main`; fetch that branch and full history before running.
+Without `--pr`, the latest issue/PR number plus one is predicted through `gh` and
+marked provisional; a missing prediction leaves the test-intent audit check
+unverified. The runner passes the base and number to the test-intent CLI. The
+advisory gate receives PR mode and the base through its existing environment inputs.
+The Python suite needs CI's Python 3.13; an unavailable interpreter version is
+reported as not checked here.
+
+Add `--list` to print commands, regenerated outputs and prerequisites without
+installing, building, querying GitHub or running checks. The plan describes the
+committed candidate; commit source edits before relying on its lane selection.
+`node scripts/ci/run-publish-preflight.mjs --prepare` is the equivalent runner entry.
+
+Independent checks continue after failures. Each result is **passed**, **failed**,
+**blocked** by a prerequisite, or **not checked here** with a reason. Unavailable
+advisory API evidence, Windows-specific commands, unreproduced display/GPU cases
+and hosted identity/toolchain checks count as incomplete, never passed. A complete run requires every
+selected step to pass; incomplete runs exit nonzero. Logs and `summary.json` are
+written under ignored `tmp/preflight/`. The disposable virtualenv and scratch files
+are recreated each run; private download caches are retained. Check commands use the
+operating system temporary directory for scratch repositories, outside the checkout
+and its installed TypeScript. Generated inputs are discarded before their
+producers run, including when prerequisites fail, so old reports cannot count as
+current evidence. No shared Python environment or application configuration is installed.
+Both lockfile-pinned Playwright installations (Node and Python) prepare their matching
+Chromium revisions in checkout-local storage with browser garbage collection disabled. The existing Gitleaks command requires an installed CLI. Gradle commands require
+`js-gradle-slot` on the shared machine. System browser-package installation is
+reported unverified; the prepared isolated Chromium is used by the browser check.
+
+The existing inventory-only `run-publish-preflight.mjs --check` and `--list`, and the
+legacy full-subset `--run`, remain available. The prepared mode supplies isolation and
+PR semantics; legacy `--run` still expects its tools and inputs to be prepared by the
+caller. Neither mode is the launcher's cheap `.agents/preflight` hook.
+
+For a focused manual build: `node scripts/lib/tool-invoker.cjs gradle build -x test`
+from the candidate worktree.
+
+## Checks by edited subject
 
 | Edited subject | Check(s) |
 |---|---|

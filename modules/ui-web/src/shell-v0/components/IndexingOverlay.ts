@@ -20,6 +20,7 @@ import { JfElement } from '../primitives/JfElement.js';
 import { ModalityController } from '../primitives/modality.js';
 import { icon } from './Icon.js';
 import { getOperationClient } from '../operations/OperationClient.js';
+import { emitEphemeralToast } from './advisory/ephemeralToast.js';
 import {
   subscribeAiState,
   type AiState,
@@ -364,8 +365,12 @@ export class IndexingOverlayHost extends JfElement {
       // Tempdoc 737 §12b: write the chat-enabled intent (no preconditions) instead of the superseded
       // core.switch-inference-mode; the reconciler converges the engine toward the spec.
       await client.invoke('core.set-chat-enabled', { args: { enabled: true } });
-    } catch {
-      // ignore; status will catch up via the poller
+    } catch (err) {
+      const reason = err instanceof Error ? err.message : String(err ?? '');
+      emitEphemeralToast({
+        message: `Could not go online.${reason ? ` ${reason}` : ''}`,
+        severity: 'error',
+      });
     } finally {
       this.switching = false;
     }

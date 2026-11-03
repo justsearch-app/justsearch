@@ -1,0 +1,267 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
+  },
+  "createdAt": "2026-11-03T15:44:01.795Z",
+  "revision": "4cd819bf2e29ec8205924d4bd5e9b6a2f5942ae3",
+  "tree": "fb5a6071d6f916f0b09a406764642a6fcc2f3e02",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/components/AuthorizationHost.toplayer.test.ts\" \"src/shell-v0/components/FailedJobsDrawer.test.ts\" \"src/shell-v0/components/IndexingOverlay.test.ts\" --reporter=json --outputFile=\"/tmp/test-intent-vitest-1803784-1793720633137.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 1865
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/components/AuthorizationHost.toplayer.test.ts#Move 4 — trusted ceremony on the Top Layer queued lightweight → typed applies each prompt’s own modality",
+      "file": "modules/ui-web/src/shell-v0/components/AuthorizationHost.toplayer.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:6a7f17a19c45005f57b120021f242017192477ce23568d632cfc0f3428bc5172",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Move 4 — trusted ceremony on the Top Layer queued lightweight → typed applies each prompt’s own modality",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/AuthorizationHost.toplayer.test.ts#Move 4 — trusted ceremony on the Top Layer queued lightweight → capability applies each prompt’s own modality",
+      "file": "modules/ui-web/src/shell-v0/components/AuthorizationHost.toplayer.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:6a7f17a19c45005f57b120021f242017192477ce23568d632cfc0f3428bc5172",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Move 4 — trusted ceremony on the Top Layer queued lightweight → capability applies each prompt’s own modality",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/AuthorizationHost.toplayer.test.ts#Move 4 — trusted ceremony on the Top Layer queued typed → lightweight applies each prompt’s own modality",
+      "file": "modules/ui-web/src/shell-v0/components/AuthorizationHost.toplayer.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:6a7f17a19c45005f57b120021f242017192477ce23568d632cfc0f3428bc5172",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Move 4 — trusted ceremony on the Top Layer queued typed → lightweight applies each prompt’s own modality",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/AuthorizationHost.toplayer.test.ts#Move 4 — trusted ceremony on the Top Layer queued capability → lightweight applies each prompt’s own modality",
+      "file": "modules/ui-web/src/shell-v0/components/AuthorizationHost.toplayer.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:6a7f17a19c45005f57b120021f242017192477ce23568d632cfc0f3428bc5172",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Move 4 — trusted ceremony on the Top Layer queued capability → lightweight applies each prompt’s own modality",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/FailedJobsDrawer.test.ts#FailedJobsDrawer — retry failure feedback reports a refused retry failure and keeps the row error",
+      "file": "modules/ui-web/src/shell-v0/components/FailedJobsDrawer.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:7957a354b215032227f6cb491715963eadff2ad0f4424c9d467a438a2216c3b2",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "FailedJobsDrawer — retry failure feedback reports a refused retry failure and keeps the row error",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/FailedJobsDrawer.test.ts#FailedJobsDrawer — retry failure feedback reports a network retry failure and keeps the row error",
+      "file": "modules/ui-web/src/shell-v0/components/FailedJobsDrawer.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:7957a354b215032227f6cb491715963eadff2ad0f4424c9d467a438a2216c3b2",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "FailedJobsDrawer — retry failure feedback reports a network retry failure and keeps the row error",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/FailedJobsDrawer.test.ts#FailedJobsDrawer — retry failure feedback reports a unknown retry failure and keeps the row error",
+      "file": "modules/ui-web/src/shell-v0/components/FailedJobsDrawer.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:7957a354b215032227f6cb491715963eadff2ad0f4424c9d467a438a2216c3b2",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "FailedJobsDrawer — retry failure feedback reports a unknown retry failure and keeps the row error",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/IndexingOverlay.test.ts#IndexingOverlayHost — Go online failures reports a refused failure and enables the CTA again",
+      "file": "modules/ui-web/src/shell-v0/components/IndexingOverlay.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:e02b962b566806ad6cf27e26262eacecaeab116f35d9a3a7bc86ac072f7e8e2c",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "IndexingOverlayHost — Go online failures reports a refused failure and enables the CTA again",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/IndexingOverlay.test.ts#IndexingOverlayHost — Go online failures reports a network failure and enables the CTA again",
+      "file": "modules/ui-web/src/shell-v0/components/IndexingOverlay.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:e02b962b566806ad6cf27e26262eacecaeab116f35d9a3a7bc86ac072f7e8e2c",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "IndexingOverlayHost — Go online failures reports a network failure and enables the CTA again",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/IndexingOverlay.test.ts#IndexingOverlayHost — Go online failures reports a unknown failure and enables the CTA again",
+      "file": "modules/ui-web/src/shell-v0/components/IndexingOverlay.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:e02b962b566806ad6cf27e26262eacecaeab116f35d9a3a7bc86ac072f7e8e2c",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "IndexingOverlayHost — Go online failures reports a unknown failure and enables the CTA again",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/IndexingOverlay.test.ts#IndexingOverlayHost — Go online failures a late failure after teardown reports locally without leaving a new overlay busy",
+      "file": "modules/ui-web/src/shell-v0/components/IndexingOverlay.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:e02b962b566806ad6cf27e26262eacecaeab116f35d9a3a7bc86ac072f7e8e2c",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "IndexingOverlayHost — Go online failures a late failure after teardown reports locally without leaving a new overlay busy",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "edc1080d89",
+    "revision": "edc1080d8968dab3c087fdfdacf2c822dadd8ad4",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/components/AuthorizationHost.toplayer.test.ts\" \"src/shell-v0/components/FailedJobsDrawer.test.ts\" \"src/shell-v0/components/IndexingOverlay.test.ts\" --reporter=json --outputFile=\"/tmp/test-intent-vitest-1803784-1793720636447.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 5159,
+        "output": "JSON report written to /tmp/test-intent-vitest-1803784-1793720636447.json\n\n"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui-web/src/shell-v0/components/AuthorizationHost.toplayer.test.ts#Move 4 — trusted ceremony on the Top Layer queued lightweight → typed applies each prompt’s own modality",
+        "classification": "assertion",
+        "detail": "Move 4 — trusted ceremony on the Top Layer queued lightweight → typed applies each prompt’s own modality:  AssertionError: expected false to be true // Object.is equality\n    at assertMode (/tmp/test-intent-before-P1Gyxq/modules/ui-web/src/shell-v0/components/AuthorizationHost.toplayer.test.ts:62:34)\n    at /tmp/test-intent-before-P1Gyxq/modules/ui-web/src/shell-v0/components/AuthorizationHost.toplayer.t"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/AuthorizationHost.toplayer.test.ts#Move 4 — trusted ceremony on the Top Layer queued lightweight → capability applies each prompt’s own modality",
+        "classification": "assertion",
+        "detail": "Move 4 — trusted ceremony on the Top Layer queued lightweight → capability applies each prompt’s own modality:  AssertionError: expected false to be true // Object.is equality\n    at assertMode (/tmp/test-intent-before-P1Gyxq/modules/ui-web/src/shell-v0/components/AuthorizationHost.toplayer.test.ts:62:34)\n    at /tmp/test-intent-before-P1Gyxq/modules/ui-web/src/shell-v0/components/AuthorizationHost.toplayer.t"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/AuthorizationHost.toplayer.test.ts#Move 4 — trusted ceremony on the Top Layer queued typed → lightweight applies each prompt’s own modality",
+        "classification": "assertion",
+        "detail": "Move 4 — trusted ceremony on the Top Layer queued typed → lightweight applies each prompt’s own modality:  AssertionError: expected true to be false // Object.is equality\n    at assertMode (/tmp/test-intent-before-P1Gyxq/modules/ui-web/src/shell-v0/components/AuthorizationHost.toplayer.test.ts:62:34)\n    at /tmp/test-intent-before-P1Gyxq/modules/ui-web/src/shell-v0/components/AuthorizationHost.toplayer.t"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/AuthorizationHost.toplayer.test.ts#Move 4 — trusted ceremony on the Top Layer queued capability → lightweight applies each prompt’s own modality",
+        "classification": "assertion",
+        "detail": "Move 4 — trusted ceremony on the Top Layer queued capability → lightweight applies each prompt’s own modality:  AssertionError: expected true to be false // Object.is equality\n    at assertMode (/tmp/test-intent-before-P1Gyxq/modules/ui-web/src/shell-v0/components/AuthorizationHost.toplayer.test.ts:62:34)\n    at /tmp/test-intent-before-P1Gyxq/modules/ui-web/src/shell-v0/components/AuthorizationHost.toplayer.t"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/FailedJobsDrawer.test.ts#FailedJobsDrawer — retry failure feedback reports a refused retry failure and keeps the row error",
+        "classification": "assertion",
+        "detail": "FailedJobsDrawer — retry failure feedback reports a refused retry failure and keeps the row error:  AssertionError: expected [] to have a length of 1 but got +0\n    at Proxy.<anonymous> (file:///home/elias/dev/justsearch/.claude/worktrees/shell-s0/modules/ui-web/node_modules/@vitest/expect/dist/index.js:1389:20)\n    at Proxy.<anonymous> (file:///home/elias/dev/justsearch/.claude/worktrees/shell-s0"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/FailedJobsDrawer.test.ts#FailedJobsDrawer — retry failure feedback reports a network retry failure and keeps the row error",
+        "classification": "assertion",
+        "detail": "FailedJobsDrawer — retry failure feedback reports a network retry failure and keeps the row error:  AssertionError: expected [] to have a length of 1 but got +0\n    at Proxy.<anonymous> (file:///home/elias/dev/justsearch/.claude/worktrees/shell-s0/modules/ui-web/node_modules/@vitest/expect/dist/index.js:1389:20)\n    at Proxy.<anonymous> (file:///home/elias/dev/justsearch/.claude/worktrees/shell-s0"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/FailedJobsDrawer.test.ts#FailedJobsDrawer — retry failure feedback reports a unknown retry failure and keeps the row error",
+        "classification": "assertion",
+        "detail": "FailedJobsDrawer — retry failure feedback reports a unknown retry failure and keeps the row error:  AssertionError: expected [] to have a length of 1 but got +0\n    at Proxy.<anonymous> (file:///home/elias/dev/justsearch/.claude/worktrees/shell-s0/modules/ui-web/node_modules/@vitest/expect/dist/index.js:1389:20)\n    at Proxy.<anonymous> (file:///home/elias/dev/justsearch/.claude/worktrees/shell-s0"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/IndexingOverlay.test.ts#IndexingOverlayHost — Go online failures reports a refused failure and enables the CTA again",
+        "classification": "assertion",
+        "detail": "IndexingOverlayHost — Go online failures reports a refused failure and enables the CTA again:  AssertionError: expected [] to have a length of 1 but got +0\n    at Proxy.<anonymous> (file:///home/elias/dev/justsearch/.claude/worktrees/shell-s0/modules/ui-web/node_modules/@vitest/expect/dist/index.js:1389:20)\n    at Proxy.<anonymous> (file:///home/elias/dev/justsearch/.claude/worktrees/shell-s0"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/IndexingOverlay.test.ts#IndexingOverlayHost — Go online failures reports a network failure and enables the CTA again",
+        "classification": "assertion",
+        "detail": "IndexingOverlayHost — Go online failures reports a network failure and enables the CTA again:  AssertionError: expected [] to have a length of 1 but got +0\n    at Proxy.<anonymous> (file:///home/elias/dev/justsearch/.claude/worktrees/shell-s0/modules/ui-web/node_modules/@vitest/expect/dist/index.js:1389:20)\n    at Proxy.<anonymous> (file:///home/elias/dev/justsearch/.claude/worktrees/shell-s0"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/IndexingOverlay.test.ts#IndexingOverlayHost — Go online failures reports a unknown failure and enables the CTA again",
+        "classification": "assertion",
+        "detail": "IndexingOverlayHost — Go online failures reports a unknown failure and enables the CTA again:  AssertionError: expected [] to have a length of 1 but got +0\n    at Proxy.<anonymous> (file:///home/elias/dev/justsearch/.claude/worktrees/shell-s0/modules/ui-web/node_modules/@vitest/expect/dist/index.js:1389:20)\n    at Proxy.<anonymous> (file:///home/elias/dev/justsearch/.claude/worktrees/shell-s0"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/IndexingOverlay.test.ts#IndexingOverlayHost — Go online failures a late failure after teardown reports locally without leaving a new overlay busy",
+        "classification": "assertion",
+        "detail": "IndexingOverlayHost — Go online failures a late failure after teardown reports locally without leaving a new overlay busy:  AssertionError: expected [] to have a length of 1 but got +0\n    at Proxy.<anonymous> (file:///home/elias/dev/justsearch/.claude/worktrees/shell-s0/modules/ui-web/node_modules/@vitest/expect/dist/index.js:1389:20)\n    at Proxy.<anonymous> (file:///home/elias/dev/justsearch/.claude/worktrees/shell-s0"
+      }
+    ]
+  },
+  "digest": "sha256:da3d2d72f3ba5b786965094e83eeffbe04ae442b897eca7319fa8f59cee11e8e"
+}

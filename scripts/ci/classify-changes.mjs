@@ -23,7 +23,7 @@ export const RULES = [
   [/^modules\/(?:adapters-lucene|ai-backend|api-contract-projection-java|app-agent|app-agent-api|app-api|app-config|app-engine|app-inference|app-observability|app-services|app-util|configuration|core|core-contracts|extension-substrate|gpu-bridge|indexer-worker|indexing|infra-core|ipc-common|ort-common|prompt-support|reranker|telemetry|worker-core|worker-services)\//, java],
   [/^modules\/ui\//, java.filter((lane) => lane !== 'search')],
   [/^modules\/system-tests\//, ['build', 'services', 'platform', 'windows', 'jseval', 'integration', 'lifecycle']],
-  [/^modules\/(?:app-api-tck|app-launcher|benchmarks|dead-code-audit|ssot-tools|test-support)\//, ['build', 'services', 'platform', 'windows', 'jseval']],
+  [/^modules\/(?:app-launcher|benchmarks|dead-code-audit|ssot-tools|test-support)\//, ['build', 'services', 'platform', 'windows', 'jseval']],
   [/^modules\/ui-web\//, ['build', 'ui', 'services', 'windows', 'jseval', 'lifecycle', 'integration']],
   [/^modules\/ui-web\/src\/api\/backendRestart\.ts$/, ['rust']],
   // The shell's updater v2 tests run this fixture generator.
@@ -60,6 +60,8 @@ export const RULES = [
   // The UI-check preparation suite (scripts/dev/test-dev-runner-prepare-ui-checks.mjs) reads
   // jsharness's declared dependencies; it runs on Linux only.
   [/^scripts\/(?:jseval|jsharness)\/pyproject\.toml$/, ['devrunner']],
+  // prepare-ui-checks.cjs also reads jsharness's lock for the pinned Python Playwright revision.
+  [/^scripts\/jsharness\/requirements\.lock\.txt$/, ['devrunner']],
   [/^models\//, [...contracts, 'license']],
   [/^(?:licenses?\/|notices?\/|NOTICE|LICENSE|native-licenses\/)/, ['license']],
 ];

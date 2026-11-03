@@ -1,7 +1,9 @@
 // @vitest-environment happy-dom
 
-import { describe, expect, it, beforeEach } from 'vitest';
+import { describe, expect, it, beforeEach, afterEach, vi } from 'vitest';
 import { nothing } from 'lit';
+import * as aiStateStore from '../state/aiStateStore.js';
+import { EPHEMERAL_TOAST_EVENT } from './advisory/ephemeralToast.js';
 import './IndexingOverlay.js';
 import type { IndexingOverlay } from './IndexingOverlay.js';
 import type { AiState } from '../state/aiStateStore.js';
@@ -200,5 +202,77 @@ describe('IndexingOverlayHost — numbers come from the one projection (813)', (
         },
       }).render(),
     ).toBe(nothing);
+  });
+});
+
+/** Real CTA → OperationClient → existing local advisory channel. */
+describe('IndexingOverlayHost — Go online failures', () => {
+  let host: import('./IndexingOverlay.js').IndexingOverlayHost;
+  let notices: import('./advisory/ephemeralToast.js').EphemeralToastSpec[];
+  const onNotice = (event: Event) => notices.push((event as CustomEvent).detail);
+
+  beforeEach(() => {
+    notices = [];
+    document.addEventListener(EPHEMERAL_TOAST_EVENT, onNotice);
+    vi.spyOn(aiStateStore, 'subscribeAiState').mockImplementation(() => () => {});
+    host = document.createElement('jf-indexing-overlay-host') as typeof host;
+    host.apiBase = 'http://indexing-test';
+    host.aiState = {
+      runtime: { mode: 'indexing' }, index: { embeddingQueueSize: known(10), vduQueueSize: known(0) },
+      snapshotLive: true, episodeMaxPendingJobs: 0, enrichSettleSamples: [],
+    } as unknown as AiState;
+    document.body.append(host);
+  });
+  afterEach(() => {
+    host.remove();
+    document.removeEventListener(EPHEMERAL_TOAST_EVENT, onNotice);
+    vi.restoreAllMocks();
+    vi.unstubAllGlobals();
+  });
+
+  it.each(['refused', 'network', 'unknown'])(
+    'reports a %s failure and enables the CTA again', async failure => {
+      vi.stubGlobal('fetch', vi.fn(async () => {
+        if (failure === 'network') throw new Error('Connection lost');
+        return new Response(JSON.stringify({ success: false,
+          ...(failure === 'refused' ? { message: 'Chat is disabled by policy', errorClass: 'TRUST_DENIED' } : {}),
+        }), { status: 403 });
+      }));
+      await host.updateComplete;
+      const overlay = host.shadowRoot!.querySelector('jf-indexing-overlay') as IndexingOverlay;
+      await overlay.updateComplete;
+      overlay.shadowRoot!.querySelector<HTMLButtonElement>('button.cta')!.click();
+      await vi.waitFor(() => expect(notices).toHaveLength(1));
+      expect(notices[0]).toMatchObject({ severity: 'error', classId: 'core.ephemeral' });
+      expect(notices[0]!.message).toContain('Could not go online');
+      if (failure !== 'unknown') expect(notices[0]!.message).toContain(failure === 'refused' ? 'Chat is disabled by policy' : 'Connection lost');
+      await host.updateComplete;
+      await overlay.updateComplete;
+      expect(overlay.shadowRoot!.querySelector<HTMLButtonElement>('button.cta')!.disabled).toBe(false);
+      expect(host.shadowRoot!.querySelector('jf-indexing-overlay')).toBe(overlay);
+    },
+  );
+
+  it('a late failure after teardown reports locally without leaving a new overlay busy', async () => {
+    let reject!: (reason: Error) => void;
+    vi.stubGlobal('fetch', vi.fn(() => new Promise<Response>((_resolve, fail) => { reject = fail; })));
+    await host.updateComplete;
+    const overlay = host.shadowRoot!.querySelector('jf-indexing-overlay') as IndexingOverlay;
+    await overlay.updateComplete;
+    overlay.shadowRoot!.querySelector<HTMLButtonElement>('button.cta')!.click();
+    expect(host.switching).toBe(true);
+    await vi.waitFor(() => expect(reject).toBeTypeOf('function'));
+    host.remove();
+    const replacement = document.createElement('jf-indexing-overlay-host') as typeof host;
+    document.body.append(replacement);
+    try {
+      reject(new Error('Response lost'));
+      await vi.waitFor(() => expect(notices).toHaveLength(1));
+      expect(notices[0]!.message).toContain('Response lost');
+      expect(host.switching).toBe(false);
+      expect(replacement.switching).toBe(false);
+    } finally {
+      replacement.remove();
+    }
   });
 });

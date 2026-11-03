@@ -1664,7 +1664,7 @@ jobs:
         run: |
           chmod +x ./gradlew 2>/dev/null || true
           GW='./gradlew'; [ "$RUNNER_OS" = "Windows" ] && GW='./gradlew.bat'
-          "$GW" :modules:app-launcher:ciUnitTest3 :modules:app-services:ciUnitTest3 :modules:app-agent:test :modules:app-util:test :modules:app-agent-api:test :modules:app-config:test :modules:app-api-tck:test -PskipWebBuild=true --console=plain
+          "$GW" :modules:app-launcher:ciUnitTest3 :modules:app-services:ciUnitTest3 :modules:app-agent:test :modules:app-util:test :modules:app-agent-api:test :modules:app-config:test -PskipWebBuild=true --console=plain
 
       - name: Report unit-test attribution
         if: always()

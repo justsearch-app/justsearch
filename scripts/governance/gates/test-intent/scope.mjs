@@ -5,8 +5,8 @@
  * test suite. Three kinds are flagged:
  *
  *   test-code         product test code under modules/: every Java test source set (anything under
- *                     src/ that is not src/main in a JVM module), modules/test-support/src/**, the
- *                     app-api TCK (modules/app-api-tck/src/**), all of modules/system-tests/** (its
+ *                     src/ that is not src/main in a JVM module), modules/test-support/src/**,
+ *                     all of modules/system-tests/** (its
  *                     src/main holds the AI-judge oracles), frontend *.test.* / *.spec.* files
  *                     (the *-lockdown.test.* files the default vitest run excludes included),
  *                     src/mocks/**, src/__test-setup__/**, and Rust test files under
@@ -91,9 +91,6 @@ export function classifyPath(rel) {
   if (module === 'test-support' && parts[2] === 'src') {
     return { kind: 'test-code', reason: 'modules/test-support (test infrastructure under src/main)' };
   }
-  if (module === 'app-api-tck' && parts[2] === 'src') {
-    return { kind: 'test-code', reason: 'app-api TCK' };
-  }
 
   // JVM test source sets: modules/<m>/src/<set>/... with <set> != main.
   if (!NON_JVM_MODULES.has(module) && parts[2] === 'src' && parts.length > 4) {
@@ -158,7 +155,7 @@ export function isStandaloneTestSource(rel) {
   if (classifyPath(p)?.kind !== 'test-code') return false;
   const parts = p.split('/');
   const module = parts[1];
-  if (['test-support', 'app-api-tck', 'system-tests'].includes(module)) return false;
+  if (['test-support', 'system-tests'].includes(module)) return false;
   if (parts.some((part) => ['resources', 'testFixtures', 'mocks', '__test-setup__'].includes(part))) return false;
   if (module === 'ui-web') return uiWebSelection(parts.slice(2).join('/')) !== null;
   if (NON_JVM_MODULES.has(module)) return false;

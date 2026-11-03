@@ -62,7 +62,7 @@ export interface RendererUserConfig {
   rendererOverride?: Record<string, string>;
 
   /**
-   * Per-pane configuration. Keyed by pane id (the Lumino Shell's
+   * Per-pane configuration. Keyed by pane id (the host's
    * pane registry assigns these). Forms and Tables read this for
    * column ordering, hidden fields, filter defaults.
    */

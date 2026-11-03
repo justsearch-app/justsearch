@@ -3,7 +3,7 @@
 
 // Linux isolated-session setup. npm installs belong to this checkout's node_modules;
 // the Python environment and session-local caches belong to this checkout's tmp/;
-// the shared Playwright cache is inspected and used read-only when it matches.
+// both pinned Playwright Chromium revisions stay in checkout-local storage.
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
@@ -110,47 +110,25 @@ if (requirements.status !== 0) {
   process.stderr.write(requirements.stderr);
   process.exit(requirements.status || 1);
 }
-run(python, ['-m', 'pip', 'install', ...JSON.parse(requirements.stdout), ...constraints], env);
+// Pin Playwright from the UI lock even when the interpreter cannot use the full CI lock.
+const playwright = fs.readFileSync(path.join(root, 'scripts/jsharness/requirements.lock.txt'), 'utf8')
+  .match(/^playwright==[^\s]+$/m)?.[0];
+if (!playwright) throw new Error('UI lock must pin playwright');
+const dependencies = JSON.parse(requirements.stdout).filter(requirement => !requirement.startsWith('playwright'));
+run(python, ['-m', 'pip', 'install', ...dependencies, playwright, ...constraints], env);
 
-// Chromium's executable_path comes from this Python Playwright, not playwright-core
-// in npm. Headless screenshots also need its matching headless-shell revision.
-const sharedBrowsers = path.join(os.homedir(), '.cache/ms-playwright');
-const probe = spawnSync(python, ['-c', `
-import subprocess
-from pathlib import Path
-import playwright
-driver = Path(playwright.__file__).parent / 'driver'
-# Use Playwright's registry so platform paths and revision overrides match launch.
-raise SystemExit(subprocess.call([str(driver / 'node'), '-e', """
-const fs = require('node:fs');
-const path = require('node:path');
-process.on('uncaughtException', error => { console.error(error); process.exit(2); });
-const bundle = path.join(process.argv[1], 'lib/coreBundle.js');
-const registry = fs.existsSync(bundle) ? require(bundle).registry.registry
-  : require(path.join(process.argv[1], 'lib/server/registry/index.js')).registry;
-const present = ['chromium', 'chromium-headless-shell'].every(name => {
-  const executable = registry.findExecutable(name).executablePath();
-  try {
-    fs.accessSync(executable, fs.constants.X_OK);
-    return fs.statSync(executable).isFile();
-  } catch { return false; }
-});
-process.exit(present ? 0 : 1);
-""", str(driver / 'package')]))
-`], { env: { ...env, PLAYWRIGHT_BROWSERS_PATH: sharedBrowsers }, stdio: 'inherit' });
-if (probe.error) throw probe.error;
-if (probe.status !== 0 && probe.status !== 1) process.exit(probe.status || 1);
-const browsers = probe.status === 0 ? sharedBrowsers : path.join(prep, 'ms-playwright');
-if (probe.status === 0) {
-  console.error(`[prepare-ui-checks] reusing matching Chromium read-only: ${browsers}`);
-} else {
-  run(python, ['-m', 'playwright', 'install', 'chromium'], { ...env, PLAYWRIGHT_BROWSERS_PATH: browsers });
-}
+// Each installed Playwright owns a different browser revision. Install both into
+// this checkout, and prevent either installer from collecting the other's revision.
+const browsers = path.join(prep, 'ms-playwright');
+const browserEnv = { ...env, PLAYWRIGHT_BROWSERS_PATH: browsers, PLAYWRIGHT_SKIP_BROWSER_GC: '1' };
+run(process.execPath, [path.join(root, 'modules/ui-web/node_modules/playwright-core/cli.js'), 'install', 'chromium'], browserEnv);
+run(python, ['-m', 'playwright', 'install', 'chromium'], browserEnv);
 
 const variables = {
   UI_CHECKS_DIR: prep,
   VIRTUAL_ENV: path.join(prep, 'venv'),
-  TMPDIR: env.TMPDIR,
+  // Scratch git repos must not inherit this checkout's installed TypeScript.
+  TMPDIR: os.tmpdir(),
   npm_config_cache: env.npm_config_cache,
   npm_config_logs_dir: env.npm_config_logs_dir,
   PIP_CONFIG_FILE: env.PIP_CONFIG_FILE,
@@ -163,6 +141,7 @@ const variables = {
   JUSTSEARCH_DATA_DIR: env.JUSTSEARCH_DATA_DIR,
   JUSTSEARCH_JOB_RECORD_DIR: env.JUSTSEARCH_JOB_RECORD_DIR,
   PLAYWRIGHT_BROWSERS_PATH: browsers,
+  PLAYWRIGHT_SKIP_BROWSER_GC: '1',
 };
 // Clear the families at source time, so settings the caller's shell gained after
 // preparation are reset too, not only the names preparation saw.

@@ -1,0 +1,151 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
+  },
+  "createdAt": "2026-11-03T15:44:06.082Z",
+  "revision": "4cd819bf2e29ec8205924d4bd5e9b6a2f5942ae3",
+  "tree": "ebe9f1c5ce6ecfbc2db3b4ed5639f7325e8a6a91",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/components/AuthorizationHost.toplayer.test.ts\" \"src/shell-v0/components/FailedJobsDrawer.test.ts\" --reporter=json --outputFile=\"/tmp/test-intent-vitest-1804858-1793720643961.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 2118
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/components/AuthorizationHost.toplayer.test.ts#Move 4 — trusted ceremony on the Top Layer queued lightweight → lightweight applies each prompt’s own modality",
+      "file": "modules/ui-web/src/shell-v0/components/AuthorizationHost.toplayer.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:6a7f17a19c45005f57b120021f242017192477ce23568d632cfc0f3428bc5172",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Move 4 — trusted ceremony on the Top Layer queued lightweight → lightweight applies each prompt’s own modality",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/AuthorizationHost.toplayer.test.ts#Move 4 — trusted ceremony on the Top Layer queued typed → typed applies each prompt’s own modality",
+      "file": "modules/ui-web/src/shell-v0/components/AuthorizationHost.toplayer.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:6a7f17a19c45005f57b120021f242017192477ce23568d632cfc0f3428bc5172",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Move 4 — trusted ceremony on the Top Layer queued typed → typed applies each prompt’s own modality",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/AuthorizationHost.toplayer.test.ts#Move 4 — trusted ceremony on the Top Layer queued typed → capability applies each prompt’s own modality",
+      "file": "modules/ui-web/src/shell-v0/components/AuthorizationHost.toplayer.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:6a7f17a19c45005f57b120021f242017192477ce23568d632cfc0f3428bc5172",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Move 4 — trusted ceremony on the Top Layer queued typed → capability applies each prompt’s own modality",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/AuthorizationHost.toplayer.test.ts#Move 4 — trusted ceremony on the Top Layer queued capability → typed applies each prompt’s own modality",
+      "file": "modules/ui-web/src/shell-v0/components/AuthorizationHost.toplayer.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:6a7f17a19c45005f57b120021f242017192477ce23568d632cfc0f3428bc5172",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Move 4 — trusted ceremony on the Top Layer queued capability → typed applies each prompt’s own modality",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/AuthorizationHost.toplayer.test.ts#Move 4 — trusted ceremony on the Top Layer queued capability → capability applies each prompt’s own modality",
+      "file": "modules/ui-web/src/shell-v0/components/AuthorizationHost.toplayer.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:6a7f17a19c45005f57b120021f242017192477ce23568d632cfc0f3428bc5172",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Move 4 — trusted ceremony on the Top Layer queued capability → capability applies each prompt’s own modality",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/FailedJobsDrawer.test.ts#FailedJobsDrawer — retry failure feedback a late retry failure after switch folder does not affect the new target",
+      "file": "modules/ui-web/src/shell-v0/components/FailedJobsDrawer.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:7957a354b215032227f6cb491715963eadff2ad0f4424c9d467a438a2216c3b2",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "FailedJobsDrawer — retry failure feedback a late retry failure after switch folder does not affect the new target",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/FailedJobsDrawer.test.ts#FailedJobsDrawer — retry failure feedback a late retry failure after close does not affect the new target",
+      "file": "modules/ui-web/src/shell-v0/components/FailedJobsDrawer.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:7957a354b215032227f6cb491715963eadff2ad0f4424c9d467a438a2216c3b2",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "FailedJobsDrawer — retry failure feedback a late retry failure after close does not affect the new target",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/FailedJobsDrawer.test.ts#FailedJobsDrawer — retry failure feedback a late retry failure after remount does not affect the new target",
+      "file": "modules/ui-web/src/shell-v0/components/FailedJobsDrawer.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:7957a354b215032227f6cb491715963eadff2ad0f4424c9d467a438a2216c3b2",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "FailedJobsDrawer — retry failure feedback a late retry failure after remount does not affect the new target",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:ea95dd1c2b2583eab0e8bd5737239936fe452445e3ae5232ef86543597409522"
+}

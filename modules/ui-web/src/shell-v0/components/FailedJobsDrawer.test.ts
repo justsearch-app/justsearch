@@ -16,6 +16,7 @@ import {
   failedJobsFolderPathHash,
   __resetFailedJobsDrawer,
 } from '../state/failedJobsDrawer.js';
+import { EPHEMERAL_TOAST_EVENT, type EphemeralToastSpec } from './advisory/ephemeralToast.js';
 import { isDevMode } from '../../api/devMode.js';
 import { readWireDrift } from '../../api/wireDriftTelemetry.js';
 
@@ -883,4 +884,78 @@ it('R3d the real Try again button stays operable while a retry never answers', a
     button().click(); await pump(el);
     expect(retried).toEqual(['A', 'A']);
   } finally { el.remove(); globalThis.fetch = oldFetch; }
+});
+
+/** Bulk retries retain failed rows and report through the existing local message channel. */
+describe('FailedJobsDrawer — retry failure feedback', () => {
+  let el: FailedJobsDrawer;
+  let notices: EphemeralToastSpec[];
+  const onNotice = (event: Event) => notices.push((event as CustomEvent).detail);
+  let invoke: () => Promise<Response>;
+
+  beforeEach(async () => {
+    notices = [];
+    document.addEventListener(EPHEMERAL_TOAST_EVENT, onNotice);
+    invoke = async () => new Response(JSON.stringify({ success: true }));
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
+      if (String(input).includes('/invoke')) return invoke();
+      if (String(input).includes('/failed/by-prefix')) {
+        return new Response(byPrefixBody([job({ pathHash: 'h-one', errorMessage: 'Original parse error' })]));
+      }
+      return new Response('{}');
+    }));
+    el = document.createElement('jf-failed-jobs-drawer') as FailedJobsDrawer;
+    el.apiBase = 'http://retry-test';
+    document.body.append(el);
+    openFailedJobs('retry-folder');
+    await pump(el);
+  });
+  afterEach(() => {
+    el.remove();
+    document.removeEventListener(EPHEMERAL_TOAST_EVENT, onNotice);
+    vi.unstubAllGlobals();
+  });
+  async function retry(): Promise<void> {
+    const button = el.shadowRoot!.querySelector('jf-button[label="Retry all failed files"]')!;
+    await settle(button);
+    const control = button.shadowRoot!.querySelector('jf-control')!;
+    await settle(control);
+    control.shadowRoot!.querySelector('button')!.click();
+  }
+
+  it.each(['refused', 'network', 'unknown'])('reports a %s retry failure and keeps the row error', async failure => {
+    invoke = async () => {
+      if (failure === 'network') throw new Error('Connection lost');
+      return new Response(JSON.stringify({ success: false,
+        ...(failure === 'refused' ? { message: 'Retry denied by policy', errorClass: 'TRUST_DENIED' } : {}),
+      }), { status: 403 });
+    };
+    await retry();
+    await vi.waitFor(() => expect(notices).toHaveLength(1));
+    expect(notices[0]).toMatchObject({ severity: 'error', classId: 'core.ephemeral' });
+    expect(notices[0]!.message).toContain('Could not retry');
+    if (failure !== 'unknown') expect(notices[0]!.message).toContain(failure === 'refused' ? 'Retry denied by policy' : 'Connection lost');
+    await pump(el);
+    expect(el.shadowRoot!.querySelector('.row')!.textContent).toContain('Original parse error');
+    expect(el.shadowRoot!.querySelector('jf-button[label="Retry all failed files"]')).not.toBeNull();
+  });
+
+  it.each(['switch folder', 'close', 'remount'])('a late retry failure after %s does not affect the new target', async navigation => {
+    let reject!: (reason: Error) => void;
+    invoke = () => new Promise<Response>((_resolve, fail) => { reject = fail; });
+    await retry();
+    if (navigation === 'switch folder') openFailedJobs('another-folder');
+    else if (navigation === 'close') closeFailedJobs();
+    else {
+      el.remove();
+      el = document.createElement('jf-failed-jobs-drawer') as FailedJobsDrawer;
+      el.apiBase = 'http://retry-test';
+      document.body.append(el);
+    }
+    await pump(el);
+    reject(new Error('Old request failed'));
+    await pump(el);
+    expect(notices).toHaveLength(0);
+    if (navigation !== 'close') expect(el.shadowRoot!.querySelector('.row')!.textContent).toContain('Original parse error');
+  });
 });

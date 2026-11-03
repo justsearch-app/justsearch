@@ -28,7 +28,7 @@ configuration, imports and setup are file changes, so they are flagged too.
 | In scope | Item |
 | --- | --- |
 | Java test source sets under `modules/<m>/src/<set>/` for any set other than `main` (test, integrationTest, systemTest, testFixtures), including their resources, golden and truth files | the file |
-| `modules/test-support/src/**` and the app-api TCK (`modules/app-api-tck/src/**`) | the file |
+| `modules/test-support/src/**` | the file |
 | All of `modules/system-tests/**`, including `src/main` (the AI-judge oracles) and its build script | the file |
 | Frontend `*.{test,spec}.{js,jsx,ts,tsx,mjs,cjs,mts,cts}`, including `*-lockdown.test.*` | the file |
 | Frontend `src/mocks/**`, `src/__test-setup__/**`, any `__fixtures__/**` or `__snapshots__/**` under `modules/` | the file |
@@ -62,8 +62,7 @@ or separate acceptance record. All of these conditions must hold:
   An exact copy of any deleted file is also ineligible. Existing byte-identical move handling
   remains for paths without case or Unicode normalization collisions: a move within the same
   execution context needs no entry; a move across contexts does.
-- It is product test code, outside `modules/test-support`, `modules/app-api-tck` and
-  `modules/system-tests`. Files under `__fixtures__`, `__snapshots__`, `resources`, `testFixtures`,
+- It is product test code, outside `modules/test-support` and `modules/system-tests`. Files under `__fixtures__`, `__snapshots__`, `resources`, `testFixtures`,
   `mocks` or `__test-setup__` are ineligible. A helper listed at either the base or the head,
   a Rust test module file, or any path recognised as build/test-runner configuration is ineligible,
   even if it has a test-like name.

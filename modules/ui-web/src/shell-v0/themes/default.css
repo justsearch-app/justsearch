@@ -160,25 +160,6 @@
   /* ACTION BUTTON — chrome */
   --justsearch-shell-action-button-padding: var(--jf-button-pad-md);
 
-  /* SHELL — Lumino dock theme overlay */
-  --justsearch-shell-shell-tabbar-bg: var(--jf-surface-bg-muted);
-  --justsearch-shell-shell-tabbar-border: var(--jf-surface-border);
-  --justsearch-shell-shell-tab-height: var(--jf-shell-tab-height);
-  --justsearch-shell-shell-tab-color: var(--jf-surface-fg-muted);
-  --justsearch-shell-shell-tab-bg: transparent;
-  --justsearch-shell-shell-tab-hover-bg: var(--jf-surface-bg-hover);
-  --justsearch-shell-shell-tab-active-bg: var(--jf-surface-bg);
-  --justsearch-shell-shell-tab-active-color: var(--jf-surface-fg);
-  --justsearch-shell-shell-tab-active-indicator: var(--jf-severity-info-strong);
-  --justsearch-shell-shell-tab-close-hover-bg: var(--jf-surface-border);
-  --justsearch-shell-shell-dock-bg: var(--jf-surface-bg);
-  --justsearch-shell-shell-dock-color: var(--jf-surface-fg);
-  --justsearch-shell-shell-pane-bg: var(--jf-surface-bg);
-  --justsearch-shell-shell-handle-bg: var(--jf-surface-border);
-  --justsearch-shell-shell-handle-hover-bg: var(--jf-overlay-handle-active);
-  --justsearch-shell-shell-drop-overlay-bg: var(--jf-overlay-bg);
-  --justsearch-shell-shell-drop-overlay-border: var(--jf-overlay-border);
-
   /* TABLE — chrome */
   --justsearch-shell-table-text-color: inherit;
   --justsearch-shell-table-bg: transparent;
