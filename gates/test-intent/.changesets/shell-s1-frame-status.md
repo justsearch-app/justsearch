@@ -1057,9 +1057,14 @@ checks of this slice read a notice; R4 changes what names a folder row. No asser
       "items": [
         "gates/dead-code/baseline.txt"
       ],
-      "class": "Structural rule kept",
-      "rule": "The dead-code gate's per-file pin of unused exports: src/api/generated/schema-types/status-response.ts may hold at most the pinned number of exports with no consumer.",
-      "whySurvives": "The predicate is unchanged; one pin advances 8 → 9 for a generated file whose single consumer (StatusDeck's per-component connection dot, ComponentState) is retired by this slice. The generator is the only authority for that file, so the export stays; the growth is declared in gates/dead-code/.changesets/shell-s1-frame-status.md. Hand-written exports orphaned by the same retirement were removed instead of re-pinned.",
+      "class": "Incidental",
+      "assessment": {
+        "purpose": "Relax one dead-code pin: src/api/generated/schema-types/status-response.ts may now hold 9 unused exports instead of 8, because this slice retires the only consumer (StatusDeck's per-component connection dot) of the generated ComponentState export. The predicate is weaker for this one generated file; hand-written exports orphaned by the same retirement were deleted instead of re-pinned.",
+        "callersAndStateOwners": "The file is generated from the status-response JSON Schema (the generator owns it; hand edits are overwritten). The dead-code gate (knip report + scripts/governance/run.mjs --gate dead-code) reads gates/dead-code/baseline.txt; no runtime code reads the pin.",
+        "indirectBehaviours": "No product behaviour changes: the export is a type with no runtime effect. The gate still fails on any further unused export in this file (pin 9) and on every other file unchanged.",
+        "evidence": "knip report on the candidate lists ComponentState in status-response.ts as unused and nothing else new there; the dead-code gate passes with pin 9 and fails with pin 8 on the candidate (the retired StatusDeck was its only importer at the base).",
+        "unresolvedRisks": "A later consumer-free export added to this generated file would be absorbed within the same pin only if another is removed; the pin should drop back when the generator stops emitting ComponentState or a consumer returns."
+      },
       "sources": [
         {
           "kind": "delegated-choice",
@@ -1096,5 +1101,16 @@ checks of this slice read a notice; R4 changes what names a folder row. No asser
   "verdict": "accept",
   "digest": "sha256:cf0e7037f27c393eb0ae955e4fc72a9112c31a5ce04396945406b0260955e8dd",
   "note": "Round 2: 19 assertion failures reproduced before, 131 named checks pass after; A1 verified in Chromium across queue, panel and announcement paths; Adaptation oracle retained; C7 evidence valid. Transcribed by the orchestrator from the verifier's answer (Codex sandbox)."
+}
+```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a1a334-d0ab-7bc0-b586-e714dd3bed4e",
+  "verdict": "reject",
+  "digest": "sha256:e7b088cb4f414621d582dc50c668304b256a3f8ae2c1788dd839fa87396a3ea2",
+  "note": "Rejected only entry 38 (dead-code baseline 8 -> 9 classified 'Structural rule kept' although the predicate is weaker). Everything else accepted: 30 assertion failures before, 143 named checks pass after, 17 Chromium security checks pass. Transcribed by the orchestrator; the entry was then reclassified as Incidental as the verifier asked."
 }
 ```
