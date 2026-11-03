@@ -597,3 +597,14 @@ runner adaptation, CI-built native-helper setup and entry 16 Adaptation review a
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "agent-verifier-x5648saw",
+  "verdict": "accept",
+  "digest": "sha256:5cb799428126778582e31a8994681807ec098cc3e4bccecc52fd0fa7f6faa8a5",
+  "note": "Transcribed by the orchestrator from verifier session agent-verifier-x5648saw (Codex, run.py); verdict and note verbatim: Entries 14/16 resolved; seven lifecycle checks independently passed after and assertion-failed before."
+}
+```
