@@ -55,6 +55,7 @@ public final class SpladeBackfillOps {
    *     metrics recording (tempdoc 710 Move 2 item 4).
    */
   public static StageOutcome processSpladeBackfill(BackfillContext context) {
+    var authority = context.indexingCoordinator().enrichmentAuthority();
     long t0 = System.nanoTime();
     EnrichmentAccounting accounting = new EnrichmentAccounting();
     try {
@@ -98,11 +99,16 @@ public final class SpladeBackfillOps {
 
       // Phase 1: collect parent content or reconstructed chunk slices in one batch.
       long t1 = System.nanoTime();
-      EnrichmentBatch batch = new EnrichmentBatch(context.documentFieldOps(), context.indexingCoordinator(), pendingIds).accounting(accounting);
+      EnrichmentBatch batch = new EnrichmentBatch(context.documentFieldOps(), context.indexingCoordinator(), pendingIds, authority).accounting(accounting);
       Map<String, String> contentByDocId = batch.contents();
       List<String> batchDocIds = new ArrayList<>(pendingIds.size());
       List<String> batchContents = new ArrayList<>(pendingIds.size());
       for (String docId : pendingIds) {
+        if (batch.stopped(() -> !context.runningSupplier().getAsBoolean())
+            || context.spladeEncoderSupplier().get() != encoder) {
+          accounting.cancelRemaining();
+          break;
+        }
         try {
           String content = contentByDocId.get(docId);
 
@@ -159,8 +165,14 @@ public final class SpladeBackfillOps {
             sliceStart += bulkPace.spladePhaseDocs()) {
           int sliceEnd = Math.min(sliceStart + bulkPace.spladePhaseDocs(), batchContents.size());
           pacer.beforeUnit(sliceEnd - sliceStart);
+          if (batch.stopped(() -> !context.runningSupplier().getAsBoolean())
+              || context.spladeEncoderSupplier().get() != encoder) {
+            accounting.cancelRemaining();
+            break;
+          }
           List<Map<String, Float>> sliceVecs;
           try {
+            batch.started(batchDocIds.subList(sliceStart, sliceEnd), EnrichmentAccounting.Stage.SPLADE);
             sliceVecs = encoder.encodeBatch(batchContents.subList(sliceStart, sliceEnd));
           } finally {
             pacer.afterUnit(sliceEnd - sliceStart);
@@ -196,6 +208,11 @@ public final class SpladeBackfillOps {
             return StageOutcome.observed(false, processed, t0, accounting);
           }
           pacer.beforeUnit(1);
+          if (batch.stopped(() -> !context.runningSupplier().getAsBoolean())
+              || context.spladeEncoderSupplier().get() != encoder) {
+            accounting.cancelRemaining();
+            break;
+          }
           try {
             Map<String, Float> sparseVec = encoder.encode(
                 batchContents.get(i), io.justsearch.core.execution.InferenceRequest.background());
@@ -240,7 +257,7 @@ public final class SpladeBackfillOps {
       long t3 = System.nanoTime();
       List<Map.Entry<String, Map<String, Object>>> batchUpdates =
           new ArrayList<>(batchDocIds.size());
-      for (int i = 0; i < batchDocIds.size(); i++) {
+      for (int i = 0; i < sparseVecs.size(); i++) {
         Map<String, Object> updates = new HashMap<>();
         updates.put(SchemaFields.SPLADE, sparseVecs.get(i));
         updates.put(SchemaFields.SPLADE_STATUS, spladeStatusFor(sparseVecs.get(i)));
@@ -248,6 +265,7 @@ public final class SpladeBackfillOps {
         batchUpdates.add(Map.entry(batchDocIds.get(i), updates));
       }
       var batchResult = batch.updateBatch(batchUpdates);
+      batch.rejectRetiredOutcomes();
       processed += batchResult.updatedCount();
       long writeMs = (System.nanoTime() - t3) / 1_000_000;
 
@@ -273,6 +291,9 @@ public final class SpladeBackfillOps {
       return StageOutcome.observed(true, processed, t0, accounting);
 
     } catch (Exception e) {
+      if (context.indexingCoordinator().enrichmentAuthority() != authority) {
+        accounting.rejectedRetiredOutcomes();
+      }
       accounting.cancelled(EnrichmentAccounting.Stage.SPLADE, e);
       context.log().error("Error during SPLADE backfill", e);
       return StageOutcome.observed(false, 0, t0, accounting);
@@ -295,7 +316,8 @@ public final class SpladeBackfillOps {
    */
   private static boolean paceAndCheckInterrupt(BackfillContext context) {
     context.pacing().pace();
-    boolean interrupt = !context.runningSupplier().getAsBoolean();
+    boolean interrupt = !context.runningSupplier().getAsBoolean()
+        || Thread.currentThread().isInterrupted();
     if (interrupt) {
       context.log().debug("SPLADE backfill interrupted: loop stopping");
     }

@@ -93,6 +93,16 @@ public interface EmbeddingProvider {
     return null;
   }
 
+  /** Whether the provider implements the optional slice seam, without tokenizing a document. */
+  static boolean exposesDocumentWindows(EmbeddingProvider provider) {
+    try {
+      return provider.getClass().getMethod("embedDocumentWindows", String.class, int.class, int.class)
+          .getDeclaringClass() != EmbeddingProvider.class;
+    } catch (NoSuchMethodException impossible) {
+      throw new IllegalStateException("EmbeddingProvider is missing its window seam", impossible);
+    }
+  }
+
   /** Returns the embedding dimension (e.g., 768 for nomic-embed-text). */
   int dimension();
 

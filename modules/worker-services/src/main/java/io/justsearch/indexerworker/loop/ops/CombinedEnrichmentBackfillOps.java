@@ -101,54 +101,24 @@ public final class CombinedEnrichmentBackfillOps {
    */
   private static final int EMBED_WINDOW_SLICE = 32;
 
-  /**
-   * Whether the embed stage must hand the rest of the cycle to SPLADE/NER (round-15 post-round
-   * finding; the starvation residual recorded in tempdoc 813 §18).
-   *
-   * <p>Phases 3b and 3c run AFTER 3a and open with {@link #stopRequested}, so an embed stage that
-   * spends the whole cycle budget leaves them structurally unable to run: live evidence showed
-   * {@code splade=0ms(ok=0)} and {@code ner=0ms(ok=0)} on EVERY cycle for 12+ minutes while SPLADE
-   * sat at 1.05% coverage, and both began advancing the moment embed reached 100%. This is the
-   * reservation: past the embed share, embed stops STARTING new units so the remaining budget
-   * reaches the other stages.
-   *
-   * <p>Three deliberate properties. (1) It is NOT the {@code aborted} signal — the batch is not
-   * yielding to the caller, it is rebalancing inside itself, so Phases 3b/3c still run, Phase 4
-   * still writes, and the tight loop is not stopped (which would hand the reserved slice straight
-   * back to the next cycle's embed stage). (2) It only applies when another stage actually has work
-   * in this batch; a pure-embed backlog keeps the whole budget. (3) The {@code unitsDone == 0} floor
-   * from {@link #stopRequested} applies here too — every batch does at least one embed unit, so the
-   * reservation can never starve embed in the other direction.
-   */
   private static boolean embedShareSpent(
-      BackfillContext context, int unitsDone, boolean otherStagesHaveWork) {
-    if (unitsDone == 0 || !otherStagesHaveWork) {
-      return false;
-    }
-    return context.embedShareExhaustedSupplier().getAsBoolean();
+      BackfillContext context, boolean otherStagesHaveWork) {
+    return otherStagesHaveWork && context.embedShareExhaustedSupplier().getAsBoolean();
   }
 
-  /**
-   * Whether this batch should stop starting NEW enrichment work (tempdoc 809 finding 3).
-   *
-   * <p>Two independent reasons, both meaning "everything after this point is wasted": the
-   * scheduler's composite yield signal (shutdown, user activity, GPU claimed, pending ingest, cycle
-   * budget spent), and a bulk deletion landing underneath the batch — which is how removing a
-   * watched root reaches this pass ({@link IndexingCoordinator#bulkDeleteEpoch()}).
-   *
-   * <p>{@code unitsDone == 0} is a deliberate floor: a batch has already paid for its content and
-   * status fetch by the time the first encoder unit runs, and a batch that yields having done
-   * nothing would report no activity, flipping the scheduler out of combined mode and starving the
-   * enrichment population instead of pacing it. Every batch completes at least one unit; only the
-   * REST of the batch is interruptible.
-   */
-  private static boolean stopRequested(
-      BackfillContext context, int unitsDone, long epochAtSelection) {
-    if (unitsDone == 0) {
-      return false;
-    }
+  private static boolean hardStopRequested(BackfillContext context, long epochAtSelection,
+      IndexingCoordinator.EnrichmentAuthority authority) {
+    return EnrichmentBatch.hardStop(() -> !context.runningSupplier().getAsBoolean()
+        || context.hardStopRequestedSupplier().getAsBoolean(), context.indexingCoordinator(),
+        epochAtSelection, authority);
+  }
+
+  /** Deadlines and hard stops both bound the start of every unit, including the first. */
+  private static boolean stopRequested(BackfillContext context, long epochAtSelection,
+      IndexingCoordinator.EnrichmentAuthority authority) {
+    // The scheduler supplier may pace. Recheck source and authority after that wait.
     return context.stopRequestedSupplier().getAsBoolean()
-        || context.indexingCoordinator().bulkDeleteEpoch() != epochAtSelection;
+        || hardStopRequested(context, epochAtSelection, authority);
   }
 
   public record BackfillContext(
@@ -184,11 +154,8 @@ public final class CombinedEnrichmentBackfillOps {
       // the sub-batch boundaries below, never mid-encode. A context that supplies `() -> false`
       // behaves exactly as this pass did before the checkpoints existed.
       BooleanSupplier stopRequestedSupplier,
-      // Tempdoc 897: the composite stop supplier above includes the cycle deadline. A
-      // single-pass late-chunking probe may spend that deadline before a null/OOM fallback can
-      // record its first resumable window, but shutdown, interruption, GPU yield, pending ingest,
-      // and bulk deletion must still pre-empt immediately. This supplier carries those hard stops
-      // without the deadline so the fallback can distinguish them.
+      // Hard stops exclude the deadline so accounting can distinguish cancellation from deferral.
+      // Both are checked before every unit, including the first and any classification fallback.
       BooleanSupplier hardStopRequestedSupplier,
       // Round-15 post-round finding: "the embed stage has used its reserved share of the cycle" —
       // see embedShareSpent. A context supplying `() -> false` gives embed the whole budget, i.e.
@@ -342,6 +309,7 @@ public final class CombinedEnrichmentBackfillOps {
     // catch block below can report it too.
     boolean aborted = false;
     EnrichmentAccounting accounting = new EnrichmentAccounting();
+    var authority = context.indexingCoordinator().enrichmentAuthority();
     long attemptStart = System.nanoTime();
     long phaseStart = attemptStart;
     String activePhase = "fetch";
@@ -472,7 +440,7 @@ public final class CombinedEnrichmentBackfillOps {
       attemptStarted = true;
 
       // Phase 1: Batch content fetch (single searcher, all docs)
-      EnrichmentBatch batch = new EnrichmentBatch(context.documentFieldOps(), context.indexingCoordinator(), pendingIds).accounting(accounting);
+      EnrichmentBatch batch = new EnrichmentBatch(context.documentFieldOps(), context.indexingCoordinator(), pendingIds, authority).accounting(accounting);
       Map<String, String> contentByDocId = batch.contents();
 
       Map<String, Map<String, String>> batchedFields = batch.fields();
@@ -486,6 +454,7 @@ public final class CombinedEnrichmentBackfillOps {
       // partial windows, or this cycle's single-pass attempt proved null/arena-OOM. They must not
       // pay documentWindowCount's second tokenization before reaching the window seam.
       Set<String> directWindowedDocIds = new HashSet<>();
+      boolean retainedParentRoute = false;
       List<String> spladeDocIds = new ArrayList<>();
 
       Set<String> stageAdvancedDocIds = new HashSet<>();
@@ -534,6 +503,8 @@ public final class CombinedEnrichmentBackfillOps {
           String chunkContent = contentByDocId.get(docId);
           String chunkEmbeddingStatus = docFields.get(SchemaFields.CHUNK_EMBEDDING_STATUS);
           String chunkSpladeStatus = docFields.get(SchemaFields.SPLADE_STATUS);
+          if ((chunkContent == null || chunkContent.isBlank())
+              && stopRequested(context, epochAtSelection, authority)) continue;
           if (chunkContent == null || chunkContent.isBlank()) {
             // Parent content plus the stored offset law should always produce a non-blank slice, so
             // a blank read here is a fetch/consistency anomaly, not a legitimately empty chunk.
@@ -572,6 +543,11 @@ public final class CombinedEnrichmentBackfillOps {
           }
           if (embedAvailable && context.chunkVectorsEnabled()
               && SchemaFields.EMBEDDING_STATUS_PENDING.equals(chunkEmbeddingStatus)) {
+            context.windowedEmbedProgress().identify(docId, chunkContent,
+                new WindowedEmbedProgress.Identity(authority, epochAtSelection, selectedEmbeddingProvider,
+                    selectedEmbeddingProvider.dimension(), docFields.get(SchemaFields.DOC_UID),
+                    docFields.get(SchemaFields.CHUNK_PARENT_CONTENT_SHA256),
+                    docFields.get(SchemaFields.SOURCE_SHA256)));
             embedDocIds.add(docId);
             embedContents.add(chunkContent);
             chunkIdsInBatch.add(docId);
@@ -608,6 +584,8 @@ public final class CombinedEnrichmentBackfillOps {
           accounting.select(docId, EnrichmentAccounting.Stage.NER);
         }
 
+        if ((content == null || content.isBlank())
+            && stopRequested(context, epochAtSelection, authority)) continue;
         if (content == null || content.isBlank()) {
           // No content means no artifact can be produced for any stage that applies here. Escalate
           // through each stage's retry-count seam (retry next cycle, FAILED at max) exactly as
@@ -661,11 +639,19 @@ public final class CombinedEnrichmentBackfillOps {
                 && embedAvailable
                 && SchemaFields.EMBEDDING_STATUS_PENDING.equals(embedStatus)
                 && hasChunkDocs(context, docId);
+        if (embedAvailable && SchemaFields.EMBEDDING_STATUS_PENDING.equals(embedStatus)) {
+          context.windowedEmbedProgress().identify(docId, content,
+              new WindowedEmbedProgress.Identity(authority, epochAtSelection, selectedEmbeddingProvider,
+                  selectedEmbeddingProvider.dimension(), docFields.get(SchemaFields.DOC_UID),
+                  docFields.get(SchemaFields.CONTENT_SHA256), docFields.get(SchemaFields.SOURCE_SHA256)));
+        }
         if (isLateChunkingParent) {
-          if (context.windowedEmbedProgress().nextWindow(docId, content) > 0) {
+          var route = context.windowedEmbedProgress().route(docId, content);
+          if (route != null || context.windowedEmbedProgress().nextWindow(docId, content) > 0) {
+            retainedParentRoute = true;
             embedDocIds.add(docId);
             embedContents.add(content);
-            directWindowedDocIds.add(docId);
+            if (route != WindowedEmbedProgress.Route.ORDINARY) directWindowedDocIds.add(docId);
           } else {
             lateChunkingDocIds.add(docId);
             lateChunkingContents.add(content);
@@ -752,13 +738,15 @@ public final class CombinedEnrichmentBackfillOps {
       List<String> windowedContents = new ArrayList<>();
       int priorityChunkEnd = 0;
       if (!embedDocIds.isEmpty() && embedAvailable) {
-        EmbeddingProvider windowProbe = context.embeddingProviderSupplier().get();
+        EmbeddingProvider windowProbe = selectedEmbeddingProvider;
         List<String> singleWindowDocIds = new ArrayList<>(embedDocIds.size());
         List<String> singleWindowContents = new ArrayList<>(embedContents.size());
         for (int i = 0; i < embedDocIds.size(); i++) {
           if (!embeddingReady(context, windowProbe)) break;
           if (directWindowedDocIds.contains(embedDocIds.get(i))
-              || windowProbe.documentWindowCount(embedContents.get(i)) > 1) {
+              || (context.windowedEmbedProgress().route(embedDocIds.get(i), embedContents.get(i))
+                      != WindowedEmbedProgress.Route.ORDINARY
+                  && windowProbe.documentWindowCount(embedContents.get(i)) > 1)) {
             windowedDocIds.add(embedDocIds.get(i));
             windowedContents.add(embedContents.get(i));
           } else if (chunkIdsInBatch.contains(embedDocIds.get(i))) {
@@ -788,7 +776,7 @@ public final class CombinedEnrichmentBackfillOps {
           // docs/tempdocs/809-human-validation-0.2.0-findings.md: a chunk turn may yield
           // only to a normal parent turn; cancellation must retain the batch's stop accounting.
           boolean stopped = context.hardStopRequestedSupplier().getAsBoolean()
-              || stopRequested(context, unitsDone, epochAtSelection);
+              || stopRequested(context, epochAtSelection, authority);
           if (!priorityTurnEndedNormally || stopped
               || !embeddingReady(context, selectedEmbeddingProvider)) {
 
@@ -805,17 +793,14 @@ public final class CombinedEnrichmentBackfillOps {
         // Every outcome still resolves within this pass's single bundled write. A non-arena-OOM failure
         // escalates the parent directly through the same retry-count/FAILED-at-max helper the
         // windowed batch failure path below uses.
-        if (embedTurn == 1 && !lateChunkingDocIds.isEmpty() && embedAvailable) {
-          EmbeddingProvider lateChunkingProvider = context.embeddingProviderSupplier().get();
+        // A retained route must get useful work next turn: another slow classification must
+        // not consume its deadline again. Unclassified parents keep their single-pass route.
+        if (embedTurn == 1 && !retainedParentRoute && !lateChunkingDocIds.isEmpty() && embedAvailable) {
+          EmbeddingProvider lateChunkingProvider = selectedEmbeddingProvider;
           for (int i = 0; i < lateChunkingDocIds.size(); i++) {
             // One whole-document forward pass per iteration — already the atomic unit, so the
             // checkpoint costs nothing but a volatile read (tempdoc 809 finding 3).
-            if (stopRequested(context, unitsDone, epochAtSelection)) {
-              aborted = true;
-
-              break;
-            }
-            if (embedShareSpent(context, unitsDone, otherStagesHaveWork)) {
+            if (embedShareSpent(context, otherStagesHaveWork)) {
               embedDeferredForOtherStages += lateChunkingDocIds.size() - i;
               break;
             }
@@ -824,7 +809,10 @@ public final class CombinedEnrichmentBackfillOps {
             String lcContent = lateChunkingContents.get(i);
             boolean fellBackToWindows = false;
             pacer.beforeUnit(1);
+            if (stopRequested(context, epochAtSelection, authority)
+                || !embeddingReady(context, lateChunkingProvider)) { aborted = true; break; }
             try {
+              accounting.started(lcDocId, EnrichmentAccounting.Stage.EMBED);
               EmbeddingService.ChunkedEmbedding result =
                   lateChunkingProvider.embedWithSpans(lcContent, NO_SPANS);
               if (result != null && result.primaryVector().length > 0) {
@@ -835,10 +823,18 @@ public final class CombinedEnrichmentBackfillOps {
                 singlePassProcessed++;
                 stageAdvancedDocIds.add(lcDocId);
               } else {
-                // Content exceeds the raised single-pass limit — fold into the windowed batch.
-                windowedDocIds.add(lcDocId);
-                windowedContents.add(lcContent);
-                directWindowedDocIds.add(lcDocId);
+                // Retain the route even if classification consumed this turn's deadline.
+                boolean windows = EmbeddingProvider.exposesDocumentWindows(lateChunkingProvider);
+                context.windowedEmbedProgress().route(lcDocId, lcContent,
+                    windows ? WindowedEmbedProgress.Route.WINDOW : WindowedEmbedProgress.Route.ORDINARY);
+                if (windows) {
+                  windowedDocIds.add(lcDocId);
+                  windowedContents.add(lcContent);
+                  directWindowedDocIds.add(lcDocId);
+                } else {
+                  embedDocIds.add(lcDocId);
+                  embedContents.add(lcContent);
+                }
                 longDocWindowed++;
                 fellBackToWindows = true;
               }
@@ -859,9 +855,17 @@ public final class CombinedEnrichmentBackfillOps {
                             + " {} (GPU arena OOM on single-pass batch-1): {}",
                         lcDocId,
                         e.getMessage());
-                windowedDocIds.add(lcDocId);
-                windowedContents.add(lcContent);
-                directWindowedDocIds.add(lcDocId);
+                boolean windows = EmbeddingProvider.exposesDocumentWindows(lateChunkingProvider);
+                context.windowedEmbedProgress().route(lcDocId, lcContent,
+                    windows ? WindowedEmbedProgress.Route.WINDOW : WindowedEmbedProgress.Route.ORDINARY);
+                if (windows) {
+                  windowedDocIds.add(lcDocId);
+                  windowedContents.add(lcContent);
+                  directWindowedDocIds.add(lcDocId);
+                } else {
+                  embedDocIds.add(lcDocId);
+                  embedContents.add(lcContent);
+                }
                 arenaOomWindowed++;
                 fellBackToWindows = true;
               } else {
@@ -891,28 +895,11 @@ public final class CombinedEnrichmentBackfillOps {
         }
 
         if (embedTurn == 1 && !windowedDocIds.isEmpty() && embedAvailable) {
-          EmbeddingProvider provider = context.embeddingProviderSupplier().get();
+          EmbeddingProvider provider = selectedEmbeddingProvider;
           WindowedEmbedProgress progress = context.windowedEmbedProgress();
           for (int i = 0; i < windowedDocIds.size(); i++) {
             String docId = windowedDocIds.get(i);
-            boolean directFallback = directWindowedDocIds.contains(docId);
-            // A null/OOM classification is not resumable progress. Ignore only the deadline it may
-            // have spent until one real window is recorded; hard preemption and deletion still win.
-            if (directFallback
-                && windowUnitsDone == 0
-                && (context.hardStopRequestedSupplier().getAsBoolean()
-                    || context.indexingCoordinator().bulkDeleteEpoch() != epochAtSelection)) {
-              aborted = true;
-
-              break;
-            }
-            int schedulingUnitsDone = directFallback ? windowUnitsDone : unitsDone;
-            if (stopRequested(context, schedulingUnitsDone, epochAtSelection)) {
-              aborted = true;
-
-              break;
-            }
-            if (embedShareSpent(context, schedulingUnitsDone, otherStagesHaveWork)) {
+            if (embedShareSpent(context, otherStagesHaveWork)) {
               embedDeferredForOtherStages += windowedDocIds.size() - i;
               break;
             }
@@ -924,6 +911,7 @@ public final class CombinedEnrichmentBackfillOps {
             // would end the lane on a stale flag and mis-report every remaining document as skipped.
             boolean stoppedOnThisDocument = false;
             boolean abortedOnThisDocument = false;
+            boolean rejectedSlice = false;
             try {
               int nextWindow = progress.nextWindow(docId, content);
               while (!progress.isComplete(docId)) {
@@ -934,44 +922,41 @@ public final class CombinedEnrichmentBackfillOps {
                 // A window is one encoder forward pass of at most a document's length, so the
                 // embedding slice counts windows here; counted whether or not the call succeeds.
                 pacer.beforeUnit(EMBED_WINDOW_SLICE);
+                if (stopRequested(context, epochAtSelection, authority)
+                    || !embeddingReady(context, provider)) {
+                  aborted = true;
+                  stoppedOnThisDocument = true;
+                  abortedOnThisDocument = true;
+                  break;
+                }
                 EmbeddingProvider.WindowSlice slice;
                 try {
+                  accounting.started(docId, isChunk ? EnrichmentAccounting.Stage.CHUNK_EMBED
+                      : EnrichmentAccounting.Stage.EMBED);
                   slice = provider.embedDocumentWindows(content, nextWindow, EMBED_WINDOW_SLICE);
                 } finally {
                   pacer.afterUnit(EMBED_WINDOW_SLICE);
                 }
-                if (slice == null || slice.vectors().isEmpty()) {
-                  // Either the provider stopped exposing windows mid-batch or it has no window at
-                  // this index — neither can produce a vector, so escalate through the same retry
-                  // seam every other embed failure uses rather than looping.
-                  throw new IllegalStateException(
-                      "windowed embed returned no vectors at window " + nextWindow);
+                if (slice == null) {
+                  progress.restartWindows(docId, content);
+                  rejectedSlice = true;
+                  throw new IllegalArgumentException("Null window slice");
                 }
                 unitsDone++;
                 windowUnitsDone++;
                 int advancedTo =
                     progress.record(
-                        docId, content, slice.totalWindows(), nextWindow, slice.vectors());
+                        docId, content, slice.totalWindows(), slice.fromWindow(), slice.vectors());
                 if (advancedTo <= nextWindow) {
-                  // The accumulator did not advance (every returned window was unusable, or the
-                  // provider answered a different range than it was asked for). Looping would spin
-                  // the GPU forever on a document that can never complete — the exact non-termination
-                  // class this work exists to remove — so escalate through the retry seam instead.
-                  throw new IllegalStateException(
-                      "windowed embed made no progress at window " + nextWindow);
+                  rejectedSlice = true;
+                  throw new IllegalArgumentException("Invalid window slice");
                 }
                 accounting.advanced(isChunk ? EnrichmentAccounting.Stage.CHUNK_EMBED : EnrichmentAccounting.Stage.EMBED);
                 nextWindow = advancedTo;
                 if (nextWindow >= slice.totalWindows()) {
                   break;
                 }
-                if (stopRequested(context, unitsDone, epochAtSelection)) {
-                  aborted = true;
-                  abortedOnThisDocument = true;
-                  stoppedOnThisDocument = true;
-                  break;
-                }
-                if (embedShareSpent(context, unitsDone, otherStagesHaveWork)) {
+                if (embedShareSpent(context, otherStagesHaveWork)) {
                   stoppedOnThisDocument = true;
                   break;
                 }
@@ -1005,7 +990,9 @@ public final class CombinedEnrichmentBackfillOps {
                   .warn(
                       "Combined backfill: windowed embed failed for {}: {}", docId, e.getMessage());
               if (!embeddingReady(context, provider) || SpladeBackfillOps.isSystemicFailure(e)) break;
-              progress.forget(docId);
+              // record() preserves a valid partial on a pure position mismatch, and resets
+              // every other malformed slice. Rejections still use ordinary retry accounting.
+              if (!rejectedSlice) progress.forget(docId);
               Map<String, String> docFields = batchedFields.getOrDefault(docId, Map.of());
               int currentRetryCount =
                   parseRetryCountOrZero(
@@ -1033,7 +1020,7 @@ public final class CombinedEnrichmentBackfillOps {
         }
 
         if (!embedDocIds.isEmpty() && embedAvailable) {
-          EmbeddingProvider provider = context.embeddingProviderSupplier().get();
+          EmbeddingProvider provider = selectedEmbeddingProvider;
           // Tempdoc 809 finding 3: encode in EMBED_ENCODE_SLICE-document slices instead of one call
           // over the whole batch. Same native forward passes (the encoder sub-batches at exactly this
           // size anyway), but the loop can now be left between them — which is what makes the
@@ -1042,24 +1029,23 @@ public final class CombinedEnrichmentBackfillOps {
           int sliceLimit = embedTurn == 0 ? priorityChunkEnd : embedDocIds.size();
           for (; sliceStart < sliceLimit;
               sliceStart = Math.min(sliceStart + EMBED_ENCODE_SLICE, sliceLimit)) {
-            if (stopRequested(context, unitsDone, epochAtSelection)) {
-              aborted = true;
-
-              break;
-            }
-            if (embedShareSpent(context, unitsDone, otherStagesHaveWork)) {
+            if (embedShareSpent(context, otherStagesHaveWork)) {
               embedDeferredForOtherStages += embedDocIds.size() - sliceStart;
               break;
             }
             int sliceEnd = Math.min(sliceStart + EMBED_ENCODE_SLICE, sliceLimit);
             List<String> sliceDocIds = embedDocIds.subList(sliceStart, sliceEnd);
             pacer.beforeUnit(sliceDocIds.size());
-            if (!embeddingReady(context, provider)) {
+            if (stopRequested(context, epochAtSelection, authority)
+                || !embeddingReady(context, provider)) {
+              aborted = true;
               priorityTurnEndedNormally = false;
               break;
             }
             List<float[]> vectors;
             try {
+              for (String id : sliceDocIds) accounting.started(id, chunkIdsInBatch.contains(id)
+                  ? EnrichmentAccounting.Stage.CHUNK_EMBED : EnrichmentAccounting.Stage.EMBED);
               vectors = provider.embedDocumentBatch(embedContents.subList(sliceStart, sliceEnd));
             } catch (Exception failure) {
               accounting.cancelled(EnrichmentAccounting.Stage.EMBED, failure);
@@ -1096,16 +1082,10 @@ public final class CombinedEnrichmentBackfillOps {
                 break;
               }
               if (fallback) {
-                // The failed batch is not a document attempt. Reach at least one individual call,
-                // even when it consumed the deadline; hard stops still pre-empt immediately.
-                if (context.hardStopRequestedSupplier().getAsBoolean()
-                    || context.indexingCoordinator().bulkDeleteEpoch() != epochAtSelection
-                    || (i > 0 && stopRequested(context, unitsDone, epochAtSelection))) {
-                  aborted = true;
-
-                  break;
-                }
+                // A fallback attempt is a new unit and must respect the same stops.
                 pacer.beforeUnit(1);
+                if (stopRequested(context, epochAtSelection, authority)
+                    || !embeddingReady(context, provider)) { aborted = true; break; }
                 try {
                   vectors.set(i, provider.embedDocument(embedContents.get(sliceStart + i),
                       InferenceRequest.background()));
@@ -1207,16 +1187,19 @@ public final class CombinedEnrichmentBackfillOps {
         }
         for (int n = 0; n < nerDocIds.size(); n++) {
           // Per-document GPU inference — already the atomic unit (batching regressed, item 22).
-          if (stopRequested(context, unitsDone, epochAtSelection)) {
-            aborted = true;
-
-            break;
-          }
           String docId = nerDocIds.get(n);
           Map<String, String> docFields = batchedFields.getOrDefault(docId, Map.of());
           String content = contentByDocId.get(docId);
           pacer.beforeUnit(1);
+          if (context.nerServiceSupplier().get() != nerService || !nerService.isAvailable()) {
+            aborted = true;
+            accounting.cancelled(EnrichmentAccounting.Stage.NER,
+                new java.util.concurrent.CancellationException());
+            break;
+          }
+          if (stopRequested(context, epochAtSelection, authority)) { aborted = true; break; }
           try {
+            accounting.started(docId, EnrichmentAccounting.Stage.NER);
             List<NerResult> nerBatch = nerService.extractEntitiesBatch(List.of(content));
             NerResult result = nerBatch.isEmpty() ? NerResult.EMPTY : nerBatch.get(0);
             Map<String, Object> updates = updatesByDocId.get(docId);
@@ -1232,6 +1215,9 @@ public final class CombinedEnrichmentBackfillOps {
             context
                 .log()
                 .warn("Combined backfill: NER failed for {}: {}", docId, e.getMessage());
+            boolean cancelled = accounting.cancelled(EnrichmentAccounting.Stage.NER, e);
+            if (cancelled || hardStopRequested(context, epochAtSelection, authority)
+                || context.nerServiceSupplier().get() != nerService) break;
             // Tempdoc 700: escalate via the same pure helper NerBackfillOps.handleNerFailure
             // uses. The try block above never touched updatesByDocId before throwing, so it's
             // safe to write the failure update directly (no partial-success clobber risk, unlike
@@ -1259,13 +1245,6 @@ public final class CombinedEnrichmentBackfillOps {
       boolean attemptedSplade = false;
       pacer.startPhase(bulkPace.spladePhaseDocs());
       for (int start = 0; start < spladeDocIds.size(); start += bulkPace.spladePhaseDocs()) {
-        if (context.hardStopRequestedSupplier().getAsBoolean()
-            || context.indexingCoordinator().bulkDeleteEpoch() != epochAtSelection
-            || stopRequested(context, unitsDone, epochAtSelection)) {
-          aborted = true;
-
-          break;
-        }
         if (!context.spladeAllowedSupplier().getAsBoolean()) break;
         SpladeEncoder encoder = context.spladeEncoderSupplier().get();
         if (encoder == null) {
@@ -1277,9 +1256,12 @@ public final class CombinedEnrichmentBackfillOps {
         List<String> sliceIds = spladeDocIds.subList(start, end);
         List<String> texts = sliceIds.stream().map(contentByDocId::get).toList();
         pacer.beforeUnit(sliceIds.size());
+        if (stopRequested(context, epochAtSelection, authority)
+            || context.spladeEncoderSupplier().get() != encoder) { aborted = true; break; }
         try {
           attemptedSplade = true;
           accounting.attempted(EnrichmentAccounting.Stage.SPLADE);
+          sliceIds.forEach(id -> accounting.started(id, EnrichmentAccounting.Stage.SPLADE));
           List<Map<String, Float>> vectors = encoder.encodeBatch(texts);
           if (vectors == null || vectors.size() != sliceIds.size()) {
             throw new IllegalStateException("SPLADE batch result size mismatch");
@@ -1406,6 +1388,18 @@ public final class CombinedEnrichmentBackfillOps {
         context.batchesSinceCommit()[0] = 0;
       }
 
+      if (context.indexingCoordinator().enrichmentAuthority() != authority) {
+        accounting.rejectedRetiredOutcomes();
+      }
+      if (embedAvailable && !embeddingReady(context, selectedEmbeddingProvider)) {
+        accounting.retired(EnrichmentAccounting.Stage.EMBED);
+        accounting.retired(EnrichmentAccounting.Stage.CHUNK_EMBED);
+        accounting.cancelRemaining();
+      }
+      if (hardStopRequested(context, epochAtSelection, authority)) {
+        accounting.cancelRemaining();
+        aborted = true;
+      }
       totalMs = (System.nanoTime() - t0) / 1_000_000;
       context.log().info("Enrichment dispositions: {}", accounting.snapshot().counters());
 

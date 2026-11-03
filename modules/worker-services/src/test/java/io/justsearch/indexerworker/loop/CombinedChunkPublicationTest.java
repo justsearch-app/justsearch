@@ -1,6 +1,8 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.indexerworker.loop;
 
+import static org.mockito.ArgumentMatchers.any;
+
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyMap;
@@ -79,7 +81,7 @@ class CombinedChunkPublicationTest extends LuceneExecutorTestBase {
         written.add(result.acceptedIds().size());
         if (refreshAfterPublication) runtime.commitOps().maybeRefreshBlocking();
         return result;
-      }).when(coordinator).publishEnrichmentBatch(anyList(), anyMap());
+      }).when(coordinator).publishEnrichmentBatch(anyList(), anyMap(), any());
       var context = new CombinedEnrichmentBackfillOps.BackfillContext(
           runtime.documentFieldOps(), coordinator, runtime.commitOps(), IndexingPacing.unthrottled(),
           () -> embedding, () -> null, () -> null, () -> true, () -> true, 100,

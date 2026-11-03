@@ -82,8 +82,8 @@ class EnrichmentAttemptAccountingTest {
     assertEquals(36, summary.tickets().size());
     assertEquals(1, summary.count(EMBED, PUBLISHED));
     assertEquals(11, summary.count(EMBED, CANCELLED));
-    assertEquals(12, summary.count(SPLADE, DEFERRED));
-    assertEquals(12, summary.count(NER, DEFERRED));
+    assertEquals(12, summary.count(SPLADE, CANCELLED));
+    assertEquals(12, summary.count(NER, CANCELLED));
     assertEquals(0, summary.count(EMBED, FAILED_CHARGED));
     assertEquals(1, outcome.embedProcessed());
     assertTrue(outcome.aborted());
@@ -118,7 +118,7 @@ class EnrichmentAttemptAccountingTest {
     });
     var outcome = CombinedEnrichmentBackfillOps.processCombinedBackfill(context());
     assertEquals(1L, outcome.accounting().counters().get("embed.window_advances"));
-    assertEquals(1, outcome.accounting().count(EMBED, DEFERRED));
+    assertEquals(1, outcome.accounting().count(EMBED, CANCELLED));
     assertEquals(0, outcome.embedProcessed());
     assertEquals(0, outcome.accounting().count(EMBED, PUBLISHED));
     assertFalse(outcome.accounting().counters().containsKey("embed.computed"));

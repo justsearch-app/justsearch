@@ -42,6 +42,8 @@ public final class NerBackfillOps {
    *     per-stage timing/counts from this instead of relying on a metrics call inside the op.
    */
   public static StageOutcome processNerBackfill(BackfillContext context) {
+    var authority = context.indexingCoordinator().enrichmentAuthority();
+    NerService selectedService = context.nerServiceSupplier().get();
     long methodStart = System.nanoTime();
     EnrichmentAccounting accounting = new EnrichmentAccounting();
     try {
@@ -69,12 +71,13 @@ public final class NerBackfillOps {
         accounting.cancelRemaining();
         return StageOutcome.observed(true, 0, methodStart, accounting);
       }
-      EnrichmentBatch batch = new EnrichmentBatch(context.documentFieldOps(), context.indexingCoordinator(), pendingIds).accounting(accounting);
+      EnrichmentBatch batch = new EnrichmentBatch(context.documentFieldOps(), context.indexingCoordinator(), pendingIds, authority).accounting(accounting);
       for (String docId : pendingIds) {
         // NER is CPU-only: interrupt on shutdown, no GPU check. Tempdoc 885 item 3: foreground
         // load paces the per-document loop instead of breaking out of it.
         context.pacing().pace();
-        if (!context.runningSupplier().getAsBoolean()) {
+        if (batch.stopped(() -> !context.runningSupplier().getAsBoolean())
+            || context.nerServiceSupplier().get() != selectedService) {
           accounting.cancelRemaining();
           context.log().debug("NER backfill interrupted: loop stopping");
           break;
@@ -94,11 +97,12 @@ public final class NerBackfillOps {
             continue;
           }
 
-          NerService nerService = context.nerServiceSupplier().get();
+          NerService nerService = selectedService;
           if (nerService == null) {
             context.log().debug("NER backfill: service unavailable, stopping batch");
             break;
           }
+          batch.started(List.of(docId), EnrichmentAccounting.Stage.NER);
           List<NerResult> nerBatch = nerService.extractEntitiesBatch(List.of(content));
           NerResult result = nerBatch.isEmpty() ? NerResult.EMPTY : nerBatch.get(0);
 
@@ -119,8 +123,13 @@ public final class NerBackfillOps {
           processed++;
 
         } catch (Exception e) {
-          accounting.cancelled(EnrichmentAccounting.Stage.NER, e);
+          boolean cancelled = accounting.cancelled(EnrichmentAccounting.Stage.NER, e);
           context.log().error("NER backfill failed for doc {}: {}", docId, e.getMessage());
+          if (cancelled || batch.stopped(() -> !context.runningSupplier().getAsBoolean())
+              || context.nerServiceSupplier().get() != selectedService) {
+            accounting.cancelRemaining();
+            break;
+          }
           markedFailed +=
               batch.failure(docId, SchemaFields.NER_RETRY_COUNT, NerBackfillOps::computeNerFailureUpdate);
           failed++;
@@ -136,6 +145,7 @@ public final class NerBackfillOps {
         processed = batch.updateBatch(batchUpdates).updatedCount();
       }
 
+      batch.rejectRetiredOutcomes();
       if (processed > 0 || failed > 0) {
         context
             .commitOps()
@@ -151,6 +161,9 @@ public final class NerBackfillOps {
       return StageOutcome.observed(true, processed, methodStart, accounting);
 
     } catch (Exception e) {
+      if (context.indexingCoordinator().enrichmentAuthority() != authority) {
+        accounting.rejectedRetiredOutcomes();
+      }
       accounting.cancelled(EnrichmentAccounting.Stage.NER, e);
       context.log().error("Error during NER backfill", e);
       return StageOutcome.observed(false, 0, methodStart, accounting);

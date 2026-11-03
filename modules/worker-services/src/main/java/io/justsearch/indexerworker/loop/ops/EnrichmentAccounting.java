@@ -49,6 +49,8 @@ public final class EnrichmentAccounting {
 
   private final Map<Ticket, Disposition> tickets = new LinkedHashMap<>();
   private final Set<Ticket> computed = new HashSet<>();
+  private final Set<Ticket> started = new HashSet<>();
+  private final Set<Ticket> retired = new HashSet<>();
   private final Set<Ticket> acceptedStages = new HashSet<>();
   private final Set<Ticket> terminalFailures = new HashSet<>();
   private final Map<String, Long> observations = new HashMap<>();
@@ -64,28 +66,54 @@ public final class EnrichmentAccounting {
   void computed(String id, Map<String, Object> updates) {
     for (Stage stage : Stage.values()) {
       Ticket ticket = new Ticket(id, stage);
+      if (updates.containsKey(stage.status) || updates.containsKey(stage.retry)) started.add(ticket);
       if (completed(updates.get(stage.status))) computed.add(ticket);
     }
   }
 
   void computed(String id, Stage stage) { computed.add(new Ticket(id, stage)); }
 
-  void attempted(Stage stage) { observations.put(stage.key + ".attempts", 1L); }
+  void started(String id, Stage stage) { started.add(new Ticket(id, stage)); }
 
-  void advanced(Stage stage) { observations.merge(stage.key + ".window_advances", 1L, Long::sum); }
-
-  void cancelled(Stage stage, Throwable failure) {
-    for (Throwable cause = failure; cause != null; cause = cause.getCause()) {
-      if (cause instanceof CancellationException || cause instanceof InterruptedException) {
-        tickets.replaceAll((ticket, disposition) -> ticket.stage() == stage
-            && disposition == Disposition.DEFERRED ? Disposition.CANCELLED : disposition);
-        return;
+  /** Retirement defers outcomes without spending a retry, including rejected failure writes. */
+  void rejectedRetiredOutcomes() {
+    for (Ticket ticket : started) {
+      Disposition disposition = tickets.get(ticket);
+      if (disposition == Disposition.DEFERRED || disposition == Disposition.CANCELLED) {
+        retired.add(ticket);
+        tickets.put(ticket, Disposition.DEFERRED);
       }
     }
   }
 
+  void retired(Stage stage) {
+    tickets.forEach((ticket, disposition) -> {
+      if (ticket.stage() == stage && started.contains(ticket)
+          && (disposition == Disposition.DEFERRED || disposition == Disposition.CANCELLED)) {
+        retired.add(ticket);
+        tickets.put(ticket, Disposition.DEFERRED);
+      }
+    });
+  }
+
+  void attempted(Stage stage) { observations.put(stage.key + ".attempts", 1L); }
+
+  void advanced(Stage stage) { observations.merge(stage.key + ".window_advances", 1L, Long::sum); }
+
+  boolean cancelled(Stage stage, Throwable failure) {
+    for (Throwable cause = failure; cause != null; cause = cause.getCause()) {
+      if (cause instanceof CancellationException || cause instanceof InterruptedException) {
+        tickets.replaceAll((ticket, disposition) -> ticket.stage() == stage
+            && disposition == Disposition.DEFERRED && !retired.contains(ticket)
+                ? Disposition.CANCELLED : disposition);
+        return true;
+      }
+    }
+    return false;
+  }
+
   void cancelRemaining() {
-    tickets.replaceAll((ticket, disposition) -> disposition == Disposition.DEFERRED
+    tickets.replaceAll((ticket, disposition) -> disposition == Disposition.DEFERRED && !retired.contains(ticket)
         ? Disposition.CANCELLED : disposition);
   }
 

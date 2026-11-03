@@ -2,6 +2,7 @@
 package io.justsearch.indexerworker.loop.ops;
 
 import io.justsearch.adapters.lucene.runtime.DocumentFieldOps;
+import io.justsearch.adapters.lucene.runtime.IndexingCoordinator;
 import io.justsearch.indexerworker.loop.pacing.IndexingPacing;
 import io.justsearch.indexerworker.disambiguation.DisambiguationService;
 import java.util.LinkedHashMap;
@@ -27,7 +28,14 @@ public final class DisambiguationBackfillOps {
       Supplier<DisambiguationService> serviceSupplier,
       BooleanSupplier runningSupplier,
       int batchSize,
-      Logger log) {}
+      Logger log,
+      IndexingCoordinator indexingCoordinator) {
+    public BackfillContext(DocumentFieldOps documentFieldOps, IndexingPacing pacing,
+        Supplier<DisambiguationService> serviceSupplier, BooleanSupplier runningSupplier,
+        int batchSize, Logger log) {
+      this(documentFieldOps, pacing, serviceSupplier, runningSupplier, batchSize, log, null);
+    }
+  }
 
   /**
    * Processes one resumable page of NER-completed documents.
@@ -37,8 +45,13 @@ public final class DisambiguationBackfillOps {
    */
   public static void processDisambiguationBackfill(BackfillContext context) {
     try {
+      var coordinator = context.indexingCoordinator();
+      var authority = coordinator == null ? null : coordinator.enrichmentAuthority();
+      long epoch = coordinator == null ? 0 : coordinator.bulkDeleteEpoch();
+      BooleanSupplier stopped = () -> EnrichmentBatch.hardStop(
+          () -> !context.runningSupplier().getAsBoolean(), coordinator, epoch, authority);
       DisambiguationService service = context.serviceSupplier().get();
-      if (service == null || !service.isAvailable() || !context.runningSupplier().getAsBoolean()) return;
+      if (service == null || !service.isAvailable() || stopped.getAsBoolean()) return;
       var state = context.documentFieldOps().entityCorpusState();
       if (state.pendingNer() != 0) return;
       if (!service.prepareReconciliation(state.revision(), state.readerKey())) return;
@@ -47,18 +60,24 @@ public final class DisambiguationBackfillOps {
       Map<String, Map<String, List<String>>> sources = new LinkedHashMap<>();
       for (var document : page.documents()) {
         context.pacing().pace();
-        if (!context.runningSupplier().getAsBoolean() || Thread.currentThread().isInterrupted()) return;
+        if (stopped.getAsBoolean() || context.serviceSupplier().get() != service) return;
         sources.put(document.id(), document.mentions());
       }
-      if (!context.runningSupplier().getAsBoolean() || Thread.currentThread().isInterrupted()) return;
+      if (stopped.getAsBoolean() || context.serviceSupplier().get() != service) return;
       service.replaceSources(sources, () -> {
         context.pacing().pace();
-        return context.runningSupplier().getAsBoolean();
+        return !stopped.getAsBoolean() && context.serviceSupplier().get() == service;
       });
-      if (!context.runningSupplier().getAsBoolean() || Thread.currentThread().isInterrupted()) return;
+      if (stopped.getAsBoolean() || context.serviceSupplier().get() != service) return;
       var current = context.documentFieldOps().entityCorpusState();
       if (!state.equals(current)) return;
-      service.acknowledgeReconciliation(page.cursor(), page.exhausted());
+      if (coordinator == null) service.acknowledgeReconciliation(page.cursor(), page.exhausted());
+      else coordinator.withEnrichmentAuthority(authority, () -> {
+        if (!stopped.getAsBoolean() && context.serviceSupplier().get() == service) {
+          service.acknowledgeReconciliation(page.cursor(), page.exhausted());
+        }
+        return null;
+      });
     } catch (Exception failure) {
       context.log().warn("Disambiguation batch incomplete; retrying next idle cycle", failure);
     }
