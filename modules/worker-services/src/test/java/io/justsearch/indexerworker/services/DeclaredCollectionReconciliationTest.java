@@ -63,6 +63,12 @@ final class DeclaredCollectionReconciliationTest {
         new LuceneRuntimeTypes.SearchResult(List.of(new LuceneRuntimeTypes.SearchHit(file.toString(), 1.0f, fields)), 1, 0));
     var runtime = mock(RunningRuntime.class);
     when(runtime.readPathOps()).thenReturn(reads);
+    var reuse = mock(io.justsearch.adapters.lucene.runtime.DocumentFieldOps.class);
+    when(reuse.isUnmodified(anyList(), any())).thenAnswer(call ->
+        ((List<io.justsearch.adapters.lucene.runtime.DocumentFieldOps.ReuseCandidate>) call.getArgument(0))
+            .stream().map(io.justsearch.adapters.lucene.runtime.DocumentFieldOps.ReuseCandidate::docId)
+            .collect(java.util.stream.Collectors.toSet()));
+    when(runtime.documentFieldOps()).thenReturn(reuse);
     var queue = mock(JobQueue.class);
     when(queue.enqueueEntries(anyList())).thenAnswer(invocation -> ((List<?>) invocation.getArgument(0)).size());
     when(queue.enqueueMaintenanceScanEntries(anyList(), nullable(String.class), any()))

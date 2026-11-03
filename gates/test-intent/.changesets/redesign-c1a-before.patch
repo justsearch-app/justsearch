@@ -1,0 +1,100 @@
+--- a/modules/worker-services/src/test/java/io/justsearch/indexerworker/services/SyncDirectoryOpsChangedStampTest.java
++++ b/modules/worker-services/src/test/java/io/justsearch/indexerworker/services/SyncDirectoryOpsChangedStampTest.java
+@@ -397,12 +397,6 @@
+     when(queue.enqueueEntries(anyList())).thenAnswer(admission);
+     when(queue.enqueueMaintenanceScanEntries(anyList(), nullable(String.class), any())).thenAnswer(admission);
+     var ops = new SyncDirectoryOps(reads, null, null, queue, IndexingPacing.unthrottled());
+-    var reuse = mock(io.justsearch.adapters.lucene.runtime.DocumentFieldOps.class);
+-    when(reuse.isUnmodified(anyList(), any())).thenAnswer(call ->
+-        ((List<io.justsearch.adapters.lucene.runtime.DocumentFieldOps.ReuseCandidate>) call.getArgument(0))
+-            .stream().map(io.justsearch.adapters.lucene.runtime.DocumentFieldOps.ReuseCandidate::docId)
+-            .collect(java.util.stream.Collectors.toSet()));
+-    ops.setDocumentFieldOps(reuse);
+     List<Path> expected = change.equals("unchanged") ? List.of() : List.of(file.toAbsolutePath());
+     if (candidate) {
+       try (var result = ops.discoverCandidateDifference(temporary.toString(), false, () -> false)) {
+--- a/modules/worker-services/src/test/java/io/justsearch/indexerworker/services/SyncExtractionPolicyTest.java
++++ b/modules/worker-services/src/test/java/io/justsearch/indexerworker/services/SyncExtractionPolicyTest.java
+@@ -71,12 +71,6 @@
+     when(queue.enqueueEntries(anyList())).thenAnswer(admission);
+     when(queue.enqueueMaintenanceScanEntries(anyList(), nullable(String.class), any())).thenAnswer(admission);
+     var ops = new SyncDirectoryOps(reads, null, null, queue, IndexingPacing.unthrottled());
+-    var reuse = mock(io.justsearch.adapters.lucene.runtime.DocumentFieldOps.class);
+-    when(reuse.isUnmodified(anyList(), any())).thenAnswer(call ->
+-        ((List<io.justsearch.adapters.lucene.runtime.DocumentFieldOps.ReuseCandidate>) call.getArgument(0))
+-            .stream().map(io.justsearch.adapters.lucene.runtime.DocumentFieldOps.ReuseCandidate::docId)
+-            .collect(java.util.stream.Collectors.toSet()));
+-    ops.setDocumentFieldOps(reuse);
+     ops.setExtractionPolicyId(policy.policyId());
+     List<Path> expected = repair ? List.of(file) : List.of();
+     for (var mode : List.of(SyncDirectoryOps.AdmissionMode.DEFAULT, SyncDirectoryOps.AdmissionMode.MAINTENANCE)) {
+--- a/modules/worker-services/src/test/java/io/justsearch/indexerworker/services/DeclaredCollectionReconciliationTest.java
++++ b/modules/worker-services/src/test/java/io/justsearch/indexerworker/services/DeclaredCollectionReconciliationTest.java
+@@ -63,12 +63,6 @@
+         new LuceneRuntimeTypes.SearchResult(List.of(new LuceneRuntimeTypes.SearchHit(file.toString(), 1.0f, fields)), 1, 0));
+     var runtime = mock(RunningRuntime.class);
+     when(runtime.readPathOps()).thenReturn(reads);
+-    var reuse = mock(io.justsearch.adapters.lucene.runtime.DocumentFieldOps.class);
+-    when(reuse.isUnmodified(anyList(), any())).thenAnswer(call ->
+-        ((List<io.justsearch.adapters.lucene.runtime.DocumentFieldOps.ReuseCandidate>) call.getArgument(0))
+-            .stream().map(io.justsearch.adapters.lucene.runtime.DocumentFieldOps.ReuseCandidate::docId)
+-            .collect(java.util.stream.Collectors.toSet()));
+-    when(runtime.documentFieldOps()).thenReturn(reuse);
+     var queue = mock(JobQueue.class);
+     when(queue.enqueueEntries(anyList())).thenAnswer(invocation -> ((List<?>) invocation.getArgument(0)).size());
+     when(queue.enqueueMaintenanceScanEntries(anyList(), nullable(String.class), any()))
+--- a/modules/worker-services/src/test/java/io/justsearch/indexerworker/services/SyncDirectoryOpsCandidateDiscoveryTest.java
++++ b/modules/worker-services/src/test/java/io/justsearch/indexerworker/services/SyncDirectoryOpsCandidateDiscoveryTest.java
+@@ -118,10 +118,6 @@
+     var ops = new SyncDirectoryOps(
+         reads, null, null, null, IndexingPacing.unthrottled(), null);
+ 
+-    var reuse = mock(io.justsearch.adapters.lucene.runtime.DocumentFieldOps.class);
+-    when(reuse.isUnmodified(org.mockito.ArgumentMatchers.anyList(), any()))
+-        .thenReturn(java.util.Set.of(PathNormalizer.normalizeKey(retained)));
+-    ops.setDocumentFieldOps(reuse);
+ 
+     try (SyncDirectoryOps.RootDifference difference =
+         ops.discoverCandidateDifference(tempDir.toString(), false, () -> false)) {
+--- a/modules/worker-services/src/test/java/io/justsearch/indexerworker/services/DeclaredCollectionScanSnapshotTest.java
++++ b/modules/worker-services/src/test/java/io/justsearch/indexerworker/services/DeclaredCollectionScanSnapshotTest.java
+@@ -45,10 +45,6 @@
+     var queue = mock(JobQueue.class);
+     when(queue.enqueueEntries(anyList())).thenAnswer(invocation -> ((List<?>) invocation.getArgument(0)).size());
+     var ops = new SyncDirectoryOps(reads, null, null, queue, IndexingPacing.unthrottled());
+-    var reuse = mock(io.justsearch.adapters.lucene.runtime.DocumentFieldOps.class);
+-    when(reuse.isUnmodified(anyList(), any())).thenReturn(hits.stream()
+-        .map(LuceneRuntimeTypes.SearchHit::docId).collect(java.util.stream.Collectors.toSet()));
+-    ops.setDocumentFieldOps(reuse);
+     var registryReads = new AtomicInteger();
+     ops.useDeclaredCollectionRoots(() -> {
+       registryReads.incrementAndGet();
+--- a/modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerIngestServiceCandidateReconciliationTest.java
++++ b/modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerIngestServiceCandidateReconciliationTest.java
+@@ -10,7 +10,6 @@
+ import static org.mockito.ArgumentMatchers.any;
+ import static org.mockito.ArgumentMatchers.anyString;
+ import static org.mockito.ArgumentMatchers.anyInt;
+-import static org.mockito.ArgumentMatchers.anyList;
+ import static org.mockito.ArgumentMatchers.anySet;
+ import static org.mockito.ArgumentMatchers.eq;
+ import static org.mockito.ArgumentMatchers.nullable;
+@@ -731,8 +730,6 @@
+     IndexingCoordinator candidateWriter = mock(IndexingCoordinator.class);
+     when(candidate.indexingCoordinator()).thenReturn(candidateWriter);
+     when(serving.readPathOps()).thenReturn(reads);
+-    when(serving.documentFieldOps().isUnmodified(anyList(), any()))
+-        .thenReturn(java.util.Set.copyOf(java.util.Arrays.asList(indexedPaths)));
+     when(serving.isAcceptingWrites()).thenReturn(true);
+     IndexingCoordinator servingWriter = mock(IndexingCoordinator.class);
+     CommitOps servingCommit = mock(CommitOps.class);
+--- a/modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/ExtractionPolicyMaintenanceAdmissionTest.java
++++ b/modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/ExtractionPolicyMaintenanceAdmissionTest.java
+@@ -100,7 +100,6 @@
+       try (var queue = new SqliteJobQueue(db)) {
+         queue.open();
+         var sync = new SyncDirectoryOps(runtime.readPathOps(), null, null, queue, IndexingPacing.unthrottled());
+-        sync.setDocumentFieldOps(runtime.documentFieldOps());
+         var result = sync.execute(root.toString(), false, null, () -> false, null,
+             SyncDirectoryOps.AdmissionMode.MAINTENANCE);
+         assertEquals("", result.getError());

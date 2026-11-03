@@ -30,28 +30,62 @@ final class ExtractionPolicyMaintenanceAdmissionTest extends LuceneExecutorTestB
 
   @Test
   void routineReconciliationReadmitsCompletedOlderExtractionAfterRestart() throws Exception {
-    check("completed");
+    check("completed", false);
   }
 
   @ParameterizedTest
   @ValueSource(strings = {"terminal", "future-retry"})
   void staleExtractionDoesNotResetProtectedFailureState(String state) throws Exception {
-    check(state);
+    check(state, false);
   }
 
-  private void check(String state) throws Exception {
+  @Test
+  void completedMissingChunkIsReadmittedWithoutForce() throws Exception {
+    check("completed", true);
+  }
+
+  @ParameterizedTest(name = "{displayName} [{index}] {arguments}")
+  @ValueSource(strings = {"terminal", "future-retry"})
+  void missingChunkRepairPreservesProtectedFailureOwner(String state) throws Exception {
+    check(state, true);
+  }
+
+  private void check(String state, boolean missingChunk) throws Exception {
     Path root = Files.createDirectory(temporary.resolve("sources"));
     Path file = Files.writeString(root.resolve("file.txt"), "unchanged source");
     String id = PathNormalizer.normalizeKey(file);
     Path db = temporary.resolve("queue.db");
     try (var runtime = IndexSchema.fromCatalog(new JustSearchConfigurationLoader().loadFieldCatalog())
         .ephemeral().withExecutorRegistrations(testLuceneExecutors()).open()) {
+      String content = missingChunk ? "alpha beta gamma delta ".repeat(400) : "old extraction";
       runtime.indexingCoordinator().indexSingle(new IndexDocument(Map.of(
           SchemaFields.DOC_ID, id, SchemaFields.DOC_UID, "uid", SchemaFields.PATH, id,
-          SchemaFields.CONTENT, "old extraction", SchemaFields.SIZE_BYTES, Files.size(file),
+          SchemaFields.CONTENT, content, SchemaFields.SIZE_BYTES, Files.size(file),
           SchemaFields.MODIFIED_AT, Files.getLastModifiedTime(file).toMillis(),
           SchemaFields.SOURCE_SHA256, SourceContentHash.sha256(file),
-          SchemaFields.EXTRACTION_POLICY_ID, "tika-default-v7")));
+          SchemaFields.EXTRACTION_POLICY_ID, missingChunk
+              ? io.justsearch.indexerworker.extract.TikaExtractionPolicy.defaults().policyId() : "tika-default-v7")));
+      if (missingChunk) {
+        int total = io.justsearch.indexing.chunking.ChunkSplitter.splitWithMetadata(content,
+            io.justsearch.indexing.chunking.ChunkSplitter.DEFAULT_CHUNK_TOKENS,
+            io.justsearch.indexing.chunking.ChunkSplitter.DEFAULT_OVERLAP_TOKENS).size();
+        assertTrue(total > 1);
+        String revision = io.justsearch.indexing.chunking.ChunkParentRevision.sha256Hex(content);
+        for (int child = 0; child < total; child++) {
+          runtime.indexingCoordinator().indexSingle(new IndexDocument(Map.of(
+              SchemaFields.DOC_ID, id + "#" + child, SchemaFields.DOC_UID, "uid#" + child,
+              SchemaFields.PATH, id, SchemaFields.IS_CHUNK, "true", SchemaFields.PARENT_DOC_ID, id,
+              SchemaFields.CHUNK_INDEX, child, SchemaFields.CHUNK_TOTAL, total,
+              SchemaFields.CHUNK_PARENT_CONTENT_SHA256, revision)));
+        }
+        runtime.indexingCoordinator().updateDocument(id, Map.of(SchemaFields.CHUNK_TOTAL, total,
+            SchemaFields.CONTENT_SHA256, revision, SchemaFields.CHUNK_PARENT_CONTENT_SHA256, revision));
+        runtime.commitOps().commitAndTrack();
+        assertTrue(runtime.documentFieldOps().isUnmodified(id, Files.getLastModifiedTime(file).toMillis(),
+            Files.size(file), SourceContentHash.sha256(file),
+            io.justsearch.indexerworker.extract.TikaExtractionPolicy.defaults().policyId()));
+        runtime.indexingCoordinator().deleteById(id + "#1");
+      }
       runtime.commitOps().commitAndTrack();
       runtime.commitOps().maybeRefreshBlocking();
       Map<String, String> saved;
@@ -66,6 +100,7 @@ final class ExtractionPolicyMaintenanceAdmissionTest extends LuceneExecutorTestB
       try (var queue = new SqliteJobQueue(db)) {
         queue.open();
         var sync = new SyncDirectoryOps(runtime.readPathOps(), null, null, queue, IndexingPacing.unthrottled());
+        sync.setDocumentFieldOps(runtime.documentFieldOps());
         var result = sync.execute(root.toString(), false, null, () -> false, null,
             SyncDirectoryOps.AdmissionMode.MAINTENANCE);
         assertEquals("", result.getError());
