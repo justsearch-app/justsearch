@@ -80,35 +80,28 @@ test('S2: candidate identity includes supporting hashes, normalizes SHA case and
   assert.equal(isolated.effectiveTargetDir(embedding, { filename: 'chat.gguf' }), embedding.targetDir);
 });
 
-test('S3: external model overrides, JVM properties and path-prefix tricks are refused before mutation', () => {
+test('S3: unlisted inherited JUSTSEARCH variables and all JVM properties are refused before mutation', () => {
   const dataDir = path.join(root, 'refused');
-  const models = path.join(dataDir, 'isolated-models');
-  const shared = path.join(root, 'shared');
   for (const env of [
-    { JUSTSEARCH_MODELS_DIR: shared },
-    { JUSTSEARCH_SPLADE_MODEL_PATH: shared },
-    { JUSTSEARCH_EMBED_ONNX_MODEL_PATH: `${models}-other/model.onnx` },
-    { JUSTSEARCH_LLM_MODEL_PATH: shared },
-    ...['JAVA_OPTS', 'UI_OPTS', 'JAVA_TOOL_OPTIONS', 'JDK_JAVA_OPTIONS', '_JAVA_OPTIONS'].map(name =>
-      ({ [name]: `-Djustsearch.models.dir="${shared}"` })),
-    { JAVA_OPTS: `-Djustsearch.splade.model_path="${shared}"` },
-    { UI_OPTS: `-Djustsearch.home="${shared}"` },
-    { JDK_JAVA_OPTIONS: `-Djustsearch.data.dir="${shared}"` },
+    { JUSTSEARCH_SPLADE_MODEL_PATH: root }, { JUSTSEARCH_CONFIG: 'config.yaml' },
+    { JUSTSEARCH_NEW_MODEL_PATH: root },
+    { JUSTSEARCH_REPO_ROOT: root }, { JUSTSEARCH_UNEXPECTED: 'true' },
+    ...['JAVA_OPTS', 'UI_OPTS', 'JAVA_TOOL_OPTIONS', 'JDK_JAVA_OPTIONS', '_JAVA_OPTIONS'].flatMap(name =>
+      [{ [name]: '-Danything=value' }, { [name]: '@options.txt' }]),
   ]) {
     assert.throws(() => prepare('partial', dataDir, env), error =>
       error.code === 'ISOLATED_MODELS_CONFLICT' && error.message.includes(Object.keys(env)[0]));
     assert.equal(fs.existsSync(dataDir), false);
   }
   assert.doesNotThrow(() => isolated.validateOverrides(dataDir, {
-    JUSTSEARCH_MODELS_DIR: models, JUSTSEARCH_SPLADE_MODEL_PATH: path.join(models, 'splade'),
-    UI_OPTS: `-Djustsearch.home="${dataDir}"`,
+    JUSTSEARCH_GPU_ENABLED: 'true', JUSTSEARCH_SERVER_EXE: '/some/server', JAVA_OPTS: '-Xmx512m',
   }));
 });
 
 test('S3: printed paths name the actual models, SPLADE override, home, settings and contract', () => {
   const dataDir = path.join(root, 'printed');
-  const splade = path.join(dataDir, 'isolated-models', 'my-splade');
-  const { paths } = prepare('none', dataDir, { JAVA_OPTS: `-Djustsearch.splade.model_path="${splade}"` });
+  const splade = null;
+  const { paths } = prepare('none', dataDir);
   let output = '';
   isolated.printPaths(paths, text => { output += text; });
   assert.deepEqual(JSON.parse(output.slice(output.indexOf('{'))), {
@@ -120,14 +113,12 @@ test('S3: printed paths name the actual models, SPLADE override, home, settings 
 test('S4: restarts and both start cleans preserve private progress; a deleted folder is recreated', async () => {
   const dataDir = path.join(root, 'restart');
   const { env } = prepare('partial', dataDir);
-  require('./lib/dev-data-folder.cjs').claimDevDataFolder(path.join(root, 'owned'), { tool: 'dev-runner' });
-  // Start from a claimed data folder, as the real CLI does before seeding.
   const owned = path.join(root, 'owned');
   const first = prepare('partial', owned);
   const staged = entries(first.env.JUSTSEARCH_MODELS_DIR)[0];
   fs.writeFileSync(staged, 'retained download progress');
   for (const mode of ['soft', 'hard']) {
-    await api.cleanOwnDataDir(owned, mode, [isolated.FOLDER]);
+    await api.cleanOwnDataDir(owned, mode, [isolated.FOLDER, isolated.CACHE_FOLDER, isolated.MARKER]);
     assert.equal(prepare('partial', owned).env.JUSTSEARCH_MODELS_DIR, first.env.JUSTSEARCH_MODELS_DIR);
     assert.equal(fs.readFileSync(staged, 'utf8'), 'retained download progress');
   }
@@ -139,7 +130,8 @@ test('S4: restarts and both start cleans preserve private progress; a deleted fo
 test('S3: a symlink cannot redirect the private folder or a seeded subtree into shared models', () => {
   const dataDir = path.join(root, 'linked');
   const shared = path.join(root, 'shared-link-target');
-  fs.mkdirSync(dataDir); fs.mkdirSync(shared);
+  prepare('none', dataDir); fs.mkdirSync(shared);
+  fs.rmdirSync(path.join(dataDir, isolated.FOLDER));
   fs.symlinkSync(shared, path.join(dataDir, 'isolated-models'), 'junction');
   assert.throws(() => prepare('partial', dataDir), /redirects outside/);
   fs.unlinkSync(path.join(dataDir, 'isolated-models'));

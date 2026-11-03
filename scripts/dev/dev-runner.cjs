@@ -322,6 +322,15 @@ function printUsage() {
       '',
       'Notes:',
       '  - start is a long-running supervisor (foreground). Use Ctrl+C or run stop/cleanup to tear down the stack.',
+      '  - Isolated models and ONNX cache stay under data-dir; paths print before launch. Use a fresh folder without inherited config.',
+      "    Restarts require this runner's isolation marker and only isolated-start output; inherited settings are refused.",
+      '    Inherited JUSTSEARCH_* variables are denied by default, including JUSTSEARCH_CONFIG and JUSTSEARCH_REPO_ROOT.',
+      '    Allowlist: JUSTSEARCH_SERVER_EXE (inference executable), JUSTSEARCH_GPU_ENABLED (GPU execution),',
+      '    JUSTSEARCH_GH_BIN (developer GitHub CLI), JUSTSEARCH_DEV_MCP_REPO_ROOT (MCP runner location),',
+      '    JUSTSEARCH_AGENT_IDENTITY_HANDOFF (caller ownership); none selects Engine configuration or storage paths.',
+      '    Runner-owned exceptions: JUSTSEARCH_DATA_DIR, JUSTSEARCH_HOME, JUSTSEARCH_MODELS_DIR,',
+      '    JUSTSEARCH_ORT_OPTIMIZED_CACHE_DIR, JUSTSEARCH_DEV_RUNNER_STATE_ROOT and JUSTSEARCH_CHAT_PROFILE.',
+      '    Remove every -D property and @argument file from JAVA_OPTS, UI_OPTS, JDK_JAVA_OPTIONS, JAVA_TOOL_OPTIONS and _JAVA_OPTIONS.',
       '  - When --json is used, stdout prints exactly one JSON object (no extra human logs).',
       '  - --clean soft|hard cleans only a data folder a dev tool created and marked (.justsearch-dev-data.json): a new or',
       '    empty folder is marked; any other non-empty folder is refused unchanged (DATA_DIR_NOT_OURS).',
@@ -607,7 +616,6 @@ const { resolveCuda12ServerExe } = require('./lib/dev-runtime.cjs');
 function resolveAiDevEnv({ isolatedModels: state = null, dataDir } = {}) {
   const isolated = state == null ? null : isolatedModels.prepare({ dataDir, state, repoRoot });
   const env = isolated ? isolated.env : {};
-  if (isolated) isolatedModels.printPaths(isolated.paths);
   // Tempdoc 656: provision the shared cuda12 GPU runtime (once, at the main checkout) so this and
   // every other worktree can reference it. Deliberately NO CPU baseline staging (GPU-only dev).
   ensureSharedCuda12Staged();
@@ -2492,9 +2500,11 @@ async function cmdStartHeavy(opts, releaseHeavy) {
   const dataDir = resolveDataDir(opts.dataDir);
   // Before admission: a start that would clean a folder that is not a dev tool's own is refused
   // before anything is stopped, started or changed.
+  if (opts.isolatedModels != null) {
+    isolatedModels.printPaths(isolatedModels.pathsFor(dataDir));
+    isolatedModels.validateOverrides(dataDir);
+  }
   assertCleanableDataDir(dataDir, opts.clean);
-  // Refuse conflicting paths before admission can stop a previous run or clean any data.
-  if (opts.isolatedModels != null) isolatedModels.validateOverrides(dataDir);
   const runDir = path.join(runsRoot, runId);
   const logsDir = path.join(runDir, 'logs');
   const runPath = path.join(runDir, 'run.json');
@@ -2685,7 +2695,9 @@ async function runAdmittedStart(opts, ctx) {
   const frontendStderr = fs.createWriteStream(frontendStderrPath, { flags: 'a' });
 
   // The clean gate is the admission above: a non-owner reaches this line only by taking over.
-  await cleanOwnDataDir(dataDir, opts.clean, opts.isolatedModels == null ? [] : [isolatedModels.FOLDER, isolatedModels.CACHE_FOLDER]);
+  if (opts.isolatedModels != null) isolatedModels.ensureDirectory(dataDir);
+  await cleanOwnDataDir(dataDir, opts.clean, opts.isolatedModels == null ? []
+    : [isolatedModels.FOLDER, isolatedModels.CACHE_FOLDER, isolatedModels.MARKER]);
 
   const aiEnv = resolveAiDevEnv({ ...opts, dataDir });
 

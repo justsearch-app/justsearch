@@ -7,169 +7,170 @@ import { createRequire } from 'node:module';
 import { pathToFileURL } from 'node:url';
 
 const require = createRequire(import.meta.url);
-// Allows the identical behavioral checks to run against a detached before checkout.
+// Run the same new checks against a detached before checkout without changing that tree.
 const repo = path.resolve(process.env.ISOLATED_MODELS_TEST_ROOT ?? path.join(import.meta.dirname, '../..'));
 const isolated = require(path.join(repo, 'scripts/dev/lib/isolated-models.cjs'));
-const { buildDevRunnerArgsStart } = await import(pathToFileURL(path.join(repo, 'scripts/dev/justsearch-dev-mcp/cli.mjs')));
-const root = fs.mkdtempSync(path.join(os.tmpdir(), 'isolated-repairs-'));
+const { buildDevRunnerArgsStart, runCliJson } = await import(pathToFileURL(path.join(repo, 'scripts/dev/justsearch-dev-mcp/cli.mjs')));
+const root = fs.mkdtempSync(path.join(os.tmpdir(), 'isolated-refusals-'));
 const tests = [];
 const test = (name, fn) => tests.push([name, fn]);
-const prepare = (dataDir, env = {}, state = 'none') => isolated.prepare({ dataDir, env, state, repoRoot: repo });
+const prepare = (dataDir, env = {}) => isolated.prepare({ dataDir, env, state: 'none', repoRoot: repo });
 const conflict = fn => assert.throws(fn, error => error.code === 'ISOLATED_MODELS_CONFLICT');
-const save = (file, value) => { fs.mkdirSync(path.dirname(file), { recursive: true }); fs.writeFileSync(file, JSON.stringify(value)); };
+const save = (file, text) => { fs.mkdirSync(path.dirname(file), { recursive: true }); fs.writeFileSync(file, text); };
 
-test('F1: CLI and MCP-built starts without dataDir use the resolved default', () => {
-  // A disposable checkout shape keeps the default data folder away from any real dev stack.
-  // A deliberately invalid runtime stops the CLI immediately after model preparation.
-  for (const transport of ['cli', 'mcp']) {
-    const fake = path.join(root, transport);
-    for (const relative of ['scripts/dev', 'scripts/lib', 'governance', 'contracts']) {
-      fs.cpSync(path.join(repo, relative), path.join(fake, relative), { recursive: true });
-    }
-    const defaultData = path.join(fake, 'modules/ui-web/.dev-data');
-    require(path.join(fake, 'scripts/dev/lib/dev-data-folder.cjs')).claimDevDataFolder(defaultData, { tool: 'dev-runner' });
-    for (const folder of ['isolated-models', 'isolated-ort-cache']) {
-      fs.mkdirSync(path.join(defaultData, folder));
-      fs.writeFileSync(path.join(defaultData, folder, 'progress'), 'retained');
-    }
-    const invalidRuntime = path.join(fake, 'not-executable');
-    fs.writeFileSync(invalidRuntime, 'invalid');
-    const args = transport === 'cli' ? ['start', '--json', '--isolated-models', '--skip-build', '--clean=hard', '--api-port=0']
-      : buildDevRunnerArgsStart({ apiPort: 0, uiPort: 5173, clean: 'hard', isolatedModels: 'none', skipBuild: true });
-    const result = spawnSync(process.execPath, [path.join(fake, 'scripts/dev/dev-runner.cjs'), ...args], {
-      encoding: 'utf8', timeout: 20000, cwd: root,
-      env: { ...process.env, JUSTSEARCH_SERVER_EXE: invalidRuntime, JS_ADMISSION_DIR: path.join(fake, 'admission'),
-        JUSTSEARCH_DEV_RUNNER_STATE_ROOT: path.join(fake, 'state') },
-    });
-    assert.equal(result.status, 1, result.stdout + result.stderr);
-    const failure = JSON.parse(result.stdout);
-    assert.match(failure.error.message, /JUSTSEARCH_SERVER_EXE must name a regular executable file/, result.stdout + result.stderr);
-    const printed = JSON.parse(result.stderr.match(/Isolated AI paths: (.+)/)?.[1] ?? '{}');
-    assert.equal(printed.appHome, path.join(fake, 'modules/ui-web/.dev-data'));
-    assert.equal(printed.models, path.join(printed.appHome, 'isolated-models'));
-    for (const folder of ['isolated-models', 'isolated-ort-cache']) {
-      assert.equal(fs.readFileSync(path.join(defaultData, folder, 'progress'), 'utf8'), 'retained');
-    }
+function fixture(name) {
+  const fake = path.join(root, name);
+  for (const relative of ['scripts/dev', 'scripts/lib', 'governance', 'contracts']) {
+    fs.cpSync(path.join(repo, relative), path.join(fake, relative), { recursive: true });
   }
-});
+  const invalidRuntime = path.join(fake, 'not-executable');
+  fs.writeFileSync(invalidRuntime, 'invalid');
+  const env = { ...process.env, JUSTSEARCH_SERVER_EXE: invalidRuntime,
+    JS_ADMISSION_DIR: path.join(fake, 'admission'), JUSTSEARCH_DEV_RUNNER_STATE_ROOT: path.join(fake, 'state') };
+  return { fake, env, data: path.join(fake, 'modules/ui-web/.dev-data') };
+}
+function start(f, { env = {}, args = ['start', '--json', '--isolated-models', '--skip-build', '--clean=none', '--api-port=0'] } = {}) {
+  return spawnSync(process.execPath, [path.join(f.fake, 'scripts/dev/dev-runner.cjs'), ...args], {
+    encoding: 'utf8', timeout: 20000, cwd: root, env: { ...f.env, ...env },
+  });
+}
+function refused(f, options, source) {
+  const result = start(f, options);
+  assert.equal(result.status, 1, result.stdout + result.stderr);
+  const failure = JSON.parse(result.stdout);
+  assert.equal(failure.error.code, 'ISOLATED_MODELS_CONFLICT', result.stdout + result.stderr);
+  assert.match(failure.error.message, source);
+  assert.equal(fs.existsSync(path.join(f.env.JUSTSEARCH_DEV_RUNNER_STATE_ROOT, 'active.json')), false);
+  return result;
+}
+function reachedRuntime(result) {
+  assert.equal(result.status, 1, result.stdout + result.stderr);
+  assert.match(JSON.parse(result.stdout).error.message, /JUSTSEARCH_SERVER_EXE must name a regular executable file/);
+}
 
-test('F2: relative data and model overrides resolve against the Engine checkout from a foreign cwd', () => {
-  const original = process.cwd();
-  try {
-    process.chdir(root);
-    const relative = 'tmp/relative-isolated-test';
-    const paths = isolated.validateOverrides(relative, { JUSTSEARCH_SPLADE_MODEL_PATH: `${relative}/isolated-models/splade` });
-    assert.equal(paths.appHome, path.join(repo, relative));
-    assert.equal(paths.models, path.join(repo, relative, 'isolated-models'));
-    assert.equal(paths.splade, path.join(paths.models, 'splade'));
-    // Java Path.of preserves whitespace in env/settings strings; trimming can admit an escape.
-    conflict(() => isolated.validateOverrides(path.join(repo, relative), {
-      JAVA_OPTS: `-Djustsearch.models.dir="${paths.models} "`,
-    }));
-    conflict(() => isolated.validateOverrides(path.join(repo, relative), {
-      JUSTSEARCH_SPLADE_MODEL_PATH: ` ${path.join(paths.models, 'splade')}`,
-    }));
-    const channels = ['JAVA_TOOL_OPTIONS', 'JDK_JAVA_OPTIONS', 'JAVA_OPTS', 'UI_OPTS', '_JAVA_OPTIONS'];
-    const env = Object.fromEntries(channels.map((name, i) => [name, `-Djustsearch.splade.model_path="${path.join(paths.models, String(i))}"`]));
-    for (let i = channels.length - 1; i >= 0; i--) {
-      assert.equal(isolated.validateOverrides(path.join(repo, relative), env).splade, path.join(paths.models, String(i)));
-      delete env[channels[i]];
-    }
-    assert.doesNotThrow(() => isolated.validateOverrides(path.join(repo, relative), {
-      JAVA_OPTS: `-Djustsearch.home=${relative} -Djustsearch.splade.model_path=${relative}/isolated-models/splade`,
-    }));
-  } finally { process.chdir(original); }
-});
-
-test('F3: repo-root and local model discovery fallbacks cannot escape isolation', () => {
-  const data = path.join(root, 'fallback');
-  conflict(() => prepare(data, { JUSTSEARCH_REPO_ROOT: repo }));
-  for (const name of ['JAVA_OPTS', 'UI_OPTS', 'JAVA_TOOL_OPTIONS', 'JDK_JAVA_OPTIONS', '_JAVA_OPTIONS']) {
-    conflict(() => prepare(data, { [name]: `-Djustsearch.repo.root="${repo}"` }));
-  }
-  assert.equal(fs.existsSync(data), false);
-  fs.mkdirSync(path.join(data, 'models'), { recursive: true });
-  fs.writeFileSync(path.join(data, 'models', 'model.onnx'), 'shared');
-  conflict(() => prepare(data));
-  fs.rmSync(path.join(data, 'models'), { recursive: true });
-  prepare(data);
-  fs.symlinkSync(path.join(data, 'isolated-models'), path.join(data, 'models'), 'junction');
-  assert.doesNotThrow(() => prepare(data));
-});
-
-test('F4: legacy and versioned settings and install-contract external paths are refused without rewriting', () => {
-  const data = path.join(root, 'saved');
-  const settings = path.join(data, 'ui/settings.json');
-  for (const key of ['llmModelPath', 'embedOnnxModelPath', 'rerankerModelPath', 'nerModelPath', 'spladeModelPath', 'citationScorerModelPath']) {
-    for (const envelope of [false, true]) {
-      const value = { [key]: path.join(root, 'shared-models') };
-      save(settings, envelope ? { schemaVersion: 6, settings: value } : value);
-      const bytes = fs.readFileSync(settings);
-      conflict(() => prepare(data));
-      assert.deepEqual(fs.readFileSync(settings), bytes);
-      assert.equal(fs.existsSync(path.join(data, 'isolated-models')), false);
-    }
-  }
-  save(settings, { schemaVersion: 6, settings: { spladeModelPath: path.join(data, 'isolated-models/splade') } });
-  const contract = path.join(data, 'install-contract.v2.json');
-  for (const value of [
-    { modelsDir: path.join(root, 'shared-models') },
-    { models: { embedding: { targetDir: '../escape', variantFilename: 'model.onnx' } } },
-    { models: { embedding: { targetDir: 'embedding', installedFiles: ['../../escape'] } } },
+test('S3: CLI refuses every inherited source before admission or data mutation', () => {
+  const f = fixture('sources');
+  const yaml = path.join(root, 'application.yaml');
+  save(yaml, `llm:\n  model_path: ${root}/shared.gguf\n`);
+  const argfile = path.join(root, 'options.txt');
+  save(argfile, `-Djustsearch.config=${yaml}`);
+  for (const env of [
+    { JUSTSEARCH_CONFIG: yaml }, { JUSTSEARCH_UNEXPECTED_PATH: root },
+    { JUSTSEARCH_REPO_ROOT: root }, { JUSTSEARCH_UNEXPECTED: 'true' },
+    { JUSTSEARCH_ANOTHER_MODEL: 'shared.gguf' }, { JUSTSEARCH_CUSTOM_PROFILE: 'foreign' },
+    ...['JAVA_OPTS', 'UI_OPTS', 'JDK_JAVA_OPTIONS', 'JAVA_TOOL_OPTIONS', '_JAVA_OPTIONS'].flatMap(name => [
+      { [name]: `-Djustsearch.config="${yaml}"` }, { [name]: `-Duser.dir="${root}"` },
+      { [name]: '-Dunrelated' }, { [name]: `@"${argfile}"` },
+    ]),
   ]) {
-    save(contract, { schemaVersion: 2, ...value });
-    const bytes = fs.readFileSync(contract);
-    conflict(() => prepare(data));
-    assert.deepEqual(fs.readFileSync(contract), bytes);
+    refused(f, { env }, new RegExp(Object.keys(env)[0]));
+    assert.equal(fs.existsSync(f.data), false);
   }
-  save(contract, { schemaVersion: 2, modelsDir: path.join(data, 'isolated-models'), models: {} });
-  assert.doesNotThrow(() => prepare(data));
-  // A real InstallContractIO write uses file URIs (including percent-encoded spaces).
-  const spacedData = path.join(root, 'saved with spaces');
-  const serialized = pathToFileURL(path.join(spacedData, 'isolated-models')).href;
-  save(path.join(spacedData, 'install-contract.v2.json'), { schemaVersion: 2, modelsDir: serialized, models: {} });
-  assert.doesNotThrow(() => prepare(spacedData));
-  save(contract, { schemaVersion: 2, modelsDir: pathToFileURL(path.join(root, 'shared-models')).href });
-  conflict(() => prepare(data));
 });
 
-test('F5: optimized graph cache is private; every JVM channel rejects external overrides', () => {
-  const data = path.join(root, 'cache');
-  const result = prepare(data);
-  const cache = path.join(data, 'isolated-ort-cache');
-  assert.equal(result.env.JUSTSEARCH_ORT_OPTIMIZED_CACHE_DIR, cache);
-  assert.equal(result.paths.optimizedCache, cache);
-  conflict(() => prepare(data, { JUSTSEARCH_ORT_OPTIMIZED_CACHE_DIR: root }));
-  for (const name of ['JAVA_OPTS', 'UI_OPTS', 'JAVA_TOOL_OPTIONS', 'JDK_JAVA_OPTIONS', '_JAVA_OPTIONS']) {
-    conflict(() => prepare(data, { [name]: `-Djustsearch.ort.optimized_cache_dir="${root}"` }));
+test('S3: unmarked non-empty folders, saved query roles and index manifests are refused unchanged', () => {
+  const f = fixture('existing');
+  for (const [relative, text] of [
+    ['foreign.txt', 'keep me'],
+    ['ui/settings.json', JSON.stringify({ settings: { queryRoles: { chat: { modelPath: '/shared/model.gguf' } } } })],
+    ['index/default/indices/g-old/.justsearch-index-generation.json', JSON.stringify({ modelPath: '/shared/model.onnx' })],
+  ]) {
+    save(path.join(f.data, relative), text);
+    refused(f, {}, /non-empty data folder/);
+    assert.equal(fs.readFileSync(path.join(f.data, relative), 'utf8'), text);
+    assert.equal(fs.existsSync(path.join(f.data, 'isolated-models')), false);
+    fs.rmSync(f.data, { recursive: true });
   }
-  assert.doesNotThrow(() => prepare(data, { JUSTSEARCH_ORT_OPTIMIZED_CACHE_DIR: cache }));
-
+  // A normal dev-data marker is not evidence of an isolated start.
+  require(path.join(f.fake, 'scripts/dev/lib/dev-data-folder.cjs')).claimDevDataFolder(f.data, { tool: 'dev-runner' });
+  refused(f, {}, /previous isolated start/);
 });
 
-test('F6: every state and restart guard rejects escaping descendants, including dangling links', () => {
+test('S3: marked folders still refuse foreign content and saved configuration before cleaning', () => {
+  const f = fixture('foreign');
+  const local = require(path.join(f.fake, 'scripts/dev/lib/isolated-models.cjs'));
+  local.prepare({ dataDir: f.data, env: {}, state: 'none', repoRoot: f.fake });
+  for (const relative of ['foreign.txt', 'config/application.yaml', 'ui/settings.json', 'install-contract.v2.json', 'models/shared.onnx']) {
+    save(path.join(f.data, relative), '{}');
+    refused(f, { args: ['start', '--json', '--isolated-models', '--skip-build', '--clean=hard'] }, /foreign content/);
+    assert.equal(fs.readFileSync(path.join(f.data, relative), 'utf8'), '{}');
+    fs.rmSync(path.join(f.data, relative.split('/')[0]), { recursive: true });
+  }
+});
+
+test('S4: CLI and MCP marked starts accept the resolved default and preserve both folders through cleans', async () => {
+  for (const transport of ['cli', 'mcp']) {
+    const f = fixture(transport);
+    const local = require(path.join(f.fake, 'scripts/dev/lib/isolated-models.cjs'));
+    local.prepare({ dataDir: f.data, env: {}, state: 'none', repoRoot: f.fake });
+    const marker = fs.readFileSync(path.join(f.data, local.MARKER), 'utf8');
+    for (const folder of ['isolated-models', 'isolated-ort-cache']) save(path.join(f.data, folder, 'progress'), 'retained');
+    for (const clean of ['soft', 'hard', 'none']) {
+      const args = transport === 'cli' ? ['start', '--json', '--isolated-models', '--skip-build', `--clean=${clean}`, '--api-port=0']
+        : buildDevRunnerArgsStart({ apiPort: 0, uiPort: 5173, clean, isolatedModels: 'none', skipBuild: true });
+      const mcp = transport === 'mcp' ? await runCliJson({ repoRoot: f.fake,
+        devRunnerPath: path.join(f.fake, 'scripts/dev/dev-runner.cjs'), args,
+        env: { ...f.env, JUSTSEARCH_DEV_MCP_REPO_ROOT: f.fake,
+          ...require(path.join(repo, 'scripts/dev/lib/agent-identity.cjs')).buildHandoffEnv({
+            harness: 'ci', owner: null, sessionId: 'isolated-test', source: 'explicit',
+          }) }, timeoutMs: 20000, mode: 'oneshot' }) : null;
+      const result = mcp ? { status: mcp.exitCode, stdout: JSON.stringify(mcp.json), stderr: mcp.stderr } : start(f, { args });
+      reachedRuntime(result);
+      const printed = JSON.parse(result.stderr.match(/Isolated AI paths: (.+)/)?.[1] ?? '{}');
+      assert.equal(printed.appHome, f.data);
+      assert.equal(fs.readFileSync(path.join(f.data, local.MARKER), 'utf8'), marker);
+      for (const folder of ['isolated-models', 'isolated-ort-cache']) {
+        assert.equal(fs.readFileSync(path.join(f.data, folder, 'progress'), 'utf8'), 'retained');
+      }
+    }
+  }
+});
+
+test('P1: default start still accepts inherited config and saved settings', () => {
+  const f = fixture('ordinary');
+  save(path.join(f.data, 'ui/settings.json'), '{"queryRoles":{}}');
+  const result = start(f, { args: ['start', '--json', '--skip-build', '--clean=none'],
+    env: { JUSTSEARCH_CONFIG: '/ordinary/application.yaml', JAVA_OPTS: '-Duser.dir=/ordinary' } });
+  reachedRuntime(result);
+  assert.doesNotMatch(result.stderr, /Isolated AI paths/);
+  assert.equal(fs.existsSync(path.join(f.data, '.justsearch-isolated-models.json')), false);
+});
+
+test('S1: runner-owned paths replace inherited values; GPU/server and ordinary JVM flags remain allowed', () => {
+  const data = path.join(root, 'owned-paths');
+  const result = prepare(data, {
+    JUSTSEARCH_HOME: '/ignored', JUSTSEARCH_DATA_DIR: '/ignored', JUSTSEARCH_MODELS_DIR: '/ignored',
+    JUSTSEARCH_ORT_OPTIMIZED_CACHE_DIR: '/ignored', JUSTSEARCH_DEV_RUNNER_STATE_ROOT: root,
+    JUSTSEARCH_CHAT_PROFILE: 'compact', JUSTSEARCH_GPU_ENABLED: 'true', JUSTSEARCH_SERVER_EXE: '/server',
+    JUSTSEARCH_GH_BIN: '/tooling/gh',
+    JAVA_OPTS: '-Xmx512m -XX:+UseG1GC',
+  });
+  assert.equal(result.env.JUSTSEARCH_MODELS_DIR, path.join(data, 'isolated-models'));
+  assert.equal(result.env.JUSTSEARCH_ORT_OPTIMIZED_CACHE_DIR, path.join(data, 'isolated-ort-cache'));
+});
+
+test('S3: escaping private-folder and cache symlinks remain refused on restart', () => {
   const data = path.join(root, 'links');
+  const { paths } = prepare(data);
   const shared = path.join(root, 'shared');
   fs.mkdirSync(shared);
-  const { paths } = prepare(data);
-  for (const target of [shared, path.join(shared, 'not-yet-created')]) {
-    const link = path.join(paths.models, 'onnx');
-    fs.symlinkSync(target, link, 'junction');
-    for (const state of ['none', 'partial', 'truncated']) conflict(() => prepare(data, {}, state));
-    conflict(() => isolated.ensureDirectory(data, {}));
-    fs.unlinkSync(link);
+  for (const folder of [paths.models, paths.optimizedCache]) {
+    for (const target of [shared, path.join(shared, 'not-yet-created')]) {
+      fs.symlinkSync(target, path.join(folder, 'escape'), 'junction');
+      conflict(() => isolated.ensureDirectory(data, {}));
+      fs.unlinkSync(path.join(folder, 'escape'));
+    }
   }
-  fs.symlinkSync(shared, path.join(paths.optimizedCache, 'redirect'), 'junction');
-  conflict(() => isolated.ensureDirectory(data, {}));
   assert.deepEqual(fs.readdirSync(shared), []);
 });
 
 let failed = 0;
 try {
   for (const [name, run] of tests) {
+    if (process.env.ISOLATED_MODELS_TEST_FILTER && !name.includes(process.env.ISOLATED_MODELS_TEST_FILTER)) continue;
     try { await run(); console.log(`PASS ${name}`); }
     catch (error) { failed++; console.error(`FAIL ${name}: ${error.stack}`); }
   }
 } finally { fs.rmSync(root, { recursive: true, force: true }); }
-console.log(`isolated-models repairs: ${tests.length - failed}/${tests.length} passed`);
+console.log(`isolated-models refusals: ${failed} failed`);
 process.exitCode = failed ? 1 : 0;

@@ -94,7 +94,13 @@ export const StartInputSchema = z
     isolatedModels: z.enum(['none', 'partial', 'truncated']).optional()
       .describe('Use <dataDir>/isolated-models instead of shared models. none creates an empty folder; '
         + 'partial seeds tiny .partial files; truncated seeds tiny incomplete final files from the registry. '
-        + 'No downloads or fake installed state. Paths print before launch; external model overrides are refused. '
+        + 'No downloads or fake installed state. Paths print before launch. Requires a fresh folder without inherited config, '
+        + 'or marked isolated-start output from this runner. Inherited JUSTSEARCH_* variables are denied by default '
+        + 'except runner-owned values and JUSTSEARCH_SERVER_EXE (inference executable), JUSTSEARCH_GPU_ENABLED (GPU execution), '
+        + 'JUSTSEARCH_GH_BIN (developer GitHub CLI), JUSTSEARCH_DEV_MCP_REPO_ROOT (MCP runner location), '
+        + 'JUSTSEARCH_AGENT_IDENTITY_HANDOFF (caller ownership); none selects Engine configuration or storage paths. '
+        + 'Refuses every -D property or @argument file in JAVA_OPTS, UI_OPTS, '
+        + 'JDK_JAVA_OPTIONS, JAVA_TOOL_OPTIONS or _JAVA_OPTIONS. '
         + 'Restart preserves the private folder; use a fresh dataDir to change seed state. Omit for normal shared models.'),
     clean: CleanModeSchema.optional(),
     waitLevel: ReadyLevelSchema.optional().describe('Readiness level to wait for after start (default: ready_worker)'),
