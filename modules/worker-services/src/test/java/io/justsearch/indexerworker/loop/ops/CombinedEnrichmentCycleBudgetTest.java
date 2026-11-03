@@ -53,7 +53,7 @@ class CombinedEnrichmentCycleBudgetTest {
   @Mock DocumentFieldOps documentFieldOps;
   @Mock IndexingCoordinator indexingCoordinator;
   @Mock CommitOps commitOps;
-  @Mock EmbeddingProvider embeddingProvider;
+  @Mock EmbeddingService embeddingProvider;
 
   private final Map<String, Map<String, Object>> fakeIndex = new LinkedHashMap<>();
   private final Map<String, String> contentByDoc = new LinkedHashMap<>();

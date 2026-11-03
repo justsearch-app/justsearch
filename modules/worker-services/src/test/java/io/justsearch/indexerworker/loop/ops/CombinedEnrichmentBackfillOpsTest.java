@@ -58,7 +58,7 @@ class CombinedEnrichmentBackfillOpsTest {
   @Mock DocumentFieldOps documentFieldOps;
   @Mock IndexingCoordinator indexingCoordinator;
   @Mock CommitOps commitOps;
-  @Mock EmbeddingProvider embeddingProvider;
+  @Mock EmbeddingService embeddingProvider;
   @Mock SpladeEncoder spladeEncoder;
   @Mock NerService nerService;
 
@@ -782,7 +782,6 @@ class CombinedEnrichmentBackfillOpsTest {
   }
 
   @Test
-  @DisplayName("real pending SPLADE reserves its share while deferring a completed-parent bundle")
   void realPendingSpladeAllowsDeferralButNeverWritesThePreservationOnlyUpdate() throws Exception {
     seedDoc("window-first", "first content", Map.of(
         SchemaFields.EMBEDDING_STATUS, SchemaFields.EMBEDDING_STATUS_PENDING));
@@ -792,8 +791,6 @@ class CombinedEnrichmentBackfillOpsTest {
     seedDoc("real-pending", "pending content", Map.of(
         SchemaFields.SPLADE_STATUS, SchemaFields.SPLADE_STATUS_PENDING));
     when(embeddingProvider.documentWindowCount(anyString())).thenReturn(2);
-    when(embeddingProvider.embedDocumentWindows(anyString(), anyInt(), anyInt()))
-        .thenReturn(new EmbeddingProvider.WindowSlice(List.of(new float[] {1f, 0f}), 0, 2));
     when(spladeEncoder.encodeBatch(anyList()))
         .thenReturn(List.of(Map.of("fresh", 1.0f), Map.of("fresh", 1.0f)));
 
@@ -802,6 +799,8 @@ class CombinedEnrichmentBackfillOpsTest {
             () -> false, () -> true, new WindowedEmbedProgress()));
 
     assertTrue(outcome.progressed(), "real pending SPLADE advanced durably");
+    assertDoesNotThrow(() -> verify(embeddingProvider, never())
+        .embedDocumentWindows(anyString(), anyInt(), anyInt()));
     verify(indexingCoordinator).updateDocumentsBatch(argThat(batch ->
         batch.size() == 1 && batch.getFirst().getKey().equals("real-pending")));
     assertFalse(fakeIndex.get("parent-deferred").containsKey(SchemaFields.SPLADE));

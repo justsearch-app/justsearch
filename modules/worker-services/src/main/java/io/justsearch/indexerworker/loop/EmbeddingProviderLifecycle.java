@@ -57,6 +57,19 @@ public final class EmbeddingProviderLifecycle {
   private final JobQueue jobQueue;
   private final IndexCountOps indexCountOps;
   private final CommitOps commitOps;
+  private volatile io.justsearch.adapters.lucene.runtime.IndexingCoordinator enrichmentCoordinator;
+
+  /** Bound by the scheduler before any background enrichment can start. */
+  public void bindEnrichmentCoordinator(
+      io.justsearch.adapters.lucene.runtime.IndexingCoordinator coordinator) {
+    synchronized (embeddingLifecycleLock) {
+      if (enrichmentCoordinator == coordinator) return;
+      if (enrichmentCoordinator != null) {
+        throw new IllegalStateException("Embedding lifecycle already bound to a coordinator");
+      }
+      coordinator.transitionEnrichmentAuthority(() -> enrichmentCoordinator = coordinator);
+    }
+  }
 
   private volatile EmbeddingProvider embeddingProvider = NoOpEmbeddingProvider.INSTANCE;
   private volatile EmbeddingService embeddingServiceForLifecycle;
@@ -116,8 +129,18 @@ public final class EmbeddingProviderLifecycle {
   // ---- setters / accessors ----
 
   public void setEmbeddingProvider(EmbeddingProvider provider) {
-    this.embeddingProvider = provider != null ? provider : NoOpEmbeddingProvider.INSTANCE;
-    this.embeddingServiceForLifecycle = provider instanceof EmbeddingService es ? es : null;
+    synchronized (embeddingLifecycleLock) {
+      // Each publication is a fresh identity, even for the same object. EmbeddingService's
+      // prefix, pooling and framing/window configuration are immutable for that publication;
+      // a replacement can never inherit its retained sums or publication authority.
+      Runnable swap = () -> {
+        this.embeddingProvider = provider != null ? provider : NoOpEmbeddingProvider.INSTANCE;
+        this.embeddingServiceForLifecycle = provider instanceof EmbeddingService es ? es : null;
+      };
+      var coordinator = enrichmentCoordinator;
+      if (coordinator == null) swap.run();
+      else coordinator.transitionEnrichmentAuthority(swap);
+    }
   }
 
   public EmbeddingProvider embeddingProvider() {
@@ -237,14 +260,13 @@ public final class EmbeddingProviderLifecycle {
       return;
     }
     log.info("GPU transition: UNLOADING embedding model (Main claimed GPU for Online Mode)");
+    setEmbeddingProvider(NoOpEmbeddingProvider.INSTANCE);
     embeddingEvents.onUnload(EmbeddingTelemetryEvents.UnloadReason.GPU_HANDOFF);
     try {
       svc.close();
     } catch (Exception e) {
       log.warn("GPU transition: Error unloading embedding service", e);
     }
-    embeddingProvider = NoOpEmbeddingProvider.INSTANCE;
-    embeddingServiceForLifecycle = null;
     notifyEmbeddingProviderChange(NoOpEmbeddingProvider.INSTANCE);
     log.info("GPU transition: Embedding model unloaded, VRAM released");
   }

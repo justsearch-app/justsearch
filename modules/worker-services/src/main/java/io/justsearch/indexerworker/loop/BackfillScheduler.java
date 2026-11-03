@@ -178,6 +178,9 @@ public final class BackfillScheduler {
     this.indexingPacing =
         java.util.Objects.requireNonNull(indexingPacing, "indexingPacing");
     this.embeddingLifecycle = embeddingLifecycle;
+    if (embeddingLifecycle != null && indexingCoordinator != null) {
+      embeddingLifecycle.bindEnrichmentCoordinator(indexingCoordinator);
+    }
     this.running = running;
     this.resolvedConfigSupplier = resolvedConfigSupplier;
     this.spladeEncoderSupplier = spladeEncoderSupplier;
@@ -828,7 +831,7 @@ public final class BackfillScheduler {
               indexingCoordinator,
               commitOps,
               signalBus,
-              () -> bge,
+              bgeM3EncoderSupplier,
               () -> running.get() && !signalBus.isIndexingHeld(),
               pacing().bgeM3BackfillBatchSize(),
               true,
@@ -858,7 +861,7 @@ public final class BackfillScheduler {
               indexingCoordinator,
               commitOps,
               signalBus,
-              () -> bge,
+              bgeM3EncoderSupplier,
               () -> running.get() && !signalBus.isIndexingHeld(),
               pacing().bgeM3InterleaveBatchSize(),
               false,
@@ -887,6 +890,7 @@ public final class BackfillScheduler {
             disambiguationServiceSupplier,
             () -> running.get() && !signalBus.isIndexingHeld(),
             pacing().disambiguationBackfillBatchSize(),
-            log));
+            log,
+            indexingCoordinator));
   }
 }

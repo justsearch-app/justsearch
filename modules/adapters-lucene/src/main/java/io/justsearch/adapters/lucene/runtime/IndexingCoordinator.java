@@ -57,6 +57,44 @@ public final class IndexingCoordinator {
    */
   private final ReentrantLock dispatchLock = new ReentrantLock();
 
+  /** Opaque, in-memory publication identity; replacement revokes all outstanding outcomes. */
+  public static final class EnrichmentAuthority {
+    private EnrichmentAuthority() {}
+  }
+
+  private volatile EnrichmentAuthority enrichmentAuthority = new EnrichmentAuthority();
+
+  public EnrichmentAuthority enrichmentAuthority() {
+    // Do not expose a newly issued token until its provider swap has finished.
+    dispatchLock.lock();
+    try { return enrichmentAuthority; }
+    finally { dispatchLock.unlock(); }
+  }
+
+  /** The provider swap and authority revocation serialize with conditional publication. */
+  public void transitionEnrichmentAuthority(Runnable transition) {
+    dispatchLock.lock();
+    try {
+      enrichmentAuthority = new EnrichmentAuthority();
+      transition.run();
+    } finally {
+      dispatchLock.unlock();
+    }
+  }
+
+  /** Publication outside Lucene (the disambiguation snapshot) shares the authority fence. */
+  public boolean withEnrichmentAuthority(EnrichmentAuthority authority,
+      java.util.concurrent.Callable<?> publication) throws Exception {
+    dispatchLock.lock();
+    try {
+      if (authority != enrichmentAuthority) return false;
+      publication.call();
+      return true;
+    } finally {
+      dispatchLock.unlock();
+    }
+  }
+
   IndexingCoordinator(RuntimeSession session, Supplier<WritePathOps> writeOps) {
     this(session, writeOps, null);
   }
@@ -290,6 +328,13 @@ public final class IndexingCoordinator {
   public LuceneRuntimeTypes.EnrichmentPublicationReceipt publishEnrichmentBatch(
       List<Map.Entry<String, Map<String, Object>>> updates,
       Map<String, DocumentFieldOps.EnrichmentInput> inputs) {
+    return publishEnrichmentBatch(updates, inputs, null);
+  }
+
+  public LuceneRuntimeTypes.EnrichmentPublicationReceipt publishEnrichmentBatch(
+      List<Map.Entry<String, Map<String, Object>>> updates,
+      Map<String, DocumentFieldOps.EnrichmentInput> inputs,
+      EnrichmentAuthority authority) {
     if (updates == null || updates.isEmpty()) {
       return new LuceneRuntimeTypes.EnrichmentPublicationReceipt(List.of(), List.of(), null);
     }
@@ -298,7 +343,13 @@ public final class IndexingCoordinator {
       guardBackpressure();
       try {
         dispatchLock.lock();
-        try { return writeOps.get().publishEnrichmentBatch(updates, inputs); }
+        try {
+          if (authority != null && authority != enrichmentAuthority) {
+            // No source/stage comparison ran: these outcomes are deferred, not stale.
+            return new LuceneRuntimeTypes.EnrichmentPublicationReceipt(List.of(), List.of(), null);
+          }
+          return writeOps.get().publishEnrichmentBatch(updates, inputs);
+        }
         finally { dispatchLock.unlock(); }
       } finally { session.queueDepth.decrementAndGet(); }
     } finally { releaseWriteBarrierAndReport(); }
