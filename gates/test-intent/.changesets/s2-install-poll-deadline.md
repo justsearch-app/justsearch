@@ -172,3 +172,25 @@ slow idle read, Brain observation freshness, and desktop recovery. No acceptance
   "note": "Audit by independent reviewer session reviewer-43 (Codex): reject: sources labelled owner-adopted for agent-drafted scenarios never shown to the owner. Transcribed by the orchestrator."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verifier-s2t-acc2",
+  "verdict": "accept",
+  "digest": "sha256:831614266ec3e2d38cf83a2c5863d00ab01b1006a82230b37719c208bf2ec4bd",
+  "note": "Acceptance by independent verifier session verifier-s2t-acc2 (Codex): accept. Transcribed by the orchestrator."
+}
+```
+
+```json
+{
+  "kind": "audit",
+  "role": "reviewer",
+  "session": "reviewer-44",
+  "verdict": "accept",
+  "digest": "sha256:831614266ec3e2d38cf83a2c5863d00ab01b1006a82230b37719c208bf2ec4bd",
+  "note": "Audit by independent reviewer session reviewer-44 (Codex): accept, no must-fix. Transcribed by the orchestrator."
+}
+```
