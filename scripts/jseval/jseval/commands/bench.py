@@ -114,7 +114,8 @@ def cmd_bench_concurrency(ctx, dataset, concurrency, base_url, output_dir,
 @click.pass_context
 def cmd_llm_bench(ctx, profile, runs, base_url, output_dir):
     """LLM inference benchmark (TTFT, E2E latency, token rate)."""
-    from .. import llm_bench, suite_stats
+    from .. import llm_bench
+    from jsharness import suite_stats
 
     if runs == 1:
         result = llm_bench.execute_llm_bench(base_url, profile=profile)

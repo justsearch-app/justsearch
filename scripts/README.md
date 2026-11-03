@@ -100,7 +100,7 @@ For failed jobs, decide and run `gh run rerun <run-id> --failed` yourself, then 
 - **Node.js** 24.x (see `scripts/setup/bootstrap-node-win.ps1`)
 - **Java** 25 (Gradle will download if missing)
 - **PowerShell** 7+ (for Windows scripts)
-- **Python** 3.x (for jseval; install via `pip install -e scripts/jseval`)
+- **Python** 3.x (for jseval; install via `pip install -e scripts/jsharness -e scripts/jseval`)
 
 ## MCP Integration
 

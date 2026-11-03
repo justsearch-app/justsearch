@@ -30,7 +30,6 @@ _GROUP_MODULES = (
     "bench",
     "gates",
     "corpus",
-    "ui",
     "eval_cmds",
     "utility",
     "release",

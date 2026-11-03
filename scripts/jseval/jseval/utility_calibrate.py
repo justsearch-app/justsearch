@@ -28,7 +28,7 @@ from pathlib import Path
 
 import httpx
 
-from jseval.types import ReadinessResult
+from jsharness.types import ReadinessResult
 
 
 def _normalize_root_path(path: str) -> str:
@@ -318,7 +318,7 @@ def check_readiness(
     A dense+sparse-ready index that is scoped to a stray/broader watched root is not actually
     ready for a clean eval run — it can silently serve leaked content (tempdoc 624 As-built #7).
     """
-    from jseval.readiness import check_search_ready
+    from jsharness.readiness import check_search_ready
     search_rd = check_search_ready(
         base_url, dense_enabled=require_dense, splade_enabled=True, timeout_sec=timeout_sec)
     roots_rd = check_watched_roots_scoped(base_url, corpus_dir, timeout_sec=timeout_sec)

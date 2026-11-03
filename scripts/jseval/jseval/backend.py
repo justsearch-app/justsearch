@@ -17,7 +17,7 @@ from pathlib import Path
 
 import httpx
 
-from . import run_register
+from jsharness import run_register
 from ._paths import REPO_ROOT, shared_models_dir
 
 log = logging.getLogger(__name__)

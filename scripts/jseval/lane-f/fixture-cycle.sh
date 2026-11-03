@@ -25,6 +25,11 @@
 #
 # Usage (repo root): bash scripts/jseval/lane-f/fixture-cycle.sh <out.json> [profile] [api-port]
 set -u
+# The measuring code -- jseval, jsharness and the lane-f helpers -- is this script's own checkout,
+# whichever directory it is invoked from; the stack and the corpus stay the invoking directory's.
+repo=$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)
+. "$repo/scripts/lib/python-path.sh"
+pythonpath=$(js_pythonpath "$repo") || exit 2
 out=${1:?out.json}
 profile=${2:-standard}
 port=${3:-33221}
@@ -55,7 +60,7 @@ curl -s -m 30 -X POST "${hdr[@]}" -d '{}' "$base/api/ai/runtime/deactivate" > /d
 
 body=$(node -e 'const p=require("path");const r=process.argv[1];console.log(JSON.stringify({paths:[p.join(r,"docs","explanation"),p.join(r,"docs","reference")]}))' "$root_win")
 ingest_response=$(curl -fsS -m 120 -X POST "${hdr[@]}" -d "$body" "$base/api/knowledge/ingest") || exit 2
-printf '%s' "$ingest_response" | node scripts/jseval/lane-f/fixture-ingest.mjs || exit 2
+printf '%s' "$ingest_response" | node "$repo/scripts/jseval/lane-f/fixture-ingest.mjs" || exit 2
 log "ingest: ${ingest_response:0:200}"
 # The enrichment wait is a PRECONDITION, not a progress message. The four-capture acceptance
 # had side A cycle 1 return READY False after the full 900s and capture anyway, on a partially
@@ -66,9 +71,9 @@ log "ingest: ${ingest_response:0:200}"
 # and braces: this stops it being written, that stops it being trusted if it ever is).
 # NOTE the exit code is taken from the command, NOT through a pipe: `cmd | tail -1` reports
 # tail exit status, so piping here would have silently swallowed the very failure this guards.
-wait_out=$( (cd scripts/jseval && python -c "
+wait_out=$( (cd "$repo/scripts/jseval" && PYTHONPATH=$pythonpath python -c "
 import sys
-from jseval.readiness import wait_pipeline_complete
+from jsharness.readiness import wait_pipeline_complete
 r = wait_pipeline_complete('$base', timeout_sec=900)
 print('READY', r.passed)
 sys.exit(0 if r.passed else 1)
@@ -145,5 +150,5 @@ if ! echo "$st" | ai_ready "$profile"; then
 fi
 
 log "capture -> $out_abs"
-(cd scripts/jseval && python -m jseval workflow-fixture capture --base-url "$base" --out "$out_abs" --corpus-root "$root_win" 2>&1 | grep -v " INFO ")
+(cd "$repo/scripts/jseval" && PYTHONPATH=$pythonpath python -m jseval workflow-fixture capture --base-url "$base" --out "$out_abs" --corpus-root "$root_win" 2>&1 | grep -v " INFO ")
 log "done"

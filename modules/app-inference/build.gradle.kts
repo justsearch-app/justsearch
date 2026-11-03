@@ -58,7 +58,9 @@ testing {
             inputs
               .files(
                 fileTree(rootDir.resolve("modules")) { include("*/src/main/java/**/*.java") },
-                fileTree(rootDir.resolve("scripts/jseval/jseval")) { include("**/*.py") },
+                fileTree(rootDir.resolve("scripts")) {
+                  include("*/pyproject.toml", "jseval/jseval/**/*.py", "jsharness/jsharness/**/*.py")
+                },
               )
               .withPropertyName("llamaExchangeScanSources")
               .withPathSensitivity(PathSensitivity.RELATIVE)

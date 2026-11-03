@@ -30,7 +30,7 @@ campaign recorded with tempdoc 789 in place.
 
 Usage (from a checkout, with the jseval package importable):
 
-    PYTHONPATH=scripts/jseval PYTHONUTF8=1 python scripts/jseval/experiments/replay_behavioral_789.py
+    PYTHONPATH=$(node scripts/lib/python-path.cjs .) PYTHONUTF8=1 python scripts/jseval/experiments/replay_behavioral_789.py
 
 Override the read-only input roots with --run-root / --datasets / --census.
 """

@@ -17,7 +17,7 @@ import httpx
 
 from .commands.run import _foreground_queries
 from .ingest import _ensure_materialized, add_watched_root
-from .readiness import flatten_status
+from jsharness.readiness import flatten_status
 from .search_load import open_client, search_body, percentile
 
 

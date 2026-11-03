@@ -336,9 +336,11 @@ tasks.register<Test>("lifecycleIntegrationTest") {
   inputs.file(rootProject.file("scripts/supervisor-conformance/migration-restart-scenario.mjs"))
   inputs.file(rootProject.file("scripts/supervisor-conformance/barrier-files.mjs"))
   inputs.file(rootProject.file("scripts/supervisor-conformance/query-reconfigure.mjs"))
-  // The installed lifecycle harness invokes jseval against the worktree Lit source.
+  // The installed lifecycle harness invokes jsharness against the worktree Lit source.
   // Fingerprint both so an edited selector, capture step or notice cannot reuse old proof.
-  inputs.files(fileTree(rootProject.file("scripts/jseval/jseval")) {
+  // python-path.cjs decides which checkout's jsharness that invocation imports.
+  inputs.file(rootProject.file("scripts/lib/python-path.cjs"))
+  inputs.files(fileTree(rootProject.file("scripts/jsharness/jsharness")) {
     include("**/*.py", "**/*.json")
   })
   inputs.files(fileTree(rootProject.file("modules/ui-web/src/shell-v0")) {

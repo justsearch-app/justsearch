@@ -104,8 +104,8 @@ source tmp/ui-checks/env.sh
 du -sh node_modules modules/ui-web/node_modules scripts/wire-contract/node_modules tmp/ui-checks
 npm run test:unit:run --prefix modules/ui-web -- src/shell-v0/controllers/AgentSessionController.test.ts --maxWorkers=4
 npm run test:unit:run --prefix modules/ui-web -- --maxWorkers=4
-python -m jseval ui-shot sv3-search-results --fixtures --no-demo --output-dir "$UI_CHECKS_DIR/captures"
-python -m jseval ui-a11y-gate --output-dir "$UI_CHECKS_DIR/a11y"
+python -m jsharness ui-shot sv3-search-results --fixtures --no-demo --output-dir "$UI_CHECKS_DIR/captures"
+python -m jsharness ui-a11y-gate --output-dir "$UI_CHECKS_DIR/a11y"
 node scripts/ci/report-github-advisories.mjs
 npm --prefix modules/ui-web run knip:report
 node scripts/docs/generate-runtime-config-matrix.mjs
@@ -126,13 +126,15 @@ For another preparation run, first remove `tmp/ui-checks/` using the cleanup bel
 the generated venv itself contains symlinks. `npm ci` replaces local dependencies.
 
 The venv installs the base and `ui` dependencies declared in
-`scripts/jseval/pyproject.toml` (including `httpx`). It imports jseval from this
-checkout through `PYTHONPATH`, without installing jseval or writing metadata or
-bytecode under `scripts/`. Python 3.13 with CI's constraint file,
-`-c scripts/jseval/requirements.lock.txt`, pins the base dependencies as CI does; the
-`ui` extra (Playwright, and with it the Chromium revision) is not pinned there or in CI. Other
-interpreters resolve dependencies freely without that file: its NumPy pin predates
-Python 3.14 wheels.
+`scripts/jsharness/pyproject.toml` (including `httpx`). It puts this checkout's jsharness
+(and jseval) on `PYTHONPATH`, without installing either or writing metadata or bytecode
+under `scripts/`. The value comes from `scripts/lib/python-path.cjs`, the one
+definition every script uses (shell: source `scripts/lib/python-path.sh` and call
+`js_pythonpath <checkout>`). jseval loads the jsharness of its own checkout even when only
+`scripts/jseval` is on the path. Python 3.13 with CI's constraint file,
+`-c scripts/jsharness/requirements.lock.txt`, pins the base and `ui` dependencies
+(Playwright, and with it the Chromium revision) as CI does. Other interpreters
+resolve dependencies freely without that Python 3.13 constraint file.
 
 Preparation and the generated `env.sh` clear every inherited `npm_config_*`,
 `NPM_CONFIG_*`, `PIP_*` and `PYTHON*` setting before setting their own cache,
@@ -442,14 +444,14 @@ Desktop-only features (native folder picker, file dialogs) are unavailable in a 
 - Stop the dev stack with `Ctrl+C` in the terminal running `dev:all`.
 - On Windows, if processes linger, terminate the process tree (e.g., via `taskkill /T /F`) to avoid stale ports.
 
-#### 3.4.7 Visual verification of UI component changes (jseval ui-shot)
+#### 3.4.7 Visual verification of UI component changes (jsharness ui-shot)
 
-When editing files under `modules/ui-web/src/`, use `jseval ui-shot` for targeted screenshot capture to verify visual correctness:
+When editing files under `modules/ui-web/src/`, use `jsharness ui-shot` for targeted screenshot capture to verify visual correctness:
 
-- **Single step**: `jseval ui-shot <step>` captures a screenshot of the named UI state. Read the output PNG path to see the result inline.
-- **Step discovery**: `jseval ui-shot --list` shows all available steps (chain and isolated) with their dependency relationships.
-- **Affected steps**: `jseval ui-shot --affected <file>` finds which steps exercise a given source file. Works with full Windows paths.
-- **Measurement companion (615 §6.2)**: every capture also writes a `<step>.measure.json` (accessibility tree + axe violations + element geometry/overflow + console errors) and prints a one-line fact summary. Judge correctness from the **facts** (cheaper + more reliable than the PNG); read the PNG for gestalt. The harness drives Lit `shell-v0`. `python -m jseval ui-shot` defaults to mock-data demo mode. For a real backend, use `--no-demo` with a running dev stack (AI also needs `ai_activate`), and choose a step without its own response mocks or demo-URL navigation: those steps still use demo data with `--no-demo`.
+- **Single step**: `jsharness ui-shot <step>` captures a screenshot of the named UI state. Read the output PNG path to see the result inline.
+- **Step discovery**: `jsharness ui-shot --list` shows all available steps (chain and isolated) with their dependency relationships.
+- **Affected steps**: `jsharness ui-shot --affected <file>` finds which steps exercise a given source file. Works with full Windows paths.
+- **Measurement companion (615 §6.2)**: every capture also writes a `<step>.measure.json` (accessibility tree + axe violations + element geometry/overflow + console errors) and prints a one-line fact summary. Judge correctness from the **facts** (cheaper + more reliable than the PNG); read the PNG for gestalt. The harness drives Lit `shell-v0`. `python -m jsharness ui-shot` defaults to mock-data demo mode. For a real backend, use `--no-demo` with a running dev stack (AI also needs `ai_activate`), and choose a step without its own response mocks or demo-URL navigation: those steps still use demo data with `--no-demo`.
 
 ### 3.5. CI signal model
 

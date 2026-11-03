@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 from jseval.comparability import determine_comparability
-from jseval.types import AnnProofResult, ReadinessResult
+from jsharness.types import ReadinessResult
+from jseval.types import AnnProofResult
 
 
 def _passed_readiness() -> ReadinessResult:

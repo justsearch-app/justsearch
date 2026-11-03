@@ -100,9 +100,18 @@ export function instrumentFiles(plan, sourceRoot = SOURCE, executionRoot = sourc
     }
     if (file.endsWith('.sh')) {
       const executableLines = code.split('\n').filter(l => !l.trimStart().startsWith('#')).join('\n');
-      for (const m of executableLines.matchAll(/\b(?:node|source|bash)\s+(scripts\/[\w./-]+\.(?:mjs|cjs|sh))/g)) add(path.join(executionRoot, m[1]));
-      for (const m of executableLines.matchAll(/\bfrom\s+(jseval[\w.]*)\s+import/g)) {
-        const base = path.join(executionRoot, 'scripts/jseval', ...m[1].split('.')); add(`${base}.py`);
+      // A called script is named from the cwd (`node scripts/x.mjs`), from the script's own checkout
+      // (`node "$repo/scripts/x.mjs"`, repo set from BASH_SOURCE) or from the script's directory
+      // (`node "${BASH_SOURCE[0]%/*}/x.cjs"`); `.` sources like `source`.
+      const repoDefinition = executableLines.match(/^\s*repo=\$\(cd "\$\(dirname "\$\{BASH_SOURCE\[0\]\}"\)\/([\w./-]+)" && pwd\)\s*$/m);
+      for (const m of executableLines.matchAll(/(?:^|[\s;&|(])(?:node|source|bash|\.)\s+["']?(\$\{?repo\}?\/|\$\{BASH_SOURCE\[0\]%\/\*\}\/)?([\w./-]+\.(?:mjs|cjs|sh))\b/gm)) {
+        if (!m[1]) { if (m[2].startsWith('scripts/')) add(path.join(executionRoot, m[2])); continue; }
+        if (m[1].startsWith('${BASH_SOURCE')) { add(path.join(path.dirname(file), m[2])); continue; }
+        if (!repoDefinition) throw new Error(`Measurement script names $repo without a recognised definition: ${file}`);
+        add(path.join(path.resolve(path.dirname(file), repoDefinition[1]), m[2]));
+      }
+      for (const m of executableLines.matchAll(/\bfrom\s+((?:jseval|jsharness)[\w.]*)\s+import/g)) {
+        const base = path.join(executionRoot, 'scripts', m[1].split('.')[0], ...m[1].split('.')); add(`${base}.py`);
       }
       if (/python\s+-m\s+jseval\b/.test(executableLines)) pythonModule('jseval');
       // The request body/query pool is loaded by the supplemental encoder probe.

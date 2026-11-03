@@ -14,7 +14,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from jseval.comparability import determine_comparability
-from jseval.types import AnnProofResult, ComparabilityResult, ReadinessResult
+from jsharness.types import ReadinessResult
+from jseval.types import AnnProofResult, ComparabilityResult
 
 # Condition semantics (tempdoc 346): A = baseline (file tools), C = with-tool.
 _BASELINE = "A"

@@ -17,7 +17,9 @@ for (const file of ['scripts/ci/pr-flakes.tsv', 'scripts/ci/pr-flakes.mjs', 'scr
 }
 for (const [path, lanes] of [
   ['docs/reference/legal/ai-runtime-and-model-redistribution.md', ['license']],
-  ['scripts/jseval/jseval/ui_a11y_gate.py', ['frontend']],
+  ['scripts/jsharness/jsharness/ui_a11y_gate.py', ['frontend', 'jseval', 'lifecycle']],
+  ['scripts/jsharness/jsharness/run_register.py', ['jseval', 'services', 'platform', 'windows', 'lifecycle', 'integration']],
+  ['scripts/jsharness/pyproject.toml', ['devrunner', 'frontend', 'jseval']],
   ['governance/ui-a11y-baseline.v1.json', ['frontend']],
   ['governance/ui-proportion-baseline.v1.json', ['frontend']],
   ['governance/status-facts.v1.json', ['frontend']],
@@ -210,7 +212,7 @@ test('tracked repository paths named by Java, Node, Rust and Gradle readers sele
     }
   }
   // ui_fixtures resolves this relative to the discovered frontend fixture dir.
-  const fixtureSource = 'scripts/jseval/jseval/ui_fixtures.py';
+  const fixtureSource = 'scripts/jsharness/jsharness/ui_fixtures.py';
   assert.match(readFileSync(fixtureSource, 'utf8'), /configuration\/src\/main\/resources\/ai\/model-registry\.v2\.json/);
   checkLiteral('modules/configuration/src/main/resources/ai/model-registry.v2.json', fixtureSource, ['frontend']);
   for (const lane of ['ui', 'services', 'search', 'platform', 'lifecycle', 'integration']) {

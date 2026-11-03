@@ -166,7 +166,7 @@ This tier verifies behaviour that spans a real boundary the Engine still has.
 *   **Performance benchmarks** — all benchmark + eval capabilities now in `scripts/jseval/` (slice 3a-1-8f §B.14, 2026-05-12 — the prior `scripts/bench/` infrastructure was deleted by commit `a9c484f59` 2026-03-16; jseval covers Claim A/B/C/D + Track G + agent + RAG via `engine-bench`, `ingest-bench`, `bench-concurrency`, `knn-bench`, `agent-eval`, `rag-eval`, `retrieval-eval`, etc.):
     *   **Claim A (engine-only):** `python -m jseval engine-bench` — isolated Lucene throughput
     *   **Claim B (pipeline):** `python -m jseval ingest-bench` — full Worker pipeline throughput
-    *   **Claim C (UX):** `python -m jseval ui-perf` — UI responsiveness during indexing
+    *   **Claim C (UX):** `python -m jsharness ui-perf` — UI responsiveness during indexing
 
 Schema migration + blue/green correctness, and the rest of the index half's end-to-end behaviour,
 are covered **in process** in `modules/app-engine/src/test/java/io/justsearch/app/engine/`
@@ -201,16 +201,16 @@ retired TS e2e tier described below:
   (`LocalApiCorsPolicyTest`, `HttpPagingCursorE2ETest`, `WorkerSearchServiceSearchPayloadTest`, etc.)
   exercises the same `/api/*` contracts the retired tier drove through a browser, at a faster,
   more deterministic layer.
-* **Visual/measurement verification (`jseval ui-shot` / `ui-check`)** — a **live, Python**
-  Playwright-driven harness (`scripts/jseval/`), distinct from the retired Node/TypeScript tier
+* **Visual/measurement verification (`jsharness ui-shot` / `ui-check`)** — a **live, Python**
+  Playwright-driven harness (`scripts/jsharness/`), distinct from the retired Node/TypeScript tier
   below. It drives the real Lit `shell-v0` UI (not a mock/demo tree) and produces a screenshot plus
   a structured `.measure.json` fact-sheet — accessibility tree, axe violations, geometry, console
-  errors — so correctness is judged from facts, not eyeballing a PNG. `jseval ui-shot <step>`
-  captures one surface; `jseval ui-a11y-gate` / `ui-proportion-gate` gate regressions
+  errors — so correctness is judged from facts, not eyeballing a PNG. `jsharness ui-shot <step>`
+  captures one surface; `jsharness ui-a11y-gate` / `ui-proportion-gate` gate regressions
   (`ui-a11y-gate` runs on frontend-selected PRs as the required `Measured axe` job — ADR-0026 amendment
   2026-10-24; `ui-proportion-gate` stays local-only);
-  `jseval ui-diff` / `ui-critic` / `ui-fuzz` are deeper situational passes. For fixture-based checks, run
-  `jseval ui-a11y-gate` and `jseval ui-proportion-gate` (both capture fixture state).
+  `jsharness ui-diff` / `ui-critic` / `ui-fuzz` are deeper situational passes. For fixture-based checks, run
+  `jsharness ui-a11y-gate` and `jsharness ui-proportion-gate` (both capture fixture state).
 
 > **Removed (tempdoc 742):** the TypeScript `@playwright/test` e2e tier — `modules/ui-web/e2e/`
 > (~15 specs covering search filters/pagination, preview highlighting, auto-discovery, AI meta
@@ -218,7 +218,7 @@ retired TS e2e tier described below:
 > `test:mobile` / `test:light` / `test:headed` / `test:debug` / `test:report` npm scripts, and the
 > `check-playwright-hardcoded-testids.mjs` / `check-playwright-sleeps.mjs` guard scripts — was
 > deleted as unwired: zero references in `.github/workflows/`, and nothing invoked the npm scripts
-> that ran it. Do not conflate it with the live `jseval ui-shot` harness above, which is a
+> that ran it. Do not conflate it with the live `jsharness ui-shot` harness above, which is a
 > different Playwright integration (Python, not Node) that remains the canonical visual-check tool.
 
 ## Test Evidence Lanes
@@ -235,7 +235,7 @@ Evidence tiers:
 |---|---|---|
 | Hosted-required unit evidence | `Unit tests (app-ui)`, `Unit tests (search-worker)`, and `Unit tests (platform-contracts)` with `-PskipWebBuild=true` | Must stay deterministic on standard hosted runners and produce attribution from JUnit XML. |
 | Hosted-required harness evidence | `jseval Python suite` — `scripts/jseval/tests` on the hosted Linux runner, without the `agent`/`ui`/`scan` extras so their `pytest.importorskip` guards are exercised | Required since 2026-09-05 (ADR-0044 amendment). Must stay fully mocked and backend-free; a test that needs a live backend belongs in another tier. |
-| Hosted-required accessibility evidence | `Measured axe` — `jseval ui-a11y-gate` over the baseline register in fixture state | Required since 2026-10-24 (ADR-0026 / ADR-0044 amendments). New rules, serious/critical violations even in baselined rules, and missing/errored scans fail. Frontend-selected PRs, main pushes and dispatch run it; other PRs report skipped. |
+| Hosted-required accessibility evidence | `Measured axe` — `jsharness ui-a11y-gate` over the baseline register in fixture state | Required since 2026-10-24 (ADR-0026 / ADR-0044 amendments). New rules, serious/critical violations even in baselined rules, and missing/errored scans fail. Frontend-selected PRs, main pushes and dispatch run it; other PRs report skipped. |
 | Local parser/fixture evidence | PDF/OCR/Office fixture tests disabled under `CI=true` | Must be declared in `scripts/ci/test-evidence-policy.v1.json` with replacement evidence and cadence. |
 | Local worker-process integration evidence | `src/integrationTest` cases that spawn worker/server processes | Must be declared when skipped under `CI=true`; run locally before changing the owned integration surface. |
 | Opt-in system/AI evidence | `modules/system-tests` tags and opt-in Gradle flags | Owned by the system-tests source sets and documented tags. |
@@ -265,7 +265,7 @@ remains the source of pass/fail truth.
 
 ## Deterministic UI evidence (EvidenceBundle v1)
 
-> **Removed (tempdoc 638):** the EBv1 capture harness (`modules/ui-web/scripts/capture-evidence-bundle.mjs`) was deleted. For screenshot-driven UI/UX verification, use the `jseval ui-shot` harness. This section is retained as historical design context only.
+> **Removed (tempdoc 638):** the EBv1 capture harness (`modules/ui-web/scripts/capture-evidence-bundle.mjs`) was deleted. For screenshot-driven UI/UX verification, use the `jsharness ui-shot` harness. This section is retained as historical design context only.
 
 For screenshot-driven UI/UX verification without committing pixel baselines, `modules/ui-web` could capture a deterministic EvidenceBundle v1 scenario (`ui_screenshots`) whose output landed under `tmp/agent-evidence/ui_screenshots/<timestamp>/`. The bundle was validated (structure + determinism budget) and avoided flaky timing via explicit UI state waits and demo-mode knobs.
 

@@ -300,7 +300,7 @@ try {
   test('the delivered catalog is well formed and all declared bindings resolve', () => {
     const result = checkSearchWindowScenarios({ root: ROOT,
       catalog: JSON.parse(readFileSync(join(ROOT, CATALOG), 'utf8')),
-      stepIndex: JSON.parse(readFileSync(join(ROOT, 'scripts/jseval/jseval/ui_step_index.json'), 'utf8')) });
+      stepIndex: JSON.parse(readFileSync(join(ROOT, 'scripts/jsharness/jsharness/ui_step_index.json'), 'utf8')) });
     assert.deepEqual(result.failures, []);
   });
 } finally {

@@ -228,6 +228,33 @@ def test_untracked_jseval_file_changes_hash(git_repo: Path):
     assert ii._dirty_state_hash(git_repo) != clean
 
 
+def test_untracked_jsharness_file_is_content_hashed(git_repo: Path):
+    """scripts/jsharness/ is in the dirt scope: its readiness wait decides when an
+    ingest counts as complete before the built index is published."""
+    package = git_repo / "scripts" / "jsharness" / "jsharness"
+    package.mkdir(parents=True)
+    (package / "__init__.py").write_text("", encoding="utf-8")
+    _git(git_repo, "add", "-A")
+    _git(git_repo, "commit", "-q", "-m", "jsharness")
+    clean = ii._dirty_state_hash(git_repo)
+    (package / "readiness.py").write_text("x = 1\n", encoding="utf-8")
+    first = ii._dirty_state_hash(git_repo)
+    assert first != clean
+    (package / "readiness.py").write_text("x = 2\n", encoding="utf-8")
+    assert ii._dirty_state_hash(git_repo) != first
+
+
+def test_tracked_jsharness_modification_changes_hash(git_repo: Path):
+    readiness = git_repo / "scripts" / "jsharness" / "jsharness" / "readiness.py"
+    readiness.parent.mkdir(parents=True)
+    readiness.write_text("x = 1\n", encoding="utf-8")
+    _git(git_repo, "add", "-A")
+    _git(git_repo, "commit", "-q", "-m", "readiness")
+    clean = ii._dirty_state_hash(git_repo)
+    readiness.write_text("x = 2\n", encoding="utf-8")
+    assert ii._dirty_state_hash(git_repo) != clean
+
+
 def test_oversized_untracked_source_file_is_unavailable(git_repo: Path):
     big = git_repo / "modules" / "big.bin"
     big.parent.mkdir(parents=True, exist_ok=True)

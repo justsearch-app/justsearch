@@ -5,6 +5,7 @@ import path from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import identity from '../dev/lib/process-identity.cjs';
 import { barrierFiles } from './barrier-files.mjs';
+import { pythonPath } from '../lib/python-path.cjs';
 
 export const BULK_FAULT_CASES = Object.freeze({
   'bulk-live-before-green-open': Object.freeze({
@@ -1335,13 +1336,12 @@ export async function exerciseLiveModelAB({ work, data, indexBase, first, manife
     if (actualInPlace && acceptedWriteDuringBuild && !watcherDeleteDuringBuild) {
       // D1-14's UI acceptance runs against this held installed Engine, not a mocked
       // status response. The installed harness intentionally has a dummy frontend;
-      // jseval auto-serves this worktree's Lit UI with its proxy pinned to the
+      // jsharness auto-serves this worktree's Lit UI with its proxy pinned to the
       // installed API, then the registered-helper sweep retires that owned server.
       const outputDir = path.join(work, 'ui-shot-semantic-paused');
-      const jsevalDir = path.join(process.cwd(), 'scripts', 'jseval');
       const uiSession = `lane-f-semantic-${first.runId}`;
       const uiEnv = { ...process.env,
-        PYTHONPATH: [jsevalDir, process.env.PYTHONPATH].filter(Boolean).join(path.delimiter),
+        PYTHONPATH: [pythonPath(process.cwd()), process.env.PYTHONPATH].filter(Boolean).join(path.delimiter),
         VITE_JUSTSEARCH_API_PORT: String(apiPort),
         // The helper's owner is the override `override-<uiSession>` (agent-identity.cjs), the same
         // owner the closeout sweep's `--session-id uiSession` names, so the sweep reaps it as its own.
@@ -1349,7 +1349,7 @@ export async function exerciseLiveModelAB({ work, data, indexBase, first, manife
       };
       try {
         const uiOutput = await new Promise((resolve, reject) => {
-          execFile('python', ['-u', '-m', 'jseval', 'ui-shot', 'search-semantic-paused-live',
+          execFile('python', ['-u', '-m', 'jsharness', 'ui-shot', 'search-semantic-paused-live',
             '--no-demo', '--output-dir', outputDir],
           { cwd: work, env: uiEnv, timeout: 150000, maxBuffer: 1024 * 1024 },
           (error, stdout, stderr) => error

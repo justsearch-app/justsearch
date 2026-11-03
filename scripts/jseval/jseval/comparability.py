@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
-from .types import AnnProofResult, ComparabilityResult, ReadinessResult
+from jsharness.types import ReadinessResult
+
+from .types import AnnProofResult, ComparabilityResult
 
 
 def determine_comparability(

@@ -18,7 +18,7 @@ export const RULES = [
   // The advisory axe sweep consumes Vite, the Python capture/gate and its fixtures,
   // the shared register, schema/token data and the surface catalog its fixtures serve.
   // It has its own selector so a Java closure alone does not start a browser sweep.
-  [/^(?:modules\/ui-web\/|scripts\/jseval\/|governance\/(?:ui-a11y-baseline|ui-proportion-baseline|status-facts)\.v1\.json$|modules\/configuration\/src\/main\/resources\/ai\/model-registry\.v2\.json$|modules\/app-api\/src\/main\/resources\/messages\/registry-surface\.en\.properties$|package(?:-lock)?\.json$)/, ['frontend']],
+  [/^(?:modules\/ui-web\/|scripts\/(?:jseval|jsharness)\/|governance\/(?:ui-a11y-baseline|ui-proportion-baseline|status-facts)\.v1\.json$|modules\/configuration\/src\/main\/resources\/ai\/model-registry\.v2\.json$|modules\/app-api\/src\/main\/resources\/messages\/registry-surface\.en\.properties$|package(?:-lock)?\.json$)/, ['frontend']],
   [/^(?:docs\/|\.claude\/|\.codex\/|\.agents\/|AGENTS\.md$|[^/]+\.md$)/, []],
   [/^modules\/(?:adapters-lucene|ai-backend|api-contract-projection-java|app-agent|app-agent-api|app-api|app-config|app-engine|app-inference|app-observability|app-services|app-util|configuration|core|core-contracts|extension-substrate|gpu-bridge|indexer-worker|indexing|infra-core|ipc-common|ort-common|prompt-support|reranker|telemetry|worker-core|worker-services)\//, java],
   [/^modules\/ui\//, java.filter((lane) => lane !== 'search')],
@@ -35,7 +35,7 @@ export const RULES = [
   [/^(?:build-logic\/|gradle\/|gradlew|settings\.gradle|build\.gradle|gradle\.properties)/, LANES.filter(lane => lane !== 'devrunner')],
   [/^(?:schemas?\/|contracts?\/|catalog\/|ssot\/|scripts\/(?:codegen|wire-contract)\/)/, contracts],
   [/^packages\//, contracts],
-  [/^(?:scripts\/jseval\/)/, ['jseval', 'services', 'platform', 'windows', 'lifecycle', 'integration']],
+  [/^(?:scripts\/(?:jseval|jsharness)\/)/, ['jseval', 'services', 'platform', 'windows', 'lifecycle', 'integration']],
   [/^(?:scripts\/dev\/|scripts\/supervisor-conformance\/|scripts\/lib\/|scripts\/.*launcher.*|dev-runner\.cjs$)/, contracts],
   [/^(?:scripts\/release\/|scripts\/ci\/(?:test-.*(?:sign|codesign|release-compatibility|pe-signatures).*|.*release-signing.*))/, ['windows', 'lifecycle', 'integration']],
   [/^governance\//, LANES.filter(lane => lane !== 'devrunner')],
@@ -58,8 +58,8 @@ export const RULES = [
   [/^(?:contracts\/(?:native-targets|platform-paths)\/spec\.v1\.json|modules\/shell\/src-tauri\/tauri\.conf\.json|package(?:-lock)?\.json|dev-runner\.cjs)$/, ['devrunner', 'windows']],
   [/^\.gitignore$/, ['devrunner', 'windows', 'jseval']],
   // The UI-check preparation suite (scripts/dev/test-dev-runner-prepare-ui-checks.mjs) reads
-  // jseval's declared dependencies; it runs on Linux only.
-  [/^scripts\/jseval\/pyproject\.toml$/, ['devrunner']],
+  // jsharness's declared dependencies; it runs on Linux only.
+  [/^scripts\/(?:jseval|jsharness)\/pyproject\.toml$/, ['devrunner']],
   [/^models\//, [...contracts, 'license']],
   [/^(?:licenses?\/|notices?\/|NOTICE|LICENSE|native-licenses\/)/, ['license']],
 ];

@@ -11,6 +11,11 @@
 #   bash scripts/jseval/lane-f/head-flag-run.sh <label> <outdir> [api-port] [--heap 2g] [--collector g1|zgc] [--dry-run]
 # Then: node scripts/jseval/lane-f/analyze-head-run.cjs <outdir>
 set -u
+# The measuring code -- jseval, jsharness and the lane-f helpers -- is this script's own checkout,
+# whichever directory it is invoked from; the stack and the corpus stay the invoking directory's.
+repo=$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)
+. "$repo/scripts/lib/python-path.sh"
+pythonpath=$(js_pythonpath "$repo") || exit 2
 label=${1:?label}
 out=${2:?outdir}
 port=${3:-33221}
@@ -48,7 +53,7 @@ root=$(pwd)
 # Java and the backend want Windows paths; the shell is POSIX (Git Bash).
 out_win=$(cygpath -w "$out_abs" 2>/dev/null || echo "$out_abs")
 root_win=$(cygpath -w "$root" 2>/dev/null || echo "$root")
-here="$root/scripts/jseval/lane-f"
+here="$repo/scripts/jseval/lane-f"
 runner=${DEV_RUNNER:-scripts/dev/dev-runner.cjs}
 base="http://127.0.0.1:$port"
 hdr=(-H "Host: 127.0.0.1:$port" -H "Content-Type: application/json")
@@ -143,8 +148,8 @@ node -e 'const r=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8"));
 log "ingest response: $(head -c 300 "$out_abs/ingest-response.json")"
 search_load 60 "$out_abs/search-load-during-enrich.csv"
 log "waiting for enrichment"
-(cd scripts/jseval && python -c "
-import sys; from jseval.readiness import wait_pipeline_complete
+(cd "$repo/scripts/jseval" && PYTHONPATH=$pythonpath python -c "
+import sys; from jsharness.readiness import wait_pipeline_complete
 r = wait_pipeline_complete('$base', timeout_sec=1500)
 print(r)
 " > "$out_abs/enrichment-wait.txt" 2>&1)

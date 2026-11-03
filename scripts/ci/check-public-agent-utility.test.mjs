@@ -238,7 +238,7 @@ ok(
     const message = missingPythonMessage("python", { error: { code: "ENOENT" } });
     return (
       message.includes("'python' not found (ENOENT)") &&
-      message.includes("python -m pip install -e scripts/jseval") &&
+      message.includes("python -m pip install -e scripts/jsharness -e scripts/jseval") &&
       message.includes("set PYTHON to the interpreter path")
     );
   })(),

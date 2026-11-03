@@ -17,6 +17,10 @@
  * against the target platform/interpreter, i.e. regeneration) — it only checks the base
  * direct dependencies pyproject.toml declares against the lock's pins, which is exactly
  * the class of drift that's cheap to catch without a network resolve.
+ *
+ * `node scripts/ci/check-jseval-lock.mjs` checks the jseval lock against the base dependencies
+ * of both packages, because the jseval lanes install jsharness with it under that lock;
+ * `... jsharness` checks the jsharness lock against jsharness's base and `ui` dependencies.
  */
 
 import fs from 'node:fs';
@@ -37,8 +41,12 @@ function repoRootFromCwd() {
 }
 
 const REPO_ROOT = repoRootFromCwd();
-const JSEVAL_DIR = path.join(REPO_ROOT, 'scripts', 'jseval');
+const PACKAGE_NAME = process.argv[2] ?? 'jseval';
+if (!['jseval', 'jsharness'].includes(PACKAGE_NAME)) throw new Error('expected jseval or jsharness');
+const JSEVAL_DIR = path.join(REPO_ROOT, 'scripts', PACKAGE_NAME);
 const PYPROJECT_PATH = path.join(JSEVAL_DIR, 'pyproject.toml');
+// The jseval lanes install jsharness alongside jseval under the jseval lock.
+const JSHARNESS_PYPROJECT_PATH = path.join(REPO_ROOT, 'scripts', 'jsharness', 'pyproject.toml');
 const LOCK_PATH = path.join(JSEVAL_DIR, 'requirements.lock.txt');
 
 const REGEN_HINT = `
@@ -50,10 +58,10 @@ platform (CPython 3.13 / manylinux2014_x86_64 — check .github/workflows/ci.yml
   python -m pip install --dry-run --ignore-installed --report report.json \\
     --python-version 3.13 --implementation cp --abi cp313 \\
     --platform manylinux2014_x86_64 --only-binary=:all: \\
-    -e scripts/jseval
+    -e scripts/jsharness -e scripts/jseval
 
 Then extract name==version pairs from report.json's install[].metadata (dropping
-jseval itself), and re-add the \`colorama==<version>; platform_system == "Windows"\`
+both local packages, jseval and jsharness), and re-add the \`colorama==<version>; platform_system == "Windows"\`
 marker line by hand — pip's target-platform override does not retarget
 platform_system/os_name/sys_platform markers, only python_version-family ones, so that
 one entry needs a manual, metadata-verified marker rather than trusting the dry-run's
@@ -93,17 +101,21 @@ function compareVersions(a, b) {
   return 0;
 }
 
-function extractDependenciesArray(pyprojectText) {
+function extractDependenciesArray(pyprojectText, pyprojectPath) {
   const marker = /^dependencies\s*=\s*\[/m.exec(pyprojectText);
-  if (!marker) fail(`could not find a top-level "dependencies = [" array in ${PYPROJECT_PATH}`);
+  if (!marker) fail(`could not find a top-level "dependencies = [" array in ${pyprojectPath}`);
   const start = marker.index + marker[0].length;
   const end = pyprojectText.indexOf(']', start);
-  if (end === -1) fail(`unterminated "dependencies" array in ${PYPROJECT_PATH}`);
+  if (end === -1) fail(`unterminated "dependencies" array in ${pyprojectPath}`);
   return pyprojectText.slice(start, end);
 }
 
-function parseDirectDependencies(pyprojectText) {
-  const arrayBody = extractDependenciesArray(pyprojectText);
+function parseDirectDependencies(pyprojectPath, includeUi) {
+  if (!fs.existsSync(pyprojectPath)) fail(`missing ${pyprojectPath}`);
+  const pyprojectText = fs.readFileSync(pyprojectPath, 'utf8');
+  const source = path.relative(REPO_ROOT, pyprojectPath).split(path.sep).join('/');
+  const ui = includeUi ? (/^ui\s*=\s*\[([^\]]*)\]/m.exec(pyprojectText)?.[1] ?? '') : '';
+  const arrayBody = extractDependenciesArray(pyprojectText, pyprojectPath) + ui;
   const entryPattern = /"([^"]+)"|'([^']+)'/g;
   const deps = [];
   let match;
@@ -119,9 +131,9 @@ function parseDirectDependencies(pyprojectText) {
       );
     }
     const [, name, operator, version] = specMatch;
-    deps.push({ name, operator, version, raw });
+    deps.push({ name, operator, version, raw, source });
   }
-  if (deps.length === 0) fail(`parsed zero dependencies out of pyproject.toml's "dependencies" array`);
+  if (deps.length === 0) fail(`parsed zero dependencies out of ${source}'s "dependencies" array`);
   return deps;
 }
 
@@ -150,15 +162,15 @@ function parseLockFile(lockText) {
 }
 
 function main() {
-  if (!fs.existsSync(PYPROJECT_PATH)) fail(`missing ${PYPROJECT_PATH}`);
   if (!fs.existsSync(LOCK_PATH)) {
     fail(`missing ${LOCK_PATH} — scripts/jseval has no dependency lock at all.`);
   }
 
-  const pyprojectText = fs.readFileSync(PYPROJECT_PATH, 'utf8');
   const lockText = fs.readFileSync(LOCK_PATH, 'utf8');
 
-  const directDeps = parseDirectDependencies(pyprojectText);
+  const directDeps = PACKAGE_NAME === 'jsharness'
+    ? parseDirectDependencies(PYPROJECT_PATH, true)
+    : [...parseDirectDependencies(PYPROJECT_PATH, false), ...parseDirectDependencies(JSHARNESS_PYPROJECT_PATH, false)];
   const pins = parseLockFile(lockText);
 
   const problems = [];
@@ -167,7 +179,7 @@ function main() {
     const pin = pins.get(key);
     if (!pin) {
       problems.push(
-        `"${dep.raw}" is a direct dependency in pyproject.toml but has no pin in ` +
+        `"${dep.raw}" is a direct dependency in ${dep.source} but has no pin in ` +
           'requirements.lock.txt (a dependency was added without regenerating the lock).'
       );
       continue;
@@ -175,14 +187,14 @@ function main() {
     if (dep.operator === '>=' || dep.operator === '~=') {
       if (compareVersions(pin.version, dep.version) < 0) {
         problems.push(
-          `"${dep.name}" pyproject.toml floor is ${dep.operator}${dep.version} but ` +
+          `"${dep.name}" ${dep.source} floor is ${dep.operator}${dep.version} but ` +
             `requirements.lock.txt pins ${pin.version}, which is BELOW that floor (the ` +
             'floor was raised without regenerating the lock).'
         );
       }
     } else if (dep.operator === '==' && pin.version !== dep.version) {
       problems.push(
-        `"${dep.name}" pyproject.toml pins exactly ${dep.version} but ` +
+        `"${dep.name}" ${dep.source} pins exactly ${dep.version} but ` +
           `requirements.lock.txt pins ${pin.version} — these must match exactly.`
       );
     }
@@ -193,7 +205,8 @@ function main() {
   }
 
   console.log(
-    `check-jseval-lock: OK - ${directDeps.length} direct dependencies in pyproject.toml ` +
+    `check-jseval-lock: OK - ${directDeps.length} direct dependencies in ` +
+      `${[...new Set(directDeps.map((dep) => dep.source))].join(' and ')} ` +
       `all satisfied by requirements.lock.txt's ${pins.size} pins.`
   );
 }
