@@ -98,7 +98,7 @@ and retired Ask/Agent stores on 2026-11-03. Compatibility navigation and saved d
       ],
       "class": "Structural rule kept",
       "rule": "The dead-code gate continues to reject new unused exports relative to the baseline for every retained module.",
-      "whySurvives": "Only the two allowance rows for the deleted retired chat stores leave the baseline. Their files are absent at HEAD; no allowance for any retained file, unused-export threshold or gate predicate changes. Removing obsolete allowances narrows the baseline."
+      "whySurvives": "Only three allowance rows leave the baseline: the two for the deleted retired chat stores (src/shell-v0/state/askChatState.ts, agentChatState.ts) and the one for the deleted Lumino shell (src/shell-v0/shell/Shell.ts). Their files are absent at HEAD; no allowance for any retained file, unused-export threshold or gate predicate changes. Removing obsolete allowances narrows the baseline."
     },
     {
       "items": [
