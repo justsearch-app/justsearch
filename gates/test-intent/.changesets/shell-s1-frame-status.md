@@ -711,3 +711,14 @@ deletion is the Obsolete entry here.
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a1a289-de22-74c0-a1bb-704f5745fe73",
+  "verdict": "reject",
+  "digest": "sha256:82de380d06c092dd16f73949a3f699723e66e27d4a94fda88750a97b32cfbaab",
+  "note": "Rejected: selecting a typed approval or plugin-consent request from the status panel while a lightweight approval is open leaves the security dialog non-modal and outside the top layer (real Chrome); the Adaptation entry drops existing assertions (SystemSelfView stale-row progress check); the new IndexingPause C7 check lacks named evidence. Transcribed by the orchestrator from the verifier's answer (Codex sandbox)."
+}
+```
