@@ -161,3 +161,14 @@ in the acceptance module suite. The shared dev-stack check is reserved for the o
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a1a36b-8535-7ec0-ad68-74b1c9177e1e",
+  "verdict": "accept",
+  "digest": "sha256:9c1331fc7e59dbd5c22017e9ca02e88a3d0274710cf20fbd18352d5285efa1f2",
+  "note": "Independent Codex verifier-2 on 24b3c7f470: 15 repair cases fail before by assertion and pass after; 26 nonqualifying and 5 matching-receipt cases pass on both trees; Incidental fixture helper reviewed; overall accept."
+}
+```
