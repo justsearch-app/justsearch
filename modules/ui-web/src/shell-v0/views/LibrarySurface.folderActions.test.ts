@@ -10,6 +10,7 @@ import type { Surface } from '../../api/types/surface.js';
 import type { PluginHostApi } from '../plugin-api/plugin-types.js';
 import { __feedForTest, __resetAiStateForTest, type StatusSnapshot } from '../state/aiStateStore.js';
 import type { IndexedRootView } from '../../api/generated/schema-types/indexed-root-view.js';
+import { EPHEMERAL_TOAST_EVENT, type EphemeralToastSpec } from '../components/advisory/ephemeralToast.js';
 
 const key = '0194f72c-0000-7000-8000-000000000001';
 const root = (pathHash: string): IndexedRootView => ({ pathHash, collection: 'default', fileCount: 0, walkCompleted: true });
@@ -169,6 +170,45 @@ it('exposes row removal progress, suppresses repeats and keeps the other row usa
   expect(el.roots.map(r => r.pathHash)).toEqual(['b']);
   expect(el.shadowRoot!.querySelector('.action-message[role="status"]')?.textContent).toContain('Folder removed');
   expect(el.shadowRoot!.activeElement?.getAttribute('label')).toBe('Add folder');
+});
+
+it('R3 a completed removal offers to add the same folder again, once, with its plain consequence', async () => {
+  const notices: EphemeralToastSpec[] = [];
+  const listen = (event: Event) => notices.push((event as CustomEvent<EphemeralToastSpec>).detail);
+  document.addEventListener(EPHEMERAL_TOAST_EVENT, listen);
+  try {
+    const { el, invoke, setRows } = await mount();
+    setRows([root('b')]);
+    button(el, 'Remove from library').onActivate(); await pump(el);
+    expect(notices.map(n => n.actionLabel)).toContain('Add docs again');
+    const offer = notices.find(n => n.actionLabel === 'Add docs again')!;
+    expect(offer.message).toBe('Removed docs from your library');
+    expect(offer.detail).toContain('/docs');
+    expect(offer.detail).toContain('Adding it again reads its files again');
+    // Works after leaving the Library; a repeated click adds once.
+    el.remove();
+    offer.onAction!(); offer.onAction!(); await pump(el);
+    expect(invoke.mock.calls.filter(call => call[0] === 'core.add-watched-root')).toEqual([['core.add-watched-root', { path: '/docs' }]]);
+    expect(notices.map(n => n.message)).toContain('Added docs again. Reading its files.');
+  } finally { document.removeEventListener(EPHEMERAL_TOAST_EVENT, listen); }
+});
+
+it('R3 a failed add-again says so and can be tried again', async () => {
+  const notices: EphemeralToastSpec[] = [];
+  const listen = (event: Event) => notices.push((event as CustomEvent<EphemeralToastSpec>).detail);
+  document.addEventListener(EPHEMERAL_TOAST_EVENT, listen);
+  try {
+    const invoke = vi.fn().mockResolvedValueOnce({ success: true }).mockRejectedValueOnce(new Error('Engine busy')).mockResolvedValue({ success: true });
+    const { el, setRows } = await mount({ invoke });
+    setRows([root('b')]);
+    button(el, 'Remove from library').onActivate(); await pump(el);
+    expect(notices.map(n => n.actionLabel)).toContain('Add docs again');
+    const offer = notices.find(n => n.actionLabel === 'Add docs again')!;
+    offer.onAction!(); await pump(el);
+    expect(notices.find(n => n.severity === 'error')?.message).toBe('Could not add docs again. Engine busy');
+    offer.onAction!(); await pump(el);
+    expect(invoke).toHaveBeenCalledTimes(3);
+  } finally { document.removeEventListener(EPHEMERAL_TOAST_EVENT, listen); }
 });
 
 it('a refused removal retains the row, explains retry without a live-watch claim, and retries', async () => {

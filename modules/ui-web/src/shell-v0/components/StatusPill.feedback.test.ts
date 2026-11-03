@@ -51,7 +51,8 @@ describe('status feedback ownership', () => {
     action.focus(); action.dispatchEvent(new FocusEvent('focus')); await flush();
     emitEphemeralToast({ message: 'A concurrent action completed' }); await flush();
     expect(pill.shadowRoot!.querySelector('.transient-action')).toBe(action);
-    await vi.advanceTimersByTimeAsync(9000); await flush(); expect(button().textContent).toContain('Notes removed');
+    // Nothing more urgent holds the pill: the engine stays in contact (R1 — an unreachable engine would).
+    await vi.advanceTimersByTimeAsync(9000); __feedContactForTest(); await flush(); expect(button().textContent).toContain('Notes removed');
     action.click(); await flush(); expect(undo).toHaveBeenCalledTimes(1);
     action.dispatchEvent(new FocusEvent('blur')); await vi.advanceTimersByTimeAsync(6000); await flush();
     expect(button().textContent).toContain('A concurrent action completed');
@@ -94,7 +95,9 @@ describe('status feedback ownership', () => {
     expect(panel().model!.sections.problems.find(row => row.id.startsWith('plugin-error:'))?.detail).toContain('Invalid manifest');
     vi.spyOn(navigator.clipboard, 'writeText').mockRejectedValueOnce(new Error('denied'));
     await pill.status.copyPluginError('https://plugin.example/test.js'); await flush();
-    expect(button().getAttribute('aria-label')).toBe('Could not copy plugin error details.');
+    // R1 — the active problem keeps the pill; the copy failure shows beside it, not in its place.
+    expect(button().getAttribute('aria-label')).toMatch(/^Problems right now \(1\)/);
+    expect(pill.shadowRoot!.querySelector('[data-testid="status-notice"]')!.textContent).toBe('Could not copy plugin error details.');
     dispatchPluginLoaded('https://plugin.example/test.js'); await flush();
     expect(panel().model!.sections.problems.filter(row => row.id.startsWith('plugin-error:'))).toEqual([]);
     expect(panel().model!.sections.earlier.some(row => row.title.includes('Invalid manifest'))).toBe(true);

@@ -83,9 +83,11 @@ describe('status pill drawing', () => {
     expect(trigger().querySelector('.label')).toBeNull();
     expect(trigger().querySelector('.count')!.textContent).toBe('1');
     expect(trigger().getAttribute('aria-label')).toBe('1 needs you');
-    // Own-action feedback stays readable at any width (C1).
+    // Own-action feedback stays readable at any width (C1); needs you keeps the pill (R1), so it
+    // reads beside the icon.
     emitEphemeralToast({ message: 'Could not copy the URL.', severity: 'error' }); await flush();
-    expect(trigger().querySelector('.label')!.textContent).toBe('Could not copy the URL.');
+    expect(pill.shadowRoot!.querySelector('[data-testid="status-notice"]')!.textContent).toBe('Could not copy the URL.');
+    expect(trigger().getAttribute('aria-label')).toBe('1 needs you');
     viewport(1280); await flush();
     expect(trigger().querySelector('.label')).not.toBeNull();
   });

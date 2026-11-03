@@ -32,6 +32,8 @@ export interface EphemeralToastSpec {
   /** Display text — already projected through `present()` where it names entities. */
   readonly message: string;
   readonly severity?: MessageSeverity;
+  /** Plain consequence shown with the record in the status panel's Earlier section. */
+  readonly detail?: string;
   readonly durationMs?: number;
   readonly actionLabel?: string;
   readonly onAction?: () => void;

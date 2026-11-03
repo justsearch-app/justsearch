@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 import { describe, expect, it } from 'vitest';
-import { deriveFrameStatus, completedLongWork, FINISHED_DWELL_MS, authorizationDeadline,
+import { deriveFrameStatus, completedLongWork, FINISHED_DWELL_MS, authorizationDeadline, transientPlacement, folderName,
   type StatusFact } from './frameStatus.js';
 import type { AiState } from './aiStateStore.js';
 import type { AdvisoryRecord } from '../components/advisory/AdvisoryStore.js';
@@ -199,14 +199,15 @@ describe('concurrent source facts', () => {
   it('B1 a folder whose scan errored is a problem right now, as the Library headline counts it, and the pill never claims calm', () => {
     const root = { pathHash: 'locked', collection: 'Locked', status: 'indexed', fileCount: 4, failedCount: 0,
       walkError: 'INCOMPLETE_COVERAGE' } as NonNullable<FrameStatusInput['roots']>[number];
-    const m = derive({ ai: ai(), roots: [root], rootsLive: true });
+    const rootPaths = new Map([['locked', '/home/me/Locked']]);
+    const m = derive({ ai: ai(), roots: [root], rootPaths, rootsLive: true });
     const row = m.sections.problems.find(f => f.id === 'folder-walk:locked');
     expect(row?.title).toBe('Locked needs attention');
     expect(row?.detail).not.toContain('INCOMPLETE_COVERAGE');
     expect(row?.actions?.[0]?.target).toBe('core.library-surface');
     expect(m.pill.kind).toBe('problems');
     expect(m.pill.label).not.toBe('Up to date');
-    const unverified = derive({ ai: ai(), roots: [{ ...root, walkError: '', deleteDetectionUnverified: true }], rootsLive: true });
+    const unverified = derive({ ai: ai(), roots: [{ ...root, walkError: '', deleteDetectionUnverified: true }], rootPaths, rootsLive: true });
     expect(unverified.sections.problems.map(f => f.title)).toEqual(['Locked: deletions not verified']);
     expect(derive({ ai: ai(), roots: [{ ...root, walkError: '' }], rootsLive: true }).pill.kind).toBe('calm');
   });
@@ -226,5 +227,54 @@ describe('concurrent source facts', () => {
   it.each(['available', 'repair_required'])('ST4 update %s retains its existing Settings action', state => {
     expect(derive({ update: { state, availableVersion: '1.2.3' } as FrameStatusInput['update'] }).sections.needs[0]!.actions![0]!.target).toBe('core.settings-surface');
     expect(derive({ update: { state: 'idle' } as FrameStatusInput['update'] }).sections.needs).toEqual([]);
+  });
+});
+
+describe('round 7 repairs', () => {
+  it('R1 a passing notice never takes the pill from a more urgent state; engine waits say nothing while unreachable', () => {
+    for (const kind of ['unreachable', 'limited', 'needs', 'problems'] as const) {
+      expect(transientPlacement({ kind }, 'core.ephemeral')).toBe('beside');
+      expect(transientPlacement({ kind }, 'core.verdict.settled')).toBe('beside');
+    }
+    for (const kind of ['working', 'finished', 'calm', 'unknown'] as const) expect(transientPlacement({ kind }, 'core.ephemeral')).toBe('pill');
+    expect(transientPlacement({ kind: 'unreachable' }, 'core.engine.wait')).toBe('hidden');
+    expect(transientPlacement({ kind: 'unknown' }, 'core.engine.wait')).toBe('pill');
+  });
+  it('R3 permission rows read in plain words, never the raw grant action', () => {
+    const entry = (action: string) => ({ id: `g-${action}`, source: 'backend' as const, kind: 'grant', occurredAt: '2026-11-03T10:00:00Z',
+      originator: 'user' as never, label: `grant ${action} Search Index`, grant: { action, subject: 'Search Index' } });
+    const rows = derive({ activity: ['ISSUED', 'CONSUMED', 'REVOKED', 'EXPIRED'].map(entry) }).sections.earlier;
+    expect(rows.map(r => r.detail)).toEqual(expect.arrayContaining(['Allowed', 'Used', 'Withdrawn', 'Expired']));
+    for (const row of rows) {
+      expect(row.title).toBe('Permission for Search Index');
+      expect(`${row.title} ${row.detail}`).not.toMatch(/grant|ISSUED|CONSUMED|REVOKED|EXPIRED/);
+    }
+  });
+  it('R3 a removal notice keeps its add-again action and plain consequence in Earlier', () => {
+    const onAction = () => {};
+    const record = { key: 'local:1', origin: 'local', acknowledged: false, sourceRenderHint: 'EPHEMERAL',
+      toast: { message: 'Removed Documents from your library', detail: '/home/me/Documents. Adding it again reads its files again.',
+        actionLabel: 'Add Documents again', onAction },
+      event: { id: 'local:1', classId: 'core.ephemeral', occurredAt: '2026-11-03T10:00:00Z', renderHint: 'EPHEMERAL', severity: 'info',
+        classExtras: {}, diagnosticsLink: null, provenance: null, primaryAction: null, primaryActionKind: null, bodyI18nKey: null } } as unknown as AdvisoryRecord;
+    const row = derive({ advisories: [record] }).sections.earlier[0]!;
+    expect(row.title).toBe('Removed Documents from your library');
+    expect(row.detail ?? '').toContain('reads its files again');
+    expect(row.actions).toEqual([{ kind: 'advisory', target: 'local:1', label: 'Add Documents again' }]);
+  });
+  it('R4 folder rows are named by folder with the path as detail, never by collection', () => {
+    const roots = [{ pathHash: 'docs', collection: 'default', status: 'indexing', inFlightCount: 3, fileCount: 8 },
+      { pathHash: 'docs2', collection: 'default', status: 'indexed', fileCount: 8, walkError: 'INCOMPLETE_COVERAGE' }] as NonNullable<FrameStatusInput['roots']>;
+    const m = derive({ roots, rootPaths: new Map([['docs', 'C:\\Users\\me\\Documents\\'], ['docs2', 'C:\\Users\\me\\Documents']]), rootsLive: true });
+    const work = m.sections.running.find(f => f.id === 'folder-work:docs')!;
+    expect(work.title).toMatch(/^Documents: /);
+    expect(work.detail).toBe('C:\\Users\\me\\Documents\\');
+    const problem = m.sections.problems.find(f => f.id === 'folder-walk:docs2')!;
+    expect(problem.title).toBe('Documents needs attention');
+    expect(problem.detail).toContain('C:\\Users\\me\\Documents');
+    for (const row of [...m.sections.running, ...m.sections.problems]) expect(row.title).not.toMatch(/default/);
+    // Before the path is resolved the row names what it is, not the collection.
+    expect(derive({ roots, rootsLive: true }).sections.problems[0]!.title).toBe('A watched folder needs attention');
+    expect(folderName('/home/me/Documents/')).toBe('Documents');
   });
 });

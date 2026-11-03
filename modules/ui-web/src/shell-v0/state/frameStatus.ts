@@ -68,6 +68,8 @@ interface FrameStatusInput {
   readonly update?: AppUpdateStatus | null;
   readonly conditions?: readonly StatusFact[];
   readonly roots?: readonly IndexedRootView[];
+  /** Resolved folder paths by path hash (the observation carries hashes only). */
+  readonly rootPaths?: ReadonlyMap<string, string>;
   readonly rootsLive?: boolean;
   readonly activity?: readonly UnifiedActionEntry[];
   readonly presence?: { readonly runs: readonly PresenceRun[]; readonly live: boolean };
@@ -95,6 +97,12 @@ const OPERATION_STATE_WORDS: Readonly<Record<string, string>> = {
   unknown: 'Outcome not known yet · checking', expired: 'Outcome no longer available',
 };
 
+/** The last segment of a folder path, either separator, ignoring a trailing one ("/home/me/Documents/" → "Documents"). */
+export function folderName(path: string): string {
+  const trimmed = path.replace(/[\\/]+$/, '');
+  return trimmed.split(/[\\/]/).pop() || path;
+}
+
 /** An unanswered agent request expires unusable (the engine refuses stale approvals): name that consequence. */
 export function authorizationDeadline(expiresAt: string, now: number): string | undefined {
   const ms = Date.parse(expiresAt) - now;
@@ -111,7 +119,7 @@ function advisoryStatusFact(record: AdvisoryRecord): StatusFact {
   const conditionId = typeof extras.conditionId === 'string' ? extras.conditionId : '';
   const reason = healthAdvisoryReasonBody(e.classId, extras);
   const body = reason ?? (e.bodyI18nKey ? present({ kind: 'resource', key: e.bodyI18nKey }).label : null);
-  const detail = body ? interpolateMessage(body, extras) : null;
+  const detail = record.toast?.detail ?? (body ? interpolateMessage(body, extras) : null);
   const title = record.toast?.message ?? (e.classId === 'operation.completed'
     ? `${present({ kind: 'operation', id: operationId }).label}${extras.outcome === 'SUCCESS' ? ' completed' : extras.outcome === 'FAILURE' ? ' failed' : ''}`
     : e.classId === 'health.recoverable'
@@ -132,8 +140,17 @@ function advisoryStatusFact(record: AdvisoryRecord): StatusFact {
   };
 }
 
+const GRANT_WORDS: Readonly<Record<string, readonly [string, NonNullable<StatusFact['tone']>]>> = {
+  ISSUED: ['Allowed', 'success'], CONSUMED: ['Used', 'neutral'], REVOKED: ['Withdrawn', 'neutral'], EXPIRED: ['Expired', 'neutral'],
+};
 /** Ledger rows in plain words: the structured outcome and gate disposition, never their raw codes. */
 function activityWords(entry: UnifiedActionEntry): { title: string; detail?: string; tone: NonNullable<StatusFact['tone']> } {
+  // R3 — grant lifecycle in plain words, never the raw action code ("grant CONSUMED").
+  if (entry.grant) {
+    const word = GRANT_WORDS[entry.grant.action.toUpperCase()];
+    return { title: `Permission${entry.grant.subject ? ` for ${entry.grant.subject}` : ''}`,
+      detail: word?.[0] ?? 'Permission changed', tone: word?.[1] ?? 'neutral' };
+  }
   if (entry.gate) {
     const { disposition, operation } = entry.gate;
     return disposition === 'DENIED' ? { title: `Approval denied: ${operation}`, tone: 'failure' }
@@ -180,7 +197,10 @@ export function deriveFrameStatus(input: FrameStatusInput): FrameStatus {
       actions: [go('All activity', 'core.activity-surface')] });
   }
   for (const root of input.roots ?? []) {
-    const name = root.collection || 'Folder';
+    // R4 — a folder is named by its folder name, with the full path as detail; the collection
+    // ("default") is not a folder name. Until the path is resolved the row says what it is.
+    const path = root.pathHash ? input.rootPaths?.get(root.pathHash) ?? null : null;
+    const name = (path && folderName(path)) || 'A watched folder';
     const state = folderStatus(root, { relativeTime: '', verifiedRelativeTime: '',
       provisional: false, enrichmentStages: progress.stages,
       enrichmentPending: progress.enrichingPending > 0, enrichmentBlocked: progress.blockedPending > 0,
@@ -188,9 +208,9 @@ export function deriveFrameStatus(input: FrameStatusInput): FrameStatus {
     const actions = [go('Show in Library', 'core.library-surface')];
     // ST5/B1 — the same folder conditions the Library headline counts (one source, folderStatus.ts).
     for (const item of folderAttention(root, state, name)) add({ id: item.kind === 'missing' ? `folder:${root.pathHash}` : item.kind === 'files' ? `files:${root.pathHash}` : `folder-${item.key}`, section: 'problems',
-      title: item.title, detail: item.detail, stale: !input.rootsLive || (item.kind === 'files' && state.failedIsLastKnown === true), actions });
+      title: item.title, detail: [item.detail, path].filter(Boolean).join(' · '), stale: !input.rootsLive || (item.kind === 'files' && state.failedIsLastKnown === true), actions });
     if (['scanning', 'indexing', 'enriching', 'waiting'].includes(state.state)) add({
-      id: `folder-work:${root.pathHash}`, section: 'running', title: `${name}: ${state.metaText}`,
+      id: `folder-work:${root.pathHash}`, section: 'running', title: `${name}: ${state.metaText.replace(`${root.collection ?? 'default'} · `, '')}`, ...(path ? { detail: path } : {}),
       stale: !input.rootsLive, percent: state.state === 'enriching' ? rootCoverage(root, progress.stages)?.percent ?? null : null, actions });
   }
   // Deduplicate the broadcast and request-scoped representations by the engine-issued identity.
@@ -337,6 +357,17 @@ export function deriveFrameStatus(input: FrameStatusInput): FrameStatus {
     pill = { ...pill, label: `${pill.kind === 'calm' ? 'Search status' : pill.label} · ${age === null ? 'not yet observed' : `last seen ${age < 1 ? 'just now' : `${age} min ago`}`} · ${ai?.connection.reachable || !pastGrace ? 'checking' : 'reconnecting'}` };
   }
   return { pill, sections, progress };
+}
+
+/**
+ * R1 — where a passing notice (own-action receipt, undo, "just finished") shows. It never displaces
+ * a more urgent state: engine unreachable, search limited, needs you and problems keep the pill and
+ * the notice shows beside it; the engine's own wait notices say nothing while the engine is
+ * unreachable. Every notice stays recoverable in Earlier.
+ */
+export function transientPlacement(pill: Pick<StatusPillState, 'kind'>, classId: string): 'pill' | 'beside' | 'hidden' {
+  if (pill.kind === 'unreachable' && classId === 'core.engine.wait') return 'hidden';
+  return ['unreachable', 'limited', 'needs', 'problems'].includes(pill.kind) ? 'beside' : 'pill';
 }
 
 /** Completion edges require an observed active phase; initial/replayed terminal values are silent. */

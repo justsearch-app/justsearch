@@ -622,6 +622,14 @@ describe('scan rollup + index tiering (tempdoc 812)', () => {
     expect(row.isRoutine).toBe(true);
   });
 
+  it('R3 grant rows carry their action and humanized subject as a structured facet', () => {
+    const row = projectBackend(backendEntry({ kind: 'grant', originator: 'agent', action: 'CONSUMED', grantId: 'g', subject: 'core.search-index' }));
+    expect(row.grant?.action).toBe('CONSUMED');
+    expect(row.grant?.subject).not.toBe('core.search-index');
+    expect(row.grant?.subject).toBeTruthy();
+    expect(projectBackend(backendEntry({ kind: 'gate', originator: 'agent', operationId: 'core.reindex', disposition: 'GATED' })).grant).toBeUndefined();
+  });
+
   it('grant and gate rows stay foreground on every originator (the tier must not hide them)', () => {
     for (const originator of ['user', 'agent', 'system'] as const) {
       expect(

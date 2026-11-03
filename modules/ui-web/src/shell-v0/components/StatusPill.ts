@@ -21,7 +21,7 @@ import { emitEphemeralToast } from './advisory/ephemeralToast.js';
 import type { MultiplexedStream } from '../streaming/MultiplexedStream.js';
 import './StatusBadge.js';
 import './SystemNotice.js';
-import type { StatusAction } from '../state/frameStatus.js';
+import { transientPlacement, type StatusAction } from '../state/frameStatus.js';
 import type { AdvisoryStore, AdvisoryRecord } from './advisory/AdvisoryStore.js';
 import type { AuthorizationHost } from './AuthorizationHost.js';
 import './StatusPanel.js';
@@ -69,6 +69,8 @@ export class StatusPill extends JfElement {
     jf-status-badge { min-width: 0; max-width: 100%; }
     jf-status-badge::part(badge) { min-width: 0; max-width: 100%; box-sizing: border-box; }
     .transient-action { font: inherit; color: var(--text-tint); background: var(--surface-2); border: 0; border-radius: var(--frame-pill-radius); padding: var(--jf-space-1) var(--jf-space-2); }
+    .beside-notice { align-self: center; min-width: 0; padding-inline: var(--jf-space-2); color: var(--text-secondary);
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .content { display: inline-flex; align-items: center; gap: var(--jf-space-2); min-width: 0; }
     .trigger.stale { outline: var(--frame-hairline) dashed var(--border-emphasized); }
     .label { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -77,8 +79,8 @@ export class StatusPill extends JfElement {
     .needs .symbol, .limited .symbol { color: var(--text-warning); }
     .problems .symbol, .unreachable .symbol { color: var(--text-danger); }
     button:focus-visible { outline: var(--frame-focus-width) solid var(--focus-ring-color); outline-offset: var(--jf-space-1); }
-    .overlay { position: fixed; inset: 0; z-index: var(--z-overlay-transient); background: var(--frame-status-dim); }
-    jf-status-panel { position: fixed; top: calc(var(--frame-status-panel-top) + var(--jf-space-2)); right: max(var(--jf-space-4), var(--frame-status-panel-right, var(--jf-space-4)));
+    .overlay { position: fixed; top: var(--frame-status-dim-top, 0); right: 0; bottom: 0; left: 0; z-index: var(--z-overlay-transient); background: var(--frame-status-dim); }
+    jf-status-panel { position: fixed; top: calc(var(--frame-status-panel-top) + var(--jf-space-2)); right: var(--frame-status-panel-right, var(--jf-space-4));
       z-index: var(--z-overlay-transient); text-align: start; }
     [hidden] { display: none; }
     .visually-hidden { position: absolute; width: var(--frame-hairline); height: var(--frame-hairline); overflow: hidden; clip-path: inset(50%); }
@@ -131,18 +133,32 @@ export class StatusPill extends JfElement {
         this.transient.open();
         const rect = this.shadowRoot!.querySelector('.trigger')!.getBoundingClientRect();
         this.style.setProperty('--frame-status-panel-top', `${rect.bottom}px`);
+        // R2 — the dim starts below the bar the pill sits in: the pill and its neighbours keep
+        // their own contrast while the panel is open.
+        this.style.setProperty('--frame-status-dim-top', `${Math.max(rect.bottom, this.parentElement?.getBoundingClientRect().bottom ?? 0)}px`);
         const panel = this.shadowRoot!.querySelector<StatusPanel>('jf-status-panel');
         void panel?.updateComplete.then(() => {
-          this.style.setProperty('--frame-status-panel-right', `${Math.max(0, Math.min(window.innerWidth - rect.right, window.innerWidth - panel.getBoundingClientRect().width))}px`);
-          // The arrow points at the pill's centre wherever the panel had to shift to fit (narrow
-          // windows clamp the panel inside the viewport), measured from the placed panel's edge.
+          // R4 — under the pill, kept a margin away from both window edges; the arrow points at the
+          // pill's centre and stays on the straight part of the panel's top edge.
+          const margin = this.cssPx('--jf-space-2');
+          const width = panel.getBoundingClientRect().width;
+          const right = Math.max(margin, Math.min(window.innerWidth - rect.right, window.innerWidth - margin - width));
+          this.style.setProperty('--frame-status-panel-right', `${right}px`);
           const placed = panel.getBoundingClientRect();
-          const fromRight = Math.min(Math.max(0, placed.right - (rect.left + rect.width / 2)), placed.width);
+          const inset = this.cssPx('--frame-panel-radius') + margin / 2;
+          const fromRight = Math.min(Math.max(inset, placed.right - (rect.left + rect.width / 2)), Math.max(inset, placed.width - inset));
           this.style.setProperty('--frame-status-arrow-right', `calc(${fromRight}px - var(--jf-space-2) / 2)`);
           panel.shadowRoot?.querySelector<HTMLElement>('[role="dialog"]')?.focus();
         });
       } else this.transient.close();
     }
+  }
+  /** A length token in px (rem resolves against the root font size); 0 when the token is not defined. */
+  private cssPx(name: string): number {
+    const value = getComputedStyle(this).getPropertyValue(name).trim();
+    const n = parseFloat(value);
+    if (!Number.isFinite(n)) return 0;
+    return value.endsWith('rem') ? n * (parseFloat(getComputedStyle(document.documentElement).fontSize) || 16) : n;
   }
   toggle(): void { if (this.open) this.close(); else if (!modalOwnsFocus()) this.open = true; }
   close(restoreFocus = true): void {
@@ -236,7 +252,11 @@ export class StatusPill extends JfElement {
     const model = this.status.model;
     const pill = model.pill;
     const plugins = this.pluginsVisible ? listStatusBarItems().filter(item => item.source === 'plugin') : [];
-    const transient = this.status.snapshot.advisories.find(row => row.key === this.status.transientKey);
+    const notice = this.status.snapshot.advisories.find(row => row.key === this.status.transientKey);
+    // R1 — a more urgent state keeps the pill; the notice shows beside it, never in its place.
+    const placement = notice ? transientPlacement(pill, notice.event.classId) : 'hidden';
+    const transient = placement === 'pill' ? notice : undefined;
+    const beside = placement === 'beside' ? notice : undefined;
     const label = transient?.toast?.message ?? `${pill.label}${pill.percent != null ? ` · ${pill.percent}%` : ''}`;
     const symbols = { calm: '●', working: '◌', needs: '!', problems: '!', unreachable: '×', limited: '!', finished: '✓', unknown: '?' };
     // ref-09: the count sits in a badge and the words follow it; a known fraction draws a ring.
@@ -247,15 +267,18 @@ export class StatusPill extends JfElement {
           <circle class="arc" cx="10" cy="10" r="8" pathLength="100" stroke-dasharray="${pill.percent} 100" transform="rotate(-90 10 10)"></circle></svg>`
         : html`<span class="symbol" aria-hidden="true">${symbols[pill.kind]}</span>`;
     const text = transient?.toast?.message ?? (pill.kind === 'needs' && pill.count != null ? (pill.count === 1 ? 'Needs you' : 'Need you') : pill.label);
-    const undo = transient?.toast?.onAction && this.transientActionLabel(transient) === 'Undo';
+    const shown = transient ?? beside;
+    const undo = shown?.toast?.onAction && this.transientActionLabel(shown) === 'Undo';
     return html`<button type="button" class="trigger ${transient ? 'notice' : pill.kind} ${pill.stale ? 'stale' : ''}"
       aria-label=${label} aria-expanded=${this.open} aria-haspopup="dialog" title="What's going on · Ctrl+Shift+S"
       @click=${() => this.toggle()} @mouseenter=${() => this.status.pauseTransient(true)} @mouseleave=${() => this.status.pauseTransient(false)}
       @focus=${() => this.status.pauseTransient(true)} @blur=${() => this.status.pauseTransient(false)}>
       <jf-status-badge .tone=${pill.kind === 'needs' || pill.kind === 'limited' ? 'warning' : pill.kind === 'unreachable' || pill.kind === 'problems' ? 'error' : 'neutral'}><span class="content">${icon}${this.narrow && !transient ? nothing : html`<span class="label">${text}</span>`}
       ${pill.kind === 'calm' && plugins.length ? html`<span aria-label="Plugin status items">${plugins.length}</span>` : nothing}</span></jf-status-badge></button>
-      ${transient?.toast?.onAction ? html`<button class="transient-action" type="button" @mouseenter=${() => this.status.pauseTransient(true)} @mouseleave=${() => this.status.pauseTransient(false)} @focus=${() => this.status.pauseTransient(true)} @blur=${() => this.status.pauseTransient(false)} @click=${() => this.act({ kind: 'advisory', target: transient.key, label: this.transientActionLabel(transient) })}
-        aria-keyshortcuts=${undo ? 'Control+Z' : nothing}>${this.transientActionLabel(transient)}${undo ? html`<kbd aria-hidden="true">Ctrl+Z</kbd>` : nothing}</button>` : nothing}
+      ${beside?.toast ? html`<span class="beside-notice" data-testid="status-notice" @mouseenter=${() => this.status.pauseTransient(true)}
+        @mouseleave=${() => this.status.pauseTransient(false)}>${beside.toast.message}</span>` : nothing}
+      ${shown?.toast?.onAction ? html`<button class="transient-action" type="button" @mouseenter=${() => this.status.pauseTransient(true)} @mouseleave=${() => this.status.pauseTransient(false)} @focus=${() => this.status.pauseTransient(true)} @blur=${() => this.status.pauseTransient(false)} @click=${() => this.act({ kind: 'advisory', target: shown.key, label: this.transientActionLabel(shown) })}
+        aria-keyshortcuts=${undo ? 'Control+Z' : nothing}>${this.transientActionLabel(shown)}${undo ? html`<kbd aria-hidden="true">Ctrl+Z</kbd>` : nothing}</button>` : nothing}
       <div class="overlay" ?hidden=${!this.open} @click=${() => this.close()}></div>
       <jf-status-panel ?hidden=${!this.open} .model=${model} .plugins=${plugins} api-base=${this.apiBase}
         @status-close=${() => this.close()}

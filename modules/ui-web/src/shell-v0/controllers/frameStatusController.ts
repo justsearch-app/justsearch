@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 import type { ReactiveController, ReactiveControllerHost } from 'lit';
 import { subscribeAiState, type AiState } from '../state/aiStateStore.js';
-import { deriveFrameStatus, completedLongWork, FINISHED_DWELL_MS, type FrameStatus, type StatusFact, type DurableStatusOperation } from '../state/frameStatus.js';
+import { deriveFrameStatus, completedLongWork, transientPlacement, FINISHED_DWELL_MS, type FrameStatus, type StatusFact, type DurableStatusOperation } from '../state/frameStatus.js';
 import { subscribeTasks, listTasks, completeTask } from '../substrates/tasks/index.js';
 import { subscribePending, listPending } from '../substrates/pending-effects/index.js';
 import { subscribeConsent, listPendingConsentRequests } from '../substrates/consent/index.js';
@@ -27,6 +27,7 @@ import { isWindowFocused } from '../../utils/windowFocus.js';
 import { presentVerdict, type VerdictPresentation } from '../state/verdict.js';
 import { presentAiEngineVerdict, type AiEngineVerdictPresentation } from '../state/aiVerdict.js';
 import { isIndexingObservation } from '../state/readinessNotice.js';
+import { resolvePathLazy } from '../hooks/resolvePathLazy.js';
 
 /** Which observation a needs-you row comes from (C6: only an observed source can announce an arrival). */
 function needsSource(id: string): string {
@@ -82,6 +83,7 @@ export class FrameStatusController implements ReactiveController {
   private operations = new Map<string, DurableStatusOperation>();
   private roots: readonly IndexedRootView[] = [];
   private rootsLive = false;
+  private readonly rootPaths = new Map<string, string>();
   private lastRemoteStamp: number | null = null;
   private remoteBusy = false;
   private lifecycle = 0;
@@ -190,6 +192,14 @@ export class FrameStatusController implements ReactiveController {
       const roots = z.object({ items: z.array(indexedRootViewSchema) }).parse(await response.json());
       if (current()) { this.roots = roots.items; this.rootsLive = true; }
     } catch { if (current()) this.rootsLive = false; }
+    // R4 — folder rows are named by folder; the observation carries hashes only (memoized resolver).
+    for (const root of this.roots) {
+      if (!current()) break;
+      const hash = root.pathHash;
+      if (!hash || this.rootPaths.has(hash)) continue;
+      const path = await resolvePathLazy('core.indexed-roots', hash, { apiBase: this.host.apiBase }).catch(() => null);
+      if (path && current()) this.rootPaths.set(hash, path);
+    }
     if (current()) try {
       const response = await authorizedFetch(`${this.host.apiBase}/api/presence`, { signal: abort.signal });
       if (!response.ok) throw new Error('Background observation unavailable');
@@ -268,11 +278,6 @@ export class FrameStatusController implements ReactiveController {
     const now = Date.now();
     if (this.ai?.connection.reachable) this.contactLostAt = null;
     else this.contactLostAt ??= now;
-    if (!this.paused && now >= this.transientUntil) {
-      this.transientKey = null;
-      const waiting = this.transientQueue.pop(); this.transientQueue = [];
-      if (waiting) this.showTransient(waiting);
-    }
     const migration = this.ai?.status?.worker?.migration;
     const generation = migration?.buildingGenerationId ?? '';
     if (['MIGRATING', 'SWITCHING', 'AWAITING_ACCEPTANCE'].includes(migration?.migrationState ?? '')
@@ -296,7 +301,7 @@ export class FrameStatusController implements ReactiveController {
         ? [{ ...item.prompt, expiresAt: item.prompt.expiresAt ?? this.deadlines.get(item.prompt.pendingId) }] : []),
       consents: listPendingConsentRequests().map(c => ({ id: String(c.id), pluginId: c.contributorId, capability: c.capability })),
       update: getAppUpdateStatus(), conditions: this.conditions, finished: this.finished,
-      roots: this.roots, rootsLive: this.rootsLive && !!this.ai?.indexingStatusLive,
+      roots: this.roots, rootPaths: this.rootPaths, rootsLive: this.rootsLive && !!this.ai?.indexingStatusLive,
       activity: this.activity, presence: { runs: this.presence, live: this.presenceLive && !!this.ai?.snapshotLive }, operations: [...this.operations.values()] });
     let next = derive();
     const finishedBefore = this.finished;
@@ -360,6 +365,17 @@ export class FrameStatusController implements ReactiveController {
       this.assertiveKey = `needs:${[...needsKey].sort().join('|')}`;
     }
     this.needsKey = needsKey;
+    // R1 — while a more urgent state holds the pill, a hover or focus pause cannot extend a notice
+    // past its window; an engine wait notice ends at once while the engine is unreachable.
+    const placement = (key: string | null): ReturnType<typeof transientPlacement> => transientPlacement(next.pill,
+      this.snapshot.advisories.find(r => r.key === key)?.event.classId ?? '');
+    const urgent = transientPlacement(next.pill, '') !== 'pill';
+    if (urgent && this.paused) this.remaining = Math.max(0, this.transientUntil - now);
+    if (placement(this.transientKey) === 'hidden' || (!this.paused || urgent) && now >= this.transientUntil) {
+      this.transientKey = null;
+      const waiting = this.transientQueue.pop(); this.transientQueue = [];
+      if (waiting && placement(waiting) !== 'hidden') this.showTransient(waiting);
+    }
     this.observedSources = new Set(['proposals', 'consents',
       ...(this.ai?.indexingStatusLive && p.activity.confirmed ? ['status'] : []),
       ...(getAppUpdateStatus() ? ['update'] : []),

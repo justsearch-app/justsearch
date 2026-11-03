@@ -59,7 +59,7 @@ export class StatusPanel extends JfElement {
       top: calc(-1 * var(--jf-space-1)); width: var(--jf-space-2); height: var(--jf-space-2);
       background: var(--surface-1); border-inline-start: var(--frame-hairline) solid var(--border-emphasized);
       border-top: var(--frame-hairline) solid var(--border-emphasized); transform: rotate(45deg); pointer-events: none; }
-    .panel { width: min(var(--frame-status-panel-width), calc(100vw - var(--jf-space-8)));
+    .panel { width: min(var(--frame-status-panel-width), calc(100vw - 2 * var(--jf-space-2)));
       max-height: calc(100dvh - var(--frame-status-panel-top) - var(--jf-space-2) - var(--jf-space-4));
       overflow-y: auto; overscroll-behavior: contain; background: var(--surface-1);
       border: var(--frame-hairline) solid var(--border-emphasized); border-radius: var(--frame-panel-radius);

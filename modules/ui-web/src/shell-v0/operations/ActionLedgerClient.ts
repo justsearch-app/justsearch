@@ -115,6 +115,8 @@ export interface UnifiedActionEntry {
    * humanized operation, so a presenter can word the row without parsing {@link label}.
    */
   readonly gate?: { readonly disposition: string; readonly operation: string };
+  /** Present on grant-lifecycle rows: the structured action (ISSUED | CONSUMED | REVOKED) and the humanized subject. */
+  readonly grant?: { readonly action: string; readonly subject: string };
   /**
    * Optional grouping key for bounded-projection collapse (tempdoc 550 thesis III(b)). Present on
    * kind='index' rows (the job collection), so the Activity timeline can collapse an indexing burst
@@ -310,6 +312,7 @@ export function projectBackend(e: BackendLedgerEntry): UnifiedActionEntry {
     // elsewhere). Conditional-spread so an absent outcome stays absent (exactOptionalPropertyTypes-safe).
     ...(e.outcome ? { outcome: e.outcome } : {}),
     ...(e.kind === 'gate' && e.disposition ? { gate: { disposition: e.disposition, operation: opLabel(e.operationId) } } : {}),
+    ...(e.kind === 'grant' && e.action ? { grant: { action: e.action, subject: e.subject ? opLabel(e.subject) : '' } } : {}),
     ...(e.kind === 'operation'
       && ['core.bulk-reindex', 'core.rebuild-index', 'core.activate-installed-models'].includes(e.operationId ?? '')
       && /^operation:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/.test(e.id)

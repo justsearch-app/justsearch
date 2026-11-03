@@ -58,6 +58,18 @@ deletion is the Obsolete entry here.
 | AiActivityDigest: summary chip, seen cursor, live update, auto-hide window | — | retired with the digest; agent actions list in Earlier and Activity |
 | AppUpdateBanner: available release → Settings; absent otherwise | frameStatus "ST4 update %s retains its existing Settings action" | kept |
 
+## Round 7 changes to this slice's own checks
+
+The R1 contract (a passing notice never displaces a more urgent state) changes where three existing
+checks of this slice read a notice; R4 changes what names a folder row. No assertion is dropped:
+
+| Check | Change | Reason |
+| --- | --- | --- |
+| StatusPill.feedback "undo pauses while hovered or focused…" | the fixture records engine contact before the 9 s step; assertions unchanged | without contact the engine reads unreachable after the 10 s grace, which now (correctly) keeps the pill; the check is about a notice when nothing is more urgent |
+| StatusPill.feedback "ST5 plugin errors … copy failures have visible feedback" | the copy failure is asserted beside the pill (`status-notice`) and the pill is asserted to keep "Problems right now (1)" | R1: an active problem keeps the pill; the feedback stays visible next to it (C1) |
+| StatusPill.design "below 1000 px the pill is an icon…" | the C1 notice is asserted beside the icon, and the pill's name is asserted to stay "1 needs you" | R1, as above |
+| frameStatus "B1 a folder whose scan errored…" | supplies the resolved folder path; same title assertions | R4: folder rows are named by folder, not by collection |
+
 ```json
 {
   "entries": [
@@ -877,6 +889,125 @@ deletion is the Obsolete entry here.
     },
     {
       "items": [
+        "modules/ui-web/src/shell-v0/components/StatusPill.precedence.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "A passing notice (own-action receipt, undo, \"Search is up to date\") never takes the pill from engine unreachable, search limited, needs you or problems: the pill keeps its state and the notice shows beside it for its window, with its action; a hover or focus pause cannot hold it longer; the engine's own update/busy wait notices are not shown while the engine is unreachable; the pill and the panel header agree; the notice stays in Earlier.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed accordingly",
+          "delegationLocation": "task t-20261103-shell user turn 2026-11-03 ~16:20Z (reply to the orchestrator's plan)",
+          "delegationScope": "the frame-build plan: S1 · Status: the pill and status panel, built on the existing data, replacing about a dozen old pieces (the status bar, bell, pop-ups, task list and others)",
+          "choice": "ST1 (Concurrent facts stay discoverable: whatever the pill shows, every actionable condition is listed in the panel.) One status pill in the top bar shows exactly one state, chosen in this order: engine unreachable > search limited (index unavailable, reindex required, schema refused) > needs you (count) > problems right now > working (most important running item, with progress when known) > just finished (6 s) > calm. Calm reads \"Up to date\" with a green dot at window width ≥ 1000 px, dot only below, same accessible name. | C1 Ordinary operation feedback keeps a visible, accessible destination with the panel closed: clipboard failures, unknown destinations, operation failures and successes of the user's own actions show at the place of the action (inline receipt) or in the pill; never silently dropped (ST10, DE5). | Repair round 7 (verifier R1): a transient never displaces a more urgent state (engine unreachable > search limited > needs you > problems); hover/focus pause cannot extend a transient past its window while something more urgent exists; engine unreachable always wins over update/preparing states; pill and panel header agree.",
+          "label": "agent choice"
+        }
+      ],
+      "repaired": true,
+      "evidence": "gates/test-intent/evidence/shell-s1-frame-status-round7-repair.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/components/StatusPill.precedence.test.ts#R1 notice precedence needs you keeps the pill while a notice shows beside it; hovering the open pill cannot hold the notice past its window",
+        "modules/ui-web/src/shell-v0/components/StatusPill.precedence.test.ts#R1 notice precedence an own-action undo keeps its action beside an urgent pill and the pill keeps its state",
+        "modules/ui-web/src/shell-v0/components/StatusPill.precedence.test.ts#R1 notice precedence an unreachable engine keeps the pill through repeated update-wait notices, and the panel header agrees"
+      ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/components/StatusPill.precedence.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "With the panel open, the page dim starts below the bar the pill sits in, so the pill keeps its own contrast; at 600 px the panel keeps an 8 px margin from both window edges and its arrow points at the pill, staying on the straight part of the panel's top edge.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed accordingly",
+          "delegationLocation": "task t-20261103-shell user turn 2026-11-03 ~16:20Z (reply to the orchestrator's plan)",
+          "delegationScope": "the frame-build plan: S1 · Status: the pill and status panel, built on the existing data, replacing about a dozen old pieces (the status bar, bell, pop-ups, task list and others)",
+          "choice": "X1 Dark, light and Windows high contrast for every frame component; contrast ≥ 4.5:1 for text; colour never the only signal; reduced motion respected; no new hard-coded colours, sizes or z-indexes (ui-web gates). | X2 Sizes 1280×800, 900×800, 600×400: nothing overflows sideways; ui-a11y-gate shows no new violations; the proportion baseline is updated deliberately. | Repair round 7 (verifier R2, R4): the pill stays above the page dim (or the dim excludes the top bar) and keeps ≥ 4.5:1 in dark, light and forced colors; at 600 px the panel keeps an 8 px margin and its arrow points at the pill. Frame design (design-system.md §7 Status panel; ref-09, ref-21/22): anchored under the pill with an arrow, over a 28 % dim.",
+          "label": "agent choice"
+        }
+      ],
+      "repaired": true,
+      "evidence": "gates/test-intent/evidence/shell-s1-frame-status-round7-repair.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/components/StatusPill.precedence.test.ts#R2 R4 panel placement R2 the page dim starts below the bar the pill sits in",
+        "modules/ui-web/src/shell-v0/components/StatusPill.precedence.test.ts#R2 R4 panel placement R4 at 600 px the panel keeps an 8 px margin from both edges and the arrow stays on its top edge, pointing at the pill"
+      ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/state/frameStatus.test.ts",
+        "modules/ui-web/src/shell-v0/operations/ActionLedgerClient.test.ts",
+        "modules/ui-web/src/shell-v0/views/LibrarySurface.folderActions.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "A completed Library removal leaves a notice, recoverable in Earlier, that offers \"Add <folder> again\": it re-adds the same path once (repeat clicks are idempotent), works after leaving the Library, says that adding it again reads its files again, and reports a failed re-add so it can be tried again. Permission (grant) rows in Earlier read \"Allowed\", \"Used\", \"Withdrawn\" or \"Expired\", from a structured grant facet on the ledger row, never the raw action code.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed accordingly",
+          "delegationLocation": "task t-20261103-shell user turn 2026-11-03 ~16:20Z (reply to the orchestrator's plan)",
+          "delegationScope": "the frame-build plan: S1 · Status: the pill and status panel, built on the existing data, replacing about a dozen old pieces (the status bar, bell, pop-ups, task list and others)",
+          "choice": "ST7 Earlier lists persisted advisories and completed operations newest first, with read/unread (existing acknowledgements), Mark all read, and Undo only where the journal/backend supports reversal; \"Add back to search\" (re-index) where forget cannot be reversed. Read/unread, seen/unseen and active/resolved stay separate. | C1 Ordinary operation feedback keeps a visible, accessible destination with the panel closed: clipboard failures, unknown destinations, operation failures and successes of the user's own actions show at the place of the action (inline receipt) or in the pill; never silently dropped (ST10, DE5). | Repair round 7 (verifier R3): after Library › Remove from library the Earlier row offers \"Add <folder name> again\" (re-adds the same path, reads it again; plain wording of the consequence), since removal has no undo; approval rows use plain words (\"Allowed\", \"Used\", \"Expired\"…) instead of raw \"grant CONSUMED\"/\"grant ISSUED\".",
+          "label": "agent choice"
+        }
+      ],
+      "repaired": true,
+      "evidence": "gates/test-intent/evidence/shell-s1-frame-status-round7-repair.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/state/frameStatus.test.ts#round 7 repairs R3 permission rows read in plain words, never the raw grant action",
+        "modules/ui-web/src/shell-v0/state/frameStatus.test.ts#round 7 repairs R3 a removal notice keeps its add-again action and plain consequence in Earlier",
+        "modules/ui-web/src/shell-v0/operations/ActionLedgerClient.test.ts#scan rollup + index tiering (tempdoc 812) R3 grant rows carry their action and humanized subject as a structured facet",
+        "modules/ui-web/src/shell-v0/views/LibrarySurface.folderActions.test.ts#R3 a completed removal offers to add the same folder again, once, with its plain consequence",
+        "modules/ui-web/src/shell-v0/views/LibrarySurface.folderActions.test.ts#R3 a failed add-again says so and can be tried again"
+      ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/state/frameStatus.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "Folder rows in Running and Problems right now are named by the folder (last path segment, either separator), with the full path as detail; the collection name never titles a folder, and an unresolved path reads \"A watched folder\".",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed accordingly",
+          "delegationLocation": "task t-20261103-shell user turn 2026-11-03 ~16:20Z (reply to the orchestrator's plan)",
+          "delegationScope": "the frame-build plan: S1 · Status: the pill and status panel, built on the existing data, replacing about a dozen old pieces (the status bar, bell, pop-ups, task list and others)",
+          "choice": "ST5 Problems right now lists active conditions only: folder unavailable, unreadable files (per folder, linking to Library), search limited, plugin load failure, AI install failed. | ST6 Running lists indexing and meaning-search progress (aggregate plus per-folder where known, \"last seen\" when stale), AI downloads/installs (pause/resume where the existing flow offers it), answering in Search, rebuilds, background agent runs. | Repair round 7 (verifier R4): folder rows in the panel are titled by the folder name with the path as detail, not by collection name (\"default: default\").",
+          "label": "agent choice"
+        }
+      ],
+      "repaired": true,
+      "evidence": "gates/test-intent/evidence/shell-s1-frame-status-round7-repair.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/state/frameStatus.test.ts#round 7 repairs R4 folder rows are named by folder with the path as detail, never by collection"
+      ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/state/frameStatus.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "The notice placement rule as a pure function: beside the pill for engine unreachable, search limited, needs you and problems; in the pill otherwise; an engine wait notice is hidden while the engine is unreachable. (The function is new in this round; its observable effect is pinned with a fail-before by the StatusPill.precedence R1 checks.)",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed accordingly",
+          "delegationLocation": "task t-20261103-shell user turn 2026-11-03 ~16:20Z (reply to the orchestrator's plan)",
+          "delegationScope": "the frame-build plan: S1 · Status: the pill and status panel, built on the existing data, replacing about a dozen old pieces (the status bar, bell, pop-ups, task list and others)",
+          "choice": "ST1 (Concurrent facts stay discoverable: whatever the pill shows, every actionable condition is listed in the panel.) One status pill in the top bar shows exactly one state, chosen in this order: engine unreachable > search limited (index unavailable, reindex required, schema refused) > needs you (count) > problems right now > working (most important running item, with progress when known) > just finished (6 s) > calm. Calm reads \"Up to date\" with a green dot at window width ≥ 1000 px, dot only below, same accessible name. | Repair round 7 (verifier R1): a transient never displaces a more urgent state (engine unreachable > search limited > needs you > problems); hover/focus pause cannot extend a transient past its window while something more urgent exists; engine unreachable always wins over update/preparing states; pill and panel header agree.",
+          "label": "agent choice"
+        }
+      ],
+      "repaired": false,
+      "evidence": "gates/test-intent/evidence/shell-s1-frame-status-new.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/state/frameStatus.test.ts#round 7 repairs R1 a passing notice never takes the pill from a more urgent state; engine waits say nothing while unreachable"
+      ]
+    },
+    {
+      "items": [
         "modules/ui-web/src/__test-setup__/happyDomShadowFocus.ts",
         "modules/ui-web/vite.config.js"
       ],
@@ -895,7 +1026,7 @@ deletion is the Obsolete entry here.
         "purpose": "Work around a Happy DOM 21 defect: ShadowRoot.activeElement throws a TypeError when focus is inside a different shadow tree (its host walk reads undefined.getRootNode()). The setup returns the browser's answer (null) for exactly that throw; vite.config.js adds the file to the vitest setupFiles.",
         "callersAndStateOwners": "Every Happy DOM test in modules/ui-web; the patched getter belongs to Happy DOM's ShadowRoot prototype in the test process only. No production code imports it.",
         "indirectBehaviours": "Only the TypeError path changes (from a crash to null, the value a browser returns when focus is not inside that root). Every other read returns Happy DOM's own value; non-TypeError errors still throw. No test selection, filter, timeout or retry changed; the setupFiles line only appends.",
-        "evidence": "Full ui-web vitest run on the final tree: 687 files, all pass (see the builder report). The status panel focus tests (StatusPill.test.ts ST3/ST15, Shell.test.ts ST15) exercise focus inside the panel while other components read their own shadow focus, the case the setup covers.",
+        "evidence": "Full ui-web vitest run on the final tree: 693 files (8786 tests), all pass (see the builder report). The status panel focus tests (StatusPill.test.ts ST3/ST15, Shell.test.ts ST15) exercise focus inside the panel while other components read their own shadow focus, the case the setup covers.",
         "unresolvedRisks": "A test that relied on the TypeError would now see null; none does in the full run. The workaround should be removed when Happy DOM fixes the getter."
       }
     },

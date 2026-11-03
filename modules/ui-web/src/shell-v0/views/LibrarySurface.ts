@@ -38,6 +38,8 @@ import '../components/SurfaceTabs.js';
 import type { SurfaceTabs, SurfaceTabItem } from '../components/SurfaceTabs.js';
 import { getSurface } from '../../api/registry/SurfaceCatalogClient.js';
 import { present } from '../display/present.js';
+import { emitEphemeralToast } from '../components/advisory/ephemeralToast.js';
+import { folderName } from '../state/frameStatus.js';
 import { takeIndexingRuleFocus, subscribeIndexingRuleFocus, type IndexingRuleControl } from '../router/indexingRuleIntent.js';
 import { takeMemberTabIntent, subscribeMemberTab } from '../router/memberTabIntent.js';
 import { resolvePathLazy } from '../hooks/resolvePathLazy.js';
@@ -1698,6 +1700,34 @@ export class LibrarySurface extends JfElement {
     return AVAILABLE;
   }
 
+  /**
+   * R3 — removal has no undo. The notice (pill, then Earlier) offers to add the same folder again,
+   * which reads its files again. It does not depend on the Library staying open.
+   */
+  private offerAddAgain(path: string, collection: string | undefined, nested: number): void {
+    const name = folderName(path);
+    const host = this.host_;
+    let adding = false;
+    emitEphemeralToast({
+      message: `Removed ${name} from your library`,
+      detail: `${path}. Adding it again reads its files again${nested ? `; the ${nested === 1 ? 'folder' : `${nested} folders`} inside it must be added separately` : ''}.`,
+      actionLabel: `Add ${name} again`,
+      onAction: () => {
+        if (adding) return;
+        adding = true;
+        void host.data.invokeOperation(OP_ADD, collection && collection !== 'default' ? { path, collection } : { path })
+          .then(result => {
+            if (!result.success) throw new Error(result.message || 'Add refused');
+            emitEphemeralToast({ message: `Added ${name} again. Reading its files.`, severity: 'success' });
+          })
+          .catch((err: unknown) => {
+            adding = false;
+            emitEphemeralToast({ message: `Could not add ${name} again. ${err instanceof Error ? err.message : String(err)}`, severity: 'error' });
+          });
+      },
+    });
+  }
+
   private async handleRemoveRoot(pathHash: string): Promise<void> {
     if (this.removingHashes.has(pathHash) || this.confirmingHashes.has(pathHash)) return;
     const resolved = this.resolvedPaths[pathHash];
@@ -1738,6 +1768,7 @@ export class LibrarySurface extends JfElement {
         { confirmLabel: 'Remove', destructive: true });
       if (!ok || serial !== this.surfaceSerial) return;
       if ([pathHash, ...nestedHashes].some(hash => this.removingHashes.has(hash))) return;
+      const collection = this.roots.find(root => root.pathHash === pathHash)?.collection;
       affected = [pathHash, ...nestedHashes];
       this.removingHashes = new Set([...this.removingHashes, ...affected]);
       acquired = true;
@@ -1769,6 +1800,7 @@ export class LibrarySurface extends JfElement {
         this.refreshSerial++;
         this.roots = this.roots.filter(root => !affected.includes(root.pathHash ?? ''));
         this.actionMessage = enclosing ? 'Folder removed. Its files stay searchable through the enclosing watched folder.' : 'Folder removed from Library and search results.';
+        this.offerAddAgain(resolved, collection, nested.length);
         await this.refresh({ live: true, force: true });
         if (serial === this.surfaceSerial) {
           await this.updateComplete;
