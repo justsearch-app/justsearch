@@ -17,6 +17,7 @@
  * Usage (run from inside the worktree):
  *   node scripts/dev/prepare-worktree.cjs            # npm ci + installDist
  *   node scripts/dev/prepare-worktree.cjs --no-dist  # FE-only (skip the Java dist)
+ *   node scripts/dev/prepare-worktree.cjs --preflight [--pr N] # prepare + selected PR checks
  */
 'use strict';
 const fs = require('fs');
@@ -27,6 +28,18 @@ const { resolveJdkHome } = require(path.join(__dirname, 'lib', 'resolve-jdk.cjs'
 
 const repoRoot = path.resolve(__dirname, '..', '..');
 const noDist = process.argv.includes('--no-dist');
+// Opt-in only: ordinary preparation keeps its existing short setup path.
+if (process.argv.includes('--preflight')) {
+  if (noDist) {
+    console.error('--preflight requires the candidate distribution; --no-dist cannot be combined with it');
+    process.exit(2);
+  }
+  const { spawnSync } = require('node:child_process');
+  const args = process.argv.slice(2).filter(arg => arg !== '--preflight');
+  const result = spawnSync(process.execPath, [path.join(repoRoot, 'scripts/ci/run-publish-preflight.mjs'), '--prepare', ...args], { cwd: repoRoot, stdio: 'inherit' });
+  if (result.error) console.error(result.error.message);
+  process.exit(result.status ?? 1);
+}
 const { runToolSync } = require('../lib/tool-invoker.cjs');
 function run(cmd, args, cwd, extraEnv) {
   console.error(`[prepare-worktree] $ ${cmd} ${args.join(' ')}  (cwd: ${cwd})`);
