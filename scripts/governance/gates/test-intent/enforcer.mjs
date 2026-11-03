@@ -36,6 +36,6 @@ export async function enforceTestIntent(options) {
   console.log(formatReport(result));
   // Tempdoc 966 Measurement: the rolling four-week counts go to the job summary on every CI run
   // (no scheduled workflow; ADR-0026). Advisory and never fatal, so the verdict is unaffected.
-  writeStepSummary({ repoRoot, env: process.env });
+  writeStepSummary({ repoRoot, env: process.env, rollingReport: result.rollingReport });
   return { ...TOOL, findings: result.findings, verdict: result.verdict, ruleDescriptions: TEST_INTENT_RULE_DESCRIPTIONS };
 }

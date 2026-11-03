@@ -458,15 +458,18 @@ export function analyzeTestIntent({ repoRoot, env = process.env, explicitBase = 
 
   // ---- 6. reconsider rule over the rolling four-week counts (advisory; never changes the verdict) ----
   let reconsider = null;
+  let rollingReport;
   try {
     const ref = rollingRef(repoRoot);
     const report = reportFor({ repoRoot, ref, days: ROLLING_DAYS });
+    rollingReport = { report };
     reconsider = { ...reconsiderRate(report.totals), ref, days: ROLLING_DAYS };
     if (reconsider.above) {
       reconsider.message = reconsiderMessage(reconsider, ROLLING_DAYS, ref);
       findings.push(finding('reconsider-rate', 'warning', reconsider.message));
     }
   } catch (e) {
+    rollingReport = { error: e };
     findings.push(finding('reconsider-rate', 'note', `rolling test-intent counts unavailable here: ${String(e.message).split('\n')[0]}`));
   }
   return {
@@ -480,6 +483,7 @@ export function analyzeTestIntent({ repoRoot, env = process.env, explicitBase = 
     changesets,
     uncovered,
     reconsider,
+    rollingReport,
   };
 }
 
