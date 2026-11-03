@@ -1011,3 +1011,14 @@ verifier supplies acceptance after reviewing the final candidate. No acceptance 
   "note": "Acceptance by independent verifier session verifier-s2r-acc4 (Codex): accept, all entries. Transcribed by the orchestrator."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verifier-s2r-acc5",
+  "verdict": "accept",
+  "digest": "sha256:79588da221fac3d125a799da7e94006ec183ea0a705dfe567020199c1167b7ac",
+  "note": "Acceptance by independent verifier session verifier-s2r-acc5 (Codex): accept, all entries. Transcribed by the orchestrator."
+}
+```
