@@ -930,6 +930,26 @@ verifier supplies acceptance after reviewing the final candidate. No acceptance 
       ],
       "whatMoved": "The composition mock is declared immediately before a nested try-with-resources and used as its resource. Mock creation, its active lifetime and reverse close order (issued view, mock, fixture) are preserved; every assertion and test input is kept.",
       "evidence": "gates/test-intent/evidence/s2-reranker-preflight-adaptation.json"
+    },
+    {
+      "items": [
+        "modules/shell/src-tauri/src/updater.rs#cfg(test)"
+      ],
+      "class": "Adaptation",
+      "moved": [
+        "rename",
+        "input re-encoding"
+      ],
+      "whatMoved": "The ui-settings successor test is renamed from v6 to v7 and its asserted current/format versions become 7, matching the register's schema bump; the successor's readable source versions extend from 0-6 to 0-7. Every assertion is kept: the installed legacy v1 store is accepted with the unchanged frozen READ_V0_OR_V1_AND_WRITE_V1 reconciliation token, and the changed token is rejected. Legacy inputs, fault injection, observations and conditions are unchanged.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "N2",
+          "quote": "Saved settings keep their meaning across the stored settings schema change (envelope schema 6 today; public API v2): existing installs load with no explicit choice (today’s behaviour), older settings versions migrate, corrupt settings are quarantined as today; declinedAiPackages stays acquisition preference only.",
+          "label": "agent-drafted, owner-adopted"
+        }
+      ]
     }
   ]
 }
