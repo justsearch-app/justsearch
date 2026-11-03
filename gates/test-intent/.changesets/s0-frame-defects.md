@@ -151,3 +151,14 @@ The tests were written by a Codex builder from the orchestrator's contract; the 
   "digest": "sha256:90b67413b630d522a423a4dcb3024d0ace7a092767a030aeae9113f4b336ce73"
 }
 ```
+
+```json
+{
+  "kind": "audit",
+  "role": "verifier",
+  "session": "01a1a21f-48ee-7f41-9852-142b98c246cd",
+  "verdict": "accept",
+  "digest": "sha256:90b67413b630d522a423a4dcb3024d0ace7a092767a030aeae9113f4b336ce73",
+  "note": "Independent audit (PR audit-selected). Read the before-state tests and the cited delegation before the candidate diff; all five entries fit New; evidence files have matching producer, script, content and self-digests; repaired checks fail before with assertions and pass after; preservation and the 41 existing tests pass before and after. Transcribed by the orchestrator from the auditor's answer (Codex sandbox)."
+}
+```
