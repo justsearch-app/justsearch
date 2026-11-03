@@ -572,3 +572,14 @@ A final invocation of the same java-prepush command after the label edit exited 
 unchanged integration/unreferenced results. No source changed after the final 43-check subset.
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a19fec-1300-7763-acdb-ad863f714c5a",
+  "verdict": "accept",
+  "digest": "sha256:99f99427bce735ce0578c2351d4e51cba3eedf0fa9d58f46862e92d921e53ba0",
+  "note": "Focused verifier-3 on bc2ee2945a: the four stored-shape repair checks fail on 454c0031ab by assertion (8 cases each) and pass; SparsePayloadStoredShapeTest isolated-file assessment accept; 42 earlier evidence checks pass on both commits. Entries 1-3 are unchanged and were accepted by verifier-2 (session 01a19fa5-6ead-7fe3-838a-1ab65933d49b) on 454c0031ab."
+}
+```
