@@ -30,7 +30,8 @@ from typing import Any, Mapping
 
 import httpx
 
-from .. import backend, index_identity, readiness
+from .. import backend, index_identity
+from jsharness import readiness
 from .._paths import REPO_ROOT, shared_models_dir
 from ..ingest import add_watched_root
 from .collections import load_collection, write_collection, write_documents
