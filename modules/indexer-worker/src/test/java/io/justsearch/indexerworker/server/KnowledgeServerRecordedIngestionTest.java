@@ -1660,6 +1660,7 @@ final class KnowledgeServerRecordedIngestionTest {
   }
 
   @Test
+  @Timeout(value = 15, unit = TimeUnit.MINUTES)
   void firstMaintenanceDuringRecordedMigrationExtractsEachCapturedFileOnce(@TempDir Path tempDir)
       throws Exception {
     var layout = WorkerBootFixture.layout(tempDir);
@@ -1723,31 +1724,26 @@ final class KnowledgeServerRecordedIngestionTest {
         if (!call.getMethod().getName().equals("inProcessStructured") || call.getArguments().length != 6) {
           return call.callRealMethod();
         }
-        var real = (io.justsearch.indexerworker.extract.TimeboxedContentExtractor) call.callRealMethod();
-        var delegate = (io.justsearch.indexerworker.extract.ExtractionSandbox) getField(real, "sandbox");
-        setField(real, "sandbox", new io.justsearch.indexerworker.extract.ExtractionSandbox() {
-          @Override public io.justsearch.indexerworker.extract.ExtractionArtifact extract(Path file)
-              throws IOException, io.justsearch.indexerworker.extract.ContentExtractor.ExtractionException {
-            extractions.computeIfAbsent(file, ignored -> new AtomicInteger()).incrementAndGet();
-            if (entered.getCount() > 0) {
-              entered.countDown();
-              try {
-                if (!release.await(30, TimeUnit.SECONDS)) throw new IOException("maintenance never released extraction");
-              } catch (InterruptedException interrupted) {
-                Thread.currentThread().interrupt();
-                throw new IOException("extraction interrupted", interrupted);
-              }
+        var extractor = org.mockito.Mockito.spy(
+            (io.justsearch.indexerworker.extract.TimeboxedContentExtractor) call.callRealMethod());
+        org.mockito.Mockito.doAnswer(extraction -> {
+          Path file = extraction.getArgument(0);
+          extractions.computeIfAbsent(file, ignored -> new AtomicInteger()).incrementAndGet();
+          if (entered.getCount() > 0) {
+            entered.countDown();
+            try {
+              if (!release.await(5, TimeUnit.MINUTES)) throw new IOException("maintenance never released extraction");
+            } catch (InterruptedException interrupted) {
+              Thread.currentThread().interrupt();
+              throw new IOException("extraction interrupted", interrupted);
             }
-            return delegate.extract(file);
           }
-          @Override public io.justsearch.indexerworker.extract.TikaExtractionPolicy policy() {
-            return delegate.policy();
-          }
-          @Override public void close() { delegate.close(); }
-        });
-        return real;
+          return extraction.callRealMethod();
+        }).when(extractor).extractArtifact(org.mockito.ArgumentMatchers.any(Path.class));
+        return extractor;
       };
-      // Delegate to the real extraction sandbox; only hold the first claimed extraction.
+      // Hold the issued claim before starting the real sandbox's extraction timebox. The
+      // synchronization wait must not consume its parser timeout on a loaded machine.
       try (var _ = org.mockito.Mockito.mockStatic(
               io.justsearch.indexerworker.extract.ExtractionSandboxFactory.class, sandboxFactory);
           var executors = new TestEngineExecutors();
@@ -1757,8 +1753,15 @@ final class KnowledgeServerRecordedIngestionTest {
         try {
           server.start();
           server.releaseModelReadyLatchForTests();
-          assertTrue(entered.await(30, TimeUnit.SECONDS), "real Green loop must claim captured work");
+          assertTrue(entered.await(5, TimeUnit.MINUTES), "real Green loop must claim captured work");
           var queue = (SqliteJobQueue) server.jobQueueForTests();
+          var published = new CountDownLatch(1);
+          @SuppressWarnings("unchecked")
+          var outcomeObserver = (java.util.function.Consumer<String>) getField(queue, "outcomeObserver");
+          queue.setOutcomeObserver(outcome -> {
+            outcomeObserver.accept(outcome);
+            if (queue.completedCount() == files.size()) published.countDown();
+          });
           var receipts = new java.util.HashMap<Path, String>();
           try (var connection = java.sql.DriverManager.getConnection("jdbc:sqlite:" + layout.dataDir().resolve("jobs.db"));
               var query = connection.createStatement();
@@ -1775,8 +1778,7 @@ final class KnowledgeServerRecordedIngestionTest {
                 JobQueue.EnqueueEntry.stat(file).withinRoot(root), null));
           }
           release.countDown();
-          long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(30);
-          while (queue.completedCount() < files.size() && System.nanoTime() < deadline) Thread.sleep(20);
+          assertTrue(published.await(5, TimeUnit.MINUTES), "the real producer must publish both files");
           assertEquals(files.size(), queue.completedCount(), "the real producer must publish both files");
           assertEquals(2, queue.recordedWalk(operation).orElseThrow().completedUnits());
           server.lifecycleManagerForTests().commitOps().maybeRefreshBlocking();
