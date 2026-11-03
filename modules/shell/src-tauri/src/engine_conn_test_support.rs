@@ -16,7 +16,9 @@ impl Fixture {
         let host = Arc::new(EngineHost::default());
         let mut command = crate::containment::engine_command("sleep").unwrap();
         command.arg("60");
-        let pid = host.admit(PreparedCommand { command }).unwrap().pid;
+        let admitted = host.admit(PreparedCommand { command }).unwrap();
+        let pid = admitted.pid;
+        host.consume_credential_line(admitted.generation, "JUSTSEARCH_WINDOW_CREDENTIAL=fixture-window");
         host.observe_manifest(&ManifestFields {
             incarnation: Some((host.session(), u64::from(host.incarnation_number()))),
             instance_id: Some("fixture-instance".into()),
@@ -116,12 +118,15 @@ while True:
   if not data: continue
   headers,body=data.split(b'\r\n\r\n',1)
   length=0
+  request_headers={}
   for line in headers.split(b'\r\n')[1:]:
    key,value=line.split(b':',1)
+   request_headers[key.lower()]=value.strip()
    if key.lower()==b'content-length': length=int(value)
   while len(body)<length: body+=conn.recv(4096)
-  expected=('X-JustSearch-Session: token-'+str(os.getpid())).encode()
-  status=b'200 OK' if headers.startswith(b'GET ') or expected in headers else b'401 Unauthorized'
+  token_ok=request_headers.get(b'x-justsearch-session')==('token-'+str(os.getpid())).encode()
+  window_ok=request_headers.get(b'x-justsearch-window')==('window-'+str(os.getpid())).encode()
+  status=b'200 OK' if headers.startswith(b'GET ') or (token_ok and window_ok) else b'403 Forbidden' if token_ok else b'401 Unauthorized'
   response=json.dumps({'pid':os.getpid()}).encode()
   conn.sendall(b'HTTP/1.1 '+status+b'\r\nContent-Length: '+str(len(response)).encode()+b'\r\nConnection: close\r\n\r\n'+response)
   if headers.startswith(b'GET '):
@@ -132,7 +137,10 @@ while True:
             .args(["-u", "-c", script])
             .arg(&port_file)
             .arg(port.to_string());
-        let pid = self.host.admit(PreparedCommand { command }).unwrap().pid;
+        let admitted = self.host.admit(PreparedCommand { command }).unwrap();
+        let pid = admitted.pid;
+        self.host.consume_credential_line(admitted.generation,
+            &format!("JUSTSEARCH_WINDOW_CREDENTIAL=window-{pid}"));
         let deadline = Instant::now() + Duration::from_secs(3);
         let port = loop {
             if let Some(port) = std::fs::read_to_string(&port_file)

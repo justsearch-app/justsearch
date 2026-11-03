@@ -80,14 +80,6 @@ async function request(port, endpoint, token, options = {}, timeoutMs = 10_000) 
   return { status: response.status, text, body };
 }
 
-async function post(port, endpoint, token, body, timeoutMs = 10_000) {
-  return request(port, endpoint, token, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify(body),
-  }, timeoutMs);
-}
-
 async function reserveFixedPort(excluded = new Set()) {
   for (let port = 41_000; port < 42_000; port += 1) {
     if (excluded.has(port)) continue;
@@ -374,8 +366,7 @@ try {
   try {
     const binding = currentBinding();
     if (binding) {
-      const stopped = await post(binding.manifest.head.apiPort, '/api/lifecycle/shutdown',
-        binding.manifest.head.sessionToken, {});
+      const stopped = await requestThroughWindow(debugPort, '/api/lifecycle/shutdown', {});
       requireThat(stopped.status >= 200 && stopped.status < 300,
         `installed Engine cleanup was refused: HTTP ${stopped.status} ${stopped.text}`);
       await waitFor('installed Engine cleanup', 20_000,

@@ -506,6 +506,84 @@ fail at fff9c9f9d0 with Mock serialization errors and pass at 81f1b00072; repair
         "modules/shell/src-tauri/src/session_credential_tests.rs#session_credential_tests::production_engine_spawn_disables_jvm_attach"
       ],
       "repaired": true
+    },
+    {
+      "items": [
+        "modules/shell/src-tauri/src/shell_connection_tests.rs",
+        "modules/shell/src-tauri/src/engine_conn_test_support.rs",
+        "modules/shell/src-tauri/src/updater_reconciliation_tests.rs"
+      ],
+      "class": "New",
+      "behaviour": "N5/N11: Real owned socket fixtures require the matching per-process window credential as well as the token. Preparation and reconciliation succeed; quit uses HTTP without a request-file fallback. Every lifecycle/upgrade route uses the successor credentials after same/new-port restart. Existing reconciliation readiness, refusal and identity oracles remain unchanged. The explicit installed Engine check now enables window-credential mode, consumes the secret stdout record, reconciles a real durable intent, and retains ordered quit, prepare/cancel/commit and released-port checks. Shell and updater readiness wait for the same-incarnation window credential even when port/token arrive first; a predecessor credential does not release the wait. A startup readiness timeout keeps the durable intent reconciling and reports not-ready rather than requiring repair.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "open a task record and proceed accordingly with the remainign work",
+          "delegationLocation": "task t-20261102-agent-approval request",
+          "delegationScope": "start the fix for the self-approval defect (any same-user program holding the session token can approve its own pending actions or create grants without the person seeing a prompt) as its own task, answering the orchestrator's question 'Should I start that fix as its own task?'",
+          "choice": "N5/N11: Every shell lifecycle and upgrade request carries the current Engine incarnation’s window credential next to the session token over the proven connection. On same-port and new-port restarts the successor supplies both credentials. Update preparation, cancellation, commit, reconciliation and quit remain usable under default-deny, without persisting the credential or broadening the token-only list. The installed Windows API-port proof cleans up through the existing window request helper.",
+          "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "Decision: when the Engine runs in window-credential mode, the shell's Engine readiness (for updater reconciliation and any other shell->Engine call gated on readiness) also requires the window credential for the current incarnation to have arrived; it waits for it within the existing bounded readiness wait, and if it does not arrive in time it reports the same transient/not-ready state it reports today for a missing token, not repair-required.",
+          "delegationLocation": "task t-20261102-agent-approval request",
+          "delegationScope": "Finish the readiness race repair, keep the existing shell lifecycle transport repair, and rerun its checks without committing.",
+          "choice": "N5/N11: Require the current incarnation's port, token and window credential before shell readiness. Delayed stdout stays not-ready within the existing wait; expiration leaves the durable update reconciling. Existing fake-Engine launch fixtures supply their synthetic incarnation credential without changing their readiness or restart oracles.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/window-credential-shell-lifecycle.json",
+      "newChecks": [
+        "modules/shell/src-tauri/src/shell_connection_tests.rs#shell_actuator::connection_tests::window_credential_authorizes_update_preparation",
+        "modules/shell/src-tauri/src/shell_connection_tests.rs#shell_actuator::connection_tests::window_credential_authorizes_reconciliation",
+        "modules/shell/src-tauri/src/shell_connection_tests.rs#shell_actuator::connection_tests::window_credential_authorizes_quit_without_request_file",
+        "modules/shell/src-tauri/src/shell_connection_tests.rs#shell_actuator::connection_tests::supervisor_successors_use_the_new_pid_and_coherent_binding_on_same_and_new_ports",
+        "modules/shell/src-tauri/src/updater_reconciliation_tests.rs#updater::reconciliation_tests::delayed_window_credential_waits_before_reconciliation",
+        "modules/shell/src-tauri/src/updater_reconciliation_tests.rs#updater::reconciliation_tests::shell_readiness_waits_for_current_window_credential"
+      ],
+      "repaired": true
+    },
+    {
+      "items": [
+        "modules/shell/src-tauri/src/engine_conn_tests.rs",
+        "modules/shell/src-tauri/src/shell_commit_transport_tests.rs"
+      ],
+      "class": "Adaptation",
+      "moved": [
+        "signature"
+      ],
+      "whatMoved": "N5/N11: Pass a fixture window credential to post_connected’s new required parameter. Preserve all response decoding, connect failure, send-hook, partial-write and receipt expectations.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "open a task record and proceed accordingly with the remainign work",
+          "delegationLocation": "task t-20261102-agent-approval request",
+          "delegationScope": "start the fix for the self-approval defect (any same-user program holding the session token can approve its own pending actions or create grants without the person seeing a prompt) as its own task, answering the orchestrator's question 'Should I start that fix as its own task?'",
+          "choice": "N5/N11: Every shell lifecycle and upgrade request carries the current Engine incarnation’s window credential next to the session token over the proven connection. On same-port and new-port restarts the successor supplies both credentials. Update preparation, cancellation, commit, reconciliation and quit remain usable under default-deny, without persisting the credential or broadening the token-only list. The installed Windows API-port proof cleans up through the existing window request helper.",
+          "label": "agent choice"
+        }
+      ]
+    },
+    {
+      "items": [
+        "modules/shell/src-tauri/src/engine_host.rs#cfg(test)"
+      ],
+      "class": "Adaptation",
+      "moved": [
+        "input re-encoding"
+      ],
+      "whatMoved": "N5/N11: Supply the fake Engine incarnation's synthetic window credential alongside its manifest credentials. Preserve the failed-generation, manual-restart, running-state, reset-budget, binding and reaping assertions.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "Decision: when the Engine runs in window-credential mode, the shell's Engine readiness (for updater reconciliation and any other shell->Engine call gated on readiness) also requires the window credential for the current incarnation to have arrived; it waits for it within the existing bounded readiness wait, and if it does not arrive in time it reports the same transient/not-ready state it reports today for a missing token, not repair-required.",
+          "delegationLocation": "task t-20261102-agent-approval request",
+          "delegationScope": "Finish the readiness race repair, keep the existing shell lifecycle transport repair, and rerun its checks without committing.",
+          "choice": "N5/N11: Require the current incarnation's port, token and window credential before shell readiness. Delayed stdout stays not-ready within the existing wait; expiration leaves the durable update reconciling. Existing fake-Engine launch fixtures supply their synthetic incarnation credential without changing their readiness or restart oracles.",
+          "label": "agent choice"
+        }
+      ]
     }
   ]
 }

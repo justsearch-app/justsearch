@@ -31,6 +31,7 @@ while True:
   while len(body)<length: body+=conn.recv(4096)
   assert headers.startswith(b'POST /api/upgrade/reconcile HTTP/1.1')
   assert ('X-JustSearch-Session: token-'+str(os.getpid())).encode() in headers
+  assert ('X-JustSearch-Window: window-'+str(os.getpid())).encode() in headers
   request=json.loads(body)
   count+=1
   pathlib.Path(sys.argv[1]+'.requests').write_text(str(count))
@@ -47,7 +48,12 @@ while True:
 "#;
     let mut command = crate::containment::engine_command("python3").unwrap();
     command.args(["-u", "-c", script]).arg(&port_file).arg(mode);
-    let pid = fixture.host.admit(PreparedCommand { command }).unwrap().pid;
+    let admitted = fixture.host.admit(PreparedCommand { command }).unwrap();
+    let pid = admitted.pid;
+    if mode != "delayed-credential" {
+        fixture.host.consume_credential_line(admitted.generation,
+            &format!("JUSTSEARCH_WINDOW_CREDENTIAL=window-{pid}"));
+    }
     let deadline = Instant::now() + Duration::from_secs(5);
     let port = loop {
         if let Some(port) = fs::read_to_string(&port_file)
@@ -87,6 +93,50 @@ while True:
         }],
     };
     (fixture, backend, request)
+}
+
+#[tokio::test]
+async fn delayed_window_credential_waits_before_reconciliation() {
+    let (fixture, backend, request) = reconciliation_server("delayed-credential");
+    assert!(backend.get_port().is_some());
+    assert!(backend.get_session_token().is_some());
+    let mut readiness = std::pin::pin!(wait_for_backend_ready(&backend));
+    assert!(
+        tokio::time::timeout(Duration::from_millis(25), &mut readiness).await.is_err(),
+        "assertion failed: port/token must not release reconciliation before window authority arrives"
+    );
+    fixture.host.consume_credential_line(0, "JUSTSEARCH_WINDOW_CREDENTIAL=predecessor");
+    assert!(
+        tokio::time::timeout(Duration::from_millis(25), &mut readiness).await.is_err(),
+        "assertion failed: a predecessor credential must not release current readiness"
+    );
+    assert!(!fixture.dir.path().join("port.requests").exists());
+    fixture.host.consume_credential_line(1,
+        &format!("JUSTSEARCH_WINDOW_CREDENTIAL=window-{}", request.head_pid));
+    let pid = tokio::time::timeout(Duration::from_secs(2), readiness).await.unwrap().unwrap();
+    assert_eq!(u64::from(pid), request.head_pid);
+    let response: ReconciliationResponse = post_head(
+        &backend, "/api/upgrade/reconcile", Some(serde_json::to_value(&request).unwrap()),
+    ).await.unwrap();
+    validate_reconciliation_response(&request, &response).unwrap();
+    assert_eq!(fs::read_to_string(fixture.dir.path().join("port.requests")).unwrap(), "1");
+}
+
+#[test]
+fn shell_readiness_waits_for_current_window_credential() {
+    let (fixture, _, request) = reconciliation_server("delayed-credential");
+    let probes = std::cell::Cell::new(0);
+    let probe = |_| { probes.set(probes.get() + 1); true };
+    assert!(
+        fixture.host.await_ready(1000, || 0, probe).is_err(),
+        "assertion failed: responsive port/token alone must remain not-ready"
+    );
+    assert_eq!(probes.get(), 0, "readiness must wait before probing");
+    fixture.host.consume_credential_line(1,
+        &format!("JUSTSEARCH_WINDOW_CREDENTIAL=window-{}", request.head_pid));
+    let ready = fixture.host.await_ready(1000, || 0, probe).unwrap();
+    assert_eq!(ready.pid.map(u64::from), Some(request.head_pid));
+    assert_eq!(probes.get(), 1);
 }
 
 async fn reconcile_fixture(mode: &str) -> (UpgradeIntent, AppUpdateStatus, usize) {

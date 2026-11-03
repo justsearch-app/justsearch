@@ -251,7 +251,7 @@ fn post_before_send(
 ) -> (Result<Value, String>, bool) {
     let timeout = Duration::from_millis(timeout_ms);
     match crate::engine_conn::connect_proven(port, std::process::id(), timeout) {
-        Ok(stream) => crate::engine_conn::post_connected(stream, port, token, path, body, timeout, before_send),
+        Ok(stream) => crate::engine_conn::post_connected(stream, port, token, "fixture-window", path, body, timeout, before_send),
         Err(error) => (Err(error), false),
     }
 }

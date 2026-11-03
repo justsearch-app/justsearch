@@ -69,6 +69,7 @@ fn proven_sender_accepts_content_length_and_chunked_responses() {
             stream,
             port,
             "fixture-token",
+            "fixture-window",
             "/prepare",
             &serde_json::json!({}),
             Duration::from_secs(1),

@@ -178,9 +178,11 @@ fn main() {
                 .env("JUSTSEARCH_FAKE_ENGINE_PLAN", &plan)
                 .stdout(Stdio::null())
                 .stderr(Stdio::null());
-            spawn_host
-                .admit(engine_host::PreparedCommand { command })
-                .map(|c| c.pid)
+            let child = spawn_host.admit(engine_host::PreparedCommand { command })?;
+            // This adapter launches the fault-injection fake, which has no secret stdout pipe.
+            spawn_host.consume_credential_line(child.generation,
+                "JUSTSEARCH_WINDOW_CREDENTIAL=fake-engine-window");
+            Ok(child.pid)
         },
         move |record| {
             *event_actor.lock().unwrap() = Some(format!("{:?}", std::thread::current().id()));

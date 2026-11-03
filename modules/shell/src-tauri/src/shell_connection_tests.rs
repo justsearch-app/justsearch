@@ -118,8 +118,12 @@ fn supervisor_successors_use_the_new_pid_and_coherent_binding_on_same_and_new_po
         }
         let pid = fixture.host.child_pid().unwrap();
         assert_ne!(Some(pid), previous);
-        let response = post(&fixture.host, "/api/upgrade/prepare", &json!({}), 1000).unwrap();
-        assert_eq!(response["pid"], pid);
+        for path in ["/api/upgrade/prepare", "/api/upgrade/cancel",
+            "/api/upgrade/commit-shutdown", "/api/upgrade/reconcile", "/api/lifecycle/shutdown"] {
+            let response = post(&fixture.host, path, &json!({}), 1000);
+            assert!(response.is_ok(), "assertion failed: current incarnation request {path} failed: {response:?}");
+            assert_eq!(response.unwrap()["pid"], pid);
+        }
         previous = Some(pid);
         if port == 0 {
             assert_ne!(fixture.host.binding_snapshot().port, Some(original_port));
@@ -158,6 +162,31 @@ fn takeover_after_a_successful_health_probe_is_rejected_on_the_actual_send_conne
     assert!(reader.join().unwrap().is_empty());
 }
 
+#[test]
+fn window_credential_authorizes_update_preparation() {
+    let fixture = Fixture::server();
+    fixture.start_server(0, "prepare-window");
+    let result = post(&fixture.host, "/api/upgrade/prepare", &json!({}), 1000);
+    assert!(result.is_ok(), "assertion failed: window-authenticated preparation failed: {result:?}");
+}
+
+#[test]
+fn window_credential_authorizes_reconciliation() {
+    let fixture = Fixture::server();
+    fixture.start_server(0, "reconcile-window");
+    let result = post(&fixture.host, "/api/upgrade/reconcile", &json!({}), 1000);
+    assert!(result.is_ok(), "assertion failed: window-authenticated reconciliation failed: {result:?}");
+}
+
+#[test]
+fn window_credential_authorizes_quit_without_request_file() {
+    let fixture = Fixture::server();
+    fixture.start_server(0, "quit-window");
+    fixture.actor().write_shutdown_request("quit", epoch() + 1000).unwrap();
+    assert!(!fixture.dir.path().join("runtime/shutdown-request.v1.json").exists(),
+        "assertion failed: window-authenticated HTTP quit fell back to the request file");
+}
+
 /// Explicit live check: builds no GUI and uses only a fresh data directory under TMPDIR.
 #[test]
 #[ignore = "requires :modules:ui:installDist; run explicitly with --ignored --nocapture"]
@@ -179,17 +208,23 @@ fn installed_engine_shutdown_upgrade_and_released_port() {
             .env(
                 "JAVA_OPTS",
                 format!(
-                    "-Djustsearch.prod=true -Djava.io.tmpdir={} -XX:-UsePerfData",
+                    "-XX:+DisableAttachMechanism -Djustsearch.prod=true -Djustsearch.windowCredential=true -Djustsearch.app.version=0.3.2 -Djava.io.tmpdir={} -XX:-UsePerfData",
                     fixture.dir.path().display()
                 ),
             )
-            .stdout(std::process::Stdio::null())
+            .stdout(std::process::Stdio::piped())
             .stderr(std::process::Stdio::null());
-        let old_pid = fixture
-            .host
-            .admit(crate::engine_host::PreparedCommand { command })
-            .unwrap()
-            .pid;
+        let admitted = fixture.host.admit(crate::engine_host::PreparedCommand { command }).unwrap();
+        let old_pid = admitted.pid;
+        let host = fixture.host.clone();
+        let stdout = admitted.stdout.unwrap();
+        let generation = admitted.generation;
+        let drain = std::thread::spawn(move || {
+            use std::io::BufRead;
+            for line in std::io::BufReader::new(stdout).lines() {
+                host.consume_credential_line(generation, &line.unwrap());
+            }
+        });
         let deadline = std::time::Instant::now() + Duration::from_secs(90);
         let port = loop {
             assert!(
@@ -202,7 +237,7 @@ fn installed_engine_shutdown_upgrade_and_released_port() {
                 fixture.host.observe_manifest(&manifest);
             }
             if let Some(port) = fixture.host.binding_snapshot().port {
-                if fixture.host.binding_snapshot().token.is_some()
+                if fixture.host.window_session_binding().is_some()
                     && engine_probe::essential_ready(port, Duration::from_millis(500)).is_some()
                 {
                     break port;
@@ -214,6 +249,33 @@ fn installed_engine_shutdown_upgrade_and_released_port() {
             );
             std::thread::sleep(Duration::from_millis(50));
         };
+        // Reconcile against a real target-side durable intent and the embedded owner contract.
+        let register: Value = serde_json::from_slice(
+            &std::fs::read(root.join("governance/store-recoverability.v1.json")).unwrap()).unwrap();
+        let owners: Vec<Value> = register["durableStores"].as_array().unwrap().iter().map(|store|
+            json!({"ownerId":store["id"], "formatVersion":store["currentVersion"]})).collect();
+        let request = json!({"schemaVersion":1,"attemptId":"connection-proof",
+            "stopEvidenceKind":"PREPARED","shutdownNonce":"n".repeat(32),
+            "sourceVersion":"0.3.1","targetVersion":"0.3.2","releaseSequence":1,
+            "headPid":old_pid,"owners":owners});
+        let mut intent = request.clone();
+        intent["phase"] = json!("RECONCILING");
+        intent["stopEvidence"] = json!({"kind":"PREPARED"});
+        std::fs::create_dir_all(fixture.dir.path().join("upgrade")).unwrap();
+        std::fs::write(fixture.dir.path().join("upgrade/intent.v1.json"), intent.to_string()).unwrap();
+        let deadline = std::time::Instant::now() + Duration::from_secs(90);
+        loop {
+            let result = post(&fixture.host, "/api/upgrade/reconcile", &request, 15000);
+            if let Ok(response) = &result {
+                assert_eq!(response["ready"], true);
+                break;
+            }
+            assert!(result.as_ref().unwrap_err().contains("(503)")
+                && std::time::Instant::now() < deadline,
+                "installed Engine reconciliation failed: {result:?}");
+            std::thread::sleep(Duration::from_millis(100));
+        }
+        std::fs::remove_file(fixture.dir.path().join("upgrade/intent.v1.json")).unwrap();
         if upgrade {
             let first = post(&fixture.host, "/api/upgrade/prepare", &json!({}), 15000).unwrap();
             assert_eq!(first["ready"], true);
@@ -257,6 +319,7 @@ fn installed_engine_shutdown_upgrade_and_released_port() {
             );
             std::thread::sleep(Duration::from_millis(10));
         }
+        drain.join().unwrap();
         // A real new listener now owns the released port. It must receive no application bytes.
         let runtime = tokio::runtime::Builder::new_current_thread()
             .enable_io()
