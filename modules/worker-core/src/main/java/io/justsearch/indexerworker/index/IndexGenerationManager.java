@@ -351,7 +351,7 @@ public final class IndexGenerationManager {
     return current != null ? current : readStateForAdmission(statePrevPath);
   }
 
-  /** Bounded, non-following read; inspecting a pointer must never restore or rewrite it. */
+  /** Non-following read; inspecting a pointer must never restore or rewrite it. */
   private State readStateForAdmission(Path path) throws IOException {
     try {
       if (!IndexOwnership.plainAttributes(path).isRegularFile()) {
@@ -359,10 +359,7 @@ public final class IndexGenerationManager {
       }
       byte[] bytes;
       try (FileChannel channel = FileChannel.open(path, StandardOpenOption.READ, LinkOption.NOFOLLOW_LINKS)) {
-        var buffer = java.nio.ByteBuffer.allocate(16_385);
-        while (buffer.hasRemaining() && channel.read(buffer) != -1) { }
-        if (buffer.position() > 16_384) throw new IndexOwnership.Unproven(path, "malformed");
-        bytes = java.util.Arrays.copyOf(buffer.array(), buffer.position());
+        bytes = java.nio.channels.Channels.newInputStream(channel).readAllBytes();
       }
       try { return JSON.readValue(bytes, State.class); }
       catch (tools.jackson.core.JacksonException malformed) { return null; }

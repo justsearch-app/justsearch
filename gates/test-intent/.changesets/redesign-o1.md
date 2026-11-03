@@ -1135,4 +1135,49 @@ Tests added or rewritten in this round:
 - `modules/worker-core/src/test/java/io/justsearch/indexerworker/index/HistoricalOwnershipAdmissionTest.java` — U1/U2, S5/S6 pointed-directory admission, S7 link/codec allowlist and read-only/atomic-repair preservation — durable
 - `modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/ReleasedOwnershipUpgradeTest.java` — U1/U2 with unchanged released index bytes and 38 searchable documents in every pointer layout — durable
 
+## Narrowed P3 repair: writer-sized pause state
+
+The admission-only 16,384-byte state limit is removed. The regular-file and no-follow
+checks, absent/unparsable fallback, and all other production behavior stay unchanged.
+The pointer-is-a-regular-file probe remains a named limit: it also fails on original main
+344bdaf03c and is outside this repair.
+
+`LongPauseStateAdmissionTest#nativeBootAcceptsLongPauseStateWrittenByManager` is an
+isolated new durable preservation check for P3: "Valid pointers and owned generations:
+normal start; upgrade from existing generation layout; state v1 normalization
+(inspection runs before normalization)." It calls the real state writer with a
+20,009-character ASCII pause reason or 10,000 quote characters (JSON escaping makes
+the state exceed the former bound), then uses a fresh manager's native initialization
+and checks the same active generation, pause flag and exact reason. Both current state
+and absent-current/previous-state fallback are exercised. Each invocation uses only its
+own `@TempDir`; it changes no global state and uses no external fixtures.
+
+Intent source (delegated-choice):
+
+- delegationQuote: "now proceed autonomusly with remaining design work and potentially some research. once done, you can proceed with the implementations of the remaining work you proposed and designed"
+- delegationLocation: "task t-20261102-redesign request"
+- delegationScope: "implement the redesigns and fixes the orchestrator proposed and designed after the ingestion defect list"
+- choice: "P3 Valid pointers and owned generations: normal start; upgrade from existing generation layout; state v1 normalization (inspection runs before normalization)."
+- label: "agent choice"
+
+This check is preservation against 344bdaf03c and a regression repair against
+6a2b59d5ba. It is therefore supplied as an extra isolated-file check, not misclassified
+as an original-main assertion failure in `newChecks`. Existing entries, original S1-S17
+evidence, and their compatibility patch are unchanged. No acceptance record or generated
+evidence is authored in this round.
+
+Exact regression replay:
+
+```text
+--before 6a2b59d5ba
+--overlay modules/worker-core/src/test/java/io/justsearch/indexerworker/index/LongPauseStateAdmissionTest.java
+--check modules/worker-core/src/test/java/io/justsearch/indexerworker/index/LongPauseStateAdmissionTest.java#nativeBootAcceptsLongPauseStateWrittenByManager
+```
+
+Exact original-main preservation replay: use `--before 344bdaf03c` with the same overlay
+and check. Neither replay needs `--before-patch` (all used signatures exist on both
+before states). Keep the earlier `--before-patch
+gates/test-intent/compatibility/redesign-o1-before.patch` only for the original S1-S17
+check lists. Execution observations for this round follow after all checks finish.
+
 ## Acceptance records
