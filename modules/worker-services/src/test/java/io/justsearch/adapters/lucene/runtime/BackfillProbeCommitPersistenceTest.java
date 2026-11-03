@@ -265,7 +265,7 @@ final class BackfillProbeCommitPersistenceTest extends LuceneExecutorTestBase {
         // Make next-batch selection deterministic without committing. Every comparison/write is real.
         runtime.commitOps().maybeRefreshBlocking();
         return result;
-      }).when(coordinator).publishEnrichmentBatch(anyList(), anyMap());
+      }).when(coordinator).publishEnrichmentBatch(anyList(), anyMap(), any());
       runtime.commitOps().setCommitCompletedListener(reason -> {
         commits.add(new CommitEvent(reason, writes.stream().filter(count -> count > 0).count()));
         System.out.println("backfill commit " + commits.getLast());

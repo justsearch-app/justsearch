@@ -1,0 +1,1419 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
+  },
+  "createdAt": "2026-11-03T14:41:52.744Z",
+  "revision": "ee69c49722dde1381359f18eb55d68205cd01a59",
+  "tree": "90541e263656273c6abaef909228908ae67c4982",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": "openjdk version \"25.0.4.1\" 2026-08-18 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "./gradlew :modules:worker-services:test --tests \"io.justsearch.indexerworker.loop.ops.CombinedEnrichmentLongDocumentTest.lateChunkNullFallbackRecordsAndResumesAWindowAfterTheProbeSpentTheDeadline\" --tests \"io.justsearch.indexerworker.loop.ops.EnrichmentUnitBoundaryTest.expiredDeadlinePreventsTheFirstUnit\" --tests \"io.justsearch.indexerworker.loop.ops.EnrichmentUnitBoundaryTest.hardStopPreventsTheFirstUnitAndCancelsTheSelection\" --tests \"io.justsearch.indexerworker.loop.ops.EnrichmentUnitBoundaryTest.sourceInvalidationDuringFetchPreventsTheFirstUnit\" --tests \"io.justsearch.indexerworker.loop.ops.EnrichmentUnitBoundaryTest.sourceInvalidationWhileTheSchedulerPacesPreventsTheFirstUnit\" --tests \"io.justsearch.indexerworker.loop.ops.EnrichmentUnitBoundaryTest.individualSourceInvalidationDuringFetchPreventsTheFirstUnit\" --tests \"io.justsearch.indexerworker.loop.ops.EnrichmentUnitBoundaryTest.exhaustedEmbeddingShareDoesNotForceAFirstDenseUnit\" --tests \"io.justsearch.indexerworker.loop.ops.EnrichmentUnitBoundaryTest.interruptionPreventsTheFirstUnitAndCancelsTheSelection\" --tests \"io.justsearch.indexerworker.loop.ops.EnrichmentUnitBoundaryTest.individualStageInterruptionPreventsTheFirstUnit\" --tests \"io.justsearch.indexerworker.loop.ops.EnrichmentUnitBoundaryTest.hardStopAfterOneUnitPreservesItsResultAndLeavesTheRestCancelled\" --tests \"io.justsearch.indexerworker.loop.ops.EnrichmentUnitBoundaryTest.identicalTextWithChangedDenseIdentityRestartsWindows\" --tests \"io.justsearch.indexerworker.loop.ops.EnrichmentUnitBoundaryTest.deadlineSpentByNullOrArenaOomClassificationRetainsItsRoute\" --tests \"io.justsearch.indexerworker.loop.ops.EnrichmentUnitBoundaryTest.hardStopAfterClassificationRetainsItsRouteWithoutStartingWindows\" --tests \"io.justsearch.indexerworker.loop.ops.EnrichmentUnitBoundaryTest.batchOnlyLateParentCompletesWithoutWindowsOrRetry\" --tests \"io.justsearch.indexerworker.loop.ops.EnrichmentAuthorityRaceTest.providerReplacementDuringInferenceRevokesSuccessAndFailure\" --tests \"io.justsearch.indexerworker.loop.ops.EnrichmentAuthorityRaceTest.providerReplacementAtCoordinatorBoundaryRevokesTheComputedOutcome\" --tests \"io.justsearch.indexerworker.loop.ops.EnrichmentAuthorityRaceTest.providerReplacementWhilePublicationWaitsForMutationLockIsAtomic\" --tests \"io.justsearch.indexerworker.loop.ops.WindowedEmbedSliceValidationTest.invalidSliceRestartsWithoutBlendingAnyOfItsVectors\" --tests \"io.justsearch.indexerworker.loop.ops.DisambiguationAuthorityTest.providerReplacementAfterClusteringCannotAcknowledgeOrPublishThePage\" --tests \"io.justsearch.indexerworker.loop.ops.EnrichmentUnitBoundaryTest.rejectedSlicesUseTheExistingRetryLimit\" --tests \"io.justsearch.indexerworker.loop.ops.EnrichmentAuthorityRaceTest.republishingTheSameProviderRestartsItsRetainedWindows\" --tests \"io.justsearch.indexerworker.loop.ops.CombinedEnrichmentBackfillOpsTest.realPendingSpladeAllowsDeferralButNeverWritesThePreservationOnlyUpdate\" --tests \"io.justsearch.indexerworker.loop.ops.EnrichmentAttemptAccountingTest.cancelledFallbackPartitionsEverySelectedStageOnce\" --tests \"io.justsearch.indexerworker.loop.ops.EnrichmentAttemptAccountingTest.partialWindowsAdvanceWithoutCompletingAnEmbedding\" --tests \"io.justsearch.indexerworker.loop.ops.EnrichmentHardStopRepairTest.individualNerUnavailabilityBoundsEveryDocument\" --tests \"io.justsearch.indexerworker.loop.ops.EnrichmentHardStopRepairTest.successfulFinalDenseCallCannotPublishAfterUnavailability\" --tests \"io.justsearch.indexerworker.loop.ops.EnrichmentHardStopRepairTest.sparseRetirementWinsOverCancellation\" --tests \"io.justsearch.indexerworker.loop.ops.EnrichmentHardStopRepairTest.bgeSourceInvalidationAndInterruptionPreventTheFirstBatch\" --tests \"io.justsearch.indexerworker.loop.ops.EnrichmentHardStopRepairTest.bgeRetirementPreventsTheFirstBatch\" --tests \"io.justsearch.indexerworker.loop.ops.EnrichmentHardStopRepairTest.combinedNerRejectsEveryOutcomeWhenTheServiceBecomesUnavailable\" --tests \"io.justsearch.indexerworker.loop.ops.EnrichmentHardStopRepairTest.sparseUnavailabilityRejectsComputedSuccessAndCancellation\" --tests \"io.justsearch.indexerworker.loop.ops.EnrichmentHardStopRepairTest.individualDenseFallbackUnavailabilityWinsOverCancellation\" --tests \"io.justsearch.indexerworker.loop.ops.EnrichmentHardStopRepairTest.individualDenseBatchUnavailabilityWinsOverCancellation\" --tests \"io.justsearch.indexerworker.loop.ops.EnrichmentHardStopRepairTest.bgeFallbackCannotStartAnotherUnitAfterAHardStop\" --tests \"io.justsearch.indexerworker.loop.ops.EnrichmentAuthorityRaceTest.unavailableProviderCannotPublishItsSuccessfulFinalDenseResult\" --tests \"io.justsearch.indexerworker.loop.ops.EnrichmentAuthorityRaceTest.replacedProviderCancellationStaysDeferredThroughTheRealWriter\" --tests \"io.justsearch.indexerworker.loop.ops.DisambiguationAuthorityTest.serviceUnavailabilityCannotPublishOrAcknowledgeThePage\" --tests \"io.justsearch.indexerworker.loop.ops.EnrichmentAuthorityRaceTest.retiredBgeCannotPublishAnyFinalOutcomeThroughTheRealWriter\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 27343
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/CombinedEnrichmentLongDocumentTest.java#lateChunkNullFallbackRecordsAndResumesAWindowAfterTheProbeSpentTheDeadline",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/CombinedEnrichmentLongDocumentTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:1aab96ab77f9549fe6afad5c25264010965f8c98fae12b8f3c175eb23a84a22f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "lateChunkNullFallbackRecordsAndResumesAWindowAfterTheProbeSpentTheDeadline()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/EnrichmentUnitBoundaryTest.java#expiredDeadlinePreventsTheFirstUnit",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/EnrichmentUnitBoundaryTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:b0beb9959b70191a0f3a7a60cbf0eb8d807041dc9355d3e2b8e1b7ab688628a1",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "expiredDeadlinePreventsTheFirstUnit(Route) [1] DENSE_BATCH",
+          "status": "passed"
+        },
+        {
+          "name": "expiredDeadlinePreventsTheFirstUnit(Route) [2] DENSE_CHUNK",
+          "status": "passed"
+        },
+        {
+          "name": "expiredDeadlinePreventsTheFirstUnit(Route) [3] WINDOW",
+          "status": "passed"
+        },
+        {
+          "name": "expiredDeadlinePreventsTheFirstUnit(Route) [4] SINGLE_PASS",
+          "status": "passed"
+        },
+        {
+          "name": "expiredDeadlinePreventsTheFirstUnit(Route) [5] NER",
+          "status": "passed"
+        },
+        {
+          "name": "expiredDeadlinePreventsTheFirstUnit(Route) [6] SPARSE_PARENT",
+          "status": "passed"
+        },
+        {
+          "name": "expiredDeadlinePreventsTheFirstUnit(Route) [7] SPARSE_CHUNK",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/EnrichmentUnitBoundaryTest.java#hardStopPreventsTheFirstUnitAndCancelsTheSelection",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/EnrichmentUnitBoundaryTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:b0beb9959b70191a0f3a7a60cbf0eb8d807041dc9355d3e2b8e1b7ab688628a1",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "hardStopPreventsTheFirstUnitAndCancelsTheSelection(Route) [1] DENSE_BATCH",
+          "status": "passed"
+        },
+        {
+          "name": "hardStopPreventsTheFirstUnitAndCancelsTheSelection(Route) [2] DENSE_CHUNK",
+          "status": "passed"
+        },
+        {
+          "name": "hardStopPreventsTheFirstUnitAndCancelsTheSelection(Route) [3] WINDOW",
+          "status": "passed"
+        },
+        {
+          "name": "hardStopPreventsTheFirstUnitAndCancelsTheSelection(Route) [4] SINGLE_PASS",
+          "status": "passed"
+        },
+        {
+          "name": "hardStopPreventsTheFirstUnitAndCancelsTheSelection(Route) [5] NER",
+          "status": "passed"
+        },
+        {
+          "name": "hardStopPreventsTheFirstUnitAndCancelsTheSelection(Route) [6] SPARSE_PARENT",
+          "status": "passed"
+        },
+        {
+          "name": "hardStopPreventsTheFirstUnitAndCancelsTheSelection(Route) [7] SPARSE_CHUNK",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/EnrichmentUnitBoundaryTest.java#sourceInvalidationDuringFetchPreventsTheFirstUnit",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/EnrichmentUnitBoundaryTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:b0beb9959b70191a0f3a7a60cbf0eb8d807041dc9355d3e2b8e1b7ab688628a1",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "sourceInvalidationDuringFetchPreventsTheFirstUnit(Route) [1] DENSE_BATCH",
+          "status": "passed"
+        },
+        {
+          "name": "sourceInvalidationDuringFetchPreventsTheFirstUnit(Route) [2] DENSE_CHUNK",
+          "status": "passed"
+        },
+        {
+          "name": "sourceInvalidationDuringFetchPreventsTheFirstUnit(Route) [3] WINDOW",
+          "status": "passed"
+        },
+        {
+          "name": "sourceInvalidationDuringFetchPreventsTheFirstUnit(Route) [4] SINGLE_PASS",
+          "status": "passed"
+        },
+        {
+          "name": "sourceInvalidationDuringFetchPreventsTheFirstUnit(Route) [5] NER",
+          "status": "passed"
+        },
+        {
+          "name": "sourceInvalidationDuringFetchPreventsTheFirstUnit(Route) [6] SPARSE_PARENT",
+          "status": "passed"
+        },
+        {
+          "name": "sourceInvalidationDuringFetchPreventsTheFirstUnit(Route) [7] SPARSE_CHUNK",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/EnrichmentUnitBoundaryTest.java#sourceInvalidationWhileTheSchedulerPacesPreventsTheFirstUnit",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/EnrichmentUnitBoundaryTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:b0beb9959b70191a0f3a7a60cbf0eb8d807041dc9355d3e2b8e1b7ab688628a1",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "sourceInvalidationWhileTheSchedulerPacesPreventsTheFirstUnit(Route) [1] DENSE_BATCH",
+          "status": "passed"
+        },
+        {
+          "name": "sourceInvalidationWhileTheSchedulerPacesPreventsTheFirstUnit(Route) [2] DENSE_CHUNK",
+          "status": "passed"
+        },
+        {
+          "name": "sourceInvalidationWhileTheSchedulerPacesPreventsTheFirstUnit(Route) [3] WINDOW",
+          "status": "passed"
+        },
+        {
+          "name": "sourceInvalidationWhileTheSchedulerPacesPreventsTheFirstUnit(Route) [4] SINGLE_PASS",
+          "status": "passed"
+        },
+        {
+          "name": "sourceInvalidationWhileTheSchedulerPacesPreventsTheFirstUnit(Route) [5] NER",
+          "status": "passed"
+        },
+        {
+          "name": "sourceInvalidationWhileTheSchedulerPacesPreventsTheFirstUnit(Route) [6] SPARSE_PARENT",
+          "status": "passed"
+        },
+        {
+          "name": "sourceInvalidationWhileTheSchedulerPacesPreventsTheFirstUnit(Route) [7] SPARSE_CHUNK",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/EnrichmentUnitBoundaryTest.java#individualSourceInvalidationDuringFetchPreventsTheFirstUnit",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/EnrichmentUnitBoundaryTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:b0beb9959b70191a0f3a7a60cbf0eb8d807041dc9355d3e2b8e1b7ab688628a1",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "individualSourceInvalidationDuringFetchPreventsTheFirstUnit(Route) [1] DENSE_BATCH",
+          "status": "passed"
+        },
+        {
+          "name": "individualSourceInvalidationDuringFetchPreventsTheFirstUnit(Route) [2] DENSE_CHUNK",
+          "status": "passed"
+        },
+        {
+          "name": "individualSourceInvalidationDuringFetchPreventsTheFirstUnit(Route) [3] NER",
+          "status": "passed"
+        },
+        {
+          "name": "individualSourceInvalidationDuringFetchPreventsTheFirstUnit(Route) [4] SPARSE_PARENT",
+          "status": "passed"
+        },
+        {
+          "name": "individualSourceInvalidationDuringFetchPreventsTheFirstUnit(Route) [5] SPARSE_CHUNK",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/EnrichmentUnitBoundaryTest.java#exhaustedEmbeddingShareDoesNotForceAFirstDenseUnit",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/EnrichmentUnitBoundaryTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:b0beb9959b70191a0f3a7a60cbf0eb8d807041dc9355d3e2b8e1b7ab688628a1",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "exhaustedEmbeddingShareDoesNotForceAFirstDenseUnit()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/EnrichmentUnitBoundaryTest.java#interruptionPreventsTheFirstUnitAndCancelsTheSelection",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/EnrichmentUnitBoundaryTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:b0beb9959b70191a0f3a7a60cbf0eb8d807041dc9355d3e2b8e1b7ab688628a1",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "interruptionPreventsTheFirstUnitAndCancelsTheSelection(Route) [1] DENSE_BATCH",
+          "status": "passed"
+        },
+        {
+          "name": "interruptionPreventsTheFirstUnitAndCancelsTheSelection(Route) [2] DENSE_CHUNK",
+          "status": "passed"
+        },
+        {
+          "name": "interruptionPreventsTheFirstUnitAndCancelsTheSelection(Route) [3] WINDOW",
+          "status": "passed"
+        },
+        {
+          "name": "interruptionPreventsTheFirstUnitAndCancelsTheSelection(Route) [4] SINGLE_PASS",
+          "status": "passed"
+        },
+        {
+          "name": "interruptionPreventsTheFirstUnitAndCancelsTheSelection(Route) [5] NER",
+          "status": "passed"
+        },
+        {
+          "name": "interruptionPreventsTheFirstUnitAndCancelsTheSelection(Route) [6] SPARSE_PARENT",
+          "status": "passed"
+        },
+        {
+          "name": "interruptionPreventsTheFirstUnitAndCancelsTheSelection(Route) [7] SPARSE_CHUNK",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/EnrichmentUnitBoundaryTest.java#individualStageInterruptionPreventsTheFirstUnit",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/EnrichmentUnitBoundaryTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:b0beb9959b70191a0f3a7a60cbf0eb8d807041dc9355d3e2b8e1b7ab688628a1",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "individualStageInterruptionPreventsTheFirstUnit(Route) [1] DENSE_BATCH",
+          "status": "passed"
+        },
+        {
+          "name": "individualStageInterruptionPreventsTheFirstUnit(Route) [2] DENSE_CHUNK",
+          "status": "passed"
+        },
+        {
+          "name": "individualStageInterruptionPreventsTheFirstUnit(Route) [3] NER",
+          "status": "passed"
+        },
+        {
+          "name": "individualStageInterruptionPreventsTheFirstUnit(Route) [4] SPARSE_PARENT",
+          "status": "passed"
+        },
+        {
+          "name": "individualStageInterruptionPreventsTheFirstUnit(Route) [5] SPARSE_CHUNK",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/EnrichmentUnitBoundaryTest.java#hardStopAfterOneUnitPreservesItsResultAndLeavesTheRestCancelled",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/EnrichmentUnitBoundaryTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:b0beb9959b70191a0f3a7a60cbf0eb8d807041dc9355d3e2b8e1b7ab688628a1",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "hardStopAfterOneUnitPreservesItsResultAndLeavesTheRestCancelled(Route) [1] DENSE_BATCH",
+          "status": "passed"
+        },
+        {
+          "name": "hardStopAfterOneUnitPreservesItsResultAndLeavesTheRestCancelled(Route) [2] DENSE_CHUNK",
+          "status": "passed"
+        },
+        {
+          "name": "hardStopAfterOneUnitPreservesItsResultAndLeavesTheRestCancelled(Route) [3] WINDOW",
+          "status": "passed"
+        },
+        {
+          "name": "hardStopAfterOneUnitPreservesItsResultAndLeavesTheRestCancelled(Route) [4] SINGLE_PASS",
+          "status": "passed"
+        },
+        {
+          "name": "hardStopAfterOneUnitPreservesItsResultAndLeavesTheRestCancelled(Route) [5] NER",
+          "status": "passed"
+        },
+        {
+          "name": "hardStopAfterOneUnitPreservesItsResultAndLeavesTheRestCancelled(Route) [6] SPARSE_PARENT",
+          "status": "passed"
+        },
+        {
+          "name": "hardStopAfterOneUnitPreservesItsResultAndLeavesTheRestCancelled(Route) [7] SPARSE_CHUNK",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/EnrichmentUnitBoundaryTest.java#identicalTextWithChangedDenseIdentityRestartsWindows",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/EnrichmentUnitBoundaryTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:b0beb9959b70191a0f3a7a60cbf0eb8d807041dc9355d3e2b8e1b7ab688628a1",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "identicalTextWithChangedDenseIdentityRestartsWindows(String) [1] generation",
+          "status": "passed"
+        },
+        {
+          "name": "identicalTextWithChangedDenseIdentityRestartsWindows(String) [2] uid",
+          "status": "passed"
+        },
+        {
+          "name": "identicalTextWithChangedDenseIdentityRestartsWindows(String) [3] revision",
+          "status": "passed"
+        },
+        {
+          "name": "identicalTextWithChangedDenseIdentityRestartsWindows(String) [4] provider",
+          "status": "passed"
+        },
+        {
+          "name": "identicalTextWithChangedDenseIdentityRestartsWindows(String) [5] dimension",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/EnrichmentUnitBoundaryTest.java#deadlineSpentByNullOrArenaOomClassificationRetainsItsRoute",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/EnrichmentUnitBoundaryTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:b0beb9959b70191a0f3a7a60cbf0eb8d807041dc9355d3e2b8e1b7ab688628a1",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "deadlineSpentByNullOrArenaOomClassificationRetainsItsRoute(boolean) [1] false",
+          "status": "passed"
+        },
+        {
+          "name": "deadlineSpentByNullOrArenaOomClassificationRetainsItsRoute(boolean) [2] true",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/EnrichmentUnitBoundaryTest.java#hardStopAfterClassificationRetainsItsRouteWithoutStartingWindows",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/EnrichmentUnitBoundaryTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:b0beb9959b70191a0f3a7a60cbf0eb8d807041dc9355d3e2b8e1b7ab688628a1",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "hardStopAfterClassificationRetainsItsRouteWithoutStartingWindows(boolean) [1] false",
+          "status": "passed"
+        },
+        {
+          "name": "hardStopAfterClassificationRetainsItsRouteWithoutStartingWindows(boolean) [2] true",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/EnrichmentUnitBoundaryTest.java#batchOnlyLateParentCompletesWithoutWindowsOrRetry",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/EnrichmentUnitBoundaryTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:b0beb9959b70191a0f3a7a60cbf0eb8d807041dc9355d3e2b8e1b7ab688628a1",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "batchOnlyLateParentCompletesWithoutWindowsOrRetry()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/EnrichmentAuthorityRaceTest.java#providerReplacementDuringInferenceRevokesSuccessAndFailure",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/EnrichmentAuthorityRaceTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:c5d3c2f328b97f1895abb168ed0fca8d7338f0cae070a4b89ad3091910544a13",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "providerReplacementDuringInferenceRevokesSuccessAndFailure(Stage, boolean) [1] SPARSE, false",
+          "status": "passed"
+        },
+        {
+          "name": "providerReplacementDuringInferenceRevokesSuccessAndFailure(Stage, boolean) [2] SPARSE, true",
+          "status": "passed"
+        },
+        {
+          "name": "providerReplacementDuringInferenceRevokesSuccessAndFailure(Stage, boolean) [3] INTERLEAVED, false",
+          "status": "passed"
+        },
+        {
+          "name": "providerReplacementDuringInferenceRevokesSuccessAndFailure(Stage, boolean) [4] INTERLEAVED, true",
+          "status": "passed"
+        },
+        {
+          "name": "providerReplacementDuringInferenceRevokesSuccessAndFailure(Stage, boolean) [5] NER, false",
+          "status": "passed"
+        },
+        {
+          "name": "providerReplacementDuringInferenceRevokesSuccessAndFailure(Stage, boolean) [6] NER, true",
+          "status": "passed"
+        },
+        {
+          "name": "providerReplacementDuringInferenceRevokesSuccessAndFailure(Stage, boolean) [7] SINGLE_PASS, false",
+          "status": "passed"
+        },
+        {
+          "name": "providerReplacementDuringInferenceRevokesSuccessAndFailure(Stage, boolean) [8] WINDOW, false",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/EnrichmentAuthorityRaceTest.java#providerReplacementAtCoordinatorBoundaryRevokesTheComputedOutcome",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/EnrichmentAuthorityRaceTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:c5d3c2f328b97f1895abb168ed0fca8d7338f0cae070a4b89ad3091910544a13",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "providerReplacementAtCoordinatorBoundaryRevokesTheComputedOutcome(Stage, boolean) [1] EMBED, false",
+          "status": "passed"
+        },
+        {
+          "name": "providerReplacementAtCoordinatorBoundaryRevokesTheComputedOutcome(Stage, boolean) [2] EMBED, true",
+          "status": "passed"
+        },
+        {
+          "name": "providerReplacementAtCoordinatorBoundaryRevokesTheComputedOutcome(Stage, boolean) [3] CHUNK, false",
+          "status": "passed"
+        },
+        {
+          "name": "providerReplacementAtCoordinatorBoundaryRevokesTheComputedOutcome(Stage, boolean) [4] CHUNK, true",
+          "status": "passed"
+        },
+        {
+          "name": "providerReplacementAtCoordinatorBoundaryRevokesTheComputedOutcome(Stage, boolean) [5] SPARSE, false",
+          "status": "passed"
+        },
+        {
+          "name": "providerReplacementAtCoordinatorBoundaryRevokesTheComputedOutcome(Stage, boolean) [6] SPARSE, true",
+          "status": "passed"
+        },
+        {
+          "name": "providerReplacementAtCoordinatorBoundaryRevokesTheComputedOutcome(Stage, boolean) [7] INTERLEAVED, false",
+          "status": "passed"
+        },
+        {
+          "name": "providerReplacementAtCoordinatorBoundaryRevokesTheComputedOutcome(Stage, boolean) [8] INTERLEAVED, true",
+          "status": "passed"
+        },
+        {
+          "name": "providerReplacementAtCoordinatorBoundaryRevokesTheComputedOutcome(Stage, boolean) [9] NER, false",
+          "status": "passed"
+        },
+        {
+          "name": "providerReplacementAtCoordinatorBoundaryRevokesTheComputedOutcome(Stage, boolean) [10] NER, true",
+          "status": "passed"
+        },
+        {
+          "name": "providerReplacementAtCoordinatorBoundaryRevokesTheComputedOutcome(Stage, boolean) [11] COMBINED, false",
+          "status": "passed"
+        },
+        {
+          "name": "providerReplacementAtCoordinatorBoundaryRevokesTheComputedOutcome(Stage, boolean) [12] COMBINED, true",
+          "status": "passed"
+        },
+        {
+          "name": "providerReplacementAtCoordinatorBoundaryRevokesTheComputedOutcome(Stage, boolean) [13] SINGLE_PASS, false",
+          "status": "passed"
+        },
+        {
+          "name": "providerReplacementAtCoordinatorBoundaryRevokesTheComputedOutcome(Stage, boolean) [14] SINGLE_PASS, true",
+          "status": "passed"
+        },
+        {
+          "name": "providerReplacementAtCoordinatorBoundaryRevokesTheComputedOutcome(Stage, boolean) [15] WINDOW, false",
+          "status": "passed"
+        },
+        {
+          "name": "providerReplacementAtCoordinatorBoundaryRevokesTheComputedOutcome(Stage, boolean) [16] WINDOW, true",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/EnrichmentAuthorityRaceTest.java#providerReplacementWhilePublicationWaitsForMutationLockIsAtomic",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/EnrichmentAuthorityRaceTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:c5d3c2f328b97f1895abb168ed0fca8d7338f0cae070a4b89ad3091910544a13",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "providerReplacementWhilePublicationWaitsForMutationLockIsAtomic(Stage, boolean) [1] EMBED, false",
+          "status": "passed"
+        },
+        {
+          "name": "providerReplacementWhilePublicationWaitsForMutationLockIsAtomic(Stage, boolean) [2] EMBED, true",
+          "status": "passed"
+        },
+        {
+          "name": "providerReplacementWhilePublicationWaitsForMutationLockIsAtomic(Stage, boolean) [3] CHUNK, false",
+          "status": "passed"
+        },
+        {
+          "name": "providerReplacementWhilePublicationWaitsForMutationLockIsAtomic(Stage, boolean) [4] CHUNK, true",
+          "status": "passed"
+        },
+        {
+          "name": "providerReplacementWhilePublicationWaitsForMutationLockIsAtomic(Stage, boolean) [5] SPARSE, false",
+          "status": "passed"
+        },
+        {
+          "name": "providerReplacementWhilePublicationWaitsForMutationLockIsAtomic(Stage, boolean) [6] SPARSE, true",
+          "status": "passed"
+        },
+        {
+          "name": "providerReplacementWhilePublicationWaitsForMutationLockIsAtomic(Stage, boolean) [7] INTERLEAVED, false",
+          "status": "passed"
+        },
+        {
+          "name": "providerReplacementWhilePublicationWaitsForMutationLockIsAtomic(Stage, boolean) [8] INTERLEAVED, true",
+          "status": "passed"
+        },
+        {
+          "name": "providerReplacementWhilePublicationWaitsForMutationLockIsAtomic(Stage, boolean) [9] NER, false",
+          "status": "passed"
+        },
+        {
+          "name": "providerReplacementWhilePublicationWaitsForMutationLockIsAtomic(Stage, boolean) [10] NER, true",
+          "status": "passed"
+        },
+        {
+          "name": "providerReplacementWhilePublicationWaitsForMutationLockIsAtomic(Stage, boolean) [11] COMBINED, false",
+          "status": "passed"
+        },
+        {
+          "name": "providerReplacementWhilePublicationWaitsForMutationLockIsAtomic(Stage, boolean) [12] COMBINED, true",
+          "status": "passed"
+        },
+        {
+          "name": "providerReplacementWhilePublicationWaitsForMutationLockIsAtomic(Stage, boolean) [13] SINGLE_PASS, false",
+          "status": "passed"
+        },
+        {
+          "name": "providerReplacementWhilePublicationWaitsForMutationLockIsAtomic(Stage, boolean) [14] SINGLE_PASS, true",
+          "status": "passed"
+        },
+        {
+          "name": "providerReplacementWhilePublicationWaitsForMutationLockIsAtomic(Stage, boolean) [15] WINDOW, false",
+          "status": "passed"
+        },
+        {
+          "name": "providerReplacementWhilePublicationWaitsForMutationLockIsAtomic(Stage, boolean) [16] WINDOW, true",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/WindowedEmbedSliceValidationTest.java#invalidSliceRestartsWithoutBlendingAnyOfItsVectors",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/WindowedEmbedSliceValidationTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:e3f4f2ef13ebc0f0a145834531a8f8390e5ff8053d7419aca24cf78dc040ccb6",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "invalidSliceRestartsWithoutBlendingAnyOfItsVectors(String) [1] totals",
+          "status": "passed"
+        },
+        {
+          "name": "invalidSliceRestartsWithoutBlendingAnyOfItsVectors(String) [2] overrun",
+          "status": "passed"
+        },
+        {
+          "name": "invalidSliceRestartsWithoutBlendingAnyOfItsVectors(String) [3] null-list",
+          "status": "passed"
+        },
+        {
+          "name": "invalidSliceRestartsWithoutBlendingAnyOfItsVectors(String) [4] empty-list",
+          "status": "passed"
+        },
+        {
+          "name": "invalidSliceRestartsWithoutBlendingAnyOfItsVectors(String) [5] null-vector",
+          "status": "passed"
+        },
+        {
+          "name": "invalidSliceRestartsWithoutBlendingAnyOfItsVectors(String) [6] empty-vector",
+          "status": "passed"
+        },
+        {
+          "name": "invalidSliceRestartsWithoutBlendingAnyOfItsVectors(String) [7] mixed-dimensions",
+          "status": "passed"
+        },
+        {
+          "name": "invalidSliceRestartsWithoutBlendingAnyOfItsVectors(String) [8] changed-dimension",
+          "status": "passed"
+        },
+        {
+          "name": "invalidSliceRestartsWithoutBlendingAnyOfItsVectors(String) [9] nan",
+          "status": "passed"
+        },
+        {
+          "name": "invalidSliceRestartsWithoutBlendingAnyOfItsVectors(String) [10] infinity",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/DisambiguationAuthorityTest.java#providerReplacementAfterClusteringCannotAcknowledgeOrPublishThePage",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/DisambiguationAuthorityTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:5f83b3e7684f2f5412b54f1b48639ad970daa20875a0ece2a2a63ee430a3979a",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "providerReplacementAfterClusteringCannotAcknowledgeOrPublishThePage()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/EnrichmentUnitBoundaryTest.java#rejectedSlicesUseTheExistingRetryLimit",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/EnrichmentUnitBoundaryTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:b0beb9959b70191a0f3a7a60cbf0eb8d807041dc9355d3e2b8e1b7ab688628a1",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "rejectedSlicesUseTheExistingRetryLimit(String) [1] replay",
+          "status": "passed"
+        },
+        {
+          "name": "rejectedSlicesUseTheExistingRetryLimit(String) [2] skip",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/EnrichmentAuthorityRaceTest.java#republishingTheSameProviderRestartsItsRetainedWindows",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/EnrichmentAuthorityRaceTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:c5d3c2f328b97f1895abb168ed0fca8d7338f0cae070a4b89ad3091910544a13",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "republishingTheSameProviderRestartsItsRetainedWindows()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/CombinedEnrichmentBackfillOpsTest.java#realPendingSpladeAllowsDeferralButNeverWritesThePreservationOnlyUpdate",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/CombinedEnrichmentBackfillOpsTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:4ca12528fefaedfb3e0ec560be233a650a136deeed84cc01dc5cebb80f58562a",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "realPendingSpladeAllowsDeferralButNeverWritesThePreservationOnlyUpdate()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/EnrichmentAttemptAccountingTest.java#cancelledFallbackPartitionsEverySelectedStageOnce",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/EnrichmentAttemptAccountingTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:9a72159cea45b28f9143c93c66e288ff32d7f2aafe0e592220279d9c908b1efc",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "cancelledFallbackPartitionsEverySelectedStageOnce()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/EnrichmentAttemptAccountingTest.java#partialWindowsAdvanceWithoutCompletingAnEmbedding",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/EnrichmentAttemptAccountingTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:9a72159cea45b28f9143c93c66e288ff32d7f2aafe0e592220279d9c908b1efc",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "partialWindowsAdvanceWithoutCompletingAnEmbedding()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/EnrichmentHardStopRepairTest.java#individualNerUnavailabilityBoundsEveryDocument",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/EnrichmentHardStopRepairTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:294767e3b3f4a551eb19067f0eed7465e7803b1e18fa6256194281e64b058526",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "individualNerUnavailabilityBoundsEveryDocument(boolean) [1] false",
+          "status": "passed"
+        },
+        {
+          "name": "individualNerUnavailabilityBoundsEveryDocument(boolean) [2] true",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/EnrichmentHardStopRepairTest.java#successfulFinalDenseCallCannotPublishAfterUnavailability",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/EnrichmentHardStopRepairTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:294767e3b3f4a551eb19067f0eed7465e7803b1e18fa6256194281e64b058526",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "successfulFinalDenseCallCannotPublishAfterUnavailability(Route) [1] SINGLE_PASS",
+          "status": "passed"
+        },
+        {
+          "name": "successfulFinalDenseCallCannotPublishAfterUnavailability(Route) [2] WINDOW",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/EnrichmentHardStopRepairTest.java#sparseRetirementWinsOverCancellation",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/EnrichmentHardStopRepairTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:294767e3b3f4a551eb19067f0eed7465e7803b1e18fa6256194281e64b058526",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "sparseRetirementWinsOverCancellation(Route) [1] INDIVIDUAL_SPARSE",
+          "status": "passed"
+        },
+        {
+          "name": "sparseRetirementWinsOverCancellation(Route) [2] INTERLEAVED_SPARSE",
+          "status": "passed"
+        },
+        {
+          "name": "sparseRetirementWinsOverCancellation(Route) [3] INDIVIDUAL_SPARSE_CHUNK",
+          "status": "passed"
+        },
+        {
+          "name": "sparseRetirementWinsOverCancellation(Route) [4] INTERLEAVED_SPARSE_CHUNK",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/EnrichmentHardStopRepairTest.java#bgeSourceInvalidationAndInterruptionPreventTheFirstBatch",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/EnrichmentHardStopRepairTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:294767e3b3f4a551eb19067f0eed7465e7803b1e18fa6256194281e64b058526",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "bgeSourceInvalidationAndInterruptionPreventTheFirstBatch(Route, Stop) [1] BGE, SOURCE",
+          "status": "passed"
+        },
+        {
+          "name": "bgeSourceInvalidationAndInterruptionPreventTheFirstBatch(Route, Stop) [2] BGE, INTERRUPTION",
+          "status": "passed"
+        },
+        {
+          "name": "bgeSourceInvalidationAndInterruptionPreventTheFirstBatch(Route, Stop) [3] BGE_CHUNK, SOURCE",
+          "status": "passed"
+        },
+        {
+          "name": "bgeSourceInvalidationAndInterruptionPreventTheFirstBatch(Route, Stop) [4] BGE_CHUNK, INTERRUPTION",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/EnrichmentHardStopRepairTest.java#bgeRetirementPreventsTheFirstBatch",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/EnrichmentHardStopRepairTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:294767e3b3f4a551eb19067f0eed7465e7803b1e18fa6256194281e64b058526",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "bgeRetirementPreventsTheFirstBatch(Route, Stop) [1] BGE, TOKEN",
+          "status": "passed"
+        },
+        {
+          "name": "bgeRetirementPreventsTheFirstBatch(Route, Stop) [2] BGE, UNAVAILABLE",
+          "status": "passed"
+        },
+        {
+          "name": "bgeRetirementPreventsTheFirstBatch(Route, Stop) [3] BGE_CHUNK, TOKEN",
+          "status": "passed"
+        },
+        {
+          "name": "bgeRetirementPreventsTheFirstBatch(Route, Stop) [4] BGE_CHUNK, UNAVAILABLE",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/EnrichmentHardStopRepairTest.java#combinedNerRejectsEveryOutcomeWhenTheServiceBecomesUnavailable",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/EnrichmentHardStopRepairTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:294767e3b3f4a551eb19067f0eed7465e7803b1e18fa6256194281e64b058526",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "combinedNerRejectsEveryOutcomeWhenTheServiceBecomesUnavailable(Result) [1] SUCCESS",
+          "status": "passed"
+        },
+        {
+          "name": "combinedNerRejectsEveryOutcomeWhenTheServiceBecomesUnavailable(Result) [2] FAILURE",
+          "status": "passed"
+        },
+        {
+          "name": "combinedNerRejectsEveryOutcomeWhenTheServiceBecomesUnavailable(Result) [3] CANCELLATION",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/EnrichmentHardStopRepairTest.java#sparseUnavailabilityRejectsComputedSuccessAndCancellation",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/EnrichmentHardStopRepairTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:294767e3b3f4a551eb19067f0eed7465e7803b1e18fa6256194281e64b058526",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "sparseUnavailabilityRejectsComputedSuccessAndCancellation(Route, Result) [1] SPARSE, SUCCESS",
+          "status": "passed"
+        },
+        {
+          "name": "sparseUnavailabilityRejectsComputedSuccessAndCancellation(Route, Result) [2] SPARSE, CANCELLATION",
+          "status": "passed"
+        },
+        {
+          "name": "sparseUnavailabilityRejectsComputedSuccessAndCancellation(Route, Result) [3] SPARSE_CHUNK, SUCCESS",
+          "status": "passed"
+        },
+        {
+          "name": "sparseUnavailabilityRejectsComputedSuccessAndCancellation(Route, Result) [4] SPARSE_CHUNK, CANCELLATION",
+          "status": "passed"
+        },
+        {
+          "name": "sparseUnavailabilityRejectsComputedSuccessAndCancellation(Route, Result) [5] INDIVIDUAL_SPARSE, SUCCESS",
+          "status": "passed"
+        },
+        {
+          "name": "sparseUnavailabilityRejectsComputedSuccessAndCancellation(Route, Result) [6] INDIVIDUAL_SPARSE, CANCELLATION",
+          "status": "passed"
+        },
+        {
+          "name": "sparseUnavailabilityRejectsComputedSuccessAndCancellation(Route, Result) [7] INTERLEAVED_SPARSE, SUCCESS",
+          "status": "passed"
+        },
+        {
+          "name": "sparseUnavailabilityRejectsComputedSuccessAndCancellation(Route, Result) [8] INTERLEAVED_SPARSE, CANCELLATION",
+          "status": "passed"
+        },
+        {
+          "name": "sparseUnavailabilityRejectsComputedSuccessAndCancellation(Route, Result) [9] INDIVIDUAL_SPARSE_CHUNK, SUCCESS",
+          "status": "passed"
+        },
+        {
+          "name": "sparseUnavailabilityRejectsComputedSuccessAndCancellation(Route, Result) [10] INDIVIDUAL_SPARSE_CHUNK, CANCELLATION",
+          "status": "passed"
+        },
+        {
+          "name": "sparseUnavailabilityRejectsComputedSuccessAndCancellation(Route, Result) [11] INTERLEAVED_SPARSE_CHUNK, SUCCESS",
+          "status": "passed"
+        },
+        {
+          "name": "sparseUnavailabilityRejectsComputedSuccessAndCancellation(Route, Result) [12] INTERLEAVED_SPARSE_CHUNK, CANCELLATION",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/EnrichmentHardStopRepairTest.java#individualDenseFallbackUnavailabilityWinsOverCancellation",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/EnrichmentHardStopRepairTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:294767e3b3f4a551eb19067f0eed7465e7803b1e18fa6256194281e64b058526",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "individualDenseFallbackUnavailabilityWinsOverCancellation(Route) [1] INDIVIDUAL_DENSE",
+          "status": "passed"
+        },
+        {
+          "name": "individualDenseFallbackUnavailabilityWinsOverCancellation(Route) [2] INDIVIDUAL_CHUNK",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/EnrichmentHardStopRepairTest.java#individualDenseBatchUnavailabilityWinsOverCancellation",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/EnrichmentHardStopRepairTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:294767e3b3f4a551eb19067f0eed7465e7803b1e18fa6256194281e64b058526",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "individualDenseBatchUnavailabilityWinsOverCancellation(Route) [1] INDIVIDUAL_DENSE",
+          "status": "passed"
+        },
+        {
+          "name": "individualDenseBatchUnavailabilityWinsOverCancellation(Route) [2] INDIVIDUAL_CHUNK",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/EnrichmentHardStopRepairTest.java#bgeFallbackCannotStartAnotherUnitAfterAHardStop",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/EnrichmentHardStopRepairTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:294767e3b3f4a551eb19067f0eed7465e7803b1e18fa6256194281e64b058526",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "bgeFallbackCannotStartAnotherUnitAfterAHardStop(Route, Stop) [1] BGE, SHUTDOWN",
+          "status": "passed"
+        },
+        {
+          "name": "bgeFallbackCannotStartAnotherUnitAfterAHardStop(Route, Stop) [2] BGE, INTERRUPTION",
+          "status": "passed"
+        },
+        {
+          "name": "bgeFallbackCannotStartAnotherUnitAfterAHardStop(Route, Stop) [3] BGE, HOLD",
+          "status": "passed"
+        },
+        {
+          "name": "bgeFallbackCannotStartAnotherUnitAfterAHardStop(Route, Stop) [4] BGE, SOURCE",
+          "status": "passed"
+        },
+        {
+          "name": "bgeFallbackCannotStartAnotherUnitAfterAHardStop(Route, Stop) [5] BGE, TOKEN",
+          "status": "passed"
+        },
+        {
+          "name": "bgeFallbackCannotStartAnotherUnitAfterAHardStop(Route, Stop) [6] BGE, UNAVAILABLE",
+          "status": "passed"
+        },
+        {
+          "name": "bgeFallbackCannotStartAnotherUnitAfterAHardStop(Route, Stop) [7] BGE_CHUNK, SHUTDOWN",
+          "status": "passed"
+        },
+        {
+          "name": "bgeFallbackCannotStartAnotherUnitAfterAHardStop(Route, Stop) [8] BGE_CHUNK, INTERRUPTION",
+          "status": "passed"
+        },
+        {
+          "name": "bgeFallbackCannotStartAnotherUnitAfterAHardStop(Route, Stop) [9] BGE_CHUNK, HOLD",
+          "status": "passed"
+        },
+        {
+          "name": "bgeFallbackCannotStartAnotherUnitAfterAHardStop(Route, Stop) [10] BGE_CHUNK, SOURCE",
+          "status": "passed"
+        },
+        {
+          "name": "bgeFallbackCannotStartAnotherUnitAfterAHardStop(Route, Stop) [11] BGE_CHUNK, TOKEN",
+          "status": "passed"
+        },
+        {
+          "name": "bgeFallbackCannotStartAnotherUnitAfterAHardStop(Route, Stop) [12] BGE_CHUNK, UNAVAILABLE",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/EnrichmentAuthorityRaceTest.java#unavailableProviderCannotPublishItsSuccessfulFinalDenseResult",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/EnrichmentAuthorityRaceTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:c5d3c2f328b97f1895abb168ed0fca8d7338f0cae070a4b89ad3091910544a13",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "unavailableProviderCannotPublishItsSuccessfulFinalDenseResult(Stage) [1] SINGLE_PASS",
+          "status": "passed"
+        },
+        {
+          "name": "unavailableProviderCannotPublishItsSuccessfulFinalDenseResult(Stage) [2] WINDOW",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/EnrichmentAuthorityRaceTest.java#replacedProviderCancellationStaysDeferredThroughTheRealWriter",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/EnrichmentAuthorityRaceTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:c5d3c2f328b97f1895abb168ed0fca8d7338f0cae070a4b89ad3091910544a13",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "replacedProviderCancellationStaysDeferredThroughTheRealWriter(Stage) [1] SPARSE",
+          "status": "passed"
+        },
+        {
+          "name": "replacedProviderCancellationStaysDeferredThroughTheRealWriter(Stage) [2] INTERLEAVED",
+          "status": "passed"
+        },
+        {
+          "name": "replacedProviderCancellationStaysDeferredThroughTheRealWriter(Stage) [3] SPARSE_CHUNK",
+          "status": "passed"
+        },
+        {
+          "name": "replacedProviderCancellationStaysDeferredThroughTheRealWriter(Stage) [4] INTERLEAVED_CHUNK",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/DisambiguationAuthorityTest.java#serviceUnavailabilityCannotPublishOrAcknowledgeThePage",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/DisambiguationAuthorityTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:5f83b3e7684f2f5412b54f1b48639ad970daa20875a0ece2a2a63ee430a3979a",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "serviceUnavailabilityCannotPublishOrAcknowledgeThePage(boolean) [1] false",
+          "status": "passed"
+        },
+        {
+          "name": "serviceUnavailabilityCannotPublishOrAcknowledgeThePage(boolean) [2] true",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/EnrichmentAuthorityRaceTest.java#retiredBgeCannotPublishAnyFinalOutcomeThroughTheRealWriter",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/EnrichmentAuthorityRaceTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:c5d3c2f328b97f1895abb168ed0fca8d7338f0cae070a4b89ad3091910544a13",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "retiredBgeCannotPublishAnyFinalOutcomeThroughTheRealWriter(Stage, boolean, String) [1] BGE, false, success",
+          "status": "passed"
+        },
+        {
+          "name": "retiredBgeCannotPublishAnyFinalOutcomeThroughTheRealWriter(Stage, boolean, String) [2] BGE, false, failure",
+          "status": "passed"
+        },
+        {
+          "name": "retiredBgeCannotPublishAnyFinalOutcomeThroughTheRealWriter(Stage, boolean, String) [3] BGE, false, cancellation",
+          "status": "passed"
+        },
+        {
+          "name": "retiredBgeCannotPublishAnyFinalOutcomeThroughTheRealWriter(Stage, boolean, String) [4] BGE, true, success",
+          "status": "passed"
+        },
+        {
+          "name": "retiredBgeCannotPublishAnyFinalOutcomeThroughTheRealWriter(Stage, boolean, String) [5] BGE, true, failure",
+          "status": "passed"
+        },
+        {
+          "name": "retiredBgeCannotPublishAnyFinalOutcomeThroughTheRealWriter(Stage, boolean, String) [6] BGE, true, cancellation",
+          "status": "passed"
+        },
+        {
+          "name": "retiredBgeCannotPublishAnyFinalOutcomeThroughTheRealWriter(Stage, boolean, String) [7] BGE_CHUNK, false, success",
+          "status": "passed"
+        },
+        {
+          "name": "retiredBgeCannotPublishAnyFinalOutcomeThroughTheRealWriter(Stage, boolean, String) [8] BGE_CHUNK, false, failure",
+          "status": "passed"
+        },
+        {
+          "name": "retiredBgeCannotPublishAnyFinalOutcomeThroughTheRealWriter(Stage, boolean, String) [9] BGE_CHUNK, false, cancellation",
+          "status": "passed"
+        },
+        {
+          "name": "retiredBgeCannotPublishAnyFinalOutcomeThroughTheRealWriter(Stage, boolean, String) [10] BGE_CHUNK, true, success",
+          "status": "passed"
+        },
+        {
+          "name": "retiredBgeCannotPublishAnyFinalOutcomeThroughTheRealWriter(Stage, boolean, String) [11] BGE_CHUNK, true, failure",
+          "status": "passed"
+        },
+        {
+          "name": "retiredBgeCannotPublishAnyFinalOutcomeThroughTheRealWriter(Stage, boolean, String) [12] BGE_CHUNK, true, cancellation",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "fb9b1ffdc0",
+    "revision": "fb9b1ffdc017fee28e75410451ff296ecebc56d2",
+    "overlays": [
+      "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/CombinedEnrichmentBackfillOpsTest.java",
+      "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/CombinedEnrichmentCycleBudgetTest.java",
+      "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/CombinedEnrichmentLongDocumentTest.java",
+      "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/DisambiguationAuthorityTest.java",
+      "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/EnrichmentAttemptAccountingTest.java",
+      "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/EnrichmentAuthorityRaceTest.java",
+      "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/EnrichmentHardStopRepairTest.java",
+      "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/EnrichmentUnitBoundaryTest.java",
+      "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/NerBackfillOpsTest.java",
+      "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/NerLazyCreationRetryTest.java",
+      "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/WindowedEmbedSliceValidationTest.java"
+    ],
+    "patches": [],
+    "runs": [
+      {
+        "command": "./gradlew :modules:worker-services:test --tests \"io.justsearch.indexerworker.loop.ops.CombinedEnrichmentLongDocumentTest.lateChunkNullFallbackRecordsAndResumesAWindowAfterTheProbeSpentTheDeadline\" --tests \"io.justsearch.indexerworker.loop.ops.EnrichmentUnitBoundaryTest.expiredDeadlinePreventsTheFirstUnit\" --tests \"io.justsearch.indexerworker.loop.ops.EnrichmentUnitBoundaryTest.hardStopPreventsTheFirstUnitAndCancelsTheSelection\" --tests \"io.justsearch.indexerworker.loop.ops.EnrichmentUnitBoundaryTest.sourceInvalidationDuringFetchPreventsTheFirstUnit\" --tests \"io.justsearch.indexerworker.loop.ops.EnrichmentUnitBoundaryTest.sourceInvalidationWhileTheSchedulerPacesPreventsTheFirstUnit\" --tests \"io.justsearch.indexerworker.loop.ops.EnrichmentUnitBoundaryTest.individualSourceInvalidationDuringFetchPreventsTheFirstUnit\" --tests \"io.justsearch.indexerworker.loop.ops.EnrichmentUnitBoundaryTest.exhaustedEmbeddingShareDoesNotForceAFirstDenseUnit\" --tests \"io.justsearch.indexerworker.loop.ops.EnrichmentUnitBoundaryTest.interruptionPreventsTheFirstUnitAndCancelsTheSelection\" --tests \"io.justsearch.indexerworker.loop.ops.EnrichmentUnitBoundaryTest.individualStageInterruptionPreventsTheFirstUnit\" --tests \"io.justsearch.indexerworker.loop.ops.EnrichmentUnitBoundaryTest.hardStopAfterOneUnitPreservesItsResultAndLeavesTheRestCancelled\" --tests \"io.justsearch.indexerworker.loop.ops.EnrichmentUnitBoundaryTest.identicalTextWithChangedDenseIdentityRestartsWindows\" --tests \"io.justsearch.indexerworker.loop.ops.EnrichmentUnitBoundaryTest.deadlineSpentByNullOrArenaOomClassificationRetainsItsRoute\" --tests \"io.justsearch.indexerworker.loop.ops.EnrichmentUnitBoundaryTest.hardStopAfterClassificationRetainsItsRouteWithoutStartingWindows\" --tests \"io.justsearch.indexerworker.loop.ops.EnrichmentUnitBoundaryTest.batchOnlyLateParentCompletesWithoutWindowsOrRetry\" --tests \"io.justsearch.indexerworker.loop.ops.EnrichmentAuthorityRaceTest.providerReplacementDuringInferenceRevokesSuccessAndFailure\" --tests \"io.justsearch.indexerworker.loop.ops.EnrichmentAuthorityRaceTest.providerReplacementAtCoordinatorBoundaryRevokesTheComputedOutcome\" --tests \"io.justsearch.indexerworker.loop.ops.EnrichmentAuthorityRaceTest.providerReplacementWhilePublicationWaitsForMutationLockIsAtomic\" --tests \"io.justsearch.indexerworker.loop.ops.WindowedEmbedSliceValidationTest.invalidSliceRestartsWithoutBlendingAnyOfItsVectors\" --tests \"io.justsearch.indexerworker.loop.ops.DisambiguationAuthorityTest.providerReplacementAfterClusteringCannotAcknowledgeOrPublishThePage\" --tests \"io.justsearch.indexerworker.loop.ops.EnrichmentUnitBoundaryTest.rejectedSlicesUseTheExistingRetryLimit\" --tests \"io.justsearch.indexerworker.loop.ops.EnrichmentAuthorityRaceTest.republishingTheSameProviderRestartsItsRetainedWindows\" --tests \"io.justsearch.indexerworker.loop.ops.CombinedEnrichmentBackfillOpsTest.realPendingSpladeAllowsDeferralButNeverWritesThePreservationOnlyUpdate\" --tests \"io.justsearch.indexerworker.loop.ops.EnrichmentAttemptAccountingTest.cancelledFallbackPartitionsEverySelectedStageOnce\" --tests \"io.justsearch.indexerworker.loop.ops.EnrichmentAttemptAccountingTest.partialWindowsAdvanceWithoutCompletingAnEmbedding\" --tests \"io.justsearch.indexerworker.loop.ops.EnrichmentHardStopRepairTest.individualNerUnavailabilityBoundsEveryDocument\" --tests \"io.justsearch.indexerworker.loop.ops.EnrichmentHardStopRepairTest.successfulFinalDenseCallCannotPublishAfterUnavailability\" --tests \"io.justsearch.indexerworker.loop.ops.EnrichmentHardStopRepairTest.sparseRetirementWinsOverCancellation\" --tests \"io.justsearch.indexerworker.loop.ops.EnrichmentHardStopRepairTest.bgeSourceInvalidationAndInterruptionPreventTheFirstBatch\" --tests \"io.justsearch.indexerworker.loop.ops.EnrichmentHardStopRepairTest.bgeRetirementPreventsTheFirstBatch\" --tests \"io.justsearch.indexerworker.loop.ops.EnrichmentHardStopRepairTest.combinedNerRejectsEveryOutcomeWhenTheServiceBecomesUnavailable\" --tests \"io.justsearch.indexerworker.loop.ops.EnrichmentHardStopRepairTest.sparseUnavailabilityRejectsComputedSuccessAndCancellation\" --tests \"io.justsearch.indexerworker.loop.ops.EnrichmentHardStopRepairTest.individualDenseFallbackUnavailabilityWinsOverCancellation\" --tests \"io.justsearch.indexerworker.loop.ops.EnrichmentHardStopRepairTest.individualDenseBatchUnavailabilityWinsOverCancellation\" --tests \"io.justsearch.indexerworker.loop.ops.EnrichmentHardStopRepairTest.bgeFallbackCannotStartAnotherUnitAfterAHardStop\" --tests \"io.justsearch.indexerworker.loop.ops.EnrichmentAuthorityRaceTest.unavailableProviderCannotPublishItsSuccessfulFinalDenseResult\" --tests \"io.justsearch.indexerworker.loop.ops.EnrichmentAuthorityRaceTest.replacedProviderCancellationStaysDeferredThroughTheRealWriter\" --tests \"io.justsearch.indexerworker.loop.ops.DisambiguationAuthorityTest.serviceUnavailabilityCannotPublishOrAcknowledgeThePage\" --tests \"io.justsearch.indexerworker.loop.ops.EnrichmentAuthorityRaceTest.retiredBgeCannotPublishAnyFinalOutcomeThroughTheRealWriter\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 46311,
+        "output": "Calculating task graph as no cached configuration is available for tasks: :modules:worker-services:test --tests io.justsearch.indexerworker.loop.ops.CombinedEnrichmentLongDocumentTest.lateChunkNullFallbackRecordsAndResumesAWindowAfterTheProbeSpentTheDeadline --tests io.justsearch.indexerworker.loop.ops.EnrichmentUnitBoundaryTest.expiredDeadlinePreventsTheFirstUnit --tests io.justsearch.indexerworker.loop.ops.EnrichmentUnitBoundaryTest.hardStopPreventsTheFirstUnitAndCancelsTheSelection --tests io.justsearch.indexerworker.loop.ops.EnrichmentUnitBoundaryTest.sourceInvalidationDuringFetchPreventsTheFirstUnit --tests io.justsearch.indexerworker.loop.ops.EnrichmentUnitBoundaryTest.sourceInvalidationWhileTheSchedulerPacesPreventsTheFirstUnit --tests io.justsearch.indexerworker.loop.ops.EnrichmentUnitBoundaryTest.individualSourceInvalidationDuringFetchPreventsTheFirstUnit --tests io.justsearch.indexerworker.loop.ops.EnrichmentUnitBoundaryTest.exhaustedEmbeddingShareDoesNotForceAFirstDenseUnit --tests io.justsearch.indexerworker.loop.ops.EnrichmentUnitBoundaryTest.interruptionPreventsTheFirstUnitAndCancelsTheSelection --tests io.justsearch.indexerworker.loop.ops.EnrichmentUnitBoundaryTest.individualStageInterruptionPreventsTheFirstUnit --tests io.justsearch.indexerworker.loop.ops.EnrichmentUnitBoundaryTest.hardStopAfterOneUnitPreservesItsResultAndLeavesTheRestCancelled --tests io.justsearch.indexerworker.loop.ops.EnrichmentUnitBoundaryTest.identicalTextWithChangedDenseIdentityRestartsWindows --tests io.justsearch.indexerworker.loop.ops.EnrichmentUnitBoundaryTest.deadlineSpentByNullOrArenaOomClassificationRetainsItsRoute --tests io.justsearch.indexerworker.loop.ops.EnrichmentUnitBoundaryTest.hardStopAfterClassificationRetainsItsRouteWithoutStartingWindows --tests io.justsearch.indexerworker.loop.ops.EnrichmentUnitBoundaryTest.batchOnlyLateParentCompletesWithoutWindowsOrRetry --tests io.justsearch.indexerworker.loop.ops.EnrichmentAuthorityRaceTest.providerReplacementDuringInferenceRevokesSuccessAndFailure --tests io.justsearch.indexerworker.loop.ops.EnrichmentAuthorityRaceTest.providerReplacementAtCoordinatorBoundaryRevokesTheComputedOutcome --tests io.justsearch.indexerworker.loop.ops.EnrichmentAuthorityRaceTest.providerReplacementWhilePublicationWaitsForMutationLockIsAtomic --tests io.justsearch.indexerworker.loop.ops.WindowedEmbedSliceValidationTest.invalidSliceRestartsWithoutBlendingAnyOfItsVectors --tests io.justsearch.indexerworker.loop.ops.DisambiguationAuthorityTest.providerReplacementAfterClusteringCannotAcknowledgeOrPublishThePage --tests io.justsearch.indexerworker.loop.ops.EnrichmentUnitBoundaryTest.rejectedSlicesUseTheExistingRetryLimit --tests io.justsearch.indexerworker.loop.ops.EnrichmentAuthorityRaceTest.republishingTheSameProviderRestartsItsRetainedWindows --tests io.justsearch.indexerworker.loop.ops.CombinedEnrichmentBackfillOpsTest.realPendingSpladeAllowsDeferralButNeverWritesThePreservationOnlyUpdate --tests io.justsearch.indexerworker.loop.ops.EnrichmentAttemptAccountingTest.cancelledFallbackPartitionsEverySelectedStageOnce --tests io.justsearch.indexerworker.loop.ops.EnrichmentAttemptAccountingTest.partialWindowsAdvanceWithoutCompletingAnEmbedding --tests io.justsearch.indexerworker.loop.ops.EnrichmentHardStopRepairTest.individualNerUnavailabilityBoundsEveryDocument --tests io.justsearch.indexerworker.loop.ops.EnrichmentHardStopRepairTest.successfulFinalDenseCallCannotPublishAfterUnavailability --tests io.justsearch.indexerworker.loop.ops.EnrichmentHardStopRepairTest.sparseRetirementWinsOverCancellation --tests io.justsearch.indexerworker.loop.ops.EnrichmentHardStopRepairTest.bgeSourceInvalidationAndInterruptionPreventTheFirstBatch --tests io.justsearch.indexerworker.loop.ops.EnrichmentHardStopRepairTest.bgeRetirementPreventsTheFirstBatch --tests io.justsearch.indexerworker.loop.ops.EnrichmentHardStopRepairTest.combinedNerRejectsEveryOutcomeWhenTheServiceBecomesUnavailable --tests io.justsearch.indexerworker.loop.ops.EnrichmentHardStopRepairTest.sparseUnavailabilityRejectsComputedSuccessAndCancellation --tests io.justsearch.indexerworker.loop.ops.EnrichmentHardStopRepairTest.individualDenseFallbackUnavailabilityWinsOverCancellation --tests io.justsearch.indexerworker.loop.ops.EnrichmentHardStopRepairTest.individualDenseBatchUnavailabilityWinsOverCancellation --tests io.justsearch.indexerworker.loop.ops.EnrichmentHardStopRepairTest.bgeFallbackCannotStartAnotherUnitAfterAHardStop --tests io.justsearch.indexerworker.loop.ops.EnrichmentAuthorityRaceTest.unavailableProviderCannotPublishItsSuccessfulFinalDenseResult --tests io.justsearch.indexerworker.loop.ops.EnrichmentAuthorityRaceTest.replacedProviderCancellationStaysDeferredThroughTheRealWriter --tests io.justsearch.indexerworker.loop.ops.DisambiguationAuthorityTest.serviceUnavailabilityCannotPublishOrAcknowledgeThePage --tests io.justsearch.indexerworker.loop.ops.EnrichmentAuthorityRaceTest.retiredBgeCannotPublishAnyFinalOutcomeThroughTheRealWriter --rerun\nProblem found: Configuration Cache warn mode is enabled (id: validation:configuration-cache:configuration-cache-warn-mode)\n  Configuration Cache warn mode is ENABLED. Configuration Cache constraint violations are being ignored. Build outputs may be incorrect and the build may crash unexpectedly. Use this only to discover configuration cache incompatibilities. Do not use this to produce artifacts.\n> Task :build-logic:checkKotlinGradlePluginConfigurationErrors SKIPPED\n> Task :build-logic:compileKotlin FROM-CACHE\n> Task :build-logic:compileJava NO-SOURCE\n> Task :build-logic:pluginDescriptors\n> Task :build-logic:processResources\n> Task :build-logic:classes\n> Task :build-logic:jar\n\n> Configure project :\nThe com.github.ben-manes.versions plugin id is deprecated; apply io.github.ben-manes.versions instead.\nThe 'val name by creating { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = create(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:174)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:adapters-lucene\nThe Configuration.setVisible(boolean) method has been deprecated. This is scheduled to be removed in Gradle 11. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#deprecate-visible-property\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$3$1.execute(build.gradle.kts:49)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:90)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:ai-backend\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$3$1.execute(build.gradle.kts:27)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:app-agent\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$2$1.execute(build.gradle.kts:40)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:app-agent-api\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$2$1.execute(build.gradle.kts:22)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:app-api\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$4$1.execute(build.gradle.kts:39)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:141)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:app-api-tck\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$2$1.execute(build.gradle.kts:34)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:app-config\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$2$1.execute(build.gradle.kts:15)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:app-engine\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$5$1.execute(build.gradle.kts:86)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:app-inference\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$2$1.execute(build.gradle.kts:31)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:app-launcher\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$13$1.execute(build.gradle.kts:193)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:app-observability\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$3$1.execute(build.gradle.kts:59)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:app-services\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$3$1.execute(build.gradle.kts:102)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:app-util\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$2$1.execute(build.gradle.kts:17)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:core\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$3$1.execute(build.gradle.kts:36)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:dead-code-audit\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$2$1.execute(build.gradle.kts:58)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:gpu-bridge\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$2$1.execute(build.gradle.kts:16)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:indexer-worker\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$5$1.execute(build.gradle.kts:169)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:216)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:indexing\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$3$1.execute(build.gradle.kts:52)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:infra-core\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$3$1.execute(build.gradle.kts:24)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:ort-common\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$2$1.execute(build.gradle.kts:37)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:prompt-support\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$2$1.execute(build.gradle.kts:18)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:reranker\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$3$1.execute(build.gradle.kts:37)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:ssot-tools\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$4$1.execute(build.gradle.kts:36)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:system-tests\nThe 'val name by getting { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:119)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by getting { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:123)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by getting { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:128)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by getting { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:131)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:telemetry\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$3$1.execute(build.gradle.kts:42)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:test-support\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$8$1.execute(build.gradle.kts:377)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:ui\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$4$1.execute(build.gradle.kts:94)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:207)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:228)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:236)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:252)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:277)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:326)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:357)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:378)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:483)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:500)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:555)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:637)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:702)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:753)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:851)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:892)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:965)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:984)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:1048)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:1101)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:1167)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:1222)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:1288)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:1375)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:1436)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:1560)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:1585)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:1600)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:worker-core\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$5$1.execute(build.gradle.kts:127)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:worker-services\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$4$1.execute(build.gradle.kts:193)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Task :modules:api-contract-projection-java:protobufDummy UP-TO-DATE\n> Task :modules:app-agent-api:processResources NO-SOURCE\n> Task :modules:api-contract-projection-java:extractProto\n> Task :modules:core-contracts:compileJava FROM-CACHE\n> Task :modules:extension-substrate:compileJava FROM-CACHE\n> Task :modules:configuration:processResources\n> Task :modules:core:processResources NO-SOURCE\n> Task :modules:core-contracts:processResources NO-SOURCE\n> Task :modules:extension-substrate:processResources NO-SOURCE\n> Task :modules:ipc-common:protobufDummy UP-TO-DATE\n> Task :modules:api-contract-projection-java:extractProtovalidateProtos\n> Task :modules:ipc-common:extractProto\n> Task :modules:worker-services:processResources NO-SOURCE\n> Task :modules:worker-services:processTestFixturesResources NO-SOURCE\n> Task :modules:api-contract-projection-java:processProtoResources\n> Task :modules:adapters-lucene:syncSsotCatalogs\n> Task :modules:adapters-lucene:processResources\n> Task :modules:core:compileJava FROM-CACHE\n> Task :modules:api-contract-projection-java:processResources\n> Task :modules:adapters-lucene:processTestFixturesResources NO-SOURCE\n> Task :modules:api-contract-projection-java:extractIncludeProto\n> Task :modules:configuration:compileJava FROM-CACHE\n> Task :modules:telemetry:compileJava FROM-CACHE\n> Task :modules:indexing:compileJava FROM-CACHE\n> Task :modules:core:compileTestFixturesJava FROM-CACHE\n> Task :modules:api-contract-projection-java:generateProto FROM-CACHE\n> Task :modules:ai-backend:processResources\n> Task :modules:configuration:classes\n> Task :modules:configuration:jar\n> Task :modules:core:classes UP-TO-DATE\n> Task :modules:app-api:buildLinuxBoundExec\n> Task :modules:core:jar\n> Task :modules:core:processTestFixturesResources NO-SOURCE\n> Task :modules:core:testFixturesClasses UP-TO-DATE\n> Task :modules:core:testFixturesJar\n> Task :modules:core-contracts:classes UP-TO-DATE\n> Task :modules:app-agent-api:compileJava FROM-CACHE\n> Task :modules:app-agent-api:classes UP-TO-DATE\n> Task :modules:app-api:processResources\n> Task :modules:ort-common:compileJava FROM-CACHE\n> Task :modules:core-contracts:jar\n> Task :modules:extension-substrate:classes UP-TO-DATE\n> Task :modules:extension-substrate:jar\n> Task :modules:app-agent-api:jar\n> Task :modules:indexing:processResources NO-SOURCE\n> Task :modules:indexing:classes UP-TO-DATE\n> Task :modules:ipc-common:processProtoResources\n> Task :modules:indexing:jar\n> Task :modules:ort-common:processResources NO-SOURCE\n> Task :modules:ort-common:classes UP-TO-DATE\n> Task :modules:ipc-common:processResources\n> Task :modules:reranker:processResources NO-SOURCE\n> Task :modules:telemetry:processResources NO-SOURCE\n> Task :modules:telemetry:classes UP-TO-DATE\n> Task :modules:adapters-lucene:compileJava FROM-CACHE\n> Task :modules:adapters-lucene:classes\n> Task :modules:telemetry:jar\n> Task :modules:ort-common:jar\n> Task :modules:ipc-common:extractIncludeProto\n> Task :modules:telemetry:compileTestFixturesJava FROM-CACHE\n> Task :modules:adapters-lucene:jar\n> Task :modules:reranker:compileJava FROM-CACHE\n> Task :modules:telemetry:processTestFixturesResources NO-SOURCE\n> Task :modules:reranker:classes UP-TO-DATE\n> Task :modules:ipc-common:generateProto FROM-CACHE\n> Task :modules:telemetry:testFixturesClasses UP-TO-DATE\n> Task :modules:worker-core:processResources NO-SOURCE\n> Task :modules:telemetry:testFixturesJar\n> Task :modules:worker-services:processTestResources\n> Task :modules:reranker:jar\n> Task :modules:adapters-lucene:compileTestFixturesJava FROM-CACHE\n> Task :modules:adapters-lucene:testFixturesClasses UP-TO-DATE\n> Task :modules:adapters-lucene:testFixturesJar\n> Task :modules:api-contract-projection-java:compileJava FROM-CACHE\n> Task :modules:api-contract-projection-java:classes\n> Task :modules:api-contract-projection-java:jar\n> Task :modules:app-api:compileJava FROM-CACHE\n> Task :modules:app-api:classes\n> Task :modules:app-api:jar\n> Task :modules:ai-backend:compileJava FROM-CACHE\n> Task :modules:ai-backend:classes\n> Task :modules:ai-backend:jar\n> Task :modules:ipc-common:compileJava FROM-CACHE\n> Task :modules:ipc-common:classes\n> Task :modules:worker-core:compileJava FROM-CACHE\n> Task :modules:worker-core:classes UP-TO-DATE\n> Task :modules:worker-core:jar\n> Task :modules:ipc-common:jar\n> Task :modules:worker-services:compileJava FROM-CACHE\n> Task :modules:worker-services:classes UP-TO-DATE\n> Task :modules:worker-services:jar\n> Task :modules:worker-services:compileTestFixturesJava FROM-CACHE\n> Task :modules:worker-services:testFixturesClasses UP-TO-DATE\n> Task :modules:worker-services:testFixturesJar\n\n> Task :modules:worker-services:compileTestJava\n\n> Task :modules:worker-services:testClasses\n\n> Task :modules:worker-services:test\n\nCombinedEnrichmentBackfillOps long-document scheduling (round-15 post-round finding) > lateChunkNullFallbackRecordsAndResumesAWindowAfterTheProbeSpentTheDeadline() FAILED\n    org.opentest4j.AssertionFailedError at CombinedEnrichmentLongDocumentTest.java:352\n\nEnrichmentAttemptAccountingTest > cancelledFallbackPartitionsEverySelectedStageOnce() FAILED\n    org.opentest4j.AssertionFailedError at EnrichmentAttemptAccountingTest.java:85\n\nCombinedEnrichmentBackfillOps > realPendingSpladeAllowsDeferralButNeverWritesThePreservationOnlyUpdate() FAILED\n    org.opentest4j.AssertionFailedError at CombinedEnrichmentBackfillOpsTest.java:802\n        Caused by: org.mockito.exceptions.verification.NeverWantedButInvoked at CombinedEnrichmentBackfillOpsTest.java:803\n\nEnrichmentAttemptAccountingTest > partialWindowsAdvanceWithoutCompletingAnEmbedding() FAILED\n    org.opentest4j.AssertionFailedError at EnrichmentAttemptAccountingTest.java:121\n\nDisambiguationAuthorityTest > providerReplacementAfterClusteringCannotAcknowledgeOrPublishThePage() FAILED\n    org.opentest4j.AssertionFailedError at DisambiguationAuthorityTest.java:55\n        Caused by: org.mockito.exceptions.verification.NeverWantedButInvoked at DisambiguationAuthorityTest.java:55\n\nEnrichmentHardStopRepairTest > combinedNerRejectsEveryOutcomeWhenTheServiceBecomesUnavailable(Result) > combinedNerRejectsEveryOutcomeWhenTheServiceBecomesUnavailable(Result) [1] SUCCESS FAILED\n    org.opentest4j.AssertionFailedError at EnrichmentHardStopRepairTest.java:356\n\nDisambiguationAuthorityTest > serviceUnavailabilityCannotPublishOrAcknowledgeThePage(boolean) > serviceUnavailabilityCannotPublishOrAcknowledgeThePage(boolean) [1] false FAILED\n    org.opentest4j.AssertionFailedError at DisambiguationAuthorityTest.java:121\n        Caused by: org.mockito.exceptions.verification.NeverWantedButInvoked at DisambiguationAuthorityTest.java:121\n\nEnrichmentHardStopRepairTest > combinedNerRejectsEveryOutcomeWhenTheServiceBecomesUnavailable(Result) > combinedNerRejectsEveryOutcomeWhenTheServiceBecomesUnavailable(Result) [2] FAILURE FAILED\n    org.opentest4j.AssertionFailedError at EnrichmentHardStopRepairTest.java:356\n\nDisambiguationAuthorityTest > serviceUnavailabilityCannotPublishOrAcknowledgeThePage(boolean) > serviceUnavailabilityCannotPublishOrAcknowledgeThePage(boolean) [2] true FAILED\n    org.opentest4j.AssertionFailedError at DisambiguationAuthorityTest.java:122\n        Caused by: org.mockito.exceptions.verification.NeverWantedButInvoked at DisambiguationAuthorityTest.java:122\n\nEnrichmentHardStopRepairTest > combinedNerRejectsEveryOutcomeWhenTheServiceBecomesUnavailable(Result) > combinedNerRejectsEveryOutcomeWhenTheServiceBecomesUnavailable(Result) [3] CANCELLATION FAILED\n    org.opentest4j.AssertionFailedError at EnrichmentHardStopRepairTest.java:356\n\nEnrichmentHardStopRepairTest > bgeSourceInvalidationAndInterruptionPreventTheFirstBatch(Route, Stop) > bgeSourceInvalidationAndInterruptionPreventTheFirstBatch(Route, Stop) [1] BGE, SOURCE FAILED\n    org.opentest4j.AssertionFailedError at EnrichmentHardStopRepairTest.java:203\n\nEnrichmentHardStopRepairTest > bgeSourceInvalidationAndInterruptionPreventTheFirstBatch(Route, Stop) > bgeSourceInvalidationAndInterruptionPreventTheFirstBatch(Route, Stop) [2] BGE, INTERRUPTION FAILED\n    org.opentest4j.AssertionFailedError at EnrichmentHardStopRepairTest.java:203\n\nEnrichmentHardStopRepairTest > bgeSourceInvalidationAndInterruptionPreventTheFirstBatch(Route, Stop) > bgeSourceInvalidationAndInterruptionPreventTheFirstBatch(Route, Stop) [3] BGE_CHUNK, SOURCE FAILED\n    org.opentest4j.AssertionFailedError at EnrichmentHardStopRepairTest.java:203\n\nEnrichmentHardStopRepairTest > bgeSourceInvalidationAndInterruptionPreventTheFirstBatch(Route, Stop) > bgeSourceInvalidationAndInterruptionPreventTheFirstBatch(Route, Stop) [4] BGE_CHUNK, INTERRUPTION FAILED\n    org.opentest4j.AssertionFailedError at EnrichmentHardStopRepairTest.java:203\n\nEnrichmentHardStopRepairTest > individualDenseFallbackUnavailabilityWinsOverCancellation(Route) > individualDenseFallbackUnavailabilityWinsOverCancellation(Route) [1] INDIVIDUAL_DENSE FAILED\n    org.opentest4j.AssertionFailedError at EnrichmentHardStopRepairTest.java:302\n\nEnrichmentHardStopRepairTest > individualDenseFallbackUnavailabilityWinsOverCancellation(Route) > individualDenseFallbackUnavailabilityWinsOverCancellation(Route) [2] INDIVIDUAL_CHUNK FAILED\n    org.opentest4j.AssertionFailedError at EnrichmentHardStopRepairTest.java:302\n\nEnrichmentHardStopRepairTest > bgeFallbackCannotStartAnotherUnitAfterAHardStop(Route, Stop) > bgeFallbackCannotStartAnotherUnitAfterAHardStop(Route, Stop) [1] BGE, SHUTDOWN FAILED\n    org.opentest4j.AssertionFailedError at EnrichmentHardStopRepairTest.java:335\n\nEnrichmentHardStopRepairTest > bgeFallbackCannotStartAnotherUnitAfterAHardStop(Route, Stop) > bgeFallbackCannotStartAnotherUnitAfterAHardStop(Route, Stop) [2] BGE, INTERRUPTION FAILED\n    org.opentest4j.AssertionFailedError at EnrichmentHardStopRepairTest.java:335\n\nEnrichmentHardStopRepairTest > bgeFallbackCannotStartAnotherUnitAfterAHardStop(Route, Stop) > bgeFallbackCannotStartAnotherUnitAfterAHardStop(Route, Stop) [3] BGE, HOLD FAILED\n    org.opentest4j.AssertionFailedError at EnrichmentHardStopRepairTest.java:335\n\nEnrichmentHardStopRepairTest > bgeFallbackCannotStartAnotherUnitAfterAHardStop(Route, Stop) > bgeFallbackCannotStartAnotherUnitAfterAHardStop(Route, Stop) [4] BGE, SOURCE FAILED\n    org.opentest4j.AssertionFailedError at EnrichmentHardStopRepairTest.java:335\n\nEnrichmentHardStopRepairTest > bgeFallbackCannotStartAnotherUnitAfterAHardStop(Route, Stop) > bgeFallbackCannotStartAnotherUnitAfterAHardStop(Route, Stop) [5] BGE, TOKEN FAILED\n    org.opentest4j.AssertionFailedError at EnrichmentHardStopRepairTest.java:335\n\nEnrichmentHardStopRepairTest > bgeFallbackCannotStartAnotherUnitAfterAHardStop(Route, Stop) > bgeFallbackCannotStartAnotherUnitAfterAHardStop(Route, Stop) [6] BGE, UNAVAILABLE FAILED\n    org.opentest4j.AssertionFailedError at EnrichmentHardStopRepairTest.java:335\n\nEnrichmentHardStopRepairTest > bgeFallbackCannotStartAnotherUnitAfterAHardStop(Route, Stop) > bgeFallbackCannotStartAnotherUnitAfterAHardStop(Route, Stop) [7] BGE_CHUNK, SHUTDOWN FAILED\n    org.opentest4j.AssertionFailedError at EnrichmentHardStopRepairTest.java:335\n\nEnrichmentHardStopRepairTest > bgeFallbackCannotStartAnotherUnitAfterAHardStop(Route, Stop) > bgeFallbackCannotStartAnotherUnitAfterAHardStop(Route, Stop) [8] BGE_CHUNK, INTERRUPTION FAILED\n    org.opentest4j.AssertionFailedError at EnrichmentHardStopRepairTest.java:335\n\nEnrichmentAuthorityRaceTest > republishingTheSameProviderRestartsItsRetainedWindows() FAILED\n    org.opentest4j.AssertionFailedError at EnrichmentAuthorityRaceTest.java:123\n\nEnrichmentHardStopRepairTest > bgeFallbackCannotStartAnotherUnitAfterAHardStop(Route, Stop) > bgeFallbackCannotStartAnotherUnitAfterAHardStop(Route, Stop) [9] BGE_CHUNK, HOLD FAILED\n    org.opentest4j.AssertionFailedError at EnrichmentHardStopRepairTest.java:335\n\nEnrichmentHardStopRepairTest > bgeFallbackCannotStartAnotherUnitAfterAHardStop(Route, Stop) > bgeFallbackCannotStartAnotherUnitAfterAHardStop(Route, Stop) [10] BGE_CHUNK, SOURCE FAILED\n    org.opentest4j.AssertionFailedError at EnrichmentHardStopRepairTest.java:335\n\nEnrichmentHardStopRepairTest > bgeFallbackCannotStartAnotherUnitAfterAHardStop(Route, Stop) > bgeFallbackCannotStartAnotherUnitAfterAHardStop(Route, Stop) [11] BGE_CHUNK, TOKEN FAILED\n    org.opentest4j.AssertionFailedError at EnrichmentHardStopRepairTest.java:335\n\nEnrichmentHardStopRepairTest > bgeFallbackCannotStartAnotherUnitAfterAHardStop(Route, Stop) > bgeFallbackCannotStartAnotherUnitAfterAHardStop(Route, Stop) [12] BGE_CHUNK, UNAVAILABLE FAILED\n    org.opentest4j.AssertionFailedError at EnrichmentHardStopRepairTest.java:335\n\nEnrichmentHardStopRepairTest > individualNerUnavailabilityBoundsEveryDocument(boolean) > individualNerUnavailabilityBoundsEveryDocument(boolean) [1] false FAILED\n    org.opentest4j.AssertionFailedError at EnrichmentHardStopRepairTest.java:203\n\nEnrichmentAuthorityRaceTest > unavailableProviderCannotPublishItsSuccessfulFinalDenseResult(Stage) > unavailableProviderCannotPublishItsSuccessfulFinalDenseResult(Stage) [1] SINGLE_PASS FAILED\n    org.opentest4j.AssertionFailedError at EnrichmentAuthorityRaceTest.java:330\n\nEnrichmentHardStopRepairTest > individualNerUnavailabilityBoundsEveryDocument(boolean) > individualNerUnavailabilityBoundsEveryDocument(boolean) [2] true FAILED\n    org.opentest4j.AssertionFailedError at EnrichmentHardStopRepairTest.java:203\n\nEnrichmentHardStopRepairTest > individualDenseBatchUnavailabilityWinsOverCancellation(Route) > individualDenseBatchUnavailabilityWinsOverCancellation(Route) [1] INDIVIDUAL_DENSE FAILED\n    org.opentest4j.AssertionFailedError at EnrichmentHardStopRepairTest.java:367\n\nEnrichmentHardStopRepairTest > individualDenseBatchUnavailabilityWinsOverCancellation(Route) > individualDenseBatchUnavailabilityWinsOverCancellation(Route) [2] INDIVIDUAL_CHUNK FAILED\n    org.opentest4j.AssertionFailedError at EnrichmentHardStopRepairTest.java:367\n\nEnrichmentHardStopRepairTest > sparseRetirementWinsOverCancellation(Route) > sparseRetirementWinsOverCancellation(Route) [1] INDIVIDUAL_SPARSE FAILED\n    org.opentest4j.AssertionFailedError at EnrichmentHardStopRepairTest.java:253\n\nEnrichmentAuthorityRaceTest > unavailableProviderCannotPublishItsSuccessfulFinalDenseResult(Stage) > unavailableProviderCannotPublishItsSuccessfulFinalDenseResult(Stage) [2] WINDOW FAILED\n    org.opentest4j.AssertionFailedError at EnrichmentAuthorityRaceTest.java:330\n\nEnrichmentHardStopRepairTest > sparseRetirementWinsOverCancellation(Route) > sparseRetirementWinsOverCancellation(Route) [2] INTERLEAVED_SPARSE FAILED\n    org.opentest4j.AssertionFailedError at EnrichmentHardStopRepairTest.java:253\n\nEnrichmentHardStopRepairTest > sparseRetirementWinsOverCancellation(Route) > sparseRetirementWinsOverCancellation(Route) [3] INDIVIDUAL_SPARSE_CHUNK FAILED\n    org.opentest4j.AssertionFailedError at EnrichmentHardStopRepairTest.java:253\n\nEnrichmentHardStopRepairTest > sparseRetirementWinsOverCancellation(Route) > sparseRetirementWinsOverCancellation(Route) [4] INTERLEAVED_SPARSE_CHUNK FAILED\n    org.opentest4j.AssertionFailedError at EnrichmentHardStopRepairTest.java:253\n\nEnrichmentHardStopRepairTest > bgeRetirementPreventsTheFirstBatch(Route, Stop) > bgeRetirementPreventsTheFirstBatch(Route, Stop) [1] BGE, TOKEN FAILED\n    org.opentest4j.AssertionFailedError at EnrichmentHardStopRepairTest.java:203\n\nEnrichmentHardStopRepairTest > bgeRetirementPreventsTheFirstBatch(Route, Stop) > bgeRetirementPreventsTheFirstBatch(Route, Stop) [2] BGE, UNAVAILABLE FAILED\n    org.opentest4j.AssertionFailedError at EnrichmentHardStopRepairTest.java:203\n\nEnrichmentAuthorityRaceTest > providerReplacementWhilePublicationWaitsForMutationLockIsAtomic(Stage, boolean) > providerReplacementWhilePublicationWaitsForMutationLockIsAtomic(Stage, boolean) [1] EMBED, false FAILED\n    org.opentest4j.AssertionFailedError at EnrichmentAuthorityRaceTest.java:330\n\nEnrichmentHardStopRepairTest > bgeRetirementPreventsTheFirstBatch(Route, Stop) > bgeRetirementPreventsTheFirstBatch(Route, Stop) [3] BGE_CHUNK, TOKEN FAILED\n    org.opentest4j.AssertionFailedError at EnrichmentHardStopRepairTest.java:203\n\nEnrichmentHardStopRepairTest > bgeRetirementPreventsTheFirstBatch(Route, Stop) > bgeRetirementPreventsTheFirstBatch(Route, Stop) [4] BGE_CHUNK, UNAVAILABLE FAILED\n    org.opentest4j.AssertionFailedError at EnrichmentHardStopRepairTest.java:203\n\nEnrichmentHardStopRepairTest > successfulFinalDenseCallCannotPublishAfterUnavailability(Route) > successfulFinalDenseCallCannotPublishAfterUnavailability(Route) [1] SINGLE_PASS FAILED\n    org.opentest4j.AssertionFailedError at EnrichmentHardStopRepairTest.java:234\n\nEnrichmentHardStopRepairTest > successfulFinalDenseCallCannotPublishAfterUnavailability(Route) > successfulFinalDenseCallCannotPublishAfterUnavailability(Route) [2] WINDOW FAILED\n    org.opentest4j.AssertionFailedError at EnrichmentHardStopRepairTest.java:234\n\nEnrichmentAuthorityRaceTest > providerReplacementWhilePublicationWaitsForMutationLockIsAtomic(Stage, boolean) > providerReplacementWhilePublicationWaitsForMutationLockIsAtomic(Stage, boolean) [2] EMBED, true FAILED\n    org.opentest4j.AssertionFailedError at EnrichmentAuthorityRaceTest.java:332\n\nEnrichmentHardStopRepairTest > sparseUnavailabilityRejectsComputedSuccessAndCancellation(Route, Result) > sparseUnavailabilityRejectsComputedSuccessAndCancellation(Route, Result) [1] SPARSE, SUCCESS FAILED\n    org.opentest4j.AssertionFailedError at EnrichmentHardStopRepairTest.java:357\n\nEnrichmentHardStopRepairTest > sparseUnavailabilityRejectsComputedSuccessAndCancellation(Route, Result) > sparseUnavailabilityRejectsComputedSuccessAndCancellation(Route, Result) [2] SPARSE, CANCELLATION FAILED\n    org.opentest4j.AssertionFailedError at EnrichmentHardStopRepairTest.java:367\n\nEnrichmentHardStopRepairTest > sparseUnavailabilityRejectsComputedSuccessAndCancellation(Route, Result) > sparseUnavailabilityRejectsComputedSuccessAndCancellation(Route, Result) [3] SPARSE_CHUNK, SUCCESS FAILED\n    org.opentest4j.AssertionFailedError at EnrichmentHardStopRepairTest.java:357\n\nEnrichmentHardStopRepairTest > sparseUnavailabilityRejectsComputedSuccessAndCancellation(Route, Result) > sparseUnavailabilityRejectsComputedSuccessAndCancellation(Route, Result) [4] SPARSE_CHUNK, CANCELLATION FAILED\n    org.opentest4j.AssertionFailedError at EnrichmentHardStopRepairTest.java:367\n\nEnrichmentHardStopRepairTest > sparseUnavailabilityRejectsComputedSuccessAndCancellation(Route, Result) > sparseUnavailabilityRejectsComputedSuccessAndCancellation(Route, Result) [5] INDIVIDUAL_SPARSE, SUCCESS FAILED\n    org.opentest4j.AssertionFailedError at EnrichmentHardStopRepairTest.java:356\n\nEnrichmentHardStopRepairTest > sparseUnavailabilityRejectsComputedSuccessAndCancellation(Route, Result) > sparseUnavailabilityRejectsComputedSuccessAndCancellation(Route, Result) [6] INDIVIDUAL_SPARSE, CANCELLATION FAILED\n    org.opentest4j.AssertionFailedError at EnrichmentHardStopRepairTest.java:367\n\nEnrichmentHardStopRepairTest > sparseUnavailabilityRejectsComputedSuccessAndCancellation(Route, Result) > sparseUnavailabilityRejectsComputedSuccessAndCancellation(Route, Result) [7] INTERLEAVED_SPARSE, SUCCESS FAILED\n    org.opentest4j.AssertionFailedError at EnrichmentHardStopRepairTest.java:356\n\nEnrichmentAuthorityRaceTest > providerReplacementWhilePublicationWaitsForMutationLockIsAtomic(Stage, boolean) > providerReplacementWhilePublicationWaitsForMutationLockIsAtomic(Stage, boolean) [3] CHUNK, false FAILED\n    org.opentest4j.AssertionFailedError at EnrichmentAuthorityRaceTest.java:330\n\nEnrichmentHardStopRepairTest > sparseUnavailabilityRejectsComputedSuccessAndCancellation(Route, Result) > sparseUnavailabilityRejectsComputedSuccessAndCancellation(Route, Result) [8] INTERLEAVED_SPARSE, CANCELLATION FAILED\n    org.opentest4j.AssertionFailedError at EnrichmentHardStopRepairTest.java:367\n\nEnrichmentHardStopRepairTest > sparseUnavailabilityRejectsComputedSuccessAndCancellation(Route, Result) > sparseUnavailabilityRejectsComputedSuccessAndCancellation(Route, Result) [9] INDIVIDUAL_SPARSE_CHUNK, SUCCESS FAILED\n    org.opentest4j.AssertionFailedError at EnrichmentHardStopRepairTest.java:356\n\nEnrichmentHardStopRepairTest > sparseUnavailabilityRejectsComputedSuccessAndCancellation(Route, Result) > sparseUnavailabilityRejectsComputedSuccessAndCancellation(Route, Result) [10] INDIVIDUAL_SPARSE_CHUNK, CANCELLATION FAILED\n    org.opentest4j.AssertionFailedError at EnrichmentHardStopRepairTest.java:367\n\nEnrichmentHardStopRepairTest > sparseUnavailabilityRejectsComputedSuccessAndCancellation(Route, Result) > sparseUnavailabilityRejectsComputedSuccessAndCancellation(Route, Result) [11] INTERLEAVED_SPARSE_CHUNK, SUCCESS FAILED\n    org.opentest4j.AssertionFailedError at EnrichmentHardStopRepairTest.java:356\n\nEnrichmentHardStopRepairTest > sparseUnavailabilityRejectsComputedSuccessAndCancellation(Route, Result) > sparseUnavailabilityRejectsComputedSuccessAndCancellation(Route, Result) [12] INTERLEAVED_SPARSE_CHUNK, CANCELLATION FAILED\n    org.opentest4j.AssertionFailedError at EnrichmentHardStopRepairTest.java:367\n\nWindowedEmbedSliceValidationTest > invalidSliceRestartsWithoutBlendingAnyOfItsVectors(String) > invalidSliceRestartsWithoutBlendingAnyOfItsVectors(String) [1] totals FAILED\n    org.opentest4j.AssertionFailedError at WindowedEmbedSliceValidationTest.java:33\n\nWindowedEmbedSliceValidationTest > invalidSliceRestartsWithoutBlendingAnyOfItsVectors(String) > invalidSliceRestartsWithoutBlendingAnyOfItsVectors(String) [2] overrun FAILED\n    org.opentest4j.AssertionFailedError at WindowedEmbedSliceValidationTest.java:33\n\nWindowedEmbedSliceValidationTest > invalidSliceRestartsWithoutBlendingAnyOfItsVectors(String) > invalidSliceRestartsWithoutBlendingAnyOfItsVectors(String) [3] null-list FAILED\n    org.opentest4j.AssertionFailedError at WindowedEmbedSliceValidationTest.java:32\n        Caused by: java.lang.NullPointerException at WindowedEmbedSliceValidationTest.java:32\n\nWindowedEmbedSliceValidationTest > invalidSliceRestartsWithoutBlendingAnyOfItsVectors(String) > invalidSliceRestartsWithoutBlendingAnyOfItsVectors(String) [4] empty-list FAILED\n    org.opentest4j.AssertionFailedError at WindowedEmbedSliceValidationTest.java:33\n\nWindowedEmbedSliceValidationTest > invalidSliceRestartsWithoutBlendingAnyOfItsVectors(String) > invalidSliceRestartsWithoutBlendingAnyOfItsVectors(String) [5] null-vector FAILED\n    org.opentest4j.AssertionFailedError at WindowedEmbedSliceValidationTest.java:33\n\nWindowedEmbedSliceValidationTest > invalidSliceRestartsWithoutBlendingAnyOfItsVectors(String) > invalidSliceRestartsWithoutBlendingAnyOfItsVectors(String) [6] empty-vector FAILED\n    org.opentest4j.AssertionFailedError at WindowedEmbedSliceValidationTest.java:33\n\nWindowedEmbedSliceValidationTest > invalidSliceRestartsWithoutBlendingAnyOfItsVectors(String) > invalidSliceRestartsWithoutBlendingAnyOfItsVectors(String) [7] mixed-dimensions FAILED\n    org.opentest4j.AssertionFailedError at WindowedEmbedSliceValidationTest.java:33\n\nWindowedEmbedSliceValidationTest > invalidSliceRestartsWithoutBlendingAnyOfItsVectors(String) > invalidSliceRestartsWithoutBlendingAnyOfItsVectors(String) [8] changed-dimension FAILED\n    org.opentest4j.AssertionFailedError at WindowedEmbedSliceValidationTest.java:33\n\nWindowedEmbedSliceValidationTest > invalidSliceRestartsWithoutBlendingAnyOfItsVectors(String) > invalidSliceRestartsWithoutBlendingAnyOfItsVectors(String) [9] nan FAILED\n    org.opentest4j.AssertionFailedError at WindowedEmbedSliceValidationTest.java:33\n\nWindowedEmbedSliceValidationTest > invalidSliceRestartsWithoutBlendingAnyOfItsVectors(String) > invalidSliceRestartsWithoutBlendingAnyOfItsVectors(String) [10] infinity FAILED\n    org.opentest4j.AssertionFailedError at WindowedEmbedSliceValidationTest.java:33\n\nEnrichmentAuthorityRaceTest > providerReplacementWhilePublicationWaitsForMutationLockIsAtomic(Stage, boolean) > providerReplacementWhilePublicationWaitsForMutationLockIsAtomic(Stage, boolean) [4] CHUNK, true FAILED\n    org.opentest4j.AssertionFailedError at EnrichmentAuthorityRaceTest.java:332\n\nEnrichmentAuthorityRaceTest > providerReplacementWhilePublicationWaitsForMutationLockIsAtomic(Stage, boolean) > providerReplacementWhilePublicationWaitsForMutationLockIsAtomic(Stage, boolean) [5] SPARSE, false FAILED\n    org.opentest4j.AssertionFailedError at EnrichmentAuthorityRaceTest.java:330\n\nEnrichmentAuthorityRaceTest > providerReplacementWhilePublicationWaitsForMutationLockIsAtomic(Stage, boolean) > providerReplacementWhilePublicationWaitsForMutationLockIsAtomic(Stage, boolean) [6] SPARSE, true FAILED\n    org.opentest4j.AssertionFailedError at EnrichmentAuthorityRaceTest.java:332\n\nEnrichmentAuthorityRaceTest > providerReplacementWhilePublicationWaitsForMutationLockIsAtomic(Stage, boolean) > providerReplacementWhilePublicationWaitsForMutationLockIsAtomic(Stage, boolean) [7] INTERLEAVED, false FAILED\n    org.opentest4j.AssertionFailedError at EnrichmentAuthorityRaceTest.java:330\n\nEnrichmentAuthorityRaceTest > providerReplacementWhilePublicationWaitsForMutationLockIsAtomic(Stage, boolean) > providerReplacementWhilePublicationWaitsForMutationLockIsAtomic(Stage, boolean) [8] INTERLEAVED, true FAILED\n    org.opentest4j.AssertionFailedError at EnrichmentAuthorityRaceTest.java:332\n\nEnrichmentAuthorityRaceTest > providerReplacementWhilePublicationWaitsForMutationLockIsAtomic(Stage, boolean) > providerReplacementWhilePublicationWaitsForMutationLockIsAtomic(Stage, boolean) [9] NER, false FAILED\n    org.opentest4j.AssertionFailedError at EnrichmentAuthorityRaceTest.java:330\n\nEnrichmentAuthorityRaceTest > providerReplacementWhilePublicationWaitsForMutationLockIsAtomic(Stage, boolean) > providerReplacementWhilePublicationWaitsForMutationLockIsAtomic(Stage, boolean) [10] NER, true FAILED\n    org.opentest4j.AssertionFailedError at EnrichmentAuthorityRaceTest.java:332\n\nEnrichmentAuthorityRaceTest > providerReplacementWhilePublicationWaitsForMutationLockIsAtomic(Stage, boolean) > providerReplacementWhilePublicationWaitsForMutationLockIsAtomic(Stage, boolean) [11] COMBINED, false FAILED\n    org.opentest4j.AssertionFailedError at EnrichmentAuthorityRaceTest.java:330\n\nEnrichmentAuthorityRaceTest > providerReplacementWhilePublicationWaitsForMutationLockIsAtomic(Stage, boolean) > providerReplacementWhilePublicationWaitsForMutationLockIsAtomic(Stage, boolean) [12] COMBINED, true FAILED\n    org.opentest4j.AssertionFailedError at EnrichmentAuthorityRaceTest.java:332\n\nEnrichmentAuthorityRaceTest > providerReplacementWhilePublicationWaitsForMutationLockIsAtomic(Stage, boolean) > providerReplacementWhilePublicationWaitsForMutationLockIsAtomic(Stage, boolean) [13] SINGLE_PASS, false FAILED\n    org.opentest4j.AssertionFailedError at EnrichmentAuthorityRaceTest.java:330\n\nEnrichmentAuthorityRaceTest > providerReplacementWhilePublicationWaitsForMutationLockIsAtomic(Stage, boolean) > providerReplacementWhilePublicationWaitsForMutationLockIsAtomic(Stage, boolean) [14] SINGLE_PASS, true FAILED\n    org.opentest4j.AssertionFailedError at EnrichmentAuthorityRaceTest.java:332\n\nEnrichmentAuthorityRaceTest > providerReplacementWhilePublicationWaitsForMutationLockIsAtomic(Stage, boolean) > providerReplacementWhilePublicationWaitsForMutationLockIsAtomic(Stage, boolean) [15] WINDOW, false FAILED\n    org.opentest4j.AssertionFailedError at EnrichmentAuthorityRaceTest.java:330\n\nEnrichmentAuthorityRaceTest > providerReplacementWhilePublicationWaitsForMutationLockIsAtomic(Stage, boolean) > providerReplacementWhilePublicationWaitsForMutationLockIsAtomic(Stage, boolean) [16] WINDOW, true FAILED\n    org.opentest4j.AssertionFailedError at EnrichmentAuthorityRaceTest.java:332\n\nEnrichmentAuthorityRaceTest > replacedProviderCancellationStaysDeferredThroughTheRealWriter(Stage) > replacedProviderCancellationStaysDeferredThroughTheRealWriter(Stage) [1] SPARSE FAILED\n    org.opentest4j.AssertionFailedError at EnrichmentAuthorityRaceTest.java:345\n\nEnrichmentAuthorityRaceTest > replacedProviderCancellationStaysDeferredThroughTheRealWriter(Stage) > replacedProviderCancellationStaysDeferredThroughTheRealWriter(Stage) [2] INTERLEAVED FAILED\n    org.opentest4j.AssertionFailedError at EnrichmentAuthorityRaceTest.java:345\n\nEnrichmentAuthorityRaceTest > replacedProviderCancellationStaysDeferredThroughTheRealWriter(Stage) > replacedProviderCancellationStaysDeferredThroughTheRealWriter(Stage) [3] SPARSE_CHUNK FAILED\n    org.opentest4j.AssertionFailedError at EnrichmentAuthorityRaceTest.java:345\n\nEnrichmentAuthorityRaceTest > replacedProviderCancellationStaysDeferredThroughTheRealWriter(Stage) > replacedProviderCancellationStaysDeferredThroughTheRealWriter(Stage) [4] INTERLEAVED_CHUNK FAILED\n    org.opentest4j.AssertionFailedError at EnrichmentAuthorityRaceTest.java:345\n\nEnrichmentAuthorityRaceTest > providerReplacementAtCoordinatorBoundaryRevokesTheComputedOutcome(Stage, boolean) > providerReplacementAtCoordinatorBoundaryRevokesTheComputedOutcome(Stage, boolean) [1] EMBED, false FAILED\n    org.opentest4j.AssertionFailedError at EnrichmentAuthorityRaceTest.java:330\n\nEnrichmentAuthorityRaceTest > providerReplacementAtCoordinatorBoundaryRevokesTheComputedOutcome(Stage, boolean) > providerReplacementAtCoordinatorBoundaryRevokesTheComputedOutcome(Stage, boolean) [2] EMBED, true FAILED\n    org.opentest4j.AssertionFailedError at EnrichmentAuthorityRaceTest.java:332\n\nEnrichmentAuthorityRaceTest > providerReplacementAtCoordinatorBoundaryRevokesTheComputedOutcome(Stage, boolean) > providerReplacementAtCoordinatorBoundaryRevokesTheComputedOutcome(Stage, boolean) [3] CHUNK, false FAILED\n    org.opentest4j.AssertionFailedError at EnrichmentAuthorityRaceTest.java:330\n\nEnrichmentAuthorityRaceTest > providerReplacementAtCoordinatorBoundaryRevokesTheComputedOutcome(Stage, boolean) > providerReplacementAtCoordinatorBoundaryRevokesTheComputedOutcome(Stage, boolean) [4] CHUNK, true FAILED\n    org.opentest4j.AssertionFailedError at EnrichmentAuthorityRaceTest.java:332\n\nEnrichmentAuthorityRaceTest > providerReplacementAtCoordinatorBoundaryRevokesTheComputedOutcome(Stage, boolean) > providerReplacementAtCoordinatorBoundaryRevokesTheComputedOutcome(Stage, boolean) [5] SPARSE, false FAILED\n    org.opentest4j.AssertionFailedError at EnrichmentAuthorityRaceTest.java:330\n\nEnrichmentAuthorityRaceTest > providerReplacementAtCoordinatorBoundaryRevokesTheComputedOutcome(Stage, boolean) > providerReplacementAtCoordinatorBoundaryRevokesTheComputedOutcome(Stage, boolean) [6] SPARSE, true FAILED\n    org.opentest4j.AssertionFailedError at EnrichmentAuthorityRaceTest.java:332\n\nEnrichmentAuthorityRaceTest > providerReplacementAtCoordinatorBoundaryRevokesTheComputedOutcome(Stage, boolean) > providerReplacementAtCoordinatorBoundaryRevokesTheComputedOutcome(Stage, boolean) [7] INTERLEAVED, false FAILED\n    org.opentest4j.AssertionFailedError at EnrichmentAuthorityRaceTest.java:330\n\nEnrichmentAuthorityRaceTest > providerReplacementAtCoordinatorBoundaryRevokesTheComputedOutcome(Stage, boolean) > providerReplacementAtCoordinatorBoundaryRevokesTheComputedOutcome(Stage, boolean) [8] INTERLEAVED, true FAILED\n    org.opentest4j.AssertionFailedError at EnrichmentAuthorityRaceTest.java:332\n\nEnrichmentAuthorityRaceTest > providerReplacementAtCoordinatorBoundaryRevokesTheComputedOutcome(Stage, boolean) > providerReplacementAtCoordinatorBoundaryRevokesTheComputedOutcome(Stage, boolean) [9] NER, false FAILED\n    org.opentest4j.AssertionFailedError at EnrichmentAuthorityRaceTest.java:330\n\nEnrichmentAuthorityRaceTest > providerReplacementAtCoordinatorBoundaryRevokesTheComputedOutcome(Stage, boolean) > providerReplacementAtCoordinatorBoundaryRevokesTheComputedOutcome(Stage, boolean) [10] NER, true FAILED\n    org.opentest4j.AssertionFailedError at EnrichmentAuthorityRaceTest.java:332\n\nEnrichmentAuthorityRaceTest > providerReplacementAtCoordinatorBoundaryRevokesTheComputedOutcome(Stage, boolean) > providerReplacementAtCoordinatorBoundaryRevokesTheComputedOutcome(Stage, boolean) [11] COMBINED, false FAILED\n    org.opentest4j.AssertionFailedError at EnrichmentAuthorityRaceTest.java:330\n\nEnrichmentAuthorityRaceTest > providerReplacementAtCoordinatorBoundaryRevokesTheComputedOutcome(Stage, boolean) > providerReplacementAtCoordinatorBoundaryRevokesTheComputedOutcome(Stage, boolean) [12] COMBINED, true FAILED\n    org.opentest4j.AssertionFailedError at EnrichmentAuthorityRaceTest.java:332\n\nEnrichmentAuthorityRaceTest > providerReplacementAtCoordinatorBoundaryRevokesTheComputedOutcome(Stage, boolean) > providerReplacementAtCoordinatorBoundaryRevokesTheComputedOutcome(Stage, boolean) [13] SINGLE_PASS, false FAILED\n    org.opentest4j.AssertionFailedError at EnrichmentAuthorityRaceTest.java:330\n\nEnrichmentAuthorityRaceTest > providerReplacementAtCoordinatorBoundaryRevokesTheComputedOutcome(Stage, boolean) > providerReplacementAtCoordinatorBoundaryRevokesTheComputedOutcome(Stage, boolean) [14] SINGLE_PASS, true FAILED\n    org.opentest4j.AssertionFailedError at EnrichmentAuthorityRaceTest.java:332\n\nEnrichmentAuthorityRaceTest > providerReplacementAtCoordinatorBoundaryRevokesTheComputedOutcome(Stage, boolean) > providerReplacementAtCoordinatorBoundaryRevokesTheComputedOutcome(Stage, boolean) [15] WINDOW, false FAILED\n    org.opentest4j.AssertionFailedError at EnrichmentAuthorityRaceTest.java:330\n\nEnrichmentAuthorityRaceTest > providerReplacementAtCoordinatorBoundaryRevokesTheComputedOutcome(Stage, boolean) > providerReplacementAtCoordinatorBoundaryRevokesTheComputedOutcome(Stage, boolean) [16] WINDOW, true FAILED\n    org.opentest4j.AssertionFailedError at EnrichmentAuthorityRaceTest.java:332\n\nEnrichmentAuthorityRaceTest > retiredBgeCannotPublishAnyFinalOutcomeThroughTheRealWriter(Stage, boolean, String) > retiredBgeCannotPublishAnyFinalOutcomeThroughTheRealWriter(Stage, boolean, String) [1] BGE, false, success FAILED\n    org.opentest4j.AssertionFailedError at EnrichmentAuthorityRaceTest.java:330\n\nEnrichmentAuthorityRaceTest > retiredBgeCannotPublishAnyFinalOutcomeThroughTheRealWriter(Stage, boolean, String) > retiredBgeCannotPublishAnyFinalOutcomeThroughTheRealWriter(Stage, boolean, String) [2] BGE, false, failure FAILED\n    org.opentest4j.AssertionFailedError at EnrichmentAuthorityRaceTest.java:338\n\nEnrichmentAuthorityRaceTest > retiredBgeCannotPublishAnyFinalOutcomeThroughTheRealWriter(Stage, boolean, String) > retiredBgeCannotPublishAnyFinalOutcomeThroughTheRealWriter(Stage, boolean, String) [3] BGE, false, cancellation FAILED\n    org.opentest4j.AssertionFailedError at EnrichmentAuthorityRaceTest.java:338\n\nEnrichmentAuthorityRaceTest > retiredBgeCannotPublishAnyFinalOutcomeThroughTheRealWriter(Stage, boolean, String) > retiredBgeCannotPublishAnyFinalOutcomeThroughTheRealWriter(Stage, boolean, String) [4] BGE, true, success FAILED\n    org.opentest4j.AssertionFailedError at EnrichmentAuthorityRaceTest.java:330\n\nEnrichmentAuthorityRaceTest > retiredBgeCannotPublishAnyFinalOutcomeThroughTheRealWriter(Stage, boolean, String) > retiredBgeCannotPublishAnyFinalOutcomeThroughTheRealWriter(Stage, boolean, String) [5] BGE, true, failure FAILED\n    org.opentest4j.AssertionFailedError at EnrichmentAuthorityRaceTest.java:338\n\nEnrichmentAuthorityRaceTest > retiredBgeCannotPublishAnyFinalOutcomeThroughTheRealWriter(Stage, boolean, String) > retiredBgeCannotPublishAnyFinalOutcomeThroughTheRealWriter(Stage, boolean, String) [6] BGE, true, cancellation FAILED\n    org.opentest4j.AssertionFailedError at EnrichmentAuthorityRaceTest.java:338\n\nEnrichmentAuthorityRaceTest > retiredBgeCannotPublishAnyFinalOutcomeThroughTheRealWriter(Stage, boolean, String) > retiredBgeCannotPublishAnyFinalOutcomeThroughTheRealWriter(Stage, boolean, String) [7] BGE_CHUNK, false, success FAILED\n    org.opentest4j.AssertionFailedError at EnrichmentAuthorityRaceTest.java:330\n\nEnrichmentAuthorityRaceTest > retiredBgeCannotPublishAnyFinalOutcomeThroughTheRealWriter(Stage, boolean, String) > retiredBgeCannotPublishAnyFinalOutcomeThroughTheRealWriter(Stage, boolean, String) [8] BGE_CHUNK, false, failure FAILED\n    org.opentest4j.AssertionFailedError at EnrichmentAuthorityRaceTest.java:338\n\nEnrichmentAuthorityRaceTest > retiredBgeCannotPublishAnyFinalOutcomeThroughTheRealWriter(Stage, boolean, String) > retiredBgeCannotPublishAnyFinalOutcomeThroughTheRealWriter(Stage, boolean, String) [9] BGE_CHUNK, false, cancellation FAILED\n    org.opentest4j.AssertionFailedError at EnrichmentAuthorityRaceTest.java:338\n\nEnrichmentAuthorityRaceTest > retiredBgeCannotPublishAnyFinalOutcomeThroughTheRealWriter(Stage, boolean, String) > retiredBgeCannotPublishAnyFinalOutcomeThroughTheRealWriter(Stage, boolean, String) [10] BGE_CHUNK, true, success FAILED\n    org.opentest4j.AssertionFailedError at EnrichmentAuthorityRaceTest.java:330\n\nEnrichmentAuthorityRaceTest > retiredBgeCannotPublishAnyFinalOutcomeThroughTheRealWriter(Stage, boolean, String) > retiredBgeCannotPublishAnyFinalOutcomeThroughTheRealWriter(Stage, boolean, String) [11] BGE_CHUNK, true, failure FAILED\n    org.opentest4j.AssertionFailedError at EnrichmentAuthorityRaceTest.java:338\n\nEnrichmentAuthorityRaceTest > retiredBgeCannotPublishAnyFinalOutcomeThroughTheRealWriter(Stage, boolean, String) > retiredBgeCannotPublishAnyFinalOutcomeThroughTheRealWriter(Stage, boolean, String) [12] BGE_CHUNK, true, cancellation FAILED\n    org.opentest4j.AssertionFailedError at EnrichmentAuthorityRaceTest.java:338\n\nEnrichmentAuthorityRaceTest > providerReplacementDuringInferenceRevokesSuccessAndFailure(Stage, boolean) > providerReplacementDuringInferenceRevokesSuccessAndFailure(Stage, boolean) [1] SPARSE, false FAILED\n    org.opentest4j.AssertionFailedError at EnrichmentAuthorityRaceTest.java:330\n\nEnrichmentAuthorityRaceTest > providerReplacementDuringInferenceRevokesSuccessAndFailure(Stage, boolean) > providerReplacementDuringInferenceRevokesSuccessAndFailure(Stage, boolean) [2] SPARSE, true FAILED\n    org.opentest4j.AssertionFailedError at EnrichmentAuthorityRaceTest.java:332\n\nEnrichmentAuthorityRaceTest > providerReplacementDuringInferenceRevokesSuccessAndFailure(Stage, boolean) > providerReplacementDuringInferenceRevokesSuccessAndFailure(Stage, boolean) [3] INTERLEAVED, false FAILED\n    org.opentest4j.AssertionFailedError at EnrichmentAuthorityRaceTest.java:330\n\nEnrichmentAuthorityRaceTest > providerReplacementDuringInferenceRevokesSuccessAndFailure(Stage, boolean) > providerReplacementDuringInferenceRevokesSuccessAndFailure(Stage, boolean) [4] INTERLEAVED, true FAILED\n    org.opentest4j.AssertionFailedError at EnrichmentAuthorityRaceTest.java:332\n\nEnrichmentAuthorityRaceTest > providerReplacementDuringInferenceRevokesSuccessAndFailure(Stage, boolean) > providerReplacementDuringInferenceRevokesSuccessAndFailure(Stage, boolean) [5] NER, false FAILED\n    org.opentest4j.AssertionFailedError at EnrichmentAuthorityRaceTest.java:330\n\nEnrichmentAuthorityRaceTest > providerReplacementDuringInferenceRevokesSuccessAndFailure(Stage, boolean) > providerReplacementDuringInferenceRevokesSuccessAndFailure(Stage, boolean) [6] NER, true FAILED\n    org.opentest4j.AssertionFailedError at EnrichmentAuthorityRaceTest.java:332\n\nEnrichmentAuthorityRaceTest > providerReplacementDuringInferenceRevokesSuccessAndFailure(Stage, boolean) > providerReplacementDuringInferenceRevokesSuccessAndFailure(Stage, boolean) [7] SINGLE_PASS, false FAILED\n    org.opentest4j.AssertionFailedError at EnrichmentAuthorityRaceTest.java:330\n\nEnrichmentAuthorityRaceTest > providerReplacementDuringInferenceRevokesSuccessAndFailure(Stage, boolean) > providerReplacementDuringInferenceRevokesSuccessAndFailure(Stage, boolean) [8] WINDOW, false FAILED\n    org.opentest4j.AssertionFailedError at EnrichmentAuthorityRaceTest.java:330\n\nEnrichmentUnitBoundaryTest > identicalTextWithChangedDenseIdentityRestartsWindows(String) > identicalTextWithChangedDenseIdentityRestartsWindows(String) [1] generation FAILED\n    org.opentest4j.AssertionFailedError at EnrichmentUnitBoundaryTest.java:354\n        Caused by: org.mockito.exceptions.verification.NeverWantedButInvoked at EnrichmentUnitBoundaryTest.java:354\n\nEnrichmentUnitBoundaryTest > identicalTextWithChangedDenseIdentityRestartsWindows(String) > identicalTextWithChangedDenseIdentityRestartsWindows(String) [2] uid FAILED\n    org.opentest4j.AssertionFailedError at EnrichmentUnitBoundaryTest.java:354\n        Caused by: org.mockito.exceptions.verification.NeverWantedButInvoked at EnrichmentUnitBoundaryTest.java:354\n\nEnrichmentUnitBoundaryTest > identicalTextWithChangedDenseIdentityRestartsWindows(String) > identicalTextWithChangedDenseIdentityRestartsWindows(String) [3] revision FAILED\n    org.opentest4j.AssertionFailedError at EnrichmentUnitBoundaryTest.java:354\n        Caused by: org.mockito.exceptions.verification.NeverWantedButInvoked at EnrichmentUnitBoundaryTest.java:354\n\nEnrichmentUnitBoundaryTest > identicalTextWithChangedDenseIdentityRestartsWindows(String) > identicalTextWithChangedDenseIdentityRestartsWindows(String) [4] provider FAILED\n    org.opentest4j.AssertionFailedError at EnrichmentUnitBoundaryTest.java:352\n        Caused by: org.mockito.exceptions.verification.opentest4j.ArgumentsAreDifferent at EnrichmentUnitBoundaryTest.java:352\n\nEnrichmentUnitBoundaryTest > identicalTextWithChangedDenseIdentityRestartsWindows(String) > identicalTextWithChangedDenseIdentityRestartsWindows(String) [5] dimension FAILED\n    org.opentest4j.AssertionFailedError at EnrichmentUnitBoundaryTest.java:354\n        Caused by: org.mockito.exceptions.verification.NeverWantedButInvoked at EnrichmentUnitBoundaryTest.java:354\n\nEnrichmentUnitBoundaryTest > interruptionPreventsTheFirstUnitAndCancelsTheSelection(Route) > interruptionPreventsTheFirstUnitAndCancelsTheSelection(Route) [1] DENSE_BATCH FAILED\n    org.opentest4j.AssertionFailedError at EnrichmentUnitBoundaryTest.java:193\n\nEnrichmentUnitBoundaryTest > interruptionPreventsTheFirstUnitAndCancelsTheSelection(Route) > interruptionPreventsTheFirstUnitAndCancelsTheSelection(Route) [2] DENSE_CHUNK FAILED\n    org.opentest4j.AssertionFailedError at EnrichmentUnitBoundaryTest.java:193\n\nEnrichmentUnitBoundaryTest > interruptionPreventsTheFirstUnitAndCancelsTheSelection(Route) > interruptionPreventsTheFirstUnitAndCancelsTheSelection(Route) [3] WINDOW FAILED\n    org.opentest4j.AssertionFailedError at EnrichmentUnitBoundaryTest.java:193\n\nEnrichmentUnitBoundaryTest > interruptionPreventsTheFirstUnitAndCancelsTheSelection(Route) > interruptionPreventsTheFirstUnitAndCancelsTheSelection(Route) [4] SINGLE_PASS FAILED\n    org.opentest4j.AssertionFailedError at EnrichmentUnitBoundaryTest.java:193\n\nEnrichmentUnitBoundaryTest > interruptionPreventsTheFirstUnitAndCancelsTheSelection(Route) > interruptionPreventsTheFirstUnitAndCancelsTheSelection(Route) [5] NER FAILED\n    org.opentest4j.AssertionFailedError at EnrichmentUnitBoundaryTest.java:193\n\nEnrichmentUnitBoundaryTest > interruptionPreventsTheFirstUnitAndCancelsTheSelection(Route) > interruptionPreventsTheFirstUnitAndCancelsTheSelection(Route) [6] SPARSE_PARENT FAILED\n    org.opentest4j.AssertionFailedError at EnrichmentUnitBoundaryTest.java:193\n\nEnrichmentUnitBoundaryTest > interruptionPreventsTheFirstUnitAndCancelsTheSelection(Route) > interruptionPreventsTheFirstUnitAndCancelsTheSelection(Route) [7] SPARSE_CHUNK FAILED\n    org.opentest4j.AssertionFailedError at EnrichmentUnitBoundaryTest.java:193\n\nEnrichmentUnitBoundaryTest > hardStopPreventsTheFirstUnitAndCancelsTheSelection(Route) > hardStopPreventsTheFirstUnitAndCancelsTheSelection(Route) [1] DENSE_BATCH FAILED\n    org.opentest4j.AssertionFailedError at EnrichmentUnitBoundaryTest.java:126\n\nEnrichmentUnitBoundaryTest > hardStopPreventsTheFirstUnitAndCancelsTheSelection(Route) > hardStopPreventsTheFirstUnitAndCancelsTheSelection(Route) [2] DENSE_CHUNK FAILED\n    org.opentest4j.AssertionFailedError at EnrichmentUnitBoundaryTest.java:126\n\nEnrichmentUnitBoundaryTest > hardStopPreventsTheFirstUnitAndCancelsTheSelection(Route) > hardStopPreventsTheFirstUnitAndCancelsTheSelection(Route) [3] WINDOW FAILED\n    org.opentest4j.AssertionFailedError at EnrichmentUnitBoundaryTest.java:126\n\nEnrichmentUnitBoundaryTest > hardStopPreventsTheFirstUnitAndCancelsTheSelection(Route) > hardStopPreventsTheFirstUnitAndCancelsTheSelection(Route) [4] SINGLE_PASS FAILED\n    org.opentest4j.AssertionFailedError at EnrichmentUnitBoundaryTest.java:126\n\nEnrichmentUnitBoundaryTest > hardStopPreventsTheFirstUnitAndCancelsTheSelection(Route) > hardStopPreventsTheFirstUnitAndCancelsTheSelection(Route) [5] NER FAILED\n    org.opentest4j.AssertionFailedError at EnrichmentUnitBoundaryTest.java:126\n\nEnrichmentUnitBoundaryTest > hardStopPreventsTheFirstUnitAndCancelsTheSelection(Route) > hardStopPreventsTheFirstUnitAndCancelsTheSelection(Route) [6] SPARSE_PARENT FAILED\n    org.opentest4j.AssertionFailedError at EnrichmentUnitBoundaryTest.java:129\n\nEnrichmentUnitBoundaryTest > hardStopPreventsTheFirstUnitAndCancelsTheSelection(Route) > hardStopPreventsTheFirstUnitAndCancelsTheSelection(Route) [7] SPARSE_CHUNK FAILED\n    org.opentest4j.AssertionFailedError at EnrichmentUnitBoundaryTest.java:129\n\nEnrichmentUnitBoundaryTest > rejectedSlicesUseTheExistingRetryLimit(String) > rejectedSlicesUseTheExistingRetryLimit(String) [1] replay FAILED\n    org.opentest4j.AssertionFailedError at EnrichmentUnitBoundaryTest.java:385\n\nEnrichmentUnitBoundaryTest > rejectedSlicesUseTheExistingRetryLimit(String) > rejectedSlicesUseTheExistingRetryLimit(String) [2] skip FAILED\n    org.opentest4j.AssertionFailedError at EnrichmentUnitBoundaryTest.java:385\n\nEnrichmentUnitBoundaryTest > sourceInvalidationDuringFetchPreventsTheFirstUnit(Route) > sourceInvalidationDuringFetchPreventsTheFirstUnit(Route) [1] DENSE_BATCH FAILED\n    org.opentest4j.AssertionFailedError at EnrichmentUnitBoundaryTest.java:152\n\nEnrichmentUnitBoundaryTest > sourceInvalidationDuringFetchPreventsTheFirstUnit(Route) > sourceInvalidationDuringFetchPreventsTheFirstUnit(Route) [2] DENSE_CHUNK FAILED\n    org.opentest4j.AssertionFailedError at EnrichmentUnitBoundaryTest.java:152\n\nEnrichmentUnitBoundaryTest > sourceInvalidationDuringFetchPreventsTheFirstUnit(Route) > sourceInvalidationDuringFetchPreventsTheFirstUnit(Route) [3] WINDOW FAILED\n    org.opentest4j.AssertionFailedError at EnrichmentUnitBoundaryTest.java:152\n\nEnrichmentUnitBoundaryTest > sourceInvalidationDuringFetchPreventsTheFirstUnit(Route) > sourceInvalidationDuringFetchPreventsTheFirstUnit(Route) [4] SINGLE_PASS FAILED\n    org.opentest4j.AssertionFailedError at EnrichmentUnitBoundaryTest.java:152\n\nEnrichmentUnitBoundaryTest > sourceInvalidationDuringFetchPreventsTheFirstUnit(Route) > sourceInvalidationDuringFetchPreventsTheFirstUnit(Route) [5] NER FAILED\n    org.opentest4j.AssertionFailedError at EnrichmentUnitBoundaryTest.java:152\n\nEnrichmentUnitBoundaryTest > sourceInvalidationDuringFetchPreventsTheFirstUnit(Route) > sourceInvalidationDuringFetchPreventsTheFirstUnit(Route) [6] SPARSE_PARENT FAILED\n    org.opentest4j.AssertionFailedError at EnrichmentUnitBoundaryTest.java:155\n\nEnrichmentUnitBoundaryTest > sourceInvalidationDuringFetchPreventsTheFirstUnit(Route) > sourceInvalidationDuringFetchPreventsTheFirstUnit(Route) [7] SPARSE_CHUNK FAILED\n    org.opentest4j.AssertionFailedError at EnrichmentUnitBoundaryTest.java:155\n\nEnrichmentUnitBoundaryTest > individualSourceInvalidationDuringFetchPreventsTheFirstUnit(Route) > individualSourceInvalidationDuringFetchPreventsTheFirstUnit(Route) [1] DENSE_BATCH FAILED\n    org.opentest4j.AssertionFailedError at EnrichmentUnitBoundaryTest.java:179\n\nEnrichmentUnitBoundaryTest > individualSourceInvalidationDuringFetchPreventsTheFirstUnit(Route) > individualSourceInvalidationDuringFetchPreventsTheFirstUnit(Route) [2] DENSE_CHUNK FAILED\n    org.opentest4j.AssertionFailedError at EnrichmentUnitBoundaryTest.java:179\n\nEnrichmentUnitBoundaryTest > individualSourceInvalidationDuringFetchPreventsTheFirstUnit(Route) > individualSourceInvalidationDuringFetchPreventsTheFirstUnit(Route) [3] NER FAILED\n    org.opentest4j.AssertionFailedError at EnrichmentUnitBoundaryTest.java:179\n\nEnrichmentUnitBoundaryTest > individualSourceInvalidationDuringFetchPreventsTheFirstUnit(Route) > individualSourceInvalidationDuringFetchPreventsTheFirstUnit(Route) [4] SPARSE_PARENT FAILED\n    org.opentest4j.AssertionFailedError at EnrichmentUnitBoundaryTest.java:179\n\nEnrichmentUnitBoundaryTest > individualSourceInvalidationDuringFetchPreventsTheFirstUnit(Route) > individualSourceInvalidationDuringFetchPreventsTheFirstUnit(Route) [5] SPARSE_CHUNK FAILED\n    org.opentest4j.AssertionFailedError at EnrichmentUnitBoundaryTest.java:179\n\nEnrichmentUnitBoundaryTest > expiredDeadlinePreventsTheFirstUnit(Route) > expiredDeadlinePreventsTheFirstUnit(Route) [1] DENSE_BATCH FAILED\n    org.opentest4j.AssertionFailedError at EnrichmentUnitBoundaryTest.java:117\n\nEnrichmentUnitBoundaryTest > expiredDeadlinePreventsTheFirstUnit(Route) > expiredDeadlinePreventsTheFirstUnit(Route) [2] DENSE_CHUNK FAILED\n    org.opentest4j.AssertionFailedError at EnrichmentUnitBoundaryTest.java:117\n\nEnrichmentUnitBoundaryTest > expiredDeadlinePreventsTheFirstUnit(Route) > expiredDeadlinePreventsTheFirstUnit(Route) [3] WINDOW FAILED\n    org.opentest4j.AssertionFailedError at EnrichmentUnitBoundaryTest.java:117\n\nEnrichmentUnitBoundaryTest > expiredDeadlinePreventsTheFirstUnit(Route) > expiredDeadlinePreventsTheFirstUnit(Route) [4] SINGLE_PASS FAILED\n    org.opentest4j.AssertionFailedError at EnrichmentUnitBoundaryTest.java:117\n\nEnrichmentUnitBoundaryTest > expiredDeadlinePreventsTheFirstUnit(Route) > expiredDeadlinePreventsTheFirstUnit(Route) [5] NER FAILED\n    org.opentest4j.AssertionFailedError at EnrichmentUnitBoundaryTest.java:117\n\nEnrichmentUnitBoundaryTest > expiredDeadlinePreventsTheFirstUnit(Route) > expiredDeadlinePreventsTheFirstUnit(Route) [6] SPARSE_PARENT FAILED\n    org.opentest4j.AssertionFailedError at EnrichmentUnitBoundaryTest.java:117\n\nEnrichmentUnitBoundaryTest > expiredDeadlinePreventsTheFirstUnit(Route) > expiredDeadlinePreventsTheFirstUnit(Route) [7] SPARSE_CHUNK FAILED\n    org.opentest4j.AssertionFailedError at EnrichmentUnitBoundaryTest.java:117\n\nEnrichmentUnitBoundaryTest > sourceInvalidationWhileTheSchedulerPacesPreventsTheFirstUnit(Route) > sourceInvalidationWhileTheSchedulerPacesPreventsTheFirstUnit(Route) [1] DENSE_BATCH FAILED\n    org.opentest4j.AssertionFailedError at EnrichmentUnitBoundaryTest.java:166\n\nEnrichmentUnitBoundaryTest > sourceInvalidationWhileTheSchedulerPacesPreventsTheFirstUnit(Route) > sourceInvalidationWhileTheSchedulerPacesPreventsTheFirstUnit(Route) [2] DENSE_CHUNK FAILED\n    org.opentest4j.AssertionFailedError at EnrichmentUnitBoundaryTest.java:166\n\nEnrichmentUnitBoundaryTest > sourceInvalidationWhileTheSchedulerPacesPreventsTheFirstUnit(Route) > sourceInvalidationWhileTheSchedulerPacesPreventsTheFirstUnit(Route) [3] WINDOW FAILED\n    org.opentest4j.AssertionFailedError at EnrichmentUnitBoundaryTest.java:166\n\nEnrichmentUnitBoundaryTest > sourceInvalidationWhileTheSchedulerPacesPreventsTheFirstUnit(Route) > sourceInvalidationWhileTheSchedulerPacesPreventsTheFirstUnit(Route) [4] SINGLE_PASS FAILED\n    org.opentest4j.AssertionFailedError at EnrichmentUnitBoundaryTest.java:166\n\nEnrichmentUnitBoundaryTest > sourceInvalidationWhileTheSchedulerPacesPreventsTheFirstUnit(Route) > sourceInvalidationWhileTheSchedulerPacesPreventsTheFirstUnit(Route) [5] NER FAILED\n    org.opentest4j.AssertionFailedError at EnrichmentUnitBoundaryTest.java:166\n\nEnrichmentUnitBoundaryTest > sourceInvalidationWhileTheSchedulerPacesPreventsTheFirstUnit(Route) > sourceInvalidationWhileTheSchedulerPacesPreventsTheFirstUnit(Route) [6] SPARSE_PARENT FAILED\n    org.opentest4j.AssertionFailedError at EnrichmentUnitBoundaryTest.java:166\n\nEnrichmentUnitBoundaryTest > sourceInvalidationWhileTheSchedulerPacesPreventsTheFirstUnit(Route) > sourceInvalidationWhileTheSchedulerPacesPreventsTheFirstUnit(Route) [7] SPARSE_CHUNK FAILED\n    org.opentest4j.AssertionFailedError at EnrichmentUnitBoundaryTest.java:166\n\nEnrichmentUnitBoundaryTest > individualStageInterruptionPreventsTheFirstUnit(Route) > individualStageInterruptionPreventsTheFirstUnit(Route) [1] DENSE_BATCH FAILED\n    org.opentest4j.AssertionFailedError at EnrichmentUnitBoundaryTest.java:210\n\nEnrichmentUnitBoundaryTest > individualStageInterruptionPreventsTheFirstUnit(Route) > individualStageInterruptionPreventsTheFirstUnit(Route) [2] DENSE_CHUNK FAILED\n    org.opentest4j.AssertionFailedError at EnrichmentUnitBoundaryTest.java:210\n\nEnrichmentUnitBoundaryTest > individualStageInterruptionPreventsTheFirstUnit(Route) > individualStageInterruptionPreventsTheFirstUnit(Route) [3] NER FAILED\n    org.opentest4j.AssertionFailedError at EnrichmentUnitBoundaryTest.java:210\n\nEnrichmentUnitBoundaryTest > individualStageInterruptionPreventsTheFirstUnit(Route) > individualStageInterruptionPreventsTheFirstUnit(Route) [4] SPARSE_PARENT FAILED\n    org.opentest4j.AssertionFailedError at EnrichmentUnitBoundaryTest.java:210\n\nEnrichmentUnitBoundaryTest > individualStageInterruptionPreventsTheFirstUnit(Route) > individualStageInterruptionPreventsTheFirstUnit(Route) [5] SPARSE_CHUNK FAILED\n    org.opentest4j.AssertionFailedError at EnrichmentUnitBoundaryTest.java:210\n\nEnrichmentUnitBoundaryTest > batchOnlyLateParentCompletesWithoutWindowsOrRetry() FAILED\n    org.opentest4j.AssertionFailedError at EnrichmentUnitBoundaryTest.java:326\n\nEnrichmentUnitBoundaryTest > hardStopAfterOneUnitPreservesItsResultAndLeavesTheRestCancelled(Route) > hardStopAfterOneUnitPreservesItsResultAndLeavesTheRestCancelled(Route) [1] DENSE_BATCH FAILED\n    org.opentest4j.AssertionFailedError at EnrichmentUnitBoundaryTest.java:245\n\nEnrichmentUnitBoundaryTest > hardStopAfterOneUnitPreservesItsResultAndLeavesTheRestCancelled(Route) > hardStopAfterOneUnitPreservesItsResultAndLeavesTheRestCancelled(Route) [2] DENSE_CHUNK FAILED\n    org.opentest4j.AssertionFailedError at EnrichmentUnitBoundaryTest.java:245\n\nEnrichmentUnitBoundaryTest > hardStopAfterOneUnitPreservesItsResultAndLeavesTheRestCancelled(Route) > hardStopAfterOneUnitPreservesItsResultAndLeavesTheRestCancelled(Route) [3] WINDOW FAILED\n    org.opentest4j.AssertionFailedError at EnrichmentUnitBoundaryTest.java:245\n\nEnrichmentUnitBoundaryTest > hardStopAfterOneUnitPreservesItsResultAndLeavesTheRestCancelled(Route) > hardStopAfterOneUnitPreservesItsResultAndLeavesTheRestCancelled(Route) [4] SINGLE_PASS FAILED\n    org.opentest4j.AssertionFailedError at EnrichmentUnitBoundaryTest.java:245\n\nEnrichmentUnitBoundaryTest > hardStopAfterOneUnitPreservesItsResultAndLeavesTheRestCancelled(Route) > hardStopAfterOneUnitPreservesItsResultAndLeavesTheRestCancelled(Route) [5] NER FAILED\n    org.opentest4j.AssertionFailedError at EnrichmentUnitBoundaryTest.java:245\n\nEnrichmentUnitBoundaryTest > hardStopAfterOneUnitPreservesItsResultAndLeavesTheRestCancelled(Route) > hardStopAfterOneUnitPreservesItsResultAndLeavesTheRestCancelled(Route) [6] SPARSE_PARENT FAILED\n    org.opentest4j.AssertionFailedError at EnrichmentUnitBoundaryTest.java:247\n\nEnrichmentUnitBoundaryTest > hardStopAfterOneUnitPreservesItsResultAndLeavesTheRestCancelled(Route) > hardStopAfterOneUnitPreservesItsResultAndLeavesTheRestCancelled(Route) [7] SPARSE_CHUNK FAILED\n    org.opentest4j.AssertionFailedError at EnrichmentUnitBoundaryTest.java:247\n\nEnrichmentUnitBoundaryTest > deadlineSpentByNullOrArenaOomClassificationRetainsItsRoute(boolean) > deadlineSpentByNullOrArenaOomClassificationRetainsItsRoute(boolean) [1] false FAILED\n    org.opentest4j.AssertionFailedError at EnrichmentUnitBoundaryTest.java:282\n        Caused by: org.mockito.exceptions.verification.NeverWantedButInvoked at EnrichmentUnitBoundaryTest.java:282\n\nEnrichmentUnitBoundaryTest > deadlineSpentByNullOrArenaOomClassificationRetainsItsRoute(boolean) > deadlineSpentByNullOrArenaOomClassificationRetainsItsRoute(boolean) [2] true FAILED\n    org.opentest4j.AssertionFailedError at EnrichmentUnitBoundaryTest.java:282\n        Caused by: org.mockito.exceptions.verification.NeverWantedButInvoked at EnrichmentUnitBoundaryTest.java:282\n\nEnrichmentUnitBoundaryTest > exhaustedEmbeddingShareDoesNotForceAFirstDenseUnit() FAILED\n    org.opentest4j.AssertionFailedError at EnrichmentUnitBoundaryTest.java:264\n        Caused by: org.mockito.exceptions.verification.NeverWantedButInvoked at EnrichmentUnitBoundaryTest.java:264\n\nEnrichmentUnitBoundaryTest > hardStopAfterClassificationRetainsItsRouteWithoutStartingWindows(boolean) > hardStopAfterClassificationRetainsItsRouteWithoutStartingWindows(boolean) [1] false FAILED\n    org.opentest4j.AssertionFailedError at EnrichmentUnitBoundaryTest.java:302\n\nEnrichmentUnitBoundaryTest > hardStopAfterClassificationRetainsItsRouteWithoutStartingWindows(boolean) > hardStopAfterClassificationRetainsItsRouteWithoutStartingWindows(boolean) [2] true FAILED\n    org.opentest4j.AssertionFailedError at EnrichmentUnitBoundaryTest.java:302\n\n> Task :modules:worker-services:test FAILED\n> Task :modules:worker-services:jacocoTestReport SKIPPED\n\n[Incubating] Problems report is available at: file:///tmp/test-intent-before-FmjWpU/build/reports/problems/problems-report.html\n64 actionable tasks: 41 executed, 23 from cache\nConfiguration cache entry stored.\n\n/tmp/test-intent-before-FmjWpU/modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/BatchServiceFailuresProbeTest.java:16: warning: [removal] ThreadDeath in java.lang has been deprecated and marked for removal\n        new AssertionError(\"broken health check\"), new ThreadDeath(),\n                                                       ^\nNote: Some input files use or override a deprecated API.\nNote: Recompile with -Xlint:deprecation for details.\nNote: Some input files use unchecked or unsafe operations.\nNote: Recompile with -Xlint:unchecked for details.\n1 warning\nOpenJDK 64-Bit Server VM warning: Sharing is only supported for boot loader classes because bootstrap classpath has been appended\nOpenJDK 64-Bit Server VM warning: Sharing is only supported for boot loader classes because bootstrap classpath has been appended\n\n188 tests completed, 188 failed\n\nFAILURE: Build failed with an exception.\n\n* What went wrong:\nExecution failed for task ':modules:worker-services:test'.\n> There were failing tests. See the report at: file:///tmp/test-intent-before-FmjWpU/modules/worker-services/build/reports/tests/test/index.html\n\nBUILD FAILED in 45s\n"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/CombinedEnrichmentLongDocumentTest.java#lateChunkNullFallbackRecordsAndResumesAWindowAfterTheProbeSpentTheDeadline",
+        "classification": "assertion",
+        "detail": "lateChunkNullFallbackRecordsAndResumesAWindowAfterTheProbeSpentTheDeadline(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: E3a-2/3: deadlines bound starting units; classification is its own unit ==> expected: <[]> but was: <[long-fallback@0]>"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/EnrichmentUnitBoundaryTest.java#expiredDeadlinePreventsTheFirstUnit",
+        "classification": "assertion",
+        "detail": "expiredDeadlinePreventsTheFirstUnit(Route) [1] DENSE_BATCH: org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: a deadline bounds the first unit too ==> expected: <0> but was: <1> | expiredDeadlinePreventsTheFirstUnit(Route) [2] DENSE_CHUNK: org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: a deadline bounds the first unit too ==> expected: <0> but was: <1> | expiredDeadlinePreventsTheFirstUnit(Route) [3] WINDOW: org.opentest4j.AssertionFailedError org"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/EnrichmentUnitBoundaryTest.java#hardStopPreventsTheFirstUnitAndCancelsTheSelection",
+        "classification": "assertion",
+        "detail": "hardStopPreventsTheFirstUnitAndCancelsTheSelection(Route) [1] DENSE_BATCH: org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: the scheduler hard-stop supplier also bounds the first unit ==> expected: <0> but was: <1> | hardStopPreventsTheFirstUnitAndCancelsTheSelection(Route) [2] DENSE_CHUNK: org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: the scheduler hard-stop supplier also bounds the first unit ==> expected: <0> but was: <1> | hardStopPreventsTh"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/EnrichmentUnitBoundaryTest.java#sourceInvalidationDuringFetchPreventsTheFirstUnit",
+        "classification": "assertion",
+        "detail": "sourceInvalidationDuringFetchPreventsTheFirstUnit(Route) [1] DENSE_BATCH: org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <0> but was: <1> | sourceInvalidationDuringFetchPreventsTheFirstUnit(Route) [2] DENSE_CHUNK: org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <0> but was: <1> | sourceInvalidationDuringFetchPreventsTheFirstUnit(Route) [3] WINDOW: org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expect"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/EnrichmentUnitBoundaryTest.java#sourceInvalidationWhileTheSchedulerPacesPreventsTheFirstUnit",
+        "classification": "assertion",
+        "detail": "sourceInvalidationWhileTheSchedulerPacesPreventsTheFirstUnit(Route) [1] DENSE_BATCH: org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: source validity must be checked after scheduler pacing ==> expected: <0> but was: <1> | sourceInvalidationWhileTheSchedulerPacesPreventsTheFirstUnit(Route) [2] DENSE_CHUNK: org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: source validity must be checked after scheduler pacing ==> expected: <0> but was: <1> | sourceIn"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/EnrichmentUnitBoundaryTest.java#individualSourceInvalidationDuringFetchPreventsTheFirstUnit",
+        "classification": "assertion",
+        "detail": "individualSourceInvalidationDuringFetchPreventsTheFirstUnit(Route) [1] DENSE_BATCH: org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <0> but was: <1> | individualSourceInvalidationDuringFetchPreventsTheFirstUnit(Route) [2] DENSE_CHUNK: org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <0> but was: <1> | individualSourceInvalidationDuringFetchPreventsTheFirstUnit(Route) [3] NER: org.opentest4j.AssertionFailedError org.opentest4j.A"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/EnrichmentUnitBoundaryTest.java#exhaustedEmbeddingShareDoesNotForceAFirstDenseUnit",
+        "classification": "assertion",
+        "detail": "exhaustedEmbeddingShareDoesNotForceAFirstDenseUnit(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: Unexpected exception thrown: org.mockito.exceptions.verification.NeverWantedButInvoked: &#10;embeddingService.embedDocumentBatch(&#10;    <any List>&#10;);&#10;Never wanted here:&#10;-> at io.justsearch.indexerworker.embed.EmbeddingService.embedDocumentBatch(Embe"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/EnrichmentUnitBoundaryTest.java#interruptionPreventsTheFirstUnitAndCancelsTheSelection",
+        "classification": "assertion",
+        "detail": "interruptionPreventsTheFirstUnitAndCancelsTheSelection(Route) [1] DENSE_BATCH: org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: interruption is checked even before the first unit ==> expected: <0> but was: <1> | interruptionPreventsTheFirstUnitAndCancelsTheSelection(Route) [2] DENSE_CHUNK: org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: interruption is checked even before the first unit ==> expected: <0> but was: <1> | interruptionPreventsTheFirst"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/EnrichmentUnitBoundaryTest.java#individualStageInterruptionPreventsTheFirstUnit",
+        "classification": "assertion",
+        "detail": "individualStageInterruptionPreventsTheFirstUnit(Route) [1] DENSE_BATCH: org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <0> but was: <1> | individualStageInterruptionPreventsTheFirstUnit(Route) [2] DENSE_CHUNK: org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <0> but was: <1> | individualStageInterruptionPreventsTheFirstUnit(Route) [3] NER: org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <0> b"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/EnrichmentUnitBoundaryTest.java#hardStopAfterOneUnitPreservesItsResultAndLeavesTheRestCancelled",
+        "classification": "assertion",
+        "detail": "hardStopAfterOneUnitPreservesItsResultAndLeavesTheRestCancelled(Route) [1] DENSE_BATCH: org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <1> but was: <13> | hardStopAfterOneUnitPreservesItsResultAndLeavesTheRestCancelled(Route) [2] DENSE_CHUNK: org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <1> but was: <13> | hardStopAfterOneUnitPreservesItsResultAndLeavesTheRestCancelled(Route) [3] WINDOW: org.opentest4j.AssertionFailedError"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/EnrichmentUnitBoundaryTest.java#identicalTextWithChangedDenseIdentityRestartsWindows",
+        "classification": "assertion",
+        "detail": "identicalTextWithChangedDenseIdentityRestartsWindows(String) [1] generation: org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: Unexpected exception thrown: org.mockito.exceptions.verification.NeverWantedButInvoked: &#10;embeddingService.embedDocumentWindows(&#10;    \"content\",&#10;    32,&#10;    32&#10;);&#10;Never wanted here:&#10;-> at io.justsearch.indexerworker.embed.EmbeddingServic | identicalTextWithChangedDenseIdentityRestartsWindows(String) [2] uid: org.opentest4j"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/EnrichmentUnitBoundaryTest.java#deadlineSpentByNullOrArenaOomClassificationRetainsItsRoute",
+        "classification": "assertion",
+        "detail": "deadlineSpentByNullOrArenaOomClassificationRetainsItsRoute(boolean) [1] false: org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: Unexpected exception thrown: org.mockito.exceptions.verification.NeverWantedButInvoked: &#10;embeddingService.embedDocumentWindows(&#10;    <any string>,&#10;    <any integer>,&#10;    <any integer>&#10;);&#10;Never wanted here:&#10;-> at io.justsearch.indexerwor | deadlineSpentByNullOrArenaOomClassificationRetainsItsRoute(boolean) [2] true: org."
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/EnrichmentUnitBoundaryTest.java#hardStopAfterClassificationRetainsItsRouteWithoutStartingWindows",
+        "classification": "assertion",
+        "detail": "hardStopAfterClassificationRetainsItsRouteWithoutStartingWindows(boolean) [1] false: org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <1> but was: <0> | hardStopAfterClassificationRetainsItsRouteWithoutStartingWindows(boolean) [2] true: org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <1> but was: <0>"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/EnrichmentUnitBoundaryTest.java#batchOnlyLateParentCompletesWithoutWindowsOrRetry",
+        "classification": "assertion",
+        "detail": "batchOnlyLateParentCompletesWithoutWindowsOrRetry(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <1> but was: <0>"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/EnrichmentAuthorityRaceTest.java#providerReplacementDuringInferenceRevokesSuccessAndFailure",
+        "classification": "assertion",
+        "detail": "providerReplacementDuringInferenceRevokesSuccessAndFailure(Stage, boolean) [1] SPARSE, false: org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: retired execution cannot publish success or terminal failure ==> expected: <PENDING> but was: <COMPLETED> | providerReplacementDuringInferenceRevokesSuccessAndFailure(Stage, boolean) [2] SPARSE, true: org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: retired execution cannot spend retries ==> expected: <0> bu"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/EnrichmentAuthorityRaceTest.java#providerReplacementAtCoordinatorBoundaryRevokesTheComputedOutcome",
+        "classification": "assertion",
+        "detail": "providerReplacementAtCoordinatorBoundaryRevokesTheComputedOutcome(Stage, boolean) [1] EMBED, false: org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: retired execution cannot publish success or terminal failure ==> expected: <PENDING> but was: <COMPLETED> | providerReplacementAtCoordinatorBoundaryRevokesTheComputedOutcome(Stage, boolean) [2] EMBED, true: org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: retired execution cannot spend retries ==> expe"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/EnrichmentAuthorityRaceTest.java#providerReplacementWhilePublicationWaitsForMutationLockIsAtomic",
+        "classification": "assertion",
+        "detail": "providerReplacementWhilePublicationWaitsForMutationLockIsAtomic(Stage, boolean) [1] EMBED, false: org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: retired execution cannot publish success or terminal failure ==> expected: <PENDING> but was: <COMPLETED> | providerReplacementWhilePublicationWaitsForMutationLockIsAtomic(Stage, boolean) [2] EMBED, true: org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: retired execution cannot spend retries ==> expected"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/WindowedEmbedSliceValidationTest.java#invalidSliceRestartsWithoutBlendingAnyOfItsVectors",
+        "classification": "assertion",
+        "detail": "invalidSliceRestartsWithoutBlendingAnyOfItsVectors(String) [1] totals: org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: invalid slices restart at zero ==> expected: <0> but was: <2> | invalidSliceRestartsWithoutBlendingAnyOfItsVectors(String) [2] overrun: org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: invalid slices restart at zero ==> expected: <0> but was: <5> | invalidSliceRestartsWithoutBlendingAnyOfItsVectors(String) [3] null-list: org.opent"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/DisambiguationAuthorityTest.java#providerReplacementAfterClusteringCannotAcknowledgeOrPublishThePage",
+        "classification": "assertion",
+        "detail": "providerReplacementAfterClusteringCannotAcknowledgeOrPublishThePage(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: the old page must not advance its cursor or publish its snapshot under the new authority ==> Unexpected exception thrown: org.mockito.exceptions.verification.NeverWantedButInvoked: &#10;disambiguationService.acknowledgeReconciliation(&#10;    <any integer>,&#10;"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/EnrichmentUnitBoundaryTest.java#rejectedSlicesUseTheExistingRetryLimit",
+        "classification": "assertion",
+        "detail": "rejectedSlicesUseTheExistingRetryLimit(String) [1] replay: org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: a rejected slice cannot loop without charge ==> expected: <1> but was: <0> | rejectedSlicesUseTheExistingRetryLimit(String) [2] skip: org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: a rejected slice cannot loop without charge ==> expected: <1> but was: <0>"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/EnrichmentAuthorityRaceTest.java#republishingTheSameProviderRestartsItsRetainedWindows",
+        "classification": "assertion",
+        "detail": "republishingTheSameProviderRestartsItsRetainedWindows(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: a new publication cannot inherit a prior partial ==> expected: <[0, 0]> but was: <[0, 32]>"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/CombinedEnrichmentBackfillOpsTest.java#realPendingSpladeAllowsDeferralButNeverWritesThePreservationOnlyUpdate",
+        "classification": "assertion",
+        "detail": "realPendingSpladeAllowsDeferralButNeverWritesThePreservationOnlyUpdate(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: Unexpected exception thrown: org.mockito.exceptions.verification.NeverWantedButInvoked: &#10;embeddingProvider.embedDocumentWindows(&#10;    <any string>,&#10;    <any integer>,&#10;    <any integer>&#10;);&#10;Never wanted here:&#10;-> at io.justsearch.indexerwo"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/EnrichmentAttemptAccountingTest.java#cancelledFallbackPartitionsEverySelectedStageOnce",
+        "classification": "assertion",
+        "detail": "cancelledFallbackPartitionsEverySelectedStageOnce(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <12> but was: <0>"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/EnrichmentAttemptAccountingTest.java#partialWindowsAdvanceWithoutCompletingAnEmbedding",
+        "classification": "assertion",
+        "detail": "partialWindowsAdvanceWithoutCompletingAnEmbedding(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <1> but was: <0>"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/EnrichmentHardStopRepairTest.java#individualNerUnavailabilityBoundsEveryDocument",
+        "classification": "assertion",
+        "detail": "individualNerUnavailabilityBoundsEveryDocument(boolean) [1] false: org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: no unit starts after a hard stop ==> expected: <0> but was: <3> | individualNerUnavailabilityBoundsEveryDocument(boolean) [2] true: org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: no unit starts after a hard stop ==> expected: <1> but was: <3>"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/EnrichmentHardStopRepairTest.java#successfulFinalDenseCallCannotPublishAfterUnavailability",
+        "classification": "assertion",
+        "detail": "successfulFinalDenseCallCannotPublishAfterUnavailability(Route) [1] SINGLE_PASS: org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <true> but was: <false> | successfulFinalDenseCallCannotPublishAfterUnavailability(Route) [2] WINDOW: org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <true> but was: <false>"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/EnrichmentHardStopRepairTest.java#sparseRetirementWinsOverCancellation",
+        "classification": "assertion",
+        "detail": "sparseRetirementWinsOverCancellation(Route) [1] INDIVIDUAL_SPARSE: org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <true> but was: <false> | sparseRetirementWinsOverCancellation(Route) [2] INTERLEAVED_SPARSE: org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <true> but was: <false> | sparseRetirementWinsOverCancellation(Route) [3] INDIVIDUAL_SPARSE_CHUNK: org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: e"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/EnrichmentHardStopRepairTest.java#bgeSourceInvalidationAndInterruptionPreventTheFirstBatch",
+        "classification": "assertion",
+        "detail": "bgeSourceInvalidationAndInterruptionPreventTheFirstBatch(Route, Stop) [1] BGE, SOURCE: org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: no unit starts after a hard stop ==> expected: <0> but was: <1> | bgeSourceInvalidationAndInterruptionPreventTheFirstBatch(Route, Stop) [2] BGE, INTERRUPTION: org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: no unit starts after a hard stop ==> expected: <0> but was: <1> | bgeSourceInvalidationAndInterruptionPreven"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/EnrichmentHardStopRepairTest.java#bgeRetirementPreventsTheFirstBatch",
+        "classification": "assertion",
+        "detail": "bgeRetirementPreventsTheFirstBatch(Route, Stop) [1] BGE, TOKEN: org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: no unit starts after a hard stop ==> expected: <0> but was: <1> | bgeRetirementPreventsTheFirstBatch(Route, Stop) [2] BGE, UNAVAILABLE: org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: no unit starts after a hard stop ==> expected: <0> but was: <1> | bgeRetirementPreventsTheFirstBatch(Route, Stop) [3] BGE_CHUNK, TOKEN: org.opentest4j.Ass"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/EnrichmentHardStopRepairTest.java#combinedNerRejectsEveryOutcomeWhenTheServiceBecomesUnavailable",
+        "classification": "assertion",
+        "detail": "combinedNerRejectsEveryOutcomeWhenTheServiceBecomesUnavailable(Result) [1] SUCCESS: org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <1> but was: <100> | combinedNerRejectsEveryOutcomeWhenTheServiceBecomesUnavailable(Result) [2] FAILURE: org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <1> but was: <100> | combinedNerRejectsEveryOutcomeWhenTheServiceBecomesUnavailable(Result) [3] CANCELLATION: org.opentest4j.AssertionFailedError"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/EnrichmentHardStopRepairTest.java#sparseUnavailabilityRejectsComputedSuccessAndCancellation",
+        "classification": "assertion",
+        "detail": "sparseUnavailabilityRejectsComputedSuccessAndCancellation(Route, Result) [1] SPARSE, SUCCESS: org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: retired results cannot reach publication ==> expected: <true> but was: <false> | sparseUnavailabilityRejectsComputedSuccessAndCancellation(Route, Result) [2] SPARSE, CANCELLATION: org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <DEFERRED> but was: <CANCELLED> | sparseUnavailabilityRejectsComputedS"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/EnrichmentHardStopRepairTest.java#individualDenseFallbackUnavailabilityWinsOverCancellation",
+        "classification": "assertion",
+        "detail": "individualDenseFallbackUnavailabilityWinsOverCancellation(Route) [1] INDIVIDUAL_DENSE: org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <true> but was: <false> | individualDenseFallbackUnavailabilityWinsOverCancellation(Route) [2] INDIVIDUAL_CHUNK: org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <true> but was: <false>"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/EnrichmentHardStopRepairTest.java#individualDenseBatchUnavailabilityWinsOverCancellation",
+        "classification": "assertion",
+        "detail": "individualDenseBatchUnavailabilityWinsOverCancellation(Route) [1] INDIVIDUAL_DENSE: org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <DEFERRED> but was: <CANCELLED> | individualDenseBatchUnavailabilityWinsOverCancellation(Route) [2] INDIVIDUAL_CHUNK: org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <DEFERRED> but was: <CANCELLED>"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/EnrichmentHardStopRepairTest.java#bgeFallbackCannotStartAnotherUnitAfterAHardStop",
+        "classification": "assertion",
+        "detail": "bgeFallbackCannotStartAnotherUnitAfterAHardStop(Route, Stop) [1] BGE, SHUTDOWN: org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: a failed batch does not authorize a fallback through a hard stop ==> expected: <1> but was: <101> | bgeFallbackCannotStartAnotherUnitAfterAHardStop(Route, Stop) [2] BGE, INTERRUPTION: org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: a failed batch does not authorize a fallback through a hard stop ==> expected: <1> but was"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/EnrichmentAuthorityRaceTest.java#unavailableProviderCannotPublishItsSuccessfulFinalDenseResult",
+        "classification": "assertion",
+        "detail": "unavailableProviderCannotPublishItsSuccessfulFinalDenseResult(Stage) [1] SINGLE_PASS: org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: retired execution cannot publish success or terminal failure ==> expected: <PENDING> but was: <COMPLETED> | unavailableProviderCannotPublishItsSuccessfulFinalDenseResult(Stage) [2] WINDOW: org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: retired execution cannot publish success or terminal failure ==> expected: <PEN"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/EnrichmentAuthorityRaceTest.java#replacedProviderCancellationStaysDeferredThroughTheRealWriter",
+        "classification": "assertion",
+        "detail": "replacedProviderCancellationStaysDeferredThroughTheRealWriter(Stage) [1] SPARSE: org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: retired success and failure outcomes stay deferred without retry charge ==> expected: <true> but was: <false> | replacedProviderCancellationStaysDeferredThroughTheRealWriter(Stage) [2] INTERLEAVED: org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: retired success and failure outcomes stay deferred without retry charge ==>"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/DisambiguationAuthorityTest.java#serviceUnavailabilityCannotPublishOrAcknowledgeThePage",
+        "classification": "assertion",
+        "detail": "serviceUnavailabilityCannotPublishOrAcknowledgeThePage(boolean) [1] false: org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: Unexpected exception thrown: org.mockito.exceptions.verification.NeverWantedButInvoked: &#10;disambiguationService.replaceSources(&#10;    <any map>,&#10;    <any>&#10;);&#10;Never wanted here:&#10;-> at io.justsearch.indexerworker.disambiguation.DisambiguationSe | serviceUnavailabilityCannotPublishOrAcknowledgeThePage(boolean) [2] true: org.opentest"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/EnrichmentAuthorityRaceTest.java#retiredBgeCannotPublishAnyFinalOutcomeThroughTheRealWriter",
+        "classification": "assertion",
+        "detail": "retiredBgeCannotPublishAnyFinalOutcomeThroughTheRealWriter(Stage, boolean, String) [1] BGE, false, success: org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: retired execution cannot publish success or terminal failure ==> expected: <PENDING> but was: <COMPLETED> | retiredBgeCannotPublishAnyFinalOutcomeThroughTheRealWriter(Stage, boolean, String) [2] BGE, false, failure: org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: retirement cannot charge the p"
+      }
+    ]
+  },
+  "digest": "sha256:e89d61e0a22a4f41f5695635c8d12a453eff772395a2c24bcb96acc8deeb29a6"
+}

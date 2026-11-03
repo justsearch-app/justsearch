@@ -34,6 +34,41 @@ import java.util.Map;
  * indexing-loop thread.
  */
 public final class WindowedEmbedProgress {
+  public enum Route { WINDOW, ORDINARY }
+
+  /** Runtime authority also distinguishes index generations and every provider publication. */
+  public record Identity(Object authority, long sourceEpoch, Object provider, int dimension, String uid,
+      String contentRevision, String sourceRevision) {}
+
+  /** Bind before reading routing or sums; identical text is insufficient proof of ownership. */
+  public void identify(String docId, String content, Identity identity) {
+    nextWindow(docId, content);
+    Partial partial = byDocId.get(docId);
+    if (partial == null || (partial.identity != null && !partial.identity.equals(identity))) {
+      partial = new Partial(fingerprintOf(content));
+      byDocId.put(docId, partial);
+    }
+    partial.identity = identity;
+  }
+
+  public Route route(String docId, String content) {
+    nextWindow(docId, content);
+    Partial partial = byDocId.get(docId);
+    return partial == null ? null : partial.route;
+  }
+
+  public void route(String docId, String content, Route route) {
+    nextWindow(docId, content);
+    byDocId.computeIfAbsent(docId, ignored -> new Partial(fingerprintOf(content))).route = route;
+  }
+
+  public void restartWindows(String docId, String content) {
+    Partial previous = byDocId.get(docId);
+    Partial restart = new Partial(fingerprintOf(content));
+    restart.identity = previous == null ? null : previous.identity;
+    restart.route = Route.WINDOW;
+    byDocId.put(docId, restart);
+  }
 
   /**
    * How many partially-embedded documents may be tracked at once. One entry is {@code
@@ -60,6 +95,8 @@ public final class WindowedEmbedProgress {
     private int totalWindows;
     private int nextWindow;
     private double[] sum;
+    private Route route;
+    private Identity identity;
 
     private Partial(String fingerprint) {
       this.fingerprint = fingerprint;
@@ -103,19 +140,37 @@ public final class WindowedEmbedProgress {
       partial = new Partial(fingerprint);
       byDocId.put(docId, partial);
     }
-    if (fromWindow != partial.nextWindow) {
-      return partial.nextWindow;
-    }
-    partial.totalWindows = Math.max(totalWindows, partial.totalWindows);
-    for (float[] vector : windowVectors) {
-      if (vector == null || vector.length == 0) {
-        continue;
+    int dimension = partial.sum != null ? partial.sum.length
+        : partial.identity == null ? 0 : partial.identity.dimension();
+    boolean valid = totalWindows > 0
+        && (partial.totalWindows == 0 || totalWindows == partial.totalWindows)
+        && windowVectors != null && !windowVectors.isEmpty()
+        && fromWindow >= 0 && fromWindow <= totalWindows
+        && windowVectors.size() <= totalWindows - fromWindow;
+    if (valid) {
+      for (float[] vector : windowVectors) {
+        if (vector == null || vector.length == 0) { valid = false; break; }
+        if (dimension == 0) dimension = vector.length;
+        if (dimension != vector.length) { valid = false; break; }
+        for (float value : vector) {
+          if (!Float.isFinite(value)) { valid = false; break; }
+        }
+        if (!valid) break;
       }
+    }
+    if (!valid) {
+      restartWindows(docId, content);
+      return 0;
+    }
+    // A replay or skip says nothing about the valid sum already retained.
+    if (fromWindow != partial.nextWindow) return partial.nextWindow;
+    partial.totalWindows = totalWindows;
+    partial.route = Route.WINDOW;
+    for (float[] vector : windowVectors) {
       if (partial.sum == null) {
         partial.sum = new double[vector.length];
       }
-      int dim = Math.min(vector.length, partial.sum.length);
-      for (int i = 0; i < dim; i++) {
+      for (int i = 0; i < vector.length; i++) {
         partial.sum[i] += vector[i];
       }
       partial.nextWindow++;
@@ -166,9 +221,9 @@ public final class WindowedEmbedProgress {
     byDocId.remove(docId);
   }
 
-  /** How many documents currently hold partial window progress — diagnostics and tests. */
+  /** Computed window progress only; route-only entries share the cap but are not window work. */
   public int trackedDocuments() {
-    return byDocId.size();
+    return (int) byDocId.values().stream().filter(partial -> partial.sum != null).count();
   }
 
   /** Drops every partial. Called from {@code resetForProfiling}. */

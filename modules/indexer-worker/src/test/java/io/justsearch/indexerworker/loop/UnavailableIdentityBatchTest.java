@@ -74,7 +74,9 @@ final class UnavailableIdentityBatchTest {
       var extractor = IndexingLoop.class.getDeclaredField("extractor");
       extractor.setAccessible(true);
       assertEquals(8_000, ((JobBatchExtractor) extractor.get(loop)).retryDelayMs());
-      verifyNoInteractions(writer);
+      // Scheduler construction binds the lifecycle fence; unavailable ingestion must do no work.
+      verify(writer).transitionEnrichmentAuthority(any(Runnable.class));
+      verifyNoMoreInteractions(writer);
     }
   }
 }

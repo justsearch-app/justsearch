@@ -55,7 +55,7 @@ class EnrichmentMapperDispositionTest extends LuceneExecutorTestBase {
         var applied = (EnrichmentPublicationReceipt) call.callRealMethod();
         receipt.set(applied);
         return applied;
-      }).when(coordinator).publishEnrichmentBatch(anyList(), anyMap());
+      }).when(coordinator).publishEnrichmentBatch(anyList(), anyMap(), any());
       var outcome = assertDoesNotThrow(() -> CombinedEnrichmentBackfillOps.processCombinedBackfill(
           new CombinedEnrichmentBackfillOps.BackfillContext(runtime.documentFieldOps(),
               coordinator, runtime.commitOps(), IndexingPacing.unthrottled(),

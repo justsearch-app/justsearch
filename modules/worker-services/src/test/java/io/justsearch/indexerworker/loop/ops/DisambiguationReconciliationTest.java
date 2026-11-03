@@ -233,7 +233,7 @@ class DisambiguationReconciliationTest extends LuceneExecutorTestBase {
       doAnswer(call -> {
         call.callRealMethod();
         throw new IllegalStateException("failure after real Lucene publication");
-      }).when(publisher).publishEnrichmentBatch(anyList(), anyMap());
+      }).when(publisher).publishEnrichmentBatch(anyList(), anyMap(), any());
     }
     if (combined) {
       CombinedEnrichmentBackfillOps.processCombinedBackfill(new CombinedEnrichmentBackfillOps.BackfillContext(

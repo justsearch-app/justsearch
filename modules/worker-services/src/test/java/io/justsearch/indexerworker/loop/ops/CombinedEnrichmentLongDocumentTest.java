@@ -97,7 +97,7 @@ class CombinedEnrichmentLongDocumentTest {
   @Mock DocumentFieldOps documentFieldOps;
   @Mock IndexingCoordinator indexingCoordinator;
   @Mock CommitOps commitOps;
-  @Mock EmbeddingProvider embeddingProvider;
+  @Mock io.justsearch.indexerworker.embed.EmbeddingService embeddingProvider;
   @Mock SpladeEncoder spladeEncoder;
   @Mock NerService nerService;
 
@@ -340,7 +340,6 @@ class CombinedEnrichmentLongDocumentTest {
   }
 
   @Test
-  @DisplayName("late-chunk null fallback records one real window, then resumes without another probe")
   void lateChunkNullFallbackRecordsAndResumesAWindowAfterTheProbeSpentTheDeadline() {
     seedLateChunkedLongParent("long-fallback");
     WindowedEmbedProgress progress = new WindowedEmbedProgress();
@@ -350,18 +349,18 @@ class CombinedEnrichmentLongDocumentTest {
         context(progress, false, false, 1, Integer.MAX_VALUE, true, () -> false));
 
     assertEquals(1, singlePassRequests.get(), "the first cycle classifies through single-pass once");
-    assertEquals(List.of("long-fallback@0"), windowRequests);
-    assertEquals(
-        WINDOW_SLICE,
-        progress.nextWindow("long-fallback", "LONG:long-fallback"),
-        "the deadline spent by the probe must not prevent the first resumable window");
+    assertEquals(List.of(), windowRequests,
+        "E3a-2/3: deadlines bound starting units; classification is its own unit");
+    assertEquals(0, progress.nextWindow("long-fallback", "LONG:long-fallback"),
+        "retain the routing decision so the next turn does useful work");
 
     newCycle();
     CombinedEnrichmentBackfillOps.processCombinedBackfill(
         context(progress, false, false, 1, Integer.MAX_VALUE, true, () -> false));
 
     assertEquals(1, singlePassRequests.get(), "a matching partial must bypass single-pass later");
-    assertEquals(List.of("long-fallback@0", "long-fallback@32"), windowRequests);
+    assertEquals(List.of("long-fallback@0"), windowRequests,
+        "the retained route starts windows without paying for classification again");
     verify(embeddingProvider, never()).documentWindowCount("LONG:long-fallback");
   }
 

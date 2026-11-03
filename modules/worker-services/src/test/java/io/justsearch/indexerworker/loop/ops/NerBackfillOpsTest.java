@@ -30,6 +30,7 @@ class NerBackfillOpsTest {
 
   @BeforeEach void snapshots() throws Exception {
     BackfillSnapshotTestSupport.install(documentFieldOps, indexingCoordinator, true, Set.of());
+    lenient().when(nerService.isAvailable()).thenReturn(true);
   }
 
   @Mock DocumentFieldOps documentFieldOps;
