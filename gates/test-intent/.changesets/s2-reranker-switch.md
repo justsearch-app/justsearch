@@ -913,3 +913,25 @@ verifier supplies acceptance after reviewing the final candidate. No acceptance 
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verifier-s2r-acc2",
+  "verdict": "accept",
+  "digest": "sha256:cd3505403c6034bb6799113771b73d15c9c412b80bb8a4680454673128ad09aa",
+  "note": "Acceptance by independent verifier session verifier-s2r-acc2 (Codex): accept, all entries. Transcribed by the orchestrator."
+}
+```
+
+```json
+{
+  "kind": "audit",
+  "role": "reviewer",
+  "session": "reviewer-39",
+  "verdict": "reject",
+  "digest": "sha256:cd3505403c6034bb6799113771b73d15c9c412b80bb8a4680454673128ad09aa",
+  "note": "Audit by independent reviewer session reviewer-39 (Codex): reject entry 13 only (wire evidence recorded before the rebase). Transcribed by the orchestrator."
+}
+```
