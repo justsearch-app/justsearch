@@ -782,7 +782,6 @@ class CombinedEnrichmentBackfillOpsTest {
   }
 
   @Test
-  @DisplayName("real pending SPLADE reserves its share while deferring a completed-parent bundle")
   void realPendingSpladeAllowsDeferralButNeverWritesThePreservationOnlyUpdate() throws Exception {
     seedDoc("window-first", "first content", Map.of(
         SchemaFields.EMBEDDING_STATUS, SchemaFields.EMBEDDING_STATUS_PENDING));

@@ -340,7 +340,6 @@ class CombinedEnrichmentLongDocumentTest {
   }
 
   @Test
-  @DisplayName("E3a-3: deadline-spent classification retains routing without starting a window")
   void lateChunkNullFallbackRecordsAndResumesAWindowAfterTheProbeSpentTheDeadline() {
     seedLateChunkedLongParent("long-fallback");
     WindowedEmbedProgress progress = new WindowedEmbedProgress();
