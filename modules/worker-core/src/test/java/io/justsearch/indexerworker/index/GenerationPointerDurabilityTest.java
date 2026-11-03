@@ -41,12 +41,14 @@ class GenerationPointerDurabilityTest {
     assertArrayEquals(valid, Files.readAllBytes(temporary.resolve("state.json")));
   }
 
-  @ParameterizedTest
+  @ParameterizedTest(name = "{displayName} [{index}] {arguments}")
   @org.junit.jupiter.params.provider.ValueSource(booleans = {false, true})
-  void bootRemovesOnlyOwnScratchAfterReadingOrRepairingAuthority(boolean repair) throws Exception {
+  void bootKeepsUnprovenScratchAndRemovesOnlyValidatedStateTemps(boolean repair) throws Exception {
     var manager = new IndexGenerationManager(temporary);
     manager.initializeOrLoad();
     manager.setMigrationPaused(true, "keep previous");
+    Path validated = temporary.resolve("state.json.234567890.tmp");
+    Files.copy(temporary.resolve("state.json"), validated);
     if (repair) Files.writeString(temporary.resolve("state.json"), "{torn");
     Path scratch = temporary.resolve("state.json.123456789.tmp");
     Files.writeString(scratch, "{interrupted publication");
@@ -60,7 +62,9 @@ class GenerationPointerDurabilityTest {
     var boot = new IndexGenerationManager(temporary).initializeForBoot(
         new IndexGenerationManager.BootOwnership.Native(), FINGERPRINT);
     assertNotNull(boot.layout().state());
-    assertFalse(Files.exists(scratch), "a completed boot must reap this writer's interrupted temp");
+    assertEquals("{interrupted publication", assertDoesNotThrow(() -> Files.readString(scratch)),
+        "a filename cannot prove who wrote an incomplete temporary");
+    assertFalse(Files.exists(validated), "only a complete owned-state snapshot authorizes temporary cleanup");
     for (String name : retained) assertEquals("other writer", Files.readString(temporary.resolve(name)));
     assertTrue(Files.isDirectory(directory));
     if (supportsSymlinks) assertTrue(Files.isSymbolicLink(link));

@@ -16,7 +16,7 @@ import java.nio.file.FileAlreadyExistsException;
 import java.nio.file.Path;
 
 /** Windows entry security, including protection against later parent ACL changes. */
-final class WindowsOwnerOnlyDirectory {
+public final class WindowsOwnerOnlyDirectory {
   // Protected DACL; owner and SYSTEM have full control, inherited by files and subdirectories.
   static final String SDDL = "D:P(A;OICI;FA;;;OW)(A;OICI;FA;;;SY)";
   // DACL_SECURITY_INFORMATION | PROTECTED_DACL_SECURITY_INFORMATION.
@@ -62,6 +62,46 @@ final class WindowsOwnerOnlyDirectory {
       throw fatal;
     } catch (Throwable unavailable) {
       throw new IOException("Windows directory security unavailable for " + path, unavailable);
+    }
+  }
+
+  /** Opens the entry itself and rejects reparse points before an index operation. */
+  public static void requireNonReparsePoint(Path path) throws IOException {
+    inspectEntry(path, false);
+  }
+
+  /** Opens the entry itself and requires one link for historical index recovery admission. */
+  public static void requireSingleLink(Path path) throws IOException {
+    inspectEntry(path, true);
+  }
+
+  private static void inspectEntry(Path path, boolean singleLink) throws IOException {
+    try (Arena arena = Arena.ofConfined()) {
+      MemorySegment captured = arena.allocate(Win32.STATE);
+      MemorySegment handle = (MemorySegment) Win32.OPEN.invokeExact(captured,
+          wide(arena, path.toString()), 0, 7, MemorySegment.NULL, 3, 0x02200000,
+          MemorySegment.NULL);
+      if (handle.address() == -1L || handle.address() == 0L) throw failure(path, captured);
+      try {
+        MemorySegment information = arena.allocate(52, 4);
+        if ((int) Win32.INFORMATION.invokeExact(captured, handle, information) == 0) {
+          throw failure(path, captured);
+        }
+        if ((information.get(ValueLayout.JAVA_INT, 0) & 0x400) != 0) {
+          throw new IOException("Reparse point is not an owned entry: " + path);
+        }
+        if (singleLink && Integer.toUnsignedLong(information.get(ValueLayout.JAVA_INT, 40)) != 1) {
+          throw new IOException("Entry must have exactly one link: " + path);
+        }
+      } finally {
+        int _ = (int) Win32.CLOSE.invokeExact(handle);
+      }
+    } catch (IOException failure) {
+      throw failure;
+    } catch (VirtualMachineError fatal) {
+      throw fatal;
+    } catch (Throwable unavailable) {
+      throw new IOException("Cannot inspect Windows entry: " + path, unavailable);
     }
   }
 

@@ -69,8 +69,8 @@ class RecoveryIntegrationTest extends RuntimeTestBase {
   @Test
   void corruptIndexAutoRecoveryProducesBackupAndFreshIndex() throws Exception {
     Path dataRoot = dataDir();
-    Path indexPath = dataRoot.resolve("idx");
-    Files.createDirectories(indexPath);
+    Path indexPath = dataRoot.resolve("indices/idx");
+    createOwnedGeneration(indexPath);
 
     IndexSchema schema = buildSchemaWithDim(4);
 
@@ -180,8 +180,8 @@ class RecoveryIntegrationTest extends RuntimeTestBase {
         System.getProperty("os.name", "").toLowerCase(java.util.Locale.ROOT).contains("win"),
         "share modes are a Windows file-system feature");
     Path dataRoot = dataDir();
-    Path indexPath = dataRoot.resolve("idx-locked");
-    Files.createDirectories(indexPath);
+    Path indexPath = dataRoot.resolve("indices/idx-locked");
+    createOwnedGeneration(indexPath);
     IndexSchema schema = buildSchemaWithDim(4);
     RunningRuntime seed = schema.atPath(indexPath).withExecutorRegistrations(testLuceneExecutors())
         .withFallbackIndexPath(dataRoot).open();
@@ -243,8 +243,8 @@ class RecoveryIntegrationTest extends RuntimeTestBase {
   @Test
   void corruptIndexWithoutAutoRecoveryFailsFast() throws Exception {
     Path dataRoot = dataDir();
-    Path indexPath = dataRoot.resolve("idx-noauto");
-    Files.createDirectories(indexPath);
+    Path indexPath = dataRoot.resolve("indices/idx-noauto");
+    createOwnedGeneration(indexPath);
 
     IndexSchema schema = buildSchemaWithDim(4);
 
@@ -291,8 +291,8 @@ class RecoveryIntegrationTest extends RuntimeTestBase {
   @Test
   void schemaMismatchRebuildBackupFirstProducesBackupAndFreshIndex() throws Exception {
     Path dataRoot = dataDir();
-    Path indexPath = dataRoot.resolve("schema-idx");
-    Files.createDirectories(indexPath);
+    Path indexPath = dataRoot.resolve("indices/schema-idx");
+    createOwnedGeneration(indexPath);
 
     // Schema A: title is a TEXT field (IndexOptions=DOCS_AND_FREQS_AND_POSITIONS,
     // DocValuesType=NONE). Seed the index with one doc that exercises the field.
@@ -358,8 +358,8 @@ class RecoveryIntegrationTest extends RuntimeTestBase {
   @Test
   void schemaMismatchWithoutRebuildPolicyFailsFast() throws Exception {
     Path dataRoot = dataDir();
-    Path indexPath = dataRoot.resolve("schema-idx-strict");
-    Files.createDirectories(indexPath);
+    Path indexPath = dataRoot.resolve("indices/schema-idx-strict");
+    createOwnedGeneration(indexPath);
 
     IndexSchema schemaA = buildSchemaWithTitleType("text");
     RunningRuntime seed = schemaA.atPath(indexPath).withExecutorRegistrations(testLuceneExecutors()).withFallbackIndexPath(dataRoot).open();
@@ -405,8 +405,8 @@ class RecoveryIntegrationTest extends RuntimeTestBase {
   void withoutRecoveryPreservesCorruptIndexEvenWhenRecoveryConfigIsEnabled(CorruptOpenMode mode)
       throws Exception {
     Path dataRoot = dataDir();
-    Path indexPath = dataRoot.resolve("corrupt-no-recovery-" + mode.name().toLowerCase(java.util.Locale.ROOT));
-    Files.createDirectories(indexPath);
+    Path indexPath = dataRoot.resolve("indices/corrupt-no-recovery-" + mode.name().toLowerCase(java.util.Locale.ROOT));
+    createOwnedGeneration(indexPath);
     IndexSchema schema = buildSchemaWithDim(4);
 
     RunningRuntime seed = schema.atPath(indexPath).withExecutorRegistrations(testLuceneExecutors())
@@ -440,8 +440,8 @@ class RecoveryIntegrationTest extends RuntimeTestBase {
   @Test
   void withoutRecoveryPreservesWritableSchemaMismatchWithBackupFirstConfig() throws Exception {
     Path dataRoot = dataDir();
-    Path indexPath = dataRoot.resolve("schema-no-recovery-writable");
-    Files.createDirectories(indexPath);
+    Path indexPath = dataRoot.resolve("indices/schema-no-recovery-writable");
+    createOwnedGeneration(indexPath);
     IndexSchema originalSchema = buildSchemaWithTitleType("text");
     RunningRuntime seed = originalSchema.atPath(indexPath).withExecutorRegistrations(testLuceneExecutors())
         .withFallbackIndexPath(dataRoot).open();
@@ -476,8 +476,8 @@ class RecoveryIntegrationTest extends RuntimeTestBase {
   @Test
   void withoutRecoveryAllowsReadOnlySchemaMismatchWithoutChangingOriginalIndex() throws Exception {
     Path dataRoot = dataDir();
-    Path indexPath = dataRoot.resolve("schema-no-recovery-readonly");
-    Files.createDirectories(indexPath);
+    Path indexPath = dataRoot.resolve("indices/schema-no-recovery-readonly");
+    createOwnedGeneration(indexPath);
     IndexSchema originalSchema = buildSchemaWithTitleType("text");
     RunningRuntime seed = originalSchema.atPath(indexPath).withExecutorRegistrations(testLuceneExecutors())
         .withFallbackIndexPath(dataRoot).open();
@@ -515,8 +515,8 @@ class RecoveryIntegrationTest extends RuntimeTestBase {
   @Test
   void bodyCorruptionRecoversAndDropsRebuildMarker() throws Exception {
     Path dataRoot = dataDir();
-    Path indexPath = dataRoot.resolve("body-corrupt-idx");
-    Files.createDirectories(indexPath);
+    Path indexPath = dataRoot.resolve("indices/body-corrupt-idx");
+    createOwnedGeneration(indexPath);
 
     IndexSchema schema = buildSchemaWithDim(4);
     RunningRuntime seed = schema.atPath(indexPath).withExecutorRegistrations(testLuceneExecutors()).withFallbackIndexPath(dataRoot).open();
@@ -564,8 +564,8 @@ class RecoveryIntegrationTest extends RuntimeTestBase {
     // which throws "no index exists". The fix materializes a fresh empty commit before the read-only
     // reopen. Unit tests using the read-WRITE open() path missed this.
     Path dataRoot = dataDir();
-    Path indexPath = dataRoot.resolve("deferred-corrupt-idx");
-    Files.createDirectories(indexPath);
+    Path indexPath = dataRoot.resolve("indices/deferred-corrupt-idx");
+    createOwnedGeneration(indexPath);
 
     IndexSchema schema = buildSchemaWithDim(4);
     RunningRuntime seed = schema.atPath(indexPath).withExecutorRegistrations(testLuceneExecutors()).withFallbackIndexPath(dataRoot).open();
@@ -610,8 +610,8 @@ class RecoveryIntegrationTest extends RuntimeTestBase {
     // later read-only boot report a crash that had not happened. The read-only half is now pinned
     // the other way in CleanShutdownMarkerLifecycleTest.
     Path dataRoot = dataDir();
-    Path indexPath = dataRoot.resolve("marker-lifecycle-idx");
-    Files.createDirectories(indexPath);
+    Path indexPath = dataRoot.resolve("indices/marker-lifecycle-idx");
+    createOwnedGeneration(indexPath);
 
     IndexSchema schema = buildSchemaWithDim(4);
     RunningRuntime rw = schema.atPath(indexPath).withExecutorRegistrations(testLuceneExecutors()).withFallbackIndexPath(dataRoot).open();
@@ -774,6 +774,16 @@ class RecoveryIntegrationTest extends RuntimeTestBase {
 
   private static String schemaMismatchPolicyYaml(String policy) {
     return "index:\n  schema_mismatch:\n    policy: " + policy + "\n";
+  }
+
+  private static void createOwnedGeneration(Path indexPath) throws IOException {
+    Files.createDirectories(indexPath);
+    String identity = indexPath.getFileName().toString();
+    Files.writeString(indexPath.resolve(".justsearch-generation.sentinel"),
+        "justsearch_generation_sentinel_v1\ngeneration_id=" + identity + "\ncreated_at_ms=1\n");
+    Files.writeString(indexPath.resolve(".justsearch-index-generation.json"),
+        "{\"format_version\":1,\"generation_id\":\"" + identity
+            + "\",\"source\":\"new\",\"created_at_ms\":2}");
   }
 
   private static ResolvedConfig resolvedConfigWith(String yaml) throws Exception {

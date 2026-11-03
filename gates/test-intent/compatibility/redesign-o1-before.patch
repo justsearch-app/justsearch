@@ -1,0 +1,38 @@
+--- a/modules/worker-core/src/main/java/io/justsearch/indexerworker/index/IndexGenerationManager.java
++++ b/modules/worker-core/src/main/java/io/justsearch/indexerworker/index/IndexGenerationManager.java
+@@ -2826,6 +2826,9 @@
+       }
+     }
+   }
++
++  public record CleanupWarning(String path, String reason) {}
++  public List<CleanupWarning> cleanupWarnings() { return List.of(); }
+ 
+   public record GcResult(int markedCount, int prunedCount) {}
+ 
+--- a/modules/app-api/src/main/java/io/justsearch/app/api/IndexingService.java
++++ b/modules/app-api/src/main/java/io/justsearch/app/api/IndexingService.java
+@@ -355,7 +355,13 @@
+    * @param prunedCount number of marked generations physically removed (0 if rejected)
+    * @param error worker error message when {@code accepted=false}; empty string on success
+    */
++  record IndexCleanupWarning(String path, String reason) {}
++
+   record IndexGcOutcome(boolean accepted, int markedCount, int prunedCount, String error) {
++    public IndexGcOutcome(boolean accepted, int markedCount, int prunedCount, String error,
++        int emptyLeftoversRemoved, java.util.List<IndexCleanupWarning> cleanupWarnings) {
++      this(accepted, markedCount, prunedCount, error);
++    }
+     public IndexGcOutcome {
+       java.util.Objects.requireNonNull(error, "error");
+     }
+--- a/modules/ui-web/src/shell-v0/state/readinessNotice.ts
++++ b/modules/ui-web/src/shell-v0/state/readinessNotice.ts
+@@ -883,6 +883,7 @@
+ export function readinessNotice(
+   verdict: SystemHealthVerdict,
+   activity?: IndexingProgress['activity'],
++  _ownershipDetail?: string,
+ ): ReadinessNoticeView | null {
+   if (activity && !activity.confirmed && verdict.kind !== 'unreachable' && verdict.reasons.some(isIndexingObservation)) {
+     return {

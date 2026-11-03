@@ -24,8 +24,10 @@ public record MigrationGenerationView(
     String migrationPauseReason,
     long migrationPausedAtMs,
     String migrationSource,
-    MigrationEnumeratorView migrationEnumerator) {
+    MigrationEnumeratorView migrationEnumerator,
+    java.util.List<io.justsearch.app.api.IndexingService.IndexCleanupWarning> cleanupWarnings) {
   public MigrationGenerationView {
+    cleanupWarnings = cleanupWarnings == null ? java.util.List.of() : java.util.List.copyOf(cleanupWarnings);
     activeGenerationId = activeGenerationId == null ? "" : activeGenerationId;
     migrationState = migrationState == null ? "" : migrationState;
     buildingGenerationId = buildingGenerationId == null ? "" : buildingGenerationId;

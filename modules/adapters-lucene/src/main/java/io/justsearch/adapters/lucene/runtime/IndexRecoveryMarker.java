@@ -40,8 +40,11 @@ public final class IndexRecoveryMarker {
   /** Writes the marker recording why a rebuild is pending (best-effort, never throws checked). */
   public static void write(Path indexDir, String reason) {
     try {
-      Files.writeString(pathFor(indexDir), (reason == null ? "unknown" : reason) + "\n",
-          StandardCharsets.UTF_8);
+      Path path = pathFor(indexDir);
+      requireRegularIfPresent(path);
+      byte[] body = ((reason == null ? "unknown" : reason) + "\n").getBytes(StandardCharsets.UTF_8);
+      if (body.length > 1_024 || parseReason(body) == null) throw new IOException("Invalid rebuild marker reason");
+      IndexOwnership.replaceControl(path, body);
     } catch (IOException e) {
       throw new UncheckedIOException("Failed to write index rebuild-pending marker", e);
     }
@@ -49,22 +52,46 @@ public final class IndexRecoveryMarker {
 
   /** True if a rebuild-pending marker exists for the given index directory. */
   public static boolean exists(Path indexDir) {
-    return Files.exists(pathFor(indexDir));
+    try {
+      requireRegularIfPresent(pathFor(indexDir));
+      return IndexOwnership.entryExists(pathFor(indexDir));
+    } catch (IOException refusal) { throw new UncheckedIOException(refusal); }
   }
 
   /** Reads the recorded reason, or {@code null} if no marker / unreadable. */
   public static String readReason(Path indexDir) {
     try {
       Path p = pathFor(indexDir);
-      return Files.exists(p) ? Files.readString(p, StandardCharsets.UTF_8).trim() : null;
+      requireRegularIfPresent(p);
+      if (!IndexOwnership.entryExists(p)) return null;
+      String reason = parseReason(IndexOwnership.readBounded(p, 1_024));
+      return reason == null ? "malformed" : reason;
     } catch (IOException e) {
-      return null;
+      return "malformed";
     }
+  }
+
+  private static void requireRegularIfPresent(Path path) throws IOException {
+    if (IndexOwnership.entryExists(path)
+        && !IndexOwnership.plainAttributes(path).isRegularFile()) {
+      throw new IndexOwnership.Unproven(path, "unexpected control object");
+    }
+  }
+
+  private static String parseReason(byte[] bytes) throws java.nio.charset.CharacterCodingException {
+    String text = StandardCharsets.UTF_8.newDecoder()
+        .onMalformedInput(java.nio.charset.CodingErrorAction.REPORT)
+        .decode(java.nio.ByteBuffer.wrap(bytes)).toString();
+    var lines = text.lines().toList();
+    if (lines.size() != 1) return null;
+    String reason = lines.get(0).trim();
+    return reason.isBlank() || reason.chars().anyMatch(Character::isISOControl) ? null : reason;
   }
 
   /** Removes the marker once the rebuild has been kicked off (idempotent). */
   public static void clear(Path indexDir) {
     try {
+      requireRegularIfPresent(pathFor(indexDir));
       Files.deleteIfExists(pathFor(indexDir));
     } catch (IOException e) {
       throw new UncheckedIOException("Failed to clear index rebuild-pending marker", e);

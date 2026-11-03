@@ -33,17 +33,15 @@ final class Release030RetirementCompletedBuildTest {
     var original = state(root);
     Path explicit = root.resolve("explicit.txt"), added = root.resolve("completed-b-only.txt");
     Path deleted = root.resolve("roots/beta/file-02.txt");
-    Path sentinel = Release030RetirementSafetyTest.buildingSentinel(root);
-    String owner = Files.readString(sentinel);
     ConfigStore previous = ConfigStore.globalOrNull();
     var installed = configure(root);
     var permissions = Files.getPosixFilePermissions(explicit);
     try {
       var models = new ReleasedModelIdentities(root);
       try (models) {
-        Files.writeString(sentinel, "uncertified B during historical fixture admission");
-        try (var executors = new TestEngineExecutors(); var server = boot(root, executors)) {
-          Files.writeString(sentinel, owner);
+        try (var certificate = Release030RetirementSafetyTest.denyCommittedCompatibility();
+            var executors = new TestEngineExecutors(); var server = boot(root, executors)) {
+          certificate.reset();
           Release030RetirementSafetyTest.stopMonitor(server);
           Release030ExactFileRecoveryTest.activateNative(server);
           assertTrue(server.appServices().ingestService().resumeMigration(
@@ -85,7 +83,7 @@ final class Release030RetirementCompletedBuildTest {
           assertEquals(3, completed.size());
           assertEquals(completed.size(), queue.removeReplayedSwitchBufferOps(completed));
           assertTrue(queue.listSwitchBufferOpsStrict().stream().noneMatch(op -> op.key().equals("path:" + key(added))));
-        } finally { Files.writeString(sentinel, owner); }
+        }
         Path building = root.resolve("data/index/default/indices").resolve(original.building_generation());
         assertTrue(CleanShutdownMarker.wasClean(building), "the real historical B writer closed cleanly");
         IndexRecoveryMarker.write(building, "obsolete completed migration");

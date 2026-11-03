@@ -221,7 +221,7 @@ public final class Release030Fixture {
 
   /** Re-encodes paths with the RELEASE catalog and commit data, never today's catalog/identity. */
   private static void relocateIndex(Path generation, Path root) throws Exception {
-    Path relocated = generation.resolveSibling(generation.getFileName() + ".relocated");
+    Path relocated = Files.createTempDirectory(root, "relocated-");
     var catalog = releaseCatalog();
     try (var directory = FSDirectory.open(generation);
         var reader = DirectoryReader.open(directory);

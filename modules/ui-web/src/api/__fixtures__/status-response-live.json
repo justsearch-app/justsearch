@@ -96,7 +96,8 @@
         "startedAtMs" : 0,
         "finishedAtMs" : 0,
         "lastPath" : ""
-      }
+      },
+      "cleanupWarnings" : [ ]
     },
     "compatibility" : {
       "embeddingCompatState" : "",
@@ -426,7 +427,8 @@
       "finishedAtMs" : 0,
       "lastPath" : ""
     },
-    "migrationSource" : ""
+    "migrationSource" : "",
+    "cleanupWarnings" : [ ]
   },
   "gpu" : {
     "available" : false,

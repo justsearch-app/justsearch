@@ -12,6 +12,7 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
 import {
+  OPEN_HEALTH,
   classifyConsequence,
   readinessNotice,
   reasonFor,
@@ -745,4 +746,23 @@ it.each([
   expect(notice?.body).toBe("Results may miss some documents' semantic matches; keyword search covers them");
   expect(notice?.body).not.toContain('fully');
   expect(warrantsSearchDegradationBanner(degraded('warn', [code]))).toBe(true);
+});
+
+
+describe('index ownership refusal', () => {
+  it('S16: an empty ownership detail keeps the manual recovery instruction', () => {
+    const notice = readinessNotice(degraded('error', ['index.ownership_unproven']), undefined, '  ');
+    expect(notice?.body).toContain('Nothing was changed');
+    expect(notice?.body).toContain('restart');
+    expect(notice?.remedy).toEqual(OPEN_HEALTH);
+  });
+  it('S16: shows unavailable search, the rejected folder and manual remedy without Rebuild', () => {
+    const detail = 'Search could not start because JustSearch cannot verify that the folder /index/indices/foreign belongs to it. Nothing in it was changed. If it is your JustSearch index, restore it from a backup; otherwise move it out of the index folder, then restart.';
+    const notice = readinessNotice(degraded('error', ['index.ownership_unproven']), undefined, detail);
+    expect(notice?.headline).toBe('Search is unavailable');
+    expect(notice?.body).toBe(detail);
+    expect(notice?.remedy).toEqual(OPEN_HEALTH);
+    expect(notice?.body).not.toMatch(/keyword/i);
+    expect(classifyConsequence(['index.ownership_unproven'])).toBe('search-unavailable');
+  });
 });

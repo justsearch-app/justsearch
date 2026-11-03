@@ -772,6 +772,10 @@ final class IndexStatusOps {
                 ? 0L
                 : stateSnapshot.paused_at_ms())
         .setMigrationSource(migrationSource)
+        .addAllCleanupWarnings(indexGenerationManager == null ? java.util.List.of()
+            : indexGenerationManager.cleanupWarnings().stream()
+                .map(w -> io.justsearch.ipc.IndexCleanupWarning.newBuilder()
+                    .setPath(w.path()).setReason(w.reason()).build()).toList())
         .build();
   }
 

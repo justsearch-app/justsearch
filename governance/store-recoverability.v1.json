@@ -861,6 +861,7 @@
       "root": "DATA_DIR",
       "ownedPaths": [
         "index/*/indices/**",
+        "index/*/staging/**",
         "index/*/state.json",
         "index/*/state.json.prev",
         "index/*/indices/*.rebuild-pending",
@@ -892,6 +893,7 @@
         "modules/indexer-worker/src/main/java/io/justsearch/indexerworker/util/IndexRootLock.java",
         "modules/adapters-lucene/src/main/java/io/justsearch/adapters/lucene/runtime/ComponentsFactory.java",
         "modules/adapters-lucene/src/main/java/io/justsearch/adapters/lucene/runtime/SafeIndexPathOps.java",
+        "modules/adapters-lucene/src/main/java/io/justsearch/adapters/lucene/runtime/IndexOwnership.java",
         "modules/configuration/src/main/java/io/justsearch/configuration/FileOps.java"
       ],
       "tests": [

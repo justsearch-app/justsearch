@@ -151,7 +151,7 @@ final class StatusFieldClassification {
         state("activeGenerationId", "migrationState", "buildingGenerationId",
             "previousGenerationId", "servingSearchGenerationId", "servingIngestGenerationId",
             "migrationSwitchingMaxDurationMs", "migrationPaused", "migrationPauseReason",
-            "migrationSource", "migrationEnumerator"),
+            "migrationSource", "migrationEnumerator", "cleanupWarnings"),
         measurement("activeIndexedDocuments", "buildingIndexedDocuments", "switchBufferDepth",
             "pendingJobsCount", "processingJobsCount", "pendingReadyJobsCount",
             "pendingBackoffJobsCount"),
@@ -240,9 +240,10 @@ final class StatusFieldClassification {
     put(table, QueueHealthGroup.class,
         state("healthy", "lastQuickCheckOk"),
         time("observedAtMs", "lastBackupAtMs", "lastQuickCheckAtMs", "lastErrorAtMs"));
+    put(table, io.justsearch.app.api.IndexingService.IndexCleanupWarning.class, state("path", "reason"));
     put(table, MigrationStatusGroup.class,
         state("state", "buildingGenerationId", "previousGenerationId", "paused", "pauseReason",
-            "switchingMaxDurationMs", "enumerator", "migrationSource"),
+            "switchingMaxDurationMs", "enumerator", "migrationSource", "cleanupWarnings"),
         time("observedAtMs", "switchingAgeMs"));
     put(table, GpuStatusView.class,
         state("available", "driverVersion", "deviceCount", "cudaFunctional", "source",

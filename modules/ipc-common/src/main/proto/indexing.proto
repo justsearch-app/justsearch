@@ -806,7 +806,8 @@ message MigrationStatus {
   // tempdoc 628 Stage C: WHY this migration is running (the generation manifest source label, e.g.
   // "corrupt_index_rebuild", "schema_mismatch", "embedding_model_change") so the UI can word the cause.
   string migration_source = 20;
-  // Next available field number: 21
+  repeated IndexCleanupWarning cleanup_warnings = 21;
+  // Next available field number: 22
 }
 
 message CompatibilityStatus {
@@ -1305,11 +1306,18 @@ message IndexGcRequest {
   bool prune_marked_only = 2;
 }
 
+message IndexCleanupWarning {
+  string path = 1;
+  string reason = 2;
+}
+
 message IndexGcResponse {
   bool accepted = 1;
   string error = 2;
   int32 marked_count = 3;
   int32 pruned_count = 4;
+  int32 empty_leftovers_removed = 5;
+  repeated IndexCleanupWarning cleanup_warnings = 6;
 }
 
 // Tempdoc 931 §E item 10 — purge deleted-but-unmerged documents from the ACTIVE index so two

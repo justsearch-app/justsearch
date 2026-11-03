@@ -35,7 +35,7 @@ src/api/generated/schema-types/presentation.ts 3 2026-07-16
 src/api/generated/schema-types/provenance.ts 1 2026-07-16
 src/api/generated/schema-types/resource.ts 8 2026-07-16
 src/api/generated/schema-types/settings-v2.ts 1 2026-07-16
-src/api/generated/schema-types/status-response.ts 6 2026-07-16
+src/api/generated/schema-types/status-response.ts 8 2026-11-03
 src/api/generated/schema-types/surface.ts 4 2026-09-02
 src/api/generated/schema-types/timeseries-snapshot.ts 1 2026-07-16
 src/api/generated/schema-types/trace-stage.ts 1 2026-07-16

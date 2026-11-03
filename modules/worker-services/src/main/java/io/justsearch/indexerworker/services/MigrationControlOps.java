@@ -204,11 +204,19 @@ final class MigrationControlOps {
           .setError("")
           .setMarkedCount(r == null ? 0 : r.markedCount())
           .setPrunedCount(r == null ? 0 : r.prunedCount())
+          .setEmptyLeftoversRemoved(r == null ? 0 : r.emptyLeftoversRemoved())
+          .addAllCleanupWarnings(r == null ? java.util.List.of() : r.cleanupWarnings().stream()
+              .map(w -> io.justsearch.ipc.IndexCleanupWarning.newBuilder()
+                  .setPath(w.path()).setReason(w.reason()).build()).toList())
           .build();
     } catch (Exception e) {
       return IndexGcResponse.newBuilder()
           .setAccepted(false)
           .setError(e.getMessage() == null ? "Failed to run GC" : e.getMessage())
+          .addAllCleanupWarnings(indexGenerationManager == null ? java.util.List.of()
+              : indexGenerationManager.cleanupWarnings().stream()
+                  .map(w -> io.justsearch.ipc.IndexCleanupWarning.newBuilder()
+                      .setPath(w.path()).setReason(w.reason()).build()).toList())
           .setMarkedCount(0)
           .setPrunedCount(0)
           .build();

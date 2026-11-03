@@ -343,6 +343,7 @@ message MigrationGenerationView {
   int64 migration_paused_at_ms = 18 [json_name = "migrationPausedAtMs"];
   string migration_source = 20 [json_name = "migrationSource"];
   MigrationEnumeratorView migration_enumerator = 19 [json_name = "migrationEnumerator"];
+  repeated IndexCleanupWarning cleanup_warnings = 21 [json_name = "cleanupWarnings"];
 }
 
 message MigrationEnumeratorView {
@@ -653,6 +654,7 @@ message MigrationStatusGroup {
   // tempdoc 628 Stage C: why the migration is running (generation manifest source), e.g.
   // "corrupt_index_rebuild" — lets the Head word the degradation cause.
   string migration_source = 10 [json_name = "migrationSource"];
+  repeated IndexCleanupWarning cleanup_warnings = 11 [json_name = "cleanupWarnings"];
 }
 
 message GpuStatusView {
@@ -724,4 +726,9 @@ message TelemetryHealthView {
 message StatusMeta {
   int64 worker_rpc_at_ms = 1 [json_name = "workerRpcAtMs"];
   bool worker_rpc_stale = 2 [json_name = "workerRpcStale"];
+}
+
+message IndexCleanupWarning {
+  string path = 1;
+  string reason = 2;
 }

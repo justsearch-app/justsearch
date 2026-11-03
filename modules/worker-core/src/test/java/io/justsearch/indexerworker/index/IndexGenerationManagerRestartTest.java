@@ -49,19 +49,28 @@ class IndexGenerationManagerRestartTest {
   }
 
   @Test
-  void diskProjectionDoesNotHideAbandonedOrLockedRetirementRepresentations(
+  void unprovenMarkedRepresentationDoesNotConsumeCapacityAndForeignPayloadRefusesStart(
       @org.junit.jupiter.api.io.TempDir Path base) throws Exception {
     var manager = new IndexGenerationManager(base);
     manager.initializeOrLoad();
-    Files.createDirectory(base.resolve("indices/g-damaged.bak-20261001-120000"));
+    // A genuine (owned) diagnostic backup: under the ownership rule an unproven one is excluded anyway.
+    Path backup = Files.createDirectory(base.resolve("indices/g-damaged.bak-20261001-120000"));
+    Files.writeString(backup.resolve(".justsearch-generation.sentinel"),
+        "justsearch_generation_sentinel_v1\ngeneration_id=g-damaged\ncreated_at_ms=1\n");
+    Files.writeString(backup.resolve(".justsearch-index-generation.json"),
+        "{\"format_version\":1,\"generation_id\":\"g-damaged\",\"source\":\"new\",\"created_at_ms\":1}");
     assertEquals(1, manager.retainedGenerationCount(), "Admission excludes diagnostic backups");
-    Files.createDirectory(base.resolve("indices/g-abandoned.del-20261001-120000"));
-    assertEquals(2, manager.retainedGenerationCount());
-    var refused = assertThrows(java.io.IOException.class,
-        () -> manager.startFreshMigration("locked-predecessor"));
-    assertTrue(refused.getMessage().contains("retained generation representation"));
-    Files.createDirectory(base.resolve("indices/g-unexpected-third"));
-    assertEquals(3, manager.retainedGenerationCount(), "A physical breach is visible, never clamped");
+    Path marked = Files.createDirectory(base.resolve("indices/g-abandoned.del-20261001-120000"));
+    Files.writeString(marked.resolve("foreign"), "foreign bytes");
+    assertEquals(1, manager.retainedGenerationCount());
+    org.junit.jupiter.api.Assertions.assertDoesNotThrow(() -> manager.startFreshMigration("manual"));
+    assertTrue(Files.isRegularFile(marked.resolve("foreign")));
+    Path foreign = Files.createDirectory(base.resolve("indices/g-unexpected-third"));
+    Files.writeString(foreign.resolve("payload"), "foreign bytes");
+    assertEquals(2, manager.retainedGenerationCount(), "only the active and building generations are owned");
+    var refused = assertThrows(java.io.IOException.class, manager::initializeOrLoad);
+    assertTrue(refused.getMessage().contains("index.ownership_unproven"));
+    assertEquals("foreign bytes", Files.readString(foreign.resolve("payload")));
   }
 
   @Test

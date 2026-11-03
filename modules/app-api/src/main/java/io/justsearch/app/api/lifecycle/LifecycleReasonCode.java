@@ -40,6 +40,7 @@ public enum LifecycleReasonCode {
   INDEX_ACTIVATING("index.activating"),
   INDEX_FAILED("index.failed"),
   INDEX_CORRUPT("index.corrupt"),
+  INDEX_OWNERSHIP_UNPROVEN("index.ownership_unproven"),
   INDEX_SHUT_DOWN("index.shut_down"),
   INDEX_UNAVAILABLE("index.unavailable"),
   INDEX_THROUGHPUT_STALLED("index.throughput_stalled"),
@@ -265,7 +266,7 @@ public enum LifecycleReasonCode {
   public RetentionClass retentionClass() {
     return switch (this) {
       // Fatal marker evidence is consumed once; exhausted recovery is terminal until READY.
-      case INDEX_CORRUPT, INDEX_SCHEMA_OPEN_REFUSED, INDEX_MIGRATION_JOURNAL_UNAVAILABLE,
+      case INDEX_OWNERSHIP_UNPROVEN, INDEX_CORRUPT, INDEX_SCHEMA_OPEN_REFUSED, INDEX_MIGRATION_JOURNAL_UNAVAILABLE,
           COMPONENT_RECOVERY_EXHAUSTED -> RetentionClass.STICKY;
 
       // Tempdoc 882 item 24: observed exactly once, at load, and never re-derived. The file that

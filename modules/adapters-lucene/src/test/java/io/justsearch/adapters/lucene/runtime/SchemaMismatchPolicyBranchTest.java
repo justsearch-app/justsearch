@@ -152,8 +152,13 @@ final class SchemaMismatchPolicyBranchTest extends LuceneExecutorTestBase {
 
   @Test
   void blueGreenMigratePropagatesTheMismatchAndKeepsEveryDocument() throws Exception {
-    Path dir = tempDir.resolve("blue-green");
+    Path dir = tempDir.resolve("indices/blue-green");
     Files.createDirectories(dir);
+    Files.writeString(dir.resolve(".justsearch-generation.sentinel"),
+        "justsearch_generation_sentinel_v1\ngeneration_id=" + dir.getFileName() + "\ncreated_at_ms=1\n");
+    Files.writeString(dir.resolve(".justsearch-index-generation.json"),
+        "{\"format_version\":1,\"generation_id\":\"" + dir.getFileName()
+            + "\",\"source\":\"new\",\"created_at_ms\":2}");
     int seeded = seedIndex(dir);
     assertEquals(1, seeded, "the seeded index has a document to lose");
 
@@ -184,8 +189,13 @@ final class SchemaMismatchPolicyBranchTest extends LuceneExecutorTestBase {
 
   @Test
   void failClosedRefusesAndKeepsEveryDocument() throws Exception {
-    Path dir = tempDir.resolve("fail-closed");
+    Path dir = tempDir.resolve("indices/fail-closed");
     Files.createDirectories(dir);
+    Files.writeString(dir.resolve(".justsearch-generation.sentinel"),
+        "justsearch_generation_sentinel_v1\ngeneration_id=" + dir.getFileName() + "\ncreated_at_ms=1\n");
+    Files.writeString(dir.resolve(".justsearch-index-generation.json"),
+        "{\"format_version\":1,\"generation_id\":\"" + dir.getFileName()
+            + "\",\"source\":\"new\",\"created_at_ms\":2}");
     int seeded = seedIndex(dir);
 
     withPolicy(
@@ -214,8 +224,13 @@ final class SchemaMismatchPolicyBranchTest extends LuceneExecutorTestBase {
    */
   @Test
   void rebuildBackupFirstEmptiesTheIndexInPlaceAfterBackingItUp() throws Exception {
-    Path dir = tempDir.resolve("rebuild-backup");
+    Path dir = tempDir.resolve("indices/rebuild-backup");
     Files.createDirectories(dir);
+    Files.writeString(dir.resolve(".justsearch-generation.sentinel"),
+        "justsearch_generation_sentinel_v1\ngeneration_id=" + dir.getFileName() + "\ncreated_at_ms=1\n");
+    Files.writeString(dir.resolve(".justsearch-index-generation.json"),
+        "{\"format_version\":1,\"generation_id\":\"" + dir.getFileName()
+            + "\",\"source\":\"new\",\"created_at_ms\":2}");
     assertEquals(1, seedIndex(dir));
 
     withPolicy(
@@ -247,8 +262,13 @@ final class SchemaMismatchPolicyBranchTest extends LuceneExecutorTestBase {
   @Test
   void aLegacyIndexUnderBlueGreenMigrateReachesSchemaMismatchAndKeepsEveryDocument()
       throws Exception {
-    Path dir = tempDir.resolve("legacy-blue-green");
+    Path dir = tempDir.resolve("indices/legacy-blue-green");
     Files.createDirectories(dir);
+    Files.writeString(dir.resolve(".justsearch-generation.sentinel"),
+        "justsearch_generation_sentinel_v1\ngeneration_id=" + dir.getFileName() + "\ncreated_at_ms=1\n");
+    Files.writeString(dir.resolve(".justsearch-index-generation.json"),
+        "{\"format_version\":1,\"generation_id\":\"" + dir.getFileName()
+            + "\",\"source\":\"new\",\"created_at_ms\":2}");
     int seeded = seedLegacyIndex(dir);
     assertEquals(1, seeded, "the legacy index has a document to lose");
 
@@ -277,8 +297,13 @@ final class SchemaMismatchPolicyBranchTest extends LuceneExecutorTestBase {
 
   @Test
   void aLegacyIndexUnderFailClosedRefusesAndKeepsEveryDocument() throws Exception {
-    Path dir = tempDir.resolve("legacy-fail-closed");
+    Path dir = tempDir.resolve("indices/legacy-fail-closed");
     Files.createDirectories(dir);
+    Files.writeString(dir.resolve(".justsearch-generation.sentinel"),
+        "justsearch_generation_sentinel_v1\ngeneration_id=" + dir.getFileName() + "\ncreated_at_ms=1\n");
+    Files.writeString(dir.resolve(".justsearch-index-generation.json"),
+        "{\"format_version\":1,\"generation_id\":\"" + dir.getFileName()
+            + "\",\"source\":\"new\",\"created_at_ms\":2}");
     int seeded = seedLegacyIndex(dir);
 
     withPolicy(
@@ -306,8 +331,13 @@ final class SchemaMismatchPolicyBranchTest extends LuceneExecutorTestBase {
    */
   @Test
   void aLegacyIndexUnderRebuildBackupFirstIsEmptiedInPlaceAfterBackingItUp() throws Exception {
-    Path dir = tempDir.resolve("legacy-rebuild-backup");
+    Path dir = tempDir.resolve("indices/legacy-rebuild-backup");
     Files.createDirectories(dir);
+    Files.writeString(dir.resolve(".justsearch-generation.sentinel"),
+        "justsearch_generation_sentinel_v1\ngeneration_id=" + dir.getFileName() + "\ncreated_at_ms=1\n");
+    Files.writeString(dir.resolve(".justsearch-index-generation.json"),
+        "{\"format_version\":1,\"generation_id\":\"" + dir.getFileName()
+            + "\",\"source\":\"new\",\"created_at_ms\":2}");
     assertEquals(1, seedLegacyIndex(dir));
 
     withPolicy(

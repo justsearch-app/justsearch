@@ -572,10 +572,14 @@ public class IndexingController {
                     "keepLatest", keepLatest,
                     "pruneMarkedOnly", pruneMarkedOnly,
                     "markedCount", outcome.markedCount(),
-                    "prunedCount", outcome.prunedCount()));
+                    "prunedCount", outcome.prunedCount(),
+                    "emptyLeftoversRemoved", outcome.emptyLeftoversRemoved(),
+                    "cleanupWarnings", outcome.cleanupWarnings()));
       } else {
         ctx.status(409)
-            .json(Map.of("status", "gc rejected by worker", "error", outcome.error()));
+            .json(Map.of("status", "gc rejected by worker", "error", outcome.error(),
+                "emptyLeftoversRemoved", outcome.emptyLeftoversRemoved(),
+                "cleanupWarnings", outcome.cleanupWarnings()));
       }
     } catch (KnowledgeClientException e) {
       int http = ApiErrorHandler.mapClientStatusToHttp(e.status());

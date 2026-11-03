@@ -40,12 +40,16 @@ public final class SafeIndexPathOps {
     Path d = normalize(dir, "dir");
     Path root = normalize(allowedRoot, "allowedRoot");
     requireUnderRoot(d, root, "backupDirectory");
-    requireDirectoryExists(d, "backupDirectory");
+    IndexOwnership.inspect(d, root);
+    if (IndexOwnership.representation(d.getFileName().toString()).role() != IndexOwnership.Role.CANONICAL) {
+      throw new IOException("Only a canonical generation can be backed up: " + d);
+    }
 
     Path backup =
         d.resolveSibling(d.getFileName().toString() + ".bak-" + TS.format(Instant.now()));
     requireUnderRoot(backup, root, "backupDirectory");
 
+    IndexOwnership.requireAbsent(backup);
     log.info("Backing up directory {} -> {}", d, backup);
     return Files.move(d, backup);
   }
@@ -59,12 +63,16 @@ public final class SafeIndexPathOps {
     Path d = normalize(dir, "dir");
     Path root = normalize(allowedRoot, "allowedRoot");
     requireUnderRoot(d, root, "markForDeletion");
-    requireDirectoryExists(d, "markForDeletion");
+    IndexOwnership.inspect(d, root);
+    if (IndexOwnership.representation(d.getFileName().toString()).role() == IndexOwnership.Role.MARKED) {
+      throw new IOException("Generation is already marked for deletion: " + d);
+    }
 
     Path del =
         d.resolveSibling(d.getFileName().toString() + ".del-" + TS.format(Instant.now()));
     requireUnderRoot(del, root, "markForDeletion");
 
+    IndexOwnership.requireAbsent(del);
     try {
       log.info("Marking directory for deletion (rename) {} -> {}", d, del);
       Path moved = Files.move(d, del, StandardCopyOption.ATOMIC_MOVE);
@@ -81,7 +89,9 @@ public final class SafeIndexPathOps {
       Path marker = dir.resolve("DELETEME");
       String body =
           "marked_at=" + Instant.now() + "\nreason=rename_failed\nerror=" + renameFailure + "\n";
-      Files.writeString(marker, body, StandardCharsets.UTF_8);
+      if (IndexOwnership.entryExists(marker)
+          && !IndexOwnership.plainAttributes(marker).isRegularFile()) return false;
+      IndexOwnership.replaceControl(marker, body.getBytes(StandardCharsets.UTF_8));
       log.warn("Rename to .del failed; wrote marker file {}", marker);
       return true;
     } catch (Exception ignored) {
@@ -90,12 +100,6 @@ public final class SafeIndexPathOps {
           dir,
           ignored.getMessage());
       return false;
-    }
-  }
-
-  private static void requireDirectoryExists(Path dir, String op) throws IOException {
-    if (!Files.exists(dir) || !Files.isDirectory(dir)) {
-      throw new IOException(op + " expected an existing directory, got: " + dir);
     }
   }
 
@@ -115,7 +119,7 @@ public final class SafeIndexPathOps {
       throw new IllegalArgumentException(
           op + " refused: target must not equal allowedRoot. target=" + target + " allowedRoot=" + allowedRoot);
     }
-    if (!target.startsWith(allowedRoot)) {
+    if (!allowedRoot.equals(target.getParent())) {
       throw new IllegalArgumentException(
           op + " refused: target is outside allowedRoot. target=" + target + " allowedRoot=" + allowedRoot);
     }

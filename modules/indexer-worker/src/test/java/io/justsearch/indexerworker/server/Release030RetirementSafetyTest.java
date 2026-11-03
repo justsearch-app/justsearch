@@ -28,15 +28,14 @@ final class Release030RetirementSafetyTest {
     var original = state(root);
     Path explicit = root.resolve("explicit.txt");
     Files.writeString(root.resolve("neighbor.txt"), "unrequestedneighbor");
-    Path sentinel = buildingSentinel(root);
-    String owner = Files.readString(sentinel);
     ConfigStore previous = ConfigStore.globalOrNull();
     var installed = configure(root);
     try {
       var models = new ReleasedModelIdentities(root);
       try (models) {
-        Files.writeString(sentinel, "unverified ownership");
-        try (var executors = new TestEngineExecutors(); var server = boot(root, executors)) {
+        try (var certificate = denyCommittedCompatibility();
+            var executors = new TestEngineExecutors(); var server = boot(root, executors)) {
+          certificate.reset();
           stopMonitor(server);
           assertTrue(search(server, "copper").contains(key(explicit)), "released A contains the explicit file");
           // The authentic admitted file already has its bytes on A. Model the released DONE row
@@ -48,7 +47,7 @@ final class Release030RetirementSafetyTest {
                   key(explicit), io.justsearch.indexing.SchemaFields.SOURCE_SHA256));
           queue(server).markDone(explicit);
           assertEquals(1, count(root, "path='" + key(explicit) + "' AND state='DONE'"));
-        } finally { Files.writeString(sentinel, owner); }
+        }
         for (int restart = 0; restart < 2; restart++) {
           try (var executors = new TestEngineExecutors(); var server = boot(root, executors)) {
             if ("IDLE".equals(state(root).migration_state())) {
@@ -346,9 +345,15 @@ final class Release030RetirementSafetyTest {
     return (SqliteJobQueue) Release030ExtractionRecoveryTest.field(server, "jobQueue");
   }
 
-  static Path buildingSentinel(Path root) {
-    return root.resolve("data/index/default/indices").resolve(state(root).building_generation())
-        .resolve(".justsearch-generation.sentinel");
+  static org.mockito.MockedStatic<io.justsearch.adapters.lucene.runtime.IndexMetadataParityGuard>
+      denyCommittedCompatibility() throws Exception {
+    var certificate = org.mockito.Mockito.mockStatic(
+        io.justsearch.adapters.lucene.runtime.IndexMetadataParityGuard.class,
+        org.mockito.Mockito.CALLS_REAL_METHODS);
+    certificate.when(() -> io.justsearch.adapters.lucene.runtime.IndexMetadataParityGuard
+        .certifiesCommittedCompatibility(org.mockito.ArgumentMatchers.any(Path.class),
+            org.mockito.ArgumentMatchers.anyMap(), org.mockito.ArgumentMatchers.anyList())).thenReturn(false);
+    return certificate;
   }
 
   static void stopMonitor(KnowledgeServer server) throws Exception {

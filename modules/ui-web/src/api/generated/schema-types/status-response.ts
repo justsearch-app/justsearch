@@ -24,6 +24,15 @@ export const componentNullableSchema = z.strictObject({
   "state_since": z.string().nullable().optional(),
 }).nullable();
 
+export interface IndexCleanupWarning {
+  path?: string | null;
+  reason?: string | null;
+}
+export const indexCleanupWarningSchema = z.strictObject({
+  "path": z.string().nullable().optional(),
+  "reason": z.string().nullable().optional(),
+});
+
 export type MigrationEnumeratorViewNullable = {
   done?: boolean;
   filesEnqueued?: number;
@@ -169,6 +178,7 @@ export interface StatusResponse {
   };
   migration?: {
     buildingGenerationId?: string | null;
+    cleanupWarnings?: IndexCleanupWarning[] | null;
     enumerator?: MigrationEnumeratorViewNullable;
     migrationSource?: string | null;
     observedAtMs?: number;
@@ -369,11 +379,11 @@ export interface StatusResponse {
         chunkEmbeddingCompletedCount?: number;
         chunkEmbeddingFailedCount?: number;
         chunkEmbeddingPendingCount?: number;
-        chunkSpladeDocCount?: number;
-        chunkSpladeFailedCount?: number;
         chunkSpladeCompletedCount?: number;
         chunkSpladeCoveragePercent?: number;
+        chunkSpladeDocCount?: number;
         chunkSpladeEnabled?: boolean;
+        chunkSpladeFailedCount?: number;
         chunkSpladePendingCount?: number;
         chunkVectorCoveragePercent?: number;
         chunkVectorsReady?: boolean;
@@ -389,6 +399,7 @@ export interface StatusResponse {
         stageId?: string | null;
         tier?: string | null;
       })[] | null;
+      completenessKnown?: boolean | null;
       embeddedAndSparseCount?: number;
       embeddingAvailable?: boolean | null;
       embeddingCompletedCount?: number;
@@ -420,7 +431,6 @@ export interface StatusResponse {
       spladeFailedCount?: number;
       spladePendingCount?: number;
       vectorReadyPercent?: number;
-      completenessKnown?: boolean | null;
     };
     failure?: {
       failedByFileKind?: Record<string, number> | null;
@@ -450,6 +460,7 @@ export interface StatusResponse {
       activeIndexedDocuments?: number;
       buildingGenerationId?: string | null;
       buildingIndexedDocuments?: number;
+      cleanupWarnings?: IndexCleanupWarning[] | null;
       migrationEnumerator?: MigrationEnumeratorViewNullable;
       migrationPauseReason?: string | null;
       migrationPaused?: boolean;
@@ -615,6 +626,7 @@ export const statusResponseSchema = z.strictObject({
   }).optional(),
   "migration": z.strictObject({
     "buildingGenerationId": z.string().nullable().optional(),
+    "cleanupWarnings": z.array(indexCleanupWarningSchema).nullable().optional(),
     "enumerator": migrationEnumeratorViewNullableSchema.optional(),
     "migrationSource": z.string().nullable().optional(),
     "observedAtMs": z.number().int().optional(),
@@ -815,11 +827,11 @@ export const statusResponseSchema = z.strictObject({
         "chunkEmbeddingCompletedCount": z.number().int().optional(),
         "chunkEmbeddingFailedCount": z.number().int().optional(),
         "chunkEmbeddingPendingCount": z.number().int().optional(),
-        "chunkSpladeDocCount": z.number().int().optional(),
-        "chunkSpladeFailedCount": z.number().int().optional(),
         "chunkSpladeCompletedCount": z.number().int().optional(),
         "chunkSpladeCoveragePercent": z.number().optional(),
+        "chunkSpladeDocCount": z.number().int().optional(),
         "chunkSpladeEnabled": z.boolean().optional(),
+        "chunkSpladeFailedCount": z.number().int().optional(),
         "chunkSpladePendingCount": z.number().int().optional(),
         "chunkVectorCoveragePercent": z.number().optional(),
         "chunkVectorsReady": z.boolean().optional(),
@@ -835,6 +847,7 @@ export const statusResponseSchema = z.strictObject({
         "stageId": z.string().nullable().optional(),
         "tier": z.string().nullable().optional(),
       })).nullable().optional(),
+      "completenessKnown": z.boolean().nullable().optional(),
       "embeddedAndSparseCount": z.number().int().optional(),
       "embeddingAvailable": z.boolean().nullable().optional(),
       "embeddingCompletedCount": z.number().int().optional(),
@@ -866,7 +879,6 @@ export const statusResponseSchema = z.strictObject({
       "spladeFailedCount": z.number().int().optional(),
       "spladePendingCount": z.number().int().optional(),
       "vectorReadyPercent": z.number().optional(),
-      "completenessKnown": z.boolean().nullable().optional(),
     }).optional(),
     "failure": z.strictObject({
       "failedByFileKind": z.record(z.string(), z.number().int()).nullable().optional(),
@@ -896,6 +908,7 @@ export const statusResponseSchema = z.strictObject({
       "activeIndexedDocuments": z.number().int().optional(),
       "buildingGenerationId": z.string().nullable().optional(),
       "buildingIndexedDocuments": z.number().int().optional(),
+      "cleanupWarnings": z.array(indexCleanupWarningSchema).nullable().optional(),
       "migrationEnumerator": migrationEnumeratorViewNullableSchema.optional(),
       "migrationPauseReason": z.string().nullable().optional(),
       "migrationPaused": z.boolean().optional(),
