@@ -27,10 +27,21 @@ independent acceptor verifies it.
         }
       ],
       "rule": "Every stored field in the SSOT field catalog either appears in the search response fixture or is declared internal with a reason why the frontend does not need it.",
-      "whySurvives": "The assertion and its loop are unchanged. One name joins INTERNAL_FIELDS: splade_payload, the stored-only binary sparse payload that FieldMapper derives for the write path (SSOT/catalogs/fields.v1.json). Search hits never carry it: SearchResultFormatter's stored-field visitor records string and numeric values only, and has no binary handler. Every other entry is unchanged. The check fails on the candidate without this entry ('Stored field splade_payload is not internal but missing from fixture', CI run 41598612855) and passes with it."
+      "whySurvives": "The assertion and its loop are unchanged. One name joins INTERNAL_FIELDS: splade_payload, the stored-only binary sparse payload that FieldMapper derives for the write path (SSOT/catalogs/fields.v1.json). Search hits never carry it: SearchResultFormatter's stored-field visitor records only string and numeric values; its binary handler discards the value. Every other entry is unchanged. The check fails on the candidate without this entry ('Stored field splade_payload is not internal but missing from fixture', CI run 41598612855) and passes with it."
     }
   ]
 }
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a1a074-22ff-7d11-8ea2-1b8ad93ec871",
+  "verdict": "accept",
+  "digest": "sha256:92e171188474efde84f1ba1326c92e92a5ba139816145e744901217c64880166",
+  "note": "verifier-4 on a3a4304934: rule and assertion unchanged, only splade_payload added; StatusRecordSchemaTest fails on 22464e1ee8 for that field and passes after (25 tests, 0 skips); no binary stored value reaches a frontend response. The one wording correction the verifier asked for (the formatter's binary handler discards values) was applied before this record."
+}
+```
