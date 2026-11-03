@@ -70,16 +70,17 @@
       ]
     },
     {
+      "$comment": "Frame status S1: the bottom-left task tray (jf-task-list) retired; its indexing aggregate is the status panel's indexing row. The relation is unchanged: the open panel (a popover over the page, anchored under the title-bar pill) must not cover the rail's Settings control or the Help affordance. The minWidthPx floor on the panel keeps both rows non-vacuous (a closed panel is a 0x0 rect).",
       "uiShotStep": "tasks-occlusion",
       "elements": [
         {
-          "selector": "jf-task-list",
-          "minWidthPx": 140,
+          "selector": "jf-status-panel .panel",
+          "minWidthPx": 320,
           "mustNotOverlapSelector": "button[data-surface-id=\"core.settings-surface\"]"
         },
         {
           "selector": "[data-help-affordance]",
-          "mustNotOverlapSelector": "jf-task-list"
+          "mustNotOverlapSelector": "jf-status-panel .panel"
         }
       ]
     },

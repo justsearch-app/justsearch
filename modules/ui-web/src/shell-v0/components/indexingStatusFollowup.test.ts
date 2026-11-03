@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, type TemplateResult } from 'lit';
 import '../views/LibrarySurface.js';
 import '../views/search-v3/Sv3Composer.js';
-import './StatusDeck.js';
+import { StatusPill } from './StatusPill.js';
 import type { LibrarySurface } from '../views/LibrarySurface.js';
 import type { Sv3Composer } from '../views/search-v3/Sv3Composer.js';
 import { __feedForTest, __resetAiStateForTest, __tickClockForTest, getAiState, type AiState, type StatusSnapshot } from '../state/aiStateStore.js';
@@ -98,7 +98,7 @@ describe('WP3.3 sixth verifier regressions', () => {
     const composer = document.createElement('jf-sv3-composer') as Sv3Composer;
     composer.draft = 'Where is the report?';
     composer.tier = 'ask';
-    const deck = document.createElement('jf-status-deck') as unknown as { aiState: AiState; render(): TemplateResult };
+    const deck = new StatusPill();
     const composerDom = document.createElement('div');
     const deckDom = document.createElement('div');
     document.body.append(composerDom, deckDom);
@@ -114,7 +114,7 @@ describe('WP3.3 sixth verifier regressions', () => {
       const availability = projectAvailability('documents', state);
       expect(availability.kind).toBe('unavailable');
       composer.unavailableReason = availability.kind === 'unavailable' ? availability.reason : '';
-      deck.aiState = state;
+      deck.status.ai = state; deck.status.refresh();
       render(composer.render(), composerDom);
       render(deck.render(), deckDom);
       await settle();

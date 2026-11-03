@@ -745,28 +745,6 @@ function computeStatusLabel(
   return aiEngine.kind === 'online' && runtime.modelLabel ? `Online — ${runtime.modelLabel}` : headline;
 }
 
-/**
- * Tempdoc 814 §D5 (one authority, one pointer) — the status readout WITHOUT the verdict flavour.
- *
- * The status-bar chip and the chat surface's degradation banner are two projections of the same
- * `verdict`. When the banner is the persistent authority for that fact on the active surface, the
- * chip yields its degradation flavour and reports the AI mode instead. "The AI mode" is not a second
- * derivation: it is exactly what {@link computeStatusLabel}/{@link computeStatusTone} already produce
- * when {@link verdictOwnsStatus} is false, so this runs the SAME two functions with a neutral verdict
- * rather than forking their fallback chain (which carries the activity overlay and the `starting`
- * elapsed clock). One authority, two call sites.
- */
-const NEUTRAL_VERDICT: SystemHealthVerdict = { kind: 'operational', severity: 'ok', reasons: [] };
-
-export function statusWithoutVerdictFlavor(
-  s: Pick<AiState, 'runtime' | 'activity' | 'aiEngine'>,
-): { label: string; tone: NoticeTone } {
-  return {
-    label: computeStatusLabel(NEUTRAL_VERDICT, s.runtime, s.activity, s.aiEngine),
-    tone: computeStatusTone(NEUTRAL_VERDICT, s.runtime, s.aiEngine),
-  };
-}
-
 function computeIndex(): AiIndex {
   const status = statusSig.get();
   const inference = inferenceSig.get();

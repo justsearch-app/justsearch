@@ -35,6 +35,8 @@ export interface EphemeralToastSpec {
   readonly durationMs?: number;
   readonly actionLabel?: string;
   readonly onAction?: () => void;
+  /** Recovery choices for an unresolved destination, rendered in Earlier. */
+  readonly destinations?: readonly { readonly id: string; readonly label: string }[];
   /**
    * Tempdoc 613 §5.2 — the message's CLASS, from the closed {@link LocalMessageClass} vocabulary
    * (defaults to `core.ephemeral`). The class declares the routing-relevant policy (supersede +

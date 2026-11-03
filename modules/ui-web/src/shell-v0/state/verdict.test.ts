@@ -622,7 +622,7 @@ describe('verdictTone (595 §10.5)', () => {
 
 describe('verdictHeadline', () => {
   it('words each kind, distinguishing cosmetic degraded from a hard one', () => {
-    expect(verdictHeadline({ kind: 'operational', severity: 'ok', reasons: [] })).toContain('operational');
+    expect(verdictHeadline({ kind: 'operational', severity: 'ok', reasons: [] })).toBe('Search available');
     expect(verdictHeadline({ kind: 'checking', severity: 'info', reasons: [] })).toBe('Checking…');
     expect(verdictHeadline({ kind: 'transitioning', severity: 'busy', reasons: ['rebuilding'] })).toBe('Rebuilding…');
     expect(verdictHeadline({ kind: 'degraded', severity: 'info', reasons: ['lambdamart.not_configured'] })).toBe('Reduced capability');
@@ -844,7 +844,7 @@ describe('presentVerdict (595 §15.1) — the ONE verdict-presentation projectio
 
   it('announces politely for non-error verdicts, assertively for an error verdict', () => {
     expect(presentVerdict({ kind: 'operational', severity: 'ok', reasons: [] }).announce).toEqual({
-      text: 'All systems operational',
+      text: 'Search available',
       politeness: 'status',
     });
     expect(presentVerdict({ kind: 'unreachable', severity: 'error', reasons: [] }).announce.politeness).toBe('alert');

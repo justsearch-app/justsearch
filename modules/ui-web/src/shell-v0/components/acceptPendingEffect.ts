@@ -24,7 +24,7 @@
  * (actions imports proposeEffect from pending-effects → would be a cycle).
  */
 
-import { acceptPending } from '../substrates/pending-effects/index.js';
+import { acceptPending, listPending } from '../substrates/pending-effects/index.js';
 import { applyEffect } from '../substrates/actions/index.js';
 import { getOperation } from '../../api/registry/OperationCatalogClient.js';
 import type { Effect } from '../substrates/effect.js';
@@ -61,7 +61,7 @@ export function acceptPendingNow(id: number): void {
 }
 
 /**
- * Tempdoc 550 C3 (Authorize ceremony, Effect path): accept a HIGH-risk invoke-operation by
+ * Tempdoc 550 C3 (Authorize ceremony, Effect path): accept a typed-confirmed invoke-operation by
  * marking the effect `consented`, then dispatching. The Shell's invoke-operation listener
  * sees the flag and uses {@link OperationClient.invokeWithConsent}: on the backend's 428 it
  * approves the backend-issued {@link PendingAuthorization} by id and re-invokes with the
@@ -70,12 +70,14 @@ export function acceptPendingNow(id: number): void {
  *
  * Centralised here — not duplicated into PendingEffectQueue and AgentActivityPanel — so the
  * two confirm surfaces cannot drift in how user consent is expressed. Non-operation /
- * non-HIGH effects accept without the flag (identical to {@link acceptPendingNow}).
+ * effects requiring no typed confirmation accept without the flag (identical to {@link acceptPendingNow}).
  */
 export function acceptPendingWithConsent(id: number): void {
+  const pending = listPending().find(item => item.id === id);
+  if (!pending) return;
   acceptPending(id, (effect, invokedBy) => {
     const e =
-      effect.kind === 'invoke-operation' && operationRisk(effect) === 'HIGH'
+      effect.kind === 'invoke-operation' && needsTypedConfirm(effect, pending.originator)
         ? { ...effect, consented: true }
         : effect;
     applyEffect(e, invokedBy);

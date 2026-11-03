@@ -174,6 +174,7 @@ async function presentAndExecute(
 
   const prompt: AuthorizationPrompt = {
     pendingId,
+    ...(detail.expiresAt ? { expiresAt: detail.expiresAt } : {}),
     operationId: detail.operationId,
     gateBehavior: payload.gateBehavior ?? detail.gateBehavior ?? 'TYPED_CONFIRM',
     ...(detail.riskTier ? { riskTier: detail.riskTier } : {}),

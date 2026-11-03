@@ -65,24 +65,31 @@ type CeremonyItem = AuthorizeItem | CapabilityItem;
 
 export class AuthorizationHost extends JfElement {
   static properties = {
+    statusPanel: { type: Boolean, attribute: 'status-panel' },
+    reviewingId: { state: true },
     active: { attribute: false },
     typed: { attribute: false },
     allowAlways: { attribute: false },
   } as const;
 
   /** The item currently being presented, or null when idle. One at a time (FIFO). */
+  declare statusPanel: boolean;
+  declare reviewingId: string | null;
   declare active: CeremonyItem | null;
   declare typed: string;
   /** Tempdoc 550 thesis IV: the "always allow this action" checkbox state for the active prompt. */
   declare allowAlways: boolean;
 
   private queue: CeremonyItem[] = [];
+  private readonly decided = new Set<string>();
   private consentListener: ((e: Event) => void) | null = null;
   /** 569 Move 4 — the native <dialog> on the trusted channel (Top Layer when modal). */
   private readonly dialogRef: Ref<HTMLDialogElement> = createRef();
 
   constructor() {
     super();
+    this.statusPanel = false;
+    this.reviewingId = null;
     this.active = null;
     this.typed = '';
     this.allowAlways = false;
@@ -208,10 +215,34 @@ export class AuthorizationHost extends JfElement {
 
   /** Broker entry point: enqueue an authorize prompt and return a promise of the decision. */
   present(prompt: AuthorizationPrompt): Promise<AuthorizationDecision> {
+    // A broadcast and the originating 428 may describe the same gate. Only its first owner
+    // receives a decision that can execute; every later route is superseded.
+    if (this.decided.has(prompt.pendingId) || this.statusRequests().some(item => item.kind === 'authorize' && item.prompt.pendingId === prompt.pendingId)) {
+      return Promise.resolve({ approved: false, allowAlways: false, superseded: true });
+    }
     return new Promise<AuthorizationDecision>((resolve) => {
       this.queue.push({ kind: 'authorize', prompt, resolve });
       this.pumpQueue();
     });
+  }
+
+  /** Read view of the existing ceremony queue, owned and drained by this host. */
+  statusRequests(): readonly CeremonyItem[] {
+    return [...(this.active ? [this.active] : []), ...this.queue];
+  }
+
+  reviewStatusRequest(id: string): void {
+    const matches = (item: CeremonyItem): boolean => item.kind === 'authorize'
+      ? item.prompt.pendingId === id : String(item.request.id) === id;
+    if (!this.active || !matches(this.active)) {
+      const index = this.queue.findIndex(matches);
+      if (index < 0) return;
+      const next = this.queue.splice(index, 1)[0]!;
+      if (this.active) this.queue.unshift(this.active);
+      this.active = next;
+    }
+    this.reviewingId = id;
+    this.requestUpdate();
   }
 
   private enqueueCapability(request: ConsentRequest): void {
@@ -303,12 +334,24 @@ export class AuthorizationHost extends JfElement {
     return prompt.riskTier !== 'HIGH' && prompt.allowAlwaysSupported !== false;
   }
 
-  private decide(approved: boolean): void {
+  private decide(approved: boolean, expectedId: string): void {
     const current = this.active;
+    if (current?.kind !== 'authorize' || current.prompt.pendingId !== expectedId) return;
+    if (current?.kind === 'authorize') {
+      if (this.decided.has(current.prompt.pendingId)) return;
+      if (current.prompt.expiresAt && Date.parse(current.prompt.expiresAt) <= Date.now()) {
+        this.cancelMatching(prompt => prompt.pendingId === current.prompt.pendingId); return;
+      }
+      if (approved && current.prompt.gateBehavior === 'TYPED_CONFIRM' && this.typed !== current.prompt.operationId) return;
+      this.decided.add(current.prompt.pendingId);
+      if (this.decided.size > 500) this.decided.delete(this.decided.values().next().value!);
+    }
+    if (approved && current.prompt.gateBehavior === 'TYPED_CONFIRM' && this.typed !== current.prompt.operationId) return;
     const honoured =
       current?.kind === 'authorize' ? AuthorizationHost.honoursAllowAlways(current.prompt) : true;
     const allowAlways = approved && honoured && this.allowAlways;
     this.active = null;
+    this.reviewingId = null;
     this.typed = '';
     this.allowAlways = false;
     if (current?.kind === 'authorize') current.resolve({ approved, allowAlways });
@@ -319,6 +362,7 @@ export class AuthorizationHost extends JfElement {
   private decideCapability(decision: ConsentDecision): void {
     const current = this.active;
     this.active = null;
+    this.reviewingId = null;
     this.typed = '';
     if (current?.kind === 'capability') resolveConsentRequest(current.request.id, decision);
     this.requestUpdate();
@@ -344,7 +388,8 @@ export class AuthorizationHost extends JfElement {
     // 569 Move 4 — open the dialog on the trusted channel. Security-bearing ceremonies
     // (high-risk typed-confirm + capability) open MODAL → the browser Top Layer, which no
     // skin overlay can occlude. Low/medium authorize opens non-modal (565 §3.D non-blocking).
-    if (this.active) this.modal.open({ nonBlocking: this.isLightweight() });
+    this.dispatchEvent(new CustomEvent('status-requests-changed', { bubbles: true, composed: true }));
+    if (this.active && (!this.statusPanel || this.reviewingId)) this.modal.open({ nonBlocking: this.isLightweight() });
     else this.modal.close();
   }
 
@@ -418,7 +463,7 @@ export class AuthorizationHost extends JfElement {
           </label>`
         : ''}
       <div class="actions">
-        <jf-button class="deny" variant="danger" data-testid="authorization-deny" label="Deny" .onActivate=${() => this.decide(false)}>
+        <jf-button class="deny" variant="danger" data-testid="authorization-deny" label="Deny" .onActivate=${() => this.decide(false, prompt.pendingId)}>
           Deny
         </jf-button>
         <jf-button
@@ -427,7 +472,7 @@ export class AuthorizationHost extends JfElement {
           data-testid="authorization-approve"
           label="Approve"
           ?disabled=${!matches}
-          .onActivate=${() => this.decide(true)}
+          .onActivate=${() => this.decide(true, prompt.pendingId)}
         >
           Approve
         </jf-button>

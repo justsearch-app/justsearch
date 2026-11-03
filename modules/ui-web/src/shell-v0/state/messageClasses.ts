@@ -55,7 +55,7 @@ export const LOCAL_MESSAGE_CLASSES = {
   // (replace-with-nothing: navigation is already visible in the rail/title). Its one emit site
   // (Shell.ts's old showNavigationToast) is gone, so this row is removed in the same change (the
   // check-message-classes BACKWARD check requires no dead declaration).
-  // "Index ready — all systems operational" settle announcement (595/StatusDeck).
+  // "Index ready — search is up to date" settle announcement (595/StatusDeck).
   'core.verdict.settled': {
     renderHint: 'EPHEMERAL',
     supersede: false,

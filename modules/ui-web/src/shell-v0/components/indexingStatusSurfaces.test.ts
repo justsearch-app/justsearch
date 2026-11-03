@@ -1,9 +1,9 @@
 // @vitest-environment happy-dom
 // SPDX-License-Identifier: Apache-2.0
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import './StatusDeck.js';
-import './TaskList.js';
-import './IndexingOverlay.js';
+import type { StatusPill } from './StatusPill.js';
+import './StatusPill.js';
+import type { StatusPanel } from './StatusPanel.js';
 import '../views/HealthSurface.js';
 import '../views/LibrarySurface.js';
 import { __feedForTest, __resetAiStateForTest, __tickClockForTest, getAiState, type StatusSnapshot } from '../state/aiStateStore.js';
@@ -32,13 +32,13 @@ async function flush() {
   await Promise.resolve();
   await Promise.all(surfaces.map((s) => s.updateComplete));
   await Promise.resolve();
-  const overlay = surfaces.at(3)?.shadowRoot?.querySelector<Surface>('jf-indexing-overlay');
-  await overlay?.updateComplete;
+  const panel = surfaces[0]?.shadowRoot?.querySelector<StatusPanel>('jf-status-panel');
+  await panel?.updateComplete;
 }
 async function mountAll() {
-  surfaces = ['jf-status-deck', 'jf-task-list', 'jf-health-surface', 'jf-indexing-overlay-host', 'jf-library-surface', 'jf-system-self-view']
+  surfaces = ['jf-status-pill', 'jf-health-surface', 'jf-library-surface', 'jf-system-self-view']
     .map((tag) => document.createElement(tag) as Surface);
-  const library = surfaces[4] as LibrarySurface;
+  const library = surfaces[2] as LibrarySurface;
   library.host_ = {
     platform: { capabilities: new Set<string>() },
     data: { fetch: async () => ({ ok: false, status: 503 }) as Response },
@@ -52,8 +52,8 @@ async function mountAll() {
   await flush();
 }
 function texts(): string[] {
-  return surfaces.map((el, i) => i === 3
-    ? el.shadowRoot?.querySelector('jf-indexing-overlay')?.shadowRoot?.textContent ?? ''
+  return surfaces.map((el, i) => i === 0
+    ? el.shadowRoot?.querySelector('jf-status-panel')?.shadowRoot?.textContent ?? ''
     : el.shadowRoot?.textContent ?? '');
 }
 function feed(s: StatusSnapshot) {
@@ -151,9 +151,9 @@ describe('WP3.3 shared status surfaces', () => {
     feed(status(0));
     await mountAll();
     for (const [i, text] of texts().entries()) {
-      expect(text, surfaces[i]!.localName).toContain(i === 4
+      expect(text, surfaces[i]!.localName).toContain(i === 2
         ? 'Meaning search is waiting while the computer saves energy.' : 'Meaning processing is waiting to save energy');
-      if (i === 4) expect(text.match(/saves energy/g)).toHaveLength(1);
+      if (i === 2) expect(text.match(/saves energy/g)).toHaveLength(1);
       expect(text, surfaces[i]!.localName).toContain('saves energy');
       expect(text, surfaces[i]!.localName).not.toMatch(/Ready — fully searchable|Up to date|System idle|Batch Processing Active/);
     }
@@ -186,18 +186,18 @@ describe('WP3.3 shared status surfaces', () => {
   it('N33.3 deferred enrichment retains the measured aggregate without an active progress bar', async () => {
     feed(status(0));
     await mountAll();
-    const tasks = surfaces[1]!.shadowRoot!;
-    const aggregate = tasks.querySelector('[data-testid="task-aggregate"]');
+    const tasks = surfaces[0]!.shadowRoot!.querySelector('jf-status-panel')!.shadowRoot!;
+    const aggregate = tasks.querySelector('[data-fact="indexing"]');
     expect(aggregate).not.toBeNull();
-    expect(aggregate?.getAttribute('data-phase')).toBe('enriching');
-    expect(aggregate?.querySelector('[data-testid="task-aggregate-counts"]')?.textContent).toContain('enrichment steps waiting');
-    expect(aggregate?.querySelector('[role="progressbar"]')).toBeNull();
+    expect((surfaces[0] as StatusPill).status.model.progress.phase).toBe('enriching');
+    expect(aggregate?.querySelector('.detail')?.textContent).toContain('enrichment steps waiting');
+    expect(aggregate?.querySelector('progress')).toBeNull();
   });
 
   it('S33.5 Library with no settled documents stays enriching without inventing a percentage', async () => {
     feed(status(0, []));
     await mountAll();
-    const library = surfaces[4] as LibrarySurface;
+    const library = surfaces[2] as LibrarySurface;
     library.roots = library.roots.map(root => ({ ...root, inFlightCount: 0 }));
     await flush();
     expect(library.shadowRoot!.querySelector('.folder-state .card-meta')?.textContent?.trim()).toBe('Meaning processing');
@@ -236,5 +236,5 @@ it.each([['energy_saver', 'Meaning processing is waiting to save energy'],
   const snapshot = status(0, [reason]);
   expect(selectIndexingProgress(snapshot, true, 0, []).activity.summary).toBe(summary);
   feed(snapshot); await mountAll();
-  expect(surfaces[0]!.shadowRoot!.querySelector('jf-indexing-controls')?.parentElement?.textContent).toContain(summary);
+  expect(surfaces[0]!.shadowRoot!.querySelector('jf-status-panel')!.shadowRoot!.querySelector('jf-indexing-controls')?.parentElement?.textContent).toContain(summary);
 });

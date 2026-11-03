@@ -123,6 +123,8 @@ export interface AdvisorySnapshot {
  * REQUIRES_ACK toasts persist.
  */
 export interface AdvisoryRecord {
+  /** True only for this resource's live UPDATE; snapshots and late discovery are replay. */
+  readonly liveArrival?: boolean;
   readonly key: string;
   readonly event: AdvisoryEvent;
   readonly acknowledged: boolean;
@@ -141,6 +143,7 @@ export interface AdvisoryRecord {
 
 /** Internal envelope-stream payload (per-stream). */
 interface AdvisoryStreamPayload {
+  readonly liveKeys?: readonly string[];
   readonly advisories: readonly AdvisoryEvent[];
   /**
    * Per-stream tracking of the most-recently-applied frame kind. Aggregated
@@ -172,7 +175,7 @@ export const advisoryReducer: EnvelopeReducer<AdvisoryStreamPayload> = (
       | { kind?: string; advisories?: AdvisoryEvent[] }
       | undefined;
     if (payload && payload.kind === 'snapshot' && Array.isArray(payload.advisories)) {
-      return { advisories: payload.advisories, lastFrameKind: 'snapshot' };
+      return { advisories: payload.advisories, lastFrameKind: 'snapshot', liveKeys: [] };
     }
     return state;
   }
@@ -181,6 +184,7 @@ export const advisoryReducer: EnvelopeReducer<AdvisoryStreamPayload> = (
     if (event && typeof event.classId === 'string') {
       return {
         advisories: [...state.advisories, event],
+        liveKeys: state.lastFrameKind === 'initial' ? [] : [...(state.liveKeys ?? []), advisoryKey(event)],
         lastFrameKind: 'update',
       };
     }
@@ -218,6 +222,7 @@ interface ResourceStreamEntry {
   /** Local snapshot mirroring this stream's latest payload + connection. */
   snapshot: {
     advisories: readonly AdvisoryEvent[];
+    liveKeys?: readonly string[];
     isConnected: boolean;
     lastFrameKind: 'initial' | 'snapshot' | 'update';
   };
@@ -328,7 +333,9 @@ export class AdvisoryStore {
     // 494: renderHint now comes from the wire record itself (uniform shape),
     // not from the source Resource's emissionPolicy.
     const flat: AdvisoryEvent[] = [];
+    const liveKeys = new Set<string>();
     for (const entry of this.entries.values()) {
+      for (const key of entry.snapshot.liveKeys ?? []) liveKeys.add(key);
       for (const event of entry.snapshot.advisories) {
         flat.push(event);
       }
@@ -341,6 +348,7 @@ export class AdvisoryStore {
         event,
         acknowledged: acks.has(key),
         sourceRenderHint: event.renderHint,
+        liveArrival: liveKeys.has(key),
         origin: 'stream',
       };
     });
@@ -438,7 +446,7 @@ export class AdvisoryStore {
       origin: 'local',
       toast: spec,
     };
-    this.localEphemeral = [...this.localEphemeral, record];
+    this.localEphemeral = [...this.localEphemeral, record].slice(-50);
     this.notify();
   }
 
@@ -506,6 +514,7 @@ export class AdvisoryStore {
       (s) => {
         entry.snapshot = {
           advisories: s.payload.advisories,
+          liveKeys: s.payload.liveKeys,
           isConnected: s.isConnected,
           lastFrameKind: s.payload.lastFrameKind,
         };
@@ -537,6 +546,7 @@ export class AdvisoryStore {
     entry.unsubscribe = stream.subscribe((s) => {
       entry.snapshot = {
         advisories: s.payload.advisories,
+        liveKeys: s.payload.liveKeys,
         isConnected: s.isConnected,
         lastFrameKind: s.payload.lastFrameKind,
       };

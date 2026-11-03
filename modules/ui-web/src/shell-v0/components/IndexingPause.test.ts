@@ -1,15 +1,13 @@
 // @vitest-environment happy-dom
 // SPDX-License-Identifier: Apache-2.0
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import './TaskList.js';
-import './StatusDeck.js';
-import './IndexingOverlay.js';
+import { StatusPill } from './StatusPill.js';
+import type { StatusPanel } from './StatusPanel.js';
 import '../views/SettingsSurface.js';
 import '../views/HealthSurface.js';
 import '../views/LibrarySurface.js';
 import '../views/search-v3/SearchV3View.js';
 import { __feedForTest, __feedContactForTest, __resetAiStateForTest, type StatusSnapshot } from '../state/aiStateStore.js';
-import { selectIndexingProgress } from '../state/indexingProgress.js';
 import { getViewerAudience, setViewerAudience } from '../state/viewerAudienceState.js';
 import { folderStatus } from '../state/folderStatus.js';
 import { createMockHostApi } from '../plugin-api/testHostApi.js';
@@ -34,6 +32,8 @@ function feed(state: string, pendingJobs = 3): void {
 }
 async function settle(el: Mounted): Promise<void> {
   await el.updateComplete;
+  const panel = el.shadowRoot?.querySelector<StatusPanel>('jf-status-panel');
+  await panel?.updateComplete;
   await new Promise(resolve => setTimeout(resolve, 0));
   await el.updateComplete;
 }
@@ -41,11 +41,13 @@ async function mount(tag: string): Promise<Mounted> {
   const el = document.createElement(tag) as Mounted;
   Object.assign(el, { host_: createMockHostApi(), activeCategory: 'indexing' });
   document.body.appendChild(el);
+  if (el instanceof StatusPill) el.open = true;
   await settle(el);
   return el;
 }
 async function controls(el: Mounted, remedy = false): Promise<Mounted> {
-  const control = el.shadowRoot?.querySelector(remedy ? 'jf-indexing-controls:not([toolbar])' : 'jf-indexing-controls') as Mounted | null;
+  const root = el.shadowRoot?.querySelector('jf-status-panel')?.shadowRoot ?? el.shadowRoot;
+  const control = root?.querySelector(remedy ? 'jf-indexing-controls:not([toolbar])' : 'jf-indexing-controls') as Mounted | null;
   expect(control, 'surface exposes indexing controls').not.toBeNull();
   await control!.updateComplete;
   return control!;
@@ -71,7 +73,7 @@ afterEach(async () => {
 });
 
 describe('WP3.7 shared pause surfaces', () => {
-  for (const tag of ['jf-task-list', 'jf-status-deck', 'jf-health-surface', 'jf-library-surface', 'jf-settings-surface']) {
+  for (const tag of ['jf-status-pill', 'jf-health-surface', 'jf-library-surface', 'jf-settings-surface']) {
     it(`S37.1 S37.5 S37.6 ${tag} exposes Resume even with nothing queued`, async () => {
       feed('PAUSED', 0);
       const el = await mount(tag);
@@ -128,7 +130,7 @@ describe('WP3.7 shared pause surfaces', () => {
 
   it('S37.1 the progress view pauses indefinitely and a sibling surface resumes from the same observation', async () => {
     feed('RUNNING');
-    const tasks = await mount('jf-task-list');
+    const tasks = await mount('jf-status-pill');
     const settings = await mount('jf-settings-surface');
     const taskControl = await controls(tasks);
     fetchMock.mockImplementation(async () => Response.json({ success: true, message: 'Accepted' }));
@@ -151,7 +153,7 @@ describe('WP3.7 shared pause surfaces', () => {
 
   it('S37.1 reports uncertain invocation failures without claiming paused', async () => {
     feed('RUNNING');
-    const el = await mount('jf-task-list');
+    const el = await mount('jf-status-pill');
     const control = await controls(el);
     button(control).click();
     await settle(control);
@@ -185,7 +187,7 @@ describe('WP3.7 shared pause surfaces', () => {
 
   it('S37.7 the status announcer changes once per pause/resume edge, staying silent on repeated polls', async () => {
     feed('RUNNING');
-    const el = await mount('jf-status-deck');
+    const el = await mount('jf-status-pill');
     const announcer = el.shadowRoot!.querySelector('[data-testid="indexing-announcer"]')!;
     const changes: string[] = [];
     const observer = new MutationObserver(() => changes.push(announcer.textContent!.trim()));
@@ -202,7 +204,7 @@ describe('WP3.7 shared pause surfaces', () => {
 
   it('S37.7 announces confirmed pause and resume once across details and unconfirmed blips', async () => {
     feed('RUNNING', 0);
-    const el = await mount('jf-status-deck');
+    const el = await mount('jf-status-pill');
     const announcer = el.shadowRoot!.querySelector('[data-testid="indexing-announcer"]')!;
     const changes: string[] = [];
     const observer = new MutationObserver(() => changes.push(announcer.textContent!.trim()));
@@ -216,7 +218,7 @@ describe('WP3.7 shared pause surfaces', () => {
     try {
       feed('PAUSED', 0); await settle(el);
       feed('PAUSED', 4); await settle(el);
-      expect(el.shadowRoot!.textContent).toContain('waiting for Resume');
+      expect(el.shadowRoot!.querySelector('jf-status-panel')!.shadowRoot!.textContent).toContain('waiting for Resume');
       await blip('PAUSED', 4);
       feed('RUNNING', 4); await settle(el);
       feed('RUNNING', 0); await settle(el);
@@ -235,7 +237,7 @@ describe('WP3.7 shared pause surfaces', () => {
       __feedForTest({ status: s }); __feedContactForTest();
     };
     error(1);
-    const el = await mount('jf-status-deck');
+    const el = await mount('jf-status-pill');
     const announcer = el.shadowRoot!.querySelector('[data-testid="indexing-announcer"]')!;
     expect(announcer.textContent).toContain('1 file could not be indexed');
     const changes: string[] = [];
@@ -278,9 +280,8 @@ describe('WP3.7 shared pause surfaces', () => {
   });
 
   it('S37.1 the indexing overlay exposes the same Pause and Resume control', async () => {
-    const el = await mount('jf-indexing-overlay');
-    Object.assign(el, { progress: selectIndexingProgress(snapshot('PAUSED'), true, 3, []),
-      activity: selectIndexingProgress(snapshot('PAUSED'), true, 3, []).activity });
+    const el = await mount('jf-status-pill');
+    feed('PAUSED');
     await settle(el);
     expect(button(await controls(el)).textContent).toContain('Resume indexing');
   });
@@ -288,7 +289,7 @@ describe('WP3.7 shared pause surfaces', () => {
 
 
 describe('CR37 keyboard continuity and recovery', () => {
-  const tags = ['jf-task-list', 'jf-status-deck', 'jf-health-surface', 'jf-library-surface', 'jf-settings-surface', 'jf-sv3-window'];
+  const tags = ['jf-status-pill', 'jf-health-surface', 'jf-library-surface', 'jf-settings-surface', 'jf-sv3-window'];
   function observe(state: string, reason = 'user_paused', stale = false): void {
     const status = snapshot(state);
     status.operating!.indexing!.reasons = [reason] as never;
@@ -306,7 +307,7 @@ describe('CR37 keyboard continuity and recovery', () => {
       resume.focus();
       observe('PAUSED', 'user_paused', true);
       await settle(el);
-      expect(el.shadowRoot!.querySelector('jf-indexing-controls'), 'poll must retain the control').toBe(control);
+      expect(el.shadowRoot!.querySelector('jf-status-panel')?.shadowRoot?.querySelector('jf-indexing-controls') ?? el.shadowRoot!.querySelector('jf-indexing-controls'), 'poll must retain the control').toBe(control);
       expect(control.shadowRoot!.activeElement, 'poll must retain keyboard focus').toBe(resume);
       expect(resume.disabled, 'uncertain activity does not make Resume impossible').toBe(false);
       fetchMock.mockResolvedValue(Response.json({ success: true, message: 'Accepted' }));
@@ -344,9 +345,8 @@ describe('CR37 keyboard continuity and recovery', () => {
   it('CR37c R2 the indexing overlay and waiting folder rows direct recovery to Reset', async () => {
     const status = snapshot('PAUSED');
     status.operating!.indexing!.reasons = ['settings_recovery'];
-    const progress = selectIndexingProgress(status, true, 3, []);
-    const overlay = await mount('jf-indexing-overlay');
-    Object.assign(overlay, { progress, activity: progress.activity });
+    const overlay = await mount('jf-status-pill');
+    __feedForTest({ status }); __feedContactForTest();
     await settle(overlay);
     expect(overlay.shadowRoot!.textContent).toContain('saved settings were damaged and replaced by defaults');
     expect(button(await controls(overlay)).textContent).toContain('Open Settings at Reset to defaults');
@@ -365,7 +365,7 @@ describe('CR37 keyboard continuity and recovery', () => {
       setViewerAudience(tier);
       try {
         observe('PAUSED', 'settings_recovery');
-        const el = await mount('jf-task-list');
+        const el = await mount('jf-status-pill');
         const control = await controls(el);
         expect(button(control).textContent).toContain('Open Settings at Reset to defaults');
         expect(control.shadowRoot!.textContent).not.toContain('set View tier to Operator');
@@ -441,13 +441,13 @@ describe('CR37 keyboard continuity and recovery', () => {
 describe('WP3.7 verifier layout and focus repairs', () => {
   it('F1 keeps empty-queue Resume visible through an unconfirmed observation', async () => {
     feed('PAUSED', 0);
-    const task = await mount('jf-task-list');
+    const task = await mount('jf-status-pill');
     const control = await controls(task);
     const resume = button(control); resume.focus();
     const stale = snapshot('PAUSED', 0);
     stale.meta = { ...stale.meta, workerRpcStale: true } as typeof stale.meta;
     __feedForTest({ status: stale }); __feedContactForTest(); await settle(task);
-    expect(task.hasAttribute('data-empty'), 'uncertainty must not hide a focused action').toBe(false);
+    expect(control.isConnected, 'uncertainty must not hide a focused action').toBe(true);
     expect(control.shadowRoot!.activeElement).toBe(resume);
     fetchMock.mockResolvedValue(Response.json({ success: true, message: 'Accepted' }));
     resume.click(); await settle(control);
@@ -456,8 +456,8 @@ describe('WP3.7 verifier layout and focus repairs', () => {
 
   it('F2 preserves a sensible focus and announces remote quiet-queue Resume once', async () => {
     feed('PAUSED', 0);
-    const deck = await mount('jf-status-deck');
-    const task = await mount('jf-task-list');
+    const deck = await mount('jf-status-pill');
+    const task = await mount('jf-status-pill');
     const control = await controls(task);
     const resume = button(control); resume.focus();
     const announcer = deck.shadowRoot!.querySelector('[data-testid="indexing-announcer"]')!;
@@ -467,34 +467,35 @@ describe('WP3.7 verifier layout and focus repairs', () => {
     try {
       feed('RUNNING', 0); await settle(task); await settle(deck);
       feed('RUNNING', 0); await settle(task); await settle(deck);
-      expect(task.hasAttribute('data-empty'), 'remote resume must not hide the focused control').toBe(false);
-      expect(task.shadowRoot!.activeElement).toBe(task.shadowRoot!.querySelector('[data-testid=task-title]'));
-      expect(task.shadowRoot!.textContent).toContain('Indexing is already running');
+      // The resolved hold leaves the panel (ST5 active-only); focus moves to the panel, not the body.
+      expect(control.isConnected).toBe(false);
+      const panel = task.shadowRoot!.querySelector<StatusPanel>('jf-status-panel')!;
+      expect(panel.shadowRoot!.activeElement).toBe(panel.shadowRoot!.querySelector('[role=dialog]'));
+      expect(deck.shadowRoot!.textContent).toContain('Indexing resumed.');
       expect(announcements.filter(t => t.includes('Indexing resumed.'))).toHaveLength(1);
     } finally { observer.disconnect(); }
   });
 
-  it('F3 keeps the focused status item outside hidden adaptive overflow', async () => {
-    feed('PAUSED');
-    const deck = await mount('jf-status-deck');
-    const control = await controls(deck);
-    const resume = button(control); resume.focus();
-    // The measured cut when the longer unconfirmed description no longer fits.
-    Object.defineProperty(deck.shadowRoot!.querySelector('.adaptive-bar'), 'clientWidth', { value: 1, configurable: true });
-    for (const item of deck.shadowRoot!.querySelectorAll('.item')) Object.defineProperty(item, 'offsetWidth', { value: 50, configurable: true });
-    const overflow = (deck as unknown as { overflow: { visibleCount: number } }).overflow;
-    overflow.visibleCount = 0;
-    const stale = snapshot('PAUSED');
-    stale.meta = { ...stale.meta, workerRpcStale: true } as typeof stale.meta;
-    __feedForTest({ status: stale }); __feedContactForTest(); await settle(deck);
-    overflow.visibleCount = 0;
-    (deck as Mounted & { requestUpdate: () => void }).requestUpdate();
-    await deck.updateComplete;
-    const item = control.closest<HTMLElement>('.item')!;
-    expect(item.hidden, 'a focused item must stay in the visible prefix').toBe(false);
-    expect(control.shadowRoot!.activeElement).toBe(resume);
-    resume.blur(); await settle(deck);
-    await vi.waitFor(() => expect(item.hidden, 'ordinary overflow returns after focus leaves').toBe(true));
+
+  it('C7 an accepted resume reads "resuming" until the engine reports work; a failed resume says so', async () => {
+    feed('PAUSED', 3);
+    const pill = await mount('jf-status-pill');
+    let control = await controls(pill);
+    fetchMock.mockResolvedValue(Response.json({ success: true, message: 'Accepted' }));
+    button(control).click(); await settle(control);
+    expect(control.shadowRoot!.textContent).toContain('Resuming');
+    feed('PAUSED', 3); await settle(pill); await settle(control);
+    expect(control.shadowRoot!.textContent, 'still held: no claim that work is running').toContain('Resuming');
+    expect(pill.shadowRoot!.textContent).toContain('Indexing paused');
+    feed('RUNNING', 3); await settle(pill);
+    control = await controls(pill); await settle(control);
+    expect(control.shadowRoot!.textContent).not.toContain('Resuming');
+    feed('PAUSED', 3); await settle(pill);
+    control = await controls(pill);
+    fetchMock.mockRejectedValue(new TypeError('Engine unavailable'));
+    button(control).click(); await settle(control);
+    expect(control.shadowRoot!.textContent).toContain('Could not confirm');
+    expect(control.shadowRoot!.textContent).not.toContain('Resuming');
   });
 
   it('F5 keeps a mature folder semantic-install caveat and pending glyph through Pause', async () => {

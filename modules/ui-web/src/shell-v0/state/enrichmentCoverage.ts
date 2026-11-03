@@ -61,12 +61,6 @@ export const ENRICHMENT_BLOCKED_CAVEAT =
   'keyword search ready · semantic search waiting for AI install';
 
 /**
- * The BODY-tier clause of the blocked state (the {@link ENRICHMENT_BODY} twin): what is still
- * missing, for a surface whose headline already carried the capability that does work.
- */
-export const ENRICHMENT_BLOCKED_BODY = 'semantic search waiting for AI install';
-
-/**
  * The short STATUS label for the blocked state — {@link ENRICHMENT_IN_PROGRESS_LABEL}'s twin, for a
  * card whose subject is the work (Health's queue card). Its terminal "Up to date" is a coverage
  * claim (813 §4), and coverage is exactly what is missing here.

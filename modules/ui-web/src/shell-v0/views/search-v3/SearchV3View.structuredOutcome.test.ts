@@ -9,8 +9,7 @@ import { __resetDraftKeptForTest } from '../../controllers/draftKeptHint.js';
 import { resetSearchState } from '../../state/searchState.js';
 import { EPHEMERAL_TOAST_EVENT, type EphemeralToastSpec } from '../../components/advisory/ephemeralToast.js';
 import { AdvisoryStore } from '../../components/advisory/AdvisoryStore.js';
-import '../../components/advisory/AdvisoryToastHost.js';
-import type { AdvisoryToastHost } from '../../components/advisory/AdvisoryToastHost.js';
+import { StatusPill } from '../../components/StatusPill.js';
 
 vi.mock('../../../utils/windowFocus.js', () => ({ isWindowFocused: async () => true }));
 vi.mock('../../../utils/notify.js', () => ({ sendDesktopNotification: async () => {} }));
@@ -71,7 +70,7 @@ it.each(['done', 'error'] as const)('XD2 announces Structured %s exactly once po
   const { view, composer, box } = await mount();
   const store = new AdvisoryStore();
   store.start();
-  const host = document.createElement('jf-advisory-toast-host') as AdvisoryToastHost;
+  const host = new StatusPill();
   host.store = store; document.body.append(host); await host.updateComplete;
   const messages: EphemeralToastSpec[] = [];
   const listen = (event: Event): void => { messages.push((event as CustomEvent<EphemeralToastSpec>).detail); };
@@ -99,11 +98,10 @@ it.each(['done', 'error'] as const)('XD2 announces Structured %s exactly once po
       expect(messages[run]!.message).toMatch(terminal === 'done' ? /extract.*complet/i : /extract.*fail/i);
       if (terminal === 'error') expect(messages[run]!.message).toContain('required must be an array');
       await host.updateComplete;
-      const notices = [...host.shadowRoot!.querySelectorAll<View>('jf-system-notice')];
-      await Promise.all(notices.map(notice => notice.updateComplete));
-      expect(notices).toHaveLength(run + 1);
-      expect(notices[run]!.getAttribute('role')).toBe('status');
-      expect(notices[run]!.getAttribute('aria-live')).toBe('polite');
+      const notice = host.shadowRoot!.querySelector('span[role="status"][aria-live="polite"]')!;
+      expect(notice.textContent).toBe(messages[run]!.message);
+      expect(host.status.snapshot.advisories.filter(r => r.origin === 'local')).toHaveLength(run + 1);
+      expect(host.shadowRoot!.querySelector('.trigger')!.getAttribute('aria-label')).toBe(messages[run]!.message);
       expect(composer.shadowRoot!.activeElement, 'terminal must not move focus').toBe(box);
       view.setAttribute('theme', run === 0 ? 'light' : 'dark');
       await drain(view);

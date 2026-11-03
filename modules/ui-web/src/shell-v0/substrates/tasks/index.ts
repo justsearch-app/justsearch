@@ -53,6 +53,7 @@ export function isTerminalStatus(status: TaskStatus): boolean {
 
 export interface Task {
   readonly id: string;
+  readonly operationKey?: string;
   readonly label: string;
   readonly status: TaskStatus;
   /** 0..1 when known; absent = indeterminate. */
@@ -173,6 +174,14 @@ export function completeTask(
     ...(status === 'succeeded' ? { progress: 1 } : {}),
   });
   _cancelFns.delete(id);
+  notify();
+}
+
+/** Invocation return is only acceptance when the server supplies a durable receipt. */
+export function bindTaskOperation(id: string, operationKey: string): void {
+  const task = _tasks.get(id);
+  if (!task || isTerminalStatus(task.status)) return;
+  putTask({ ...task, operationKey });
   notify();
 }
 

@@ -27,7 +27,17 @@
    ============================================ */
 
 @layer core-theme {
+
 :root {
+  /* Frame status geometry: theme-independent dimensions, seed-derived dimming. */
+  --frame-status-panel-width: 25.625rem;
+  --frame-status-panel-top: 3rem;
+  --frame-panel-radius: 1rem;
+  --frame-pill-radius: 999rem;
+  --frame-hairline: 1px;
+  --frame-focus-width: 2px;
+  --frame-status-dot: 0.5rem;
+  --frame-status-dim: rgba(var(--p-shadow), 0.28);
   /* === Primitive Palette ===
      Base colors and hue angles shared across semantic tokens.
      Override these to create new themes — semantic tokens derive from them. */

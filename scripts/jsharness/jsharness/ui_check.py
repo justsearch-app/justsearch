@@ -1421,13 +1421,11 @@ def _build_steps(ui_url: str, cooldown_ms: int, timeout_ms: int) -> list[Step]:
             if route == "palette":
                 await page.keyboard.press("Control+k")
                 await page.get_by_role("option").filter(has_text="Change indexing rules").click()
-            elif route in ("status", "browse"):
-                control = page.locator('jf-status-deck').get_by_role("button", name="Change hours", exact=True)
-                if not await control.is_visible():
-                    await page.get_by_role("button", name=re.compile(r"more status item")).click()
-                await control.click()
-            elif route in ("tasks", "warm", "reduced"):
-                await page.locator('jf-task-list').get_by_role("button", name="Change hours", exact=True).click()
+            elif route in ("status", "browse", "tasks", "warm", "reduced"):
+                # Frame status S1: the status bar and the task tray retired into one status panel,
+                # opened from the title-bar pill; the indexing hold row keeps its "Change hours".
+                await page.locator("jf-status-pill .trigger").click()
+                await page.locator("jf-status-panel").get_by_role("button", name="Change hours", exact=True).click()
             elif route == "settings":
                 await page.locator('jf-settings-surface').get_by_role("button", name="Change when to index", exact=True).click()
             else:
@@ -1582,7 +1580,8 @@ def _build_steps(ui_url: str, cooldown_ms: int, timeout_ms: int) -> list[Step]:
             # Chromium real timers, no clock replacement or action-triggered refresh.
             for _ in range(40 if mode == "fresh" else 25):
                 text = await heading.inner_text()
-                deck = await page.locator('jf-status-deck').evaluate("el => el.shadowRoot.textContent")
+                # Frame status S1: the indexing announcer moved from the status bar into the pill.
+                deck = await page.locator('jf-status-pill').evaluate("el => el.shadowRoot.textContent")
                 samples.append({"ageMs": int(time.time() * 1000) - sampled_at, "headline": text, "deck": deck})
                 assert "Rebuilding" not in text, samples
                 if mode == "fresh":
@@ -1711,7 +1710,7 @@ def _build_steps(ui_url: str, cooldown_ms: int, timeout_ms: int) -> list[Step]:
         # Tempdoc 813 Slice D — the capture that proves the redesigned Tasks panel cannot cover the
         # rail's bottom controls. Registered in governance/ui-proportion-baseline.v1.json with TWO
         # mustNotOverlapSelector rows (Settings + the Help affordance) AND a `minWidthPx` floor on
-        # `jf-task-list` itself: a hidden panel yields a 0x0 rect that satisfies any overlap check
+        # the panel itself (now the status panel, S1): a hidden panel yields a 0x0 rect that satisfies any overlap check
         # vacuously (ui_proportion_gate._rects_overlap), so the non-vacuity companion is what makes
         # the two occlusion rows mean anything.
         #
@@ -1744,10 +1743,11 @@ def _build_steps(ui_url: str, cooldown_ms: int, timeout_ms: int) -> list[Step]:
             state="visible", timeout=15_000
         )
         await page.locator("[data-help-affordance]").first.wait_for(state="visible", timeout=15_000)
-        # The aggregate card, not merely the host element: `jf-task-list` exists in the DOM whenever
-        # the shell is mounted (it self-hides via [data-empty]), so waiting on the host would wait on
-        # nothing. The card is only rendered on a phase the projection can actually speak to.
-        await page.locator('[data-testid="task-aggregate"]').first.wait_for(
+        # Frame status S1: the bottom-left task tray retired; its indexing aggregate is the status
+        # panel's indexing row, opened from the title-bar pill. Wait on the row itself, not the
+        # panel host (always mounted, hidden while closed), so the occlusion rows cannot pass vacuously.
+        await page.locator("jf-status-pill .trigger").click()
+        await page.locator('jf-status-panel article[data-fact="indexing"]').first.wait_for(
             state="visible", timeout=15_000
         )
         if cooldown_ms > 0:
@@ -1786,10 +1786,12 @@ def _build_steps(ui_url: str, cooldown_ms: int, timeout_ms: int) -> list[Step]:
         await page.locator('.folder-details').first.wait_for(state="visible", timeout=15_000)
         await page.mouse.move(600, 120)
         await page.keyboard.press("Escape")
-        # The aggregate card (not the `jf-task-list` host, which exists whenever the shell is mounted
-        # and self-hides via [data-empty]) — the same non-vacuity reasoning as `tasks-occlusion`.
-        await page.locator('[data-testid="task-aggregate"]').first.wait_for(
-            state="visible", timeout=15_000
+        # The status panel's indexing row (frame status S1 retired the task tray's aggregate card),
+        # not the always-mounted panel host — the same non-vacuity reasoning as `tasks-occlusion`.
+        # The row renders while the panel is closed; wait for it attached so the Library capture
+        # is not covered by the open panel.
+        await page.locator('jf-status-panel article[data-fact="indexing"]').first.wait_for(
+            state="attached", timeout=15_000
         )
         if cooldown_ms > 0:
             await asyncio.sleep(cooldown_ms / 1000)

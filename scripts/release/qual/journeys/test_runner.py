@@ -341,8 +341,10 @@ class RunnerTests(unittest.TestCase):
              patch.object(linux, 'snapshot', return_value=state):
             linux.update_prepare(run)
         run.nav.assert_not_called()
-        self.assertEqual(run.wd.click.call_args_list[0].args,
-                         ('button[aria-label="Open app update settings"]',))
+        # Frame status S1: the offer is the status panel's Needs you row, opened from the pill.
+        self.assertEqual([c.args for c in run.wd.click.call_args_list[:2]],
+                         [('button.trigger[aria-haspopup="dialog"]',),
+                          ('article[data-fact="app-update"] button', 'Review and install')])
         self.assertTrue(run.facts['updateOffered'])
         run.wd.element.assert_called_with('button[aria-label="Install update"]:not(:disabled)', seconds=45)
 
@@ -355,7 +357,8 @@ class RunnerTests(unittest.TestCase):
         linux.open_update_offer(run, 'recovered')
         run.close_settings.assert_called_once()
         self.assertEqual(run.wd.click.call_args_list, [
-            call('button[aria-label="Open app update settings"]'),
+            call('button.trigger[aria-haspopup="dialog"]'),
+            call('article[data-fact="app-update"] button', 'Review and install'),
             call('button[data-settings-category="desktop"]')])
         run.nav.assert_not_called()
         run.wd.element.assert_called_with('button[aria-label="Install update"]:not(:disabled)', seconds=45)

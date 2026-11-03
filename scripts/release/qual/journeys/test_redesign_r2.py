@@ -124,7 +124,7 @@ class UpdateTests(unittest.TestCase):
         run = Mock()
         def dom(script, args=None):
             if 'repair:' in script:return {'text': 'Manual repair required', 'repair': True}
-            if 'jf-app-update-banner' in script:return 'Manual repair required'
+            if 'data-fact="app-update"' in script:return 'Manual repair required'
             return False
         run.wd.execute.side_effect = dom
         run.require.return_value = '0.3.1'

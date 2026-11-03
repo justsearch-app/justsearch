@@ -103,7 +103,7 @@ export type Stability =
       readonly source?: MigrationSource;
     };
 
-export type VerdictKind =
+type VerdictKind =
   | 'operational'
   | 'checking'
   | 'connecting'
@@ -390,7 +390,7 @@ function sourceOfReasons(reasons: readonly string[]): MigrationSource | undefine
 export function verdictHeadline(v: SystemHealthVerdict): string {
   switch (v.kind) {
     case 'operational':
-      return 'All systems operational';
+      return 'Search available';
     case 'checking':
       return 'Checking…';
     case 'connecting':

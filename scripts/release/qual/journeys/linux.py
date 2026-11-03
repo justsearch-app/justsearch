@@ -598,23 +598,28 @@ def open_update_offer(run, evidence):
     expected_candidate = run.require('initialVersion')
     assert re.search(r'(?<![\w.+~-])' + re.escape(expected_candidate) + r'(?![\w+~-]|\.\w)', banner), 'Update banner does not name the candidate version'
     run.native.shot(evidence + '-banner')
-    action = run.wd.execute("return all(document,'button[aria-label=\"Open app update settings\"]').some(e=>{const r=e.getBoundingClientRect();return r.width>0&&r.height>0})")
+    # Frame status S1: the banner retired; the offer is a Needs you row in the status panel,
+    # opened from the title-bar pill. Its action navigates to Settings like the banner's did.
+    run.wd.click('button.trigger[aria-haspopup="dialog"]')
+    action = run.wd.execute("return all(document,'article[data-fact=\"app-update\"] button').some(e=>{const r=e.getBoundingClientRect();return r.width>0&&r.height>0})")
     if action:
-        run.wd.click('button[aria-label="Open app update settings"]')
+        run.wd.click('article[data-fact="app-update"] button', 'Review and install')
     else:
         run.nav('Settings')
     run.wd.click('button[data-settings-category="desktop"]')
     run.wd.element('button[aria-label="Install update"]:not(:disabled)', seconds=45)
-    run.evidence(evidence, {'banner': banner, 'action': 'banner: Review and install' if action else 'Settings fallback: banner has no visible action',
+    run.evidence(evidence, {'banner': banner, 'action': 'status panel: Review and install' if action else 'Settings fallback: status panel row has no visible action',
                           'secondsToControlsReady': round(time.monotonic() - started, 3),
                           'readinessSignal': 'Banner names candidate; enabled Install update visible in Desktop settings'})
 
 
 def update_banner(run):
+    # The update offer's Needs you row (data-fact="app-update"), rendered by the status panel whether
+    # or not the panel is open; the repair state names itself ("The app update needs repair").
     banner = run.wd.execute("""
-const banners=all(document,'jf-app-update-banner').filter(e=>!e.hidden);
-return {text:banners.map(e=>e.shadowRoot.textContent).join(' ').trim(),
-        repair:banners.some(e=>e.shadowRoot?.querySelector('[role="alert"]'))};
+const rows=all(document,'article[data-fact="app-update"]');
+return {text:rows.map(e=>e.textContent.replace(/\\s+/g,' ')).join(' ').trim(),
+        repair:rows.some(e=>/needs repair/.test(e.textContent))};
 """)
     if banner['repair']:
         raise ProductFailure('Updater requires repair: ' + banner['text'])

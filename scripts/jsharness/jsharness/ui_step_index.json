@@ -82,7 +82,8 @@
     "sv3-composer-occlusion", "chat-proportion", "chat-bands-detailed"
   ],
   "shell-v0/components/chat/evidenceProjection.ts": ["sv3-citation-selected", "sv3-citation-dropped"],
-  "shell-v0/components/StatusDeck.ts": ["chat-chip-yield"],
+  "shell-v0/components/StatusPill.ts": ["chat-chip-yield", "tasks-occlusion", "library-arrival-status-1280x720", "library-arrival-status-600x400"],
+  "shell-v0/components/StatusPanel.ts": ["tasks-occlusion", "library-arrival-tasks-1280x720", "library-arrival-tasks-600x400"],
   "shell-v0/components/ContextMenu.ts": ["context-menu"],
 
   "shell-v0/chrome/Shell.ts": [
@@ -90,7 +91,6 @@
     "home-light", "library-light", "ai-brain-light", "health-light",
     "settings-light", "security-light", "help-light"
   ],
-  "shell-v0/components/TaskList.ts": ["tasks-occlusion"],
   "shell-v0/chrome/OverlayHost.ts": ["tasks-occlusion"],
   "shell-v0/plugin-api/CorePlugin.ts": [
     "home", "library", "ai-brain", "health", "settings", "security", "help"
@@ -143,9 +143,6 @@
   "shell-v0/components/IndexingRulesEditor.ts": ["library-indexing-rules-dark", "library-indexing-rules-light", "library-indexing-rules-forced", "library-indexing-rules-minimum", "library-indexing-held", "library-arrival-tasks-1280x720", "library-arrival-tasks-600x400", "library-arrival-reduced-1280x720", "library-arrival-reduced-600x400"],
   "shell-v0/components/IndexingControls.ts": ["library-indexing-rules-dark", "library-indexing-held"],
   "shell-v0/state/indexingProgress.ts": ["library-indexing-rules-dark", "library-indexing-held"],
-  "shell-v0/components/AppUpdateBanner.ts": [
-    "settings", "settings-light"
-  ],
   "shell-v0/views/HelpSurface.ts": ["help", "help-light", "help-narrow"],
 
   "shell-v0/shell/Shell.ts": ["shell-v0-demo"],

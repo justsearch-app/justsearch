@@ -37,8 +37,8 @@
       "class": "dialog"
     },
     {
-      "file": "shell-v0/components/chat/ResolutionToast.ts",
-      "class": "toast"
+      "file": "shell-v0/components/StatusPill.ts",
+      "class": "anchored"
     }
   ]
 }

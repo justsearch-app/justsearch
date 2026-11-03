@@ -103,7 +103,8 @@ class IndexingControls extends SignalWatcher(JfElement) {
     }
     if (!this.pending && this.awaitingStatus && this.progress.activity.confirmed
       && (changed.has('progress') || (this.requestedResume && !this.reasons.includes('user_paused')))) {
-      if (this.requestedResume && this.reasons.includes('user_paused')) return;
+      if (this.requestedResume && (this.reasons.includes('user_paused')
+        || !this.progress.pause && !['indexing', 'enriching', 'ready'].includes(this.progress.phase))) return;
       this.message = this.action !== 'resume' && this.requestedResume && this.remainingRules
         ? `Manual pause cleared. Indexing is still held by ${this.remainingRules}.` : '';
       this.awaitingStatus = false;
@@ -147,7 +148,7 @@ class IndexingControls extends SignalWatcher(JfElement) {
       if (this.saveWithSettings) await this.saveWithSettings(write); else await write();
       this.requestedResume = resume;
       this.awaitingStatus = true;
-      this.message = 'Waiting for status to confirm the request.';
+      this.message = resume ? 'Resuming. Waiting for status to confirm the request.' : 'Waiting for status to confirm the request.';
     } catch (error: unknown) {
       this.message = `Could not confirm the indexing request. Check the current status before trying again. ${error instanceof Error ? error.message : ''}`;
     } finally {

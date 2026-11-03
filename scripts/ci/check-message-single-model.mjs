@@ -26,10 +26,9 @@
  * automatically); no enumerated allowlist. Lighter scripts/ci tier; wired as a
  * ci.yml step + the pre-merge checks table (docs/reference/contributing/pre-merge-checks.md).
  *
- * NOTE (honest scope): `ResolutionToast` (chat citation-resolution) is a
- * chat-interaction affordance, not a system-notification channel, so it is not
- * in this gate's scope; the system-message singularity is toast/banner/pill for
- * notifications, which all route through the seam above. The reindex banner and
+ * NOTE (honest scope): the retired `ResolutionToast` (navigation resolution)
+ * now routes through the seam above like every other own-action receipt; the
+ * system-message singularity is the status pill/banner for notifications. The reindex banner and
  * connection pill are projections of the 557 observed-state authority (not a
  * second message model) — see tempdoc 559 §Authority III.
  */

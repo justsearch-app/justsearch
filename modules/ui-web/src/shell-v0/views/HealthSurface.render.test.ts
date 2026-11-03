@@ -193,7 +193,7 @@ describe('HealthSurface — recommendedActions panel', () => {
     try {
       const section = el.shadowRoot?.querySelector('.card.section.recommended');
       expect(section).not.toBeNull();
-      expect(section?.textContent).toContain('All systems operational');
+      expect(section?.textContent).toContain('Up to date');
     } finally {
       teardown(el);
     }
@@ -233,7 +233,7 @@ describe('HealthSurface — recommendedActions panel', () => {
 
   it('595 §1.1: header and footer agree on the unknown boundary — both "Checking…", NEVER a split', async () => {
     // retrieval 'unknown' (settled) was the boundary where the header alarmed
-    // ("Service degraded") while the footer greened ("✓ All systems operational").
+    // ("Service degraded") while the footer greened ("✓ Up to date").
     // With one verdict, both must read the SAME non-green, non-alarming "Checking…".
     __feedForTest({
       status: {
@@ -255,7 +255,7 @@ describe('HealthSurface — recommendedActions panel', () => {
       expect(footer?.textContent).toContain('Checking');
       // The contradiction must be GONE on both surfaces.
       expect(badge?.textContent).not.toContain('Service degraded');
-      expect(footer?.textContent).not.toContain('All systems operational');
+      expect(footer?.textContent).not.toContain('Up to date');
     } finally {
       teardown(el);
     }
@@ -288,7 +288,7 @@ describe('HealthSurface — recommendedActions panel', () => {
       // Fresh mount, no poll completed → must NOT fail-open to "operational".
       const section = el.shadowRoot?.querySelector('.card.section.recommended');
       expect(section?.textContent).toContain('Connecting');
-      expect(section?.textContent).not.toContain('All systems operational');
+      expect(section?.textContent).not.toContain('Up to date');
     } finally {
       teardown(el);
     }
@@ -366,7 +366,7 @@ describe('HealthSurface — recommendedActions panel', () => {
     try {
       const section = el.shadowRoot?.querySelector('.card.section.recommended');
       expect(section?.textContent).toContain('Service degraded');
-      expect(section?.textContent).not.toContain('All systems operational');
+      expect(section?.textContent).not.toContain('Up to date');
     } finally {
       teardown(el);
     }

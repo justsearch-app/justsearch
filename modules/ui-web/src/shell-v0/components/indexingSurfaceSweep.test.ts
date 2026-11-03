@@ -6,8 +6,10 @@ import '../views/BrainSurface.js';
 import '../views/HealthSurface.js';
 import '../views/LibrarySurface.js';
 import '../views/SystemSelfView.js';
-import './TaskList.js';
-import './StatusDeck.js';
+import { StatusPanel } from './StatusPanel.js';
+import { StatusPill } from './StatusPill.js';
+import { deriveFrameStatus } from '../state/frameStatus.js';
+import type { Task } from '../substrates/tasks/index.js';
 import './LivenessReadout.js';
 import '../views/search-v3/SearchV3View.js';
 import './CapabilityMap.js';
@@ -78,6 +80,12 @@ function dom(tpl: TemplateResult): HTMLDivElement {
   const container = document.createElement('div');
   render(tpl, container);
   return container;
+}
+function framePanel(state: AiState, tasks: Task[] = []) {
+  const panel = new StatusPanel();
+  panel.model = deriveFrameStatus({ ai: state, now: Date.now(), contactLostAt: null, tasks });
+  panel.expanded = new Set(['indexing']);
+  return panel;
 }
 function expectedReason(which: Case): string {
   return which === 'energy' ? 'Meaning search is waiting while the computer saves energy.'
@@ -163,37 +171,29 @@ describe('WP3.3 complete surface sweep', () => {
       } else expect(row.querySelector('.status-icon.indexed'), which).not.toBeNull();
     }
   });
-  it('S33.4 Tasks and System self-view qualify retained indexing rows while preserving independent agent tasks', () => {
+  it('S33.4 Running and System self-view qualify retained indexing rows while preserving independent agent tasks', () => {
     for (const which of CASES) {
-      const state = observe(which, 4);
-      __resetTasksForTest();
+      const state = observe(which, 4); __resetTasksForTest();
       upsertMirroredTask({ id: 'idxjob:one', label: 'one.pdf', status: 'running', progress: 0.4 });
       upsertMirroredTask({ id: 'agent:one', label: 'Agent task', status: 'running' });
-      for (const tag of ['jf-task-list', 'jf-system-self-view']) {
-        const el = harness(tag, state);
-        if (tag === 'jf-task-list') {
-          el.filesOpen = true;
-          Object.assign(el, { tasks: [
-            { id: 'idxjob:one', label: 'one.pdf', status: 'running', progress: 0.4 },
-            { id: 'agent:one', label: 'Agent task', status: 'running' },
-          ] });
-        }
-        const output = dom(el.render());
-        const row = output.querySelector(tag === 'jf-task-list' ? '[data-testid="task-idxjob:one"]' : '[data-testid="self-view-task"]')!;
-        expect(row.textContent, `${tag}: ${which}`).toContain(unconfirmed(which) ? 'last observed running' : 'running');
-        if (unconfirmed(which)) expect(row.querySelector('.bar')).toBeNull();
-        expect(output.textContent).toContain('Agent task');
-      }
+      const panel = framePanel(state, [{ id: 'idxjob:one', label: 'one.pdf', status: 'running', progress: 0.4 },
+        { id: 'agent:one', label: 'Agent task', status: 'running' }] as Task[]);
+      const running = dom(panel.render());
+      const detail = running.querySelector('[data-detail="idxjob:one"]')!;
+      expect(detail.textContent, which).toContain(unconfirmed(which) ? 'last observed running' : 'running');
+      if (unconfirmed(which)) expect(running.querySelector('[data-fact="indexing"] progress')).toBeNull();
+      expect(running.textContent).toContain('Agent task');
+      const system = dom(harness('jf-system-self-view', state).render());
+      expect(system.querySelector('[data-testid="self-view-task"]')!.textContent, which).toContain(unconfirmed(which) ? 'last observed running' : 'running');
+      expect(system.textContent).toContain('Agent task');
     }
   });
-  it('S33.4 status-deck running-job chip marks retained indexing activity as last observed', () => {
+  it('S33.4 Running marks retained indexing activity as last observed', () => {
     for (const which of CASES) {
-      const el = harness('jf-status-deck', observe(which, 4));
-      Object.assign(el, { runningTasks: [{ id: 'idxjob:one', label: 'one.pdf', status: 'running' }] });
-      const chip = dom(el.renderCoreItem('core.running-job'));
-      const label = chip.querySelector('[aria-label]')?.getAttribute('aria-label') ?? '';
-      expect(label, which).toContain(unconfirmed(which) ? 'last observed' : 'one.pdf');
-      if (unconfirmed(which)) expect(chip.textContent).toContain('last observed');
+      const panel = framePanel(observe(which, 4), [{ id: 'idxjob:one', label: 'one.pdf', status: 'running' }] as Task[]);
+      const output = dom(panel.render());
+      expect(output.textContent, which).toContain('one.pdf');
+      if (unconfirmed(which)) expect(output.textContent).toContain('last observed');
     }
   });
 
@@ -236,21 +236,21 @@ describe('WP3.3 complete surface sweep', () => {
       if (unconfirmed(which)) expect(card.textContent).toContain(UNCONFIRMED);
     }
   });
-  it('S33.4 Tasks label the entire stale stage disclosure as last observed', () => {
+  it('S33.4 Running labels the entire stale stage disclosure as last observed', () => {
     for (const which of CASES) {
-      const el = harness('jf-task-list', observe(which));
-      el.filesOpen = true;
-      const files = dom(el.render()).querySelector('[data-testid="tasks-files"]')!;
-      if (unconfirmed(which)) expect(files.textContent, which).toContain('Last observed indexing and enrichment details');
+      const panel = framePanel(observe(which));
+      const files = dom(panel.render()).querySelector('[data-expanded="indexing"]')!;
+      if (unconfirmed(which)) expect(files.textContent, which).toContain('last seen');
       expect(files.textContent).toContain('Semantic vectors');
     }
   });
-  it('S33.1 S33.4 mode pills cannot assert indexing from the parked AI runtime alone', () => {
+  it('S33.1 S33.4 status cannot assert indexing from the parked AI runtime alone', () => {
     for (const which of CASES) {
       const state = observe(which);
-      const el = harness('jf-status-deck', state);
-      el.aiState = { ...state, statusLabel: 'Indexing', aiEngine: { kind: 'indexing', stability: { kind: 'settled' }, installFailure: null } };
-      expect(el.inferenceChipReadout().label, which).toBe(unconfirmed(which) ? UNCONFIRMED
+      state.aiEngine = { kind: 'indexing', stability: { kind: 'settled' }, installFailure: null };
+      const panel = framePanel(state);
+      const fact = panel.model!.sections.running.find(r => r.id === 'indexing')!;
+      expect(fact.title, which).toBe(unconfirmed(which) ? UNCONFIRMED
         : which === 'energy' ? 'Meaning processing is waiting to save energy' : which === 'chat' ? 'Search is ready — still improving' : 'Meaning processing is waiting for the GPU');
     }
   });
@@ -312,13 +312,12 @@ describe('WP3.3 complete surface sweep', () => {
     }
   });
 
-  it('S33.6 the deck has one indexing announcement even while the AI runtime is in indexing mode', () => {
+  it('S33.6 the frame has one indexing announcement even while the AI runtime is in indexing mode', () => {
     const state = observe('energy');
-    const el = harness('jf-status-deck', state);
-    el.aiState = { ...state, aiEngine: { kind: 'indexing', stability: { kind: 'settled' }, installFailure: null } };
-    const deck = dom(el.render());
-    expect(deck.querySelector('[data-testid="indexing-announcer"]')?.textContent).toContain(expectedReason('energy'));
-    expect(deck.querySelector('[data-testid="ai-engine-announcer"]')?.textContent?.trim() ?? '').toBe('');
+    const pill = new StatusPill(); pill.status.ai = state; pill.status.refresh();
+    const output = dom(pill.render());
+    expect(output.querySelector('[data-testid="indexing-announcer"]')?.textContent).toContain(expectedReason('energy'));
+    expect(output.querySelector('[data-testid="ai-engine-announcer"]')?.textContent?.trim() ?? '').toBe('');
   });
 
   it('S33.4 Brain compatibility diagnostics qualify retained indexing readiness', () => {
