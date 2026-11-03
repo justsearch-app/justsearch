@@ -20,12 +20,13 @@ the add-watched-root risk value (catalog test and operation-wire golden) need en
 is overlaid onto the before-state so its conformance check compares the base catalog with the new
 value. N1 for the raised operation already held on the base, so its check has no fail-before. For Rust fail-before, the compatibility patch exposes only new API shapes, keeps the
 old session-only stdout filtering and supplies no window authority; the overlaid
-`justsearch-bound-exec` helper is the CI-built native fixture the shell's spawn tests need.
+`justsearch-bound-exec` helper is compiled from `native/bound-exec/bound-exec.c` for the shell's spawn tests.
 
-The default-deny evidence uses the evidence runner with a temporary adaptation that creates and
-removes a shared clone for the before-state, instead of registering a worktree in the source
-repository. Its producer script digest records that adaptation; check execution and result parsing
-are unchanged. The before-state is `dcce080acd`, with only the new test source overlaid.
+All evidence is regenerated at HEAD with the unmodified `run-evidence.mjs`, run from an isolated
+shared clone. Its temporary before-state worktrees and build folders stay inside the session
+temporary directory. The default-deny before-state is `dcce080acd`, with only the new test source
+overlaid. The register-count entry is a new expectation for the deliberate S7 launch setting, not
+a repair, so its evidence has no fail-before.
 
 ```json
 {
@@ -332,11 +333,22 @@ are unchanged. The before-state is `dcce080acd`, with only the new test source o
       "items": [
         "modules/configuration/src/test/java/io/justsearch/configuration/resolved/ConfigApplyScopesTest.java"
       ],
-      "class": "Adaptation",
-      "moved": [
-        "signature"
+      "class": "New",
+      "behaviour": "S7: The configuration apply-scope register contains 290 entries, including the one new restart-required justsearch.windowCredential launch setting used by the shell to request the window credential. The packaged register must remain byte-identical to the repository register; the existing explicit scope assertions remain unchanged. This is a deliberate new configuration expectation, not a repair of the prior 289-entry register.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "open a task record and proceed accordingly with the remainign work",
+          "delegationLocation": "task t-20261102-agent-approval request",
+          "delegationScope": "start the fix for the self-approval defect (any same-user program holding the session token can approve its own pending actions or create grants without the person seeing a prompt) as its own task, answering the orchestrator's question 'Should I start that fix as its own task?'",
+          "choice": "S7: The shell requests its per-Engine-start window credential through justsearch.windowCredential, a restart-required configuration entry. Register that one launch setting alongside the 289 existing entries, so the packaged and repository configuration registers contain 290 entries and stay byte-identical.",
+          "label": "agent choice"
+        }
       ],
-      "whatMoved": "One register count. packagedRegisterIsTheRepositoryRegister counts 290 register entries instead of 289: the one added entry is justsearch.windowCredential (restart-required), the shell's launch request for the window credential; the byte comparison with the repository register and the explicit scope assertions are unchanged."
+      "evidence": "gates/test-intent/evidence/window-credential-config-register.json",
+      "newChecks": [
+        "modules/configuration/src/test/java/io/justsearch/configuration/resolved/ConfigApplyScopesTest.java#packagedRegisterIsTheRepositoryRegister"
+      ]
     },
     {
       "items": [
