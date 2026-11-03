@@ -1,0 +1,11 @@
+--- a/modules/app-api/src/main/java/io/justsearch/app/api/UiSettings.java
++++ b/modules/app-api/src/main/java/io/justsearch/app/api/UiSettings.java
+@@ -303,3 +303,8 @@
+   public Boolean getRerankerEnabled() { return rerankerEnabled; }
+   public void setRerankerEnabled(Boolean enabled) { rerankerEnabled = enabled; }
++  // Before-only compile scaffolding: always zero, never stored or serialized.
++  @com.fasterxml.jackson.annotation.JsonIgnore
++  public long getRerankerPreferenceRevision() { return 0; }
++  @com.fasterxml.jackson.annotation.JsonIgnore
++  public void setRerankerPreferenceRevision(long ignored) { }
+ 

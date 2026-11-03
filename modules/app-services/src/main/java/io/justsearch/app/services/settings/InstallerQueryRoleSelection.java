@@ -26,8 +26,9 @@ final class InstallerQueryRoleSelection {
     if (plan.models().stream().noneMatch(model -> "reranker".equals(model.packageId()))
         || plan.models().stream().noneMatch(model ->
             "citation-scorer".equals(model.packageId()))) return Optional.empty();
-    Optional<QueryRoleSelection.Role> reranker = role(plan, "reranker",
-        candidate.getRerankerModelPath());
+    Optional<QueryRoleSelection.Role> reranker = Boolean.FALSE.equals(candidate.getRerankerEnabled())
+        ? Optional.of(QueryRoleSelection.Role.disabled())
+        : role(plan, "reranker", candidate.getRerankerModelPath());
     Optional<QueryRoleSelection.Role> citation = role(plan, "citation-scorer",
         candidate.getCitationScorerModelPath());
     if (reranker.isEmpty() || citation.isEmpty()) return Optional.empty();

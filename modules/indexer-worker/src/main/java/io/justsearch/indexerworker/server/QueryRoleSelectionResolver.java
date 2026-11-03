@@ -37,7 +37,9 @@ final class QueryRoleSelectionResolver {
         EnvRegistry.RERANK_MODEL_PATH.configKey());
     boolean citationOverride = isOperatorOverride(resolved,
         EnvRegistry.CITATION_SCORER_MODEL_PATH.configKey());
-    if (!rerankerOverride && !citationOverride) {
+    boolean explicitlyOff = !rerankerOverride
+        && EncoderConfigurationProjection.rerankerOffBySavedPreference(resolved);
+    if (!rerankerOverride && !citationOverride && !explicitlyOff) {
       return new BootResolution(enrich(committed), Map.of());
     }
     var projection = EncoderConfigurationProjection.from(resolved);
@@ -45,7 +47,7 @@ final class QueryRoleSelectionResolver {
     var citation = projection.citation();
     Map<EncoderRole, String> unavailable = new EnumMap<>(EncoderRole.class);
     QueryRoleSelection.Role selectedReranker = captureForBoot(EncoderRole.RERANKER,
-        unavailable, () -> rerankerOverride
+        unavailable, () -> explicitlyOff ? QueryRoleSelection.Role.disabled() : rerankerOverride
             ? select("reranker", true, reranker.modelPath(), null, generation, false,
                 reranker.gpuEnabled())
             : select("reranker", false, reranker.modelPath(),
@@ -113,6 +115,49 @@ final class QueryRoleSelectionResolver {
     if (variant == null) throw new IOException("Active legacy query model is unavailable: "
         + packageId);
     return capture(packageId, variant.modelFile(), gpuEnabled);
+  }
+
+  /** The retained identity is owned by the same prepared settings candidate as the switch. */
+  static QueryRoleSelection.Role selectReranker(io.justsearch.app.api.UiSettings candidate,
+      boolean pathChanged, Path desiredDirectory, QueryRoleSelection.Role prior,
+      GenerationModelSelection generation, boolean currentlyWired, boolean gpuEnabled)
+      throws IOException {
+    if (Boolean.FALSE.equals(candidate.getRerankerEnabled())) {
+      QueryRoleSelection.Role retained = pathChanged
+          ? select("reranker", true, desiredDirectory, null, generation, currentlyWired, gpuEnabled)
+          : prior;
+      if (retained == null && currentlyWired) {
+        retained = select("reranker", false, desiredDirectory, null, generation, true, gpuEnabled);
+      }
+      if (retained != null && retained.state() == QueryRoleSelection.State.SELECTED) {
+        candidate.setRerankerRestoreSelection(retained);
+      }
+      return QueryRoleSelection.Role.disabled();
+    }
+    boolean probe = pathChanged;
+    if (Boolean.TRUE.equals(candidate.getRerankerEnabled()) && !pathChanged
+        && (prior == null || prior.state() != QueryRoleSelection.State.SELECTED)) {
+      // Switching on restores the exact retained selection (model, tokenizer, variant, custom
+      // file). Only an actual model-path change selects from a directory again.
+      var retained = candidate.getRerankerRestoreSelection();
+      if (retained != null) {
+        if (!GenerationModelSelection.verifyIdentity(retained.model())
+            || !GenerationModelSelection.verifyIdentity(retained.tokenizer())) {
+          throw new IOException("The kept Best match first files changed or are missing: "
+              + retained.model().path());
+        }
+        return enrich("reranker", retained);
+      }
+      // Nothing retained (a role disabled before the switch existed): the installed directory.
+      probe = true;
+    }
+    var selected = select("reranker", probe, desiredDirectory, prior,
+        generation, currentlyWired, gpuEnabled);
+    if (Boolean.TRUE.equals(candidate.getRerankerEnabled())
+        && selected.state() != QueryRoleSelection.State.SELECTED) {
+      throw new IOException("Best match first cannot be enabled without a selected reranker");
+    }
+    return selected;
   }
 
   static QueryRoleSelection enrich(QueryRoleSelection selection) {

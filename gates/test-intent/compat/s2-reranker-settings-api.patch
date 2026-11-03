@@ -1,0 +1,13 @@
+--- a/modules/app-api/src/main/java/io/justsearch/app/api/UiSettings.java
++++ b/modules/app-api/src/main/java/io/justsearch/app/api/UiSettings.java
+@@ -296,6 +296,10 @@
+   // SPLADE_MODEL_PATH, CITATION_SCORER_MODEL_PATH).
+   private String embedOnnxModelPath = "";
+   private String rerankerModelPath = "";
++  // Before-only wire scaffolding. No resolution, activation or installer behavior.
++  private Boolean rerankerEnabled;
++  public Boolean getRerankerEnabled() { return rerankerEnabled; }
++  public void setRerankerEnabled(Boolean enabled) { rerankerEnabled = enabled; }
+   private String nerModelPath = "";
+   private String spladeModelPath = "";
+   private String citationScorerModelPath = "";

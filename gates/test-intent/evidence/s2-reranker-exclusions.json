@@ -1,0 +1,58 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
+  },
+  "createdAt": "2026-11-03T13:00:01.919Z",
+  "revision": "14fdbf6157523d89068873b62de6bc14601851ef",
+  "tree": "78b210814750417fbef249962095cef04dc8d58e",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": "openjdk version \"25.0.4.1\" 2026-08-18 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "./gradlew :modules:app-services:test --tests \"io.justsearch.app.services.settings.LiteralExclusionSettingsTest\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 9127
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/settings/LiteralExclusionSettingsTest.java",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/settings/LiteralExclusionSettingsTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:8ee71751d9ec7fd9ccf3b3c51bf658f6ae5bf73736cd0d3a9ce9375315a43ab1",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "RF55V6ExactEntriesSurviveSaveReloadWithUnrelatedFieldsAndLegacyFallbacks()",
+          "status": "passed"
+        },
+        {
+          "name": "RF55PublicSaveCanRetainOrRemoveExactTokensButCannotCreateOrModifyThem()",
+          "status": "passed"
+        },
+        {
+          "name": "RF55EveryLegacyVersionKeepsItsStringMeaningAndCannotCarryTypedState()",
+          "status": "passed"
+        },
+        {
+          "name": "RF55ResetClearsLegacyAndPrecisePolicyTogether()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:b70b4e7f8f28248d5d39f69fa3963d232aff3299e87fb64c609f4f35ac9d899d"
+}

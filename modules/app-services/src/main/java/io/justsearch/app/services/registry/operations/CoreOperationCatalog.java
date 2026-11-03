@@ -1138,7 +1138,8 @@ public final class CoreOperationCatalog implements OperationCatalog {
     return new Operation(
         START_AI_INSTALL,
         Presentation.forId(START_AI_INSTALL),
-        Interface.of(INSTALL_ARGS_WITH_TERMS_SCHEMA, "{\"type\":\"object\"}"),
+        Interface.of("{\"type\":\"object\",\"properties\":{\"acceptTerms\":{\"type\":\"boolean\"},"
+            + "\"enableRerankerOnCompletion\":{\"type\":\"boolean\"}}}", "{\"type\":\"object\"}"),
         new OperationPolicy(
             RiskTier.MEDIUM,
             ConfirmStrategy.Inline.INSTANCE,

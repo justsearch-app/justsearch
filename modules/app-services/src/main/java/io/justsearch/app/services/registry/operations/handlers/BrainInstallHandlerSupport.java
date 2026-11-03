@@ -29,11 +29,15 @@ final class BrainInstallHandlerSupport {
   }
 
   static boolean parseAcceptTerms(String argumentsJson) {
+    return parseBoolean(argumentsJson, "acceptTerms");
+  }
+
+  static boolean parseBoolean(String argumentsJson, String key) {
     try {
       JsonNode root =
           HandlerJson.MAPPER.readTree(
               argumentsJson == null || argumentsJson.isBlank() ? "{}" : argumentsJson);
-      JsonNode v = root.get("acceptTerms");
+      JsonNode v = root.get(key);
       return v != null && v.isBoolean() && v.asBoolean();
     } catch (Exception e) {
       // tolerate parse errors — default false (matches HTTP handler semantics).

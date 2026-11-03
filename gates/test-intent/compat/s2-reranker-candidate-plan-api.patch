@@ -1,0 +1,35 @@
+diff --git a/modules/app-services/src/main/java/io/justsearch/app/services/gpu/DevicePlanState.java b/modules/app-services/src/main/java/io/justsearch/app/services/gpu/DevicePlanState.java
+index f662cf7d50..01f74db49e 100644
+--- a/modules/app-services/src/main/java/io/justsearch/app/services/gpu/DevicePlanState.java
++++ b/modules/app-services/src/main/java/io/justsearch/app/services/gpu/DevicePlanState.java
+@@ -72,6 +72,11 @@ public final class DevicePlanState {
+     }
+   }
+ 
++  /** Before-only compile bridge: the historical implementation did not stage a plan. */
++  public Runnable stage(GpuProfileResolver.Resolution candidate) {
++    return () -> {};
++  }
++
+   /** Delivers the current resolution to {@code consumer} now and every later one as published. */
+   public void subscribe(Consumer<GpuProfileResolver.Resolution> consumer) {
+     Objects.requireNonNull(consumer, "consumer");
+diff --git a/modules/indexer-worker/src/main/java/io/justsearch/indexerworker/server/KnowledgeServer.java b/modules/indexer-worker/src/main/java/io/justsearch/indexerworker/server/KnowledgeServer.java
+index da3edc2c02..397a4939ad 100644
+--- a/modules/indexer-worker/src/main/java/io/justsearch/indexerworker/server/KnowledgeServer.java
++++ b/modules/indexer-worker/src/main/java/io/justsearch/indexerworker/server/KnowledgeServer.java
+@@ -5491,6 +5491,14 @@ public final class KnowledgeServer implements Closeable {
+         desiredVersion, appliedVersion, evidence, reasonCode, Set.copyOf(missing), coherent);
+   }
+ 
++  /** Before-only compile bridge: preserve preparation without a candidate-plan callback. */
++  public PreparedQueryRoleSettings prepareQueryRoleSettings(UiSettings candidate,
++      ResolvedConfig desired, Set<String> changedKeys, QueryRoleSelection prior,
++      java.util.function.Function<java.util.Map<io.justsearch.ort.EncoderRole, Double>, Runnable>
++          stageCandidatePlan) {
++    return prepareQueryRoleSettings(candidate, desired, changedKeys, prior);
++  }
++
+   /** Builds a private query successor while retaining the exact currently issued A view. */
+   public PreparedQueryRoleSettings prepareQueryRoleSettings(UiSettings candidate,
+       ResolvedConfig desired, Set<String> changedKeys, QueryRoleSelection prior) {

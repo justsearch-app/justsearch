@@ -1,0 +1,91 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
+  },
+  "createdAt": "2026-11-03T10:10:21.603Z",
+  "revision": "f111a68d6629fc3a050398c46fe5807d259fa6bb",
+  "tree": "d5ea51a08a7c6059ec33a0dcc7100e34272deac1",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": "openjdk version \"25.0.4.1\" 2026-08-18 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "./gradlew :modules:indexer-worker:test --tests \"io.justsearch.indexerworker.server.RerankerSwitchOnCudaTest.switchingOnRealizesCudaUnderTheStagedCandidatePlan\" --tests \"io.justsearch.indexerworker.server.RerankerSwitchOnCudaTest.aRefusedSwitchOnPutsThePublishedPlanBack\" --tests \"io.justsearch.indexerworker.server.RerankerSwitchAfterRepairTest.anUnexplainedReplacementIsStillRefused\" --tests \"io.justsearch.indexerworker.server.RerankerSwitchAfterRepairTest.aRetainedCustomModelIsNotReplacedByTheInstalledOne\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 6499
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/RerankerSwitchOnCudaTest.java#switchingOnRealizesCudaUnderTheStagedCandidatePlan",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/RerankerSwitchOnCudaTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:c85d0dabd7b18795e8508e8594009c90ca4a37aa3dd0651a35916f2c3cd24eb5",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "switchingOnRealizesCudaUnderTheStagedCandidatePlan(Path)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/RerankerSwitchOnCudaTest.java#aRefusedSwitchOnPutsThePublishedPlanBack",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/RerankerSwitchOnCudaTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:c85d0dabd7b18795e8508e8594009c90ca4a37aa3dd0651a35916f2c3cd24eb5",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aRefusedSwitchOnPutsThePublishedPlanBack(Path)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/RerankerSwitchAfterRepairTest.java#anUnexplainedReplacementIsStillRefused",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/RerankerSwitchAfterRepairTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:d15783a1afd65d811ff4836163ae239caa9550c62c79ef9f7e449a1f1c2a8a89",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "anUnexplainedReplacementIsStillRefused()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/RerankerSwitchAfterRepairTest.java#aRetainedCustomModelIsNotReplacedByTheInstalledOne",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/RerankerSwitchAfterRepairTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:d15783a1afd65d811ff4836163ae239caa9550c62c79ef9f7e449a1f1c2a8a89",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aRetainedCustomModelIsNotReplacedByTheInstalledOne()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:eb24285044b01dbf18c1d56da4ac60ef9a4bee9aa5d376595e423762ed1b7079"
+}
