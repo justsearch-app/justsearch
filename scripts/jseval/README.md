@@ -50,3 +50,46 @@ whether bytes belong here (tempdoc 930 chunk C; enforced mechanically by the
    `782-hero/cells.v1.json` and enumerated as one 8-cell root by
    `experiments/paraphrase_bridge_suite.py`. Re-point a duplicate only when no
    commitment, certification or pre-registration names its path.
+
+## Search-quality quick check
+
+Run from the checkout whose engine is being measured, with jseval installed:
+
+```sh
+python -m jseval quality prepare scifact
+python -m jseval quality baseline scifact
+python -m jseval quality check scifact
+python -m jseval quality ablate scifact --mode vector
+```
+
+Omit the collection arguments to baseline/check to use SciFact, MIRACL de,
+MIRACL fr and Enron. Each needs its prepared index; run `quality prepare ALIAS`
+for each beforehand. Stored collection directories with `quality.config.json`
+also work, with `--documents-dir` for local source texts. Preparation builds
+through pausable background admission and may wait for the Gradle slot. Scoring
+never builds or repairs an index and refuses missing, corrupt or stale inputs
+as **not ready**. Re-run preparation outside the exclusive window.
+
+`check` sends the Search window's ordinary refined request: search syntax,
+50 results, excerpts and the same four facets, with mode and pipeline left to
+the engine. `ablate` labels explicit text/vector/hybrid runs as sensitivity
+information. Runs require a clean candidate and a distribution built for it;
+model files and index population are verified. HTTP failures and reranker
+loading, contention, deadline or inference drops invalidate the run. Identical
+by-design skips in both arms remain comparable, with their reasons recorded.
+
+Scoring estimates its cost before reserving the machine through
+`scripts/dev/admission.py exclusive`. The default window is 600 seconds,
+including backend startup, scoring and cleanup. `--window-seconds` may shorten
+it; there is no override for work that does not fit. Gate waiting and draining
+each stop after 120 seconds. The admission guardian owns and reaps all children,
+including hung inference. The next collection starts warming while the current
+one is queried.
+
+Each command prints one outcome line. Exit codes: PASS 0, REGRESSION 1,
+INCONCLUSIVE/INVALID 2. Reports name the measured surface, request, candidate,
+models and per-collection elapsed times. JSONL runs, summaries and comparison
+reports default to the gitignored `scripts/jseval/runs/quality/`; baselines live
+in its `baselines/` directory. Use `--runs-dir`, `--baseline-dir` and
+`--cache-root` to choose separate resources. Set `JS_ADMISSION_DIR` when running
+isolated tests; ordinary checks use the shared machine reservation.

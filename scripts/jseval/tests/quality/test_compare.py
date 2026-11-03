@@ -267,41 +267,30 @@ def _skip_reranker(run, qids, reason="DEADLINE_EXCEEDED"):
                               if r.qid in qids else r for r in run.results])
 
 
-def test_same_rankings_with_the_reranker_skipped_on_some_queries_is_inconclusive(c):
-    skipped = {"q001", "q011", "q021", "q031", "q041", "q051"}  # 10%: a loaded machine
+def test_same_rankings_with_reranker_deadline_skips_is_invalid(c):
+    skipped = {"q001", "q011", "q021", "q031", "q041", "q051"}
     cand = _skip_reranker(_run(c, commit="b" * 40), skipped)
     cmp = qcmp.compare(c, config_for(c), _run(c), cand)
-    assert cmp.verdict.outcome is Outcome.INCONCLUSIVE and cmp.verdict.exit_code == 2
-    assert all(row["delta"] == 0 for row in cmp.per_query.values())  # same rankings
-    assert cmp.affected["served.reranker"] == sorted(skipped)
-    assert any(x.startswith("served.reranker: differs on 6 queries (q001, q011, q021, q031, "
-                            "q041, q051)") for x in cmp.confounds), cmp.confounds
-    assert "confounded" in cmp.verdict.reasons[0]
+    assert cmp.verdict.outcome is Outcome.INVALID and cmp.verdict.exit_code == 2
+    assert all(q in ";".join(cmp.verdict.reasons) for q in skipped)
+    assert "DEADLINE_EXCEEDED" in cmp.verdict.reasons[0]
 
 
 def test_a_degraded_baseline_cannot_hide_a_broken_reranker(c):
-    """Baseline skipped the reranker on 20% of queries, the candidate on all of them."""
     qids = sorted(c.queries)
     base = _skip_reranker(_run(c), set(qids[::5]))
     cand = _skip_reranker(_run(c, commit="b" * 40), set(qids), "MODEL_LOAD_FAILED")
-    cmp = qcmp.compare(c, config_for(c), base, cand)
-    assert cmp.verdict.outcome is Outcome.INCONCLUSIVE
-    assert len(cmp.affected["served.reranker"]) == 48
-    # both arms skipped everywhere although both declared it: still never a pass
-    base_all = _skip_reranker(_run(c), set(qids))
-    cmp = qcmp.compare(c, config_for(c), base_all, cand)
-    assert cmp.verdict.outcome is Outcome.INCONCLUSIVE
-    assert "served.reranker" not in cmp.affected
-    assert cmp.affected["served.reranker_skipped"] == qids
-    # declared as part of the change, a reranker difference is not a confound, a shortfall is
-    cmp = qcmp.compare(c, config_for(c), base, cand, intended=["commit", "served"])
-    assert cmp.verdict.outcome is Outcome.INCONCLUSIVE
-    assert [x.split(":")[0] for x in cmp.confounds] == ["served.reranker_skipped"]
+    for base_arm in (base, _skip_reranker(_run(c), set(qids))):
+        for intended in (["commit"], ["commit", "served"]):
+            cmp = qcmp.compare(c, config_for(c), base_arm, cand, intended=intended)
+            assert cmp.verdict.outcome is Outcome.INVALID
+            assert any("baseline: reranker dropped" in r for r in cmp.verdict.reasons)
+            assert any("candidate: reranker dropped" in r for r in cmp.verdict.reasons)
 
 
 def test_a_reranker_the_arms_do_not_declare_is_compared_but_not_required(c):
-    base = _skip_reranker(_run(c, expected_reranker="skipped"), set(c.queries))
-    cand = _skip_reranker(_run(c, commit="b" * 40, expected_reranker="skipped"), set(c.queries))
+    base = _skip_reranker(_run(c, expected_reranker="skipped"), set(c.queries), "DISABLED")
+    cand = _skip_reranker(_run(c, commit="b" * 40, expected_reranker="skipped"), set(c.queries), "DISABLED")
     assert qcmp.compare(c, config_for(c), base, cand).verdict.outcome is Outcome.PASS
     cmp = qcmp.compare(c, config_for(c), base, _run(c, commit="b" * 40))
     assert cmp.verdict.outcome is Outcome.INCONCLUSIVE

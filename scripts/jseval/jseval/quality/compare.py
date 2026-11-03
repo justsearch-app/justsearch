@@ -112,6 +112,15 @@ def load_baseline(path: str | os.PathLike) -> tuple[RunRecord, dict]:
 # --------------------------------------------------------------------------- validity
 
 
+# CrossEncoderSkipReason.java:33-48; isDrop():102-119 explicitly classifies these
+# seven reasons as by-design. RerankSkipCause.java:36-66 has no legitimate skip:
+# all its non-NONE causes are budget/loading/inference drops. Unknown stays invalid.
+BY_DESIGN_RERANK_SKIPS = frozenset({
+    "NAVIGATIONAL_QUERY", "DISABLED", "BELOW_MIN_THRESHOLD", "DOCS_TOO_LONG",
+    "PIPELINE_NOT_ELIGIBLE", "MODEL_NOT_CONFIGURED", "FUSION_CONFIDENT",
+})
+
+
 def validate_run(c: Collection, run: RunRecord, label_versions: set[str], arm: str) -> list[str]:
     """Every reason this run is not a complete, valid result for collection ``c``."""
     h = run.header
@@ -158,6 +167,12 @@ def validate_run(c: Collection, run: RunRecord, label_versions: set[str], arm: s
     if short:
         out.append(f"{arm}: {len(short)} queries were served by fewer legs than the declared "
                    f"{', '.join(h.expected_legs)} ({_ids(short)})")
+    drops = [r for r in run.results if r.error is None
+             and r.served.reranker == "skipped"
+             and r.served.reason not in BY_DESIGN_RERANK_SKIPS]
+    if drops:
+        out.append(f"{arm}: reranker dropped: " + "; ".join(
+            f"{r.qid}: {r.served.reason or 'missing reason'}" for r in drops))
     outside = sorted({d for r in run.results for d in r.ranked if d not in c.documents})
     if outside:
         out.append(f"{arm}: {len(outside)} delivered documents are not in the manifest "
@@ -206,11 +221,14 @@ def served_differences(baseline: RunRecord, candidate: RunRecord) -> dict[str, l
     qids = sorted(set(b) & set(n))
     out = {
         "served.legs": [q for q in qids if set(b[q].legs) != set(n[q].legs)],
-        "served.reranker": [q for q in qids if b[q].reranker != n[q].reranker],
+        "served.reranker": [q for q in qids if (b[q].reranker, b[q].reason) != (n[q].reranker, n[q].reason)],
         "served.reranker_skipped": [
             q for q in qids
-            if (baseline.header.expected_reranker == "executed" and b[q].reranker != "executed")
-            or (candidate.header.expected_reranker == "executed" and n[q].reranker != "executed")],
+            if not (b[q].reranker == n[q].reranker == "skipped"
+                    and b[q].reason == n[q].reason
+                    and b[q].reason in BY_DESIGN_RERANK_SKIPS)
+            and ((baseline.header.expected_reranker == "executed" and b[q].reranker != "executed")
+            or (candidate.header.expected_reranker == "executed" and n[q].reranker != "executed"))],
     }
     return {k: v for k, v in out.items() if v}
 
@@ -317,7 +335,9 @@ def compare(c: Collection, cfg: QualityConfig, baseline: RunRecord | None,
         if expect_models is not None and dict(h.model_hashes) != dict(expect_models):
             reasons.append("candidate: result is from another model set")
     if reasons:
-        return Comparison(Verdict(Outcome.INVALID, tuple(reasons)), c, cfg, baseline, candidate)
+        affected = served_differences(baseline, candidate) if baseline and candidate else {}
+        return Comparison(Verdict(Outcome.INVALID, tuple(reasons)), c, cfg, baseline, candidate,
+                          affected=affected)
 
     notes = []
     if baseline.header.collection_version != c.version or \

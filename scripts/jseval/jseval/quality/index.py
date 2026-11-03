@@ -474,9 +474,11 @@ class IndexHandle:
                                   _json(self.root / "materialized.json"), c.content, c.metadata)
         return materialized.ranked_doc_ids(locations, self.documents_dir)
 
-    def wait(self) -> "IndexHandle":
+    def wait(self, *, prepared_only: bool = False, deadline: float | None = None) -> "IndexHandle":
         if self._backend:
             return self
+        if prepared_only and self._worker:
+            raise IndexRefused("not ready: index is building in the background")
         if self._worker:
             try:
                 code = self._worker.wait(timeout=self.config.timeout_sec + 3720)
@@ -488,13 +490,15 @@ class IndexHandle:
                                    f"{(self.root / 'build.log').read_text()[-6000:]}")
         entry = _json(self.root / "entry.json")
         _check_owner(entry["owner"], self.collection, self.index_key)
+        deadline = deadline if deadline is not None else time.monotonic() + self.config.timeout_sec
         port = _free_port()
         self._backend = backend.start_backend(repo_root=self.config.repo_root, data_dir=self.data_dir,
                                              port=port, env_overrides=_launch_env(self.config, self.data_dir, self.env),
-                                             health_timeout_sec=180)
+                                             health_timeout_sec=max(.001, min(180, deadline - time.monotonic())),
+                                             **({"prepared_only": True, "startup_admission": False}
+                                                if prepared_only else {}))
         self.base_url = f"http://127.0.0.1:{port}"
         # Warm-up/readiness is behavioral, not the launcher's health check.
-        deadline = time.monotonic() + self.config.timeout_sec
         last = None
         while time.monotonic() < deadline:
             result = confirm(self)
@@ -505,7 +509,7 @@ class IndexHandle:
                 break
             time.sleep(2)
         self.close()
-        raise IndexRefused(f"serving backend not confirmed: {last}")
+        raise IndexRefused(f"not ready: serving backend not confirmed: {last}")
 
     def close(self) -> None:
         if self._worker and self._worker.poll() is None:
@@ -525,7 +529,7 @@ class IndexHandle:
         self.close()
 
 
-def prepare_index(collection: Collection, config: IndexConfig) -> IndexHandle:
+def prepare_index(collection: Collection, config: IndexConfig, *, prepared_only: bool = False) -> IndexHandle:
     if (collection.version != collection.compute_version() or not collection.documents
             or len(collection.documents) > 50000):
         raise IndexRefused("empty or modified collection")
@@ -533,6 +537,10 @@ def prepare_index(collection: Collection, config: IndexConfig) -> IndexHandle:
     key, components = compute_index_key(collection, config, env)
     root = _under_cache(config.cache_root) / sha256_text(collection.name) / key
     data = _under_cache(config.data_dir) if config.data_dir else root / "data"
+    if prepared_only:
+        backend.require_prepared(config.repo_root, data)
+        if not (root / "entry.json").is_file():
+            raise IndexRefused("not ready: no complete prepared index; run quality prepare outside the scoring window")
     root.mkdir(parents=True, exist_ok=True)
     # Lock the actual data path, including explicit paths shared by different keys.
     data.parent.mkdir(parents=True, exist_ok=True)
@@ -582,8 +590,10 @@ def prepare_index(collection: Collection, config: IndexConfig) -> IndexHandle:
             handle._worker = subprocess.Popen(command, cwd=config.repo_root, env=worker_env,
                                               stdout=out, stderr=subprocess.STDOUT)
         return handle
-    except BaseException:
+    except BaseException as e:
         lock.close()
+        if prepared_only and isinstance(e, Exception):
+            raise IndexRefused(f"not ready: prepared index refused ({e}); run quality prepare outside the scoring window") from e
         raise
 
 

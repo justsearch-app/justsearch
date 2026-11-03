@@ -4,7 +4,7 @@ One command per action, a one-line outcome on stdout, exit codes PASS 0 / REGRES
 INVALID or INCONCLUSIVE 2 — an unexpected error or an interrupt is INVALID too, never the
 REGRESSION code an unhandled Python error would exit with. ``COLLECTION`` is a config alias
 (built from its official source, see ``jseval/quality/config/``) or a stored collection
-directory. Running a search is not done here.
+directory. check/baseline use the refined Search request on prepared indexes; ablate is explicit.
 """
 from __future__ import annotations
 
@@ -22,7 +22,7 @@ from ..quality.types import Outcome, RunRecordError, atomic_write_text
 
 
 def _invalid(ctx, message: str) -> None:
-    click.echo(f"INVALID {message}")
+    click.echo("INVALID " + " ".join(message.split()))
     ctx.exit(Outcome.INVALID.exit_code)
 
 
@@ -57,7 +57,7 @@ def _checked_collection(ctx, ref: str):
 
 @click.group("quality")
 def quality_group() -> None:
-    """Offline search quality: known answers, scoring, old-vs-new comparison."""
+    """Search quality: prepared real-engine checks, baselines and comparisons."""
 
 
 @quality_group.command("known-answers")
@@ -155,3 +155,81 @@ def cmd_compare(ctx, collection: str, baseline_path: Path, candidate_path: Path,
 
 
 COMMANDS = [quality_group]
+
+
+def _run_options(command):
+    for option in reversed([
+        click.argument('collections', nargs=-1),
+        click.option('--baseline-dir', type=click.Path(file_okay=False, path_type=Path),
+                     default=Path('scripts/jseval/runs/quality/baselines'), show_default=True),
+        click.option('--runs-dir', type=click.Path(file_okay=False, path_type=Path),
+                     default=Path('scripts/jseval/runs/quality'), show_default=True),
+        click.option('--window-seconds', type=click.FloatRange(min=45, max=600, min_open=True), default=600,
+                     help='Exclusive window including startup and cleanup; estimate must fit.'),
+        click.option('--models-dir', type=click.Path(file_okay=False, path_type=Path)),
+        click.option('--documents-dir', type=click.Path(file_okay=False, path_type=Path)),
+        click.option('--cache-root', type=click.Path(file_okay=False, path_type=Path),
+                     default=Path.home()/'.cache/justsearch-quality/indexes'),
+    ]):
+        command = option(command)
+    return command
+
+
+def _execute_quality(ctx, action, **kwargs):
+    from ..quality.run import execute, RunRefused
+    from ..quality.index import IndexRefused
+    refs = kwargs.pop('collections')
+    try:
+        outcome, line = execute(action, refs, **kwargs)
+    except (RunRefused, IndexRefused, qcmp.BaselineError, qcoll.CollectionError,
+            known_answers.KnownAnswerFailure) as e:
+        _invalid(ctx, str(e))
+    click.echo(line)
+    ctx.exit(outcome.exit_code)
+
+
+@quality_group.command('check')
+@_run_options
+@click.pass_context
+@_never_crash
+def cmd_check(ctx, **kwargs):
+    """Run the Search window's refined request on COLLECTIONS (default: all four)."""
+    _execute_quality(ctx, 'check', **kwargs)
+
+
+@quality_group.command('baseline')
+@_run_options
+@click.pass_context
+@_never_crash
+def cmd_baseline(ctx, **kwargs):
+    """Run all COLLECTIONS and store their valid, complete baselines."""
+    _execute_quality(ctx, 'baseline', **kwargs)
+
+
+@quality_group.command('ablate')
+@_run_options
+@click.option('--mode', required=True, type=click.Choice(['text', 'vector', 'hybrid']),
+              help='Explicit-mode sensitivity information, separate from the quick check.')
+@click.pass_context
+@_never_crash
+def cmd_ablate(ctx, **kwargs):
+    """Run a labelled explicit-mode ablation on COLLECTIONS."""
+    _execute_quality(ctx, 'ablate', **kwargs)
+
+
+@quality_group.command('prepare')
+@click.argument('collection')
+@click.option('--documents-dir', type=click.Path(file_okay=False, path_type=Path))
+@click.option('--models-dir', type=click.Path(file_okay=False, path_type=Path))
+@click.option('--cache-root', type=click.Path(file_okay=False, path_type=Path),
+              default=Path.home()/'.cache/justsearch-quality/indexes')
+@click.pass_context
+@_never_crash
+def cmd_prepare(ctx, collection, documents_dir, models_dir, cache_root):
+    """Build/confirm an index through pausable background admission, outside scoring."""
+    from ..quality.index import IndexConfig, prepare_index
+    c, _cfg, _ka = _checked_collection(ctx, collection)
+    cfg = IndexConfig(documents_dir=documents_dir, models_dir=models_dir, cache_root=cache_root)
+    with prepare_index(c, cfg) as handle:
+        handle.wait()
+    click.echo(f'PASS {c.name} prepared index ready')

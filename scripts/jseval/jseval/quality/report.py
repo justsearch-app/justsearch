@@ -83,8 +83,8 @@ def render(cmp: Comparison) -> str:
         if cmp.confounds:
             out += ["Uncontrolled differences (comparison is INCONCLUSIVE):", ""]
             out += [f"- {x}" for x in cmp.confounds] + [""]
-            for k, ids in cmp.affected.items():
-                out += [f"Affected queries ({k}, {len(ids)}): " + ", ".join(ids), ""]
+        for k, ids in cmp.affected.items():
+            out += [f"Affected queries ({k}, {len(ids)}): " + ", ".join(ids), ""]
         if cmp.notes:
             out += [f"- note: {x}" for x in cmp.notes] + [""]
     if v.groups:
