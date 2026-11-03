@@ -126,13 +126,10 @@ src/shell-v0/router/surfaceSchemas.ts 1 2026-07-16
 src/shell-v0/router/tauriBridge.ts 2 2026-09-02
 src/shell-v0/router/transports.ts 1 2026-07-16
 src/shell-v0/router/types.ts 2 2026-07-16
-src/shell-v0/shell/Shell.ts 2 2026-10-28
 src/shell-v0/state/UserStateDocument.ts 4 2026-07-16
-src/shell-v0/state/agentChatState.ts 2 2026-07-16
 src/shell-v0/state/aiStateStore.ts 7 2026-10-28
 src/shell-v0/state/aiVerdict.ts 1 2026-09-02
 src/shell-v0/state/appUpdateState.ts 1 2026-09-02
-src/shell-v0/state/askChatState.ts 3 2026-10-28
 src/shell-v0/state/availability.ts 1 2026-07-16
 src/shell-v0/state/conversationListStore.ts 2 2026-09-02
 src/shell-v0/state/enrichmentCoverage.ts 1 2026-09-02

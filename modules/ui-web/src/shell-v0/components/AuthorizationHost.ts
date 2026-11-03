@@ -312,6 +312,9 @@ export class AuthorizationHost extends JfElement {
 
   private pumpQueue(): void {
     if (this.active || this.queue.length === 0) return;
+    // End the previous ceremony before rendering the next: an already-open native dialog cannot
+    // switch between show() and showModal(), and each queued prompt owns its own modality.
+    this.modal.close();
     this.active = this.queue.shift()!;
     this.typed = '';
     this.allowAlways = false;

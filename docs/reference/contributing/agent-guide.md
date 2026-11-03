@@ -729,8 +729,12 @@ says to. Exit 2 means retry once, then investigate if it fails again.
 For CI selection, publication and post-merge verification, follow [ADR-0053 § Decision](../../decisions/0053-one-pr-ci-run-and-squash-auto-merge.md#decision)
 and its [Measured axe amendment](../../decisions/0053-one-pr-ci-run-and-squash-auto-merge.md#amendment-2026-10-24-measured-axe-becomes-required).
 
-Validate the local reproduction inventory with `node scripts/ci/run-publish-preflight.mjs --check`
-before pushing. Confirm the merge with `node scripts/dev/run-gh.mjs merge-wait N` before cleanup.
+Before pushing a committed candidate, run
+`node scripts/dev/prepare-worktree.cjs --preflight --pr N` for isolated preparation and
+the existing local reproductions of required checks CI selects. See [pre-merge checks](pre-merge-checks.md#one-command-candidate-preflight)
+for provisional PR numbers, prerequisites and incomplete local evidence. Add `--list`
+for an offline plan. `node scripts/ci/run-publish-preflight.mjs --check` still validates
+the local reproduction inventory alone. This long run is separate from `.agents/preflight`. Confirm the merge with `node scripts/dev/run-gh.mjs merge-wait N` before cleanup.
 The gateway's reads and write remain a short sole-writer window: avoid concurrent edits to the
 review record and PR metadata while enqueue runs. Direct merge commands bypass its validation.
 

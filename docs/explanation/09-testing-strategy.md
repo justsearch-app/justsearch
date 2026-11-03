@@ -369,10 +369,6 @@ The legacy nightly battery (`scripts/ci/dag-runner-agent-battery.mjs` + harness)
 
 See [Agent Analytics Pipeline](21-agent-analytics-pipeline.md) for the behavioral tracking layer (event capture, session analysis, scoring rubric, LLM-as-judge evaluation, bias mitigation).
 
-## The `TCK` (Technology Compatibility Kit)
-*   **Module:** `modules/app-api-tck`
-*   **Purpose:** Since we have strict interfaces (`SearchPort`, `IndexingService`, etc.), the TCK ensures that both the "Real" in-process index implementation and the "Mock" implementations used in tests behave identically.
-
 ## Stress & Soak Testing
 *   **Module:** `modules/app-engine` (`EngineSoakTest`). The `soakTest` source set and its Gradle
     task were removed at lane F stage A item A12: its only class, `SoakSuiteTest`, drove a spawned

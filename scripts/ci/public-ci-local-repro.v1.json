@@ -18,9 +18,20 @@
         "node scripts/ci/test-check-lockfile-completeness.mjs",
         "node scripts/ci/verify-test-evidence-policy.mjs",
         "node scripts/ci/check-root-readme.mjs",
+        "node scripts/ci/check-suppression-ratchet.mjs",
+        "node scripts/ci/check-tempdoc-size.mjs",
+        "node scripts/governance/run.mjs --gate consumer-drift --gate contract-projection --gate contribution-surface --gate interaction-surface --gate observed-happening --gate runtime-state --gate ssot-catalog-sync --gate stage-completeness --gate surface-altitude --gate engine-port --mode gate",
+        "node scripts/governance/run.mjs --gate operation-surface --gate execution-surface --gate register-guard-resolution --mode gate",
+        "npm --prefix modules/ui-web run lint",
+        "npm run lint:scripts",
         "node scripts/governance/run-all-tests.mjs",
         "node scripts/governance/run.mjs --self-test --mode gate",
         "node scripts/ci/run-node-tests.mjs scripts/lib/engine-discovery.test.mjs",
+        "node scripts/ci/run-ui-web-gates.mjs",
+        "node scripts/governance/run.mjs --gate config-surface --mode gate",
+        "node scripts/governance/run.mjs --gate dead-code --mode gate",
+        "node scripts/governance/run.mjs --gate npm-audit --mode gate",
+        "node scripts/governance/run.mjs --gate wire --mode gate",
         "node scripts/governance/run.mjs --gate test-intent --mode gate",
         "node scripts/ci/check-readme-benchmark-numbers.mjs",
         "node scripts/docs/check-frontend-stack-claims.mjs",
@@ -42,6 +53,9 @@
         "node scripts/codegen/dump-cargo-licenses.mjs",
         "cmd /c \"cd modules\\ui-web && npx --yes license-checker --production --json --relativeOnly > ..\\..\\build\\npm-licenses.json\"",
         "node scripts/ci/regen-all.mjs --check --only notices"
+      ],
+      "lanes": [
+        "license"
       ]
     },
     {
@@ -50,6 +64,9 @@
       "commands": [
         "node scripts/lib/tool-invoker.cjs gradle assemble -PskipWebBuild=false",
         "node scripts/dev/java-prepush.mjs"
+      ],
+      "lanes": [
+        "build"
       ]
     },
     {
@@ -58,7 +75,12 @@
       "commands": [
         "npm run test:unit:run --prefix modules/ui-web -- --maxWorkers=4",
         "npm run test:unit:lockdown --prefix modules/ui-web -- --maxWorkers=4",
-        "node scripts/lib/tool-invoker.cjs gradle :modules:app-agent:test :modules:app-agent-api:test :modules:app-api:test :modules:app-api-tck:test :modules:app-config:test :modules:app-launcher:test :modules:app-observability:test :modules:app-services:test :modules:app-util:test :modules:ui:test -PskipWebBuild=true --console=plain"
+        "node scripts/lib/tool-invoker.cjs gradle :modules:app-agent:test :modules:app-agent-api:test :modules:app-api:test :modules:app-config:test :modules:app-launcher:test :modules:app-observability:test :modules:app-services:test :modules:app-util:test :modules:ui:test -PskipWebBuild=true --console=plain",
+        "node scripts/lib/tool-invoker.cjs gradle :modules:app-services:exportRegistrySnapshot -PskipWebBuild=true --console=plain && node scripts/governance/run.mjs --gate consumer-presence --gate host-owns-truth --gate runtime-witness --mode gate --out tmp/snapshot-gates.sarif && node -e \"if (require('fs').readFileSync('tmp/snapshot-gates.sarif','utf8').includes('snapshot-missing')) { console.error('registry snapshot absent: these three gates inspected nothing'); process.exit(1); }\""
+      ],
+      "lanes": [
+        "ui",
+        "services"
       ]
     },
     {
@@ -66,6 +88,9 @@
       "mode": "local-subset",
       "commands": [
         "node scripts/lib/tool-invoker.cjs gradle :modules:adapters-lucene:test :modules:configuration:test :modules:core:test :modules:core-contracts:test :modules:indexer-worker:test :modules:indexing:test :modules:ipc-common:test :modules:worker-core:test :modules:worker-services:test -PskipWebBuild=true --console=plain"
+      ],
+      "lanes": [
+        "search"
       ]
     },
     {
@@ -73,6 +98,9 @@
       "mode": "local-subset",
       "commands": [
         "node scripts/lib/tool-invoker.cjs gradle :modules:ai-backend:test :modules:api-contract-projection-java:test :modules:app-engine:test :modules:app-inference:test :modules:benchmarks:test :modules:dead-code-audit:test :modules:extension-substrate:test :modules:gpu-bridge:test :modules:infra-core:test :modules:ort-common:test :modules:prompt-support:test :modules:reranker:test :modules:ssot-tools:test :modules:system-tests:test :modules:telemetry:test :modules:test-support:test -PskipWebBuild=true --console=plain"
+      ],
+      "lanes": [
+        "platform"
       ]
     },
     {
@@ -80,17 +108,26 @@
       "mode": "local-subset",
       "commands": [
         "node scripts/lib/tool-invoker.cjs gradle :modules:system-tests:lifecycleIntegrationTest -PincludeAiTests=false -PskipWebBuild=true --console=plain"
+      ],
+      "lanes": [
+        "lifecycle"
       ]
     },
     {
       "check": "Windows-native tests",
       "mode": "hosted-only",
-      "reason": "Requires the pinned windows-latest runner image and Windows-only test selection; a developer workstation is not the hosted runner contract."
+      "reason": "Requires the pinned windows-latest runner image and Windows-only test selection; a developer workstation is not the hosted runner contract.",
+      "lanes": [
+        "windows"
+      ]
     },
     {
       "check": "Shell crate tests (Rust)",
       "mode": "hosted-only",
-      "reason": "Requires the workflow's pinned MSVC toolchain, cache, and staged bundle-resource placeholder."
+      "reason": "Requires the workflow's pinned MSVC toolchain, cache, and staged bundle-resource placeholder.",
+      "lanes": [
+        "rust"
+      ]
     },
     {
       "check": "Secret scan",
@@ -112,6 +149,9 @@
         "python -m pip install -e scripts/jsharness -e scripts/jseval -c scripts/jseval/requirements.lock.txt",
         "python -m pip install \"pytest>=7.0\" \"pyyaml>=6.0\" \"hypothesis>=6.0\" \"jsonschema>=4.0\"",
         "python -m pytest scripts/jseval/tests scripts/jsharness/tests -q -p no:cacheprovider"
+      ],
+      "lanes": [
+        "jseval"
       ]
     },
     {
@@ -122,6 +162,9 @@
         "npm ci --prefix modules/ui-web --audit=false",
         "python -m playwright install --with-deps chromium",
         "python -m jsharness ui-a11y-gate --output-dir build/ci/ui-a11y"
+      ],
+      "lanes": [
+        "frontend"
       ]
     },
     {

@@ -382,7 +382,7 @@ export const LIBRARY_CARDS_REGION = 'core.library.cards';
  * cards at bespoke parity. The Remove INTENT is emitted by the renderer and handled by the surface
  * (the gated `core.remove-watched-root` operation + confirm stay team-owned — the §7 boundary).
  */
-export const LIBRARY_CARDS_BODY: SurfaceBodyDeclaration = {
+const LIBRARY_CARDS_BODY: SurfaceBodyDeclaration = {
   heading: 'Folders',
   placement: 'STAGE',
   schema: {
@@ -410,7 +410,7 @@ export const HELP_REFERENCE_REGION = 'core.help.reference';
  * troubleshooting + network lists, rendered through the engine via the `shortcuts-table` / `list-items`
  * renderers. The FAQ (collapsible) + the export-diagnostics operation stay surface-owned (§7).
  */
-export const HELP_REFERENCE_BODY: SurfaceBodyDeclaration = {
+const HELP_REFERENCE_BODY: SurfaceBodyDeclaration = {
   heading: 'Reference',
   placement: 'STAGE',
   schema: {
@@ -456,7 +456,7 @@ export const HEALTH_STATS_REGION = 'core.health.stats';
  * plus a declared adaptive enrichment-capability strip the engine clips via `OverflowController` (the
  * author declares priority; the engine owns the clip — Move 3 OVERFLOW on a real surface).
  */
-export const HEALTH_STATS_BODY: SurfaceBodyDeclaration = {
+const HEALTH_STATS_BODY: SurfaceBodyDeclaration = {
   heading: 'Index',
   placement: 'STAGE',
   // 594 Move 1b — each chip that asserts a runtime/build fact carries a `fact`-ref, not a literal:

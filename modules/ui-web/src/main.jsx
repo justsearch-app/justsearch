@@ -56,7 +56,6 @@ async function bootstrap() {
   const params = new URLSearchParams(window.location.search);
 
   // Reset recovery precedes surface registration and every persistent state singleton.
-  // Even debug routes must not open normal stores while a desktop reset is incomplete.
   const { isTauriRuntime } = await import('./utils/tauriRuntime.ts')
   if (isTauriRuntime()) {
     const { gateFactoryReset } = await import('./boot/factoryReset.ts')
@@ -66,31 +65,6 @@ async function bootstrap() {
   const { startMessageCatalogs } = await import('./i18n')
   const { authorizedFetch } = await import('./shell-v0/api/authorizedFetch.ts')
   const { stopAiStateStore } = await import('./shell-v0/state/aiStateStore.ts')
-
-  // Substrate-isolation debug route: standalone Lit docking shell demo.
-  if (params.get('shell-demo') === '1') {
-    const { mountShellDemo } = await import('./shell-v0/demo/shell-demo.ts')
-    mountShellDemo(document.getElementById('root'))
-    return
-  }
-  // Substrate-isolation debug route: HealthLitView Conditions stream.
-  if (params.get('lit-health') === '1') {
-    const { mountHealthLitDemo } = await import('./shell-v0/demo/health-lit-demo.ts')
-    mountHealthLitDemo(document.getElementById('root'))
-    return
-  }
-  // Substrate-isolation debug route: TIMESERIES cohort.
-  if (params.get('lit-health-trends') === '1') {
-    const { mountHealthLitTrendsDemo } = await import('./shell-v0/demo/health-lit-trends-demo.ts')
-    mountHealthLitTrendsDemo(document.getElementById('root'))
-    return
-  }
-  // 569 — the user-authored frontend demo (engine + §9 spike + statechart + quarantine).
-  if (params.get('presentation-demo') === '1') {
-    const { mountPresentationDemo } = await import('./shell-v0/demo/presentation-demo.ts')
-    mountPresentationDemo(document.getElementById('root'))
-    return
-  }
 
   // Production boot: <jf-shell> directly. SurfaceCatalog booted up-front
   // so the rail has data on first paint.

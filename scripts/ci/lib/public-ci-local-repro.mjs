@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { LANES } from '../classify-changes.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 export const DEFAULT_REPRO_PATH = path.resolve(HERE, '..', 'public-ci-local-repro.v1.json');
@@ -23,6 +24,10 @@ export function validatePublicCiLocalRepro({ manifest, signalPolicy }) {
   for (const entry of contexts) {
     counts.set(entry?.check, (counts.get(entry?.check) || 0) + 1);
     if (!entry?.check) errors.push('every context needs a non-empty check name');
+    if (entry?.lanes !== undefined && (!Array.isArray(entry.lanes) ||
+        !entry.lanes.length || entry.lanes.some(lane => !LANES.includes(lane)))) {
+      errors.push(`${entry?.check || '<unnamed>'}: lanes must name known classifier lanes`);
+    }
     if (entry?.mode === 'local-subset') {
       if (!Array.isArray(entry.commands) || entry.commands.length === 0 || entry.commands.some((command) => typeof command !== 'string' || !command.trim())) {
         errors.push(`${entry?.check || '<unnamed>'}: local-subset needs non-empty commands`);

@@ -292,13 +292,6 @@ export default defineConfig(({ command, mode }) => {
           ) {
             return 'vendor-ses'
           }
-          // Keep the Lumino widget framework (the core Shell's DockLayout /
-          // DockPanel) out of the app entry chunk so `app_main` stays smaller.
-          // Lumino is eagerly loaded by the shell, so it still counts toward
-          // total_js_bytes, but isolating it shrinks index-*.js (~180 kB out).
-          if (normalizedId.includes('/node_modules/@lumino/')) {
-            return 'vendor-lumino'
-          }
           return undefined
         },
       },

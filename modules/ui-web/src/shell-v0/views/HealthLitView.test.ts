@@ -289,8 +289,7 @@ describe('HealthLitView render', () => {
     await el.updateComplete;
     // The SSE channel drops and stays down past the debounce window; the /api/status poll still
     // reports the backend reachable. This test asserts that condition directly rather than relying
-    // on aiStateStore's real global singleton, which is unstarted in a unit test (startAiStateStore
-    // is only ever called from the presentation-demo debug route, not this component) — an unstarted
+    // on aiStateStore's real global singleton, which this component does not start — an unstarted
     // store's `connection.reachable` is `false` by design (computeReachability in aiStateStore.ts),
     // not `true`, so asserting "the default in a fresh store" was never actually testing what it
     // said; setting the property directly tests the badge's OWN tone-derivation logic (the thing

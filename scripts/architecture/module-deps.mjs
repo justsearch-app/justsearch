@@ -49,7 +49,6 @@ const ENTRY_POINT_MODULES = new Set([
   'system-tests',      // Test entry
   'benchmarks',        // Benchmark entry
   'reports',           // Report generation (not under modules/)
-  'app-api-tck',       // TCK test module
   'ai-engine-native',  // JNI bridge (invisible to Gradle dependency graph)
 ]);
 

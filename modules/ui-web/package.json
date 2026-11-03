@@ -36,7 +36,6 @@
     "@jsonforms/core": "^3.8.0",
     "@lit-labs/signals": "^0.3.0",
     "@lit-labs/virtualizer": "^2.1.1",
-    "@lumino/widgets": "^2.8.0",
     "@tanstack/table-core": "^8.21.3",
     "@tauri-apps/api": "^2.11.1",
     "@tauri-apps/plugin-autostart": "^2.5.1",
