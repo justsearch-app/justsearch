@@ -14,7 +14,7 @@ import pytest
 
 from jseval import backend, index_identity
 from jseval.quality import index
-from .test_redesign import cached_handle
+from .test_redesign import cached_handle, serving_clock
 
 
 @pytest.mark.parametrize('termination', [signal.SIGTERM, signal.SIGKILL])
@@ -131,6 +131,7 @@ def test_known_failed_content_audit_quarantines_only_when_settled(tmp_path, monk
               'indexedDocumentsUnknown': observation == 'unknown-count',
               'countObservations': {'active': {'state': 'stale' if observation == 'count-stale' else 'fresh'}},
               'pendingJobs': 1 if observation == 'queued' else 0,
+              'embeddingPendingCount': 1 if observation == 'pending' else 0,
               'embeddingEnabled': observation != 'disabled', 'spladeEnabled': False,
               'chunkSpladeEnabled': False, 'nerEnabled': False, 'failedNerCount': 0,
               'meta': {'workerRpcStale': observation == 'stale'},
@@ -144,3 +145,50 @@ def test_known_failed_content_audit_quarantines_only_when_settled(tmp_path, monk
         h.wait(prepared_only=True, deadline=time.monotonic()+.05)
     assert (h.root/'entry.json').exists() is (observation != 'failed')
     assert (h.root/'quarantine').exists() is (observation == 'failed')
+
+
+def test_settled_missing_artifact_quarantines_cache(tmp_path, monkeypatch):
+    h = cached_handle(tmp_path, monkeypatch)
+    status = {'indexState': 'IDLE', 'indexedDocuments': len(h.collection.documents),
+              'indexedDocumentsUnknown': False, 'pendingJobs': 0,
+              'embeddingEnabled': True, 'embeddingPendingCount': 0,
+              'spladeEnabled': False, 'chunkSpladeEnabled': False,
+              'nerEnabled': False, 'failedNerCount': 0, 'completenessKnown': True,
+              'completeness': [{'stageId': 'embed', 'missing': 1, 'failed': 0}]}
+    _wire_confirmation(h, status, monkeypatch)
+    with pytest.raises(index.IndexRefused, match=r'enrichment_missing\(embed\)'):
+        h.wait(prepared_only=True, deadline=time.monotonic()+.05)
+    assert not (h.root/'entry.json').exists()
+    assert not h.data_dir.exists()
+    assert 'enrichment_missing(embed)' in next((h.root/'quarantine').glob('*/reason.json')).read_text()
+
+
+@pytest.mark.parametrize('pending', [1, -1, None, 'absent'])
+def test_pending_missing_artifact_preserves_cache_until_settled(tmp_path, monkeypatch, serving_clock, pending):
+    h = cached_handle(tmp_path, monkeypatch)
+    status = {'indexState': 'IDLE', 'indexedDocuments': len(h.collection.documents),
+              'indexedDocumentsUnknown': False, 'pendingJobs': 0,
+              'embeddingEnabled': True, 'embeddingPendingCount': pending,
+              'spladeEnabled': False, 'chunkSpladeEnabled': False,
+              'nerEnabled': False, 'failedNerCount': 0, 'completenessKnown': True,
+              'completeness': [{'stageId': 'embed', 'missing': 1, 'failed': 0}]}
+    if pending == 'absent':
+        status.pop('embeddingPendingCount')
+    _wire_confirmation(h, status, monkeypatch)
+    original = index.confirm
+    def confirm(handle):
+        if confirmation.call_count == 2:
+            assert (h.root/'entry.json').exists() and h.data_dir.exists()
+            assert not (h.root/'quarantine').exists()
+            status['embeddingPendingCount'] = 0
+        result = original(handle)
+        if confirmation.call_count == 1:
+            assert result.failures and result.transient_failures == result.failures
+        return result
+    confirmation = Mock(side_effect=confirm)
+    monkeypatch.setattr(index, 'confirm', confirmation)
+    with pytest.raises(index.IndexRefused, match=r'enrichment_missing\(embed\)'):
+        h.wait(prepared_only=True, deadline=time.monotonic()+5)
+    assert confirmation.call_count == 2
+    assert not (h.root/'entry.json').exists()
+    assert (h.root/'quarantine').exists()

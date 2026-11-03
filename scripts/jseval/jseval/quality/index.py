@@ -395,14 +395,20 @@ def _readiness_refusal(status: dict, reasons: list[str]) -> IndexRefused:
                    and all(observations.get(name, {}).get("state") not in ("unknown", "stale")
                            for name in ("active", "searchable")))
     bad_population = fresh and known_count and "population.count differs from collection" in reasons
-    # Do not infer corruption from missing coverage, queued work, unavailable
+    # Do not infer corruption from coverage alone, queued work, unavailable
     # audits, or the default enable flags published before the worker is ready.
     idle = (s.get("indexState") == "IDLE" and s.get("pendingJobs", 0) == 0
             and not readiness._check_index_idle_conditions(s, -1))
-    failed_content = (fresh and idle
-                      and s.get("completenessKnown") is True
-                      and any(reason.startswith("enrichment_failed(") for reason in reasons))
-    refusal = IndexRefused if bad_population or failed_content else TransientIndexRefused
+    pending_fields = {"embed": "embeddingPendingCount", "ner": "pendingNerCount",
+                      "chunk_embed": "chunkEmbeddingPendingCount", "splade": "spladePendingCount",
+                      "chunk_splade": "chunkSpladePendingCount"}
+    # Readiness defaults absent pending counts to zero; quarantine needs an
+    # explicitly observed zero for the affected stage.
+    missing_content = any(f"enrichment_missing({stage})" in reasons and s.get(pending) == 0
+                          for stage, pending in pending_fields.items())
+    bad_content = (fresh and idle and s.get("completenessKnown") is True
+                   and (missing_content or any(reason.startswith("enrichment_failed(") for reason in reasons)))
+    refusal = IndexRefused if bad_population or bad_content else TransientIndexRefused
     return refusal("; ".join(reasons))
 
 
