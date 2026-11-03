@@ -816,6 +816,11 @@ public final class CombinedEnrichmentBackfillOps {
               EmbeddingService.ChunkedEmbedding result =
                   lateChunkingProvider.embedWithSpans(lcContent, NO_SPANS);
               if (result != null && result.primaryVector().length > 0) {
+                accounting.computed(lcDocId, EnrichmentAccounting.Stage.EMBED);
+              }
+              if (batch.retired(() -> !embeddingReady(context, lateChunkingProvider),
+                  EnrichmentAccounting.Stage.EMBED)) break;
+              if (result != null && result.primaryVector().length > 0) {
                 Map<String, Object> updates = updatesByDocId.get(lcDocId);
                 updates.put(SchemaFields.VECTOR, result.primaryVector());
                 updates.put(SchemaFields.EMBEDDING_STATUS, SchemaFields.EMBEDDING_STATUS_COMPLETED);
@@ -839,6 +844,8 @@ public final class CombinedEnrichmentBackfillOps {
                 fellBackToWindows = true;
               }
             } catch (Exception e) {
+              if (batch.retired(() -> !embeddingReady(context, lateChunkingProvider),
+                  EnrichmentAccounting.Stage.EMBED)) break;
               accounting.cancelled(EnrichmentAccounting.Stage.EMBED, e);
               if (!embeddingReady(context, lateChunkingProvider)
                   || (SpladeBackfillOps.isSystemicFailure(e) && !isArenaOomFailure(e))) {
@@ -951,6 +958,16 @@ public final class CombinedEnrichmentBackfillOps {
                   rejectedSlice = true;
                   throw new IllegalArgumentException("Invalid window slice");
                 }
+                if (progress.isComplete(docId)) {
+                  accounting.computed(docId, isChunk ? EnrichmentAccounting.Stage.CHUNK_EMBED
+                      : EnrichmentAccounting.Stage.EMBED);
+                }
+                if (batch.retired(() -> !embeddingReady(context, provider),
+                    isChunk ? EnrichmentAccounting.Stage.CHUNK_EMBED : EnrichmentAccounting.Stage.EMBED)) {
+                  progress.forget(docId);
+                  stoppedOnThisDocument = true;
+                  break;
+                }
                 accounting.advanced(isChunk ? EnrichmentAccounting.Stage.CHUNK_EMBED : EnrichmentAccounting.Stage.EMBED);
                 nextWindow = advancedTo;
                 if (nextWindow >= slice.totalWindows()) {
@@ -984,6 +1001,11 @@ public final class CombinedEnrichmentBackfillOps {
                 windowDocsResumable++;
               }
             } catch (Exception e) {
+              if (batch.retired(() -> !embeddingReady(context, provider),
+                  isChunk ? EnrichmentAccounting.Stage.CHUNK_EMBED : EnrichmentAccounting.Stage.EMBED)) {
+                progress.forget(docId);
+                break;
+              }
               accounting.cancelled(isChunk ? EnrichmentAccounting.Stage.CHUNK_EMBED : EnrichmentAccounting.Stage.EMBED, e);
               context
                   .log()
@@ -1048,6 +1070,8 @@ public final class CombinedEnrichmentBackfillOps {
                   ? EnrichmentAccounting.Stage.CHUNK_EMBED : EnrichmentAccounting.Stage.EMBED);
               vectors = provider.embedDocumentBatch(embedContents.subList(sliceStart, sliceEnd));
             } catch (Exception failure) {
+              if (batch.retired(() -> !embeddingReady(context, provider),
+                  EnrichmentAccounting.Stage.EMBED, EnrichmentAccounting.Stage.CHUNK_EMBED)) break;
               accounting.cancelled(EnrichmentAccounting.Stage.EMBED, failure);
               accounting.cancelled(EnrichmentAccounting.Stage.CHUNK_EMBED, failure);
               if (!embeddingReady(context, provider) || SpladeBackfillOps.isSystemicFailure(failure)) {
@@ -1096,6 +1120,8 @@ public final class CombinedEnrichmentBackfillOps {
                         ? EnrichmentAccounting.Stage.CHUNK_EMBED : EnrichmentAccounting.Stage.EMBED);
                   }
                 } catch (Exception failure) {
+                  if (batch.retired(() -> !embeddingReady(context, provider),
+                      EnrichmentAccounting.Stage.EMBED, EnrichmentAccounting.Stage.CHUNK_EMBED)) break;
                   accounting.cancelled(EnrichmentAccounting.Stage.EMBED, failure);
                   accounting.cancelled(EnrichmentAccounting.Stage.CHUNK_EMBED, failure);
                   if (!embeddingReady(context, provider) || SpladeBackfillOps.isSystemicFailure(failure)) {
@@ -1191,17 +1217,16 @@ public final class CombinedEnrichmentBackfillOps {
           Map<String, String> docFields = batchedFields.getOrDefault(docId, Map.of());
           String content = contentByDocId.get(docId);
           pacer.beforeUnit(1);
-          if (context.nerServiceSupplier().get() != nerService || !nerService.isAvailable()) {
-            aborted = true;
-            accounting.cancelled(EnrichmentAccounting.Stage.NER,
-                new java.util.concurrent.CancellationException());
-            break;
-          }
-          if (stopRequested(context, epochAtSelection, authority)) { aborted = true; break; }
+          if (batch.stopped(() -> stopRequested(context, epochAtSelection, authority),
+              () -> context.nerServiceSupplier().get() != nerService || !nerService.isAvailable(),
+              EnrichmentAccounting.Stage.NER)) { aborted = true; break; }
           try {
             accounting.started(docId, EnrichmentAccounting.Stage.NER);
             List<NerResult> nerBatch = nerService.extractEntitiesBatch(List.of(content));
             NerResult result = nerBatch.isEmpty() ? NerResult.EMPTY : nerBatch.get(0);
+            accounting.computed(docId, EnrichmentAccounting.Stage.NER);
+            if (batch.retired(() -> context.nerServiceSupplier().get() != nerService || !nerService.isAvailable(),
+                EnrichmentAccounting.Stage.NER)) break;
             Map<String, Object> updates = updatesByDocId.get(docId);
             updates.put(
                 SchemaFields.NER_STATUS,
@@ -1215,6 +1240,8 @@ public final class CombinedEnrichmentBackfillOps {
             context
                 .log()
                 .warn("Combined backfill: NER failed for {}: {}", docId, e.getMessage());
+            if (batch.retired(() -> context.nerServiceSupplier().get() != nerService || !nerService.isAvailable(),
+                EnrichmentAccounting.Stage.NER)) break;
             boolean cancelled = accounting.cancelled(EnrichmentAccounting.Stage.NER, e);
             if (cancelled || hardStopRequested(context, epochAtSelection, authority)
                 || context.nerServiceSupplier().get() != nerService) break;
@@ -1266,6 +1293,9 @@ public final class CombinedEnrichmentBackfillOps {
           if (vectors == null || vectors.size() != sliceIds.size()) {
             throw new IllegalStateException("SPLADE batch result size mismatch");
           }
+          sliceIds.forEach(id -> accounting.computed(id, EnrichmentAccounting.Stage.SPLADE));
+          if (batch.retired(() -> context.spladeEncoderSupplier().get() != encoder,
+              EnrichmentAccounting.Stage.SPLADE)) break;
           for (int i = 0; i < sliceIds.size(); i++) {
             String id = sliceIds.get(i);
             Map<String, Float> vector = vectors.get(i);
@@ -1277,6 +1307,8 @@ public final class CombinedEnrichmentBackfillOps {
             stageAdvancedDocIds.add(id);
           }
         } catch (Exception failure) {
+          if (batch.retired(() -> context.spladeEncoderSupplier().get() != encoder,
+              EnrichmentAccounting.Stage.SPLADE)) break;
           accounting.cancelled(EnrichmentAccounting.Stage.SPLADE, failure);
           context.log().warn("Combined backfill: SPLADE slice failed: {}", failure.getMessage());
           if (context.spladeEncoderSupplier().get() != encoder || SpladeBackfillOps.isSystemicFailure(failure)) {

@@ -48,9 +48,10 @@ public final class DisambiguationBackfillOps {
       var coordinator = context.indexingCoordinator();
       var authority = coordinator == null ? null : coordinator.enrichmentAuthority();
       long epoch = coordinator == null ? 0 : coordinator.bulkDeleteEpoch();
-      BooleanSupplier stopped = () -> EnrichmentBatch.hardStop(
-          () -> !context.runningSupplier().getAsBoolean(), coordinator, epoch, authority);
       DisambiguationService service = context.serviceSupplier().get();
+      BooleanSupplier stopped = () -> EnrichmentBatch.hardStop(
+          () -> !context.runningSupplier().getAsBoolean() || service == null || !service.isAvailable()
+              || context.serviceSupplier().get() != service, coordinator, epoch, authority);
       if (service == null || !service.isAvailable() || stopped.getAsBoolean()) return;
       var state = context.documentFieldOps().entityCorpusState();
       if (state.pendingNer() != 0) return;

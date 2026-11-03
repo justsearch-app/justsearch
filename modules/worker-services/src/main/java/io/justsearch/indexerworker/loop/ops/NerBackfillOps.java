@@ -72,12 +72,13 @@ public final class NerBackfillOps {
         return StageOutcome.observed(true, 0, methodStart, accounting);
       }
       EnrichmentBatch batch = new EnrichmentBatch(context.documentFieldOps(), context.indexingCoordinator(), pendingIds, authority).accounting(accounting);
+      BooleanSupplier unavailable = () -> selectedService == null || !selectedService.isAvailable()
+          || context.nerServiceSupplier().get() != selectedService;
       for (String docId : pendingIds) {
         // NER is CPU-only: interrupt on shutdown, no GPU check. Tempdoc 885 item 3: foreground
         // load paces the per-document loop instead of breaking out of it.
         context.pacing().pace();
-        if (batch.stopped(() -> !context.runningSupplier().getAsBoolean())
-            || context.nerServiceSupplier().get() != selectedService) {
+        if (batch.stopped(() -> !context.runningSupplier().getAsBoolean(), unavailable, EnrichmentAccounting.Stage.NER)) {
           accounting.cancelRemaining();
           context.log().debug("NER backfill interrupted: loop stopping");
           break;
@@ -119,10 +120,12 @@ public final class NerBackfillOps {
           applyEntityFieldUpdates(updates, result);
 
           accounting.computed(docId, updates);
+          if (batch.retired(unavailable, EnrichmentAccounting.Stage.NER)) break;
           batchUpdates.add(Map.entry(docId, updates));
           processed++;
 
         } catch (Exception e) {
+          if (batch.retired(unavailable, EnrichmentAccounting.Stage.NER)) break;
           boolean cancelled = accounting.cancelled(EnrichmentAccounting.Stage.NER, e);
           context.log().error("NER backfill failed for doc {}: {}", docId, e.getMessage());
           if (cancelled || batch.stopped(() -> !context.runningSupplier().getAsBoolean())

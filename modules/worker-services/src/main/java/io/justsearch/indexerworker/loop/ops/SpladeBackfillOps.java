@@ -100,12 +100,12 @@ public final class SpladeBackfillOps {
       // Phase 1: collect parent content or reconstructed chunk slices in one batch.
       long t1 = System.nanoTime();
       EnrichmentBatch batch = new EnrichmentBatch(context.documentFieldOps(), context.indexingCoordinator(), pendingIds, authority).accounting(accounting);
+      BooleanSupplier unavailable = () -> context.spladeEncoderSupplier().get() != encoder;
       Map<String, String> contentByDocId = batch.contents();
       List<String> batchDocIds = new ArrayList<>(pendingIds.size());
       List<String> batchContents = new ArrayList<>(pendingIds.size());
       for (String docId : pendingIds) {
-        if (batch.stopped(() -> !context.runningSupplier().getAsBoolean())
-            || context.spladeEncoderSupplier().get() != encoder) {
+        if (batch.stopped(() -> !context.runningSupplier().getAsBoolean(), unavailable, EnrichmentAccounting.Stage.SPLADE)) {
           accounting.cancelRemaining();
           break;
         }
@@ -165,8 +165,7 @@ public final class SpladeBackfillOps {
             sliceStart += bulkPace.spladePhaseDocs()) {
           int sliceEnd = Math.min(sliceStart + bulkPace.spladePhaseDocs(), batchContents.size());
           pacer.beforeUnit(sliceEnd - sliceStart);
-          if (batch.stopped(() -> !context.runningSupplier().getAsBoolean())
-              || context.spladeEncoderSupplier().get() != encoder) {
+          if (batch.stopped(() -> !context.runningSupplier().getAsBoolean(), unavailable, EnrichmentAccounting.Stage.SPLADE)) {
             accounting.cancelRemaining();
             break;
           }
@@ -192,9 +191,13 @@ public final class SpladeBackfillOps {
           for (int i = sliceStart; i < sliceEnd; i++) {
             accounting.computed(batchDocIds.get(i), EnrichmentAccounting.Stage.SPLADE);
           }
+          if (batch.retired(unavailable, EnrichmentAccounting.Stage.SPLADE)) break;
           sparseVecs.addAll(sliceVecs);
         }
       } catch (Exception e) {
+        if (batch.retired(unavailable, EnrichmentAccounting.Stage.SPLADE)) {
+          return StageOutcome.observed(true, processed, t0, accounting);
+        }
         accounting.cancelled(EnrichmentAccounting.Stage.SPLADE, e);
         context.log().error("SPLADE batch encoding failed: {}", e.getMessage());
         if (context.spladeEncoderSupplier().get() != encoder || isSystemicFailure(e)) {
@@ -208,20 +211,22 @@ public final class SpladeBackfillOps {
             return StageOutcome.observed(false, processed, t0, accounting);
           }
           pacer.beforeUnit(1);
-          if (batch.stopped(() -> !context.runningSupplier().getAsBoolean())
-              || context.spladeEncoderSupplier().get() != encoder) {
+          if (batch.stopped(() -> !context.runningSupplier().getAsBoolean(), unavailable, EnrichmentAccounting.Stage.SPLADE)) {
             accounting.cancelRemaining();
             break;
           }
           try {
             Map<String, Float> sparseVec = encoder.encode(
                 batchContents.get(i), io.justsearch.core.execution.InferenceRequest.background());
+            accounting.computed(batchDocIds.get(i), EnrichmentAccounting.Stage.SPLADE);
+            if (batch.retired(unavailable, EnrichmentAccounting.Stage.SPLADE)) break;
             Map<String, Object> updates = new HashMap<>();
             updates.put(SchemaFields.SPLADE, sparseVec);
             updates.put(SchemaFields.SPLADE_STATUS, spladeStatusFor(sparseVec));
             updates.put(SchemaFields.SPLADE_RETRY_COUNT, "0");
             if (batch.update(batchDocIds.get(i), updates)) processed++;
           } catch (Exception e2) {
+            if (batch.retired(unavailable, EnrichmentAccounting.Stage.SPLADE)) break;
             accounting.cancelled(EnrichmentAccounting.Stage.SPLADE, e2);
             if (context.spladeEncoderSupplier().get() != encoder || isSystemicFailure(e2)) {
               commitIfNeeded(context, processed, failed, markedFailed);

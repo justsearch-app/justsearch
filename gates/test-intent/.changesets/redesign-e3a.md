@@ -69,17 +69,17 @@ main either ignores it on dense/NER routes or leaves untouched sparse tickets de
       "sources": [
         {
           "kind": "owner-words",
-          "location": "task t-20261102-redesign E3a builder assignment, E3a-3",
+          "location": "task redesign-e3a request",
           "quote": "The next turn starts the routed work without classifying again."
         },
         {
           "kind": "owner-words",
-          "location": "task t-20261102-redesign E3a builder assignment, Test intent",
+          "location": "task redesign-e3a request",
           "quote": "The replaced #1095 expectation (E3a-3) is an Adaptation with its source quoted."
         },
         {
           "kind": "owner-words",
-          "location": "task t-20261102-redesign E3a builder assignment, E3a-3",
+          "location": "task redesign-e3a request",
           "quote": "The design (\"deadlines bound starting units\"; \"retain the routing decision ... so the next turn does useful work\") authorizes replacing it; record the reason in test intent."
         }
       ]
@@ -106,7 +106,7 @@ main either ignores it on dense/NER routes or leaves untouched sparse tickets de
       "sources": [
         {
           "kind": "owner-words",
-          "location": "E3a builder assignment, E3a-1",
+          "location": "task redesign-e3a request",
           "quote": "The unconditional first-unit floor (CombinedEnrichmentBackfillOps ~145) and the embedding budget-share floor (~123) are deleted."
         }
       ]
@@ -119,16 +119,16 @@ main either ignores it on dense/NER routes or leaves untouched sparse tickets de
       "moved": [
         "instrumentation"
       ],
-      "whatMoved": "Only hard-stop dispositions change: untouched NER/SPLADE tickets in cancelledFallbackPartitionsEverySelectedStageOnce and the interrupted partial in partialWindowsAdvanceWithoutCompletingAnEmbedding now expect CANCELLED. Counters, accepted/computed counts, timing, retry policy, provider-retirement DEFERRED expectations and all other assertions stay.",
+      "whatMoved": "Only hard-stop dispositions change: untouched NER/SPLADE tickets in cancelledFallbackPartitionsEverySelectedStageOnce and the interrupted partial in partialWindowsAdvanceWithoutCompletingAnEmbedding now expect CANCELLED. Counters, accepted/computed counts, timing, retry policy, provider-retirement DEFERRED expectations and all other assertions stay. The individualNerReportsAcceptedEmptyAndRejectedComputedOutput fixture explicitly returns true from service availability; its oracle is unchanged.",
       "sources": [
         {
           "kind": "owner-words",
-          "location": "E3a builder assignment, E3a-1",
+          "location": "task redesign-e3a request",
           "quote": "Retries unchanged, untouched rows stay pending, and every selected document-stage gets its E1 disposition (cancelled)."
         },
         {
           "kind": "owner-words",
-          "location": "E3a settled revision, provider retirement",
+          "location": "task redesign-e3a request",
           "quote": "Provider retirement keeps E1's meaning."
         }
       ]
@@ -145,8 +145,26 @@ main either ignores it on dense/NER routes or leaves untouched sparse tickets de
       "sources": [
         {
           "kind": "owner-words",
-          "location": "E3a builder assignment, E3a-7",
+          "location": "task redesign-e3a request",
           "quote": "Conditional publication validates that authority under the coordinator lock, together with the source/stage comparison, and provider transition takes the same lock."
+        }
+      ]
+    },
+    {
+      "items": [
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/NerBackfillOpsTest.java",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/NerLazyCreationRetryTest.java"
+      ],
+      "class": "Adaptation",
+      "moved": [
+        "instrumentation"
+      ],
+      "whatMoved": "The existing ready-service fixtures now explicitly return true from NerService.isAvailable(). All content, extraction, retry, status and publication assertions remain unchanged. The repair checks availability before each unit, including the first.",
+      "sources": [
+        {
+          "kind": "owner-words",
+          "location": "task redesign-e3a request",
+          "quote": "add provider (and NER/disambiguation service) availability where that route has a provider."
         }
       ]
     }
@@ -204,3 +222,75 @@ Preservation selectors (candidate and unmodified base, no repair fail-before cla
 - `modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/EnrichmentAuthorityRaceTest.java#completedPublicationKeepsItsDispositionAcrossLaterReplacement`
 - `modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/EnrichmentUnitBoundaryTest.java#nullAndEmptySlicesKeepExistingRetryAccounting`
 - Existing P1-P5 suites in the assignment, with the authorized long-document and E3a-1 adaptations above. The unmodified baseline suites separately establish preservation before overlaying changed expectations.
+
+
+## Repair round 1 coverage
+
+`EnrichmentHardStopRepairTest#everyHardStopBoundsEveryRoute` exercises all six stop columns,
+before the first unit and after the first unit, for each dense batch (combined/individual),
+single-pass, window, chunk batch (combined/individual), sparse parent/chunk
+(combined/individual/interleaved), NER (combined/individual), and BGE-M3 parent/chunk route.
+Shutdown and hold enter through the route's supplied stop condition; interruption is a real
+thread interrupt, source invalidation changes the observed deletion epoch, token revocation uses
+the bound production lifecycle, and unavailability uses each route's existing availability seam.
+SPLADE and BGE-M3 expose availability by their nullable encoder supplier, rather than an
+isAvailable method. The matrix observes calls and writes at the coordinator interface and checks
+that no stopped row spends a retry.
+
+The BGE-M3 ops checks supply a live encoder supplier. The two production scheduler paths in
+modules/worker-services/src/main/java/io/justsearch/indexerworker/loop/BackfillScheduler.java
+currently supply a captured encoder instead. Passing the existing live supplier through those two
+arguments is a pending scope decision because that caller is outside the assignment's named files.
+Until that wiring changes, BGE-M3 supplier-unavailability cells are verified at the ops boundary,
+not through the production scheduler.
+
+`DisambiguationAuthorityTest#hardStopsBoundEveryDisambiguationPage` covers all five applicable
+columns before clustering and after clustering, including the final page. The source column is
+not applicable. It asserts that no retired/stopped page is acknowledged. The service's own
+publication callback also receives the same availability-aware stop predicate.
+
+`EnrichmentHardStopRepairTest#retirementDefersSuccessFailureAndCancellationOnEveryRoute`
+checks both forms of retirement for all inference routes and all three returned outcomes;
+window calls return their final slice. The real-writer checks in EnrichmentAuthorityRaceTest
+also assert persisted PENDING status, unchanged retry counts and no searchable retired sparse
+terms. The existing replacement-boundary/mutation-lock races and P1-P5 suites remain selected.
+
+Counterexample mapping: F1 -> individualNerUnavailabilityBoundsEveryDocument;
+F2 -> successfulFinalDenseCallCannotPublishAfterUnavailability and
+unavailableProviderCannotPublishItsSuccessfulFinalDenseResult (real writer);
+F3 -> sparseRetirementWinsOverCancellation and
+replacedProviderCancellationStaysDeferredThroughTheRealWriter;
+F4 -> bgeSourceInvalidationAndInterruptionPreventTheFirstBatch.
+`bgeFallbackCannotStartAnotherUnitAfterAHardStop` exercises the next-unit fence after a failed
+unified batch, for both parent and chunk routes and every stop column.
+
+Additional overlays for the existing --before fb9b1ffdc0 arguments:
+
+- `--overlay modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/EnrichmentHardStopRepairTest.java`
+- `--overlay modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/NerBackfillOpsTest.java`
+- `--overlay modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/NerLazyCreationRetryTest.java`
+
+Additional repair selectors (prefix each with `--check`):
+
+- `modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/EnrichmentHardStopRepairTest.java#individualNerUnavailabilityBoundsEveryDocument`
+- `modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/EnrichmentHardStopRepairTest.java#successfulFinalDenseCallCannotPublishAfterUnavailability`
+- `modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/EnrichmentHardStopRepairTest.java#sparseRetirementWinsOverCancellation`
+- `modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/EnrichmentHardStopRepairTest.java#bgeSourceInvalidationAndInterruptionPreventTheFirstBatch`
+- `modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/EnrichmentHardStopRepairTest.java#bgeRetirementPreventsTheFirstBatch`
+- `modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/EnrichmentHardStopRepairTest.java#combinedNerRejectsEveryOutcomeWhenTheServiceBecomesUnavailable`
+- `modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/EnrichmentHardStopRepairTest.java#sparseUnavailabilityRejectsComputedSuccessAndCancellation`
+- `modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/EnrichmentHardStopRepairTest.java#individualDenseFallbackUnavailabilityWinsOverCancellation`
+- `modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/EnrichmentHardStopRepairTest.java#individualDenseBatchUnavailabilityWinsOverCancellation`
+- `modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/EnrichmentHardStopRepairTest.java#bgeFallbackCannotStartAnotherUnitAfterAHardStop`
+- `modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/EnrichmentAuthorityRaceTest.java#unavailableProviderCannotPublishItsSuccessfulFinalDenseResult`
+- `modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/EnrichmentAuthorityRaceTest.java#replacedProviderCancellationStaysDeferredThroughTheRealWriter`
+- `modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/DisambiguationAuthorityTest.java#serviceUnavailabilityCannotPublishOrAcknowledgeThePage`
+- `modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/EnrichmentAuthorityRaceTest.java#retiredBgeCannotPublishAnyFinalOutcomeThroughTheRealWriter`
+
+Additional coverage selectors (not an all-parameters fail-before claim):
+
+- `modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/EnrichmentHardStopRepairTest.java#everyHardStopBoundsEveryRoute`
+- `modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/EnrichmentHardStopRepairTest.java#retirementDefersSuccessFailureAndCancellationOnEveryRoute`
+- `modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/EnrichmentHardStopRepairTest.java#fallbackRetirementDefersEveryOutcome`
+- `modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/DisambiguationAuthorityTest.java#hardStopsBoundEveryDisambiguationPage`
+- `modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/EnrichmentAuthorityRaceTest.java#unavailableProviderDefersFailureAndCancellationThroughTheRealWriter`

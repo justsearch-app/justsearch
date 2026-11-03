@@ -62,6 +62,8 @@ public final class BgeM3BackfillOps {
    */
   public static StageOutcome processBgeM3Backfill(BackfillContext context) {
     long t0 = System.nanoTime();
+    var authority = context.indexingCoordinator().enrichmentAuthority();
+    EnrichmentAccounting accounting = new EnrichmentAccounting();
     try {
       List<String> pendingIds =
           context.chunkSpladeEnabled()
@@ -77,6 +79,7 @@ public final class BgeM3BackfillOps {
                       SchemaFields.SPLADE_STATUS,
                       SchemaFields.SPLADE_STATUS_PENDING,
                       context.batchSize());
+      accounting.select(pendingIds, EnrichmentAccounting.Stage.SPLADE);
       long queryMs = (System.nanoTime() - t0) / 1_000_000;
 
       if (pendingIds.isEmpty()) {
@@ -93,13 +96,10 @@ public final class BgeM3BackfillOps {
       int processed = 0;
       int failed = 0;
 
-      if (shouldInterrupt(context)) {
-        return StageOutcome.elapsedSince(t0);
-      }
-
       // Phase 1: Collect content for all pending docs
       long t1 = System.nanoTime();
-      EnrichmentBatch batch = new EnrichmentBatch(context.documentFieldOps(), context.indexingCoordinator(), pendingIds);
+      EnrichmentBatch batch = new EnrichmentBatch(context.documentFieldOps(), context.indexingCoordinator(), pendingIds, authority).accounting(accounting);
+      BooleanSupplier unavailable = () -> context.encoderSupplier().get() != encoder;
       Map<String, String> contentByDocId = batch.contents();
       Map<String, Map<String, String>> typeByDocId =
           batch.fields();
@@ -110,6 +110,14 @@ public final class BgeM3BackfillOps {
       // EMBEDDING_STATUS), since the SPLADE_STATUS=PENDING query above mixes both doc types.
       List<Boolean> batchIsChunk = new ArrayList<>(pendingIds.size());
       for (String docId : pendingIds) {
+        boolean isChunkDoc = "true".equals(batch.fields(docId).get(SchemaFields.IS_CHUNK));
+        accounting.select(docId, isChunkDoc ? EnrichmentAccounting.Stage.CHUNK_EMBED : EnrichmentAccounting.Stage.EMBED);
+      }
+      for (String docId : pendingIds) {
+        if (batch.stopped(() -> shouldInterrupt(context), unavailable, EnrichmentAccounting.Stage.values())) {
+          accounting.cancelRemaining();
+          break;
+        }
         try {
           boolean isChunk =
               "true".equals(
@@ -145,17 +153,23 @@ public final class BgeM3BackfillOps {
 
       if (batchContents.isEmpty()) {
         commitIfNeeded(context, processed, failed);
-        return new StageOutcome(true, processed, (System.nanoTime() - t0) / 1_000_000);
+        return StageOutcome.observed(true, processed, t0, accounting);
       }
 
-      if (shouldInterrupt(context)) {
-        return new StageOutcome(true, processed, (System.nanoTime() - t0) / 1_000_000);
+      if (batch.stopped(() -> shouldInterrupt(context), unavailable, EnrichmentAccounting.Stage.values())) {
+        accounting.cancelRemaining();
+        return StageOutcome.observed(true, processed, t0, accounting);
       }
 
       // Phase 2: Batch encode with BGE-M3 (produces both dense + sparse)
       long t2 = System.nanoTime();
       List<BgeM3Output> outputs;
       try {
+        batch.started(batchDocIds, EnrichmentAccounting.Stage.SPLADE);
+        for (int i = 0; i < batchDocIds.size(); i++) {
+          batch.started(List.of(batchDocIds.get(i)), batchIsChunk.get(i)
+              ? EnrichmentAccounting.Stage.CHUNK_EMBED : EnrichmentAccounting.Stage.EMBED);
+        }
         outputs = encoder.encodeBatch(batchContents);
         // A short/empty result is as unusable as null for the index-aligned loop in Phase 3 —
         // trusting its length to match batchDocIds is what crash-loops the embedding-chunk
@@ -170,17 +184,38 @@ public final class BgeM3BackfillOps {
                   + ")");
         }
       } catch (Exception e) {
+        if (batch.retired(unavailable, EnrichmentAccounting.Stage.values())) {
+          return StageOutcome.observed(true, processed, t0, accounting);
+        }
+        boolean cancelled = false;
+        for (var stage : EnrichmentAccounting.Stage.values()) cancelled |= accounting.cancelled(stage, e);
+        if (cancelled) return StageOutcome.observed(false, processed, t0, accounting);
         context.log().error("BGE-M3 batch encoding failed: {}", e.getMessage());
         // Fallback to per-doc encoding
         int perDocFailed = 0;
         for (int i = 0; i < batchDocIds.size(); i++) {
+          if (batch.stopped(() -> shouldInterrupt(context), unavailable, EnrichmentAccounting.Stage.values())) {
+            accounting.cancelRemaining();
+            break;
+          }
           String docId = batchDocIds.get(i);
           boolean isChunk = batchIsChunk.get(i);
           try {
             BgeM3Output output = encoder.encode(
                 batchContents.get(i), io.justsearch.core.execution.InferenceRequest.background());
+            if (output != null) {
+              batch.computed(docId, EnrichmentAccounting.Stage.SPLADE);
+              if (output.denseVector() != null && output.denseVector().length > 0) {
+                batch.computed(docId, isChunk ? EnrichmentAccounting.Stage.CHUNK_EMBED : EnrichmentAccounting.Stage.EMBED);
+              }
+            }
+            if (batch.retired(unavailable, EnrichmentAccounting.Stage.values())) break;
             if (writeOutput(batch, docId, isChunk, output)) processed++;
           } catch (Exception e2) {
+            if (batch.retired(unavailable, EnrichmentAccounting.Stage.values())) break;
+            boolean cancelledFallback = false;
+            for (var stage : EnrichmentAccounting.Stage.values()) cancelledFallback |= accounting.cancelled(stage, e2);
+            if (cancelledFallback) break;
             context
                 .log()
                 .warn("BGE-M3 per-doc encoding failed for {}: {}", docId, e2.getMessage());
@@ -205,9 +240,20 @@ public final class BgeM3BackfillOps {
                   "BGE-M3 encoding unavailable: entire batch of {} docs failed — {}",
                   perDocFailed,
                   e.getMessage());
-          return new StageOutcome(false, processed, (System.nanoTime() - t0) / 1_000_000);
+          return StageOutcome.observed(false, processed, t0, accounting);
         }
-        return new StageOutcome(true, processed, (System.nanoTime() - t0) / 1_000_000);
+        return StageOutcome.observed(true, processed, t0, accounting);
+      }
+      for (int i = 0; i < batchDocIds.size(); i++) {
+        if (outputs.get(i) == null) continue;
+        batch.computed(batchDocIds.get(i), EnrichmentAccounting.Stage.SPLADE);
+        if (outputs.get(i).denseVector() != null && outputs.get(i).denseVector().length > 0) {
+          batch.computed(batchDocIds.get(i), batchIsChunk.get(i)
+              ? EnrichmentAccounting.Stage.CHUNK_EMBED : EnrichmentAccounting.Stage.EMBED);
+        }
+      }
+      if (batch.retired(unavailable, EnrichmentAccounting.Stage.values())) {
+        return StageOutcome.observed(true, processed, t0, accounting);
       }
       long encodeMs = (System.nanoTime() - t2) / 1_000_000;
 
@@ -258,11 +304,11 @@ public final class BgeM3BackfillOps {
               writeMs,
               commitMs,
               docs > 0 ? totalMs / docs : 0);
-      return new StageOutcome(true, processed, totalMs);
+      return StageOutcome.observed(true, processed, t0, accounting);
 
     } catch (Exception e) {
       context.log().error("Error during BGE-M3 backfill", e);
-      return new StageOutcome(false, 0, (System.nanoTime() - t0) / 1_000_000);
+      return StageOutcome.observed(false, 0, t0, accounting);
     }
   }
 

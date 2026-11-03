@@ -50,6 +50,23 @@ final class EnrichmentBatch {
     return hardStop(stop, coordinator, deletionEpoch, authority);
   }
 
+  boolean stopped(BooleanSupplier stop, BooleanSupplier unavailable,
+      EnrichmentAccounting.Stage... stages) {
+    boolean stopped = stopped(stop);
+    // The stop supplier may pace, so observe retirement after it returns too.
+    return retired(unavailable, stages) || stopped;
+  }
+
+  /** Availability is checked at unit boundaries; replacement is also fenced at publication. */
+  boolean retired(BooleanSupplier unavailable, EnrichmentAccounting.Stage... stages) {
+    boolean unavailableNow = unavailable.getAsBoolean();
+    rejectRetiredOutcomes();
+    if (unavailableNow && accounting != null) {
+      for (var stage : stages) accounting.retired(stage);
+    }
+    return unavailableNow || coordinator.enrichmentAuthority() != authority;
+  }
+
   static boolean hardStop(BooleanSupplier stop, IndexingCoordinator coordinator, long deletionEpoch,
       IndexingCoordinator.EnrichmentAuthority authority) {
     return stop.getAsBoolean() || Thread.currentThread().isInterrupted()

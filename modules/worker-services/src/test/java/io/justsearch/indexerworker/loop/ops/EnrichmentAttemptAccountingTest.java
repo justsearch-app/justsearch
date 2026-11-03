@@ -171,6 +171,7 @@ class EnrichmentAttemptAccountingTest {
 
   @Test
   void individualNerReportsAcceptedEmptyAndRejectedComputedOutput() throws Exception {
+    when(ner.isAvailable()).thenReturn(true);
     documents.put("accepted", Map.of(SchemaFields.NER_STATUS, "PENDING"));
     documents.put("stale", Map.of(SchemaFields.NER_STATUS, "PENDING"));
     when(ner.extractEntitiesBatch(anyList())).thenReturn(List.of(io.justsearch.indexerworker.ner.NerResult.EMPTY));

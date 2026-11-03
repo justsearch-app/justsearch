@@ -24,6 +24,7 @@ final class NerLazyCreationRetryTest {
     IndexingCoordinator index = mock(IndexingCoordinator.class);
     CommitOps commits = mock(CommitOps.class);
     NerService ner = mock(NerService.class);
+    when(ner.isAvailable()).thenReturn(true);
     BackfillSnapshotTestSupport.install(fields, index, true, Set.of());
     when(fields.queryDocIdsByField(eq(SchemaFields.NER_STATUS), eq(SchemaFields.NER_STATUS_PENDING), anyInt()))
         .thenReturn(List.of("doc"));
