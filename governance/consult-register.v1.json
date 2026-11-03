@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "$comment": "Region -> governing-doc register (tempdoc 620 Move 2). CONSULT IT WHEN YOU EDIT A PATH IT COVERS: the row names the docs to read and, where present, the recipe to run. Machine consumer: scripts/ci/run-ui-web-gates.mjs parses the `ui-web-gates` row's recipe as the single authority for the ui-web gate set (its command count is floor-checked, so the recipe prose must keep parsing). Schema per row: pathIncludes (array of path substrings; matches if the edited path contains any) + region (label) + docs ([{path, why}] to read before editing) + maintain (optional bool; when true, the row's docs are expected to be updated in the same PR as a change to the region) + recipe (optional array of step strings -- a numbered procedure; a recipe row typically sets docs:[]).",
+  "$comment": "Region -> governing-doc register (tempdoc 620 Move 2). CONSULT IT WHEN YOU EDIT A PATH IT COVERS: the row names the docs to read and, where present, the recipe to run. Machine consumer: scripts/ci/run-ui-web-gates.mjs reads the `ui-web-gates` row's commands (an ordered array of argv arrays) as the authority for the ui-web gate set; recipe prose is explanation only. Schema per row: pathIncludes (array of path substrings; matches if the edited path contains any) + region (label) + docs ([{path, why}] to read before editing) + maintain (optional bool; when true, the row's docs are expected to be updated in the same PR as a change to the region) + recipe (optional array of step strings -- a numbered procedure; a recipe row typically sets docs:[]).",
   "regions": [
     {
       "id": "shell-v0",
@@ -39,13 +39,46 @@
       ],
       "region": "the ui-web frontend (pre-merge gate set)",
       "docs": [],
+      "commands": [
+        ["node", "scripts/ci/check-adaptive-closure.mjs"],
+        ["node", "scripts/ci/check-layout-purity.mjs"],
+        ["node", "scripts/ci/check-surface-composition.mjs"],
+        ["node", "scripts/ci/check-message-single-model.mjs"],
+        ["node", "scripts/ci/check-run-renderers.mjs"],
+        ["node", "scripts/ci/check-inflight-liveness.mjs"],
+        ["node", "scripts/ci/check-liveness-constants-single-authority.mjs"],
+        ["node", "scripts/ci/check-declared-surfaces.mjs"],
+        ["node", "scripts/ci/check-live-channels.mjs"],
+        ["node", "scripts/ci/check-contrast-matrix.mjs"],
+        ["node", "scripts/ci/check-style-literal-ratchet.mjs"],
+        ["node", "scripts/ci/check-search-window-scenarios.mjs"],
+        ["node", "scripts/ci/check-search-view-size.mjs"],
+        ["node", "scripts/ci/check-search-window-scenarios.test.mjs"],
+        ["node", "scripts/ci/check-search-view-size.test.mjs"],
+        ["node", "scripts/governance/run.mjs", "--gate", "ambient-purity", "--mode", "gate"],
+        ["node", "scripts/governance/run.mjs", "--gate", "atom-fork-ratchet", "--mode", "gate"],
+        ["node", "scripts/governance/run.mjs", "--gate", "modality-contract", "--mode", "gate"],
+        ["node", "scripts/governance/run.mjs", "--gate", "transient-arbitration", "--mode", "gate"],
+        ["node", "scripts/governance/run.mjs", "--gate", "modal-arbitration", "--mode", "gate"],
+        ["node", "scripts/ci/check-steering-arbitration.mjs"],
+        ["node", "scripts/ci/check-search-issuance.mjs"],
+        ["node", "scripts/ci/check-verdict-derivation.mjs"],
+        ["node", "scripts/ci/check-ai-verdict-derivation.mjs"],
+        ["node", "scripts/ci/check-message-classes.mjs"],
+        ["node", "scripts/ci/check-capability-availability.mjs"],
+        ["node", "scripts/ci/check-realized-capability.mjs"],
+        ["node", "scripts/ci/check-consequence-classification.mjs"],
+        ["node", "scripts/ci/check-folder-status-derivation.mjs"],
+        ["node", "scripts/ci/check-surface-task-state-retention.mjs"],
+        ["node", "scripts/ci/check-thread-event-kinds.mjs"]
+      ],
       "recipe": [
         "Any modules/ui-web/src/** edit — run the ui-web gate set before merge (node scripts/ci/<name>.mjs): check-adaptive-closure, check-layout-purity, check-surface-composition, check-message-single-model, check-run-renderers, check-inflight-liveness, check-liveness-constants-single-authority, check-declared-surfaces, check-live-channels, check-contrast-matrix, check-style-literal-ratchet, check-search-window-scenarios (with its self-test: node scripts/ci/check-search-window-scenarios.test.mjs), check-search-view-size (with its self-test: node scripts/ci/check-search-view-size.test.mjs).",
         "Tempdoc 930 row 9 (chunk H) retired the recipe's 12 static a11y/contrast/token oracles (full list: tempdoc 930 section 19.3 finding F10) in favor of measured axe (ui-shot + governance/ui-a11y-baseline.v1.json) and review, since every traced a11y/contrast catch came from one of those, never from a static oracle. check-contrast-matrix (the four-palette sweep) and every register-backed check stay in the recipe above. gen-token-names and gen-component-vocabulary remain as codegen scripts (their generated files are still compiled against) — only their --check gate registration was removed.",
-        "Plus the kernel gates: node scripts/governance/run.mjs --gate ambient-purity,atom-fork-ratchet,modality-contract,transient-arbitration,modal-arbitration --mode gate (`--gate` is repeatable, so one invocation with several `--gate <id>` flags also works; `node scripts/ci/run-ui-web-gates.mjs` expands this list and runs the whole set, tempdoc 872).",
+        "Plus the kernel gates: node scripts/governance/run.mjs --gate ambient-purity,atom-fork-ratchet,modality-contract,transient-arbitration,modal-arbitration --mode gate (`--gate` is repeatable, so one invocation with several `--gate <id>` flags also works; `node scripts/ci/run-ui-web-gates.mjs` runs the authoritative commands list for the whole set, tempdoc 872).",
         "modules/ui-web/src/shell-v0/** edits additionally: check-steering-arbitration, check-search-issuance, check-verdict-derivation, check-ai-verdict-derivation, check-message-classes, check-capability-availability, check-realized-capability, check-consequence-classification, check-folder-status-derivation.",
         "shell-v0/views/** edits additionally: check-surface-task-state-retention, check-thread-event-kinds.",
-        "Frontend lint + typecheck + unit tests: cd modules/ui-web && npm run lint && npm run typecheck && npm run test:unit:run. (Also listed in docs/reference/contributing/pre-merge-checks.md.) `npm run lint` is `eslint . --max-warnings=0` — tempdoc 930 §22.2 follow-up 8 made warnings and unused `eslint-disable` directives fail, so the ts-any/todo-fixme successors cannot rot back into advisories. It is NOT parsed into this runner's command list: it needs `npm ci --prefix modules/ui-web`, and this runner deliberately runs in CI ABOVE that install. CI runs it as the separate \"Frontend lint\" step."
+        "Frontend lint + typecheck + unit tests: cd modules/ui-web && npm run lint && npm run typecheck && npm run test:unit:run. (Also listed in docs/reference/contributing/pre-merge-checks.md.) `npm run lint` is `eslint . --max-warnings=0` — tempdoc 930 §22.2 follow-up 8 made warnings and unused `eslint-disable` directives fail, so the ts-any/todo-fixme successors cannot rot back into advisories. It is not included in the authoritative commands list: it needs `npm ci --prefix modules/ui-web`, and this runner deliberately runs in CI ABOVE that install. CI runs it as the separate \"Frontend lint\" step."
       ]
     },
     {

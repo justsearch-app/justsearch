@@ -87,6 +87,9 @@ test('arguments must select known gates in the production registry', () => {
 test('quoted values and flag-shaped output paths are parsed as argument values', () => {
   const command = 'node scripts/governance/run.mjs --gate "engine-port" --mode "gate" --out "--help"';
   assert.equal(check(command).rows[0].production, true);
+  const warn = check('node scripts/governance/run.mjs --gate engine-port --out "report --mode gate"');
+  assert.equal(warn.rows[0].production, false);
+  assert.match(warn.issues[0], /engine-port: no required hosted production invocation/);
 });
 test('the checked-in workflow enforces engine-port on production', () => {
   const read = (p) => fs.readFileSync(new URL('../../' + p, import.meta.url), 'utf8');

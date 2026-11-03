@@ -2,7 +2,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { parseUiWebGateCommands } from './run-ui-web-gates.mjs';
+import { readUiWebGateCommands } from './run-ui-web-gates.mjs';
 
 // Only executable run fields count. Comments, fixture tests and warn-mode runs are
 // not evidence that a required hosted job enforces a gate on production sources.
@@ -81,7 +81,7 @@ export function requiredHostedJobIds(jobs, requiredChecks) {
 
 // Credit only plain commands whose arguments the runner accepts. Shell operators,
 // substitutions and escaping need shell evaluation, so they cannot prove enforcement.
-function gateCommand(command, known) {
+function workflowCommandArgs(command) {
   if (/[;&|<>`$\\]/.test(command)) return null;
   const words = [];
   let word = '';
@@ -105,7 +105,13 @@ function gateCommand(command, known) {
   }
   if (quote) return null;
   if (started) words.push(word);
-  if (words[0] !== 'node' || words[1] !== 'scripts/governance/run.mjs') return null;
+  return words;
+}
+
+// Both sources use the runner's argv semantics; register values are already
+// tokenized and must never be interpreted as workflow shell text.
+function gateCommand(words, known) {
+  if (!words || words[0] !== 'node' || words[1] !== 'scripts/governance/run.mjs') return null;
 
   let mode = 'warn';
   let format = 'sarif';
@@ -147,12 +153,13 @@ export function checkCoverage({ workflowText, registry, consultRegister, require
       const matrix = /^matrix\.(\w+) == ['"]([\w-]+)['"]$/.exec(condition);
       return matrix && new RegExp(`${matrix[1]}: ['"]?${matrix[2]}['"]?\\s*$`, 'm').test(job.text);
     });
-    const commands = enforcedRuns.flatMap((r) => r.text.replace(/\\\s*\n/g, ' ').split('\n').map((c) => c.split('#')[0]));
-    if (commands.some((c) => /^node scripts\/ci\/run-ui-web-gates\.mjs\s*$/.test(c.trim()))) {
-      commands.push(...parseUiWebGateCommands(consultRegister).map((c) => c.join(' ')));
+    const commands = enforcedRuns.flatMap((r) => r.text.replace(/\\\s*\n/g, ' ').split('\n').map((c) => c.split('#')[0]))
+      .map((text) => ({ text, argv: workflowCommandArgs(text) }));
+    if (commands.some((c) => /^node scripts\/ci\/run-ui-web-gates\.mjs\s*$/.test(c.text.trim()))) {
+      commands.push(...readUiWebGateCommands(consultRegister).map((argv) => ({ argv })));
     }
     for (const command of commands) {
-      const parsed = gateCommand(command, known);
+      const parsed = gateCommand(command.argv, known);
       if (parsed?.fixtures) for (const id of parsed.ids) fixtures.add(id);
       if (parsed?.production) for (const id of parsed.ids) {
         if (['consumer-presence', 'host-owns-truth', 'runtime-witness'].includes(id)) {
@@ -162,7 +169,7 @@ export function checkCoverage({ workflowText, registry, consultRegister, require
           const assertion = `node -e "if (require('fs').readFileSync('tmp/snapshot-gates.sarif','utf8').includes('snapshot-missing')) { console.error('registry snapshot absent: these three gates inspected nothing'); process.exit(1); }"`;
           const wired = enforcedRuns.some((r) => {
             const lines = r.text.split('\n').map((line) => line.trim());
-            const gate = lines.findIndex((line) => line === command.trim());
+            const gate = lines.findIndex((line) => line === command.text?.trim());
             return lines.indexOf(exporter) >= 0 && lines.indexOf(exporter) < gate && lines.indexOf(assertion) > gate;
           });
           if (!wired) continue;
