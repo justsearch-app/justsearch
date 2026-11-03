@@ -141,3 +141,13 @@ The tests were written by a Codex builder from the orchestrator's contract; the 
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a1a215-af07-7f01-bd2d-922d218963d1",
+  "verdict": "accept",
+  "digest": "sha256:90b67413b630d522a423a4dcb3024d0ace7a092767a030aeae9113f4b336ce73"
+}
+```
