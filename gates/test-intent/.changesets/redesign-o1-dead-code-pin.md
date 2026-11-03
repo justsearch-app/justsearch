@@ -34,3 +34,14 @@ request; the independent acceptor verifies it.
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a1a061-7837-7570-bbbd-542ef034213f",
+  "verdict": "accept",
+  "digest": "sha256:4405484bdae1ebf875afd3b1d5ed79a3293737999e2c2f144821e6f10935d950",
+  "note": "verifier-6 on 1f593b9625: both new exports are generated cleanup-warning element helpers with no outside consumer; only the named pin changed; dead-code gate fails before (silent growth 6 -> 8) and passes after; generator --check passes."
+}
+```
