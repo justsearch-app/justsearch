@@ -7,6 +7,9 @@ description: "How JustSearch is extended: one declaration model, one composer, f
 
 # The Extension Substrate
 
+> Customization (themes, skins, layouts, plugins and macros) is frozen for now.
+> What exists keeps working and gets fixes, but no new extension features are being added.
+
 Everything that extends JustSearch is the **same kind of thing**. A user's
 plugin, a core operation, a resource, a prompt template, an external MCP tool,
 a workflow, an agent tool — each is a *contribution* that **declares** what it

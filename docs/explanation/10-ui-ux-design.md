@@ -2,66 +2,92 @@
 title: UI/UX Design System
 type: explanation
 status: stable
-description: "The 5-zone layout, interaction model, and design pillars."
+description: "Current window structure, visual rules, interaction model, progress vocabulary, and accessibility requirements."
 ---
 
 # UI/UX Design System
 
-This document describes the architectural principles, layout strategy ("Zoning"), and interaction models of the JustSearch user interface. It serves as the source of truth for the application's visual and functional design.
+This page states the current UI rules and explains the shell and interaction model.
+Implementation anchors are under `modules/ui-web/src/shell-v0/`; history lives in git
+and the frozen tempdocs.
 
-## 1. Design Philosophy
+## 1. Design principles
 
-JustSearch is designed as a **HUD (Heads-Up Display)** for your digital life. The interface prioritizes speed, data density, and keyboard navigability, wrapping complex AI operations in a calm, glassmorphic aesthetic.
+JustSearch is a keyboard-first desktop utility for finding files and working with their
+contents. Use the system UI font and familiar interaction patterns. Primary actions must
+be reachable by keyboard, with visible focus and meaningful labels.
 
-### Core Tenets
-*   **"Glass" Aesthetic:** The UI uses backdrop blurring (`backdrop-filter: blur(20px)`) and translucency to feel lightweight and native.
-*   **Native Integration:** The UI masquerades as a native OS utility by using system fonts and standard interaction patterns.
-*   **Keyboard First:** Every primary action (Search, Navigation, Mode Switching) is accessible via hotkeys.
-*   **Zone-Based Layout:** The screen is divided into strict functional areas ("Zones") to maintain spatial consistency.
-*   **Ambient Status:** System health, AI inference modes, and indexing status are passive indicators that don't block user flow.
+**Simple is the default; Detailed is available on request.** Routine actions and status
+stay understandable without technical knowledge. Diagnostics, raw identifiers and runtime
+configuration belong in Detailed mode. Use the shared app-wide disclosure level described
+in [Simple and Detailed UI modes](../reference/ui/simple-vs-detailed-mode.md).
 
-## 2. The Zoning System
+### Current visual rules
 
-The application layout is defined declaratively in
-`modules/ui-web/src/shell-v0/layout/LayoutManifest.ts`, which composes three
-**structural zones** — `rail`, `stage` (exclusive), and `statusBar` — into named
-presets (`core.default`, `core.focus`). The shell chrome renders them as
-`<jf-rail>` / `<jf-stage>` and the status deck.
+These rules were agreed by the maintainer on 2026-11-01, using the Search window as the
+visual reference:
 
-The five **functional regions** described below map onto those three structural zones:
+- **Use the whole window.** Do not put a window's contents in a narrow centred column or
+  wrap groups in cards (boxes). Separate groups with small grey headings, space and
+  hairlines.
+- **Say the state in words.** For example, “Your files are searchable” tells the user what
+  they can do. Keep technical detail in Detailed mode; a colour or icon alone is not a status.
+- **Use text actions.** Avoid outlined pill buttons. Give a window's main action one filled
+  teal button; secondary actions are quiet text controls.
+- **Reserve teal** for the main action, switches that are on, progress, and links that add
+  something. Do not use it as decoration or a file-type colour code.
+- **Use the existing typography and surface tokens.** Headlines are regular weight (400),
+  in the 24–30 px range; body text is 14–15 px and grey details are 12–13 px. Hairlines are
+  approximately seven-percent white in the dark theme, with theme-appropriate contrast in
+  light and high-contrast modes. The token names below are the implementation vocabulary;
+  do not copy raw style values into components where the style-literal ratchet forbids them.
 
-| Functional region | Structural zone |
+| Purpose | Existing tokens and source |
 |---|---|
-| Activity Rail (navigation) | `rail` |
-| Global Command (top input bar) | `stage` region (header) |
-| Stage (main content) | `stage` |
-| Inspector (right detail panel) | `stage` region (collapsible right sub-panel) |
-| Status Deck (bottom telemetry) | `statusBar` |
+| System UI font | `--font-native` in `styles/tokens.css`; Search uses `--font-sans` in `views/search-v3/sv3-tokens.css.ts` |
+| Search headline | `--font-size-sv3-display`, used at weight 400 by `Sv3Composer` |
+| Body text | `--font-size-sv3-sm` in Search; `--font-size-md` in the shared scale |
+| Grey details | `--font-size-sv3-xs` / `--secondary-label` in Search; `--font-size-sm` / `--text-secondary` in the shared scale |
+| Group spacing | Search's `--space-*` scale; shared `--density-stack-gap*` tokens |
+| Hairlines | Search's `--border`; shared `--border-subtle` → `--glass-border` (both dark defaults use six-percent white, the nearby existing rung) |
+| Main action | Search's `--primary` / `--primary-foreground`; shared `--accent-tint` / `--accent-on-tint` |
+| Keyboard focus | Search's `--ring`; shared `--focus-ring-color` |
 
-```mermaid
-graph TD
-    Rail["rail — Activity Rail (Region B)"] --> Stage["stage — Global Command (A) · Content (C) · Inspector (D)"]
-    Stage --> Status["statusBar — Status Deck (Region E)"]
-```
+These are window-composition rules. A conversation's reading measure and a document pane
+are content layouts within a window, not a narrow container for the whole application.
+Some floating panels use blur; backdrop blur and a glass aesthetic are not UI requirements.
 
-### Zone B: Activity Rail (Navigation)
-*   **Location:** Left vertical strip.
-*   **Purpose:** Top-level navigation between major views.
-*   **Components:**
-    *   **Search:** (Home) The one interaction window for retrieval, grounded Q&A, and agent runs. It lands in the `retrieve` base tier (instant file search, no model required) and stays there until the user chooses **Ask** for a cited answer or **Delegate** for multi-step agent work. Past conversations stay reachable from the retrieve landing via the "Continue your last conversation?" card. Legacy mode-specific surface IDs remain URL-routable compatibility addresses, not additional rail destinations.
-    *   **Library:** Manage indexed folders.
-    *   **Brain:** AI Model Configuration & VRAM Monitoring (also surfaces index schema mismatch / reindex-required state).
-    *   **System:** System diagnostics and telemetry (hosts Health / Logs / Activity).
-    *   **Settings:** General application preferences. Placement `MODAL` (tempdoc 855): the
-        rail keeps a fixed bottom affordance (same pattern as Help), but pressing it opens
-        Settings as a centered overlay window over the unchanged Stage rather than
-        navigating into it — see "Settings window" below.
+## 2. Shell structure
+
+`chrome/Shell.ts` renders the following structure. `layout/LayoutManifest.ts` describes
+visibility and composition of the `rail`, `stage` and `statusBar` regions; it does not
+imply five fixed functional zones.
+
+| Shell part | Responsibility |
+|---|---|
+| Title bar | App name, back/forward navigation, recent views, active surface title, Simple/Detailed control, bookmarks and Copy URL |
+| Rail | Catalog-driven navigation; Simple mode withholds optional diagnostic surfaces |
+| Stage | The active surface; layouts can also compose a second surface in a split stage |
+| Status bar (`jf-status-deck`) | Connection, file/index/memory facts, AI activity and active work, subject to available space |
+| Overlay slots (`jf-overlay-host`) | Command palette, Settings, tasks, notices, reading drawers and other transient surfaces in named slots |
+
+### Main windows
+
+- **Search** is one interaction window for retrieval, cited answers and delegated work.
+  It starts in Search (keyword retrieval requires no model); the user can choose Ask or
+  Delegate. A session sidebar keeps past conversations reachable. Legacy mode-specific
+  surface IDs remain compatibility addresses rather than extra rail destinations.
+- **Library** manages indexed sources and folders, their state, exclusions and recovery actions.
+- **AI Brain** presents AI installation/readiness in Simple mode and configuration/runtime
+  detail in Detailed mode. It surfaces schema incompatibility and enrichment readiness
+  rather than treating a drained job queue as complete semantic coverage.
+- **System** hosts diagnostic surfaces including Health, Logs and Activity. Health shows
+  observed system/indexing facts and resource charts.
+- **Settings** is a modal window opened from the rail, command palette or a deep link.
 
 ### Settings window
 
-`core.settings-surface` is the first realization of `Placement.MODAL` (declared but
-previously unused in both the FE `Placement` union and the Java `Surface` placement
-enum). Navigating to it — from the rail, the command palette, or a deep-link URL —
+`core.settings-surface` uses `Placement.MODAL`. Navigating to it — from the rail, the command palette, or a deep-link URL —
 opens `<jf-settings-window>` (`shell-v0/chrome/SettingsWindow.ts`), a chrome-level
 element in `OverlayHost`'s `center` slot (the same dock as the command palette),
 instead of mounting into the Stage; the Stage's active surface is untouched
@@ -76,74 +102,21 @@ Inside the window, one category tree — declared once in
 `shell-v0/views/settingsRegister.ts` as `{group → category → entry}`, where an entry
 is either a native section or a member surface id — drives the vertical grouped nav
 (accordion + scroll-spy), the category pages, deep-link targets, and in-window search;
-none of these are hand-maintained separately, so they cannot drift from each other.
-Two categories are member surfaces mounted through the same catalog composition
-machinery as Settings' presentation gallery/editor tabs: `core.security-surface`
-(absorbed as the Privacy & Trust category; placement `DEEPLINK`) and the Appearance
-category's presentation members. The Token Editor (`placement: 'DEEPLINK'`, formerly a
-rail surface) is reached from Appearance via a launch link, not embedded, per the
-plugin-presentation boundary (ADR-0035). A member surface's own id stays
-deep-linkable unchanged — e.g. a link to `core.security-surface` opens the settings
-window at the Security category via the existing member→host alias redirect.
+these are projections of the same register.
+Member categories mount `core.security-surface` (Privacy & Trust),
+`core.presentation-gallery-surface` and `core.presentation-editor-surface` through the
+catalog composition machinery. The Token Editor (`placement: 'DEEPLINK'`) is reached
+from Appearance through a launch link, per the plugin-presentation boundary
+([ADR-0035](../decisions/0035-fe-plugin-boundary.md)). A member surface's own ID stays
+deep-linkable: for example, `core.security-surface` opens the Settings window at its
+member category through the member-to-host redirect.
 
-### Zone A: Global Command (Hybrid Input)
-*   **Location:** Top horizontal bar.
-*   **Purpose:** The primary input vector for the application.
-*   **Modes:**
-    *   **Search Mode:** Default. Type to search files.
-    *   **Command Mode:** Prefix `/`. Activates system commands (e.g., `/reindex`). Visualized as a purple pill.
-    *   **Chat Mode:** Prefix `??` or `ask`. Switches input to a multi-line textarea for AI Q&A. Visualized with a teal border.
-*   **Features:**
-    *   Ghost text autocomplete (`Tab` to accept).
-    *   Debounced inputs for local vs. remote search.
-    *   **Search history dropdown:** Shows recent searches on focus when query is empty (localStorage-backed, max 30 entries, deduplicated). Individual entries can be removed.
-    *   **Syntax help button:** A `?` button next to the SIMPLE/LUCENE mode toggle shows a popover with mode-specific guidance (Lucene operators table or Simple mode description).
-    *   **Window drag region:** Empty space in the header bar acts as a drag handle for the frameless Tauri window (`-webkit-app-region: drag`). Input fields and buttons are excluded.
+### Status bar
 
-### Zone C: Stage (Main Content)
-*   **Location:** Center viewport.
-*   **Purpose:** Displays the active view's content.
-*   **Views:**
-    *   **Launchpad:** Empty Search state that teaches prerequisites and gives quick entry points:
-        *   **Get started ladder:** Add folder → check status → try an example query (chips).
-        *   **Quick cards:** Add folder, Configure AI, Health, Actions.
-    *   **Mode-specific empty states:** When no results/content exist, the Stage shows context-appropriate guidance:
-        *   *Search mode:* "No results" with filter suggestions.
-        *   *Command mode (`/`):* Terminal icon with "No matching command" and help hint.
-        *   *Chat mode (`??`):* Message icon with "Ask a question" and usage hint.
-    *   **Result List:** Virtualized list of search results with keyboard navigation (`↑`/`↓`).
-        * Uses container-query responsive layouts so result cards adapt cleanly as the Stage width changes.
-        * **Cursor vs selection:** arrow keys move a cursor (highlight) without opening the Inspector; `Enter` commits selection and opens the Inspector.
-        * When the Inspector is closed and nothing is selected, Search can show a right-side **Browse** panel (focused preview + actions) to avoid dead space.
-    *   **Library Manager:** Tree view of watched paths.
-    *   **Brain Configuration:** Sliders for Context Window, Temperature, and Model Path inputs.
-        * When AI is not installed, the Simple panel shows a "What you get" capabilities list (Q&A, summarization, semantic search) to motivate installation.
-        * When schema incompatibility is detected, the Brain view surfaces a clear "Rebuild Index" call-to-action and reason.
-        * When semantic search (chunk vectors) is still backfilling, the Brain view surfaces readiness/progress so the UI can say "semantic search ready" vs "building" deterministically.
-    *   **Health Dashboard:** Real-time charts of RAM/CPU/Index.
-
-### Zone D: Inspector Panel
-*   **Location:** Right vertical panel (Collapsible).
-*   **Purpose:** "Details on Demand".
-*   **Content:**
-    *   **File Metadata:** Path, size, modified date, MIME type.
-    *   **Answer-first AI output:** the AI response is presented above trust UI and Preview so "Summarize" feels immediate. During streaming, progress phases (searching → reading → writing) are shown with animated dots.
-    *   **Trust UI:** context capacity (limit/used), RAG/partial/fallback, truncation, and Sources/citations remain visible during streaming. Citation buttons (`[1]`, `[2]`) show hover cards with document name, match percentage, and excerpt preview. A **retrieval mode badge** (HYBRID / BM25 / FULLTEXT) indicates how chunks were selected, with a tooltip showing the reason code.
-    *   **Preview:** Paged extracted text preview (loaded via `GET /api/preview`), collapsible when AI is active.
-        * Preview also surfaces `vduStatus` + `textProvenance` so users can see whether text came from Tika extraction, Tika/Tesseract OCR, or VDU. When OCR evidence is available, the source line can include compact confidence, fallback, truncation, or skip details.
-    *   **AI Insights:** Auto-generated summaries, key entities.
-    *   **Chat/Q&A:** The output of AI queries ("Brain" results) is rendered here alongside the source document.
-    *   **Actions:** "Open Folder", "Reindex", "Copy Path".
-
-### Zone E: Status Deck (Telemetry)
-*   **Location:** Bottom horizontal bar.
-*   **Purpose:** Ambient system feedback.
-*   **Indicators:**
-    *   **Connectivity:** Green/Red wifi icon for Backend connection.
-    *   **Index Stats:** Total documents, Index size, Memory usage.
-    *   **AI Mode:** "Online" (Brain active) vs "Indexing" (Embeddings active).
-    *   **Queues:** **Only visible when active.** Shows pending VDU or Embedding job counts (e.g., "5 VDU pending").
-    *   **Process pending enrichment:** Appears only when queues are non-zero, allowing a manual trigger of the pending enrichment work (VDU + embedding backfill) for already-indexed documents.
+The status deck is a compact projection of shared state, not a second source of facts.
+Connection and memory signals are pinned while lower-priority facts can yield as space
+shrinks. Counts and sizes distinguish observed, last-known and unknown values. Queue and
+enrichment activity appears when relevant. The Help surface supplies keyboard guidance.
 
 ### Progress vocabulary (Tasks panel, Health, folder rows)
 
@@ -152,10 +125,10 @@ numbers from one place — the `selectIndexingProgress` projection over the `/ap
 snapshot (`shell-v0/state/indexingProgress.ts`). Numbers may differ between surfaces by
 **scope** (index-wide vs one folder), never by derivation.
 
-*   **Phases:** **Scanning** (walking a folder, nothing enqueued yet) → **Indexing**
+*   **Phases:** **Scanning** (walking a folder) → **Indexing**
     (files becoming keyword-searchable; the job queue drains) → **Enriching** (the
     semantic layers — embeddings, SPLADE, entities, passage vectors — catching up on
-    already-indexed documents) → **Ready**.
+    already-indexed documents) → **Ready**. Blocked or unconfirmed work must say so rather than imply readiness.
 *   **Two tiers of "done":** job drain makes a folder keyword-searchable, which is not the
     same fact as fully searchable. A Library row therefore reads
     `312 files · keyword search ready · semantic search still catching up · 40%` while
@@ -167,104 +140,93 @@ snapshot (`shell-v0/state/indexingProgress.ts`). Numbers may differ between surf
 *   **No fabricated numbers:** a percent is rendered only when the denominator is
     faithful (at least one applicable stage with documents to enrich). With no
     denominator — or a stale snapshot — the surface says less rather than showing a
-    placeholder, and the estimate line is withdrawn entirely outside the Indexing phase.
+    placeholder, and time estimates are withdrawn when their observed basis is missing or stale.
+    Indexing uses recent ingest throughput; Enriching uses its own measured settle rate,
+    not the ingest rate. Neither is a countdown.
 *   **"Offline" is not a progress word.** It describes the AI engine or a service being
     down, and nothing else; enrichment copy uses the phase nouns above.
 
-## 3. Key Interaction Models
+## 3. Interaction model
 
-### The Search Flow
-1.  **Input:** User types in Zone A.
-2.  **Local vs Remote:**
-    *   Short queries (< 3 chars) filter local history/cache.
-    *   Long queries trigger backend Lucene search.
-3.  **Narrowing controls (Zone C):** A filter bar sits above results:
-    *   **Scope**: dropdown of indexed roots (sets `pathPrefix`)
-    *   **Type**: `file_kind` buckets (PDF/Markdown/Images/…)
-    *   **Sort**: Relevance / Newest / Oldest (TEXT mode)
-    *   **Date / Language**: DocValues-backed filters
-    *   **Facets**: optional facet counts (first page only)
-    *   Active filters are shown as removable chips, with a one-click “Clear”.
-4.  **Typo Correction:** If a query returns zero hits and a fuzzy match finds better results, the response includes `correctionApplied: true` and `correctedQuery`. Zone C shows a banner: "Showing results for **X** instead of *Y*". Per-term correction also replaces results when a corrected query returns significantly more hits.
-5.  **Results:** Rendered by the Lit search results components (Zone C) with a highlighted snippet sourced from `content_preview`.
-6.  **Pagination:** When more results exist, Zone C shows a **Load more** control (cursor-based paging for TEXT mode).
-7.  **Browse (cursor) vs select (commit):**
-    *   Arrow keys move a **cursor** (highlighted row) without opening the Inspector.
-    *   `Enter` commits selection and opens the Inspector.
-    *   Hover may update the cursor, but does not commit selection.
-8.  **Multi-selection + batch AI:**
-    *   Checkboxes manage a `selectedIds` set for batch actions (summarize / ask across multiple files).
-    *   Clicking a result row toggles its checkbox AND opens the Inspector (no separate "checkbox then click row" dance). `Ctrl/Cmd+Click` toggles the checkbox without changing the single selection.
-9.  **Open vs Inspect (keyboard):**
-    *   `Enter`: inspect (open Inspector).
-    *   `Ctrl/Cmd+Enter`: open file (Desktop) or best-effort open preview (Browser).
-    *   The Action Panel is the primary action surface for selection-based commands (`Ctrl/Cmd+Shift+P`).
+### Search and document reading
 
-### Implicit Interactions
-*   **Drag & Drop:** Dropping folders onto the application window (Zone C) automatically adds them to the Index and starts ingestion.
-*   **Context Menus:** Right-clicking any result item opens a native-style menu with:
-    *   *Primary:* Open, Reveal in Explorer, Copy Path.
-    *   *AI:* Summarize, Find Similar.
-    *   *System:* Re-index File.
+The composer belongs to the Search window. Search, Ask and Delegate are explicit
+choices. Commands are available through the separate command palette.
 
-### AI Mode Switching
-The system exposes Online and indexing activity as runtime modes; they do not imply exclusive GPU ownership:
-*   **Online Mode:** LLM is loaded. Chat and Search QA are available, and ONNX encoders may remain GPU-resident and continue indexing/search work.
-*   **Indexing Mode:** Background embedding and enrichment work runs; the LLM may also be loaded. Both workloads share available GPU memory.
+Search uses a debounced quick pass and a refined pass on settle or Enter, with guards
+against superseded responses. Recent searches are reachable from the empty Search
+composer. The current filter disclosure accepts folder, modified-date and size bounds;
+active restrictions can be removed, and result facets use the shared filter state.
 
-**Transition:**
-*   Users can manually toggle via the "Brain" view (Settings).
-*   "Process pending enrichment" (Library header and the degradation-banner remedy) dispatches `core.trigger-offline-processing` through the catalog-driven `<jf-operation>`. Each operation runs one captured pass of up to 100 pending vision documents, starting the AI engine when needed, then hands pending embedding work to the indexing mode. Its durable operation record reports acknowledged processed/failed units and any blocked remainder; it completes only after procedure cleanup. An incomplete pass reports `ENRICHMENT_INCOMPLETE`. Completion describes that captured pass and the embedding handoff; future backlog and autonomous embedding completion remain visible through `/api/inference/status`. The user-visible label is defined once in `registry-operation.en.properties`.
+Results use the shared Lit `ResultsCard` renderer with snippets, result explanations and
+facet controls. In the Search window, opening a result and choosing it for an Ask are
+separate acts: a plain click opens the document; explicit selection controls choose files.
+The results can prepare an Ask about those chosen files.
 
-## 4. Visual Language & Accessibility
+Answers and their streaming activity appear in the conversation. Citations open the
+source in the document reading pane, with a citation witness when one is available.
+The pane loads extracted text through `/api/preview` and shows extraction provenance and
+available OCR/VDU evidence. Trust and context detail stays with the conversation
+and its context disclosures.
 
-### Glass Material
-*   Backgrounds use `backdrop-filter: blur(20px)` to blend with the desktop wallpaper.
-*   Borders are semi-transparent white (`rgba(255,255,255,0.1)`).
+### Keyboard and implicit actions
 
-### Typography
-*   **Font:** **System Native Stack.** The app inherits the OS font to feel like a built-in utility.
-    *   *Windows:* Segoe UI
-    *   *macOS:* San Francisco
-    *   *Linux:* System Default
-*   **Monospace:** JetBrains Mono (for paths, code, and hotkeys).
-*   **Scale:** Small (11px) for status, Regular (13px) for content, Large (16px) for headers.
+Use registered commands and keybindings for primary actions. In the composer, Enter
+submits at the chosen tier, Shift+Enter adds a newline and Ctrl/Cmd+Enter delegates;
+composition by an input method editor takes precedence. Tab follows reachable controls.
 
-### Categorical Semiotics
-Files are visually distinguished by subtle color coding on icons and borders to aid peripheral scanning:
-*   **Documents (PDF/Docx):** Muted Blue / Slate.
-*   **Images (PNG/JPG):** Muted Purple / Lavender.
-*   **Code (JS/Py):** Muted Teal / Cyan.
-*   **Data (CSV/Excel):** Muted Green / Emerald.
-*   **Archives (Zip):** Muted Orange / Amber.
+Dropping folders onto the shell dispatches the add-to-index action. Result context menus
+expose the actions appropriate to the result through the shared menu; do not promise a
+fixed list of commands on every item.
 
-### Theme System
-The UI supports three theme modes, selectable in Settings → Appearance:
-*   **System:** Follows the OS `prefers-color-scheme` media query. Listens for live OS changes via `matchMedia`.
-*   **Dark:** Default. Designed for the glassmorphic aesthetic.
-*   **Light:** Adapted glass surfaces, stronger borders, and inverted text primitives. All colors resolve through CSS custom property tokens in `tokens.css`.
+### AI activity and enrichment
 
-Theme preference is persisted to both `localStorage` (instant recall) and the backend settings API. A FOUC-prevention inline script in `<head>` reads the saved theme before the first paint.
+Online and indexing activity are runtime states, not exclusive GPU ownership: a loaded
+LLM and background encoders can share available GPU memory. AI Brain exposes the
+configuration and activity controls.
 
-#### Design Token Architecture
-All colors are defined as CSS custom properties in `tokens.css` (~90 semantic tokens + 10 primitives). Zero hardcoded theme-breaking colors in component code (1 intentional residual: the white toggle knob in the toggle control, `shell-v0/renderers/controls/ToggleSwitchRenderer.ts` / `<jf-toggle>`).
+“Process pending work” dispatches `core.trigger-offline-processing` through the
+catalog-driven `jf-operation`. Each operation runs one captured pass of up to 100 pending
+vision documents, starts the AI engine when needed, then hands pending embedding work to
+the indexing mode. Its durable operation record reports acknowledged processed/failed
+units and blocked remainder; it completes only after procedure cleanup. An incomplete
+pass reports `ENRICHMENT_INCOMPLETE`. Completion describes that pass and the embedding
+handoff; future backlog and autonomous embedding completion remain visible through
+`/api/inference/status`. The label is defined in `registry-operation.en.properties`.
 
-**Three-layer token system:**
-1.  **Primitives** — base values that switch per-theme:
-    *   `--p-glass` (RGB channels: white in dark, navy in light) — used by all glass/surface tokens
-    *   `--p-shadow` (RGB channels) — used by all shadow tokens
-    *   `--p-text` (RGB channels: white in dark, slate in light) — used by all text tokens
-    *   7 OKLCH hue constants (`--h-teal`, `--h-purple`, `--h-green`, `--h-amber`, `--h-red`, `--h-blue`, `--h-magenta`) — theme-invariant
-2.  **Semantic tokens** — purpose-named tokens composed from primitives (e.g., `--glass-surface: rgba(var(--p-glass), 0.06)`)
-3.  **Tailwind `@theme inline`** — maps tokens to utility classes (e.g., `bg-glass-surface`)
+## 4. Themes and accessibility
 
-Adding a 3rd theme requires overriding 3 RGB primitives + tuning per-theme lightness/chroma/opacity. Glass and text tokens auto-adapt.
+### Theme system
+
+The app follows the OS colour setting unless the user picks a theme. Settings → Appearance
+supports System, Dark and Light. System resolves `prefers-color-scheme` and follows live
+OS changes; Dark is an explicit choice, not the app's unconditional default.
+`index.html` samples the OS preference (or an explicit theme URL parameter) before the
+first paint; `state/themeState.ts` applies restored appearance and live changes.
+Appearance settings are restored through the settings API; palette selection is projected
+from the consolidated `UserStateDocument`.
+
+Shared colours use CSS custom properties in `styles/tokens.css`; Search also has the
+scoped vocabulary in `views/search-v3/sv3-tokens.css.ts`. The shared cascade has
+`core-theme`, `user-theme` and `user-override` layers, with accessibility overrides taking
+precedence. Primitive colours feed semantic surface, text and accent tokens; Tailwind's
+`@theme inline` maps shared tokens to utilities. Use the existing tokens rather than
+assuming a fixed token count, a single colour exception or a three-value recipe for
+another theme.
 
 ### Accessibility
-*   **High Contrast Mode:** A dedicated mode that removes transparency and enforces strict black/white contrast (detected via OS preference or manual toggle in Settings).
-*   **Focus Rings:** All interactive elements have visible focus states for keyboard navigation.
-*   **Hotkeys:** Global hotkeys are hinted in Zone E (Status Deck) when the `Alt` key is held.
-*   **ARIA Roles:** Result list uses `role="grid"` / `role="row"` / `role="gridcell"`. Context menus use `role="menu"` / `role="menuitem"`. Multi-select checkboxes use `role="checkbox"` with `aria-checked`.
-*   **Zone Focus Management:** Tab cycling between zones moves DOM focus to the target zone's primary element (input or container) via `requestAnimationFrame`, enabling immediate keyboard interaction after zone switch.
-*   **Destructive Action Confirmation:** Reset to Defaults and Restart Worker require a confirmation dialog (`warning` variant) before executing.
-*   **WCAG Contrast Verification:** All views pass WCAG AA color-contrast (4.5:1 normal text, 3:1 large text) in both dark and light themes, verified by `@axe-core/playwright` scans integrated into the evidence bundle capture script (`--a11y-scan` flag).
+
+- **Visible focus:** preserve keyboard focus rings and meaningful focus restoration when
+  closing dialogs. Focus is part of the interaction, not decorative teal.
+- **Contrast:** check WCAG AA contrast (4.5:1 for normal text, 3:1 for large text) in dark
+  and light themes. The contrast-matrix gate checks token pairings; `jsharness ui-a11y-gate`
+  checks measured axe results from rendered surfaces. A configured scan is not evidence
+  that every view passes.
+- **High contrast:** keep the app's high-contrast setting and OS forced-colours support
+  working. High-contrast overrides strengthen text/border contrast; OS forced-colours
+  also removes blur. Do not rely on transparency to convey state.
+- **Semantics:** use the roles the actual controls implement. Current result containers
+  use `list` / `listitem`, and shared menus use `menu` / `menuitem`.
+- **Destructive actions:** require a confirmation before destructive work. Settings'
+  Delete all data flow includes a typed DELETE confirmation; operation controls follow
+  their declared confirmation policy.

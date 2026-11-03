@@ -7,6 +7,9 @@ description: "Author a V1.5 plugin that runs in a SES Compartment, contributes a
 
 # Writing a JustSearch plugin
 
+> Customization (themes, skins, layouts, plugins and macros) is frozen for now.
+> What exists keeps working and gets fixes, but no new extension features are being added.
+
 This guide walks through writing a complete V1.5 plugin from
 scratch. Before you start, you should be familiar with:
 
