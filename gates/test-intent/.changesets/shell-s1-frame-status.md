@@ -956,3 +956,14 @@ deletion is the Obsolete entry here.
   "note": "Rejected: selecting a typed approval or plugin-consent request from the status panel while a lightweight approval is open leaves the security dialog non-modal and outside the top layer (real Chrome); the Adaptation entry drops existing assertions (SystemSelfView stale-row progress check); the new IndexingPause C7 check lacks named evidence. Transcribed by the orchestrator from the verifier's answer (Codex sandbox)."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a1a2d8-2a33-7311-bdea-29958ebbeda6",
+  "verdict": "accept",
+  "digest": "sha256:cf0e7037f27c393eb0ae955e4fc72a9112c31a5ce04396945406b0260955e8dd",
+  "note": "Round 2: 19 assertion failures reproduced before, 131 named checks pass after; A1 verified in Chromium across queue, panel and announcement paths; Adaptation oracle retained; C7 evidence valid. Transcribed by the orchestrator from the verifier's answer (Codex sandbox)."
+}
+```
