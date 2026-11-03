@@ -1168,3 +1168,14 @@ checks of this slice read a notice; R4 changes what names a folder row. No asser
   "note": "Rejected only entry 38 (dead-code baseline 8 -> 9 classified 'Structural rule kept' although the predicate is weaker). Everything else accepted: 30 assertion failures before, 143 named checks pass after, 17 Chromium security checks pass. Transcribed by the orchestrator; the entry was then reclassified as Incidental as the verifier asked."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a1a37e-8fa8-7971-9669-5348028cc136",
+  "verdict": "accept",
+  "digest": "sha256:fcfd63724f94781d6d307b3c3ac5e19a8b1df72937878722aca5ac08a887a01a",
+  "note": "Final acceptance on b4ee2624ce: the 38 earlier entries unchanged (accepted in rounds 2 and 4); three new Obsolete entries with production-removal sources; decision-record conflict search repeated, none. Transcribed by the orchestrator from the verifier's answer (Codex sandbox)."
+}
+```

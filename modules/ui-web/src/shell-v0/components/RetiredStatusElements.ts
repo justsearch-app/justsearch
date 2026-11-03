@@ -39,3 +39,6 @@ if (!customElements.get('jf-advisory-rail-badge')) customElements.define('jf-adv
 if (!customElements.get('jf-resolution-toast')) customElements.define('jf-resolution-toast', class extends HTMLElement {
   connectedCallback(): void { this.hidden = true; }
 });
+if (!customElements.get('jf-dispatch-source')) customElements.define('jf-dispatch-source', class extends HTMLElement {
+  connectedCallback(): void { this.hidden = true; }
+});
