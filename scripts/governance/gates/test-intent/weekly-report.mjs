@@ -230,14 +230,16 @@ export function reportFor({ repoRoot, ref, days, now = new Date() }) {
 /**
  * Append the rolling four-week counts to the GitHub job summary (the gate step calls this on every
  * CI run). Never throws: the counts are advisory and must not change the gate's verdict.
+ * Reuse analysis's report or error when supplied; early analysis exits still collect their own.
  * @returns {string|null} what was written, or null when there is no job summary to write to
  */
-export function writeStepSummary({ repoRoot, env = process.env }) {
+export function writeStepSummary({ repoRoot, env = process.env, rollingReport }) {
   const file = env.GITHUB_STEP_SUMMARY;
   if (!file) return null;
   let md;
   try {
-    md = renderMarkdown(reportFor({ repoRoot, ref: rollingRef(repoRoot), days: ROLLING_DAYS }));
+    if (rollingReport?.error) throw rollingReport.error;
+    md = renderMarkdown(rollingReport?.report ?? reportFor({ repoRoot, ref: rollingRef(repoRoot), days: ROLLING_DAYS }));
   } catch (e) {
     md = `# Test-intent counts\n\nNot available on this run: ${e.message.split('\n')[0]}\n`;
   }
