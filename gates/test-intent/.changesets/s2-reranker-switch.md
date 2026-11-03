@@ -980,3 +980,14 @@ verifier supplies acceptance after reviewing the final candidate. No acceptance 
   "note": "Audit by independent reviewer session reviewer-40 (Codex): accept, no must-fix. Transcribed by the orchestrator."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verifier-s2r-acc4",
+  "verdict": "accept",
+  "digest": "sha256:4b2a962e46fc9f94587177340a1451c5242ffc0813feaa2c79abd5f6bd98b0e4",
+  "note": "Acceptance by independent verifier session verifier-s2r-acc4 (Codex): accept, all entries. Transcribed by the orchestrator."
+}
+```
