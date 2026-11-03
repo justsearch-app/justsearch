@@ -323,3 +323,16 @@ Builder elapsed interval: 2026-11-03T13:42Z–16:16Z (about 2h 34m); assignment 
 Most elapsed time was shared Gradle-slot waiting and complete module suites.
 
 Final read-only check at 2026-11-03T16:16Z confirmed the owned run remains ACTIVE, HTTP-ready and worker-ready.
+
+## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a1a289-117e-7340-b932-a44ffe3845a3",
+  "verdict": "accept",
+  "digest": "sha256:b394220a5e971449cea2338e83dbfc6257b5c9e0e4aca4e2297973a64f045645",
+  "note": "Independent Codex verifier on 979e0e9b6b: all six entries accepted with the committed repair and preservation evidence; the code passed every C1a scenario and preservation item in the earlier independent verification (session 01a1a23a-21f1-7cd0-9913-ecf529e6b8f2)."
+}
+```
