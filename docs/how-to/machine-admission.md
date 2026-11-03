@@ -11,16 +11,16 @@ On Linux with Python 3.11+, run a **short scoring command** from the repository 
 
 ```bash
 python3 -I scripts/dev/admission.py exclusive --purpose 'search-quality scoring' --session eval-p3 \
-  --drain-timeout 120 --timeout 600 -- your-scoring-command
+  --drain-timeout 600 --timeout 600 -- your-scoring-command
 python3 -I scripts/dev/admission.py status
 ```
 
 The gate closes to new heavy work while existing heavy work drains. A drain timeout
 returns **75**, lists the holders' purposes, PIDs and start times, and reopens the gate.
-The gate never stays closed long: `--drain-timeout` is at most 120 seconds and
-`--timeout` at most 600, so drain plus window is at most 12 minutes. Waiting for the
+The gate never stays closed long: `--drain-timeout` is at most 600 seconds and
+`--timeout` at most 600, so drain plus window is at most 20 minutes. Waiting for the
 gate itself (behind another window) is bounded by `--gate-timeout` (default and
-maximum 720 seconds, every mode) and returns **75** with the window's holder listed.
+maximum 1200 seconds, every mode) and returns **75** with the window's holder listed.
 The scoring budget starts when the work lock is acquired, includes cleanup, defaults
 to 600 seconds. Deadline expiry returns **124**; the tool reserves
 a short part of the budget for TERM, KILL and reaping the command's descendants.

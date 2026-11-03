@@ -25,11 +25,11 @@ REFUSED = 75
 UNAVAILABLE = 73
 GRACE = 0.2
 POLL = 0.05
-# The agreed budget: the gate never stays closed for long (drain + window <= 12 minutes).
-MAX_DRAIN = 120
+# The agreed budget: drain + scoring window <= 20 minutes.
+MAX_DRAIN = 600
 MAX_WINDOW = 600
 MAX_GATE_WAIT = MAX_DRAIN + MAX_WINDOW
-MAX_HOOK = MAX_DRAIN
+MAX_HOOK = 120
 DEFAULT_HOOK = 60
 
 
@@ -371,7 +371,7 @@ def run_hook(command, env, timeout):
     subprocess.run(shlex.split(command), env=env, check=True, timeout=timeout)
 
 
-def pausable(args):
+def pausable_window(args, check):
     if nested(os.environ):
         raise ValueError("pausable cannot be nested inside an admission")
     root = directory()
@@ -385,13 +385,14 @@ def pausable(args):
         stack.callback(os.close, work)
         record = Record(root, "pausable", args.purpose, args.session, state="waiting")
         stack.callback(record.close)
-        if not lock(gate, fcntl.LOCK_SH, time.monotonic() + args.gate_timeout):
+        if not lock(gate, fcntl.LOCK_SH, time.monotonic() + args.gate_timeout, check):
             raise Refused(f"gate stayed closed for {args.gate_timeout:g} s; holders: {json.dumps(exclusive_rows(root))}")
-        lock(work, fcntl.LOCK_SH)
+        lock(work, fcntl.LOCK_SH, check=check)
         # Unlocking on pause applies to the shared open file, so the job's copy pauses too.
         child, group = spawn(args.command, env=env, pass_fds=(work, record.stream.fileno()))
 
         def running():
+            check()
             if child.poll() is not None:
                 raise ChildProcessError
 
@@ -400,6 +401,7 @@ def pausable(args):
             record.write(state="working", group=group)
             fcntl.flock(gate, fcntl.LOCK_UN)
             while child.poll() is None:
+                check()
                 if try_lock(gate, fcntl.LOCK_SH):
                     fcntl.flock(gate, fcntl.LOCK_UN)
                 else:
@@ -418,7 +420,7 @@ def pausable(args):
         except ChildProcessError:
             return child.wait()
         finally:
-            clean_group(group, child)
+            clean_descendants(child)
 
 
 def exclusive_window(args, check):
@@ -458,6 +460,16 @@ def exclusive_window(args, check):
 def exclusive(args):
     if nested(os.environ):
         raise ValueError("exclusive cannot be nested inside an admission")
+    return guarded(args, exclusive_window)
+
+
+def pausable(args):
+    if nested(os.environ):
+        raise ValueError("pausable cannot be nested inside an admission")
+    return guarded(args, pausable_window)
+
+
+def guarded(args, window):
     # The guardian owns the locks and the child. EOF from the CLI, even on SIGKILL,
     # triggers descendant cleanup BEFORE it closes the locks. No timestamp/PID reclaim.
     lifetime_read, lifetime_write = os.pipe()
@@ -472,7 +484,10 @@ def exclusive(args):
 
         try:
             subreaper()
-            code = exclusive_window(args, check)
+            code = window(args, check)
+        except Refused as error:
+            warn(str(error))
+            code = REFUSED
         except (OSError, ValueError) as error:
             print(f"admission: {error}", file=sys.stderr, flush=True)
             code = 73

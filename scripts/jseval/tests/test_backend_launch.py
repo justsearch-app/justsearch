@@ -36,7 +36,7 @@ def test_install_distribution_uses_shared_invoker_and_literal_argv(tmp_path):
         _install_distribution(root, {"JUSTSEARCH_MODELS_DIR": "models space"})
     args, options = run.call_args
     assert args[0] == ["node", str(root / "scripts/lib/tool-invoker.cjs"), "gradle",
-                       ":modules:ui:installDist", "-PskipWebBuild=true", "--quiet"]
+                       ":modules:ui:installDist", "-PskipWebBuild=true", "--quiet", "--no-daemon"]
     assert options["cwd"] == str(root)
     assert options["env"]["JUSTSEARCH_MODELS_DIR"] == "models space"
     assert not options.get("shell", False)

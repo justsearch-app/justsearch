@@ -212,6 +212,10 @@
     "group": "query-understanding"
   },
   {
+    "name": "quality",
+    "group": "quality"
+  },
+  {
     "name": "rag-eval",
     "group": "eval"
   },

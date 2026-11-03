@@ -79,8 +79,9 @@ def main_repo_root() -> Path:
     large shared assets (models, native runtime) resolve against the binary-bearing main
     tree rather than the worktree's pointer-only copy.
 
-    Mirrors ``scripts/dev/dev-runner.cjs`` ``resolveMainRepoRoot`` (tempdoc 618 §2 / 644
-    Axis 1). Falls back to ``REPO_ROOT`` when not in a worktree or on any parse failure.
+    Shared clones resolve their source checkout through Git's object alternates.
+    Otherwise falls back to ``REPO_ROOT`` on any parse failure. The linked-worktree
+    resolution mirrors ``scripts/dev/dev-runner.cjs`` ``resolveMainRepoRoot``.
     """
     git_path = REPO_ROOT / ".git"
     try:
@@ -92,6 +93,19 @@ def main_repo_root() -> Path:
                 git_dir = (REPO_ROOT / match.group(1)).resolve()
                 return git_dir.parents[2]
     except (OSError, IndexError):
+        pass
+    # A shared standalone clone has a .git directory, with its source object
+    # store recorded in alternates. It shares the same large assets as a linked
+    # worktree; its own models/ usually contains only tracked LFS pointers.
+    objects = git_path / "objects"
+    try:
+        for alternate in (objects / "info/alternates").read_text().splitlines():
+            store = (objects / alternate).resolve()
+            if store.name == "objects" and store.parent.name == ".git":
+                source = store.parent.parent
+                if (source / "scripts/jseval").is_dir():
+                    return source
+    except OSError:
         pass
     return REPO_ROOT
 
