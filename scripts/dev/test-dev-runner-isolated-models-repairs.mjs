@@ -7,6 +7,12 @@ import { createRequire } from 'node:module';
 import { pathToFileURL } from 'node:url';
 
 const require = createRequire(import.meta.url);
+// Hermetic: inherited JustSearch and JVM settings from the caller (CI sets JUSTSEARCH_PR_CI,
+// developers may set more) must not change what these tests observe.
+for (const name of Object.keys(process.env)) {
+  if (/^JUSTSEARCH_/.test(name) || /^(?:JAVA_OPTS|UI_OPTS|JDK_JAVA_OPTIONS|JAVA_TOOL_OPTIONS|_JAVA_OPTIONS)$/.test(name)) delete process.env[name];
+}
+
 // Run the same new checks against a detached before checkout without changing that tree.
 const repo = path.resolve(process.env.ISOLATED_MODELS_TEST_ROOT ?? path.join(import.meta.dirname, '../..'));
 const isolated = require(path.join(repo, 'scripts/dev/lib/isolated-models.cjs'));

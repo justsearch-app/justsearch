@@ -116,6 +116,7 @@ including `JUSTSEARCH_CONFIG` and `JUSTSEARCH_REPO_ROOT`. Only these variables a
 - `JUSTSEARCH_GH_BIN` selects the GitHub CLI for developer tooling; the Engine does not read it.
 - `JUSTSEARCH_DEV_MCP_REPO_ROOT` locates the MCP server's runner; the Engine does not read it.
 - `JUSTSEARCH_AGENT_IDENTITY_HANDOFF` carries caller ownership identity, with no configuration or storage paths.
+- `JUSTSEARCH_PR_CI` is CI's test-selection flag; only build and test tooling read it, never the Engine.
 
 The other exceptions are variables the runner sets itself: `JUSTSEARCH_DATA_DIR`, `JUSTSEARCH_HOME`,
 `JUSTSEARCH_MODELS_DIR`, `JUSTSEARCH_ORT_OPTIMIZED_CACHE_DIR`, `JUSTSEARCH_DEV_RUNNER_STATE_ROOT`

@@ -6,6 +6,12 @@ import { spawnSync } from 'node:child_process';
 import { createRequire } from 'node:module';
 
 const require = createRequire(import.meta.url);
+// Hermetic: inherited JustSearch and JVM settings from the caller (CI sets JUSTSEARCH_PR_CI,
+// developers may set more) must not change what these tests observe.
+for (const name of Object.keys(process.env)) {
+  if (/^JUSTSEARCH_/.test(name) || /^(?:JAVA_OPTS|UI_OPTS|JDK_JAVA_OPTIONS|JAVA_TOOL_OPTIONS|_JAVA_OPTIONS)$/.test(name)) delete process.env[name];
+}
+
 const api = require('./dev-runner.cjs').__test;
 const isolated = require('./lib/isolated-models.cjs');
 const repoRoot = path.resolve(import.meta.dirname, '../..');

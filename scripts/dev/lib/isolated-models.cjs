@@ -32,6 +32,7 @@ const ALLOWED_ENV = new Set([
   'JUSTSEARCH_GH_BIN', // Selects the GitHub CLI for developer tooling; the Engine does not read it.
   'JUSTSEARCH_DEV_MCP_REPO_ROOT', // Locates the MCP server's runner; the Engine does not read it.
   'JUSTSEARCH_AGENT_IDENTITY_HANDOFF', // Carries caller ownership identity, with no configuration or storage paths.
+  'JUSTSEARCH_PR_CI', // CI's test-selection flag; only build and test tooling read it, never the Engine.
 ]);
 
 function refuse(message) {
