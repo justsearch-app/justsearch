@@ -1075,6 +1075,60 @@ checks of this slice read a notice; R4 changes what names a folder row. No asser
           "label": "agent choice"
         }
       ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/components/DispatchSource.test.ts"
+      ],
+      "class": "Obsolete",
+      "removedChecks": "Checks of the retired dispatch-source presenter, its transport chrome, or the agent recall digest helper leave with their production files, which have no remaining production consumers.",
+      "sources": [
+        {
+          "kind": "removal",
+          "removed": [
+            "modules/ui-web/src/shell-v0/components/DispatchSource.ts",
+            "modules/ui-web/src/shell-v0/components/TransportChrome.ts",
+            "modules/ui-web/src/shell-v0/substrates/recall/agentRecall.ts"
+          ]
+        }
+      ],
+      "conflictSearch": "decision records searched for a conflict: none"
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/components/TransportChrome.test.ts"
+      ],
+      "class": "Obsolete",
+      "removedChecks": "Checks of the retired dispatch-source presenter, its transport chrome, or the agent recall digest helper leave with their production files, which have no remaining production consumers.",
+      "sources": [
+        {
+          "kind": "removal",
+          "removed": [
+            "modules/ui-web/src/shell-v0/components/DispatchSource.ts",
+            "modules/ui-web/src/shell-v0/components/TransportChrome.ts",
+            "modules/ui-web/src/shell-v0/substrates/recall/agentRecall.ts"
+          ]
+        }
+      ],
+      "conflictSearch": "decision records searched for a conflict: none"
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/substrates/recall/agentRecall.test.ts"
+      ],
+      "class": "Obsolete",
+      "removedChecks": "Checks of the retired dispatch-source presenter, its transport chrome, or the agent recall digest helper leave with their production files, which have no remaining production consumers.",
+      "sources": [
+        {
+          "kind": "removal",
+          "removed": [
+            "modules/ui-web/src/shell-v0/components/DispatchSource.ts",
+            "modules/ui-web/src/shell-v0/components/TransportChrome.ts",
+            "modules/ui-web/src/shell-v0/substrates/recall/agentRecall.ts"
+          ]
+        }
+      ],
+      "conflictSearch": "decision records searched for a conflict: none"
     }
   ]
 }
