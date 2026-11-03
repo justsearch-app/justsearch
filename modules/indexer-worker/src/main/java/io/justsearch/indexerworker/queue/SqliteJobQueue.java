@@ -3422,7 +3422,9 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
                 && source.stillCurrent(entry.path());
             if ((enumeration && enumerationSupersededByAcceptedMutation(
                 generation, normalizePath(entry.path()), entry.plannedSourceSha256(), normalizedCollection, current))
-                || (current && !entry.forceReindex() && identicalCandidateAdmission(generation, entry, normalizedCollection))) {
+                || (current && !entry.forceReindex()
+                    && (identicalCandidateAdmission(generation, entry, normalizedCollection)
+                        || (maintenance && attachCapturedCandidateReceipt(generation, entry, normalizedCollection))))) {
               superseded++;
             } else {
               admitted.add(entry);
@@ -3449,6 +3451,47 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
     } finally {
       unlockAfterChanges();
     }
+  }
+
+  /**
+   * First maintenance can supply the missing replay receipt for a recorded migration's captured
+   * member. The caller has validated the current source under the existing admission fence; the
+   * recorded generation naming rule supplies the walk-to-target proof. Native generation names
+   * have no such binding. Write only the receipt: even a claimed member's complete row and walk
+   * progress must stay untouched.
+   */
+  private boolean attachCapturedCandidateReceipt(String generation, JobQueue.EnqueueEntry entry,
+      String collection) throws SQLException {
+    if (releaseRecovery != null && releaseRecovery.retiringBuild()) return false;
+    try (var query = connection.prepareStatement("""
+        SELECT j.unit_revision FROM jobs j
+        JOIN ingestion_walk_progress w ON w.operation_key = j.scan_id
+        WHERE j.path = ? AND ? = 'g-' || j.scan_id
+          AND w.captured_plan = 1 AND w.enumeration_outcome = 'COMPLETE'
+          AND w.manifest_sha256 IS NOT NULL AND w.sealed_at IS NULL
+          AND j.walk_seen_epoch BETWEEN 1 AND w.enumeration_epoch
+          AND j.state IN ('PENDING', 'PROCESSING')
+          AND j.planned_source_sha256 = ? AND j.admitted_source_sha256 = ?
+          AND j.collection IS ? AND j.ingestion_root IS ?
+          AND NOT EXISTS (SELECT 1 FROM switch_buffer b
+              WHERE b.generation = ? AND b.key = 'path:' || j.path)
+        """)) {
+      query.setString(1, normalizePath(entry.path()));
+      query.setString(2, generation);
+      query.setString(3, entry.plannedSourceSha256());
+      query.setString(4, entry.plannedSourceSha256());
+      query.setString(5, collection);
+      query.setString(6, PathNormalizer.normalizeKey(entry.ingestionRoot()));
+      query.setString(7, generation);
+      try (var row = query.executeQuery()) {
+        if (!row.next()) return false;
+        String revision = row.getString(1);
+        if (revision == null || revision.startsWith("release030")
+            || revision.startsWith("root1:") || revision.startsWith("root2:")) return false;
+      }
+    }
+    bufferAdmittedFile(generation, entry);
+    return true;
   }
 
   /** Repeated enumeration retains the exact candidate receipt, including completed work. */
