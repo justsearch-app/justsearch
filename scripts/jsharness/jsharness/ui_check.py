@@ -576,6 +576,31 @@ def _cite_card_selected_selector(escaped_key: str) -> str:
     return f'button.source[data-cite-key="{escaped_key}"][data-selected][aria-current="true"]'
 
 
+async def _status_notice_slot(page):
+    """The ONE element a frame notice shows in right now: `(locator, placement)`.
+
+    Frame status S1 retired the advisory toast host: an ephemeral advisory shows IN the title-bar
+    pill, or BESIDE it while a more urgent state holds the pill (`transientPlacement`). The slot
+    is read off the pill's own resting kind, so a capture asserts the exact placement the product
+    is meant to use rather than accepting either. Raises when a notice is already showing — a
+    pre-existing notice would make any later witness ambiguous.
+    """
+    trigger = page.locator(S.CSS_STATUS_PILL_TRIGGER)
+    await trigger.wait_for(state="visible", timeout=10_000)
+    classes = (await trigger.get_attribute("class") or "").split()
+    if "notice" in classes or await page.locator(S.CSS_STATUS_NOTICE_BESIDE).count() != 0:
+        raise AssertionError(f"a frame notice is already showing before the probe: {classes!r}")
+    if any(kind in classes for kind in S.STATUS_PILL_URGENT_KINDS):
+        return page.locator(S.CSS_STATUS_NOTICE_BESIDE), "beside"
+    return page.locator(S.CSS_STATUS_NOTICE_IN_PILL), "pill"
+
+
+async def _visible_status_notices(page) -> int:
+    """How many frame-notice elements are visible (pill and beside slots together)."""
+    return (await page.locator(S.CSS_STATUS_NOTICE_IN_PILL + ":visible").count()
+            + await page.locator(S.CSS_STATUS_NOTICE_BESIDE + ":visible").count())
+
+
 # ---------------------------------------------------------------------------
 # Step registry — all screenshots declared here
 # ---------------------------------------------------------------------------
@@ -615,7 +640,7 @@ def _build_steps(ui_url: str, cooldown_ms: int, timeout_ms: int) -> list[Step]:
         await page.get_by_text("Install update", exact=True).wait_for()
 
     async def setup_engine_admission_wait(page):
-        """Exercise the real admission-wait emitter and its mounted toast projection."""
+        """Exercise the real admission-wait emitter and its status-pill projection."""
         await page.evaluate(
             """() => {
               const events = [];
@@ -644,6 +669,8 @@ def _build_steps(ui_url: str, cooldown_ms: int, timeout_ms: int) -> list[Step]:
               globalThis.__justsearchReportAdmissionWait = reportAdmissionWait;
             """,
         )
+        slot = await _status_notice_slot(page)
+        earlier_before = await page.locator(S.CSS_STATUS_EARLIER_LOCAL_ROW).count()
         emitted = await page.evaluate(
             """() => {
               if (typeof globalThis.__justsearchReportAdmissionWait !== 'function') {
@@ -663,19 +690,42 @@ def _build_steps(ui_url: str, cooldown_ms: int, timeout_ms: int) -> list[Step]:
         if any(event.get("supersede") is not True for event in emitted):
             raise AssertionError(f"admission-wait emissions did not supersede: {emitted!r}")
 
-        toast = page.locator(S.CSS_TOAST)
-        await toast.first.wait_for(state="visible", timeout=10_000)
+        # The retired toast stack showed every live record, so "one visible toast" witnessed the
+        # supersede. The pill shows one notice at a time by construction, so the supersede witness
+        # moves to the record set: the status panel's Earlier section keeps every local record
+        # that was not superseded, and must have gained exactly ONE admission-wait row.
+        notice, placement = slot
+        latest = "JustSearch is preparing an update. Waiting to reconnect."
+        earlier = page.locator(S.CSS_STATUS_EARLIER_LOCAL_ROW)
+        await notice.filter(has_text=latest).wait_for(state="visible", timeout=10_000)
         await asyncio.sleep(0.2)
-        if await toast.count() != 1:
-            raise AssertionError("same-class admission waits must leave one visible toast")
-        toast_text = await toast.first.inner_text()
-        if "preparing an update" not in toast_text:
-            raise AssertionError(f"latest admission-wait notice was not rendered: {toast_text!r}")
-        notice = toast.first.locator("jf-system-notice")
-        if await notice.get_attribute("tone") != "neutral":
+        if await _visible_status_notices(page) != 1:
+            raise AssertionError("same-class admission waits must leave one visible notice")
+        notice_text = await notice.inner_text()
+        if "preparing an update" not in notice_text:
+            raise AssertionError(f"latest admission-wait notice was not rendered: {notice_text!r}")
+        if await earlier.count() != earlier_before + 1:
+            raise AssertionError(
+                f"same-class admission waits must keep one Earlier row, got "
+                f"{await earlier.count() - earlier_before} new rows"
+            )
+        wait_row = earlier.filter(has_text="preparing an update")
+        if await wait_row.count() != 1 or await earlier.filter(has_text="JustSearch is busy").count() != 0:
+            raise AssertionError("the superseded admission wait must not remain in Earlier")
+        # The notice's own tone is the record's: the Earlier row's state icon carries it.
+        if await wait_row.locator(".state-icon").get_attribute("data-tone") != "neutral":
             raise AssertionError("informational admission wait must use the canonical neutral tone")
-        if await notice.get_attribute("live") != "status":
-            raise AssertionError("admission-wait toast must use polite status announcement")
+        if placement == "pill":
+            badge_tone = await page.locator(S.CSS_STATUS_PILL_BADGE).evaluate("el => el.tone")
+            if badge_tone != "neutral":
+                raise AssertionError(f"pill notice for an informational wait was tinted {badge_tone!r}")
+        polite = await page.locator(S.CSS_STATUS_POLITE_ANNOUNCER).text_content() or ""
+        assertive = await page.locator(S.CSS_STATUS_ASSERTIVE_ANNOUNCER).text_content() or ""
+        if latest not in polite or "preparing an update" in assertive:
+            raise AssertionError(
+                f"admission-wait notice must use polite status announcement: polite={polite!r} "
+                f"assertive={assertive!r}"
+            )
 
     # === Shared-browser chain (sequential, depends_on linkage) ===
 
@@ -1264,18 +1314,30 @@ def _build_steps(ui_url: str, cooldown_ms: int, timeout_ms: int) -> list[Step]:
         await _type_and_search(page)
         await page.locator(S.CSS_SV3_RESULT_ROW).first.click()
         await page.locator("jf-document-pane :is(.blocks, .source)").wait_for(state="visible", timeout=15_000)
-        if await page.locator(S.CSS_TOAST + ":visible").count() != 0:
-            raise AssertionError("ambient toasts invalidate the exact cap witness")
+        # Exact witness: no notice showing and no local record in Earlier before the probe, so the
+        # three rows and the one notice below are the probe's own.
+        notice, _placement = await _status_notice_slot(page)
+        earlier = page.locator(S.CSS_STATUS_EARLIER_LOCAL_ROW)
+        if await earlier.count() != 0:
+            raise AssertionError("ambient local notices invalidate the exact witness")
         await page.evaluate("""() => {
             for (let i = 0; i < 3; i++) document.dispatchEvent(new CustomEvent('jf-advisory-ephemeral', {
-                detail: {message: `Occlusion probe toast ${i + 1}`, severity: 'error', supersede: false},
+                detail: {message: `Occlusion probe notice ${i + 1}`, severity: 'error', supersede: false},
                 bubbles: true,
             }));
         }""")
-        await page.locator(S.CSS_TOAST).nth(2).wait_for(state="visible")
+        # The newest notice takes the one slot; all three stay in Earlier. The retired toast stack's
+        # "three visible, no overflow summary" has no counterpart: the pill never stacks, which
+        # is what "exactly one visible notice" asserts instead.
+        await notice.filter(has_text="Occlusion probe notice 3").wait_for(state="visible")
         await asyncio.sleep(0.3)
-        if await page.locator(S.CSS_TOAST + ":visible").count() != 3 or await page.get_by_test_id("toast-more").is_visible():
-            raise AssertionError("expected exactly three visible toasts without overflow summary")
+        if await _visible_status_notices(page) != 1:
+            raise AssertionError("expected exactly one visible frame notice")
+        if await earlier.count() != 3:
+            raise AssertionError(f"expected three Earlier rows for the probe, got {await earlier.count()}")
+        for i in range(3):
+            if await earlier.filter(has_text=f"Occlusion probe notice {i + 1}").count() != 1:
+                raise AssertionError(f"Earlier is missing probe notice {i + 1}")
 
     async def setup_sv3_composer_occlusion(page):
         # Tempdoc 859 §B — the measured half of "the composer floats over the transcript".

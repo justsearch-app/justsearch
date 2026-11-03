@@ -510,7 +510,7 @@ class TestRegisterAndCaptureAgreeOnSelectors:
         from jsharness import ui_measure
 
         sels = ui_measure._find_proportion_baseline().get("chat-occlusion") or []
-        assert ".toast" in sels
+        assert "button.trigger.notice" in sels
         assert '[data-testid="sv3-topbar"]' in sels, "the overlap counterpart must be captured, not just named"
         assert '[data-testid="sv3-main-scroller"]' in sels
 
