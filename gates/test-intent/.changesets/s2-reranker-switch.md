@@ -7,7 +7,7 @@ author-session: s2-reranker-builder-20261102
 
 # Test-intent entries
 
-The before-only patches add inert scaffolding so checks can execute on their before-states: `s2-reranker-settings-api.patch` adds a nullable wire property on 551357f754, and `s2-reranker-preference-revision.patch` adds an always-zero, unserialized choice revision accessor on 9a81be19f4. Neither changes installer, resolution, activation or settings behavior. The independent
+The before-only patches add inert scaffolding so checks can execute on their before-states: `s2-reranker-settings-api.patch` adds a nullable wire property on 551357f754, and `s2-reranker-preference-revision.patch` adds an always-zero, unserialized choice revision accessor on 9a81be19f4. The CUDA before-only patch `s2-reranker-candidate-plan-api.patch` adds a preparation overload that delegates to the historical method without invoking its new callback, plus an inert stage method, on 8613d76e02. These patches change no historical installer, resolution, activation, settings or device-plan behavior. The independent
 verifier supplies acceptance after reviewing the final candidate. No acceptance is recorded here.
 
 ```json
@@ -256,7 +256,7 @@ verifier supplies acceptance after reviewing the final candidate. No acceptance 
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/RerankerSwitchTest.java"
       ],
       "class": "New",
-      "behaviour": "Enabling without a selectable reranker is refused by query-role selection rather than accepting a disabled role. Switching on now arrives as a path change of the retained directory (redesign decision A), so the exact-identity restore check selects through that route; its expected exact custom identity is unchanged.",
+      "behaviour": "Enabling without a selectable reranker is refused by query-role selection rather than accepting a disabled role. Switching on is the switch, not a model-path change: the exact-identity restore check passes pathChanged=false and restores the retained custom identity.",
       "sources": [
         {
           "kind": "owner-adopted-scenario",
@@ -515,7 +515,7 @@ verifier supplies acceptance after reviewing the final candidate. No acceptance 
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/RerankerSwitchOnCudaTest.java"
       ],
       "class": "New",
-      "behaviour": "Switching on with a CUDA reranker from a published device-memory plan without a reranker budget: once memory admission passed, the preparation warms under the candidate configuration's staged plan and realizes CUDA with the retained files; an abandoned or refused switch-on puts the published plan back.",
+      "behaviour": "Switching on with a CUDA reranker from a published device-memory plan without a reranker budget: once memory admission passed, the preparation warms under the candidate configuration's staged plan and realizes CUDA with the retained files; an abandoned or refused switch-on puts the published plan back. This mock-session check exercises the real query-role preparation and device-plan state; it does not run a native CUDA session. The before-only compatibility patch leaves historical preparation unchanged and supplies inert API scaffolding.",
       "sources": [
         {
           "kind": "owner-adopted-scenario",
@@ -532,11 +532,12 @@ verifier supplies acceptance after reviewing the final candidate. No acceptance 
           "label": "agent-drafted, owner-adopted"
         }
       ],
-      "evidence": "gates/test-intent/evidence/s2-reranker-round3-new.json",
+      "evidence": "gates/test-intent/evidence/s2-reranker-cuda-repair.json",
       "newChecks": [
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/RerankerSwitchOnCudaTest.java#switchingOnRealizesCudaUnderTheStagedCandidatePlan",
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/RerankerSwitchOnCudaTest.java#aRefusedSwitchOnPutsThePublishedPlanBack"
-      ]
+      ],
+      "repaired": true
     },
     {
       "items": [
@@ -725,21 +726,54 @@ verifier supplies acceptance after reviewing the final candidate. No acceptance 
       "items": [
         "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceReasonCodeContractTest.java"
       ],
-      "class": "Adaptation",
-      "moved": [
-        "input re-encoding"
-      ],
-      "whatMoved": "The chunk-side recall-complete gap case now names the cross-encoder its splice exists for: the search request sets cross_encoder_enabled, which is what a Head search with a reranker sends. The corpus, the collapse multiplier, the flag off/on comparison, the limit and both assertions (collapse-dropped parent absent with the flag off, rescued into the judge window with it on) are unchanged.",
+      "class": "Obsolete",
+      "behaviour": "Retire the old precondition and expectation: with no cross-encoder, turning index.hybrid.chunk_leg_recall_complete_enabled on rescued the collapse-dropped parent p-d into results. Adding setCrossEncoderEnabled(true) changes that precondition; it is not input re-encoding. ShortPageRankingDepthTest#chunkRecallCompleteLeavesPagesWithoutCrossEncoderAlone now asserts that the flag leaves pages without a cross-encoder alone. The doc-side leg recall splice (index.hybrid.leg_recall_complete_enabled, default true) now also runs only with a cross-encoder, which slightly changes ranking for every install without a reranker. This is the recorded agent choice under R1, not preservation licensed by N1.",
       "sources": [
         {
           "kind": "owner-adopted-scenario",
           "task": "t-20261101-uiimpl",
-          "scenario": "N1",
-          "quote": "Answers on/off (core.set-chat-enabled) keeps files and its meaning; search by exact words and by meaning, indexing and its pacing, energy and manual pause rules, GPU-pressure handling and picture-reading back-off work as today; installs, consent, decline and Repair of parts not switched keep today’s behaviour.",
+          "scenario": "R1",
+          "quote": "After install, Best match first has a live switch (sentence and path). Off: searches and the answer context stop using the reranker within one change, no Engine restart, results stay usable (earlier ordering); files kept; the page says \"Off - files kept\". On: reranking returns with the same model files.",
           "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed accordingly",
+          "delegationLocation": "task t-20261101-uiimpl user turn proceed accordingly",
+          "delegationScope": "The Best match first work under the owner-adopted scenarios, including R1: results without the reranker stay usable.",
+          "choice": "Task t-20261101-uiimpl, round-decision sequence 2 decision B: \"the splice applies only when a cross-encoder reranks\". This is the recorded agent choice for the usable fused ordering without a reranker.",
+          "label": "agent choice"
         }
       ],
-      "evidence": "gates/test-intent/evidence/s2-reranker-round2-new.json"
+      "conflictSearch": "Searched docs/decisions with rg -n -i 'rerank|cross.encoder|recall.complete|leg.recall|splice'. No decision found requiring the doc-side or chunk-side recall splice without a cross-encoder; no conflicting decision found. R1 and the recorded agent choice supply the reason for retiring the old expectation."
+    },
+    {
+      "items": [
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceReasonCodeContractTest.java"
+      ],
+      "class": "New",
+      "behaviour": "With cross_encoder_enabled=true, the chunk-side recall-complete check still compares the same corpus, collapse multiplier and limit: p-d is absent with the flag off and rescued into the cross-encoder judge window with it on. Without a cross-encoder the splice no longer runs, as checked separately by ShortPageRankingDepthTest#chunkRecallCompleteLeavesPagesWithoutCrossEncoderAlone (s2-reranker-round3-depth.json). The doc-side leg recall splice (index.hybrid.leg_recall_complete_enabled, default true) likewise now requires a cross-encoder; this slightly changes ranking for every install without a reranker.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "R1",
+          "quote": "After install, Best match first has a live switch (sentence and path). Off: searches and the answer context stop using the reranker within one change, no Engine restart, results stay usable (earlier ordering); files kept; the page says \"Off - files kept\". On: reranking returns with the same model files.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed accordingly",
+          "delegationLocation": "task t-20261101-uiimpl user turn proceed accordingly",
+          "delegationScope": "The Best match first work under the owner-adopted scenarios, including R1: results without the reranker stay usable.",
+          "choice": "Task t-20261101-uiimpl, round-decision sequence 2 decision B: \"the splice applies only when a cross-encoder reranks\". This is the recorded agent choice for the usable fused ordering without a reranker.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/s2-reranker-round2-new.json",
+      "newChecks": [
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceReasonCodeContractTest.java#chunkSideRecallComplete_rescuesLegTopNParentDroppedByCollapse"
+      ]
     },
     {
       "items": [

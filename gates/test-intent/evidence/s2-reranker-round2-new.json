@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
   },
-  "createdAt": "2026-11-03T08:31:09.654Z",
-  "revision": "6f770ee77de1258d727a4f278cb8effc68730257",
-  "tree": "4646f7f5dacf58edc78ac746b2d405d9f07e4788",
+  "createdAt": "2026-11-03T12:12:54.926Z",
+  "revision": "def240961f76fa637a52e968263b1e8914f66925",
+  "tree": "173e6e0f158ef98b09da665597a18518555b80c8",
   "environment": {
     "platform": "linux",
     "arch": "x64",
@@ -21,13 +21,13 @@
       "command": "./gradlew :modules:indexer-worker:test --tests \"io.justsearch.indexerworker.server.RerankerSwitchOnCudaTest.switchingOnRealizesCudaUnderTheStagedCandidatePlan\" --tests \"io.justsearch.indexerworker.server.RerankerSwitchOnCudaTest.aRefusedSwitchOnPutsThePublishedPlanBack\" --tests \"io.justsearch.indexerworker.server.RerankerSwitchRetainedSelectionTest.switchingOnRefusesWhenTheRetainedFilesChanged\" --tests \"io.justsearch.indexerworker.server.RerankerSwitchTest.onRestoresExactCustomIdentityInsteadOfProbingAnotherVariant\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 5435
+      "durationMs": 35121
     },
     {
       "command": "./gradlew :modules:worker-services:test --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceReasonCodeContractTest.chunkSideRecallComplete_rescuesLegTopNParentDroppedByCollapse\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 3010
+      "durationMs": 5362
     }
   ],
   "checks": [
@@ -35,7 +35,7 @@
       "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/RerankerSwitchOnCudaTest.java#switchingOnRealizesCudaUnderTheStagedCandidatePlan",
       "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/RerankerSwitchOnCudaTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:e9632c512388d3767d775d2b1249ab56243015425837a8e7c28fb9efa7c4647e",
+      "contentDigest": "sha256:c85d0dabd7b18795e8508e8594009c90ca4a37aa3dd0651a35916f2c3cd24eb5",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -50,7 +50,7 @@
       "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/RerankerSwitchOnCudaTest.java#aRefusedSwitchOnPutsThePublishedPlanBack",
       "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/RerankerSwitchOnCudaTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:e9632c512388d3767d775d2b1249ab56243015425837a8e7c28fb9efa7c4647e",
+      "contentDigest": "sha256:c85d0dabd7b18795e8508e8594009c90ca4a37aa3dd0651a35916f2c3cd24eb5",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -108,5 +108,5 @@
     }
   ],
   "failBefore": null,
-  "digest": "sha256:3eba57a40b6da370e20000d1364d24268db04cf880a150470458819c5ddd0379"
+  "digest": "sha256:fcdd6d6fd4a6d18f6c9de0ecb3ff80ff0ebb51bf81c936ab1a4a718965d57a08"
 }
