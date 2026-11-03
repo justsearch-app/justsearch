@@ -30,7 +30,8 @@ function fixture(name) {
     fs.cpSync(path.join(repo, relative), path.join(fake, relative), { recursive: true });
   }
   const invalidRuntime = path.join(fake, 'not-executable');
-  fs.writeFileSync(invalidRuntime, 'invalid');
+  // A directory is not a regular file on any platform; a non-executable file still passes on Windows.
+  fs.mkdirSync(invalidRuntime);
   const env = { ...process.env, JUSTSEARCH_SERVER_EXE: invalidRuntime,
     JS_ADMISSION_DIR: path.join(fake, 'admission'), JUSTSEARCH_DEV_RUNNER_STATE_ROOT: path.join(fake, 'state') };
   return { fake, env, data: path.join(fake, 'modules/ui-web/.dev-data') };
