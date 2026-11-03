@@ -135,18 +135,25 @@ That user is the trust boundary; another local account is outside it. See ADR-00
 second-account access require platform verification in addition to source probes.
 
 **Packaged app: the manifest token is not the operator.** It permits read/search and untrusted
-requests. Approvals, operation/family grant creation, plugin trust and agent-autonomy increases
-require the app window's separate per-boot credential. A caller with only the manifest token cannot
+requests through the operation-invoke route and MCP. State-changing HTTP methods (POST, PUT, PATCH,
+DELETE) under `/api/**` require the app window's separate per-boot credential by default, before any
+controller runs. One explicit allowlist in `WindowAuthority` permits read-like POSTs, grant revocation
+and pending rejection, and the operation-invoke route whose intent lattice already treats outside
+callers as untrusted. GET, HEAD and OPTIONS are unaffected; `/mcp` retains its protocol and intent
+checks. New state-changing API routes inherit the refusal. A caller with only the manifest token cannot
 turn a transport header or client label into a button, rail or palette click. Medium-risk operations
 without a covering grant prompt in the app. Routes with no pending flow refuse with
-`WINDOW_CREDENTIAL_REQUIRED` (403): the direct folder-add API and settings writes. Use the app. Pending actions wait and expire
-without a window approving them. The approval bridge remains event-only: actions announced while
+`WINDOW_CREDENTIAL_REQUIRED` (403), including direct folder-add, policy creation/allowlist updates,
+AI install/repair, pack import, runtime activation and settings writes. The legacy REST MCP bridge's
+search, status, retrieve-context and match-citations calls remain available; its direct ingest call
+is refused with 403. Use operation invocation or MCP for the existing pending-approval flow.
+Pending actions wait and expire without a window approving them. The approval bridge remains event-only: actions announced while
 it is disconnected are not recovered here.
 
 The shell requests the window credential at production Engine spawn. The Engine delivers it once
 through its stdout pipe; the shell consumes that record before logging and holds the credential
 in memory. Only the shell's existing webview command supplies it to the UI. It never enters the
-runtime manifest/history, public discovery, HTTP API responses, logs or diagnostics. It rotates on
+runtime manifest/history, public discovery, HTTP API responses, logs or diagnostics exports. It rotates on
 every Engine boot, independently of the manifest token. Deep links retain URL provenance even when
 the webview attaches this credential; receiving a link is not a click.
 
@@ -158,7 +165,10 @@ exact pending operation and arguments, are single use, and expire after five min
 **Accepted residuals:** another same-user process can edit saved grants or the plugin allowlist;
 these files are not authenticated. Existing entries, including earlier self-grants that cannot be
 distinguished from genuine approvals, survive upgrades unchanged. The window credential lives in
-Engine, shell and webview memory, and release devtools can expose it. On Linux a same-user process
+Engine, shell and webview memory, and release devtools can expose it. An Engine OOM heap dump
+can also expose it: the shell's `lib.rs` enables JVM heap dumps, which
+can contain the credential. This crash-artifact exception outlives the crashed process; the credential
+rotates on restart, so an old dump does not authorize the next Engine. On Linux a same-user process
 able to open the Engine stdout pipe through `/proc` could race the shell for its one delivery;
 after the shell consumes the bytes, the pipe retains no readable credential record. This is not
 isolation from a process that can inspect or alter the app's memory or saved files.

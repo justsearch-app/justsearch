@@ -14,13 +14,18 @@ link started were classed as a click (shown by mutation in the builder report). 
 source-document regression check in `scripts/sandbox/window-credential-docs.test.mjs` (outside
 product test-intent scope).
 
-The five new test files are isolated new sources (exempt); their entries are kept so their
+The new test files are isolated new sources (exempt); their entries are kept so their
 fail-before evidence is recorded by the script. Only the Rust test module, the register count and
 the add-watched-root risk value (catalog test and operation-wire golden) need entries. The golden
 is overlaid onto the before-state so its conformance check compares the base catalog with the new
 value. N1 for the raised operation already held on the base, so its check has no fail-before. For Rust fail-before, the compatibility patch exposes only new API shapes, keeps the
 old session-only stdout filtering and supplies no window authority; the overlaid
 `justsearch-bound-exec` helper is the CI-built native fixture the shell's spawn tests need.
+
+The default-deny evidence uses the evidence runner with a temporary adaptation that creates and
+removes a shared clone for the before-state, instead of registering a worktree in the source
+repository. Its producer script digest records that adaptation; check execution and result parsing
+are unchanged. The before-state is `dcce080acd`, with only the new test source overlaid.
 
 ```json
 {
@@ -332,6 +337,66 @@ old session-only stdout filtering and supplies no window authority; the overlaid
         "signature"
       ],
       "whatMoved": "One register count. packagedRegisterIsTheRepositoryRegister counts 290 register entries instead of 289: the one added entry is justsearch.windowCredential (restart-required), the shell's launch request for the window credential; the byte comparison with the repository register and the explicit scope assertions are unchanged."
+    },
+    {
+      "items": [
+        "modules/ui/src/test/java/io/justsearch/ui/api/ProductionWindowRouteBoundaryTest.java"
+      ],
+      "class": "New",
+      "behaviour": "S1-S5 default-deny: the real production LocalApiServer and Head assembly (including ResourceApiModule, MCP and worker-ready RAG routes) enumerate every registered mutation route. Token-only and wrong-window requests to non-allowlisted /api routes return 403 WINDOW_CREDENTIAL_REQUIRED before controllers. Explicit checks cover policy creation and allowlist updates in unmanaged and machine-managed states, install start and repair, pack import and runtime activation. A newly registered handler is closed for POST, PUT, PATCH and DELETE, including accepted path variants; its window requests work and GET/HEAD/OPTIONS keep their existing behavior.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "open a task record and proceed accordingly with the remainign work",
+          "delegationLocation": "task t-20261102-agent-approval request",
+          "delegationScope": "start the fix for the self-approval defect (any same-user program holding the session token can approve its own pending actions or create grants without the person seeing a prompt) as its own task, answering the orchestrator's question 'Should I start that fix as its own task?'",
+          "choice": "S1-S5 default-deny: new state-changing /api routes require the app window by default; only one explicit, reasoned token-only allowlist survives.",
+          "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "open a task record and proceed accordingly with the remainign work",
+          "delegationLocation": "task t-20261102-agent-approval request",
+          "delegationScope": "start the fix for the self-approval defect (any same-user program holding the session token can approve its own pending actions or create grants without the person seeing a prompt) as its own task, answering the orchestrator's question 'Should I start that fix as its own task?'",
+          "choice": "S4/S5: policy creation and pack-manifest allowlist update, AI install start/repair, pack import and runtime activation cannot change state for a token-only caller, including machine-managed and unmanaged policy installs.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/window-credential-default-deny.json",
+      "newChecks": [
+        "modules/ui/src/test/java/io/justsearch/ui/api/ProductionWindowRouteBoundaryTest.java#s1ToS5EveryRegisteredMutationDefaultsToWindowAuthority",
+        "modules/ui/src/test/java/io/justsearch/ui/api/ProductionWindowRouteBoundaryTest.java#s4PolicyCreateUnmanagedIsRefusedBeforeWriting",
+        "modules/ui/src/test/java/io/justsearch/ui/api/ProductionWindowRouteBoundaryTest.java#s4PolicyAllowlistUnmanagedIsRefusedBeforeWriting",
+        "modules/ui/src/test/java/io/justsearch/ui/api/ProductionWindowRouteBoundaryTest.java#s4PolicyCreateManagedIsRefusedBeforeReadingPolicy",
+        "modules/ui/src/test/java/io/justsearch/ui/api/ProductionWindowRouteBoundaryTest.java#s4PolicyAllowlistManagedIsRefusedBeforeReadingPolicy",
+        "modules/ui/src/test/java/io/justsearch/ui/api/ProductionWindowRouteBoundaryTest.java#s4AiInstallStartIsRefusedBeforeDownloads",
+        "modules/ui/src/test/java/io/justsearch/ui/api/ProductionWindowRouteBoundaryTest.java#s4AiInstallRepairIsRefusedBeforeDownloads",
+        "modules/ui/src/test/java/io/justsearch/ui/api/ProductionWindowRouteBoundaryTest.java#s4PackImportIsRefusedBeforeStartingAnImport",
+        "modules/ui/src/test/java/io/justsearch/ui/api/ProductionWindowRouteBoundaryTest.java#s5RuntimeActivationIsRefusedBeforeActivating",
+        "modules/ui/src/test/java/io/justsearch/ui/api/ProductionWindowRouteBoundaryTest.java#s1ToS5NewRoutesAndAllMutationMethodsAreClosedBeforeTheirHandler"
+      ],
+      "repaired": true
+    },
+    {
+      "items": [
+        "modules/ui/src/test/java/io/justsearch/ui/api/ProductionWindowRouteBoundaryTest.java"
+      ],
+      "class": "New",
+      "behaviour": "Preservation for S1-S5 default-deny: the app window can still mutate with its credential; headless mode keeps token-as-operator, and development ignores even a builder-supplied window credential. The real production assembly is used in all three modes.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "open a task record and proceed accordingly with the remainign work",
+          "delegationLocation": "task t-20261102-agent-approval request",
+          "delegationScope": "start the fix for the self-approval defect (any same-user program holding the session token can approve its own pending actions or create grants without the person seeing a prompt) as its own task, answering the orchestrator's question 'Should I start that fix as its own task?'",
+          "choice": "S1-S5 default-deny (N1 preservation): app-window actions keep working; headless (no shell flag) and development mode retain their existing mutation access.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/window-credential-default-deny-modes.json",
+      "newChecks": [
+        "modules/ui/src/test/java/io/justsearch/ui/api/ProductionWindowRouteBoundaryTest.java#n1WindowAndHeadlessAndDevelopmentKeepTheirMutationAccess"
+      ]
     }
   ]
 }
