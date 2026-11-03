@@ -37,6 +37,7 @@
   --frame-hairline: 1px;
   --frame-focus-width: 2px;
   --frame-status-dot: 0.5rem;
+  --frame-status-ring: 1rem;
   --frame-status-dim: rgba(var(--p-shadow), 0.28);
   /* === Primitive Palette ===
      Base colors and hue angles shared across semantic tokens.

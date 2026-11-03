@@ -67,7 +67,7 @@ import './OverlayHost.js';
 import '../components/DragOverlay.js';
 import '../components/StatusPill.js';
 import '../components/RetiredStatusElements.js';
-import type { StatusPill } from '../components/StatusPill.js';
+import { undoStatusNotice, type StatusPill } from '../components/StatusPill.js';
 // §21.E — register the PendingEffect chrome surface. Renders nothing
 // when the queue is empty; floats in lower-right when a proposal lands.
 import '../components/RetrospectivePanel.js';
@@ -956,6 +956,8 @@ export class Shell extends JfElement {
         category: 'Edit',
         provenance: CORE_PROVENANCE,
         handler: () => {
+          // The undo notice in the status pill names what Ctrl+Z reverses while it is showing.
+          if (undoStatusNotice()) return { kind: 'noop' as const };
           const undone = undoLastEffect((e) => dispatchEffectToChrome(e));
           dispatchEffectToChrome({
             kind: 'toast',

@@ -90,7 +90,10 @@ describe('Needs you (moved from proposed-effect cards and agent activity)', () =
     const prompt = { pendingId: 'one', operationId: 'core.reindex', gateBehavior: 'INLINE_CONFIRM', expiresAt: new Date(Date.now() + 50000).toISOString() };
     const decision = requestAuthorization(prompt); const duplicate = requestAuthorization(prompt); await flush();
     expect(panel().model!.sections.needs.filter(r => r.id === 'authorization:one')).toHaveLength(1);
-    expect(panel().model!.sections.needs[0]!.detail).toContain(prompt.expiresAt);
+    // ref-09: the deadline reads as its consequence, relative to now, never as a raw timestamp.
+    const deadline = panel().shadowRoot!.querySelector('[data-fact="authorization:one"] [data-deadline]')!;
+    expect(deadline.textContent!.trim()).toBe('◷ Denied automatically in less than a minute');
+    expect(panel().shadowRoot!.textContent).not.toContain(prompt.expiresAt);
     await expect(duplicate).resolves.toMatchObject({ approved: false, superseded: true });
     action('Review request').click(); await flush();
     const staleButton = host.shadowRoot!.querySelector<JfButton>('[data-testid="authorization-approve"]')!;

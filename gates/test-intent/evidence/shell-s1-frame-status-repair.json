@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
   },
-  "createdAt": "2026-11-03T17:25:59.489Z",
-  "revision": "edc1080d8968dab3c087fdfdacf2c822dadd8ad4",
-  "tree": "88976d35ac6c44d70e37abfcae57639dab9d0c54",
+  "createdAt": "2026-11-03T17:41:30.127Z",
+  "revision": "90e738a288a0f248cc2c677b77e18461a53a4149",
+  "tree": "ff202ed40858b1093d1183223b0f702007c0affd",
   "environment": {
     "platform": "linux",
     "arch": "x64",
@@ -18,54 +18,39 @@
   },
   "runs": [
     {
-      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/state/verdict.test.ts\" \"src/shell-v0/components/advisory/AdvisoryStore.test.ts\" \"src/shell-v0/components/acceptPendingEffect.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/0zq8l5qk/tmp/test-intent-vitest-26851-1793726751103.json\"",
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/chrome/Shell.status.test.ts\" \"src/shell-v0/components/acceptPendingEffect.test.ts\" \"src/shell-v0/state/verdict.test.ts\" \"src/shell-v0/views/HealthSurface.render.test.ts\" \"src/shell-v0/components/advisory/AdvisoryStore.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/2gv9wcal/tmp/test-intent-vitest-9226-1793727664916.json\"",
       "cwd": "modules/ui-web",
       "exitCode": 0,
-      "durationMs": 2826
+      "durationMs": 11024
     }
   ],
   "checks": [
     {
-      "id": "modules/ui-web/src/shell-v0/state/verdict.test.ts#words each kind, distinguishing cosmetic degraded from a hard one",
-      "file": "modules/ui-web/src/shell-v0/state/verdict.test.ts",
+      "id": "modules/ui-web/src/shell-v0/chrome/Shell.status.test.ts#ST10 the frame has one status destination and no retired presenter mounts",
+      "file": "modules/ui-web/src/shell-v0/chrome/Shell.status.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:0c4e92bcaed2128068e9d1487be30a31d7244bb396408dce3106e0fb8e22cc8a",
+      "contentDigest": "sha256:2bd4a8478e62fc899d1550aa418b21b0ae833808a029ef06c5dec4ca4316899c",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
       "cases": [
         {
-          "name": "verdictHeadline words each kind, distinguishing cosmetic degraded from a hard one",
+          "name": "ST10 the frame has one status destination and no retired presenter mounts",
           "status": "passed"
         }
       ]
     },
     {
-      "id": "modules/ui-web/src/shell-v0/state/verdict.test.ts#announces politely for non-error verdicts, assertively for an error verdict",
-      "file": "modules/ui-web/src/shell-v0/state/verdict.test.ts",
+      "id": "modules/ui-web/src/shell-v0/chrome/Shell.status.test.ts#ref-07 the shell Undo command (Ctrl+Z) reverses the undo notice showing in the pill, not while typing, after a shell remount too",
+      "file": "modules/ui-web/src/shell-v0/chrome/Shell.status.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:0c4e92bcaed2128068e9d1487be30a31d7244bb396408dce3106e0fb8e22cc8a",
+      "contentDigest": "sha256:2bd4a8478e62fc899d1550aa418b21b0ae833808a029ef06c5dec4ca4316899c",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
       "cases": [
         {
-          "name": "presentVerdict (595 §15.1) — the ONE verdict-presentation projection announces politely for non-error verdicts, assertively for an error verdict",
-          "status": "passed"
-        }
-      ]
-    },
-    {
-      "id": "modules/ui-web/src/shell-v0/components/advisory/AdvisoryStore.test.ts#C6 only an UPDATE after the snapshot is a live arrival; snapshots and pre-snapshot updates are replay",
-      "file": "modules/ui-web/src/shell-v0/components/advisory/AdvisoryStore.test.ts",
-      "runner": "vitest",
-      "contentDigest": "sha256:7f357d4ac5723b993b3c264cdcdd751937cd502e2ed75fe2b409b0a1c344b232",
-      "executed": true,
-      "skipped": false,
-      "outcome": "passed",
-      "cases": [
-        {
-          "name": "advisoryReducer C6 only an UPDATE after the snapshot is a live arrival; snapshots and pre-snapshot updates are replay",
+          "name": "ref-07 the shell Undo command (Ctrl+Z) reverses the undo notice showing in the pill, not while typing, after a shell remount too",
           "status": "passed"
         }
       ]
@@ -84,44 +69,119 @@
           "status": "passed"
         }
       ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/state/verdict.test.ts#verdictHeadline words each kind, distinguishing cosmetic degraded from a hard one",
+      "file": "modules/ui-web/src/shell-v0/state/verdict.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:0c4e92bcaed2128068e9d1487be30a31d7244bb396408dce3106e0fb8e22cc8a",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "verdictHeadline words each kind, distinguishing cosmetic degraded from a hard one",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/state/verdict.test.ts#presentVerdict (595 §15.1) — the ONE verdict-presentation projection announces politely for non-error verdicts, assertively for an error verdict",
+      "file": "modules/ui-web/src/shell-v0/state/verdict.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:0c4e92bcaed2128068e9d1487be30a31d7244bb396408dce3106e0fb8e22cc8a",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "presentVerdict (595 §15.1) — the ONE verdict-presentation projection announces politely for non-error verdicts, assertively for an error verdict",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/HealthSurface.render.test.ts#HealthSurface — recommendedActions panel renders \"All healthy\" when recommendedActions is empty and the verdict is operational",
+      "file": "modules/ui-web/src/shell-v0/views/HealthSurface.render.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:65cd95a9185e21c1d1702d2f9f5b1cf05d095e6d18cb0efe4a4024a6ff3735b1",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "HealthSurface — recommendedActions panel renders \"All healthy\" when recommendedActions is empty and the verdict is operational",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/advisory/AdvisoryStore.test.ts#advisoryReducer C6 only an UPDATE after the snapshot is a live arrival; snapshots and pre-snapshot updates are replay",
+      "file": "modules/ui-web/src/shell-v0/components/advisory/AdvisoryStore.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:7f357d4ac5723b993b3c264cdcdd751937cd502e2ed75fe2b409b0a1c344b232",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "advisoryReducer C6 only an UPDATE after the snapshot is a live arrival; snapshots and pre-snapshot updates are replay",
+          "status": "passed"
+        }
+      ]
     }
   ],
   "failBefore": {
-    "ref": "edc1080d89",
-    "revision": "edc1080d8968dab3c087fdfdacf2c822dadd8ad4",
+    "ref": "bfc6a52032",
+    "revision": "bfc6a52032e65f4e1992c314d09b5685799961ea",
     "overlays": [],
     "patches": [],
     "runs": [
       {
-        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/state/verdict.test.ts\" \"src/shell-v0/components/advisory/AdvisoryStore.test.ts\" \"src/shell-v0/components/acceptPendingEffect.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/0zq8l5qk/tmp/test-intent-vitest-26851-1793726756342.json\"",
+        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/chrome/Shell.status.test.ts\" \"src/shell-v0/components/acceptPendingEffect.test.ts\" \"src/shell-v0/state/verdict.test.ts\" \"src/shell-v0/views/HealthSurface.render.test.ts\" \"src/shell-v0/components/advisory/AdvisoryStore.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/2gv9wcal/tmp/test-intent-vitest-9226-1793727679298.json\"",
         "cwd": "<before-worktree>",
         "exitCode": 1,
-        "durationMs": 2571,
-        "output": "JSON report written to /home/elias/.cache/am/0zq8l5qk/tmp/test-intent-vitest-26851-1793726756342.json\n\n"
+        "durationMs": 10237,
+        "output": "JSON report written to /home/elias/.cache/am/2gv9wcal/tmp/test-intent-vitest-9226-1793727679298.json\n\n"
       }
     ],
     "checks": [
       {
-        "id": "modules/ui-web/src/shell-v0/state/verdict.test.ts#words each kind, distinguishing cosmetic degraded from a hard one",
+        "id": "modules/ui-web/src/shell-v0/chrome/Shell.status.test.ts#ST10 the frame has one status destination and no retired presenter mounts",
         "classification": "assertion",
-        "detail": "verdictHeadline words each kind, distinguishing cosmetic degraded from a hard one:  AssertionError: expected 'All systems operational' to be 'Search available' // Object.is equality\n    at /home/elias/.cache/am/0zq8l5qk/tmp/test-intent-before-xA6SCo/modules/ui-web/src/shell-v0/state/verdict.test.ts:625:83\n    at file:///home/elias/dev/justsearch/modules/ui-web/node_modules/@vitest/"
+        "detail": "ST10 the frame has one status destination and no retired presenter mounts:  AssertionError: one always-mounted title-bar status owner: expected  to have a length of 1 but got +0\n    at Proxy.<anonymous> (file:///home/elias/dev/justsearch/modules/ui-web/node_modules/@vitest/expect/dist/index.js:1389:20)\n    at Proxy.<anonymous> (file:///home/elias/dev/justsearch/modules/ui-w"
       },
       {
-        "id": "modules/ui-web/src/shell-v0/state/verdict.test.ts#announces politely for non-error verdicts, assertively for an error verdict",
+        "id": "modules/ui-web/src/shell-v0/chrome/Shell.status.test.ts#ref-07 the shell Undo command (Ctrl+Z) reverses the undo notice showing in the pill, not while typing, after a shell remount too",
         "classification": "assertion",
-        "detail": "presentVerdict (595 §15.1) — the ONE verdict-presentation projection announces politely for non-error verdicts, assertively for an error verdict:  AssertionError: expected { …(2) } to deeply equal { text: 'Search available', …(1) }\n    at /home/elias/.cache/am/0zq8l5qk/tmp/test-intent-before-xA6SCo/modules/ui-web/src/shell-v0/state/verdict.test.ts:846:91\n    at file:///home/elias/dev/justsearch/modules/ui-web/node_modules/@vitest/runner/dist/c"
-      },
-      {
-        "id": "modules/ui-web/src/shell-v0/components/advisory/AdvisoryStore.test.ts#C6 only an UPDATE after the snapshot is a live arrival; snapshots and pre-snapshot updates are replay",
-        "classification": "assertion",
-        "detail": "advisoryReducer C6 only an UPDATE after the snapshot is a live arrival; snapshots and pre-snapshot updates are replay:  AssertionError: expected undefined to deeply equal []\n    at /home/elias/.cache/am/0zq8l5qk/tmp/test-intent-before-xA6SCo/modules/ui-web/src/shell-v0/components/advisory/AdvisoryStore.test.ts:160:28\n    at file:///home/elias/dev/justsearch/modules/ui-web/node_modules/@vitest/runner/dist/chunk-artifa"
+        "detail": "ref-07 the shell Undo command (Ctrl+Z) reverses the undo notice showing in the pill, not while typing, after a shell remount too:  AssertionError: round 1: expected \"vi.fn()\" to be called 1 times, but got 0 times\n    at /home/elias/.cache/am/2gv9wcal/tmp/test-intent-before-JIZ9ZO/modules/ui-web/src/shell-v0/chrome/Shell.status.test.ts:46:36\n    at file:///home/elias/dev/justsearch/modules/ui-web/node_modules/@vitest/runner/dist"
       },
       {
         "id": "modules/ui-web/src/shell-v0/components/acceptPendingEffect.test.ts#C12 typed agent MEDIUM acceptance preserves consent without minting a token",
         "classification": "assertion",
         "detail": "C12 typed agent MEDIUM acceptance preserves consent without minting a token:  AssertionError: expected { operationId: 'core.reindex', …(3) } to match object { operationId: 'core.reindex', …(2) }\n(2 matching properties omitted from actual)\n    at Proxy.<anonymous> (file:///home/elias/dev/justsearch/modules/ui-web/node_modules/@vitest/expect/dist/index.js:1283:10)\n    at Proxy."
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/state/verdict.test.ts#verdictHeadline words each kind, distinguishing cosmetic degraded from a hard one",
+        "classification": "assertion",
+        "detail": "verdictHeadline words each kind, distinguishing cosmetic degraded from a hard one:  AssertionError: expected 'All systems operational' to be 'Search available' // Object.is equality\n    at /home/elias/.cache/am/2gv9wcal/tmp/test-intent-before-JIZ9ZO/modules/ui-web/src/shell-v0/state/verdict.test.ts:625:83\n    at file:///home/elias/dev/justsearch/modules/ui-web/node_modules/@vitest/"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/state/verdict.test.ts#presentVerdict (595 §15.1) — the ONE verdict-presentation projection announces politely for non-error verdicts, assertively for an error verdict",
+        "classification": "assertion",
+        "detail": "presentVerdict (595 §15.1) — the ONE verdict-presentation projection announces politely for non-error verdicts, assertively for an error verdict:  AssertionError: expected { …(2) } to deeply equal { text: 'Search available', …(1) }\n    at /home/elias/.cache/am/2gv9wcal/tmp/test-intent-before-JIZ9ZO/modules/ui-web/src/shell-v0/state/verdict.test.ts:846:91\n    at file:///home/elias/dev/justsearch/modules/ui-web/node_modules/@vitest/runner/dist/c"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/HealthSurface.render.test.ts#HealthSurface — recommendedActions panel renders \"All healthy\" when recommendedActions is empty and the verdict is operational",
+        "classification": "assertion",
+        "detail": "HealthSurface — recommendedActions panel renders \"All healthy\" when recommendedActions is empty and the verdict is operational:  AssertionError: expected '\\n            ✓ All systems operation…' to contain 'Up to date'\n    at /home/elias/.cache/am/2gv9wcal/tmp/test-intent-before-JIZ9ZO/modules/ui-web/src/shell-v0/views/HealthSurface.render.test.ts:196:36\n    at file:///home/elias/dev/justsearch/modules/ui-web/node_modules/@vi"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/advisory/AdvisoryStore.test.ts#advisoryReducer C6 only an UPDATE after the snapshot is a live arrival; snapshots and pre-snapshot updates are replay",
+        "classification": "assertion",
+        "detail": "advisoryReducer C6 only an UPDATE after the snapshot is a live arrival; snapshots and pre-snapshot updates are replay:  AssertionError: expected undefined to deeply equal []\n    at /home/elias/.cache/am/2gv9wcal/tmp/test-intent-before-JIZ9ZO/modules/ui-web/src/shell-v0/components/advisory/AdvisoryStore.test.ts:160:28\n    at file:///home/elias/dev/justsearch/modules/ui-web/node_modules/@vitest/runner/dist/chunk-artifa"
       }
     ]
   },
-  "digest": "sha256:87ab093dd06b00bfe33e6474ffd2de53c743e830503c7d11d6d8f843e9af3f8e"
+  "digest": "sha256:38fb207ebcbdb66ddfd8cb59e8e51b10cf9514eaeeff2ebb73fb12e7014dee70"
 }

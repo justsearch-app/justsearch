@@ -41,6 +41,8 @@ export interface StatusFact {
   readonly details?: readonly StatusFact[];
   readonly confidence?: number;
   readonly diagnostics?: string;
+  /** Consequence of not answering, relative to now ("Denied automatically in 4 min"). */
+  readonly deadline?: string;
 }
 interface PendingStatusAuthorization {
   readonly pendingId: string; readonly operationId: string; readonly argsSummary?: string;
@@ -74,6 +76,8 @@ interface StatusPillState {
   readonly label: string;
   readonly stale: boolean;
   readonly percent?: number | null;
+  /** Needs-you count, shown as the pill's badge. */
+  readonly count?: number;
 }
 export interface FrameStatus {
   readonly pill: StatusPillState;
@@ -81,6 +85,14 @@ export interface FrameStatus {
   readonly progress: IndexingProgress;
 }
 const go = (label: string, target: string): StatusAction => ({ label, target, kind: 'navigate' });
+
+/** An unanswered agent request expires unusable (the engine refuses stale approvals): name that consequence. */
+export function authorizationDeadline(expiresAt: string, now: number): string | undefined {
+  const ms = Date.parse(expiresAt) - now;
+  if (!Number.isFinite(ms)) return undefined;
+  const minutes = Math.ceil(ms / 60_000);
+  return `Denied automatically ${ms < 60_000 ? 'in less than a minute' : minutes < 60 ? `in ${minutes} min` : `in about ${Math.round(minutes / 60)} h`}`;
+}
 
 function advisoryStatusFact(record: AdvisoryRecord): StatusFact {
   const e = record.event;
@@ -159,7 +171,8 @@ export function deriveFrameStatus(input: FrameStatusInput): FrameStatus {
     if (request.expiresAt && Date.parse(request.expiresAt) <= now) continue;
     add({ id: `authorization:${request.pendingId}`, section: 'needs',
       title: `${request.requestedBy ?? 'An agent'} requests ${present({ kind: 'operation', id: request.operationId }).label}`,
-      detail: [request.argsSummary, request.expiresAt ? `Decision deadline: ${request.expiresAt}` : ''].filter(Boolean).join(' · '),
+      ...(request.argsSummary ? { detail: request.argsSummary } : {}),
+      ...(request.expiresAt && authorizationDeadline(request.expiresAt, now) ? { deadline: authorizationDeadline(request.expiresAt, now)! } : {}),
       actions: [{ kind: 'authorization', target: request.pendingId, label: 'Review request' }] });
   }
   for (const p of [...input.proposals ?? []].sort((a, b) => (a.confidence ?? 1) - (b.confidence ?? 1))) add({ id: `proposal:${p.id}`, section: 'needs',
@@ -278,7 +291,7 @@ export function deriveFrameStatus(input: FrameStatusInput): FrameStatus {
   const pastGrace = input.contactLostAt !== null && now - input.contactLostAt >= RECONNECT_GRACE_MS;
   if (ai && !ai.connection.reachable && pastGrace) pill = { kind: 'unreachable', label: "Can't reach the engine", stale: false };
   else if (limited) pill = { kind: 'limited', label: 'Search limited', stale };
-  else if (sections.needs.length) pill = { kind: 'needs', label: `Needs you (${sections.needs.length})`, stale: sections.needs.every(row => row.stale === true) };
+  else if (sections.needs.length) pill = { kind: 'needs', label: `${sections.needs.length} ${sections.needs.length === 1 ? 'needs' : 'need'} you`, count: sections.needs.length, stale: sections.needs.every(row => row.stale === true) };
   else if (sections.problems.length) pill = { kind: 'problems', label: `Problems right now (${sections.problems.length})`, stale };
   else if (sections.running.some(row => row.id !== FILE_ACTIVITY_ID)) {
     const row = sections.running.find(r => r.id !== FILE_ACTIVITY_ID)!;

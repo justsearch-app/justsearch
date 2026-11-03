@@ -61,6 +61,7 @@ export class StatusPanel extends JfElement {
     h3 { margin: 0; font-size: var(--font-size-sm); font-weight: var(--jf-weight-medium); color: var(--text-secondary); }
     p { margin: var(--jf-space-1) 0; }
     .detail, time { color: var(--text-secondary); font-size: var(--font-size-xs); }
+    .deadline { color: var(--text-warning); font-size: var(--font-size-xs); }
     article { padding-block: var(--jf-space-3); }
     .title { display: flex; align-items: baseline; gap: var(--jf-space-2); }
     .title > span { flex: 1; }
@@ -80,7 +81,7 @@ export class StatusPanel extends JfElement {
     @media (forced-colors: active) {
       :host::before { background: Canvas; border-color: CanvasText; }
       .panel { background: Canvas; color: CanvasText; border-color: CanvasText; box-shadow: none; }
-      button { color: ButtonText; } .detail, time, h3 { color: CanvasText; }
+      button { color: ButtonText; } .detail, .deadline, time, h3 { color: CanvasText; }
       .actions button, footer button, .unread { color: LinkText; }
       button:focus-visible { outline-color: Highlight; }
     }
@@ -119,6 +120,7 @@ export class StatusPanel extends JfElement {
         ${row.occurredAt ? html`<time datetime=${row.occurredAt}>${formatRelativeIso(row.occurredAt)}</time>` : nothing}</div>
       ${row.stale ? html`<p class="detail">Last seen · checking for an update</p>` : nothing}
       ${row.detail ? html`<p class="detail" title=${row.progressLabel ?? nothing} aria-label=${row.progressLabel ?? nothing}>${row.detail}</p>` : nothing}
+      ${row.deadline ? html`<p class="deadline" data-deadline><span aria-hidden="true">◷</span> ${row.deadline}</p>` : nothing}
       ${row.indeterminate && !row.stale ? html`<progress aria-label=${row.title}></progress>` : nothing}
       ${row.percent != null && !row.stale ? html`<progress aria-label=${row.title} max="100" value=${row.percent}></progress>` : nothing}
       ${row.indexing && this.model ? html`<jf-indexing-controls .progress=${this.model.progress}

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 import { describe, expect, it } from 'vitest';
-import { deriveFrameStatus, completedLongWork, FINISHED_DWELL_MS,
+import { deriveFrameStatus, completedLongWork, FINISHED_DWELL_MS, authorizationDeadline,
   type StatusFact } from './frameStatus.js';
 import type { AiState } from './aiStateStore.js';
 import type { AdvisoryRecord } from '../components/advisory/AdvisoryStore.js';
@@ -88,6 +88,25 @@ describe('frame status projection', () => {
     expect(install.actions).toContainEqual({ kind: 'install-toggle', target: 'pause', label: 'Pause download' });
     const paused = derive({ ai: ai({ installStatus: { state: 'running', paused: true }, installObservationLive: true }) });
     expect(paused.sections.running.find(row => row.id === 'ai-install')!.actions).toContainEqual({ kind: 'install-toggle', target: 'resume', label: 'Resume download' });
+  });
+  it('ref-09 agent request deadlines read as their consequence relative to now, never as a raw time', () => {
+    const expiresAt = new Date(now + 4 * 60_000).toISOString();
+    const fact = derive({ authorizations: [{ pendingId: 'p', operationId: 'core.reindex', expiresAt, argsSummary: 'Downloads' }] }).sections.needs[0]!;
+    expect(fact.deadline).toBe('Denied automatically in 4 min');
+    expect(fact.detail).toBe('Downloads');
+    expect(JSON.stringify(fact)).not.toContain(expiresAt);
+    // The countdown follows the derivation clock; it rounds up so it never claims more time than is left.
+    expect(derive({ now: now + 3 * 60_000 + 1, authorizations: [{ pendingId: 'p', operationId: 'core.reindex', expiresAt }] }).sections.needs[0]!.deadline)
+      .toBe('Denied automatically in less than a minute');
+    expect(authorizationDeadline(new Date(now + 90 * 60_000).toISOString(), now)).toBe('Denied automatically in about 2 h');
+    expect(authorizationDeadline(new Date(now + 61_000).toISOString(), now)).toBe('Denied automatically in 2 min');
+    // No deadline line without a parseable deadline.
+    expect(derive({ authorizations: [{ pendingId: 'p', operationId: 'core.reindex', expiresAt: 'soon' }] }).sections.needs[0]!.deadline).toBeUndefined();
+    expect(derive({ authorizations: [{ pendingId: 'p', operationId: 'core.reindex' }] }).sections.needs[0]!.deadline).toBeUndefined();
+  });
+  it('ref-09 the needs-you pill carries its count for the badge', () => {
+    expect(derive({ conditions: [condition('needs')] }).pill).toMatchObject({ kind: 'needs', label: '1 needs you', count: 1 });
+    expect(derive({ conditions: [condition('needs'), { ...condition('needs'), id: 'n2' }] }).pill).toMatchObject({ label: '2 need you', count: 2 });
   });
   it('C12 the broadcast advisory and the request-scoped prompt for one authorization give one decision route', () => {
     const request = { pendingId: 'exact-target1', operationId: 'core.reindex', expiresAt: new Date(now + 50_000).toISOString() };

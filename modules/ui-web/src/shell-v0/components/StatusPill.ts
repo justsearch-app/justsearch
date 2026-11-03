@@ -22,16 +22,27 @@ import type { MultiplexedStream } from '../streaming/MultiplexedStream.js';
 import './StatusBadge.js';
 import './SystemNotice.js';
 import type { StatusAction } from '../state/frameStatus.js';
-import type { AdvisoryStore } from './advisory/AdvisoryStore.js';
+import type { AdvisoryStore, AdvisoryRecord } from './advisory/AdvisoryStore.js';
 import type { AuthorizationHost } from './AuthorizationHost.js';
 import './StatusPanel.js';
 import type { StatusPanel } from './StatusPanel.js';
+
+/** The connected pill; shell commands registered once per page reach it across shell remounts. */
+let connectedPill: StatusPill | null = null;
+/**
+ * Shell Undo (Ctrl+Z): reverse the undo notice showing in the pill. False when none is showing, and
+ * while typing or under a modal, where Undo keeps its previous meaning.
+ */
+export function undoStatusNotice(): boolean {
+  if (isTypingTarget(deepActiveElement()) || modalOwnsFocus()) return false;
+  return connectedPill?.undoNotice() ?? false;
+}
 
 /** Self-contained title-bar status. Presentation visibility only hides plugin contributions. */
 export class StatusPill extends JfElement {
   static override properties = {
     store: { attribute: false }, apiBase: { attribute: 'api-base' }, pluginsVisible: { type: Boolean, attribute: false },
-    multiplex: { attribute: false }, authorizationHost: { attribute: false }, open: { state: true },
+    multiplex: { attribute: false }, authorizationHost: { attribute: false }, open: { state: true }, narrow: { state: true },
   };
   declare store: AdvisoryStore | null;
   declare apiBase: string;
@@ -39,13 +50,17 @@ export class StatusPill extends JfElement {
   declare multiplex: MultiplexedStream | null;
   declare authorizationHost: (() => AuthorizationHost | null) | null;
   declare open: boolean;
+  /** Window narrower than 1000 px: the state reads from the icon (badge, ring or dot); the name stays on the button. */
+  declare narrow: boolean;
+  private narrowQuery: MediaQueryList | null = null;
+  private readonly narrowChange = (): void => { this.narrow = this.narrowQuery?.matches ?? false; };
   readonly status = new FrameStatusController(this);
   private readonly transient = new TransientController(this, {
     layer: 'transient', id: 'frame-status', managesDismiss: true, close: () => this.close(),
   });
   constructor() {
     super(); this.store = null; this.apiBase = ''; this.pluginsVisible = true;
-    this.multiplex = null; this.authorizationHost = null; this.open = false;
+    this.multiplex = null; this.authorizationHost = null; this.open = false; this.narrow = false;
   }
   static styles = css`
     :host { display: inline-flex; min-width: 0; max-width: 100%; font-size: var(--font-size-sm); }
@@ -67,25 +82,42 @@ export class StatusPill extends JfElement {
       z-index: var(--z-overlay-transient); text-align: start; }
     [hidden] { display: none; }
     .visually-hidden { position: absolute; width: var(--frame-hairline); height: var(--frame-hairline); overflow: hidden; clip-path: inset(50%); }
-    @media (max-width: 999px) { .calm .label { display: none; } }
+    .count { display: inline-grid; place-items: center; min-width: var(--frame-status-ring); height: var(--frame-status-ring);
+      padding-inline: var(--jf-space-1); box-sizing: border-box; border-radius: var(--frame-pill-radius);
+      background: var(--accent-warning); color: var(--accent-on-warning); font-size: var(--font-size-xs);
+      font-weight: var(--jf-weight-medium); font-variant-numeric: tabular-nums; }
+    .ring { width: var(--frame-status-ring); height: var(--frame-status-ring); flex-shrink: 0; }
+    .ring circle { fill: none; stroke-width: 2.5; }
+    .ring .track { stroke: var(--border-emphasized); }
+    .ring .arc { stroke: var(--accent); }
+    kbd { font: inherit; font-size: var(--font-size-xs); color: var(--text-secondary); margin-inline-start: var(--jf-space-2); }
     @media (forced-colors: active) {
       .trigger { color: ButtonText; background: ButtonFace; border-color: ButtonText; }
       .symbol { color: ButtonText !important; } button:focus-visible { outline-color: Highlight; }
+      .count { background: ButtonText; color: ButtonFace; forced-color-adjust: none; }
+      .ring .track { stroke: GrayText; } .ring .arc { stroke: ButtonText; }
       .overlay { background: transparent; }
     }
   `;
   override connectedCallback(): void {
     super.connectedCallback();
+    connectedPill = this;
     document.addEventListener('keydown', this.keydown);
     this.status.setMultiplex(this.multiplex);
     window.addEventListener('blur', this.windowBlur);
     document.addEventListener('visibilitychange', this.visibility);
+    this.narrowQuery = typeof window.matchMedia === 'function' ? window.matchMedia('(max-width: 999px)') : null;
+    this.narrowQuery?.addEventListener('change', this.narrowChange);
+    this.narrowChange();
   }
   override disconnectedCallback(): void {
     super.disconnectedCallback();
+    if (connectedPill === this) connectedPill = null;
     document.removeEventListener('keydown', this.keydown);
     window.removeEventListener('blur', this.windowBlur);
     document.removeEventListener('visibilitychange', this.visibility);
+    this.narrowQuery?.removeEventListener('change', this.narrowChange);
+    this.narrowQuery = null;
     this.open = false;
   }
   protected override willUpdate(changed: PropertyValues): void {
@@ -184,20 +216,42 @@ export class StatusPill extends JfElement {
     } catch (error) { emitEphemeralToast({ message: `Action failed: ${error instanceof Error ? error.message : String(error)}`, severity: 'error' }); }
     finally { this.executing.delete(action.target); }
   }
+  /** Same label the panel's Earlier row uses for this record: an unlabelled action is not claimed as an undo. */
+  private transientActionLabel(record: AdvisoryRecord): string { return record.toast?.actionLabel ?? 'Review'; }
+  /**
+   * The shell's Undo command (Ctrl+Z) reverses the undo notice shown in the pill, when there is one.
+   * Returns false when none is showing so the command falls back to the effect journal.
+   */
+  undoNotice(): boolean {
+    const record = this.status.snapshot.advisories.find(row => row.key === this.status.transientKey);
+    if (!record?.toast?.onAction || this.transientActionLabel(record) !== 'Undo') return false;
+    void this.act({ kind: 'advisory', target: record.key, label: 'Undo' });
+    return true;
+  }
   override render() {
     const model = this.status.model;
     const pill = model.pill;
     const plugins = this.pluginsVisible ? listStatusBarItems().filter(item => item.source === 'plugin') : [];
     const transient = this.status.snapshot.advisories.find(row => row.key === this.status.transientKey);
-    const label = transient?.toast?.message ?? pill.label;
+    const label = transient?.toast?.message ?? `${pill.label}${pill.percent != null ? ` · ${pill.percent}%` : ''}`;
     const symbols = { calm: '●', working: '◌', needs: '!', problems: '!', unreachable: '×', limited: '!', finished: '✓', unknown: '?' };
+    // ref-09: the count sits in a badge and the words follow it; a known fraction draws a ring.
+    const icon = !transient && pill.kind === 'needs' && pill.count != null
+      ? html`<span class="count" aria-hidden="true">${pill.count}</span>`
+      : !transient && pill.kind === 'working' && pill.percent != null
+        ? html`<svg class="ring" viewBox="0 0 20 20" aria-hidden="true" data-percent=${pill.percent}><circle class="track" cx="10" cy="10" r="8"></circle>
+          <circle class="arc" cx="10" cy="10" r="8" pathLength="100" stroke-dasharray="${pill.percent} 100" transform="rotate(-90 10 10)"></circle></svg>`
+        : html`<span class="symbol" aria-hidden="true">${symbols[pill.kind]}</span>`;
+    const text = transient?.toast?.message ?? (pill.kind === 'needs' && pill.count != null ? (pill.count === 1 ? 'Needs you' : 'Need you') : pill.label);
+    const undo = transient?.toast?.onAction && this.transientActionLabel(transient) === 'Undo';
     return html`<button type="button" class="trigger ${transient ? 'notice' : pill.kind} ${pill.stale ? 'stale' : ''}"
       aria-label=${label} aria-expanded=${this.open} aria-haspopup="dialog" title="What's going on · Ctrl+Shift+S"
       @click=${() => this.toggle()} @mouseenter=${() => this.status.pauseTransient(true)} @mouseleave=${() => this.status.pauseTransient(false)}
       @focus=${() => this.status.pauseTransient(true)} @blur=${() => this.status.pauseTransient(false)}>
-      <jf-status-badge .tone=${pill.kind === 'needs' || pill.kind === 'limited' ? 'warning' : pill.kind === 'unreachable' || pill.kind === 'problems' ? 'error' : 'neutral'}><span class="content"><span class="symbol" aria-hidden="true">${symbols[pill.kind]}</span><span class="label">${label}${pill.percent != null ? ` · ${pill.percent}%` : ''}</span>
+      <jf-status-badge .tone=${pill.kind === 'needs' || pill.kind === 'limited' ? 'warning' : pill.kind === 'unreachable' || pill.kind === 'problems' ? 'error' : 'neutral'}><span class="content">${icon}${this.narrow && !transient ? nothing : html`<span class="label">${text}</span>`}
       ${pill.kind === 'calm' && plugins.length ? html`<span aria-label="Plugin status items">${plugins.length}</span>` : nothing}</span></jf-status-badge></button>
-      ${transient?.toast?.onAction ? html`<button class="transient-action" type="button" @mouseenter=${() => this.status.pauseTransient(true)} @mouseleave=${() => this.status.pauseTransient(false)} @focus=${() => this.status.pauseTransient(true)} @blur=${() => this.status.pauseTransient(false)} @click=${() => this.act({ kind: 'advisory', target: transient.key, label: transient.toast!.actionLabel ?? 'Undo' })}>${transient.toast.actionLabel ?? 'Undo'}</button>` : nothing}
+      ${transient?.toast?.onAction ? html`<button class="transient-action" type="button" @mouseenter=${() => this.status.pauseTransient(true)} @mouseleave=${() => this.status.pauseTransient(false)} @focus=${() => this.status.pauseTransient(true)} @blur=${() => this.status.pauseTransient(false)} @click=${() => this.act({ kind: 'advisory', target: transient.key, label: this.transientActionLabel(transient) })}
+        aria-keyshortcuts=${undo ? 'Control+Z' : nothing}>${this.transientActionLabel(transient)}${undo ? html`<kbd aria-hidden="true">Ctrl+Z</kbd>` : nothing}</button>` : nothing}
       <div class="overlay" ?hidden=${!this.open} @click=${() => this.close()}></div>
       <jf-status-panel ?hidden=${!this.open} .model=${model} .plugins=${plugins} api-base=${this.apiBase}
         @status-close=${() => this.close()}

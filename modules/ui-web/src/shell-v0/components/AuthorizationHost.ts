@@ -35,6 +35,7 @@ import { JfElement } from '../primitives/JfElement.js';
 import './Button.js';
 import { ModalController } from '../primitives/modalController.js';
 import { ref, createRef, type Ref } from 'lit/directives/ref.js';
+import { keyed } from 'lit/directives/keyed.js';
 import {
   setAuthorizationPresenter,
   setAuthorizationCanceller,
@@ -407,6 +408,10 @@ export class AuthorizationHost extends JfElement {
       : this.active.kind === 'capability'
         ? this.renderCapabilityBody(this.active.request)
         : this.renderAuthorizeBody(this.active.prompt);
+    // Each prompt gets its own controls: jf-button forwards onActivate without re-rendering, so a
+    // reused button would carry the previous prompt's exact-target closure into the next one.
+    const identity = !this.active ? '' : this.active.kind === 'capability'
+      ? `capability:${String(this.active.request.id)}` : `authorize:${this.active.prompt.pendingId}`;
     return html`
       <dialog
         ${ref(this.dialogRef)}
@@ -414,7 +419,7 @@ export class AuthorizationHost extends JfElement {
         data-testid=${testid}
         @cancel=${(e: Event) => e.preventDefault()}
       >
-        ${body}
+        ${keyed(identity, body)}
       </dialog>
     `;
   }

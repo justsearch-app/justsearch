@@ -138,6 +138,7 @@ export type TokenName =
   | '--frame-status-dot'
   | '--frame-status-panel-top'
   | '--frame-status-panel-width'
+  | '--frame-status-ring'
   | '--glass-blur'
   | '--glass-blur-elevated'
   | '--glass-blur-scale'
@@ -371,6 +372,7 @@ export const TOKEN_NAMES: readonly TokenName[] = [
   '--frame-status-dot',
   '--frame-status-panel-top',
   '--frame-status-panel-width',
+  '--frame-status-ring',
   '--glass-blur',
   '--glass-blur-elevated',
   '--glass-blur-scale',
