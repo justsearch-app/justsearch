@@ -6,7 +6,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
 import { SEARCH_VIEW, MAX_LINES, checkSearchViewSize } from './check-search-view-size.mjs';
-import { parseUiWebGateCommands } from './run-ui-web-gates.mjs';
+import { readUiWebGateCommands } from './run-ui-web-gates.mjs';
 
 assert.equal(checkSearchViewSize('line\n'.repeat(MAX_LINES)).failure, null);
 assert.equal(checkSearchViewSize('line\n'.repeat(MAX_LINES - 1)).failure, null);
@@ -26,11 +26,11 @@ try {
   assert.equal(result.status, 1);
   assert.match(result.stderr, /Move code out rather than raise the number/);
   const register = JSON.parse(readFileSync(new URL('../../governance/consult-register.v1.json', import.meta.url), 'utf8'));
-  const commands = parseUiWebGateCommands(register);
+  const commands = readUiWebGateCommands(register);
   for (const name of ['check-search-view-size.mjs', 'check-search-view-size.test.mjs']) {
-    assert.ok(commands.some(command => command.includes(`scripts/ci/${name}`)), `${name} stays in the ui-web gate recipe`);
+    assert.ok(commands.some(command => command.includes(`scripts/ci/${name}`)), `${name} stays in the ui-web command list`);
   }
 } finally {
   rmSync(root, { recursive: true, force: true });
 }
-console.log('search-view-size self-test OK (boundaries, CLI failure/success and recipe bindings).');
+console.log('search-view-size self-test OK (boundaries, CLI failure/success and command-list bindings).');

@@ -2,7 +2,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { parseUiWebGateCommands } from './run-ui-web-gates.mjs';
+import { readUiWebGateCommands } from './run-ui-web-gates.mjs';
 
 // Only executable run fields count. Comments, fixture tests and warn-mode runs are
 // not evidence that a required hosted job enforces a gate on production sources.
@@ -149,7 +149,7 @@ export function checkCoverage({ workflowText, registry, consultRegister, require
     });
     const commands = enforcedRuns.flatMap((r) => r.text.replace(/\\\s*\n/g, ' ').split('\n').map((c) => c.split('#')[0]));
     if (commands.some((c) => /^node scripts\/ci\/run-ui-web-gates\.mjs\s*$/.test(c.trim()))) {
-      commands.push(...parseUiWebGateCommands(consultRegister).map((c) => c.join(' ')));
+      commands.push(...readUiWebGateCommands(consultRegister).map((c) => c.join(' ')));
     }
     for (const command of commands) {
       const parsed = gateCommand(command, known);

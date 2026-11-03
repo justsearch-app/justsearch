@@ -7,7 +7,7 @@ import { resolve, join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { CATALOG, checkSearchWindowScenarios, readBaseCatalog, testTitles } from './check-search-window-scenarios.mjs';
-import { parseUiWebGateCommands } from './run-ui-web-gates.mjs';
+import { readUiWebGateCommands } from './run-ui-web-gates.mjs';
 
 const ROOT = resolve(fileURLToPath(new URL('../..', import.meta.url)));
 const root = mkdtempSync(join(tmpdir(), 'search-window-scenarios-'));
@@ -292,9 +292,9 @@ try {
     git(shallow, ['fetch', '--quiet', '--unshallow', 'origin']);
     assert.deepEqual(readBaseCatalog(shallow, 'head-side'), { base: sharedBase, catalog: catalog() });
   });
-  test('the always-on UI recipe runs the catalog check and its contract tests', () => {
+  test('the always-on UI command list runs the catalog check and its contract tests', () => {
     const register = JSON.parse(readFileSync(join(ROOT, 'governance/consult-register.v1.json'), 'utf8'));
-    const commands = parseUiWebGateCommands(register).map(command => command.join(' '));
+    const commands = readUiWebGateCommands(register).map(command => command.join(' '));
     for (const file of ['check-search-window-scenarios.mjs', 'check-search-window-scenarios.test.mjs']) assert.ok(commands.includes(`node scripts/ci/${file}`));
   });
   test('the delivered catalog is well formed and all declared bindings resolve', () => {
