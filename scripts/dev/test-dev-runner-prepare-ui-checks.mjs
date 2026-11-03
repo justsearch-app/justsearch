@@ -23,8 +23,8 @@ const script = process.env.PREPARE_UI_CHECKS_SCRIPT || fileURLToPath(new URL('./
 const realPython = spawnSync('python3', ['-c', 'import sys; print(sys.executable)'], { encoding: 'utf8' });
 assert.equal(realPython.status, 0, realPython.stderr);
 
-// Only npm/venv/install are stubbed. The actual browser probe runs in Python and
-// its Node subprocess against a tiny Playwright registry with fixture executables.
+// Installers are stubbed; both browser revisions share a cache whose contents
+// model Playwright GC, so preparing one revision must preserve the other.
 function fixture(t, version = '3.14') {
   const base = fs.mkdtempSync(path.join(os.tmpdir(), 'prepare-ui-checks-'));
   t.after(() => fs.rmSync(base, { recursive: true, force: true }));
@@ -47,43 +47,27 @@ function fixture(t, version = '3.14') {
   write(path.join(checkout, 'scripts/dev/prepare-ui-checks.cjs'), fs.readFileSync(script));
   write(path.join(checkout, 'scripts/lib/python-path.cjs'), fs.readFileSync(new URL('../lib/python-path.cjs', import.meta.url)));
   write(path.join(checkout, 'scripts/jsharness/pyproject.toml'), fs.readFileSync(new URL('../jsharness/pyproject.toml', import.meta.url)));
+  write(path.join(checkout, 'scripts/jsharness/requirements.lock.txt'), fs.readFileSync(new URL('../jsharness/requirements.lock.txt', import.meta.url)));
   const pkg = path.join(tools, 'packages/playwright');
-  write(path.join(pkg, '__init__.py'));
-  fs.mkdirSync(path.join(pkg, 'driver'), { recursive: true });
-  fs.symlinkSync(process.execPath, path.join(pkg, 'driver/node'));
-  write(path.join(pkg, 'driver/package/lib/server/registry/index.js'), `
-const path = require('node:path');
-exports.registry = { findExecutable: name => ({ executablePath: () => path.join(
-  process.env.PLAYWRIGHT_BROWSERS_PATH,
-  name === 'chromium' ? 'chromium-123/chrome-linux/chrome' : 'chromium_headless_shell-456/chrome-linux/headless_shell'
-) }) };
-`);
-  const bundle = path.join(pkg, 'driver/package/lib/coreBundle.js');
-  write(bundle, "exports.registry = require('./server/registry/index.js');\n");
-  // Also provide the older JSON/API interface so the before script's probe runs.
-  write(path.join(pkg, 'driver/package/browsers.json'), JSON.stringify({ browsers: [{ name: 'chromium-headless-shell', revision: '456' }] }));
-  write(path.join(pkg, 'sync_api.py'), `
-import os
-from pathlib import Path
-from types import SimpleNamespace
-class sync_playwright:
-    def __enter__(self):
-        return SimpleNamespace(chromium=SimpleNamespace(executable_path=str(Path(os.environ['PLAYWRIGHT_BROWSERS_PATH']) / 'chromium-123/chrome-linux/chrome')))
-    def __exit__(self, *args): pass
-`);
   const stub = `#!${process.execPath}
 const fs = require('node:fs');
 const path = require('node:path');
 const { spawnSync } = require('node:child_process');
 const args = process.argv.slice(2);
 const tool = path.basename(process.argv[1]);
-const selectedEnv = Object.fromEntries(Object.entries(process.env).filter(([key]) => /^(npm_config_|NPM_CONFIG_|PIP_|PYTHON|JUSTSEARCH_)/.test(key)));
+const selectedEnv = Object.fromEntries(Object.entries(process.env).filter(([key]) => /^(npm_config_|NPM_CONFIG_|PIP_|PYTHON|JUSTSEARCH_|PLAYWRIGHT_|TMPDIR$)/.test(key)));
 fs.appendFileSync(${JSON.stringify(trace)}, JSON.stringify({ tool, args, env: selectedEnv }) + '\\n');
 if (tool === 'python3') {
   const bin = path.join(args[2], 'bin');
   fs.mkdirSync(bin, { recursive: true });
   fs.copyFileSync(process.argv[1], path.join(bin, 'python'));
   fs.chmodSync(path.join(bin, 'python'), 0o755);
+} else if (tool === 'cli.js' || args[1] === 'playwright') {
+  const cache = process.env.PLAYWRIGHT_BROWSERS_PATH;
+  const revision = tool === 'cli.js' ? 'node-1.61.1' : 'python-1.64.1';
+  if (process.env.PLAYWRIGHT_SKIP_BROWSER_GC !== '1') fs.rmSync(cache, { recursive: true, force: true });
+  fs.mkdirSync(cache, { recursive: true });
+  fs.writeFileSync(path.join(cache, revision), 'usable');
 } else if (args[0] === '-c') {
   if (args[1].startsWith('import sys; print(')) console.log(${JSON.stringify(version)});
   else {
@@ -96,13 +80,10 @@ if (tool === 'python3') {
 `;
   write(path.join(tools, 'npm'), stub, 0o755);
   write(path.join(tools, 'python3'), stub, 0o755);
-  const cache = path.join(home, '.cache/ms-playwright');
-  const chromium = path.join(cache, 'chromium-123/chrome-linux/chrome');
-  const shell = path.join(cache, 'chromium_headless_shell-456/chrome-linux/headless_shell');
-  write(chromium, '', 0o755);
-  write(shell, '', 0o755);
+  write(path.join(checkout, 'modules/ui-web/node_modules/playwright-core/cli.js'), stub);
+  const cache = path.join(checkout, 'tmp/ui-checks/ms-playwright');
   return {
-    root: checkout, outside, chromium, shell, bundle,
+    root: checkout, outside, cache,
     calls: () => fs.existsSync(trace) ? fs.readFileSync(trace, 'utf8').trim().split('\n').map(JSON.parse) : [],
     run: (extra = {}) => spawnSync(process.execPath, [path.join(checkout, 'scripts/dev/prepare-ui-checks.cjs')], {
       cwd: checkout, encoding: 'utf8', env: { ...process.env, HOME: home, PATH: `${tools}:${process.env.PATH}`, ...extra },
@@ -237,27 +218,11 @@ test('installs declared base and UI dependencies without building jsharness meta
   assert.equal(result.status, 0, result.stderr);
   const pip = f.calls().find(call => call.args[1] === 'pip');
   assert.ok(pip.args.includes('httpx>=0.25.0'));
-  assert.ok(pip.args.includes('playwright>=1.40'));
+  assert.ok(pip.args.includes('playwright==1.64.1'));
+  assert.ok(!pip.args.includes('playwright>=1.40'));
   assert.ok(!pip.args.includes('-e'));
   assert.ok(!pip.args.some(arg => arg.startsWith(f.root)));
-  assert.deepEqual(fs.readdirSync(path.join(f.root, 'scripts', 'jsharness')), ['pyproject.toml']);
-});
-
-test('shared browser probe supports the older unbundled registry layout', t => {
-  const f = fixture(t);
-  fs.unlinkSync(f.bundle);
-  const result = f.run();
-  assert.equal(result.status, 0, result.stderr);
-  assert.equal(f.calls().filter(call => call.args[1] === 'playwright').length, 0);
-});
-
-test('unexpected registry errors stop preparation instead of installing browsers', t => {
-  const f = fixture(t);
-  fs.writeFileSync(f.bundle, "throw new Error('broken registry');\n");
-  const result = f.run();
-  assert.equal(result.status, 2, result.stderr);
-  assert.match(result.stderr, /broken registry/);
-  assert.equal(f.calls().filter(call => call.args[1] === 'playwright').length, 0);
+  assert.deepEqual(fs.readdirSync(path.join(f.root, 'scripts', 'jsharness')), ['pyproject.toml', 'requirements.lock.txt']);
 });
 
 for (const version of ['3.13', '3.14']) {
@@ -271,17 +236,42 @@ for (const version of ['3.13', '3.14']) {
   });
 }
 
-for (const missing of ['neither', 'chromium', 'shell', 'shell-executable-bit']) {
-  test(`shared browser cache: ${missing} missing`, t => {
+for (const cached of [[], ['node-1.61.1'], ['python-1.64.1'], ['node-1.61.1', 'python-1.64.1']]) {
+  test(`prepares both local browser revisions with GC protection; cached: ${cached.join(', ') || 'none'}`, t => {
     const f = fixture(t);
-    if (missing === 'chromium') fs.unlinkSync(f.chromium);
-    if (missing === 'shell') fs.unlinkSync(f.shell); // Keep its directory: the reported regression.
-    if (missing === 'shell-executable-bit') fs.chmodSync(f.shell, 0o644);
-    const result = f.run();
+    fs.mkdirSync(f.cache, { recursive: true });
+    for (const revision of cached) fs.writeFileSync(path.join(f.cache, revision), 'cached');
+    const result = f.run({ PLAYWRIGHT_SKIP_BROWSER_GC: '0', PLAYWRIGHT_BROWSERS_PATH: f.outside });
     assert.equal(result.status, 0, result.stderr);
-    const installs = f.calls().filter(call => call.args[1] === 'playwright');
-    assert.equal(installs.length, missing === 'neither' ? 0 : 1);
-    const env = fs.readFileSync(path.join(f.root, 'tmp/ui-checks/env.sh'), 'utf8');
-    assert.ok(env.includes(missing === 'neither' ? '.cache/ms-playwright' : 'tmp/ui-checks/ms-playwright'));
+    const installs = f.calls().filter(call => call.tool === 'cli.js' || call.args[1] === 'playwright');
+    assert.equal(installs.length, 2);
+    assert.deepEqual(installs.map(call => call.args), [['install', 'chromium'], ['-m', 'playwright', 'install', 'chromium']]);
+    for (const install of installs) {
+      assert.equal(install.env.PLAYWRIGHT_BROWSERS_PATH, f.cache);
+      assert.equal(install.env.PLAYWRIGHT_SKIP_BROWSER_GC, '1');
+    }
+    assert.deepEqual(fs.readdirSync(f.cache).sort(), ['node-1.61.1', 'python-1.64.1']);
+    const sourced = spawnSync('bash', ['--noprofile', '--norc', '-c',
+      'source "$1" && exec "$2" -e "console.log(JSON.stringify(process.env))"',
+      'source-env', path.join(f.root, 'tmp/ui-checks/env.sh'), process.execPath,
+    ], { encoding: 'utf8', env: { ...process.env, PLAYWRIGHT_SKIP_BROWSER_GC: '0' } });
+    assert.equal(sourced.status, 0, sourced.stderr);
+    const env = JSON.parse(sourced.stdout);
+    assert.equal(env.PLAYWRIGHT_BROWSERS_PATH, f.cache);
+    assert.equal(env.PLAYWRIGHT_SKIP_BROWSER_GC, '1');
   });
 }
+
+test('prepared governance scratch repos stay outside the checkout and its installed TypeScript', t => {
+  const f = fixture(t);
+  const result = f.run();
+  assert.equal(result.status, 0, result.stderr);
+  const sourced = spawnSync('bash', ['--noprofile', '--norc', '-c',
+    `source "$1" && exec "$2" -e 'const fs = require("node:fs"), os = require("node:os"), path = require("node:path"); const root = fs.mkdtempSync(path.join(os.tmpdir(), "governance-repo-")); console.log(root); fs.rmSync(root, {recursive:true, force:true});'`,
+    'source-env', path.join(f.root, 'tmp/ui-checks/env.sh'), process.execPath,
+  ], { encoding: 'utf8', env: process.env });
+  assert.equal(sourced.status, 0, sourced.stderr);
+  const relative = path.relative(f.root, sourced.stdout.trim());
+  assert.ok(relative.startsWith('..') || path.isAbsolute(relative), sourced.stdout);
+  assert.equal(path.dirname(sourced.stdout.trim()), os.tmpdir());
+});

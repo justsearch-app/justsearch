@@ -60,6 +60,8 @@ export const RULES = [
   // The UI-check preparation suite (scripts/dev/test-dev-runner-prepare-ui-checks.mjs) reads
   // jsharness's declared dependencies; it runs on Linux only.
   [/^scripts\/(?:jseval|jsharness)\/pyproject\.toml$/, ['devrunner']],
+  // prepare-ui-checks.cjs also reads jsharness's lock for the pinned Python Playwright revision.
+  [/^scripts\/jsharness\/requirements\.lock\.txt$/, ['devrunner']],
   [/^models\//, [...contracts, 'license']],
   [/^(?:licenses?\/|notices?\/|NOTICE|LICENSE|native-licenses\/)/, ['license']],
 ];
