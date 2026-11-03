@@ -78,11 +78,11 @@ imply five fixed functional zones.
   Delegate. A session sidebar keeps past conversations reachable. Legacy mode-specific
   surface IDs remain compatibility addresses rather than extra rail destinations.
 - **Library** manages indexed sources and folders, their state, exclusions and recovery actions.
-- **AI Brain** presents AI installation/readiness in Simple mode and configuration/runtime
-  detail in Detailed mode. It surfaces schema incompatibility and enrichment readiness
+- **AI Brain** presents AI installation and readiness; engine configuration sits behind
+  its own Advanced settings disclosure, independent of the app-wide Detailed mode. It surfaces schema incompatibility and enrichment readiness
   rather than treating a drained job queue as complete semantic coverage.
 - **System** hosts diagnostic surfaces including Health, Logs and Activity. Health shows
-  observed system/indexing facts and resource charts.
+  observed system and indexing facts and the recent inference transition history.
 - **Settings** is a modal window opened from the rail, command palette or a deep link.
 
 ### Settings window
@@ -130,12 +130,10 @@ snapshot (`shell-v0/state/indexingProgress.ts`). Numbers may differ between surf
     semantic layers — embeddings, SPLADE, entities, passage vectors — catching up on
     already-indexed documents) → **Ready**. Blocked or unconfirmed work must say so rather than imply readiness.
 *   **Two tiers of "done":** job drain makes a folder keyword-searchable, which is not the
-    same fact as fully searchable. A Library row therefore reads
-    `312 files · keyword search ready · semantic search still catching up · 40%` while
-    coverage climbs, and
-    `312 files · fully searchable · indexed 2m ago` once it is complete
-    (`shell-v0/state/folderStatus.ts`, from the per-root coverage counts on
-    `IndexedRootView`). "Up to date" in Health is likewise reserved for
+    same fact as fully searchable. A Library folder row therefore reads
+    `Meaning processing · 40%` while semantic coverage climbs and `Up to date` only once
+    it is complete (`views/LibrarySurface.ts`, from `shell-v0/state/folderStatus.ts` and the
+    per-root coverage counts on `IndexedRootView`). "Up to date" in Health is likewise reserved for
     coverage-complete, not job-drain.
 *   **No fabricated numbers:** a percent is rendered only when the denominator is
     faithful (at least one applicable stage with documents to enrich). With no
