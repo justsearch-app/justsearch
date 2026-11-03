@@ -528,13 +528,21 @@ def test_witness_reads_live_manifest_content_chunks_and_raw_search_paths(collect
         ix.witness("http://engine", c, m, root / "documents", cfg)
 
 
-def test_cpu_stage_selection_and_lifecycle_paths_override_inherited_state(config, monkeypatch):
+def test_gpu_selection_is_inherited_and_keyed_and_lifecycle_paths_override_inherited_state(
+        collection, config, monkeypatch):
+    c, _ = collection
     monkeypatch.setenv("JUSTSEARCH_DATA_DIR", "/foreign/data")
     monkeypatch.setenv("JUSTSEARCH_INDEX_BASE_PATH", "/foreign/index")
-    monkeypatch.setenv("JUSTSEARCH_RERANK_GPU_ENABLED", "true")
+    monkeypatch.setenv("JUSTSEARCH_SPLADE_ENABLED", "true")
     monkeypatch.setattr(ix.shutil, "which", lambda _: "/usr/bin/slot")
+    monkeypatch.setenv("JUSTSEARCH_GPU_ENABLED", "false")
+    cpu_key, _ = ix.compute_index_key(c, config)
+    monkeypatch.setenv("JUSTSEARCH_GPU_ENABLED", "true")
+    monkeypatch.setenv("JUSTSEARCH_RERANK_GPU_ENABLED", "true")
     env = config.environment()
-    assert env["JUSTSEARCH_GPU_ENABLED"] == env["JUSTSEARCH_RERANK_GPU_ENABLED"] == "false"
+    # The caller's GPU selection reaches the engine and shapes the reusable index key.
+    assert env["JUSTSEARCH_GPU_ENABLED"] == env["JUSTSEARCH_RERANK_GPU_ENABLED"] == "true"
+    assert ix.compute_index_key(c, config)[0] != cpu_key
     assert env["JUSTSEARCH_SPLADE_ENABLED"] == env["JUSTSEARCH_RAG_CHUNK_SPLADE_ENABLED"] == "false"
     assert "JUSTSEARCH_DATA_DIR" not in env and "JUSTSEARCH_INDEX_BASE_PATH" not in env
     launch = ix._launch_env(config, Path("/owned/data"), env)
@@ -562,3 +570,29 @@ def test_runtime_registration_is_not_an_index_shaping_input(collection, config, 
     assert ix.compute_index_key(c, config, env)[0] == first
     (register / "own-backend.json").write_text('{"pid": 456}')
     assert ix.compute_index_key(c, config, env)[0] == first
+
+
+def test_canary_is_the_first_candidate_whose_search_executes_every_canary_stage(monkeypatch):
+    def trace(ce_status, reason=None):
+        return {"searchTrace": {"stages": [
+            {"id": "sparse-retrieval", "status": "executed"},
+            {"id": "dense-retrieval", "status": "executed"},
+            {"id": "cross-encoder", "status": ce_status, "reason": reason}]}}
+    answers = {"Forwarded by Phillip": trace("skipped", "NAVIGATIONAL_QUERY"),
+               "who approved the pipeline contract": trace("executed")}
+    asked = []
+
+    def post(_client, path, payload):
+        assert path == "/api/knowledge/search"
+        # The exact request adoption's canary check replays.
+        assert {k: v for k, v in payload.items() if k != "query"} == {
+            "mode": "hybrid", "limit": 5, "debug": True}
+        asked.append(payload["query"])
+        return answers[payload["query"]]
+
+    monkeypatch.setattr(ix, "_post", post)
+    candidates = ["Forwarded by Phillip", "Forwarded by Phillip", "who approved the pipeline contract"]
+    assert ix._canary_query("http://engine", candidates) == "who approved the pipeline contract"
+    assert asked == ["Forwarded by Phillip", "who approved the pipeline contract"]
+    with pytest.raises(ix.IndexRefused, match="NAVIGATIONAL_QUERY"):
+        ix._canary_query("http://engine", ["Forwarded by Phillip"])

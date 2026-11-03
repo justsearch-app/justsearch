@@ -279,7 +279,8 @@ def execute(action: str, refs: tuple[str, ...], *, baseline_dir: Path,
             'estimate_seconds': estimate, 'request': request, 'mode': mode,
             'commit': commit, 'dirty_hash': dirty,
             'hardware': {'system': platform.system(), 'machine': platform.machine(),
-                         'cpu': platform.processor(), 'cpu_count': os.cpu_count(), 'gpu_enabled': False},
+                         'cpu': platform.processor(), 'cpu_count': os.cpu_count(),
+                         'gpu_enabled': loaded[0][2].environment().get('JUSTSEARCH_GPU_ENABLED')},
             'items': []}
     for n, (c, qc, cfg, baseline, models) in enumerate(loaded):
         folder = out / str(n)

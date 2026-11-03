@@ -10,6 +10,7 @@ import pytest
 
 from jseval.quality import collections as qc
 from jseval.quality import known_answers
+from jseval._paths import REPO_ROOT
 from jseval.quality.types import sha256_text
 
 from .helpers import have_ir, make_collection
@@ -305,3 +306,15 @@ def test_miracl_pool_is_every_judged_passage_plus_seeded_filler(lang, queries, j
     again = qc.build(cfg)
     assert again.version == c.version and again.documents == c.documents
     known_answers.check(c, cfg)
+
+
+def test_enron_expected_counts_follow_corpus_build_judgments_of_the_committed_recipe():
+    # corpus-build judges only each question's first-hop evidence (aggregation: all), so the
+    # known answers of the recipe set are those of its committed fabricated questions.
+    cfg = qc.load_config("enron-email")
+    recipe = REPO_ROOT / cfg.source["recipe"]
+    questions = json.loads((recipe / "fabricated-queries.json").read_text(encoding="utf-8"))
+    judged = sum(len(q["evidence_ids"]) if q.get("question_type") == "aggregation" else 1
+                 for q in questions)
+    assert (cfg.expected["queries"], cfg.expected["judgments"], cfg.expected["positives"],
+            cfg.expected["grades"]) == (len(questions), judged, judged, {"1": judged})

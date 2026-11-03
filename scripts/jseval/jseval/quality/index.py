@@ -89,10 +89,9 @@ class IndexConfig:
         forbidden = excluded & self.env.keys()
         if forbidden:
             raise ValueError(f"lifecycle-owned environment overrides: {sorted(forbidden)}")
-        env.update({"JUSTSEARCH_GPU_ENABLED": "false", "JUSTSEARCH_SPLADE_ENABLED": "false",
+        # GPU selection is the caller's (inherited above) and part of the index key.
+        env.update({"JUSTSEARCH_SPLADE_ENABLED": "false",
                     "JUSTSEARCH_RAG_CHUNK_SPLADE_ENABLED": "false", "JUSTSEARCH_LLM_ENABLED": "false"})
-        for name in ("EMBED", "SPLADE", "NER", "RERANK", "RERANK_CHUNKS", "BGE_M3"):
-            env[f"JUSTSEARCH_{name}_GPU_ENABLED"] = "false"
         for name in ("JAVA_OPTS", "UI_OPTS", "JAVA_TOOL_OPTIONS", "JDK_JAVA_OPTIONS"):
             if name in os.environ:
                 env[name] = os.environ[name]
@@ -358,6 +357,29 @@ def _probe(client: httpx.Client, query: str, request: Mapping, materialized: Col
     if expected not in ranked[:3]:
         raise IndexRefused(f"probe did not return expected document {expected} within top 3")
     return {"query": query, "expected": expected, "ranked": list(ranked), "stages": stages}
+
+
+CANARY_STAGES = ("sparse-retrieval", "dense-retrieval", "cross-encoder")
+
+
+def _canary_query(base_url: str, candidates) -> str:
+    """The first candidate whose live hybrid search executes every canary stage.
+
+    Adoption replays exactly this request (index_identity._confirm_canary). A probe
+    passage can be mail boilerplate the engine routes as navigational, skipping the
+    reranker by design; such a query cannot attest that the reranker serves.
+    """
+    seen = []
+    with httpx.Client(base_url=base_url, timeout=60) as client:
+        for query in dict.fromkeys(candidates):
+            body = _post(client, "/api/knowledge/search",
+                         {"query": query, "mode": "hybrid", "limit": 5, "debug": True})
+            stages = {s.get("id"): (s.get("status"), s.get("reason"))
+                      for s in (body.get("searchTrace") or {}).get("stages", [])}
+            if all(stages.get(stage, (None,))[0] == "executed" for stage in CANARY_STAGES):
+                return query
+            seen.append({stage: stages.get(stage) for stage in CANARY_STAGES})
+    raise IndexRefused(f"no canary query executes {', '.join(CANARY_STAGES)}: {seen[:3]}")
 
 
 def witness(base_url: str, c: Collection, m: Collection, docs: Path,
@@ -716,14 +738,15 @@ def _build(root: Path) -> None:
         key, _ = compute_index_key(c, cfg, spec["env"])
         if key != spec["key"]:
             raise IndexRefused("index-shaping inputs changed during build")
+        canary = _canary_query(url, [p["query"] for p in w["probes"]]
+                               + [q.text for _, q in sorted(c.queries.items())])
         roots = _json(data / "watched_roots.json")
         entry = {"schema": SCHEMA, "owner": _population_owner(c, spec["key"]),
                  "identity": identity.to_doc(), "witness": w,
                  "attestation": {"build_state": "COMPLETE", "generation_id": w["generation"],
                                  "counts": w["counts"],
                                  "watched_roots": [r["path"] for r in roots["roots"]],
-                                 "canary": {"query": w["probes"][0]["query"],
-                                            "required_stages": ["sparse-retrieval", "dense-retrieval", "cross-encoder"]}}}
+                                 "canary": {"query": canary, "required_stages": list(CANARY_STAGES)}}}
         # Close the writer before publishing; failed/interrupted close never publishes.
         backend.stop_backend(info.proc, data_dir=data)
         info = None
@@ -741,7 +764,7 @@ def main() -> None:
         p.add_argument("root", type=Path)
         if cmd == "hook":
             p.add_argument("action", choices=("pause", "resume"))
-    p = commands.add_parser("agreement", help="S23: fresh build, adoption and restart on CPU")
+    p = commands.add_parser("agreement", help="S23: fresh build, adoption and restart")
     p.add_argument("collection", type=Path)
     p.add_argument("--documents-dir", type=Path)
     p.add_argument("--cache-root", type=Path, required=True, help="a new directory under ~/.cache/justsearch-quality")
