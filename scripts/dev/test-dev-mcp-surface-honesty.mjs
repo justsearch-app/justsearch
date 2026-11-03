@@ -45,6 +45,7 @@ import {
   truncationNotice,
 } from './justsearch-dev-mcp/server.mjs';
 import { buildDevRunnerArgsStart } from './justsearch-dev-mcp/cli.mjs';
+import { StartInputSchema } from './justsearch-dev-mcp/schemas.mjs';
 import { createRequire } from 'node:module';
 
 // Fail closed: non-zero until the runner at the bottom clears it, so a top-level abort cannot leave
@@ -727,6 +728,24 @@ function admitApiCallPath(rawPath, base = 'http://127.0.0.1:33301') {
 // verdict is still wrong, which is the shape `audit-without-test` names.
 
 const provenanceWiringTests = [
+  ['isolatedModels is optional, validates the seed state, and reaches the dev-runner parser', () => {
+    const defaults = { apiPort: 0, uiPort: 5173, clean: 'soft' };
+    const ordinary = buildDevRunnerArgsStart({ ...defaults, ...StartInputSchema.parse({}) });
+    assert.ok(!ordinary.some(arg => arg.startsWith('--isolated-models')));
+    for (const state of ['none', 'partial', 'truncated']) {
+      const input = StartInputSchema.parse({ isolatedModels: state });
+      const args = buildDevRunnerArgsStart({ ...defaults, isolatedModels: input.isolatedModels });
+      assert.equal(devRunnerModule.__test.parseArgs(args).isolatedModels, state);
+    }
+    for (const state of [true, '', 'installed']) {
+      assert.equal(StartInputSchema.safeParse({ isolatedModels: state }).success, false);
+    }
+  }],
+  ['the start handler forwards isolatedModels to the CLI argument builder', async () => {
+    const src = await fsp.readFile(path.join(HERE, 'justsearch-dev-mcp', 'server.mjs'), 'utf8');
+    const call = src.slice(src.indexOf('const args = buildDevRunnerArgsStart({'));
+    assert.match(call.slice(0, call.indexOf('});')), /isolatedModels:\s*input\.isolatedModels/);
+  }],
   ['start forwards the resolved distFrom root to the dev-runner', () => {
     const args = buildDevRunnerArgsStart({
       apiPort: 0, uiPort: 5173, clean: 'soft', distFromRoot: '/tmp/main/.claude/worktrees/lane-x',

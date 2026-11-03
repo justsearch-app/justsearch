@@ -27,6 +27,7 @@ const { TICK, compareIdentity, identityOf, identityKey, hasPid, birthOrder, born
 const engineActuator = require('./lib/engine-actuator.cjs');
 const jobRun = require('./lib/job-run.cjs');
 const devDataFolder = require('./lib/dev-data-folder.cjs');
+const isolatedModels = require('./lib/isolated-models.cjs');
 const ledgerLib = require('./lib/exit-ledger.cjs');
 const processIdentity = require('./lib/process-identity.cjs');
 
@@ -172,6 +173,7 @@ function parseArgs(argv) {
     uiPort: 5173,
     apiPort: 0,
     dataDir: null,
+    isolatedModels: null,
     clean: 'soft', // soft|hard|none
     runId: null,
     active: false,
@@ -216,6 +218,12 @@ function parseArgs(argv) {
         break;
       case '--data-dir':
         out.dataDir = takeValue();
+        break;
+      case '--isolated-models':
+        out.isolatedModels = inline ?? (args[i + 1] && !args[i + 1].startsWith('--') ? takeValue() : 'none');
+        if (!isolatedModels.STATES.includes(out.isolatedModels)) {
+          throw new Error(`Invalid --isolated-models: ${out.isolatedModels} (expected none|partial|truncated)`);
+        }
         break;
       case '--clean':
         out.clean = String(takeValue() || '').toLowerCase();
@@ -281,6 +289,7 @@ function parseArgs(argv) {
   if (!['soft', 'hard', 'none'].includes(out.clean)) {
     throw new Error(`Invalid --clean: ${out.clean} (expected soft|hard|none)`);
   }
+  if (out.isolatedModels != null && out.cmd !== 'start') throw new Error('--isolated-models is only valid for start');
   if (out.forgetUnresolved && out.cmd !== 'stop') {
     throw new Error('--forget-unresolved is only valid for stop; it leaves processes running and a person decides. It does not clean data.');
   }
@@ -303,6 +312,7 @@ function printUsage() {
       '          [--chat-profile compact|standard]  (backend JUSTSEARCH_CHAT_PROFILE; dev default compact)',
       '          [--prompt-cache-mib <MiB>]  (chat host cache; default 1024, eval and VDU always 0)',
       '          [--dist-from <root>]  (record-only: the checkout the MCP caller asked to launch from)',
+      '          [--isolated-models[=none|partial|truncated]]  (private models under data-dir; no downloads)',
       '  status  [--run <runId>|--active] [--json]',
       '  stop    [--run <runId>|--active] [--force] [--json]',
       '  stop    [--run <runId>|--active] --forget-unresolved [--json] (leaves processes running; a person decides)',
@@ -312,6 +322,15 @@ function printUsage() {
       '',
       'Notes:',
       '  - start is a long-running supervisor (foreground). Use Ctrl+C or run stop/cleanup to tear down the stack.',
+      '  - Isolated models and ONNX cache stay under data-dir; paths print before launch. Use a fresh folder without inherited config.',
+      "    Restarts require this runner's isolation marker and only isolated-start output; inherited settings are refused.",
+      '    Inherited JUSTSEARCH_* variables are denied by default, including JUSTSEARCH_CONFIG and JUSTSEARCH_REPO_ROOT.',
+      '    Allowlist: JUSTSEARCH_SERVER_EXE (inference executable), JUSTSEARCH_GPU_ENABLED (GPU execution),',
+      '    JUSTSEARCH_GH_BIN (developer GitHub CLI), JUSTSEARCH_DEV_MCP_REPO_ROOT (MCP runner location),',
+      '    JUSTSEARCH_AGENT_IDENTITY_HANDOFF (caller ownership); none selects Engine configuration or storage paths.',
+      '    Runner-owned exceptions: JUSTSEARCH_DATA_DIR, JUSTSEARCH_HOME, JUSTSEARCH_MODELS_DIR,',
+      '    JUSTSEARCH_ORT_OPTIMIZED_CACHE_DIR, JUSTSEARCH_DEV_RUNNER_STATE_ROOT and JUSTSEARCH_CHAT_PROFILE.',
+      '    Remove every -D property and @argument file from JAVA_OPTS, UI_OPTS, JDK_JAVA_OPTIONS, JAVA_TOOL_OPTIONS and _JAVA_OPTIONS.',
       '  - When --json is used, stdout prints exactly one JSON object (no extra human logs).',
       '  - --clean soft|hard cleans only a data folder a dev tool created and marked (.justsearch-dev-data.json): a new or',
       '    empty folder is marked; any other non-empty folder is refused unchanged (DATA_DIR_NOT_OURS).',
@@ -369,13 +388,13 @@ function authoredStoreTopLevelNames(registerPath) {
   return names;
 }
 
-async function cleanDataDir(dir, mode) {
+async function cleanDataDir(dir, mode, preserve = []) {
   if (mode === 'none') return;
   if (mode === 'hard') {
     // Preserve ui/ so llmModelPath and other UI settings survive a hard reset.
     // Without this, AI activation fails with MODEL_PATH_REQUIRED until the user
     // reconfigures the model path manually.
-    const hardKeep = new Set(['ui', devDataFolder.MARKER]);
+    const hardKeep = new Set(['ui', devDataFolder.MARKER, ...preserve]);
     await mkdirp(dir);
     const entries = await fsp.readdir(dir).catch(() => []);
     for (const ent of entries) {
@@ -386,6 +405,7 @@ async function cleanDataDir(dir, mode) {
   }
   // soft: preserve config/index/watched roots/ui settings + AI models/packs/policy + GPL data.
   const keep = new Set([
+    ...preserve,
     devDataFolder.MARKER, 'config', 'index', 'watched_roots.json', 'ui',
     'models', 'installed-packs.v1.json', 'policy.v1.json',
     'gpl-training-triples.ndjson',     // GPL training data (hours of LLM work)
@@ -448,11 +468,11 @@ function assertCleanableDataDir(dir, mode) {
 }
 
 /** The clean, on this tool's own folder only: it is claimed (marked) first, or refused unchanged. */
-async function cleanOwnDataDir(dir, mode) {
+async function cleanOwnDataDir(dir, mode, preserve = []) {
   if (mode === 'none') return;
   const claim = devDataFolder.claimDevDataFolder(dir, dataFolderOptions(dir));
   if (!claim.ok) throw dataFolderRefusal(dir, claim);
-  await cleanDataDir(dir, mode);
+  await cleanDataDir(dir, mode, preserve);
 }
 
 async function getRunDirectoryTimestamp(runDir) {
@@ -593,15 +613,16 @@ function ensureSharedCuda12Staged() {
  */
 const { resolveCuda12ServerExe } = require('./lib/dev-runtime.cjs');
 
-function resolveAiDevEnv() {
-  const env = {};
+function resolveAiDevEnv({ isolatedModels: state = null, dataDir } = {}) {
+  const isolated = state == null ? null : isolatedModels.prepare({ dataDir, state, repoRoot });
+  const env = isolated ? isolated.env : {};
   // Tempdoc 656: provision the shared cuda12 GPU runtime (once, at the main checkout) so this and
   // every other worktree can reference it. Deliberately NO CPU baseline staging (GPU-only dev).
   ensureSharedCuda12Staged();
   const runtime = require('./lib/dev-runtime.cjs').resolveDevRuntime(repoRoot, mainRepoRoot);
   if (runtime.source === 'override' && !runtime.valid) throw new Error('JUSTSEARCH_SERVER_EXE must name a regular executable file');
   if (runtime.valid) env.JUSTSEARCH_SERVER_EXE = runtime.path;
-  if (!process.env.JUSTSEARCH_MODELS_DIR) {
+  if (!isolated && !process.env.JUSTSEARCH_MODELS_DIR) {
     // Tempdoc 618 §2: prefer the MAIN checkout's models (holds the LFS binaries) over a
     // worktree's models/ (tracked manifests only), so a worktree dev stack finds real models.
     const mainModels = path.join(mainRepoRoot, 'models');
@@ -611,7 +632,7 @@ function resolveAiDevEnv() {
   }
   // The supervisor fixture prepares its own candidate settings. Injecting a higher-priority
   // model path here would silently replace that candidate with the shared development model.
-  if (!process.env.JUSTSEARCH_SPLADE_MODEL_PATH
+  if (!isolated && !process.env.JUSTSEARCH_SPLADE_MODEL_PATH
       && process.env.JUSTSEARCH_SUPERVISOR_HARNESS !== '1') {
     const modelsBase = env.JUSTSEARCH_MODELS_DIR || path.join(repoRoot, 'models');
     const spladeDir = path.join(modelsBase, 'splade', 'naver-splade-v3');
@@ -2479,6 +2500,10 @@ async function cmdStartHeavy(opts, releaseHeavy) {
   const dataDir = resolveDataDir(opts.dataDir);
   // Before admission: a start that would clean a folder that is not a dev tool's own is refused
   // before anything is stopped, started or changed.
+  if (opts.isolatedModels != null) {
+    isolatedModels.printPaths(isolatedModels.pathsFor(dataDir));
+    isolatedModels.validateOverrides(dataDir);
+  }
   assertCleanableDataDir(dataDir, opts.clean);
   const runDir = path.join(runsRoot, runId);
   const logsDir = path.join(runDir, 'logs');
@@ -2670,9 +2695,11 @@ async function runAdmittedStart(opts, ctx) {
   const frontendStderr = fs.createWriteStream(frontendStderrPath, { flags: 'a' });
 
   // The clean gate is the admission above: a non-owner reaches this line only by taking over.
-  await cleanOwnDataDir(dataDir, opts.clean);
+  if (opts.isolatedModels != null) isolatedModels.ensureDirectory(dataDir);
+  await cleanOwnDataDir(dataDir, opts.clean, opts.isolatedModels == null ? []
+    : [isolatedModels.FOLDER, isolatedModels.CACHE_FOLDER, isolatedModels.MARKER]);
 
-  const aiEnv = resolveAiDevEnv();
+  const aiEnv = resolveAiDevEnv({ ...opts, dataDir });
 
   // Tempdoc 842 §2.4: ambient operator env ALWAYS wins (same convention as resolveAiDevEnv above);
   // otherwise the CLI-supplied profile applies, and the dev default is "compact" even when the
@@ -2839,6 +2866,7 @@ async function runAdmittedStart(opts, ctx) {
   // with the SAME log streams, the same run id and the same lease — 7.6's dev-runner sentence — so
   // what survives the child is everything except the child.
   const spawnEngineChild = (apiPortForThisIncarnation, incarnationEnv = {}, n = 1, startup = {}) => {
+    if (opts.isolatedModels != null) isolatedModels.ensureDirectory(dataDir);
     const executable = harnessActive && Number(process.env.JUSTSEARCH_SUPERVISOR_HARNESS_FAIL_SPAWN_AT) === n
       ? path.join(dataDir, 'missing-java') : spawnBackend.command;
     if (path.isAbsolute(executable) && !fs.existsSync(executable)) {
@@ -5011,6 +5039,7 @@ if (require.main === module) {
       resolveDataDir,
       cleanDataDir,
       cleanOwnDataDir,
+      resolveAiDevEnv,
       assertCleanableDataDir,
       authoredStoreTopLevelNames,
       acquireAdmission,

@@ -73,6 +73,67 @@ The dev MCP surface exposes exactly these **12** tools:
 | `justsearch.dev.ai_activate` | Activate the online AI runtime. |
 | `justsearch.dev.reload` | Hot-reload the running stack's Engine: compile from the tree that stack was launched from, push method-body changes over identity-checked JDWP, reconstruct services with the ONNX encoders still loaded. Ownership-gated. |
 
+### Private models for install-state checks
+
+Pass `isolatedModels: "none"` to `justsearch.dev.start` to use `<dataDir>/isolated-models/`
+instead of the shared main-checkout models. The equivalent CLI option is `--isolated-models`
+or `--isolated-models=none`. Omit the parameter or flag to keep the usual shared models and
+SPLADE injection.
+
+| State | Seed on a fresh data folder |
+|---|---|
+| `none` | Empty models folder: check the real app's AI-not-installed state. |
+| `partial` | Tiny sibling `.partial` staging files at registry-derived install targets. |
+| `truncated` | Tiny final files shorter than the registry's declared sizes. |
+
+For example, call `justsearch.dev.start` with
+`{"dataDir":"tmp/install-check","apiPort":0,"isolatedModels":"partial"}` or run:
+
+```sh
+node scripts/dev/dev-runner.cjs start --data-dir=tmp/install-check --api-port=0 --isolated-models=partial
+```
+
+Seeding downloads nothing, writes at most 64 bytes per file, and never creates a fake installed
+state or runtime pack. The real status and install plan still classify the files. Before launch,
+stderr prints the models folder, effective SPLADE override (null when absent), app home, settings
+file, install contract, and private optimized-graph cache (`<dataDir>/isolated-ort-cache/`).
+Relative data paths resolve from the checkout, matching the Engine. Shared SPLADE injection is skipped.
+
+Isolation is guaranteed for a fresh data folder without inherited configuration. A non-empty folder
+is refused unless it has `.justsearch-isolated-models.json`, written by this runner on an isolated
+start, and contains only isolated-start output (private models/cache and normal Engine runtime
+output). A general dev-data marker alone is insufficient. Saved configuration/settings, install
+contracts, normal `models/` fallbacks and foreign top-level content are refused even in a marked
+folder. Keep this folder dedicated to isolated starts; do not copy configuration or index data into
+it. Restart preserves its private folders and marker, including through soft/hard start cleans;
+a deleted private folder is recreated. Use a fresh data folder to change seed state.
+
+Before admission or cleaning, the runner denies inherited `JUSTSEARCH_*` variables by default,
+including `JUSTSEARCH_CONFIG` and `JUSTSEARCH_REPO_ROOT`. Only these variables are allowed:
+
+- `JUSTSEARCH_SERVER_EXE` selects the inference executable, not configuration or model storage.
+- `JUSTSEARCH_GPU_ENABLED` selects GPU execution, not configuration or storage paths.
+- `JUSTSEARCH_GH_BIN` selects the GitHub CLI for developer tooling; the Engine does not read it.
+- `JUSTSEARCH_DEV_MCP_REPO_ROOT` locates the MCP server's runner; the Engine does not read it.
+- `JUSTSEARCH_AGENT_IDENTITY_HANDOFF` carries caller ownership identity, with no configuration or storage paths.
+- `JUSTSEARCH_PR_CI` is CI's test-selection flag; only build and test tooling read it, never the Engine.
+
+The other exceptions are variables the runner sets itself: `JUSTSEARCH_DATA_DIR`, `JUSTSEARCH_HOME`,
+`JUSTSEARCH_MODELS_DIR`, `JUSTSEARCH_ORT_OPTIMIZED_CACHE_DIR`, `JUSTSEARCH_DEV_RUNNER_STATE_ROOT`
+and `JUSTSEARCH_CHAT_PROFILE`. Paths in those variables are replaced with the run's paths; the
+chat profile selects a registry variant. Every `-D` property (including `-Duser.dir`) and every `@argument` file
+in `JAVA_OPTS`, `UI_OPTS`, `JDK_JAVA_OPTIONS`, `JAVA_TOOL_OPTIONS` or `_JAVA_OPTIONS` is refused.
+Unset the named source and retry. The checkout's own `config/application.yaml` remains eligible
+for normal discovery and supplies no model path. Escaping symlinks below the private models or
+cache folder are refused for every seed state and before each supervised restart.
+
+Restart with the same option and data folder to retain the private files, including across a
+soft or hard start clean (the private cache is retained too). A deleted private folder is recreated
+before the Engine starts.
+Seeds fill missing files only and never overwrite downloaded or staged bytes; use a fresh
+data folder to check a different seed state. Use a fresh data folder for a clean AI-not-installed
+check. Install, Repair, resume and activation continue to use the product's real size/hash checks.
+
 Legacy underscore-style dev tool names and standalone readiness/listing/suggestion/cleanup tools are obsolete. Agents should use the dotted names above.
 
 **Retired in tempdoc 844 P1** — do not reintroduce these names in tooling or prompts:
@@ -85,6 +146,19 @@ Legacy underscore-style dev tool names and standalone readiness/listing/suggesti
 | `justsearch.dev.validate_evidence` | 0 invocations (its capture counterpart never produced a bundle to validate). | `node scripts/evidence/validate-evidencebundle-v1.mjs <bundleDir>` |
 
 The **EvidenceBundle format itself is live and load-bearing** — only the two MCP wrappers were removed. `scripts/evidence/validate-evidencebundle-v1.mjs` still gates the `installer_verify` job.
+
+Known limits of the guarantee (each needs an unusual inherited setting; seeds are only ever
+written under `<dataDir>/isolated-models/`, so no real model is overwritten):
+
+- An inherited `JUSTSEARCH_DEV_RUNNER_STATE_ROOT` that points inside the shared models is refused
+  only after the runner has created its run folder there, and is resolved from the checkout rather
+  than the caller's working directory.
+- The protected default graph cache is located from the shell's `HOME`; if `HOME` differs from the
+  account's home, the real default cache is not protected.
+- A data folder placed under a custom shared models or cache folder named by an inherited
+  `JUSTSEARCH_MODELS_DIR` or `JUSTSEARCH_ORT_OPTIMIZED_CACHE_DIR` is not refused (those values are
+  replaced for the Engine, not checked as protected locations).
+- `JDK_AOT_VM_OPTIONS` is not inspected; it only applies in the JVM's ahead-of-time cache creation mode.
 
 ## Standard Workflow
 
@@ -415,6 +489,7 @@ and writes no signal — distinct from a push that failed.
 | `RUN_NOT_FOUND` / `NO_API_URL` | The active run record references a runId that no longer exists or has no `apiBaseUrl`. | Call `quick_health` to re-orient; the run may have partially failed. |
 | `DIST_NOT_BUILT` | The checkout being launched from has no Head dist (`modules/ui/build/install/ui/bin/ui.bat`) — typically a fresh worktree, or `skipBuild: true` without a prior `installDist`. `error.details` carries `distPath`, `repoRoot`, and `remedy`. | `node scripts/dev/prepare-worktree.cjs` in that checkout, or `node scripts/lib/tool-invoker.cjs gradle :modules:ui:installDist`. Run `preflight { distFrom }` with the same value first — it checks the dists in the tree `start` will use. |
 | `DATA_DIR_NOT_OURS` | A start (or cleanup) with `clean: "soft"` or `"hard"` named a data folder that no dev tool created and marked (`.justsearch-dev-data.json`) and that is not empty, or the default `modules/ui-web/.dev-data` from older runs holds something a dev data folder does not. Nothing in the folder was changed and nothing was started. `error.details` carries `dataDir`, `reason` and, for the default folder, the `unknown` entries. | Pass a new or empty folder (it is created or marked), omit `dataDir` to use the default dev folder, or use `clean: "none"`, which deletes nothing. |
+| `ISOLATED_MODELS_CONFLICT` | An isolated start found inherited configuration, a JVM property/argument file, an unmarked non-empty folder, foreign content, or an escaping symlink. | Unset the named source or use a fresh data folder dedicated to isolated starts. |
 | `START_TIMED_OUT` | The dev-runner start subprocess did not report a result inside `startTimeoutMs`. **Readiness was not confirmed and it is not established that this call started anything.** Whatever could be read off disk afterwards is under `observed` (active runId, recorded ports/URLs, and one `/api/health` status code) — observations, not a started stack. Before tempdoc 844 this branch synthesized `ok: true` from any runId in `active.json`, so a start that died mid-boot, or a run that was already there, was reported as a successful start. | Call `quick_health { probe: true }` to find out what is actually running, and `tail_log { kind: "backend_stderr" }` if the boot failed. |
 | `INVALID_DIST_FROM` | `distFrom` is neither the main repo nor a sibling worktree under `.claude/worktrees`, or that checkout has no `scripts/dev/dev-runner.cjs`. A **bare worktree name** (`"round14"`) is resolved against `.claude/worktrees/<name>`; when no such directory exists the message lists the names that do. | Pass a worktree name, a path to a sibling worktree, or the main repo root. |
 

@@ -62,6 +62,8 @@ export const RULES = [
   [/^scripts\/(?:jseval|jsharness)\/pyproject\.toml$/, ['devrunner']],
   // prepare-ui-checks.cjs also reads jsharness's lock for the pinned Python Playwright revision.
   [/^scripts\/jsharness\/requirements\.lock\.txt$/, ['devrunner']],
+  // The isolated-models seeds (scripts/dev/lib/isolated-models.cjs) derive their paths from the model registry.
+  [/^modules\/configuration\/src\/main\/resources\/ai\/model-registry\.v2\.json$/, ['devrunner']],
   [/^models\//, [...contracts, 'license']],
   [/^(?:licenses?\/|notices?\/|NOTICE|LICENSE|native-licenses\/)/, ['license']],
 ];

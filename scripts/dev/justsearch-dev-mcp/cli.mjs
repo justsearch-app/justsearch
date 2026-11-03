@@ -174,7 +174,7 @@ export async function readRunJson({ repoRoot, runId }) {
   return JSON.parse(raw);
 }
 
-export function buildDevRunnerArgsStart({ apiPort, uiPort, clean, dataDir, takeover, skipBuild, hotReload, sessionId, leaseDurationSec, chatProfile, distFromRoot }) {
+export function buildDevRunnerArgsStart({ apiPort, uiPort, clean, dataDir, isolatedModels, takeover, skipBuild, hotReload, sessionId, leaseDurationSec, chatProfile, distFromRoot }) {
   const out = [
     'start',
     '--json',
@@ -183,6 +183,7 @@ export function buildDevRunnerArgsStart({ apiPort, uiPort, clean, dataDir, takeo
     `--clean=${clean}`,
   ];
   if (dataDir) out.push(`--data-dir=${dataDir}`);
+  if (isolatedModels != null) out.push(`--isolated-models=${isolatedModels}`);
   if (takeover) out.push(`--takeover=${takeover}`);
   if (skipBuild) out.push('--skip-build');
   if (hotReload) out.push('--hot-reload');
