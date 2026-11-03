@@ -1,0 +1,35 @@
+diff --git a/modules/adapters-lucene/src/main/java/io/justsearch/adapters/lucene/runtime/DocumentFieldOps.java b/modules/adapters-lucene/src/main/java/io/justsearch/adapters/lucene/runtime/DocumentFieldOps.java
+index 9fe955c70a..64702b61e1 100644
+--- a/modules/adapters-lucene/src/main/java/io/justsearch/adapters/lucene/runtime/DocumentFieldOps.java
++++ b/modules/adapters-lucene/src/main/java/io/justsearch/adapters/lucene/runtime/DocumentFieldOps.java
+@@ -759,6 +759,16 @@ public final class DocumentFieldOps {
+     }
+   }
+ 
++  /** Compatibility signature for C1a checks; the base never calls it. */
++  public record ReuseCandidate(String docId, long modifiedAtMs, long sizeBytes,
++      String sourceSha256, String extractionPolicyId) {}
++
++  /** Compatibility signature for C1a checks; the base never calls it. */
++  public Set<String> isUnmodified(List<ReuseCandidate> candidates,
++      java.util.function.BooleanSupplier cancelled) throws IOException {
++    throw new UnsupportedOperationException("C1a compatibility signature");
++  }
++
+   /**
+    * Queries document IDs matching a specific field value.
+    *
+diff --git a/modules/worker-services/src/main/java/io/justsearch/indexerworker/services/SyncDirectoryOps.java b/modules/worker-services/src/main/java/io/justsearch/indexerworker/services/SyncDirectoryOps.java
+index e634ba3fe9..4858563bfe 100644
+--- a/modules/worker-services/src/main/java/io/justsearch/indexerworker/services/SyncDirectoryOps.java
++++ b/modules/worker-services/src/main/java/io/justsearch/indexerworker/services/SyncDirectoryOps.java
+@@ -86,6 +86,9 @@ final class SyncDirectoryOps {
+   private static final int MAX_INDEXED_PATH_CHARS_FOR_MISSING_SCAN = 16 * 1024 * 1024;
+ 
+   private final ReadPathOps readPathOps;
++
++  /** Compatibility signature for C1a checks; the base ignores it. */
++  void setDocumentFieldOps(io.justsearch.adapters.lucene.runtime.DocumentFieldOps fields) {}
+   private final PruneOps pruneOps;
+   private final CommitOps commitOps;
+ 

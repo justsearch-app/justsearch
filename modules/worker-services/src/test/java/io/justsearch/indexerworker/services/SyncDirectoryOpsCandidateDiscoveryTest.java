@@ -118,6 +118,11 @@ final class SyncDirectoryOpsCandidateDiscoveryTest {
     var ops = new SyncDirectoryOps(
         reads, null, null, null, IndexingPacing.unthrottled(), null);
 
+    var reuse = mock(io.justsearch.adapters.lucene.runtime.DocumentFieldOps.class);
+    when(reuse.isUnmodified(org.mockito.ArgumentMatchers.anyList(), any()))
+        .thenReturn(java.util.Set.of(PathNormalizer.normalizeKey(retained)));
+    ops.setDocumentFieldOps(reuse);
+
     try (SyncDirectoryOps.RootDifference difference =
         ops.discoverCandidateDifference(tempDir.toString(), false, () -> false)) {
       assertEquals(List.of(added.toAbsolutePath()), difference.additions());

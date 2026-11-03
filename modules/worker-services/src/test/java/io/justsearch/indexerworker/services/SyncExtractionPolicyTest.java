@@ -71,6 +71,12 @@ final class SyncExtractionPolicyTest {
     when(queue.enqueueEntries(anyList())).thenAnswer(admission);
     when(queue.enqueueMaintenanceScanEntries(anyList(), nullable(String.class), any())).thenAnswer(admission);
     var ops = new SyncDirectoryOps(reads, null, null, queue, IndexingPacing.unthrottled());
+    var reuse = mock(io.justsearch.adapters.lucene.runtime.DocumentFieldOps.class);
+    when(reuse.isUnmodified(anyList(), any())).thenAnswer(call ->
+        ((List<io.justsearch.adapters.lucene.runtime.DocumentFieldOps.ReuseCandidate>) call.getArgument(0))
+            .stream().map(io.justsearch.adapters.lucene.runtime.DocumentFieldOps.ReuseCandidate::docId)
+            .collect(java.util.stream.Collectors.toSet()));
+    ops.setDocumentFieldOps(reuse);
     ops.setExtractionPolicyId(policy.policyId());
     List<Path> expected = repair ? List.of(file) : List.of();
     for (var mode : List.of(SyncDirectoryOps.AdmissionMode.DEFAULT, SyncDirectoryOps.AdmissionMode.MAINTENANCE)) {
