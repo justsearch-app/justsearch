@@ -1,3 +1,4 @@
+import shutil
 """Index trust boundaries; real CPU lifecycle is opt-in via JSEVAL_QUALITY_INDEX_REAL=1."""
 from dataclasses import replace
 import json
@@ -296,6 +297,13 @@ def _wait_for_file(path, worker, timeout=30):
         time.sleep(.05)
 
 
+def _stand_in_gradle_slot(monkeypatch):
+    """CI runners have no machine Gradle slot wrapper; tests that stop before any build need a path."""
+    which = shutil.which
+    monkeypatch.setattr(ix.shutil, "which",
+                        lambda name, *a, **kw: "/bin/false" if name == "js-gradle-slot" else which(name, *a, **kw))
+
+
 def _startup_queue(monkeypatch, *, real):
     """Hold this build at its launcher boundary, before installDist/engine start.
 
@@ -357,6 +365,7 @@ def test_startup_pause_exclusive_drains_queued_backend(collection, config, tmp_p
     cfg = replace(config, repo_root=ix.REPO_ROOT, documents_dir=source,
                   cache_root=tmp_path / "cache")
     monkeypatch.setattr(ix, "_under_cache", lambda p: p)
+    _stand_in_gradle_slot(monkeypatch)  # never invoked: the fixture stops before installDist
     _startup_queue(monkeypatch, real=False)
     with pytest.raises(ix.IndexRefused, match='fixture resumed queued startup'), ix.prepare_index(c, cfg) as handle:
         _startup_pause_exclusive(handle, admission_dir)

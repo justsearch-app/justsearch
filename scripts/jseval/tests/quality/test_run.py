@@ -174,6 +174,8 @@ def test_execute_estimate_guard_runs_before_reservation(tmp_path, monkeypatch):
     handle.model_hashes={'model':'pinned'}
     monkeypatch.setattr(run.index,'prepare_index',lambda *a,**kw:handle)
     monkeypatch.setattr(run,'estimate_seconds',lambda *a:601)
+    which=run.index.shutil.which  # CI runners have no machine Gradle slot wrapper; nothing builds here
+    monkeypatch.setattr(run.index.shutil,'which',lambda name,*a,**kw:'/bin/false' if name=='js-gradle-slot' else which(name,*a,**kw))
     spawn=Mock(side_effect=AssertionError('over-budget work must never reserve'))
     monkeypatch.setattr(run.subprocess,'Popen',spawn)
     with pytest.raises(run.RunRefused,match='estimate.*budget'):
