@@ -134,6 +134,22 @@ try {
       assert.match(result.issues[0], /ambient-purity: no required hosted production invocation/);
     }
   });
+
+  run('register output argument containing --mode gate cannot claim production enforcement', () => {
+    const command = ['node', 'scripts/governance/run.mjs', '--gate', 'ambient-purity', '--out', 'report --mode gate'];
+    const result = coverage(fixture([command]));
+    assert.equal(result.rows[0].production, false);
+    assert.match(result.issues[0], /ambient-purity: no required hosted production invocation/);
+  });
+
+  run('register gate-mode arguments retain production enforcement', () => {
+    const command = ['node', 'scripts/governance/run.mjs', '--gate', 'ambient-purity', '--mode', 'gate'];
+    for (const argv of [command, [...command, '--out', 'report; --mode warn']]) {
+      const result = coverage(fixture([argv]));
+      assert.equal(result.rows[0].production, true);
+      assert.deepEqual(result.issues, []);
+    }
+  });
 } finally {
   fs.rmSync(root, { recursive: true, force: true });
 }
