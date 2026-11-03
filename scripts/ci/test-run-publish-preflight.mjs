@@ -232,6 +232,12 @@ assert.equal(fixtureResults.get('first-1').status, 'blocked');
 // Every python -m step carries the CI interpreter guard, not only pip and pytest.
 assert.ok(buildPreparedPlan({ contexts: [{ check: 'Py', mode: 'local-subset', commands: ['python -m jsharness ui-a11y-gate'] }] }, { context, lanes: {}, registry: { gates: [] } }).filter(step => step.check === 'Py').every(step => step.pythonVersion === '3.13'));
 
+// The Cargo license producer can download crates: an offline failure is not checked here, not failed.
+{
+  const cargoStep = buildPreparedPlan({ contexts: [{ check: 'Cargo', mode: 'local-subset', commands: ['node scripts/codegen/dump-cargo-licenses.mjs'] }] }, { context, lanes: {}, registry: { gates: [] } }).find(step => step.check === 'Cargo');
+  assert.equal(cargoStep.network, true);
+  assert.equal(resultForCommand(cargoStep, { status: 1, stdout: 'error: failed to download from `https://index.crates.io` ... could not resolve host: index.crates.io' }).status, 'not checked here');
+}
 // Prepared commands come from the inventory; the two diff-aware checks receive PR context.
 for (const step of frontendPlan.filter(step => step.check && step.command)) {
   const entry = repositoryManifest.contexts.find(entry => entry.check === step.check);

@@ -158,7 +158,7 @@ export function buildPreparedPlan(manifest, { cwd = ROOT, context, lanes, regist
       const pythonVersion = /\bpython -m /.test(command) ? '3.13' : undefined;
       steps.push({ id, check: entry.check, command, needs: [...new Set(needs)], reason,
         platform: windows ? 'win32' : undefined, pythonVersion,
-        network: /npm (?:ci|.*install)|pip install|playwright install/.test(command) });
+        network: /npm (?:ci|.*install)|pip install|playwright install|dump-cargo-licenses/.test(command) });
       // Only setup failures stop the rest of this context. Checks stay independent.
       if (!reason && (windows || /npm (?:ci|.*install)|pip install|playwright install|(?:gradle|gradlew).*\b(?:assemble|build|checkLicense)\b/.test(original))) setup.push(id);
     }
