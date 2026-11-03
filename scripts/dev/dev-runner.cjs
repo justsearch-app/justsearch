@@ -2685,9 +2685,9 @@ async function runAdmittedStart(opts, ctx) {
   const frontendStderr = fs.createWriteStream(frontendStderrPath, { flags: 'a' });
 
   // The clean gate is the admission above: a non-owner reaches this line only by taking over.
-  await cleanOwnDataDir(dataDir, opts.clean, opts.isolatedModels == null ? [] : [isolatedModels.FOLDER]);
+  await cleanOwnDataDir(dataDir, opts.clean, opts.isolatedModels == null ? [] : [isolatedModels.FOLDER, isolatedModels.CACHE_FOLDER]);
 
-  const aiEnv = resolveAiDevEnv(opts);
+  const aiEnv = resolveAiDevEnv({ ...opts, dataDir });
 
   // Tempdoc 842 §2.4: ambient operator env ALWAYS wins (same convention as resolveAiDevEnv above);
   // otherwise the CLI-supplied profile applies, and the dev default is "compact" even when the

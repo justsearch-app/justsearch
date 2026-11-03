@@ -112,7 +112,7 @@ test('S3: printed paths name the actual models, SPLADE override, home, settings 
   let output = '';
   isolated.printPaths(paths, text => { output += text; });
   assert.deepEqual(JSON.parse(output.slice(output.indexOf('{'))), {
-    models: path.join(dataDir, 'isolated-models'), splade, appHome: dataDir,
+    models: path.join(dataDir, 'isolated-models'), optimizedCache: path.join(dataDir, 'isolated-ort-cache'), splade, appHome: dataDir,
     settings: path.join(dataDir, 'ui', 'settings.json'), installContract: path.join(dataDir, 'install-contract.v2.json'),
   });
 });
