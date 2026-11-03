@@ -190,3 +190,13 @@ daemons). Each checkout used its own .gradle and build directories. No installed
 dev stack, model server or GPU was used. `.agents/preflight` does not exist in this checkout.
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "agent-verifier-n224vf5f",
+  "verdict": "accept",
+  "digest": "sha256:07e597c1acd57d3be2b5a48953a086187ba656d860a8e3bfb35e0de60f0ecb9f"
+}
+```
