@@ -865,7 +865,7 @@ public final class WritePathOps {
         Object status = patch.containsKey(SchemaFields.SPLADE_STATUS)
             ? patch.get(SchemaFields.SPLADE_STATUS)
             : readKeywordDocValue(searcher, doc, SchemaFields.SPLADE_STATUS);
-        if (STATUS_COMPLETED.equals(status) && stored.getBinaryValue(SparsePayload.FIELD) == null)
+        if (STATUS_COMPLETED.equals(status) && stored.getField(SparsePayload.FIELD) == null)
           documents.add(doc);
       } catch (IOException failure) {
         failures.put(doc, failure);
@@ -933,6 +933,8 @@ public final class WritePathOps {
                 fields.put(SchemaFields.SPLADE, features);
                 log.debug("Sparse payload preservation: bytesRead={}, featuresRead={}, termsVisited=0", bytes.length, features.size());
               } else {
+                if (fields.containsKey(SparsePayload.FIELD))
+                  throw new IOException("Invalid stored sparse payload: expected one binary value");
                 var sparse = parentCache.sparse == null
                     ? sparseFeatures(searcher, Set.of(globalDocId)) : parentCache.sparse;
                 if (sparse.failures().containsKey(globalDocId)) throw sparse.failures().get(globalDocId);

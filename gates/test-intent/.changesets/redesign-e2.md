@@ -453,4 +453,122 @@ Matching environmental failures, observed freshly on main and candidate:
 
 `env -u DISPLAY -u WAYLAND_DISPLAY node scripts/dev/java-prepush.mjs --unreferenced` exited 0: BUILD SUCCESSFUL in 5m 40s; 251 actionable tasks (27 executed, 5 from cache, 219 up-to-date). It used the required Gradle slot wrapper and -PskipWebBuild=true. Compilation, PMD, indexing/UI integration checks and the unreferenced-code check passed; unchanged integration tasks reused their prior results. No acceptance record was written. Repository tmp/ was not edited; no commit, push or publication was made.
 
+## Revision after verifier-2: stored payload shape repair
+
+Missing now means no stored `splade_payload` field. Batch preparation checks field presence rather
+than the presence of a binary value. Preservation rejects a present reconstructed value unless it
+is exactly one BytesRef, through the same row-local IOException path used by the byte decoder.
+The ordinary, batch and conditional paths share that policy; status/content precedence is unchanged.
+No production signature, persisted field or scheduling/selection rule changed.
+
+SparsePayloadStoredShapeTest is a new isolated test file (exempt from an entry). It owns its temporary
+Lucene indexes and inherits executor cleanup; it changes no system property, static registry,
+metrics registry or thread interrupt status, and reads no input outside the test. It covers string,
+numeric, duplicate binary and mixed binary/string fields on parents and chunks. The coordinator
+checks inspect publication/storage outcomes and unchanged payload values, postings, status and retry
+counts after commit and reopen. The searcher-taking checks additionally count actual sparse-field
+reads and require zero legacy scans. No encoder or model is installed by this fixture.
+
+Expectation source: delegated-choice, delegationQuote "now proceed autonomusly with remaining design
+work and potentially some research. once done, you can proceed with the implementations of the
+remaining work you proposed and designed", delegationLocation "task t-20261102-redesign request",
+delegationScope "implement the redesigns and fixes the orchestrator proposed and designed after the
+ingestion defect list", label "agent choice". Choice: E2-8 completed (stored shape), '"missing" means only that the row has no
+`splade_payload` stored field at all. Any other present `splade_payload` the writer cannot produce is malformed,
+like malformed bytes: more than one value, or a value that is not binary (string, numeric). It makes
+that row a row-local storage failure (E2-3: withheld, reported as a storage failure with no retry
+charge, postings/payload/status/retries unchanged, no encoder call), and the healthy rows in the
+same batch or conditional publication still publish. It never takes the legacy scan, never rebuilds
+the payload from postings, and never raises a batch-wide error.'
+
+Defect source safeguard: no data loss; reproduction: seed completed sparse parent or chunk rows
+first/bad/last, replace bad's stored payload with a string, numeric, duplicate binary or mixed value,
+then publish NER-only output through IndexingCoordinator. Before the repair, string/numeric rows are
+silently rebuilt from postings, and duplicate/mixed fields abort batch/conditional processing at bad
+without a storage disposition, withholding last. Ordinary RMW also silently rebuilds duplicate fields.
+
+Tests added or rewritten: modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/SparsePayloadStoredShapeTest.java — E2-3/E2-8 stored shapes, parent/chunk isolation and no legacy scan — durable
+
+Repair comparison arguments (no run-evidence.mjs or acceptance record was written):
+
+```text
+--before 454c0031ab
+--overlay modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/SparsePayloadStoredShapeTest.java
+--check modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/SparsePayloadStoredShapeTest.java#ordinaryRmwRejectsMalformedStoredShapeWithoutChangingWork
+--check modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/SparsePayloadStoredShapeTest.java#batchRmwWithholdsMalformedStoredShapeAndStillWritesLaterRows
+--check modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/SparsePayloadStoredShapeTest.java#conditionalPublicationReportsOnlyMalformedRowAsStorageFailure
+--check modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/SparsePayloadStoredShapeTest.java#presentMalformedShapesNeverUseTheLegacyScan
+```
+
+No before-patch is needed for this repair comparison. This repair's checks compare against
+454c0031ab; they are exempt extra checks, not additions to the main 049e79a46f newChecks list.
+The before checkout is a shared clone inside $TMPDIR with its own build folders and temporary
+Lucene indexes; the candidate uses its own checkout/build folders and temporary indexes.
+
+Repair observations (all eight parent/chunk × stored-shape cases executed for each method):
+
+| Exact method (SparsePayloadStoredShapeTest.java, full path in the arguments above) | 454c0031ab | Repaired candidate |
+| --- | --- | --- |
+| ordinaryRmwRejectsMalformedStoredShapeWithoutChangingWork | Eight assertion failures: expected storage exception, none thrown | Eight passed |
+| batchRmwWithholdsMalformedStoredShapeAndStillWritesLaterRows | Eight assertion failures: no exception for string/numeric; CONFIGURATION instead of DISK_IO for duplicate/mixed | Eight passed |
+| conditionalPublicationReportsOnlyMalformedRowAsStorageFailure | Eight assertion failures: expected bad=sparse_artifact_read, got empty storageFailures | Eight passed |
+| presentMalformedShapesNeverUseTheLegacyScan | Eight assertion failures: missing IOException for string/numeric; unexpected configuration exception for duplicate/mixed | Eight passed |
+
+The before run exited 1 in 39s (32 executed, 32 assertion failures, zero skipped); it overlaid only
+the new test on 454c0031ab, without a compatibility patch. The candidate's full adapter suite
+executed 998 passing tests (1,001 total, zero failures/errors, three unrelated skips), including all
+32 new cases, all eight SparsePayloadPreservationTest cases, and the unchanged earlier repair checks.
+No compile failure, unrelated exception or skip is counted as fail-before or pass-after.
+
+Commands used the headless prefix `env -u DISPLAY -u WAYLAND_DISPLAY` and every Gradle run used
+`js-gradle-slot ./gradlew -PskipWebBuild=true`:
+
+- Candidate `--continue :modules:adapters-lucene:test :modules:worker-services:test` exited 1 in
+  5m 35s. Adapters passed as above. Worker-services reported 3,299 tests, four failures and 23 skips
+  in Gradle; its XML totals are 3,300 tests/four failures/24 skips. Both counts give 3,272 passed.
+- The before run `:modules:adapters-lucene:test --tests '*SparsePayloadStoredShapeTest'` exited 1
+  with the 32 assertion failures above.
+- Before `:modules:worker-services:test --tests '*LinuxRootMountInfoTest' --tests '*WatcherUnavailabilityScopeTest'`
+  exited 1 in 25s: 13 tests, four failures, zero skips. The missing `/dev/disk/by-uuid` exception
+  and three watcher availability assertions match the candidate's four failures exactly (the
+  same methods and failure messages listed in the prior repair section). These environmental
+  failures are retained, not weakened or skipped.
+- `.agents/preflight` is absent. `git diff --check` passes. The test-intent CLI against 049e79a46f
+  classifies all 11 flagged files and exempts this new test. It reports only the absent independent
+  acceptance record; the builder did not write one or run run-evidence.mjs.
+
+Shared resources touched: the Gradle two-slot admission queue and Gradle caches. No shared running
+application, dev stack or GPU was used. No commit, push or publication was made; repository tmp/
+was not edited. Logs and the before checkout are outside the repository, in the session's $TMPDIR.
+
+The final test edit adds only `{displayName}` to parameterized case labels so the method IDs above
+can be selected from JUnit XML. After that edit, the final before run exited 1 in 19s with all 32
+cases failing by assertion; the final candidate subset and adapter PMD check exited 0 in 26s with
+43 executed checks passing and zero skips. The subset included the new class, all eight
+SparsePayloadPreservationTest methods and these unchanged earlier repair methods:
+
+- BatchUpdateIntegrationTest#rmwHealsMissingSpladeStatusToPending
+- RemovalAndRenameDurabilityTest#missingChunkSpladeStatusIsHealedOnlyWhenChunkSpladeIsEnabled
+- SparseRmwPreservationTest#suppliedSparseAndContentReplacementKeepTheirOwnSemantics
+
+The final subset command was:
+
+```text
+env -u DISPLAY -u WAYLAND_DISPLAY js-gradle-slot ./gradlew -PskipWebBuild=true -PskipErrorProneTests=false :modules:adapters-lucene:test --tests '*SparsePayloadStoredShapeTest' --tests '*SparsePayloadPreservationTest' --tests '*BatchUpdateIntegrationTest.rmwHealsMissingSpladeStatusToPending' --tests '*RemovalAndRenameDurabilityTest.missingChunkSpladeStatusIsHealedOnlyWhenChunkSpladeIsEnabled' --tests '*SparseRmwPreservationTest.suppliedSparseAndContentReplacementKeepTheirOwnSemantics' :modules:adapters-lucene:pmdTest
+```
+
+Reading the final before and candidate XML through the evidence runner's existing
+`parseJUnitXml`/`selectJUnitCases` functions selected exactly eight cases for each of the four
+file-and-method IDs above: eight failed before and eight passed after for each ID. This was a
+read-only check of XML, not run-evidence.mjs and not an authored evidence or acceptance record.
+
+`env -u DISPLAY -u WAYLAND_DISPLAY node scripts/dev/java-prepush.mjs --unreferenced` exited 0 in
+5m 42s (251 actionable tasks: 27 executed, five from cache, 219 up-to-date): compilation, PMD,
+selected integration checks and the unreferenced-code check passed. This first run preceded the
+display-label-only edit; the final subset freshly compiled and checked the edited test.
+
+A final invocation of the same java-prepush command after the label edit exited 0 in 3s:
+251 tasks up-to-date, reusing the freshly completed compilation/adapter PMD checks and the earlier
+unchanged integration/unreferenced results. No source changed after the final 43-check subset.
+
 ## Acceptance records
