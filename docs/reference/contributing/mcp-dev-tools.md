@@ -146,6 +146,19 @@ Legacy underscore-style dev tool names and standalone readiness/listing/suggesti
 
 The **EvidenceBundle format itself is live and load-bearing** — only the two MCP wrappers were removed. `scripts/evidence/validate-evidencebundle-v1.mjs` still gates the `installer_verify` job.
 
+Known limits of the guarantee (each needs an unusual inherited setting; seeds are only ever
+written under `<dataDir>/isolated-models/`, so no real model is overwritten):
+
+- An inherited `JUSTSEARCH_DEV_RUNNER_STATE_ROOT` that points inside the shared models is refused
+  only after the runner has created its run folder there, and is resolved from the checkout rather
+  than the caller's working directory.
+- The protected default graph cache is located from the shell's `HOME`; if `HOME` differs from the
+  account's home, the real default cache is not protected.
+- A data folder placed under a custom shared models or cache folder named by an inherited
+  `JUSTSEARCH_MODELS_DIR` or `JUSTSEARCH_ORT_OPTIMIZED_CACHE_DIR` is not refused (those values are
+  replaced for the Engine, not checked as protected locations).
+- `JDK_AOT_VM_OPTIONS` is not inspected; it only applies in the JVM's ahead-of-time cache creation mode.
+
 ## Standard Workflow
 
 1. Orient with `justsearch.dev.quick_health` — the compact readiness check, and the first call after compaction.

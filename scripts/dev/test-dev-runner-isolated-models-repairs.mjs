@@ -177,9 +177,12 @@ test('S3: data and runner-state folders overlapping the shared models or graph c
   conflict(() => isolated.validateOverrides(repo, {}));
   conflict(() => isolated.validateOverrides(path.join(root, 'fresh-state'), { JUSTSEARCH_DEV_RUNNER_STATE_ROOT: path.join(sharedModels, 'state') }));
   const viaLink = path.join(root, 'link-to-models');
-  fs.symlinkSync(sharedModels, viaLink);
+  fs.symlinkSync(sharedModels, viaLink, process.platform === 'win32' ? 'junction' : 'dir');
   conflict(() => isolated.validateOverrides(path.join(viaLink, 'check'), {}));
-  const cache = path.join(os.homedir(), '.justsearch', 'cache', 'ort-optimized');
+  const platformHome = process.platform === 'win32'
+    ? path.join(process.env.LOCALAPPDATA || path.join(os.homedir(), 'AppData', 'Local'), 'JustSearch')
+    : process.platform === 'darwin' ? path.join(os.homedir(), 'Library', 'Application Support', 'JustSearch') : path.join(os.homedir(), '.justsearch');
+  const cache = path.join(platformHome, 'cache', 'ort-optimized');
   conflict(() => isolated.validateOverrides(path.join(cache, 'check'), {}));
   assert.doesNotThrow(() => isolated.validateOverrides(path.join(root, 'fresh-ok'), {}));
 });
