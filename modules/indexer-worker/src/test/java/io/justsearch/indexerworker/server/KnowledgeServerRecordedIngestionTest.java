@@ -1675,10 +1675,15 @@ final class KnowledgeServerRecordedIngestionTest {
     Path root = Files.createDirectory(tempDir.resolve("captured-sources"));
     var files = List.of(Files.writeString(root.resolve("first.txt"), "First cobaltcaptured source with enough text for the actual lexical indexing pipeline. ".repeat(10)),
         Files.writeString(root.resolve("second.txt"), "Second cobaltcaptured source with enough text for the actual lexical indexing pipeline. ".repeat(10)));
-    try {
+    try (var _ = io.justsearch.indexerworker.services.NoVolumeIdentityExtension.withVolumeIdentity(true)) {
+      // Direct queue seeding must also reproduce the explicit ingest's volume record. Pin
+      // known volume evidence so a sandbox without /dev/disk/by-uuid covers the same policy.
+      io.justsearch.indexerworker.services.ExplicitIngestRecords.recordRoot(layout.indexBase(), root);
       String fingerprint;
       try (var seed = withoutDeferredModels(helperServer(layout))) {
         seed.start();
+        assertTrue(((DefaultWorkerAppServices) seed.appServices()).ingestService().rootCheck().admits(root),
+            "fixture must admit the captured root on its recorded volume");
         var method = KnowledgeServer.class.getDeclaredMethod("expectedIndexFingerprintOrNull");
         method.setAccessible(true);
         fingerprint = (String) method.invoke(seed);

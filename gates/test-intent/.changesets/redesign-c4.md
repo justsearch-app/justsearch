@@ -20,9 +20,10 @@ Repair run-evidence arguments:
 --check modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/RediscoveryAdmissionTest.java#rejectedCapturedReceiptRollsBackAndCanBeRetriedAfterReopen
 --check modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/RediscoveryAdmissionTest.java#foregroundMutationAroundCapturedAttachmentKeepsExistingMaintenancePrecedence
 --check modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/KnowledgeServerRecordedIngestionTest.java#firstMaintenanceDuringRecordedMigrationExtractsEachCapturedFileOnce
+--overlay modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/ExplicitIngestRecords.java
 ```
 
-No --before-patch or --overlay is required: both changed test files are transplanted by --check.
+No --before-patch is required. Both changed test files are transplanted by --check; the shared fixture helper ExplicitIngestRecords (which records the captured root's volume, as an explicit ingest of that root does) is overlaid.
 The foreground matrix's attach-first cases fail before; its mutation-first cases preserve baseline behavior.
 The resume fixture re-observes the original admission through `beginCapturedWalk` and
 `enqueueRecordedEntries`, which advances its membership to the resumed epoch. The preservation
