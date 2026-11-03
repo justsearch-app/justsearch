@@ -294,3 +294,16 @@ Additional coverage selectors (not an all-parameters fail-before claim):
 - `modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/EnrichmentHardStopRepairTest.java#fallbackRetirementDefersEveryOutcome`
 - `modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/DisambiguationAuthorityTest.java#hardStopsBoundEveryDisambiguationPage`
 - `modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/EnrichmentAuthorityRaceTest.java#unavailableProviderDefersFailureAndCancellationThroughTheRealWriter`
+
+## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a1a1dc-b298-7523-88ea-cdba89e5a361",
+  "verdict": "accept",
+  "digest": "sha256:2827deb476c669533d218386306d8b6467c7ff17650874152f0b9b39d00968de",
+  "note": "Independent Codex verifier on 8eeb8c101b: entries 1-7 and the five exempt files accepted; 38 repair checks fail before by assertion and pass after; focused run 934 checks per tree."
+}
+```
