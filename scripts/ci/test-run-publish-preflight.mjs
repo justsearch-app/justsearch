@@ -225,7 +225,12 @@ const windowsResults = await executePreparedPlan(windowsPlan.map(step => step.id
   platform: 'linux', report() {}, run() { throw new Error('unavailable producer and its consumer must not run'); },
 });
 assert.equal(windowsResults.get('native-producer-0').status, 'not checked here');
-assert.equal(windowsResults.get('native-producer-1').status, 'blocked');
+// A consumer of a producer that cannot run here is itself unverifiable here, never passed.
+assert.equal(windowsResults.get('native-producer-1').status, 'not checked here');
+// A failed setup still blocks the rest of its check (S5).
+assert.equal(fixtureResults.get('first-1').status, 'blocked');
+// Every python -m step carries the CI interpreter guard, not only pip and pytest.
+assert.ok(buildPreparedPlan({ contexts: [{ check: 'Py', mode: 'local-subset', commands: ['python -m jsharness ui-a11y-gate'] }] }, { context, lanes: {}, registry: { gates: [] } }).filter(step => step.check === 'Py').every(step => step.pythonVersion === '3.13'));
 
 // Prepared commands come from the inventory; the two diff-aware checks receive PR context.
 for (const step of frontendPlan.filter(step => step.check && step.command)) {
@@ -286,8 +291,8 @@ try {
   fs.writeFileSync(path.join(scratch, output), JSON.stringify({ targets: [{ available: false, error: 'HTTP 403' }] }));
   assert.equal(resultForCommand({ advisory: true, outputs: [output] }, { status: 0 }, { cwd: scratch }).status, 'not checked here', 'advisory producer exits zero even when the API is unavailable');
   const blockedProducer = await executePreparedPlan([{ id: 'setup', reason: 'unavailable' }, { ...producer, needs: ['setup'] }], { cwd: scratch, run, report() {} });
-  assert.equal(blockedProducer.get('produce').status, 'blocked');
-  assert.equal(fs.existsSync(path.join(scratch, output)), false, 'blocked producer retires stale evidence too');
+  assert.equal(blockedProducer.get('produce').status, 'not checked here');
+  assert.equal(fs.existsSync(path.join(scratch, output)), false, 'an unverifiable producer retires stale evidence too');
   const shellResults = await executePreparedPlan([
     { id: 'multiline', isolated: false, command: 'node -e "process.exit(9)"\nnode -e "process.exit(0)"' },
     { id: 'independent', isolated: false, command: 'node -e "process.exit(7)"' },

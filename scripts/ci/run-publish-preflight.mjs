@@ -155,7 +155,7 @@ export function buildPreparedPlan(manifest, { cwd = ROOT, context, lanes, regist
       if (command === 'node scripts/ci/check-tempdoc-size.mjs') command += ` --base ${context.base}`;
       if (/playwright install --with-deps/.test(command)) reason = 'system browser dependencies require changes to the shared host; isolated Chromium is prepared separately';
       const windows = /^cmd \/c\b|^\.\/gradlew\.bat\b/.test(command);
-      const pythonVersion = /python -m (?:pip|pytest)/.test(command) ? '3.13' : undefined;
+      const pythonVersion = /\bpython -m /.test(command) ? '3.13' : undefined;
       steps.push({ id, check: entry.check, command, needs: [...new Set(needs)], reason,
         platform: windows ? 'win32' : undefined, pythonVersion,
         network: /npm (?:ci|.*install)|pip install|playwright install/.test(command) });
@@ -225,7 +225,8 @@ export async function executePreparedPlan(steps, {
     if (step.reason) result = { status: 'not checked here', reason: step.reason };
     else if (step.platform && step.platform !== platform) result = { status: 'not checked here', reason: `requires ${step.platform}; running on ${platform}` };
     else if (blocked.length) {
-      const unavailable = blocked.filter(id => results.get(id).status === 'not checked here' && (id.startsWith('input-') || id === 'wire-tools'));
+      // A prerequisite that could not be checked here makes its dependents unverifiable here too, not blocked.
+      const unavailable = blocked.filter(id => results.get(id).status === 'not checked here');
       result = unavailable.length
         ? { status: 'not checked here', reason: unavailable.map(id => `${id}: ${results.get(id).reason}`).join('; ') }
         : { status: 'blocked', reason: `prerequisites: ${blocked.join(', ')}` };
