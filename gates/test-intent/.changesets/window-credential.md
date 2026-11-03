@@ -34,59 +34,92 @@ old session-only stdout filtering and supplies no window authority; the overlaid
       "behaviour": "S1-S5/S8 refuse token-only authority before consuming pending actions or changing grants, roots, settings, agent gates, autonomy or plugin trust. Window actions and preexisting saved entries remain usable. HTTP callers cannot claim trusted gesture transports; a settings write, which has no pending flow, is refused with WINDOW_CREDENTIAL_REQUIRED instead of running or reporting a recovery failure.",
       "sources": [
         {
-          "kind": "owner-words",
-          "quote": "Outside caller approves a pending action (capsule issuance and execute:true, with and without allowAlways), its own or another caller's, with the pending id taken from a response or the event stream: refused; nothing approved, consumed, granted or run; the action stays pending and approvable in the app.",
-          "location": "task t-20261102-agent-approval request"
+          "kind": "delegated-choice",
+          "delegationQuote": "open a task record and proceed accordingly with the remainign work",
+          "delegationLocation": "task t-20261102-agent-approval request",
+          "delegationScope": "start the fix for the self-approval defect (any same-user program holding the session token can approve its own pending actions or create grants without the person seeing a prompt) as its own task, answering the orchestrator's question 'Should I start that fix as its own task?'",
+          "choice": "S1: Outside caller approves a pending action (capsule issuance and execute:true, with and without allowAlways), its own or another caller's, with the pending id taken from a response or the event stream: refused; nothing approved, consumed, granted or run; the action stays pending and approvable in the app.",
+          "label": "agent choice"
         },
         {
-          "kind": "owner-words",
-          "quote": "Without a grant that covers it, an outside caller invokes a medium-risk operation (e.g. add a folder, ingest) with no transport header, blank, unknown, or forged BUTTON/RAIL/PALETTE/SYSTEM_INTERNAL and any client header: it does not run unprompted; it becomes a pending action shown in the app (or is refused where the path has no pending flow).",
-          "location": "task t-20261102-agent-approval request"
+          "kind": "delegated-choice",
+          "delegationQuote": "open a task record and proceed accordingly with the remainign work",
+          "delegationLocation": "task t-20261102-agent-approval request",
+          "delegationScope": "start the fix for the self-approval defect (any same-user program holding the session token can approve its own pending actions or create grants without the person seeing a prompt) as its own task, answering the orchestrator's question 'Should I start that fix as its own task?'",
+          "choice": "S3: Without a grant that covers it, an outside caller invokes a medium-risk operation (e.g. add a folder, ingest) with no transport header, blank, unknown, or forged BUTTON/RAIL/PALETTE/SYSTEM_INTERNAL and any client header: it does not run unprompted; it becomes a pending action shown in the app (or is refused where the path has no pending flow).",
+          "label": "agent choice"
         },
         {
-          "kind": "owner-words",
-          "quote": "Missing or wrong -> 403 with a clear error code; nothing changes.",
-          "location": "task t-20261102-agent-approval request"
+          "kind": "delegated-choice",
+          "delegationQuote": "open a task record and proceed accordingly with the remainign work",
+          "delegationLocation": "task t-20261102-agent-approval request",
+          "delegationScope": "start the fix for the self-approval defect (any same-user program holding the session token can approve its own pending actions or create grants without the person seeing a prompt) as its own task, answering the orchestrator's question 'Should I start that fix as its own task?'",
+          "choice": "S1: Missing or wrong -> 403 with a clear error code; nothing changes.",
+          "label": "agent choice"
         },
         {
-          "kind": "owner-words",
-          "quote": "chat start/resume/fork requests with an autonomyLevel above the default are downgraded to the default without it.",
-          "location": "task t-20261102-agent-approval request"
+          "kind": "delegated-choice",
+          "delegationQuote": "open a task record and proceed accordingly with the remainign work",
+          "delegationLocation": "task t-20261102-agent-approval request",
+          "delegationScope": "start the fix for the self-approval defect (any same-user program holding the session token can approve its own pending actions or create grants without the person seeing a prompt) as its own task, answering the orchestrator's question 'Should I start that fix as its own task?'",
+          "choice": "S5: chat start/resume/fork requests with an autonomyLevel above the default are downgraded to the default without it.",
+          "label": "agent choice"
         },
         {
-          "kind": "owner-words",
-          "quote": "Upgrade with existing durable-grants.json and plugin-allowlist.json: entries keep working, files not rewritten.",
-          "location": "task t-20261102-agent-approval request"
+          "kind": "delegated-choice",
+          "delegationQuote": "open a task record and proceed accordingly with the remainign work",
+          "delegationLocation": "task t-20261102-agent-approval request",
+          "delegationScope": "start the fix for the self-approval defect (any same-user program holding the session token can approve its own pending actions or create grants without the person seeing a prompt) as its own task, answering the orchestrator's question 'Should I start that fix as its own task?'",
+          "choice": "N6: Upgrade with existing durable-grants.json and plugin-allowlist.json: entries keep working, files not rewritten.",
+          "label": "agent choice"
         },
         {
-          "kind": "owner-words",
-          "quote": "Outside caller creates an operation or family grant, or approves with allowAlways: refused; durable-grants.json unchanged, also after restart.",
-          "location": "task t-20261102-agent-approval request"
+          "kind": "delegated-choice",
+          "delegationQuote": "open a task record and proceed accordingly with the remainign work",
+          "delegationLocation": "task t-20261102-agent-approval request",
+          "delegationScope": "start the fix for the self-approval defect (any same-user program holding the session token can approve its own pending actions or create grants without the person seeing a prompt) as its own task, answering the orchestrator's question 'Should I start that fix as its own task?'",
+          "choice": "S2: Outside caller creates an operation or family grant, or approves with allowAlways: refused; durable-grants.json unchanged, also after restart.",
+          "label": "agent choice"
         },
         {
-          "kind": "owner-words",
-          "quote": "Outside caller adds a folder through POST /api/indexing/roots (the direct path): no watched root added, no scan admitted, nothing persisted after restart, unless approved in the app.",
-          "location": "task t-20261102-agent-approval request"
+          "kind": "delegated-choice",
+          "delegationQuote": "open a task record and proceed accordingly with the remainign work",
+          "delegationLocation": "task t-20261102-agent-approval request",
+          "delegationScope": "start the fix for the self-approval defect (any same-user program holding the session token can approve its own pending actions or create grants without the person seeing a prompt) as its own task, answering the orchestrator's question 'Should I start that fix as its own task?'",
+          "choice": "S4: Outside caller adds a folder through POST /api/indexing/roots (the direct path): no watched root added, no scan admitted, nothing persisted after restart, unless approved in the app.",
+          "label": "agent choice"
         },
         {
-          "kind": "owner-words",
-          "quote": "Outside caller calls /api/chat/approve for agent and workflow gates (sessionId given or omitted), POST /api/chat/agent/autonomy, starts/resumes/forks a chat with autonomyLevel above the default, or POST /api/plugins/allowlist: refused or downgraded to the default autonomy; no plugin becomes trusted, also after reload and restart.",
-          "location": "task t-20261102-agent-approval request"
+          "kind": "delegated-choice",
+          "delegationQuote": "open a task record and proceed accordingly with the remainign work",
+          "delegationLocation": "task t-20261102-agent-approval request",
+          "delegationScope": "start the fix for the self-approval defect (any same-user program holding the session token can approve its own pending actions or create grants without the person seeing a prompt) as its own task, answering the orchestrator's question 'Should I start that fix as its own task?'",
+          "choice": "S5: Outside caller calls /api/chat/approve for agent and workflow gates (sessionId given or omitted), POST /api/chat/agent/autonomy, starts/resumes/forks a chat with autonomyLevel above the default, or POST /api/plugins/allowlist: refused or downgraded to the default autonomy; no plugin becomes trusted, also after reload and restart.",
+          "label": "agent choice"
         },
         {
-          "kind": "owner-words",
-          "quote": "With no app window (closed, not yet connected, disconnected), nothing that needs a person runs: pending actions wait and expire as today; no implicit consent.",
-          "location": "task t-20261102-agent-approval request"
+          "kind": "delegated-choice",
+          "delegationQuote": "open a task record and proceed accordingly with the remainign work",
+          "delegationLocation": "task t-20261102-agent-approval request",
+          "delegationScope": "start the fix for the self-approval defect (any same-user program holding the session token can approve its own pending actions or create grants without the person seeing a prompt) as its own task, answering the orchestrator's question 'Should I start that fix as its own task?'",
+          "choice": "S8: With no app window (closed, not yet connected, disconnected), nothing that needs a person runs: pending actions wait and expire as today; no implicit consent.",
+          "label": "agent choice"
         },
         {
-          "kind": "owner-words",
-          "quote": "Approval stays exact and single use: changed arguments refused; a different operation or preparation substituted for the pending one refused; admission refusal happens before the pending is consumed, so a retry after admission frees still works; duplicate/concurrent approval; 410 after use, expiry after 5 min, nothing after restart.",
-          "location": "task t-20261102-agent-approval request"
+          "kind": "delegated-choice",
+          "delegationQuote": "open a task record and proceed accordingly with the remainign work",
+          "delegationLocation": "task t-20261102-agent-approval request",
+          "delegationScope": "start the fix for the self-approval defect (any same-user program holding the session token can approve its own pending actions or create grants without the person seeing a prompt) as its own task, answering the orchestrator's question 'Should I start that fix as its own task?'",
+          "choice": "N9: Approval stays exact and single use: changed arguments refused; a different operation or preparation substituted for the pending one refused; admission refusal happens before the pending is consumed, so a retry after admission frees still works; duplicate/concurrent approval; 410 after use, expiry after 5 min, nothing after restart.",
+          "label": "agent choice"
         },
         {
-          "kind": "owner-words",
-          "location": "task t-20261102-agent-approval request",
-          "quote": "In the app: button, rail and palette actions behave as today (medium risk runs, high risk asks typed confirm); approve with and without \"allow always\"; grants list in Settings; revoke; Global Hard Stop."
+          "kind": "delegated-choice",
+          "delegationQuote": "open a task record and proceed accordingly with the remainign work",
+          "delegationLocation": "task t-20261102-agent-approval request",
+          "delegationScope": "start the fix for the self-approval defect (any same-user program holding the session token can approve its own pending actions or create grants without the person seeing a prompt) as its own task, answering the orchestrator's question 'Should I start that fix as its own task?'",
+          "choice": "N1: In the app: button, rail and palette actions behave as today (medium risk runs, high risk asks typed confirm); approve with and without \"allow always\"; grants list in Settings; revoke; Global Hard Stop.",
+          "label": "agent choice"
         }
       ],
       "evidence": "gates/test-intent/evidence/window-credential-java.json",
@@ -111,14 +144,20 @@ old session-only stdout filtering and supplies no window authority; the overlaid
       "behaviour": "S6: a request from the window that a received link started (URL_DEEPLINK or URL_BAR) keeps URL provenance, MEDIUM source tier and the inline prompt for a medium-risk operation even though it carries the window credential. This already held on the base (no credential existed); the check guards the new credential from turning a link into a click.",
       "sources": [
         {
-          "kind": "owner-words",
-          "quote": "A justsearch:// link launched by another process (shell argument or single-instance forwarding) that would change something does not count as a click: it keeps URL provenance and prompts.",
-          "location": "task t-20261102-agent-approval request"
+          "kind": "delegated-choice",
+          "delegationQuote": "open a task record and proceed accordingly with the remainign work",
+          "delegationLocation": "task t-20261102-agent-approval request",
+          "delegationScope": "start the fix for the self-approval defect (any same-user program holding the session token can approve its own pending actions or create grants without the person seeing a prompt) as its own task, answering the orchestrator's question 'Should I start that fix as its own task?'",
+          "choice": "S6: A justsearch:// link launched by another process (shell argument or single-instance forwarding) that would change something does not count as a click: it keeps URL provenance and prompts.",
+          "label": "agent choice"
         },
         {
-          "kind": "owner-words",
-          "quote": "whatever the webview does on their behalf keeps URL provenance (send the URL transport explicitly); they must not become BUTTON just because the window credential is attached.",
-          "location": "task t-20261102-agent-approval request"
+          "kind": "delegated-choice",
+          "delegationQuote": "open a task record and proceed accordingly with the remainign work",
+          "delegationLocation": "task t-20261102-agent-approval request",
+          "delegationScope": "start the fix for the self-approval defect (any same-user program holding the session token can approve its own pending actions or create grants without the person seeing a prompt) as its own task, answering the orchestrator's question 'Should I start that fix as its own task?'",
+          "choice": "S6: whatever the webview does on their behalf keeps URL provenance (send the URL transport explicitly); they must not become BUTTON just because the window credential is attached.",
+          "label": "agent choice"
         }
       ],
       "evidence": "gates/test-intent/evidence/window-credential-java-s6.json",
@@ -136,19 +175,28 @@ old session-only stdout filtering and supplies no window authority; the overlaid
       "behaviour": "S4 through the generic operation route: core.add-watched-root is declared MEDIUM risk (it was LOW, which the lattice runs without a prompt at every trust level). A token-only caller invoking it via POST /api/operations/core.add-watched-root/invoke, with no, forged trusted or MCP transport, gets 428 with a pending id and the folder is not added; approving that pending in the app window adds it (N2); the window's own click with no, BUTTON, PALETTE or RAIL transport still adds it with no prompt (N1). The catalog test and the operation-wire golden carry the same one value: risk MEDIUM, confirm None, executors UI and AGENT unchanged.",
       "sources": [
         {
-          "kind": "owner-words",
-          "quote": "Without a grant that covers it, an outside caller invokes a medium-risk operation (e.g. add a folder, ingest) with no transport header, blank, unknown, or forged BUTTON/RAIL/PALETTE/SYSTEM_INTERNAL and any client header: it does not run unprompted; it becomes a pending action shown in the app (or is refused where the path has no pending flow).",
-          "location": "task t-20261102-agent-approval request"
+          "kind": "delegated-choice",
+          "delegationQuote": "open a task record and proceed accordingly with the remainign work",
+          "delegationLocation": "task t-20261102-agent-approval request",
+          "delegationScope": "start the fix for the self-approval defect (any same-user program holding the session token can approve its own pending actions or create grants without the person seeing a prompt) as its own task, answering the orchestrator's question 'Should I start that fix as its own task?'",
+          "choice": "S3: Without a grant that covers it, an outside caller invokes a medium-risk operation (e.g. add a folder, ingest) with no transport header, blank, unknown, or forged BUTTON/RAIL/PALETTE/SYSTEM_INTERNAL and any client header: it does not run unprompted; it becomes a pending action shown in the app (or is refused where the path has no pending flow).",
+          "label": "agent choice"
         },
         {
-          "kind": "owner-words",
-          "quote": "Outside caller adds a folder through POST /api/indexing/roots (the direct path): no watched root added, no scan admitted, nothing persisted after restart, unless approved in the app.",
-          "location": "task t-20261102-agent-approval request"
+          "kind": "delegated-choice",
+          "delegationQuote": "open a task record and proceed accordingly with the remainign work",
+          "delegationLocation": "task t-20261102-agent-approval request",
+          "delegationScope": "start the fix for the self-approval defect (any same-user program holding the session token can approve its own pending actions or create grants without the person seeing a prompt) as its own task, answering the orchestrator's question 'Should I start that fix as its own task?'",
+          "choice": "S4: Outside caller adds a folder through POST /api/indexing/roots (the direct path): no watched root added, no scan admitted, nothing persisted after restart, unless approved in the app.",
+          "label": "agent choice"
         },
         {
-          "kind": "owner-words",
-          "location": "task t-20261102-agent-approval request",
-          "quote": "In the app: button, rail and palette actions behave as today (medium risk runs, high risk asks typed confirm); approve with and without \"allow always\"; grants list in Settings; revoke; Global Hard Stop."
+          "kind": "delegated-choice",
+          "delegationQuote": "open a task record and proceed accordingly with the remainign work",
+          "delegationLocation": "task t-20261102-agent-approval request",
+          "delegationScope": "start the fix for the self-approval defect (any same-user program holding the session token can approve its own pending actions or create grants without the person seeing a prompt) as its own task, answering the orchestrator's question 'Should I start that fix as its own task?'",
+          "choice": "N1: In the app: button, rail and palette actions behave as today (medium risk runs, high risk asks typed confirm); approve with and without \"allow always\"; grants list in Settings; revoke; Global Hard Stop.",
+          "label": "agent choice"
         }
       ],
       "evidence": "gates/test-intent/evidence/window-credential-java-watched-root.json",
@@ -168,9 +216,12 @@ old session-only stdout filtering and supplies no window authority; the overlaid
       "behaviour": "N1 for the raised operation: a click in the app window (no transport, BUTTON, PALETTE or RAIL, with the window credential) adds the folder through the real lattice and executor with no prompt and no pending. This already held on the base (LOW ran automatically everywhere); the check guards that raising the risk adds no prompt to the person's own click.",
       "sources": [
         {
-          "kind": "owner-words",
-          "location": "task t-20261102-agent-approval request",
-          "quote": "In the app: button, rail and palette actions behave as today (medium risk runs, high risk asks typed confirm); approve with and without \"allow always\"; grants list in Settings; revoke; Global Hard Stop."
+          "kind": "delegated-choice",
+          "delegationQuote": "open a task record and proceed accordingly with the remainign work",
+          "delegationLocation": "task t-20261102-agent-approval request",
+          "delegationScope": "start the fix for the self-approval defect (any same-user program holding the session token can approve its own pending actions or create grants without the person seeing a prompt) as its own task, answering the orchestrator's question 'Should I start that fix as its own task?'",
+          "choice": "N1: In the app: button, rail and palette actions behave as today (medium risk runs, high risk asks typed confirm); approve with and without \"allow always\"; grants list in Settings; revoke; Global Hard Stop.",
+          "label": "agent choice"
         }
       ],
       "evidence": "gates/test-intent/evidence/window-credential-java-watched-root-n1.json",
@@ -186,9 +237,12 @@ old session-only stdout filtering and supplies no window authority; the overlaid
       "behaviour": "S7 keeps both Engine credentials inside the Engine even when an inference server echoes all incoming headers into its API response.",
       "sources": [
         {
-          "kind": "owner-words",
-          "location": "task t-20261102-agent-approval request",
-          "quote": "The window credential appears in no manifest or manifest history, log (stdout/stderr, shell log), diagnostics bundle, public discovery response or API response, and is not readable from the Engine's stdout by another process after the shell has consumed it (or the residual is named if it cannot be prevented on Linux)."
+          "kind": "delegated-choice",
+          "delegationQuote": "open a task record and proceed accordingly with the remainign work",
+          "delegationLocation": "task t-20261102-agent-approval request",
+          "delegationScope": "start the fix for the self-approval defect (any same-user program holding the session token can approve its own pending actions or create grants without the person seeing a prompt) as its own task, answering the orchestrator's question 'Should I start that fix as its own task?'",
+          "choice": "S7: The window credential appears in no manifest or manifest history, log (stdout/stderr, shell log), diagnostics bundle, public discovery response or API response, and is not readable from the Engine's stdout by another process after the shell has consumed it (or the residual is named if it cannot be prevented on Linux).",
+          "label": "agent choice"
         }
       ],
       "evidence": "gates/test-intent/evidence/window-credential-java.json",
@@ -205,19 +259,28 @@ old session-only stdout filtering and supplies no window authority; the overlaid
       "behaviour": "Attach the in-memory window credential beside the origin-bound session token; keep URL provenance; rotate both once on refusal and discard obsolete in-flight answers. Strip both credentials on other origins and keep redirect rejection. A deep-link operation sent through the invocation handler carries URL_DEEPLINK beside the credential.",
       "sources": [
         {
-          "kind": "owner-words",
-          "quote": "ui-web's single request path (http.ts:268-303, 589-605) attaches it as a header next to the token.",
-          "location": "task t-20261102-agent-approval request"
+          "kind": "delegated-choice",
+          "delegationQuote": "open a task record and proceed accordingly with the remainign work",
+          "delegationLocation": "task t-20261102-agent-approval request",
+          "delegationScope": "start the fix for the self-approval defect (any same-user program holding the session token can approve its own pending actions or create grants without the person seeing a prompt) as its own task, answering the orchestrator's question 'Should I start that fix as its own task?'",
+          "choice": "S7: ui-web's single request path (http.ts:268-303, 589-605) attaches it as a header next to the token.",
+          "label": "agent choice"
         },
         {
-          "kind": "owner-words",
-          "quote": "whatever the webview does on their behalf keeps URL provenance (send the URL transport explicitly); they must not become BUTTON just because the window credential is attached.",
-          "location": "task t-20261102-agent-approval request"
+          "kind": "delegated-choice",
+          "delegationQuote": "open a task record and proceed accordingly with the remainign work",
+          "delegationLocation": "task t-20261102-agent-approval request",
+          "delegationScope": "start the fix for the self-approval defect (any same-user program holding the session token can approve its own pending actions or create grants without the person seeing a prompt) as its own task, answering the orchestrator's question 'Should I start that fix as its own task?'",
+          "choice": "S6: whatever the webview does on their behalf keeps URL provenance (send the URL transport explicitly); they must not become BUTTON just because the window credential is attached.",
+          "label": "agent choice"
         },
         {
-          "kind": "owner-words",
-          "quote": "Engine restart, crash recovery, delayed startup, restart during credential resolution, stale manifest, port reuse: the window credential rotates; the app recovers as it does today for the session token (one retry, bounded wait; no promise of no visible error); an old credential is refused.",
-          "location": "task t-20261102-agent-approval request"
+          "kind": "delegated-choice",
+          "delegationQuote": "open a task record and proceed accordingly with the remainign work",
+          "delegationLocation": "task t-20261102-agent-approval request",
+          "delegationScope": "start the fix for the self-approval defect (any same-user program holding the session token can approve its own pending actions or create grants without the person seeing a prompt) as its own task, answering the orchestrator's question 'Should I start that fix as its own task?'",
+          "choice": "N5: Engine restart, crash recovery, delayed startup, restart during credential resolution, stale manifest, port reuse: the window credential rotates; the app recovers as it does today for the session token (one retry, bounded wait; no promise of no visible error); an old credential is refused.",
+          "label": "agent choice"
         }
       ],
       "evidence": "gates/test-intent/evidence/window-credential-ui.json",
@@ -237,14 +300,20 @@ old session-only stdout filtering and supplies no window authority; the overlaid
       "behaviour": "The shell waits for its current child's window credential and verified manifest binding together; a predecessor pipe cannot install a credential on the successor; both secret stdout record types are excluded from logging.",
       "sources": [
         {
-          "kind": "owner-words",
-          "quote": "The window credential appears in no manifest or manifest history, log (stdout/stderr, shell log), diagnostics bundle, public discovery response or API response, and is not readable from the Engine's stdout by another process after the shell has consumed it (or the residual is named if it cannot be prevented on Linux).",
-          "location": "task t-20261102-agent-approval request"
+          "kind": "delegated-choice",
+          "delegationQuote": "open a task record and proceed accordingly with the remainign work",
+          "delegationLocation": "task t-20261102-agent-approval request",
+          "delegationScope": "start the fix for the self-approval defect (any same-user program holding the session token can approve its own pending actions or create grants without the person seeing a prompt) as its own task, answering the orchestrator's question 'Should I start that fix as its own task?'",
+          "choice": "S7: The window credential appears in no manifest or manifest history, log (stdout/stderr, shell log), diagnostics bundle, public discovery response or API response, and is not readable from the Engine's stdout by another process after the shell has consumed it (or the residual is named if it cannot be prevented on Linux).",
+          "label": "agent choice"
         },
         {
-          "kind": "owner-words",
-          "quote": "Rotates on every Engine start; the shell picks up the new one the way it does today for restarts.",
-          "location": "task t-20261102-agent-approval request"
+          "kind": "delegated-choice",
+          "delegationQuote": "open a task record and proceed accordingly with the remainign work",
+          "delegationLocation": "task t-20261102-agent-approval request",
+          "delegationScope": "start the fix for the self-approval defect (any same-user program holding the session token can approve its own pending actions or create grants without the person seeing a prompt) as its own task, answering the orchestrator's question 'Should I start that fix as its own task?'",
+          "choice": "N5: Rotates on every Engine start; the shell picks up the new one the way it does today for restarts.",
+          "label": "agent choice"
         }
       ],
       "evidence": "gates/test-intent/evidence/window-credential-rust.json",
