@@ -13,7 +13,7 @@ import org.junit.jupiter.params.provider.CsvSource;
 class LongPauseStateAdmissionTest {
   @TempDir Path temporary;
 
-  @ParameterizedTest
+  @ParameterizedTest(name = "{displayName} [{index}] {arguments}")
   @CsvSource({"ascii,false", "escaped,false", "ascii,true", "escaped,true"})
   void nativeBootAcceptsLongPauseStateWrittenByManager(String shape, boolean previous)
       throws Exception {
