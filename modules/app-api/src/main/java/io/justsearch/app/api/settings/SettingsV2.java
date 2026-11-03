@@ -21,7 +21,9 @@ public record SettingsV2(
     String rerankerModelPath,
     String citationScorerModelPath,
     CompositionV2 composition,
-    Boolean rerankerEnabled
+    Boolean rerankerEnabled,
+    @com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL)
+    Boolean rerankerSwitchIntent
 ) {
   public SettingsV2 {
     // Do not replace nulls with defaults here.
@@ -30,6 +32,9 @@ public record SettingsV2(
     indexPaths = indexPaths != null ? List.copyOf(indexPaths) : null;
     if (apiPort != null && (apiPort < 0 || apiPort > 65535)) {
       throw new IllegalArgumentException("apiPort out of range: " + apiPort);
+    }
+    if (Boolean.TRUE.equals(rerankerSwitchIntent) && rerankerEnabled == null) {
+      throw new IllegalArgumentException("Reranker switch intent requires rerankerEnabled");
     }
     // settingsMode is server-set only (ignored in POST body).
   }
@@ -76,6 +81,15 @@ public record SettingsV2(
       CompositionV2 composition) {
     this(ui, llm, indexPaths, settingsMode, witness, operationKey, state, apiPort,
         restartScheduled, rerankerModelPath, citationScorerModelPath, composition, null);
+  }
+
+  /** Ordinary settings saves carry no explicit switch intent. */
+  public SettingsV2(UiSettingsV2 ui, LlmSettingsV2 llm, List<String> indexPaths, String settingsMode,
+      SettingsWitness witness, String operationKey, String state, Integer apiPort,
+      Boolean restartScheduled, String rerankerModelPath, String citationScorerModelPath,
+      CompositionV2 composition, Boolean rerankerEnabled) {
+    this(ui, llm, indexPaths, settingsMode, witness, operationKey, state, apiPort,
+        restartScheduled, rerankerModelPath, citationScorerModelPath, composition, rerankerEnabled, null);
   }
 
   public static SettingsV2 empty() {

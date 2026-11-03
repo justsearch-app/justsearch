@@ -66,6 +66,9 @@
     "rerankerModelPath" : {
       "type" : [ "string", "null" ]
     },
+    "rerankerSwitchIntent" : {
+      "type" : "boolean"
+    },
     "restartScheduled" : {
       "type" : [ "boolean", "null" ]
     },

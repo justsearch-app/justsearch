@@ -38,10 +38,28 @@ final class RerankerRepeatedEnableHttpTest {
   @ValueSource(booleans = {false, true})
   void repeatedEnablePreparesDisabledRoleOrRefusesWithoutCommitting(boolean filesReady,
       @TempDir Path dir) throws Exception {
+    exerciseSave(filesReady, true, true, dir);
+  }
+
+  @org.junit.jupiter.api.Test
+  void themeSaveEchoingTrueDoesNotPrepareUnavailableReranker(@TempDir Path dir) throws Exception {
+    exerciseSave(false, false, true, dir);
+  }
+
+  @ParameterizedTest(name = "plainEnableChangeStillPreparesOrRefuses({0})")
+  @ValueSource(booleans = {false, true})
+  void plainEnableChangeStillPreparesOrRefuses(boolean filesReady, @TempDir Path dir)
+      throws Exception {
+    exerciseSave(filesReady, false, false, dir);
+  }
+
+  private static void exerciseSave(boolean filesReady, boolean switchIntent, boolean initialEnabled,
+      Path dir) throws Exception {
+    boolean prepare = switchIntent || !initialEnabled;
     var store = new UiSettingsStore(UiSettingsStore.PersistenceMode.READ_WRITE,
         dir.resolve("settings.json"));
     var initial = new UiSettings();
-    initial.setRerankerEnabled(true);
+    initial.setRerankerEnabled(initialEnabled);
     var disabled = new QueryRoleSelection(QueryRoleSelection.Role.disabled(),
         QueryRoleSelection.Role.disabled());
     var witness = new SettingsWitness(0, null);
@@ -78,7 +96,8 @@ final class RerankerRepeatedEnableHttpTest {
       var controller = new SettingsController(store, dir, null, new SettingsServiceImpl(store, runner));
       var json = JsonMapper.builder().build();
       var ctx = mock(Context.class);
-      when(ctx.body()).thenReturn("{\"rerankerEnabled\":true,\"witness\":"
+      when(ctx.body()).thenReturn("{\"ui\":{\"theme\":\"dark\"},\"rerankerEnabled\":true,"
+          + (switchIntent ? "\"rerankerSwitchIntent\":true," : "") + "\"witness\":"
           + json.writeValueAsString(witness) + ",\"operationKey\":\""
           + OperationKeys.generate(Clock.systemUTC()) + "\"}");
       when(ctx.path()).thenReturn("/api/settings/v2");
@@ -86,13 +105,18 @@ final class RerankerRepeatedEnableHttpTest {
       when(ctx.json(any())).thenReturn(ctx);
       when(ctx.status(anyInt())).thenReturn(ctx);
       controller.handleUpdateSettingsV2(ctx);
-      if (filesReady) {
-        assertEquals(selected, store.inspect().queryRoles(),
-            "An unchanged true preference must prepare a working query role");
+      assertEquals(prepare ? 1 : 0, preparations.get(), prepare
+          ? "An enable must go through reranker preparation"
+          : "A theme save echoing the saved true must not prepare the reranker");
+      if (filesReady || !prepare) {
+        assertEquals(prepare ? selected : disabled, store.inspect().queryRoles(),
+            "A theme echo leaves the role alone; an enable must prepare a working role");
         var response = ArgumentCaptor.forClass(Object.class);
         verify(ctx).json(response.capture());
         assertEquals("COMPLETE", assertInstanceOf(SettingsV2.class, response.getValue()).state());
         assertEquals(1, store.inspect().witness().acceptedRevision());
+        assertEquals("dark", store.load().getTheme());
+        assertEquals(prepare ? 1 : 0, store.load().getRerankerPreferenceRevision());
       } else {
         assertEquals(witness, store.inspect().witness(),
             "A repeated enable without a working reranker must not commit");
@@ -104,8 +128,7 @@ final class RerankerRepeatedEnableHttpTest {
             ((Map<?, ?>) refusal.getValue()).get("errorCode"));
         assertEquals(disabled, store.inspect().queryRoles());
       }
-      assertEquals(1, preparations.get());
-      assertEquals(Boolean.TRUE, store.load().getRerankerEnabled());
+      assertEquals(filesReady || !prepare || initialEnabled, store.load().getRerankerEnabled());
     }
   }
 }

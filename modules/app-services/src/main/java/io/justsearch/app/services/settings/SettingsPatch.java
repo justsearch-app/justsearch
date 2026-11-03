@@ -50,7 +50,7 @@ final class SettingsPatch {
         input.apiPort() == null ? null : normalized.configuredApiPort(), null,
         input.rerankerModelPath() == null ? null : normalized.getRerankerModelPath(),
         input.citationScorerModelPath() == null ? null : normalized.getCitationScorerModelPath(),
-        null, input.rerankerEnabled());
+        null, input.rerankerEnabled(), input.rerankerSwitchIntent());
   }
 
   /** Merges an incoming {@link SettingsV2} into the existing {@link UiSettings}. */
@@ -74,10 +74,13 @@ final class SettingsPatch {
       base.setRerankerModelPath(incoming.rerankerModelPath());
     }
     if (incoming.rerankerEnabled() != null) {
+      boolean choiceChanged = !java.util.Objects.equals(
+          base.getRerankerEnabled(), incoming.rerankerEnabled());
       base.setRerankerEnabled(incoming.rerankerEnabled());
-      // An explicit choice still supersedes a pending install when its value is unchanged.
-      // The coordinator validates the witness and owns the final revision stamp.
-      if (incoming.witness() != null) {
+      // Only the switch can repeat an explicit choice. Echoes from ordinary saves must not
+      // prepare a model or fence a pending install. The owner validates and stamps the revision.
+      if (incoming.witness() != null
+          && (choiceChanged || Boolean.TRUE.equals(incoming.rerankerSwitchIntent()))) {
         base.setRerankerPreferenceRevision(
             Math.addExact(incoming.witness().acceptedRevision(), 1));
       }

@@ -19,4 +19,22 @@ final class RerankerSettingsWireTest {
       assertEquals("/custom/ranker", reopened.rerankerModelPath());
     }
   }
+
+  @Test
+  void switchIntentNeedsAValueAndIsOmittedWhenAbsent() {
+    var json = JsonMapper.builder().build();
+    assertThrows(tools.jackson.core.JacksonException.class,
+        () -> json.readValue("{\"rerankerSwitchIntent\":true}", SettingsV2.class),
+        "A switch intent without a Best match first value is malformed");
+    var marked = json.readValue("{\"rerankerSwitchIntent\":true,\"rerankerEnabled\":false}",
+        SettingsV2.class);
+    var reopened = json.readValue(json.writeValueAsString(marked), SettingsV2.class);
+    assertEquals(Boolean.TRUE, reopened.rerankerSwitchIntent());
+    assertEquals(Boolean.FALSE, reopened.rerankerEnabled());
+    var projected = new SettingsV2(null, null, java.util.List.of(), null, null, null, null, null,
+        null, null, null, null, Boolean.TRUE);
+    assertNull(projected.rerankerSwitchIntent());
+    assertFalse(json.writeValueAsString(projected).contains("rerankerSwitchIntent"),
+        "A projection without an intent never echoes the marker");
+  }
 }

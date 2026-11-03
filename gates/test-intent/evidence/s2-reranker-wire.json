@@ -1,0 +1,46 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
+  },
+  "createdAt": "2026-11-03T02:43:21.109Z",
+  "revision": "29783766b8a599a6e37ee33d4b072693f0e252fb",
+  "tree": "467596fb4f1a957ff0bcf48cdab526a7b44fa79b",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": "openjdk version \"25.0.4.1\" 2026-08-18 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "./gradlew :modules:app-api:test --tests \"io.justsearch.app.api.settings.RerankerSettingsWireTest.switchIntentNeedsAValueAndIsOmittedWhenAbsent\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 2884
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/app-api/src/test/java/io/justsearch/app/api/settings/RerankerSettingsWireTest.java#switchIntentNeedsAValueAndIsOmittedWhenAbsent",
+      "file": "modules/app-api/src/test/java/io/justsearch/app/api/settings/RerankerSettingsWireTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:6231d6bda8439941a04cb0d876129b3dc7460858dd07f1f9b104c91e16dbe4b8",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "switchIntentNeedsAValueAndIsOmittedWhenAbsent()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:b014fbb64eee46c4f01fbcb50827cc4efc37f2a84477ddecdb936bdfb60a99c3"
+}

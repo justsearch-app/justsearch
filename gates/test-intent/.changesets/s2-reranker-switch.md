@@ -7,8 +7,7 @@ author-session: s2-reranker-builder-20261102
 
 # Test-intent entries
 
-The before-only patch adds an inert nullable wire property so installer preservation checks can
-execute on 551357f754. It changes no installer, resolution or activation behavior. The independent
+The before-only patches add inert scaffolding so checks can execute on their before-states: `s2-reranker-settings-api.patch` adds a nullable wire property on 551357f754, and `s2-reranker-preference-revision.patch` adds an always-zero, unserialized choice revision accessor on 9a81be19f4. Neither changes installer, resolution, activation or settings behavior. The independent
 verifier supplies acceptance after reviewing the final candidate. No acceptance is recorded here.
 
 ```json
@@ -321,7 +320,7 @@ verifier supplies acceptance after reviewing the final candidate. No acceptance 
         "modules/app-services/src/test/java/io/justsearch/app/services/ai/install/RerankerInstallConcurrentChoiceTest.java"
       ],
       "class": "New",
-      "behaviour": "Install completion preserves an Off saved through the settings coordinator during a real local HTTP download, including an unchanged Off and Off/On/Off. It reports that the newer choice was kept, persists Off across reload and keeps the downloaded bytes. An unrelated chat setting still permits the consented enable.",
+      "behaviour": "Install completion preserves an Off saved through the settings coordinator during a real local HTTP download, including an unchanged Off and Off/On/Off. It reports that the newer choice was kept, persists Off and the revision that accepted it across reload, and keeps the downloaded bytes.",
       "sources": [
         {
           "kind": "owner-adopted-scenario",
@@ -333,7 +332,7 @@ verifier supplies acceptance after reviewing the final candidate. No acceptance 
       ],
       "evidence": "gates/test-intent/evidence/s2-reranker-repair2.json",
       "newChecks": [
-        "modules/app-services/src/test/java/io/justsearch/app/services/ai/install/RerankerInstallConcurrentChoiceTest.java"
+        "modules/app-services/src/test/java/io/justsearch/app/services/ai/install/RerankerInstallConcurrentChoiceTest.java#concurrentOffDuringDownloadKeepsTheNewerChoice"
       ],
       "repaired": true
     },
@@ -342,7 +341,7 @@ verifier supplies acceptance after reviewing the final candidate. No acceptance 
         "modules/ui/src/test/java/io/justsearch/ui/api/RerankerRepeatedEnableHttpTest.java"
       ],
       "class": "New",
-      "behaviour": "A repeated true through the settings HTTP controller and real coordinator prepares a working reranker when the saved preference is already true and the durable role is disabled. Unavailable files refuse without replacing settings bytes or their witness; a prepared selection commits COMPLETE.",
+      "behaviour": "A repeated true marked as the switch's explicit intent, through the settings HTTP controller and real coordinator, goes through reranker preparation when the saved preference is already true and the durable role is disabled. Unavailable files refuse without replacing settings bytes or their witness; a prepared selection commits COMPLETE.",
       "sources": [
         {
           "kind": "owner-adopted-scenario",
@@ -357,6 +356,159 @@ verifier supplies acceptance after reviewing the final candidate. No acceptance 
         "modules/ui/src/test/java/io/justsearch/ui/api/RerankerRepeatedEnableHttpTest.java#repeatedEnablePreparesDisabledRoleOrRefusesWithoutCommitting"
       ],
       "repaired": true
+    },
+    {
+      "items": [
+        "modules/app-services/src/test/java/io/justsearch/app/services/ai/install/RerankerInstallConcurrentChoiceTest.java"
+      ],
+      "class": "New",
+      "behaviour": "A public settings save from another window that echoes the saved Best match first value without the switch intent is not a new choice: the persisted choice revision stays unchanged and the consented switch-on still completes with the downloaded model after the download.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "R3",
+          "quote": "Switching Best match first while searches and answers run: in-flight work completes, new work uses the new setting; a second window shows the change; a stale save cannot overwrite a newer one (settings witness). Failures (missing or corrupt files, warm-up failure, low memory, crash mid-change) leave a truthful state, never a false On/Off. Missing files: the existing consent with size and licence, no transfer if declined.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "R1",
+          "quote": "After install, Best match first has a live switch (sentence and path). Off: searches and the answer context stop using the reranker within one change, no Engine restart, results stay usable (earlier ordering); files kept; the page says \"Off - files kept\". On: reranking returns with the same model files.",
+          "label": "agent-drafted, owner-adopted"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/s2-reranker-repair3.json",
+      "newChecks": [
+        "modules/app-services/src/test/java/io/justsearch/app/services/ai/install/RerankerInstallConcurrentChoiceTest.java#publicSaveEchoingTheUnchangedChoiceDuringDownloadStillAllowsConsentedEnable"
+      ],
+      "repaired": true
+    },
+    {
+      "items": [
+        "modules/ui/src/test/java/io/justsearch/ui/api/RerankerRepeatedEnableHttpTest.java"
+      ],
+      "class": "New",
+      "behaviour": "Through the settings HTTP controller and real coordinator, a theme save that echoes the saved true while the reranker files are unavailable runs no reranker preparation, commits COMPLETE with the theme, and leaves the disabled role, the saved true and the choice revision as they were.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "R3",
+          "quote": "Switching Best match first while searches and answers run: in-flight work completes, new work uses the new setting; a second window shows the change; a stale save cannot overwrite a newer one (settings witness). Failures (missing or corrupt files, warm-up failure, low memory, crash mid-change) leave a truthful state, never a false On/Off. Missing files: the existing consent with size and licence, no transfer if declined.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "N2",
+          "quote": "Saved settings keep their meaning across the stored settings schema change (envelope schema 6 today; public API v2): existing installs load with no explicit choice (today’s behaviour), older settings versions migrate, corrupt settings are quarantined as today; declinedAiPackages stays acquisition preference only.",
+          "label": "agent-drafted, owner-adopted"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/s2-reranker-repair3.json",
+      "newChecks": [
+        "modules/ui/src/test/java/io/justsearch/ui/api/RerankerRepeatedEnableHttpTest.java#themeSaveEchoingTrueDoesNotPrepareUnavailableReranker"
+      ],
+      "repaired": true
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/views/BrainSurface.reranker-switch.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "Both requests the page's Best match first switch sends, Off and then On, carry the explicit switch intent marker with the chosen value; the remaining switch assertions are unchanged.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "R1",
+          "quote": "After install, Best match first has a live switch (sentence and path). Off: searches and the answer context stop using the reranker within one change, no Engine restart, results stay usable (earlier ordering); files kept; the page says \"Off - files kept\". On: reranking returns with the same model files.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "R3",
+          "quote": "Switching Best match first while searches and answers run: in-flight work completes, new work uses the new setting; a second window shows the change; a stale save cannot overwrite a newer one (settings witness). Failures (missing or corrupt files, warm-up failure, low memory, crash mid-change) leave a truthful state, never a false On/Off. Missing files: the existing consent with size and licence, no transfer if declined.",
+          "label": "agent-drafted, owner-adopted"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/s2-reranker-repair3.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/views/BrainSurface.reranker-switch.test.ts#shares the sentence and path choice, waits for completion, and switches back on"
+      ],
+      "repaired": true
+    },
+    {
+      "items": [
+        "modules/app-services/src/test/java/io/justsearch/app/services/ai/install/RerankerInstallConcurrentChoiceTest.java"
+      ],
+      "class": "New",
+      "behaviour": "After a consented install whose switch-on was fenced by a newer Off, a Repair or an install of additions keeps Off, the disabled role and the persisted choice revision (the addition's own path is applied); a second consent takes its own snapshot and enables. A consented install interrupted before completion and followed by an Engine restart does not enable on the later Repair: the install-start snapshot is memory-only (named limit). An internal chat write during the download still allows the consented enable.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "R2",
+          "quote": "The Best match first choice survives Engine restart, app upgrade and a legacy install whose reranker was found by discovery; an explicit off survives Repair, installing additions and runtime activation (none silently turns it back on). Absent choice keeps today’s behaviour.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "R3",
+          "quote": "Switching Best match first while searches and answers run: in-flight work completes, new work uses the new setting; a second window shows the change; a stale save cannot overwrite a newer one (settings witness). Failures (missing or corrupt files, warm-up failure, low memory, crash mid-change) leave a truthful state, never a false On/Off. Missing files: the existing consent with size and licence, no transfer if declined.",
+          "label": "agent-drafted, owner-adopted"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/s2-reranker-lifecycle.json",
+      "newChecks": [
+        "modules/app-services/src/test/java/io/justsearch/app/services/ai/install/RerankerInstallConcurrentChoiceTest.java#followUpInstallAfterAFencedEnable",
+        "modules/app-services/src/test/java/io/justsearch/app/services/ai/install/RerankerInstallConcurrentChoiceTest.java#interruptedConsentedInstallDoesNotEnableAfterRestart",
+        "modules/app-services/src/test/java/io/justsearch/app/services/ai/install/RerankerInstallConcurrentChoiceTest.java#unrelatedSettingsWriteDuringDownloadStillAllowsConsentedEnable"
+      ]
+    },
+    {
+      "items": [
+        "modules/ui/src/test/java/io/justsearch/ui/api/RerankerRepeatedEnableHttpTest.java"
+      ],
+      "class": "New",
+      "behaviour": "A plain settings save without the switch intent that changes the saved false to true still goes through reranker preparation: a prepared selection commits COMPLETE, unavailable files refuse without committing and the saved false stays.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "R3",
+          "quote": "Switching Best match first while searches and answers run: in-flight work completes, new work uses the new setting; a second window shows the change; a stale save cannot overwrite a newer one (settings witness). Failures (missing or corrupt files, warm-up failure, low memory, crash mid-change) leave a truthful state, never a false On/Off. Missing files: the existing consent with size and licence, no transfer if declined.",
+          "label": "agent-drafted, owner-adopted"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/s2-reranker-lifecycle.json",
+      "newChecks": [
+        "modules/ui/src/test/java/io/justsearch/ui/api/RerankerRepeatedEnableHttpTest.java#plainEnableChangeStillPreparesOrRefuses"
+      ]
+    },
+    {
+      "items": [
+        "modules/app-api/src/test/java/io/justsearch/app/api/settings/RerankerSettingsWireTest.java"
+      ],
+      "class": "New",
+      "behaviour": "The switch intent marker is accepted only with a Best match first value (a marker alone is refused as malformed), round-trips with its value, and is never written by a settings projection that carries no intent.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "R3",
+          "quote": "Switching Best match first while searches and answers run: in-flight work completes, new work uses the new setting; a second window shows the change; a stale save cannot overwrite a newer one (settings witness). Failures (missing or corrupt files, warm-up failure, low memory, crash mid-change) leave a truthful state, never a false On/Off. Missing files: the existing consent with size and licence, no transfer if declined.",
+          "label": "agent-drafted, owner-adopted"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/s2-reranker-wire.json",
+      "newChecks": [
+        "modules/app-api/src/test/java/io/justsearch/app/api/settings/RerankerSettingsWireTest.java#switchIntentNeedsAValueAndIsOmittedWhenAbsent"
+      ]
     }
   ]
 }

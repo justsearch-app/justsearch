@@ -56,8 +56,11 @@ public final class SettingsServiceImpl implements SettingsService {
         "servingRefreshProfileId");
   }
 
-  private static void requireRerankerChoiceAuthority(io.justsearch.app.api.settings.SettingsV2 input) {
-    if (input.rerankerEnabled() == null) return;
+  private static void requireRerankerChoiceAuthority(io.justsearch.app.api.settings.SettingsV2 input,
+      io.justsearch.app.api.UiSettings saved) {
+    if (input.rerankerEnabled() == null
+        || (!Boolean.TRUE.equals(input.rerankerSwitchIntent())
+            && Objects.equals(input.rerankerEnabled(), saved.getRerankerEnabled()))) return;
     for (var key : java.util.List.of(io.justsearch.configuration.EnvRegistry.RERANK_MODEL_PATH,
         io.justsearch.configuration.EnvRegistry.RERANK_ENABLED)) {
       if (key.get().filter(value -> !value.isBlank()).isPresent()) {
@@ -97,7 +100,6 @@ public final class SettingsServiceImpl implements SettingsService {
     if (input.witness() == null || engineAdmission == null || context.workId().isEmpty()) {
       throw new IllegalArgumentException("Accepted reconfigure requires a witness and exact admitted work");
     }
-    requireRerankerChoiceAuthority(input);
     var patch = SettingsPatch.normalize(input);
     UiModeIntent modeIntent = modeIntentOf(modeIntentHeader, patch);
     if (!publicWriteActive.compareAndSet(false, true)) {
@@ -115,6 +117,7 @@ public final class SettingsServiceImpl implements SettingsService {
       }
       Long latest = modeIntent == null ? null : latestUiModeIntentByClient.get(modeIntent.clientId());
       boolean applyMode = modeIntent == null || latest == null || modeIntent.sequence() > latest;
+      requireRerankerChoiceAuthority(patch, snapshot.settings());
       var candidate = SettingsPatch.merge(snapshot.settings(), patch, applyMode);
       String invalidPath = SettingsPatch.validateIndexPath(candidate.getIndexBasePath());
       if (invalidPath != null) throw refused("INVALID_PATH", invalidPath);
@@ -252,7 +255,6 @@ public final class SettingsServiceImpl implements SettingsService {
         return startPublic(existing.orElseThrow(),
             ignored -> { throw new IllegalStateException("A recorded settings attempt cannot execute again"); });
       }
-      requireRerankerChoiceAuthority(patch);
       if (!store.mode().isWritable()) throw refused("SETTINGS_READ_ONLY", "Settings persistence is disabled");
       UiSettingsStore.Snapshot snapshot;
       try { snapshot = store.inspect(); }
@@ -263,6 +265,7 @@ public final class SettingsServiceImpl implements SettingsService {
       Long latest = modeIntent == null ? null : latestUiModeIntentByClient.entrySet().stream()
           .filter(entry -> entry.getKey().equals(modeIntent.clientId())).map(Map.Entry::getValue).findFirst().orElse(null);
       boolean applyMode = modeIntent == null || latest == null || modeIntent.sequence() > latest;
+      requireRerankerChoiceAuthority(patch, snapshot.settings());
       var candidate = SettingsPatch.merge(snapshot.settings(), patch, applyMode);
       String invalidPath = SettingsPatch.validateIndexPath(candidate.getIndexBasePath());
       if (invalidPath != null) throw refused("INVALID_PATH", invalidPath);

@@ -1,0 +1,109 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
+  },
+  "createdAt": "2026-11-03T02:43:13.644Z",
+  "revision": "29783766b8a599a6e37ee33d4b072693f0e252fb",
+  "tree": "5a201b4cd2b17ec9f0105509a3d54aba2a138d02",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": "openjdk version \"25.0.4.1\" 2026-08-18 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "./gradlew :modules:app-services:test --tests \"io.justsearch.app.services.ai.install.RerankerInstallConcurrentChoiceTest.followUpInstallAfterAFencedEnable\" --tests \"io.justsearch.app.services.ai.install.RerankerInstallConcurrentChoiceTest.interruptedConsentedInstallDoesNotEnableAfterRestart\" --tests \"io.justsearch.app.services.ai.install.RerankerInstallConcurrentChoiceTest.unrelatedSettingsWriteDuringDownloadStillAllowsConsentedEnable\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 13925
+    },
+    {
+      "command": "./gradlew :modules:ui:test --tests \"io.justsearch.ui.api.RerankerRepeatedEnableHttpTest.plainEnableChangeStillPreparesOrRefuses\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 8043
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/ai/install/RerankerInstallConcurrentChoiceTest.java#followUpInstallAfterAFencedEnable",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/ai/install/RerankerInstallConcurrentChoiceTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:5c9d4d58e56d7f4f76e639f62bb94183b28741211188b092c10b435c599bed35",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "followUpInstallAfterAFencedEnable(repair)",
+          "status": "passed"
+        },
+        {
+          "name": "followUpInstallAfterAFencedEnable(additions)",
+          "status": "passed"
+        },
+        {
+          "name": "followUpInstallAfterAFencedEnable(consent-again)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/ai/install/RerankerInstallConcurrentChoiceTest.java#interruptedConsentedInstallDoesNotEnableAfterRestart",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/ai/install/RerankerInstallConcurrentChoiceTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:5c9d4d58e56d7f4f76e639f62bb94183b28741211188b092c10b435c599bed35",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "interruptedConsentedInstallDoesNotEnableAfterRestart(Path)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/ai/install/RerankerInstallConcurrentChoiceTest.java#unrelatedSettingsWriteDuringDownloadStillAllowsConsentedEnable",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/ai/install/RerankerInstallConcurrentChoiceTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:5c9d4d58e56d7f4f76e639f62bb94183b28741211188b092c10b435c599bed35",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "unrelatedSettingsWriteDuringDownloadStillAllowsConsentedEnable(Path)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/RerankerRepeatedEnableHttpTest.java#plainEnableChangeStillPreparesOrRefuses",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/RerankerRepeatedEnableHttpTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:3046f2bff68a3e1dc0677d46b959d12d271987fbb0a98fc0b448b2496cfba381",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "plainEnableChangeStillPreparesOrRefuses(false)",
+          "status": "passed"
+        },
+        {
+          "name": "plainEnableChangeStillPreparesOrRefuses(true)",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:afe991dc3c05a6921978dcb7b2675e4aae98c8b750ce3361a3f3ff5f33adc18b"
+}

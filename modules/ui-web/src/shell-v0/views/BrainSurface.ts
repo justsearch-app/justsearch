@@ -1963,7 +1963,7 @@ export class BrainSurface extends JfElement {
     await this.withBusy('reranker-switch', async () => {
       this.runtimeError = null;
       ++this.choiceRevision;
-      const attempt = createSettingsAttempt({ rerankerEnabled: enabled }, requireSettingsWitness(this.rerankerSettings?.witness));
+      const attempt = createSettingsAttempt({ rerankerEnabled: enabled, rerankerSwitchIntent: true }, requireSettingsWitness(this.rerankerSettings?.witness));
       let result;
       try {
         result = await executeSettingsAttempt(

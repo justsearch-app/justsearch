@@ -18,7 +18,7 @@ const json = (body: unknown, status = 200) => new Response(JSON.stringify(body),
 let enabled: boolean | null;
 let witness: { acceptedRevision: number; lastCommittedOperationKey: string | null };
 let preview: InstallPlanPreview;
-let posts: Array<{ rerankerEnabled: boolean; witness: typeof witness }>;
+let posts: Array<{ rerankerEnabled: boolean; rerankerSwitchIntent?: boolean; witness: typeof witness }>;
 let operations: string[];
 let operationArgs: unknown[];
 let refusal: string | null;
@@ -93,7 +93,8 @@ describe('Best match first live switch', () => {
     expect(el.shadowRoot!.querySelector('[data-feature="reranker"]')!.textContent).toContain('Off — files kept');
     emit(false); await settle(el);
     switches(el)[1]!.click(); await settle(el);
-    expect(posts.map(p => p.rerankerEnabled)).toEqual([false, true]);
+    expect(posts.map(p => ({ enabled: p.rerankerEnabled, intent: p.rerankerSwitchIntent })))
+      .toEqual([{ enabled: false, intent: true }, { enabled: true, intent: true }]);
     emit(true); await settle(el);
     expect(switches(el).map(b => b.getAttribute('aria-checked'))).toEqual(['true', 'true']);
     expect(el.shadowRoot!.querySelectorAll('[data-feature="reranker"] > .step-meta')[1]!.textContent?.trim()).toBe('On');
