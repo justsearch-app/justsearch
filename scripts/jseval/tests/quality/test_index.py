@@ -1,5 +1,6 @@
 """Index trust boundaries; real CPU lifecycle is opt-in via JSEVAL_QUALITY_INDEX_REAL=1."""
 from dataclasses import replace
+import json
 import os
 from pathlib import Path
 import subprocess
@@ -203,6 +204,78 @@ def test_confirm_without_running_backend_refuses(collection, config, tmp_path):
     assert not result.ok and "no live serving backend" in result.failures[0]
 
 
+def test_confirm_allows_query_time_ranking_changes_but_rejects_shape_and_content(
+        collection, config, tmp_path, monkeypatch):
+    from types import SimpleNamespace
+    from copy import deepcopy
+    c, source = collection
+    cfg = replace(config, documents_dir=source)
+    env = env_for(cfg)
+    key, components = ix.compute_index_key(c, cfg, env)
+    root = tmp_path / "entry"
+    data = root / "data"
+    data.mkdir(parents=True)
+    owner = ix._population_owner(c, key)
+    ix._write(data / "quality-owner.json", owner)
+    original = {"index_population": c.index_population(), "content": dict(c.content),
+                "extracted_content": dict(c.content), "samples": {"ANSWER-1": {"chunks": 2}},
+                "probes": [{"ranked": ["ANSWER-1", "answer-2"]}],
+                "generation": "generation", "completeness": []}
+    ix._write(root / "entry.json", {"owner": owner, "witness": original})
+    current = deepcopy(original)
+    current["probes"][0]["ranked"].reverse()
+    monkeypatch.setattr(ix, "witness", lambda *args: current)
+    monkeypatch.setattr(ix.index_identity, "confirm_adoption", lambda *a, **kw:
+                        ix.index_identity.ConfirmResult(True, [], {}))
+    handle = ix.IndexHandle(c, cfg, key, root, data, "cached", components, env, None,
+                           _backend=SimpleNamespace(proc=SimpleNamespace(poll=lambda: None)),
+                           base_url="http://engine")
+    query_file = cfg.repo_root / next(p for p in ix.QUERY_TIME_ONLY if p.endswith("KnowledgeSearchEngine.java"))
+    query_file.parent.mkdir(parents=True)
+    query_file.write_text("changed fusion weight")
+    assert ix.confirm(handle).ok
+    # Full delivered-order agreement remains a separate, stricter check.
+    assert ix._agreement(original, current) == ["witness differs: probes"]
+    current["content"]["ANSWER-1"] = sha256_text("wrong live content")
+    refused = ix.confirm(handle)
+    assert not refused.ok and "witness differs: content" in refused.failures
+    current["content"] = dict(c.content)
+    (cfg.repo_root / "shape.java").write_text("new index shape")
+    refused = ix.confirm(handle)
+    assert not refused.ok and any("index-shaping inputs changed" in f for f in refused.failures)
+
+
+@pytest.mark.parametrize("rank,ok", [(0, True), (2, True), (3, False)])
+def test_adoption_probe_is_exact_lexical_and_requires_expected_in_top_three(
+        collection, tmp_path, rank, ok):
+    c, _ = collection
+    docs = tmp_path / "documents"
+    # Additional opaque ids let the fourth result exercise the bound.
+    m = Collection("probe", "en", {"q": QueryText("query")}, {"q": {"0": 1}},
+                   {str(i): f"{i}.txt" for i in range(4)},
+                   {str(i): sha256_text(str(i)) for i in range(4)})
+    order = ["1", "2", "3"]
+    order.insert(rank, "0")
+    seen = []
+    def transport(request):
+        seen.append(json.loads(request.content))
+        return httpx.Response(200, json={"results": [
+            {"fields": {"path": str(docs / m.documents[d])}} for d in order],
+            "searchTrace": {"stages": [
+                {"id": "sparse-retrieval", "status": "executed"},
+                {"id": "dense-retrieval", "status": "skipped"},
+                {"id": "cross-encoder", "status": "skipped", "reason": "NAVIGATIONAL_QUERY"}]}})
+    with httpx.Client(base_url="http://engine", transport=httpx.MockTransport(transport)) as client:
+        request = {"mode": "text", "querySyntax": "search", "limit": 3}
+        if ok:
+            ix._probe(client, 'unique "quoted" passage', request, m, docs, "0")
+        else:
+            with pytest.raises(ix.IndexRefused, match="top 3"):
+                ix._probe(client, 'unique "quoted" passage', request, m, docs, "0")
+    assert seen == [{"mode": "text", "querySyntax": "search", "limit": 3,
+                     "query": '"unique \\"quoted\\" passage"', "debug": True}]
+
+
 def _wait_for_file(path, worker, timeout=30):
     deadline = time.monotonic() + timeout
     while not path.exists():
@@ -370,12 +443,20 @@ def test_real_cpu_official_subset_agreement_pause_and_foreign_population(monkeyp
     # (IndexCountOps.querySpladeFeatureCounts). Audit completion measures encoding.
     for state in states:
         assert next(a for a in state["completeness"] if a["stageId"] == "splade")["present"] == 0
-        assert all(p["stages"]["splade-retrieval"] == "skipped" for p in state["probes"])
+        assert all(p["stages"]["dense-retrieval"] == "skipped" for p in state["probes"])
     print(f"CPU lifecycle evidence: {root}; timings={timings}")
 
 
-def test_witness_reads_live_manifest_content_chunks_and_raw_search_paths(collection, config, tmp_path, monkeypatch):
+@pytest.mark.parametrize("shared_prefix", [False, True])
+def test_witness_reads_live_manifest_content_chunks_and_raw_search_paths(collection, config, tmp_path, monkeypatch, shared_prefix):
     c, source = collection
+    if shared_prefix:
+        prefix = " ".join(f"common{i}" for i in range(12)) + " "
+        for rel in c.documents.values():
+            path = source / rel
+            path.write_text(prefix + path.read_text())
+        c = replace(c, content={d: sha256_text((source / rel).read_text())
+                                for d, rel in c.documents.items()}, version="")
     root = tmp_path / "entry"
     root.mkdir()
     cfg = replace(config, documents_dir=source)
@@ -393,8 +474,9 @@ def test_witness_reads_live_manifest_content_chunks_and_raw_search_paths(collect
                                 "missing": 0, "failed": 0},
                                {"stageId": "splade", "expected": 2, "present": 0,
                                 "missing": 2, "failed": 0}]}
-    stages = [{"id": s, "status": "executed"} for s in
-              ("sparse-retrieval", "dense-retrieval", "cross-encoder")]
+    stages = [{"id": "sparse-retrieval", "status": "executed"},
+              {"id": "dense-retrieval", "status": "skipped"},
+              {"id": "cross-encoder", "status": "skipped", "reason": "NAVIGATIONAL_QUERY"}]
     returned_ids = list(ids.values())
     source_hashes = {ids[d]: c.content[d] for d in ids}
     def transport(request):
@@ -422,6 +504,11 @@ def test_witness_reads_live_manifest_content_chunks_and_raw_search_paths(collect
     assert w["index_population"] == c.index_population()
     assert w["content"] == c.content
     assert w["samples"] and len(w["probes"]) == 3
+    if shared_prefix:
+        assert all(len(p["query"].split()) > 12 for p in w["probes"] if p["source_word_offset"] == 0)
+    for p in w["probes"]:
+        assert sum(p["query"].casefold() in " ".join(text.split()).casefold()
+                   for text in texts.values()) == 1
     texts[returned_ids[0]] = texts[returned_ids[0]].strip()  # extraction may normalize whitespace
     normalized = ix.witness("http://engine", c, m, root / "documents", cfg)
     assert normalized["content"] == w["content"]

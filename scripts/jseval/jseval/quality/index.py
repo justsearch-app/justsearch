@@ -336,16 +336,17 @@ def _ready_reasons(status: dict, c: Collection, sparse: bool) -> list[str]:
 
 def _probe(client: httpx.Client, query: str, request: Mapping, materialized: Collection,
            docs: Path, expected: str) -> dict:
-    body = _post(client, "/api/knowledge/search", {**request, "query": query, "debug": True})
+    # Adoption proves stored retrieval, independently of fusion/reranker scores.
+    # Search phrase syntax escapes punctuation from the original source passage;
+    # its advanced-query pipeline also disables expansion and reranking.
+    phrase = '"' + query.replace('\\', '\\\\').replace('"', '\\"') + '"'
+    body = _post(client, "/api/knowledge/search", {**request, "query": phrase, "debug": True})
     trace = body.get("searchTrace") or {}
     stages = {s["id"]: s.get("status") for s in trace.get("stages", [])}
-    for name in ("sparse-retrieval", "dense-retrieval", "cross-encoder"):
-        if stages.get(name) != "executed":
-            raise IndexRefused(f"probe {name} did not execute: {stages}")
-    degradation = trace.get("degradation") or {}
-    # The trace also carries affirmative facts (e.g. spladeExecuted), not just failures.
-    if any(degradation.get(k) for k in ("vectorBlocked", "hybridFallback", "crossEncoderSkipped")):
-        raise IndexRefused(f"probe degraded: {degradation}")
+    if (stages.get("sparse-retrieval") != "executed"
+            or stages.get("dense-retrieval") != "skipped"
+            or stages.get("cross-encoder") != "skipped"):
+        raise IndexRefused(f"probe did not use lexical retrieval only: {stages}")
     locations = []
     for hit in body.get("results", []):
         # The Search REST surface delivers raw hits, not MCP's display projection.
@@ -354,8 +355,8 @@ def _probe(client: httpx.Client, query: str, request: Mapping, materialized: Col
             raise IndexRefused("search hit has no full document identity")
         locations.append(location)
     ranked = materialized.ranked_doc_ids(locations, docs)
-    if expected not in ranked:
-        raise IndexRefused(f"probe did not return expected document {expected}")
+    if expected not in ranked[:3]:
+        raise IndexRefused(f"probe did not return expected document {expected} within top 3")
     return {"query": query, "expected": expected, "ranked": list(ranked), "stages": stages}
 
 
@@ -391,6 +392,7 @@ def witness(base_url: str, c: Collection, m: Collection, docs: Path,
         longest = max(texts, key=lambda doc: ((docs / m.documents[doc]).stat().st_size, doc))
         samples = sorted(set([longest] + sorted(texts)[:max(0, config.sample_size - 1)]))
         sample, probes = {}, []
+        normalized = {doc: " ".join(text.split()).casefold() for doc, text in texts.items()}
         for doc in samples:
             chunks = _get(client, "/api/debug/chunks", params={"docId": by_doc[doc]})
             sample[doc] = {"extracted_sha256": hashes[doc], "chunks": chunks["chunksFound"]}
@@ -404,7 +406,17 @@ def witness(base_url: str, c: Collection, m: Collection, docs: Path,
                 query = " ".join(words[start:start + 12])
                 if query not in " ".join(texts[doc].split()):
                     raise IndexRefused(f"source passage missing from extracted text: {doc} at word {start}")
-                probe = _probe(client, query, config.request, m, docs, doc)
+                # Extend shared boilerplate until this passage names only its source.
+                end = min(len(words), start + 12)
+                while any(query.casefold() in text for other, text in normalized.items() if other != doc):
+                    if end == len(words):
+                        raise IndexRefused(f"no unique source passage for {doc} at word {start}")
+                    end = min(len(words), end + 12)
+                    query = " ".join(words[start:end])
+                if query.casefold() not in normalized[doc]:
+                    raise IndexRefused(f"source passage missing from extracted text: {doc} at word {start}")
+                probe = _probe(client, query, {"mode": "text", "querySyntax": "search", "limit": 3},
+                               m, docs, doc)
                 probe.update(source_word_offset=start, source_word_count=len(words))
                 probes.append(probe)
         meta = _get(client, "/api/debug/commit-metadata")
@@ -427,7 +439,14 @@ def witness(base_url: str, c: Collection, m: Collection, docs: Path,
 
 
 def _agreement(a: dict, b: dict) -> list[str]:
-    return [f"witness differs: {k}" for k in ("index_population", "content", "extracted_content", "samples", "probes",
+    """Same-code lifecycle agreement also compares the full delivered rankings."""
+    return _adoption_agreement(a, b) + (["witness differs: probes"] if a["probes"] != b["probes"] else [])
+
+
+def _adoption_agreement(a: dict, b: dict) -> list[str]:
+    # Each live lexical probe already proved its expected document in the top 3.
+    # Query-time ranking is deliberately absent from the reusable index key.
+    return [f"witness differs: {k}" for k in ("index_population", "content", "extracted_content", "samples",
                                              "generation", "completeness") if a[k] != b[k]]
 
 
@@ -612,7 +631,7 @@ def confirm(handle: IndexHandle) -> index_identity.ConfirmResult:
         _check_owner(entry["owner"], handle.collection, handle.index_key)
         m = _materialize(handle.collection, handle.config, handle.root)
         current = witness(handle.base_url, handle.collection, m, handle.root / "documents", handle.config)
-        failures.extend(_agreement(entry["witness"], current))
+        failures.extend(_adoption_agreement(entry["witness"], current))
         adopted = index_identity.confirm_adoption(handle.base_url, entry, handle.data_dir,
                                                   handle.env, index_key=handle.index_key)
         failures.extend(adopted.failures)

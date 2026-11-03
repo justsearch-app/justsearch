@@ -181,6 +181,40 @@ def test_execute_estimate_guard_runs_before_reservation(tmp_path, monkeypatch):
     assert not list(tmp_path.iterdir())
 
 
+def test_collection_probe_rankings_remain_evidence_not_comparison_input(tmp_path, monkeypatch):
+    import time
+    from jseval.quality import index
+    from jseval.quality.types import RunRecord
+    c = make_collection()
+    fixture = make_run(c)
+    handle = Mock(index_key='prepared-key', index_population=c.index_population(),
+                  index_build='cached', index_cache_key='prepared-key',
+                  model_hashes=dict(fixture.header.model_hashes), env={},
+                  index_state={'settled': True, 'probes': [{'ranked': ['d001', 'd000']}]},
+                  base_url='http://engine')
+    monkeypatch.setattr(run, 'require_exclusive', lambda _: None)
+    monkeypatch.setattr(run.collections, 'load_collection', lambda _: c)
+    monkeypatch.setattr(run.index, 'prepare_index', lambda *a, **kw: handle)
+    monkeypatch.setattr(run.index, 'confirm', lambda _: Mock(ok=True))
+    results = {r.qid: r for r in fixture.results}
+    monkeypatch.setattr(run, 'search_query', lambda client, h, qid, *a: results[qid])
+    item = {'index_config': run._serial_config(index.IndexConfig()),
+            **{k: str(tmp_path/k) for k in ('collection', 'run', 'ready', 'go', 'done')}}
+    Path(item['go']).touch()
+    run._collection_worker({'request': run.refined_request(), 'commit': fixture.header.commit,
+                            'dirty_hash': None, 'mode': None, 'hardware': {}, 'budget': 600},
+                           item, time.monotonic()+30)
+    assert json.loads(Path(item['done']).read_text())['error'] is None
+    record = RunRecord.read(item['run'])
+    assert record.header.index_state['probes'] == handle.index_state['probes']
+    before = replace(record.header, index_state={**record.header.index_state,
+                     'probes': [{'ranked': ['d000', 'd001']}]})
+    assert compare.identity_differences(before, record.header) == {}
+    # Baselines written before the probe witness was introduced also compare.
+    before = replace(record.header, index_state={'settled': True, 'runtime': {}})
+    assert compare.identity_differences(before, record.header) == {}
+
+
 @pytest.mark.skipif(sys.platform != 'linux',reason='Linux admission guardian')
 def test_real_admission_deadline_reaps_hung_worker_and_releases(tmp_path,monkeypatch):
     import os,time

@@ -203,6 +203,11 @@ def identity_differences(b: RunHeader, n: RunHeader) -> dict[str, str]:
     for name in ("index_state", "budget"):
         bm, nm = getattr(b, name), getattr(n, name)
         for k in sorted(set(bm) | set(nm)):
+            # Adoption already checks expected lexical hits. Probe ordering is
+            # query-time output, retained as evidence and compared only by the
+            # separate same-code lifecycle agreement command.
+            if name == "index_state" and k == "probes":
+                continue
             if bm.get(k) != nm.get(k):
                 diffs[f"{name}.{k}"] = f"{bm.get(k)!r} -> {nm.get(k)!r}"
     if (set(b.expected_legs), b.expected_reranker) != (set(n.expected_legs), n.expected_reranker):
