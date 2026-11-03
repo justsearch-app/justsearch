@@ -92,7 +92,7 @@ class CombinedEnrichmentFailureAccountingTest {
   }
 
   @Test
-  void preservationEncodesOnlyParentsWithAnotherOutcomeAndPublishesEveryEncode() throws Exception {
+  void completedSparseIsNotEncodedOrCountedAsNewWork() throws Exception {
     for (int i = 0; i < 10; i++) {
       seed("doc-" + i, SchemaFields.EMBEDDING_STATUS);
       index.get("doc-" + i).put(SchemaFields.SPLADE_STATUS, "COMPLETED");
@@ -104,10 +104,10 @@ class CombinedEnrichmentFailureAccountingTest {
     var outcome = CombinedEnrichmentBackfillOps.processCombinedBackfill(context());
     assertTrue(outcome.progressed());
     assertEquals(8, outcome.embedProcessed());
-    assertEquals(8, outcome.spladeProcessed());
-    verify(splade).encodeBatch(List.of("doc-0", "doc-1", "doc-2", "doc-3", "doc-4", "doc-5", "doc-6", "doc-7"));
+    assertEquals(0, outcome.spladeProcessed());
+    verify(splade, never()).encodeBatch(anyList());
     for (int i = 0; i < 10; i++) {
-      assertEquals(i < 8, index.get("doc-" + i).containsKey(SchemaFields.SPLADE));
+      assertFalse(index.get("doc-" + i).containsKey(SchemaFields.SPLADE));
       assertEquals(i < 8 ? "COMPLETED" : "PENDING", index.get("doc-" + i).get(SchemaFields.EMBEDDING_STATUS));
     }
   }

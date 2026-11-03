@@ -194,6 +194,8 @@ public final class SchemaFields {
   // SPLADE sparse retrieval fields
   /** SPLADE sparse vector field (FeatureField per token). */
   public static final String SPLADE = "splade";
+  /** Stored sparse entries derived alongside FeatureFields; never caller-owned. */
+  public static final String SPLADE_PAYLOAD = "splade_payload";
   /** SPLADE processing status for this document. */
   public static final String SPLADE_STATUS = "splade_status";
   public static final String SPLADE_STATUS_PENDING = "PENDING";
@@ -374,6 +376,7 @@ public final class SchemaFields {
 
       // SPLADE sparse retrieval
       SPLADE,
+      SPLADE_PAYLOAD,
       SPLADE_STATUS,
       SPLADE_RETRY_COUNT,
 

@@ -235,9 +235,9 @@ final class RemovalAndRenameDurabilityTest extends LuceneExecutorTestBase {
     }
   }
 
-  @org.junit.jupiter.params.ParameterizedTest
+  @org.junit.jupiter.params.ParameterizedTest(name = "sparseStatesAndRetriesSurviveMetadataUpdate({arguments})")
   @org.junit.jupiter.params.provider.ValueSource(strings = {"PENDING", "FAILED", "COMPLETED"})
-  void C32ApplicableSparseStatesKeepRetriesAndCompletedWithoutDataRequeues(String state) {
+  void sparseStatesAndRetriesSurviveMetadataUpdate(String state) {
     try (var runtime = open(directory.resolve("index"))) {
       parent(runtime, "/parent", "source"); child(runtime, "child", "/parent", REV); refresh(runtime);
       for (String id : List.of("/parent", "child")) {
@@ -252,9 +252,9 @@ final class RemovalAndRenameDurabilityTest extends LuceneExecutorTestBase {
       }
       refresh(runtime);
       for (String id : List.of("/parent", "child")) {
-        assertEquals(state.equals("COMPLETED") ? "PENDING" : state,
+        assertEquals(state,
             runtime.documentFieldOps().getDocumentField(id, SchemaFields.SPLADE_STATUS));
-        assertEquals(state.equals("COMPLETED") ? "0" : "2",
+        assertEquals("2",
             runtime.documentFieldOps().getDocumentField(id, SchemaFields.SPLADE_RETRY_COUNT));
       }
     }
@@ -306,14 +306,19 @@ final class RemovalAndRenameDurabilityTest extends LuceneExecutorTestBase {
   }
 
 
-  @Test void C32SparseAbsenceUsesTheCurrentChunkConfiguration() {
+  @Test void missingChunkSpladeStatusIsHealedOnlyWhenChunkSpladeIsEnabled() {
     try (var runtime = open(directory.resolve("index"))) {
       parent(runtime, "/parent", "source"); child(runtime, "child", "/parent", REV); refresh(runtime);
       runtime.indexingCoordinator().updateDocument("child", Map.of(SchemaFields.META_AUTHOR, "Carol")); refresh(runtime);
       assertNull(runtime.documentFieldOps().getDocumentField("child", SchemaFields.SPLADE_STATUS));
+      assertNull(runtime.documentFieldOps().getDocumentField("child", SchemaFields.SPLADE_RETRY_COUNT));
       runtime.session().resolvedConfig = io.justsearch.configuration.resolved.ResolvedConfig.builder()
           .putDefault("rag.chunk_splade.enabled", "true").build();
       runtime.indexingCoordinator().updateDocument("child", Map.of(SchemaFields.META_AUTHOR, "Dana")); refresh(runtime);
+      assertEquals("PENDING", runtime.documentFieldOps().getDocumentField("child", SchemaFields.SPLADE_STATUS));
+      assertEquals("0", runtime.documentFieldOps().getDocumentField("child", SchemaFields.SPLADE_RETRY_COUNT));
+    }
+    try (var runtime = open(directory.resolve("index"))) {
       assertEquals("PENDING", runtime.documentFieldOps().getDocumentField("child", SchemaFields.SPLADE_STATUS));
       assertEquals("0", runtime.documentFieldOps().getDocumentField("child", SchemaFields.SPLADE_RETRY_COUNT));
     }

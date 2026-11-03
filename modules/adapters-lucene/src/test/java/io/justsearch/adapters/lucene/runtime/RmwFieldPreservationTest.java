@@ -24,8 +24,7 @@ import tools.jackson.databind.ObjectMapper;
  *
  * <p>The read-modify-write choke point preserves non-stored, non-docValues data-bearing fields the
  * caller omits, per their declared {@code rmwPolicy}: vectors are re-read and carried forward
- * ({@code preserve-reread}); SPLADE data cannot be re-read, so its status field is driven
- * ({@code reset-status}) to force a re-encode. Startup fail-fast rejects an undeclared fragile field.
+ * ({@code preserve-reread}); SPLADE postings and their status/retry companions are re-read. Startup fail-fast rejects an undeclared fragile field.
  */
 class RmwFieldPreservationTest extends LuceneExecutorTestBase {
 
@@ -117,9 +116,9 @@ class RmwFieldPreservationTest extends LuceneExecutorTestBase {
         this::createRuntimeWithVectorAndSplade);
   }
 
-  /** SPLADE cannot be re-read: an RMW dropping its data downgrades COMPLETED status to PENDING. */
+  /** Unrelated RMW carries existing sparse work without inference. */
   @Test
-  void spladeDataDropTriggersStatusDowngrade() throws Exception {
+  void spladePostingsSurvivePartialUpdate() throws Exception {
     withConfig(
         (runtime) -> {
           Map<String, Object> doc = new HashMap<>();
@@ -139,27 +138,18 @@ class RmwFieldPreservationTest extends LuceneExecutorTestBase {
                   "doc-0", Map.of("entity_persons_raw", "Alice")));
           commit(runtime);
 
-          // The SPLADE FeatureField data is unavoidably dropped (no re-read lane) ...
-          assertEquals(0, spladeHits(runtime, "alpha"), "SPLADE data is dropped by the rewrite");
-          // ... but the status is now PENDING so the backfill will re-encode — no silent
-          // COMPLETED-but-empty doc (the second silent-loss bug is fixed).
+          assertEquals(1, spladeHits(runtime, "alpha"), "SPLADE postings survive the rewrite");
           assertEquals(
-              SchemaFields.SPLADE_STATUS_PENDING,
+              SchemaFields.SPLADE_STATUS_COMPLETED,
               runtime.documentFieldOps().getDocumentField("doc-0", SchemaFields.SPLADE_STATUS),
-              "status must downgrade to PENDING when SPLADE data is dropped");
+              "completed sparse work stays completed");
         },
         this::createRuntimeWithVectorAndSplade);
   }
 
-  /**
-   * Tempdoc 712 (chunk-level SPLADE): sparse postings written on a chunk doc are retrievable
-   * through the production chunk-sparse query ({@code searchChunksSplade}, {@code is_chunk=true}
-   * filtered), and an unrelated RMW cannot silently lose them — the data is dropped (no re-read
-   * lane for FeatureFields) but {@code splade_status} downgrades to PENDING so the backfill
-   * re-derives. The F-032 no-silent-loss guard, applied to the chunk sparse leg.
-   */
+  /** Chunk sparse search retains the existing posting through a declaration update. */
   @Test
-  void chunkSpladeSearchableAndRmwDowngradesStatus() throws Exception {
+  void chunkSpladeRemainsSearchableAfterRmw() throws Exception {
     withConfig(
         (runtime) -> {
           Map<String, Object> chunk = new HashMap<>();
@@ -186,14 +176,14 @@ class RmwFieldPreservationTest extends LuceneExecutorTestBase {
           commit(runtime);
 
           assertEquals(
-              0,
+              1,
               runtime.chunkSearchOps().searchChunksSplade(Map.of("alpha", 1.0f), 10, null)
                   .hits().size(),
-              "SPLADE data is dropped by the rewrite (no re-read lane)");
+              "SPLADE postings survive the rewrite");
           assertEquals(
-              SchemaFields.SPLADE_STATUS_PENDING,
+              SchemaFields.SPLADE_STATUS_COMPLETED,
               runtime.documentFieldOps().getDocumentField("chunk-0", SchemaFields.SPLADE_STATUS),
-              "status must downgrade to PENDING so the backfill re-derives the chunk's sparse data");
+              "the chunk keeps completed sparse work");
         },
         this::createRuntimeWithChunkSplade);
   }

@@ -753,6 +753,7 @@ final class StatusRecordSchemaTest {
         "ocr_present",                   // indexing metadata
         "parent_doc_id",                 // chunk parent reference
         "parent_token_count",            // indexing metadata
+        "splade_payload",                // binary sparse payload for the write path; search hits skip binary values
         "vdu_enrichment",                // VDU metadata
         "vdu_page_count",                // VDU metadata
         "vdu_processed",                 // VDU metadata

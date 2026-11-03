@@ -231,15 +231,9 @@ class BatchUpdateIntegrationTest extends LuceneExecutorTestBase {
     }
   }
 
-  /**
-   * reset-status lane (tempdoc 711): an RMW that omits the {@code splade} field on a COMPLETED doc
-   * drops the SPLADE FeatureField data, so the engine must downgrade {@code splade_status} to
-   * PENDING (and reset its retry counter) to force a re-encode — even though the caller only touched
-   * an unrelated (NER) field. Before 711 this path either preserved COMPLETED (silent data loss) or
-   * dropped the status entirely.
-   */
+  /** A NER-only RMW keeps the completed sparse status and its retry count. */
   @Test
-  void rmwDowngradesCompletedSpladeStatusToPendingWhenDataDropped() throws Exception {
+  void rmwPreservesCompletedSpladeStatusAndRetry() throws Exception {
     String prev = System.getProperty("justsearch.config");
     Path base = null;
     Path cfg = null;
@@ -263,7 +257,7 @@ class BatchUpdateIntegrationTest extends LuceneExecutorTestBase {
       runtime.commitOps().commitAndTrack();
       runtime.commitOps().maybeRefreshBlocking();
 
-      // NER-style RMW: no SPLADE fields in updates → SPLADE data is dropped by the rewrite.
+      // NER-style RMW: no SPLADE fields in updates.
       boolean updated =
           runtime.indexingCoordinator().updateDocument(
               "doc-0", Map.of("entity_persons_raw", "Alice"));
@@ -275,12 +269,12 @@ class BatchUpdateIntegrationTest extends LuceneExecutorTestBase {
       String statusAfter =
           runtime.documentFieldOps().getDocumentField("doc-0", SchemaFields.SPLADE_STATUS);
       assertEquals(
-          SchemaFields.SPLADE_STATUS_PENDING,
+          SchemaFields.SPLADE_STATUS_COMPLETED,
           statusAfter,
-          "COMPLETED must downgrade to PENDING — the SPLADE data was just dropped, re-encode needed");
+          "completed sparse work survives an unrelated update");
       String retryAfter =
           runtime.documentFieldOps().getDocumentField("doc-0", SchemaFields.SPLADE_RETRY_COUNT);
-      assertEquals("0", retryAfter, "retry counter must reset on the COMPLETED->PENDING downgrade");
+      assertEquals("3", retryAfter, "an unrelated update must preserve retry history");
 
       runtime.close();
     } finally {
@@ -288,10 +282,7 @@ class BatchUpdateIntegrationTest extends LuceneExecutorTestBase {
     }
   }
 
-  // ---- reset-status lane state-matrix coverage (tempdoc 711) ----
-  //
-  // The reset-status lane preserves FAILED / non-terminal statuses, downgrades COMPLETED to PENDING
-  // (data dropped), heals a missing status to PENDING, and always yields to a caller-supplied status.
+  // Sparse status and retry values survive unrelated updates; missing statuses enroll as PENDING.
 
   /** doc=FAILED, updates=entity — FAILED must survive (resurrecting it would mask real failures). */
   @Test
@@ -441,7 +432,7 @@ class BatchUpdateIntegrationTest extends LuceneExecutorTestBase {
     }
   }
 
-  /** doc=none (no status anywhere), updates=entity — a missing status heals to PENDING. */
+  /** doc=none (no status anywhere), updates=entity — enroll the missing sparse stage. */
   @Test
   void rmwHealsMissingSpladeStatusToPending() throws Exception {
     String prev = System.getProperty("justsearch.config");
@@ -454,13 +445,13 @@ class BatchUpdateIntegrationTest extends LuceneExecutorTestBase {
 
       var runtime = createRuntimeWithNonStoredSpladeStatus();
 
-      // Index WITHOUT splade_status (a pre-fix corrupted doc). The reset-status lane must heal it
-      // to PENDING so it becomes visible to the backfill.
+      // Legacy rows without a SPLADE status retain the reset lane's enrollment behavior.
       Map<String, Object> fields = new HashMap<>();
       fields.put(SchemaFields.DOC_ID, "doc-0");
       fields.put(SchemaFields.DOC_UID, "doc-0#0");
       fields.put(SchemaFields.PATH, "test/doc-0.txt");
       fields.put(SchemaFields.CONTENT, "corrupted doc with no splade_status");
+      fields.put(SchemaFields.SPLADE_RETRY_COUNT, 7);
       runtime.indexingCoordinator().indexSingle(new IndexDocument(fields));
       runtime.commitOps().commitAndTrack();
       runtime.commitOps().maybeRefreshBlocking();
@@ -478,7 +469,8 @@ class BatchUpdateIntegrationTest extends LuceneExecutorTestBase {
       assertEquals(
           SchemaFields.SPLADE_STATUS_PENDING,
           statusAfter,
-          "a missing status must heal to PENDING so the doc becomes visible to backfill");
+          "an unrelated update enrolls a legacy row with no SPLADE status");
+      assertEquals("0", runtime.documentFieldOps().getDocumentField("doc-0", SchemaFields.SPLADE_RETRY_COUNT));
 
       runtime.close();
     } finally {
@@ -486,9 +478,9 @@ class BatchUpdateIntegrationTest extends LuceneExecutorTestBase {
     }
   }
 
-  /** Batch RMW path: COMPLETED downgrades to PENDING per doc when SPLADE data is dropped. */
+  /** Batch RMW keeps each completed sparse result. */
   @Test
-  void rmwBatchDowngradesCompletedSpladeStatus() throws Exception {
+  void rmwBatchPreservesCompletedSpladeStatus() throws Exception {
     String prev = System.getProperty("justsearch.config");
     Path base = null;
     Path cfg = null;
@@ -528,9 +520,9 @@ class BatchUpdateIntegrationTest extends LuceneExecutorTestBase {
         String statusAfter =
             runtime.documentFieldOps().getDocumentField("doc-" + i, SchemaFields.SPLADE_STATUS);
         assertEquals(
-            SchemaFields.SPLADE_STATUS_PENDING,
+            SchemaFields.SPLADE_STATUS_COMPLETED,
             statusAfter,
-            "batch RMW must downgrade each COMPLETED doc to PENDING when SPLADE data is dropped");
+            "batch RMW preserves each completed sparse status");
       }
 
       runtime.close();

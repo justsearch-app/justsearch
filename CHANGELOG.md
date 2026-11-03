@@ -13,6 +13,10 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) once it reache
 
 ## [Unreleased]
 
+### Changed
+- Partial enrichment updates preserve completed sparse search artifacts without running the sparse encoder again. Existing indexes acquire the stored sparse payload lazily on rewrite.
+- Downgrading an index written by this version to v0.3.2 is not supported without re-indexing. The additional stored field triggers v0.3.2's catalog-shape mismatch handling.
+
 ## [0.3.2] - 2026-10-30
 
 ### Added

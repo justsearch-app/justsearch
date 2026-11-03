@@ -1,0 +1,858 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
+  },
+  "createdAt": "2026-11-03T04:18:24.955Z",
+  "revision": "f5f150c9df32c1698c80b13f10d55a8f05f335f5",
+  "tree": "09abf44e173f9de945cd2880a87a8148092577e8",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": "openjdk version \"25.0.4.1\" 2026-08-18 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "./gradlew :modules:adapters-lucene:test --tests \"io.justsearch.adapters.lucene.runtime.BatchUpdateIntegrationTest.rmwPreservesCompletedSpladeStatusAndRetry\" --tests \"io.justsearch.adapters.lucene.runtime.BatchUpdateIntegrationTest.rmwBatchPreservesCompletedSpladeStatus\" --tests \"io.justsearch.adapters.lucene.runtime.RmwFieldPreservationTest.spladePostingsSurvivePartialUpdate\" --tests \"io.justsearch.adapters.lucene.runtime.RmwFieldPreservationTest.chunkSpladeRemainsSearchableAfterRmw\" --tests \"io.justsearch.adapters.lucene.runtime.RemovalAndRenameDurabilityTest.sparseStatesAndRetriesSurviveMetadataUpdate\" --tests \"io.justsearch.adapters.lucene.runtime.SparseRmwPreservationTest.partialUpdatesRetainPostingsStatusAndRetryAfterReopen\" --tests \"io.justsearch.adapters.lucene.runtime.SparseRmwPreservationTest.batchTraversesSparseDictionaryOncePerLeaf\" --tests \"io.justsearch.adapters.lucene.runtime.SparseRmwPreservationTest.unreadableSparseDocumentIsWithheldWhileOtherDocumentsPublish\" --tests \"io.justsearch.adapters.lucene.runtime.SparsePayloadPreservationTest.mapperDerivesAllAcceptedFeaturesAndRewritesKeepFrequencies\" --tests \"io.justsearch.adapters.lucene.runtime.SparsePayloadPreservationTest.legacyScanRunsOnceAndEmptyOrFailedRowsNeverDecodeOldPayload\" --tests \"io.justsearch.adapters.lucene.runtime.SparsePayloadPreservationTest.malformedPayloadsWithholdOnlyTheirRowsWithoutChangingStoredWork\" --tests \"io.justsearch.adapters.lucene.runtime.SparsePayloadPreservationTest.storedPayloadReadFailureIsIsolatedInConditionalPublication\" --tests \"io.justsearch.adapters.lucene.runtime.SparsePayloadPreservationTest.suppliedSparseWinsWithReplacementContentAndStatusOnlyFailureDropsBoth\" --tests \"io.justsearch.adapters.lucene.runtime.SparsePayloadPreservationTest.chunkPayloadSurvivesBatchPublicationReopenAndMerge\" --tests \"io.justsearch.adapters.lucene.runtime.SparsePayloadPreservationTest.payloadIsDerivedAndCannotCertifyAnInvalidStatus\" --tests \"io.justsearch.adapters.lucene.runtime.SparsePayloadPreservationTest.payloadAdditionAcceptedByBothParityPaths\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 16763
+    },
+    {
+      "command": "./gradlew :modules:worker-services:test --tests \"io.justsearch.indexerworker.loop.ops.CombinedEnrichmentBackfillOpsTest.completedParentSplade_withPendingEmbedding_isPreservedWithoutReencoding\" --tests \"io.justsearch.indexerworker.loop.ops.CombinedEnrichmentBackfillOpsTest.completedParentSplade_withPendingNer_isPreservedWithoutReencoding\" --tests \"io.justsearch.indexerworker.loop.ops.CombinedEnrichmentBackfillOpsTest.completedParentSplade_deadlineAfterEmbedding_preservesAndPublishes\" --tests \"io.justsearch.indexerworker.loop.ops.CombinedEnrichmentBackfillOpsTest.completedParentSplade_preservationFollowsNerOutcome\" --tests \"io.justsearch.indexerworker.loop.ops.CombinedEnrichmentBackfillOpsTest.completedParentPreservationDoesNotDeferItsOwnPendingEmbedding\" --tests \"io.justsearch.indexerworker.loop.ops.CombinedEnrichmentBackfillOpsTest.completedWindowPublishesWithoutPreservationInference\" --tests \"io.justsearch.indexerworker.loop.ops.CombinedEnrichmentBackfillOpsTest.completedParentSplade_encoderFailure_doesNotChargeRetryOrReplaceArtifact\" --tests \"io.justsearch.indexerworker.loop.ops.CombinedEnrichmentBackfillOpsTest.chunkSpladeOn_chunkLane_preservesCompletedSpladeWithoutReencoding\" --tests \"io.justsearch.indexerworker.loop.ops.CombinedEnrichmentFailureAccountingTest.completedSparseIsNotEncodedOrCountedAsNewWork\" --tests \"io.justsearch.indexerworker.loop.ops.CombinedEnrichmentRmwIntegrationTest.pendingEmbedding_preservesCompletedParentSplade_withoutEncoderCall\" --tests \"io.justsearch.indexerworker.loop.ops.CombinedEnrichmentRmwIntegrationTest.pendingNer_preservesCompletedParentSplade_withoutEncoderCall\" --tests \"io.justsearch.indexerworker.loop.ops.CombinedEnrichmentRmwIntegrationTest.absentSpladeEncoderPublishesNerAndRetainsCompletedSplade\" --tests \"io.justsearch.indexerworker.loop.ops.CombinedEnrichmentRmwIntegrationTest.failingSpladeEncoderIsNotCalledAndEmbeddingPublishes\" --tests \"io.justsearch.indexerworker.loop.ops.EnrichmentAttemptAccountingTest.untouchedSparseWorkIsNeitherComputedNorPublishedAgain\" --tests \"io.justsearch.indexerworker.loop.ops.EnrichmentAttemptAccountingTest.unusedFailingSparseEncoderDoesNotCreateAnAttemptOrWithholdEmbedding\" --tests \"io.justsearch.indexerworker.loop.BackfillSchedulerPersistenceTest.deadlineAfterEmbeddingPublishesWithoutSparseRederivation\" --tests \"io.justsearch.indexerworker.loop.BackfillSchedulerSlowBatchTest.failingSparseEncoderCannotAffectCompletedSparseDocumentsAcrossCycles\" --tests \"io.justsearch.indexerworker.loop.BackfillSchedulerSlowBatchTest.completedSparseBatchPublishesWithoutCallingFailingEncoder\" --tests \"io.justsearch.indexerworker.loop.BackfillSchedulerSlowBatchTest.completedSparseBatchDoesNotCallSlowFailingEncoder\" --tests \"io.justsearch.indexerworker.loop.BackfillSchedulerSlowBatchTest.costlySparseEncoderIsNotCalledForFinishedWorkWhileDenseAndNerAdvance\" --tests \"io.justsearch.indexerworker.loop.BackfillSchedulerSlowBatchTest.completedSparsePublishesEmbeddingDuringSparseBackoffOrEncoderRetirement\" --tests \"io.justsearch.indexerworker.loop.ops.EnrichmentStorageDispositionTest.unreadableArtifactDefersEarnedOutcomeWithoutRetryCharge\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 6887
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/BatchUpdateIntegrationTest.java#rmwPreservesCompletedSpladeStatusAndRetry",
+      "file": "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/BatchUpdateIntegrationTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:52075d48ad0f75fd42fd4d834baf920c8869bf589b11d8c52e3f3b7ea801fced",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "rmwPreservesCompletedSpladeStatusAndRetry()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/BatchUpdateIntegrationTest.java#rmwBatchPreservesCompletedSpladeStatus",
+      "file": "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/BatchUpdateIntegrationTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:52075d48ad0f75fd42fd4d834baf920c8869bf589b11d8c52e3f3b7ea801fced",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "rmwBatchPreservesCompletedSpladeStatus()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/RmwFieldPreservationTest.java#spladePostingsSurvivePartialUpdate",
+      "file": "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/RmwFieldPreservationTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:6bc9f722ae02790d5748baec45f1043590bb492b48ec843c3d364761123a8118",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "spladePostingsSurvivePartialUpdate()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/RmwFieldPreservationTest.java#chunkSpladeRemainsSearchableAfterRmw",
+      "file": "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/RmwFieldPreservationTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:6bc9f722ae02790d5748baec45f1043590bb492b48ec843c3d364761123a8118",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "chunkSpladeRemainsSearchableAfterRmw()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/RemovalAndRenameDurabilityTest.java#sparseStatesAndRetriesSurviveMetadataUpdate",
+      "file": "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/RemovalAndRenameDurabilityTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:09f1451af85b3bfeadf79d2064ea4f2a4974eaba66cd2be75c7ff0961bf1e05b",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "sparseStatesAndRetriesSurviveMetadataUpdate(PENDING)",
+          "status": "passed"
+        },
+        {
+          "name": "sparseStatesAndRetriesSurviveMetadataUpdate(FAILED)",
+          "status": "passed"
+        },
+        {
+          "name": "sparseStatesAndRetriesSurviveMetadataUpdate(COMPLETED)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/CombinedEnrichmentBackfillOpsTest.java#completedParentSplade_withPendingEmbedding_isPreservedWithoutReencoding",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/CombinedEnrichmentBackfillOpsTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:59842486bc7b0f58ba8c400117c846c275a4458d1b40ed6ebed20c31c927dbad",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "completedParentSplade_withPendingEmbedding_isPreservedWithoutReencoding()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/CombinedEnrichmentBackfillOpsTest.java#completedParentSplade_withPendingNer_isPreservedWithoutReencoding",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/CombinedEnrichmentBackfillOpsTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:59842486bc7b0f58ba8c400117c846c275a4458d1b40ed6ebed20c31c927dbad",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "completedParentSplade_withPendingNer_isPreservedWithoutReencoding()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/CombinedEnrichmentBackfillOpsTest.java#completedParentSplade_deadlineAfterEmbedding_preservesAndPublishes",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/CombinedEnrichmentBackfillOpsTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:59842486bc7b0f58ba8c400117c846c275a4458d1b40ed6ebed20c31c927dbad",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "completedParentSplade_deadlineAfterEmbedding_preservesAndPublishes()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/CombinedEnrichmentBackfillOpsTest.java#completedParentSplade_preservationFollowsNerOutcome",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/CombinedEnrichmentBackfillOpsTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:59842486bc7b0f58ba8c400117c846c275a4458d1b40ed6ebed20c31c927dbad",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "completedParentSplade_preservationFollowsNerOutcome()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/CombinedEnrichmentBackfillOpsTest.java#completedParentPreservationDoesNotDeferItsOwnPendingEmbedding",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/CombinedEnrichmentBackfillOpsTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:59842486bc7b0f58ba8c400117c846c275a4458d1b40ed6ebed20c31c927dbad",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "completedParentPreservationDoesNotDeferItsOwnPendingEmbedding()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/CombinedEnrichmentBackfillOpsTest.java#completedWindowPublishesWithoutPreservationInference",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/CombinedEnrichmentBackfillOpsTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:59842486bc7b0f58ba8c400117c846c275a4458d1b40ed6ebed20c31c927dbad",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "completedWindowPublishesWithoutPreservationInference()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/CombinedEnrichmentBackfillOpsTest.java#completedParentSplade_encoderFailure_doesNotChargeRetryOrReplaceArtifact",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/CombinedEnrichmentBackfillOpsTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:59842486bc7b0f58ba8c400117c846c275a4458d1b40ed6ebed20c31c927dbad",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "completedParentSplade_encoderFailure_doesNotChargeRetryOrReplaceArtifact()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/CombinedEnrichmentBackfillOpsTest.java#chunkSpladeOn_chunkLane_preservesCompletedSpladeWithoutReencoding",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/CombinedEnrichmentBackfillOpsTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:59842486bc7b0f58ba8c400117c846c275a4458d1b40ed6ebed20c31c927dbad",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "chunkSpladeOn_chunkLane_preservesCompletedSpladeWithoutReencoding()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/CombinedEnrichmentFailureAccountingTest.java#completedSparseIsNotEncodedOrCountedAsNewWork",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/CombinedEnrichmentFailureAccountingTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:8a8dddacebf4683a6ffb2f21e0a6e8eed1d8a59efe6a2f12f593858e945b3016",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "completedSparseIsNotEncodedOrCountedAsNewWork()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/CombinedEnrichmentRmwIntegrationTest.java#pendingEmbedding_preservesCompletedParentSplade_withoutEncoderCall",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/CombinedEnrichmentRmwIntegrationTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:7dc5994337dbf7946165a1d516ecf72ba43b49b4a419c0a0160d0a3cbea2f1ab",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "pendingEmbedding_preservesCompletedParentSplade_withoutEncoderCall()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/CombinedEnrichmentRmwIntegrationTest.java#pendingNer_preservesCompletedParentSplade_withoutEncoderCall",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/CombinedEnrichmentRmwIntegrationTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:7dc5994337dbf7946165a1d516ecf72ba43b49b4a419c0a0160d0a3cbea2f1ab",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "pendingNer_preservesCompletedParentSplade_withoutEncoderCall()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/CombinedEnrichmentRmwIntegrationTest.java#absentSpladeEncoderPublishesNerAndRetainsCompletedSplade",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/CombinedEnrichmentRmwIntegrationTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:7dc5994337dbf7946165a1d516ecf72ba43b49b4a419c0a0160d0a3cbea2f1ab",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "absentSpladeEncoderPublishesNerAndRetainsCompletedSplade()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/CombinedEnrichmentRmwIntegrationTest.java#failingSpladeEncoderIsNotCalledAndEmbeddingPublishes",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/CombinedEnrichmentRmwIntegrationTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:7dc5994337dbf7946165a1d516ecf72ba43b49b4a419c0a0160d0a3cbea2f1ab",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "failingSpladeEncoderIsNotCalledAndEmbeddingPublishes()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/EnrichmentAttemptAccountingTest.java#untouchedSparseWorkIsNeitherComputedNorPublishedAgain",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/EnrichmentAttemptAccountingTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:104f2829b2314b41f1fada0719c2249934b27075ff831f032d317a5bbbfbfb0c",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "untouchedSparseWorkIsNeitherComputedNorPublishedAgain()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/EnrichmentAttemptAccountingTest.java#unusedFailingSparseEncoderDoesNotCreateAnAttemptOrWithholdEmbedding",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/EnrichmentAttemptAccountingTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:104f2829b2314b41f1fada0719c2249934b27075ff831f032d317a5bbbfbfb0c",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "unusedFailingSparseEncoderDoesNotCreateAnAttemptOrWithholdEmbedding()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/BackfillSchedulerPersistenceTest.java#deadlineAfterEmbeddingPublishesWithoutSparseRederivation",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/BackfillSchedulerPersistenceTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:28bce1bf28fb8ad372d40e485cc76f14676bbb542900a6be54124f59a32dd9b7",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "deadlineAfterEmbeddingPublishesWithoutSparseRederivation()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/BackfillSchedulerSlowBatchTest.java#failingSparseEncoderCannotAffectCompletedSparseDocumentsAcrossCycles",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/BackfillSchedulerSlowBatchTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:bd2abcb7494d8f0a0589d7ab792849068a4365c2f64ad13a4afdd62ec6c9cbbe",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "failingSparseEncoderCannotAffectCompletedSparseDocumentsAcrossCycles()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/BackfillSchedulerSlowBatchTest.java#completedSparseBatchPublishesWithoutCallingFailingEncoder",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/BackfillSchedulerSlowBatchTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:bd2abcb7494d8f0a0589d7ab792849068a4365c2f64ad13a4afdd62ec6c9cbbe",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "completedSparseBatchPublishesWithoutCallingFailingEncoder(int) [1] 0",
+          "status": "passed"
+        },
+        {
+          "name": "completedSparseBatchPublishesWithoutCallingFailingEncoder(int) [2] 64",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/BackfillSchedulerSlowBatchTest.java#completedSparseBatchDoesNotCallSlowFailingEncoder",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/BackfillSchedulerSlowBatchTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:bd2abcb7494d8f0a0589d7ab792849068a4365c2f64ad13a4afdd62ec6c9cbbe",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "completedSparseBatchDoesNotCallSlowFailingEncoder(int) [1] 0",
+          "status": "passed"
+        },
+        {
+          "name": "completedSparseBatchDoesNotCallSlowFailingEncoder(int) [2] 64",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/BackfillSchedulerSlowBatchTest.java#costlySparseEncoderIsNotCalledForFinishedWorkWhileDenseAndNerAdvance",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/BackfillSchedulerSlowBatchTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:bd2abcb7494d8f0a0589d7ab792849068a4365c2f64ad13a4afdd62ec6c9cbbe",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "costlySparseEncoderIsNotCalledForFinishedWorkWhileDenseAndNerAdvance()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/BackfillSchedulerSlowBatchTest.java#completedSparsePublishesEmbeddingDuringSparseBackoffOrEncoderRetirement",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/BackfillSchedulerSlowBatchTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:bd2abcb7494d8f0a0589d7ab792849068a4365c2f64ad13a4afdd62ec6c9cbbe",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "completedSparsePublishesEmbeddingDuringSparseBackoffOrEncoderRetirement(boolean) [1] false",
+          "status": "passed"
+        },
+        {
+          "name": "completedSparsePublishesEmbeddingDuringSparseBackoffOrEncoderRetirement(boolean) [2] true",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/SparseRmwPreservationTest.java#partialUpdatesRetainPostingsStatusAndRetryAfterReopen",
+      "file": "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/SparseRmwPreservationTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:20151ebb49cb54d6f82a672ae5c72d7964e424014a6891542c65e3afdd9074fb",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "partialUpdatesRetainPostingsStatusAndRetryAfterReopen()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/SparseRmwPreservationTest.java#batchTraversesSparseDictionaryOncePerLeaf",
+      "file": "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/SparseRmwPreservationTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:20151ebb49cb54d6f82a672ae5c72d7964e424014a6891542c65e3afdd9074fb",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "batchTraversesSparseDictionaryOncePerLeaf()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/SparseRmwPreservationTest.java#unreadableSparseDocumentIsWithheldWhileOtherDocumentsPublish",
+      "file": "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/SparseRmwPreservationTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:20151ebb49cb54d6f82a672ae5c72d7964e424014a6891542c65e3afdd9074fb",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "unreadableSparseDocumentIsWithheldWhileOtherDocumentsPublish()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/EnrichmentStorageDispositionTest.java#unreadableArtifactDefersEarnedOutcomeWithoutRetryCharge",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/EnrichmentStorageDispositionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:3db3d749d2a9a172b6b53cbf01f10bee5bab21478decbeaf9965b708d3dd1c77",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "unreadableArtifactDefersEarnedOutcomeWithoutRetryCharge()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/SparsePayloadPreservationTest.java#mapperDerivesAllAcceptedFeaturesAndRewritesKeepFrequencies",
+      "file": "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/SparsePayloadPreservationTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:fc059b7ef0341affa077baf98e7abd939da26205f4153918014368822ab24d75",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "mapperDerivesAllAcceptedFeaturesAndRewritesKeepFrequencies()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/SparsePayloadPreservationTest.java#legacyScanRunsOnceAndEmptyOrFailedRowsNeverDecodeOldPayload",
+      "file": "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/SparsePayloadPreservationTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:fc059b7ef0341affa077baf98e7abd939da26205f4153918014368822ab24d75",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "legacyScanRunsOnceAndEmptyOrFailedRowsNeverDecodeOldPayload()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/SparsePayloadPreservationTest.java#malformedPayloadsWithholdOnlyTheirRowsWithoutChangingStoredWork",
+      "file": "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/SparsePayloadPreservationTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:fc059b7ef0341affa077baf98e7abd939da26205f4153918014368822ab24d75",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "malformedPayloadsWithholdOnlyTheirRowsWithoutChangingStoredWork()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/SparsePayloadPreservationTest.java#storedPayloadReadFailureIsIsolatedInConditionalPublication",
+      "file": "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/SparsePayloadPreservationTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:fc059b7ef0341affa077baf98e7abd939da26205f4153918014368822ab24d75",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "storedPayloadReadFailureIsIsolatedInConditionalPublication()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/SparsePayloadPreservationTest.java#suppliedSparseWinsWithReplacementContentAndStatusOnlyFailureDropsBoth",
+      "file": "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/SparsePayloadPreservationTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:fc059b7ef0341affa077baf98e7abd939da26205f4153918014368822ab24d75",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "suppliedSparseWinsWithReplacementContentAndStatusOnlyFailureDropsBoth()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/SparsePayloadPreservationTest.java#chunkPayloadSurvivesBatchPublicationReopenAndMerge",
+      "file": "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/SparsePayloadPreservationTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:fc059b7ef0341affa077baf98e7abd939da26205f4153918014368822ab24d75",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "chunkPayloadSurvivesBatchPublicationReopenAndMerge()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/SparsePayloadPreservationTest.java#payloadIsDerivedAndCannotCertifyAnInvalidStatus",
+      "file": "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/SparsePayloadPreservationTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:fc059b7ef0341affa077baf98e7abd939da26205f4153918014368822ab24d75",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "payloadIsDerivedAndCannotCertifyAnInvalidStatus()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/SparsePayloadPreservationTest.java#payloadAdditionAcceptedByBothParityPaths",
+      "file": "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/SparsePayloadPreservationTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:fc059b7ef0341affa077baf98e7abd939da26205f4153918014368822ab24d75",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "payloadAdditionAcceptedByBothParityPaths()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "049e79a46f",
+    "revision": "049e79a46f9103e1adb53820d1415aa0e875334d",
+    "overlays": [
+      "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/BatchUpdateIntegrationTest.java",
+      "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/RmwFieldPreservationTest.java",
+      "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/RemovalAndRenameDurabilityTest.java",
+      "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/CombinedEnrichmentBackfillOpsTest.java",
+      "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/CombinedEnrichmentFailureAccountingTest.java",
+      "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/CombinedEnrichmentRmwIntegrationTest.java",
+      "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/EnrichmentAttemptAccountingTest.java",
+      "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/BackfillSchedulerPersistenceTest.java",
+      "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/BackfillSchedulerSlowBatchTest.java",
+      "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/SparseRmwPreservationTest.java",
+      "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/EnrichmentStorageDispositionTest.java",
+      "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/SparsePayloadPreservationTest.java"
+    ],
+    "patches": [
+      {
+        "path": "gates/test-intent/compatibility/redesign-e2-before.patch",
+        "contentDigest": "sha256:8162fb7d1de9ee0df25da6de909528b656c77fd9222e9383de70e438286542bb"
+      }
+    ],
+    "runs": [
+      {
+        "command": "./gradlew :modules:adapters-lucene:test --tests \"io.justsearch.adapters.lucene.runtime.BatchUpdateIntegrationTest.rmwPreservesCompletedSpladeStatusAndRetry\" --tests \"io.justsearch.adapters.lucene.runtime.BatchUpdateIntegrationTest.rmwBatchPreservesCompletedSpladeStatus\" --tests \"io.justsearch.adapters.lucene.runtime.RmwFieldPreservationTest.spladePostingsSurvivePartialUpdate\" --tests \"io.justsearch.adapters.lucene.runtime.RmwFieldPreservationTest.chunkSpladeRemainsSearchableAfterRmw\" --tests \"io.justsearch.adapters.lucene.runtime.RemovalAndRenameDurabilityTest.sparseStatesAndRetriesSurviveMetadataUpdate\" --tests \"io.justsearch.adapters.lucene.runtime.SparseRmwPreservationTest.partialUpdatesRetainPostingsStatusAndRetryAfterReopen\" --tests \"io.justsearch.adapters.lucene.runtime.SparseRmwPreservationTest.batchTraversesSparseDictionaryOncePerLeaf\" --tests \"io.justsearch.adapters.lucene.runtime.SparseRmwPreservationTest.unreadableSparseDocumentIsWithheldWhileOtherDocumentsPublish\" --tests \"io.justsearch.adapters.lucene.runtime.SparsePayloadPreservationTest.mapperDerivesAllAcceptedFeaturesAndRewritesKeepFrequencies\" --tests \"io.justsearch.adapters.lucene.runtime.SparsePayloadPreservationTest.legacyScanRunsOnceAndEmptyOrFailedRowsNeverDecodeOldPayload\" --tests \"io.justsearch.adapters.lucene.runtime.SparsePayloadPreservationTest.malformedPayloadsWithholdOnlyTheirRowsWithoutChangingStoredWork\" --tests \"io.justsearch.adapters.lucene.runtime.SparsePayloadPreservationTest.storedPayloadReadFailureIsIsolatedInConditionalPublication\" --tests \"io.justsearch.adapters.lucene.runtime.SparsePayloadPreservationTest.suppliedSparseWinsWithReplacementContentAndStatusOnlyFailureDropsBoth\" --tests \"io.justsearch.adapters.lucene.runtime.SparsePayloadPreservationTest.chunkPayloadSurvivesBatchPublicationReopenAndMerge\" --tests \"io.justsearch.adapters.lucene.runtime.SparsePayloadPreservationTest.payloadIsDerivedAndCannotCertifyAnInvalidStatus\" --tests \"io.justsearch.adapters.lucene.runtime.SparsePayloadPreservationTest.payloadAdditionAcceptedByBothParityPaths\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 9314,
+        "output": "Calculating task graph as no cached configuration is available for tasks: :modules:adapters-lucene:test --tests io.justsearch.adapters.lucene.runtime.BatchUpdateIntegrationTest.rmwPreservesCompletedSpladeStatusAndRetry --tests io.justsearch.adapters.lucene.runtime.BatchUpdateIntegrationTest.rmwBatchPreservesCompletedSpladeStatus --tests io.justsearch.adapters.lucene.runtime.RmwFieldPreservationTest.spladePostingsSurvivePartialUpdate --tests io.justsearch.adapters.lucene.runtime.RmwFieldPreservationTest.chunkSpladeRemainsSearchableAfterRmw --tests io.justsearch.adapters.lucene.runtime.RemovalAndRenameDurabilityTest.sparseStatesAndRetriesSurviveMetadataUpdate --tests io.justsearch.adapters.lucene.runtime.SparseRmwPreservationTest.partialUpdatesRetainPostingsStatusAndRetryAfterReopen --tests io.justsearch.adapters.lucene.runtime.SparseRmwPreservationTest.batchTraversesSparseDictionaryOncePerLeaf --tests io.justsearch.adapters.lucene.runtime.SparseRmwPreservationTest.unreadableSparseDocumentIsWithheldWhileOtherDocumentsPublish --tests io.justsearch.adapters.lucene.runtime.SparsePayloadPreservationTest.mapperDerivesAllAcceptedFeaturesAndRewritesKeepFrequencies --tests io.justsearch.adapters.lucene.runtime.SparsePayloadPreservationTest.legacyScanRunsOnceAndEmptyOrFailedRowsNeverDecodeOldPayload --tests io.justsearch.adapters.lucene.runtime.SparsePayloadPreservationTest.malformedPayloadsWithholdOnlyTheirRowsWithoutChangingStoredWork --tests io.justsearch.adapters.lucene.runtime.SparsePayloadPreservationTest.storedPayloadReadFailureIsIsolatedInConditionalPublication --tests io.justsearch.adapters.lucene.runtime.SparsePayloadPreservationTest.suppliedSparseWinsWithReplacementContentAndStatusOnlyFailureDropsBoth --tests io.justsearch.adapters.lucene.runtime.SparsePayloadPreservationTest.chunkPayloadSurvivesBatchPublicationReopenAndMerge --tests io.justsearch.adapters.lucene.runtime.SparsePayloadPreservationTest.payloadIsDerivedAndCannotCertifyAnInvalidStatus --tests io.justsearch.adapters.lucene.runtime.SparsePayloadPreservationTest.payloadAdditionAcceptedByBothParityPaths --rerun\nProblem found: Configuration Cache warn mode is enabled (id: validation:configuration-cache:configuration-cache-warn-mode)\n  Configuration Cache warn mode is ENABLED. Configuration Cache constraint violations are being ignored. Build outputs may be incorrect and the build may crash unexpectedly. Use this only to discover configuration cache incompatibilities. Do not use this to produce artifacts.\n> Task :build-logic:checkKotlinGradlePluginConfigurationErrors SKIPPED\n> Task :build-logic:compileKotlin FROM-CACHE\n> Task :build-logic:compileJava NO-SOURCE\n> Task :build-logic:pluginDescriptors\n> Task :build-logic:processResources\n> Task :build-logic:classes\n> Task :build-logic:jar\n\n> Configure project :\nThe com.github.ben-manes.versions plugin id is deprecated; apply io.github.ben-manes.versions instead.\nThe 'val name by creating { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = create(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:174)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:adapters-lucene\nThe Configuration.setVisible(boolean) method has been deprecated. This is scheduled to be removed in Gradle 11. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#deprecate-visible-property\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$3$1.execute(build.gradle.kts:49)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:90)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:ai-backend\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$3$1.execute(build.gradle.kts:27)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:app-agent\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$2$1.execute(build.gradle.kts:40)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:app-agent-api\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$2$1.execute(build.gradle.kts:22)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:app-api\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$4$1.execute(build.gradle.kts:39)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:141)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:app-api-tck\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$2$1.execute(build.gradle.kts:34)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:app-config\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$2$1.execute(build.gradle.kts:15)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:app-engine\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$5$1.execute(build.gradle.kts:86)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:app-inference\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$2$1.execute(build.gradle.kts:31)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:app-launcher\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$13$1.execute(build.gradle.kts:193)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:app-observability\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$3$1.execute(build.gradle.kts:59)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:app-services\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$3$1.execute(build.gradle.kts:102)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:app-util\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$2$1.execute(build.gradle.kts:17)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:core\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$3$1.execute(build.gradle.kts:36)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:dead-code-audit\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$2$1.execute(build.gradle.kts:58)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:gpu-bridge\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$2$1.execute(build.gradle.kts:16)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:indexer-worker\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$5$1.execute(build.gradle.kts:169)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:216)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:indexing\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$3$1.execute(build.gradle.kts:52)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:infra-core\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$3$1.execute(build.gradle.kts:24)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:ort-common\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$2$1.execute(build.gradle.kts:37)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:prompt-support\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$2$1.execute(build.gradle.kts:18)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:reranker\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$3$1.execute(build.gradle.kts:37)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:ssot-tools\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$4$1.execute(build.gradle.kts:36)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:system-tests\nThe 'val name by getting { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:119)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by getting { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:123)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by getting { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:128)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by getting { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:131)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:telemetry\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$3$1.execute(build.gradle.kts:42)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:test-support\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$8$1.execute(build.gradle.kts:377)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:ui\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$4$1.execute(build.gradle.kts:94)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:207)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:228)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:236)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:252)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:277)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:326)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:357)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:378)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:483)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:500)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:555)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:637)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:702)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:753)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:851)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:892)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:965)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:984)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:1048)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:1101)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:1167)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:1222)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:1288)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:1375)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:1436)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:1560)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:1585)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:1600)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:worker-core\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$5$1.execute(build.gradle.kts:127)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:worker-services\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$4$1.execute(build.gradle.kts:193)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Task :modules:adapters-lucene:processTestFixturesResources NO-SOURCE\n> Task :modules:core:processResources NO-SOURCE\n> Task :modules:core:processTestFixturesResources NO-SOURCE\n> Task :modules:adapters-lucene:processTestResources\n> Task :modules:core-contracts:processResources NO-SOURCE\n> Task :modules:configuration:processResources\n> Task :modules:indexing:processResources NO-SOURCE\n> Task :modules:adapters-lucene:syncSsotCatalogs\n> Task :modules:adapters-lucene:processResources\n> Task :modules:core-contracts:compileJava FROM-CACHE\n> Task :modules:core-contracts:classes UP-TO-DATE\n> Task :modules:core-contracts:jar\n> Task :modules:core:compileJava FROM-CACHE\n> Task :modules:core:classes UP-TO-DATE\n> Task :modules:core:jar\n> Task :modules:configuration:compileJava FROM-CACHE\n> Task :modules:configuration:classes\n> Task :modules:indexing:compileJava FROM-CACHE\n> Task :modules:core:compileTestFixturesJava FROM-CACHE\n> Task :modules:indexing:classes UP-TO-DATE\n> Task :modules:core:testFixturesClasses UP-TO-DATE\n> Task :modules:core:testFixturesJar\n> Task :modules:indexing:jar\n> Task :modules:configuration:jar\n> Task :modules:adapters-lucene:compileJava FROM-CACHE\n> Task :modules:adapters-lucene:classes\n> Task :modules:adapters-lucene:compileTestFixturesJava FROM-CACHE\n> Task :modules:adapters-lucene:testFixturesClasses UP-TO-DATE\n> Task :modules:adapters-lucene:testFixturesJar\n> Task :modules:adapters-lucene:jar\n\n> Task :modules:adapters-lucene:compileTestJava\n\n> Task :modules:adapters-lucene:testClasses\n\n> Task :modules:adapters-lucene:test\n\nBatchUpdateIntegrationTest > rmwBatchPreservesCompletedSpladeStatus() FAILED\n    org.opentest4j.AssertionFailedError at BatchUpdateIntegrationTest.java:522\n\nBatchUpdateIntegrationTest > rmwPreservesCompletedSpladeStatusAndRetry() FAILED\n    org.opentest4j.AssertionFailedError at BatchUpdateIntegrationTest.java:271\n\nRemovalAndRenameDurabilityTest > sparseStatesAndRetriesSurviveMetadataUpdate(String) > sparseStatesAndRetriesSurviveMetadataUpdate(COMPLETED) FAILED\n    org.opentest4j.AssertionFailedError at RemovalAndRenameDurabilityTest.java:255\n\nRmwFieldPreservationTest > spladePostingsSurvivePartialUpdate() FAILED\n    org.opentest4j.AssertionFailedError at RmwFieldPreservationTest.java:141\n\nRmwFieldPreservationTest > chunkSpladeRemainsSearchableAfterRmw() FAILED\n    org.opentest4j.AssertionFailedError at RmwFieldPreservationTest.java:178\n\nSparsePayloadPreservationTest > malformedPayloadsWithholdOnlyTheirRowsWithoutChangingStoredWork() FAILED\n    org.opentest4j.AssertionFailedError at SparsePayloadPreservationTest.java:134\n\nSparsePayloadPreservationTest > suppliedSparseWinsWithReplacementContentAndStatusOnlyFailureDropsBoth() FAILED\n    org.opentest4j.AssertionFailedError at SparsePayloadPreservationTest.java:219\n\nSparsePayloadPreservationTest > payloadAdditionAcceptedByBothParityPaths() FAILED\n    org.opentest4j.AssertionFailedError at SparsePayloadPreservationTest.java:292\n\nSparsePayloadPreservationTest > legacyScanRunsOnceAndEmptyOrFailedRowsNeverDecodeOldPayload() FAILED\n    org.opentest4j.AssertionFailedError at SparsePayloadPreservationTest.java:79\n\nSparsePayloadPreservationTest > mapperDerivesAllAcceptedFeaturesAndRewritesKeepFrequencies() FAILED\n    org.opentest4j.AssertionFailedError at SparsePayloadPreservationTest.java:44\n\nSparsePayloadPreservationTest > chunkPayloadSurvivesBatchPublicationReopenAndMerge() FAILED\n    org.opentest4j.AssertionFailedError at SparsePayloadPreservationTest.java:244\n\nSparsePayloadPreservationTest > storedPayloadReadFailureIsIsolatedInConditionalPublication() FAILED\n    org.opentest4j.AssertionFailedError at SparsePayloadPreservationTest.java:192\n\nSparsePayloadPreservationTest > payloadIsDerivedAndCannotCertifyAnInvalidStatus() FAILED\n    org.opentest4j.AssertionFailedError at SparsePayloadPreservationTest.java:271\n\nSparseRmwPreservationTest > batchTraversesSparseDictionaryOncePerLeaf() FAILED\n    org.opentest4j.AssertionFailedError at SparseRmwPreservationTest.java:94\n\nSparseRmwPreservationTest > unreadableSparseDocumentIsWithheldWhileOtherDocumentsPublish() FAILED\n    org.opentest4j.AssertionFailedError at SparseRmwPreservationTest.java:116\n\nSparseRmwPreservationTest > partialUpdatesRetainPostingsStatusAndRetryAfterReopen() FAILED\n    org.opentest4j.AssertionFailedError at SparseRmwPreservationTest.java:160\n\n> Task :modules:adapters-lucene:test FAILED\n> Task :modules:adapters-lucene:jacocoTestReport SKIPPED\n\n[Incubating] Problems report is available at: file:///tmp/test-intent-before-dritAX/build/reports/problems/problems-report.html\n24 actionable tasks: 16 executed, 8 from cache\nConfiguration cache entry stored.\n\nNote: Some input files use or override a deprecated API.\nNote: Recompile with -Xlint:deprecation for details.\n\n18 tests completed, 16 failed\n\nFAILURE: Build failed with an exception.\n\n* What went wrong:\nExecution failed for task ':modules:adapters-lucene:test'.\n> There were failing tests. See the report at: file:///tmp/test-intent-before-dritAX/modules/adapters-lucene/build/reports/tests/test/index.html\n\nBUILD FAILED in 9s\n"
+      },
+      {
+        "command": "./gradlew :modules:worker-services:test --tests \"io.justsearch.indexerworker.loop.ops.CombinedEnrichmentBackfillOpsTest.completedParentSplade_withPendingEmbedding_isPreservedWithoutReencoding\" --tests \"io.justsearch.indexerworker.loop.ops.CombinedEnrichmentBackfillOpsTest.completedParentSplade_withPendingNer_isPreservedWithoutReencoding\" --tests \"io.justsearch.indexerworker.loop.ops.CombinedEnrichmentBackfillOpsTest.completedParentSplade_deadlineAfterEmbedding_preservesAndPublishes\" --tests \"io.justsearch.indexerworker.loop.ops.CombinedEnrichmentBackfillOpsTest.completedParentSplade_preservationFollowsNerOutcome\" --tests \"io.justsearch.indexerworker.loop.ops.CombinedEnrichmentBackfillOpsTest.completedParentPreservationDoesNotDeferItsOwnPendingEmbedding\" --tests \"io.justsearch.indexerworker.loop.ops.CombinedEnrichmentBackfillOpsTest.completedWindowPublishesWithoutPreservationInference\" --tests \"io.justsearch.indexerworker.loop.ops.CombinedEnrichmentBackfillOpsTest.completedParentSplade_encoderFailure_doesNotChargeRetryOrReplaceArtifact\" --tests \"io.justsearch.indexerworker.loop.ops.CombinedEnrichmentBackfillOpsTest.chunkSpladeOn_chunkLane_preservesCompletedSpladeWithoutReencoding\" --tests \"io.justsearch.indexerworker.loop.ops.CombinedEnrichmentFailureAccountingTest.completedSparseIsNotEncodedOrCountedAsNewWork\" --tests \"io.justsearch.indexerworker.loop.ops.CombinedEnrichmentRmwIntegrationTest.pendingEmbedding_preservesCompletedParentSplade_withoutEncoderCall\" --tests \"io.justsearch.indexerworker.loop.ops.CombinedEnrichmentRmwIntegrationTest.pendingNer_preservesCompletedParentSplade_withoutEncoderCall\" --tests \"io.justsearch.indexerworker.loop.ops.CombinedEnrichmentRmwIntegrationTest.absentSpladeEncoderPublishesNerAndRetainsCompletedSplade\" --tests \"io.justsearch.indexerworker.loop.ops.CombinedEnrichmentRmwIntegrationTest.failingSpladeEncoderIsNotCalledAndEmbeddingPublishes\" --tests \"io.justsearch.indexerworker.loop.ops.EnrichmentAttemptAccountingTest.untouchedSparseWorkIsNeitherComputedNorPublishedAgain\" --tests \"io.justsearch.indexerworker.loop.ops.EnrichmentAttemptAccountingTest.unusedFailingSparseEncoderDoesNotCreateAnAttemptOrWithholdEmbedding\" --tests \"io.justsearch.indexerworker.loop.BackfillSchedulerPersistenceTest.deadlineAfterEmbeddingPublishesWithoutSparseRederivation\" --tests \"io.justsearch.indexerworker.loop.BackfillSchedulerSlowBatchTest.failingSparseEncoderCannotAffectCompletedSparseDocumentsAcrossCycles\" --tests \"io.justsearch.indexerworker.loop.BackfillSchedulerSlowBatchTest.completedSparseBatchPublishesWithoutCallingFailingEncoder\" --tests \"io.justsearch.indexerworker.loop.BackfillSchedulerSlowBatchTest.completedSparseBatchDoesNotCallSlowFailingEncoder\" --tests \"io.justsearch.indexerworker.loop.BackfillSchedulerSlowBatchTest.costlySparseEncoderIsNotCalledForFinishedWorkWhileDenseAndNerAdvance\" --tests \"io.justsearch.indexerworker.loop.BackfillSchedulerSlowBatchTest.completedSparsePublishesEmbeddingDuringSparseBackoffOrEncoderRetirement\" --tests \"io.justsearch.indexerworker.loop.ops.EnrichmentStorageDispositionTest.unreadableArtifactDefersEarnedOutcomeWithoutRetryCharge\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 8018,
+        "output": "Calculating task graph as no cached configuration is available for tasks: :modules:worker-services:test --tests io.justsearch.indexerworker.loop.ops.CombinedEnrichmentBackfillOpsTest.completedParentSplade_withPendingEmbedding_isPreservedWithoutReencoding --tests io.justsearch.indexerworker.loop.ops.CombinedEnrichmentBackfillOpsTest.completedParentSplade_withPendingNer_isPreservedWithoutReencoding --tests io.justsearch.indexerworker.loop.ops.CombinedEnrichmentBackfillOpsTest.completedParentSplade_deadlineAfterEmbedding_preservesAndPublishes --tests io.justsearch.indexerworker.loop.ops.CombinedEnrichmentBackfillOpsTest.completedParentSplade_preservationFollowsNerOutcome --tests io.justsearch.indexerworker.loop.ops.CombinedEnrichmentBackfillOpsTest.completedParentPreservationDoesNotDeferItsOwnPendingEmbedding --tests io.justsearch.indexerworker.loop.ops.CombinedEnrichmentBackfillOpsTest.completedWindowPublishesWithoutPreservationInference --tests io.justsearch.indexerworker.loop.ops.CombinedEnrichmentBackfillOpsTest.completedParentSplade_encoderFailure_doesNotChargeRetryOrReplaceArtifact --tests io.justsearch.indexerworker.loop.ops.CombinedEnrichmentBackfillOpsTest.chunkSpladeOn_chunkLane_preservesCompletedSpladeWithoutReencoding --tests io.justsearch.indexerworker.loop.ops.CombinedEnrichmentFailureAccountingTest.completedSparseIsNotEncodedOrCountedAsNewWork --tests io.justsearch.indexerworker.loop.ops.CombinedEnrichmentRmwIntegrationTest.pendingEmbedding_preservesCompletedParentSplade_withoutEncoderCall --tests io.justsearch.indexerworker.loop.ops.CombinedEnrichmentRmwIntegrationTest.pendingNer_preservesCompletedParentSplade_withoutEncoderCall --tests io.justsearch.indexerworker.loop.ops.CombinedEnrichmentRmwIntegrationTest.absentSpladeEncoderPublishesNerAndRetainsCompletedSplade --tests io.justsearch.indexerworker.loop.ops.CombinedEnrichmentRmwIntegrationTest.failingSpladeEncoderIsNotCalledAndEmbeddingPublishes --tests io.justsearch.indexerworker.loop.ops.EnrichmentAttemptAccountingTest.untouchedSparseWorkIsNeitherComputedNorPublishedAgain --tests io.justsearch.indexerworker.loop.ops.EnrichmentAttemptAccountingTest.unusedFailingSparseEncoderDoesNotCreateAnAttemptOrWithholdEmbedding --tests io.justsearch.indexerworker.loop.BackfillSchedulerPersistenceTest.deadlineAfterEmbeddingPublishesWithoutSparseRederivation --tests io.justsearch.indexerworker.loop.BackfillSchedulerSlowBatchTest.failingSparseEncoderCannotAffectCompletedSparseDocumentsAcrossCycles --tests io.justsearch.indexerworker.loop.BackfillSchedulerSlowBatchTest.completedSparseBatchPublishesWithoutCallingFailingEncoder --tests io.justsearch.indexerworker.loop.BackfillSchedulerSlowBatchTest.completedSparseBatchDoesNotCallSlowFailingEncoder --tests io.justsearch.indexerworker.loop.BackfillSchedulerSlowBatchTest.costlySparseEncoderIsNotCalledForFinishedWorkWhileDenseAndNerAdvance --tests io.justsearch.indexerworker.loop.BackfillSchedulerSlowBatchTest.completedSparsePublishesEmbeddingDuringSparseBackoffOrEncoderRetirement --tests io.justsearch.indexerworker.loop.ops.EnrichmentStorageDispositionTest.unreadableArtifactDefersEarnedOutcomeWithoutRetryCharge --rerun\nProblem found: Configuration Cache warn mode is enabled (id: validation:configuration-cache:configuration-cache-warn-mode)\n  Configuration Cache warn mode is ENABLED. Configuration Cache constraint violations are being ignored. Build outputs may be incorrect and the build may crash unexpectedly. Use this only to discover configuration cache incompatibilities. Do not use this to produce artifacts.\n> Task :build-logic:checkKotlinGradlePluginConfigurationErrors SKIPPED\n> Task :build-logic:compileKotlin UP-TO-DATE\n> Task :build-logic:compileJava NO-SOURCE\n> Task :build-logic:pluginDescriptors UP-TO-DATE\n> Task :build-logic:processResources UP-TO-DATE\n> Task :build-logic:classes UP-TO-DATE\n> Task :build-logic:jar UP-TO-DATE\n\n> Configure project :\nThe com.github.ben-manes.versions plugin id is deprecated; apply io.github.ben-manes.versions instead.\nThe 'val name by creating { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = create(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:174)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:adapters-lucene\nThe Configuration.setVisible(boolean) method has been deprecated. This is scheduled to be removed in Gradle 11. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#deprecate-visible-property\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$3$1.execute(build.gradle.kts:49)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:90)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:ai-backend\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$3$1.execute(build.gradle.kts:27)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:app-agent\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$2$1.execute(build.gradle.kts:40)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:app-agent-api\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$2$1.execute(build.gradle.kts:22)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:app-api\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$4$1.execute(build.gradle.kts:39)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:141)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:app-api-tck\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$2$1.execute(build.gradle.kts:34)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:app-config\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$2$1.execute(build.gradle.kts:15)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:app-engine\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$5$1.execute(build.gradle.kts:86)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:app-inference\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$2$1.execute(build.gradle.kts:31)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:app-launcher\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$13$1.execute(build.gradle.kts:193)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:app-observability\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$3$1.execute(build.gradle.kts:59)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:app-services\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$3$1.execute(build.gradle.kts:102)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:app-util\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$2$1.execute(build.gradle.kts:17)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:core\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$3$1.execute(build.gradle.kts:36)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:dead-code-audit\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$2$1.execute(build.gradle.kts:58)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:gpu-bridge\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$2$1.execute(build.gradle.kts:16)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:indexer-worker\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$5$1.execute(build.gradle.kts:169)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:216)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:indexing\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$3$1.execute(build.gradle.kts:52)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:infra-core\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$3$1.execute(build.gradle.kts:24)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:ort-common\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$2$1.execute(build.gradle.kts:37)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:prompt-support\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$2$1.execute(build.gradle.kts:18)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:reranker\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$3$1.execute(build.gradle.kts:37)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:ssot-tools\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$4$1.execute(build.gradle.kts:36)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:system-tests\nThe 'val name by getting { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:119)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by getting { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:123)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by getting { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:128)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by getting { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:131)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:telemetry\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$3$1.execute(build.gradle.kts:42)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:test-support\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$8$1.execute(build.gradle.kts:377)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:ui\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$4$1.execute(build.gradle.kts:94)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:207)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:228)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:236)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:252)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:277)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:326)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:357)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:378)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:483)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:500)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:555)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:637)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:702)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:753)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:851)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:892)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:965)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:984)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:1048)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:1101)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:1167)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:1222)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:1288)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:1375)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:1436)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:1560)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:1585)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\nThe 'val name by registering(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = register<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle.<init>(build.gradle.kts:1600)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:worker-core\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$5$1.execute(build.gradle.kts:127)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Configure project :modules:worker-services\nThe 'val name by getting(Type::class) { }' property delegate syntax has been deprecated. This is scheduled to be removed in Gradle 10. Use 'val element = getByName<Type>(name) { }' instead. Consult the upgrading guide for further information: https://docs.gradle.org/9.8.2/userguide/upgrading_version_9.html#kotlin_dsl_delegated_properties\n\tat Build_gradle$4$1.execute(build.gradle.kts:193)\n\t(Run with --stacktrace to get the full stack trace of this deprecation warning.)\n\n> Task :modules:api-contract-projection-java:protobufDummy UP-TO-DATE\n> Task :modules:app-agent-api:processResources NO-SOURCE\n> Task :modules:api-contract-projection-java:extractProto\n> Task :modules:core-contracts:compileJava UP-TO-DATE\n> Task :modules:extension-substrate:compileJava FROM-CACHE\n> Task :modules:configuration:processResources UP-TO-DATE\n> Task :modules:core:processResources NO-SOURCE\n> Task :modules:core-contracts:processResources NO-SOURCE\n> Task :modules:extension-substrate:processResources NO-SOURCE\n> Task :modules:ipc-common:protobufDummy UP-TO-DATE\n> Task :modules:ipc-common:extractProto\n> Task :modules:worker-services:processResources NO-SOURCE\n> Task :modules:worker-services:processTestFixturesResources NO-SOURCE\n> Task :modules:adapters-lucene:syncSsotCatalogs UP-TO-DATE\n> Task :modules:core:compileJava UP-TO-DATE\n> Task :modules:adapters-lucene:processResources UP-TO-DATE\n> Task :modules:api-contract-projection-java:extractProtovalidateProtos\n> Task :modules:indexing:compileJava UP-TO-DATE\n> Task :modules:configuration:compileJava UP-TO-DATE\n> Task :modules:api-contract-projection-java:processProtoResources\n> Task :modules:api-contract-projection-java:processResources\n> Task :modules:telemetry:compileJava FROM-CACHE\n> Task :modules:core:compileTestFixturesJava UP-TO-DATE\n> Task :modules:adapters-lucene:processTestFixturesResources NO-SOURCE\n> Task :modules:ai-backend:processResources\n> Task :modules:configuration:classes UP-TO-DATE\n> Task :modules:configuration:jar UP-TO-DATE\n> Task :modules:core:classes UP-TO-DATE\n> Task :modules:core:jar UP-TO-DATE\n> Task :modules:core:processTestFixturesResources NO-SOURCE\n> Task :modules:core:testFixturesClasses UP-TO-DATE\n> Task :modules:core:testFixturesJar UP-TO-DATE\n> Task :modules:core-contracts:classes UP-TO-DATE\n> Task :modules:core-contracts:jar UP-TO-DATE\n> Task :modules:extension-substrate:classes UP-TO-DATE\n> Task :modules:api-contract-projection-java:extractIncludeProto\n> Task :modules:extension-substrate:jar\n> Task :modules:indexing:processResources NO-SOURCE\n> Task :modules:indexing:classes UP-TO-DATE\n> Task :modules:adapters-lucene:compileJava UP-TO-DATE\n> Task :modules:adapters-lucene:classes UP-TO-DATE\n> Task :modules:indexing:jar UP-TO-DATE\n> Task :modules:adapters-lucene:jar UP-TO-DATE\n> Task :modules:adapters-lucene:compileTestFixturesJava UP-TO-DATE\n> Task :modules:adapters-lucene:testFixturesClasses UP-TO-DATE\n> Task :modules:adapters-lucene:testFixturesJar UP-TO-DATE\n> Task :modules:ort-common:processResources NO-SOURCE\n> Task :modules:ipc-common:processProtoResources\n> Task :modules:reranker:processResources NO-SOURCE\n> Task :modules:telemetry:processResources NO-SOURCE\n> Task :modules:telemetry:classes UP-TO-DATE\n> Task :modules:ipc-common:processResources\n> Task :modules:ort-common:compileJava FROM-CACHE\n> Task :modules:telemetry:jar\n> Task :modules:ort-common:classes UP-TO-DATE\n> Task :modules:app-agent-api:compileJava FROM-CACHE\n> Task :modules:app-agent-api:classes UP-TO-DATE\n> Task :modules:telemetry:compileTestFixturesJava FROM-CACHE\n> Task :modules:telemetry:processTestFixturesResources NO-SOURCE\n> Task :modules:telemetry:testFixturesClasses UP-TO-DATE\n> Task :modules:telemetry:testFixturesJar\n> Task :modules:worker-core:processResources NO-SOURCE\n> Task :modules:worker-services:processTestResources\n> Task :modules:ort-common:jar\n> Task :modules:reranker:compileJava FROM-CACHE\n> Task :modules:reranker:classes UP-TO-DATE\n> Task :modules:api-contract-projection-java:generateProto FROM-CACHE\n> Task :modules:reranker:jar\n> Task :modules:app-agent-api:jar\n> Task :modules:app-api:buildLinuxBoundExec\n> Task :modules:app-api:processResources\n> Task :modules:ipc-common:extractIncludeProto\n> Task :modules:ipc-common:generateProto FROM-CACHE\n> Task :modules:api-contract-projection-java:compileJava FROM-CACHE\n> Task :modules:api-contract-projection-java:classes\n> Task :modules:api-contract-projection-java:jar\n> Task :modules:app-api:compileJava FROM-CACHE\n> Task :modules:app-api:classes\n> Task :modules:ai-backend:compileJava FROM-CACHE\n> Task :modules:ai-backend:classes\n> Task :modules:ai-backend:jar\n> Task :modules:app-api:jar\n> Task :modules:worker-core:compileJava FROM-CACHE\n> Task :modules:worker-core:classes UP-TO-DATE\n> Task :modules:worker-core:jar\n> Task :modules:ipc-common:compileJava FROM-CACHE\n> Task :modules:ipc-common:classes\n> Task :modules:ipc-common:jar\n> Task :modules:worker-services:compileJava FROM-CACHE\n> Task :modules:worker-services:classes UP-TO-DATE\n> Task :modules:worker-services:compileTestFixturesJava FROM-CACHE\n> Task :modules:worker-services:testFixturesClasses UP-TO-DATE\n> Task :modules:worker-services:testFixturesJar\n> Task :modules:worker-services:jar\n> Task :modules:worker-services:compileTestJava FROM-CACHE\n> Task :modules:worker-services:testClasses\n\n> Task :modules:worker-services:test\n\nBackfillScheduler slow-batch interruption (tempdoc 809 finding 3) > completedSparseBatchDoesNotCallSlowFailingEncoder(int) > completedSparseBatchDoesNotCallSlowFailingEncoder(int) [1] 0 FAILED\n    org.opentest4j.AssertionFailedError at BackfillSchedulerSlowBatchTest.java:830\n\nBackfillScheduler slow-batch interruption (tempdoc 809 finding 3) > completedSparseBatchDoesNotCallSlowFailingEncoder(int) > completedSparseBatchDoesNotCallSlowFailingEncoder(int) [2] 64 FAILED\n    org.opentest4j.AssertionFailedError at BackfillSchedulerSlowBatchTest.java:828\n\nBackfillScheduler slow-batch interruption (tempdoc 809 finding 3) > costlySparseEncoderIsNotCalledForFinishedWorkWhileDenseAndNerAdvance() FAILED\n    org.opentest4j.AssertionFailedError at BackfillSchedulerSlowBatchTest.java:890\n\nBackfillScheduler slow-batch interruption (tempdoc 809 finding 3) > completedSparseBatchPublishesWithoutCallingFailingEncoder(int) > completedSparseBatchPublishesWithoutCallingFailingEncoder(int) [1] 0 FAILED\n    org.opentest4j.AssertionFailedError at BackfillSchedulerSlowBatchTest.java:830\n\nBackfillScheduler slow-batch interruption (tempdoc 809 finding 3) > completedSparseBatchPublishesWithoutCallingFailingEncoder(int) > completedSparseBatchPublishesWithoutCallingFailingEncoder(int) [2] 64 FAILED\n    org.opentest4j.AssertionFailedError at BackfillSchedulerSlowBatchTest.java:828\n\nBackfillScheduler slow-batch interruption (tempdoc 809 finding 3) > failingSparseEncoderCannotAffectCompletedSparseDocumentsAcrossCycles() FAILED\n    org.opentest4j.AssertionFailedError at BackfillSchedulerSlowBatchTest.java:732\n\nBackfillScheduler slow-batch interruption (tempdoc 809 finding 3) > completedSparsePublishesEmbeddingDuringSparseBackoffOrEncoderRetirement(boolean) > completedSparsePublishesEmbeddingDuringSparseBackoffOrEncoderRetirement(boolean) [1] false FAILED\n    org.opentest4j.AssertionFailedError at BackfillSchedulerSlowBatchTest.java:933\n\nCombinedEnrichmentFailureAccountingTest > completedSparseIsNotEncodedOrCountedAsNewWork() FAILED\n    org.opentest4j.AssertionFailedError at CombinedEnrichmentFailureAccountingTest.java:107\n\nEnrichmentAttemptAccountingTest > untouchedSparseWorkIsNeitherComputedNorPublishedAgain() FAILED\n    org.opentest4j.AssertionFailedError at EnrichmentAttemptAccountingTest.java:101\n\nEnrichmentAttemptAccountingTest > unusedFailingSparseEncoderDoesNotCreateAnAttemptOrWithholdEmbedding() FAILED\n    org.opentest4j.AssertionFailedError at EnrichmentAttemptAccountingTest.java:215\n\nBackfillSchedulerPersistenceTest > deadlineAfterEmbeddingPublishesWithoutSparseRederivation() FAILED\n    org.opentest4j.AssertionFailedError at BackfillSchedulerPersistenceTest.java:174\n        Caused by: org.mockito.exceptions.verification.NeverWantedButInvoked at BackfillSchedulerPersistenceTest.java:174\n\nCombinedEnrichmentBackfillOps > completedParentSplade_deadlineAfterEmbedding_preservesAndPublishes() FAILED\n    org.opentest4j.AssertionFailedError at CombinedEnrichmentBackfillOpsTest.java:723\n        Caused by: org.mockito.exceptions.verification.NeverWantedButInvoked at CombinedEnrichmentBackfillOpsTest.java:723\n\nCombinedEnrichmentBackfillOps > chunkSpladeOn_chunkLane_preservesCompletedSpladeWithoutReencoding() FAILED\n    org.opentest4j.AssertionFailedError at CombinedEnrichmentBackfillOpsTest.java:1382\n        Caused by: org.mockito.exceptions.verification.NeverWantedButInvoked at CombinedEnrichmentBackfillOpsTest.java:1382\n\nCombinedEnrichmentBackfillOps > completedParentSplade_withPendingNer_isPreservedWithoutReencoding() FAILED\n    org.opentest4j.AssertionFailedError at CombinedEnrichmentBackfillOpsTest.java:692\n        Caused by: org.mockito.exceptions.verification.NeverWantedButInvoked at CombinedEnrichmentBackfillOpsTest.java:692\n\nCombinedEnrichmentBackfillOps > completedParentSplade_encoderFailure_doesNotChargeRetryOrReplaceArtifact() FAILED\n    org.opentest4j.AssertionFailedError at CombinedEnrichmentBackfillOpsTest.java:895\n\nCombinedEnrichmentBackfillOps > completedWindowPublishesWithoutPreservationInference() FAILED\n    org.opentest4j.AssertionFailedError at CombinedEnrichmentBackfillOpsTest.java:875\n\nCombinedEnrichmentBackfillOps > completedParentPreservationDoesNotDeferItsOwnPendingEmbedding() FAILED\n    org.opentest4j.AssertionFailedError at CombinedEnrichmentBackfillOpsTest.java:781\n        Caused by: org.mockito.exceptions.verification.NeverWantedButInvoked at CombinedEnrichmentBackfillOpsTest.java:781\n\nCombinedEnrichmentBackfillOps > completedParentSplade_preservationFollowsNerOutcome() FAILED\n    org.opentest4j.AssertionFailedError at CombinedEnrichmentBackfillOpsTest.java:756\n        Caused by: org.mockito.exceptions.verification.NeverWantedButInvoked at CombinedEnrichmentBackfillOpsTest.java:756\n\nCombinedEnrichmentBackfillOps > completedParentSplade_withPendingEmbedding_isPreservedWithoutReencoding() FAILED\n    org.opentest4j.AssertionFailedError at CombinedEnrichmentBackfillOpsTest.java:670\n        Caused by: org.mockito.exceptions.verification.NeverWantedButInvoked at CombinedEnrichmentBackfillOpsTest.java:670\n\nCombinedEnrichmentBackfillOps — parent SPLADE RMW > absentSpladeEncoderPublishesNerAndRetainsCompletedSplade() FAILED\n    org.opentest4j.AssertionFailedError at CombinedEnrichmentRmwIntegrationTest.java:166\n\nCombinedEnrichmentBackfillOps — parent SPLADE RMW > failingSpladeEncoderIsNotCalledAndEmbeddingPublishes() FAILED\n    org.opentest4j.AssertionFailedError at CombinedEnrichmentRmwIntegrationTest.java:193\n\nCombinedEnrichmentBackfillOps — parent SPLADE RMW > pendingNer_preservesCompletedParentSplade_withoutEncoderCall() FAILED\n    org.opentest4j.AssertionFailedError at CombinedEnrichmentRmwIntegrationTest.java:121\n\nCombinedEnrichmentBackfillOps — parent SPLADE RMW > pendingEmbedding_preservesCompletedParentSplade_withoutEncoderCall() FAILED\n    org.opentest4j.AssertionFailedError at CombinedEnrichmentRmwIntegrationTest.java:89\n\nEnrichmentStorageDispositionTest > unreadableArtifactDefersEarnedOutcomeWithoutRetryCharge() FAILED\n    org.opentest4j.AssertionFailedError at EnrichmentStorageDispositionTest.java:23\n\n> Task :modules:worker-services:test FAILED\n> Task :modules:worker-services:jacocoTestReport SKIPPED\n\n[Incubating] Problems report is available at: file:///tmp/test-intent-before-dritAX/build/reports/problems/problems-report.html\n64 actionable tasks: 27 executed, 16 from cache, 21 up-to-date\nConfiguration cache entry stored.\n\nOpenJDK 64-Bit Server VM warning: Sharing is only supported for boot loader classes because bootstrap classpath has been appended\nOpenJDK 64-Bit Server VM warning: Sharing is only supported for boot loader classes because bootstrap classpath has been appended\n\n25 tests completed, 24 failed\n\nFAILURE: Build failed with an exception.\n\n* What went wrong:\nExecution failed for task ':modules:worker-services:test'.\n> There were failing tests. See the report at: file:///tmp/test-intent-before-dritAX/modules/worker-services/build/reports/tests/test/index.html\n\nBUILD FAILED in 7s\n"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/BatchUpdateIntegrationTest.java#rmwPreservesCompletedSpladeStatusAndRetry",
+        "classification": "assertion",
+        "detail": "rmwPreservesCompletedSpladeStatusAndRetry(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: completed sparse work survives an unrelated update ==> expected: <COMPLETED> but was: <PENDING>"
+      },
+      {
+        "id": "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/BatchUpdateIntegrationTest.java#rmwBatchPreservesCompletedSpladeStatus",
+        "classification": "assertion",
+        "detail": "rmwBatchPreservesCompletedSpladeStatus(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: batch RMW preserves each completed sparse status ==> expected: <COMPLETED> but was: <PENDING>"
+      },
+      {
+        "id": "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/RmwFieldPreservationTest.java#spladePostingsSurvivePartialUpdate",
+        "classification": "assertion",
+        "detail": "spladePostingsSurvivePartialUpdate(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: SPLADE postings survive the rewrite ==> expected: <1> but was: <0>"
+      },
+      {
+        "id": "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/RmwFieldPreservationTest.java#chunkSpladeRemainsSearchableAfterRmw",
+        "classification": "assertion",
+        "detail": "chunkSpladeRemainsSearchableAfterRmw(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: SPLADE postings survive the rewrite ==> expected: <1> but was: <0>"
+      },
+      {
+        "id": "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/RemovalAndRenameDurabilityTest.java#sparseStatesAndRetriesSurviveMetadataUpdate",
+        "classification": "assertion",
+        "detail": "sparseStatesAndRetriesSurviveMetadataUpdate(COMPLETED): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <COMPLETED> but was: <PENDING>"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/CombinedEnrichmentBackfillOpsTest.java#completedParentSplade_withPendingEmbedding_isPreservedWithoutReencoding",
+        "classification": "assertion",
+        "detail": "completedParentSplade_withPendingEmbedding_isPreservedWithoutReencoding(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: Unexpected exception thrown: org.mockito.exceptions.verification.NeverWantedButInvoked: &#10;spladeEncoder.encodeBatch(<any List>);&#10;Never wanted here:&#10;-> at io.justsearch.indexerworker.splade.SpladeEncoder.encodeBatch(SpladeEncoder.java:384)&#10;But invok"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/CombinedEnrichmentBackfillOpsTest.java#completedParentSplade_withPendingNer_isPreservedWithoutReencoding",
+        "classification": "assertion",
+        "detail": "completedParentSplade_withPendingNer_isPreservedWithoutReencoding(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: Unexpected exception thrown: org.mockito.exceptions.verification.NeverWantedButInvoked: &#10;spladeEncoder.encodeBatch(<any List>);&#10;Never wanted here:&#10;-> at io.justsearch.indexerworker.splade.SpladeEncoder.encodeBatch(SpladeEncoder.java:384)&#10;But invok"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/CombinedEnrichmentBackfillOpsTest.java#completedParentSplade_deadlineAfterEmbedding_preservesAndPublishes",
+        "classification": "assertion",
+        "detail": "completedParentSplade_deadlineAfterEmbedding_preservesAndPublishes(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: Unexpected exception thrown: org.mockito.exceptions.verification.NeverWantedButInvoked: &#10;spladeEncoder.encodeBatch(<any List>);&#10;Never wanted here:&#10;-> at io.justsearch.indexerworker.splade.SpladeEncoder.encodeBatch(SpladeEncoder.java:384)&#10;But invok"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/CombinedEnrichmentBackfillOpsTest.java#completedParentSplade_preservationFollowsNerOutcome",
+        "classification": "assertion",
+        "detail": "completedParentSplade_preservationFollowsNerOutcome(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: Unexpected exception thrown: org.mockito.exceptions.verification.NeverWantedButInvoked: &#10;spladeEncoder.encodeBatch(<any List>);&#10;Never wanted here:&#10;-> at io.justsearch.indexerworker.splade.SpladeEncoder.encodeBatch(SpladeEncoder.java:384)&#10;But invok"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/CombinedEnrichmentBackfillOpsTest.java#completedParentPreservationDoesNotDeferItsOwnPendingEmbedding",
+        "classification": "assertion",
+        "detail": "completedParentPreservationDoesNotDeferItsOwnPendingEmbedding(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: Unexpected exception thrown: org.mockito.exceptions.verification.NeverWantedButInvoked: &#10;spladeEncoder.encodeBatch(<any List>);&#10;Never wanted here:&#10;-> at io.justsearch.indexerworker.splade.SpladeEncoder.encodeBatch(SpladeEncoder.java:384)&#10;But invok"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/CombinedEnrichmentBackfillOpsTest.java#completedWindowPublishesWithoutPreservationInference",
+        "classification": "assertion",
+        "detail": "completedWindowPublishesWithoutPreservationInference(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <true> but was: <false>"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/CombinedEnrichmentBackfillOpsTest.java#completedParentSplade_encoderFailure_doesNotChargeRetryOrReplaceArtifact",
+        "classification": "assertion",
+        "detail": "completedParentSplade_encoderFailure_doesNotChargeRetryOrReplaceArtifact(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <null> but was: <1>"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/CombinedEnrichmentBackfillOpsTest.java#chunkSpladeOn_chunkLane_preservesCompletedSpladeWithoutReencoding",
+        "classification": "assertion",
+        "detail": "chunkSpladeOn_chunkLane_preservesCompletedSpladeWithoutReencoding(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: Unexpected exception thrown: org.mockito.exceptions.verification.NeverWantedButInvoked: &#10;spladeEncoder.encodeBatch(<any List>);&#10;Never wanted here:&#10;-> at io.justsearch.indexerworker.splade.SpladeEncoder.encodeBatch(SpladeEncoder.java:384)&#10;But invok"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/CombinedEnrichmentFailureAccountingTest.java#completedSparseIsNotEncodedOrCountedAsNewWork",
+        "classification": "assertion",
+        "detail": "completedSparseIsNotEncodedOrCountedAsNewWork(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <0> but was: <8>"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/CombinedEnrichmentRmwIntegrationTest.java#pendingEmbedding_preservesCompletedParentSplade_withoutEncoderCall",
+        "classification": "assertion",
+        "detail": "pendingEmbedding_preservesCompletedParentSplade_withoutEncoderCall(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: the existing FeatureField posting must survive RMW ==> expected: <true> but was: <false>"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/CombinedEnrichmentRmwIntegrationTest.java#pendingNer_preservesCompletedParentSplade_withoutEncoderCall",
+        "classification": "assertion",
+        "detail": "pendingNer_preservesCompletedParentSplade_withoutEncoderCall(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: the existing FeatureField posting must survive RMW ==> expected: <true> but was: <false>"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/CombinedEnrichmentRmwIntegrationTest.java#absentSpladeEncoderPublishesNerAndRetainsCompletedSplade",
+        "classification": "assertion",
+        "detail": "absentSpladeEncoderPublishesNerAndRetainsCompletedSplade(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <COMPLETED> but was: <PENDING>"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/CombinedEnrichmentRmwIntegrationTest.java#failingSpladeEncoderIsNotCalledAndEmbeddingPublishes",
+        "classification": "assertion",
+        "detail": "failingSpladeEncoderIsNotCalledAndEmbeddingPublishes(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: a failing encoder must not affect existing sparse work ==> expected: <true> but was: <false>"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/EnrichmentAttemptAccountingTest.java#untouchedSparseWorkIsNeitherComputedNorPublishedAgain",
+        "classification": "assertion",
+        "detail": "untouchedSparseWorkIsNeitherComputedNorPublishedAgain(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: there is no new sparse output in this cycle ==> expected: <0> but was: <1>"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/EnrichmentAttemptAccountingTest.java#unusedFailingSparseEncoderDoesNotCreateAnAttemptOrWithholdEmbedding",
+        "classification": "assertion",
+        "detail": "unusedFailingSparseEncoderDoesNotCreateAnAttemptOrWithholdEmbedding(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <false> but was: <true>"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/BackfillSchedulerPersistenceTest.java#deadlineAfterEmbeddingPublishesWithoutSparseRederivation",
+        "classification": "assertion",
+        "detail": "deadlineAfterEmbeddingPublishesWithoutSparseRederivation(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: Unexpected exception thrown: org.mockito.exceptions.verification.NeverWantedButInvoked: &#10;spladeEncoder.encodeBatch(<any List>);&#10;Never wanted here:&#10;-> at io.justsearch.indexerworker.splade.SpladeEncoder.encodeBatch(SpladeEncoder.java:384)&#10;But invok"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/BackfillSchedulerSlowBatchTest.java#failingSparseEncoderCannotAffectCompletedSparseDocumentsAcrossCycles",
+        "classification": "assertion",
+        "detail": "failingSparseEncoderCannotAffectCompletedSparseDocumentsAcrossCycles(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <false> but was: <true>"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/BackfillSchedulerSlowBatchTest.java#completedSparseBatchPublishesWithoutCallingFailingEncoder",
+        "classification": "assertion",
+        "detail": "completedSparseBatchPublishesWithoutCallingFailingEncoder(int) [1] 0: org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <false> but was: <true> | completedSparseBatchPublishesWithoutCallingFailingEncoder(int) [2] 64: org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <false> but was: <true>"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/BackfillSchedulerSlowBatchTest.java#completedSparseBatchDoesNotCallSlowFailingEncoder",
+        "classification": "assertion",
+        "detail": "completedSparseBatchDoesNotCallSlowFailingEncoder(int) [1] 0: org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <false> but was: <true> | completedSparseBatchDoesNotCallSlowFailingEncoder(int) [2] 64: org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <false> but was: <true>"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/BackfillSchedulerSlowBatchTest.java#costlySparseEncoderIsNotCalledForFinishedWorkWhileDenseAndNerAdvance",
+        "classification": "assertion",
+        "detail": "costlySparseEncoderIsNotCalledForFinishedWorkWhileDenseAndNerAdvance(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <0> but was: <75>"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/BackfillSchedulerSlowBatchTest.java#completedSparsePublishesEmbeddingDuringSparseBackoffOrEncoderRetirement",
+        "classification": "assertion",
+        "detail": "completedSparsePublishesEmbeddingDuringSparseBackoffOrEncoderRetirement(boolean) [1] false: org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <COMPLETED> but was: <PENDING>"
+      },
+      {
+        "id": "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/SparseRmwPreservationTest.java#partialUpdatesRetainPostingsStatusAndRetryAfterReopen",
+        "classification": "assertion",
+        "detail": "partialUpdatesRetainPostingsStatusAndRetryAfterReopen(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: encoded posting frequencies must be identical ==> expected: <{alpha=32572, beta=32812}> but was: <{}>"
+      },
+      {
+        "id": "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/SparseRmwPreservationTest.java#batchTraversesSparseDictionaryOncePerLeaf",
+        "classification": "assertion",
+        "detail": "batchTraversesSparseDictionaryOncePerLeaf(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: one sparse term pass per leaf for the entire NER batch ==> expected: <2> but was: <0>"
+      },
+      {
+        "id": "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/SparseRmwPreservationTest.java#unreadableSparseDocumentIsWithheldWhileOtherDocumentsPublish",
+        "classification": "assertion",
+        "detail": "unreadableSparseDocumentIsWithheldWhileOtherDocumentsPublish(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <[good]> but was: <[broken, good]>"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/EnrichmentStorageDispositionTest.java#unreadableArtifactDefersEarnedOutcomeWithoutRetryCharge",
+        "classification": "assertion",
+        "detail": "unreadableArtifactDefersEarnedOutcomeWithoutRetryCharge(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <1> but was: <null>"
+      },
+      {
+        "id": "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/SparsePayloadPreservationTest.java#mapperDerivesAllAcceptedFeaturesAndRewritesKeepFrequencies",
+        "classification": "assertion",
+        "detail": "mapperDerivesAllAcceptedFeaturesAndRewritesKeepFrequencies(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: every accepted sparse artifact must carry its derived payload ==> expected: not <null>"
+      },
+      {
+        "id": "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/SparsePayloadPreservationTest.java#legacyScanRunsOnceAndEmptyOrFailedRowsNeverDecodeOldPayload",
+        "classification": "assertion",
+        "detail": "legacyScanRunsOnceAndEmptyOrFailedRowsNeverDecodeOldPayload(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <true> but was: <false>"
+      },
+      {
+        "id": "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/SparsePayloadPreservationTest.java#malformedPayloadsWithholdOnlyTheirRowsWithoutChangingStoredWork",
+        "classification": "assertion",
+        "detail": "malformedPayloadsWithholdOnlyTheirRowsWithoutChangingStoredWork(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <9> but was: <0>"
+      },
+      {
+        "id": "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/SparsePayloadPreservationTest.java#storedPayloadReadFailureIsIsolatedInConditionalPublication",
+        "classification": "assertion",
+        "detail": "storedPayloadReadFailureIsIsolatedInConditionalPublication(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <[healthy]> but was: <[broken, healthy]>"
+      },
+      {
+        "id": "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/SparsePayloadPreservationTest.java#suppliedSparseWinsWithReplacementContentAndStatusOnlyFailureDropsBoth",
+        "classification": "assertion",
+        "detail": "suppliedSparseWinsWithReplacementContentAndStatusOnlyFailureDropsBoth(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: not <null>"
+      },
+      {
+        "id": "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/SparsePayloadPreservationTest.java#chunkPayloadSurvivesBatchPublicationReopenAndMerge",
+        "classification": "assertion",
+        "detail": "chunkPayloadSurvivesBatchPublicationReopenAndMerge(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: not <null>"
+      },
+      {
+        "id": "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/SparsePayloadPreservationTest.java#payloadIsDerivedAndCannotCertifyAnInvalidStatus",
+        "classification": "assertion",
+        "detail": "payloadIsDerivedAndCannotCertifyAnInvalidStatus(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: actual array was <null>"
+      },
+      {
+        "id": "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/SparsePayloadPreservationTest.java#payloadAdditionAcceptedByBothParityPaths",
+        "classification": "assertion",
+        "detail": "payloadAdditionAcceptedByBothParityPaths(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: certified additive stored binary field is compatible when both fingerprints are available ==> expected: <true> but was: <false>"
+      }
+    ]
+  },
+  "digest": "sha256:55df776ccc07ad85b22ca92fe26739dd343390fcc5db4bdcc2519e4906dff285"
+}

@@ -105,7 +105,10 @@ public final class EnrichmentAccounting {
           else acceptedStages.add(ticket);
         }
         if (!tickets.containsKey(ticket)) continue;
-        if (rejected.contains(update.getKey())) {
+        if (receipt.storageFailures().containsKey(update.getKey())) {
+          tickets.put(ticket, Disposition.DEFERRED);
+          observations.merge(stage.key + ".deferred_storage", 1L, Long::sum);
+        } else if (rejected.contains(update.getKey())) {
           tickets.put(ticket, Disposition.REJECTED_STALE);
         } else if (accepted.contains(update.getKey())) {
           Object status = fields.get(stage.status);

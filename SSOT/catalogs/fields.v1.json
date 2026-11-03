@@ -447,6 +447,14 @@
       "roles": ["filter", "facet"]
     },
     {
+      "id": "splade_payload",
+      "type": "binary-stored",
+      "stored": true,
+      "docValues": false,
+      "roles": [],
+      "compatibleAddition": true
+    },
+    {
       "id": "splade",
       "type": "splade",
       "stored": false,

@@ -34,17 +34,25 @@ public final class LuceneRuntimeTypes {
   /**
    * In-memory receipt for ordered conditional publication; failure leaves the suffix unattempted.
    * correctedFailedStatuses names the stage status fields the mapper corrected to FAILED in each
-   * accepted mutation, without changing that mutation or charging a retry.
+   * accepted mutation, without changing that mutation or charging a retry. storageFailures names
+   * withheld documents and their storage reason; other documents can still be accepted.
    */
   public record EnrichmentPublicationReceipt(
       List<String> acceptedIds, List<String> rejectedIds,
-      Map<String, java.util.Set<String>> correctedFailedStatuses, RuntimeException failure) {
+      Map<String, java.util.Set<String>> correctedFailedStatuses,
+      Map<String, String> storageFailures, RuntimeException failure) {
     public EnrichmentPublicationReceipt {
+      storageFailures = Map.copyOf(storageFailures);
       acceptedIds = List.copyOf(acceptedIds);
       rejectedIds = List.copyOf(rejectedIds);
       correctedFailedStatuses = correctedFailedStatuses.entrySet().stream().collect(
           java.util.stream.Collectors.toUnmodifiableMap(Map.Entry::getKey,
               entry -> java.util.Set.copyOf(entry.getValue())));
+    }
+
+    public EnrichmentPublicationReceipt(List<String> acceptedIds, List<String> rejectedIds,
+        Map<String, java.util.Set<String>> correctedFailedStatuses, RuntimeException failure) {
+      this(acceptedIds, rejectedIds, correctedFailedStatuses, Map.of(), failure);
     }
 
     public EnrichmentPublicationReceipt(List<String> acceptedIds, List<String> rejectedIds,

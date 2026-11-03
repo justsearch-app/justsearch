@@ -23,12 +23,12 @@
       "required": ["id", "type", "stored", "docValues", "roles"],
       "properties": {
         "id": { "type": "string", "pattern": "^[a-z0-9_]+$" },
-        "type": { "type": "string", "enum": ["keyword", "text", "long", "double", "boolean", "vector", "splade"] },
+        "type": { "type": "string", "enum": ["keyword", "text", "long", "double", "boolean", "vector", "splade", "binary-stored"] },
         "stored": { "type": "boolean" },
         "docValues": { "type": "boolean" },
         "roles": { "type": "array", "items": { "$ref": "#/$defs/role" } },
         "multiValued": { "type": "boolean" },
-        "compatibleAddition": { "type": "boolean", "description": "An optional stored keyword without roles may be absent from an older compatible index. Not part of its physical fingerprint." },
+        "compatibleAddition": { "type": "boolean", "description": "An optional stored keyword or binary field without roles may be absent from an older compatible index. Not part of its physical fingerprint." },
         "unique": { "type": "boolean" },
         "rmwPolicy": {
           "type": "string",
@@ -51,6 +51,10 @@
         }
       },
       "allOf": [
+        {
+          "if": { "properties": { "type": { "const": "binary-stored" } } },
+          "then": { "properties": { "stored": { "const": true }, "docValues": { "const": false }, "roles": { "maxItems": 0 }, "multiValued": { "const": false } } }
+        },
         {
           "if": { "properties": { "type": { "const": "text" } } },
           "then": {

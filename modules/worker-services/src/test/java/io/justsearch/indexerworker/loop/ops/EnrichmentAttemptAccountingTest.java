@@ -92,18 +92,19 @@ class EnrichmentAttemptAccountingTest {
   }
 
   @Test
-  void preservationPublicationIsNotANewStageCompletion() throws Exception {
+  void untouchedSparseWorkIsNeitherComputedNorPublishedAgain() throws Exception {
     documents.put("parent", Map.of(SchemaFields.EMBEDDING_STATUS, "PENDING", SchemaFields.SPLADE_STATUS, "COMPLETED"));
     when(embedding.embedDocumentBatch(anyList())).thenReturn(List.of(new float[] {1, 0}));
     when(splade.encodeBatch(anyList())).thenReturn(List.of(Map.of("term", 1f)));
     var outcome = CombinedEnrichmentBackfillOps.processCombinedBackfill(context());
     assertEquals(1, outcome.embedProcessed(), "published parent vectors include successful parents");
-    assertEquals(1, outcome.spladeProcessed(), "legacy publication count keeps its meaning");
+    assertEquals(0, outcome.spladeProcessed(), "there is no new sparse output in this cycle");
     assertEquals(1, outcome.accounting().tickets().size());
     assertEquals(1, outcome.accounting().count(EMBED, PUBLISHED));
     assertEquals(0, outcome.accounting().count(SPLADE, PUBLISHED));
-    assertEquals(1L, outcome.accounting().counters().get("splade.computed"));
-    assertEquals(1L, outcome.accounting().counters().get("splade.accepted"));
+    assertFalse(outcome.accounting().counters().containsKey("splade.computed"));
+    assertFalse(outcome.accounting().counters().containsKey("splade.accepted"));
+    verify(splade, never()).encodeBatch(anyList());
     verifyNoInteractions(commits);
   }
 
@@ -205,17 +206,18 @@ class EnrichmentAttemptAccountingTest {
   }
 
   @Test
-  void failedPreservationStillReportsTheSpladeAttempt() throws Exception {
+  void unusedFailingSparseEncoderDoesNotCreateAnAttemptOrWithholdEmbedding() throws Exception {
     documents.put("parent", Map.of(SchemaFields.EMBEDDING_STATUS, "PENDING",
         SchemaFields.SPLADE_STATUS, "COMPLETED"));
     when(embedding.embedDocumentBatch(anyList())).thenReturn(List.of(new float[] {1, 0}));
     when(splade.encodeBatch(anyList())).thenThrow(new CancellationException("preservation cancelled"));
     var outcome = assertDoesNotThrow(() -> CombinedEnrichmentBackfillOps.processCombinedBackfill(context()));
-    assertEquals(1L, outcome.accounting().counters().get("splade.attempts"));
+    assertFalse(outcome.accounting().counters().containsKey("splade.attempts"));
     assertEquals(0, outcome.spladeProcessed());
     assertFalse(outcome.accounting().counters().containsKey("splade.computed"));
-    assertEquals(1, outcome.accounting().count(EMBED, DEFERRED));
-    verify(coordinator, never()).publishEnrichmentBatch(anyList(), anyMap());
+    assertEquals(1, outcome.accounting().count(EMBED, PUBLISHED));
+    verify(coordinator).publishEnrichmentBatch(anyList(), anyMap());
+    verify(splade, never()).encodeBatch(anyList());
     verifyNoInteractions(commits);
   }
 

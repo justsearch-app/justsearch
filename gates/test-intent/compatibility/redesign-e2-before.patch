@@ -1,0 +1,36 @@
+diff --git a/modules/adapters-lucene/src/main/java/io/justsearch/adapters/lucene/runtime/LuceneRuntimeTypes.java b/modules/adapters-lucene/src/main/java/io/justsearch/adapters/lucene/runtime/LuceneRuntimeTypes.java
+index 956cbb055e..1bdceb6601 100644
+--- a/modules/adapters-lucene/src/main/java/io/justsearch/adapters/lucene/runtime/LuceneRuntimeTypes.java
++++ b/modules/adapters-lucene/src/main/java/io/justsearch/adapters/lucene/runtime/LuceneRuntimeTypes.java
+@@ -52,6 +52,14 @@ public final class LuceneRuntimeTypes {
+       this(acceptedIds, rejectedIds, Map.of(), failure);
+     }
+ 
++    public EnrichmentPublicationReceipt(List<String> acceptedIds, List<String> rejectedIds,
++        Map<String, java.util.Set<String>> correctedFailedStatuses,
++        Map<String, String> storageFailures, RuntimeException failure) {
++      this(acceptedIds, rejectedIds, correctedFailedStatuses, failure);
++    }
++
++    public Map<String, String> storageFailures() { return Map.of(); }
++
+     public BatchUpdateResult result() {
+       if (failure != null) throw failure;
+       return new BatchUpdateResult(acceptedIds.size(), rejectedIds.size());
+diff --git a/modules/adapters-lucene/src/main/java/io/justsearch/adapters/lucene/runtime/WritePathOps.java b/modules/adapters-lucene/src/main/java/io/justsearch/adapters/lucene/runtime/WritePathOps.java
+index 3f2438cef5..6877e87903 100644
+--- a/modules/adapters-lucene/src/main/java/io/justsearch/adapters/lucene/runtime/WritePathOps.java
++++ b/modules/adapters-lucene/src/main/java/io/justsearch/adapters/lucene/runtime/WritePathOps.java
+@@ -1221,6 +1221,12 @@ public final class WritePathOps {
+     }
+   }
+ 
++  LuceneRuntimeTypes.EnrichmentPublicationReceipt publishEnrichmentBatch(IndexSearcher searcher,
++      List<Map.Entry<String, Map<String, Object>>> updates,
++      Map<String, DocumentFieldOps.EnrichmentInput> inputs) {
++    return publishEnrichmentBatch(updates, inputs);
++  }
++
+   int updateDocumentPaths(String oldPath, String newPath) {
+     guardWritable();
+     if (oldPath == null || oldPath.isBlank() || newPath == null || newPath.isBlank()) {
