@@ -154,6 +154,8 @@ def validate_run(c: Collection, run: RunRecord, label_versions: set[str], arm: s
         out.append(f"{arm}: interrupted output (the run never recorded its end)")
     if h.dirty_hash is not None:
         out.append(f"{arm}: built from a dirty tree ({h.dirty_hash[:12]})")
+    if h.index_state.get("settled") is False:
+        out.append(f"{arm}: index is not settled")
     pop, want = h.index_population, c.index_population()
     if any(pop.get(k) != v for k, v in want.items()):
         out.append(f"{arm}: index population {pop.get('count')} docs / manifest "
@@ -278,6 +280,8 @@ def _ids(qids: list[str], show: int = 10) -> str:
 
 
 def _is_intended(name: str, intended: Iterable[str]) -> bool:
+    if name in {"index_state.index_cache_key", "index_state.generation"} and "index_key" in intended:
+        return True
     return any(name == i or name.startswith(i + ".") for i in intended)
 
 

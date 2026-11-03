@@ -54,9 +54,14 @@ def test_real_cpu_baseline_check_errors_and_window(monkeypatch):
         'judgments':'official','expected':c.counts(),'bootstrap':{'resamples':1000,'seed':1}}))
     cfg = index.IndexConfig(repo_root=engine, models_dir=models, cache_root=root/'indexes', timeout_sec=600)
     # Preparation is outside the exclusive window; only its private pausable worker builds.
-    with index.prepare_index(c,cfg) as handle:
-        if handle._worker:
-            assert handle._worker.wait(timeout=4500) == 0, (handle.root/'build.log').read_text()[-6000:]
+    preparation_times = {}
+    for kind in ('fresh', 'cached'):
+        start = time.monotonic()
+        with index.prepare_index(c,cfg) as handle:
+            assert handle.index_build == kind
+            handle.wait()
+            assert index.confirm(handle).ok
+        preparation_times[kind] = time.monotonic()-start
     admission = engine/'scripts/dev/admission.py'
     def status():
         return json.loads(subprocess.check_output([sys.executable,str(admission),'status'],text=True))
@@ -141,6 +146,7 @@ with index.prepare_index(c,cfg,prepared_only=True) as h:
         with pytest.raises(run.RunRefused,match='estimate.*budget'):
             run.require_budget(181,180)
         print('CPU_ACCEPTANCE',root,line)
+        print('CPU_PREPARATION_SECONDS',preparation_times)
         for summary in sorted((root/'runs').glob('*/summary.json')):
             print(summary.read_text())
     finally:

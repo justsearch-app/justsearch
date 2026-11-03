@@ -234,6 +234,18 @@ def test_confirm_allows_query_time_ranking_changes_but_rejects_shape_and_content
     query_file.parent.mkdir(parents=True)
     query_file.write_text("changed fusion weight")
     assert ix.confirm(handle).ok
+    # A fresh engine stays owned by its worker until close, before entry.json is
+    # published. Extra confirmation uses the worker's witnessed entry receipt.
+    import contextlib
+    entry = ix._json(root / "entry.json")
+    ix._write(root / "prepared.json", {"entry": entry})
+    (root / "entry.json").unlink()
+    handle._worker = SimpleNamespace(poll=lambda: None)
+    with monkeypatch.context() as patch:
+        patch.setattr(ix.backend, "_machine_admission", lambda _: contextlib.nullcontext())
+        assert ix.confirm(handle).ok
+    handle._worker = None
+    ix._write(root / "entry.json", entry)
     # Full delivered-order agreement remains a separate, stricter check.
     assert ix._agreement(original, current) == ["witness differs: probes"]
     current["content"]["ANSWER-1"] = sha256_text("wrong live content")

@@ -177,7 +177,6 @@ def test_absent_baseline_is_invalid(c):
     (dict(model_hashes={"embed": "e2", "reranker": "r1"}), "models: differ in embed"),
     (dict(request_config={"mode": "hybrid", "k": 20}), "request_config: differs in k"),
     (dict(index_key="idx-2"), "index_key: idx-1 -> idx-2"),
-    (dict(index_state={"settled": False}), "index_state.settled: True -> False"),
     (dict(index_state={"settled": True, "enrichment": "partial"}), "index_state.enrichment"),
 ])
 def test_uncontrolled_difference_is_named_and_inconclusive(c, change, named):
@@ -188,6 +187,13 @@ def test_uncontrolled_difference_is_named_and_inconclusive(c, change, named):
     assert any(named in x for x in cmp.confounds), cmp.confounds
     assert "confounded" in cmp.verdict.reasons[0]
     assert cmp.verdict.groups  # still reported, never turned into a verdict
+
+
+def test_unsettled_difference_is_invalid_even_when_declared_intentional(c):
+    candidate = _run(c, index_state={"settled": False})
+    result = qcmp.compare(c, config_for(c), _run(c), candidate, intended=['index_state'])
+    assert result.verdict.outcome is Outcome.INVALID
+    assert any('not settled' in reason for reason in result.verdict.reasons)
 
 
 def test_declared_change_is_not_a_confound(c):

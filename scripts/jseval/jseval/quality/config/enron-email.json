@@ -2,7 +2,7 @@
   "schema": "jseval.quality.config.v1",
   "collection": "enron-email",
   "language": "en",
-  "source": {"kind": "beir-dir", "path": null, "recipe": "scripts/jseval/707-corpora/en-email-enron-raw/1000-short-natural"},
+  "source": {"kind": "beir-dir", "path": "tmp/781-v2-datasets/mixed/en-email-enron-raw-1k-short-natural", "recipe": "scripts/jseval/707-corpora/en-email-enron-raw/1000-short-natural"},
   "judgments": "official",
   "labels": {"lang": "en", "kind": "known-item"},
   "expected": {"queries": 50, "judgments": 50, "positives": 50, "grades": {"1": 50}, "documents": 1000},

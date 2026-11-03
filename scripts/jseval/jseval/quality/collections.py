@@ -262,6 +262,9 @@ def build(cfg: QualityConfig, *, path: str | os.PathLike | None = None) -> Colle
         return build_miracl_pool(cfg)
     if kind == "beir-dir":
         src = path or cfg.source.get("path")
+        if src and path is None and not Path(src).is_absolute():
+            from .._paths import main_repo_root
+            src = main_repo_root() / src
         if not src:
             raise CollectionError(f"{cfg.collection}: a beir-dir collection needs its directory")
         return from_beir_dir(src, cfg)
@@ -434,18 +437,25 @@ def write_documents(c: Collection, out_root: str | os.PathLike) -> int:
     whose hash differs from the collection's content hash is refused before it is written."""
     import ir_datasets
 
-    dataset = c.metadata.get("source", {}).get("dataset")
-    if not dataset:
-        raise CollectionError(f"{c.name}: no ir_datasets source to read document text from")
-    store = ir_datasets.load(dataset).docs_store()
+    source = c.metadata.get("source", {})
+    if source.get("kind") == "beir-dir":
+        docs = ((row['_id'], document_text(row.get('title') or '', row['text']))
+                for _, row in _jsonl_rows(Path(source['path']) / 'corpus.jsonl')
+                if row['_id'] in c.documents)
+    else:
+        dataset = source.get("dataset")
+        if not dataset:
+            raise CollectionError(f"{c.name}: no ir_datasets source to read document text from")
+        store = ir_datasets.load(dataset).docs_store()
+        docs = ((doc.doc_id, document_text(getattr(doc, 'title', '') or '', doc.text))
+                for doc in store.get_many_iter(c.documents.keys()))
     root = Path(out_root)
     n = 0
-    for doc in store.get_many_iter(c.documents.keys()):
-        text = document_text(getattr(doc, "title", "") or "", doc.text)
-        if sha256_text(text) != c.content[doc.doc_id]:
-            raise CollectionError(f"{c.name}: the text of {doc.doc_id} does not match its "
+    for doc_id, text in docs:
+        if sha256_text(text) != c.content[doc_id]:
+            raise CollectionError(f"{c.name}: the text of {doc_id} does not match its "
                                   "recorded content hash")
-        p = root / c.documents[doc.doc_id]
+        p = root / c.documents[doc_id]
         p.parent.mkdir(parents=True, exist_ok=True)
         with open(p, "w", encoding="utf-8", newline="") as f:  # the hashed text, byte for byte
             f.write(text)

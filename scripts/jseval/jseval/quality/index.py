@@ -1,12 +1,13 @@
 """Collection-exclusive, fail-closed index lifecycle.
 
 ``prepare_index`` returns immediately. ``handle.wait()`` joins a low-priority,
-pausable build, then starts the scoring backend through the normal jseval launcher.
+pausable preparation and reuses its live engine through confirmation and teardown.
 ``confirm`` reads the live index; a cache marker is never proof of validity.
 Use ``with prepare_index(...) as handle: handle.wait()`` to own and stop the backend.
 
 Build workers finish and stop their engine before publishing entry.json. They hold
-no exclusive scoring reservation. An incomplete worker leaves an owner record,
+no exclusive scoring reservation. Their data lock survives caller death through
+writer teardown. An incomplete worker leaves an owner record,
 never an adoptable entry. The next preparation discards only that owner's partial
 index. A foreign owner/population is an error, including at an explicitly chosen path.
 """
@@ -563,23 +564,49 @@ class IndexHandle:
         if prepared_only and self._worker:
             raise IndexRefused("not ready: index is building in the background")
         if self._worker:
-            try:
-                code = self._worker.wait(timeout=self.config.timeout_sec + 3720)
-            except subprocess.TimeoutExpired:
-                self.close()
-                raise IndexRefused("background build deadline expired") from None
-            if code:
-                raise IndexRefused(f"background build exited {code}: "
-                                   f"{(self.root / 'build.log').read_text()[-6000:]}")
+            until = deadline if deadline is not None else time.monotonic() + self.config.timeout_sec + 3720
+            while time.monotonic() < until:
+                code = self._worker.poll()
+                if code is not None:
+                    raise IndexRefused(f"background preparation exited {code}: "
+                                       f"{(self.root / 'build.log').read_text()[-6000:]}")
+                ready = self.root / "prepared.json"
+                if ready.exists():
+                    prepared = _json(ready)
+                    self.base_url = prepared["url"]
+                    self.index_state = prepared["index_state"]
+                    # Only the supervisor stops this engine. Its admission and
+                    # inherited data lock cover the complete writer lifetime.
+                    self._backend = backend.BackendInfo(self._worker, self.data_dir)
+                    return self
+                time.sleep(.05)
+            self.close()
+            raise IndexRefused("background preparation deadline expired")
         entry = _json(self.root / "entry.json")
         _check_owner(entry["owner"], self.collection, self.index_key)
         deadline = deadline if deadline is not None else time.monotonic() + self.config.timeout_sec
         port = _free_port()
-        self._backend = backend.start_backend(repo_root=self.config.repo_root, data_dir=self.data_dir,
+        try:
+            # Distribution absence is not evidence against an owned cached index.
+            if prepared_only:
+                backend.require_prepared(self.config.repo_root)
+        except BaseException:
+            self.close()
+            raise
+        try:
+            self._backend = backend.start_backend(repo_root=self.config.repo_root, data_dir=self.data_dir,
                                              port=port, env_overrides=_launch_env(self.config, self.data_dir, self.env),
                                              health_timeout_sec=max(.001, min(180, deadline - time.monotonic())),
                                              **({"prepared_only": True, "startup_admission": False}
                                                 if prepared_only else {}))
+        except BaseException as e:
+            # start_backend tears down an unsuccessful start before raising.
+            try:
+                if self.index_build == "cached":
+                    _quarantine(self.root, self.data_dir, self.collection, self.index_key, str(e))
+            finally:
+                self.close()
+            raise
         self.base_url = f"http://127.0.0.1:{port}"
         # Warm-up/readiness is behavioral, not the launcher's health check.
         last = None
@@ -606,10 +633,25 @@ class IndexHandle:
 
     def close(self) -> None:
         try:
-            if self._worker and self._worker.poll() is None:
+            if self._worker:
                 # Admission owns, identifies and cleans this worker's whole process tree.
-                self._worker.terminate()
-                self._worker.wait(timeout=150)
+                ready = (self.root / "prepared.json").exists()
+                (self.root / "stop").touch()
+                # Give a ready worker time to stop its writer and publish before
+                # asking admission to cancel an unfinished preparation.
+                if ready:
+                    try:
+                        self._worker.wait(timeout=60)
+                    except subprocess.TimeoutExpired:
+                        self._worker.terminate()
+                elif self._worker.poll() is None:
+                    self._worker.terminate()
+                if self._worker.poll() is None:
+                    self._worker.wait(timeout=150)
+                self._backend = None
+                if ready and self._worker.poll() != 0:
+                    raise IndexRefused(f"preparation teardown failed: exit {self._worker.returncode}; "
+                                       f"{(self.root / 'build.log').read_text()[-6000:]}")
             if self._backend:
                 backend.stop_backend(self._backend.proc, data_dir=self.data_dir)
                 self._backend = None
@@ -665,14 +707,18 @@ def prepare_index(collection: Collection, config: IndexConfig, *, prepared_only:
                              "cached" if adopted else "fresh", components, env, lock)
         if adopted:
             _materialize(collection, config, root)  # rehash the source files before boot
-            return handle
+            if prepared_only:
+                return handle
         write_collection(collection, root / "collection")
         (root / "worker.json").unlink(missing_ok=True)
         (root / "engine-ready").unlink(missing_ok=True)
+        (root / "prepared.json").unlink(missing_ok=True)
+        (root / "stop").unlink(missing_ok=True)
         serial = dataclasses.asdict(config)
         for k in ("repo_root", "models_dir", "documents_dir", "cache_root", "data_dir"):
             serial[k] = str(serial[k]) if serial[k] is not None else None
-        _write(root / "build.json", {"config": serial, "env": env, "key": key, "data": str(data)})
+        _write(root / "build.json", {"config": serial, "env": env, "key": key, "data": str(data),
+                                    "adopted": adopted, "parent": _process(os.getpid())})
         # __name__ is __main__ when the agreement command runs via python -m.
         hook = [sys.executable, "-m", "jseval.quality.index", "hook", str(root)]
         command = [sys.executable, str(config.repo_root / "scripts/dev/admission.py"), "pausable",
@@ -689,7 +735,8 @@ def prepare_index(collection: Collection, config: IndexConfig, *, prepared_only:
             str(Path(__file__).resolve().parents[2]), worker_env.get("PYTHONPATH"))))
         with (root / "build.log").open("w") as out:
             handle._worker = subprocess.Popen(command, cwd=config.repo_root, env=worker_env,
-                                              stdout=out, stderr=subprocess.STDOUT)
+                                              stdout=out, stderr=subprocess.STDOUT,
+                                              pass_fds=(lock.fileno(),))
         return handle
     except BaseException as e:
         try:
@@ -705,6 +752,15 @@ def prepare_index(collection: Collection, config: IndexConfig, *, prepared_only:
 
 
 def confirm(handle: IndexHandle) -> index_identity.ConfirmResult:
+    if handle._worker:
+        # A caller-requested extra probe cannot race an exclusive pause of the
+        # preparation worker. Internal confirmation already runs in that worker.
+        with backend._machine_admission({**os.environ, **handle.env}):
+            return _confirm(handle)
+    return _confirm(handle)
+
+
+def _confirm(handle: IndexHandle, entry: dict | None = None) -> index_identity.ConfirmResult:
     handle.index_state = {"settled": False}
     failures = []
     checks = {}
@@ -715,7 +771,9 @@ def confirm(handle: IndexHandle) -> index_identity.ConfirmResult:
         if key != handle.index_key:
             raise IndexRefused("index-shaping inputs changed since preparation")
         _check_owner(_json(handle.data_dir / "quality-owner.json"), handle.collection, handle.index_key)
-        entry = _json(handle.root / "entry.json")
+        if entry is None:
+            entry = (_json(handle.root / "prepared.json")["entry"] if handle._worker
+                     else _json(handle.root / "entry.json"))
         _check_owner(entry["owner"], handle.collection, handle.index_key)
         m = _materialize(handle.collection, handle.config, handle.root)
         current = witness(handle.base_url, handle.collection, m, handle.root / "documents", handle.config)
@@ -780,13 +838,19 @@ def _build(root: Path) -> None:
     m = _materialize(c, cfg, root)
     port = _free_port()
     info = None
+    adopted = spec.get("adopted", False)
+    attempted = False
     try:
+        if adopted:
+            backend.require_prepared(cfg.repo_root)
+        attempted = True
         info = backend.start_backend(repo_root=cfg.repo_root, data_dir=data, port=port,
                                      env_overrides=_launch_env(cfg, data, spec["env"]), health_timeout_sec=180,
-                                     startup_admission=False)
+                                     startup_admission=False, prepared_only=adopted)
         url = f"http://127.0.0.1:{port}"
         _write(root / "engine-ready", {"url": url})
-        add_watched_root(url, root / "documents")
+        if not adopted:
+            add_watched_root(url, root / "documents")
         deadline = time.monotonic() + cfg.timeout_sec
         last = None
         while time.monotonic() < deadline:
@@ -800,24 +864,54 @@ def _build(root: Path) -> None:
             time.sleep(2)
         else:
             raise IndexRefused(f"build readiness deadline: {last}")
-        identity = index_identity.compute_live_identity(url, spec["env"], index_key=spec["key"])
-        key, _ = compute_index_key(c, cfg, spec["env"])
+        key, components = compute_index_key(c, cfg, spec["env"])
         if key != spec["key"]:
             raise IndexRefused("index-shaping inputs changed during build")
-        canary = _canary_query(url, [p["query"] for p in w["probes"]]
-                               + [q.text for _, q in sorted(c.queries.items())])
-        roots = _json(data / "watched_roots.json")
-        entry = {"schema": SCHEMA, "owner": _population_owner(c, spec["key"]),
-                 "identity": identity.to_doc(), "witness": w,
-                 "attestation": {"build_state": "COMPLETE", "generation_id": w["generation"],
-                                 "counts": w["counts"],
-                                 "watched_roots": [r["path"] for r in roots["roots"]],
-                                 "canary": {"query": canary, "required_stages": list(CANARY_STAGES)}}}
+        if adopted:
+            entry = _json(root / "entry.json")
+        else:
+            identity = index_identity.compute_live_identity(url, spec["env"], index_key=spec["key"])
+            canary = _canary_query(url, [p["query"] for p in w["probes"]]
+                                   + [q.text for _, q in sorted(c.queries.items())])
+            roots = _json(data / "watched_roots.json")
+            entry = {"schema": SCHEMA, "owner": _population_owner(c, spec["key"]),
+                     "identity": identity.to_doc(), "witness": w,
+                     "attestation": {"build_state": "COMPLETE", "generation_id": w["generation"],
+                                     "counts": w["counts"],
+                                     "watched_roots": [r["path"] for r in roots["roots"]],
+                                     "canary": {"query": canary, "required_stages": list(CANARY_STAGES)}}}
+        handle = IndexHandle(c, cfg, key, root, data, "cached" if adopted else "fresh",
+                             components, spec["env"], None, _backend=info, base_url=url)
+        result = _confirm(handle, entry)
+        if not result.ok:
+            raise IndexRefused(f"not ready: preparation confirmation failed: {result.failures}")
+        _write(root / "prepared.json", {"url": url, "index_state": handle.index_state, "entry": entry})
+        # Keep this same engine under pausable admission until its caller closes
+        # it or dies. The supervisor retains the data lock throughout teardown.
+        parent = spec["parent"]
+        while not (root / "stop").exists():
+            try:
+                current = _process(parent["pid"])
+            except (OSError, IndexError):
+                break
+            if current["birth"] != parent["birth"] or current["state"] == "Z":
+                break
+            if info.proc.poll() is not None:
+                raise IndexRefused("preparation engine exited before close")
+            time.sleep(.05)
         # Close the writer before publishing; failed/interrupted close never publishes.
         backend.stop_backend(info.proc, data_dir=data)
         info = None
         _write(root / "entry.json", entry)
+    except BaseException as e:
+        if info:
+            backend.stop_backend(info.proc, data_dir=data)
+            info = None
+        if adopted and attempted:
+            _quarantine(root, data, c, spec["key"], str(e))
+        raise
     finally:
+        (root / "prepared.json").unlink(missing_ok=True)
         if info:
             backend.stop_backend(info.proc, data_dir=data)
 

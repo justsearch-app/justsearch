@@ -229,6 +229,7 @@ def test_failed_live_adoption_is_quarantined_after_engine_stops(tmp_path, monkey
     engine = Mock()
     engine.proc.poll.return_value = None
     monkeypatch.setattr(index.backend, 'start_backend', lambda **kw: engine)
+    monkeypatch.setattr(index.backend, 'require_prepared', lambda *a: None)
     stopped = []
     def stop(*a, **kw):
         assert data.exists() and (root/'entry.json').exists()
