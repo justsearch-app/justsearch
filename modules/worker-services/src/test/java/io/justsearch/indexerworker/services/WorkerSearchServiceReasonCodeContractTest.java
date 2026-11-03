@@ -521,13 +521,18 @@ final class WorkerSearchServiceReasonCodeContractTest extends io.justsearch.adap
   }
 
   private static Set<String> resultIds(WorkerSearchService service) {
+    // The splice feeds the cross-encoder's judge window, so the request names one.
     SearchResponse response =
         invokeSearch(
             service,
             SearchRequest.newBuilder()
                 .setQuery("reliability")
                 .setLimit(3)
-                .setPipeline(PipelineConfig.newBuilder().setSparseEnabled(true).build())
+                .setPipeline(
+                    PipelineConfig.newBuilder()
+                        .setSparseEnabled(true)
+                        .setCrossEncoderEnabled(true)
+                        .build())
                 .build());
     return response.getResultsList().stream()
         .map(r -> r.getId())

@@ -45,6 +45,10 @@ final class DeclaredCollectionScanSnapshotTest {
     var queue = mock(JobQueue.class);
     when(queue.enqueueEntries(anyList())).thenAnswer(invocation -> ((List<?>) invocation.getArgument(0)).size());
     var ops = new SyncDirectoryOps(reads, null, null, queue, IndexingPacing.unthrottled());
+    var reuse = mock(io.justsearch.adapters.lucene.runtime.DocumentFieldOps.class);
+    when(reuse.isUnmodified(anyList(), any())).thenReturn(hits.stream()
+        .map(LuceneRuntimeTypes.SearchHit::docId).collect(java.util.stream.Collectors.toSet()));
+    ops.setDocumentFieldOps(reuse);
     var registryReads = new AtomicInteger();
     ops.useDeclaredCollectionRoots(() -> {
       registryReads.incrementAndGet();

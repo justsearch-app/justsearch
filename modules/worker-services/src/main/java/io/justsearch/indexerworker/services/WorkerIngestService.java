@@ -272,6 +272,7 @@ public final class WorkerIngestService {
         // Read through a supplier: the identity store is wired by setDocumentIdentityStore AFTER
         // this constructor runs, so capturing the field here would capture the UNAVAILABLE sentinel.
         confirmedDeletionMarker);
+    this.syncOps.setDocumentFieldOps(ingestLifecycle != null ? ingestLifecycle.documentFieldOps() : null);
     this.syncOps.setForcedPathSink(paths -> this.forcedPathSink.accept(paths));
     this.syncOps.setPruneGuardFactory(this::pruneGuard);
     this.syncOps.setPruneWriterFence(pruneWriterFence);
@@ -286,6 +287,7 @@ public final class WorkerIngestService {
         jobQueue,
         this.indexingPacing,
         confirmedDeletionMarker);
+    this.candidateDiscoveryOps.setDocumentFieldOps(searchLifecycle != null ? searchLifecycle.documentFieldOps() : null);
     this.candidateDiscoveryOps.setPrefixScopeFactory(root -> prefixScope(root.toString()));
     this.candidateDiscoveryOps.setPruneGuardFactory(this::pruneGuard);
     this.candidateDiscoveryOps.setDirectoryExclusions(this::isUserExcludedDirectory);

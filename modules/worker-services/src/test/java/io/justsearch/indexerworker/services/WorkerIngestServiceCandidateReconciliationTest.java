@@ -10,6 +10,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anySet;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.nullable;
@@ -730,6 +731,8 @@ final class WorkerIngestServiceCandidateReconciliationTest
     IndexingCoordinator candidateWriter = mock(IndexingCoordinator.class);
     when(candidate.indexingCoordinator()).thenReturn(candidateWriter);
     when(serving.readPathOps()).thenReturn(reads);
+    when(serving.documentFieldOps().isUnmodified(anyList(), any()))
+        .thenReturn(java.util.Set.copyOf(java.util.Arrays.asList(indexedPaths)));
     when(serving.isAcceptingWrites()).thenReturn(true);
     IndexingCoordinator servingWriter = mock(IndexingCoordinator.class);
     CommitOps servingCommit = mock(CommitOps.class);

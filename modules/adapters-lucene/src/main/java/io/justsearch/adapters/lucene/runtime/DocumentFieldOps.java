@@ -700,63 +700,96 @@ public final class DocumentFieldOps {
     try {
       while (true) {
         var admission = session.commitOps.withAdmissionSearcher(bridge,
-            searcher -> {
-              org.apache.lucene.search.TopDocs docs =
-                  searcher.search(new TermQuery(new Term(idField, docId)), 1);
-              if (docs.scoreDocs.length == 0) {
-                log.trace("isUnmodified: not indexed yet: {}", docId);
-                return false;
-              }
-
-              int docNum = docs.scoreDocs[0].doc;
-              long modifiedAt =
-                  readPathOps.readLongDocValueOrStoredLong(searcher, docNum, SchemaFields.MODIFIED_AT);
-              if (modifiedAt < 0) {
-                log.trace("isUnmodified: no modified_at field (legacy doc): {}", docId);
-                return false;
-              }
-              if (modifiedAt != currentLastModified) return false;
-              if (currentSizeBytes != null) {
-                long sizeBytes = readPathOps.readLongDocValueOrStoredLong(
-                    searcher, docNum, SchemaFields.SIZE_BYTES);
-                if (sizeBytes < 0 || sizeBytes != currentSizeBytes) return false;
-              }
-              if (sourceSha256 != null || extractionPolicyId != null) {
-                var evidence = searcher.storedFields().document(docNum,
-                    Set.of(SchemaFields.SOURCE_SHA256, SchemaFields.EXTRACTION_POLICY_ID));
-                if (sourceSha256 != null && !sourceSha256.equals(evidence.get(SchemaFields.SOURCE_SHA256))) {
-                  return false;
-                }
-                if (extractionPolicyId != null && !extractionPolicyId.equals(evidence.get(SchemaFields.EXTRACTION_POLICY_ID))) {
-                  return false;
-                }
-              }
-              var assessment = session.chunkCompleteness.assess(searcher, docNum, docId);
-              boolean unchanged = assessment.complete();
-              if (unchanged && assessment.backfill() != null) {
-                unchanged = session.indexingCoordinator.backfillChunkDeclaration(
-                    searcher, docNum, docId, assessment.backfill());
-                // Only the one-time migration refreshes here. Subsequent admission reads metadata.
-                if (unchanged) {
-                  session.commitOps.maybeRefreshBlocking();
-                  session.commitOps.refreshAdmissionAfterBackfill();
-                }
-              }
-              if (unchanged) {
-                log.trace(
-                    "isUnmodified: unchanged (stored={}, current={}): {}",
-                    modifiedAt,
-                    currentLastModified,
-                    docId);
-              }
-              return unchanged;
-            });
+            searcher -> isUnmodified(searcher, docId, currentLastModified, currentSizeBytes,
+                sourceSha256, extractionPolicyId));
         if (session.commitOps.admissionReaderStillCurrent(admission.epoch())) return admission.value();
       }
     } catch (IOException e) {
       log.debug("Failed to check if modified: {}", docId, e);
       return false;
     }
+  }
+
+  /** Parent evidence worth certifying against the current admission reader. */
+  public record ReuseCandidate(String docId, long modifiedAtMs, long sizeBytes,
+      String sourceSha256, String extractionPolicyId) {}
+
+  /**
+   * Certifies a bounded batch on one admission reader, sharing the single-document assessment.
+   * I/O uncertainty propagates so strict reconciliation cannot certify a partial observation.
+   */
+  public Set<String> isUnmodified(List<ReuseCandidate> candidates,
+      java.util.function.BooleanSupplier cancelled) throws IOException {
+    if (candidates.isEmpty()) return Set.of();
+    while (true) {
+      var admission = session.commitOps.withAdmissionSearcher(bridge, searcher -> {
+        var unchanged = new java.util.HashSet<String>();
+        for (var candidate : candidates) {
+          if (cancelled.getAsBoolean() || Thread.currentThread().isInterrupted()) {
+            throw new IOException("Indexed reuse check cancelled");
+          }
+          if (isUnmodified(searcher, candidate.docId(), candidate.modifiedAtMs(),
+              Long.valueOf(candidate.sizeBytes()), candidate.sourceSha256(),
+              candidate.extractionPolicyId())) unchanged.add(candidate.docId());
+        }
+        return unchanged;
+      });
+      if (session.commitOps.admissionReaderStillCurrent(admission.epoch())) return admission.value();
+    }
+  }
+
+  private boolean isUnmodified(org.apache.lucene.search.IndexSearcher searcher, String docId,
+      long currentLastModified, Long currentSizeBytes, String sourceSha256,
+      String extractionPolicyId) throws IOException {
+    org.apache.lucene.search.TopDocs docs =
+        searcher.search(new TermQuery(new Term(idField, docId)), 1);
+    if (docs.scoreDocs.length == 0) {
+      log.trace("isUnmodified: not indexed yet: {}", docId);
+      return false;
+    }
+
+    int docNum = docs.scoreDocs[0].doc;
+    long modifiedAt =
+        readPathOps.readLongDocValueOrStoredLong(searcher, docNum, SchemaFields.MODIFIED_AT);
+    if (modifiedAt < 0) {
+      log.trace("isUnmodified: no modified_at field (legacy doc): {}", docId);
+      return false;
+    }
+    if (modifiedAt != currentLastModified) return false;
+    if (currentSizeBytes != null) {
+      long sizeBytes = readPathOps.readLongDocValueOrStoredLong(
+          searcher, docNum, SchemaFields.SIZE_BYTES);
+      if (sizeBytes < 0 || sizeBytes != currentSizeBytes) return false;
+    }
+    if (sourceSha256 != null || extractionPolicyId != null) {
+      var evidence = searcher.storedFields().document(docNum,
+          Set.of(SchemaFields.SOURCE_SHA256, SchemaFields.EXTRACTION_POLICY_ID));
+      if (sourceSha256 != null && !sourceSha256.equals(evidence.get(SchemaFields.SOURCE_SHA256))) {
+        return false;
+      }
+      if (extractionPolicyId != null && !extractionPolicyId.equals(evidence.get(SchemaFields.EXTRACTION_POLICY_ID))) {
+        return false;
+      }
+    }
+    var assessment = session.chunkCompleteness.assess(searcher, docNum, docId);
+    boolean unchanged = assessment.complete();
+    if (unchanged && assessment.backfill() != null) {
+      unchanged = session.indexingCoordinator.backfillChunkDeclaration(
+          searcher, docNum, docId, assessment.backfill());
+      // Only the one-time migration refreshes here. Subsequent admission reads metadata.
+      if (unchanged) {
+        session.commitOps.maybeRefreshBlocking();
+        session.commitOps.refreshAdmissionAfterBackfill();
+      }
+    }
+    if (unchanged) {
+      log.trace(
+          "isUnmodified: unchanged (stored={}, current={}): {}",
+          modifiedAt,
+          currentLastModified,
+          docId);
+    }
+    return unchanged;
   }
 
   /**

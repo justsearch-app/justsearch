@@ -232,6 +232,7 @@
         "modules/ui-web/src/api/settingsAttempt.ts",
         "modules/ui-web/src/api/exclusionPolicy.ts",
         "modules/ui-web/src/shell-v0/components/IndexingRulesEditor.ts",
+        "modules/ui-web/src/shell-v0/views/BrainSurface.ts",
         "modules/ui-web/src/shell-v0/views/LibrarySurface.ts",
         "modules/ui-web/src/shell-v0/views/SettingsSurface.ts"
       ],

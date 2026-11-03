@@ -140,6 +140,14 @@ public interface AiInstallService {
    */
   Attempt startInstall(boolean acceptTerms);
 
+  /** Starts an install carrying the consented Best match first enable intent to completion. */
+  default Attempt startInstall(boolean acceptTerms, boolean enableRerankerOnCompletion) {
+    if (enableRerankerOnCompletion) {
+      throw new UnsupportedOperationException("Reranker install intent unavailable");
+    }
+    return startInstall(acceptTerms);
+  }
+
   /** Request cancellation of an in-flight install. */
   void cancel();
 

@@ -476,12 +476,27 @@ final class WatcherDeleteSafetyTest extends LuceneExecutorTestBase {
     Path retained = indexed("retained.txt");
     for (Path source : List.of(file, retained)) {
       String id = "chunk:" + java.util.UUID.randomUUID();
+      String content = "original " + source.getFileName();
+      String revision = io.justsearch.indexing.chunking.ChunkParentRevision.sha256Hex(content);
+      // This preservation control retains a reusable family; malformed children are repair work.
+      runtime.indexingCoordinator().updateDocument(source.toString(), Map.of(
+          SchemaFields.CONTENT_SHA256, revision, SchemaFields.CHUNK_TOTAL, 1,
+          SchemaFields.CHUNK_PARENT_CONTENT_SHA256, revision));
       runtime.indexingCoordinator().indexSingle(new IndexDocument(Map.of(
           SchemaFields.DOC_ID, id, SchemaFields.DOC_UID, id,
           SchemaFields.PATH, source.toString(), SchemaFields.PARENT_DOC_ID, source.toString(),
-          SchemaFields.IS_CHUNK, "true", SchemaFields.CONTENT, "old chunk")));
+          SchemaFields.IS_CHUNK, "true", SchemaFields.CONTENT, content,
+          SchemaFields.CHUNK_INDEX, 0, SchemaFields.CHUNK_TOTAL, 1,
+          SchemaFields.CHUNK_PARENT_CONTENT_SHA256, revision)));
     }
     runtime.commitOps().commitAndTrack(CommitReason.SWITCH_BUFFER_REPLAY);
+    for (Path source : List.of(file, retained)) {
+      assertTrue(runtime.documentFieldOps().isUnmodified(source.toString(),
+          Files.getLastModifiedTime(source).toMillis(), Files.size(source),
+          io.justsearch.indexerworker.loop.SourceContentHash.sha256(source),
+          io.justsearch.indexerworker.extract.TikaExtractionPolicy.defaults().policyId()),
+          "nonregular replacement controls start with complete current indexed families");
+    }
     runtime.close();
     runtime = null;
     Files.delete(file);

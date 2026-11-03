@@ -1325,7 +1325,7 @@ export async function main() {
   mcpServer.registerTool(
     'justsearch.dev.start',
     {
-      description: 'Launch the dev stack. Returns OWNER_CONFLICT if another agent owns it (use takeover param to override with user approval), or if an operation is running in your own stack (wait, or takeover "force"). Cold start: ~1 min; warm: ~15s (HTTP ready) / ~40s (worker ready). Blocks until readiness level reached.',
+      description: 'Launch the dev stack. isolatedModels: "none" | "partial" | "truncated" uses private models and ONNX cache under dataDir without downloads and prints effective paths. Requires a fresh folder without inherited config, or marked isolated-start output from this runner. Inherited JUSTSEARCH_* variables are denied by default except runner-owned values and JUSTSEARCH_SERVER_EXE (inference executable), JUSTSEARCH_GPU_ENABLED (GPU execution), JUSTSEARCH_GH_BIN (developer GitHub CLI), JUSTSEARCH_DEV_MCP_REPO_ROOT (MCP runner location), JUSTSEARCH_AGENT_IDENTITY_HANDOFF (caller ownership); none selects Engine configuration or storage paths. Refuses every -D property or @argument file in JAVA_OPTS, UI_OPTS, JDK_JAVA_OPTIONS, JAVA_TOOL_OPTIONS or _JAVA_OPTIONS. Omit for shared models. Returns OWNER_CONFLICT if another agent owns it (use takeover param to override with user approval), or if an operation is running in your own stack (wait, or takeover "force"). Cold start: ~1 min; warm: ~15s (HTTP ready) / ~40s (worker ready). Blocks until readiness level reached.',
       inputSchema: StartInputSchema,
       annotations: { destructiveHint: false, openWorldHint: false },
     },
@@ -1405,6 +1405,7 @@ export async function main() {
 
       const args = buildDevRunnerArgsStart({
         apiPort, uiPort, clean, dataDir, takeover, skipBuild, hotReload,
+        isolatedModels: input.isolatedModels,
         sessionId: input.sessionId,
         leaseDurationSec: input.leaseDurationSec,
         chatProfile: input.chatProfile,

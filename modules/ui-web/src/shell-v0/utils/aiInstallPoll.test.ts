@@ -250,7 +250,8 @@ describe('aiInstallPoll lifecycle cancellation', () => {
     await vi.advanceTimersByTimeAsync(0);
     expect(fetchMock).toHaveBeenCalledTimes(6);
     finish.slice(0, 3).forEach((resolve) => resolve(jsonResponse({ state: 'running' })));
-    await vi.advanceTimersByTimeAsync(30_000);
+    // Settle the replacement within its one-interval deadline; only obsolete results are ignored.
+    await vi.advanceTimersByTimeAsync(999);
     expect(fetchMock).toHaveBeenCalledTimes(6);
     if (lifecycle === 'resubscribe') {
       expect(listener).toHaveBeenCalledExactlyOnceWith({ install: null, runtime: null, packs: null });
@@ -263,6 +264,7 @@ describe('aiInstallPoll lifecycle cancellation', () => {
       install: { state: 'idle' }, runtime: { state: 'idle' }, packs: { state: 'idle' },
       installObservation: { latestReadFailed: false },
       runtimeObservation: { latestReadFailed: false },
+      packsObservation: { latestReadFailed: false },
     });
     await vi.advanceTimersByTimeAsync(5_000);
     expect(fetchMock).toHaveBeenCalledTimes(9);

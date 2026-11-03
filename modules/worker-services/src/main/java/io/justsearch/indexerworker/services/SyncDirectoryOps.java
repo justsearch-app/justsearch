@@ -6,6 +6,7 @@ import io.justsearch.adapters.lucene.runtime.PathPrefixScope;
 import static io.justsearch.indexerworker.services.IngestResponses.*;
 
 import io.justsearch.adapters.lucene.runtime.CommitOps;
+import io.justsearch.adapters.lucene.runtime.DocumentFieldOps;
 import io.justsearch.adapters.lucene.runtime.LuceneRuntimeTypes;
 import io.justsearch.adapters.lucene.runtime.PruneOps;
 import io.justsearch.adapters.lucene.runtime.ReadPathOps;
@@ -43,6 +44,7 @@ final class SyncDirectoryOps {
   private static final int SYNC_PRUNE_THROTTLE_BATCH_SIZE = 100;
   private static final int SYNC_WALK_THROTTLE_EVERY_N_FILES = 100;
   private static final int SYNC_ENQUEUE_BATCH_SIZE = 2_000;
+  private static final int REUSE_CHECK_BATCH_SIZE = 256;
 
   private java.util.function.Supplier<List<io.justsearch.app.api.knowledge.IngestCollectionPolicy.RootBinding>> declaredCollectionRoots = List::of;
 
@@ -86,6 +88,57 @@ final class SyncDirectoryOps {
   private static final int MAX_INDEXED_PATH_CHARS_FOR_MISSING_SCAN = 16 * 1024 * 1024;
 
   private final ReadPathOps readPathOps;
+  private DocumentFieldOps documentFieldOps;
+
+  void setDocumentFieldOps(DocumentFieldOps fields) {
+    documentFieldOps = fields;
+  }
+
+  /** Only parent-filter matches reach this bounded, current-reader certification. */
+  private Set<String> reusableFamilies(Map<Path, IndexedFileStamp> pending,
+      java.util.function.BooleanSupplier cancelled) throws IOException {
+    if (pending.isEmpty()) return Set.of();
+    checkCancelled(cancelled);
+    if (documentFieldOps == null) throw new IOException("Indexed reuse reader unavailable");
+    var candidates = pending.entrySet().stream().map(entry -> {
+      var stamp = entry.getValue();
+      return new DocumentFieldOps.ReuseCandidate(PathNormalizer.normalizeKey(entry.getKey()),
+          stamp.modifiedAtMs(), stamp.sizeBytes(), stamp.sourceSha256(), extractionPolicyId);
+    }).toList();
+    return documentFieldOps.isUnmodified(candidates, cancelled);
+  }
+
+  private void addIncompleteFamilies(Map<Path, IndexedFileStamp> pending,
+      java.util.function.BooleanSupplier cancelled, List<Path> additions) throws IOException {
+    var unchanged = reusableFamilies(pending, cancelled);
+    for (var path : pending.keySet()) {
+      checkCancelled(cancelled);
+      if (!unchanged.contains(PathNormalizer.normalizeKey(path))) additions.add(path);
+    }
+    pending.clear();
+  }
+
+  private boolean spoolIncompleteFamilies(Map<Path, IndexedFileStamp> pending,
+      java.util.function.BooleanSupplier cancelled, ReconciliationSpool spool) throws IOException {
+    Set<String> unchanged;
+    boolean unverified = false;
+    try {
+      unchanged = reusableFamilies(pending, cancelled);
+    } catch (IOException | RuntimeException unavailable) {
+      // Ordinary sync still repairs additions when index evidence is unavailable.
+      unchanged = Set.of();
+      unverified = true;
+    }
+    for (var entry : pending.entrySet()) {
+      if (cancelled.getAsBoolean() || Thread.currentThread().isInterrupted()) break;
+      if (!unchanged.contains(PathNormalizer.normalizeKey(entry.getKey()))) {
+        spool.add(entry.getKey(), entry.getValue().sizeBytes());
+      }
+    }
+    pending.clear();
+    return unverified;
+  }
+
   private final PruneOps pruneOps;
   private final CommitOps commitOps;
 
@@ -227,7 +280,10 @@ final class SyncDirectoryOps {
     this.pruneWriterFence = java.util.Objects.requireNonNull(fence, "fence");
   }
 
-  /** A complete, bounded serving-index/disk difference. No queue or Lucene mutation occurs here. */
+  /**
+   * A complete, bounded serving-index/disk difference. No queue admission occurs here;
+   * indexed reuse may perform its existing guarded legacy chunk-declaration backfill.
+   */
   record RootDifference(
       List<Path> additions,
       List<String> deletions,
@@ -293,6 +349,7 @@ final class SyncDirectoryOps {
       indexedFiles.keySet().removeIf(scope::excludes);
       Set<String> seenDiskPaths = new HashSet<>();
       List<Path> eligibleFiles = new ArrayList<>();
+      Map<Path, IndexedFileStamp> pendingReuse = new java.util.LinkedHashMap<>();
       Files.walkFileTree(
           root,
           new SimpleFileVisitor<Path>() {
@@ -352,6 +409,11 @@ final class SyncDirectoryOps {
                 if (force || indexed == null || !indexed.matches(attrs) || !extractionMatches(indexed)
                     || !collectionMatches(indexed, file, collection, declared)) {
                   eligibleFiles.add(file.toAbsolutePath().normalize());
+                } else {
+                  pendingReuse.put(file.toAbsolutePath().normalize(), indexed);
+                  if (pendingReuse.size() >= REUSE_CHECK_BATCH_SIZE) {
+                    addIncompleteFamilies(pendingReuse, cancelled, eligibleFiles);
+                  }
                 }
               }
               return FileVisitResult.CONTINUE;
@@ -389,6 +451,7 @@ final class SyncDirectoryOps {
             }
           });
 
+      addIncompleteFamilies(pendingReuse, cancelled, eligibleFiles);
       List<Path> additions = new ArrayList<>();
       for (Path file : eligibleFiles) {
         checkCancelled(cancelled);
@@ -964,6 +1027,7 @@ final class SyncDirectoryOps {
       boolean[] walkIncomplete = {false};
       final Map<String, IndexedFileStamp> indexedPathsFinal = indexedPaths;
       var declared = new CollectionSnapshot();
+      Map<Path, IndexedFileStamp> pendingReuse = new java.util.LinkedHashMap<>();
 
       Files.walkFileTree(
           root,
@@ -1040,6 +1104,11 @@ final class SyncDirectoryOps {
                 // 813 Slice B: the walk already holds the size — no extra stat.
                 if (stopped()) return FileVisitResult.TERMINATE;
                 spool.add(file, attrs.size());
+              } else if (admissionMode == AdmissionMode.DEFAULT || admissionMode == AdmissionMode.MAINTENANCE) {
+                pendingReuse.put(file, indexed);
+                if (pendingReuse.size() >= REUSE_CHECK_BATCH_SIZE) {
+                  walkIncomplete[0] |= spoolIncompleteFamilies(pendingReuse, cancelled, spool);
+                }
               }
               return FileVisitResult.CONTINUE;
             }
@@ -1076,6 +1145,8 @@ final class SyncDirectoryOps {
             }
           });
 
+      walkIncomplete[0] |= spoolIncompleteFamilies(pendingReuse, cancelled, spool);
+      walkInterrupted[0] |= Thread.currentThread().isInterrupted();
       int filesAdded = spool.drain(SYNC_ENQUEUE_BATCH_SIZE, provenance,
           () -> cancelled.getAsBoolean() || walkInterrupted[0]
               || Thread.currentThread().isInterrupted(), entries -> {

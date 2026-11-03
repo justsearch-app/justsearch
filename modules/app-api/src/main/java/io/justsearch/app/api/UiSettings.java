@@ -296,6 +296,34 @@ public final class UiSettings {
   // SPLADE_MODEL_PATH, CITATION_SCORER_MODEL_PATH).
   private String embedOnnxModelPath = "";
   private String rerankerModelPath = "";
+  // Null preserves legacy query-role authority; false keeps the installed files unused.
+  private Boolean rerankerEnabled;
+  private long rerankerPreferenceRevision;
+  private io.justsearch.app.api.settings.QueryRoleSelection.Role rerankerRestoreSelection;
+
+  public Boolean getRerankerEnabled() { return rerankerEnabled; }
+  public void setRerankerEnabled(Boolean enabled) { rerankerEnabled = enabled; }
+
+  /** Settings-owner witness of the last accepted choice, including a same-value choice. */
+  @com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_DEFAULT)
+  public long getRerankerPreferenceRevision() { return rerankerPreferenceRevision; }
+  public void setRerankerPreferenceRevision(long revision) {
+    if (revision < 0) throw new IllegalArgumentException("Invalid reranker preference revision");
+    rerankerPreferenceRevision = revision;
+  }
+
+  public io.justsearch.app.api.settings.QueryRoleSelection.Role getRerankerRestoreSelection() {
+    return rerankerRestoreSelection;
+  }
+
+  public void setRerankerRestoreSelection(
+      io.justsearch.app.api.settings.QueryRoleSelection.Role selection) {
+    if (selection != null && selection.state()
+        != io.justsearch.app.api.settings.QueryRoleSelection.State.SELECTED) {
+      throw new IllegalArgumentException("Retained reranker must select exact files");
+    }
+    rerankerRestoreSelection = selection;
+  }
   private String nerModelPath = "";
   private String spladeModelPath = "";
   private String citationScorerModelPath = "";

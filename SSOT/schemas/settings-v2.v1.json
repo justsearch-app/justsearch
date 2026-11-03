@@ -60,8 +60,14 @@
     "operationKey" : {
       "type" : [ "string", "null" ]
     },
+    "rerankerEnabled" : {
+      "type" : [ "boolean", "null" ]
+    },
     "rerankerModelPath" : {
       "type" : [ "string", "null" ]
+    },
+    "rerankerSwitchIntent" : {
+      "type" : "boolean"
     },
     "restartScheduled" : {
       "type" : [ "boolean", "null" ]

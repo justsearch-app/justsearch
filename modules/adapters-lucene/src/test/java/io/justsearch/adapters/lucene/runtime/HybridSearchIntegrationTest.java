@@ -113,7 +113,7 @@ class HybridSearchIntegrationTest extends RuntimeTestBase {
     // Query: "fox" with vector pointing in +X direction
     float[] queryVector = new float[] {1.0f, 0.0f, 0.0f, 0.0f};
 
-    SearchResult result = runtime.hybridSearchOps().searchHybrid("fox", queryVector, 10, LuceneRuntimeTypes.QuerySyntax.SIMPLE, EngineContext.Urgency.FOREGROUND, io.justsearch.core.execution.EngineTaskLifetime.NONE);
+    SearchResult result = runtime.hybridSearchOps().searchHybrid("fox", queryVector, 10, LuceneRuntimeTypes.QuerySyntax.SIMPLE, true, EngineContext.Urgency.FOREGROUND, io.justsearch.core.execution.EngineTaskLifetime.NONE);
 
     assertNotNull(result);
     assertTrue(result.hits().size() >= 2, "Should return at least 2 documents");
@@ -240,7 +240,7 @@ class HybridSearchIntegrationTest extends RuntimeTestBase {
     System.setProperty("index.hybrid.text_candidate_multiplier", "1");
     System.setProperty("index.hybrid.vector_candidate_multiplier", "1");
     new LifecycleTestAccessor(runtime).refreshConfigForTests();
-    var small = runtime.hybridSearchOps().searchHybrid(queryText, queryVector, 10, LuceneRuntimeTypes.QuerySyntax.SIMPLE, EngineContext.Urgency.FOREGROUND, io.justsearch.core.execution.EngineTaskLifetime.NONE);
+    var small = runtime.hybridSearchOps().searchHybrid(queryText, queryVector, 10, LuceneRuntimeTypes.QuerySyntax.SIMPLE, true, EngineContext.Urgency.FOREGROUND, io.justsearch.core.execution.EngineTaskLifetime.NONE);
     var smallIds = small.hits().stream().map(h -> h.docId()).toList();
     assertFalse(
         smallIds.contains("both"),
@@ -255,7 +255,7 @@ class HybridSearchIntegrationTest extends RuntimeTestBase {
     System.setProperty("index.hybrid.text_candidate_multiplier", "2");
     System.setProperty("index.hybrid.vector_candidate_multiplier", "2");
     new LifecycleTestAccessor(runtime).refreshConfigForTests();
-    var large = runtime.hybridSearchOps().searchHybrid(queryText, queryVector, 10, LuceneRuntimeTypes.QuerySyntax.SIMPLE, EngineContext.Urgency.FOREGROUND, io.justsearch.core.execution.EngineTaskLifetime.NONE);
+    var large = runtime.hybridSearchOps().searchHybrid(queryText, queryVector, 10, LuceneRuntimeTypes.QuerySyntax.SIMPLE, true, EngineContext.Urgency.FOREGROUND, io.justsearch.core.execution.EngineTaskLifetime.NONE);
     assertEquals(
         "both",
         large.hits().get(0).docId(),
@@ -341,7 +341,7 @@ class HybridSearchIntegrationTest extends RuntimeTestBase {
     runtime.commitOps().maybeRefreshBlocking();
 
     float[] queryVector = new float[] {1.0f, 0.0f, 0.0f, 0.0f};
-    SearchResult result = runtime.hybridSearchOps().searchHybrid("uniqueterm", queryVector, 10, LuceneRuntimeTypes.QuerySyntax.SIMPLE, EngineContext.Urgency.FOREGROUND, io.justsearch.core.execution.EngineTaskLifetime.NONE);
+    SearchResult result = runtime.hybridSearchOps().searchHybrid("uniqueterm", queryVector, 10, LuceneRuntimeTypes.QuerySyntax.SIMPLE, true, EngineContext.Urgency.FOREGROUND, io.justsearch.core.execution.EngineTaskLifetime.NONE);
 
     assertNotNull(result);
 
@@ -380,22 +380,22 @@ class HybridSearchIntegrationTest extends RuntimeTestBase {
     // Null query text should throw
     assertThrows(
         IllegalArgumentException.class,
-        () -> runtime.hybridSearchOps().searchHybrid(null, validVector, 10, LuceneRuntimeTypes.QuerySyntax.SIMPLE, EngineContext.Urgency.FOREGROUND, io.justsearch.core.execution.EngineTaskLifetime.NONE));
+        () -> runtime.hybridSearchOps().searchHybrid(null, validVector, 10, LuceneRuntimeTypes.QuerySyntax.SIMPLE, true, EngineContext.Urgency.FOREGROUND, io.justsearch.core.execution.EngineTaskLifetime.NONE));
 
     // Blank query text should throw
     assertThrows(
         IllegalArgumentException.class,
-        () -> runtime.hybridSearchOps().searchHybrid("  ", validVector, 10, LuceneRuntimeTypes.QuerySyntax.SIMPLE, EngineContext.Urgency.FOREGROUND, io.justsearch.core.execution.EngineTaskLifetime.NONE));
+        () -> runtime.hybridSearchOps().searchHybrid("  ", validVector, 10, LuceneRuntimeTypes.QuerySyntax.SIMPLE, true, EngineContext.Urgency.FOREGROUND, io.justsearch.core.execution.EngineTaskLifetime.NONE));
 
     // Null vector should throw
     assertThrows(
         IllegalArgumentException.class,
-        () -> runtime.hybridSearchOps().searchHybrid("query", null, 10, LuceneRuntimeTypes.QuerySyntax.SIMPLE, EngineContext.Urgency.FOREGROUND, io.justsearch.core.execution.EngineTaskLifetime.NONE));
+        () -> runtime.hybridSearchOps().searchHybrid("query", null, 10, LuceneRuntimeTypes.QuerySyntax.SIMPLE, true, EngineContext.Urgency.FOREGROUND, io.justsearch.core.execution.EngineTaskLifetime.NONE));
 
     // Empty vector should throw
     assertThrows(
         IllegalArgumentException.class,
-        () -> runtime.hybridSearchOps().searchHybrid("query", new float[0], 10, LuceneRuntimeTypes.QuerySyntax.SIMPLE, EngineContext.Urgency.FOREGROUND, io.justsearch.core.execution.EngineTaskLifetime.NONE));
+        () -> runtime.hybridSearchOps().searchHybrid("query", new float[0], 10, LuceneRuntimeTypes.QuerySyntax.SIMPLE, true, EngineContext.Urgency.FOREGROUND, io.justsearch.core.execution.EngineTaskLifetime.NONE));
 
     runtime.close();
   }

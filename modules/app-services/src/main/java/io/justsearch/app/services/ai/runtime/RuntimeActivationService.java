@@ -705,9 +705,36 @@ public final class RuntimeActivationService
     EncoderRuntimeExplainer.ObservedExecutionProvider observed = resolveObservedEp(role);
 
     // 1. Check if explicitly disabled (Head-owned: uses Head-side env vars)
-    String enabledStr = resolveEnvOrProp(enabledEnv, enabledProp);
+    ConfigStore published = ConfigStore.globalOrNull();
+    var enabled = published == null ? null : published.get().resolution(enabledProp);
+    String enabledStr = enabled != null && enabled.isResolved()
+        ? enabled.value() : resolveEnvOrProp(enabledEnv, enabledProp);
+    io.justsearch.app.api.settings.QueryRoleSelection queryRoles = null;
+    if ("reranker".equals(id)) {
+      try {
+        queryRoles = settingsStore.inspect().queryRoles();
+      } catch (RuntimeException unavailable) {
+        return onnxFeature(id, label, "unknown", "settings_unavailable", null, false, observed);
+      }
+    }
     if ("false".equalsIgnoreCase(enabledStr)) {
+      var pathSource = published == null ? null : published.get().resolution(pathProp);
+      if ("reranker".equals(id) && sessionActive && pathSource != null
+          && pathSource.isResolved() && pathSource.sourceOrdinal()
+              >= io.justsearch.configuration.resolved.ResolvedConfigBuilder.ORDINAL_ENV_VAR) {
+        return onnxFeature(id, label, "active", "operator_override", pathSource.value(), true, observed);
+      }
       return onnxFeature(id, label, "inactive", "disabled", null, sessionActive, observed);
+    }
+    if ("reranker".equals(id)) {
+      var pathSource = published == null ? null : published.get().resolution(pathProp);
+      boolean operatorPath = pathSource != null && pathSource.isResolved()
+          && pathSource.sourceOrdinal()
+              >= io.justsearch.configuration.resolved.ResolvedConfigBuilder.ORDINAL_ENV_VAR;
+      if (!operatorPath && queryRoles != null && queryRoles.reranker().state()
+          == io.justsearch.app.api.settings.QueryRoleSelection.State.DISABLED) {
+        return onnxFeature(id, label, "inactive", "disabled", null, sessionActive, observed);
+      }
     }
 
     // 2. Published configuration includes the accepted installer settings at their true ordinal.

@@ -1,0 +1,145 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
+  },
+  "createdAt": "2026-11-03T16:01:48.766Z",
+  "revision": "0286547f383940b63639d58dd4592a17ece054d8",
+  "tree": "58bee13ef8c1775cea0ceb0ab4bb1f94935f0f5d",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": "openjdk version \"25.0.4.1\" 2026-08-18 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "./gradlew :modules:adapters-lucene:test --tests \"io.justsearch.adapters.lucene.runtime.FanoutRuntimeLifetimeTest\" --tests \"io.justsearch.adapters.lucene.runtime.HybridSearchIntegrationTest\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 8014
+    },
+    {
+      "command": "./gradlew :modules:indexer-worker:test --tests \"io.justsearch.indexerworker.server.RerankerSwitchTest\" --tests \"io.justsearch.indexerworker.server.RerankerSwitchTest.onRestoresExactCustomIdentityInsteadOfProbingAnotherVariant\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 15513
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/FanoutRuntimeLifetimeTest.java",
+      "file": "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/FanoutRuntimeLifetimeTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:c83a6ffb3937331b78ae75826ab2e8b926a698ea6096dced549fbf6f53df149d",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "refusedDirectChunkRetainsOldRuntimeUntilAcceptedLegActuallyExits()",
+          "status": "passed"
+        },
+        {
+          "name": "refusedHybridRetainsOldRuntimeUntilAcceptedLegAcquiresAndReleasesSearcher()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/HybridSearchIntegrationTest.java",
+      "file": "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/HybridSearchIntegrationTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:7473ddef187d029d586a0bb497e16cc2a067c5d096bbf89c6516b3d0f216c086",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "searchHybridWithInvalidInputsThrows()",
+          "status": "passed"
+        },
+        {
+          "name": "searchHybridCombinesTextAndVectorResults()",
+          "status": "passed"
+        },
+        {
+          "name": "hybridEntryPointsForwardQuerySyntaxToTheTextLeg()",
+          "status": "passed"
+        },
+        {
+          "name": "searchHybridAppliesLowSignalCapBasedOnBm25Evidence()",
+          "status": "passed"
+        },
+        {
+          "name": "searchHybridCandidateMultipliersControlWhetherCrossSignalOverlapCanEnterTopK()",
+          "status": "passed"
+        },
+        {
+          "name": "filteredHybridSearchAppliesPrefixExpansion()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/RerankerSwitchTest.java",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/RerankerSwitchTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:635cd386337f92b3d1e82304b7c2e012140233a10d21d9d83541d38f03b815e7",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "offPublishesWithoutRerankerAndKeepsIssuedViewAndExactFiles(Path)",
+          "status": "passed"
+        },
+        {
+          "name": "onRestoresExactCustomIdentityInsteadOfProbingAnotherVariant(Path)",
+          "status": "passed"
+        },
+        {
+          "name": "offRefusesAnIssuedCallBeyondTheDrainBoundAndKeepsTheServingView(Path)",
+          "status": "passed"
+        },
+        {
+          "name": "enablingWithoutFilesRefusesInsteadOfSelectingDisabled()",
+          "status": "passed"
+        },
+        {
+          "name": "offRefusesFailedPairedCompositionAndKeepsTheServingView(Path)",
+          "status": "passed"
+        },
+        {
+          "name": "absentPreferencePreservesDisabledRoleAndOffGatesGenerationActivation(Path)",
+          "status": "passed"
+        },
+        {
+          "name": "offRefusesMemoryAdmissionWithoutReplacingTheServingView(Path)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/RerankerSwitchTest.java#onRestoresExactCustomIdentityInsteadOfProbingAnotherVariant",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/RerankerSwitchTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:635cd386337f92b3d1e82304b7c2e012140233a10d21d9d83541d38f03b815e7",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "onRestoresExactCustomIdentityInsteadOfProbingAnotherVariant(Path)",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:a9fd43256c6cac056d63f20d8b8fe2f3dbcadfc7458c65f673ef82b62c6ebfdc"
+}

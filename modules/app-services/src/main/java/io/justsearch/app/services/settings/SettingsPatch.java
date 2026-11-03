@@ -49,7 +49,8 @@ final class SettingsPatch {
     return new SettingsV2(ui, llm, paths, null, input.witness(), null, null,
         input.apiPort() == null ? null : normalized.configuredApiPort(), null,
         input.rerankerModelPath() == null ? null : normalized.getRerankerModelPath(),
-        input.citationScorerModelPath() == null ? null : normalized.getCitationScorerModelPath());
+        input.citationScorerModelPath() == null ? null : normalized.getCitationScorerModelPath(),
+        null, input.rerankerEnabled(), input.rerankerSwitchIntent());
   }
 
   /** Merges an incoming {@link SettingsV2} into the existing {@link UiSettings}. */
@@ -67,7 +68,22 @@ final class SettingsPatch {
       base.setApiPort(incoming.apiPort());
     }
     if (incoming.rerankerModelPath() != null) {
+      if (!java.util.Objects.equals(base.getRerankerModelPath(), incoming.rerankerModelPath())) {
+        base.setRerankerRestoreSelection(null);
+      }
       base.setRerankerModelPath(incoming.rerankerModelPath());
+    }
+    if (incoming.rerankerEnabled() != null) {
+      boolean choiceChanged = !java.util.Objects.equals(
+          base.getRerankerEnabled(), incoming.rerankerEnabled());
+      base.setRerankerEnabled(incoming.rerankerEnabled());
+      // Only the switch can repeat an explicit choice. Echoes from ordinary saves must not
+      // prepare a model or fence a pending install. The owner validates and stamps the revision.
+      if (incoming.witness() != null
+          && (choiceChanged || Boolean.TRUE.equals(incoming.rerankerSwitchIntent()))) {
+        base.setRerankerPreferenceRevision(
+            Math.addExact(incoming.witness().acceptedRevision(), 1));
+      }
     }
     if (incoming.citationScorerModelPath() != null) {
       base.setCitationScorerModelPath(incoming.citationScorerModelPath());

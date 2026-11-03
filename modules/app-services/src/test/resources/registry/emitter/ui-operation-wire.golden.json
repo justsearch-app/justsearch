@@ -1404,6 +1404,9 @@
       "properties" : {
         "acceptTerms" : {
           "type" : "boolean"
+        },
+        "enableRerankerOnCompletion" : {
+          "type" : "boolean"
         }
       }
     },

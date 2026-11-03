@@ -1,0 +1,112 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
+  },
+  "createdAt": "2026-11-03T12:12:54.926Z",
+  "revision": "def240961f76fa637a52e968263b1e8914f66925",
+  "tree": "173e6e0f158ef98b09da665597a18518555b80c8",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": "openjdk version \"25.0.4.1\" 2026-08-18 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "./gradlew :modules:indexer-worker:test --tests \"io.justsearch.indexerworker.server.RerankerSwitchOnCudaTest.switchingOnRealizesCudaUnderTheStagedCandidatePlan\" --tests \"io.justsearch.indexerworker.server.RerankerSwitchOnCudaTest.aRefusedSwitchOnPutsThePublishedPlanBack\" --tests \"io.justsearch.indexerworker.server.RerankerSwitchRetainedSelectionTest.switchingOnRefusesWhenTheRetainedFilesChanged\" --tests \"io.justsearch.indexerworker.server.RerankerSwitchTest.onRestoresExactCustomIdentityInsteadOfProbingAnotherVariant\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 35121
+    },
+    {
+      "command": "./gradlew :modules:worker-services:test --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceReasonCodeContractTest.chunkSideRecallComplete_rescuesLegTopNParentDroppedByCollapse\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 5362
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/RerankerSwitchOnCudaTest.java#switchingOnRealizesCudaUnderTheStagedCandidatePlan",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/RerankerSwitchOnCudaTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:c85d0dabd7b18795e8508e8594009c90ca4a37aa3dd0651a35916f2c3cd24eb5",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "switchingOnRealizesCudaUnderTheStagedCandidatePlan(Path)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/RerankerSwitchOnCudaTest.java#aRefusedSwitchOnPutsThePublishedPlanBack",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/RerankerSwitchOnCudaTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:c85d0dabd7b18795e8508e8594009c90ca4a37aa3dd0651a35916f2c3cd24eb5",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aRefusedSwitchOnPutsThePublishedPlanBack(Path)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/RerankerSwitchRetainedSelectionTest.java#switchingOnRefusesWhenTheRetainedFilesChanged",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/RerankerSwitchRetainedSelectionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:6537c118cf33d298fea00059bc39e96633e42fe6f839b126d2c26e9d1fd2a00f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "switchingOnRefusesWhenTheRetainedFilesChanged(Path)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/RerankerSwitchTest.java#onRestoresExactCustomIdentityInsteadOfProbingAnotherVariant",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/RerankerSwitchTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:7bb58f88b76bd906397a160b0a9a4f064f1a499a6c378c454045a39bc88c44b1",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "onRestoresExactCustomIdentityInsteadOfProbingAnotherVariant(Path)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceReasonCodeContractTest.java#chunkSideRecallComplete_rescuesLegTopNParentDroppedByCollapse",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceReasonCodeContractTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:b59fb12dedb36a13d5b1ecec7d8e541b09d022575271e71c7c4b11fb900df799",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "chunkSideRecallComplete_rescuesLegTopNParentDroppedByCollapse()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:fcdd6d6fd4a6d18f6c9de0ecb3ff80ff0ebb51bf81c936ab1a4a718965d57a08"
+}

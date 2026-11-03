@@ -143,6 +143,26 @@ public final class InferenceCompositionRoot {
     return weights;
   }
 
+  /**
+   * {@link #gpuRoleWeightsMiB(ResolvedConfig)} with the reranker the exact {@code reranker}
+   * selection a query preparation composes: the size of its selected model file when that variant
+   * runs on CUDA, and no reranker otherwise. The plan of a preparation then budgets the model and
+   * variant the session loads, not the one discovery would pick for the configuration.
+   */
+  public static Map<EncoderRole, Double> gpuRoleWeightsMiB(ResolvedConfig cfg,
+      QueryRoleSelection.Role reranker) {
+    Objects.requireNonNull(reranker, "reranker");
+    Map<EncoderRole, Double> weights = new EnumMap<>(EncoderRole.class);
+    weights.putAll(gpuRoleWeightsMiB(cfg));
+    weights.remove(EncoderRole.RERANKER);
+    VariantSelection variant = witnessedVariant(reranker,
+        EncoderConfigurationProjection.from(cfg).reranker().gpuEnabled());
+    if (variant != null && variant.executionProvider() == ExecutionProvider.CUDA) {
+      weights.put(EncoderRole.RERANKER, reranker.model().sizeBytes() / (1024.0 * 1024.0));
+    }
+    return weights;
+  }
+
   private static void putGpuWeight(
       Map<EncoderRole, Double> weights,
       EncoderRole role,
