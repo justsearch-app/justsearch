@@ -39,6 +39,7 @@ function makeAiState(overrides: Partial<AiState> = {}): AiState {
     enrichSettleSamples: [],
     installObservationLive: false,
     runtimeObservationLive: false,
+    packObservationLive: false,
     installStatus: null,
     runtimeStatus: null,
     packStatus: null,

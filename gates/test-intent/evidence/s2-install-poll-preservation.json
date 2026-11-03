@@ -1,0 +1,381 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
+  },
+  "createdAt": "2026-11-03T17:24:47.462Z",
+  "revision": "cab9030e66476c90c003694a5dc8b769a8446d9e",
+  "tree": "21f9fa46864fecd1fe597c0c406859cb82313417",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/utils/aiInstallPoll.deadline.test.ts\" \"src/shell-v0/utils/aiInstallPoll.test.ts\" \"src/shell-v0/utils/aiInstallPoll.refresh.test.ts\" \"src/shell-v0/views/BrainSurface.observationFreshness.test.ts\" \"src/boot/desktopRecoveryPolling.test.ts\" \"src/shell-v0/components/StatusDeck.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/krch1q5g/tmp/test-intent-vitest-334-1793726681875.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 5584
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/utils/aiInstallPoll.deadline.test.ts#T2 uses the idle interval as the deadline and accepts a slow answer before it",
+      "file": "modules/ui-web/src/shell-v0/utils/aiInstallPoll.deadline.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:61287777462ecb4423200f98ce60d3ea4dbe904bd6a82d9bb7cdfe5d1ad8143c",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "AI status read deadline T2 uses the idle interval as the deadline and accepts a slow answer before it",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/utils/aiInstallPoll.test.ts",
+      "file": "modules/ui-web/src/shell-v0/utils/aiInstallPoll.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:ad7b902d2f362658fe2152dd70c1f556f385c492a3c16a756038aeba74ca3052",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aiInstallPoll — self-healing, always-on poller (tempdoc 663 §O regression) a failed first fetch does NOT permanently strand the signal — a later tick recovers",
+          "status": "passed"
+        },
+        {
+          "name": "aiInstallPoll — self-healing, always-on poller (tempdoc 663 §O regression) retains the last-known-good value on a LATER transient failure (never regresses to null)",
+          "status": "passed"
+        },
+        {
+          "name": "aiInstallPoll — self-healing, always-on poller (tempdoc 663 §O regression) the poller stops when the last subscriber unsubscribes, and resumes fresh for a new subscriber",
+          "status": "passed"
+        },
+        {
+          "name": "aiInstallPoll — adaptive cadence stays FAST while an install is running",
+          "status": "passed"
+        },
+        {
+          "name": "aiInstallPoll — adaptive cadence stays FAST while a run is PAUSED — a parked download is still a live subject",
+          "status": "passed"
+        },
+        {
+          "name": "aiInstallPoll — adaptive cadence stays FAST while the install status is still UNKNOWN (the self-healing retry window)",
+          "status": "passed"
+        },
+        {
+          "name": "aiInstallPoll — adaptive cadence stays FAST while a runtime activation or a pack import is in flight",
+          "status": "passed"
+        },
+        {
+          "name": "aiInstallPoll — adaptive cadence slows down when everything is settled and idle",
+          "status": "passed"
+        },
+        {
+          "name": "aiInstallPoll — adaptive cadence actually spaces the ticks out — an idle machine is not polled at 1 Hz",
+          "status": "passed"
+        },
+        {
+          "name": "aiInstallPoll — adaptive cadence re-arms the FAST cadence on the very first tick that sees a run start",
+          "status": "passed"
+        },
+        {
+          "name": "aiInstallPoll lifecycle cancellation ignores cancelled requests after resubscribe",
+          "status": "passed"
+        },
+        {
+          "name": "aiInstallPoll lifecycle cancellation ignores cancelled requests after rebind",
+          "status": "passed"
+        },
+        {
+          "name": "AI observation freshness G1 a failed install read invalidates retained observations even with other endpoints reachable",
+          "status": "passed"
+        },
+        {
+          "name": "AI observation freshness G1 a failed runtime read invalidates retained observations even with other endpoints reachable",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/utils/aiInstallPoll.refresh.test.ts",
+      "file": "modules/ui-web/src/shell-v0/utils/aiInstallPoll.refresh.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:1be1cae74925d150a50b61f6e7ac96c44c4ff3543dd6a319bc2de05b69f0c8ef",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "install refresh now reads immediately between ticks and resumes the regular schedule",
+          "status": "passed"
+        },
+        {
+          "name": "install refresh now shares one queued read among concurrent callers without overlapping any endpoint",
+          "status": "passed"
+        },
+        {
+          "name": "install refresh now does nothing without subscribers and drops queued reads when the last subscriber leaves",
+          "status": "passed"
+        },
+        {
+          "name": "install refresh now an obsolete queued read cannot refresh a replacement API base",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/BrainSurface.observationFreshness.test.ts",
+      "file": "modules/ui-web/src/shell-v0/views/BrainSurface.observationFreshness.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:fbd2b1382711b141f86fd8284448d8329b66a3c3f2158906cca9b8e3c6695785",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Brain observation freshness repair H1 delayed successful download polls preserve the same Pause control and keyboard focus",
+          "status": "passed"
+        },
+        {
+          "name": "Brain observation freshness repair H2 reversed replies and both cadence transitions keep successful observations live: install first",
+          "status": "passed"
+        },
+        {
+          "name": "Brain observation freshness repair H2 reversed replies and both cadence transitions keep successful observations live: runtime first",
+          "status": "passed"
+        },
+        {
+          "name": "Brain observation freshness repair H3 a failed install read closes the gate immediately and a successful retry recovers",
+          "status": "passed"
+        },
+        {
+          "name": "Brain observation freshness repair H3 a failed runtime read closes the gate immediately and a successful retry recovers",
+          "status": "passed"
+        },
+        {
+          "name": "Brain observation freshness repair H5 a directed admission wait longer than 15 seconds and its successful retry keep the gate open",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/boot/desktopRecoveryPolling.test.ts",
+      "file": "modules/ui-web/src/boot/desktopRecoveryPolling.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:63b97de35abf95a14e8fd2645a630d1fa31a94f8676afe1fafec4fc506eff186",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "terminal recovery application polling teardown stops all real store pollers with pending requests",
+          "status": "passed"
+        },
+        {
+          "name": "terminal recovery application polling teardown stops all real store pollers with scheduled requests",
+          "status": "passed"
+        },
+        {
+          "name": "terminal recovery application polling teardown aborts admission retry waits owned by all five store requests",
+          "status": "passed"
+        },
+        {
+          "name": "terminal recovery application polling teardown tears down a late store start when terminal recovery prevents application mounting",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/StatusDeck.test.ts",
+      "file": "modules/ui-web/src/shell-v0/components/StatusDeck.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:e3d6a61d193564ea2949ec72e686b5896eea0b3afaa585462d7dd5c2fc63d001",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "StatusDeck (slice 461) renders default groups when status null (everything muted)",
+          "status": "passed"
+        },
+        {
+          "name": "StatusDeck (slice 461) connection dot turns healthy when api + index READY",
+          "status": "passed"
+        },
+        {
+          "name": "StatusDeck (slice 461) 807: the connection dot goes red when the snapshot is no longer live — READY/READY notwithstanding",
+          "status": "passed"
+        },
+        {
+          "name": "StatusDeck (slice 461) 807: the never-contacted `unreachable` verdict reddens the dot too",
+          "status": "passed"
+        },
+        {
+          "name": "StatusDeck (slice 461) connection dot fails closed for invalid api states",
+          "status": "passed"
+        },
+        {
+          "name": "StatusDeck (slice 461) connection dot fails closed for invalid index states",
+          "status": "passed"
+        },
+        {
+          "name": "StatusDeck (slice 461) connection dot fails closed for missing component data {}",
+          "status": "passed"
+        },
+        {
+          "name": "StatusDeck (slice 461) connection dot fails closed for missing component data {\"readiness\":{}}",
+          "status": "passed"
+        },
+        {
+          "name": "StatusDeck (slice 461) connection dot fails closed for missing component data {\"readiness\":{\"engineComponents\":{}}}",
+          "status": "passed"
+        },
+        {
+          "name": "StatusDeck (slice 461) connection dot shows starting for api",
+          "status": "passed"
+        },
+        {
+          "name": "StatusDeck (slice 461) connection dot shows starting for index",
+          "status": "passed"
+        },
+        {
+          "name": "StatusDeck (slice 461) memory dot turns warn at >80% utilization",
+          "status": "passed"
+        },
+        {
+          "name": "StatusDeck (slice 461) system pill tone follows the verdict-derived statusTone (tempdoc 649)",
+          "status": "passed"
+        },
+        {
+          "name": "StatusDeck (slice 461) queue group renders when pendingJobs > 0",
+          "status": "passed"
+        },
+        {
+          "name": "StatusDeck (slice 461) S33.1 energy saver names continued text indexing and deferred enrichment",
+          "status": "passed"
+        },
+        {
+          "name": "StatusDeck (slice 461) 630: queue stays the plain active count when not energy-reduced",
+          "status": "passed"
+        },
+        {
+          "name": "StatusDeck (slice 461) 813: jobs drained but enrichment outstanding ⇒ the chip reads the enriching percent",
+          "status": "passed"
+        },
+        {
+          "name": "StatusDeck (slice 461) 813: the embed-count fallback shows the embedding number, not the multi-stage sum",
+          "status": "passed"
+        },
+        {
+          "name": "StatusDeck (slice 461) 813: a blocked embedding stage claims no enrichment progress",
+          "status": "passed"
+        },
+        {
+          "name": "StatusDeck (slice 461) §17.2 — files/size/memory values come from the projectFact authority (one formatter)",
+          "status": "passed"
+        },
+        {
+          "name": "StatusDeck (slice 461) endpoint label shows api-base attribute",
+          "status": "passed"
+        },
+        {
+          "name": "StatusDeck (slice 461) 595 §15.1 (E1): a visually-hidden aria-live announcer mirrors the verdict, politely",
+          "status": "passed"
+        },
+        {
+          "name": "StatusDeck (slice 461) 595 §15.1 (E1): an error verdict announces assertively",
+          "status": "passed"
+        },
+        {
+          "name": "StatusDeck (slice 461) N1: a transitioning → operational edge fires one completion toast",
+          "status": "passed"
+        },
+        {
+          "name": "StatusDeck (slice 461) N1: first-load (connecting → operational) and reconnect (unreachable → operational) do NOT toast",
+          "status": "passed"
+        },
+        {
+          "name": "StatusDeck (slice 461) N1: a transitioning → checking → operational recovery still fires exactly one toast",
+          "status": "passed"
+        },
+        {
+          "name": "StatusDeck (slice 461) N3: the inference-mode pill is a jf-control that navigates to Health on activate",
+          "status": "passed"
+        },
+        {
+          "name": "StatusDeck (slice 461) E2: provisional with a retained last-settled value shows it dimmed, not \"…\"",
+          "status": "passed"
+        },
+        {
+          "name": "StatusDeck (slice 461) E2: provisional with NO retained value falls back to \"…\"",
+          "status": "passed"
+        },
+        {
+          "name": "StatusDeck (slice 461) E2: a retained value with a null size shows last-known Files but \"…\" for Size (honesty)",
+          "status": "passed"
+        },
+        {
+          "name": "StatusDeck (slice 461) Tempdoc 663 Design pass 3 — AI-engine toast tracker + click-routing installing → online fires exactly one \"core.ai-engine.settled\" toast",
+          "status": "passed"
+        },
+        {
+          "name": "StatusDeck (slice 461) Tempdoc 663 Design pass 3 — AI-engine toast tracker + click-routing installing → install_failed fires exactly one \"core.ai-engine.failed\" toast",
+          "status": "passed"
+        },
+        {
+          "name": "StatusDeck (slice 461) Tempdoc 663 Design pass 3 — AI-engine toast tracker + click-routing reaching \"online\" WITHOUT a preceding \"installing\" (e.g. first load already online) does not toast",
+          "status": "passed"
+        },
+        {
+          "name": "StatusDeck (slice 461) Tempdoc 663 Design pass 3 — AI-engine toast tracker + click-routing the inference-mode pill routes to the AI Brain surface when not_installed/install_failed",
+          "status": "passed"
+        },
+        {
+          "name": "StatusDeck (slice 461) Tempdoc 663 Design pass 3 — AI-engine toast tracker + click-routing the inference-mode pill still routes to Health for ordinary states (e.g. online)",
+          "status": "passed"
+        },
+        {
+          "name": "StatusDeck (slice 461) 814 §D5 — capability-degradation arbitration with the surface banner yields on the chat surface when the verdict warrants that surface a banner",
+          "status": "passed"
+        },
+        {
+          "name": "StatusDeck (slice 461) 814 §D5 — capability-degradation arbitration with the surface banner does NOT yield on another surface — the chip is the global indicator there",
+          "status": "passed"
+        },
+        {
+          "name": "StatusDeck (slice 461) 814 §D5 — capability-degradation arbitration with the surface banner does NOT yield on the chat surface when the verdict warrants NO banner (info tier)",
+          "status": "passed"
+        },
+        {
+          "name": "StatusDeck (slice 461) 814 §D5 — capability-degradation arbitration with the surface banner does NOT yield an UNREACHABLE verdict — that is a connection fact, not this register row",
+          "status": "passed"
+        },
+        {
+          "name": "announces retry waiting with its backlog and deadline",
+          "status": "passed"
+        },
+        {
+          "name": "uses a fresh serving count during migration instead of the retained count",
+          "status": "passed"
+        },
+        {
+          "name": "keeps unavailable enrichment visible when the file queue is empty",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:23005fb7168d2f99528f455266a480862a865b762af6a9c5064f7c2fd96f997d"
+}
