@@ -5,6 +5,7 @@ import path from 'node:path';
 import { ROOT, ARMS, buildPlan, parseArgs, latestRecords } from './e-run.mjs';
 import { measurementIdentity, normalizePlan, instrumentFiles } from './e-pair-identity.mjs';
 
+const posixPath = file => file.replaceAll('\\', '/');
 const values = JSON.parse(fs.readFileSync(path.join(ROOT, 'docs/design/lane-f-engine-jvm/evidence/E/values.json'))).values;
 const options = (arm, group) => ({ sourceRoot: ROOT, outputRoot: ROOT, armTree: ARMS[arm], arm, group,
   machine: { cpu: ['test-cpu'], ramBytes: 1000 }, corpus: [['frozen-corpus.txt', 'fixed-hash']],
@@ -36,7 +37,9 @@ test('scorer, test, and unrelated instrument bytes do not enter measurement iden
   assert.equal(normal.pairIdentity, scorerChanged.pairIdentity);
   assert.ok(normal.pairIdentityInputs.instruments['scripts/jseval/lane-f/e-start-ready.mjs']);
   assert.ok(normal.pairIdentityInputs.instruments['scripts/jseval/jseval/bulk_load.py']);
-  assert.ok(normal.pairIdentityInputs.instruments['scripts/jseval/jseval/readiness.py']);
+  for (const module of ['readiness', 'run_register', 'agent_identity']) {
+    assert.ok(normal.pairIdentityInputs.instruments[`scripts/jsharness/jsharness/${module}.py`]);
+  }
   assert.ok(normal.pairIdentityInputs.instruments['scripts/jseval/jseval/search_load.py']);
   assert.ok(normal.pairIdentityInputs.instruments['scripts/dev/lib/stop-exit-census.cjs']);
   assert.ok(normal.pairIdentityInputs.instruments['scripts/dev/lib/stop-exit-census.ps1']);
@@ -45,7 +48,7 @@ test('scorer, test, and unrelated instrument bytes do not enter measurement iden
 test('instrument bytes, imported dependencies, plan arguments and shared launch settings change identity', () => {
   const plan = planFor('main', 'e2-e3-load'), opts = options('main', 'e2-e3-load');
   const normal = measurementIdentity(plan, opts);
-  for (const changed of ['head-rss-sampler.ps1', 'readiness.py']) {
+  for (const changed of ['head-rss-sampler.ps1', 'readiness.py', 'run_register.py', 'agent_identity.py']) {
     const modified = measurementIdentity(plan, opts, file => file.endsWith(changed)
       ? Buffer.concat([fs.readFileSync(file), Buffer.from('\n# instrument change')]) : fs.readFileSync(file));
     assert.notEqual(normal.pairIdentity, modified.pairIdentity);
@@ -55,6 +58,26 @@ test('instrument bytes, imported dependencies, plan arguments and shared launch 
   assert.notEqual(normal.pairIdentity, measurementIdentity(changed, opts).pairIdentity);
   const launch = structuredClone(plan); launch.find(c => c.mode === 'start').env.JUSTSEARCH_HEAD_HEAP = '4g';
   assert.notEqual(normal.pairIdentity, measurementIdentity(launch, opts).pairIdentity);
+});
+test('quality acquisition includes the moved suite statistics in its identity', () => {
+  const plan = planFor('main', 'e1-quality'), opts = options('main', 'e1-quality');
+  const normal = measurementIdentity(plan, opts);
+  assert.ok(normal.pairIdentityInputs.instruments['scripts/jsharness/jsharness/suite_stats.py']);
+  const modified = measurementIdentity(plan, opts, file => file.endsWith('suite_stats.py')
+    ? Buffer.concat([fs.readFileSync(file), Buffer.from('\n# instrument change')]) : fs.readFileSync(file));
+  assert.notEqual(normal.pairIdentity, modified.pairIdentity);
+});
+test('fixture capture identity counts what its shell scripts call from their own checkout', () => {
+  const plan = planFor('main', 'e1-quality'), opts = options('main', 'e1-quality');
+  const normal = measurementIdentity(plan, opts);
+  // fixture-cycle.sh runs `node "$repo/.../fixture-ingest.mjs"` and sources `. "$repo/scripts/lib/python-path.sh"`,
+  // which runs `node "${BASH_SOURCE[0]%/*}/python-path.cjs"`.
+  for (const name of ['scripts/jseval/lane-f/fixture-ingest.mjs', 'scripts/lib/python-path.sh', 'scripts/lib/python-path.cjs']) {
+    assert.ok(normal.pairIdentityInputs.instruments[name], name);
+    const modified = measurementIdentity(plan, opts, file => posixPath(file).endsWith(name)
+      ? Buffer.concat([fs.readFileSync(file), Buffer.from('\n// instrument change')]) : fs.readFileSync(file));
+    assert.notEqual(normal.pairIdentity, modified.pairIdentity, name);
+  }
 });
 test('resolved invocation/session/raw paths and arm-only Worker env normalize away', () => {
   const template = planFor('main', 'e4-memory-soak');
@@ -79,15 +102,24 @@ test('Python dependencies follow the actual cwd/PYTHONPATH checkout', t => {
   const scratch = fs.mkdtempSync(path.join(ROOT, 'tmp/e-python-identity-'));
   t.after(() => fs.rmSync(scratch, { recursive: true, force: true }));
   const pyRoot = path.join(scratch, 'scripts/jseval'), pkg = path.join(pyRoot, 'jseval');
+  const harness = path.join(scratch, 'scripts/jsharness/jsharness');
   fs.mkdirSync(pkg, { recursive: true });
+  fs.mkdirSync(harness, { recursive: true });
   fs.writeFileSync(path.join(pkg, '__init__.py'), '');
+  fs.writeFileSync(path.join(harness, '__init__.py'), '');
   fs.writeFileSync(path.join(pkg, 'minimal.py'), 'from . import dependency\n');
-  fs.writeFileSync(path.join(pkg, 'dependency.py'), 'VALUE = 1\n');
+  fs.writeFileSync(path.join(pkg, 'dependency.py'), 'from jsharness import readiness\nVALUE = 1\n');
+  fs.writeFileSync(path.join(harness, 'readiness.py'), 'from .types import Result\nVALUE = 1\n');
+  fs.writeFileSync(path.join(harness, 'types.py'), 'class Result: pass\n');
   const plan = [{ label: 'measurement', executable: 'python', args: ['-m', 'jseval.minimal'], cwd: pyRoot, env: { PYTHONPATH: pyRoot } }];
   const opts = { sourceRoot: ROOT, outputRoot: scratch };
   const first = measurementIdentity(plan, opts);
   assert.ok(first.pairIdentityInputs.instruments['scripts/jseval/jseval/dependency.py']);
-  fs.writeFileSync(path.join(pkg, 'dependency.py'), 'VALUE = 2\n');
+  assert.ok(first.pairIdentityInputs.instruments['scripts/jsharness/jsharness/readiness.py']);
+  assert.ok(first.pairIdentityInputs.instruments['scripts/jsharness/jsharness/types.py']);
+  fs.appendFileSync(path.join(harness, 'readiness.py'), 'VALUE = 2\n');
+  assert.notEqual(first.pairIdentity, measurementIdentity(plan, opts).pairIdentity);
+  fs.appendFileSync(path.join(pkg, 'dependency.py'), 'VALUE = 2\n');
   assert.notEqual(first.pairIdentity, measurementIdentity(plan, opts).pairIdentity);
 });
 test('E4 aggregates corresponding window protocols rather than equating 55 and 10 minute windows', t => {

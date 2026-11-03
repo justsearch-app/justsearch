@@ -8,6 +8,9 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { test } from 'node:test';
+import { createRequire } from 'node:module';
+
+const { pythonPath } = createRequire(import.meta.url)('../lib/python-path.cjs');
 
 // The recipe and its stubs (shebang npm/python3, bash) are Linux-only; the shared
 // dev-runner lane also runs on Windows.
@@ -27,7 +30,7 @@ function fixture(t, version = '3.14') {
   t.after(() => fs.rmSync(base, { recursive: true, force: true }));
   // `checkout` is a temporary fixture, not the repository. Fixture-only folders are joined
   // from segments so the change classifier's reader scan (scripts/ci/classify-changes.test.mjs)
-  // does not count them as repository reads; the one real read, jseval's pyproject.toml,
+  // does not count them as repository reads; the one real read, jsharness's pyproject.toml,
   // selects this lane there.
   const checkout = path.join(base, 'checkout');
   const outside = path.join(base, 'outside');
@@ -42,7 +45,8 @@ function fixture(t, version = '3.14') {
     fs.mkdirSync(dir, { recursive: true });
   }
   write(path.join(checkout, 'scripts/dev/prepare-ui-checks.cjs'), fs.readFileSync(script));
-  write(path.join(checkout, 'scripts/jseval/pyproject.toml'), fs.readFileSync(new URL('../jseval/pyproject.toml', import.meta.url)));
+  write(path.join(checkout, 'scripts/lib/python-path.cjs'), fs.readFileSync(new URL('../lib/python-path.cjs', import.meta.url)));
+  write(path.join(checkout, 'scripts/jsharness/pyproject.toml'), fs.readFileSync(new URL('../jsharness/pyproject.toml', import.meta.url)));
   const pkg = path.join(tools, 'packages/playwright');
   write(path.join(pkg, '__init__.py'));
   fs.mkdirSync(path.join(pkg, 'driver'), { recursive: true });
@@ -182,7 +186,7 @@ test('clears inherited npm and Python settings during preparation and after sour
     assert.equal(env.PIP_CONFIG_FILE, os.devNull);
     assert.equal(env.PYTHONNOUSERSITE, '1');
     assert.equal(env.PYTHONDONTWRITEBYTECODE, '1');
-    assert.equal(env.PYTHONPATH, path.join(f.root, 'scripts', 'jseval'));
+    assert.equal(env.PYTHONPATH, pythonPath(f.root));
   }
   assert.deepEqual(fs.readdirSync(f.outside), []);
 });
@@ -202,7 +206,7 @@ test('env.sh also clears settings the shell gained after preparation', t => {
   assert.equal(sourced.status, 0, sourced.stderr);
   const env = JSON.parse(sourced.stdout);
   for (const key of Object.keys(later)) assert.equal(env[key], undefined, key);
-  assert.equal(env.PYTHONPATH, path.join(f.root, 'scripts', 'jseval'));
+  assert.equal(env.PYTHONPATH, pythonPath(f.root));
 });
 
 test('confines state roots in preparation and the sourced environment', t => {
@@ -227,7 +231,7 @@ test('confines state roots in preparation and the sourced environment', t => {
   }
 });
 
-test('installs declared base and UI dependencies without building jseval metadata', t => {
+test('installs declared base and UI dependencies without building jsharness metadata', t => {
   const f = fixture(t);
   const result = f.run();
   assert.equal(result.status, 0, result.stderr);
@@ -236,7 +240,7 @@ test('installs declared base and UI dependencies without building jseval metadat
   assert.ok(pip.args.includes('playwright>=1.40'));
   assert.ok(!pip.args.includes('-e'));
   assert.ok(!pip.args.some(arg => arg.startsWith(f.root)));
-  assert.deepEqual(fs.readdirSync(path.join(f.root, 'scripts', 'jseval')), ['pyproject.toml']);
+  assert.deepEqual(fs.readdirSync(path.join(f.root, 'scripts', 'jsharness')), ['pyproject.toml']);
 });
 
 test('shared browser probe supports the older unbundled registry layout', t => {
@@ -263,7 +267,7 @@ for (const version of ['3.13', '3.14']) {
     assert.equal(result.status, 0, result.stderr);
     const pip = f.calls().find(call => call.args[1] === 'pip');
     assert.equal(pip.args.includes('-c'), version === '3.13');
-    if (version === '3.13') assert.equal(pip.args.at(-1), path.join(f.root, 'scripts', 'jseval', 'requirements.lock.txt'));
+    if (version === '3.13') assert.equal(pip.args.at(-1), path.join(f.root, 'scripts', 'jsharness', 'requirements.lock.txt'));
   });
 }
 

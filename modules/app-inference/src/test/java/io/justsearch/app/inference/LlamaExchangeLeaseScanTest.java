@@ -51,6 +51,10 @@ final class LlamaExchangeLeaseScanTest {
       "modules/system-tests/src/main/java/io/justsearch/systemtests/chaos/ExternalLlamaServerClient.java",
       "a chaos-test client of an external server it starts itself");
 
+  /** The Python packages under scripts/ whose LLM calls must go through the proxy. */
+  private static final List<String> EVAL_PACKAGES =
+      List.of("scripts/jseval/jseval", "scripts/jsharness/jsharness");
+
   private static final Path ROOT = repoRoot();
   private static final Path INFERENCE =
       ROOT.resolve("modules/app-inference/src/main/java/io/justsearch/app/inference");
@@ -128,23 +132,41 @@ final class LlamaExchangeLeaseScanTest {
     Pattern direct = Pattern.compile("8080");
     Pattern llm = Pattern.compile("(?i)llm|llama|--port|judge");
     List<String> violations = new ArrayList<>();
-    Path jseval = ROOT.resolve("scripts/jseval/jseval");
-    try (Stream<Path> files = Files.walk(jseval)) {
-      for (Path file : files.filter(p -> p.toString().endsWith(".py")).toList()) {
-        List<String> lines = Files.readAllLines(file, StandardCharsets.UTF_8);
-        for (int i = 0; i < lines.size(); i++) {
-          String line = lines.get(i);
-          if (direct.matcher(line).find() && llm.matcher(line).find()) {
-            violations.add(ROOT.relativize(file).toString().replace('\\', '/') + ":" + (i + 1)
-                + ": " + line.strip());
+    for (String evalPackage : EVAL_PACKAGES) {
+      try (Stream<Path> files = Files.walk(ROOT.resolve(evalPackage))) {
+        for (Path file : files.filter(p -> p.toString().endsWith(".py")).toList()) {
+          List<String> lines = Files.readAllLines(file, StandardCharsets.UTF_8);
+          for (int i = 0; i < lines.size(); i++) {
+            String line = lines.get(i);
+            if (direct.matcher(line).find() && llm.matcher(line).find()) {
+              violations.add(ROOT.relativize(file).toString().replace('\\', '/') + ":" + (i + 1)
+                  + ": " + line.strip());
+            }
           }
+        }
+      } catch (IOException failure) {
+        throw new UncheckedIOException(failure);
+      }
+    }
+    assertEquals(List.of(), violations,
+        "eval LLM calls default to the Engine's /v1 proxy, not llama-server's own port");
+  }
+
+  @Test
+  void theEvalScanCoversEveryPythonPackageUnderScripts() {
+    List<String> packages = new ArrayList<>();
+    try (Stream<Path> dirs = Files.list(ROOT.resolve("scripts"))) {
+      for (Path dir : dirs.sorted().toList()) {
+        if (Files.isRegularFile(dir.resolve("pyproject.toml"))) {
+          String name = dir.getFileName().toString();
+          packages.add("scripts/" + name + "/" + name);
         }
       }
     } catch (IOException failure) {
       throw new UncheckedIOException(failure);
     }
-    assertEquals(List.of(), violations,
-        "eval LLM calls default to the Engine's /v1 proxy, not llama-server's own port");
+    assertEquals(packages, EVAL_PACKAGES,
+        "a Python package under scripts/ is scanned for direct llama-server calls");
   }
 
   // ==================== helpers ====================

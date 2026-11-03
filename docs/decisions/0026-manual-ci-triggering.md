@@ -182,7 +182,7 @@ capability is unaffected and remains available for manual use.
 
 ## Amendment 2026-09-05: measured axe runs on PRs as an advisory lane
 
-Two of this ADR's descendants — `jseval ui-a11y-gate` and `jseval
+Two of this ADR's descendants — `jsharness ui-a11y-gate` and `jseval
 ui-proportion-gate` — carried "Local-first (ADR-0026): a runnable gate, not a
 CI-wired kernel gate" in their own docstrings. That citation was load-bearing
 for the a11y gate in a way this ADR never intended. ADR-0026 is about *runner
@@ -192,7 +192,7 @@ that needs no self-hosted runner at all.
 
 `ui-a11y-gate` is exactly that check. Its deterministic `--fixtures` capture
 state intercepts every `/api/*` request inside Playwright and answers from
-committed schema-valid fixtures (`scripts/jseval/jseval/ui_fixtures.py`), and
+committed schema-valid fixtures (`scripts/jsharness/jsharness/ui_fixtures.py`), and
 `ui-shot` starts its own Vite dev server out of `modules/ui-web`
 (`ui_shot.py::_start_vite_server`). No backend, no Gradle, no GPU, no dev
 stack — Node, Python and headless Chromium. Measured at 350s wall for the 20
@@ -206,7 +206,7 @@ local. That was a real reduction in automated accessibility coverage, tracked
 as §22.2 follow-up 5.
 
 **Decision.** `.github/workflows/ci.yml` gains a `measured-axe` job
-(`Measured axe (advisory)`, `ubuntu-latest`) running `jseval ui-a11y-gate` on
+(`Measured axe (advisory)`, `ubuntu-latest`) running `jsharness ui-a11y-gate` on
 `pull_request` for affected frontend inputs, `push` to `main` and
 `workflow_dispatch` (current scheduling: ADR-0053). This adds no trigger and
 touches no self-hosted runner, so the manual-only policy for self-hosted and

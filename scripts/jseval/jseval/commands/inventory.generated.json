@@ -264,38 +264,6 @@
     "group": "analysis"
   },
   {
-    "name": "ui-a11y-gate",
-    "group": "ui"
-  },
-  {
-    "name": "ui-check",
-    "group": "ui"
-  },
-  {
-    "name": "ui-critic",
-    "group": "ui"
-  },
-  {
-    "name": "ui-diff",
-    "group": "ui"
-  },
-  {
-    "name": "ui-fuzz",
-    "group": "ui"
-  },
-  {
-    "name": "ui-perf",
-    "group": "ui"
-  },
-  {
-    "name": "ui-proportion-gate",
-    "group": "ui"
-  },
-  {
-    "name": "ui-shot",
-    "group": "ui"
-  },
-  {
     "name": "union-recall-gate",
     "group": "gates"
   },

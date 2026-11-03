@@ -359,7 +359,7 @@ def cmd_utility_run(ctx, queries, corpus_dir, corpus_root, mcp_config, model, co
                     log_dir, output_dir):
     """Run the agent-utility matrix THROUGH Inspect AI (resumable) and compose (tempdoc 624).
 
-    Requires the `agent` extra: `pip install jseval[agent]`. condition is a sample
+    Requires the `agent` extra: `pip install -e scripts/jsharness -e 'scripts/jseval[agent]'`. condition is a sample
     field, seed=epoch, and cohort=task-args. `eval_set` makes re-runs resume
     (skip completed cells). Then reads the EvalLogs into `utility-comparison.v1`.
     """
@@ -392,7 +392,7 @@ def cmd_utility_run(ctx, queries, corpus_dir, corpus_root, mcp_config, model, co
     # (old calibration files keep working byte-for-byte).
     timeout_s_by_condition = None
     if calibration:
-        from ..types import ReadinessResult
+        from jsharness.types import ReadinessResult
         calib = json.loads(Path(calibration).read_text(encoding="utf-8"))
         # Provenance binding (tempdoc 758 §A/§B) — fail closed BEFORE spending if the banked
         # calibration was pinned at a different git checkout, or the `claude` CLI drifted, since

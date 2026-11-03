@@ -9,14 +9,19 @@ from pathlib import Path
 import sys
 
 root = Path(sys.argv[1]).resolve()
+roots = {'jseval': root, 'jsharness': root.parent / 'jsharness'}
 pending = [Path(p).resolve() for p in sys.argv[2:]]
 seen = set()
 
 
 def add_module(module):
-    base = root.joinpath(*module.split('.'))
-    for parent in [root / 'jseval', *base.parents]:
-        if parent == root or root not in parent.parents:
+    parts = module.split('.')
+    package_root = roots.get(parts[0])
+    if package_root is None:
+        return
+    base = package_root.joinpath(*parts)
+    for parent in [package_root / parts[0], *base.parents]:
+        if parent == package_root or package_root not in parent.parents:
             continue
         init = parent / '__init__.py'
         if init.is_file():
@@ -32,7 +37,8 @@ while pending:
         continue
     seen.add(file)
     tree = ast.parse(file.read_text(encoding='utf-8-sig'), filename=str(file))
-    package = '.'.join(file.parent.relative_to(root).parts) if root in file.parents else ''
+    package_root = next((p for p in roots.values() if p in file.parents), None)
+    package = '.'.join(file.parent.relative_to(package_root).parts) if package_root else ''
     # CLI boot imports every registered command. Derive its dynamic import list
     # from the owning registry, rather than copying a second command catalog.
     if file == root / 'jseval' / 'cli.py':
@@ -47,15 +53,14 @@ while pending:
     for node in ast.walk(tree):
         if isinstance(node, ast.Import):
             for alias in node.names:
-                if alias.name.startswith('jseval'):
-                    add_module(alias.name)
+                add_module(alias.name)
         if isinstance(node, ast.ImportFrom):
             if node.level:
                 parts = package.split('.')
                 module = '.'.join(parts[:len(parts) - node.level + 1] + ([node.module] if node.module else []))
             else:
                 module = node.module or ''
-            if module.startswith('jseval'):
+            if module.split('.')[0] in roots:
                 add_module(module)
                 for alias in node.names:
                     add_module(f'{module}.{alias.name}')

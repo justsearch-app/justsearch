@@ -100,7 +100,15 @@ jobs:
         # Fails fast, before installing, if pyproject.toml's floors and the committed
         # lock (tempdoc 792 §6) disagree — e.g. a dependency added or a floor raised
         # without regenerating scripts/jseval/requirements.lock.txt.
-        run: node scripts/ci/check-jseval-lock.mjs
+        run: |
+          node scripts/ci/check-jseval-lock.mjs
+          node scripts/ci/check-jseval-lock.mjs jsharness
+          node --test scripts/ci/check-jseval-lock.test.mjs
+
+      - name: Python path helper
+        # scripts/lib/python-path.cjs (shell: python-path.sh) gives callers the PYTHONPATH
+        # naming both packages of their own checkout.
+        run: node --test scripts/lib/python-path.test.mjs
 
       - name: Install canonical jseval
         # Constraint-installed against the dependency lock (tempdoc 792 §6) so the
@@ -108,7 +116,7 @@ jobs:
         # run instead of whatever floor-only pyproject.toml + an unpinned resolver
         # happens to pick that day. `-c` only pins packages pyproject.toml already
         # requires; it can't force-install anything extra.
-        run: python -m pip install -e scripts/jseval -c scripts/jseval/requirements.lock.txt
+        run: python -m pip install -e scripts/jsharness -e scripts/jseval -c scripts/jseval/requirements.lock.txt
 
       - name: Test release composition (Python)
         # tempdoc 802. Kept in THIS lane, alongside the claim checks it protects, so a
@@ -791,7 +799,7 @@ jobs:
       - name: Install canonical jseval
         # Mirrors the claims lane's install: constraint-installed against the dependency
         # lock (tempdoc 792 §6) so the suite resolves the same versions every run.
-        run: python -m pip install -e scripts/jseval -c scripts/jseval/requirements.lock.txt
+        run: python -m pip install -e scripts/jsharness -e scripts/jseval -c scripts/jseval/requirements.lock.txt
 
       - name: Install test dependencies
         # The `dev` extra's four packages are absent from requirements.lock.txt, so `-c`
@@ -804,7 +812,7 @@ jobs:
         # `-p no:cacheprovider`: a fresh runner has no cache to reuse and the plugin
         # would only write .pytest_cache into the checkout.
         # Release composition runs in Public claims above.
-        run: python -m pytest scripts/jseval/tests --ignore=scripts/jseval/tests/test_release.py -q -p no:cacheprovider
+        run: python -m pytest scripts/jseval/tests scripts/jsharness/tests --ignore=scripts/jseval/tests/test_release.py -q -p no:cacheprovider
 
   measured-axe:
     needs: changes
@@ -813,14 +821,14 @@ jobs:
     # Tempdoc 930 §22.2 follow-up 5. Chunk H retired twelve static a11y/token oracles in
     # favour of measurement, but only half the replacement ran on PRs: the four-palette
     # contrast sweep (`check-contrast-matrix`, inside the required `Public claims` lane via
-    # run-ui-web-gates.mjs). The other half — `jseval ui-a11y-gate`, real axe-core against
+    # run-ui-web-gates.mjs). The other half — `jsharness ui-a11y-gate`, real axe-core against
     # the rendered page — was local-only. This sweep runs on PRs, pushes to main and
     # manual dispatch. The stable advisory record supports promotion to required
     # (ADR-0026 / ADR-0044 amendments, 2026-10-24).
     #
     # Nothing about that gate needs the backend, which is why it can run here: `--fixtures`
     # intercepts every `/api/*` request in Playwright and serves committed schema-valid
-    # bodies (scripts/jseval/jseval/ui_fixtures.py `install_fixtures`), and `ui-shot` starts
+    # bodies (scripts/jsharness/jsharness/ui_fixtures.py `install_fixtures`), and `ui-shot` starts
     # its own Vite dev server out of `modules/ui-web` (ui_shot.py `_start_vite_server`). So
     # the whole sweep is Node + Python + headless Chromium: no Java, no Gradle, no GPU, no
     # dev stack. Measured locally at 350s wall for the register's 20 surfaces including a
@@ -847,12 +855,8 @@ jobs:
         with:
           python-version: "3.13"
 
-      - name: Install canonical jseval with the ui extra
-        # The `ui` extra is Playwright. It is an optional-dependency, so it is absent from
-        # requirements.lock.txt and `-c` leaves it unpinned — same shape as the pytest
-        # install in the two lanes above. The lock-drift guard only compares pyproject's
-        # base `dependencies` against the lock, so naming an extra here cannot trip it.
-        run: python -m pip install -e "scripts/jseval[ui]" -c scripts/jseval/requirements.lock.txt
+      - name: Install canonical jsharness with the ui extra
+        run: python -m pip install -e "scripts/jsharness[ui]" -c scripts/jsharness/requirements.lock.txt
 
       - name: Install frontend dependencies
         # axe.min.js (the bundle ui_measure injects) and Vite both come from here.
@@ -888,7 +892,7 @@ jobs:
         run: |
           set -o pipefail
           mkdir -p build/ci/ui-a11y
-          python -m jseval ui-a11y-gate --output-dir build/ci/ui-a11y 2>&1 \
+          python -m jsharness ui-a11y-gate --output-dir build/ci/ui-a11y 2>&1 \
             | tee build/ci/ui-a11y/gate-report.log
 
       - name: Upload measured-axe captures
@@ -907,7 +911,7 @@ jobs:
           set -euo pipefail
           mkdir -p build/ci/ui-run-flows
           for step in sv3-run-activity-steering sv3-run-budget sv3-run-approval sv3-run-approval-failure sv3-run-halt sv3-run-halt-failure sv3-run-halt-timeout sv3-ask-stop-late-response search-semantic-paused; do
-            python -m jseval ui-shot "$step" --fixtures --no-demo --output-dir build/ci/ui-run-flows 2>&1 \
+            python -m jsharness ui-shot "$step" --fixtures --no-demo --output-dir build/ci/ui-run-flows 2>&1 \
               | tee "build/ci/ui-run-flows/$step.log"
           done
 

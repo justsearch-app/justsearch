@@ -7,7 +7,7 @@ import logging
 import subprocess
 from pathlib import Path
 
-from . import suite_stats
+from jsharness import suite_stats
 from ._paths import DEFAULT_BENCH_CLAIM_A, DEFAULT_BENCH_TRACK_G, REPO_ROOT
 
 log = logging.getLogger(__name__)

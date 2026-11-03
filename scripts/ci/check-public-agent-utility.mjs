@@ -72,7 +72,7 @@ export function missingPythonMessage(python, replay) {
     const code = replay.error.code || "unknown error";
     return (
       `offline replay could not start: '${python}' not found (${code}). ` +
-      "Install Python 3.13+ and run: python -m pip install -e scripts/jseval " +
+      "Install Python 3.13+ and run: python -m pip install -e scripts/jsharness -e scripts/jseval " +
       "(or set PYTHON to the interpreter path)."
     );
   }

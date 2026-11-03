@@ -14,7 +14,7 @@ import { execFileSync } from 'node:child_process';
 import ts from 'typescript';
 
 export const CATALOG = 'governance/search-window-scenarios.v1.json';
-const STEP_INDEX = 'scripts/jseval/jseval/ui_step_index.json';
+const STEP_INDEX = 'scripts/jsharness/jsharness/ui_step_index.json';
 export const LAYERS = ['controller', 'view', 'real-ui-fixture', 'live-backend'];
 const RACES = ['concurrent-or-identical-send', 'late-response', 'second-conversation-or-tab', 'reload', 'screen-switch'];
 const nonempty = value => typeof value === 'string' && value.trim().length > 0;

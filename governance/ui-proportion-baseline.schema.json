@@ -40,7 +40,7 @@
         "type": "object",
         "required": ["uiShotStep", "elements"],
         "properties": {
-          "uiShotStep": { "type": "string", "description": "The jseval ui-shot step name this registration is captured under." },
+          "uiShotStep": { "type": "string", "description": "The jsharness ui-shot step name this registration is captured under." },
           "$comment": { "type": "string", "description": "Why this step's rows exist / what state they are measured in — the reasoning that would otherwise live only in a commit message." },
           "tolerancePx": {
             "type": "integer",

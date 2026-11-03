@@ -18,12 +18,12 @@
  *
  * ONE serve contract, two consumer paths (tempdoc 615 §27/§29). This is the HUMAN path
  * (foreground, eyes-are-the-mount-check). The AUTOMATED path is the screenshot harness's
- * `scripts/jseval/jseval/ui_shot.py` (`_start_vite_server`), which adds detached spawn +
+ * `scripts/jsharness/jsharness/ui_shot.py` (`_start_vite_server`), which adds detached spawn +
  * captured stderr + an app-mounted readiness gate (`ui_check._await_app_ready`) on top of
  * the same contract: FREE-PORT scan · `--strictPort` · NEUTRAL vite (no `--mode mock`) ·
  * provenance. They are two native paths bound by this contract (NOT one cross-language
  * process — that would add the very fragility §27 removes); drift is guarded by
- * `scripts/jseval/tests/test_ui_serve.py`.
+ * `scripts/jsharness/tests/test_ui_serve.py`.
  *
  * Tempdoc 861 W3 [A3] — registers a spawn record in the `agent-spawns/` scope so a leaked Vite is
  * reapable and a build-conflict hint can name it. Vite's own `node vite.js` is started directly

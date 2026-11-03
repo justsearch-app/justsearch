@@ -1454,7 +1454,7 @@ def read_enrichment(client) -> dict:
     ``expected_doc_count_min=0`` because the doc count is the fixture corpus's business (the
     capture already records docCountAtStart/End), not this check's.
     """
-    from .readiness import _check_pipeline_complete_conditions, flatten_status
+    from jsharness.readiness import _check_pipeline_complete_conditions, flatten_status
 
     try:
         resp = client.get("/api/status", timeout=30.0)

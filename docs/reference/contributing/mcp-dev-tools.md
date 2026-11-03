@@ -275,7 +275,7 @@ by exact name. So `foreign/` is invisible to the 271/542 lease and admission log
 mistaken for one of its runs, and cannot be deleted by run retention. Nothing here writes
 `active.json` or an op-lease.
 
-**Producer.** `scripts/jseval/jseval/run_register.py`. `start_backend` writes the record at spawn
+**Producer.** `scripts/jsharness/jsharness/run_register.py`. `start_backend` writes the record at spawn
 (not after health — the JVM holds ports, the data dir and the GPU from the moment it starts, and
 that boot window is exactly what a neighbour's "is the machine free?" check must not miss);
 `stop_backend` removes it, keyed by pid. Writes are a temp file plus an atomic `os.replace`, so a

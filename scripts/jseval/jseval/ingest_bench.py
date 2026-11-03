@@ -5,7 +5,9 @@ from __future__ import annotations
 import logging
 from pathlib import Path
 
-from . import ingest, suite_stats
+from . import ingest
+
+from jsharness import suite_stats
 from .types import IngestConfig
 
 log = logging.getLogger(__name__)

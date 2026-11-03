@@ -24,7 +24,8 @@ from typing import Any, Mapping
 import httpx
 
 from . import duplicate_prevalence_production as production
-from . import ingest, readiness, workflow_fixture
+from . import ingest, workflow_fixture
+from jsharness import readiness
 
 
 OPERATION_REF = "core.trigger-offline-processing"

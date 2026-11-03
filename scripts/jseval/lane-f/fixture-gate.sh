@@ -35,6 +35,11 @@
 #
 # Exit 0 = pass, 1 = regression / missing field / unhealthy capture, 2 = usage error.
 set -u
+# The measuring code -- jseval, jsharness and the lane-f helpers -- is this script's own checkout,
+# whichever directory it is invoked from; the stack and the corpus stay the invoking directory's.
+repo=$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)
+. "$repo/scripts/lib/python-path.sh"
+pythonpath=$(js_pythonpath "$repo") || exit 2
 baseline_dir=${1:?baseline side directory (from fixture-pair.sh)}
 candidate_dir=${2:?candidate side directory (from fixture-pair.sh)}
 report=${3:-}
@@ -55,7 +60,7 @@ for side in baseline candidate; do
   if [[ $side == baseline ]]; then dir=$baseline_abs; else dir=$candidate_abs; fi
   # Run bare and keep the status in a variable: a pipe here would report the PIPE's status
   # and swallow the refusal, and a later $? read would be stale.
-  listing=$( (cd scripts/jseval && python -m jseval workflow-fixture side-captures "$dir") 2>&1 )
+  listing=$( (cd "$repo/scripts/jseval" && PYTHONPATH=$pythonpath python -m jseval workflow-fixture side-captures "$dir") 2>&1 )
   rc=$?
   if [[ $rc -ne 0 ]]; then
     echo "fixture-gate: $listing" >&2
@@ -85,4 +90,4 @@ if [[ -n $report ]]; then
   args+=(--report-out "$(cd "$(dirname "$report")" && pwd)/$(basename "$report")")
 fi
 
-(cd scripts/jseval && python -m jseval workflow-fixture diff "${args[@]}")
+(cd "$repo/scripts/jseval" && PYTHONPATH=$pythonpath python -m jseval workflow-fixture diff "${args[@]}")

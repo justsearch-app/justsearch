@@ -547,7 +547,7 @@ capturing when the enrichment wait fails, `fixture-pair.sh` retries that cycle o
 clean, the capture records `provenance.enrichment` (index state, per-stage enabled flags, coverage
 percentages, pending counts) read at capture *start*, and `capture_health` refuses a capture whose
 enabled stages are not complete. The verdict is
-`jseval.readiness._check_pipeline_complete_conditions` **imported**, not restated — two copies of
+`jsharness.readiness._check_pipeline_complete_conditions` **imported**, not restated — two copies of
 "is the index ready" drift, and then a capture can satisfy the ingest wait while failing the
 capture check. This gap is why the first four-capture acceptance passed with 0 regressions: one
 side captured a half-enriched index, disagreed with *itself* on 11 of 12 queries, and every
@@ -932,8 +932,11 @@ so invoking it from a *different* worktree once silently ran the wrong copy. It 
 **fails closed** instead, printing the exact remedy inline:
 
 ```text
-PYTHONPATH=<worktree>/scripts/jseval
+PYTHONPATH=<worktree>/scripts/jseval;<worktree>/scripts/jsharness
 ```
+
+(`:` instead of `;` outside Windows; in a script, take the value from
+`node scripts/lib/python-path.cjs <worktree>`.)
 
 Follow the printed fix. `JUSTSEARCH_ALLOW_CROSS_CHECKOUT_JSEVAL=1` overrides the guard
 deliberately — use it only when you actually intend to run another checkout's copy.
@@ -1187,7 +1190,7 @@ sidecar must also be bound to a strict corpus SHA-256. Private alias/catalog mat
 directory.
 
 **Local prerequisite for the full pytest suite.** `python -m pytest scripts/jseval/tests` needs the
-optional extras: `pip install -e "scripts/jseval[dev,agent]"`. Without them four test modules fail
+optional extras: `pip install -e scripts/jsharness -e "scripts/jseval[dev,agent]"`. Without them four test modules fail
 at *collection* (`inspect_ai`, `hypothesis`), so the run reports collection errors and executes
 nothing rather than reporting a partial pass.
 

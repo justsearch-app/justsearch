@@ -58,15 +58,6 @@ class CorpusMeta:
 
 
 @dataclass
-class ReadinessResult:
-    """Result of a backend readiness check."""
-
-    passed: bool
-    failure_reasons: list[str] = field(default_factory=list)
-    snapshot: dict = field(default_factory=dict)
-
-
-@dataclass
 class AnnProofResult:
     """Result of ANN proof computation."""
 
