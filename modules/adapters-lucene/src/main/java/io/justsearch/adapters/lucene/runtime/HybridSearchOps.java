@@ -293,6 +293,10 @@ public final class HybridSearchOps {
    * using virtual threads. The caller binds concrete search implementations via the functional
    * interfaces (e.g., unfiltered, filtered by Query, filtered by RuntimeSearchFilters).
    *
+   * <p>{@code rerankPool} says whether a cross-encoder reranks the
+   * returned list. Only then are leg-top candidates spliced in: without a reranker the returned
+   * list is what the user sees, and the splice would displace fused hits from it.
+   *
    * @param textLeg the text/BM25 search leg (bound by caller with any filter)
    * @param vectorLeg the vector/KNN search leg (bound by caller with any filter)
    * @param queryText the text query (used for skip heuristic and logging)
@@ -301,24 +305,6 @@ public final class HybridSearchOps {
    * @param debug if true, enables debug scores in RRF fusion output
    * @param logPrefix label for debug log messages
    * @return search results ordered by fused RRF score (highest first)
-   */
-  SearchResult executeHybrid(
-      TextSearchLeg textLeg,
-      VectorSearchLeg vectorLeg,
-      String queryText,
-      float[] queryVector,
-      int limit,
-      boolean debug,
-      String logPrefix,
-      EngineContext.Urgency urgency, io.justsearch.core.execution.EngineTaskLifetime childLifetime) {
-    return executeHybrid(textLeg, vectorLeg, queryText, queryVector, limit, debug, logPrefix,
-        true, urgency, childLifetime);
-  }
-
-  /**
-   * {@link #executeHybrid} where {@code rerankPool} says whether a cross-encoder reranks the
-   * returned list. Only then are leg-top candidates spliced in: without a reranker the returned
-   * list is what the user sees, and the splice would displace fused hits from it.
    */
   SearchResult executeHybrid(
       TextSearchLeg textLeg,
@@ -462,11 +448,6 @@ public final class HybridSearchOps {
    * @param syntax how the text leg parses {@code queryText} (tempdoc 821 §P / register F-046)
    * @return search results ordered by fused RRF score
    */
-  SearchResult searchHybrid(String queryText, float[] queryVector, int limit, QuerySyntax syntax,
-      EngineContext.Urgency urgency, io.justsearch.core.execution.EngineTaskLifetime childLifetime) {
-    return searchHybrid(queryText, queryVector, limit, syntax, true, urgency, childLifetime);
-  }
-
   SearchResult searchHybrid(String queryText, float[] queryVector, int limit, QuerySyntax syntax,
       boolean rerankPool, EngineContext.Urgency urgency,
       io.justsearch.core.execution.EngineTaskLifetime childLifetime) {

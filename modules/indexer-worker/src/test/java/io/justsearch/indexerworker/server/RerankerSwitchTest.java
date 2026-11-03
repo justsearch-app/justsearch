@@ -65,17 +65,19 @@ final class RerankerSwitchTest {
   @Test
   void offRefusesAnIssuedCallBeyondTheDrainBoundAndKeepsTheServingView(@TempDir Path dir)
       throws Exception {
-    try (var f = new KnowledgeServerQuerySettingsOwnerTest.QueryFixture(dir, 512L);
-        var composition = f.composition(); var issued = f.server.captureServingView()) {
-      UiSettings candidate = new UiSettings();
-      candidate.setRerankerEnabled(false);
-      var refused = assertThrows(io.justsearch.app.api.settings.SettingsCommitOwner.Refused.class,
-          () -> f.server.prepareQueryRoleSettings(candidate, f.configuration,
-              Set.of("rerankerEnabled"), f.selection));
-      assertEquals("COMPONENT_PREPARATION_REQUIRED", refused.response().errorCode().orElseThrow());
-      assertSame(f.producer, issued.services());
-      f.assertA();
-      assertFalse(f.queryA.isClosed());
+    try (var f = new KnowledgeServerQuerySettingsOwnerTest.QueryFixture(dir, 512L)) {
+      var composition = f.composition();
+      try (composition; var issued = f.server.captureServingView()) {
+        UiSettings candidate = new UiSettings();
+        candidate.setRerankerEnabled(false);
+        var refused = assertThrows(io.justsearch.app.api.settings.SettingsCommitOwner.Refused.class,
+            () -> f.server.prepareQueryRoleSettings(candidate, f.configuration,
+                Set.of("rerankerEnabled"), f.selection));
+        assertEquals("COMPONENT_PREPARATION_REQUIRED", refused.response().errorCode().orElseThrow());
+        assertSame(f.producer, issued.services());
+        f.assertA();
+        assertFalse(f.queryA.isClosed());
+      }
     }
   }
 

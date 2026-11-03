@@ -266,7 +266,7 @@ verifier supplies acceptance after reviewing the final candidate. No acceptance 
           "label": "agent-drafted, owner-adopted"
         }
       ],
-      "evidence": "gates/test-intent/evidence/s2-reranker-repair1.json",
+      "evidence": "gates/test-intent/evidence/s2-reranker-preflight-fail-before.json",
       "newChecks": [
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/RerankerSwitchTest.java#enablingWithoutFilesRefusesInsteadOfSelectingDisabled"
       ],
@@ -790,7 +790,7 @@ verifier supplies acceptance after reviewing the final candidate. No acceptance 
           "label": "agent-drafted, owner-adopted"
         }
       ],
-      "evidence": "gates/test-intent/evidence/s2-reranker-round2-new.json",
+      "evidence": "gates/test-intent/evidence/s2-reranker-preflight-adaptation.json",
       "newChecks": [
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/RerankerSwitchTest.java#onRestoresExactCustomIdentityInsteadOfProbingAnotherVariant"
       ]
@@ -907,6 +907,29 @@ verifier supplies acceptance after reviewing the final candidate. No acceptance 
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/RerankerSwitchAfterRepairTest.java#anUnexplainedReplacementIsStillRefused",
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/RerankerSwitchAfterRepairTest.java#aRetainedCustomModelIsNotReplacedByTheInstalledOne"
       ]
+    },
+    {
+      "items": [
+        "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/FanoutRuntimeLifetimeTest.java",
+        "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/HybridSearchIntegrationTest.java"
+      ],
+      "class": "Adaptation",
+      "moved": [
+        "input re-encoding"
+      ],
+      "whatMoved": "The removed executeHybrid and searchHybrid overloads passed rerankPool=true. Their callers now pass true explicitly to the remaining overloads; every assertion, other input, precondition, observation, fault injection, tag and condition is kept.",
+      "evidence": "gates/test-intent/evidence/s2-reranker-preflight-adaptation.json"
+    },
+    {
+      "items": [
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/RerankerSwitchTest.java"
+      ],
+      "class": "Adaptation",
+      "moved": [
+        "instrumentation"
+      ],
+      "whatMoved": "The composition mock is declared immediately before a nested try-with-resources and used as its resource. Mock creation, its active lifetime and reverse close order (issued view, mock, fixture) are preserved; every assertion and test input is kept.",
+      "evidence": "gates/test-intent/evidence/s2-reranker-preflight-adaptation.json"
     }
   ]
 }
