@@ -350,6 +350,7 @@ export interface AiState {
   packStatus: PackImportStatus | null;
   installObservationLive: boolean;
   runtimeObservationLive: boolean;
+  packObservationLive: boolean;
   /**
    * Tempdoc 663 Design pass 2 - the ONE AI-engine lifecycle verdict, the fourth 594/595/596 sibling.
    * Computed once here from `installStatus`/`runtimeStatus`/`runtime`/`connection.reachable` - every
@@ -383,6 +384,7 @@ const installStatusSig = signal<InstallStatus | null>(null);
 const runtimeStatusSig = signal<AiRuntimeStatus | null>(null);
 const installObservationSig = signal<AiObservation | undefined>(undefined);
 const runtimeObservationSig = signal<AiObservation | undefined>(undefined);
+const packObservationSig = signal<AiObservation | undefined>(undefined);
 const packStatusSig = signal<PackImportStatus | null>(null);
 // 595 §15.3 (E2) — retained last-settled index counts. Written ONLY by the poll
 // callback (`onStatusUpdate`), read by `buildSnapshot`; no computed writes it.
@@ -1007,6 +1009,7 @@ function buildSnapshot(): AiState {
     packStatus: packStatusSig.get(),
     installObservationLive: isAiObservationLive(installObservationSig.get()),
     runtimeObservationLive: isAiObservationLive(runtimeObservationSig.get()),
+    packObservationLive: isAiObservationLive(packObservationSig.get()),
     aiEngine,
     chatDisabledBySpec,
     chatUnloadedReason: chatUnloadedReason(
@@ -1119,6 +1122,7 @@ function onStatusUpdate(snap: StatusSnapshot | null, invalidated = false): void 
 function onAiInstallUpdate(snap: AiInstallSnapshot): void {
   installObservationSig.set(snap.installObservation);
   runtimeObservationSig.set(snap.runtimeObservation);
+  packObservationSig.set(snap.packsObservation);
   installStatusSig.set(snap.install);
   runtimeStatusSig.set(snap.runtime);
   packStatusSig.set(snap.packs);
@@ -1341,6 +1345,7 @@ export function __resetAiStateForTest(): void {
   installStateSig.set(UNKNOWN);
   installObservationSig.set(undefined);
   runtimeObservationSig.set(undefined);
+  packObservationSig.set(undefined);
   installStatusSig.set(null);
   runtimeStatusSig.set(null);
   packStatusSig.set(null);

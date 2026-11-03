@@ -264,6 +264,7 @@ describe('aiInstallPoll lifecycle cancellation', () => {
       install: { state: 'idle' }, runtime: { state: 'idle' }, packs: { state: 'idle' },
       installObservation: { latestReadFailed: false },
       runtimeObservation: { latestReadFailed: false },
+      packsObservation: { latestReadFailed: false },
     });
     await vi.advanceTimersByTimeAsync(5_000);
     expect(fetchMock).toHaveBeenCalledTimes(9);

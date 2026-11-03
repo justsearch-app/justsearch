@@ -13,7 +13,8 @@
  * This module fixes that structurally, mirroring `inferencePoll.ts`'s proven shape: ONE shared,
  * always-on poller (first fetch is eager, then on an ADAPTIVE cadence — see `pollIntervalFor`),
  * fanning out to every subscriber.
- * Each read gets one poll interval to answer, including its response body; unanswered reads are
+ * Each read gets at least the slow poll interval (5s) to answer, including its response body;
+ * unanswered reads are
  * aborted and count as failed, so even a held request lets the batch finish and schedule a retry.
  * An explicit admission retry delay is an answer and is honoured, as in `statusPoll.ts`.
  * A failed tick retains the last-known-good value per field (never regresses a known field to
@@ -119,6 +120,7 @@ export interface AiInstallSnapshot {
   packs: PackImportStatus | null;
   installObservation?: AiObservation;
   runtimeObservation?: AiObservation;
+  packsObservation?: AiObservation;
 }
 
 type Listener = (snapshot: AiInstallSnapshot) => void;
@@ -182,7 +184,7 @@ function untilAbandoned<T>(step: Promise<T>, signal: AbortSignal): Promise<T> {
 async function fetchJson<T>(path: string, currentSignal: AbortSignal): Promise<T | null> {
   const read = new AbortController();
   const signal = AbortSignal.any([currentSignal, read.signal]);
-  const interval = pollIntervalFor(last);
+  const interval = Math.max(SLOW_INTERVAL_MS, pollIntervalFor(last));
   let bound: ReturnType<typeof setTimeout>;
   const clearBound = () => clearTimeout(bound);
   const arm = (ms: number) => {
@@ -190,7 +192,7 @@ async function fetchJson<T>(path: string, currentSignal: AbortSignal): Promise<T
     bound = setTimeout(() => read.abort(), ms);
   };
   // A server-directed wait is an answer, not silence; its retry gets one interval to answer.
-  observeAdmissionWait(signal, delay => { if (!read.signal.aborted) arm(delay + interval); });
+  observeAdmissionWait(signal, delay => { if (!signal.aborted) arm(delay + interval); });
   arm(interval);
   // Stop releases timers synchronously, including when a fetch ignores cancellation.
   signal.addEventListener('abort', clearBound, { once: true });
@@ -217,13 +219,10 @@ async function readStatus(key: 'install' | 'runtime' | 'packs', current: AbortCo
   const value = await fetchJson<NonNullable<AiInstallSnapshot[typeof key]>>(`/api/ai/${key}/status`, current.signal);
   if (controller !== current) return;
   // A failed read retains history but immediately invalidates its observation.
-  last = { ...last, [key]: value ?? last[key] };
-  if (key !== 'packs') {
-    const observationKey = `${key}Observation` as const;
-    last = { ...last, [observationKey]: {
-      latestReadFailed: value === null,
-    } };
-  }
+  const observationKey = `${key}Observation` as const;
+  last = { ...last, [key]: value ?? last[key], [observationKey]: {
+    latestReadFailed: value === null,
+  } };
   publish(current);
 }
 

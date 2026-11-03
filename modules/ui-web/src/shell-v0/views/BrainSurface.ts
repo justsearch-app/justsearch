@@ -3023,6 +3023,7 @@ export class BrainSurface extends JfElement {
   private renderPackImport(): TemplateResult | typeof nothing {
     const tauri = this.hostHasFilePicker();
     const allowlist = this.policy?.packAllowlistConfigured ?? false;
+    const live = this._unifiedAiState?.packObservationLive === true;
     return html`
       <div class="section">
         <h4>Import an offline package</h4>
@@ -3051,17 +3052,20 @@ export class BrainSurface extends JfElement {
                     label="Import pack"
                     .availability=${this.busy['pack-import']
                       ? { kind: 'blocked' }
-                      : this.packStatus?.state === 'running'
-                        ? unavailableBecause('A pack import is already in progress.')
-                        : AVAILABLE}
+                      : !live
+                        ? unavailableBecause('Checking pack status before importing.')
+                        : this.packStatus?.state === 'running'
+                          ? unavailableBecause('A pack import is already in progress.')
+                          : AVAILABLE}
                     .onActivate=${() => void this.importPack()}
                   >
                     ${icon({ name: 'hard-drive', size: 14 })} Import pack
                   </jf-button>
                 </div>
+                ${!live ? html`<p>Checking pack status…</p>` : nothing}
                 ${this.packStatus
                   ? html`<div style="margin-top: 0.5rem; font-size: var(--font-size-xs); color: var(--text-secondary)">
-                      Pack status: <code>${this.packStatus.state}</code>
+                      ${live ? 'Pack status:' : 'Pack status — last observed:'} <code>${this.packStatus.state}</code>
                       ${this.packStatus.phase ? html` · ${this.packStatus.phase}` : nothing}
                       ${this.packStatus.message ? html` — ${this.packStatus.message}` : nothing}
                     </div>`

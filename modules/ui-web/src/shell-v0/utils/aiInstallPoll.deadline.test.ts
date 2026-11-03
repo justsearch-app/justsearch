@@ -51,7 +51,7 @@ describe('AI status read deadline', () => {
       expect(seen.at(-1)?.[endpoint]).toEqual(healthy[endpoint]);
       await vi.advanceTimersByTimeAsync(1000);
       expect(calls).toBe(2);
-      await vi.advanceTimersByTimeAsync(999);
+      await vi.advanceTimersByTimeAsync(4999);
       expect(heldSignal?.aborted).toBe(false);
       await vi.advanceTimersByTimeAsync(1);
       const failed = seen.at(-1);
@@ -62,10 +62,8 @@ describe('AI status read deadline', () => {
       expect(calls).toBe(3);
       expect(heldSignal?.aborted).toBe(true);
       expect(failed?.[endpoint]).toEqual(healthy[endpoint]);
-      if (endpoint !== 'packs') {
-        expect(failed?.[`${endpoint}Observation`]).toEqual({ latestReadFailed: true });
-        expect(seen.at(-1)?.[`${endpoint}Observation`]).toEqual({ latestReadFailed: false });
-      }
+      expect(failed?.[`${endpoint}Observation`]).toEqual({ latestReadFailed: true });
+      expect(seen.at(-1)?.[`${endpoint}Observation`]).toEqual({ latestReadFailed: false });
       expect(seen.at(-1)?.[endpoint]).toEqual(recovered);
       const publications = seen.length;
       finish();
@@ -85,12 +83,13 @@ describe('AI status read deadline', () => {
     vi.stubGlobal('fetch', fetch);
     const seen: AiInstallSnapshot[] = [];
     subscribeAiInstall(snapshot => seen.push(snapshot));
-    await vi.advanceTimersByTimeAsync(6000);
-    expect(fetch).toHaveBeenCalledTimes(12); // Batches at 0, 2s, 4s, 6s; each gets 1s to answer.
+    await vi.advanceTimersByTimeAsync(18000);
+    expect(fetch).toHaveBeenCalledTimes(12); // Batches at 0, 6s, 12s, 18s; each gets 5s to answer.
     expect(signals.slice(0, 9).every(signal => signal.aborted)).toBe(true);
     expect(signals.slice(9).every(signal => !signal.aborted)).toBe(true);
     expect(seen.at(-1)?.installObservation).toEqual({ latestReadFailed: true });
     expect(seen.at(-1)?.runtimeObservation).toEqual({ latestReadFailed: true });
+    expect(seen.at(-1)?.packsObservation).toEqual({ latestReadFailed: true });
   });
 
   it('T2 uses the idle interval as the deadline and accepts a slow answer before it', async () => {

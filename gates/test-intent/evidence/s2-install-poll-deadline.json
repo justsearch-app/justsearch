@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
   },
-  "createdAt": "2026-11-03T17:13:32.703Z",
-  "revision": "bfc6a52032e65f4e1992c314d09b5685799961ea",
-  "tree": "f0c0a1dabfb0f0e7ad450448da755a8005146273",
+  "createdAt": "2026-11-03T17:24:29.109Z",
+  "revision": "cab9030e66476c90c003694a5dc8b769a8446d9e",
+  "tree": "f8da9d65bc9cd435193e507089060cf69a230a9a",
   "environment": {
     "platform": "linux",
     "arch": "x64",
@@ -18,10 +18,10 @@
   },
   "runs": [
     {
-      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/utils/aiInstallPoll.deadline.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/twycipnw/tmp/test-intent-vitest-64-1793726003773.json\"",
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/utils/aiInstallPoll.deadline.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/krch1q5g/tmp/test-intent-vitest-177-1793726660787.json\"",
       "cwd": "modules/ui-web",
       "exitCode": 0,
-      "durationMs": 1622
+      "durationMs": 1642
     }
   ],
   "checks": [
@@ -29,7 +29,7 @@
       "id": "modules/ui-web/src/shell-v0/utils/aiInstallPoll.deadline.test.ts#T1 abandons a held install response and recovers on the next tick",
       "file": "modules/ui-web/src/shell-v0/utils/aiInstallPoll.deadline.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:2d55aed106a310f676192e4c5b5c4807ee29ed3071993e840b5334cbfa7c22b7",
+      "contentDigest": "sha256:61287777462ecb4423200f98ce60d3ea4dbe904bd6a82d9bb7cdfe5d1ad8143c",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -44,7 +44,7 @@
       "id": "modules/ui-web/src/shell-v0/utils/aiInstallPoll.deadline.test.ts#T1 abandons a held install body and recovers on the next tick",
       "file": "modules/ui-web/src/shell-v0/utils/aiInstallPoll.deadline.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:2d55aed106a310f676192e4c5b5c4807ee29ed3071993e840b5334cbfa7c22b7",
+      "contentDigest": "sha256:61287777462ecb4423200f98ce60d3ea4dbe904bd6a82d9bb7cdfe5d1ad8143c",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -59,7 +59,7 @@
       "id": "modules/ui-web/src/shell-v0/utils/aiInstallPoll.deadline.test.ts#T1 abandons a held runtime response and recovers on the next tick",
       "file": "modules/ui-web/src/shell-v0/utils/aiInstallPoll.deadline.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:2d55aed106a310f676192e4c5b5c4807ee29ed3071993e840b5334cbfa7c22b7",
+      "contentDigest": "sha256:61287777462ecb4423200f98ce60d3ea4dbe904bd6a82d9bb7cdfe5d1ad8143c",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -74,7 +74,7 @@
       "id": "modules/ui-web/src/shell-v0/utils/aiInstallPoll.deadline.test.ts#T1 abandons a held runtime body and recovers on the next tick",
       "file": "modules/ui-web/src/shell-v0/utils/aiInstallPoll.deadline.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:2d55aed106a310f676192e4c5b5c4807ee29ed3071993e840b5334cbfa7c22b7",
+      "contentDigest": "sha256:61287777462ecb4423200f98ce60d3ea4dbe904bd6a82d9bb7cdfe5d1ad8143c",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -89,7 +89,7 @@
       "id": "modules/ui-web/src/shell-v0/utils/aiInstallPoll.deadline.test.ts#T1 abandons a held packs response and recovers on the next tick",
       "file": "modules/ui-web/src/shell-v0/utils/aiInstallPoll.deadline.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:2d55aed106a310f676192e4c5b5c4807ee29ed3071993e840b5334cbfa7c22b7",
+      "contentDigest": "sha256:61287777462ecb4423200f98ce60d3ea4dbe904bd6a82d9bb7cdfe5d1ad8143c",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -104,7 +104,7 @@
       "id": "modules/ui-web/src/shell-v0/utils/aiInstallPoll.deadline.test.ts#T1 abandons a held packs body and recovers on the next tick",
       "file": "modules/ui-web/src/shell-v0/utils/aiInstallPoll.deadline.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:2d55aed106a310f676192e4c5b5c4807ee29ed3071993e840b5334cbfa7c22b7",
+      "contentDigest": "sha256:61287777462ecb4423200f98ce60d3ea4dbe904bd6a82d9bb7cdfe5d1ad8143c",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -119,7 +119,7 @@
       "id": "modules/ui-web/src/shell-v0/utils/aiInstallPoll.deadline.test.ts#T1 keeps polling when every response is held forever",
       "file": "modules/ui-web/src/shell-v0/utils/aiInstallPoll.deadline.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:2d55aed106a310f676192e4c5b5c4807ee29ed3071993e840b5334cbfa7c22b7",
+      "contentDigest": "sha256:61287777462ecb4423200f98ce60d3ea4dbe904bd6a82d9bb7cdfe5d1ad8143c",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -134,7 +134,7 @@
       "id": "modules/ui-web/src/shell-v0/utils/aiInstallPoll.deadline.test.ts#T1/T2 abandons an idle read at 5s and shares one queued refresh after abandonment",
       "file": "modules/ui-web/src/shell-v0/utils/aiInstallPoll.deadline.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:2d55aed106a310f676192e4c5b5c4807ee29ed3071993e840b5334cbfa7c22b7",
+      "contentDigest": "sha256:61287777462ecb4423200f98ce60d3ea4dbe904bd6a82d9bb7cdfe5d1ad8143c",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -153,55 +153,55 @@
     "patches": [],
     "runs": [
       {
-        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/utils/aiInstallPoll.deadline.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/twycipnw/tmp/test-intent-vitest-64-1793726010605.json\"",
+        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/utils/aiInstallPoll.deadline.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/krch1q5g/tmp/test-intent-vitest-177-1793726666545.json\"",
         "cwd": "<before-worktree>",
         "exitCode": 1,
-        "durationMs": 1229,
-        "output": "JSON report written to /home/elias/.cache/am/twycipnw/tmp/test-intent-vitest-64-1793726010605.json\n\n"
+        "durationMs": 1557,
+        "output": "JSON report written to /home/elias/.cache/am/krch1q5g/tmp/test-intent-vitest-177-1793726666545.json\n\n"
       }
     ],
     "checks": [
       {
         "id": "modules/ui-web/src/shell-v0/utils/aiInstallPoll.deadline.test.ts#T1 abandons a held install response and recovers on the next tick",
         "classification": "assertion",
-        "detail": "AI status read deadline T1 abandons a held install response and recovers on the next tick:  AssertionError: expected 2 to be 3 // Object.is equality\n    at /home/elias/.cache/am/twycipnw/tmp/test-intent-before-hf6lLj/modules/ui-web/src/shell-v0/utils/aiInstallPoll.deadline.test.ts:62:21\n    at file:///home/elias/.cache/am/twycipnw/tmp/test-intent-before-hf6lLj/modules/ui-web/node_modules/@"
+        "detail": "AI status read deadline T1 abandons a held install response and recovers on the next tick:  AssertionError: expected 2 to be 3 // Object.is equality\n    at /home/elias/.cache/am/krch1q5g/tmp/test-intent-before-A6InCT/modules/ui-web/src/shell-v0/utils/aiInstallPoll.deadline.test.ts:62:21\n    at file:///home/elias/.cache/am/krch1q5g/tmp/test-intent-before-A6InCT/modules/ui-web/node_modules/@"
       },
       {
         "id": "modules/ui-web/src/shell-v0/utils/aiInstallPoll.deadline.test.ts#T1 abandons a held install body and recovers on the next tick",
         "classification": "assertion",
-        "detail": "AI status read deadline T1 abandons a held install body and recovers on the next tick:  AssertionError: expected 2 to be 3 // Object.is equality\n    at /home/elias/.cache/am/twycipnw/tmp/test-intent-before-hf6lLj/modules/ui-web/src/shell-v0/utils/aiInstallPoll.deadline.test.ts:62:21\n    at file:///home/elias/.cache/am/twycipnw/tmp/test-intent-before-hf6lLj/modules/ui-web/node_modules/@"
+        "detail": "AI status read deadline T1 abandons a held install body and recovers on the next tick:  AssertionError: expected 2 to be 3 // Object.is equality\n    at /home/elias/.cache/am/krch1q5g/tmp/test-intent-before-A6InCT/modules/ui-web/src/shell-v0/utils/aiInstallPoll.deadline.test.ts:62:21\n    at file:///home/elias/.cache/am/krch1q5g/tmp/test-intent-before-A6InCT/modules/ui-web/node_modules/@"
       },
       {
         "id": "modules/ui-web/src/shell-v0/utils/aiInstallPoll.deadline.test.ts#T1 abandons a held runtime response and recovers on the next tick",
         "classification": "assertion",
-        "detail": "AI status read deadline T1 abandons a held runtime response and recovers on the next tick:  AssertionError: expected 2 to be 3 // Object.is equality\n    at /home/elias/.cache/am/twycipnw/tmp/test-intent-before-hf6lLj/modules/ui-web/src/shell-v0/utils/aiInstallPoll.deadline.test.ts:62:21\n    at file:///home/elias/.cache/am/twycipnw/tmp/test-intent-before-hf6lLj/modules/ui-web/node_modules/@"
+        "detail": "AI status read deadline T1 abandons a held runtime response and recovers on the next tick:  AssertionError: expected 2 to be 3 // Object.is equality\n    at /home/elias/.cache/am/krch1q5g/tmp/test-intent-before-A6InCT/modules/ui-web/src/shell-v0/utils/aiInstallPoll.deadline.test.ts:62:21\n    at file:///home/elias/.cache/am/krch1q5g/tmp/test-intent-before-A6InCT/modules/ui-web/node_modules/@"
       },
       {
         "id": "modules/ui-web/src/shell-v0/utils/aiInstallPoll.deadline.test.ts#T1 abandons a held runtime body and recovers on the next tick",
         "classification": "assertion",
-        "detail": "AI status read deadline T1 abandons a held runtime body and recovers on the next tick:  AssertionError: expected 2 to be 3 // Object.is equality\n    at /home/elias/.cache/am/twycipnw/tmp/test-intent-before-hf6lLj/modules/ui-web/src/shell-v0/utils/aiInstallPoll.deadline.test.ts:62:21\n    at file:///home/elias/.cache/am/twycipnw/tmp/test-intent-before-hf6lLj/modules/ui-web/node_modules/@"
+        "detail": "AI status read deadline T1 abandons a held runtime body and recovers on the next tick:  AssertionError: expected 2 to be 3 // Object.is equality\n    at /home/elias/.cache/am/krch1q5g/tmp/test-intent-before-A6InCT/modules/ui-web/src/shell-v0/utils/aiInstallPoll.deadline.test.ts:62:21\n    at file:///home/elias/.cache/am/krch1q5g/tmp/test-intent-before-A6InCT/modules/ui-web/node_modules/@"
       },
       {
         "id": "modules/ui-web/src/shell-v0/utils/aiInstallPoll.deadline.test.ts#T1 abandons a held packs response and recovers on the next tick",
         "classification": "assertion",
-        "detail": "AI status read deadline T1 abandons a held packs response and recovers on the next tick:  AssertionError: expected 2 to be 3 // Object.is equality\n    at /home/elias/.cache/am/twycipnw/tmp/test-intent-before-hf6lLj/modules/ui-web/src/shell-v0/utils/aiInstallPoll.deadline.test.ts:62:21\n    at file:///home/elias/.cache/am/twycipnw/tmp/test-intent-before-hf6lLj/modules/ui-web/node_modules/@"
+        "detail": "AI status read deadline T1 abandons a held packs response and recovers on the next tick:  AssertionError: expected 2 to be 3 // Object.is equality\n    at /home/elias/.cache/am/krch1q5g/tmp/test-intent-before-A6InCT/modules/ui-web/src/shell-v0/utils/aiInstallPoll.deadline.test.ts:62:21\n    at file:///home/elias/.cache/am/krch1q5g/tmp/test-intent-before-A6InCT/modules/ui-web/node_modules/@"
       },
       {
         "id": "modules/ui-web/src/shell-v0/utils/aiInstallPoll.deadline.test.ts#T1 abandons a held packs body and recovers on the next tick",
         "classification": "assertion",
-        "detail": "AI status read deadline T1 abandons a held packs body and recovers on the next tick:  AssertionError: expected 2 to be 3 // Object.is equality\n    at /home/elias/.cache/am/twycipnw/tmp/test-intent-before-hf6lLj/modules/ui-web/src/shell-v0/utils/aiInstallPoll.deadline.test.ts:62:21\n    at file:///home/elias/.cache/am/twycipnw/tmp/test-intent-before-hf6lLj/modules/ui-web/node_modules/@"
+        "detail": "AI status read deadline T1 abandons a held packs body and recovers on the next tick:  AssertionError: expected 2 to be 3 // Object.is equality\n    at /home/elias/.cache/am/krch1q5g/tmp/test-intent-before-A6InCT/modules/ui-web/src/shell-v0/utils/aiInstallPoll.deadline.test.ts:62:21\n    at file:///home/elias/.cache/am/krch1q5g/tmp/test-intent-before-A6InCT/modules/ui-web/node_modules/@"
       },
       {
         "id": "modules/ui-web/src/shell-v0/utils/aiInstallPoll.deadline.test.ts#T1 keeps polling when every response is held forever",
         "classification": "assertion",
-        "detail": "AI status read deadline T1 keeps polling when every response is held forever:  AssertionError: expected \"vi.fn()\" to be called 12 times, but got 3 times\n    at /home/elias/.cache/am/twycipnw/tmp/test-intent-before-hf6lLj/modules/ui-web/src/shell-v0/utils/aiInstallPoll.deadline.test.ts:89:19\n    at file:///home/elias/.cache/am/twycipnw/tmp/test-intent-before-hf6lLj/modules/ui-w"
+        "detail": "AI status read deadline T1 keeps polling when every response is held forever:  AssertionError: expected \"vi.fn()\" to be called 12 times, but got 3 times\n    at /home/elias/.cache/am/krch1q5g/tmp/test-intent-before-A6InCT/modules/ui-web/src/shell-v0/utils/aiInstallPoll.deadline.test.ts:87:19\n    at file:///home/elias/.cache/am/krch1q5g/tmp/test-intent-before-A6InCT/modules/ui-w"
       },
       {
         "id": "modules/ui-web/src/shell-v0/utils/aiInstallPoll.deadline.test.ts#T1/T2 abandons an idle read at 5s and shares one queued refresh after abandonment",
         "classification": "assertion",
-        "detail": "AI status read deadline T1/T2 abandons an idle read at 5s and shares one queued refresh after abandonment:  AssertionError: expected \"vi.fn()\" to be called 9 times, but got 6 times\n    at /home/elias/.cache/am/twycipnw/tmp/test-intent-before-hf6lLj/modules/ui-web/src/shell-v0/utils/aiInstallPoll.deadline.test.ts:144:19\n    at file:///home/elias/.cache/am/twycipnw/tmp/test-intent-before-hf6lLj/modules/ui-w"
+        "detail": "AI status read deadline T1/T2 abandons an idle read at 5s and shares one queued refresh after abandonment:  AssertionError: expected \"vi.fn()\" to be called 9 times, but got 6 times\n    at /home/elias/.cache/am/krch1q5g/tmp/test-intent-before-A6InCT/modules/ui-web/src/shell-v0/utils/aiInstallPoll.deadline.test.ts:143:19\n    at file:///home/elias/.cache/am/krch1q5g/tmp/test-intent-before-A6InCT/modules/ui-w"
       }
     ]
   },
-  "digest": "sha256:6eebc38684583381c888b723e75746e7f8f6e04f091c8c20f9d510a85a0e1885"
+  "digest": "sha256:3552d72547d284f1e002cd65bba1d893e7f391ae0144828013fda3c7ce72bd7e"
 }
