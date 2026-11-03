@@ -131,9 +131,10 @@ snapshot (`shell-v0/state/indexingProgress.ts`). Numbers may differ between surf
     already-indexed documents) → **Ready**. Blocked or unconfirmed work must say so rather than imply readiness.
 *   **Two tiers of "done":** job drain makes a folder keyword-searchable, which is not the
     same fact as fully searchable. A Library folder row therefore reads
-    `Meaning processing · 40%` while semantic coverage climbs and `Up to date` only once
-    it is complete (`views/LibrarySurface.ts`, from `shell-v0/state/folderStatus.ts` and the
-    per-root coverage counts on `IndexedRootView`). "Up to date" in Health is likewise reserved for
+    `Meaning processing · 40%` while semantic coverage climbs and `Up to date` once coverage
+    is complete or, where a folder has no coverage counts, once nothing is pending for it
+    (`views/LibrarySurface.ts`, from `shell-v0/state/folderStatus.ts` and the per-root
+    coverage counts on `IndexedRootView`). "Up to date" in Health is likewise reserved for
     coverage-complete, not job-drain.
 *   **No fabricated numbers:** a percent is rendered only when the denominator is
     faithful (at least one applicable stage with documents to enrich). With no
@@ -185,12 +186,11 @@ configuration and activity controls.
 
 “Process pending work” dispatches `core.trigger-offline-processing` through the
 catalog-driven `jf-operation`. Each operation runs one captured pass of up to 100 pending
-vision documents, starts the AI engine when needed, then hands pending embedding work to
-the indexing mode. Its durable operation record reports acknowledged processed/failed
+vision documents and starts the AI engine when needed; embedding backfill needs no handoff
+and runs beside chat. Its durable operation record reports acknowledged processed/failed
 units and blocked remainder; it completes only after procedure cleanup. An incomplete
-pass reports `ENRICHMENT_INCOMPLETE`. Completion describes that pass and the embedding
-handoff; future backlog and autonomous embedding completion remain visible through
-`/api/inference/status`. The label is defined in `registry-operation.en.properties`.
+pass reports `ENRICHMENT_INCOMPLETE`. Completion describes that pass; future backlog and
+embedding progress remain visible through `/api/inference/status`. The label is defined in `registry-operation.en.properties`.
 
 ## 4. Themes and accessibility
 
