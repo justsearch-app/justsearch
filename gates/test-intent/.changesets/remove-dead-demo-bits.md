@@ -115,3 +115,14 @@ and retired Ask/Agent stores on 2026-11-03. Compatibility navigation and saved d
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a1a20b-560e-7bc1-9b3d-f6a78d4aeaad",
+  "verdict": "accept",
+  "digest": "sha256:fd7d5e0b3008afd8746c2fb1836ac9c97178250628d2cf7809b9319729b5ddb3",
+  "note": "Codex verifier acceptor (verifier-small-4): all six entries accepted"
+}
+```
