@@ -1,9 +1,9 @@
-import shutil
 """Index trust boundaries; real CPU lifecycle is opt-in via JSEVAL_QUALITY_INDEX_REAL=1."""
 from dataclasses import replace
 import json
 import os
 from pathlib import Path
+import shutil
 import subprocess
 import sys
 import tempfile
