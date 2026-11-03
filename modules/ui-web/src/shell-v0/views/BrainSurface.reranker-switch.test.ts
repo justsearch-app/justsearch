@@ -20,6 +20,7 @@ let witness: { acceptedRevision: number; lastCommittedOperationKey: string | nul
 let preview: InstallPlanPreview;
 let posts: Array<{ rerankerEnabled: boolean; witness: typeof witness }>;
 let operations: string[];
+let operationArgs: unknown[];
 let refusal: string | null;
 let wait: Promise<void> | null;
 let invalidReceipt: boolean;
@@ -34,8 +35,8 @@ async function settle(el: Brain) {
 async function mount() {
   const el = document.createElement('jf-brain-surface') as Brain;
   el.apiBase = '';
-  el.host_ = createMockHostApi({ data: { invokeOperation: async (id: string) => {
-    operations.push(id); return { success: true, structuredData: { state: 'running' } };
+  el.host_ = createMockHostApi({ data: { invokeOperation: async (id: string, args: unknown) => {
+    operations.push(id); operationArgs.push(args); return { success: true, structuredData: { state: 'running' } };
   } } });
   document.body.append(el); await settle(el); return el;
 }
@@ -44,7 +45,7 @@ function switches(el: Brain) {
 }
 beforeEach(() => {
   enabled = null; witness = { acceptedRevision: 0, lastCommittedOperationKey: null };
-  posts = []; operations = []; refusal = null; wait = null; invalidReceipt = false;
+  posts = []; operations = []; operationArgs = []; refusal = null; wait = null; invalidReceipt = false;
   preview = { totalDownloadBytes: 0, components: ['embedding', 'reranker', 'chat'].map(id => ({
     id, label: id, state: 'installed', declinable: id !== 'embedding', totalBytes: 1024, downloadBytes: 0,
   })) };
@@ -93,8 +94,9 @@ describe('Best match first live switch', () => {
     emit(false); await settle(el);
     switches(el)[1]!.click(); await settle(el);
     expect(posts.map(p => p.rerankerEnabled)).toEqual([false, true]);
+    emit(true); await settle(el);
     expect(switches(el).map(b => b.getAttribute('aria-checked'))).toEqual(['true', 'true']);
-    expect(el.shadowRoot!.querySelector('[data-feature="reranker"]')!.textContent).toContain('On');
+    expect(el.shadowRoot!.querySelectorAll('[data-feature="reranker"] > .step-meta')[1]!.textContent?.trim()).toBe('On');
     expect(operations).toEqual([]);
   });
 
@@ -128,6 +130,43 @@ describe('Best match first live switch', () => {
     emit(false); window.dispatchEvent(new Event('focus')); await settle(second);
     expect(switches(second).map(b => b.getAttribute('aria-checked'))).toEqual(['false', 'false']);
     expect(second.shadowRoot!.querySelector('[data-feature="reranker"]')!.textContent).toContain('Off — files kept');
+  });
+
+  it('accepts and completes a consented enable across installer revisions without a follow-up save', async () => {
+    enabled = false; emit(false);
+    preview = { totalDownloadBytes: 1024, components: [
+      { id: 'embedding', state: 'installed', totalBytes: 4096, downloadBytes: 0 },
+      { id: 'reranker', label: 'Ranking model', state: 'to-download', declinable: true, totalBytes: 1024, downloadBytes: 1024 },
+    ] };
+    const el = await mount(); switches(el)[0]!.click(); await settle(el);
+    const dialog = el.shadowRoot!.querySelector('[data-testid="install-consent-dialog"]');
+    (dialog!.querySelector('[label="Accept and download"]') as unknown as { onActivate(): void }).onActivate();
+    await settle(el);
+    expect(operations).toEqual(['core.start-ai-install']);
+    witness = { acceptedRevision: 1, lastCommittedOperationKey: 'installer-intermediate-write' };
+    // The installer owns the final enable batch at its current revision.
+    if ((operationArgs[0] as { enableRerankerOnCompletion?: boolean }).enableRerankerOnCompletion) {
+      enabled = true; witness = { acceptedRevision: 2, lastCommittedOperationKey: 'installer-completion' };
+    }
+    preview.components![1]!.state = 'installed';
+    store.current = { ...store.current, installStatus: { state: 'completed', phase: 'done',
+      installedFully: true, packages: [{ packageId: 'reranker', state: 'installed' }] } };
+    emit(true); window.dispatchEvent(new Event('focus')); await settle(el);
+    expect(posts).toEqual([]);
+    expect(operationArgs).toEqual([{ acceptTerms: true, enableRerankerOnCompletion: true }]);
+    expect(enabled).toBe(true);
+    expect(switches(el).map(b => b.getAttribute('aria-checked'))).toEqual(['true', 'true']);
+    expect(el.shadowRoot!.querySelectorAll('[data-feature="reranker"] > .step-meta')[1]!.textContent?.trim()).toBe('On');
+  });
+
+  it('keeps enabled but unavailable when a completed save has no serving reranker observation', async () => {
+    enabled = false; emit(false);
+    const el = await mount(); switches(el)[0]!.click(); await settle(el);
+    expect(enabled).toBe(true);
+    expect(el.shadowRoot!.querySelectorAll('[data-feature="reranker"] > .step-meta')[1]!.textContent?.trim())
+      .toBe('Unavailable — Best match first is enabled');
+    emit(true); await settle(el);
+    expect(el.shadowRoot!.querySelectorAll('[data-feature="reranker"] > .step-meta')[1]!.textContent?.trim()).toBe('On');
   });
 
   it('consents to every missing selected part and cancellation leaves Off without a transfer', async () => {

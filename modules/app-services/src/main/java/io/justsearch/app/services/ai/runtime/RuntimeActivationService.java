@@ -709,6 +709,14 @@ public final class RuntimeActivationService
     var enabled = published == null ? null : published.get().resolution(enabledProp);
     String enabledStr = enabled != null && enabled.isResolved()
         ? enabled.value() : resolveEnvOrProp(enabledEnv, enabledProp);
+    io.justsearch.app.api.settings.QueryRoleSelection queryRoles = null;
+    if ("reranker".equals(id)) {
+      try {
+        queryRoles = settingsStore.inspect().queryRoles();
+      } catch (RuntimeException unavailable) {
+        return onnxFeature(id, label, "unknown", "settings_unavailable", null, false, observed);
+      }
+    }
     if ("false".equalsIgnoreCase(enabledStr)) {
       var pathSource = published == null ? null : published.get().resolution(pathProp);
       if ("reranker".equals(id) && sessionActive && pathSource != null
@@ -719,7 +727,6 @@ public final class RuntimeActivationService
       return onnxFeature(id, label, "inactive", "disabled", null, sessionActive, observed);
     }
     if ("reranker".equals(id)) {
-      var queryRoles = settingsStore.inspect().queryRoles();
       var pathSource = published == null ? null : published.get().resolution(pathProp);
       boolean operatorPath = pathSource != null && pathSource.isResolved()
           && pathSource.sourceOrdinal()

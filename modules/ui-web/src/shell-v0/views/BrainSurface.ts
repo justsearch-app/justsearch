@@ -23,7 +23,6 @@ import { getSurface } from '../../api/registry/SurfaceCatalogClient.js';
 import { authorizedFetch } from '../api/authorizedFetch.js';
 import { saveAbsoluteSettings, createSettingsAttempt, executeSettingsAttempt, requireSettingsWitness, SettingsAttemptError } from '../../api/settingsAttempt.js';
 import type { SettingsV2 } from '../../api/generated/schema-types/settings-v2.js';
-import type { SettingsWitness } from '../../api/settingsAttempt.js';
 import { present } from '../display/present.js';
 import { formatBytes } from '../display/format.js';
 import { projectFact } from '../display/facts.js';
@@ -604,7 +603,6 @@ export class BrainSurface extends JfElement {
   private rerankerSettings: SettingsV2 | null = null;
   private rerankerApplied: boolean | null = null;
   private rerankerUncertain = false;
-  private enableRerankerAfterInstall: SettingsWitness | null = null;
   private refreshRevision = 0;
   private planRevision = 0;
   private planReads = 0;
@@ -1251,13 +1249,6 @@ export class BrainSurface extends JfElement {
           this.rerankerUncertain = false;
         }
       }
-      if (this.enableRerankerAfterInstall && s.installStatus?.state === 'completed'
-          && s.installStatus.phase !== 'activation_required'
-          && s.installStatus.packages?.some(p => p.packageId === 'reranker' && p.state === 'installed')) {
-        const witness = this.enableRerankerAfterInstall;
-        this.enableRerankerAfterInstall = null;
-        void this.setRerankerEnabled(true, witness);
-      }
       if (s.packStatus) this.packStatus = s.packStatus;
       this.requestUpdate();
     });
@@ -1868,9 +1859,10 @@ export class BrainSurface extends JfElement {
     this.installConsentOpen = false;
     await this.withBusy('install-start', async () => {
       this.runtimeError = null;
-      const data = (await this.invokeOp('core.start-ai-install', { acceptTerms: true })) as InstallStatus;
+      const data = (await this.invokeOp('core.start-ai-install', { acceptTerms: true,
+        ...(feature === 'reranker' ? { enableRerankerOnCompletion: true } : {}),
+      })) as InstallStatus;
       if (data) {
-        if (feature === 'reranker') this.enableRerankerAfterInstall = requireSettingsWitness(this.rerankerSettings?.witness);
         void refreshAiInstallNow();
         if (feature === 'chat') await this.setChatEnabled(true);
       }
@@ -1967,11 +1959,11 @@ export class BrainSurface extends JfElement {
     });
   }
 
-  private async setRerankerEnabled(enabled: boolean, witness = this.rerankerSettings?.witness): Promise<void> {
+  private async setRerankerEnabled(enabled: boolean): Promise<void> {
     await this.withBusy('reranker-switch', async () => {
       this.runtimeError = null;
       ++this.choiceRevision;
-      const attempt = createSettingsAttempt({ rerankerEnabled: enabled }, requireSettingsWitness(witness));
+      const attempt = createSettingsAttempt({ rerankerEnabled: enabled }, requireSettingsWitness(this.rerankerSettings?.witness));
       let result;
       try {
         result = await executeSettingsAttempt(
@@ -1984,7 +1976,7 @@ export class BrainSurface extends JfElement {
         throw error;
       }
       this.rerankerUncertain = false;
-      this.rerankerApplied = enabled;
+      this.rerankerApplied = enabled ? null : false;
       this.rerankerSettings = { ...this.rerankerSettings, rerankerEnabled: enabled, witness: result.witness };
       await this.refreshSettings(true);
     });

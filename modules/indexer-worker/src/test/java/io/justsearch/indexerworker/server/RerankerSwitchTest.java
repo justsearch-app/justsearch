@@ -18,6 +18,14 @@ import org.junit.jupiter.api.io.TempDir;
 
 final class RerankerSwitchTest {
   @Test
+  void enablingWithoutFilesRefusesInsteadOfSelectingDisabled() {
+    UiSettings candidate = new UiSettings();
+    candidate.setRerankerEnabled(true);
+    assertThrows(java.io.IOException.class, () -> QueryRoleSelectionResolver.selectReranker(
+        candidate, false, null, QueryRoleSelection.Role.disabled(), null, false, false));
+  }
+
+  @Test
   void offRefusesMemoryAdmissionWithoutReplacingTheServingView(@TempDir Path dir)
       throws Exception {
     try (var f = new KnowledgeServerQuerySettingsOwnerTest.QueryFixture(dir, 0L);

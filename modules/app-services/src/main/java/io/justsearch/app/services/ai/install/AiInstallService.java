@@ -184,6 +184,9 @@ public final class AiInstallService implements io.justsearch.app.api.AiInstallSe
   // explicitly on cancellation, the one moment the number changes without a plan being asked for.
   private volatile long resumableBytesOnDisk;
 
+  /** Owned by the running install guard, never persisted before successful completion. */
+  private boolean enableRerankerOnCompletion;
+
   /**
    * What the runtime OBSERVES per registry package id ({@code "active"} | {@code "inactive"} |
    * {@code "unknown"}), tempdoc 824 §3.3c. Late-bound to {@code
@@ -730,6 +733,11 @@ public final class AiInstallService implements io.justsearch.app.api.AiInstallSe
   /** Registry-injecting seam for producer tests; the public path always uses the shipped registry. */
   Optional<io.justsearch.app.api.AiInstallService.InstalledGenerationCandidate>
       prepareInstalledGenerationCandidate(ModelRegistry registry) {
+    return prepareInstalledGenerationCandidate(registry, false);
+  }
+
+  private Optional<io.justsearch.app.api.AiInstallService.InstalledGenerationCandidate>
+      prepareInstalledGenerationCandidate(ModelRegistry registry, boolean enableReranker) {
     if (settingsStore == null) return Optional.empty();
     InstallContract contract = readInstallContractBestEffort();
     if (contract == null || contract.models().isEmpty()
@@ -789,8 +797,16 @@ public final class AiInstallService implements io.justsearch.app.api.AiInstallSe
         }
       }
 
-      setOnnxCandidatePath(candidate, packageId,
-          modelPath.getParent().toAbsolutePath().normalize().toString());
+      String installedDirectory = modelPath.getParent().toAbsolutePath().normalize().toString();
+      if (enableReranker && "reranker".equals(packageId)) {
+        // A consented download cannot replace the user's retained custom selection.
+        if (candidate.getRerankerModelPath().isBlank()
+            && candidate.getRerankerRestoreSelection() == null) {
+          candidate.setRerankerModelPath(installedDirectory);
+        }
+      } else {
+        setOnnxCandidatePath(candidate, packageId, installedDirectory);
+      }
       models.add(new RecordedInstallerGenerationPlan.ModelIdentity(
           packageId, selected.filename(), model.path(), model.sha256(), model.size(),
           provenance));
@@ -813,7 +829,11 @@ public final class AiInstallService implements io.justsearch.app.api.AiInstallSe
             packageId + "/" + fileName, asset.path(), asset.sha256(), asset.size(), provenance));
       }
     }
+    if (enableReranker && models.stream().noneMatch(model -> "reranker".equals(model.packageId()))) {
+      throw new IllegalStateException("Best match first files are not ready; the saved choice was kept");
+    }
     if (models.isEmpty() || assets.isEmpty()) return Optional.empty();
+    if (enableReranker) candidate.setRerankerEnabled(true);
 
     ResolvedConfig serving = ConfigStore.globalOrNull() == null
         ? ConfigStoreRebuilder.prepare(snapshot.settings())
@@ -988,6 +1008,11 @@ public final class AiInstallService implements io.justsearch.app.api.AiInstallSe
   }
 
   public Attempt startInstall(boolean acceptTerms) {
+    return startInstall(acceptTerms, false);
+  }
+
+  @Override
+  public Attempt startInstall(boolean acceptTerms, boolean enableRerankerOnCompletion) {
     if (!acceptTerms) {
       throw new AiInstallException(
           400, ApiErrorCode.TERMS_REQUIRED, "You must accept the model terms before downloading.");
@@ -999,6 +1024,7 @@ public final class AiInstallService implements io.justsearch.app.api.AiInstallSe
         throw new AiInstallException(
             409, ApiErrorCode.INSTALL_ALREADY_RUNNING, "AI install is already running.");
       }
+      this.enableRerankerOnCompletion = enableRerankerOnCompletion;
       cancelFlag.set(false);
       pause.resume();
       status.cancelRequested = false;
@@ -1367,7 +1393,7 @@ public final class AiInstallService implements io.justsearch.app.api.AiInstallSe
 
       // Query-only ONNX paths use the ordinary settings owner. A mixed candidate stays entirely
       // deferred for recorded activation, including its chat path.
-      applyQueryOnlyCandidateIfNeeded();
+      if (!enableRerankerOnCompletion) applyQueryOnlyCandidateIfNeeded();
 
       // ---- Stage 4: validate ---------------------------------------------------------------
       // A generation-changing acquisition has deliberately not published the new ONNX paths yet,
@@ -1387,7 +1413,8 @@ public final class AiInstallService implements io.justsearch.app.api.AiInstallSe
         return;
       }
 
-      applyCompletionState();
+      if (enableRerankerOnCompletion) completeRerankerInstall(registry);
+      else applyCompletionState();
     } finally {
       if (acquisitionFreeze != null) {
         acquisitionFreeze.close();
@@ -2234,6 +2261,41 @@ public final class AiInstallService implements io.justsearch.app.api.AiInstallSe
     var prepared = candidate.orElseThrow();
     if (!prepared.generationBoundKeys().isEmpty()) return;
     commitSettings(prepared.candidateSettings(), prepared.settingsWitness(), "ai-install-onnx-models");
+  }
+
+  /** The enable intent and installed query path are committed by one completion batch. */
+  private void completeRerankerInstall(ModelRegistry registry) {
+    if (settingsStore == null) throw new IllegalStateException("Settings authority unavailable");
+    InstallCompleteness diskTruth = recomputeCompletenessFromDiskBestEffort();
+    boolean activationRequired = hasGenerationChangingAcquisition();
+    if (diskTruth == null || !diskTruth.packagesWithMissingRequiredFiles().isEmpty()) {
+      if (diskTruth == null) throw new IllegalStateException("Installation files could not be verified");
+      applyCompletionState(diskTruth);
+      return;
+    }
+    var prepared = prepareInstalledGenerationCandidate(registry, true).orElseThrow(
+        () -> new IllegalStateException("Best match first files are not ready"));
+    UiSettings candidate = prepared.candidateSettings();
+    if (!prepared.generationBoundKeys().isEmpty()) {
+      // Index-changing additions still await recorded activation. Apply only the consented
+      // query role now; do not publish the new index model paths through ordinary settings.
+      var snapshot = settingsStore.inspect();
+      if (!snapshot.witness().equals(prepared.settingsWitness())) {
+        throw new IllegalStateException("Settings changed during install completion");
+      }
+      candidate = snapshot.settings();
+      candidate.setRerankerEnabled(true);
+      candidate.setRerankerModelPath(prepared.candidateSettings().getRerankerModelPath());
+    }
+    synchronized (lock) {
+      if (cancelFlag.get()) {
+        cancelled();
+        return;
+      }
+      commitSettings(candidate, prepared.settingsWitness(), "ai-install-onnx-models");
+      applyCompletionState(diskTruth);
+      if ("completed".equals(status.state) && activationRequired) markActivationRequired();
+    }
   }
 
   /**

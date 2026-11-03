@@ -140,8 +140,13 @@ final class QueryRoleSelectionResolver {
         && (prior == null || prior.state() == QueryRoleSelection.State.DISABLED);
     var retained = candidate.getRerankerRestoreSelection();
     if (enabling && !pathChanged && retained != null) return enrich("reranker", retained);
-    return select("reranker", pathChanged || enabling, desiredDirectory, prior,
+    var selected = select("reranker", pathChanged || enabling, desiredDirectory, prior,
         generation, currentlyWired, gpuEnabled);
+    if (Boolean.TRUE.equals(candidate.getRerankerEnabled())
+        && selected.state() != QueryRoleSelection.State.SELECTED) {
+      throw new IOException("Best match first cannot be enabled without a selected reranker");
+    }
+    return selected;
   }
 
   static QueryRoleSelection enrich(QueryRoleSelection selection) {
