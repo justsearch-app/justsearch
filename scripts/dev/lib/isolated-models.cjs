@@ -58,6 +58,16 @@ function physicalPath(candidate) {
   }
 }
 
+function protectedTrees() {
+  const home = require('node:os').homedir();
+  const platformDefault = process.platform === 'win32'
+    ? path.join(process.env.LOCALAPPDATA || path.join(home, 'AppData', 'Local'), 'JustSearch')
+    : process.platform === 'darwin' ? path.join(home, 'Library', 'Application Support', 'JustSearch') : path.join(home, '.justsearch');
+  const mainRoot = require('./dev-runtime.cjs').resolveMainRepoRoot(ENGINE_CWD);
+  return [...new Set([path.join(ENGINE_CWD, 'models'), path.join(mainRoot, 'models'),
+    path.join(platformDefault, 'cache', 'ort-optimized')])];
+}
+
 function pathsFor(dataDir) {
   const home = path.resolve(ENGINE_CWD, dataDir);
   return {
@@ -97,13 +107,23 @@ function validateOverrides(dataDir, env = process.env) {
   // Include _JAVA_OPTIONS too: HotSpot reads it even though the launcher does not.
   for (const name of ['JAVA_OPTS', 'UI_OPTS', 'JDK_JAVA_OPTIONS', 'JAVA_TOOL_OPTIONS', '_JAVA_OPTIONS']) {
     for (const option of splitJvmOptions(env[name])) {
-      if (option.startsWith('-D') || option.startsWith('@')) {
-        refuse(`inherited ${name} contains ${option.startsWith('@') ? 'an @argument file' : 'a -D property'}; remove it before starting`);
+      // -XX:VMOptionsFile and -XX:Flags load further options (including -D) from a file.
+      if (option.startsWith('-D') || option.startsWith('@') || /^-XX:(?:VMOptionsFile|Flags)=/.test(option)) {
+        refuse(`inherited ${name} contains ${option.startsWith('@') ? 'an @argument file' : option.startsWith('-D') ? 'a -D property' : 'a JVM options file'}; remove it before starting`);
       }
     }
   }
   const paths = pathsFor(dataDir);
   const home = physicalPath(paths.appHome);
+  // Nothing an isolated start writes may overlap the shared models or the machine-wide graph cache.
+  const protectedRoots = protectedTrees().map(physicalPath);
+  const owned = [home];
+  if (env.JUSTSEARCH_DEV_RUNNER_STATE_ROOT) owned.push(physicalPath(path.resolve(ENGINE_CWD, env.JUSTSEARCH_DEV_RUNNER_STATE_ROOT)));
+  for (const ownedRoot of owned) {
+    for (const shared of protectedRoots) {
+      if (within(shared, ownedRoot) || within(ownedRoot, shared)) refuse(`${ownedRoot} overlaps the shared ${shared}; use a data folder outside it`);
+    }
+  }
   for (const [folder, root] of [[paths.models, path.join(home, FOLDER)],
     [paths.optimizedCache, path.join(home, CACHE_FOLDER)]]) {
     if (physicalPath(folder) !== root) refuse(`${folder} redirects outside its private folder`);

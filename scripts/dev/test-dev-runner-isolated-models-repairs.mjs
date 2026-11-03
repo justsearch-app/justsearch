@@ -164,6 +164,26 @@ test('S3: escaping private-folder and cache symlinks remain refused on restart',
   assert.deepEqual(fs.readdirSync(shared), []);
 });
 
+test('S3: JVM options files are refused before launch (reviewer-s6c)', () => {
+  for (const [name, value] of [['JAVA_OPTS', '-XX:VMOptionsFile=/tmp/options.txt'], ['JDK_JAVA_OPTIONS', '-XX:Flags=/tmp/.hotspotrc'],
+    ['JAVA_TOOL_OPTIONS', '-Xmx1g -XX:VMOptionsFile=/tmp/o.txt']]) {
+    conflict(() => isolated.validateOverrides(path.join(root, `optfile-${name}`), { [name]: value }));
+  }
+});
+
+test('S3: data and runner-state folders overlapping the shared models or graph cache are refused (reviewer-s6c)', () => {
+  const sharedModels = path.join(repo, 'models');
+  conflict(() => isolated.validateOverrides(path.join(sharedModels, 'install-check'), {}));
+  conflict(() => isolated.validateOverrides(repo, {}));
+  conflict(() => isolated.validateOverrides(path.join(root, 'fresh-state'), { JUSTSEARCH_DEV_RUNNER_STATE_ROOT: path.join(sharedModels, 'state') }));
+  const viaLink = path.join(root, 'link-to-models');
+  fs.symlinkSync(sharedModels, viaLink);
+  conflict(() => isolated.validateOverrides(path.join(viaLink, 'check'), {}));
+  const cache = path.join(os.homedir(), '.justsearch', 'cache', 'ort-optimized');
+  conflict(() => isolated.validateOverrides(path.join(cache, 'check'), {}));
+  assert.doesNotThrow(() => isolated.validateOverrides(path.join(root, 'fresh-ok'), {}));
+});
+
 let failed = 0;
 try {
   for (const [name, run] of tests) {
