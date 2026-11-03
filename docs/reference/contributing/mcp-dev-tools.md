@@ -73,6 +73,41 @@ The dev MCP surface exposes exactly these **12** tools:
 | `justsearch.dev.ai_activate` | Activate the online AI runtime. |
 | `justsearch.dev.reload` | Hot-reload the running stack's Engine: compile from the tree that stack was launched from, push method-body changes over identity-checked JDWP, reconstruct services with the ONNX encoders still loaded. Ownership-gated. |
 
+### Private models for install-state checks
+
+Pass `isolatedModels: "none"` to `justsearch.dev.start` to use `<dataDir>/isolated-models/`
+instead of the shared main-checkout models. The equivalent CLI option is `--isolated-models`
+or `--isolated-models=none`. Omit the parameter or flag to keep the usual shared models and
+SPLADE injection.
+
+| State | Seed on a fresh data folder |
+|---|---|
+| `none` | Empty models folder: check the real app's AI-not-installed state. |
+| `partial` | Tiny sibling `.partial` staging files at registry-derived install targets. |
+| `truncated` | Tiny final files shorter than the registry's declared sizes. |
+
+For example, call `justsearch.dev.start` with
+`{"dataDir":"tmp/install-check","apiPort":0,"isolatedModels":"partial"}` or run:
+
+```sh
+node scripts/dev/dev-runner.cjs start --data-dir=tmp/install-check --api-port=0 --isolated-models=partial
+```
+
+Seeding downloads nothing, writes at most 64 bytes per file, and never creates a fake installed
+state or runtime pack. The real status and install plan still classify the files. Before launch,
+stderr prints the models folder, effective SPLADE override (null when absent), app home, settings
+file, and install contract. Shared SPLADE injection is skipped. Inherited model-path overrides
+outside the private folder, including JVM system properties, refuse the start before admission
+or cleaning; unset the named override and retry. A models-root override must name the private
+folder exactly. JVM home/data-directory overrides must match the run's data folder.
+
+Restart with the same option and data folder to retain the private files, including across a
+soft or hard start clean. A deleted private folder is recreated before the Engine starts.
+Seeds fill missing files only and never overwrite downloaded or staged bytes; use a fresh
+data folder to check a different seed state. Existing app settings retain their usual behavior;
+use a fresh data folder for a clean AI-not-installed check. Install, Repair, resume and activation
+continue to use the product's real size/hash checks.
+
 Legacy underscore-style dev tool names and standalone readiness/listing/suggestion/cleanup tools are obsolete. Agents should use the dotted names above.
 
 **Retired in tempdoc 844 P1** — do not reintroduce these names in tooling or prompts:
@@ -415,6 +450,7 @@ and writes no signal — distinct from a push that failed.
 | `RUN_NOT_FOUND` / `NO_API_URL` | The active run record references a runId that no longer exists or has no `apiBaseUrl`. | Call `quick_health` to re-orient; the run may have partially failed. |
 | `DIST_NOT_BUILT` | The checkout being launched from has no Head dist (`modules/ui/build/install/ui/bin/ui.bat`) — typically a fresh worktree, or `skipBuild: true` without a prior `installDist`. `error.details` carries `distPath`, `repoRoot`, and `remedy`. | `node scripts/dev/prepare-worktree.cjs` in that checkout, or `node scripts/lib/tool-invoker.cjs gradle :modules:ui:installDist`. Run `preflight { distFrom }` with the same value first — it checks the dists in the tree `start` will use. |
 | `DATA_DIR_NOT_OURS` | A start (or cleanup) with `clean: "soft"` or `"hard"` named a data folder that no dev tool created and marked (`.justsearch-dev-data.json`) and that is not empty, or the default `modules/ui-web/.dev-data` from older runs holds something a dev data folder does not. Nothing in the folder was changed and nothing was started. `error.details` carries `dataDir`, `reason` and, for the default folder, the `unknown` entries. | Pass a new or empty folder (it is created or marked), omit `dataDir` to use the default dev folder, or use `clean: "none"`, which deletes nothing. |
+| `ISOLATED_MODELS_CONFLICT` | An isolated start found a conflicting inherited model/JVM path or a private folder redirected through a symlink. | Unset the named override or use a fresh data folder; keep all model paths inside its `isolated-models` folder. |
 | `START_TIMED_OUT` | The dev-runner start subprocess did not report a result inside `startTimeoutMs`. **Readiness was not confirmed and it is not established that this call started anything.** Whatever could be read off disk afterwards is under `observed` (active runId, recorded ports/URLs, and one `/api/health` status code) — observations, not a started stack. Before tempdoc 844 this branch synthesized `ok: true` from any runId in `active.json`, so a start that died mid-boot, or a run that was already there, was reported as a successful start. | Call `quick_health { probe: true }` to find out what is actually running, and `tail_log { kind: "backend_stderr" }` if the boot failed. |
 | `INVALID_DIST_FROM` | `distFrom` is neither the main repo nor a sibling worktree under `.claude/worktrees`, or that checkout has no `scripts/dev/dev-runner.cjs`. A **bare worktree name** (`"round14"`) is resolved against `.claude/worktrees/<name>`; when no such directory exists the message lists the names that do. | Pass a worktree name, a path to a sibling worktree, or the main repo root. |
 

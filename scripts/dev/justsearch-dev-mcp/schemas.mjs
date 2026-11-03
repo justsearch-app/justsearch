@@ -91,6 +91,11 @@ export const StartInputSchema = z
     apiPort: z.number().int().min(0).optional(),
     uiPort: z.number().int().positive().optional(),
     dataDir: z.string().min(1).optional(),
+    isolatedModels: z.enum(['none', 'partial', 'truncated']).optional()
+      .describe('Use <dataDir>/isolated-models instead of shared models. none creates an empty folder; '
+        + 'partial seeds tiny .partial files; truncated seeds tiny incomplete final files from the registry. '
+        + 'No downloads or fake installed state. Paths print before launch; external model overrides are refused. '
+        + 'Restart preserves the private folder; use a fresh dataDir to change seed state. Omit for normal shared models.'),
     clean: CleanModeSchema.optional(),
     waitLevel: ReadyLevelSchema.optional().describe('Readiness level to wait for after start (default: ready_worker)'),
     skipBuild: z.boolean().optional().describe('Skip the Gradle build step and launch from the '

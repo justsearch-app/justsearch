@@ -1325,7 +1325,7 @@ export async function main() {
   mcpServer.registerTool(
     'justsearch.dev.start',
     {
-      description: 'Launch the dev stack. Returns OWNER_CONFLICT if another agent owns it (use takeover param to override with user approval), or if an operation is running in your own stack (wait, or takeover "force"). Cold start: ~1 min; warm: ~15s (HTTP ready) / ~40s (worker ready). Blocks until readiness level reached.',
+      description: 'Launch the dev stack. isolatedModels: "none" | "partial" | "truncated" uses a private models folder under dataDir without downloads, prints effective paths and refuses external model overrides. Omit for shared models. Returns OWNER_CONFLICT if another agent owns it (use takeover param to override with user approval), or if an operation is running in your own stack (wait, or takeover "force"). Cold start: ~1 min; warm: ~15s (HTTP ready) / ~40s (worker ready). Blocks until readiness level reached.',
       inputSchema: StartInputSchema,
       annotations: { destructiveHint: false, openWorldHint: false },
     },
@@ -1405,6 +1405,7 @@ export async function main() {
 
       const args = buildDevRunnerArgsStart({
         apiPort, uiPort, clean, dataDir, takeover, skipBuild, hotReload,
+        isolatedModels: input.isolatedModels,
         sessionId: input.sessionId,
         leaseDurationSec: input.leaseDurationSec,
         chatProfile: input.chatProfile,
