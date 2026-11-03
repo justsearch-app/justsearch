@@ -147,12 +147,13 @@ record is authored here; the named evidence files are outputs for the independen
 
 ## Run-evidence arguments
 
-The before compatibility patch removes only newly required reuse-reader mock wiring from existing
-controls and the direct setter in the maintenance fixture. It does not change inputs, calls,
-assertions or production code. The repair fixtures reach sync through WorkerIngestService's real
-wiring on both versions. The changed test files are automatically overlaid by --check; the six
-additional overlays keep the other adapted controls compiling on the baseline. Each tree builds
-into its own build directories.
+The before compatibility patch adds only the two new production signatures the checks compile
+against (DocumentFieldOps.ReuseCandidate with a batch isUnmodified that the base never calls, and a
+no-op SyncDirectoryOps.setDocumentFieldOps). It changes no base behaviour, inputs, calls or
+assertions. The repair fixtures reach sync through WorkerIngestService's real wiring on both
+versions. The changed test files are automatically overlaid by --check; the six additional overlays
+keep the other adapted controls compiling on the baseline. Each tree builds into its own build
+directories.
 
 Repair:
 
