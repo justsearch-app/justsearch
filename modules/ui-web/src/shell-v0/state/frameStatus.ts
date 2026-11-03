@@ -14,7 +14,7 @@ import { present } from '../display/present.js';
 import type { Task } from '../substrates/tasks/index.js';
 import type { PendingEffect } from '../substrates/pending-effects/index.js';
 import type { AppUpdateStatus } from './appUpdateState.js';
-import { folderStatus, rootCoverage } from './folderStatus.js';
+import { folderAttention, folderStatus, rootCoverage } from './folderStatus.js';
 import type { IndexedRootView } from '../../api/generated/schema-types/indexed-root-view.js';
 import type { PresenceRun } from '../controllers/AgentSessionController.js';
 import type { UnifiedActionEntry } from '../operations/ActionLedgerClient.js';
@@ -43,6 +43,8 @@ export interface StatusFact {
   readonly diagnostics?: string;
   /** Consequence of not answering, relative to now ("Denied automatically in 4 min"). */
   readonly deadline?: string;
+  /** How a finished or historical item ended; drawn as an icon plus words, never colour alone. */
+  readonly tone?: 'success' | 'failure' | 'warning' | 'neutral';
 }
 interface PendingStatusAuthorization {
   readonly pendingId: string; readonly operationId: string; readonly argsSummary?: string;
@@ -85,6 +87,13 @@ export interface FrameStatus {
   readonly progress: IndexingProgress;
 }
 const go = (label: string, target: string): StatusAction => ({ label, target, kind: 'navigate' });
+const TASK_STATUS_WORDS: Readonly<Record<string, string>> = {
+  queued: 'Queued', running: 'Running', succeeded: 'Completed', failed: 'Failed', cancelled: 'Cancelled',
+};
+const OPERATION_STATE_WORDS: Readonly<Record<string, string>> = {
+  accepted: 'Accepted · waiting to start', running: 'Running', complete: 'Completed', failed: 'Failed',
+  unknown: 'Outcome not known yet · checking', expired: 'Outcome no longer available',
+};
 
 /** An unanswered agent request expires unusable (the engine refuses stale approvals): name that consequence. */
 export function authorizationDeadline(expiresAt: string, now: number): string | undefined {
@@ -108,8 +117,11 @@ function advisoryStatusFact(record: AdvisoryRecord): StatusFact {
     : e.classId === 'health.recoverable'
       ? `${present({ kind: 'condition', id: conditionId }).label}${extras.subject ? ` (${extras.subject})` : ''}`
       : chrome.label);
+  const tone: StatusFact['tone'] = extras.outcome === 'FAILURE' || e.severity === 'error' ? 'failure'
+    : e.classId === 'health.recoverable' || e.severity === 'warning' || e.classId === 'authorization.pending' ? 'warning'
+      : extras.outcome === 'SUCCESS' || e.severity === 'success' || e.classId === 'core.verdict.settled' ? 'success' : 'neutral';
   return {
-    id: `advisory:${record.key}`, section: 'earlier', title,
+    id: `advisory:${record.key}`, section: 'earlier', title, tone,
     ...(detail ? { detail } : {}), occurredAt: e.occurredAt,
     // Read state never decides whether a condition is active or an approval is valid.
     unread: record.sourceRenderHint !== 'EPHEMERAL' && !record.acknowledged,
@@ -118,6 +130,21 @@ function advisoryStatusFact(record: AdvisoryRecord): StatusFact {
       label: e.primaryActionKind === 'undo' ? 'Undo' : /forget/.test(operationId) ? 'Add back to search' : present({ kind: 'operation', id: e.primaryAction.target }).label || 'Review' }]
       : record.toast?.onAction ? [{ kind: 'advisory', target: record.key, label: record.toast.actionLabel ?? 'Review' }] : [],
   };
+}
+
+/** Ledger rows in plain words: the structured outcome and gate disposition, never their raw codes. */
+function activityWords(entry: UnifiedActionEntry): { title: string; detail?: string; tone: NonNullable<StatusFact['tone']> } {
+  if (entry.gate) {
+    const { disposition, operation } = entry.gate;
+    return disposition === 'DENIED' ? { title: `Approval denied: ${operation}`, tone: 'failure' }
+      : disposition === 'APPROVED' ? { title: `Approved: ${operation}`, tone: 'success' }
+        : { title: `Approval requested: ${operation}`, tone: 'warning' };
+  }
+  const outcome = ({ SUCCESS: ['Completed', 'success'], FAILURE: ['Failed', 'failure'], FAILED: ['Failed', 'failure'],
+    UNDONE: ['Undone', 'neutral'], PARTIAL: ['Finished incomplete', 'warning'], STARTED: ['Started', 'neutral'] } as const)[
+    entry.outcome as 'SUCCESS'] as readonly [string, NonNullable<StatusFact['tone']>] | undefined;
+  return { title: entry.label, ...(outcome ? { detail: outcome[0] } : {}),
+    tone: outcome?.[1] ?? (/^Index (failed|gave up)/.test(entry.label) ? 'failure' : 'neutral') };
 }
 
 export function deriveFrameStatus(input: FrameStatusInput): FrameStatus {
@@ -147,8 +174,9 @@ export function deriveFrameStatus(input: FrameStatusInput): FrameStatus {
   }
   for (const entry of input.activity ?? []) {
     if (entry.isRoutine || entry.operationOutcomeKey) continue;
-    add({ id: `activity:${entry.id}`, section: 'earlier', title: entry.label,
-      detail: entry.outcome, occurredAt: entry.occurredAt,
+    const words = activityWords(entry);
+    add({ id: `activity:${entry.id}`, section: 'earlier', title: words.title,
+      ...(words.detail ? { detail: words.detail } : {}), tone: words.tone, occurredAt: entry.occurredAt,
       actions: [go('All activity', 'core.activity-surface')] });
   }
   for (const root of input.roots ?? []) {
@@ -158,10 +186,9 @@ export function deriveFrameStatus(input: FrameStatusInput): FrameStatus {
       enrichmentPending: progress.enrichingPending > 0, enrichmentBlocked: progress.blockedPending > 0,
       indexingPaused: !!progress.pause, retryWaiting: progress.phase === 'waiting' });
     const actions = [go('Show in Library', 'core.library-surface')];
-    if (state.state === 'unavailable') add({ id: `folder:${root.pathHash}`, section: 'problems',
-      title: `${name} can't be found`, stale: !input.rootsLive, actions });
-    if (state.failed > 0) add({ id: `files:${root.pathHash}`, section: 'problems',
-      title: `${state.failed} files in ${name} couldn't be read`, stale: !input.rootsLive || state.failedIsLastKnown, actions });
+    // ST5/B1 — the same folder conditions the Library headline counts (one source, folderStatus.ts).
+    for (const item of folderAttention(root, state, name)) add({ id: item.kind === 'missing' ? `folder:${root.pathHash}` : item.kind === 'files' ? `files:${root.pathHash}` : `folder-${item.key}`, section: 'problems',
+      title: item.title, detail: item.detail, stale: !input.rootsLive || (item.kind === 'files' && state.failedIsLastKnown === true), actions });
     if (['scanning', 'indexing', 'enriching', 'waiting'].includes(state.state)) add({
       id: `folder-work:${root.pathHash}`, section: 'running', title: `${name}: ${state.metaText}`,
       stale: !input.rootsLive, percent: state.state === 'enriching' ? rootCoverage(root, progress.stages)?.percent ?? null : null, actions });
@@ -252,7 +279,8 @@ export function deriveFrameStatus(input: FrameStatusInput): FrameStatus {
     const gaps = outcome?.phase === 'awaiting_acceptance';
     add({ id: `operation:${operation.id}`, section: gaps ? 'needs' : outcome?.state === 'failed' ? 'problems'
       : outcome?.state === 'complete' ? 'earlier' : 'running', title: operation.label,
-    detail: gaps ? 'Completed with gaps — review before continuing.' : outcome?.message ?? outcome?.state ?? 'Last seen running · checking',
+    detail: gaps ? 'Completed with gaps — review before continuing.' : outcome?.message ?? (outcome ? OPERATION_STATE_WORDS[outcome.state] ?? undefined : 'Last seen running · checking'),
+    tone: gaps ? 'warning' : outcome?.state === 'failed' ? 'failure' : outcome?.state === 'complete' ? 'success' : 'neutral',
     stale: operation.fresh === false || !outcome || ['unknown', 'expired'].includes(outcome.state),
     actions: [go('Review in Library', 'core.library-surface')] });
   }
@@ -263,7 +291,8 @@ export function deriveFrameStatus(input: FrameStatusInput): FrameStatus {
     // override the aggregate selector, and do not duplicate the aggregate as a finished task.
     if (task.id.startsWith('idxjob:')) continue;
     add({ id: `task:${task.id}`, section: task.status === 'running' || task.status === 'queued' ? 'running' : 'earlier',
-      title: task.label, detail: task.status, occurredAt: task.startedAt,
+      title: task.label, detail: TASK_STATUS_WORDS[task.status] ?? task.status, occurredAt: task.startedAt,
+      tone: task.status === 'failed' ? 'failure' : task.status === 'succeeded' ? 'success' : 'neutral',
       percent: task.progress === undefined ? null : Math.round(task.progress * 100),
       actions: [...(task.originSurfaceId ? [go('Return to it', task.originSurfaceId)] : []),
         ...(task.cancellable && task.status === 'running' ? [{ kind: 'cancel-task' as const, target: task.id, label: 'Cancel' }] : [])] });
@@ -273,6 +302,7 @@ export function deriveFrameStatus(input: FrameStatusInput): FrameStatus {
     add({ id: `background:${run.sessionId}`, section: terminal ? 'earlier'
       : ['WAITING_BUDGET', 'WAITING_CONTEXT'].includes(run.state) ? 'needs' : 'running',
       title: `Background agent ${run.state === 'DONE' ? 'finished' : run.state === 'ERROR' ? 'failed' : 'run'}`,
+      tone: run.state === 'ERROR' ? 'failure' : run.state === 'DONE' ? 'success' : 'neutral',
       detail: run.state.toLowerCase().replaceAll('_', ' '), stale: !terminal && !input.presence!.live,
       actions: [{ kind: 'background-runs', target: run.sessionId, label: 'View background runs' }] });
   }

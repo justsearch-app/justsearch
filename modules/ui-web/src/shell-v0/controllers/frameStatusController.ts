@@ -28,6 +28,16 @@ import { presentVerdict, type VerdictPresentation } from '../state/verdict.js';
 import { presentAiEngineVerdict, type AiEngineVerdictPresentation } from '../state/aiVerdict.js';
 import { isIndexingObservation } from '../state/readinessNotice.js';
 
+/** Which observation a needs-you row comes from (C6: only an observed source can announce an arrival). */
+function needsSource(id: string): string {
+  if (id.startsWith('proposal:')) return 'proposals';
+  if (id.startsWith('consent:')) return 'consents';
+  if (id === 'app-update') return 'update';
+  if (id.startsWith('background:')) return 'presence';
+  if (id.startsWith('operation:')) return id;
+  return 'status';
+}
+
 interface StatusHost extends ReactiveControllerHost {
   apiBase: string;
   multiplex: MultiplexedStream | null;
@@ -79,6 +89,8 @@ export class FrameStatusController implements ReactiveController {
   private presence: readonly PresenceRun[] = [];
   private presenceLive = false;
   private deadlines = new Map<string, string>();
+  /** Sources observed in the previous refresh; only these can announce a needs-you arrival. */
+  private observedSources = new Set<string>();
 
   constructor(private readonly host: StatusHost) {
     this.model = deriveFrameStatus({ ai: null, now: Date.now(), contactLostAt: null });
@@ -114,6 +126,7 @@ export class FrameStatusController implements ReactiveController {
     this.unsubs = [];
     this.stopStore?.(); this.stopStore = undefined;
     this.activeWork = null; this.installing = false; this.sawTransitioning = false; this.needsKey = null;
+    this.observedSources = new Set();
     clearInterval(this.timer);
     document.removeEventListener('jf-plugin-load-error', this.pluginError);
     document.removeEventListener('jf-plugin-loaded', this.pluginLoaded);
@@ -336,10 +349,22 @@ export class FrameStatusController implements ReactiveController {
     // An edge observed in this refresh shows in this refresh, not a timer tick later.
     if (this.finished !== finishedBefore) next = derive();
     const needsKey = new Set(next.sections.needs.map(f => f.id));
-    // Initial/replayed retained approvals remain discoverable without a new arrival announcement.
-    if (this.needsKey && [...needsKey].some(id => !this.needsKey!.has(id))
-      && ![...needsKey].every(id => id.startsWith('authorization:'))) this.assertive = `${next.sections.needs.length} items need you.`;
+    // C6 — an arrival is a new item from a source that was already observed in the previous
+    // refresh. Startup snapshots, reconnects and late discovery only establish the baseline.
+    // Approval requests announce through their own live REQUIRES_ACK arrival, never here.
+    const arrived = [...needsKey].filter(id => !this.needsKey?.has(id) && !id.startsWith('authorization:')
+      && this.observedSources.has(needsSource(id)));
+    if (arrived.length) {
+      const n = next.sections.needs.length;
+      this.assertive = `${n} ${n === 1 ? 'item needs' : 'items need'} you.`;
+      this.assertiveKey = `needs:${[...needsKey].sort().join('|')}`;
+    }
     this.needsKey = needsKey;
+    this.observedSources = new Set(['proposals', 'consents',
+      ...(this.ai?.indexingStatusLive && p.activity.confirmed ? ['status'] : []),
+      ...(getAppUpdateStatus() ? ['update'] : []),
+      ...(this.presenceLive && this.ai?.snapshotLive ? ['presence'] : []),
+      ...[...this.operations.values()].filter(o => o.fresh && o.outcome).map(o => `operation:${o.id}`)]);
     this.model = next;
     this.host.requestUpdate();
   }

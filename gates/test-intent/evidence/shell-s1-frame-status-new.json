@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
   },
-  "createdAt": "2026-11-03T17:42:09.009Z",
-  "revision": "90e738a288a0f248cc2c677b77e18461a53a4149",
-  "tree": "020be7e2562bd41d1676bcf1151cf33d072158f0",
+  "createdAt": "2026-11-03T19:11:26.453Z",
+  "revision": "ff208596af898b979ee9bdacca8acca63830b275",
+  "tree": "58507da7ea3dfbd6aed7ca49072a882d3888f72d",
   "environment": {
     "platform": "linux",
     "arch": "x64",
@@ -18,249 +18,354 @@
   },
   "runs": [
     {
-      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/chrome/Shell.test.ts\" \"src/shell-v0/components/IndexingPause.test.ts\" \"src/shell-v0/components/RetiredStatusElements.test.ts\" \"src/shell-v0/components/StatusPanel.approvals.test.ts\" \"src/shell-v0/components/StatusPanel.history.test.ts\" \"src/shell-v0/components/StatusPanel.running.test.ts\" \"src/shell-v0/components/StatusPill.design.test.ts\" \"src/shell-v0/components/StatusPill.feedback.test.ts\" \"src/shell-v0/components/StatusPill.test.ts\" \"src/shell-v0/components/StatusPill.transitions.test.ts\" \"src/shell-v0/components/indexingTaskWaiting.test.ts\" \"src/shell-v0/state/frameStatus.test.ts\" \"src/shell-v0/views/ActivitySurface.actions.test.ts\" \"src/shell-v0/substrates/tasks/indexingJobsQueueRail.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/2gv9wcal/tmp/test-intent-vitest-9507-1793727709510.json\"",
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/state/frameStatus.test.ts\" \"src/shell-v0/components/StatusPanel.approvals.test.ts\" \"src/shell-v0/components/StatusPanel.history.test.ts\" \"src/shell-v0/components/StatusPanel.running.test.ts\" \"src/shell-v0/components/StatusPill.design.test.ts\" \"src/shell-v0/components/StatusPill.feedback.test.ts\" \"src/shell-v0/components/StatusPill.test.ts\" \"src/shell-v0/components/StatusPill.transitions.test.ts\" \"src/shell-v0/components/RetiredStatusElements.test.ts\" \"src/shell-v0/views/ActivitySurface.actions.test.ts\" \"src/shell-v0/chrome/Shell.test.ts\" \"src/shell-v0/components/IndexingPause.test.ts\" \"src/shell-v0/components/indexingTaskWaiting.test.ts\" \"src/shell-v0/substrates/tasks/indexingJobsQueueRail.test.ts\" \"src/shell-v0/components/AuthorizationHost.toplayer.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/nv7ds18p/tmp/test-intent-vitest-12446-1793733074730.json\"",
       "cwd": "modules/ui-web",
       "exitCode": 0,
-      "durationMs": 19487
+      "durationMs": 11716
     }
   ],
   "checks": [
     {
-      "id": "modules/ui-web/src/shell-v0/chrome/Shell.test.ts#Shell — settings window vs. stage navigation (tempdoc 855) ST15 opening Settings or switching windows closes the status panel and returns focus to the pill",
-      "file": "modules/ui-web/src/shell-v0/chrome/Shell.test.ts",
+      "id": "modules/ui-web/src/shell-v0/state/frameStatus.test.ts#frame status projection ST1 keeps concurrent facts discoverable while the pill chooses one urgency",
+      "file": "modules/ui-web/src/shell-v0/state/frameStatus.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:577fe6ec5b964f6566d625d4166bcaf10c21c579d2fb52fdfd91baad22f89a0c",
+      "contentDigest": "sha256:5099face12bb97d3a7487286ba7d3367e77e24230c79e866d3e9d9c04abbd00a",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
       "cases": [
         {
-          "name": "Shell — settings window vs. stage navigation (tempdoc 855) ST15 opening Settings or switching windows closes the status panel and returns focus to the pill",
+          "name": "frame status projection ST1 keeps concurrent facts discoverable while the pill chooses one urgency",
           "status": "passed"
         }
       ]
     },
     {
-      "id": "modules/ui-web/src/shell-v0/components/IndexingPause.test.ts#WP3.7 verifier layout and focus repairs F2 preserves a sensible focus and announces remote quiet-queue Resume once",
-      "file": "modules/ui-web/src/shell-v0/components/IndexingPause.test.ts",
+      "id": "modules/ui-web/src/shell-v0/state/frameStatus.test.ts#frame status projection ST2 separates contact from poll freshness and waits a full poll before unreachable",
+      "file": "modules/ui-web/src/shell-v0/state/frameStatus.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:9b1291b703d0e767468d873257d6eefdce5f3803d3a80880802c56b579f00470",
+      "contentDigest": "sha256:5099face12bb97d3a7487286ba7d3367e77e24230c79e866d3e9d9c04abbd00a",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
       "cases": [
         {
-          "name": "WP3.7 verifier layout and focus repairs F2 preserves a sensible focus and announces remote quiet-queue Resume once",
+          "name": "frame status projection ST2 separates contact from poll freshness and waits a full poll before unreachable",
           "status": "passed"
         }
       ]
     },
     {
-      "id": "modules/ui-web/src/shell-v0/components/RetiredStatusElements.test.ts#ST10 frozen jf-status-deck is defined and inert without transports or listeners",
-      "file": "modules/ui-web/src/shell-v0/components/RetiredStatusElements.test.ts",
+      "id": "modules/ui-web/src/shell-v0/state/frameStatus.test.ts#frame status projection ST6 durable acceptance and gaps suppress an invocation-return completion",
+      "file": "modules/ui-web/src/shell-v0/state/frameStatus.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:ac6cb858afb43ea086b7309917447d6559f3262acb17e0e425e31f97d7bfb31d",
+      "contentDigest": "sha256:5099face12bb97d3a7487286ba7d3367e77e24230c79e866d3e9d9c04abbd00a",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
       "cases": [
         {
-          "name": "ST10 frozen jf-status-deck is defined and inert without transports or listeners",
+          "name": "frame status projection ST6 durable acceptance and gaps suppress an invocation-return completion",
           "status": "passed"
         }
       ]
     },
     {
-      "id": "modules/ui-web/src/shell-v0/components/RetiredStatusElements.test.ts#ST10 frozen jf-task-list is defined and inert without transports or listeners",
-      "file": "modules/ui-web/src/shell-v0/components/RetiredStatusElements.test.ts",
+      "id": "modules/ui-web/src/shell-v0/state/frameStatus.test.ts#frame status projection ST7 read state never decides active/resolved and Earlier stays newest first",
+      "file": "modules/ui-web/src/shell-v0/state/frameStatus.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:ac6cb858afb43ea086b7309917447d6559f3262acb17e0e425e31f97d7bfb31d",
+      "contentDigest": "sha256:5099face12bb97d3a7487286ba7d3367e77e24230c79e866d3e9d9c04abbd00a",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
       "cases": [
         {
-          "name": "ST10 frozen jf-task-list is defined and inert without transports or listeners",
+          "name": "frame status projection ST7 read state never decides active/resolved and Earlier stays newest first",
           "status": "passed"
         }
       ]
     },
     {
-      "id": "modules/ui-web/src/shell-v0/components/RetiredStatusElements.test.ts#ST10 frozen jf-pending-effect-queue is defined and inert without transports or listeners",
-      "file": "modules/ui-web/src/shell-v0/components/RetiredStatusElements.test.ts",
+      "id": "modules/ui-web/src/shell-v0/state/frameStatus.test.ts#frame status projection ST8 C6 terminal replay is silent; only an observed active-to-ready edge completes",
+      "file": "modules/ui-web/src/shell-v0/state/frameStatus.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:ac6cb858afb43ea086b7309917447d6559f3262acb17e0e425e31f97d7bfb31d",
+      "contentDigest": "sha256:5099face12bb97d3a7487286ba7d3367e77e24230c79e866d3e9d9c04abbd00a",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
       "cases": [
         {
-          "name": "ST10 frozen jf-pending-effect-queue is defined and inert without transports or listeners",
+          "name": "frame status projection ST8 C6 terminal replay is silent; only an observed active-to-ready edge completes",
           "status": "passed"
         }
       ]
     },
     {
-      "id": "modules/ui-web/src/shell-v0/components/RetiredStatusElements.test.ts#ST10 frozen jf-agent-activity-panel is defined and inert without transports or listeners",
-      "file": "modules/ui-web/src/shell-v0/components/RetiredStatusElements.test.ts",
+      "id": "modules/ui-web/src/shell-v0/state/frameStatus.test.ts#frame status projection ST6 AI downloads preserve measured progress and the existing pause/resume route",
+      "file": "modules/ui-web/src/shell-v0/state/frameStatus.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:ac6cb858afb43ea086b7309917447d6559f3262acb17e0e425e31f97d7bfb31d",
+      "contentDigest": "sha256:5099face12bb97d3a7487286ba7d3367e77e24230c79e866d3e9d9c04abbd00a",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
       "cases": [
         {
-          "name": "ST10 frozen jf-agent-activity-panel is defined and inert without transports or listeners",
+          "name": "frame status projection ST6 AI downloads preserve measured progress and the existing pause/resume route",
           "status": "passed"
         }
       ]
     },
     {
-      "id": "modules/ui-web/src/shell-v0/components/RetiredStatusElements.test.ts#ST10 frozen jf-ai-activity-digest is defined and inert without transports or listeners",
-      "file": "modules/ui-web/src/shell-v0/components/RetiredStatusElements.test.ts",
+      "id": "modules/ui-web/src/shell-v0/state/frameStatus.test.ts#frame status projection ref-09 agent request deadlines read as their consequence relative to now, never as a raw time",
+      "file": "modules/ui-web/src/shell-v0/state/frameStatus.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:ac6cb858afb43ea086b7309917447d6559f3262acb17e0e425e31f97d7bfb31d",
+      "contentDigest": "sha256:5099face12bb97d3a7487286ba7d3367e77e24230c79e866d3e9d9c04abbd00a",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
       "cases": [
         {
-          "name": "ST10 frozen jf-ai-activity-digest is defined and inert without transports or listeners",
+          "name": "frame status projection ref-09 agent request deadlines read as their consequence relative to now, never as a raw time",
           "status": "passed"
         }
       ]
     },
     {
-      "id": "modules/ui-web/src/shell-v0/components/RetiredStatusElements.test.ts#ST10 frozen jf-app-update-banner is defined and inert without transports or listeners",
-      "file": "modules/ui-web/src/shell-v0/components/RetiredStatusElements.test.ts",
+      "id": "modules/ui-web/src/shell-v0/state/frameStatus.test.ts#frame status projection ref-09 the needs-you pill carries its count for the badge",
+      "file": "modules/ui-web/src/shell-v0/state/frameStatus.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:ac6cb858afb43ea086b7309917447d6559f3262acb17e0e425e31f97d7bfb31d",
+      "contentDigest": "sha256:5099face12bb97d3a7487286ba7d3367e77e24230c79e866d3e9d9c04abbd00a",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
       "cases": [
         {
-          "name": "ST10 frozen jf-app-update-banner is defined and inert without transports or listeners",
+          "name": "frame status projection ref-09 the needs-you pill carries its count for the badge",
           "status": "passed"
         }
       ]
     },
     {
-      "id": "modules/ui-web/src/shell-v0/components/RetiredStatusElements.test.ts#ST10 frozen jf-plugin-error-overlay is defined and inert without transports or listeners",
-      "file": "modules/ui-web/src/shell-v0/components/RetiredStatusElements.test.ts",
+      "id": "modules/ui-web/src/shell-v0/state/frameStatus.test.ts#frame status projection C12 the broadcast advisory and the request-scoped prompt for one authorization give one decision route",
+      "file": "modules/ui-web/src/shell-v0/state/frameStatus.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:ac6cb858afb43ea086b7309917447d6559f3262acb17e0e425e31f97d7bfb31d",
+      "contentDigest": "sha256:5099face12bb97d3a7487286ba7d3367e77e24230c79e866d3e9d9c04abbd00a",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
       "cases": [
         {
-          "name": "ST10 frozen jf-plugin-error-overlay is defined and inert without transports or listeners",
+          "name": "frame status projection C12 the broadcast advisory and the request-scoped prompt for one authorization give one decision route",
           "status": "passed"
         }
       ]
     },
     {
-      "id": "modules/ui-web/src/shell-v0/components/RetiredStatusElements.test.ts#ST10 frozen jf-indexing-overlay is defined and inert without transports or listeners",
-      "file": "modules/ui-web/src/shell-v0/components/RetiredStatusElements.test.ts",
+      "id": "modules/ui-web/src/shell-v0/state/frameStatus.test.ts#frame status projection ST1 working shows the most important running item with its measured progress only",
+      "file": "modules/ui-web/src/shell-v0/state/frameStatus.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:ac6cb858afb43ea086b7309917447d6559f3262acb17e0e425e31f97d7bfb31d",
+      "contentDigest": "sha256:5099face12bb97d3a7487286ba7d3367e77e24230c79e866d3e9d9c04abbd00a",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
       "cases": [
         {
-          "name": "ST10 frozen jf-indexing-overlay is defined and inert without transports or listeners",
+          "name": "frame status projection ST1 working shows the most important running item with its measured progress only",
           "status": "passed"
         }
       ]
     },
     {
-      "id": "modules/ui-web/src/shell-v0/components/RetiredStatusElements.test.ts#ST10 frozen jf-indexing-overlay-host is defined and inert without transports or listeners",
-      "file": "modules/ui-web/src/shell-v0/components/RetiredStatusElements.test.ts",
+      "id": "modules/ui-web/src/shell-v0/state/frameStatus.test.ts#frame status projection ST2 a reachable engine with a stale poll says checking, never reconnecting, and never claims calm",
+      "file": "modules/ui-web/src/shell-v0/state/frameStatus.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:ac6cb858afb43ea086b7309917447d6559f3262acb17e0e425e31f97d7bfb31d",
+      "contentDigest": "sha256:5099face12bb97d3a7487286ba7d3367e77e24230c79e866d3e9d9c04abbd00a",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
       "cases": [
         {
-          "name": "ST10 frozen jf-indexing-overlay-host is defined and inert without transports or listeners",
+          "name": "frame status projection ST2 a reachable engine with a stale poll says checking, never reconnecting, and never claims calm",
           "status": "passed"
         }
       ]
     },
     {
-      "id": "modules/ui-web/src/shell-v0/components/RetiredStatusElements.test.ts#ST10 frozen jf-advisory-toast-host is defined and inert without transports or listeners",
-      "file": "modules/ui-web/src/shell-v0/components/RetiredStatusElements.test.ts",
+      "id": "modules/ui-web/src/shell-v0/state/frameStatus.test.ts#frame status projection C12 deduplicates the same backend authorization by pending id",
+      "file": "modules/ui-web/src/shell-v0/state/frameStatus.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:ac6cb858afb43ea086b7309917447d6559f3262acb17e0e425e31f97d7bfb31d",
+      "contentDigest": "sha256:5099face12bb97d3a7487286ba7d3367e77e24230c79e866d3e9d9c04abbd00a",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
       "cases": [
         {
-          "name": "ST10 frozen jf-advisory-toast-host is defined and inert without transports or listeners",
+          "name": "frame status projection C12 deduplicates the same backend authorization by pending id",
           "status": "passed"
         }
       ]
     },
     {
-      "id": "modules/ui-web/src/shell-v0/components/RetiredStatusElements.test.ts#ST10 frozen jf-advisory-inbox-drawer is defined and inert without transports or listeners",
-      "file": "modules/ui-web/src/shell-v0/components/RetiredStatusElements.test.ts",
+      "id": "modules/ui-web/src/shell-v0/state/frameStatus.test.ts#indexing detail moved from the task tray (813 §5/§20) stage rows mark only finished stages, extraction has no fraction, and file rows come after stages",
+      "file": "modules/ui-web/src/shell-v0/state/frameStatus.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:ac6cb858afb43ea086b7309917447d6559f3262acb17e0e425e31f97d7bfb31d",
+      "contentDigest": "sha256:5099face12bb97d3a7487286ba7d3367e77e24230c79e866d3e9d9c04abbd00a",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
       "cases": [
         {
-          "name": "ST10 frozen jf-advisory-inbox-drawer is defined and inert without transports or listeners",
+          "name": "indexing detail moved from the task tray (813 §5/§20) stage rows mark only finished stages, extraction has no fraction, and file rows come after stages",
           "status": "passed"
         }
       ]
     },
     {
-      "id": "modules/ui-web/src/shell-v0/components/RetiredStatusElements.test.ts#ST10 frozen jf-advisory-rail-badge is defined and inert without transports or listeners",
-      "file": "modules/ui-web/src/shell-v0/components/RetiredStatusElements.test.ts",
+      "id": "modules/ui-web/src/shell-v0/state/frameStatus.test.ts#indexing detail moved from the task tray (813 §5/§20) a terminal indexing failure is a current problem, never a completion",
+      "file": "modules/ui-web/src/shell-v0/state/frameStatus.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:ac6cb858afb43ea086b7309917447d6559f3262acb17e0e425e31f97d7bfb31d",
+      "contentDigest": "sha256:5099face12bb97d3a7487286ba7d3367e77e24230c79e866d3e9d9c04abbd00a",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
       "cases": [
         {
-          "name": "ST10 frozen jf-advisory-rail-badge is defined and inert without transports or listeners",
+          "name": "indexing detail moved from the task tray (813 §5/§20) a terminal indexing failure is a current problem, never a completion",
           "status": "passed"
         }
       ]
     },
     {
-      "id": "modules/ui-web/src/shell-v0/components/RetiredStatusElements.test.ts#ST10 frozen jf-resolution-toast is defined and inert without transports or listeners",
-      "file": "modules/ui-web/src/shell-v0/components/RetiredStatusElements.test.ts",
+      "id": "modules/ui-web/src/shell-v0/state/frameStatus.test.ts#concurrent source facts ST1 search restriction index.failed precedes decisions and remains actionable",
+      "file": "modules/ui-web/src/shell-v0/state/frameStatus.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:ac6cb858afb43ea086b7309917447d6559f3262acb17e0e425e31f97d7bfb31d",
+      "contentDigest": "sha256:5099face12bb97d3a7487286ba7d3367e77e24230c79e866d3e9d9c04abbd00a",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
       "cases": [
         {
-          "name": "ST10 frozen jf-resolution-toast is defined and inert without transports or listeners",
+          "name": "concurrent source facts ST1 search restriction index.failed precedes decisions and remains actionable",
           "status": "passed"
         }
       ]
     },
     {
-      "id": "modules/ui-web/src/shell-v0/components/RetiredStatusElements.test.ts#the frame decision entry and read view remain reserved from authored presentations",
-      "file": "modules/ui-web/src/shell-v0/components/RetiredStatusElements.test.ts",
+      "id": "modules/ui-web/src/shell-v0/state/frameStatus.test.ts#concurrent source facts ST1 search restriction index.blocked_legacy precedes decisions and remains actionable",
+      "file": "modules/ui-web/src/shell-v0/state/frameStatus.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:ac6cb858afb43ea086b7309917447d6559f3262acb17e0e425e31f97d7bfb31d",
+      "contentDigest": "sha256:5099face12bb97d3a7487286ba7d3367e77e24230c79e866d3e9d9c04abbd00a",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
       "cases": [
         {
-          "name": "the frame decision entry and read view remain reserved from authored presentations",
+          "name": "concurrent source facts ST1 search restriction index.blocked_legacy precedes decisions and remains actionable",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/state/frameStatus.test.ts#concurrent source facts ST1 search restriction index.schema_open_refused precedes decisions and remains actionable",
+      "file": "modules/ui-web/src/shell-v0/state/frameStatus.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:5099face12bb97d3a7487286ba7d3367e77e24230c79e866d3e9d9c04abbd00a",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "concurrent source facts ST1 search restriction index.schema_open_refused precedes decisions and remains actionable",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/state/frameStatus.test.ts#concurrent source facts ST4 keeps all decisions, holds and running work visible together, including all overlapping holds",
+      "file": "modules/ui-web/src/shell-v0/state/frameStatus.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:5099face12bb97d3a7487286ba7d3367e77e24230c79e866d3e9d9c04abbd00a",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "concurrent source facts ST4 keeps all decisions, holds and running work visible together, including all overlapping holds",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/state/frameStatus.test.ts#concurrent source facts ST5 active folder failures and AI failure leave Problems on recovery without turning acknowledgement into recovery",
+      "file": "modules/ui-web/src/shell-v0/state/frameStatus.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:5099face12bb97d3a7487286ba7d3367e77e24230c79e866d3e9d9c04abbd00a",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "concurrent source facts ST5 active folder failures and AI failure leave Problems on recovery without turning acknowledgement into recovery",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/state/frameStatus.test.ts#concurrent source facts ST6 answering, per-folder work, rebuild and background runs retain separate freshness and real fractions",
+      "file": "modules/ui-web/src/shell-v0/state/frameStatus.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:5099face12bb97d3a7487286ba7d3367e77e24230c79e866d3e9d9c04abbd00a",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "concurrent source facts ST6 answering, per-folder work, rebuild and background runs retain separate freshness and real fractions",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/state/frameStatus.test.ts#concurrent source facts ST7 unread sorts ahead of a newer read item and remains separate from seen and active state",
+      "file": "modules/ui-web/src/shell-v0/state/frameStatus.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:5099face12bb97d3a7487286ba7d3367e77e24230c79e866d3e9d9c04abbd00a",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "concurrent source facts ST7 unread sorts ahead of a newer read item and remains separate from seen and active state",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/state/frameStatus.test.ts#concurrent source facts ST4 update available retains its existing Settings action",
+      "file": "modules/ui-web/src/shell-v0/state/frameStatus.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:5099face12bb97d3a7487286ba7d3367e77e24230c79e866d3e9d9c04abbd00a",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "concurrent source facts ST4 update available retains its existing Settings action",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/state/frameStatus.test.ts#concurrent source facts ST4 update repair_required retains its existing Settings action",
+      "file": "modules/ui-web/src/shell-v0/state/frameStatus.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:5099face12bb97d3a7487286ba7d3367e77e24230c79e866d3e9d9c04abbd00a",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "concurrent source facts ST4 update repair_required retains its existing Settings action",
           "status": "passed"
         }
       ]
@@ -389,7 +494,7 @@
       "id": "modules/ui-web/src/shell-v0/components/StatusPanel.history.test.ts#Earlier (moved from the inbox drawer) omits empty sections; calm has one line and the two history destinations",
       "file": "modules/ui-web/src/shell-v0/components/StatusPanel.history.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:b2a48be234b9dd7685fc2d94c78ad0c1bcb89e1d475c68f64807c2a7d86d369f",
+      "contentDigest": "sha256:323ca9f2d746fbdbb2a9fc2d9ce0176fbf283e9fb399d22f62645d9afa657203",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -404,7 +509,7 @@
       "id": "modules/ui-web/src/shell-v0/components/StatusPanel.history.test.ts#Earlier (moved from the inbox drawer) unread comes first, then newest within read state; history does not reactivate a resolved condition",
       "file": "modules/ui-web/src/shell-v0/components/StatusPanel.history.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:b2a48be234b9dd7685fc2d94c78ad0c1bcb89e1d475c68f64807c2a7d86d369f",
+      "contentDigest": "sha256:323ca9f2d746fbdbb2a9fc2d9ce0176fbf283e9fb399d22f62645d9afa657203",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -419,7 +524,7 @@
       "id": "modules/ui-web/src/shell-v0/components/StatusPanel.history.test.ts#Earlier (moved from the inbox drawer) Mark all read uses the existing acknowledgement and stays focusable with a reason when already read",
       "file": "modules/ui-web/src/shell-v0/components/StatusPanel.history.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:b2a48be234b9dd7685fc2d94c78ad0c1bcb89e1d475c68f64807c2a7d86d369f",
+      "contentDigest": "sha256:323ca9f2d746fbdbb2a9fc2d9ce0176fbf283e9fb399d22f62645d9afa657203",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -434,7 +539,7 @@
       "id": "modules/ui-web/src/shell-v0/components/StatusPanel.history.test.ts#Earlier (moved from the inbox drawer) diagnostics preserve safe navigation or plain text for https://example.test/diagnostics",
       "file": "modules/ui-web/src/shell-v0/components/StatusPanel.history.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:b2a48be234b9dd7685fc2d94c78ad0c1bcb89e1d475c68f64807c2a7d86d369f",
+      "contentDigest": "sha256:323ca9f2d746fbdbb2a9fc2d9ce0176fbf283e9fb399d22f62645d9afa657203",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -449,7 +554,7 @@
       "id": "modules/ui-web/src/shell-v0/components/StatusPanel.history.test.ts#Earlier (moved from the inbox drawer) diagnostics preserve safe navigation or plain text for diagnostics.i18n.key",
       "file": "modules/ui-web/src/shell-v0/components/StatusPanel.history.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:b2a48be234b9dd7685fc2d94c78ad0c1bcb89e1d475c68f64807c2a7d86d369f",
+      "contentDigest": "sha256:323ca9f2d746fbdbb2a9fc2d9ce0176fbf283e9fb399d22f62645d9afa657203",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -464,7 +569,7 @@
       "id": "modules/ui-web/src/shell-v0/components/StatusPanel.history.test.ts#Earlier (moved from the inbox drawer) diagnostics preserve safe navigation or plain text for javascript:alert(1)",
       "file": "modules/ui-web/src/shell-v0/components/StatusPanel.history.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:b2a48be234b9dd7685fc2d94c78ad0c1bcb89e1d475c68f64807c2a7d86d369f",
+      "contentDigest": "sha256:323ca9f2d746fbdbb2a9fc2d9ce0176fbf283e9fb399d22f62645d9afa657203",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -479,7 +584,7 @@
       "id": "modules/ui-web/src/shell-v0/components/StatusPanel.history.test.ts#Earlier (moved from the inbox drawer) retains local receipts in Earlier without making them unread",
       "file": "modules/ui-web/src/shell-v0/components/StatusPanel.history.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:b2a48be234b9dd7685fc2d94c78ad0c1bcb89e1d475c68f64807c2a7d86d369f",
+      "contentDigest": "sha256:323ca9f2d746fbdbb2a9fc2d9ce0176fbf283e9fb399d22f62645d9afa657203",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -494,7 +599,7 @@
       "id": "modules/ui-web/src/shell-v0/components/StatusPanel.history.test.ts#Earlier (moved from the inbox drawer) unknown advisory classes use default chrome, without exposing their raw class id as the title",
       "file": "modules/ui-web/src/shell-v0/components/StatusPanel.history.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:b2a48be234b9dd7685fc2d94c78ad0c1bcb89e1d475c68f64807c2a7d86d369f",
+      "contentDigest": "sha256:323ca9f2d746fbdbb2a9fc2d9ce0176fbf283e9fb399d22f62645d9afa657203",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -509,7 +614,7 @@
       "id": "modules/ui-web/src/shell-v0/components/StatusPanel.history.test.ts#Earlier (moved from the inbox drawer) humanizes recoverable conditions, authored reasons and operation actions",
       "file": "modules/ui-web/src/shell-v0/components/StatusPanel.history.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:b2a48be234b9dd7685fc2d94c78ad0c1bcb89e1d475c68f64807c2a7d86d369f",
+      "contentDigest": "sha256:323ca9f2d746fbdbb2a9fc2d9ce0176fbf283e9fb399d22f62645d9afa657203",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -524,7 +629,7 @@
       "id": "modules/ui-web/src/shell-v0/components/StatusPanel.history.test.ts#Earlier (moved from the inbox drawer) forget offers reindexing while backend supported reversal alone is called Undo",
       "file": "modules/ui-web/src/shell-v0/components/StatusPanel.history.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:b2a48be234b9dd7685fc2d94c78ad0c1bcb89e1d475c68f64807c2a7d86d369f",
+      "contentDigest": "sha256:323ca9f2d746fbdbb2a9fc2d9ce0176fbf283e9fb399d22f62645d9afa657203",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -719,7 +824,7 @@
       "id": "modules/ui-web/src/shell-v0/components/StatusPill.design.test.ts#status pill drawing ref-09 needs you shows its count in a badge followed by the words, and names both",
       "file": "modules/ui-web/src/shell-v0/components/StatusPill.design.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:59ec9c3e307c081c363df406a8964f94816972d2a2df6944ce7bb32166e75b5f",
+      "contentDigest": "sha256:3cfb167dbf2249781eb85d335ff41759cd7e362dfa0b0487789fe73ab688956f",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -734,7 +839,7 @@
       "id": "modules/ui-web/src/shell-v0/components/StatusPill.design.test.ts#status pill drawing working with a known fraction draws a ring instead of \"· N%\" text; unknown fractions draw none",
       "file": "modules/ui-web/src/shell-v0/components/StatusPill.design.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:59ec9c3e307c081c363df406a8964f94816972d2a2df6944ce7bb32166e75b5f",
+      "contentDigest": "sha256:3cfb167dbf2249781eb85d335ff41759cd7e362dfa0b0487789fe73ab688956f",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -749,7 +854,7 @@
       "id": "modules/ui-web/src/shell-v0/components/StatusPill.design.test.ts#status pill drawing below 1000 px the pill is an icon (badge or dot) with the same accessible name, without truncated text",
       "file": "modules/ui-web/src/shell-v0/components/StatusPill.design.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:59ec9c3e307c081c363df406a8964f94816972d2a2df6944ce7bb32166e75b5f",
+      "contentDigest": "sha256:3cfb167dbf2249781eb85d335ff41759cd7e362dfa0b0487789fe73ab688956f",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -764,7 +869,7 @@
       "id": "modules/ui-web/src/shell-v0/components/StatusPill.design.test.ts#status pill drawing ref-07 the undo notice names Ctrl+Z, and the shell undo command reverses that notice once",
       "file": "modules/ui-web/src/shell-v0/components/StatusPill.design.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:59ec9c3e307c081c363df406a8964f94816972d2a2df6944ce7bb32166e75b5f",
+      "contentDigest": "sha256:3cfb167dbf2249781eb85d335ff41759cd7e362dfa0b0487789fe73ab688956f",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -779,7 +884,7 @@
       "id": "modules/ui-web/src/shell-v0/components/StatusPill.design.test.ts#status pill drawing a notice whose action is not an undo neither claims Ctrl+Z nor takes the undo command",
       "file": "modules/ui-web/src/shell-v0/components/StatusPill.design.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:59ec9c3e307c081c363df406a8964f94816972d2a2df6944ce7bb32166e75b5f",
+      "contentDigest": "sha256:3cfb167dbf2249781eb85d335ff41759cd7e362dfa0b0487789fe73ab688956f",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -794,7 +899,7 @@
       "id": "modules/ui-web/src/shell-v0/components/StatusPill.feedback.test.ts#status feedback ownership C1 ST7 local action outcomes stay visible in the closed pill and recoverable in Earlier",
       "file": "modules/ui-web/src/shell-v0/components/StatusPill.feedback.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:ea45e7f580c1f7ca44787a49c196c382ee529747dc891244f67c19a08cb25b54",
+      "contentDigest": "sha256:eacc1286b2472d20eaac7fa578ddf5f69ebe3ca2809407d3e454191c844a7e98",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -809,7 +914,7 @@
       "id": "modules/ui-web/src/shell-v0/components/StatusPill.feedback.test.ts#status feedback ownership ST8 a witnessed active-to-ready edge completes once; initial ready and reconnect replay stay silent",
       "file": "modules/ui-web/src/shell-v0/components/StatusPill.feedback.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:ea45e7f580c1f7ca44787a49c196c382ee529747dc891244f67c19a08cb25b54",
+      "contentDigest": "sha256:eacc1286b2472d20eaac7fa578ddf5f69ebe3ca2809407d3e454191c844a7e98",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -824,7 +929,7 @@
       "id": "modules/ui-web/src/shell-v0/components/StatusPill.feedback.test.ts#status feedback ownership undo pauses while hovered or focused, survives a concurrent arrival, and keeps its action identity",
       "file": "modules/ui-web/src/shell-v0/components/StatusPill.feedback.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:ea45e7f580c1f7ca44787a49c196c382ee529747dc891244f67c19a08cb25b54",
+      "contentDigest": "sha256:eacc1286b2472d20eaac7fa578ddf5f69ebe3ca2809407d3e454191c844a7e98",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -839,7 +944,7 @@
       "id": "modules/ui-web/src/shell-v0/components/StatusPill.feedback.test.ts#status feedback ownership C6 retained snapshots and late discovery stay silent; live REQUIRES_ACK arrivals retain desktop escalation",
       "file": "modules/ui-web/src/shell-v0/components/StatusPill.feedback.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:ea45e7f580c1f7ca44787a49c196c382ee529747dc891244f67c19a08cb25b54",
+      "contentDigest": "sha256:eacc1286b2472d20eaac7fa578ddf5f69ebe3ca2809407d3e454191c844a7e98",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -854,7 +959,7 @@
       "id": "modules/ui-web/src/shell-v0/components/StatusPill.feedback.test.ts#status feedback ownership ST5 plugin errors leave active Problems on recovery and keep history; copy failures have visible feedback",
       "file": "modules/ui-web/src/shell-v0/components/StatusPill.feedback.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:ea45e7f580c1f7ca44787a49c196c382ee529747dc891244f67c19a08cb25b54",
+      "contentDigest": "sha256:eacc1286b2472d20eaac7fa578ddf5f69ebe3ca2809407d3e454191c844a7e98",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -869,7 +974,7 @@
       "id": "modules/ui-web/src/shell-v0/components/StatusPill.test.ts#status pill and panel ST3 opens, closes on pill, Escape and outside pointer, and returns focus",
       "file": "modules/ui-web/src/shell-v0/components/StatusPill.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:40e67d2bcf736c2e5e9fc0f452b7940758ea87a3b8f3d89c02d88cab0758cbc5",
+      "contentDigest": "sha256:742ec30eafb0f90a5d5fcbf968963747fa7afd0a48cae41e9c43824e1c4c3685",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -884,7 +989,7 @@
       "id": "modules/ui-web/src/shell-v0/components/StatusPill.test.ts#status pill and panel C10 teardown and remount keep exactly one activity subscription",
       "file": "modules/ui-web/src/shell-v0/components/StatusPill.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:40e67d2bcf736c2e5e9fc0f452b7940758ea87a3b8f3d89c02d88cab0758cbc5",
+      "contentDigest": "sha256:742ec30eafb0f90a5d5fcbf968963747fa7afd0a48cae41e9c43824e1c4c3685",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -899,7 +1004,7 @@
       "id": "modules/ui-web/src/shell-v0/components/StatusPill.test.ts#status pill and panel ST3 C8 shortcut yields to typing, IME, repeat and modal ownership",
       "file": "modules/ui-web/src/shell-v0/components/StatusPill.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:40e67d2bcf736c2e5e9fc0f452b7940758ea87a3b8f3d89c02d88cab0758cbc5",
+      "contentDigest": "sha256:742ec30eafb0f90a5d5fcbf968963747fa7afd0a48cae41e9c43824e1c4c3685",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -914,7 +1019,7 @@
       "id": "modules/ui-web/src/shell-v0/components/StatusPill.test.ts#status pill and panel ST15 updates preserve the scrolling element, expanded row and keyed plugin node",
       "file": "modules/ui-web/src/shell-v0/components/StatusPill.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:40e67d2bcf736c2e5e9fc0f452b7940758ea87a3b8f3d89c02d88cab0758cbc5",
+      "contentDigest": "sha256:742ec30eafb0f90a5d5fcbf968963747fa7afd0a48cae41e9c43824e1c4c3685",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -929,7 +1034,7 @@
       "id": "modules/ui-web/src/shell-v0/components/StatusPill.test.ts#status pill and panel ST9 renders original plugin content and provenance, removes on uninstall, and layout only hides plugins",
       "file": "modules/ui-web/src/shell-v0/components/StatusPill.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:40e67d2bcf736c2e5e9fc0f452b7940758ea87a3b8f3d89c02d88cab0758cbc5",
+      "contentDigest": "sha256:742ec30eafb0f90a5d5fcbf968963747fa7afd0a48cae41e9c43824e1c4c3685",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -944,7 +1049,7 @@
       "id": "modules/ui-web/src/shell-v0/components/StatusPill.test.ts#status pill and panel ST15 window switch closes the panel; teardown removes keyboard and blur listeners",
       "file": "modules/ui-web/src/shell-v0/components/StatusPill.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:40e67d2bcf736c2e5e9fc0f452b7940758ea87a3b8f3d89c02d88cab0758cbc5",
+      "contentDigest": "sha256:742ec30eafb0f90a5d5fcbf968963747fa7afd0a48cae41e9c43824e1c4c3685",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -1211,361 +1316,211 @@
       ]
     },
     {
-      "id": "modules/ui-web/src/shell-v0/components/indexingTaskWaiting.test.ts#withdraws delayed file work from the running chip while preserving independent agent work",
-      "file": "modules/ui-web/src/shell-v0/components/indexingTaskWaiting.test.ts",
+      "id": "modules/ui-web/src/shell-v0/components/RetiredStatusElements.test.ts#ST10 frozen jf-status-deck is defined and inert without transports or listeners",
+      "file": "modules/ui-web/src/shell-v0/components/RetiredStatusElements.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:c9d032d838598fffd8279410473d48b08ab9d201e212b771f8d41d94f0d32348",
+      "contentDigest": "sha256:ac6cb858afb43ea086b7309917447d6559f3262acb17e0e425e31f97d7bfb31d",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
       "cases": [
         {
-          "name": "withdraws delayed file work from the running chip while preserving independent agent work",
+          "name": "ST10 frozen jf-status-deck is defined and inert without transports or listeners",
           "status": "passed"
         }
       ]
     },
     {
-      "id": "modules/ui-web/src/shell-v0/state/frameStatus.test.ts#frame status projection ST1 keeps concurrent facts discoverable while the pill chooses one urgency",
-      "file": "modules/ui-web/src/shell-v0/state/frameStatus.test.ts",
+      "id": "modules/ui-web/src/shell-v0/components/RetiredStatusElements.test.ts#ST10 frozen jf-task-list is defined and inert without transports or listeners",
+      "file": "modules/ui-web/src/shell-v0/components/RetiredStatusElements.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:572c91ea423f9d3c11b749796b586f0f0ee040722a24897cd42dbea2d1b9f621",
+      "contentDigest": "sha256:ac6cb858afb43ea086b7309917447d6559f3262acb17e0e425e31f97d7bfb31d",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
       "cases": [
         {
-          "name": "frame status projection ST1 keeps concurrent facts discoverable while the pill chooses one urgency",
+          "name": "ST10 frozen jf-task-list is defined and inert without transports or listeners",
           "status": "passed"
         }
       ]
     },
     {
-      "id": "modules/ui-web/src/shell-v0/state/frameStatus.test.ts#frame status projection ST2 separates contact from poll freshness and waits a full poll before unreachable",
-      "file": "modules/ui-web/src/shell-v0/state/frameStatus.test.ts",
+      "id": "modules/ui-web/src/shell-v0/components/RetiredStatusElements.test.ts#ST10 frozen jf-pending-effect-queue is defined and inert without transports or listeners",
+      "file": "modules/ui-web/src/shell-v0/components/RetiredStatusElements.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:572c91ea423f9d3c11b749796b586f0f0ee040722a24897cd42dbea2d1b9f621",
+      "contentDigest": "sha256:ac6cb858afb43ea086b7309917447d6559f3262acb17e0e425e31f97d7bfb31d",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
       "cases": [
         {
-          "name": "frame status projection ST2 separates contact from poll freshness and waits a full poll before unreachable",
+          "name": "ST10 frozen jf-pending-effect-queue is defined and inert without transports or listeners",
           "status": "passed"
         }
       ]
     },
     {
-      "id": "modules/ui-web/src/shell-v0/state/frameStatus.test.ts#frame status projection ST6 durable acceptance and gaps suppress an invocation-return completion",
-      "file": "modules/ui-web/src/shell-v0/state/frameStatus.test.ts",
+      "id": "modules/ui-web/src/shell-v0/components/RetiredStatusElements.test.ts#ST10 frozen jf-agent-activity-panel is defined and inert without transports or listeners",
+      "file": "modules/ui-web/src/shell-v0/components/RetiredStatusElements.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:572c91ea423f9d3c11b749796b586f0f0ee040722a24897cd42dbea2d1b9f621",
+      "contentDigest": "sha256:ac6cb858afb43ea086b7309917447d6559f3262acb17e0e425e31f97d7bfb31d",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
       "cases": [
         {
-          "name": "frame status projection ST6 durable acceptance and gaps suppress an invocation-return completion",
+          "name": "ST10 frozen jf-agent-activity-panel is defined and inert without transports or listeners",
           "status": "passed"
         }
       ]
     },
     {
-      "id": "modules/ui-web/src/shell-v0/state/frameStatus.test.ts#frame status projection ST7 read state never decides active/resolved and Earlier stays newest first",
-      "file": "modules/ui-web/src/shell-v0/state/frameStatus.test.ts",
+      "id": "modules/ui-web/src/shell-v0/components/RetiredStatusElements.test.ts#ST10 frozen jf-ai-activity-digest is defined and inert without transports or listeners",
+      "file": "modules/ui-web/src/shell-v0/components/RetiredStatusElements.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:572c91ea423f9d3c11b749796b586f0f0ee040722a24897cd42dbea2d1b9f621",
+      "contentDigest": "sha256:ac6cb858afb43ea086b7309917447d6559f3262acb17e0e425e31f97d7bfb31d",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
       "cases": [
         {
-          "name": "frame status projection ST7 read state never decides active/resolved and Earlier stays newest first",
+          "name": "ST10 frozen jf-ai-activity-digest is defined and inert without transports or listeners",
           "status": "passed"
         }
       ]
     },
     {
-      "id": "modules/ui-web/src/shell-v0/state/frameStatus.test.ts#frame status projection ST8 C6 terminal replay is silent; only an observed active-to-ready edge completes",
-      "file": "modules/ui-web/src/shell-v0/state/frameStatus.test.ts",
+      "id": "modules/ui-web/src/shell-v0/components/RetiredStatusElements.test.ts#ST10 frozen jf-app-update-banner is defined and inert without transports or listeners",
+      "file": "modules/ui-web/src/shell-v0/components/RetiredStatusElements.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:572c91ea423f9d3c11b749796b586f0f0ee040722a24897cd42dbea2d1b9f621",
+      "contentDigest": "sha256:ac6cb858afb43ea086b7309917447d6559f3262acb17e0e425e31f97d7bfb31d",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
       "cases": [
         {
-          "name": "frame status projection ST8 C6 terminal replay is silent; only an observed active-to-ready edge completes",
+          "name": "ST10 frozen jf-app-update-banner is defined and inert without transports or listeners",
           "status": "passed"
         }
       ]
     },
     {
-      "id": "modules/ui-web/src/shell-v0/state/frameStatus.test.ts#frame status projection ST6 AI downloads preserve measured progress and the existing pause/resume route",
-      "file": "modules/ui-web/src/shell-v0/state/frameStatus.test.ts",
+      "id": "modules/ui-web/src/shell-v0/components/RetiredStatusElements.test.ts#ST10 frozen jf-plugin-error-overlay is defined and inert without transports or listeners",
+      "file": "modules/ui-web/src/shell-v0/components/RetiredStatusElements.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:572c91ea423f9d3c11b749796b586f0f0ee040722a24897cd42dbea2d1b9f621",
+      "contentDigest": "sha256:ac6cb858afb43ea086b7309917447d6559f3262acb17e0e425e31f97d7bfb31d",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
       "cases": [
         {
-          "name": "frame status projection ST6 AI downloads preserve measured progress and the existing pause/resume route",
+          "name": "ST10 frozen jf-plugin-error-overlay is defined and inert without transports or listeners",
           "status": "passed"
         }
       ]
     },
     {
-      "id": "modules/ui-web/src/shell-v0/state/frameStatus.test.ts#frame status projection ref-09 agent request deadlines read as their consequence relative to now, never as a raw time",
-      "file": "modules/ui-web/src/shell-v0/state/frameStatus.test.ts",
+      "id": "modules/ui-web/src/shell-v0/components/RetiredStatusElements.test.ts#ST10 frozen jf-indexing-overlay is defined and inert without transports or listeners",
+      "file": "modules/ui-web/src/shell-v0/components/RetiredStatusElements.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:572c91ea423f9d3c11b749796b586f0f0ee040722a24897cd42dbea2d1b9f621",
+      "contentDigest": "sha256:ac6cb858afb43ea086b7309917447d6559f3262acb17e0e425e31f97d7bfb31d",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
       "cases": [
         {
-          "name": "frame status projection ref-09 agent request deadlines read as their consequence relative to now, never as a raw time",
+          "name": "ST10 frozen jf-indexing-overlay is defined and inert without transports or listeners",
           "status": "passed"
         }
       ]
     },
     {
-      "id": "modules/ui-web/src/shell-v0/state/frameStatus.test.ts#frame status projection ref-09 the needs-you pill carries its count for the badge",
-      "file": "modules/ui-web/src/shell-v0/state/frameStatus.test.ts",
+      "id": "modules/ui-web/src/shell-v0/components/RetiredStatusElements.test.ts#ST10 frozen jf-indexing-overlay-host is defined and inert without transports or listeners",
+      "file": "modules/ui-web/src/shell-v0/components/RetiredStatusElements.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:572c91ea423f9d3c11b749796b586f0f0ee040722a24897cd42dbea2d1b9f621",
+      "contentDigest": "sha256:ac6cb858afb43ea086b7309917447d6559f3262acb17e0e425e31f97d7bfb31d",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
       "cases": [
         {
-          "name": "frame status projection ref-09 the needs-you pill carries its count for the badge",
+          "name": "ST10 frozen jf-indexing-overlay-host is defined and inert without transports or listeners",
           "status": "passed"
         }
       ]
     },
     {
-      "id": "modules/ui-web/src/shell-v0/state/frameStatus.test.ts#frame status projection C12 the broadcast advisory and the request-scoped prompt for one authorization give one decision route",
-      "file": "modules/ui-web/src/shell-v0/state/frameStatus.test.ts",
+      "id": "modules/ui-web/src/shell-v0/components/RetiredStatusElements.test.ts#ST10 frozen jf-advisory-toast-host is defined and inert without transports or listeners",
+      "file": "modules/ui-web/src/shell-v0/components/RetiredStatusElements.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:572c91ea423f9d3c11b749796b586f0f0ee040722a24897cd42dbea2d1b9f621",
+      "contentDigest": "sha256:ac6cb858afb43ea086b7309917447d6559f3262acb17e0e425e31f97d7bfb31d",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
       "cases": [
         {
-          "name": "frame status projection C12 the broadcast advisory and the request-scoped prompt for one authorization give one decision route",
+          "name": "ST10 frozen jf-advisory-toast-host is defined and inert without transports or listeners",
           "status": "passed"
         }
       ]
     },
     {
-      "id": "modules/ui-web/src/shell-v0/state/frameStatus.test.ts#frame status projection ST1 working shows the most important running item with its measured progress only",
-      "file": "modules/ui-web/src/shell-v0/state/frameStatus.test.ts",
+      "id": "modules/ui-web/src/shell-v0/components/RetiredStatusElements.test.ts#ST10 frozen jf-advisory-inbox-drawer is defined and inert without transports or listeners",
+      "file": "modules/ui-web/src/shell-v0/components/RetiredStatusElements.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:572c91ea423f9d3c11b749796b586f0f0ee040722a24897cd42dbea2d1b9f621",
+      "contentDigest": "sha256:ac6cb858afb43ea086b7309917447d6559f3262acb17e0e425e31f97d7bfb31d",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
       "cases": [
         {
-          "name": "frame status projection ST1 working shows the most important running item with its measured progress only",
+          "name": "ST10 frozen jf-advisory-inbox-drawer is defined and inert without transports or listeners",
           "status": "passed"
         }
       ]
     },
     {
-      "id": "modules/ui-web/src/shell-v0/state/frameStatus.test.ts#frame status projection ST2 a reachable engine with a stale poll says checking, never reconnecting, and never claims calm",
-      "file": "modules/ui-web/src/shell-v0/state/frameStatus.test.ts",
+      "id": "modules/ui-web/src/shell-v0/components/RetiredStatusElements.test.ts#ST10 frozen jf-advisory-rail-badge is defined and inert without transports or listeners",
+      "file": "modules/ui-web/src/shell-v0/components/RetiredStatusElements.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:572c91ea423f9d3c11b749796b586f0f0ee040722a24897cd42dbea2d1b9f621",
+      "contentDigest": "sha256:ac6cb858afb43ea086b7309917447d6559f3262acb17e0e425e31f97d7bfb31d",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
       "cases": [
         {
-          "name": "frame status projection ST2 a reachable engine with a stale poll says checking, never reconnecting, and never claims calm",
+          "name": "ST10 frozen jf-advisory-rail-badge is defined and inert without transports or listeners",
           "status": "passed"
         }
       ]
     },
     {
-      "id": "modules/ui-web/src/shell-v0/state/frameStatus.test.ts#frame status projection C12 deduplicates the same backend authorization by pending id",
-      "file": "modules/ui-web/src/shell-v0/state/frameStatus.test.ts",
+      "id": "modules/ui-web/src/shell-v0/components/RetiredStatusElements.test.ts#ST10 frozen jf-resolution-toast is defined and inert without transports or listeners",
+      "file": "modules/ui-web/src/shell-v0/components/RetiredStatusElements.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:572c91ea423f9d3c11b749796b586f0f0ee040722a24897cd42dbea2d1b9f621",
+      "contentDigest": "sha256:ac6cb858afb43ea086b7309917447d6559f3262acb17e0e425e31f97d7bfb31d",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
       "cases": [
         {
-          "name": "frame status projection C12 deduplicates the same backend authorization by pending id",
+          "name": "ST10 frozen jf-resolution-toast is defined and inert without transports or listeners",
           "status": "passed"
         }
       ]
     },
     {
-      "id": "modules/ui-web/src/shell-v0/state/frameStatus.test.ts#indexing detail moved from the task tray (813 §5/§20) stage rows mark only finished stages, extraction has no fraction, and file rows come after stages",
-      "file": "modules/ui-web/src/shell-v0/state/frameStatus.test.ts",
+      "id": "modules/ui-web/src/shell-v0/components/RetiredStatusElements.test.ts#the frame decision entry and read view remain reserved from authored presentations",
+      "file": "modules/ui-web/src/shell-v0/components/RetiredStatusElements.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:572c91ea423f9d3c11b749796b586f0f0ee040722a24897cd42dbea2d1b9f621",
+      "contentDigest": "sha256:ac6cb858afb43ea086b7309917447d6559f3262acb17e0e425e31f97d7bfb31d",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
       "cases": [
         {
-          "name": "indexing detail moved from the task tray (813 §5/§20) stage rows mark only finished stages, extraction has no fraction, and file rows come after stages",
-          "status": "passed"
-        }
-      ]
-    },
-    {
-      "id": "modules/ui-web/src/shell-v0/state/frameStatus.test.ts#indexing detail moved from the task tray (813 §5/§20) a terminal indexing failure is a current problem, never a completion",
-      "file": "modules/ui-web/src/shell-v0/state/frameStatus.test.ts",
-      "runner": "vitest",
-      "contentDigest": "sha256:572c91ea423f9d3c11b749796b586f0f0ee040722a24897cd42dbea2d1b9f621",
-      "executed": true,
-      "skipped": false,
-      "outcome": "passed",
-      "cases": [
-        {
-          "name": "indexing detail moved from the task tray (813 §5/§20) a terminal indexing failure is a current problem, never a completion",
-          "status": "passed"
-        }
-      ]
-    },
-    {
-      "id": "modules/ui-web/src/shell-v0/state/frameStatus.test.ts#concurrent source facts ST1 search restriction index.failed precedes decisions and remains actionable",
-      "file": "modules/ui-web/src/shell-v0/state/frameStatus.test.ts",
-      "runner": "vitest",
-      "contentDigest": "sha256:572c91ea423f9d3c11b749796b586f0f0ee040722a24897cd42dbea2d1b9f621",
-      "executed": true,
-      "skipped": false,
-      "outcome": "passed",
-      "cases": [
-        {
-          "name": "concurrent source facts ST1 search restriction index.failed precedes decisions and remains actionable",
-          "status": "passed"
-        }
-      ]
-    },
-    {
-      "id": "modules/ui-web/src/shell-v0/state/frameStatus.test.ts#concurrent source facts ST1 search restriction index.blocked_legacy precedes decisions and remains actionable",
-      "file": "modules/ui-web/src/shell-v0/state/frameStatus.test.ts",
-      "runner": "vitest",
-      "contentDigest": "sha256:572c91ea423f9d3c11b749796b586f0f0ee040722a24897cd42dbea2d1b9f621",
-      "executed": true,
-      "skipped": false,
-      "outcome": "passed",
-      "cases": [
-        {
-          "name": "concurrent source facts ST1 search restriction index.blocked_legacy precedes decisions and remains actionable",
-          "status": "passed"
-        }
-      ]
-    },
-    {
-      "id": "modules/ui-web/src/shell-v0/state/frameStatus.test.ts#concurrent source facts ST1 search restriction index.schema_open_refused precedes decisions and remains actionable",
-      "file": "modules/ui-web/src/shell-v0/state/frameStatus.test.ts",
-      "runner": "vitest",
-      "contentDigest": "sha256:572c91ea423f9d3c11b749796b586f0f0ee040722a24897cd42dbea2d1b9f621",
-      "executed": true,
-      "skipped": false,
-      "outcome": "passed",
-      "cases": [
-        {
-          "name": "concurrent source facts ST1 search restriction index.schema_open_refused precedes decisions and remains actionable",
-          "status": "passed"
-        }
-      ]
-    },
-    {
-      "id": "modules/ui-web/src/shell-v0/state/frameStatus.test.ts#concurrent source facts ST4 keeps all decisions, holds and running work visible together, including all overlapping holds",
-      "file": "modules/ui-web/src/shell-v0/state/frameStatus.test.ts",
-      "runner": "vitest",
-      "contentDigest": "sha256:572c91ea423f9d3c11b749796b586f0f0ee040722a24897cd42dbea2d1b9f621",
-      "executed": true,
-      "skipped": false,
-      "outcome": "passed",
-      "cases": [
-        {
-          "name": "concurrent source facts ST4 keeps all decisions, holds and running work visible together, including all overlapping holds",
-          "status": "passed"
-        }
-      ]
-    },
-    {
-      "id": "modules/ui-web/src/shell-v0/state/frameStatus.test.ts#concurrent source facts ST5 active folder failures and AI failure leave Problems on recovery without turning acknowledgement into recovery",
-      "file": "modules/ui-web/src/shell-v0/state/frameStatus.test.ts",
-      "runner": "vitest",
-      "contentDigest": "sha256:572c91ea423f9d3c11b749796b586f0f0ee040722a24897cd42dbea2d1b9f621",
-      "executed": true,
-      "skipped": false,
-      "outcome": "passed",
-      "cases": [
-        {
-          "name": "concurrent source facts ST5 active folder failures and AI failure leave Problems on recovery without turning acknowledgement into recovery",
-          "status": "passed"
-        }
-      ]
-    },
-    {
-      "id": "modules/ui-web/src/shell-v0/state/frameStatus.test.ts#concurrent source facts ST6 answering, per-folder work, rebuild and background runs retain separate freshness and real fractions",
-      "file": "modules/ui-web/src/shell-v0/state/frameStatus.test.ts",
-      "runner": "vitest",
-      "contentDigest": "sha256:572c91ea423f9d3c11b749796b586f0f0ee040722a24897cd42dbea2d1b9f621",
-      "executed": true,
-      "skipped": false,
-      "outcome": "passed",
-      "cases": [
-        {
-          "name": "concurrent source facts ST6 answering, per-folder work, rebuild and background runs retain separate freshness and real fractions",
-          "status": "passed"
-        }
-      ]
-    },
-    {
-      "id": "modules/ui-web/src/shell-v0/state/frameStatus.test.ts#concurrent source facts ST7 unread sorts ahead of a newer read item and remains separate from seen and active state",
-      "file": "modules/ui-web/src/shell-v0/state/frameStatus.test.ts",
-      "runner": "vitest",
-      "contentDigest": "sha256:572c91ea423f9d3c11b749796b586f0f0ee040722a24897cd42dbea2d1b9f621",
-      "executed": true,
-      "skipped": false,
-      "outcome": "passed",
-      "cases": [
-        {
-          "name": "concurrent source facts ST7 unread sorts ahead of a newer read item and remains separate from seen and active state",
-          "status": "passed"
-        }
-      ]
-    },
-    {
-      "id": "modules/ui-web/src/shell-v0/state/frameStatus.test.ts#concurrent source facts ST4 update available retains its existing Settings action",
-      "file": "modules/ui-web/src/shell-v0/state/frameStatus.test.ts",
-      "runner": "vitest",
-      "contentDigest": "sha256:572c91ea423f9d3c11b749796b586f0f0ee040722a24897cd42dbea2d1b9f621",
-      "executed": true,
-      "skipped": false,
-      "outcome": "passed",
-      "cases": [
-        {
-          "name": "concurrent source facts ST4 update available retains its existing Settings action",
-          "status": "passed"
-        }
-      ]
-    },
-    {
-      "id": "modules/ui-web/src/shell-v0/state/frameStatus.test.ts#concurrent source facts ST4 update repair_required retains its existing Settings action",
-      "file": "modules/ui-web/src/shell-v0/state/frameStatus.test.ts",
-      "runner": "vitest",
-      "contentDigest": "sha256:572c91ea423f9d3c11b749796b586f0f0ee040722a24897cd42dbea2d1b9f621",
-      "executed": true,
-      "skipped": false,
-      "outcome": "passed",
-      "cases": [
-        {
-          "name": "concurrent source facts ST4 update repair_required retains its existing Settings action",
+          "name": "the frame decision entry and read view remain reserved from authored presentations",
           "status": "passed"
         }
       ]
@@ -1616,6 +1571,66 @@
       ]
     },
     {
+      "id": "modules/ui-web/src/shell-v0/chrome/Shell.test.ts#Shell — settings window vs. stage navigation (tempdoc 855) ST15 opening Settings or switching windows closes the status panel and returns focus to the pill",
+      "file": "modules/ui-web/src/shell-v0/chrome/Shell.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:577fe6ec5b964f6566d625d4166bcaf10c21c579d2fb52fdfd91baad22f89a0c",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Shell — settings window vs. stage navigation (tempdoc 855) ST15 opening Settings or switching windows closes the status panel and returns focus to the pill",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/IndexingPause.test.ts#WP3.7 verifier layout and focus repairs F2 preserves a sensible focus and announces remote quiet-queue Resume once",
+      "file": "modules/ui-web/src/shell-v0/components/IndexingPause.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:9b1291b703d0e767468d873257d6eefdce5f3803d3a80880802c56b579f00470",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "WP3.7 verifier layout and focus repairs F2 preserves a sensible focus and announces remote quiet-queue Resume once",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/IndexingPause.test.ts#WP3.7 verifier layout and focus repairs C7 an accepted resume reads \"resuming\" until the engine reports work; a failed resume says so",
+      "file": "modules/ui-web/src/shell-v0/components/IndexingPause.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:9b1291b703d0e767468d873257d6eefdce5f3803d3a80880802c56b579f00470",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "WP3.7 verifier layout and focus repairs C7 an accepted resume reads \"resuming\" until the engine reports work; a failed resume says so",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/indexingTaskWaiting.test.ts#withdraws delayed file work from the running chip while preserving independent agent work",
+      "file": "modules/ui-web/src/shell-v0/components/indexingTaskWaiting.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:8806cac6ea45a6f4570d814ebfa835c1e5515b4b17dad6764187799e31eed7ab",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "withdraws delayed file work from the running chip while preserving independent agent work",
+          "status": "passed"
+        }
+      ]
+    },
+    {
       "id": "modules/ui-web/src/shell-v0/substrates/tasks/indexingJobsQueueRail.test.ts#standalone million-row rail shows one real queued count, retry until claim, liveness, both failures, DONE, cancel and resync",
       "file": "modules/ui-web/src/shell-v0/substrates/tasks/indexingJobsQueueRail.test.ts",
       "runner": "vitest",
@@ -1644,8 +1659,53 @@
           "status": "passed"
         }
       ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/AuthorizationHost.toplayer.test.ts#Move 4 — trusted ceremony on the Top Layer A1 selecting typed → capability from the status panel applies the selected prompt’s own modality",
+      "file": "modules/ui-web/src/shell-v0/components/AuthorizationHost.toplayer.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:f182d5cc0b6e3987188623a00322be08b2cec889995b6f5df65642be12d3fd57",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Move 4 — trusted ceremony on the Top Layer A1 selecting typed → capability from the status panel applies the selected prompt’s own modality",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/AuthorizationHost.toplayer.test.ts#Move 4 — trusted ceremony on the Top Layer A1 selecting capability → typed from the status panel applies the selected prompt’s own modality",
+      "file": "modules/ui-web/src/shell-v0/components/AuthorizationHost.toplayer.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:f182d5cc0b6e3987188623a00322be08b2cec889995b6f5df65642be12d3fd57",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Move 4 — trusted ceremony on the Top Layer A1 selecting capability → typed from the status panel applies the selected prompt’s own modality",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/StatusPill.test.ts#status pill and panel B4 the palette entry \"What's going on\" opens the panel once the palette has closed",
+      "file": "modules/ui-web/src/shell-v0/components/StatusPill.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:742ec30eafb0f90a5d5fcbf968963747fa7afd0a48cae41e9c43824e1c4c3685",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "status pill and panel B4 the palette entry \"What's going on\" opens the panel once the palette has closed",
+          "status": "passed"
+        }
+      ]
     }
   ],
   "failBefore": null,
-  "digest": "sha256:8da9e435b6e87245d0904b2113fcc92424da836f874296842a92ab0e6ac10ca7"
+  "digest": "sha256:0d83ddc2ad545c3b1ddfe9eb8975a1a6b1687305df7d721f3a15ded80c321247"
 }

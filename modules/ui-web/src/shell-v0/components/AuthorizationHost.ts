@@ -240,6 +240,12 @@ export class AuthorizationHost extends JfElement {
       if (index < 0) return;
       const next = this.queue.splice(index, 1)[0]!;
       if (this.active) this.queue.unshift(this.active);
+      // An open native dialog cannot switch between show() and showModal(): end the previous
+      // prompt's presentation so the selected one opens in its own modality (typed and capability
+      // ceremonies modal in the top layer, lightweight non-modal), as the queue does.
+      this.modal.close();
+      this.typed = '';
+      this.allowAlways = false;
       this.active = next;
     }
     this.reviewingId = id;

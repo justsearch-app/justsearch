@@ -555,3 +555,35 @@ export function rememberFailedCounts(
   }
   return next;
 }
+
+/** A per-folder condition the Library headline counts as needing attention. */
+export interface FolderAttention {
+  readonly key: string;
+  readonly kind: 'missing' | 'walk' | 'files' | 'deletions';
+  readonly title: string;
+  readonly detail: string;
+}
+
+const WALK_ERROR_WORDS: Readonly<Record<string, string>> = {
+  INCOMPLETE_COVERAGE: "The last scan couldn't read every file or subfolder (for example, missing permission). Reindex after fixing access.",
+  CLIENT_CANCELLED: 'The last scan was cancelled before it finished. Reindex to cover the whole folder.',
+};
+
+/**
+ * The folder conditions behind the Library's "N things need your attention" headline. One source
+ * for the Library and the status panel, so a counted folder problem is never missing elsewhere.
+ */
+export function folderAttention(root: IndexedRootView, status: FolderStatus, name: string): FolderAttention[] {
+  const hash = root.pathHash ?? '';
+  const items: FolderAttention[] = [];
+  if (status.state === 'unavailable') items.push({ key: `missing:${hash}`, kind: 'missing', title: `${name} can't be found`,
+    detail: 'Reconnect the drive or remove it. Last-known indexed content may still be searchable; reindex cannot cover this folder while it is offline.' });
+  else if (root.walkError) items.push({ key: `walk:${hash}`, kind: 'walk', title: `${name} needs attention`,
+    detail: WALK_ERROR_WORDS[root.walkError] ?? root.walkError });
+  if (status.failed > 0) items.push({ key: `files:${hash}`, kind: 'files',
+    title: `${status.failed} ${status.failed === 1 ? 'file needs' : 'files need'} review · ${name}${status.failedIsLastKnown ? ' · last known' : ''}`,
+    detail: 'Review the named files and their reasons, including unreadable sources, exhausted retries and extraction failures.' });
+  if (status.state === 'unverified') items.push({ key: `deletions:${hash}`, kind: 'deletions', title: `${name}: deletions not verified`,
+    detail: 'Some stale entries may remain searchable.' });
+  return items;
+}

@@ -2,7 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { StatusPill } from './StatusPill.js';
-import type { StatusPanel } from './StatusPanel.js';
+import { StatusPanel } from './StatusPanel.js';
+import type { UnifiedActionEntry } from '../operations/ActionLedgerClient.js';
 import { AdvisoryStore, type AdvisoryRecord, type AdvisorySnapshot } from './advisory/AdvisoryStore.js';
 import { deriveFrameStatus } from '../state/frameStatus.js';
 import { __resetAiStateForTest } from '../state/aiStateStore.js';
@@ -84,5 +85,31 @@ describe('Earlier (moved from the inbox drawer)', () => {
     expect(button('Add back to search')).toBeDefined();
     await publish([{ ...r, event: { ...r.event, primaryActionKind: 'undo', primaryAction: { target: 'core.some-operation', defaultArgsJson: '{"executionId":"exact"}' } } }]);
     expect(button('Undo')).toBeDefined();
+  });
+  it('a failed operation reads as a failure in Earlier, and ledger codes read as plain words', async () => {
+    const activity = (id: string, extra: Partial<UnifiedActionEntry>): UnifiedActionEntry => ({ id, source: 'backend', kind: 'operation',
+      occurredAt: '2026-11-03T10:00:00Z', originator: 'user', label: 'Reindex everything', ...extra });
+    panel().model = deriveFrameStatus({ ai: null, now: 0, contactLostAt: null, advisories: [record('failed', { event: { ...record('failed').event,
+      classId: 'operation.completed', classExtras: { operationId: 'core.bulk-reindex', outcome: 'FAILURE' } } })],
+    activity: [activity('a1', { outcome: 'FAILURE' }), activity('a2', { outcome: 'SUCCESS', label: 'Search index' }),
+      activity('g1', { kind: 'gate', label: 'GATED Reindex everything (TYPED_CONFIRM)', gate: { disposition: 'GATED', operation: 'Reindex everything' } })] });
+    await panel().updateComplete;
+    const row = (id: string) => panel().shadowRoot!.querySelector(`article[data-fact="${id}"]`)!;
+    for (const id of ['advisory:failed', 'activity:a1']) {
+      expect(row(id).querySelector('.state-icon')!.textContent, id).toBe('✕');
+      expect(row(id).textContent, id).toMatch(/failed/i);
+    }
+    expect(row('activity:a2').querySelector('.state-icon')!.textContent).toBe('✓');
+    const text = panel().shadowRoot!.querySelector('section[aria-label="Earlier"]')!.textContent!;
+    for (const code of ['GATED', 'SUCCESS', 'FAILURE', 'TYPED_CONFIRM']) expect(text, code).not.toContain(code);
+    expect(row('activity:g1').textContent).toContain('Approval requested: Reindex everything');
+  });
+  it('row titles share one icon column that never stretches with the title', async () => {
+    const css = (panel().constructor as typeof StatusPanel).styles.cssText;
+    // The icon is not a flexible title span: a fixed inline size, no grow.
+    expect(css).toMatch(/\.state-icon\s*\{[^}]*flex:\s*none[^}]*inline-size:\s*var\(--jf-space-4\)/);
+    expect(css).not.toMatch(/\.title\s*>\s*span\s*\{/);
+    await publish([record('one')]);
+    expect(panel().shadowRoot!.querySelector('.title > .state-icon + .text')).not.toBeNull();
   });
 });

@@ -134,6 +134,39 @@ describe('pendingAuthorizationBridge (tempdoc 655)', () => {
     vi.restoreAllMocks();
   });
 
+  it('B2 after a reload or in a second window, requests still waiting in the Engine rejoin the ceremony queue once', async () => {
+    const future = new Date(Date.now() + 240_000).toISOString();
+    const record = (pendingId: string, expiresAt = future) => ({ event: { classId: 'authorization.pending',
+      classExtras: { pendingId, operationId: 'core.ingest-files', riskTier: 'MEDIUM', gateBehavior: 'TYPED_CONFIRM', expiresAt } } });
+    let snapshot = { advisories: [record('waiting'), record('expired', new Date(Date.now() - 1000).toISOString()), record('answered'),
+      { event: { classId: 'operation.completed', classExtras: { pendingId: 'not-a-request', operationId: 'core.x' } } }] };
+    const listeners = new Set<(s: typeof snapshot) => void>();
+    const retained = { subscribe: (cb: (s: typeof snapshot) => void) => { listeners.add(cb); cb(snapshot); return () => listeners.delete(cb); } };
+    peekPendingMock.mockImplementation(async (id: string) => id === 'answered' ? null : detailFor(id, { expiresAt: future }));
+    requestAuthorizationMock.mockReturnValue(new Promise(() => {}));
+    const stop = startPendingAuthorizationBridge('http://test', { multiplex: multiplexOn(fakeEs), retained });
+    await flush();
+    expect(peekPendingMock).not.toHaveBeenCalledWith('expired');
+    expect(peekPendingMock).not.toHaveBeenCalledWith('not-a-request');
+    expect(requestAuthorizationMock).toHaveBeenCalledTimes(1);
+    expect(requestAuthorizationMock.mock.calls[0]?.[0]).toMatchObject({ pendingId: 'waiting', operationId: 'core.ingest-files',
+      gateBehavior: 'TYPED_CONFIRM', expiresAt: future });
+    // The live announcement and later snapshots of the same request never present it again.
+    fakeEs.emitFrame(pendingFrame(1, 'waiting'));
+    listeners.forEach(cb => cb(snapshot)); await flush();
+    expect(requestAuthorizationMock).toHaveBeenCalledTimes(1);
+    // A failed read is neither expiry nor an answer: the next snapshot tries again.
+    peekPendingMock.mockRejectedValueOnce(new TypeError('offline'));
+    snapshot = { advisories: [...snapshot.advisories, record('later')] };
+    listeners.forEach(cb => cb(snapshot)); await flush();
+    expect(requestAuthorizationMock).toHaveBeenCalledTimes(1);
+    listeners.forEach(cb => cb(snapshot)); await flush();
+    expect(requestAuthorizationMock).toHaveBeenCalledTimes(2);
+    expect(requestAuthorizationMock.mock.calls[1]?.[0]).toMatchObject({ pendingId: 'later' });
+    stop();
+    expect(listeners.size).toBe(0);
+  });
+
   it('fetches detail, presents the ceremony, and executes on approval', async () => {
     peekPendingMock.mockResolvedValue(detailFor('pa-001'));
     requestAuthorizationMock.mockResolvedValue({ approved: true, allowAlways: false });

@@ -5,6 +5,7 @@ import { JfElement } from '../primitives/JfElement.js';
 import type { FrameStatus, StatusAction, StatusFact, StatusSection } from '../state/frameStatus.js';
 import type { StatusBarItem } from '../commands/StatusBarRegistry.js';
 import { formatRelativeIso } from '../../utils/relativeTime.js';
+import { glyphChar, statusGlyph } from '../utils/statusTone.js';
 // 559 Authority VI — plugin items keep one line and overflow by priority into "…", never clip.
 import { OverflowController } from '../primitives/adaptiveBar.js';
 import './ProvenanceChip.js';
@@ -22,6 +23,16 @@ function summary(model: FrameStatus): string {
     n('running') ? `${n('running')} running` : ''].filter(Boolean);
   const state = ['needs', 'problems', 'working'].includes(model.pill.kind) ? null : model.pill.label;
   return [state, ...counts].filter(Boolean).join(' · ') || model.pill.label;
+}
+
+/**
+ * The row's icon. History shows how an item ended (a failure is never drawn as a check); the words
+ * in the title and detail carry the same meaning, so the glyph is never the only signal.
+ */
+function rowGlyph(row: StatusFact): string {
+  if (row.section !== 'earlier' && row.tone !== 'failure') return ({ needs: '!', problems: '×', running: '◌' } as const)[row.section];
+  // The one status → glyph authority (565 §17); an item without a decisive outcome draws a plain dot.
+  return glyphChar(statusGlyph(row.tone === 'neutral' ? 'info' : row.tone)) || '•';
 }
 
 /** Keyed rows preserve disclosures, focus and scroll through live source updates. */
@@ -53,10 +64,10 @@ export class StatusPanel extends JfElement {
       overflow-y: auto; overscroll-behavior: contain; background: var(--surface-1);
       border: var(--frame-hairline) solid var(--border-emphasized); border-radius: var(--frame-panel-radius);
       box-shadow: var(--shadow-float); overflow-wrap: anywhere; }
-    header, section, footer, .plugins { padding: var(--jf-space-4); }
-    header, section, .plugins { border-bottom: var(--frame-hairline) solid var(--border-subtle); }
-    header, .heading, footer { display: flex; align-items: center; gap: var(--jf-space-3); }
-    header > div, .heading > span { flex: 1; min-width: 0; }
+    .header, section, .footer, .plugins { padding: var(--jf-space-4); }
+    .header, section, .plugins { border-bottom: var(--frame-hairline) solid var(--border-subtle); }
+    .header, .heading, .footer { display: flex; align-items: center; gap: var(--jf-space-3); }
+    .header > div, .heading > span { flex: 1; min-width: 0; }
     h2 { margin: 0; font-size: var(--font-size-lg); font-weight: var(--jf-weight-medium); }
     h3 { margin: 0; font-size: var(--font-size-sm); font-weight: var(--jf-weight-medium); color: var(--text-secondary); }
     p { margin: var(--jf-space-1) 0; }
@@ -64,12 +75,16 @@ export class StatusPanel extends JfElement {
     .deadline { color: var(--text-warning); font-size: var(--font-size-xs); }
     article { padding-block: var(--jf-space-3); }
     .title { display: flex; align-items: baseline; gap: var(--jf-space-2); }
-    .title > span { flex: 1; }
-    .state-icon { flex: 0; color: var(--text-secondary); }
+    .title > .text { flex: 1; min-width: 0; }
+    /* A fixed icon column: every row title starts at the same inline offset. */
+    .state-icon { flex: none; inline-size: var(--jf-space-4); text-align: center; color: var(--text-secondary); }
+    .state-icon[data-tone="success"] { color: var(--text-success); }
+    .state-icon[data-tone="failure"] { color: var(--text-danger); }
+    .state-icon[data-tone="warning"] { color: var(--text-warning); }
     time { flex-shrink: 0; font-variant-numeric: tabular-nums; }
     .actions { display: flex; flex-wrap: wrap; gap: var(--jf-space-3); margin-top: var(--jf-space-2); }
     button { font: inherit; color: var(--text-primary); background: transparent; border: 0; padding: var(--jf-space-1); cursor: pointer; }
-    .actions button, footer button { color: var(--text-tint); }
+    .actions button, .footer button { color: var(--text-tint); }
     button:hover { text-decoration: underline; }
     button:focus-visible { outline: var(--frame-focus-width) solid var(--focus-ring-color); outline-offset: var(--jf-space-1); }
     progress { display: block; width: 100%; height: var(--jf-space-1); accent-color: var(--accent); margin-top: var(--jf-space-2); }
@@ -81,8 +96,8 @@ export class StatusPanel extends JfElement {
     @media (forced-colors: active) {
       :host::before { background: Canvas; border-color: CanvasText; }
       .panel { background: Canvas; color: CanvasText; border-color: CanvasText; box-shadow: none; }
-      button { color: ButtonText; } .detail, .deadline, time, h3 { color: CanvasText; }
-      .actions button, footer button, .unread { color: LinkText; }
+      button { color: ButtonText; } .detail, .deadline, time, h3, .state-icon[data-tone] { color: CanvasText; }
+      .actions button, .footer button, .unread { color: LinkText; }
       button:focus-visible { outline-color: Highlight; }
     }
   `;
@@ -116,7 +131,7 @@ export class StatusPanel extends JfElement {
   private row(row: StatusFact): TemplateResult {
     const expanded = this.expanded.has(row.id);
     return html`<article data-fact=${row.id}>
-      <div class="title"><span class="state-icon" aria-hidden="true">${({ needs: '!', problems: '×', running: '◌', earlier: '✓' })[row.section]}</span><span>${row.title}${row.confidence == null ? nothing : html` <jf-status-badge .tone=${row.confidence < 0.5 ? 'warning' : 'neutral'} .label=${`${Math.round(row.confidence * 100)}% confidence`}></jf-status-badge>`} ${row.unread ? html`<span class="unread">Unread</span>` : nothing}</span>
+      <div class="title"><span class="state-icon" aria-hidden="true" data-tone=${row.tone ?? nothing}>${rowGlyph(row)}</span><span class="text">${row.title}${row.confidence == null ? nothing : html` <jf-status-badge .tone=${row.confidence < 0.5 ? 'warning' : 'neutral'} .label=${`${Math.round(row.confidence * 100)}% confidence`}></jf-status-badge>`} ${row.unread ? html`<span class="unread">Unread</span>` : nothing}</span>
         ${row.occurredAt ? html`<time datetime=${row.occurredAt}>${formatRelativeIso(row.occurredAt)}</time>` : nothing}</div>
       ${row.stale ? html`<p class="detail">Last seen · checking for an update</p>` : nothing}
       ${row.detail ? html`<p class="detail" title=${row.progressLabel ?? nothing} aria-label=${row.progressLabel ?? nothing}>${row.detail}</p>` : nothing}
@@ -144,6 +159,8 @@ export class StatusPanel extends JfElement {
       ${hidden > 0 || this.pluginsOpen && this.overflow.visibleCount < this.plugins.length ? html`<button type="button" aria-expanded=${this.pluginsOpen}
         @click=${() => { this.pluginsOpen = !this.pluginsOpen; }}>${this.pluginsOpen ? 'Fewer' : `… ${hidden} more`}</button>` : nothing}</div>`;
   }
+  // B5 — the header and footer rows are plain containers: page banner/contentinfo landmarks belong
+  // to the app frame, never to a popover.
   override render(): TemplateResult {
     const model = this.model;
     return html`<div class="panel" role="dialog" aria-label="What's going on" tabindex="-1"
@@ -153,8 +170,8 @@ export class StatusPanel extends JfElement {
       }} @focusout=${(event: FocusEvent) => {
         if (!(event.relatedTarget instanceof Node) || !this.shadowRoot?.contains(event.relatedTarget)) this.focusedRow = null;
       }}>
-      <header><div><h2>What's going on</h2><p class="detail">${model ? summary(model) : 'Checking search status'}</p></div>
-        <button type="button" aria-label="Close status panel" @click=${() => this.dispatchEvent(new CustomEvent('status-close', { bubbles: true, composed: true }))}>×</button></header>
+      <div class="header"><div><h2>What's going on</h2><p class="detail">${model ? summary(model) : 'Checking search status'}</p></div>
+        <button type="button" aria-label="Close status panel" @click=${() => this.dispatchEvent(new CustomEvent('status-close', { bubbles: true, composed: true }))}>×</button></div>
       ${model ? (['needs', 'problems', 'running', 'earlier'] as const).map(section => {
         const rows = model.sections[section];
         if (!rows.length) return nothing;
@@ -168,8 +185,8 @@ export class StatusPanel extends JfElement {
       ${model && Object.values(model.sections).every(rows => !rows.length)
         ? html`<p class="empty">${model.pill.kind === 'calm' ? 'Search is up to date. Nothing needs you.' : model.pill.label}</p>` : nothing}
       ${this.renderPlugins()}
-      <footer><button type="button" @click=${() => this.action({ kind: 'navigate', target: 'core.activity-surface', label: 'All activity' })}>All activity</button>
-        <button type="button" @click=${() => this.action({ kind: 'navigate', target: 'core.health-surface', label: 'Health' })}>Health</button></footer>
+      <div class="footer"><button type="button" @click=${() => this.action({ kind: 'navigate', target: 'core.activity-surface', label: 'All activity' })}>All activity</button>
+        <button type="button" @click=${() => this.action({ kind: 'navigate', target: 'core.health-surface', label: 'Health' })}>Health</button></div>
     </div>`;
   }
 }

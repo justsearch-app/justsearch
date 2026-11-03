@@ -9,6 +9,11 @@ import { registerStatusBarItem, unregisterStatusBarItem, __resetForTest as reset
 import { CORE_PROVENANCE } from '../primitives/provenance.js';
 import { ModalityController, __resetModalityForTest } from '../primitives/modality.js';
 import { deriveFrameStatus } from '../state/frameStatus.js';
+import '../commands/CommandPalette.js';
+import type { CommandPalette } from '../commands/CommandPalette.js';
+import '../views/search-v3/Sv3Palette.js';
+import type { Sv3Palette } from '../views/search-v3/Sv3Palette.js';
+import { registerAction, unregisterAction } from '../substrates/actions/index.js';
 let pill: StatusPill;
 const button = () => pill.shadowRoot!.querySelector<HTMLButtonElement>('.trigger')!;
 const panel = () => pill.shadowRoot!.querySelector<StatusPanel>('jf-status-panel')!;
@@ -54,6 +59,42 @@ describe('status pill and panel', () => {
     press({ isComposing: true }); await flush(); expect(pill.open).toBe(false);
     press({ repeat: true }); await flush(); expect(pill.open).toBe(false);
     const modal = new ModalityController(pill); modal.enter(); press(); await flush(); expect(pill.open).toBe(false); modal.exit();
+  });
+  it('B4 C8 one overlay at a time: the shortcut stands down under either palette, and opening a palette closes the panel', async () => {
+    const press = () => document.dispatchEvent(new KeyboardEvent('keydown', { key: 'S', ctrlKey: true, shiftKey: true, bubbles: true }));
+    const shellPalette = document.createElement('jf-command-palette') as CommandPalette;
+    const searchPalette = document.createElement('jf-sv3-palette') as Sv3Palette;
+    document.body.append(shellPalette, searchPalette);
+    try {
+      for (const [name, open, close] of [
+        ['shell palette', () => shellPalette.show(), () => shellPalette.hide()],
+        ['search palette', () => void searchPalette.show(), () => searchPalette.hide()],
+      ] as const) {
+        open(); await flush();
+        press(); await flush();
+        expect(pill.open, `${name}: the panel shortcut does not fire under the palette`).toBe(false);
+        close(); await flush();
+        press(); await flush();
+        expect(pill.open, `${name}: the shortcut works again once the palette closed`).toBe(true);
+        open(); await flush();
+        expect(pill.open, `${name}: opening the palette closes the panel`).toBe(false);
+        close(); await flush();
+      }
+    } finally { shellPalette.remove(); searchPalette.remove(); }
+  });
+  it('B4 the palette entry "What\'s going on" opens the panel once the palette has closed', async () => {
+    registerAction({ id: 'core.action.shell.test-status-panel', title: "What's going on", category: 'Diagnostics', provenance: CORE_PROVENANCE,
+      handler: () => { pill.toggle(); return { kind: 'noop' as const }; } } as Parameters<typeof registerAction>[0]);
+    const palette = document.createElement('jf-command-palette') as CommandPalette;
+    document.body.append(palette);
+    try {
+      palette.show(); await palette.updateComplete;
+      const index = palette.results.findIndex(r => r.entry.label === "What's going on");
+      expect(index).toBeGreaterThanOrEqual(0);
+      (palette as unknown as { handleSelect(i: number): void }).handleSelect(index);
+      expect(palette.open).toBe(false);
+      await vi.waitFor(() => expect(pill.open).toBe(true));
+    } finally { palette.remove(); unregisterAction('core.action.shell.test-status-panel'); }
   });
   it('ST15 updates preserve the scrolling element, expanded row and keyed plugin node', async () => {
     pill.open = true; await flush();

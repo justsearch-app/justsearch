@@ -21,8 +21,7 @@
       "outFile": "status-response.ts",
       "consumers": [
         "modules/ui-web/src/shell-v0/utils/statusPoll.ts",
-        "modules/ui-web/src/api/lifecycleState.ts",
-        "modules/ui-web/src/shell-v0/components/StatusDeck.ts"
+        "modules/ui-web/src/api/lifecycleState.ts"
       ]
     },
     {
@@ -56,6 +55,7 @@
       "consumers": [
         "modules/ui-web/src/api/domains/packs.ts",
         "modules/ui-web/src/shell-v0/utils/aiInstallPoll.ts",
+        "modules/ui-web/src/shell-v0/components/StatusPill.ts",
         "modules/ui-web/src/shell-v0/state/installComponents.ts",
         "modules/ui-web/src/shell-v0/substrates/ai/aiInstallBridge.ts",
         "modules/ui-web/src/shell-v0/substrates/tasks/aiInstallTasksBridge.ts",
@@ -81,7 +81,9 @@
       "outFile": "indexed-root-view.ts",
       "consumers": [
         "modules/ui-web/src/shell-v0/views/LibrarySurface.ts",
-        "modules/ui-web/src/shell-v0/state/folderStatus.ts"
+        "modules/ui-web/src/shell-v0/state/folderStatus.ts",
+        "modules/ui-web/src/shell-v0/state/frameStatus.ts",
+        "modules/ui-web/src/shell-v0/controllers/frameStatusController.ts"
       ]
     },
     {
@@ -192,7 +194,9 @@
       "outFile": "operation-outcome-view.ts",
       "consumers": [
         "modules/ui-web/src/shell-v0/views/LibrarySurface.ts",
-        "modules/ui-web/src/shell-v0/components/OperationOutcomeDetail.ts"
+        "modules/ui-web/src/shell-v0/components/OperationOutcomeDetail.ts",
+        "modules/ui-web/src/shell-v0/state/frameStatus.ts",
+        "modules/ui-web/src/shell-v0/controllers/frameStatusController.ts"
       ]
     },
     {

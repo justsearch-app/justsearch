@@ -114,4 +114,12 @@ describe('status pill drawing', () => {
     expect(pill.undoNotice()).toBe(false);
     expect(reveal).not.toHaveBeenCalled();
   });
+  it('at 600 px the panel arrow points at the pill where the panel had to shift to fit', async () => {
+    viewport(600);
+    vi.spyOn(trigger(), 'getBoundingClientRect').mockReturnValue({ left: 200, right: 300, width: 100, top: 8, bottom: 40, height: 32, x: 200, y: 8, toJSON: () => ({}) } as DOMRect);
+    vi.spyOn(panel(), 'getBoundingClientRect').mockReturnValue({ left: 16, right: 568, width: 552, top: 48, bottom: 400, height: 352, x: 16, y: 48, toJSON: () => ({}) } as DOMRect);
+    pill.open = true; await flush(); await flush();
+    // Pill centre 250 px; placed panel's right edge 568 px: the arrow sits 318 px from that edge.
+    expect(pill.style.getPropertyValue('--frame-status-arrow-right')).toBe('calc(318px - var(--jf-space-2) / 2)');
+  });
 });

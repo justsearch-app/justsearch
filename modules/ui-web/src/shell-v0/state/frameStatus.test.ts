@@ -196,6 +196,20 @@ describe('concurrent source facts', () => {
     const recovered = derive({ roots: [{ ...root, status: 'indexed', failedCount: 0 }], rootsLive: true, advisories: [advisory(true)] });
     expect(recovered.sections.problems).toEqual([]); expect(recovered.sections.earlier).toHaveLength(1);
   });
+  it('B1 a folder whose scan errored is a problem right now, as the Library headline counts it, and the pill never claims calm', () => {
+    const root = { pathHash: 'locked', collection: 'Locked', status: 'indexed', fileCount: 4, failedCount: 0,
+      walkError: 'INCOMPLETE_COVERAGE' } as NonNullable<FrameStatusInput['roots']>[number];
+    const m = derive({ ai: ai(), roots: [root], rootsLive: true });
+    const row = m.sections.problems.find(f => f.id === 'folder-walk:locked');
+    expect(row?.title).toBe('Locked needs attention');
+    expect(row?.detail).not.toContain('INCOMPLETE_COVERAGE');
+    expect(row?.actions?.[0]?.target).toBe('core.library-surface');
+    expect(m.pill.kind).toBe('problems');
+    expect(m.pill.label).not.toBe('Up to date');
+    const unverified = derive({ ai: ai(), roots: [{ ...root, walkError: '', deleteDetectionUnverified: true }], rootsLive: true });
+    expect(unverified.sections.problems.map(f => f.title)).toEqual(['Locked: deletions not verified']);
+    expect(derive({ ai: ai(), roots: [{ ...root, walkError: '' }], rootsLive: true }).pill.kind).toBe('calm');
+  });
   it('ST6 answering, per-folder work, rebuild and background runs retain separate freshness and real fractions', () => {
     const m = derive({ ai: ai({ activity: { state: 'generating' } as unknown as AiState['activity'], stability: { kind: 'provisional', cause: 'rebuilding' } as AiState['stability'] }),
       roots: [{ pathHash: 'notes', collection: 'Notes', status: 'indexing', inFlightCount: 3, fileCount: 8 } as NonNullable<FrameStatusInput['roots']>[number]], rootsLive: false,

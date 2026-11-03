@@ -181,10 +181,15 @@ describe('WP3.3 complete surface sweep', () => {
       const running = dom(panel.render());
       const detail = running.querySelector('[data-detail="idxjob:one"]')!;
       expect(detail.textContent, which).toContain(unconfirmed(which) ? 'last observed running' : 'running');
-      if (unconfirmed(which)) expect(running.querySelector('[data-fact="indexing"] progress')).toBeNull();
+      if (unconfirmed(which)) {
+        expect(detail.querySelector('progress, .bar'), which).toBeNull();
+        expect(running.querySelector('[data-fact="indexing"] progress')).toBeNull();
+      }
       expect(running.textContent).toContain('Agent task');
       const system = dom(harness('jf-system-self-view', state).render());
-      expect(system.querySelector('[data-testid="self-view-task"]')!.textContent, which).toContain(unconfirmed(which) ? 'last observed running' : 'running');
+      const systemRow = system.querySelector('[data-testid="self-view-task"]')!;
+      expect(systemRow.textContent, which).toContain(unconfirmed(which) ? 'last observed running' : 'running');
+      if (unconfirmed(which)) expect(systemRow.querySelector('.bar'), `jf-system-self-view: ${which}`).toBeNull();
       expect(system.textContent).toContain('Agent task');
     }
   });
@@ -246,8 +251,8 @@ describe('WP3.3 complete surface sweep', () => {
   });
   it('S33.1 S33.4 status cannot assert indexing from the parked AI runtime alone', () => {
     for (const which of CASES) {
-      const state = observe(which);
-      state.aiEngine = { kind: 'indexing', stability: { kind: 'settled' }, installFailure: null };
+      const observed = observe(which);
+      const state = { ...observed, statusLabel: 'Indexing', aiEngine: { kind: 'indexing', stability: { kind: 'settled' }, installFailure: null } } as AiState;
       const panel = framePanel(state);
       const fact = panel.model!.sections.running.find(r => r.id === 'indexing')!;
       expect(fact.title, which).toBe(unconfirmed(which) ? UNCONFIRMED

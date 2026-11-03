@@ -849,6 +849,9 @@ export class Shell extends JfElement {
     // frontend request (an MCP tool call) via the same `<jf-authorization-host>` ceremony.
     this.pendingAuthorizationBridgeStop = startPendingAuthorizationBridge(this.apiBase, {
       multiplex: this.shellEventsMultiplex ?? undefined,
+      // B2 — after a reload or in a second window, the retained advisory snapshot re-discovers
+      // requests still waiting in the Engine; they rejoin the same ceremony queue (Needs you).
+      retained: this.advisoryStore,
     });
     // Tempdoc 550 thesis I (process-spanning ONE log): bridge FE-local effects into the one
     // authoritative backend action-event log, so the activity timeline is one log (no read-time

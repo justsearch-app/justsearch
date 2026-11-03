@@ -75,7 +75,7 @@ export class StatusPill extends JfElement {
     .symbol { color: var(--text-secondary); }
     .calm .symbol { color: var(--text-success); }
     .needs .symbol, .limited .symbol { color: var(--text-warning); }
-    .problems .symbol, .unreachable .symbol { color: var(--text-error); }
+    .problems .symbol, .unreachable .symbol { color: var(--text-danger); }
     button:focus-visible { outline: var(--frame-focus-width) solid var(--focus-ring-color); outline-offset: var(--jf-space-1); }
     .overlay { position: fixed; inset: 0; z-index: var(--z-overlay-transient); background: var(--frame-status-dim); }
     jf-status-panel { position: fixed; top: calc(var(--frame-status-panel-top) + var(--jf-space-2)); right: max(var(--jf-space-4), var(--frame-status-panel-right, var(--jf-space-4)));
@@ -134,7 +134,11 @@ export class StatusPill extends JfElement {
         const panel = this.shadowRoot!.querySelector<StatusPanel>('jf-status-panel');
         void panel?.updateComplete.then(() => {
           this.style.setProperty('--frame-status-panel-right', `${Math.max(0, Math.min(window.innerWidth - rect.right, window.innerWidth - panel.getBoundingClientRect().width))}px`);
-          this.style.setProperty('--frame-status-arrow-right', `${rect.width / 2}px`);
+          // The arrow points at the pill's centre wherever the panel had to shift to fit (narrow
+          // windows clamp the panel inside the viewport), measured from the placed panel's edge.
+          const placed = panel.getBoundingClientRect();
+          const fromRight = Math.min(Math.max(0, placed.right - (rect.left + rect.width / 2)), placed.width);
+          this.style.setProperty('--frame-status-arrow-right', `calc(${fromRight}px - var(--jf-space-2) / 2)`);
           panel.shadowRoot?.querySelector<HTMLElement>('[role="dialog"]')?.focus();
         });
       } else this.transient.close();

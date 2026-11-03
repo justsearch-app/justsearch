@@ -91,6 +91,43 @@ describe('Move 4 — trusted ceremony on the Top Layer', () => {
     },
   );
 
+  it.each(kinds.flatMap(first => kinds.filter(second => second !== first).map(second => [first, second] as const)))(
+    'A1 selecting %s → %s from the status panel applies the selected prompt’s own modality', async (first, second) => {
+      host.remove();
+      host = document.createElement('jf-authorization-host') as AuthorizationHost;
+      host.setAttribute('status-panel', '');
+      document.body.appendChild(host);
+      await settle();
+      const dialog = host.shadowRoot!.querySelector('dialog')!;
+      const modal = vi.spyOn(dialog, 'showModal');
+      const nonModal = vi.spyOn(dialog, 'show');
+      const id = (kind: Kind, name: string) => kind === 'capability'
+        ? String(listPendingConsentRequests().find(r => r.contributorId === `plugin.${name}`)!.id) : name;
+      enqueue(first, 'first');
+      enqueue(second, 'second');
+      await settle();
+      // The status panel lists both; nothing opens until one is selected.
+      expect(dialog.open).toBe(false);
+      host.reviewStatusRequest(id(first, 'first'));
+      await settle();
+      expect(dialog.open).toBe(true);
+      expect(modalOwnsFocus()).toBe(first !== 'lightweight');
+      modal.mockClear(); nonModal.mockClear();
+      // The first stays open (undecided) while the user selects the second from the panel.
+      host.reviewStatusRequest(id(second, 'second'));
+      await settle();
+      expect(dialog.open).toBe(true);
+      expect(host.shadowRoot!.querySelector('dialog')!.getAttribute('data-testid'))
+        .toBe(second === 'capability' ? 'capability-ceremony' : 'authorization-ceremony');
+      expect(modalOwnsFocus(), `${second} modality`).toBe(second !== 'lightweight');
+      expect(document.documentElement.style.overflow).toBe(second === 'lightweight' ? '' : 'hidden');
+      if ((first === 'lightweight') !== (second === 'lightweight')) {
+        expect(second === 'lightweight' ? nonModal : modal, `${second} reopened in its own mode`).toHaveBeenCalledTimes(1);
+      }
+      expect(second === 'lightweight' ? modal : nonModal).not.toHaveBeenCalled();
+    },
+  );
+
   it('opens a high-risk ceremony as a modal <dialog> (showModal → top layer, un-occludable)', async () => {
     void requestAuthorization({
       pendingId: 'p',

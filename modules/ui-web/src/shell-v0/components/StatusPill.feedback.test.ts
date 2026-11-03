@@ -5,7 +5,7 @@ import { StatusPill } from './StatusPill.js';
 import type { StatusPanel } from './StatusPanel.js';
 import { AdvisoryStore, type AdvisoryRecord, type AdvisorySnapshot } from './advisory/AdvisoryStore.js';
 import { emitEphemeralToast } from './advisory/ephemeralToast.js';
-import { __feedForTest, __resetAiStateForTest, type StatusSnapshot } from '../state/aiStateStore.js';
+import { __feedForTest, __feedContactForTest, __resetAiStateForTest, type StatusSnapshot } from '../state/aiStateStore.js';
 import { dispatchPluginError, dispatchPluginLoaded } from '../state/pluginLoadEvents.js';
 import { sendDesktopNotification } from '../../utils/notify.js';
 vi.mock('../../utils/windowFocus.js', () => ({ isWindowFocused: async () => false }));
@@ -70,6 +70,24 @@ describe('status feedback ownership', () => {
     expect(sendDesktopNotification).toHaveBeenCalledTimes(1);
     listeners.forEach(cb => cb(snapshot)); await flush(); expect(sendDesktopNotification).toHaveBeenCalledTimes(1);
     pill.remove(); document.body.append(pill); await flush(); expect(sendDesktopNotification).toHaveBeenCalledTimes(1);
+  });
+  it('B3 C6 a hold observed at startup or after a reconnect is silent; a live hold arrival is announced once in plain grammar', async () => {
+    const held = (state: string) => __feedForTest({ status: { operating: { indexing: { state, reasons: ['user_paused'], untilEpochMs: null, waitingForResume: true } },
+      worker: { core: { indexState: 'INDEXING', pendingJobs: 3, indexedDocuments: 12, searchableDocuments: 12, indexHealthy: true },
+        migration: { processingJobsCount: 0 }, enrichment: { backfillMode: 'idle' } },
+      readiness: { composites: { retrieval: { state: 'READY', reasonCodes: [] } } } } as unknown as StatusSnapshot });
+    // Reload with indexing paused: the first observation lists the hold without an arrival announcement.
+    held('PAUSED'); __feedContactForTest(); await flush();
+    expect(pill.status.model.sections.needs.map(row => row.id)).toEqual(['indexing-hold']);
+    expect(pill.status.assertive).toBe('');
+    // The hold is resolved while observed, then arrives again live (paused elsewhere): one announcement.
+    held('RUNNING'); __feedContactForTest(); await flush();
+    expect(pill.status.model.sections.needs).toEqual([]);
+    held('PAUSED'); __feedContactForTest(); await flush();
+    expect(pill.status.assertive).toBe('1 item needs you.');
+    const announced = pill.status.assertiveKey;
+    held('PAUSED'); __feedContactForTest(); await flush();
+    expect(pill.status.assertiveKey).toBe(announced);
   });
   it('ST5 plugin errors leave active Problems on recovery and keep history; copy failures have visible feedback', async () => {
     dispatchPluginError({ pluginUrl: 'https://plugin.example/test.js', message: 'Invalid manifest', stack: 'stack details' }); await flush();

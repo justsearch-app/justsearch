@@ -51,6 +51,6 @@ it('withdraws delayed file work from the running chip while preserving independe
   // The delayed file is not counted as running work: Running holds the waiting aggregate and the
   // independent agent task only, and the header count says so.
   expect(el.model!.sections.running.map(row => row.id)).toEqual(['indexing', 'task:agent:live']);
-  expect(el.shadowRoot!.querySelector('header')!.textContent).toContain('2 running');
+  expect(el.shadowRoot!.querySelector('.header')!.textContent).toContain('2 running');
   expect(el.shadowRoot!.textContent).not.toContain('3 running');
 });

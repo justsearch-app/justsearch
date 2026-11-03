@@ -11,6 +11,8 @@
 
 import { html, css, nothing, type TemplateResult } from 'lit';
 import { JfElement } from '../primitives/JfElement.js';
+import { ModalityController } from '../primitives/modality.js';
+import { closeOthersInLayer } from '../state/transientLayerArbiter.js';
 import { repeat } from 'lit/directives/repeat.js';
 import {
   invokeCommand,
@@ -75,6 +77,19 @@ export class CommandPalette extends JfElement {
     this.wizardCompletedLabels = [];
   }
 
+  /**
+   * The palette owns the keyboard while open (backdrop + focus in its field), so it enters the app's
+   * one modality authority like the Search palette does: global shortcuts — the status panel's
+   * among them — stand down under it. Focus stays this component's own (no restore on exit).
+   */
+  private readonly modality = new ModalityController(this);
+
+  /** One overlay at a time: opening the palette closes any open popover (the status panel included). */
+  private enterOverlay(): void {
+    closeOthersInLayer('transient', 'command-palette');
+    this.modality.enter();
+  }
+
   connectedCallback(): void {
     super.connectedCallback();
     // Tempdoc 508-followup §δ1 — register as the slot prompt provider
@@ -107,6 +122,7 @@ export class CommandPalette extends JfElement {
       this.wizardStep = { slot, templateId, resolver: resolve };
       this.wizardActive = true;
       this.wizardInput = slot.default ?? '';
+      this.enterOverlay();
       this.open = true;
       this.updateComplete.then(() => {
         const input = this.shadowRoot?.querySelector('input');
@@ -281,6 +297,7 @@ export class CommandPalette extends JfElement {
   `;
 
   show(): void {
+    this.enterOverlay();
     this.open = true;
     this.query = '';
     this.results = searchPaletteEntries('');
@@ -293,6 +310,7 @@ export class CommandPalette extends JfElement {
 
   hide(): void {
     this.open = false;
+    this.modality.exit({ skipFocusRestore: true });
     this.query = '';
     this.results = [];
     this.selectedIndex = 0;
@@ -335,19 +353,23 @@ export class CommandPalette extends JfElement {
     } else if (e.key === 'Enter') {
       e.preventDefault();
       const selected = this.results[this.selectedIndex];
-      if (selected) {
-        this.invokeEntry(selected.entry);
-        this.hide();
-      }
+      if (selected) this.runEntry(selected.entry);
     }
   }
 
   private handleSelect(index: number): void {
     const selected = this.results[index];
-    if (selected) {
-      this.invokeEntry(selected.entry);
-      this.hide();
-    }
+    if (selected) this.runEntry(selected.entry);
+  }
+
+  /**
+   * Close, then run: the chosen command (e.g. "What's going on") acts on the page, not under the
+   * palette's modality. The query is read before closing clears it.
+   */
+  private runEntry(entry: PaletteEntry): void {
+    const query = this.query;
+    this.hide();
+    this.invokeEntry(entry, query);
   }
 
   /**
@@ -357,9 +379,9 @@ export class CommandPalette extends JfElement {
    * not via a direct `setSearchQuery` side-channel; everything else goes through
    * the normal command/action invoke path unchanged.
    */
-  private invokeEntry(entry: PaletteEntry): void {
+  private invokeEntry(entry: PaletteEntry, query: string): void {
     if (entry.origin === 'intent' && entry.id === 'intent.search') {
-      const text = entry.intentText ?? parsePaletteQuery(this.query).text;
+      const text = entry.intentText ?? parsePaletteQuery(query).text;
       // Tempdoc 548 §4.5 (S4-B) — authority collapse: the query travels through
       // the navigation INTENT, giving "the user asked to search" a single
       // authority instead of a setSearchQuery side-channel + a separate navigate.

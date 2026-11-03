@@ -40,6 +40,8 @@ deletion is the Obsolete entry here.
 | TaskList: terminal state on active→ready only, F1 "indexed and enriched" honesty, failures withdraw completion | StatusPill.feedback ST8; StatusPanel.running "persisted vectors…", "blocked meaning search…"; frameStatus "a terminal indexing failure…" | kept |
 | TaskList: collapse when empty, disclosure toggle | StatusPanel.history "omits empty sections…"; StatusPill.test ST15 expanded row | kept (panel form) |
 | IndexingOverlay: unconfirmed header, queue rows, liveness withdrawal, retry waiting not active, one projection's counts | StatusPanel.running "stale retained indexing…", "a missing observation…"; IndexingPause (adapted) | kept (panel form) |
+| IndexingPause F3: focused status item kept outside the status bar's adaptive overflow | — | retired with the status bar (ST10): the panel's indexing controls never enter an overflow cut |
+| indexingMissedSurfaces: status-bar mode chip label ('Engine gone'/'unavailable' engine label); overlay host absent for 'Engine gone' | indexingMissedSurfaces (adapted: Running rebuild fact; Running progress bar) | chip label and overlay host retired (ST10); the qualification itself is kept |
 | IndexingOverlay: Go online CTA, its S0 failure notice, dismiss, modality authority (864 F2), Sv3Main 864 F2 | — | retired with the overlay (ST10); Go online stays in AI Brain (core.set-chat-enabled, failures in that window's runtime error) |
 | AdvisoryToastHost: snapshot seeds silently, pre-snapshot updates silent, new advisories after snapshot | AdvisoryStore C6 (repaired); StatusPill.feedback C6; frameStatus ST8 C6 | kept |
 | AdvisoryToastHost 655: desktop notification for live REQUIRES_ACK while unfocused only, never for replay | StatusPill.transitions "only a live REQUIRES_ACK arrival…"; StatusPill.feedback C6 | kept (ST14) |
@@ -156,7 +158,7 @@ deletion is the Obsolete entry here.
         "modules/ui-web/src/shell-v0/components/IndexingPause.test.ts"
       ],
       "class": "Obsolete",
-      "removedChecks": "F2 'preserves a sensible focus and announces remote quiet-queue Resume once': the assertions that the task tray stays mounted after a remote resume (no data-empty), keeps focus on its task title and reads 'Indexing is already running'. Those belonged to the task tray (TaskList.ts, removed). In the panel a resolved hold leaves Needs you (ST4/ST5 active-only) and focus moves to the panel itself; the announcement-once assertion is kept (see the New entry).",
+      "removedChecks": "F2 'preserves a sensible focus and announces remote quiet-queue Resume once': the assertions that the task tray stays mounted after a remote resume (no data-empty), keeps focus on its task title and reads 'Indexing is already running'. Those belonged to the task tray (TaskList.ts, removed). In the panel a resolved hold leaves Needs you (ST4/ST5 active-only) and focus moves to the panel itself; the announcement-once assertion is kept (see the New entry). Also removed: F3 'keeps the focused status item outside hidden adaptive overflow', which measured the status bar's adaptive overflow (.adaptive-bar / .item, the bar's OverflowController cut) to keep the focused Pause/Resume item visible and let it overflow again after blur. The status bar is removed (StatusDeck.ts); in the panel the indexing controls sit in their row and never enter an overflow cut (the plugin row keeps its own OverflowController, pinned by StatusPill.test ST9/ST15).",
       "sources": [
         {
           "kind": "delegated-choice",
@@ -169,7 +171,33 @@ deletion is the Obsolete entry here.
         {
           "kind": "removal",
           "removed": [
-            "modules/ui-web/src/shell-v0/components/TaskList.ts"
+            "modules/ui-web/src/shell-v0/components/TaskList.ts",
+            "modules/ui-web/src/shell-v0/components/StatusDeck.ts"
+          ]
+        }
+      ],
+      "conflictSearch": "decision records searched for a conflict: none — docs/decisions/*.md (54 records) searched for StatusDeck, status bar, TaskList, task list, AdvisoryToastHost, toast, AdvisoryInbox, inbox drawer, rail badge, AiActivityDigest, PendingEffectQueue, AgentActivityPanel, AppUpdateBanner, PluginErrorOverlay, ResolutionToast, IndexingOverlay, indexing overlay: no matches"
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/components/indexingMissedSurfaces.test.ts"
+      ],
+      "class": "Obsolete",
+      "removedChecks": "Two presenter-only assertions inside otherwise adapted tests (the rest of each test is the Adaptation entry): (1) 'S33.4 S33.6 migration mode pills qualify retained rebuilding while preserving fresh migration' asserted the status bar's inference-mode chip label (inferenceChipReadout().label): the engine's statusLabel for 'Engine gone' and 'unavailable', the unconfirmed placeholder otherwise. The chip is removed with the status bar (StatusDeck.ts); the test keeps the retained-rebuilding qualification at the new owner (the Running rebuild fact is stale and carries no fraction when unconfirmed), and the engine label stays pinned by 'declared liveness readouts qualify retained migration and its accessible name' in the same file. (2) 'S33.1 S33.4 overlay activity animation stops during deferred work and uncertainty, then resumes' asserted that the full-screen overlay host renders no jf-indexing-overlay for 'Engine gone' and read the overlay's .icon-box spin animation. The overlay is removed (IndexingOverlay.ts); the same on/off condition is now read from the Running row's progress bar for every case, 'Engine gone' included.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed accordingly",
+          "delegationLocation": "task t-20261103-shell user turn 2026-11-03 ~16:20Z (reply to the orchestrator's plan)",
+          "delegationScope": "the frame-build plan: S1 · Status: the pill and status panel, built on the existing data, replacing about a dozen old pieces (the status bar, bell, pop-ups, task list and others)",
+          "choice": "ST10 Retired after S1: StatusDeck status bar, rail AI dots and advisory rail badge, AdvisoryToastHost pop-ups, AdvisoryInboxDrawer, AiActivityDigest, TaskList, PendingEffectQueue cards, AgentActivityPanel, AppUpdateBanner, PluginErrorOverlay cards, ResolutionToast (moved into the panel or an inline notice), IndexingOverlay backdrop. Their actions remain reachable from the panel or their window. No mechanism is shown in two places. | ST3 Clicking the pill (or a keyboard shortcut, listed in the palette) opens the status panel over the page, anchored under the pill; Escape, outside click or the pill closes it and returns focus to the pill. Sections in order: Needs you, Problems right now, Running, Earlier, plugin row; footer All activity, Health. Empty sections are omitted; an all-calm panel says so in one line. | ST4 Needs you lists: backend pending authorizations (agent/MCP operation approvals) with their deadline, frontend proposed effects (agent suggestions), plugin capability requests waiting, indexing holds (manual pause, schedule, battery, settings recovery), app update available or repair required, rebuild gap decision. Each with its existing actions. | ST7 Earlier lists persisted advisories and completed operations newest first, with read/unread (existing acknowledgements), Mark all read, and Undo only where the journal/backend supports reversal; \"Add back to search\" (re-index) where forget cannot be reversed. Read/unread, seen/unseen and active/resolved stay separate. | ST11 Wording: \"All systems operational\" is gone; the calm state claims only what is checked (\"Up to date\" covers search; AI health shown separately in AI Brain/Health). The advisory \"offline\" indicator no longer derives from poll staleness alone.",
+          "label": "agent choice"
+        },
+        {
+          "kind": "removal",
+          "removed": [
+            "modules/ui-web/src/shell-v0/components/StatusDeck.ts",
+            "modules/ui-web/src/shell-v0/components/IndexingOverlay.ts"
           ]
         }
       ],
@@ -195,7 +223,7 @@ deletion is the Obsolete entry here.
         "instrumentation",
         "input re-encoding"
       ],
-      "whatMoved": "The observation point moved from the retired presenters to their new owner; inputs, preconditions, fault injection and expected outcomes are kept. IndexingPause: the shared Pause/Resume surface cases mount jf-status-pill (panel open) instead of jf-task-list / jf-status-deck / jf-indexing-overlay and read jf-indexing-controls inside the panel; the indexing announcer is the pill's; 'uncertainty must not hide a focused action' reads control.isConnected instead of the tray's data-empty attribute; overlay cases feed the same snapshot through the store instead of assigning a precomputed projection. indexingMissedSurfaces: 'mode pill qualifies retained rebuilding' reads the Running rebuild fact (stale when unconfirmed, no fraction) instead of the status-bar chip label; 'overlay animation stops during deferred work and uncertainty' reads the indexing row's progress bar presence with the identical condition; 'announcements use one region and withdraw stale rebuild claims' keeps both original assertions (one Rebuilding notice, none after the stale observation) on the pill. indexingStatusFollowup/indexingStatusSurfaces/indexingSurfaceSweep: the same states render through jf-status-pill / jf-status-panel (deriveFrameStatus) in place of jf-status-deck / jf-task-list / jf-indexing-overlay-host, with the same expected sentences, 'last observed'/'last seen' qualification and absence of bars; the stale stage disclosure's qualifier is the panel's 'last seen' instead of the tray's heading 'Last observed indexing and enrichment details'. indexingTaskWaiting: the running list is the panel's Running section; the delayed file is still not counted (Running ids are exactly the waiting aggregate and the agent task; '3 running' absent). indexingJobsQueueRail: the queued/failed totals and the 8-row file window read from the indexing row's details in the panel instead of the tray's aggregate cards; a fetch stub keeps the pill's status-cadence reads off any real origin. SettingsSurface.indexingRules: the schedule-hold row moves from the task tray to the panel's Needs you. SearchV3View.structuredOutcome: the polite announcement is the pill's polite live region and the outcome's local record, instead of one toast per outcome. platform-open-guard: the refusal toast's renderer is the pill instead of the toast host. Shell.test (slice 492): the mounted status owner is jf-status-pill instead of jf-status-deck. HealthSurface.render: the negative assertions 'never claims the green phrase' follow the phrase's new wording ('Up to date' instead of 'All systems operational').",
+      "whatMoved": "The observation point moved from the retired presenters to their new owner; inputs, preconditions, fault injection and expected outcomes are kept. IndexingPause: the shared Pause/Resume surface cases mount jf-status-pill (panel open) instead of jf-task-list / jf-status-deck / jf-indexing-overlay and read jf-indexing-controls inside the panel; the indexing announcer is the pill's; 'uncertainty must not hide a focused action' reads control.isConnected instead of the tray's data-empty attribute; overlay cases feed the same snapshot through the store instead of assigning a precomputed projection. indexingMissedSurfaces: 'mode pill qualifies retained rebuilding' reads the Running rebuild fact (stale when unconfirmed, no fraction) instead of the status-bar chip label (the chip-label values are the separate Obsolete entry); 'overlay animation stops during deferred work and uncertainty' reads the indexing row's progress bar presence with the identical condition (the overlay-host absence for 'Engine gone' is the separate Obsolete entry); 'announcements use one region and withdraw stale rebuild claims' keeps both original assertions (one Rebuilding notice, none after the stale observation) on the pill. indexingSurfaceSweep 'Running and System self-view qualify retained indexing rows': the System self-view half is unchanged (its row reads 'last observed running' and has no .bar when unconfirmed), and the task-tray half reads the panel's per-file detail line (same words, no progress bar) and the indexing row's bar; 'status cannot assert indexing from the parked AI runtime alone' keeps its input (statusLabel 'Indexing', aiEngine indexing) and reads the Running indexing fact's title with the same expected sentences. indexingStatusFollowup/indexingStatusSurfaces/indexingSurfaceSweep: the same states render through jf-status-pill / jf-status-panel (deriveFrameStatus) in place of jf-status-deck / jf-task-list / jf-indexing-overlay-host, with the same expected sentences, 'last observed'/'last seen' qualification and absence of bars; the stale stage disclosure's qualifier is the panel's 'last seen' instead of the tray's heading 'Last observed indexing and enrichment details'. indexingTaskWaiting: the running list is the panel's Running section; the delayed file is still not counted (Running ids are exactly the waiting aggregate and the agent task; '3 running' absent). indexingJobsQueueRail: the queued/failed totals and the 8-row file window read from the indexing row's details in the panel instead of the tray's aggregate cards; a fetch stub keeps the pill's status-cadence reads off any real origin. SettingsSurface.indexingRules: the schedule-hold row moves from the task tray to the panel's Needs you. SearchV3View.structuredOutcome: the polite announcement is the pill's polite live region and the outcome's local record, instead of one toast per outcome. platform-open-guard: the refusal toast's renderer is the pill instead of the toast host. Shell.test (slice 492): the mounted status owner is jf-status-pill instead of jf-status-deck. HealthSurface.render: the negative assertions 'never claims the green phrase' follow the phrase's new wording ('Up to date' instead of 'All systems operational').",
       "sources": [
         {
           "kind": "delegated-choice",
@@ -579,7 +607,7 @@ deletion is the Obsolete entry here.
         "modules/ui-web/src/shell-v0/components/IndexingPause.test.ts"
       ],
       "class": "New",
-      "behaviour": "After a remote resume of a quiet queue the resolved hold leaves the panel, focus moves to the panel rather than the page, and 'Indexing resumed.' is announced once.",
+      "behaviour": "After a remote resume of a quiet queue the resolved hold leaves the panel, focus moves to the panel rather than the page, and 'Indexing resumed.' is announced once. C7: an accepted Resume reads 'Resuming' (and the pill keeps 'Indexing paused') until the engine reports work running; a failed Resume says it could not confirm and drops 'Resuming'.",
       "sources": [
         {
           "kind": "delegated-choice",
@@ -593,7 +621,8 @@ deletion is the Obsolete entry here.
       "repaired": false,
       "evidence": "gates/test-intent/evidence/shell-s1-frame-status-new.json",
       "newChecks": [
-        "modules/ui-web/src/shell-v0/components/IndexingPause.test.ts#WP3.7 verifier layout and focus repairs F2 preserves a sensible focus and announces remote quiet-queue Resume once"
+        "modules/ui-web/src/shell-v0/components/IndexingPause.test.ts#WP3.7 verifier layout and focus repairs F2 preserves a sensible focus and announces remote quiet-queue Resume once",
+        "modules/ui-web/src/shell-v0/components/IndexingPause.test.ts#WP3.7 verifier layout and focus repairs C7 an accepted resume reads \"resuming\" until the engine reports work; a failed resume says so"
       ]
     },
     {
@@ -639,6 +668,211 @@ deletion is the Obsolete entry here.
       "newChecks": [
         "modules/ui-web/src/shell-v0/substrates/tasks/indexingJobsQueueRail.test.ts#standalone million-row rail shows one real queued count, retry until claim, liveness, both failures, DONE, cancel and resync",
         "modules/ui-web/src/shell-v0/substrates/tasks/indexingJobsQueueRail.test.ts#multiplexed million-row rail shows one real queued count, retry until claim, liveness, both failures, DONE, cancel and resync"
+      ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/components/AuthorizationHost.toplayer.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "Selecting a request from the status panel while another prompt is open presents the selected one in its own modality: typed approvals and plugin capability requests modal in the top layer (scroll lock, modality authority), lightweight approvals non-modal.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed accordingly",
+          "delegationLocation": "task t-20261103-shell user turn 2026-11-03 ~16:20Z (reply to the orchestrator's plan)",
+          "delegationScope": "the frame-build plan: S1 · Status: the pill and status panel, built on the existing data, replacing about a dozen old pieces (the status bar, bell, pop-ups, task list and others)",
+          "choice": "ST12 (must not break) Typed confirmation of high-risk and agent medium-risk proposals; acceptance and rejection outcomes; exact-target binding of backend pending authorizations; withdrawal/expiry reconciliation (transport failure is not expiry). | C12 (must not break) One decision, one execution: the same authorization reached from the panel, a dialog and an MCP announcement executes once; repeated clicks are idempotent; expired, withdrawn or superseded requests (run cancelled, engine restart, answered elsewhere) cannot execute and leave the panel. | Repair round 6 (verifier A1) restates the contract from PR #1115: typed approvals and plugin capability consent are modal in the browser top layer whatever is open or queued, from every entry point (queue, panel selection, announcement); lightweight approvals are non-modal.",
+          "label": "agent choice"
+        }
+      ],
+      "repaired": true,
+      "evidence": "gates/test-intent/evidence/shell-s1-frame-status-round6-repair.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/components/AuthorizationHost.toplayer.test.ts#Move 4 — trusted ceremony on the Top Layer A1 selecting lightweight → typed from the status panel applies the selected prompt’s own modality",
+        "modules/ui-web/src/shell-v0/components/AuthorizationHost.toplayer.test.ts#Move 4 — trusted ceremony on the Top Layer A1 selecting lightweight → capability from the status panel applies the selected prompt’s own modality",
+        "modules/ui-web/src/shell-v0/components/AuthorizationHost.toplayer.test.ts#Move 4 — trusted ceremony on the Top Layer A1 selecting typed → lightweight from the status panel applies the selected prompt’s own modality",
+        "modules/ui-web/src/shell-v0/components/AuthorizationHost.toplayer.test.ts#Move 4 — trusted ceremony on the Top Layer A1 selecting capability → lightweight from the status panel applies the selected prompt’s own modality"
+      ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/components/AuthorizationHost.toplayer.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "Selecting a typed approval while a plugin capability request is open (or the reverse) keeps the selected security prompt modal in the top layer: the swap never leaves a modal ceremony non-modal (must-not-break around the A1 repair; both modes are modal on the candidate too).",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed accordingly",
+          "delegationLocation": "task t-20261103-shell user turn 2026-11-03 ~16:20Z (reply to the orchestrator's plan)",
+          "delegationScope": "the frame-build plan: S1 · Status: the pill and status panel, built on the existing data, replacing about a dozen old pieces (the status bar, bell, pop-ups, task list and others)",
+          "choice": "ST12 (must not break) Typed confirmation of high-risk and agent medium-risk proposals; acceptance and rejection outcomes; exact-target binding of backend pending authorizations; withdrawal/expiry reconciliation (transport failure is not expiry). | C12 (must not break) One decision, one execution: the same authorization reached from the panel, a dialog and an MCP announcement executes once; repeated clicks are idempotent; expired, withdrawn or superseded requests (run cancelled, engine restart, answered elsewhere) cannot execute and leave the panel. | Repair round 6 (verifier A1) restates the contract from PR #1115: typed approvals and plugin capability consent are modal in the browser top layer whatever is open or queued, from every entry point (queue, panel selection, announcement); lightweight approvals are non-modal.",
+          "label": "agent choice"
+        }
+      ],
+      "repaired": false,
+      "evidence": "gates/test-intent/evidence/shell-s1-frame-status-new.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/components/AuthorizationHost.toplayer.test.ts#Move 4 — trusted ceremony on the Top Layer A1 selecting typed → capability from the status panel applies the selected prompt’s own modality",
+        "modules/ui-web/src/shell-v0/components/AuthorizationHost.toplayer.test.ts#Move 4 — trusted ceremony on the Top Layer A1 selecting capability → typed from the status panel applies the selected prompt’s own modality"
+      ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/state/frameStatus.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "A folder whose last scan errored (walkError, e.g. INCOMPLETE_COVERAGE) or whose deletions are unverified is listed in Problems right now in plain words, with the Library action, exactly as the Library headline counts it; while one is listed the pill is not calm.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed accordingly",
+          "delegationLocation": "task t-20261103-shell user turn 2026-11-03 ~16:20Z (reply to the orchestrator's plan)",
+          "delegationScope": "the frame-build plan: S1 · Status: the pill and status panel, built on the existing data, replacing about a dozen old pieces (the status bar, bell, pop-ups, task list and others)",
+          "choice": "ST1 (Concurrent facts stay discoverable: whatever the pill shows, every actionable condition is listed in the panel.) One status pill in the top bar shows exactly one state, chosen in this order: engine unreachable > search limited (index unavailable, reindex required, schema refused) > needs you (count) > problems right now > working (most important running item, with progress when known) > just finished (6 s) > calm. Calm reads \"Up to date\" with a green dot at window width ≥ 1000 px, dot only below, same accessible name. | ST5 Problems right now lists active conditions only: folder unavailable, unreadable files (per folder, linking to Library), search limited, plugin load failure, AI install failed. A resolved condition leaves the section; history of it remains in Earlier/Activity.",
+          "label": "agent choice"
+        }
+      ],
+      "repaired": true,
+      "evidence": "gates/test-intent/evidence/shell-s1-frame-status-round6-repair.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/state/frameStatus.test.ts#concurrent source facts B1 a folder whose scan errored is a problem right now, as the Library headline counts it, and the pill never claims calm"
+      ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/operations/pendingAuthorizationBridge.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "After a reload or in a second window, an MCP request still waiting in the Engine (re-discovered from the retained advisory snapshot and confirmed by id) rejoins the one ceremony queue with its deadline, once; expired, answered or non-request records are not presented, and a failed read is retried rather than treated as expiry.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed accordingly",
+          "delegationLocation": "task t-20261103-shell user turn 2026-11-03 ~16:20Z (reply to the orchestrator's plan)",
+          "delegationScope": "the frame-build plan: S1 · Status: the pill and status panel, built on the existing data, replacing about a dozen old pieces (the status bar, bell, pop-ups, task list and others)",
+          "choice": "ST4 Needs you lists: backend pending authorizations (agent/MCP operation approvals) with their deadline, frontend proposed effects (agent suggestions), plugin capability requests waiting, indexing holds (manual pause, schedule, battery, settings recovery), app update available or repair required, rebuild gap decision. Each with its existing actions. | ST15 Live behaviour: the panel updates while open without losing scroll or an expanded item; a second window shows the same state; reload keeps unread state; switching windows with the panel open closes it. | ST12 (must not break) Typed confirmation of high-risk and agent medium-risk proposals; acceptance and rejection outcomes; exact-target binding of backend pending authorizations; withdrawal/expiry reconciliation (transport failure is not expiry). | C12 (must not break) One decision, one execution: the same authorization reached from the panel, a dialog and an MCP announcement executes once; repeated clicks are idempotent; expired, withdrawn or superseded requests (run cancelled, engine restart, answered elsewhere) cannot execute and leave the panel.",
+          "label": "agent choice"
+        }
+      ],
+      "repaired": true,
+      "evidence": "gates/test-intent/evidence/shell-s1-frame-status-round6-repair.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/operations/pendingAuthorizationBridge.test.ts#pendingAuthorizationBridge (tempdoc 655) B2 after a reload or in a second window, requests still waiting in the Engine rejoin the ceremony queue once"
+      ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/components/StatusPill.feedback.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "An indexing hold first observed at startup (or after a reconnect) is listed in Needs you without an assertive announcement; a hold that arrives while observed is announced once, as '1 item needs you.'.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed accordingly",
+          "delegationLocation": "task t-20261103-shell user turn 2026-11-03 ~16:20Z (reply to the orchestrator's plan)",
+          "delegationScope": "the frame-build plan: S1 · Status: the pill and status panel, built on the existing data, replacing about a dozen old pieces (the status bar, bell, pop-ups, task list and others)",
+          "choice": "C6 (must not break) Historical replay stays silent: startup snapshots, reconnects and late resource discovery list retained records in Earlier without new notices, sounds, badges or completion announcements. | ST4 Needs you lists: backend pending authorizations (agent/MCP operation approvals) with their deadline, frontend proposed effects (agent suggestions), plugin capability requests waiting, indexing holds (manual pause, schedule, battery, settings recovery), app update available or repair required, rebuild gap decision. Each with its existing actions.",
+          "label": "agent choice"
+        }
+      ],
+      "repaired": true,
+      "evidence": "gates/test-intent/evidence/shell-s1-frame-status-round6-repair.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/components/StatusPill.feedback.test.ts#status feedback ownership B3 C6 a hold observed at startup or after a reconnect is silent; a live hold arrival is announced once in plain grammar"
+      ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/components/StatusPill.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "Ctrl+Shift+S does not open the panel while the shell command palette or the Search palette is open, works again once it closed, and opening either palette closes an open panel (one overlay at a time).",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed accordingly",
+          "delegationLocation": "task t-20261103-shell user turn 2026-11-03 ~16:20Z (reply to the orchestrator's plan)",
+          "delegationScope": "the frame-build plan: S1 · Status: the pill and status panel, built on the existing data, replacing about a dozen old pieces (the status bar, bell, pop-ups, task list and others)",
+          "choice": "ST3 Clicking the pill (or a keyboard shortcut, listed in the palette) opens the status panel over the page, anchored under the pill; Escape, outside click or the pill closes it and returns focus to the pill. Sections in order: Needs you, Problems right now, Running, Earlier, plugin row; footer All activity, Health. Empty sections are omitted; an all-calm panel says so in one line. | C8 (orchestrator acceptance class for ST3's shortcut) shortcuts ignored in text fields, IME, repeat and under a modal; repair round 6 (verifier B4): under another modal/overlay the panel shortcut must not fire, and opening the palette closes the panel (one overlay at a time).",
+          "label": "agent choice"
+        }
+      ],
+      "repaired": true,
+      "evidence": "gates/test-intent/evidence/shell-s1-frame-status-round6-repair.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/components/StatusPill.test.ts#status pill and panel B4 C8 one overlay at a time: the shortcut stands down under either palette, and opening a palette closes the panel"
+      ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/components/StatusPill.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "The palette entry \"What's going on\" still opens the status panel: the palette closes (leaving its modality) before the chosen command runs (must-not-break around the B4 repair).",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed accordingly",
+          "delegationLocation": "task t-20261103-shell user turn 2026-11-03 ~16:20Z (reply to the orchestrator's plan)",
+          "delegationScope": "the frame-build plan: S1 · Status: the pill and status panel, built on the existing data, replacing about a dozen old pieces (the status bar, bell, pop-ups, task list and others)",
+          "choice": "ST3 Clicking the pill (or a keyboard shortcut, listed in the palette) opens the status panel over the page, anchored under the pill; Escape, outside click or the pill closes it and returns focus to the pill. Sections in order: Needs you, Problems right now, Running, Earlier, plugin row; footer All activity, Health. Empty sections are omitted; an all-calm panel says so in one line. | C8 (orchestrator acceptance class for ST3's shortcut) shortcuts ignored in text fields, IME, repeat and under a modal; repair round 6 (verifier B4): under another modal/overlay the panel shortcut must not fire, and opening the palette closes the panel (one overlay at a time).",
+          "label": "agent choice"
+        }
+      ],
+      "repaired": false,
+      "evidence": "gates/test-intent/evidence/shell-s1-frame-status-new.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/components/StatusPill.test.ts#status pill and panel B4 the palette entry \"What's going on\" opens the panel once the palette has closed"
+      ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/components/StatusPanel.landmarks.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "The open panel adds no banner or contentinfo landmark to the page (axe: landmark-banner-is-top-level, landmark-contentinfo-is-top-level, no duplicate banner/contentinfo, landmark-unique).",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed accordingly",
+          "delegationLocation": "task t-20261103-shell user turn 2026-11-03 ~16:20Z (reply to the orchestrator's plan)",
+          "delegationScope": "the frame-build plan: S1 · Status: the pill and status panel, built on the existing data, replacing about a dozen old pieces (the status bar, bell, pop-ups, task list and others)",
+          "choice": "X2 Sizes 1280×800, 900×800, 600×400: nothing overflows sideways; ui-a11y-gate shows no new violations; the proportion baseline is updated deliberately.",
+          "label": "agent choice"
+        }
+      ],
+      "repaired": true,
+      "evidence": "gates/test-intent/evidence/shell-s1-frame-status-round6-repair.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/components/StatusPanel.landmarks.test.ts#B5 X2 the open panel adds no page-level banner or contentinfo landmark"
+      ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/components/StatusPanel.history.test.ts",
+        "modules/ui-web/src/shell-v0/components/StatusPill.design.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "In Earlier a failed operation is drawn as a failure (×) and a success as a check, with the outcome in words; ledger codes (GATED, SUCCESS, FAILURE, TYPED_CONFIRM) are never shown raw; row titles share a fixed icon column; at 600 px the panel arrow points at the pill's centre after the panel shifted to fit.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed accordingly",
+          "delegationLocation": "task t-20261103-shell user turn 2026-11-03 ~16:20Z (reply to the orchestrator's plan)",
+          "delegationScope": "the frame-build plan: S1 · Status: the pill and status panel, built on the existing data, replacing about a dozen old pieces (the status bar, bell, pop-ups, task list and others)",
+          "choice": "ST7 Earlier lists persisted advisories and completed operations newest first, with read/unread (existing acknowledgements), Mark all read, and Undo only where the journal/backend supports reversal; \"Add back to search\" (re-index) where forget cannot be reversed. Read/unread, seen/unseen and active/resolved stay separate. | X1 Dark, light and Windows high contrast for every frame component; contrast ≥ 4.5:1 for text; colour never the only signal; reduced motion respected; no new hard-coded colours, sizes or z-indexes (ui-web gates). | X2 Sizes 1280×800, 900×800, 600×400: nothing overflows sideways; ui-a11y-gate shows no new violations; the proportion baseline is updated deliberately. | Frame design (design-system.md §7 Status panel; ref-09, ref-21/22): the panel is anchored under the pill with its arrow at the pill.",
+          "label": "agent choice"
+        }
+      ],
+      "repaired": true,
+      "evidence": "gates/test-intent/evidence/shell-s1-frame-status-round6-repair.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/components/StatusPanel.history.test.ts#Earlier (moved from the inbox drawer) a failed operation reads as a failure in Earlier, and ledger codes read as plain words",
+        "modules/ui-web/src/shell-v0/components/StatusPanel.history.test.ts#Earlier (moved from the inbox drawer) row titles share one icon column that never stretches with the title",
+        "modules/ui-web/src/shell-v0/components/StatusPill.design.test.ts#status pill drawing at 600 px the panel arrow points at the pill where the panel had to shift to fit"
       ]
     },
     {
