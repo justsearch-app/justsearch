@@ -1125,17 +1125,13 @@ final class SyncDirectoryOps {
                 String source;
                 String sourceState;
                 try {
-                  var before = Files.readAttributes(entry.path(), BasicFileAttributes.class,
-                      java.nio.file.LinkOption.NOFOLLOW_LINKS);
+                  var before = io.justsearch.indexerworker.loop.FileFreshnessSnapshot.capture(entry.path());
                   source = io.justsearch.indexerworker.loop.SourceContentHash.sha256WithinRoot(entry.path(), root,
                       () -> cancelled.getAsBoolean() || Thread.currentThread().isInterrupted());
-                  var after = Files.readAttributes(entry.path(), BasicFileAttributes.class,
-                      java.nio.file.LinkOption.NOFOLLOW_LINKS);
-                  if (!before.isRegularFile() || !after.isRegularFile() || before.size()!=after.size()
-                      || !before.lastModifiedTime().equals(after.lastModifiedTime())
-                      || !java.util.Objects.equals(before.fileKey(),after.fileKey()))
+                  if (!before.regularFile() || before.validateNow()
+                      != io.justsearch.indexerworker.loop.FileFreshnessSnapshot.SourceValidationResult.FRESH)
                     throw new IOException("ROOT source changed during proof");
-                  sourceState = "file/" + before.size() + "/" + before.lastModifiedTime().toMillis()
+                  sourceState = "file/" + before.sizeBytes() + "/" + before.modifiedAtMs()
                       + "/" + before.fileKey() + "/" + source;
                 }
                 catch (IOException incomplete) { throw new java.io.UncheckedIOException(incomplete); }

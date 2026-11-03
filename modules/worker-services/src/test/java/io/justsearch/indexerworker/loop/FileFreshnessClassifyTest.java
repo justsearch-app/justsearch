@@ -16,7 +16,7 @@ class FileFreshnessClassifyTest {
 
   private static FileFreshnessSnapshot snap(
       String normalizedPath, Object fileKey, long size, long mtime, boolean regular) {
-    return new FileFreshnessSnapshot(null, normalizedPath, "hash", fileKey, size, mtime, regular, 0L);
+    return new FileFreshnessSnapshot(null, normalizedPath, "hash", fileKey, size, java.nio.file.attribute.FileTime.fromMillis(mtime), null, regular, 0L);
   }
 
   private static final FileFreshnessSnapshot BASE = snap("/a/b.txt", "key1", 100L, 1000L, true);
@@ -38,10 +38,10 @@ class FileFreshnessClassifyTest {
   }
 
   @Test
-  @DisplayName("null file-key on either side never triggers FILE_KEY_CHANGED")
-  void nullFileKeyIgnored() {
-    assertEquals(SourceValidationResult.FRESH, FileFreshness.classify(snap("/a/b.txt", null, 100L, 1000L, true), snap("/a/b.txt", "key1", 100L, 1000L, true)));
-    assertEquals(SourceValidationResult.FRESH, FileFreshness.classify(BASE, snap("/a/b.txt", null, 100L, 1000L, true)));
+  @DisplayName("null file-key transitions trigger FILE_KEY_CHANGED")
+  void nullFileKeyChanged() {
+    assertEquals(SourceValidationResult.FILE_KEY_CHANGED, FileFreshness.classify(snap("/a/b.txt", null, 100L, 1000L, true), snap("/a/b.txt", "key1", 100L, 1000L, true)));
+    assertEquals(SourceValidationResult.FILE_KEY_CHANGED, FileFreshness.classify(BASE, snap("/a/b.txt", null, 100L, 1000L, true)));
   }
 
   @Test

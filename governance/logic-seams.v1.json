@@ -39,7 +39,7 @@
         "io.justsearch.indexerworker.loop.FileFreshnessClassifyTest"
       ],
       "pure": true,
-      "law": "Priority-ordered freshness classification: path-identity > file-kind > size > mtime > file-key. The FIRST difference in that order decides the result; null file-key on either side never triggers FILE_KEY_CHANGED. A reorder or flipped comparison silently misclassifies a changed file as FRESH (index corruption).",
+      "law": "Priority-ordered transient freshness classification: path-identity > file-kind > size > full-precision mtime > file-key > optional ctime. The FIRST difference in that order decides the result; null/non-null file-key transitions trigger FILE_KEY_CHANGED. Ctime differences use CONTENT_CHANGED. A reorder or flipped comparison silently misclassifies a changed file as FRESH (index corruption).",
       "guard": "test:FileFreshnessClassifyTest",
       "note": "Functional-core extraction from FileFreshnessSnapshot (IO capture stays in the record)."
     },

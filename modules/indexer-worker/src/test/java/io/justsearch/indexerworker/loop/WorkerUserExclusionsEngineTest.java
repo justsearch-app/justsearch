@@ -260,8 +260,9 @@ class WorkerUserExclusionsEngineTest extends LuceneExecutorTestBase {
           new io.justsearch.indexerworker.extract.ContentExtractor.ExtractionResult("private", "private.txt", "text/plain"),
           extractionPolicy, "exclusions-test", false).validate(extractionPolicy, null);
       var claim = new JobQueue.IndexJob(file, null, null, null, null, null, false, null, root);
-      var envelope = new FileEnvelope(file,
-          io.justsearch.indexerworker.util.PathNormalizer.normalizeKey(file), "hash", null, 7, 1, true, 1);
+      var envelope = FileEnvelope.fromSnapshot(new FileFreshnessSnapshot(file,
+          io.justsearch.indexerworker.util.PathNormalizer.normalizeKey(file), "hash", null,
+          7, java.nio.file.attribute.FileTime.fromMillis(1), null, true, 1));
       var extracted = new ExtractedJob(claim, artifact, System.currentTimeMillis(),
           envelope, null, "00000000-0000-4000-8000-000000003102");
       installed.update(config("[\"private.txt\"]"));

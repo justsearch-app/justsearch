@@ -103,8 +103,9 @@ public final class HeldFileWriter {
         new ExtractionResult(content, file.getFileName().toString(), "text/plain"),
         TikaExtractionPolicy.defaults(), "test-fixture", false);
     try {
-      var envelope = new FileEnvelope(file, PathNormalizer.normalizeKey(file),
-          "hash-" + file.getFileName(), null, content.length(), MODIFIED, true, MODIFIED);
+      var envelope = FileEnvelope.fromSnapshot(new FileFreshnessSnapshot(file,
+          PathNormalizer.normalizeKey(file), "hash-" + file.getFileName(), null,
+          content.length(), java.nio.file.attribute.FileTime.fromMillis(MODIFIED), null, true, MODIFIED));
       return new ExtractedJob(file, null, artifact.validate(TikaExtractionPolicy.defaults(), null),
           System.currentTimeMillis(), envelope, null, "uid-" + file.getFileName());
     } catch (ContentExtractor.ExtractionException e) {

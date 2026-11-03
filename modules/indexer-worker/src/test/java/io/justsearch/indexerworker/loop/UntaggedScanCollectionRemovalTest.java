@@ -115,8 +115,10 @@ final class UntaggedScanCollectionRemovalTest extends LuceneExecutorTestBase {
     var artifact = ExtractionArtifact.full(new ContentExtractor.ExtractionResult(
         Files.readString(file), file.getFileName().toString(), "text/plain"),
         policy, "collection-removal-test", false).validate(policy, null);
-    var envelope = new FileEnvelope(file, PathNormalizer.normalizeKey(file), "hash", null,
-        Files.size(file), Files.getLastModifiedTime(file).toMillis(), true, System.currentTimeMillis());
+    var envelope = FileEnvelope.fromSnapshot(new FileFreshnessSnapshot(file,
+        PathNormalizer.normalizeKey(file), "hash", null, Files.size(file),
+        java.nio.file.attribute.FileTime.fromMillis(Files.getLastModifiedTime(file).toMillis()),
+        null, true, System.currentTimeMillis()));
     writer.write(new ExtractedJob(claim, artifact, System.currentTimeMillis(), envelope, null,
         "00000000-0000-4000-8000-000000003107"), null);
   }

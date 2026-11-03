@@ -309,6 +309,11 @@ public final class JobBatchExtractor {
       }
       requireReadableSource(claim);
       String sourceSha256 = SourceContentHash.sha256WithinRoot(filePath, claim.ingestionRoot());
+      if (staleResolver.tryHandleStale(filePath, envelope, collection, null, "after hashing", provenance, claim)) {
+        batchStats.recordSkipped();
+        return null;
+      }
+      boolean unchanged = false;
       try {
         String normalizedPath = envelope.normalizedPath();
         boolean forceReindex = claim.plannedSourceSha256() != null
@@ -316,29 +321,29 @@ public final class JobBatchExtractor {
                 ? claim.recordedForce() : claim.forceReindex() || forcedPaths.remove(normalizedPath));
         // Skip isUnmodified() on empty index — every doc is new (312 item 10).
         if (!forceReindex && !indexEmptyForBatch) {
-          if (documentFieldOps.isUnmodified(normalizedPath, envelope.modifiedAtMs(), envelope.sizeBytes(),
+          unchanged = documentFieldOps.isUnmodified(normalizedPath, envelope.modifiedAtMs(), envelope.sizeBytes(),
                   sourceSha256, contentExtractor.extractionPolicy().policyId())
               && Objects.equals(collection == null || collection.isBlank() ? null : collection,
-                  documentFieldOps.getDocumentFieldOrThrow(normalizedPath, SchemaFields.COLLECTION))
-              && FileFreshnessSnapshot.fromEnvelope(envelope).validateNow()
-                  == FileFreshnessSnapshot.SourceValidationResult.FRESH) {
-            log.debug("File unchanged, skipping: {}", filePath);
-            FileEnvelope envelopeForLedger = envelope;
-            journal.recordOutcomeSafely(
-                filePath,
-                "UNCHANGED",
-                () ->
-                    jobQueue.markClaimDone(claim,
-                        journal.skipped(IngestionReasonCodes.UNCHANGED),
-                        ledgerEntry(filePath, envelopeForLedger, collection, null, provenance)));
-            batchStats.recordSkipped();
-            return null;
-          }
+                  documentFieldOps.getDocumentFieldOrThrow(normalizedPath, SchemaFields.COLLECTION));
         } else if (forceReindex) {
           log.debug("Force reindex requested, bypassing unchanged check: {}", filePath);
         }
       } catch (RuntimeException e) {
         log.debug("Could not check modification state, proceeding with extraction: {}", filePath);
+      }
+      if (unchanged) {
+        if (staleResolver.tryHandleStale(filePath, envelope, collection, null,
+            "before unchanged acknowledgment", provenance, claim)) {
+          batchStats.recordSkipped();
+          return null;
+        }
+        log.debug("File unchanged, skipping: {}", filePath);
+        FileEnvelope envelopeForLedger = envelope;
+        journal.recordOutcomeSafely(filePath, "UNCHANGED", () -> jobQueue.markClaimDone(claim,
+            journal.skipped(IngestionReasonCodes.UNCHANGED),
+            ledgerEntry(filePath, envelopeForLedger, collection, null, provenance)));
+        batchStats.recordSkipped();
+        return null;
       }
 
       Span extractSpan = maybeSpan("indexing.extract");
