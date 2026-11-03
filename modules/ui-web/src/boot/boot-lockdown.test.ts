@@ -197,23 +197,13 @@ it('RS4 incomplete and storage-cleanup starts stay gated under real lockdown', a
   }
 }, 30_000);
 
-it('RN3 normal desktop and browser starts and debug routes mount after lockdown', async () => {
+it('RN3 normal desktop and browser starts mount after lockdown', async () => {
   for (const desktop of [true, false]) {
     const page = await open('idle', false, true, desktop);
     try {
       await mounted(page, 'jf-shell');
       await page.reload();
       await mounted(page, 'jf-shell');
-    } finally { await page.close(); }
-  }
-  for (const route of ['shell-demo', 'lit-health', 'lit-health-trends', 'presentation-demo']) {
-    const page = await open('idle', false, false, true, `?${route}=1`);
-    try {
-      const selector = route === 'presentation-demo' ? '#root > h1' : '#root > .jf-shell-dock';
-      await expect.poll(() => page.locator(selector).count(), { timeout: 8000 }).toBe(1);
-      await expect.poll(() => page.evaluate(() => Object.isFrozen(Symbol)), { timeout: 8000 }).toBe(true);
-      await page.reload();
-      await expect.poll(() => page.locator(selector).count(), { timeout: 8000 }).toBe(1);
     } finally { await page.close(); }
   }
 }, 60_000);

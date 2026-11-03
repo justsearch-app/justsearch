@@ -9,14 +9,13 @@
  * i.e. the closed `KNOWN_TOKEN_NAMES` vocabulary that the whole 569 runtime authors against.
  *
  * The single-authority relationship (the #352 "dual namespace" resolved structurally, not by
- * a flattening migration that would break the standalone framework demos + the layering guard):
+ * a flattening migration that would break the layering guard):
  *   - `--surface-*` / `--accent-*` / `KNOWN_TOKEN_NAMES`  = THE canonical authoring authority.
  *   - `--jf-*`  = the framework component tier, RESOLVED THROUGH this one bridge to the authority.
  *
  * Direction of override: Layer 4 redefines Layer 2 (semantic), not Layer 3 (component);
  * component tokens pick up the change because every one resolves through a semantic token
- * (drift guard I4). Standalone routes (`?shell-demo=1`, `?lit-health=1`) do not import the
- * barrel and render with the framework's own defaults — the layered model serves both.
+ * (drift guard I4).
  *
  * Usage: imported by `shell-v0/index.ts` so any consumer of the barrel gets the bridge.
  */

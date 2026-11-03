@@ -47,7 +47,7 @@ public enum Audience {
 
   /**
    * Visible only with a debug build flag. Reserved for substrate
-   * introspection surfaces (e.g., {@code ?surface=core.shell-demo}); not for
+   * introspection surfaces; not for
    * end-user features.
    */
   DEVELOPER

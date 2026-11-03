@@ -200,7 +200,7 @@ import { bootstrapAggregateSubstrate } from '../aggregate-substrate/bootstrap.js
 // first-party manifest installs at boot via the declarative path,
 // proving the substrate end-to-end (vs the imperative registerAction
 // from Slice 7's canonical Action).
-import { installCoreDemoManifest, installCoreWalkthroughManifest } from '../substrates/manifest/canonicalManifest.js';
+import { installCoreWalkthroughManifest } from '../substrates/manifest/canonicalManifest.js';
 // Tempdoc 543 §13.6 — Workspace Profiles substrate. Boot restores
 // the persisted profile registry + auto-mirrors UserStateDocument
 // profiles + re-applies the active profile's Scope snapshot.
@@ -1095,14 +1095,6 @@ export class Shell extends JfElement {
     // Idempotent (bootstrap.ts internal guard).
     bootstrapAggregateSubstrate();
 
-    // Tempdoc 543 §13.2.3 — install canonical first-party demo
-    // ContributionManifest. Idempotent. Proves the declarative path
-    // end-to-end (manifest → installer → atomic registrations →
-    // listInstalledManifests / getAction). Fire-and-forget; errors
-    // surface as console warnings rather than blocking chrome boot.
-    installCoreDemoManifest().catch((err) => {
-      console.warn('[Shell] installCoreDemoManifest failed', err);
-    });
     // 548 §4.3(d) — the welcome walkthrough now ships as a ContributionManifest
     // (migrated out of CorePlugin.register), proving the manifest is the
     // canonical declaration root for a real first-party feature.

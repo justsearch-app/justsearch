@@ -68,8 +68,6 @@ const COVERED_FILES = [
   // the I4 drift-guard exception list permits.
   'components/TimeseriesPolyline.ts',
   'views/TimeseriesSparkline.ts',
-  // Lumino theme overlay (slice 3a.1 Phase 6) — references shell tokens.
-  'themes/lumino-theme.css',
 ];
 
 interface TokenRef {

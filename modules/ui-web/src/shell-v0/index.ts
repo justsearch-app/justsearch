@@ -93,19 +93,6 @@ import { registerSearchResultActions } from './commands/searchResultActions.js';
 registerSearchResultActions();
 export { confirmAsync, ConfirmDialog } from './components/ConfirmDialog.js';
 
-// Shell (Lumino-backed dock + pane registry)
-export { Shell } from './shell/Shell.js';
-export type {
-  PaneDescriptor,
-  AddPaneOptions,
-  SerializedLayout,
-  SerializedAreaConfig,
-  SerializedTabAreaConfig,
-  SerializedSplitAreaConfig,
-} from './shell/Shell.js';
-export { LitWidget } from './shell/LitWidget.js';
-export type { LitWidgetOptions } from './shell/LitWidget.js';
-
 // Generic shell components
 export { Form, setAtPath } from './components/Form.js';
 export type { FormChangeEventDetail } from './components/Form.js';

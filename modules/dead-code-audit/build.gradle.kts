@@ -12,7 +12,7 @@ plugins {
 // It is a dependency SINK (nothing depends on it -> no cycles) and produces no production code.
 //
 // The deps are deliberately on EVERY module that carries production io.justsearch classes, as
-// `testImplementation` (the analysis runs as a test). app-api-tck is omitted (no src/main).
+// `testImplementation` (the analysis runs as a test).
 dependencies {
   val auditedModules =
       listOf(
