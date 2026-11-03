@@ -800,6 +800,9 @@ public final class AiInstallService implements io.justsearch.app.api.AiInstallSe
         }
       }
 
+      if ("reranker".equals(packageId)) {
+        refreshRetainedReranker(candidate, installed, pkg, selected, model);
+      }
       String installedDirectory = modelPath.getParent().toAbsolutePath().normalize().toString();
       if (keepRerankerSelection && "reranker".equals(packageId)) {
         // A consented download cannot replace the user's retained custom selection.
@@ -875,6 +878,43 @@ public final class AiInstallService implements io.justsearch.app.api.AiInstallSe
     } catch (RuntimeException failure) {
       throw new IllegalStateException("Failed to encode installer activation candidate", failure);
     }
+  }
+
+  /**
+   * Best match first switched off keeps the identities of the files it served. A sanctioned
+   * upgrade or Repair that replaced that same installed model in place (same file, same variant,
+   * bytes verified against the registry and the install contract) refreshes the kept identities
+   * from this verified installation, so switching on is not refused for the sanctioned
+   * replacement. Off stays off. A retained custom file, another variant, or bytes this
+   * installation does not explain keep their old identities, and switching on still refuses them.
+   */
+  private static void refreshRetainedReranker(UiSettings candidate,
+      InstallContract.InstalledModel installed, ModelPackage pkg, ModelVariant selected,
+      FileIdentity model) {
+    var retained = candidate.getRerankerRestoreSelection();
+    if (!Boolean.FALSE.equals(candidate.getRerankerEnabled()) || retained == null
+        || retained.state() != io.justsearch.app.api.settings.QueryRoleSelection.State.SELECTED
+        || !retained.model().path().equals(model.path())
+        || !selected.filename().equals(retained.variantId())
+        || retained.precision() != null && (retained.precision() != selected.precision()
+            || retained.targetEp() != selected.targetEP())) {
+      return;
+    }
+    Path tokenizerPath = retained.tokenizer().path();
+    if (!installed.installedFiles().contains(tokenizerPath.getFileName().toString())) return;
+    String expectedTokenizerSha = pkg.supportingFiles().stream()
+        .filter(file -> tokenizerPath.getFileName().toString().equals(file.filename()))
+        .map(io.justsearch.configuration.model.SupportingFile::sha256)
+        .findFirst().orElse(null);
+    FileIdentity tokenizer = readFileIdentity(tokenizerPath, expectedTokenizerSha);
+    if (tokenizer == null) return;
+    candidate.setRerankerRestoreSelection(
+        io.justsearch.app.api.settings.QueryRoleSelection.Role.selected(retained.variantId(),
+            new io.justsearch.app.api.operations.CandidateIndexSelection.ModelFile(
+                model.path(), model.sha256().toLowerCase(java.util.Locale.ROOT), model.size()),
+            new io.justsearch.app.api.operations.CandidateIndexSelection.ModelFile(
+                tokenizer.path(), tokenizer.sha256(), tokenizer.size()),
+            selected.precision(), selected.targetEP()));
   }
 
   private static void setOnnxCandidatePath(UiSettings settings, String packageId, String path) {

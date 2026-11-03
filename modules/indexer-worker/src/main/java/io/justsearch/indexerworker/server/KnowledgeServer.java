@@ -5509,21 +5509,24 @@ public final class KnowledgeServer implements Closeable {
   /** Builds a private query successor while retaining the exact currently issued A view. */
   public PreparedQueryRoleSettings prepareQueryRoleSettings(UiSettings candidate,
       ResolvedConfig desired, Set<String> changedKeys, QueryRoleSelection prior) {
-    return prepareQueryRoleSettings(candidate, desired, changedKeys, prior, () -> () -> {});
+    return prepareQueryRoleSettings(candidate, desired, changedKeys, prior, weights -> () -> {});
   }
 
   /**
    * {@link #prepareQueryRoleSettings(UiSettings, ResolvedConfig, Set, QueryRoleSelection)} where
-   * {@code stageCandidatePlan} puts {@code desired}'s device-memory plan in effect and returns the
-   * action that puts the published plan back. A reranker the serving view does not run (Best match
-   * first switched on) is warmed under that plan once memory admission passed: the published plan
-   * of a configuration without it has no reranker budget, and a planned CUDA session sends calls
-   * without a budget to the CPU. A refused or abandoned preparation puts the published plan back;
-   * the commit publishes the candidate's own.
+   * {@code stageCandidatePlan} puts in effect the device-memory plan of {@code desired} with the
+   * given encoder weights, makes it the plan the commit publishes, and returns the action that puts
+   * the published plan back. A reranker the serving view does not run (Best match first switched
+   * on) is warmed under that plan once memory admission passed: the published plan of a
+   * configuration without it has no reranker budget, and a planned CUDA session sends calls without
+   * a budget to the CPU. The weights are those of the exact selection prepared here (model, variant
+   * and size; a retained custom file too), never a model discovery would pick instead. A refused or
+   * abandoned preparation puts the published plan back.
    */
   public PreparedQueryRoleSettings prepareQueryRoleSettings(UiSettings candidate,
       ResolvedConfig desired, Set<String> changedKeys, QueryRoleSelection prior,
-      java.util.function.Supplier<Runnable> stageCandidatePlan) {
+      java.util.function.Function<java.util.Map<io.justsearch.ort.EncoderRole, Double>, Runnable>
+          stageCandidatePlan) {
     Objects.requireNonNull(stageCandidatePlan, "stageCandidatePlan");
     Objects.requireNonNull(candidate, "candidate");
     Objects.requireNonNull(desired, "desired");
@@ -5613,7 +5616,8 @@ public final class KnowledgeServer implements Closeable {
           && Boolean.TRUE.equals(candidate.getRerankerEnabled());
       if (selection.reranker().state() == QueryRoleSelection.State.SELECTED
           && (switchedOn || old.queryRoleSet.reranker() == null)) {
-        prepared.candidatePlanRestore = Objects.requireNonNull(stageCandidatePlan.get(),
+        prepared.candidatePlanRestore = Objects.requireNonNull(stageCandidatePlan.apply(
+            InferenceCompositionRoot.gpuRoleWeightsMiB(desired, selection.reranker())),
             "Candidate plan restore");
       }
       prepared.captureSource();

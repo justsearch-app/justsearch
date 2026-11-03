@@ -24,7 +24,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicReference;
-import java.util.function.Supplier;
+import java.util.function.Function;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
@@ -48,9 +48,9 @@ final class RerankerSwitchOnDevicePlanTest {
 
   @Test
   void switchOnPreparesUnderTheCandidatePlanAndARefusalKeepsThePublishedPlan() throws Exception {
-    ConfigStoreRebuilder.DevicePlanner planner = config -> GpuProfileResolver.resolve(config,
-        DevicePlanTestSupport.device(12_282), weights(Boolean.TRUE.equals(
-            config.ai().reranker().enabled())), Set.of());
+    ConfigStoreRebuilder.DevicePlanner planner = GpuProfileResolver.planner(
+        () -> DevicePlanTestSupport.device(12_282),
+        config -> weights(Boolean.TRUE.equals(config.ai().reranker().enabled())));
     ConfigStoreRebuilder.rememberDevicePlanner(planner);
     UiSettings off = new UiSettings();
     off.setRerankerEnabled(false);
@@ -74,9 +74,11 @@ final class RerankerSwitchOnDevicePlanTest {
     // that abandons the preparation (where it restores the published plan).
     KnowledgeServer server = mock(KnowledgeServer.class, call -> {
       if (!"prepareQueryRoleSettings".equals(call.getMethod().getName())) return null;
+      // The Worker passes the weights of the files it selected.
       Runnable restore = () -> {};
       if (call.getArguments().length == 5) {
-        restore = call.<Supplier<Runnable>>getArgument(4).get();
+        restore = call.<Function<Map<EncoderRole, Double>, Runnable>>getArgument(4)
+            .apply(SELECTED);
       }
       duringPreparation.set(DeviceArenaPlans.current(0));
       restore.run();
@@ -94,12 +96,17 @@ final class RerankerSwitchOnDevicePlanTest {
     GpuArenaPlan warmedUnder = duringPreparation.get().orElseThrow();
     assertTrue(warmedUnder.role(EncoderRole.RERANKER).isPresent(),
         "the switch-on warm-up runs under a plan with a reranker budget");
-    assertEquals(ConfigStoreRebuilder.planOf(desired).orElseThrow().plan().orElseThrow(),
-        warmedUnder, "the plan is the candidate configuration's own");
+    assertEquals(1_100.0, warmedUnder.role(EncoderRole.RERANKER).orElseThrow().weightsMiB(),
+        "the plan budgets the reranker file the Worker selected, not the configured one");
     assertEquals(Optional.of(offPlan), DeviceArenaPlans.current(0),
         "the refused switch-on leaves the published plan in effect");
     assertFalse(DeviceArenaPlans.current(0).orElseThrow().role(EncoderRole.RERANKER).isPresent());
   }
+
+  // The weights of the files the Worker selected: a reranker other than the configured default.
+  private static final Map<EncoderRole, Double> SELECTED = Map.of(
+      EncoderRole.EMBEDDING, 598.3, EncoderRole.SPLADE, 474.2, EncoderRole.NER, 257.2,
+      EncoderRole.RERANKER, 1_100.0);
 
   private static Map<EncoderRole, Double> weights(boolean reranker) {
     var weights = new EnumMap<EncoderRole, Double>(DevicePlanTestSupport.DEFAULT_WEIGHTS);

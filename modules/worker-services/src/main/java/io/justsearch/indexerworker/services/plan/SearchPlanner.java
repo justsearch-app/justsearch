@@ -290,10 +290,10 @@ public final class SearchPlanner {
       return new LegSet.SpladeOnly(spl, retrievalLimit);
     }
     if (canSparse && canSplade && spl != null) {
-      return new LegSet.Bm25Splade(spl, retrievalLimit);
+      return new LegSet.Bm25Splade(spl, fusedRetrievalLimit);
     }
     if (canDense && canSplade && vec != null && spl != null) {
-      return new LegSet.DenseSplade(vec, spl, retrievalLimit);
+      return new LegSet.DenseSplade(vec, spl, fusedRetrievalLimit);
     }
     if (canSparse) {
       return new LegSet.Bm25Only(retrievalLimit);

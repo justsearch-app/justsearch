@@ -2,6 +2,7 @@
 package io.justsearch.indexerworker.services;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -106,6 +107,41 @@ final class ShortPageRankingDepthTest
     assertEquals(PINNED_CHUNKED_9, ids(search(chunked, 9, true, true)));
   }
 
+  /**
+   * The SPLADE pairs fuse two legs like the other hybrids. A document second on both legs wins
+   * the ten-result fusion; the one-result page without a cross-encoder must show it, and not the
+   * single-leg winner a fusion of each leg's first hit picks.
+   */
+  @Test
+  void keywordAndSpladeWithoutCrossEncoderRankShortPagesToTheTenResultDepth() throws Exception {
+    assertSpladePairRanksToTheTenResultDepth(true);
+  }
+
+  @Test
+  void meaningAndSpladeWithoutCrossEncoderRankShortPagesToTheTenResultDepth() throws Exception {
+    assertSpladePairRanksToTheTenResultDepth(false);
+  }
+
+  private void assertSpladePairRanksToTheTenResultDepth(boolean keyword) throws Exception {
+    var service = spladePair();
+    String pair = keyword ? "keyword+SPLADE" : "meaning+SPLADE";
+    SearchResponse tenPage = spladeSearch(service, 10, keyword, false);
+    assertTrue(tenPage.getSearchTrace().getDegradation().getSpladeExecuted(), pair);
+    assertFalse(tenPage.getSearchTrace().getDegradation().getHybridFallback(), pair);
+    List<String> order = ids(tenPage);
+    assertEquals("both", order.get(0), pair + ": second on both legs wins the fusion " + order);
+    assertEquals(List.of("both"), ids(spladeSearch(service, 1, keyword, false)),
+        pair + ": the one-result page is the ten-result page's first hit");
+    assertEquals(order.subList(0, 2), ids(spladeSearch(service, 2, keyword, false)), pair);
+    // With a cross-encoder the Worker keeps ranking to the requested limit, as on 8613d76e02.
+    assertEquals(PINNED_SPLADE_RERANK_1.get(keyword), ids(spladeSearch(service, 1, keyword, true)),
+        pair + " with a cross-encoder");
+  }
+
+  // The one-result pages of the SPLADE corpus with a cross-encoder on 8613d76e02.
+  private static final Map<Boolean, List<String>> PINNED_SPLADE_RERANK_1 =
+      Map.of(true, List.of("keyword-top"), false, List.of("meaning-top"));
+
   // The pages this corpus returned on 8613d76e02, before short pages without a cross-encoder
   // were repaired.
   private static final List<String> PINNED_CHUNKED_1 = List.of("doc-0");
@@ -123,11 +159,25 @@ final class ShortPageRankingDepthTest
     return service.search(request.build(), CallContext.none());
   }
 
+  private static SearchResponse spladeSearch(
+      WorkerSearchService service, int limit, boolean keyword, boolean crossEncoder) {
+    var pipeline = PipelineConfig.newBuilder().setSparseEnabled(keyword).setDenseEnabled(!keyword)
+        .setSpladeEnabled(true).setFusionAlgorithm("rrf").setCrossEncoderEnabled(crossEncoder);
+    var request = SearchRequest.newBuilder().setQuery("apple").setLimit(limit).setPipeline(pipeline);
+    if (!keyword) request.addAllVector(List.of(1f, 0f, 0f, 0f));
+    return service.search(request.build(), CallContext.none());
+  }
+
   private static List<String> ids(SearchResponse response) {
     return response.getResultsList().stream().map(hit -> hit.getId()).toList();
   }
 
   private RunningRuntime open(String name, String hybridYaml) throws Exception {
+    return open(name, hybridYaml, FieldCatalogDef.forChunkTesting(4));
+  }
+
+  private RunningRuntime open(String name, String hybridYaml, FieldCatalogDef catalog)
+      throws Exception {
     Path dir = Files.createDirectories(temp.resolve(name));
     Path config = dir.resolve("config.yaml");
     Files.writeString(config, "app:\n  data_dir: '" + dir.toString().replace('\\', '/')
@@ -135,7 +185,7 @@ final class ShortPageRankingDepthTest
         + "  vector:\n    dimension: 4\n"
         + (hybridYaml.isEmpty() ? "" : "  hybrid:\n" + hybridYaml));
     System.setProperty("justsearch.config", config.toString());
-    var runtime = IndexSchema.fromCatalog(FieldCatalogDef.forChunkTesting(4)).ephemeral()
+    var runtime = IndexSchema.fromCatalog(catalog).ephemeral()
         .withExecutorRegistrations(testLuceneExecutors()).open();
     runtimes.add(runtime);
     return runtime;
@@ -155,6 +205,43 @@ final class ShortPageRankingDepthTest
     runtime.commitOps().commitAndTrack();
     runtime.commitOps().maybeRefreshBlocking();
     return new WorkerSearchService(runtime);
+  }
+
+  /**
+   * One leader per leg (keyword, meaning, SPLADE) found by that leg only, and "both", second on
+   * every leg. A query SPLADE encoder weighs the one query term.
+   */
+  private WorkerSearchService spladePair() throws Exception {
+    var fields = new ArrayList<>(FieldCatalogDef.forChunkTesting(4).fields());
+    fields.add(new FieldCatalogDef.FieldDef(
+        "splade_status", "keyword", true, true, List.of("filter"), null, null, false));
+    fields.add(new FieldCatalogDef.FieldDef(
+        "splade", "splade", false, false, List.of(), null, null, false,
+        "reset-status:splade_status"));
+    var runtime = open("splade", "", new FieldCatalogDef("chunk-test+splade", fields));
+    spladeDoc(runtime, "keyword-top", roundOne(30), new float[] {0f, 1f, 0f, 0f}, null);
+    spladeDoc(runtime, "meaning-top", "filler filler filler", new float[] {1f, 0f, 0f, 0f}, null);
+    spladeDoc(runtime, "splade-top", "filler filler filler", new float[] {0f, 0f, 1f, 0f}, 9f);
+    spladeDoc(runtime, "both", roundOne(20), new float[] {0.9f, 0.1f, 0f, 0f}, 5f);
+    runtime.commitOps().commitAndTrack();
+    runtime.commitOps().maybeRefreshBlocking();
+    var splade = org.mockito.Mockito.mock(io.justsearch.indexerworker.splade.SpladeEncoder.class);
+    org.mockito.Mockito.when(splade.encode(org.mockito.ArgumentMatchers.anyString(),
+        org.mockito.ArgumentMatchers.any(io.justsearch.core.execution.InferenceRequest.class)))
+        .thenReturn(Map.of("apple", 1f));
+    var bindings = new io.justsearch.indexerworker.server.EncoderBindings();
+    bindings.bindSpladeEncoder(splade);
+    return new WorkerSearchService(runtime,
+        io.justsearch.indexerworker.embed.NoOpEmbeddingProvider.INSTANCE, bindings);
+  }
+
+  private static void spladeDoc(
+      RunningRuntime runtime, String id, String content, float[] vector, Float apple) {
+    Map<String, Object> fields = new HashMap<>(Map.of(
+        SchemaFields.DOC_ID, id, SchemaFields.DOC_UID, id + "#0", SchemaFields.PATH, "/" + id,
+        SchemaFields.CONTENT, content, SchemaFields.VECTOR, vector));
+    if (apple != null) fields.put(SchemaFields.SPLADE, Map.of("apple", apple));
+    runtime.indexingCoordinator().indexSingle(new IndexDocument(fields));
   }
 
   /**

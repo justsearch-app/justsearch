@@ -674,14 +674,11 @@ public final class EngineRoot implements WorkerHost {
       if (current == null) {
         throw new IllegalStateException("Physical encoder owner is unavailable");
       }
-      // A switch-on warms its reranker under the candidate's admitted device-memory plan.
+      // A switch-on warms its reranker under the plan of the exact files it selected; the commit
+      // publishes that plan.
       var prepared = current.prepareQueryRoleSettings(candidate, desired, changedKeys, prior.get(),
-          () -> {
-            var state = followedPlanState;
-            return state == null ? () -> {} : state.stage(
-                io.justsearch.app.services.config.ConfigStoreRebuilder.planOf(desired).orElse(
-                    io.justsearch.app.services.gpu.GpuProfileResolver.Resolution.unresolved()));
-          });
+          weights -> io.justsearch.app.services.config.ConfigStoreRebuilder.stagePlan(
+              followedPlanState, desired, weights));
       return new io.justsearch.app.services.settings.FixedSettingsComponentComposer.QueryRolePreparedOwner() {
         @Override public io.justsearch.app.api.settings.QueryRoleSelection selection() {
           return prepared.selection();

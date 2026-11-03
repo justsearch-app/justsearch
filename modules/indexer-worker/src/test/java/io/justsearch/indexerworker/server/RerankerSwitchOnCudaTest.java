@@ -53,7 +53,7 @@ final class RerankerSwitchOnCudaTest {
         var realized = cudaSession(f, composition, true);
         var prepared = assertDoesNotThrow(() -> f.server.prepareQueryRoleSettings(switchOn(f),
             saved(dir, models, "true"), Set.of("rerankerEnabled"), disabled(),
-            () -> state.stage(on)),
+            weights -> state.stage(on)),
             "switching on is not refused for a CUDA session that cannot realize CUDA");
 
         assertTrue(realized.get(), "the warm-up ran on the CUDA session");
@@ -80,7 +80,7 @@ final class RerankerSwitchOnCudaTest {
         cudaSession(f, composition, false);
         var refused = assertThrows(io.justsearch.app.api.settings.SettingsCommitOwner.Refused.class,
             () -> f.server.prepareQueryRoleSettings(switchOn(f), saved(dir, models, "true"),
-                Set.of("rerankerEnabled"), disabled(), () -> {
+                Set.of("rerankerEnabled"), disabled(), weights -> {
                   Runnable restore = state.stage(on);
                   staged.set(DeviceArenaPlans.current(0));
                   return restore;
