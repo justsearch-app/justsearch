@@ -96,7 +96,8 @@ def test_beir_source_is_materialized_with_verified_text(tmp_path):
         collections.write_documents(c, out)
 
 
-def test_teardown_failure_cannot_publish_preparation_success(tmp_path, monkeypatch):
+@pytest.mark.parametrize('receipt_present', [True, False])
+def test_teardown_failure_cannot_publish_preparation_success(tmp_path, monkeypatch, receipt_present):
     c = make_collection()
     index._write(tmp_path/'prepared.json', {'url': 'http://engine'})
     (tmp_path/'build.log').write_text('writer teardown failed')
@@ -106,9 +107,75 @@ def test_teardown_failure_cannot_publish_preparation_success(tmp_path, monkeypat
     monkeypatch.setattr(backend, 'stop_backend', lambda *a, **kw: None)
     h = index.IndexHandle(c, index.IndexConfig(), 'key', tmp_path, tmp_path/'data',
                           'fresh', {}, {}, lock, _worker=worker, _backend=Mock())
+    if not receipt_present:
+        # wait() already observed readiness; the failed worker's finally removed it.
+        (tmp_path/'prepared.json').unlink()
     with pytest.raises(index.IndexRefused, match='teardown failed'):
         h.close()
     assert lock.closed
+
+
+def test_cached_preparation_refreshes_distribution_after_query_only_edit(
+        collection, config, tmp_path, monkeypatch):
+    c, source = collection
+    cfg = replace(config, documents_dir=source, cache_root=tmp_path/'cache')
+    (cfg.repo_root/'.gitignore').write_text('build/\n')
+    env = env_for(cfg)
+    query_code = cfg.repo_root / next(p for p in index.QUERY_TIME_ONLY
+                                    if p.endswith('KnowledgeSearchEngine.java'))
+    query_code.parent.mkdir(parents=True)
+    query_code.write_text('// original query code\n')
+    monkeypatch.setattr(backend, 'source_identity', lambda _: ('commit', index._file_hash(query_code)))
+    dist = cfg.repo_root/'modules/ui/build/install/ui'
+    (dist/'bin').mkdir(parents=True)
+    (dist/'bin/ui').touch()
+    receipt = dist/'.jseval-source.json'
+    index._write(receipt, list(backend.source_identity(cfg.repo_root)))
+    key, _ = index.compute_index_key(c, cfg, env)
+    root = tmp_path/'entry'
+    data = root/'data'
+    data.mkdir(parents=True)
+    owner = index._population_owner(c, key)
+    index._write(data/'quality-owner.json', owner)
+    entry = {'owner': owner, 'witness': {'generation': 'original'}}
+    index._write(root/'entry.json', entry)
+    index.write_collection(c, root/'collection')
+    from jseval.quality.run import _serial_config
+    index._write(root/'build.json', {'config': _serial_config(cfg), 'env': env,
+                                    'key': key, 'data': str(data), 'adopted': True,
+                                    'parent': index._process(os.getpid())})
+    query_code.write_text('// changed query code\n')
+    assert index.compute_index_key(c, cfg, env)[0] == key
+    with pytest.raises(RuntimeError, match='stale'):
+        backend.require_prepared(cfg.repo_root)
+    events = []
+    def install(repo, launch_env):
+        events.append('install')
+        assert repo == cfg.repo_root
+        assert launch_env['JUSTSEARCH_MODELS_DIR'] == str(cfg.models_dir)
+        index._write(receipt, list(backend.source_identity(repo)))
+    def start(**kwargs):
+        events.append('start')
+        backend.require_prepared(cfg.repo_root)
+        assert kwargs['prepared_only'] is True
+        assert kwargs['startup_admission'] is False
+        return backend.BackendInfo(Mock(), data)
+    monkeypatch.setattr(backend, '_install_distribution', install)
+    monkeypatch.setattr(backend, 'start_backend', start)
+    monkeypatch.setattr(backend, 'stop_backend', lambda *a, **kw: events.append('stop'))
+    monkeypatch.setattr(index, 'add_watched_root', Mock(side_effect=AssertionError('cached index reingested')))
+    monkeypatch.setattr(index, 'witness', lambda *a: entry['witness'])
+    def confirm(handle, adopted_entry):
+        events.append('confirm')
+        assert adopted_entry == entry
+        assert handle.index_build == 'cached'
+        return index.index_identity.ConfirmResult(True, [], {})
+    monkeypatch.setattr(index, '_confirm', confirm)
+    (root/'stop').touch()
+    index._build(root)
+    assert events == ['install', 'start', 'confirm', 'stop']
+    assert index._json(root/'entry.json') == entry
+    assert not (root/'prepared.json').exists()
 
 
 def test_unsettled_runs_cannot_pass_or_be_stored(tmp_path):

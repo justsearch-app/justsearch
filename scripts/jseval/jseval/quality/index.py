@@ -649,7 +649,7 @@ class IndexHandle:
                 if self._worker.poll() is None:
                     self._worker.wait(timeout=150)
                 self._backend = None
-                if ready and self._worker.poll() != 0:
+                if self._worker.poll() != 0:
                     raise IndexRefused(f"preparation teardown failed: exit {self._worker.returncode}; "
                                        f"{(self.root / 'build.log').read_text()[-6000:]}")
             if self._backend:
@@ -842,7 +842,15 @@ def _build(root: Path) -> None:
     attempted = False
     try:
         if adopted:
-            backend.require_prepared(cfg.repo_root)
+            try:
+                backend.require_prepared(cfg.repo_root)
+            except RuntimeError:
+                # Preparation may refresh query-only code without reindexing.
+                # The Gradle invoker takes heavy admission of its own; this
+                # pausable worker never holds an exclusive scoring window.
+                backend._install_distribution(cfg.repo_root, {
+                    **os.environ, **_launch_env(cfg, data, spec["env"])})
+                backend.require_prepared(cfg.repo_root)
         attempted = True
         info = backend.start_backend(repo_root=cfg.repo_root, data_dir=data, port=port,
                                      env_overrides=_launch_env(cfg, data, spec["env"]), health_timeout_sec=180,

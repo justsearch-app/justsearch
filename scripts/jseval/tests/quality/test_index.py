@@ -358,7 +358,7 @@ def test_startup_pause_exclusive_drains_queued_backend(collection, config, tmp_p
                   cache_root=tmp_path / "cache")
     monkeypatch.setattr(ix, "_under_cache", lambda p: p)
     _startup_queue(monkeypatch, real=False)
-    with ix.prepare_index(c, cfg) as handle:
+    with pytest.raises(ix.IndexRefused, match='fixture resumed queued startup'), ix.prepare_index(c, cfg) as handle:
         _startup_pause_exclusive(handle, admission_dir)
         assert handle._worker.wait(timeout=30) == 1
         assert "fixture resumed queued startup" in (handle.root / "build.log").read_text()
