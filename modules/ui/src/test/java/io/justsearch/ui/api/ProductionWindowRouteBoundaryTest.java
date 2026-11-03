@@ -111,11 +111,17 @@ final class ProductionWindowRouteBoundaryTest {
 
   private HttpResponse<String> send(String method, String path, String body, String window)
       throws Exception {
+    return send(method, path, body, window, new String[0]);
+  }
+
+  private HttpResponse<String> send(String method, String path, String body, String window, String... headers)
+      throws Exception {
     var request = HttpRequest.newBuilder(URI.create("http://127.0.0.1:" + server.getPort() + path))
         .timeout(Duration.ofSeconds(5)).header("X-JustSearch-Session", TOKEN)
         .header("Content-Type", "application/json")
         .method(method, HttpRequest.BodyPublishers.ofString(body));
     if (window != null) request.header("X-JustSearch-Window", window);
+    if (headers.length > 0) request.headers(headers);
     return client.send(request.build(), HttpResponse.BodyHandlers.ofString());
   }
 
@@ -231,13 +237,43 @@ final class ProductionWindowRouteBoundaryTest {
       assertEquals(204, send(method, "/api/window-boundary-probe", "{}", WINDOW).statusCode());
       assertEquals(1, calls.getAndSet(0));
     }
-    // The router also accepts case and escaped path variants; they must not bypass the guard.
-    for (String path : List.of("/API/window-boundary-probe", "/%61pi/window-boundary-probe",
-        "/api/window-boundary-probe/")) {
+    // Pin trailing-slash routing and case/escape rejection; none bypass the guard.
+    for (var variant : Map.of("/API/window-boundary-probe", 404,
+        "/%61pi/window-boundary-probe", 404, "/api/window-boundary-probe/", 204).entrySet()) {
+      String path = variant.getKey();
       var window = send("POST", path, "{}", WINDOW);
-      calls.set(0);
-      if (window.statusCode() == 204) refused("POST", path, "{}");
+      assertEquals(variant.getValue(), window.statusCode(), path + ": " + window.body());
+      assertEquals(variant.getValue() == 204 ? 1 : 0, calls.getAndSet(0), path);
+      var outside = send("POST", path, "{}", null);
+      assertEquals(variant.getValue() == 204 ? 403 : 404, outside.statusCode(), path + ": " + outside.body());
+      assertTrue(outside.body().contains(variant.getValue() == 204
+          ? "WINDOW_CREDENTIAL_REQUIRED" : "NOT_FOUND"), path + ": " + outside.body());
       assertEquals(0, calls.get(), path);
+    }
+    // Javalin supports X-HTTP-Method-Override; the guard and router must agree on that method.
+    for (String header : List.of("X-HTTP-Method-Override", "X-Method-Override", "X-HTTP-Method")) {
+      boolean supported = header.equals("X-HTTP-Method-Override");
+      for (String method : MUTATIONS) {
+        var denied = send(method, "/api/window-boundary-probe", "{}", null, header, "GET");
+        assertEquals(supported ? 404 : 403, denied.statusCode(), header + " " + method + ": " + denied.body());
+        assertEquals(0, calls.get());
+        var read = send("GET", "/api/window-boundary-probe", "", null, header, method);
+        assertEquals(supported ? 403 : 404, read.statusCode(), header + " " + method + ": " + read.body());
+        assertEquals(0, calls.get());
+      }
+    }
+    for (String method : List.of("HEAD", "OPTIONS")) {
+      for (String window : List.of("", WINDOW)) {
+        var response = send(method, "/api/window-boundary-probe", "", window.isEmpty() ? null : window);
+        assertEquals(method.equals("HEAD") ? 404 : 403, response.statusCode(), method + ": " + response.body());
+        assertEquals(0, calls.get(), method + " must never dispatch a mutation handler");
+        if (method.equals("OPTIONS")) {
+          var preflight = send(method, "/api/window-boundary-probe", "", window.isEmpty() ? null : window,
+              "Origin", "http://tauri.localhost", "Access-Control-Request-Method", "POST");
+          assertEquals(200, preflight.statusCode(), preflight.body());
+          assertEquals(0, calls.get(), "CORS preflight must never dispatch a mutation handler");
+        }
+      }
     }
     for (String method : List.of("GET", "HEAD")) {
       app.addHttpHandler(io.javalin.http.HandlerType.valueOf(method), "/api/window-read-probe",

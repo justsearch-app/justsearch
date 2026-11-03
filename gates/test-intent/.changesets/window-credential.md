@@ -15,18 +15,46 @@ source-document regression check in `scripts/sandbox/window-credential-docs.test
 product test-intent scope).
 
 The new test files are isolated new sources (exempt); their entries are kept so their
-fail-before evidence is recorded by the script. Only the Rust test module, the register count and
-the add-watched-root risk value (catalog test and operation-wire golden) need entries. The golden
+fail-before evidence is recorded by the script. The Rust test module, register count and raised operation risk values (catalog test and
+operation-wire golden) need entries. The golden
 is overlaid onto the before-state so its conformance check compares the base catalog with the new
 value. N1 for the raised operation already held on the base, so its check has no fail-before. For Rust fail-before, the compatibility patch exposes only new API shapes, keeps the
 old session-only stdout filtering and supplies no window authority; the overlaid
 `justsearch-bound-exec` helper is compiled from `native/bound-exec/bound-exec.c` for the shell's spawn tests.
 
-All evidence is regenerated at HEAD with the unmodified `run-evidence.mjs`, run from an isolated
-shared clone. Its temporary before-state worktrees and build folders stay inside the session
+Execution evidence is produced with the unmodified `run-evidence.mjs`, run from an isolated
+shared clone. The review repairs use fff9c9f9d0 for attach/settings fail-before; the refreshed
+watched-root checks retain their original 57bf6cfe5a baseline. Its temporary before-state worktrees and build folders stay inside the session
 temporary directory. The default-deny before-state is `dcce080acd`, with only the new test source
 overlaid. The register-count entry is a new expectation for the deliberate S7 launch setting, not
 a repair, so its evidence has no fail-before.
+
+Review repairs after fff9c9f9d0 add S7 attach hardening and S3/S5 operation-route settings gating.
+The catalog audit covers CoreOperationCatalog and AgentToolsOperationCatalog:
+
+- Chat enable/disable, indexing rules, pause and resume persist settings through RuntimeSpecStore
+  and SettingsCommitCoordinator; all four now use MEDIUM risk with confirmation None.
+- `core.remember` persists assistant memory and remains LOW by the orchestrator's explicit
+  continuation decision. It is a separate finding: raising it here would prompt on every in-app
+  assistant remember call.
+- Reindex, reconcile, retry and offline processing keep their existing LOW policy by that same
+  decision: they process existing roots without widening them. Cancel marks an existing job done
+  and settle-index collapses already-hidden tombstones; both narrow existing state and stay LOW.
+- Export-diagnostics creates a local redacted diagnostic artifact without changing settings or
+  authority and stays LOW. The other LOW operations (ping, path resolution, diagnostic summary,
+  preview-excludes, pack preflight, search, document read, folder browse and navigation) do not
+  widen saved state or persist settings. No additional settings writer was found.
+
+The attach audit found no runtime attach dependency in diagnostics export, SlowRequestDumper,
+telemetry or the Rust supervisor. Dumps use Thread.getAllStackTraces and management beans;
+diagnostics read files and existing service state; supervision uses child handles and HTTP.
+JDI/attach utilities found under scripts/dev, scripts/supervisor-conformance and jseval, and jcmd
+in worker/soak tests, are development or qualification tools. The shell command also serves a debug
+shell when it launches a bundled Engine, so that launch gets the flag too. External development
+and directly launched headless JVM commands are unchanged.
+
+The GPU journey mock correction exercises window_api on success and rejection. Original GPU tests
+fail at fff9c9f9d0 with Mock serialization errors and pass at 81f1b00072; repaired tests pass here.
 
 ```json
 {
@@ -355,7 +383,7 @@ a repair, so its evidence has no fail-before.
         "modules/ui/src/test/java/io/justsearch/ui/api/ProductionWindowRouteBoundaryTest.java"
       ],
       "class": "New",
-      "behaviour": "S1-S5 default-deny: the real production LocalApiServer and Head assembly (including ResourceApiModule, MCP and worker-ready RAG routes) enumerate every registered mutation route. Token-only and wrong-window requests to non-allowlisted /api routes return 403 WINDOW_CREDENTIAL_REQUIRED before controllers. Explicit checks cover policy creation and allowlist updates in unmanaged and machine-managed states, install start and repair, pack import and runtime activation. A newly registered handler is closed for POST, PUT, PATCH and DELETE, including accepted path variants; its window requests work and GET/HEAD/OPTIONS keep their existing behavior.",
+      "behaviour": "S1-S5 default-deny: the real production LocalApiServer and Head assembly (including ResourceApiModule, MCP and worker-ready RAG routes) enumerate every registered mutation route. Token-only and wrong-window requests to non-allowlisted /api routes return 403 WINDOW_CREDENTIAL_REQUIRED before controllers. Explicit checks cover policy creation and allowlist updates in unmanaged and machine-managed states, install start and repair, pack import and runtime activation. A newly registered handler is closed for POST, PUT, PATCH and DELETE, including accepted path variants; its window requests work and GET/HEAD/OPTIONS keep their existing behavior. Path checks explicitly pin case and escape rejection (404) and trailing-slash routing (204), and explicit token-only statuses (404 for rejected routes, 403 for the accepted route) for every variant; method-override headers plus HEAD/OPTIONS never invoke the mutation probe.",
       "sources": [
         {
           "kind": "delegated-choice",
@@ -409,6 +437,75 @@ a repair, so its evidence has no fail-before.
       "newChecks": [
         "modules/ui/src/test/java/io/justsearch/ui/api/ProductionWindowRouteBoundaryTest.java#n1WindowAndHeadlessAndDevelopmentKeepTheirMutationAccess"
       ]
+    },
+    {
+      "items": [
+        "modules/ui/src/test/java/io/justsearch/ui/api/SettingsOperationRiskBoundaryTest.java",
+        "modules/app-services/src/test/java/io/justsearch/app/services/registry/operations/CoreOperationCatalogTest.java",
+        "modules/app-services/src/test/resources/registry/emitter/ui-operation-wire.golden.json"
+      ],
+      "class": "New",
+      "behaviour": "S3/S5: Settings writes via core.set-chat-enabled, core.set-indexing-rules, core.indexing-pause and core.indexing-resume must require pending approval for outside callers without a covering grant, including forged click transports; settings bytes and the accepted revision stay unchanged. Trusted app-window clicks stay automatic.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "open a task record and proceed accordingly with the remainign work",
+          "delegationLocation": "task t-20261102-agent-approval request",
+          "delegationScope": "start the fix for the self-approval defect (any same-user program holding the session token can approve its own pending actions or create grants without the person seeing a prompt) as its own task, answering the orchestrator's question 'Should I start that fix as its own task?'",
+          "choice": "S3/S5: Settings writes via core.set-chat-enabled, core.set-indexing-rules, core.indexing-pause and core.indexing-resume must require pending approval for outside callers without a covering grant, including forged click transports; settings bytes and the accepted revision stay unchanged. Trusted app-window clicks stay automatic.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/window-credential-settings-repair.json",
+      "newChecks": [
+        "modules/ui/src/test/java/io/justsearch/ui/api/SettingsOperationRiskBoundaryTest.java#s3s5OutsideSettingsWriteStaysPendingWithoutPersistence",
+        "modules/app-services/src/test/java/io/justsearch/app/services/registry/operations/CoreOperationCatalogTest.java#setChatEnabledIsMediumRiskNoConfirmNoPreconditionsAndSupersedesSwitchMode",
+        "modules/app-services/src/test/java/io/justsearch/app/services/registry/emitter/UIOperationViewConformanceTest.java"
+      ],
+      "repaired": true
+    },
+    {
+      "items": [
+        "modules/ui/src/test/java/io/justsearch/ui/api/SettingsOperationRiskBoundaryTest.java"
+      ],
+      "class": "New",
+      "behaviour": "N1 preservation: the same four settings operations run without a prompt for a credentialed app-window click with no transport, BUTTON, RAIL or PALETTE. Real handlers commit settings through the existing owner; a fresh store reload observes chat enabled, indexing resumed and pauseOnBattery enabled.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "open a task record and proceed accordingly with the remainign work",
+          "delegationLocation": "task t-20261102-agent-approval request",
+          "delegationScope": "start the fix for the self-approval defect (any same-user program holding the session token can approve its own pending actions or create grants without the person seeing a prompt) as its own task, answering the orchestrator's question 'Should I start that fix as its own task?'",
+          "choice": "S3/S5 (N1 preservation): raising settings operations to MEDIUM must not add a prompt to a click in the app window.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/window-credential-settings-clicks.json",
+      "newChecks": [
+        "modules/ui/src/test/java/io/justsearch/ui/api/SettingsOperationRiskBoundaryTest.java#n1WindowSettingsClickPersistsWithoutPrompt"
+      ]
+    },
+    {
+      "items": [
+        "modules/shell/src-tauri/src/session_credential_tests.rs"
+      ],
+      "class": "New",
+      "behaviour": "S7: the shell command that starts the credential-holding Engine JVM disables the standard JVM attach mechanism, closing same-user attach heap dumping. The existing per-launch credential flag remains on that command.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "open a task record and proceed accordingly with the remainign work",
+          "delegationLocation": "task t-20261102-agent-approval request",
+          "delegationScope": "start the fix for the self-approval defect (any same-user program holding the session token can approve its own pending actions or create grants without the person seeing a prompt) as its own task, answering the orchestrator's question 'Should I start that fix as its own task?'",
+          "choice": "S7: Start the production Engine JVM with -XX:+DisableAttachMechanism so standard JVM attach tooling cannot dump the window credential; diagnostics, supervision and in-process thread dumps must continue without attach.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/window-credential-attach-repair.json",
+      "newChecks": [
+        "modules/shell/src-tauri/src/session_credential_tests.rs#session_credential_tests::production_engine_spawn_disables_jvm_attach"
+      ],
+      "repaired": true
     }
   ]
 }

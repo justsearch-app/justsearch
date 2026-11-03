@@ -144,12 +144,16 @@ checks. New state-changing API routes inherit the refusal. A caller with only th
 turn a transport header or client label into a button, rail or palette click. Medium-risk operations
 without a covering grant prompt in the app. Routes with no pending flow refuse with
 `WINDOW_CREDENTIAL_REQUIRED` (403), including direct folder-add, policy creation/allowlist updates,
-AI install/repair, pack import, runtime activation and settings writes. The legacy REST MCP bridge's
+AI install/repair, pack import, runtime activation and direct settings writes. Through operation
+invocation, chat enable/disable, indexing rules and indexing pause/resume are MEDIUM risk: an outside
+caller without a covering grant gets a pending approval; a trusted window click stays automatic. The legacy REST MCP bridge's
 search, status, retrieve-context and match-citations calls remain available; its direct ingest call
 is refused with 403. Use operation invocation or MCP for the existing pending-approval flow.
 Pending actions wait and expire without a window approving them. The approval bridge remains event-only: actions announced while
 it is disconnected are not recovered here.
 
+The shell starts the production Engine with `-XX:+DisableAttachMechanism`, blocking standard JVM
+attach tooling from dumping its heap. Product diagnostics and supervision do not require attach.
 The shell requests the window credential at production Engine spawn. The Engine delivers it once
 through its stdout pipe; the shell consumes that record before logging and holds the credential
 in memory. Only the shell's existing webview command supplies it to the UI. It never enters the
@@ -165,7 +169,11 @@ exact pending operation and arguments, are single use, and expire after five min
 **Accepted residuals:** another same-user process can edit saved grants or the plugin allowlist;
 these files are not authenticated. Existing entries, including earlier self-grants that cannot be
 distinguished from genuine approvals, survive upgrades unchanged. The window credential lives in
-Engine, shell and webview memory, and release devtools can expose it. An Engine OOM heap dump
+Engine, shell and webview memory, and release devtools can expose it. On Windows, a same-user
+process can read another same-user process's memory: deliberate memory-scraping code can recover
+the credential from the shell, webview or Engine. On Linux the same applies where
+`kernel.yama.ptrace_scope` is 0. This fix removes the trivial path of reading the manifest; it does
+not prevent deliberate memory extraction by same-user code. An Engine OOM heap dump
 can also expose it: the shell's `lib.rs` enables JVM heap dumps, which
 can contain the credential. This crash-artifact exception outlives the crashed process; the credential
 rotates on restart, so an old dump does not authorize the next Engine. On Linux a same-user process

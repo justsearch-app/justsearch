@@ -85,3 +85,13 @@ fn secret_stdout_lines_are_consumed_before_logging_even_without_a_live_child() {
         .split("if let Some(stderr)").next().unwrap();
     assert!(drain.find("consume_credential_line").unwrap() < drain.find("writeln!").unwrap());
 }
+
+#[test]
+fn production_engine_spawn_disables_jvm_attach() {
+    let source = include_str!("lib.rs");
+    let spawn = source.split("let mut cmd = containment::engine_command(&java_bin)")
+        .nth(1).unwrap().split("// GPU acceleration:").next().unwrap();
+    assert!(spawn.contains(".arg(\"-XX:+DisableAttachMechanism\")"),
+        "assertion failed: packaged Engine must disable same-user JVM attach");
+    assert!(spawn.contains(".arg(\"-Djustsearch.windowCredential=true\")"));
+}

@@ -835,6 +835,8 @@ fn spawn_headless_backend<R: tauri::Runtime>(
         // The packaged shell is the production trust boundary: Head must mint a per-boot
         // session token and enforce it on every mutating loopback request. Browser development
         // uses the separate dev-stack launch path and does not pass through this command.
+        // The window credential lives in this JVM; same-user attach must not expose its heap.
+        .arg("-XX:+DisableAttachMechanism")
         .arg("-Djustsearch.prod=true")
         .arg("-Djustsearch.windowCredential=true")
         .arg(format!(

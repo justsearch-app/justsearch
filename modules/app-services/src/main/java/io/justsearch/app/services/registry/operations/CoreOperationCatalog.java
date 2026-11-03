@@ -975,11 +975,9 @@ public final class CoreOperationCatalog implements OperationCatalog {
             "{\"type\":\"object\",\"properties\":{\"enabled\":{\"type\":\"boolean\"}},\"required\":[\"enabled\"]}",
             "{\"type\":\"object\",\"properties\":{\"chatEnabled\":{\"type\":\"boolean\"},\"engineState\":{\"type\":\"string\"}}}"),
         new OperationPolicy(
-            // Tempdoc 737 §12b: LOW + None — a reversible intent write with NO preconditions (the
-            // whole point: an intent to enable/disable chat cannot be denied for being off). The
-            // primary escape action from every runtime state; gating it with a confirm or a
-            // capability would re-introduce §3b's dead-button class.
-            RiskTier.LOW,
+            // Persisted intent needs approval from outside callers. None keeps trusted window
+            // clicks automatic; no capability precondition may prevent the escape action.
+            RiskTier.MEDIUM,
             ConfirmStrategy.None.INSTANCE,
             AuditPolicy.METADATA_ONLY,
             RetryPolicy.noRetry(),
@@ -1000,7 +998,7 @@ public final class CoreOperationCatalog implements OperationCatalog {
             + "\"properties\":{\"schedule\":{\"type\":[\"object\",\"null\"]},"
             + "\"pauseOnBattery\":{\"type\":\"boolean\"}},\"additionalProperties\":false}",
             "{\"type\":\"object\"}"),
-        new OperationPolicy(RiskTier.LOW, ConfirmStrategy.None.INSTANCE,
+        new OperationPolicy(RiskTier.MEDIUM, ConfirmStrategy.None.INSTANCE,
             AuditPolicy.METADATA_ONLY, RetryPolicy.noRetry(), Set.of(), false)
             .withRecordKind(io.justsearch.agent.api.registry.OperationKind.SETTINGS_APPLY),
         OperationAvailability.empty(), OperationLineage.empty(), Binding.of(SET_INDEXING_RULES),
@@ -1013,7 +1011,7 @@ public final class CoreOperationCatalog implements OperationCatalog {
             ? "{\"type\":\"object\",\"properties\":{\"untilEpochMs\":{\"type\":[\"integer\",\"null\"],\"minimum\":0}},\"additionalProperties\":false}"
             : "{\"type\":\"object\",\"properties\":{},\"additionalProperties\":false}",
             "{\"type\":\"object\"}"),
-        new OperationPolicy(RiskTier.LOW, ConfirmStrategy.None.INSTANCE,
+        new OperationPolicy(RiskTier.MEDIUM, ConfirmStrategy.None.INSTANCE,
             AuditPolicy.METADATA_ONLY, RetryPolicy.noRetry(), Set.of(), false)
             .withRecordKind(io.justsearch.agent.api.registry.OperationKind.SETTINGS_APPLY),
         OperationAvailability.empty(), OperationLineage.empty(), Binding.of(ref),
