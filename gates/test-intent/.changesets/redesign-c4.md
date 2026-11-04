@@ -172,3 +172,14 @@ in the acceptance module suite. The shared dev-stack check is reserved for the o
   "note": "Independent Codex verifier-2 on 24b3c7f470: 15 repair cases fail before by assertion and pass after; 26 nonqualifying and 5 matching-receipt cases pass on both trees; Incidental fixture helper reviewed; overall accept."
 }
 ```
+
+```json
+{
+  "kind": "audit",
+  "role": "reviewer",
+  "session": "01a1a3e4-cf62-78a3-af31-43d0c57758a5",
+  "verdict": "reject",
+  "digest": "sha256:9c1331fc7e59dbd5c22017e9ca02e88a3d0274710cf20fbd18352d5285efa1f2",
+  "note": "Audit (Codex reviewer): entry 1 rejected - committed tests lack a retained earlier-epoch member (walk_seen_epoch < enumeration_epoch) and a same-bytes foreground re-add without a receipt (pending and claimed); entries 2 and 3 accept."
+}
+```
