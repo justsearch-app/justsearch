@@ -40,12 +40,15 @@ class EnrichmentAttemptAccountingTest {
 
   @BeforeEach
   void setup() throws Exception {
+    BackfillSnapshotTestSupport.installSelection(fields);
     when(embedding.isAvailable()).thenReturn(true);
     when(fields.queryDocIdsByField(anyString(), anyString(), anyInt())).thenAnswer(call ->
         documents.entrySet().stream().filter(entry -> call.getArgument(1).equals(entry.getValue().get(call.getArgument(0))))
             .map(Map.Entry::getKey).toList());
     when(fields.queryNonChunkDocIdsByField(anyString(), anyString(), anyInt())).thenAnswer(call ->
         fields.queryDocIdsByField(call.getArgument(0), call.getArgument(1), call.getArgument(2)));
+    lenient().when(fields.getEnrichmentInputs(anyList(), anyLong())).thenAnswer(call ->
+        fields.getEnrichmentInputs(call.getArgument(0)));
     when(fields.getEnrichmentInputs(anyList())).thenAnswer(call -> {
       Map<String, DocumentFieldOps.EnrichmentInput> result = new LinkedHashMap<>();
       for (String id : (List<String>) call.getArgument(0)) {

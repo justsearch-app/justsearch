@@ -809,8 +809,7 @@ class CombinedEnrichmentBackfillOpsTest {
   }
 
   @Test
-  @DisplayName("partial aggregate write retains completed windows and cannot claim progress")
-  void partialWriteRetainsCompletedWindowsUntilTheirActualRetryWrite() throws Exception {
+  void acceptedPartialPublicationReleasesOnlyItsOwnerBesideWithheldPeer() throws Exception {
     for (String id : List.of("first", "second")) {
       seedDoc(id, id + " content", Map.of(
           SchemaFields.EMBEDDING_STATUS, SchemaFields.EMBEDDING_STATUS_PENDING,
@@ -840,7 +839,8 @@ class CombinedEnrichmentBackfillOpsTest {
     var partial = CombinedEnrichmentBackfillOps.processCombinedBackfill(context);
     assertTrue(partial.wroteAnything());
     assertFalse(partial.progressed());
-    assertEquals(2, progress.trackedDocuments(), "aggregate count cannot identify the skipped doc");
+    assertEquals(1, progress.trackedDocuments(), "the accepted receipt releases first while second stays resumable");
+    assertFalse(progress.isComplete("first"));
     assertTrue(progress.isComplete("second"));
     assertEquals(SchemaFields.EMBEDDING_STATUS_PENDING,
         fakeIndex.get("second").get(SchemaFields.EMBEDDING_STATUS));

@@ -61,28 +61,30 @@ public final class BgeM3BackfillOps {
    *     BackfillScheduler}'s per-stage metrics recording (tempdoc 710 Move 2 item 4).
    */
   public static StageOutcome processBgeM3Backfill(BackfillContext context) {
+    return processBgeM3Backfill(context, null);
+  }
+
+  public static StageOutcome processBgeM3Backfill(
+      BackfillContext context, EnrichmentSelection selection) {
+    if (selection != null) selection.begin();
     long t0 = System.nanoTime();
     var authority = context.indexingCoordinator().enrichmentAuthority();
     EnrichmentAccounting accounting = new EnrichmentAccounting();
     try {
       List<String> pendingIds =
           context.chunkSpladeEnabled()
-              ? context
-                  .documentFieldOps()
-                  .queryDocIdsByField(
-                      SchemaFields.SPLADE_STATUS,
-                      SchemaFields.SPLADE_STATUS_PENDING,
-                      context.batchSize())
-              : context
-                  .documentFieldOps()
-                  .queryNonChunkDocIdsByField(
-                      SchemaFields.SPLADE_STATUS,
-                      SchemaFields.SPLADE_STATUS_PENDING,
-                      context.batchSize());
+              ? EnrichmentSelection.page(selection, context.documentFieldOps(),
+              SchemaFields.SPLADE_STATUS, context.batchSize(), false)
+              : EnrichmentSelection.page(selection, context.documentFieldOps(),
+              SchemaFields.SPLADE_STATUS, context.batchSize(), true);
+      var excluded = context.documentFieldOps().excludedProcessingIds(pendingIds);
+      pendingIds = new ArrayList<>(pendingIds);
+      pendingIds.removeAll(excluded);
       accounting.select(pendingIds, EnrichmentAccounting.Stage.SPLADE);
       long queryMs = (System.nanoTime() - t0) / 1_000_000;
 
       if (pendingIds.isEmpty()) {
+        if (selection != null) selection.examined(excluded);
         return StageOutcome.none();
       }
 
@@ -98,7 +100,7 @@ public final class BgeM3BackfillOps {
 
       // Phase 1: Collect content for all pending docs
       long t1 = System.nanoTime();
-      EnrichmentBatch batch = new EnrichmentBatch(context.documentFieldOps(), context.indexingCoordinator(), pendingIds, authority).accounting(accounting);
+      EnrichmentBatch batch = new EnrichmentBatch(context.documentFieldOps(), context.indexingCoordinator(), pendingIds, authority, selection, excluded).accounting(accounting);
       BooleanSupplier unavailable = () -> context.encoderSupplier().get() != encoder;
       Map<String, String> contentByDocId = batch.contents();
       Map<String, Map<String, String>> typeByDocId =
@@ -109,11 +111,13 @@ public final class BgeM3BackfillOps {
       // is a chunk doc (CHUNK_VECTOR/CHUNK_EMBEDDING_STATUS) or a parent doc (VECTOR/
       // EMBEDDING_STATUS), since the SPLADE_STATUS=PENDING query above mixes both doc types.
       List<Boolean> batchIsChunk = new ArrayList<>(pendingIds.size());
-      for (String docId : pendingIds) {
+      for (String docId : batch.ids()) {
+        if (selection != null && !"PENDING".equals(batch.fields(docId).get(SchemaFields.SPLADE_STATUS))) continue;
         boolean isChunkDoc = "true".equals(batch.fields(docId).get(SchemaFields.IS_CHUNK));
         accounting.select(docId, isChunkDoc ? EnrichmentAccounting.Stage.CHUNK_EMBED : EnrichmentAccounting.Stage.EMBED);
       }
-      for (String docId : pendingIds) {
+      for (String docId : batch.ids()) {
+        if (selection != null && !"PENDING".equals(batch.fields(docId).get(SchemaFields.SPLADE_STATUS))) continue;
         if (batch.stopped(() -> shouldInterrupt(context), unavailable, EnrichmentAccounting.Stage.values())) {
           accounting.cancelRemaining();
           break;

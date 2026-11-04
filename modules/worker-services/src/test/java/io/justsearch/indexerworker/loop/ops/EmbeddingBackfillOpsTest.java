@@ -291,16 +291,16 @@ class EmbeddingBackfillOpsTest {
       String half = "x".repeat((int) EmbeddingBackfillOps.MAX_PARENT_BATCH_CHARS / 2);
       when(documentFieldOps.queryDocIdsByField(
           eq(SchemaFields.EMBEDDING_STATUS), eq(SchemaFields.EMBEDDING_STATUS_PENDING), anyInt()))
-          .thenReturn(List.of("first", "second", "later"));
-      when(documentFieldOps.getDocumentContent("first")).thenReturn(half);
-      when(documentFieldOps.getDocumentContent("second")).thenReturn(half);
+          .thenReturn(List.of("a-first", "b-second", "c-later"));
+      when(documentFieldOps.getDocumentContent("a-first")).thenReturn(half);
+      when(documentFieldOps.getDocumentContent("b-second")).thenReturn(half);
       when(embeddingProvider.embedDocumentBatch(List.of(half, half))).thenReturn(List.of());
       when(embeddingProvider.embedDocument(eq(half), any(InferenceRequest.class))).thenReturn(new float[] {1f});
 
       EmbeddingBackfillOps.processEmbeddingBackfill(context());
 
       verify(embeddingProvider).embedDocumentBatch(List.of(half, half));
-      verify(documentFieldOps, never()).getDocumentContent("later");
+      verify(documentFieldOps, never()).getDocumentContent("c-later");
     }
 
     @Test

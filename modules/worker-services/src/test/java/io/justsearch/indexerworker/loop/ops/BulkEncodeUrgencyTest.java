@@ -104,6 +104,7 @@ class BulkEncodeUrgencyTest {
 
   @Test
   void parentEmbeddingBackfillFallbackAcquiresBackground() throws Exception {
+    BackfillSnapshotTestSupport.install(documentFieldOps,indexingCoordinator,true,Set.of());
     EmbeddingService service = recordingEmbeddingService();
     when(documentFieldOps.queryDocIdsByField(
             eq(SchemaFields.EMBEDDING_STATUS), eq(SchemaFields.EMBEDDING_STATUS_PENDING), anyInt()))

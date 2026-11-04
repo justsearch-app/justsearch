@@ -128,6 +128,63 @@ class SpladePendingSelectionTest extends LuceneExecutorTestBase {
         "a permanently-parked chunk population must not read as outstanding work");
   }
 
+  @org.junit.jupiter.params.ParameterizedTest(name = "{displayName} [{index}] {arguments}")
+  @org.junit.jupiter.params.provider.ValueSource(strings = {"embedding_status", "chunk_embedding_status", "splade_status", "ner_status"})
+  void keysetPagesUseDocumentIdsAcrossInsertionOrderRefreshAndDeletedCursor(String stage) throws Exception {
+    for (String id : List.of("00-c", "00-a", "00-e", "00-b", "00-d")) {
+      var fields = new HashMap<String,Object>();
+      fields.put(SchemaFields.DOC_ID,id); fields.put(SchemaFields.DOC_UID,id+"-uid");
+      fields.put(SchemaFields.CONTENT,"text"); fields.put(stage,"PENDING");
+      runtime.indexingCoordinator().indexSingle(new IndexDocument(fields));
+    }
+    runtime.commitOps().commitAndTrack(); runtime.commitOps().maybeRefreshBlocking();
+    var fields = runtime.documentFieldOps();
+    assertEquals(List.of("00-a","00-b"), fields.queryPendingPage(stage,2,false,null).ids());
+    runtime.indexingCoordinator().deleteById("00-b");
+    indexParent("00-aa","new behind cursor","PENDING");
+    runtime.commitOps().commitAndTrack(); runtime.commitOps().maybeRefreshBlocking();
+    assertEquals(List.of("00-c","00-d"),fields.queryPendingPage(stage,2,false,"00-b").ids());
+    assertEquals("00-e",fields.queryPendingPage(stage,2,false,"00-d").ids().getFirst());
+    assertEquals(List.of(),fields.queryPendingPage(stage,2,false,"zzzz").ids());
+    assertEquals("00-a",fields.queryPendingPage(stage,2,false,null).ids().getFirst());
+  }
+
+  @org.junit.jupiter.params.ParameterizedTest(name = "{displayName} [{index}] {arguments}")
+  @org.junit.jupiter.params.provider.ValueSource(ints = {1_000,50_000})
+  void pageAndContentReadCountsStayBoundedAsBacklogGrows(int backlog) throws Exception {
+    try (var directory = new org.apache.lucene.store.ByteBuffersDirectory();
+        var writer = new org.apache.lucene.index.IndexWriter(directory,new org.apache.lucene.index.IndexWriterConfig(
+            new org.apache.lucene.analysis.core.KeywordAnalyzer()));
+        var session = new RuntimeSession(IndexSchema.fromCatalog(io.justsearch.configuration.FieldCatalogDef.forChunkTesting(4)),testLuceneExecutors())) {
+      for (int i = backlog-1; i >= 0; i--) {
+        String id = String.format(java.util.Locale.ROOT,"%08d",i);
+        var doc = new org.apache.lucene.document.Document();
+        doc.add(new org.apache.lucene.document.StringField(SchemaFields.DOC_ID,id,org.apache.lucene.document.Field.Store.YES));
+        doc.add(new org.apache.lucene.document.SortedDocValuesField(SchemaFields.DOC_ID,new org.apache.lucene.util.BytesRef(id)));
+        doc.add(new org.apache.lucene.document.StringField(SchemaFields.EMBEDDING_STATUS,"PENDING",org.apache.lucene.document.Field.Store.YES));
+        doc.add(new org.apache.lucene.document.StoredField(SchemaFields.CONTENT,"short text"));
+        writer.addDocument(doc);
+      }
+      try (var reader = org.apache.lucene.index.DirectoryReader.open(writer)) {
+        var searcher = org.mockito.Mockito.spy(new org.apache.lucene.search.IndexSearcher(reader));
+        var bridge = org.mockito.Mockito.mock(SearcherBridge.class);
+        org.mockito.Mockito.when(bridge.withSearcher(org.mockito.ArgumentMatchers.any())).thenAnswer(call ->
+            ((ReadPathOps.SearcherOperation<?>)call.getArgument(0)).execute(searcher));
+        var fields = new DocumentFieldOps(session,bridge,SchemaFields.DOC_ID,new ReadPathOps(session,SchemaFields.DOC_ID));
+        var ids = fields.queryPendingPage(SchemaFields.EMBEDDING_STATUS,200,false,null).ids();
+        assertEquals(200,ids.size());
+        assertEquals(200,fields.getEnrichmentInputs(ids,512_000).size());
+        long queries = org.mockito.Mockito.mockingDetails(searcher).getInvocations().stream().filter(invocation -> {
+          var args = invocation.getArguments();
+          return invocation.getMethod().getName().equals("search") && args.length == 2
+              && args[1] instanceof org.apache.lucene.search.CollectorManager;
+        }).count();
+        assertEquals(201,queries,"one keyset page plus 200 content/proof lookups, independent of backlog");
+        System.out.println("E3b P5 backlog="+backlog+" page=200 indexQueries="+queries);
+      }
+    }
+  }
+
   private void indexParent(String docId, String content, String spladeStatus) {
     Map<String, Object> fields = new HashMap<>();
     fields.put(SchemaFields.DOC_ID, docId);
@@ -171,6 +228,9 @@ class SpladePendingSelectionTest extends LuceneExecutorTestBase {
               { "id": "chunk_parent_content_sha256", "type": "keyword", "stored": true, "docValues": false, "roles": [] },
               { "id": "chunk_start_char", "type": "long", "stored": true, "docValues": true },
               { "id": "chunk_end_char", "type": "long", "stored": true, "docValues": true },
+              { "id": "embedding_status", "type": "keyword", "stored": true, "docValues": true, "roles": ["filter"] },
+              { "id": "chunk_embedding_status", "type": "keyword", "stored": true, "docValues": true, "roles": ["filter"] },
+              { "id": "ner_status", "type": "keyword", "stored": true, "docValues": true, "roles": ["filter"] },
               { "id": "splade_status", "type": "keyword", "stored": false, "docValues": true, "roles": ["filter"] },
               { "id": "splade_retry_count", "type": "long", "stored": false, "docValues": true },
               { "id": "splade", "type": "splade", "stored": false, "docValues": false, "rmwPolicy": "reset-status:splade_status" }

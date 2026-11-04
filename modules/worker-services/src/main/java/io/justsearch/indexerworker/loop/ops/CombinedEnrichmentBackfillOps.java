@@ -291,11 +291,22 @@ public final class CombinedEnrichmentBackfillOps {
     return processCombinedBackfill(context, BulkPacePolicy.DEFAULTS);
   }
 
+  public static CombinedOutcome processCombinedBackfill(
+      BackfillContext context, EnrichmentSelection selection) {
+    if (selection != null) selection.begin();
+    return processCombinedBackfill(context, BulkPacePolicy.DEFAULTS, selection);
+  }
+
   /**
    * As {@link #processCombinedBackfill(BackfillContext)}, with the phase slice sizes that bound the
    * GPU work between two {@code pace()} calls given explicitly (Spec D §3.3).
    */
   static CombinedOutcome processCombinedBackfill(BackfillContext context, BulkPacePolicy bulkPace) {
+    return processCombinedBackfill(context, bulkPace, null);
+  }
+
+  private static CombinedOutcome processCombinedBackfill(BackfillContext context, BulkPacePolicy bulkPace,
+      EnrichmentSelection selection) {
     // Timings survive exceptions; completed counts are assigned only after publication.
     long embedMs = 0;
     long spladeMs = 0;
@@ -331,9 +342,7 @@ public final class CombinedEnrichmentBackfillOps {
       // caught too, and re-read at every checkpoint below.
       epochAtSelection = context.indexingCoordinator().bulkDeleteEpoch();
 
-      // Phase 0: Query pending docs. Uses caches from tight loop — first call queries all
-      // pending IDs (no limit), subsequent calls pop from cache. Eliminates 4 Lucene queries
-      // per iteration after the first (334 Phase 10).
+      // Phase 0: bounded document-ID pages, independently resumable for each stage.
       EmbeddingProvider selectedEmbeddingProvider = context.embeddingProviderSupplier().get();
       boolean embedAvailable = embeddingReady(context, selectedEmbeddingProvider);
       boolean spladeConfigured = context.spladeEncoderSupplier().get() != null;
@@ -343,96 +352,56 @@ public final class CombinedEnrichmentBackfillOps {
           context.nerServiceSupplier().get() != null
               && context.nerServiceSupplier().get().isAvailable();
 
-      // Populate parent cache on first call (or when drained)
-      if (context.parentIdCache().isEmpty()) {
-        List<List<String>> stagePending = new ArrayList<>();
-        if (embedAvailable) {
-          stagePending.add(
-              context
-                  .documentFieldOps()
-                  .queryDocIdsByField(
-                      SchemaFields.EMBEDDING_STATUS,
-                      SchemaFields.EMBEDDING_STATUS_PENDING,
-                      Integer.MAX_VALUE));
-        }
-        if (spladeAvailable) {
-          // ChunkDocumentWriter stamps splade_status=PENDING on every chunk whatever the
-          // chunk-SPLADE flag says, so with the flag off that status is not a work signal: the
-          // stage will never run for those documents, and selecting them hands each batch slots it
-          // can only rewrite. Excluding them here is what makes the pass converge — a selected
-          // chunk with no runnable stage is neither progress nor terminal, so the tight loop's
-          // `progressed` continue-condition goes false while the population never shrinks
-          // (tempdoc 931: 4,632 rewrite-only escalations across 231 zero-advancement cycles).
-          stagePending.add(
-              context.chunkSpladeEnabled()
-                  ? context
-                      .documentFieldOps()
-                      .queryDocIdsByField(
-                          SchemaFields.SPLADE_STATUS,
-                          SchemaFields.SPLADE_STATUS_PENDING,
-                          Integer.MAX_VALUE)
-                  : context
-                      .documentFieldOps()
-                      .queryNonChunkDocIdsByField(
-                          SchemaFields.SPLADE_STATUS,
-                          SchemaFields.SPLADE_STATUS_PENDING,
-                          Integer.MAX_VALUE));
-        }
-        if (nerAvailable) {
-          stagePending.add(
-              context
-                  .documentFieldOps()
-                  .queryDocIdsByField(
-                      SchemaFields.NER_STATUS,
-                      SchemaFields.NER_STATUS_PENDING,
-                      Integer.MAX_VALUE));
-        }
-        Set<String> allPending = new LinkedHashSet<>();
-        int longest = stagePending.stream().mapToInt(List::size).max().orElse(0);
-        for (int i = 0; i < longest; i++) {
-          for (List<String> ids : stagePending) {
-            if (i < ids.size()) allPending.add(ids.get(i));
-          }
-        }
-        allPending.removeAll(context.publishedDocIds());
-        context.parentIdCache().addAll(allPending);
-      }
-
-      // Populate chunk cache on first call (or when drained)
+      // Each stage contributes one bounded page. Interleave stages as before; the
+      // unexamined suffix stays behind its stage cursor rather than in an all-ID cache.
+      List<List<String>> stagePending = new ArrayList<>();
+      if (embedAvailable) stagePending.add(EnrichmentSelection.page(selection,
+          context.documentFieldOps(), SchemaFields.EMBEDDING_STATUS, context.batchSize(), false));
+      if (spladeAvailable) stagePending.add(EnrichmentSelection.page(selection,
+          context.documentFieldOps(), SchemaFields.SPLADE_STATUS, context.batchSize(),
+          !context.chunkSpladeEnabled()));
+      if (nerAvailable) stagePending.add(EnrichmentSelection.page(selection,
+          context.documentFieldOps(), SchemaFields.NER_STATUS, context.batchSize(), false));
       int chunkSlotsPerBatch = context.chunkSlotsPerBatch();
-      if (context.chunkIdCache().isEmpty() && embedAvailable && context.chunkVectorsEnabled()) {
-        context
-            .chunkIdCache()
-            .addAll(
-                context
-                    .documentFieldOps()
-                    .queryDocIdsByField(
-                        SchemaFields.CHUNK_EMBEDDING_STATUS,
-                        SchemaFields.EMBEDDING_STATUS_PENDING,
-                        Integer.MAX_VALUE));
+      List<String> chunkPage = embedAvailable && context.chunkVectorsEnabled() && chunkSlotsPerBatch > 0
+          ? EnrichmentSelection.page(selection, context.documentFieldOps(),
+              SchemaFields.CHUNK_EMBEDDING_STATUS, chunkSlotsPerBatch, false) : List.of();
+      Set<String> alreadyPublished = new HashSet<>();
+      for (List<String> ids : stagePending) for (String id : ids)
+        if (context.publishedDocIds().contains(id)) alreadyPublished.add(id);
+      for (String id : chunkPage) if (context.publishedDocIds().contains(id)) alreadyPublished.add(id);
+      Set<String> parents = new LinkedHashSet<>();
+      // Retained owners get served before admitting more work. Reap obsolete identities first.
+      context.windowedEmbedProgress().reconcile(context.documentFieldOps(), authority,
+          epochAtSelection, selectedEmbeddingProvider);
+      for (String id : context.windowedEmbedProgress().owners()) {
+        if (parents.size() >= context.batchSize()) break;
+        if (!context.publishedDocIds().contains(id)) parents.add(id);
       }
-
-      context.parentIdCache().removeAll(context.publishedDocIds());
-      context.chunkIdCache().removeAll(context.publishedDocIds());
-      if (context.parentIdCache().isEmpty() && context.chunkIdCache().isEmpty()) {
-        return CombinedOutcome.none();
+      int longest = stagePending.stream().mapToInt(List::size).max().orElse(0);
+      for (int i = 0; i < longest && parents.size() < context.batchSize(); i++) {
+        for (List<String> ids : stagePending) {
+          if (i < ids.size() && parents.size() < context.batchSize()
+              && !alreadyPublished.contains(ids.get(i))) parents.add(ids.get(i));
+        }
       }
-
-      // Pop batchSize parents + chunkSlots chunks from caches
-      List<String> pendingIds = new ArrayList<>(context.batchSize() + chunkSlotsPerBatch);
-      for (int i = 0; i < context.batchSize() && !context.parentIdCache().isEmpty(); i++) {
-        pendingIds.add(context.parentIdCache().poll());
-      }
-      Set<String> chunkDocIds = new LinkedHashSet<>();
-      for (int i = 0; i < chunkSlotsPerBatch && !context.chunkIdCache().isEmpty(); i++) {
-        String id = context.chunkIdCache().poll();
-        chunkDocIds.add(id);
-        if (!pendingIds.contains(id)) pendingIds.add(id);
-      }
-
-      pendingIds.removeAll(context.documentFieldOps().excludedProcessingIds(pendingIds));
+      Set<String> chunkDocIds = new LinkedHashSet<>(chunkPage);
+      chunkDocIds.removeAll(alreadyPublished);
+      // A full progress store defers new dense owners before retaining their proof.
+      // Otherwise a refused oversized chunk could consume the allowance needed by
+      // the admitted owners that must finish to release a slot. Other stages can
+      // still select the same chunk independently through their own page.
+      chunkDocIds.removeIf(id -> !context.windowedEmbedProgress().canAdmit(id));
+      // Preserve the chunk-first lane when allocating retained text, too. A retained
+      // oversized parent must not consume the allowance before chunks get their turn.
+      List<String> pendingIds = new ArrayList<>(chunkDocIds);
+      for (String id : parents) if (!pendingIds.contains(id)) pendingIds.add(id);
+      var excluded = new HashSet<>(context.documentFieldOps().excludedProcessingIds(pendingIds));
+      excluded.addAll(alreadyPublished);
+      pendingIds.removeAll(excluded);
       chunkDocIds.retainAll(pendingIds);
       if (pendingIds.isEmpty()) {
+        if (selection != null) selection.examined(excluded);
         return CombinedOutcome.none();
       }
 
@@ -440,7 +409,7 @@ public final class CombinedEnrichmentBackfillOps {
       attemptStarted = true;
 
       // Phase 1: Batch content fetch (single searcher, all docs)
-      EnrichmentBatch batch = new EnrichmentBatch(context.documentFieldOps(), context.indexingCoordinator(), pendingIds, authority).accounting(accounting);
+      EnrichmentBatch batch = new EnrichmentBatch(context.documentFieldOps(), context.indexingCoordinator(), pendingIds, authority, selection, excluded).accounting(accounting);
       Map<String, String> contentByDocId = batch.contents();
 
       Map<String, Map<String, String>> batchedFields = batch.fields();
@@ -458,7 +427,6 @@ public final class CombinedEnrichmentBackfillOps {
       List<String> spladeDocIds = new ArrayList<>();
 
       Set<String> stageAdvancedDocIds = new HashSet<>();
-      Set<String> completedWindowDocIds = new HashSet<>();
 
       // Track which doc IDs are chunk docs (need CHUNK_VECTOR instead of VECTOR)
       Set<String> chunkIdsInBatch = new HashSet<>();
@@ -481,12 +449,14 @@ public final class CombinedEnrichmentBackfillOps {
       // anyway or hand embed a shorter budget for nothing.
       int nerCandidates = 0;
 
-      for (String docId : pendingIds) {
+      for (String docId : batch.ids()) {
         updatesByDocId.put(docId, new HashMap<>());
         Map<String, String> docFields = batchedFields.getOrDefault(docId, Map.of());
         boolean isChunkDoc =
             chunkDocIds.contains(docId)
                 || "true".equalsIgnoreCase(docFields.get(SchemaFields.IS_CHUNK));
+
+        boolean docEmbedAvailable = embedAvailable && context.windowedEmbedProgress().canAdmit(docId);
 
         if (isChunkDoc) {
           if (embedAvailable && context.chunkVectorsEnabled()
@@ -513,7 +483,7 @@ public final class CombinedEnrichmentBackfillOps {
             // lies" class). Escalate via the retry-count seam instead: retry next cycle, FAIL at
             // max — never COMPLETED-without-data.
             Map<String, Object> updates = updatesByDocId.get(docId);
-            if (embedAvailable && context.chunkVectorsEnabled()
+            if (docEmbedAvailable && context.chunkVectorsEnabled()
                 && SchemaFields.EMBEDDING_STATUS_PENDING.equals(chunkEmbeddingStatus)
                 && embeddingReady(context, selectedEmbeddingProvider)) {
               Map<String, Object> escalation =
@@ -541,7 +511,7 @@ public final class CombinedEnrichmentBackfillOps {
             }
             continue;
           }
-          if (embedAvailable && context.chunkVectorsEnabled()
+          if (docEmbedAvailable && context.chunkVectorsEnabled()
               && SchemaFields.EMBEDDING_STATUS_PENDING.equals(chunkEmbeddingStatus)) {
             context.windowedEmbedProgress().identify(docId, chunkContent,
                 new WindowedEmbedProgress.Identity(authority, epochAtSelection, selectedEmbeddingProvider,
@@ -591,7 +561,7 @@ public final class CombinedEnrichmentBackfillOps {
           // through each stage's retry-count seam (retry next cycle, FAILED at max) exactly as
           // EmbeddingBackfillOps does for the identical condition — never COMPLETED-without-data.
           Map<String, Object> updates = updatesByDocId.get(docId);
-          if (embedAvailable && SchemaFields.EMBEDDING_STATUS_PENDING.equals(embedStatus)) {
+          if (docEmbedAvailable && SchemaFields.EMBEDDING_STATUS_PENDING.equals(embedStatus)) {
             Map<String, Object> escalation =
                 EmbeddingBackfillOps.computeEmbeddingFailureUpdate(
                     parseRetryCountOrZero(docFields.get(SchemaFields.EMBEDDING_RETRY_COUNT)));
@@ -636,10 +606,10 @@ public final class CombinedEnrichmentBackfillOps {
         // result lands in this same doc's entry in updatesByDocId — one bundled write either way.
         boolean isLateChunkingParent =
             context.lateChunkingEnabled()
-                && embedAvailable
+                && docEmbedAvailable
                 && SchemaFields.EMBEDDING_STATUS_PENDING.equals(embedStatus)
                 && hasChunkDocs(context, docId);
-        if (embedAvailable && SchemaFields.EMBEDDING_STATUS_PENDING.equals(embedStatus)) {
+        if (docEmbedAvailable && SchemaFields.EMBEDDING_STATUS_PENDING.equals(embedStatus)) {
           context.windowedEmbedProgress().identify(docId, content,
               new WindowedEmbedProgress.Identity(authority, epochAtSelection, selectedEmbeddingProvider,
                   selectedEmbeddingProvider.dimension(), docFields.get(SchemaFields.DOC_UID),
@@ -656,7 +626,7 @@ public final class CombinedEnrichmentBackfillOps {
             lateChunkingDocIds.add(docId);
             lateChunkingContents.add(content);
           }
-        } else if (embedAvailable && SchemaFields.EMBEDDING_STATUS_PENDING.equals(embedStatus)) {
+        } else if (docEmbedAvailable && SchemaFields.EMBEDDING_STATUS_PENDING.equals(embedStatus)) {
           embedDocIds.add(docId);
           embedContents.add(content);
         }
@@ -812,7 +782,7 @@ public final class CombinedEnrichmentBackfillOps {
             if (stopRequested(context, epochAtSelection, authority)
                 || !embeddingReady(context, lateChunkingProvider)) { aborted = true; break; }
             try {
-              accounting.started(lcDocId, EnrichmentAccounting.Stage.EMBED);
+              batch.started(List.of(lcDocId), EnrichmentAccounting.Stage.EMBED);
               EmbeddingService.ChunkedEmbedding result =
                   lateChunkingProvider.embedWithSpans(lcContent, NO_SPANS);
               if (result != null && result.primaryVector().length > 0) {
@@ -938,7 +908,7 @@ public final class CombinedEnrichmentBackfillOps {
                 }
                 EmbeddingProvider.WindowSlice slice;
                 try {
-                  accounting.started(docId, isChunk ? EnrichmentAccounting.Stage.CHUNK_EMBED
+                  batch.started(List.of(docId), isChunk ? EnrichmentAccounting.Stage.CHUNK_EMBED
                       : EnrichmentAccounting.Stage.EMBED);
                   slice = provider.embedDocumentWindows(content, nextWindow, EMBED_WINDOW_SLICE);
                 } finally {
@@ -992,7 +962,6 @@ public final class CombinedEnrichmentBackfillOps {
                     "0");
                 windowDocsCompleted++;
                 stageAdvancedDocIds.add(docId);
-                completedWindowDocIds.add(docId);
               } else {
                 // Interrupted part-way. The document stays PENDING with no update of any kind — a
                 // partial mean-pool is NOT this document's embedding and must never be written — but
@@ -1066,7 +1035,7 @@ public final class CombinedEnrichmentBackfillOps {
             }
             List<float[]> vectors;
             try {
-              for (String id : sliceDocIds) accounting.started(id, chunkIdsInBatch.contains(id)
+              for (String id : sliceDocIds) batch.started(List.of(id), chunkIdsInBatch.contains(id)
                   ? EnrichmentAccounting.Stage.CHUNK_EMBED : EnrichmentAccounting.Stage.EMBED);
               vectors = provider.embedDocumentBatch(embedContents.subList(sliceStart, sliceEnd));
             } catch (Exception failure) {
@@ -1221,7 +1190,7 @@ public final class CombinedEnrichmentBackfillOps {
               () -> context.nerServiceSupplier().get() != nerService || !nerService.isAvailable(),
               EnrichmentAccounting.Stage.NER)) { aborted = true; break; }
           try {
-            accounting.started(docId, EnrichmentAccounting.Stage.NER);
+            batch.started(List.of(docId), EnrichmentAccounting.Stage.NER);
             List<NerResult> nerBatch = nerService.extractEntitiesBatch(List.of(content));
             NerResult result = nerBatch.isEmpty() ? NerResult.EMPTY : nerBatch.get(0);
             accounting.computed(docId, EnrichmentAccounting.Stage.NER);
@@ -1288,7 +1257,7 @@ public final class CombinedEnrichmentBackfillOps {
         try {
           attemptedSplade = true;
           accounting.attempted(EnrichmentAccounting.Stage.SPLADE);
-          sliceIds.forEach(id -> accounting.started(id, EnrichmentAccounting.Stage.SPLADE));
+          sliceIds.forEach(id -> batch.started(List.of(id), EnrichmentAccounting.Stage.SPLADE));
           List<Map<String, Float>> vectors = encoder.encodeBatch(texts);
           if (vectors == null || vectors.size() != sliceIds.size()) {
             throw new IllegalStateException("SPLADE batch result size mismatch");
@@ -1364,7 +1333,7 @@ public final class CombinedEnrichmentBackfillOps {
           // Do not hide a replacement revision; the writer's existing reader can distinguish it
           // without an additional NRT refresh.
           var current = context.documentFieldOps().getEnrichmentInputs(
-              batchUpdates.stream().map(Map.Entry::getKey).toList());
+              batchUpdates.stream().map(Map.Entry::getKey).toList(), EmbeddingBackfillOps.MAX_PARENT_BATCH_CHARS);
           for (var entry : batchUpdates) {
             String id = entry.getKey();
             var input = current.get(id);
@@ -1378,15 +1347,12 @@ public final class CombinedEnrichmentBackfillOps {
         }
       }
       boolean completeBatchWrite = written == batchUpdates.size() && written > 0;
-      if (completeBatchWrite) {
-        Set<String> writtenDocIds = new HashSet<>();
-        for (var entry : batchUpdates) {
-          writtenDocIds.add(entry.getKey());
-        }
-        for (String docId : completedWindowDocIds) {
-          if (writtenDocIds.contains(docId)) {
-            context.windowedEmbedProgress().forget(docId);
-          }
+      // Release each accepted owner independently: a withheld peer must not pin its slot.
+      for (String docId : batch.acceptedIds()) {
+        var updates = updatesByDocId.get(docId);
+        if (updates != null && (updates.get(SchemaFields.VECTOR) instanceof float[]
+            || updates.get(SchemaFields.CHUNK_VECTOR) instanceof float[])) {
+          context.windowedEmbedProgress().forget(docId);
         }
       }
       // These counts feed the metrics that existed before publication receipts, so they keep
@@ -1564,6 +1530,7 @@ public final class CombinedEnrichmentBackfillOps {
           : CombinedOutcome.none();
     }
     } finally {
+      context.windowedEmbedProgress().releaseUnused();
       enrichmentSpan.end();
     }
   }

@@ -55,28 +55,30 @@ public final class SpladeBackfillOps {
    *     metrics recording (tempdoc 710 Move 2 item 4).
    */
   public static StageOutcome processSpladeBackfill(BackfillContext context) {
+    return processSpladeBackfill(context, null);
+  }
+
+  public static StageOutcome processSpladeBackfill(
+      BackfillContext context, EnrichmentSelection selection) {
+    if (selection != null) selection.begin();
     var authority = context.indexingCoordinator().enrichmentAuthority();
     long t0 = System.nanoTime();
     EnrichmentAccounting accounting = new EnrichmentAccounting();
     try {
       List<String> pendingIds =
           context.chunkSpladeEnabled()
-              ? context
-                  .documentFieldOps()
-                  .queryDocIdsByField(
-                      SchemaFields.SPLADE_STATUS,
-                      SchemaFields.SPLADE_STATUS_PENDING,
-                      context.batchSize())
-              : context
-                  .documentFieldOps()
-                  .queryNonChunkDocIdsByField(
-                      SchemaFields.SPLADE_STATUS,
-                      SchemaFields.SPLADE_STATUS_PENDING,
-                      context.batchSize());
+              ? EnrichmentSelection.page(selection, context.documentFieldOps(),
+              SchemaFields.SPLADE_STATUS, context.batchSize(), false)
+              : EnrichmentSelection.page(selection, context.documentFieldOps(),
+              SchemaFields.SPLADE_STATUS, context.batchSize(), true);
       long queryMs = (System.nanoTime() - t0) / 1_000_000;
 
+      var excluded = context.documentFieldOps().excludedProcessingIds(pendingIds);
+      pendingIds = new ArrayList<>(pendingIds);
+      pendingIds.removeAll(excluded);
       accounting.select(pendingIds, EnrichmentAccounting.Stage.SPLADE);
       if (pendingIds.isEmpty()) {
+        if (selection != null) selection.examined(excluded);
         return StageOutcome.none();
       }
 
@@ -99,12 +101,13 @@ public final class SpladeBackfillOps {
 
       // Phase 1: collect parent content or reconstructed chunk slices in one batch.
       long t1 = System.nanoTime();
-      EnrichmentBatch batch = new EnrichmentBatch(context.documentFieldOps(), context.indexingCoordinator(), pendingIds, authority).accounting(accounting);
+      EnrichmentBatch batch = new EnrichmentBatch(context.documentFieldOps(), context.indexingCoordinator(), pendingIds, authority, selection, excluded).accounting(accounting);
       BooleanSupplier unavailable = () -> context.spladeEncoderSupplier().get() != encoder;
       Map<String, String> contentByDocId = batch.contents();
       List<String> batchDocIds = new ArrayList<>(pendingIds.size());
       List<String> batchContents = new ArrayList<>(pendingIds.size());
-      for (String docId : pendingIds) {
+      for (String docId : batch.ids()) {
+        if (selection != null && !"PENDING".equals(batch.fields(docId).get(SchemaFields.SPLADE_STATUS))) continue;
         if (batch.stopped(() -> !context.runningSupplier().getAsBoolean(), unavailable, EnrichmentAccounting.Stage.SPLADE)) {
           accounting.cancelRemaining();
           break;

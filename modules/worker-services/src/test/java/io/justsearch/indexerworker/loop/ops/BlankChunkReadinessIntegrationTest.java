@@ -86,7 +86,7 @@ class BlankChunkReadinessIntegrationTest extends LuceneExecutorTestBase {
           case NONE -> { }
         }
         return result;
-      }).when(fields).getEnrichmentInputs(anyList());
+      }).when(fields).getEnrichmentInputs(anyList(), anyLong());
       var log = LoggerFactory.getLogger(BlankChunkReadinessIntegrationTest.class);
       if (combined) {
         var context = new CombinedEnrichmentBackfillOps.BackfillContext(

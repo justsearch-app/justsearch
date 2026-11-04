@@ -321,14 +321,43 @@ public final class DocumentFieldOps {
       return Map.of();
     }
     try {
+      return readDocumentFieldsBatch(docIds, fieldNames, false);
+    } catch (IOException e) {
+      log.debug(
+          "Failed to batch-fetch fields {} for {} docs: {}",
+          fieldNames, docIds.size(), e.getMessage());
+      return Map.of();
+    }
+  }
+
+  /** Metadata cleanup must distinguish deleted owners from an unreadable index. */
+  public Map<String, Map<String, String>> getDocumentFieldsBatchOrThrow(
+      List<String> docIds, Set<String> fieldNames) throws IOException {
+    return readDocumentFieldsBatch(docIds, fieldNames, true);
+  }
+
+  private Map<String, Map<String, String>> readDocumentFieldsBatch(
+      List<String> docIds, Set<String> fieldNames, boolean singleQuery) throws IOException {
+    if (docIds == null || docIds.isEmpty() || fieldNames == null || fieldNames.isEmpty()) return Map.of();
       maybeRefreshBlockingIfCommittedSinceRefresh();
       return bridge.withSearcher(searcher -> {
-        // Phase 1: Resolve all doc IDs to Lucene internal doc numbers.
+        // Resolve the bounded owner set in one query; cleanup must not add one search per partial.
         List<Map.Entry<Integer, String>> resolved = new ArrayList<>(docIds.size());
-        for (String docId : docIds) {
-          var topDocs = searcher.search(new TermQuery(new Term(idField, docId)), 1);
-          if (topDocs.scoreDocs.length > 0) {
-            resolved.add(Map.entry(topDocs.scoreDocs[0].doc, docId));
+        if (singleQuery) {
+          var terms = docIds.stream().map(org.apache.lucene.util.BytesRef::new).toList();
+          var sort = new org.apache.lucene.search.Sort(new org.apache.lucene.search.SortField(
+              idField, org.apache.lucene.search.SortField.Type.STRING));
+          var hits = searcher.search(new org.apache.lucene.search.TermInSetQuery(idField, terms),
+              docIds.size(), sort);
+          for (var hit : hits.scoreDocs) {
+            var id = (org.apache.lucene.util.BytesRef) ((org.apache.lucene.search.FieldDoc) hit).fields[0];
+            if (id == null) throw new IOException("Document has no ID doc values");
+            resolved.add(Map.entry(hit.doc, id.utf8ToString()));
+          }
+        } else {
+          for (String docId : docIds) {
+            var topDocs = searcher.search(new TermQuery(new Term(idField, docId)), 1);
+            if (topDocs.scoreDocs.length > 0) resolved.add(Map.entry(topDocs.scoreDocs[0].doc, docId));
           }
         }
         if (resolved.isEmpty()) {
@@ -375,18 +404,15 @@ public final class DocumentFieldOps {
         }
         return Collections.unmodifiableMap(result);
       });
-    } catch (IOException e) {
-      log.debug(
-          "Failed to batch-fetch fields {} for {} docs: {}",
-          fieldNames, docIds.size(), e.getMessage());
-      return Map.of();
-    }
   }
 
   /** One immutable reader's text, identity and stage state, including a chunk's parent. */
   public record EnrichmentInput(
       String content, Map<String, String> fields,
       String parentId, Map<String, String> parentFields) {}
+
+  /** The examined prefix excludes every ID deferred by the retention allowance. */
+  public record EnrichmentInputPage(Map<String, EnrichmentInput> inputs, List<String> examinedIds) {}
 
   static final Set<String> ENRICHMENT_FIELDS = Set.of(
       SchemaFields.CONTENT, SchemaFields.CONTENT_SHA256, SchemaFields.SOURCE_SHA256,
@@ -411,17 +437,35 @@ public final class DocumentFieldOps {
   /** Retains at most the parent text budget; admits one oversized first parent whole. */
   public Map<String, EnrichmentInput> getEnrichmentInputs(List<String> docIds, long maxContentChars)
       throws IOException {
-    if (docIds == null || docIds.isEmpty()) return Map.of();
+    return getEnrichmentInputPage(docIds, maxContentChars).inputs();
+  }
+
+  public EnrichmentInputPage getEnrichmentInputPage(List<String> docIds, long maxContentChars)
+      throws IOException {
+    if (maxContentChars <= 0) throw new IllegalArgumentException("Text budget must be positive");
+    if (docIds == null || docIds.isEmpty()) return new EnrichmentInputPage(Map.of(), List.of());
     maybeRefreshBlockingIfCommittedSinceRefresh();
     return bridge.withSearcher(searcher -> {
       Map<String, EnrichmentInput> inputs = new LinkedHashMap<>();
       Map<String, Map<String, String>> parents = new HashMap<>();
+      Set<String> chargedTexts = new LinkedHashSet<>();
+      List<String> examined = new ArrayList<>();
       var storedFields = searcher.storedFields();
       var revisionGuard = new ChunkReadRevisionGuard();
       long retainedChars = 0;
       for (String docId : docIds) {
         Map<String, String> fields = enrichmentFields(searcher, storedFields, docId, ENRICHMENT_FIELDS);
-        if (fields == null) continue;
+        if (fields == null) {
+          examined.add(docId);
+          continue;
+        }
+        var knownParent = parents.get(docId);
+        if (knownParent != null && fields.containsKey(SchemaFields.CONTENT)
+            && knownParent.containsKey(SchemaFields.CONTENT)) {
+          var shared = new HashMap<>(fields);
+          shared.put(SchemaFields.CONTENT, knownParent.get(SchemaFields.CONTENT));
+          fields = Collections.unmodifiableMap(shared);
+        }
         String parentId = fields.get(SchemaFields.PARENT_DOC_ID);
         Map<String, String> parent = Map.of();
         String content = fields.get(SchemaFields.CONTENT);
@@ -430,20 +474,37 @@ public final class DocumentFieldOps {
         }
         if (parentId != null && !parentId.isBlank()) {
           if (!parents.containsKey(parentId)) {
-            parents.put(parentId, enrichmentFields(searcher, storedFields, parentId, PARENT_REVISION_FIELDS));
+            var proof = enrichmentFields(searcher, storedFields, parentId, PARENT_REVISION_FIELDS);
+            var capturedParent = inputs.get(parentId);
+            if (proof != null && capturedParent != null && proof.containsKey(SchemaFields.CONTENT)
+                && capturedParent.fields().containsKey(SchemaFields.CONTENT)) {
+              var shared = new HashMap<>(proof);
+              shared.put(SchemaFields.CONTENT, capturedParent.fields().get(SchemaFields.CONTENT));
+              proof = Collections.unmodifiableMap(shared);
+            }
+            parents.put(parentId, proof);
           }
           parent = parents.get(parentId);
           ChunkSlice slice = chunkSliceFrom(fields);
           content = slice == null || parent == null ? null
               : revisionGuard.slice(docId, slice, parentRevisionFrom(parent)).orElse(null);
         }
-        long chars = content == null ? 0 : content.length();
+        // Chunk slices keep the entire parent's text as publication proof. Count that text
+        // once, including when the parent itself is also in this turn's collection.
+        String textId = parentId == null || parentId.isBlank() ? docId : parentId;
+        String proof = parentId == null || parentId.isBlank() ? content
+            : parent == null ? null : parent.get(SchemaFields.CONTENT);
+        long chars = chargedTexts.contains(textId) || proof == null ? 0 : proof.length();
+        // A slice is another retained String on modern JVMs, separate from its proof.
+        if (parentId != null && !parentId.isBlank() && content != null) chars += content.length();
         if (retainedChars > 0 && retainedChars + chars > maxContentChars) break;
         inputs.put(docId, new EnrichmentInput(content, fields, parentId, parent));
+        examined.add(docId);
+        chargedTexts.add(textId);
         retainedChars += chars;
         if (retainedChars >= maxContentChars) break;
       }
-      return Collections.unmodifiableMap(inputs);
+      return new EnrichmentInputPage(Collections.unmodifiableMap(inputs), List.copyOf(examined));
     });
   }
 
@@ -799,6 +860,36 @@ public final class DocumentFieldOps {
    */
   public List<String> queryDocIdsByField(String field, String value, int limit) {
     return queryDocIdsByField(field, value, limit, false);
+  }
+
+  public record PendingIdPage(List<String> ids, boolean exhausted) {}
+
+  /** One bounded, ID-ordered keyset page. Exclusions are examined by the caller, so an
+   * excluded or poison head cannot pin the sweep. The key survives reader replacement. */
+  public PendingIdPage queryPendingPage(
+      String field, int limit, boolean excludeChunks, String afterId) throws IOException {
+    if (limit <= 0) throw new IllegalArgumentException("Page size must be positive");
+    return bridge.withSearcher(searcher -> {
+      var query = new BooleanQuery.Builder()
+          .add(new TermQuery(new Term(field, "PENDING")), BooleanClause.Occur.FILTER);
+      if (excludeChunks) query.add(new TermQuery(new Term(SchemaFields.IS_CHUNK, "true")),
+          BooleanClause.Occur.MUST_NOT);
+      if (afterId != null) query.add(org.apache.lucene.search.TermRangeQuery.newStringRange(
+          idField, afterId, null, false, false), BooleanClause.Occur.FILTER);
+      var sort = new org.apache.lucene.search.Sort(
+          new org.apache.lucene.search.SortField(idField, org.apache.lucene.search.SortField.Type.STRING));
+      var hits = searcher.search(query.build(), limit, sort);
+      List<String> ids = new ArrayList<>(hits.scoreDocs.length);
+      for (var hit : hits.scoreDocs) {
+        var key = (org.apache.lucene.util.BytesRef)
+            ((org.apache.lucene.search.FieldDoc) hit).fields[0];
+        if (key == null || key.length == 0) throw new IOException("Pending document has no ID");
+        ids.add(key.utf8ToString());
+      }
+      boolean exhausted = hits.totalHits.relation() == org.apache.lucene.search.TotalHits.Relation.EQUAL_TO
+          && hits.totalHits.value() == ids.size();
+      return new PendingIdPage(List.copyOf(ids), exhausted);
+    });
   }
 
   /** Control reads must distinguish an empty selection from an unreadable index. */
