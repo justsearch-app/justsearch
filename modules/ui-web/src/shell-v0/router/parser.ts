@@ -88,6 +88,15 @@ export function extractUrls(text: string): Array<{
  * via the surface's state schema) happens downstream at the resolver stage;
  * this function returns args as raw strings (per URLSearchParams).
  */
+/**
+ * C1 — a `justsearch://surface/…` address, whether or not its id is well formed. An address whose
+ * id the grammar rejects (a bare id, a `vendor.` id without its owner) still names a window the
+ * reader expected to open, so its sources report it as an unknown destination instead of dropping it.
+ */
+export function isSurfaceUrl(raw: string): boolean {
+  return typeof raw === 'string' && raw.startsWith(`${URL_SCHEME}//${URL_HOST_SURFACE}/`);
+}
+
 export function parseUrl(raw: string): ShellAddress | null {
   if (typeof raw !== 'string') return null;
   let parsed: URL;

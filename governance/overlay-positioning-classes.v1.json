@@ -9,10 +9,6 @@
   },
   "exempt": [
     {
-      "file": "shell-v0/components/BookmarksPopover.ts",
-      "class": "anchored"
-    },
-    {
       "file": "shell-v0/components/ContextMenu.ts",
       "class": "anchored"
     },

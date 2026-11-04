@@ -100,7 +100,7 @@
               "properties": {
                 "selector": {
                   "type": "string",
-                  "description": "Shadow-piercing CSS selector (resolved via ui_measure.py's deepQuery), e.g. 'jf-rail'."
+                  "description": "Shadow-piercing CSS selector (resolved via ui_measure.py's deepQuery), e.g. 'jf-top-bar'."
                 },
                 "maxHeightPx": {
                   "type": "integer",

@@ -2,25 +2,23 @@ import { canonicalSurfaceId } from '../router/surfaceIdentity.js';
 import { readLastViewedConversation } from '../controllers/lastViewedConversation.js';
 // SPDX-License-Identifier: Apache-2.0
 /**
- * Shell — Lit-side chrome root (slice 449 phase 10).
+ * Shell — Lit-side chrome root (slice 449 phase 10; frame per shell slice 2).
  *
  * Replaces the React `<GlassShell>` + `<App>` skeleton for the
  * substrate-driven dispatch path. Layout zones:
- *   - top  : minimal title bar (theme + status badge)
- *   - left : <jf-rail> (Activity Rail)
- *   - main : <jf-stage> (Surface dispatcher)
- *   - bottom : minimal status deck (api state + queue)
+ *   - top  : <jf-top-bar> (brand, area switcher, status pill, Settings, More menu)
+ *   - main : <jf-stage> (window dispatcher; a window's own tab row sits at its top)
  *
- * Reads the SurfaceCatalog at boot; consumes the `placement: 'RAIL'`
- * subset of entries to populate the rail. Active-view state is owned
- * here (not Zustand-coupled).
+ * Reads the SurfaceCatalog at boot; the `placement: 'RAIL'` subset names
+ * the areas (Search, Library, AI Brain), System and the plugin windows
+ * listed under More. Active-view state is owned here (not Zustand-coupled).
  *
  * Mount path: `?lit-chrome=1` URL flag — `main.jsx` branches to mount
  * `<jf-shell>` instead of the React `<App>` when present. Production
  * default remains the React app for V1 coexistence; phase 11 (React
  * decommission) flips the default.
  *
- * Side-effect registers `<jf-shell>`, `<jf-rail>`, `<jf-stage>`.
+ * Side-effect registers `<jf-shell>`, `<jf-stage>` (and `<jf-top-bar>` via its module).
  */
 
 import { html, css, nothing, type TemplateResult } from 'lit';
@@ -28,7 +26,6 @@ import { JfElement } from '../primitives/JfElement.js';
 import { completedForget, FORGET_COMPLETED_EVENT,
   type IndexedForgetCompletion } from '../../api/domains/forget.js';
 import { startSurfaceTransition } from './viewTransition.js';
-import '../components/RecentsMenu.js';
 import {
   NAVIGATE_TO_SURFACE_EVENT,
   type NavigateToSurfaceDetail,
@@ -51,22 +48,20 @@ import { operationFailureMessage } from '../operations/operationFailureMessage.j
 import { originatorToTransport } from '../operations/originatorTransport.js';
 import { startDragDetect, type DragKind } from '../utils/dragDetect.js';
 import { startAiStateStore, subscribeAiState } from '../state/aiStateStore.js';
-import { projectAvailability, unavailableBecause } from '../state/availability.js';
+import { projectAvailability } from '../state/availability.js';
 import '../components/Control.js';
 // 569 §14 — host authorities the global presentation-intent Effect listeners drive.
 import { applyAppearance } from '../state/themeState.js';
-import {
-  enqueueUiModeSettings,
-  setUiMode,
-  getUiMode,
-  subscribeUiMode,
-  type UiMode,
-} from '../state/uiModeState.js';
+import { setUiMode } from '../state/uiModeState.js';
 import { applyPresentation, listPresentations } from '../state/presentationState.js';
 import './OverlayHost.js';
 import '../components/DragOverlay.js';
 import '../components/StatusPill.js';
 import '../components/RetiredStatusElements.js';
+import './RetiredFrameElements.js';
+import './TopBar.js';
+import type { TopBar, TopBarDestination, TopBarSelection } from './TopBar.js';
+import { FRAME_AREAS, FRAME_FIXED_WINDOWS } from '../layout/frameAreas.js';
 import { undoStatusNotice, type StatusPill } from '../components/StatusPill.js';
 // §21.E — register the PendingEffect chrome surface. Renders nothing
 // when the queue is empty; floats in lower-right when a proposal lands.
@@ -111,8 +106,6 @@ import '../components/BootPhasesPanel.js';
 // Slice 471 — provenance badge (docked in the 559 OverlayHost top-right slot)
 // is mounted by the chrome whenever any non-core override is active in userConfig.
 import '../components/ProvenanceBadge.js';
-import '../components/BookmarksPopover.js';
-import type { BookmarksPopover } from '../components/BookmarksPopover.js';
 // Slice 490 §4.D — Advisory chrome: toast host (HUD), inbox drawer
 // (DRAWER), rail badge (RAIL). All three subscribe to a shell-owned
 // AdvisoryStore (Group B4 follow-up — replaces the singleton pattern).
@@ -135,9 +128,9 @@ import type { CitationSelectDetail } from '../components/chat/CitationsPanel.js'
 import {
   getUserConfig,
   subscribeUserConfig,
-  setRailExpanded,
 } from '../state/userConfigState.js';
 import { updateShellContext, subscribeShellContext } from '../state/shellContextState.js';
+import { getViewerAudience, subscribeViewerAudience } from '../state/viewerAudienceState.js';
 // Tempdoc 543 §3.B + §20.7 A0 — Scope substrate. Direct restoreScope
 // import deliberately removed: WorkspaceProfile.activateProfile is
 // now the SOLE Scope writer in chrome boot. Anything that needs to
@@ -237,6 +230,7 @@ import {
   registerKeybinding as registerKeybindingEntry,
   attachKeybindingDispatcher,
   loadPersistedKeybindings,
+  isMac,
 } from '../commands/KeybindingRegistry.js';
 import { invokeCommand } from '../commands/CommandRegistry.js';
 import { CORE_PROVENANCE } from '../primitives/provenance.js';
@@ -252,7 +246,6 @@ import '../components/Peek.js';
 import './SettingsWindow.js';
 import type { SettingsWindow } from './SettingsWindow.js';
 type SurfaceCatalogEntry = Surface;
-import { icon } from '../components/Icon.js';
 import { copyToClipboard } from '../utils/clipboardCopy.js';
 // Slice 492 — Intent substrate three-tier wiring. Sources fire Intents;
 // the router delegates to handlers; handlers realize the intent. This
@@ -271,25 +264,17 @@ import { strictPolicy } from '../router/recoveryPolicy.js';
 import { createURLSource } from '../router/sources/URLSource.js';
 import { createTauriDeepLinkSource } from '../router/sources/TauriDeepLinkSource.js';
 import { createBackendStreamSource } from '../router/sources/BackendStreamSource.js';
-import { deactivateProjection, flushPendingNavigationWrite, flushPendingProjection } from '../router/URLProjector.js';
+import { deactivateProjection, flushPendingNavigationWrite, flushPendingProjection, historyIndex } from '../router/URLProjector.js';
 import {
   fetchAndRegisterSurfaceSchemas,
   registerCoreStores,
 } from '../router/bootstrap.js';
 import type { ShellAddressNavigation, StateSnapshot } from '../router/types.js';
 import type { TransportTag } from '../router/transports.js';
-// Slice 501 — Navigation chrome (journal + saved views).
-import {
-  recordNavigation,
-  subscribeJournal,
-  getJournalState,
-  canGoBack,
-  canGoForward,
-  navigateBack,
-  navigateForward,
-  isNavigatingHistoryNow,
-} from '../state/NavigationJournal.js';
-import { canonicalize, parseUrl } from '../router/parser.js';
+// Slice 501 — the navigation journal (resume-on-launch and the record of where the reader went).
+// Back and Forward themselves run on browser history (FR3), which the journal follows.
+import { recordNavigation, getJournalState } from '../state/NavigationJournal.js';
+import { canonicalize, isSurfaceUrl, parseUrl } from '../router/parser.js';
 import { deriveRichLabel } from '../utils/deriveRichLabel.js';
 // The app's ONE "is the reader typing?" pair (857 PR-A) — adopted here by tempdoc 864 Layer 2(a),
 // which retired this file's private fourth copy of the same descent.
@@ -298,16 +283,11 @@ import {
   isTypingTarget,
   shouldIgnoreKeyEvent,
 } from '../utils/keyboardHandler.js';
-import { modalOwnsFocus } from '../primitives/modality.js';
+import { modalOwnsFocus, openModalDepth } from '../primitives/modality.js';
 import { installSearchSummonBridge } from '../router/tauriBridge.js';
-import { SURFACE_ICONS, railAccessibleName } from '../utils/surfaceIcons.js';
-import {
-  isViewSaved,
-  findSavedView,
-  saveView,
-  removeView,
-  subscribeSavedViews,
-} from '../state/savedViewState.js';
+import { surfaceIcon } from '../utils/surfaceIcons.js';
+import { findCategory } from '../views/settingsRegister.js';
+import { focusRegion, type FrameRegion } from './frameRegions.js';
 // Slice 491 §9.D Phase E (C2/C3) — side-effect imports that register typed
 // chat views in the viewFactoryRegistry at module-load time.
 // <jf-chat-shape-mount> resolves shape-ids by looking up the registry; without
@@ -331,20 +311,22 @@ import { canonicalComponentTag } from '../renderers/componentIdentity.js';
 // out of the eager app entry chunk (ui-bundle app_main budget).
 import { ensureSurfaceLoaded, isLazySurface } from '../views/lazySurfaceRegistry.js';
 
-// Surface tag → rail icon mapping: imported from shared module (slice 501).
+// Surface tag → icon mapping (the More menu's window icons): imported from shared module (slice 501).
 // See utils/surfaceIcons.ts for the mapping.
 
-// Tempdoc 578 §5.6 Phase 4 — Help is no longer a rail surface (DEEPLINK); it is reached via the
-// dedicated "?" affordance the rail renders in its bottom section.
-// Tempdoc 855 §9.2 — Settings followed it off the catalog rail list (Placement.MODAL: it opens as a
-// window over the stage), so it too is a fixed bottom affordance rather than a bottom-pinned surface.
-/** Tempdoc 578 — the Help surface id the rail's "?" affordance deep-links to. */
+// Shell slice 2 — Help (DEEPLINK) is reached from More › Help & shortcuts and F1; Settings (MODAL,
+// tempdoc 855: a window over the stage) from the top bar's gear; System from More › System.
+/** Tempdoc 578 — the Help surface More › Help & shortcuts (and F1) opens. */
 const HELP_SURFACE_ID = 'core.help-surface';
-/** Tempdoc 855 — the MODAL surface the rail's fixed Settings affordance opens. */
+/** Tempdoc 855 — the MODAL surface the top bar's Settings button opens. */
 const SETTINGS_SURFACE_ID = 'core.settings-surface';
+/** Health · Activity · Logs, hosted as tabs; More › System opens it. */
+const SYSTEM_SURFACE_ID = 'core.system-surface';
+/** Developer windows listed under More › Developer while the developer view tier is on. */
+const DEVELOPER_WINDOW_IDS = ['core.api-explorer-surface'];
 
-// Tempdoc 571 §6 — the one interaction window (561). TRUST surfaces home adjacent to it in the rail,
-// derived from altitude (see Rail.render). Mirrors the Java interaction-surface gate's canonicalSurface.
+// Tempdoc 571 §6 — the one interaction window (561); the first area of the switcher (Ctrl+1).
+// Mirrors the Java interaction-surface gate's canonicalSurface.
 const INTERACTION_SURFACE_ID = 'core.search-v3-surface';
 
 // Tempdoc 923 / F-22 — these remain valid compatibility addresses that preselect one interaction
@@ -368,7 +350,7 @@ function isSplitPaneCandidate(surface: SurfaceCatalogEntry, primaryId: string): 
 }
 
 // Tempdoc 571 §4b — altitude-band rank for the cross-altitude move-ban. PRODUCT + TRUST share the
-// product region (TRUST's finer "adjacent to chat" placement is the Rail render's job); DIAGNOSTIC
+// product region; DIAGNOSTIC
 // sinks to the diagnostics region; TOOL (headless) last. A user reorder is clamped to keep each
 // surface in its own band, so a saved surfaceOrder cannot drag a DIAGNOSTIC surface into the product
 // region (or vice versa) — altitude, not user drag, owns which band a surface lives in.
@@ -407,12 +389,7 @@ export class Shell extends JfElement {
     dragActive: { state: true },
     dragKind: { state: true },
     userConfig: { state: true },
-    copyUrlFeedback: { state: true },
-    journalCanBack: { state: true },
-    journalCanForward: { state: true },
-    isBookmarked: { state: true },
-    // Tempdoc 738 — the surfaced Simple/Detailed toggle mirrors the uiMode authority for its active state.
-    uiMode: { state: true },
+    developerTier: { state: true },
     initialNavigationPending: { state: true },
   };
 
@@ -422,23 +399,15 @@ export class Shell extends JfElement {
   declare dragActive: boolean;
   declare dragKind: DragKind | null;
   declare userConfig: RendererUserConfig;
-  /** Slice 489 T1/G1 — transient state for Copy URL button feedback. */
-  declare copyUrlFeedback: 'copied' | 'failed' | null;
-  /** Slice 501 — journal-derived back/forward enabled state. */
-  declare journalCanBack: boolean;
-  declare journalCanForward: boolean;
-  /** Slice 501 — whether the current URL is bookmarked. */
-  declare isBookmarked: boolean;
-  /** Tempdoc 738 — app-wide Simple/Detailed mode, mirrored for the topbar toggle's active state. */
-  declare uiMode: UiMode;
+  /** The developer view tier (Settings › Developer › View tier): shows More › Developer. */
+  declare developerTier: boolean;
   /** Draft cutover must wait for URL, native cold ingress and journal restore. */
   private declare initialNavigationPending: boolean;
 
   private dragUnsubscribe: (() => void) | null = null;
   private userConfigUnsubscribe: (() => void) | null = null;
   private catalogUnsubscribe: (() => void) | null = null;
-  // Tempdoc 586 F-2 — Simple/Detailed mode re-filters the rail (see refreshSurfaces).
-  private uiModeUnsubscribe: (() => void) | null = null;
+  private viewerAudienceUnsubscribe: (() => void) | null = null;
   /**
    * Slice 490 Group B4 — Shell-owned AdvisoryStore. Passed to the three advisory
    * chrome elements via property bindings; replaces the previous module-level
@@ -458,7 +427,6 @@ export class Shell extends JfElement {
   private shellEventsMultiplex: MultiplexedStream | null = null;
   private operationClient: OperationClient | null = null;
   private _aiState: import('../state/aiStateStore.js').AiState | null = null;
-  private _aiDependentIds: Set<string> = new Set();
   private _aiUnsub: (() => void) | null = null;
   // Slice 492 — Intent substrate.
   private intentRouter: IntentRouter | null = null;
@@ -473,10 +441,8 @@ export class Shell extends JfElement {
    */
   private disconnected = false;
   private sourceGeneration = 0;
-  /** The previously-active surface, for "Go back" (`goBack`/`navigateBack`). Search Thread S5b —
-   *  set directly by `setActiveSurface`'s own bookkeeping (the navigation toast that used to set
-   *  this as a side effect is retired). */
-  private previousActiveId: string | null = null;
+  /** The tab each window host last showed, so its address names it (FR3: the tab is part of the address). */
+  private readonly hostTabs = new Map<string, string>();
   /** Tempdoc 507 §3 — CORE-tier PluginHostApi injected into surfaces at mount. */
   private hostApi_: PluginHostApi | null = null;
   /** Tempdoc 629 (#10) — app-wide auto-lock idle watcher handle (started at mount, stopped at unmount). */
@@ -484,9 +450,6 @@ export class Shell extends JfElement {
   private userActivityStop: (() => void) | null = null;
   /** Tempdoc 508 §3 — global keybinding for command palette. */
   private keybindingTeardown: (() => void) | null = null;
-  // Slice 501 — journal subscription + keyboard handler + savedViews teardowns.
-  private journalUnsubscribe: (() => void) | null = null;
-  private savedViewsUnsubscribe: (() => void) | null = null;
   // Tempdoc 543 §3.B — Scope substrate consumer: profile-switch + audience projection.
   private scopeProfileSwitchUnsub: (() => void) | null = null;
   // Tempdoc 543 §13.2.1 — EvaluationContext substrate consumer: bump
@@ -515,6 +478,43 @@ export class Shell extends JfElement {
   private setUiModeListener: ((e: Event) => void) | null = null;
   private applyPresentationListener: ((e: Event) => void) | null = null;
   private boundKeyHandler = (e: KeyboardEvent) => this.handleGlobalKey(e);
+  /** FR3 — the mouse's back and forward buttons are the same Back and Forward as Alt+Left/Right. */
+  private readonly onMouseNavigate = (e: MouseEvent): void => {
+    if (e.button !== 3 && e.button !== 4) return;
+    // Under a dialog the platform's own traversal applies (browser Back closes Settings once).
+    if (modalOwnsFocus()) return;
+    e.preventDefault();
+    if (e.button === 3) this.appBack();
+    else this.appForward();
+  };
+  /**
+   * A window host's tab row changed tab: a navigation like any other (FR3), so Back returns to the
+   * tab before. The entry being left first names the tab it showed, which an address reached
+   * without one (a switcher choice) did not, so Back reopens that tab rather than keeping this one.
+   */
+  private readonly onWindowTabChange = (e: Event): void => {
+    const { id: tab, previous } = (e as CustomEvent<{ id?: string; previous?: string }>).detail ?? {};
+    const host = this.hostOfTabEvent(e);
+    if (!tab || !host) return;
+    if (previous) this.replaceAddressState(host, { tab: previous });
+    this.hostTabs.set(host, tab);
+    this.activateSurface(host, { tab }, 'BUTTON');
+  };
+  /** The section the Settings window shows (it keeps the last one between openings). */
+  private settingsSection: string | null = null;
+  /**
+   * The Settings window changed section: the address names it (replace, so Back still closes once).
+   * Only while the window is open: Settings mounts ahead of its first opening and reports the section
+   * it starts on, which must never overwrite a section the address asks for (FR3, reload).
+   */
+  private readonly onSettingsSectionChange = (e: Event): void => {
+    const section = (e as CustomEvent<{ id?: string }>).detail?.id;
+    if (!section) return;
+    this.settingsSection = section;
+    if (this.shadowRoot?.querySelector<SettingsWindow>('jf-settings-window')?.open) {
+      this.replaceAddressState(SETTINGS_SURFACE_ID, { section });
+    }
+  };
 
   // Slice 496 §3.A: bound handler for navigate-with-context events.
   // Tempdoc 609 §R (T1.3) — "return to running job" from an overlay (TaskList / status-bar chip).
@@ -616,21 +616,18 @@ export class Shell extends JfElement {
     this.dragActive = false;
     this.dragKind = null;
     this.userConfig = getUserConfig();
-    this.copyUrlFeedback = null;
-    this.uiMode = getUiMode();
+    this.developerTier = getViewerAudience() === 'DEVELOPER';
   }
 
   static styles = css`
+    /* Shell slice 2 — the frame is one top bar over the window area (the rail retired). */
     :host {
       display: grid;
-      /* Tempdoc 813 §5c — the rail track reads its width from the ONE --rail-width token
-         (tokens.css) instead of an inline literal, so a viewport-docked overlay can reserve the
-         same band the rail actually occupies rather than re-deriving it. */
-      grid-template-columns: var(--rail-width) minmax(0, 1fr);
-      grid-template-rows: 2.5rem minmax(0, 1fr);
+      grid-template-columns: minmax(0, 1fr);
+      grid-template-rows: auto minmax(0, 1fr);
       grid-template-areas:
-        'topbar topbar'
-        'rail   stage';
+        'topbar'
+        'stage';
       width: 100vw;
       height: 100vh;
       box-sizing: border-box;
@@ -638,150 +635,27 @@ export class Shell extends JfElement {
       font-family: system-ui, -apple-system, sans-serif;
       background: var(--surface-1);
     }
-    /* Search Thread S5b — the expanded (labels-visible) rail needs its GRID TRACK widened too:
-       the Rail's own :host([expanded]) width is clamped by this column otherwise.
-       Tempdoc 813 §5c — expressed as an override of the ONE --rail-width token so everything
-       that reserves the rail's band (the OverlayHost bottom-left slot) follows the expansion
-       automatically; a second literal here would have left the reservation calibrated to the
-       collapsed rail and occluded again the moment the user expands it. */
-    :host([data-rail-expanded]) {
-      --rail-width: 11rem;
-    }
-    .topbar {
+    jf-top-bar {
       grid-area: topbar;
-      display: flex;
-      align-items: center;
-      gap: 0.75rem;
-      padding: 0 1rem;
-      border-bottom: 1px solid var(--border-subtle);
-      font-size: var(--font-size-xs);
-      color: var(--text-secondary);
-    }
-    .topbar .brand {
-      font-weight: 600;
-      color: var(--text-primary);
+      position: relative;
     }
     .stage {
       grid-area: stage;
       overflow: auto;
+      min-width: 0;
     }
-    jf-status-pill { max-width: 40%; min-width: 0; flex-shrink: 1; }
-    .surface-title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    /* Slice 501 — navigation chrome buttons. */
-    .nav-btn,
-    jf-control.nav-btn::part(control) {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      width: 1.5rem;
-      height: 1.5rem;
-      padding: 0;
-      border: none;
-      border-radius: 0.25rem;
-      background: transparent;
-      color: var(--text-secondary);
-      cursor: pointer;
-      transition: background var(--duration-fast) var(--ease-standard), color var(--duration-fast) var(--ease-standard);
-    }
-    .nav-btn:hover:not([disabled]),
-    jf-control.nav-btn::part(control):hover:not([aria-disabled='true']) {
-      background: var(--surface-2);
-      color: var(--text-primary);
-    }
-    /* The back/forward nav buttons are composed jf-controls (596 typed availability): the unavailable
-       state is aria-disabled (focusable, reason reachable), not native [disabled]. Dim both forms. */
-    .nav-btn[disabled],
-    jf-control.nav-btn::part(control)[aria-disabled='true'] {
-      opacity: 0.3;
-      cursor: default;
-    }
-    .surface-title {
-      font-size: var(--font-size-xs);
-      font-weight: 500;
-      color: var(--text-primary);
-      /* Tempdoc 559 Authority II: this is the page's single <h1> (the canonical
-         heading projected from the active surface), so reset default h1 metrics
-         and keep it inline in the topbar flex row. */
-      margin: 0 0 0 0.25rem;
-      line-height: inherit;
-    }
-    .bookmark-btn.active {
-      color: var(--text-tint);
-    }
-    /* Slice 489 T1/G1 — Copy URL topbar affordance. */
-    .topbar .spacer {
-      flex: 1;
-    }
-    /* Tempdoc 738 — the Simple/Detailed segmented toggle (surfaces the uiMode disclosure authority). */
-    .ui-mode-toggle {
-      display: inline-flex;
-      align-items: center;
-      gap: 1px;
-      padding: 1px;
-      border: 1px solid var(--border-subtle);
-      border-radius: 0.375rem;
-    }
-    .ui-mode-opt {
-      border: none;
-      background: transparent;
-      color: var(--text-secondary);
-      font: inherit;
-      font-size: var(--font-size-xs);
-      padding: 0.125rem 0.5rem;
-      border-radius: 0.3125rem;
-      cursor: pointer;
-      transition: background var(--duration-fast) var(--ease-standard), color var(--duration-fast) var(--ease-standard);
-    }
-    .ui-mode-opt:hover:not(.active) {
-      color: var(--text-primary);
-    }
-    .ui-mode-opt.active {
-      background: var(--surface-2);
-      color: var(--text-primary);
-    }
-    /* Forced colors (Windows High Contrast) erase both marks above (a fill and a tint), so the
-       pressed mode takes the selection pair and the bookmarked state the Highlight ink. A selection
-       pair needs 'forced-color-adjust: none': otherwise the browser paints a Canvas backplate behind
-       the text, and HighlightText on Canvas is unreadable. */
-    @media (forced-colors: active) {
-      .ui-mode-opt.active {
-        forced-color-adjust: none;
-        background: Highlight;
-        color: HighlightText;
-      }
-      .bookmark-btn.active {
-        color: Highlight;
-      }
-    }
-    .copy-url {
-      display: inline-flex;
-      align-items: center;
-      gap: 0.375rem;
-      padding: 0.125rem 0.5rem;
-      border-radius: 0.25rem;
-      background: transparent;
-      color: var(--text-secondary);
-      border: 1px solid var(--border-subtle);
-      font: inherit;
-      font-size: var(--font-size-xs);
-      cursor: pointer;
-      transition: background var(--duration-fast) var(--ease-standard), color var(--duration-fast) var(--ease-standard), border-color var(--duration-fast) var(--ease-standard);
-    }
-    .copy-url:hover {
-      background: var(--surface-2);
-      color: var(--text-primary);
-    }
-    .copy-url:focus-visible {
-      outline: 2px solid var(--accent-tint);
-      outline-offset: 2px;
-    }
-    .copy-url.copied {
-      color: var(--text-tint);
-      border-color: var(--accent-tint-45);
-    }
-    .copy-url.failed {
-      color: var(--text-danger);
-      border-color: var(--accent-danger-45);
+    .stage:focus { outline: none; }
+    .stage:focus-visible { outline: var(--frame-focus-width) solid var(--focus-ring-color); outline-offset: calc(-1 * var(--frame-focus-width)); }
+    /* Tempdoc 559 Authority II — the page's single <h1> names the active window; the top bar shows
+       the same name in the switcher, so the heading is for the document outline only. */
+    .visually-hidden {
+      position: absolute;
+      width: var(--frame-hairline);
+      height: var(--frame-hairline);
+      margin: 0;
+      overflow: hidden;
+      clip-path: inset(50%);
+      white-space: nowrap;
     }
     .empty {
       padding: 2rem;
@@ -810,6 +684,9 @@ export class Shell extends JfElement {
     // Slice 496 §3.A: listen for navigate-with-context events from surfaces.
     this.addEventListener('navigate-with-context', this.onNavigateWithContext);
     this.addEventListener('citation-select', this.onCitationSelect);
+    this.addEventListener('tab-change', this.onWindowTabChange);
+    this.addEventListener('settings-section-change', this.onSettingsSectionChange);
+    window.addEventListener('mouseup', this.onMouseNavigate, true);
     // Tempdoc 609 §R (T1.3) — overlay components (TaskList, running-job chip) request "return to job"
     // navigation via a document-level event; route it through activateSurface.
     document.addEventListener(NAVIGATE_TO_SURFACE_EVENT, this.onNavigateToSurface);
@@ -1375,8 +1252,8 @@ export class Shell extends JfElement {
         apiBase: this.apiBase,
         registerSurfacePort: () => {},
         navigate: (target) => this.activateSurface(target, {}, 'BUTTON'),
-        navigateBack: () => this.goBack(),
-        navigateForward: () => {},
+        navigateBack: () => this.appBack(),
+        navigateForward: () => this.appForward(),
         registerCommand: (id, label, handler, labelKey) => {
           // Fallback CORE host: this branch runs in standalone mode when no
           // PluginRegistry wires up a real plugin-scoped HostApi. Real
@@ -1448,7 +1325,7 @@ export class Shell extends JfElement {
     // Search now owns its `<jf-document-pane>` directly.
     // Slice 471 — userConfig subscribe drives both Stage's override
     // dispatch + the ProvenanceBadge visibility.
-    // Slice 472 — also re-filter rail when surfaceVisibility /
+    // Slice 472 — also re-filter the window list when surfaceVisibility /
     // surfaceOrder change.
     // 687 R5b — narrow reading mount inputs (the wide-layout decision + the shared inspector
     // selection). The shared viewport authority remains after the old host's width reporter retires.
@@ -1465,34 +1342,19 @@ export class Shell extends JfElement {
     ];
     this.userConfigUnsubscribe = subscribeUserConfig((cfg) => {
       this.userConfig = cfg;
-      this.syncRailExpandedAttr();
       this.refreshSurfaces();
     });
-    this.syncRailExpandedAttr();
-    // Tempdoc 586 F-2 — re-filter the rail live when the Simple/Detailed mode changes (mirrors the
-    // surfaceVisibility re-filter above). subscribeUiMode fires immediately, so this also seeds the
-    // initial filtered rail consistently with the persisted mode.
-    this.uiModeUnsubscribe = subscribeUiMode((m) => {
-      this.uiMode = m;
-      this.refreshSurfaces();
+    // More › Developer follows the developer view tier (Settings › Developer › View tier).
+    this.viewerAudienceUnsubscribe = subscribeViewerAudience((audience) => {
+      this.developerTier = audience === 'DEVELOPER';
     });
-    // Slice 471 / 469 — re-filter rail when SurfaceCatalog mutates
+    // Slice 471 / 469 — re-filter the window list when SurfaceCatalog mutates
     // (plugin install/uninstall via mergePluginSurfaceContributions
     // / removePluginSurfaceContributions; or boot-time catalog refresh).
-    // Without this, a plugin uninstall leaves the rail showing the
+    // Without this, a plugin uninstall leaves the More menu showing the
     // plugin's surface until the next userConfig change.
     this.catalogUnsubscribe = onSurfaceCatalogChange(() => {
       this.refreshSurfaces();
-    });
-    // Slice 501 — Navigation journal subscription + keyboard shortcuts.
-    this.journalCanBack = canGoBack();
-    this.journalCanForward = canGoForward();
-    this.journalUnsubscribe = subscribeJournal(() => {
-      this.journalCanBack = canGoBack();
-      this.journalCanForward = canGoForward();
-    });
-    this.savedViewsUnsubscribe = subscribeSavedViews(() => {
-      this.updateBookmarkState();
     });
     document.addEventListener('keydown', this.boundKeyHandler, true);
     // Slice 492 — Intent substrate bootstrap.
@@ -1582,7 +1444,7 @@ export class Shell extends JfElement {
         // bookmarks, browser tabs, and OS task-switcher labels carry the
         // surface context. The lookup uses the catalog's localized
         // labelKey; missing entries fall through to the bare app name.
-        // Fires uniformly across all intent sources (URL paste, rail click,
+        // Fires uniformly across all intent sources (URL paste, area switch,
         // Tauri deep-link, backend-emitted intent) because every navigation
         // path funnels through NavigationHandler.setActiveSurface.
         this.updateDocumentTitle(id);
@@ -1594,12 +1456,6 @@ export class Shell extends JfElement {
           // search hit); close it on a genuine surface change so stale content
           // doesn't persist across surfaces.
           setInspectorOpen(false);
-          // Search Thread S5b — the navigation TOAST is retired (replace-with-nothing: navigation is
-          // already visible in the rail/title, so no push notification rides along). The
-          // `previousActiveId` bookkeeping it used to do as a side effect moves here, in
-          // `setActiveSurface` itself, so `goBack`/`navigateBack` (the host API's back action) keeps
-          // working without the toast that used to be its only caller of this assignment.
-          this.previousActiveId = prev;
         }
         // Tempdoc 855 §11.1 — a REALIZED stage navigation reaches this callback only from the
         // normal (non-MODAL) branch, so the address has moved off the settings window: dismiss it.
@@ -1629,6 +1485,15 @@ export class Shell extends JfElement {
         // left alone afterwards.
         if (!win.open) this.settingsOpenPushed = info.pushed;
         win.open = true;
+        // C9 — the Settings entry remembers the area it opened over, so a reload (or Back to this
+        // entry) shows that area underneath, and closing returns to it.
+        this.keepAreaUnderSettings();
+        // Shell slice 2 — `?section=<category>` opens that Settings section (reload, deep link,
+        // Back/Forward). Unknown sections are ignored: the window keeps the section it shows, and an
+        // address without one is completed with it.
+        const section = state?.section;
+        if (typeof section === 'string' && findCategory(section)) requestMemberTab(SETTINGS_SURFACE_ID, section);
+        else if (this.settingsSection) this.replaceAddressState(SETTINGS_SURFACE_ID, { section: this.settingsSection });
         if (state?.focusSettingsRecovery === true || state?.focusSettingsRecovery === 'true') {
           win.focusSettingsRecovery();
         }
@@ -1656,6 +1521,7 @@ export class Shell extends JfElement {
       // plain typo/synonym auto-correct from firing it.
       onRedirect: (originalId, targetId) => {
         if (getSurface(targetId)?.members?.includes(originalId)) {
+          if (targetId !== SETTINGS_SURFACE_ID) this.hostTabs.set(targetId, originalId);
           requestMemberTab(targetId, originalId);
         }
       },
@@ -1693,10 +1559,7 @@ export class Shell extends JfElement {
       if (outcome.status !== 'unresolved' && outcome.status !== 'auto-corrected') return;
       if (!this.shadowRoot) return;
       if (outcome.status === 'unresolved') {
-        emitEphemeralToast({ message: `Couldn't find ${outcome.attemptedId}. Choose a destination in status.`, severity: 'warning',
-          actionLabel: 'Choose destination', destinations: outcome.alternatives,
-          onAction: () => this.shadowRoot?.querySelector<StatusPill>('jf-status-pill')?.toggle(),
-        });
+        this.unknownWindowNotice(outcome.alternatives);
       } else {
         emitEphemeralToast({ message: `Opened ${outcome.canonicalId} instead of ${outcome.originalId}`, actionLabel: 'Undo auto-correction',
           onAction: () => { void this.intentRouter?.dispatch({ address: { kind: 'navigate', target: outcome.originalId, state: {} }, transport: 'BUTTON' }, { recoveryPolicyOverride: strictPolicy }); },
@@ -1708,20 +1571,28 @@ export class Shell extends JfElement {
     this.intentRouter.subscribe((intent, outcome) => {
       if (intent.address.kind === 'navigate' && (outcome.status === 'dispatched' || outcome.status === 'auto-corrected')) {
         navigationHandled = true;
-        if (!isNavigatingHistoryNow()) {
-          // Settle a claimed conversation before recording the surface that follows it.
-          // A browser traversal has already moved its address and must never push here.
-          if (intent.transport !== 'URL_BAR') flushPendingNavigationWrite();
-          const url = canonicalize(persistentAddress(intent.address));
-          const label = deriveRichLabel(
-            intent.address.target,
-            url,
-            present({ kind: 'surface', id: intent.address.target }).label,
-          );
-          recordNavigation(intent.address.target, url, label, intent.transport);
+        // Settle a claimed conversation before recording the surface that follows it.
+        // A browser traversal has already moved its address and must never push here.
+        if (intent.transport !== 'URL_BAR') flushPendingNavigationWrite();
+        const url = canonicalize(persistentAddress(intent.address));
+        const label = deriveRichLabel(
+          intent.address.target,
+          url,
+          present({ kind: 'surface', id: intent.address.target }).label,
+        );
+        recordNavigation(intent.address.target, url, label, intent.transport);
+        // The window tab is part of the address: an address naming a tab opens it, and an address
+        // without one is completed with the tab the window shows (after the handler wrote it).
+        const tab = intent.address.state?.tab;
+        const host = outcome.status === 'auto-corrected' ? outcome.canonicalId : intent.address.target;
+        if (typeof tab === 'string' && getSurface(host)?.members !== undefined) {
+          this.hostTabs.set(host, tab);
+          requestMemberTab(host, tab);
         }
-        // Update bookmark star after URL projection writes (async — next microtask).
-        queueMicrotask(() => this.updateBookmarkState());
+        queueMicrotask(() => {
+          const shown = this.hostTabs.get(host);
+          if (shown && host !== SETTINGS_SURFACE_ID) this.replaceAddressState(host, { tab: shown });
+        });
       }
     });
     // Inline router-dispatch binding (was previously a 4-line
@@ -1769,8 +1640,8 @@ export class Shell extends JfElement {
     // teardown function is invoked immediately on resolution rather
     // than buried in `sourceTeardowns` after teardown already ran.
     const sources = [
-      createURLSource(),
-      createTauriDeepLinkSource(),
+      createURLSource({ onUnknownSurface: () => this.unknownWindowNotice([]) }),
+      createTauriDeepLinkSource({ onUnknownSurface: () => this.unknownWindowNotice([]) }),
       // Tempdoc 662: subscribes the intent streamId on the shared multiplexer constructed
       // earlier in this method, instead of opening its own EventSource.
       createBackendStreamSource({ multiplex: this.shellEventsMultiplex! }),
@@ -1783,6 +1654,7 @@ export class Shell extends JfElement {
       if (request.kind === 'deepLink') {
         const address = parseUrl(request.url);
         if (address) await router.dispatch({ address, transport: 'URL_DEEPLINK' });
+        else if (isSurfaceUrl(request.url)) this.unknownWindowNotice([]);
       } else {
         await this.summonSearch();
       }
@@ -1905,14 +1777,17 @@ export class Shell extends JfElement {
     this.autoLock_ = null;
     this.removeEventListener('navigate-with-context', this.onNavigateWithContext);
     this.removeEventListener('citation-select', this.onCitationSelect);
+    this.removeEventListener('tab-change', this.onWindowTabChange);
+    this.removeEventListener('settings-section-change', this.onSettingsSectionChange);
+    window.removeEventListener('mouseup', this.onMouseNavigate, true);
     document.removeEventListener(NAVIGATE_TO_SURFACE_EVENT, this.onNavigateToSurface);
     this.dragUnsubscribe?.();
     for (const u of this.narrowReadingUnsubs) u();
     this.narrowReadingUnsubs = [];
     this.userConfigUnsubscribe?.();
     this.catalogUnsubscribe?.();
-    this.uiModeUnsubscribe?.();
-    this.uiModeUnsubscribe = null;
+    this.viewerAudienceUnsubscribe?.();
+    this.viewerAudienceUnsubscribe = null;
     this.keybindingTeardown?.();
     this._aiUnsub?.();
     this.scopeProfileSwitchUnsub?.();
@@ -1966,11 +1841,6 @@ export class Shell extends JfElement {
       );
       this.undoOperationListener = null;
     }
-    // Slice 501 — navigation chrome teardown.
-    this.journalUnsubscribe?.();
-    this.journalUnsubscribe = null;
-    this.savedViewsUnsubscribe?.();
-    this.savedViewsUnsubscribe = null;
     document.removeEventListener('keydown', this.boundKeyHandler, true);
     // Slice 492 — tear down intent substrate.
     //
@@ -2012,7 +1882,7 @@ export class Shell extends JfElement {
    * origin to downstream listeners / future audit consumers.
    *
    * Used by:
-   *   - Rail click (Shell.handleRailClick → `'RAIL'`).
+   *   - Area switch: top-bar switcher, the minimal bar's area menu, Ctrl+1/2/3 (`'RAIL'`).
    *   - Drop-completion redirect (Shell.handleFolderDrop → `'BUTTON'`).
    *   - Future palette / programmatic activations.
    */
@@ -2033,6 +1903,18 @@ export class Shell extends JfElement {
    * label; `"JustSearch"` as a fallback (surface missing from rail set,
    * label catalog not yet fetched, etc).
    */
+  /**
+   * L3 / C1 — every unknown destination gets the same short notice: it fits the top bar beside the
+   * pill at every size, and its action names what to do next. (The raw id is not words a reader uses.)
+   */
+  private unknownWindowNotice(destinations: readonly { readonly id: string; readonly label: string }[]): void {
+    if (!this.shadowRoot) return;
+    emitEphemeralToast({ message: "Couldn't find that window", severity: 'warning',
+      actionLabel: 'Choose destination', destinations,
+      onAction: () => this.shadowRoot?.querySelector<StatusPill>('jf-status-pill')?.toggle(),
+    });
+  }
+
   private updateDocumentTitle(surfaceId: string): void {
     // §2.A: surface-label resolution (catalog labelKey → id-derived fallback)
     // lives in the one display projector now.
@@ -2062,7 +1944,11 @@ export class Shell extends JfElement {
    *     does, so a boot-entered session was otherwise left with NO projection for its whole life.
    */
   private onSettingsWindowClose(): void {
-    if (this.settingsOpenPushed) {
+    // C9 — an app entry before the Settings entry is the area it opened over: Settings reached by
+    // Forward, a reload or a pasted address sits on one too, not only an opening that pushed.
+    // Returning there means a later Back never lands on Settings again.
+    const index = (window.history.state as { jsNavIndex?: unknown } | null)?.jsNavIndex;
+    if (this.settingsOpenPushed || (typeof index === 'number' && index > 0)) {
       this.settingsOpenPushed = false;
       window.history.back();
       return;
@@ -2072,162 +1958,186 @@ export class Shell extends JfElement {
     const fallback =
       this.surfaces.find((s) => s.id === 'core.search-v3-surface') ?? this.surfaces[0];
     const target = this.activeId ?? fallback?.id ?? null;
-    if (target) this.activateSurface(target, {}, 'BUTTON');
+    if (!target) return;
+    // The Settings entry is the first the app owns (opened straight from a link): the area replaces
+    // it, so there is no Settings entry left for Back to reopen.
+    const tab = this.hostTabs.get(target);
+    const address: ShellAddressNavigation = { kind: 'navigate', target, state: tab ? { tab } : {} };
+    try {
+      window.history.replaceState({ ...(window.history.state as Record<string, unknown> | null), surfaceId: target, jsNavIndex: 0 },
+        '', `#${canonicalize(address)}`);
+    } catch {
+      // history API failure is non-fatal.
+    }
+    void this.intentRouter?.dispatch({ address, transport: 'BUTTON' }, { pushHistory: false, taskOrigin: 'fresh' });
   }
 
-  private goBack(): void {
-    if (this.previousActiveId) {
-      this.activateSurface(this.previousActiveId, {}, 'BUTTON');
+  /**
+   * Record on the Settings entry the area underneath it and the window tab it shows, or — when the
+   * entry already names them (a reload, Back or Forward onto it) — show that area and tab again.
+   */
+  private keepAreaUnderSettings(): void {
+    const entry = (window.history.state as Record<string, unknown> | null) ?? {};
+    const over = entry.settingsOver;
+    if (typeof over === 'string' && over !== SETTINGS_SURFACE_ID && getSurface(over)) {
+      // FR3 — the window under Settings shows its addressed tab from the start, not its first one.
+      const tab = entry.settingsOverTab;
+      if (typeof tab === 'string' && getSurface(over)?.members?.includes(tab) && this.hostTabs.get(over) !== tab) {
+        this.hostTabs.set(over, tab);
+        requestMemberTab(over, tab);
+      }
+      if (over === this.activeId) return;
+      this.activeId = over;
+      updateShellContext({ activeSurface: over });
+      this.updateDocumentTitle(over);
+      return;
+    }
+    if (!this.activeId) return;
+    const tab = this.hostTabs.get(this.activeId);
+    try {
+      window.history.replaceState({ ...entry, settingsOver: this.activeId, ...(tab ? { settingsOverTab: tab } : {}) }, '');
+    } catch {
+      // history API failure is non-fatal.
     }
   }
 
   /**
-   * Slice 489 T1/G1 — clipboard copy of the current canonical URL. The
-   * topbar button (rendered in render()) wires this. The click handler is
-   * the required user gesture for `navigator.clipboard.writeText`.
+   * FR3 — Back runs on the browser's own history, so the address and the stage can never disagree
+   * (popstate re-dispatches the earlier address through the one router). The first view the app
+   * owns has nothing before it: Back there stays put rather than leaving the app.
    */
-  private async handleCopyUrlClick(): Promise<void> {
-    flushPendingProjection();
-    const url = window.location.href;
-    const ok = await copyToClipboard(url);
-    this.copyUrlFeedback = ok ? 'copied' : 'failed';
-    // Auto-clear feedback after a short visual window.
-    window.setTimeout(() => {
-      this.copyUrlFeedback = null;
-    }, 1500);
+  appBack(): void {
+    if (historyIndex() > 0) window.history.back();
   }
 
-  /**
-   * Tempdoc 738 — surface the app-wide Simple/Detailed disclosure authority (uiModeState) as reachable
-   * chrome, so a Simple-mode user can always recover the technical detail the surfaces hide. "Detailed"
-   * is the user-facing label for the `advanced` mode.
-   */
-  private renderUiModeToggle(): TemplateResult {
-    // Read the authority LIVE (not the cached `this.uiMode`) so the toggle can never desync from what
-    // the surfaces render — e.g. when the async settings seed sets the mode after this component's
-    // constructor ran. `this.uiMode` + the subscription remain only to trigger the re-render.
-    const mode = getUiMode();
-    return html`<div class="ui-mode-toggle" role="group" aria-label="Detail level">
-      ${(['simple', 'advanced'] as const).map(
-        (m) => html`<button
-          type="button"
-          class=${mode === m ? 'ui-mode-opt active' : 'ui-mode-opt'}
-          aria-pressed=${mode === m ? 'true' : 'false'}
-          @click=${() => this.handleUiModeSelect(m)}
-        >
-          ${m === 'simple' ? 'Simple' : 'Detailed'}
-        </button>`,
-      )}
-    </div>`;
+  /** FR3 — Forward returns to the later view Back left (a no-op when there is none). */
+  appForward(): void {
+    window.history.forward();
   }
 
-  private handleUiModeSelect(mode: UiMode): void {
-    if (this.uiMode === mode) return;
-    // Immediate, app-wide: drives the rail-trim (586 F-2) + every 728 disclosure consumer via the store.
-    setUiMode(mode);
-    // Persist best-effort so the choice survives restart, independent of whether SettingsSurface (which
-    // owns the jf-save-settings listener) is mounted — the topbar must not depend on it. Same endpoint +
-    // `{ ui: {...} }` body shape SettingsSurface uses (SettingsSurface.saveSettingsListener).
-    const data = this.hostApi_?.data;
-    if (!data) return;
-    void enqueueUiModeSettings((path, init) => data.fetch(path, {
-      method: init?.method,
-      headers: init?.headers as Record<string, string> | undefined,
-      body: init?.body as string | undefined,
-      signal: init?.signal ?? undefined,
-    }), { ui: { mode } })
-      .catch((error: unknown) => {
-        this.hostApi_?.ui.showNotification(error instanceof Error ? error.message : 'Could not save detail level.', { severity: 'error' });
-      });
-  }
-
-  private toggleBookmarksPopover(): void {
-    const popover = this.renderRoot.querySelector(
-      '#bookmarks-popover',
-    ) as BookmarksPopover | null;
-    popover?.toggle();
-  }
-
-  private handleBookmarkNavigate(url: string): void {
-    const addr = parseUrl(url);
-    if (addr && addr.kind === 'navigate' && this.intentRouter) {
-      void this.intentRouter.dispatch(
-        { address: addr, transport: 'BUTTON' },
-        { pushHistory: true },
-      );
+  /** Replace the current address's state (no new history entry) while it still names `target`. */
+  private replaceAddressState(target: string, patch: StateSnapshot): void {
+    const current = parseUrl(window.location.hash.slice(1));
+    if (current?.kind !== 'navigate' || canonicalSurfaceId(current.target) !== target) return;
+    const next = `#${canonicalize({ ...current, state: { ...current.state, ...patch } })}`;
+    if (window.location.hash === next) return;
+    try {
+      window.history.replaceState(window.history.state, '', next);
+    } catch {
+      // history API failure is non-fatal.
     }
   }
 
-  private currentCanonicalUrl(): string {
-    const hash = window.location.hash;
-    return hash.startsWith('#') ? hash.slice(1) : '';
+  /** The active window whose tab row emitted `e` (a split layout's second pane does not own the address). */
+  private hostOfTabEvent(e: Event): string | null {
+    const active = this.activeId ? getSurface(this.activeId) : undefined;
+    const primary = this.shadowRoot?.querySelector<Stage>('jf-stage')?.primaryWindow();
+    if (!active?.members?.length || !primary) return null;
+    return e.composedPath().includes(primary) ? active.id : null;
   }
 
-  private updateBookmarkState(): void {
-    this.isBookmarked = isViewSaved(this.currentCanonicalUrl());
-  }
-
-  private handleBookmarkToggle(): void {
+  /** Developer menu: copy the canonical address of the current view (was the title bar's Copy URL). */
+  private async copyLink(): Promise<void> {
     flushPendingProjection();
-    const url = this.currentCanonicalUrl();
-    if (!url) return;
-    if (isViewSaved(url)) {
-      const existing = findSavedView(url);
-      if (existing) removeView(existing.id);
-    } else {
-      const surfaceId = this.activeId ?? '';
-      const label = deriveRichLabel(
-        surfaceId,
-        url,
-        present({ kind: 'surface', id: surfaceId }).label,
-      );
-      saveView(label || 'Untitled', url, this.activeId ?? '');
-    }
-    this.updateBookmarkState();
+    const ok = await copyToClipboard(window.location.href);
+    emitEphemeralToast({ message: ok ? 'Link copied' : 'Could not copy the link', severity: ok ? 'success' : 'error' });
+  }
+
+  /** The area order of the switcher; Ctrl+1/2/3 follow it. */
+  private static readonly AREAS = FRAME_AREAS;
+
+  /** Ctrl+1/2/3 (⌘ on macOS). AltGr (Ctrl+Alt) types characters on many layouts, so it never counts. */
+  private static areaShortcut(e: KeyboardEvent): string | null {
+    if (!(e.ctrlKey || e.metaKey) || e.altKey || e.shiftKey) return null;
+    const digit = /^Digit([1-3])$/.exec(e.code)?.[1] ?? (/^[1-3]$/.test(e.key) ? e.key : undefined);
+    return digit ? Shell.AREAS[Number(digit) - 1]?.id ?? null : null;
+  }
+
+  /** Switch to an area: the switcher, Ctrl+1/2/3 and the minimal bar's area menu all come here. */
+  private switchArea(id: string): void {
+    if (!getSurface(id)) return;
+    this.activateSurface(id, {}, 'RAIL');
+  }
+
+  /** The reader chose something in the top bar. */
+  private onTopBarSelect(selection: TopBarSelection): void {
+    if (selection.kind === 'area') this.switchArea(selection.id);
+    // About: Settings › Desktop shows the version and update state (there is no About page yet).
+    else if (selection.kind === 'window' && selection.id === 'about') this.activateSurface(SETTINGS_SURFACE_ID, { section: 'desktop' }, 'BUTTON');
+    else if (selection.kind === 'window') this.activateSurface(selection.id, {}, 'BUTTON');
+    else if (selection.kind === 'settings') this.activateSurface(SETTINGS_SURFACE_ID, {}, 'BUTTON');
+    else void this.copyLink();
+  }
+
+  /** FR8 — F6 / Shift+F6: top bar → window tabs → content → details pane, skipping absent regions. */
+  private cycleRegion(direction: 1 | -1): void {
+    const bar = this.shadowRoot?.querySelector<TopBar>('jf-top-bar') ?? null;
+    const main = this.shadowRoot?.querySelector<HTMLElement>('.stage') ?? null;
+    const stage = this.shadowRoot?.querySelector<Stage>('jf-stage') ?? null;
+    const regions: FrameRegion[] = [
+      { kind: 'top-bar', root: bar },
+      { kind: 'window-tabs', root: stage?.primaryWindow() ?? null },
+      { kind: 'content', root: main },
+      // The details pane may sit in the window or, below the wide breakpoint, in the overlay drawer.
+      { kind: 'details', root: this },
+    ];
+    focusRegion(regions, direction);
+  }
+
+  /** Alt+Left/Right; on macOS, in a text field Option+Left/Right move the caret by word instead (C8). */
+  private static isBackForwardChord(e: KeyboardEvent): boolean {
+    return e.altKey && !e.ctrlKey && !e.metaKey && !e.shiftKey && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')
+      && !(isMac() && isTypingTarget(deepActiveElement()));
   }
 
   /**
    * Slice 501 — global keyboard shortcut handler (capture phase).
-   * Guards: skip when the reader is typing, by the app's one shared definition of that.
+   * Guards: IME composition, auto-repeat and an open dialog stand every chord down. None of these
+   * chords inserts or removes text, so they also work from a text field (C8, FR3).
    */
   private handleGlobalKey(e: KeyboardEvent): void {
-    // Tempdoc 864 Layer 2(a) — THE shared typing guard (857 PR-A), not a fourth copy of it. This
-    // handler carried a private descent that omitted `SELECT` — precisely the omission 857 was
-    // written to close on the other copies — while guarding the app's most powerful chords: a `Ctrl+D`
-    // or `Alt+←` pressed with a `<select>` focused fired over the reader's type-ahead. The SUBJECT is
-    // still "where is focus?" (a capture-phase `event.target` is retargeted to the shadow host and
-    // would miss every input in a shadow tree); only the private predicate is gone.
-    // W5 is an explicit Ask command, including from the automatically focused composer.
-    // Other navigation chords still yield to editing; IME, repeat and modal guards remain below.
-    const askShortcut = e.ctrlKey && e.shiftKey && e.key === 'A';
-    if (isTypingTarget(deepActiveElement()) && !askShortcut) return;
-    // Tempdoc 864 Layer 2(b) — IME composition and auto-repeat, by the app's ONE definition (a held
-    // `Ctrl+D` used to flap the bookmark on and off for as long as the key was down).
+    // Tempdoc 864 Layer 2(b) — IME composition and auto-repeat, by the app's ONE definition.
     if (shouldIgnoreKeyEvent(e)) return;
     // Tempdoc 864 Layer 2(d) — these chords navigate and mutate; none of them belongs to a reader
     // who is inside a modal. `showModal()` makes the background inert to the POINTER, but this is a
     // `document` listener and keystrokes made inside the dialog still arrive here.
-    if (modalOwnsFocus()) return;
-    if (e.altKey && e.key === 'ArrowLeft') {
+    // C9 — the Settings window is a place in history: when it is the only modal, Alt+Left/Right
+    // are its Back and Forward exactly as the browser's are (Back closes it, Forward reopens it).
+    const settingsOnly = openModalDepth() === 1 && !!this.shadowRoot?.querySelector<SettingsWindow>('jf-settings-window')?.open;
+    if (modalOwnsFocus() && !(settingsOnly && Shell.isBackForwardChord(e))) return;
+    // Shell slice 2 — Ctrl+1/2/3 switch areas and F6 moves between frame regions. Neither inserts
+    // or removes text, so they also work from a text field (the Search composer keeps focus on
+    // arrival); AltGr combinations, which do type on many layouts, are excluded above.
+    const area = Shell.areaShortcut(e);
+    if (area) {
       e.preventDefault();
-      if (this.intentRouter) {
-        void navigateBack(this.intentRouter.dispatch.bind(this.intentRouter));
-      }
-    } else if (e.altKey && e.key === 'ArrowRight') {
+      this.switchArea(area);
+      return;
+    }
+    if (e.key === 'F6' && !e.ctrlKey && !e.altKey && !e.metaKey) {
       e.preventDefault();
-      if (this.intentRouter) {
-        void navigateForward(this.intentRouter.dispatch.bind(this.intentRouter));
-      }
-      // Tempdoc 821 §4 — the Ctrl+L branch that used to call handleCopyUrlClick() here was removed:
-      // Search Thread S2 reassigned mod+l to shell.focus-composer app-wide (registered with no `when`
-      // scoping at Shell.ts:935-940, "focus the bar from anywhere"), and this raw handler ran in
-      // parallel with that registered keybinding (neither call site calls stopPropagation), so every
-      // Ctrl+L press both dispatched an unconsumed jf-focus-composer event AND copied the URL. Copy
-      // URL now has no keyboard chord — click the button.
-    } else if (e.ctrlKey && e.key === 'd') {
+      this.cycleRegion(e.shiftKey ? -1 : 1);
+      return;
+    }
+    if (e.key === 'F1' && !e.ctrlKey && !e.altKey && !e.metaKey && !e.shiftKey) {
       e.preventDefault();
-      this.handleBookmarkToggle();
-    } else if (askShortcut) {
+      this.activateSurface(HELP_SURFACE_ID, {}, 'BUTTON');
+      return;
+    }
+    // FR3 — Alt+Left/Right are Back and Forward wherever focus is: they edit no text, and Back often
+    // lands in a text field (the Search composer takes focus on arrival), where a typing guard used
+    // to swallow the Forward that followed. The chord is the app's alone, so nothing under it (a
+    // tab row's or an option group's arrow keys) also acts on it.
+    // On macOS Option+Left/Right move the caret by word, so in a text field the chord stays the text's (C8).
+    if (Shell.isBackForwardChord(e)) {
+      e.preventDefault();
+      e.stopPropagation();
+      if (e.key === 'ArrowLeft') this.appBack();
+      else this.appForward();
+      return;
+    }
+    // W5 is an explicit Ask command, including from the automatically focused composer.
+    if (e.ctrlKey && e.shiftKey && e.key === 'A') {
       e.preventDefault();
       this.handleAskAiShortcut();
     }
@@ -2303,18 +2213,8 @@ export class Shell extends JfElement {
       railSurfaces = railSurfaces.filter((s) => visibility[s.id] !== false);
     }
 
-    // Tempdoc 586 F-2 — Simple-mode rail trim. The Simple/Detailed toggle (uiModeState) now
-    // actually shapes the rail: in Simple mode the advanced/diagnostic surface (the System
-    // dashboard) drops off so a non-technical user sees a cleaner set; AI Brain stays
-    // (local-model management is user-facing). Detailed restores it. Applied after the
-    // visibility filter and before ordering, so altitude-band clamping below still holds.
-    // (Tempdoc 855 §5 item 2 — the Theme Editor used to be listed here too, but it is now
-    // DEEPLINK-placement, not RAIL, so it never reaches `railSurfaces` in the first place;
-    // listing it in this set would have been dead code.)
-    if (getUiMode() === 'simple') {
-      const hiddenInSimple = new Set(['core.system-surface']);
-      railSurfaces = railSurfaces.filter((s) => !hiddenInSimple.has(s.id));
-    }
+    // Tempdoc 586 F-2's Simple-mode trim of System retired with the rail (shell slice 2): System is
+    // a fixed row of the More menu in every detail level, never a switcher area.
 
     // Slice 472 — apply userConfig surfaceOrder. Surfaces in the
     // order list keep that order; surfaces not in the list keep
@@ -2345,18 +2245,12 @@ export class Shell extends JfElement {
       }
       // Tempdoc 571 §4b — the cross-altitude move-ban: honor the user reorder only WITHIN each altitude
       // band. A saved surfaceOrder that interleaves bands cannot smuggle a DIAGNOSTIC surface into the
-      // product region; altitude (not user drag) owns band membership. The Rail render derives the final
-      // visual bands from the same altitude — this keeps `this.surfaces` itself band-consistent for every
-      // consumer (activeId default, secondary surface), not only the rail.
+      // product region; altitude (not user drag) owns band membership. This keeps `this.surfaces`
+      // band-consistent for every consumer (activeId default, secondary surface, the More menu).
       railSurfaces = clampReorderToAltitudeBands(ordered);
     }
 
     this.surfaces = railSurfaces;
-    this._aiDependentIds = new Set(
-      railSurfaces
-        .filter((s) => s.consumes?.conversationShapes && s.consumes.conversationShapes.length > 0)
-        .map((s) => s.id),
-    );
     if (this.surfaces.length > 0 && !this.activeId) {
       // Tempdoc 577 Goal 3 §3.6 — Search is retired as a RAIL peer (DEEPLINK), so it is no longer in
       // `this.surfaces` (rail-only). The boot landing is the ONE interaction window
@@ -2400,13 +2294,11 @@ export class Shell extends JfElement {
     ></jf-document-pane>`;
   }
 
-  /** S5b — mirror the persisted rail-expanded state onto the host so the grid track widens. */
-  private syncRailExpandedAttr(): void {
-    if (this.userConfig?.railExpanded) this.setAttribute('data-rail-expanded', '');
-    else this.removeAttribute('data-rail-expanded');
-  }
-
-  private isRailVisible(): boolean {
+  /**
+   * FR5 — a layout's `rail.visible:false` (focus, zen, saved custom layouts) hides the switcher.
+   * The areas stay reachable by Ctrl+1/2/3 and the palette.
+   */
+  private isSwitcherVisible(): boolean {
     const layoutId = this.userConfig?.activeLayoutId;
     if (!layoutId) return true;
     const layout = getLayout(layoutId);
@@ -2415,10 +2307,9 @@ export class Shell extends JfElement {
   }
 
   /**
-   * Tempdoc 508-followup §β3 — status-deck visibility honors
-   * {@code layout.zones.statusBar.visible}. Default visible when the
-   * layout omits the key (back-compat with the original hardcoded
-   * always-on behavior).
+   * Tempdoc 508-followup §β3 / FR5 — `layout.zones.statusBar.visible` maps to the plugin status
+   * row and the pill's plugin count only; notices and needs-you always show. Default visible when
+   * the layout omits the key.
    */
   private isStatusDeckVisible(): boolean {
     const layoutId = this.userConfig?.activeLayoutId;
@@ -2476,11 +2367,25 @@ export class Shell extends JfElement {
     return fallback ?? null;
   }
 
-  private handleRailClick(id: string): void {
-    // Slice 492 — rail clicks dispatch through the canonical activation
-    // entry; the router + NavigationHandler take it from there. Exactly
-    // one path to surface activation.
-    this.activateSurface(id, {}, 'RAIL');
+  /** One top-bar destination for a catalog window. */
+  private destination(id: string, extra: Partial<TopBarDestination> = {}): TopBarDestination {
+    return { id, label: present({ kind: 'surface', id }).label, icon: surfaceIcon(id), ...extra };
+  }
+
+  /** The switcher's areas, in their fixed order, as the active layout and visibility allow. */
+  private areaDestinations(): TopBarDestination[] {
+    return Shell.AREAS
+      .filter(area => this.surfaces.some(s => s.id === area.id))
+      .map(area => this.destination(area.id, {
+        shortcut: area.shortcut,
+        icon: area.id === INTERACTION_SURFACE_ID ? 'search' : area.id === 'core.library-surface' ? 'folder' : 'cpu',
+      }));
+  }
+
+  /** More › More: rail windows that are neither an area nor System (catalog contributions, plugins). */
+  private pluginWindows(): TopBarDestination[] {
+    const fixed = new Set<string>([...Shell.AREAS.map(a => a.id), ...FRAME_FIXED_WINDOWS]);
+    return this.surfaces.filter(s => !fixed.has(s.id)).map(s => this.destination(s.id));
   }
 
   override render(): TemplateResult {
@@ -2490,97 +2395,30 @@ export class Shell extends JfElement {
     const splitAxis = this.resolveSplitAxis();
     const secondary =
       splitAxis !== null && active ? this.resolveSecondarySurface(active.id) : null;
+    const known = (id: string): TopBarDestination | null => getSurface(id) ? this.destination(id) : null;
     return html`
-      <div class="topbar" role="banner">
-        <span class="brand">JustSearch</span>
-        ${/* 596 face 1.1 — typed availability, not a suppressed title-on-disabled. When there is
-             nowhere to go the reason is REACHABLE (aria-disabled + focus/hover tooltip) on the
-             composed jf-control, instead of a `title` the browser hides on a disabled control. */ ''}
-        <jf-control
-          class="nav-btn"
-          label="Go back"
-          .availability=${this.journalCanBack
-            ? undefined
-            : unavailableBecause('No earlier view to go back to')}
-          .onActivate=${() => {
-            if (this.intentRouter) {
-              void navigateBack(this.intentRouter.dispatch.bind(this.intentRouter));
-            }
-          }}
-        >${icon({ name: 'chevron-left', size: 14 })}</jf-control>
-        <jf-control
-          class="nav-btn"
-          label="Go forward"
-          .availability=${this.journalCanForward
-            ? undefined
-            : unavailableBecause('No later view to go forward to')}
-          .onActivate=${() => {
-            if (this.intentRouter) {
-              void navigateForward(this.intentRouter.dispatch.bind(this.intentRouter));
-            }
-          }}
-        >${icon({ name: 'chevron-right', size: 14 })}</jf-control>
-        ${/* Tempdoc 609 §R (T1.2) — the navigation-trail menu (read-only projection of NavigationJournal). */ ''}
-        <jf-recents-menu
-          class="nav-btn"
-          .dispatch=${this.intentRouter ? this.intentRouter.dispatch.bind(this.intentRouter) : null}
-        ></jf-recents-menu>
-        <h1 class="surface-title">${active ? present({ kind: 'surface', id: active.id }).label : ''}</h1>
-        <span class="spacer"></span>
-        <jf-status-pill .store=${this.advisoryStore} api-base=${this.apiBase}
+      <jf-top-bar
+        role="banner"
+        active-id=${this.activeId ?? ''}
+        .areas=${this.areaDestinations()}
+        .switcherVisible=${this.isSwitcherVisible()}
+        .system=${getSurface(SYSTEM_SURFACE_ID) ? this.destination(SYSTEM_SURFACE_ID, { icon: 'server', detail: 'Health, Activity, Logs' }) : null}
+        .help=${known(HELP_SURFACE_ID) ? this.destination(HELP_SURFACE_ID, { label: 'Help & shortcuts', shortcut: 'F1' }) : null}
+        .about=${getSurface(SETTINGS_SURFACE_ID) ? { id: 'about', label: 'About JustSearch', icon: 'info' as const } : null}
+        .windows=${this.pluginWindows()}
+        .developerWindows=${DEVELOPER_WINDOW_IDS.map(known).filter((d): d is TopBarDestination => d !== null)}
+        .developer=${this.developerTier}
+        .backendAddress=${this.apiBase || window.location.origin}
+        @top-bar-select=${(e: CustomEvent<TopBarSelection>) => this.onTopBarSelect(e.detail)}
+      >
+        <jf-status-pill slot="status" .store=${this.advisoryStore} api-base=${this.apiBase}
           .pluginsVisible=${this.isStatusDeckVisible()}
           .multiplex=${this.shellEventsMultiplex}
           .authorizationHost=${() => this.shadowRoot?.querySelector('jf-authorization-host') ?? null}
         ></jf-status-pill>
-        ${this.renderUiModeToggle()}
-        <button
-          type="button"
-          class=${`nav-btn bookmark-btn${this.isBookmarked ? ' active' : ''}`}
-          aria-label=${this.isBookmarked ? 'Remove bookmark' : 'Bookmark this view'}
-          title=${this.isBookmarked ? 'Remove bookmark (Ctrl+D)' : 'Bookmark this view (Ctrl+D)'}
-          @click=${() => this.handleBookmarkToggle()}
-        >${icon({ name: 'bookmark', size: 14 })}</button>
-        <button
-          type="button"
-          class="nav-btn"
-          aria-label="View bookmarks"
-          title="View saved bookmarks"
-          @click=${() => this.toggleBookmarksPopover()}
-        >${icon({ name: 'chevron-down', size: 12 })}</button>
-        <button
-          type="button"
-          class=${`copy-url${
-            this.copyUrlFeedback ? ` ${this.copyUrlFeedback}` : ''
-          }`}
-          aria-label="Copy current URL"
-          title="Copy URL"
-          @click=${() => {
-            void this.handleCopyUrlClick();
-          }}
-        >
-          ${icon({ name: 'copy', size: 12 })}
-          ${this.copyUrlFeedback === 'copied'
-            ? 'Copied!'
-            : this.copyUrlFeedback === 'failed'
-              ? 'Failed'
-              : 'Copy URL'}
-        </button>
-      </div>
-      ${this.isRailVisible() ? html`<jf-rail
-        role=${placementToLandmarkRole('RAIL')}
-        aria-label="Surfaces"
-        .surfaces=${this.surfaces}
-        .active=${this.activeId ?? ''}
-        .aiActivity=${this._aiState?.activity?.state ?? 'idle'}
-        .aiChatAvailable=${this._aiState?.capabilities?.chat ?? true}
-        .aiDependentIds=${this._aiDependentIds}
-        .expanded=${this.userConfig?.railExpanded ?? false}
-        @rail-select=${(e: CustomEvent<{ id: string }>) =>
-          this.handleRailClick(e.detail.id)}
-        @rail-expand-toggle=${() => setRailExpanded(!(this.userConfig?.railExpanded ?? false))}
-      >
-      </jf-rail>` : nothing}
+      </jf-top-bar>
       <div class="stage" role=${placementToLandmarkRole('STAGE')} aria-label="Main content">
+        <h1 class="visually-hidden">${active ? present({ kind: 'surface', id: active.id }).label : 'JustSearch'}</h1>
         <jf-stage
           .initialNavigationPending=${this.initialNavigationPending}
           .surface=${active ?? null}
@@ -2666,12 +2504,6 @@ export class Shell extends JfElement {
       <jf-effect-audit-log></jf-effect-audit-log>
       <!-- Tempdoc 543 §12.3 #5 — kernel-rendered hover-preview host. -->
       <jf-hover-preview-host></jf-hover-preview-host>
-      <jf-bookmarks-popover
-        id="bookmarks-popover"
-        @bookmark-navigate=${(e: CustomEvent<{ url: string }>) => {
-          this.handleBookmarkNavigate(e.detail.url);
-        }}
-      ></jf-bookmarks-popover>
     `;
   }
 
@@ -2680,318 +2512,6 @@ export class Shell extends JfElement {
 
 if (typeof customElements !== 'undefined' && !customElements.get('jf-shell')) {
   customElements.define('jf-shell', Shell);
-}
-
-// ---------- Rail ----------
-
-export class Rail extends JfElement {
-  static properties = {
-    surfaces: { type: Array },
-    active: { type: String },
-    aiActivity: { attribute: false },
-    aiChatAvailable: { type: Boolean, attribute: false },
-    aiDependentIds: { attribute: false },
-    // Search Thread S5b — the rail's collapsed (icon-only, default) / expanded (icon + label)
-    // chrome state. `reflect: true` so `:host([expanded])` can widen the rail in CSS.
-    expanded: { type: Boolean, reflect: true },
-  };
-
-  declare surfaces: SurfaceCatalogEntry[];
-  declare active: string;
-  declare aiActivity: import('../state/aiStateStore.js').ActivityState;
-  declare aiChatAvailable: boolean;
-  declare aiDependentIds: Set<string>;
-  declare expanded: boolean;
-
-  constructor() {
-    super();
-    this.surfaces = [];
-    this.active = '';
-    this.aiActivity = 'idle';
-    this.aiChatAvailable = true;
-    this.aiDependentIds = new Set();
-    this.expanded = false;
-  }
-
-  static styles = css`
-    :host {
-      grid-area: rail;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 0.375rem;
-      padding: 0.5rem 0;
-      border-right: 1px solid var(--border-subtle);
-      background: var(--surface-1);
-      transition: width var(--duration-fast) var(--ease-standard);
-    }
-    /* Search Thread S5b — expanded (labels-visible) rail: buttons stretch full-width and align
-       their content to the leading edge instead of the collapsed icon-only centering. */
-    :host([expanded]) {
-      align-items: stretch;
-      padding: 0.5rem 0.5rem;
-    }
-    button {
-      width: 2.25rem;
-      height: 2.25rem;
-      border-radius: 0.4rem;
-      background: transparent;
-      color: var(--text-secondary);
-      border: 1px solid transparent;
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      transition: background var(--duration-fast), color var(--duration-fast);
-    }
-    :host([expanded]) button {
-      width: 100%;
-      height: auto;
-      min-height: 2.25rem;
-      justify-content: flex-start;
-      gap: 0.625rem;
-      padding: 0.35rem 0.6rem;
-    }
-    button:hover {
-      background: var(--surface-secondary);
-      color: var(--text-primary);
-    }
-    button.active {
-      background: var(--accent-tint-16);
-      color: var(--text-tint);
-      border-color: var(--accent-tint-30);
-    }
-    /* Forced colors (Windows High Contrast) paint every rail button's edge the same CanvasText and
-       erase the tint, so the current surface takes the selection pair ('forced-color-adjust: none'
-       keeps the browser's Canvas backplate from landing behind the label). */
-    @media (forced-colors: active) {
-      button.active {
-        forced-color-adjust: none;
-        background: Highlight;
-        border-color: Highlight;
-        color: HighlightText;
-      }
-    }
-    button.ai-dimmed {
-      opacity: 0.4;
-    }
-    button.ai-dimmed:hover {
-      opacity: 0.7;
-    }
-    .rail-label {
-      font-size: var(--font-size-sm);
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
-    .expand-toggle {
-      color: var(--text-muted);
-    }
-    :host([expanded]) .expand-toggle .btn-wrap {
-      transform: rotate(180deg);
-    }
-    .btn-wrap {
-      position: relative;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
-    .activity-dot {
-      position: absolute;
-      top: 2px;
-      right: 2px;
-      width: 6px;
-      height: 6px;
-      border-radius: 50%;
-      background: var(--accent-tint);
-      animation: pulse 1.5s ease-in-out infinite;
-    }
-    @keyframes pulse {
-      0%, 100% { opacity: 1; }
-      50% { opacity: 0.4; }
-    }
-    .spacer {
-      flex: 1;
-    }
-    .divider {
-      width: 1.25rem;
-      border-top: 1px solid var(--border-subtle);
-      margin: 0.25rem 0;
-    }
-    /* Tempdoc 571 — the altitude-derived Diagnostics band: a flex sub-column matching the rail's
-       own column gap + a leading divider that visually separates it from the product surfaces. */
-    .band {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 0.375rem;
-    }
-    .band-divider {
-      width: 1.25rem;
-      border-top: 1px solid var(--border-subtle);
-      margin: 0.25rem 0 0;
-    }
-  `;
-
-  private select(id: string): void {
-    this.dispatchEvent(
-      new CustomEvent('rail-select', {
-        detail: { id },
-        bubbles: true,
-        composed: true,
-      }),
-    );
-  }
-
-  private renderButton(s: SurfaceCatalogEntry): TemplateResult {
-    const iconName = SURFACE_ICONS[s.id] ?? 'hard-drive';
-    const isActive = this.active === s.id;
-    const isAiDependent = this.aiDependentIds.has(s.id);
-    const dimmed = isAiDependent && !this.aiChatAvailable && !isActive;
-    const classes = [isActive ? 'active' : '', dimmed ? 'ai-dimmed' : ''].filter(Boolean).join(' ');
-    // Tempdoc 602 R8 — icon-only rail control: name the intent for surfaces whose
-    // glyph under-specifies it (Library's folder-plus reads as "new"); else the label.
-    const railName = railAccessibleName(s.id, present({ kind: 'surface', id: s.id }).label);
-    return html`
-      <button
-        class=${classes}
-        title=${railName}
-        aria-label=${railName}
-        aria-current=${isActive ? 'page' : nothing}
-        data-surface-id=${s.id}
-        data-altitude=${s.altitude ?? 'PRODUCT'}
-        @click=${() => this.select(s.id)}
-      >
-        <span class="btn-wrap">
-          ${icon({ name: iconName, size: 18 })}
-        </span>
-        ${this.expanded ? html`<span class="rail-label">${railName}</span>` : nothing}
-      </button>
-    `;
-  }
-
-  /**
-   * Search Thread S5b — the rail-foot chevron toggling collapsed (icon-only) ↔ expanded
-   * (icon + label) chrome. Fires `rail-expand-toggle`; Shell owns the persisted userConfig write
-   * (mirrors `rail-select`'s dispatch-up-then-Shell-decides shape).
-   */
-  private renderExpandToggle(): TemplateResult {
-    return html`
-      <button
-        class="expand-toggle"
-        title=${this.expanded ? 'Collapse rail' : 'Expand rail'}
-        aria-label=${this.expanded ? 'Collapse rail' : 'Expand rail'}
-        aria-pressed=${this.expanded ? 'true' : 'false'}
-        data-testid="rail-expand-toggle"
-        @click=${() =>
-          this.dispatchEvent(
-            new CustomEvent('rail-expand-toggle', { bubbles: true, composed: true }),
-          )}
-      >
-        <span class="btn-wrap">${icon({ name: 'chevron-right', size: 16 })}</span>
-        ${this.expanded ? html`<span class="rail-label">Collapse</span>` : nothing}
-      </button>
-    `;
-  }
-
-  /**
-   * Tempdoc 578 §5.6 Phase 4 — the dedicated Help "?" affordance. Help is no longer a rail surface
-   * (DEEPLINK), so it is reached via this fixed bottom-chrome button rather than a catalog rail slot.
-   * Fires the same `rail-select` path so navigation/active-state work uniformly.
-   */
-  private renderHelpButton(): TemplateResult {
-    const isActive = this.active === HELP_SURFACE_ID;
-    return html`
-      <button
-        class=${isActive ? 'active' : ''}
-        title="Help"
-        aria-label="Help"
-        aria-current=${isActive ? 'page' : nothing}
-        data-help-affordance
-        @click=${() => this.select(HELP_SURFACE_ID)}
-      >
-        <span class="btn-wrap">${icon({ name: 'help-circle', size: 18 })}</span>
-      </button>
-    `;
-  }
-
-  /**
-   * Tempdoc 855 §9.2 — the fixed Settings affordance. Settings is a MODAL surface now (it opens as
-   * a window over the stage), so it is no longer in the catalog-derived rail list; this keeps its
-   * bottom-pinned place and fires the same `rail-select` path, so every entry point stays one flow.
-   * `aria-haspopup="dialog"` is the honest semantic: the button opens a window, it does not make a
-   * page current (which is why the catalog button's `aria-current` has no counterpart here).
-   */
-  private renderSettingsButton(): TemplateResult {
-    const railName = railAccessibleName(
-      SETTINGS_SURFACE_ID,
-      present({ kind: 'surface', id: SETTINGS_SURFACE_ID }).label,
-    );
-    return html`
-      <button
-        title=${railName}
-        aria-label=${railName}
-        aria-haspopup="dialog"
-        data-surface-id=${SETTINGS_SURFACE_ID}
-        @click=${() => this.select(SETTINGS_SURFACE_ID)}
-      >
-        <span class="btn-wrap">
-          ${icon({ name: SURFACE_ICONS[SETTINGS_SURFACE_ID] ?? 'settings', size: 18 })}
-        </span>
-        ${this.expanded ? html`<span class="rail-label">${railName}</span>` : nothing}
-      </button>
-    `;
-  }
-
-  override render(): TemplateResult {
-    // Tempdoc 571 §6 — homing is a projection of declared altitude (NOT catalog hand-placement):
-    //  • DIAGNOSTIC surfaces (Logs, Health) band together below the product surfaces;
-    //  • a TRUST surface (Activity) stays first-class in the product band AND homes adjacent to the
-    //    interaction window — order within the band = [up to & incl. the interaction surface] → [TRUST]
-    //    → [the rest], so Activity sits right after chat by construction (derived, not hand-reordered).
-    // An absent altitude ⇒ PRODUCT (the benign default), so the split degrades safely.
-    const altitudeOf = (s: SurfaceCatalogEntry): string => s.altitude ?? 'PRODUCT';
-    const diagnostics = this.surfaces.filter((s) => altitudeOf(s) === 'DIAGNOSTIC');
-    const productAll = this.surfaces.filter((s) => altitudeOf(s) !== 'DIAGNOSTIC');
-    const trust = productAll.filter((s) => altitudeOf(s) === 'TRUST');
-    const rest = productAll.filter((s) => altitudeOf(s) !== 'TRUST');
-    const anchor = rest.findIndex((s) => s.id === INTERACTION_SURFACE_ID);
-    const product =
-      trust.length === 0
-        ? productAll
-        : anchor === -1
-          ? [...trust, ...rest]
-          : [...rest.slice(0, anchor + 1), ...trust, ...rest.slice(anchor + 1)];
-    return html`
-      ${product.map((s) => this.renderButton(s))}
-      ${diagnostics.length > 0
-        ? html`<div
-            class="band"
-            data-testid="rail-band-diagnostics"
-            role="group"
-            aria-label="Diagnostics"
-          >
-            <div class="band-divider" title="Diagnostics"></div>
-            ${diagnostics.map((s) => this.renderButton(s))}
-          </div>`
-        : nothing}
-      <div class="spacer"></div>
-      <!-- Slice 490 §4.D / Group B3 — "bottom-chrome" slot for rail-mounted
-           chrome elements (advisory rail badge). Renders above the help /
-           settings divider so the badge is co-located with rail-level
-           controls, honoring the slice 490 §4.D Placement.RAIL commitment. -->
-      <slot name="bottom-chrome"></slot>
-      <div class="divider"></div>
-      ${this.renderHelpButton()}
-      ${this.renderSettingsButton()}
-      <div class="divider"></div>
-      ${this.renderExpandToggle()}
-    `;
-  }
-}
-
-if (typeof customElements !== 'undefined' && !customElements.get('jf-rail')) {
-  customElements.define('jf-rail', Rail);
 }
 
 // ---------- Stage ----------
@@ -3022,6 +2542,16 @@ export class Stage extends JfElement {
   declare aiAvailable: boolean;
   declare initialNavigationPending: boolean;
   private declare summonCoreSurface: { id: string; overrideId: string | undefined } | null;
+
+  /**
+   * The mounted element of the primary window — the one that owns the address (in a split layout
+   * the second pane does not). Null before it mounts.
+   */
+  primaryWindow(): HTMLElement | null {
+    const surface = this.resolveSurface();
+    const element = surface ? this._surfaceElCache.get(surface.id) ?? null : null;
+    return element?.isConnected ? element : null;
+  }
 
   /** Target a single retained element; never broadcast to both search implementations. */
   async focusSearch(id: string): Promise<void> {

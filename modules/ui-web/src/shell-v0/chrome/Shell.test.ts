@@ -36,13 +36,7 @@ import {
 import { __resetBootstrapForTest } from '../router/bootstrap.js';
 import { __resetUserConfigForTest } from '../state/userConfigState.js';
 import { __resetAiStateForTest, __feedForTest, __tickClockForTest, type StatusSnapshot } from '../state/aiStateStore.js';
-import {
-  enqueueUiModePersistence,
-  UI_MODE_INTENT_HEADER,
-  setUiMode,
-  getUiMode,
-  __resetUiModeForTest,
-} from '../state/uiModeState.js';
+import { __resetUiModeForTest } from '../state/uiModeState.js';
 import { __activeSurfaceIdForTest, deactivateProjection } from '../router/URLProjector.js';
 import { __resetJournalForTest, getJournalState } from '../state/NavigationJournal.js';
 import { __resetConversationListForTest, setActiveConversation } from '../state/conversationListStore.js';
@@ -94,7 +88,6 @@ const LEGACY_ASK: Surface = {
 const LEGACY_FREE_CHAT: Surface = { ...LEGACY_ASK, id: 'core.free-chat-surface' };
 const LEGACY_EXTRACT: Surface = { ...LEGACY_ASK, id: 'core.extract-surface' };
 
-const UUID_V7 = /^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
 let settingsAcceptedRevision = 0;
 let settingsLastCommittedOperationKey: string | null = null;
 
@@ -340,68 +333,9 @@ describe('Shell — slice 492 substrate integration', () => {
     expect(calls).toBe(1);
   });
 
-  it('Tempdoc 738 — the topbar Simple/Detailed toggle reflects the live uiMode and drives it on click', async () => {
-    __resetUiModeForTest();
-    const shell = await renderShell();
-    const opts = () =>
-      Array.from(shell.shadowRoot?.querySelectorAll('.ui-mode-opt') ?? []) as HTMLButtonElement[];
-    expect(opts().map((b) => b.textContent?.trim())).toEqual(['Simple', 'Detailed']);
-    // Default: Simple active.
-    expect(opts()[0]!.getAttribute('aria-pressed')).toBe('true');
-    expect(opts()[1]!.getAttribute('aria-pressed')).toBe('false');
-    // An external mode change (e.g. the async settings seed) is reflected LIVE — the boot-desync fix.
-    setUiMode('advanced');
-    await shell.updateComplete;
-    expect(opts()[1]!.getAttribute('aria-pressed')).toBe('true');
-    expect(opts()[0]!.getAttribute('aria-pressed')).toBe('false');
-    // Clicking a segment drives the authority back.
-    opts()[0]!.click();
-    await shell.updateComplete;
-    expect(getUiMode()).toBe('simple');
-    // Finish the click's queued write while its transport fixture is still installed.
-    await enqueueUiModePersistence(async () => undefined);
-  });
-
-  it('923 review — topbar persistence joins the shared cross-control mode queue', async () => {
-    const shell = await renderShell();
-    let release!: (response: Response) => void;
-    const blocker = enqueueUiModePersistence(
-      () => new Promise<Response>((resolve) => {
-        release = resolve;
-      }),
-    );
-    await Promise.resolve();
-
-    const detailed = Array.from(
-      shell.shadowRoot?.querySelectorAll<HTMLButtonElement>('.ui-mode-opt') ?? [],
-    ).find((button) => button.textContent?.trim() === 'Detailed');
-    detailed?.click();
-    await shell.updateComplete;
-    await Promise.resolve();
-    const fetchMock = globalThis.fetch as ReturnType<typeof vi.fn>;
-    const settingsPosts = () => fetchMock.mock.calls.filter(([input, init]) =>
-      String(input).endsWith('/api/settings/v2')
-      && (init as RequestInit | undefined)?.method === 'POST');
-    expect(settingsPosts()).toHaveLength(0);
-
-    release(new Response('{}', { status: 200 }));
-    await blocker;
-    await new Promise((resolve) => setTimeout(resolve, 0));
-    expect(settingsPosts()).toHaveLength(1);
-    const request = JSON.parse(String((settingsPosts()[0]?.[1] as RequestInit | undefined)?.body)) as {
-      ui: { mode: string };
-      witness: { acceptedRevision: number; lastCommittedOperationKey: string | null };
-      operationKey: string;
-    };
-    expect(request).toEqual({
-      ui: { mode: 'advanced' },
-      witness: { acceptedRevision: 0, lastCommittedOperationKey: null },
-      operationKey: expect.stringMatching(UUID_V7),
-    });
-    expect(request.operationKey).toMatch(UUID_V7);
-    expect(new Headers((settingsPosts()[0]?.[1] as RequestInit | undefined)?.headers)
-      .get(UI_MODE_INTENT_HEADER)).toMatch(/:2$/);
-  });
+  // Shell slice 2 (FR4) — the title bar's Simple/Detailed toggle retired; Settings › Detail level is
+  // the remaining control and its live reflection and shared persistence queue are pinned in
+  // views/SettingsSurface.ui-mode.test.ts.
 
   it('923 F-22 — normalizes a persisted Ask pane to Search or its Library pair', () => {
     seedSurfaceCatalog({
@@ -502,9 +436,10 @@ describe('Shell — slice 492 substrate integration', () => {
           await vi.advanceTimersByTimeAsync(100);
           journal = getJournalState();
           expect(journal.entries[journal.cursor]?.url).toBe(library);
-          const back = shell.shadowRoot?.querySelector('jf-control[label="Go back"]');
-          (back?.shadowRoot?.querySelector('button') as HTMLButtonElement | null)?.click();
-          await vi.advanceTimersByTimeAsync(0);
+          // Shell slice 2 — Back is Alt+Left (the title bar's Go back button retired); it runs on
+          // browser history, whose popstate re-dispatches the earlier address.
+          document.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowLeft', altKey: true, bubbles: true, cancelable: true }));
+          await vi.advanceTimersByTimeAsync(50);
           expect(shell.activeId).toBe(sv3);
           expect(window.location.hash).toContain('conversationId=old-parent');
         } finally {

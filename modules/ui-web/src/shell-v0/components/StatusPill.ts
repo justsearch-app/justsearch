@@ -38,7 +38,7 @@ export function undoStatusNotice(): boolean {
   return connectedPill?.undoNotice() ?? false;
 }
 
-/** Self-contained title-bar status. Presentation visibility only hides plugin contributions. */
+/** Self-contained top-bar status. Presentation visibility only hides plugin contributions. */
 export class StatusPill extends JfElement {
   static override properties = {
     store: { attribute: false }, apiBase: { attribute: 'api-base' }, pluginsVisible: { type: Boolean, attribute: false },
@@ -69,11 +69,24 @@ export class StatusPill extends JfElement {
     jf-status-badge { min-width: 0; max-width: 100%; }
     jf-status-badge::part(badge) { min-width: 0; max-width: 100%; box-sizing: border-box; }
     .transient-action { font: inherit; color: var(--text-tint); background: var(--surface-2); border: 0; border-radius: var(--frame-pill-radius); padding: var(--jf-space-1) var(--jf-space-2); }
-    .beside-notice { align-self: center; min-width: 0; padding-inline: var(--jf-space-2); color: var(--text-secondary);
+    .beside-notice { align-self: center; min-width: 0; max-width: var(--frame-menu-width); padding-inline: var(--jf-space-2); color: var(--text-secondary);
       white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .transient-action { white-space: nowrap; flex: none; }
     .content { display: inline-flex; align-items: center; gap: var(--jf-space-2); min-width: 0; }
     .trigger.stale { outline: var(--frame-hairline) dashed var(--border-emphasized); }
-    .label { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    /* L3 — the pill's words never truncate: the top bar makes room for them (it is a grid whose
+       brand side gives way), and below 720 px the pill is its icon alone. A notice cannot fit
+       beside it there, so it moves under the top bar, where it wraps instead of being cut. */
+    .label { white-space: nowrap; flex: none; }
+    .notice-below { display: none; }
+    @media (max-width: 719px) {
+      .label, .beside-notice { display: none; }
+      .notice-below { display: block; position: fixed; top: var(--frame-topbar-height); inset-inline-end: var(--jf-space-2);
+        max-width: calc(100vw - 2 * var(--jf-space-2)); box-sizing: border-box; z-index: var(--z-overlay-top);
+        padding: var(--jf-space-1) var(--jf-space-2); border: var(--frame-hairline) solid var(--border-subtle);
+        border-radius: var(--frame-control-radius); background: var(--surface-1); color: var(--text-primary);
+        white-space: normal; overflow-wrap: anywhere; }
+    }
     .symbol { color: var(--text-secondary); }
     .calm .symbol { color: var(--text-success); }
     .needs .symbol, .limited .symbol { color: var(--text-warning); }
@@ -99,6 +112,7 @@ export class StatusPill extends JfElement {
       .count { background: ButtonText; color: ButtonFace; forced-color-adjust: none; }
       .ring .track { stroke: GrayText; } .ring .arc { stroke: ButtonText; }
       .overlay { background: transparent; }
+      .notice-below { border-color: CanvasText; }
     }
   `;
   override connectedCallback(): void {
@@ -275,8 +289,9 @@ export class StatusPill extends JfElement {
       @focus=${() => this.status.pauseTransient(true)} @blur=${() => this.status.pauseTransient(false)}>
       <jf-status-badge .tone=${pill.kind === 'needs' || pill.kind === 'limited' ? 'warning' : pill.kind === 'unreachable' || pill.kind === 'problems' ? 'error' : 'neutral'}><span class="content">${icon}${this.narrow && !transient ? nothing : html`<span class="label">${text}</span>`}
       ${pill.kind === 'calm' && plugins.length ? html`<span aria-label="Plugin status items">${plugins.length}</span>` : nothing}</span></jf-status-badge></button>
-      ${beside?.toast ? html`<span class="beside-notice" data-testid="status-notice" @mouseenter=${() => this.status.pauseTransient(true)}
+      ${beside?.toast ? html`<span class="beside-notice" data-testid="status-notice" title=${beside.toast.message} @mouseenter=${() => this.status.pauseTransient(true)}
         @mouseleave=${() => this.status.pauseTransient(false)}>${beside.toast.message}</span>` : nothing}
+      ${shown?.toast ? html`<span class="notice-below">${shown.toast.message}</span>` : nothing}
       ${shown?.toast?.onAction ? html`<button class="transient-action" type="button" @mouseenter=${() => this.status.pauseTransient(true)} @mouseleave=${() => this.status.pauseTransient(false)} @focus=${() => this.status.pauseTransient(true)} @blur=${() => this.status.pauseTransient(false)} @click=${() => this.act({ kind: 'advisory', target: shown.key, label: this.transientActionLabel(shown) })}
         aria-keyshortcuts=${undo ? 'Control+Z' : nothing}>${this.transientActionLabel(shown)}${undo ? html`<kbd aria-hidden="true">Ctrl+Z</kbd>` : nothing}</button>` : nothing}
       <div class="overlay" ?hidden=${!this.open} @click=${() => this.close()}></div>

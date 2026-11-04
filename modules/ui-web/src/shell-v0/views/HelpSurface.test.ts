@@ -173,7 +173,12 @@ describe('HelpSurface — keyboard shortcuts (tempdoc 586 P-3)', () => {
     // (Composer.ts) are listed; Esc does not clear the search bar (Composer.ts has no Escape branch).
     expect(text).toContain('Ctrl / ⌘ + L or /');
     expect(text).toContain('Alt + ← / →');
-    expect(text).toContain('Ctrl + D');
+    // Shell slice 2 — Ctrl+D retired with the bookmarks button (FR4), so its row must not reappear;
+    // the frame's own keys are listed instead.
+    expect(text).not.toContain('Ctrl + D');
+    expect(text).toContain('Ctrl / ⌘ + 1 / 2 / 3');
+    expect(text).toContain('F6 / Shift + F6');
+    expect(text).toContain('F1');
     expect(text).toContain('Ctrl + Shift + A');
     expect(text).toContain('Ctrl + Enter');
     expect(text).not.toContain('Clear the search box');

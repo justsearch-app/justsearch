@@ -112,9 +112,10 @@ export interface UnifiedActionEntry {
   readonly outcome?: string;
   /**
    * Present on trust-gate rows: the structured disposition (GATED | DENIED | APPROVED) and the
-   * humanized operation, so a presenter can word the row without parsing {@link label}.
+   * humanized operation, so a presenter can word the row without parsing {@link label}; the raw
+   * operation id lets the status panel tie a GATED row to the request still waiting for it (L4b).
    */
-  readonly gate?: { readonly disposition: string; readonly operation: string };
+  readonly gate?: { readonly disposition: string; readonly operation: string; readonly operationId?: string };
   /** Present on grant-lifecycle rows: the structured action (ISSUED | CONSUMED | REVOKED) and the humanized subject. */
   readonly grant?: { readonly action: string; readonly subject: string };
   /**
@@ -311,7 +312,8 @@ export function projectBackend(e: BackendLedgerEntry): UnifiedActionEntry {
     // tempdoc 558 Deepening 3 — structured outcome (operation rows: SUCCESS/FAILURE/UNDONE; absent
     // elsewhere). Conditional-spread so an absent outcome stays absent (exactOptionalPropertyTypes-safe).
     ...(e.outcome ? { outcome: e.outcome } : {}),
-    ...(e.kind === 'gate' && e.disposition ? { gate: { disposition: e.disposition, operation: opLabel(e.operationId) } } : {}),
+    ...(e.kind === 'gate' && e.disposition ? { gate: { disposition: e.disposition, operation: opLabel(e.operationId),
+      ...(e.operationId ? { operationId: e.operationId } : {}) } } : {}),
     ...(e.kind === 'grant' && e.action ? { grant: { action: e.action, subject: e.subject ? opLabel(e.subject) : '' } } : {}),
     ...(e.kind === 'operation'
       && ['core.bulk-reindex', 'core.rebuild-index', 'core.activate-installed-models'].includes(e.operationId ?? '')

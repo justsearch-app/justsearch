@@ -24,7 +24,7 @@
  */
 
 import { isTauriRuntime } from '../../../utils/tauriRuntime.js';
-import { parseUrl } from '../parser.js';
+import { isSurfaceUrl, parseUrl } from '../parser.js';
 import type { Intent } from '../types.js';
 import type { IntentSource, SourceDispatch } from './IntentSource.js';
 
@@ -33,7 +33,8 @@ const TAURI_EVENT_NAME = 'justsearch://deep-link';
 /** Stable Manifest-tier id this source corresponds to. */
 export const TAURI_DEEP_LINK_SOURCE_REF = 'core.os-tauri-deeplink';
 
-export function createTauriDeepLinkSource(): IntentSource {
+/** C1 — `onUnknownSurface`: a window address the grammar rejects; the frame says so. */
+export function createTauriDeepLinkSource(config: { onUnknownSurface?: (url: string) => void } = {}): IntentSource {
   return {
     ref: TAURI_DEEP_LINK_SOURCE_REF,
     async start(dispatch: SourceDispatch): Promise<() => void> {
@@ -52,6 +53,7 @@ export function createTauriDeepLinkSource(): IntentSource {
         if (coldLaunchUrl) {
           const intent = toIntent(coldLaunchUrl);
           if (intent) dispatch(intent, { pushHistory: true });
+          else if (isSurfaceUrl(coldLaunchUrl)) config.onUnknownSurface?.(coldLaunchUrl);
         }
       } catch {
         // Cold-launch read failures are non-fatal — proceed to warm-event subscription.
@@ -68,6 +70,7 @@ export function createTauriDeepLinkSource(): IntentSource {
             console.warn(
               `[TauriDeepLinkSource] received un-parseable deep-link URL: ${url}`,
             );
+            if (isSurfaceUrl(url)) config.onUnknownSurface?.(url);
             return;
           }
           dispatch(intent, { pushHistory: true });

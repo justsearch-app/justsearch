@@ -31,6 +31,7 @@ export const RESERVED_COMPONENTS: ReadonlySet<string> = new Set([
   'jf-status-pill', // host-owned status and decision entry point
   'jf-status-panel', // host-owned status and decision read view
   'jf-shell', // the chrome shell (kernel-owned)
+  'jf-top-bar', // the frame's one bar: area switcher, status entry point, Settings and More (shell slice 2)
   'jf-engine-recovery', // native update/recovery controls belong to desktop boot, not user layouts
   'jf-action-ledger', // tempdoc 571 — the trust read-view (Activity's Outcome face): the authorization
   // audit (gate firings GATED/DENIED/APPROVED). A skin must not forge or occlude it — the
