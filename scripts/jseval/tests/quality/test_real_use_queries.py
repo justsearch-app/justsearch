@@ -562,7 +562,10 @@ def test_gate_has_no_external_engine_path(option, capsys):
     {},  # LLM defaults to enabled in Java; absence is insufficient.
     *[{"JUSTSEARCH_LLM_ENABLED": "false", name: value}
       for name in ("JAVA_OPTS", "UI_OPTS", "JAVA_TOOL_OPTIONS", "JDK_JAVA_OPTIONS", "_JAVA_OPTIONS")
-      for value in ("-Djustsearch.qu.enabled=true", "-Djustsearch.llm.enabled=on", "@hidden-options")],
+      for value in ("-Djustsearch.qu.enabled=true", "-Djustsearch.llm.enabled=on", "@hidden-options",
+                    # The launcher keeps the backslash and splits at the space; shlex did not.
+                    r"-Dpadding=x\ -Djustsearch.qu.enabled=true",
+                    '"-Djustsearch.qu.enabled=true"', "-XX:VMOptionsFile=/tmp/opts")],
 ])
 def test_gate_refuses_before_start_or_date_only_extraction(env, monkeypatch):
     from jseval.quality import run

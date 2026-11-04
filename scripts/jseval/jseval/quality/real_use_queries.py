@@ -36,7 +36,6 @@ import os
 from pathlib import Path
 import random
 import re
-import shlex
 import statistics
 import subprocess
 import sys
@@ -1237,14 +1236,14 @@ def require_keyword_environment(env: dict) -> None:
             or env.get("JUSTSEARCH_LLM_ENABLED", "").strip().lower() != "false"):
         raise ValueError("keyword measurement requires JUSTSEARCH_QU_ENABLED absent or false "
                          "and JUSTSEARCH_LLM_ENABLED=false")
+    # No parsing: launchers split these texts differently (escapes, quotes), so any JustSearch
+    # property or option file anywhere in the raw text is refused, whatever its value.
     for name in ("JAVA_OPTS", "UI_OPTS", "JAVA_TOOL_OPTIONS", "JDK_JAVA_OPTIONS", "_JAVA_OPTIONS"):
-        for option in shlex.split(env.get(name, os.environ.get(name, ""))):
-            key, _, value = option.partition("=")
-            # Argument/VM option files could hide an overriding property.
-            if (option.startswith(("@", "-XX:VMOptionsFile=", "-XX:Flags="))
-                    or (key in ("-Djustsearch.qu.enabled", "-Djustsearch.llm.enabled")
-                        and value.strip().lower() != "false")):
-                raise ValueError(f"keyword measurement refuses JVM override in {name}: {option}")
+        text = env.get(name, os.environ.get(name, ""))
+        lowered = text.lower()
+        if "justsearch" in lowered or "@" in text or "vmoptionsfile" in lowered or "-xx:flags" in lowered:
+            raise ValueError(f"keyword measurement refuses JustSearch properties or option files "
+                             f"in {name}")
 
 
 def gate(timeout_sec: float, cache_root: Path | None = None) -> int:
