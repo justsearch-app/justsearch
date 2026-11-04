@@ -738,3 +738,36 @@ WebKit do not, and Forward is only testable under the spec's behaviour.
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a1a65b-d490-7e22-8052-4ba61d6aceaa",
+  "verdict": "reject",
+  "digest": "sha256:7451f821ded832dd940d8d2af034e58d98cc1f4d03265fbd4464c3a58f5479ba",
+  "note": "Round 1 on 6fe76d255f: the L3 oracle checked wording only while the notice was invisible at 600 px; Settings Back/Forward/close/Back reopened Settings. Transcribed by the orchestrator from the verifier's answer (Codex sandbox)."
+}
+```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a1a6d4-cbed-7f33-9008-a4cba896811a",
+  "verdict": "reject",
+  "digest": "sha256:9e7204d247b146dc18876d9b8b1e4c8b03eab2fd79aca4859b92185182013176",
+  "note": "Round 2 on 38c6e7027f: five stale evidence citations (Shell.globalKeys.test.ts changed after its evidence run). Transcribed by the orchestrator from the verifier's answer (Codex sandbox)."
+}
+```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a1a73b-7a53-74a2-842f-b3867918669c",
+  "verdict": "accept",
+  "digest": "sha256:f985634454b5e9e9cabee4ab5e31d08af47822bfca90c3da8e18cb2a64a2758e",
+  "note": "Round 3 on 705c73b316: 26 New (repaired entries fail before by assertion), 9 Obsolete (removals verified), 5 Adaptation (whole oracle kept), 1 Incidental; evidence valid. Transcribed by the orchestrator from the verifier's answer (Codex sandbox)."
+}
+```
