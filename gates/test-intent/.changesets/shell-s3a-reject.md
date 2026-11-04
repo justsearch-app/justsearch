@@ -273,3 +273,14 @@ No independent acceptance is claimed by this builder.
 ## Acceptance records
 
 Pending independent verification.
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "6nu4z190",
+  "verdict": "accept",
+  "digest": "sha256:ce19b413b05d2ae3cd6d6b91b783e50630dc297a4358bae5628916a188b0035f",
+  "note": "Round 3 on 5d1c711e3d: 8 New, 4 Adaptation; repaired entries fail before by assertion; oracles kept. Earlier rounds rejected (MCP exact-JSON entry lacked a New entry; then its source). Transcribed by the orchestrator from the verifier's answer (Codex sandbox)."
+}
+```
