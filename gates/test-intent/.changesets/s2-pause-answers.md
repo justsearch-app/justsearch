@@ -481,3 +481,14 @@ The file-only narrowing entries below supersede all earlier backfill classificat
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verifier-s2p-acc3",
+  "verdict": "accept",
+  "digest": "sha256:d906f0a01e5c25f9935d6526df9cd5c07d5bbcd1bda8e2e90114c7f29eede671",
+  "note": "Acceptance by independent verifier session verifier-s2p-acc3 (Codex): accept, no must-fix. Transcribed by the orchestrator."
+}
+```
