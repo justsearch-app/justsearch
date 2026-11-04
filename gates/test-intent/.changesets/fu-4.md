@@ -83,6 +83,35 @@ The builder leaves execution evidence and acceptance to the orchestrator, as ass
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/RetirementMaintenanceAdmissionTest.java#outstandingBatchPublishesOnceAndLaterBatchProgresses",
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/RetirementMaintenanceProcessTest.java#retirementProcessBatchSurvivesTwoRealIntervalSyncs"
       ]
+    },
+    {
+      "items": [
+        "scripts/ci/stress-suite-policy.v1.json"
+      ],
+      "class": "Structural rule kept",
+      "rule": "Every Java @Tag(\"stress\") test under modules/**/src/test is registered in the explicit stress-suite policy with its module task, owner and reason.",
+      "whySurvives": "Register the existing RetirementMaintenanceProcessTest under modules/indexer-worker, as named in the brief. Its real upgrade boot, delayed extraction child and two real 60-second maintenance sync intervals remain stress-tagged. No test, expectation, tag or execution condition changes; no current CI job runs the listed tasks, so registration adds no CI load.",
+      "sources": [
+        {
+          "kind": "owner-words",
+          "quote": "yea you can go for all fice",
+          "location": "task fu-4 user turn approving the adopted scenarios"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "fu-4",
+          "scenario": "FUD4",
+          "quote": "Batch progress: several successful sub-minute extractions keep one batch outstanding across several admissions (arranged so main re-admits before the batch writes); every file publishes with one extraction each, and a later batch progresses.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "fu-4",
+          "scenario": "P3",
+          "quote": "Ordinary periodic maintenance keeps unchanged claims and indexes newly discovered missing files.",
+          "label": "agent-drafted, owner-adopted"
+        }
+      ]
     }
   ]
 }
