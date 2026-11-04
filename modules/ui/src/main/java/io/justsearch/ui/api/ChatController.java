@@ -401,7 +401,7 @@ public final class ChatController {
       if (io.justsearch.app.api.chat.AnswersPausedException.causedByPause(e)) {
         sink.accept(new SseEvent("error", ChatResidencyGate.refusalBody(
             new io.justsearch.app.api.chat.ChatRefusal(io.justsearch.app.api.chat.RefusalReason.INDEXING,
-                java.util.Optional.empty(), false), null, null)));
+                Optional.empty(), false), null, null)));
         return;
       }
       LOG.error("Chat dispatch failed for shape {}", shapeId.value(), e);

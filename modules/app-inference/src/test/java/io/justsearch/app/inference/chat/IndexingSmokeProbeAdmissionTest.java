@@ -24,14 +24,14 @@ final class IndexingSmokeProbeAdmissionTest {
         "SYSTEM_INTERNAL", "TRUSTED");
     try (var queued = tracker.queue(GenerationTracker.Kind.GENERATE, probe)) {
       paused.set(true);
-      try (var lease = assertDoesNotThrow(queued::admit)) {
+      try (var _ = assertDoesNotThrow(queued::admit)) {
         assertEquals(1, tracker.inFlight());
       }
     }
     assertDoesNotThrow(() -> tracker.admit(GenerationTracker.Kind.GENERATE, probe).close());
     assertThrows(AnswersPausedException.class,
         () -> tracker.admit(GenerationTracker.Kind.GENERATE, null));
-    try (var drain = tracker.closeIfIdle()) {
+    try (var _ = tracker.closeIfIdle()) {
       assertThrows(GenerationUnavailableException.class,
           () -> tracker.admit(GenerationTracker.Kind.GENERATE, probe));
     }

@@ -144,7 +144,7 @@ public class InferenceLifecycleManager
   }
 
   /** Binds the saved policy and the live Engine backlog observation. */
-  public void setAnswersPaused(java.util.function.BooleanSupplier paused) {
+  public void setAnswersPaused(BooleanSupplier paused) {
     generation.setAnswersPaused(paused);
   }
 

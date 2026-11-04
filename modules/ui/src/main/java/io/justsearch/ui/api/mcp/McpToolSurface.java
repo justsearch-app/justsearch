@@ -2325,7 +2325,7 @@ public final class McpToolSurface {
     if (e instanceof io.justsearch.app.api.chat.ChatRefusal refusal) return errorContent(refusal);
     if (io.justsearch.app.api.chat.AnswersPausedException.causedByPause(e)) {
       return errorContent(new io.justsearch.app.api.chat.ChatRefusal(
-          io.justsearch.app.api.chat.RefusalReason.INDEXING, java.util.Optional.empty(), false));
+          io.justsearch.app.api.chat.RefusalReason.INDEXING, Optional.empty(), false));
     }
     String detail = e.getMessage() != null ? e.getMessage() : "no additional detail";
     String message = tool
