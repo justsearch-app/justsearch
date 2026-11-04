@@ -136,6 +136,18 @@ only one member. No known-item target's in-cluster status rests on a lost
 member. One known-item query (ki-142) lost its target and was dropped. One topical
 query keeps two of its three members.
 
+The collection is a 1,000-file subset of those 2,890 (step `subset`, recorded
+in `real-use-queries/subset.json` with the reason each file is kept). It keeps
+760 files: every known-item target, its byte-identical copies, every member of
+each cluster a target belongs to and every member of each topical query's
+group. The other 240 are a fixed-seed sample per source, format and language
+stratum. Each stratum first gets as many sampled files as it has targets (so
+every source's targets keep other files to be told apart from), then the fill
+moves strata toward their shares of the 2,890 files. OCR-routed PDFs are only
+kept, never sampled; 88 are in the subset. EUR-Lex German PDFs have no files
+beyond their five targets. The 2,890-file population stays defined by the
+recipe and `excluded.json`, so the collection can grow back.
+
 Its index is keyed by document identity. Editing queries or judgments reuses
 the prepared index. Prepare it once in the background, GPU allowed, with the
 runtime environment it is keyed with:
@@ -164,7 +176,8 @@ the inputs and outputs without document text:
   SHA-256, parameters, model output, gate results);
 - clusters with their evidence (`clusters.json`);
 - the stratified plan (`plan.json`);
-- the gate results per query and stratum (`gates.json`);
+- the gate results per query and stratum, and every dropped query with its
+  reason (`gates.json`);
 - extraction sizing (`chunks.json`).
 
 Known-item queries have one target each, judged grade 2. A byte-identical copy
@@ -173,3 +186,11 @@ or topic groups, never from a single document. They are stored with
 `kind: topical` and no judgments. The config's `pending_kinds` excludes them
 from scoring until a pooled labelling pass; `check` reports how many are
 pending.
+
+The plan holds 10% spare queries (`SPARE`) for drops. Four planned queries
+never passed the verbatim-leak and word-limit gates (reason `gates`). After the
+triviality regeneration rounds, partial queries still had 32 of 60 targets at
+lexical rank 1. The gate then dropped the fewest that leave at most half (4,
+28 of 56), sampled with the recorded seed among the rank-1 partial queries
+(reason `triviality`). Their targets stay in the corpus. That leaves 183
+known-item queries.

@@ -1,84 +1,130 @@
 {
  "distinguishability": {
   "bundestag": {
-   "length_separability": 0.0625,
-   "max_target_5gram_coverage": 0.25,
-   "native_base_rate": 0.65625,
-   "other_median_words": 2010.0,
-   "others": 394,
+   "length_separability": 0.06451612903225806,
+   "max_target_5gram_coverage": 0.3225806451612903,
+   "native_base_rate": 0.6774193548387096,
+   "other_median_words": 1853.5,
+   "others": 154,
    "passed": true,
-   "target_median_words": 2209.5,
-   "targets": 32,
+   "target_median_words": 2300,
+   "targets": 31,
    "token_cap": 2000
   },
   "enron": {
-   "length_separability": 0.09375,
-   "max_target_5gram_coverage": 0.0625,
-   "native_base_rate": 0.0625,
-   "other_median_words": 199.5,
-   "others": 468,
+   "length_separability": 0.1935483870967742,
+   "max_target_5gram_coverage": 0.06451612903225806,
+   "native_base_rate": 0.25806451612903225,
+   "other_median_words": 230.0,
+   "others": 82,
    "passed": true,
-   "target_median_words": 214.0,
-   "targets": 32,
+   "target_median_words": 212,
+   "targets": 31,
    "token_cap": 2000
   },
   "eurlex": {
-   "length_separability": 0.10714285714285714,
-   "max_target_5gram_coverage": 0.17857142857142858,
-   "native_base_rate": 0.6428571428571429,
-   "other_median_words": 726.0,
-   "others": 402,
+   "length_separability": 0.1111111111111111,
+   "max_target_5gram_coverage": 0.18518518518518517,
+   "native_base_rate": 0.5185185185185185,
+   "other_median_words": 643,
+   "others": 229,
    "passed": true,
-   "target_median_words": 802.5,
-   "targets": 28,
+   "target_median_words": 722,
+   "targets": 27,
    "token_cap": 2000
   },
   "govdata": {
    "length_separability": 0.0,
    "max_target_5gram_coverage": 0.6875,
-   "native_base_rate": 0.75,
-   "other_median_words": 2957.5,
-   "others": 184,
+   "native_base_rate": 0.8125,
+   "other_median_words": 2967.0,
+   "others": 126,
    "passed": true,
    "target_median_words": 2436.5,
    "targets": 16,
    "token_cap": 2000
   },
   "govdocs1": {
-   "length_separability": 0.16666666666666666,
+   "length_separability": 0.3,
    "max_target_5gram_coverage": 0.06666666666666667,
-   "native_base_rate": 0.06666666666666667,
-   "other_median_words": 2571,
-   "others": 927,
+   "native_base_rate": 0.16666666666666666,
+   "other_median_words": 2282.5,
+   "others": 152,
    "passed": true,
    "target_median_words": 2689.5,
    "targets": 30,
    "token_cap": 2000
   },
   "safedocs": {
-   "length_separability": 0.09090909090909091,
-   "max_target_5gram_coverage": 0.09090909090909091,
-   "native_base_rate": 0.09090909090909091,
-   "other_median_words": 721,
-   "others": 175,
+   "length_separability": 0.047619047619047616,
+   "max_target_5gram_coverage": 0.09523809523809523,
+   "native_base_rate": 0.09523809523809523,
+   "other_median_words": 267.5,
+   "others": 24,
    "passed": true,
-   "target_median_words": 480.0,
-   "targets": 22,
+   "target_median_words": 566,
+   "targets": 21,
    "token_cap": 2000
   },
   "wikipedia": {
    "length_separability": 0.07407407407407407,
    "max_target_5gram_coverage": 0.1111111111111111,
-   "native_base_rate": 0.2222222222222222,
-   "other_median_words": 1211,
-   "others": 153,
+   "native_base_rate": 0.18518518518518517,
+   "other_median_words": 1494.0,
+   "others": 50,
    "passed": true,
    "target_median_words": 905,
    "targets": 27,
    "token_cap": 2000
   }
  },
- "generation": "g-20261104-054545",
+ "dropped": {
+  "ki-011": {
+   "attempts": 13,
+   "last_rejection": "verbatim leak",
+   "reason": "gates"
+  },
+  "ki-032": {
+   "level": "partial",
+   "lexical_rank": 1,
+   "query": "Jelpke Anfrage Inlandsgeheimdienst Minderjährige",
+   "reason": "triviality"
+  },
+  "ki-056": {
+   "level": "partial",
+   "lexical_rank": 1,
+   "query": "Sternberg Allegheny netting affiliates",
+   "reason": "triviality"
+  },
+  "ki-071": {
+   "attempts": 14,
+   "last_rejection": "6 words",
+   "reason": "gates"
+  },
+  "ki-080": {
+   "level": "partial",
+   "lexical_rank": 1,
+   "query": "Durchführungsverordnung 129/2013 Agrarbetriebe Anpassung",
+   "reason": "triviality"
+  },
+  "ki-155": {
+   "level": "partial",
+   "lexical_rank": 1,
+   "query": "Grote Bauland Eichendorffstraße Immobilienmakler",
+   "reason": "triviality"
+  },
+  "tp-096": {
+   "attempts": 16,
+   "last_rejection": "8 words",
+   "reason": "gates"
+  },
+  "tp-100": {
+   "attempts": 16,
+   "last_rejection": "verbatim leak",
+   "reason": "gates"
+  }
+ },
+ "generation": "g-20261104-120953",
  "queries": {
   "ki-001": {
    "absent_word_share": 0.25,
@@ -93,7 +139,7 @@
    "absent_word_share": 0.0,
    "kind": "known-item",
    "level": "partial",
-   "lexical_rank": 3,
+   "lexical_rank": 2,
    "query": "Eurofighter Diehl Boeing Bundesregierung",
    "verbatim_leak": [],
    "words": 4
@@ -117,11 +163,11 @@
    "words": 5
   },
   "ki-005": {
-   "absent_word_share": 0.0,
+   "absent_word_share": 0.2,
    "kind": "known-item",
    "level": "partial",
-   "lexical_rank": 2,
-   "query": "Warken Asylverfahren Plenarprotokoll Gall",
+   "lexical_rank": 4,
+   "query": "Göring-Eckardt Asylpaket Bundestagssitzung 2016",
    "verbatim_leak": [],
    "words": 4
   },
@@ -129,7 +175,7 @@
    "absent_word_share": 0.5,
    "kind": "known-item",
    "level": "vague",
-   "lexical_rank": null,
+   "lexical_rank": 40,
    "query": "Agrarpreise Juni 2023 market",
    "verbatim_leak": [],
    "words": 4
@@ -189,11 +235,11 @@
    "words": 4
   },
   "ki-014": {
-   "absent_word_share": 0.5,
+   "absent_word_share": 0.75,
    "kind": "known-item",
    "level": "partial",
-   "lexical_rank": 24,
-   "query": "Korte lobbying Taxi Gesetz",
+   "lexical_rank": 25,
+   "query": "Korte Lobbyeinfluss Personenverkehr Reform",
    "verbatim_leak": [],
    "words": 4
   },
@@ -201,7 +247,7 @@
    "absent_word_share": 0.6,
    "kind": "known-item",
    "level": "vague",
-   "lexical_rank": 37,
+   "lexical_rank": 1,
    "query": "AfD Sicherheitsdebatte Bundestag Kanzler-Regierungserklärung",
    "verbatim_leak": [],
    "words": 4
@@ -243,11 +289,11 @@
    "words": 3
   },
   "ki-020": {
-   "absent_word_share": 0.25,
+   "absent_word_share": 0.5,
    "kind": "known-item",
    "level": "partial",
    "lexical_rank": 1,
-   "query": "Kleinwächter Atomschirm Aachener Vertrag",
+   "query": "Kleinwächter Frankreich nuclear Schutzgarantie",
    "verbatim_leak": [],
    "words": 4
   },
@@ -255,7 +301,7 @@
    "absent_word_share": 0.25,
    "kind": "known-item",
    "level": "vague",
-   "lexical_rank": 10,
+   "lexical_rank": 11,
    "query": "Petitionen Sammelübersicht Bundestag Eingaben",
    "verbatim_leak": [],
    "words": 4
@@ -282,7 +328,7 @@
    "absent_word_share": 0.75,
    "kind": "known-item",
    "level": "vague",
-   "lexical_rank": null,
+   "lexical_rank": 2,
    "query": "Lobbyismus Verbrauchervertragsgesetz Linke Regierungsantwort",
    "verbatim_leak": [],
    "words": 4
@@ -306,11 +352,11 @@
    "words": 4
   },
   "ki-027": {
-   "absent_word_share": 0.5,
+   "absent_word_share": 1.0,
    "kind": "known-item",
    "level": "vague",
-   "lexical_rank": 1,
-   "query": "Hunko Drohnenangriff Deutscher Ermitlung",
+   "lexical_rank": null,
+   "query": "Bundesanwalt Drohnentod Terrorverdächtiger Verfharen",
    "verbatim_leak": [],
    "words": 4
   },
@@ -328,7 +374,7 @@
    "kind": "known-item",
    "level": "partial",
    "lexical_rank": 1,
-   "query": "Hemmelgarn Baumaterial price Lieferketten",
+   "query": "Hemmelgarn construction Holzpreise Lieferengpässe",
    "verbatim_leak": [],
    "words": 4
   },
@@ -350,15 +396,6 @@
    "verbatim_leak": [],
    "words": 5
   },
-  "ki-032": {
-   "absent_word_share": 0.25,
-   "kind": "known-item",
-   "level": "partial",
-   "lexical_rank": 1,
-   "query": "Jelpke Verfassungsschutz Jugendliche Datenspeicherung",
-   "verbatim_leak": [],
-   "words": 4
-  },
   "ki-033": {
    "absent_word_share": 0.25,
    "kind": "known-item",
@@ -378,11 +415,11 @@
    "words": 5
   },
   "ki-035": {
-   "absent_word_share": 0.0,
+   "absent_word_share": 0.25,
    "kind": "known-item",
    "level": "partial",
-   "lexical_rank": 1,
-   "query": "Planters SportsLine football newsletter",
+   "lexical_rank": 2,
+   "query": "CBS email game peanuts",
    "verbatim_leak": [],
    "words": 4
   },
@@ -405,11 +442,11 @@
    "words": 5
   },
   "ki-038": {
-   "absent_word_share": 0.0,
+   "absent_word_share": 0.25,
    "kind": "known-item",
    "level": "partial",
    "lexical_rank": 1,
-   "query": "Horton GISB ratification vote",
+   "query": "GISB voting form fax",
    "verbatim_leak": [],
    "words": 4
   },
@@ -444,7 +481,7 @@
    "absent_word_share": 0.5,
    "kind": "known-item",
    "level": "vague",
-   "lexical_rank": null,
+   "lexical_rank": 1,
    "query": "Tana fuel supplier amendment",
    "verbatim_leak": [],
    "words": 4
@@ -459,11 +496,11 @@
    "words": 5
   },
   "ki-044": {
-   "absent_word_share": 0.5,
+   "absent_word_share": 0.75,
    "kind": "known-item",
    "level": "partial",
    "lexical_rank": 2,
-   "query": "Russell IMC Sicherheiten covenant",
+   "query": "Russell Pfandrecht Kreditvertrag collatral",
    "verbatim_leak": [],
    "words": 4
   },
@@ -513,20 +550,20 @@
    "words": 5
   },
   "ki-050": {
-   "absent_word_share": 0.75,
+   "absent_word_share": 0.25,
    "kind": "known-item",
    "level": "partial",
    "lexical_rank": 1,
-   "query": "Bracewell attorney fees Novmber",
+   "query": "Mintz lawer bills banks",
    "verbatim_leak": [],
    "words": 4
   },
   "ki-051": {
-   "absent_word_share": 0.25,
+   "absent_word_share": 0.5,
    "kind": "known-item",
    "level": "vague",
-   "lexical_rank": 2,
-   "query": "Eyeforenergy newsletter accountant blame",
+   "lexical_rank": 1,
+   "query": "Eyeforenergy newsletter auditor scandal",
    "verbatim_leak": [],
    "words": 4
   },
@@ -554,15 +591,6 @@
    "level": "exact",
    "lexical_rank": 1,
    "query": "FW Hola mi primo",
-   "verbatim_leak": [],
-   "words": 4
-  },
-  "ki-056": {
-   "absent_word_share": 0.0,
-   "kind": "known-item",
-   "level": "partial",
-   "lexical_rank": 1,
-   "query": "Sternberg Allegheny setoff PUHCA",
    "verbatim_leak": [],
    "words": 4
   },
@@ -612,11 +640,11 @@
    "words": 4
   },
   "ki-062": {
-   "absent_word_share": 0.5,
+   "absent_word_share": 0.75,
    "kind": "known-item",
    "level": "partial",
    "lexical_rank": 1,
-   "query": "Lengkeek Tausch Montreal 2004",
+   "query": "Lengkeek Kalender 2004 Tausch",
    "verbatim_leak": [],
    "words": 4
   },
@@ -639,11 +667,11 @@
    "words": 5
   },
   "ki-065": {
-   "absent_word_share": 0.0,
+   "absent_word_share": 0.5,
    "kind": "known-item",
    "level": "partial",
    "lexical_rank": 1,
-   "query": "Chevron Texaco oil merger",
+   "query": "Texaco takeover oil giants",
    "verbatim_leak": [],
    "words": 4
   },
@@ -669,7 +697,7 @@
    "absent_word_share": 0.0,
    "kind": "known-item",
    "level": "partial",
-   "lexical_rank": 19,
+   "lexical_rank": 18,
    "query": "Einfuhrwerte Kommission Januar 2013",
    "verbatim_leak": [],
    "words": 4
@@ -678,7 +706,7 @@
    "absent_word_share": 0.75,
    "kind": "known-item",
    "level": "vague",
-   "lexical_rank": 6,
+   "lexical_rank": 5,
    "query": "Rübenzucker Zollaufschläge Aussetzung Wirtschaftsjahr",
    "verbatim_leak": [],
    "words": 4
@@ -696,7 +724,7 @@
    "absent_word_share": 0.5,
    "kind": "known-item",
    "level": "vague",
-   "lexical_rank": 26,
+   "lexical_rank": 3,
    "query": "Pauschalwerte Zitrusfrüchte Januar 2013",
    "verbatim_leak": [],
    "words": 4
@@ -705,7 +733,7 @@
    "absent_word_share": 0.0,
    "kind": "known-item",
    "level": "exact",
-   "lexical_rank": 1,
+   "lexical_rank": 2,
    "query": "Verordnung 68/2013 Katalog der Einzelfuttermittel",
    "verbatim_leak": [],
    "words": 5
@@ -714,7 +742,7 @@
    "absent_word_share": 0.4,
    "kind": "known-item",
    "level": "partial",
-   "lexical_rank": 7,
+   "lexical_rank": 6,
    "query": "Zucker Importzölle Preise 2012/13",
    "verbatim_leak": [],
    "words": 4
@@ -741,7 +769,7 @@
    "absent_word_share": 0.25,
    "kind": "known-item",
    "level": "vague",
-   "lexical_rank": 4,
+   "lexical_rank": 5,
    "query": "Eigenmittel Clearingstellen Delegierte Verordnung",
    "verbatim_leak": [],
    "words": 4
@@ -752,15 +780,6 @@
    "level": "exact",
    "lexical_rank": 1,
    "query": "Durchführungsverordnung Nr. 9/2013 Liberia",
-   "verbatim_leak": [],
-   "words": 4
-  },
-  "ki-080": {
-   "absent_word_share": 0.25,
-   "kind": "known-item",
-   "level": "partial",
-   "lexical_rank": 2,
-   "query": "Kürzung Direktzahlungen Bauern Übergangsbeihilfe",
    "verbatim_leak": [],
    "words": 4
   },
@@ -831,7 +850,7 @@
    "absent_word_share": 0.25,
    "kind": "known-item",
    "level": "partial",
-   "lexical_rank": 8,
+   "lexical_rank": 12,
    "query": "Šemeta toy candy customs",
    "verbatim_leak": [],
    "words": 4
@@ -840,7 +859,7 @@
    "absent_word_share": 0.25,
    "kind": "known-item",
    "level": "vague",
-   "lexical_rank": 6,
+   "lexical_rank": 3,
    "query": "2013 pesticide residue limits",
    "verbatim_leak": [],
    "words": 4
@@ -858,7 +877,7 @@
    "absent_word_share": 0.5,
    "kind": "known-item",
    "level": "partial",
-   "lexical_rank": 45,
+   "lexical_rank": 25,
    "query": "Silva Rodriguez Febuary fruit",
    "verbatim_leak": [],
    "words": 4
@@ -885,7 +904,7 @@
    "absent_word_share": 0.0,
    "kind": "known-item",
    "level": "vague",
-   "lexical_rank": 9,
+   "lexical_rank": 7,
    "query": "solar panel import registration",
    "verbatim_leak": [],
    "words": 4
@@ -903,7 +922,7 @@
    "absent_word_share": 0.5,
    "kind": "known-item",
    "level": "partial",
-   "lexical_rank": 4,
+   "lexical_rank": 2,
    "query": "2013 motorbike approval regulaton",
    "verbatim_leak": [],
    "words": 4
@@ -927,11 +946,11 @@
    "words": 5
   },
   "ki-101": {
-   "absent_word_share": 0.0,
+   "absent_word_share": 0.75,
    "kind": "known-item",
    "level": "partial",
-   "lexical_rank": 1,
-   "query": "Hamburg Großhandel Mai 2022",
+   "lexical_rank": null,
+   "query": "Statistikamt Nord Handelsumsatz Hansestadt",
    "verbatim_leak": [],
    "words": 4
   },
@@ -957,7 +976,7 @@
    "absent_word_share": 0.75,
    "kind": "known-item",
    "level": "partial",
-   "lexical_rank": 36,
+   "lexical_rank": 31,
    "query": "Hansestadt Handelsumsatz April Statistikbericht",
    "verbatim_leak": [],
    "words": 4
@@ -966,7 +985,7 @@
    "absent_word_share": 0.5,
    "kind": "known-item",
    "level": "vague",
-   "lexical_rank": 39,
+   "lexical_rank": 27,
    "query": "Hamburg Industrieproduktion 2022 Güterarten",
    "verbatim_leak": [],
    "words": 4
@@ -975,7 +994,7 @@
    "absent_word_share": 0.0,
    "kind": "known-item",
    "level": "exact",
-   "lexical_rank": 1,
+   "lexical_rank": 2,
    "query": "Ausfuhr Hamburg 2. Quartal 2025",
    "verbatim_leak": [],
    "words": 5
@@ -1020,7 +1039,7 @@
    "absent_word_share": 0.25,
    "kind": "known-item",
    "level": "vague",
-   "lexical_rank": 6,
+   "lexical_rank": 3,
    "query": "Hamburg wholesale Umsatz 2019",
    "verbatim_leak": [],
    "words": 4
@@ -1074,7 +1093,7 @@
    "absent_word_share": 0.0,
    "kind": "known-item",
    "level": "vague",
-   "lexical_rank": 13,
+   "lexical_rank": 2,
    "query": "HUD grants training slides",
    "verbatim_leak": [],
    "words": 4
@@ -1093,7 +1112,7 @@
    "kind": "known-item",
    "level": "partial",
    "lexical_rank": 1,
-   "query": "HL7 RxNorm licensing fees",
+   "query": "NLM DailyMed drug standards",
    "verbatim_leak": [],
    "words": 4
   },
@@ -1101,7 +1120,7 @@
    "absent_word_share": 0.5,
    "kind": "known-item",
    "level": "vague",
-   "lexical_rank": 12,
+   "lexical_rank": 13,
    "query": "Tenino bussiness stats 1997",
    "verbatim_leak": [],
    "words": 4
@@ -1116,11 +1135,11 @@
    "words": 4
   },
   "ki-122": {
-   "absent_word_share": 0.5,
+   "absent_word_share": 0.75,
    "kind": "known-item",
    "level": "partial",
    "lexical_rank": 1,
-   "query": "Part 75 smal emitters",
+   "query": "smal emitters monitoring shortcut",
    "verbatim_leak": [],
    "words": 4
   },
@@ -1143,11 +1162,11 @@
    "words": 5
   },
   "ki-125": {
-   "absent_word_share": 0.75,
+   "absent_word_share": 1.0,
    "kind": "known-item",
    "level": "partial",
-   "lexical_rank": 23,
-   "query": "Gehalt drive alone earnigs",
+   "lexical_rank": null,
+   "query": "commuter Verdienst census tabel",
    "verbatim_leak": [],
    "words": 4
   },
@@ -1173,8 +1192,8 @@
    "absent_word_share": 0.75,
    "kind": "known-item",
    "level": "partial",
-   "lexical_rank": 21,
-   "query": "Howell Fahrer recommendation letter",
+   "lexical_rank": 1,
+   "query": "Howell Empfehlungsschreiben limb waiver",
    "verbatim_leak": [],
    "words": 4
   },
@@ -1182,7 +1201,7 @@
    "absent_word_share": 0.75,
    "kind": "known-item",
    "level": "vague",
-   "lexical_rank": null,
+   "lexical_rank": 1,
    "query": "archaeology relics training slides",
    "verbatim_leak": [],
    "words": 4
@@ -1197,20 +1216,20 @@
    "words": 5
   },
   "ki-131": {
-   "absent_word_share": 0.25,
+   "absent_word_share": 0.75,
    "kind": "known-item",
    "level": "partial",
-   "lexical_rank": 2,
-   "query": "HL7 Labor notification mapping",
+   "lexical_rank": 5,
+   "query": "Labor Meldung ORU spreadsheet",
    "verbatim_leak": [],
    "words": 4
   },
   "ki-132": {
-   "absent_word_share": 0.5,
+   "absent_word_share": 1.0,
    "kind": "known-item",
    "level": "vague",
-   "lexical_rank": 21,
-   "query": "census housing survey estimates",
+   "lexical_rank": null,
+   "query": "neighborhood dwellings demographics profile",
    "verbatim_leak": [],
    "words": 4
   },
@@ -1228,7 +1247,7 @@
    "kind": "known-item",
    "level": "vague",
    "lexical_rank": 1,
-   "query": "hurricane Rita flood report",
+   "query": "Texas storm damage mapping",
    "verbatim_leak": [],
    "words": 4
   },
@@ -1245,8 +1264,8 @@
    "absent_word_share": 0.0,
    "kind": "known-item",
    "level": "partial",
-   "lexical_rank": 2,
-   "query": "Pacific Wireless Difuntorum FCC",
+   "lexical_rank": 1,
+   "query": "Lodi licensee Difuntorum reinstatement",
    "verbatim_leak": [],
    "words": 4
   },
@@ -1290,17 +1309,17 @@
    "absent_word_share": 0.25,
    "kind": "known-item",
    "level": "partial",
-   "lexical_rank": 2,
-   "query": "ICALEPCS EPICS powr supply",
+   "lexical_rank": 1,
+   "query": "EPICS powr supply record",
    "verbatim_leak": [],
    "words": 4
   },
   "ki-144": {
-   "absent_word_share": 0.25,
+   "absent_word_share": 0.5,
    "kind": "known-item",
    "level": "vague",
-   "lexical_rank": 2,
-   "query": "mortality data coding handbook",
+   "lexical_rank": 1,
+   "query": "federal fatality statistics manual",
    "verbatim_leak": [],
    "words": 4
   },
@@ -1336,7 +1355,7 @@
    "kind": "known-item",
    "level": "partial",
    "lexical_rank": 1,
-   "query": "Dreispitz Anfahrt Parkplatz Bus",
+   "query": "Münchenstein Wegbeschreibung Tram Haltestelle",
    "verbatim_leak": [],
    "words": 4
   },
@@ -1363,7 +1382,7 @@
    "kind": "known-item",
    "level": "partial",
    "lexical_rank": 1,
-   "query": "Nachmittagsbetreuung Aschaffenburg Mensa Hausaufgaben",
+   "query": "Ganztagsschule Aschaffenburg Hausaufgabenbetreuung Mittagessen",
    "verbatim_leak": [],
    "words": 4
   },
@@ -1382,15 +1401,6 @@
    "level": "exact",
    "lexical_rank": 1,
    "query": "Pressemitteilung Wandsbeker Winterzauber 2009",
-   "verbatim_leak": [],
-   "words": 4
-  },
-  "ki-155": {
-   "absent_word_share": 0.5,
-   "kind": "known-item",
-   "level": "partial",
-   "lexical_rank": 1,
-   "query": "Grote Neugersdorf Baugrundstück Exposé",
    "verbatim_leak": [],
    "words": 4
   },
@@ -1440,20 +1450,20 @@
    "words": 4
   },
   "ki-161": {
-   "absent_word_share": 0.25,
+   "absent_word_share": 0.5,
    "kind": "known-item",
    "level": "partial",
    "lexical_rank": 1,
-   "query": "Sebald Gesellschaft Statuten Kempten",
+   "query": "Vereinssatzung Sebald Literaturpreis Erinnerung",
    "verbatim_leak": [],
    "words": 4
   },
   "ki-162": {
-   "absent_word_share": 0.6,
+   "absent_word_share": 0.75,
    "kind": "known-item",
    "level": "vague",
    "lexical_rank": 1,
-   "query": "Einbauherd Spezifikationen EBO9.3 Limatec",
+   "query": "Backofen Produktblatt Küchengerät Limatec",
    "verbatim_leak": [],
    "words": 4
   },
@@ -1471,7 +1481,7 @@
    "kind": "known-item",
    "level": "partial",
    "lexical_rank": 1,
-   "query": "TNG Telefonanleitung Handy Neukunden",
+   "query": "TNG Handy Einrichtung Kurzanleitung",
    "verbatim_leak": [],
    "words": 4
   },
@@ -1498,7 +1508,7 @@
    "kind": "known-item",
    "level": "partial",
    "lexical_rank": 1,
-   "query": "Niehaves divisibility Klapptest Mathe",
+   "query": "Niehaves Arbeitsblatt Teilbarkeitsregeln worksheet",
    "verbatim_leak": [],
    "words": 4
   },
@@ -1506,7 +1516,7 @@
    "absent_word_share": 0.6,
    "kind": "known-item",
    "level": "vague",
-   "lexical_rank": 5,
+   "lexical_rank": 2,
    "query": "Bits manipulieren Hardware-Port Spickzettel",
    "verbatim_leak": [],
    "words": 4
@@ -1548,11 +1558,11 @@
    "words": 1
   },
   "ki-173": {
-   "absent_word_share": 0.25,
+   "absent_word_share": 0.5,
    "kind": "known-item",
    "level": "partial",
    "lexical_rank": 1,
-   "query": "Sankey Energieverluste Dampfmaschine Irland",
+   "query": "Napoleon Feldzug Energieflüsse Visualisierung",
    "verbatim_leak": [],
    "words": 4
   },
@@ -1587,7 +1597,7 @@
    "absent_word_share": 0.75,
    "kind": "known-item",
    "level": "vague",
-   "lexical_rank": 1,
+   "lexical_rank": 2,
    "query": "CUTEC Harz Forschungsinstitut Defizit",
    "verbatim_leak": [],
    "words": 4
@@ -1605,8 +1615,8 @@
    "absent_word_share": 0.5,
    "kind": "known-item",
    "level": "partial",
-   "lexical_rank": 26,
-   "query": "power system Kraftwerke Stromnetze",
+   "lexical_rank": 1,
+   "query": "energy Stromnetze Kraftwerke Aktuatoren",
    "verbatim_leak": [],
    "words": 4
   },
@@ -1633,7 +1643,7 @@
    "kind": "known-item",
    "level": "partial",
    "lexical_rank": 1,
-   "query": "ESDA human body capacitor",
+   "query": "ESDA static shock body",
    "verbatim_leak": [],
    "words": 4
   },
@@ -1641,7 +1651,7 @@
    "absent_word_share": 0.667,
    "kind": "known-item",
    "level": "vague",
-   "lexical_rank": 1,
+   "lexical_rank": 27,
    "query": "hydropower downsides notes",
    "verbatim_leak": [],
    "words": 3
@@ -1669,7 +1679,7 @@
    "kind": "known-item",
    "level": "vague",
    "lexical_rank": 1,
-   "query": "renewable heat sources wiki",
+   "query": "warmth storage underground seasons",
    "verbatim_leak": [],
    "words": 4
   },
@@ -1695,7 +1705,7 @@
    "absent_word_share": 0.25,
    "kind": "known-item",
    "level": "vague",
-   "lexical_rank": 27,
+   "lexical_rank": 1,
    "query": "military solar power office",
    "verbatim_leak": [],
    "words": 4
@@ -1714,7 +1724,7 @@
    "kind": "known-item",
    "level": "partial",
    "lexical_rank": 1,
-   "query": "Audi Dresden climate-neutral fuel",
+   "query": "Audi Dresden synthetic fuel",
    "verbatim_leak": [],
    "words": 4
   },
@@ -1723,7 +1733,7 @@
    "kind": "known-item",
    "level": "vague",
    "lexical_rank": 1,
-   "query": "Staudamm India Himalaya hydropower",
+   "query": "Staudamm tallest India reservoir",
    "verbatim_leak": [],
    "words": 4
   },
@@ -2213,18 +2223,6 @@
    "verbatim_leak": [],
    "words": 5
   },
-  "tp-076": {
-   "kind": "topical",
-   "query": "EU fruit vegetable import prices",
-   "verbatim_leak": [],
-   "words": 5
-  },
-  "tp-077": {
-   "kind": "topical",
-   "query": "EU fruit vegetable import prices",
-   "verbatim_leak": [],
-   "words": 5
-  },
   "tp-078": {
    "kind": "topical",
    "query": "sugar import duties price regulations",
@@ -2542,25 +2540,25 @@
   "focus": {
    "deep": {
     "median_rank": 3.0,
-    "not_in_top50": 2,
+    "not_in_top50": 4,
     "queries": 34,
-    "rank1": 10,
-    "rank1_share": 0.294,
+    "rank1": 12,
+    "rank1_share": 0.353,
     "verbatim_leaks": 0
    },
    "start": {
     "median_rank": 1,
-    "not_in_top50": 13,
-    "queries": 153,
-    "rank1": 108,
-    "rank1_share": 0.706,
+    "not_in_top50": 11,
+    "queries": 149,
+    "rank1": 106,
+    "rank1_share": 0.711,
     "verbatim_leaks": 0
    }
   },
   "format": {
    "csv": {
     "median_rank": 4,
-    "not_in_top50": 0,
+    "not_in_top50": 2,
     "queries": 5,
     "rank1": 1,
     "rank1_share": 0.2,
@@ -2575,19 +2573,19 @@
     "verbatim_leaks": 0
    },
    "eml": {
-    "median_rank": 1.0,
-    "not_in_top50": 1,
-    "queries": 32,
+    "median_rank": 1,
+    "not_in_top50": 0,
+    "queries": 31,
     "rank1": 26,
-    "rank1_share": 0.812,
+    "rank1_share": 0.839,
     "verbatim_leaks": 0
    },
    "html": {
-    "median_rank": 1.0,
+    "median_rank": 1,
     "not_in_top50": 2,
-    "queries": 42,
-    "rank1": 26,
-    "rank1_share": 0.619,
+    "queries": 41,
+    "rank1": 25,
+    "rank1_share": 0.61,
     "verbatim_leaks": 0
    },
    "md": {
@@ -2600,30 +2598,30 @@
    },
    "pdf": {
     "median_rank": 1,
-    "not_in_top50": 9,
-    "queries": 63,
-    "rank1": 39,
-    "rank1_share": 0.619,
+    "not_in_top50": 8,
+    "queries": 61,
+    "rank1": 38,
+    "rank1_share": 0.623,
     "verbatim_leaks": 0
    },
    "ppt": {
-    "median_rank": 2,
-    "not_in_top50": 1,
+    "median_rank": 1,
+    "not_in_top50": 0,
     "queries": 5,
-    "rank1": 2,
-    "rank1_share": 0.4,
+    "rank1": 4,
+    "rank1_share": 0.8,
     "verbatim_leaks": 0
    },
    "txt": {
-    "median_rank": 1.5,
+    "median_rank": 1.0,
     "not_in_top50": 0,
     "queries": 4,
-    "rank1": 2,
-    "rank1_share": 0.5,
+    "rank1": 4,
+    "rank1_share": 1.0,
     "verbatim_leaks": 0
    },
    "xls": {
-    "median_rank": 1.5,
+    "median_rank": 3.0,
     "not_in_top50": 1,
     "queries": 4,
     "rank1": 2,
@@ -2632,46 +2630,46 @@
    },
    "xlsx": {
     "median_rank": 2.0,
-    "not_in_top50": 1,
+    "not_in_top50": 2,
     "queries": 16,
-    "rank1": 7,
-    "rank1_share": 0.438,
+    "rank1": 5,
+    "rank1_share": 0.312,
     "verbatim_leaks": 0
    }
   },
   "in_cluster": {
    "in-cluster": {
-    "median_rank": 1.5,
+    "median_rank": 2.0,
     "not_in_top50": 7,
-    "queries": 86,
-    "rank1": 43,
-    "rank1_share": 0.5,
+    "queries": 84,
+    "rank1": 38,
+    "rank1_share": 0.452,
     "verbatim_leaks": 0
    },
    "singleton": {
     "median_rank": 1,
     "not_in_top50": 8,
-    "queries": 101,
-    "rank1": 75,
-    "rank1_share": 0.743,
+    "queries": 99,
+    "rank1": 80,
+    "rank1_share": 0.808,
     "verbatim_leaks": 0
    }
   },
   "language": {
    "de": {
-    "median_rank": 1,
+    "median_rank": 1.0,
     "not_in_top50": 10,
-    "queries": 95,
-    "rank1": 56,
-    "rank1_share": 0.589,
+    "queries": 92,
+    "rank1": 51,
+    "rank1_share": 0.554,
     "verbatim_leaks": 0
    },
    "en": {
-    "median_rank": 1.0,
+    "median_rank": 1,
     "not_in_top50": 5,
-    "queries": 92,
-    "rank1": 62,
-    "rank1_share": 0.674,
+    "queries": 91,
+    "rank1": 67,
+    "rank1_share": 0.736,
     "verbatim_leaks": 0
    }
   },
@@ -2680,74 +2678,74 @@
     "median_rank": 1,
     "not_in_top50": 0,
     "queries": 65,
-    "rank1": 61,
-    "rank1_share": 0.938,
+    "rank1": 59,
+    "rank1_share": 0.908,
     "verbatim_leaks": 0
    },
    "partial": {
-    "median_rank": 2.0,
-    "not_in_top50": 2,
-    "queries": 60,
-    "rank1": 29,
-    "rank1_share": 0.483,
+    "median_rank": 1.5,
+    "not_in_top50": 4,
+    "queries": 56,
+    "rank1": 28,
+    "rank1_share": 0.5,
     "verbatim_leaks": 0
    },
    "vague": {
-    "median_rank": 2.0,
-    "not_in_top50": 13,
+    "median_rank": 1.5,
+    "not_in_top50": 11,
     "queries": 62,
-    "rank1": 28,
-    "rank1_share": 0.452,
+    "rank1": 31,
+    "rank1_share": 0.5,
     "verbatim_leaks": 0
    }
   },
   "source": {
    "bundestag": {
-    "median_rank": 1.0,
-    "not_in_top50": 4,
-    "queries": 32,
-    "rank1": 20,
-    "rank1_share": 0.625,
+    "median_rank": 1,
+    "not_in_top50": 3,
+    "queries": 31,
+    "rank1": 19,
+    "rank1_share": 0.613,
     "verbatim_leaks": 0
    },
    "enron": {
-    "median_rank": 1.0,
-    "not_in_top50": 1,
-    "queries": 32,
+    "median_rank": 1,
+    "not_in_top50": 0,
+    "queries": 31,
     "rank1": 26,
-    "rank1_share": 0.812,
+    "rank1_share": 0.839,
     "verbatim_leaks": 0
    },
    "eurlex": {
-    "median_rank": 2.0,
+    "median_rank": 2,
     "not_in_top50": 2,
-    "queries": 28,
-    "rank1": 11,
-    "rank1_share": 0.393,
+    "queries": 27,
+    "rank1": 10,
+    "rank1_share": 0.37,
     "verbatim_leaks": 0
    },
    "govdata": {
     "median_rank": 2.0,
-    "not_in_top50": 1,
+    "not_in_top50": 2,
     "queries": 16,
-    "rank1": 7,
-    "rank1_share": 0.438,
+    "rank1": 5,
+    "rank1_share": 0.312,
     "verbatim_leaks": 0
    },
    "govdocs1": {
-    "median_rank": 1.5,
-    "not_in_top50": 2,
+    "median_rank": 1.0,
+    "not_in_top50": 3,
     "queries": 30,
-    "rank1": 15,
-    "rank1_share": 0.5,
+    "rank1": 20,
+    "rank1_share": 0.667,
     "verbatim_leaks": 0
    },
    "safedocs": {
-    "median_rank": 1.0,
+    "median_rank": 1,
     "not_in_top50": 5,
-    "queries": 22,
-    "rank1": 16,
-    "rank1_share": 0.727,
+    "queries": 21,
+    "rank1": 15,
+    "rank1_share": 0.714,
     "verbatim_leaks": 0
    },
    "wikipedia": {
@@ -2761,7 +2759,7 @@
   }
  },
  "summary": {
-  "accepted": 316,
+  "accepted": 310,
   "distinguishability_passed": {
    "bundestag": true,
    "enron": true,
@@ -2771,28 +2769,33 @@
    "safedocs": true,
    "wikipedia": true
   },
-  "known_item": 187,
-  "topical": 129,
+  "dropped": {
+   "gates": 4,
+   "triviality": 4
+  },
+  "known_item": 183,
+  "topical": 127,
   "triviality": {
    "exact": {
     "passed": null,
     "queries": 65,
-    "rank1": 61,
-    "rank1_share": 0.938
+    "rank1": 59,
+    "rank1_share": 0.908
    },
    "partial": {
     "passed": true,
-    "queries": 60,
-    "rank1": 29,
-    "rank1_share": 0.483
+    "queries": 56,
+    "rank1": 28,
+    "rank1_share": 0.5
    },
    "vague": {
     "passed": true,
     "queries": 62,
-    "rank1": 28,
-    "rank1_share": 0.452
+    "rank1": 31,
+    "rank1_share": 0.5
    }
   },
+  "triviality_drop_seed": "20261104/triviality-drop",
   "verbatim_leak_failures": 0
  }
 }

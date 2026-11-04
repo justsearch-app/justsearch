@@ -1,17 +1,17 @@
 {
-  "content_sha256": "a26d21956e40b6c4310fd6d531edfc4eda589e3980499ab3c5a2b4bdce219891",
+  "content_sha256": "49b6eb08159ec10275aa54ee55214f8426ea0d9c31d1307564c0e2f99d62504f",
   "counts": {
-    "documents": 2890,
+    "documents": 1000,
     "grades": {
-      "2": 187
+      "2": 183
     },
-    "judgments": 187,
-    "positives": 187,
-    "queries": 309
+    "judgments": 183,
+    "positives": 183,
+    "queries": 305
   },
-  "judgments_sha256": "06f2d6d2abe59a282fb53783712cfa988e992cca05e89eff71aafe98ffab6876",
+  "judgments_sha256": "84a71d3937a4bcfcab1947d251cf20c7e9e6ec9df6253ee2bbe773a480510772",
   "language": "mul",
-  "manifest_sha256": "5704bd71b671d429f9c8b4a1a8b7086706a28ff33d8f6c5983fd5b9707221be3",
+  "manifest_sha256": "3358bdc5ca4233e5ee9da3ea40a600bb8d128bf64accdf29ed5bc90bc481566d",
   "metadata": {
     "config": "real-use",
     "layout": "as-is",
@@ -26,5 +26,5 @@
   },
   "name": "real-use",
   "schema": "jseval.quality.collection.v1",
-  "version": "ba1a4eb3b795ab628377110dcf476d38df6dd0ac6284575c7cb66b548c58580a"
+  "version": "a7c576adae7dd7688521fa4439ae3e084eb0efad0ce2fe553a178fef4a48d649"
 }

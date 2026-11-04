@@ -11,11 +11,14 @@ outputs, document ids, cluster evidence and gate results only.
 ``clusters``  near-duplicate clusters (exact + SimHash/Jaccard, ``duplicate_prevalence``), the
               recipe's natural families, and text-similarity topic groups.
 ``plan``      stratified known-item targets and topical groups, with recall levels and traits.
+``subset``    shrink the collection to about 1,000 files: every target, its byte copies and
+              clusters, every topical group, and a fixed-seed sample by source, format, language.
 ``generate``  write queries through ``claude -p`` (subscription, no tools); verbatim-leak gate
               with regeneration.
 ``gate``      lexical-only (``mode: text``) rank of every known-item target on the prepared
-              index; regenerate rank-1 partial/vague queries until at most half are rank 1;
-              distinguishability reports.
+              index; regenerate rank-1 partial/vague queries for ``--rounds`` rounds, then drop
+              the fewest seeded rank-1 ones that leave at most half rank 1 (recorded with every
+              other drop and its reason); distinguishability reports.
 ``write``     the stored collection: known-item judgments (target 2, byte-identical copy 1),
               topical queries pending labels.
 """
@@ -55,9 +58,12 @@ COLLECTION = "real-use"
 MODEL = "claude-sonnet-5-5"
 SEED = 20261104
 STALL_SECONDS = 15 * 60
+POLL_SECONDS = 15
 MONITORED = ("indexState", "indexedDocuments", "pendingJobs", "pendingJobsCount",
              "processingJobsCount", "embeddingPendingCount", "chunkEmbeddingPendingCount",
-             "pendingNerCount", "failedNerCount", "chunkDocCount", "embeddingDocCount")
+             "pendingNerCount", "failedNerCount", "chunkDocCount", "embeddingDocCount",
+             "spladeEnabled", "spladePendingCount", "chunkSpladePendingCount", "pendingVduCount",
+             "batchTiming")
 LEVELS = ("exact", "partial", "vague")
 # Known-item targets per (source, language): about 180, half German, every source.
 QUOTAS = {("bundestag", "de"): 30, ("eurlex", "de"): 15, ("eurlex", "en"): 15,
@@ -114,16 +120,30 @@ def ngrams(toks, n: int = 3) -> set[tuple[str, ...]]:
 # --------------------------------------------------------------------------- prepare
 
 
-def _monitor(root: Path, log: Path, stop: threading.Event) -> None:
-    """Poll the build engine once a minute; report a queue that stopped shrinking for 15 min.
+def _paused(root: Path) -> bool:
+    """Whether admission paused the build worker (its process is stopped, ``SIGSTOP``)."""
+    try:
+        pid = json.loads((root / "worker.json").read_text())["pid"]
+        return Path(f"/proc/{pid}/stat").read_text().rsplit(")", 1)[1].split()[0] in ("T", "t")
+    except (OSError, ValueError, KeyError, IndexError):
+        return False
 
-    Only responsive observations count: a paused (admission) engine does not answer and so
-    never looks stalled. The build itself is left to the core lifecycle.
+
+def _monitor(root: Path, log: Path, stop: threading.Event) -> None:
+    """Poll the build engine every ``POLL_SECONDS``; report a queue that stopped shrinking.
+
+    A paused (admission) build is logged as ``paused`` and never looks stalled. The build
+    itself is left to the core lifecycle.
     """
     best, since, reported = None, time.monotonic(), False
-    while not stop.wait(60):
+    while not stop.wait(POLL_SECONDS):
+        if _paused(root):
+            since = time.monotonic()
+            _log(log, {"paused": True})
+            continue
         ready = root / "engine-ready"
         if not ready.exists():
+            _log(log, {"starting": True})
             continue
         try:
             url = json.loads(ready.read_text())["url"]
@@ -142,6 +162,55 @@ def _monitor(root: Path, log: Path, stop: threading.Event) -> None:
             reported = True
             atomic_write_text(log.with_name("STALLED.json"), canonical_json(
                 {"at": time.time(), "seconds_without_progress": time.monotonic() - since, **row}) + "\n")
+
+
+STAGES = (
+    # (stage, done when) over responsive monitor rows; stages overlap in the engine, so each is
+    # reported as the window from the previous stage's end to its own end.
+    ("extraction_ocr", lambda r, n: r.get("queue") == 0 and r.get("indexedDocuments") == n),
+    ("embedding", lambda r, n: r.get("embeddingPendingCount") == 0 and r.get("chunkEmbeddingPendingCount") == 0),
+    # Document SPLADE's pending count stays at the document count while it is disabled (the
+    # core disables it); it counts only when the engine reports it enabled.
+    ("other_enrichment", lambda r, n: r.get("pendingNerCount") == 0
+     and (r.get("spladeEnabled") is not True or r.get("spladePendingCount") == 0)
+     and (r.get("chunkSpladePendingCount") or 0) == 0),
+)
+
+
+def stage_timing(rows: list[dict], documents: int) -> dict:
+    """Per-stage wall time of a build from its monitor log (``start`` row to ``done`` row).
+
+    Each stage ends at the first poll that shows it complete (and every earlier stage
+    complete); its window starts where the previous one ended. Paused polls are counted
+    per window. ``engine_batch_ms`` is the engine's own enrichment batch timing.
+    """
+    start = [r["at"] for r in rows if "start" in r][-1]  # the latest preparation in this log
+    end = next((r["at"] for r in rows if "done" in r and r["at"] >= start), rows[-1]["at"])
+    polls = [r for r in rows if start <= r["at"] <= end]
+    marks, at = {}, start
+    first_engine = next((r["at"] for r in polls if "queue" in r), None)
+    for name, done in STAGES:
+        hit = next((r["at"] for r in polls if r["at"] >= at and "queue" in r and done(r, documents)), None)
+        if hit is None:
+            break
+        marks[name] = hit
+        at = hit
+    windows, prev = {}, start
+    edges = [("startup", first_engine)] if first_engine else []
+    for name, mark in [*edges, *marks.items(), ("confirmation", end)]:
+        if mark is None or mark < prev:
+            continue
+        paused = [r for r in polls if prev < r["at"] <= mark and r.get("paused")]
+        windows[name] = {"seconds": round(mark - prev, 1),
+                         "paused_seconds_approx": round(len(paused) * POLL_SECONDS, 1)}
+        prev = mark
+    last = next((r for r in reversed(polls) if "queue" in r), {})
+    return {"documents": documents, "total_seconds": round(end - start, 1),
+            "paused_seconds_approx": round(sum(1 for r in polls if r.get("paused")) * POLL_SECONDS, 1),
+            "poll_seconds": POLL_SECONDS, "stages": windows,
+            "incomplete": [name for name, _ in STAGES if name not in marks],
+            "engine_batch_ms": (last.get("batchTiming") or {}).get("totalMs"),
+            "pending_vdu_at_end": last.get("pendingVduCount")}
 
 
 def _open(c: Collection, timeout_sec: float):
@@ -168,6 +237,9 @@ def prepare(ref: str, timeout_sec: float) -> int:
                    "index_build": handle.index_build, "seconds": round(time.monotonic() - started, 1),
                    "counts": state.get("counts"), "generation": state.get("generation")}
     _log(log, {"done": summary})
+    if summary["index_build"] == "fresh":
+        summary["timing"] = stage_timing(_jsonl(log), len(c.documents))
+        _write_json(log.with_name(f"{handle.index_key[:16]}.timing.json"), summary["timing"])
     print(canonical_json(summary))
     return 0
 
@@ -658,6 +730,116 @@ def _topical_groups(cl: dict, records: dict, rng: random.Random) -> list[dict]:
     return sorted(out, key=lambda c: c["id"])
 
 
+# --------------------------------------------------------------------------- subset
+
+SUBSET_SIZE = 1000
+KEPT_CAP = 800  # kept sets beyond this would need proportional topical caps (not needed so far)
+OCR_ROUTES = ("ocr_full", "ocr_selective")
+
+
+def population(rows: dict[str, dict]) -> set[str]:
+    """The recipe's files the engine held completely: the recipe minus ``excluded.json``."""
+    excluded = json.loads((RECORD / "excluded.json").read_text(encoding="utf-8"))["documents"]
+    return set(rows) - {e["doc"] for e in excluded}
+
+
+def stratum_of(d: dict) -> str:
+    return f"{d['source']}/{d['format']}/{d['language']}"
+
+
+def select_subset(rows: dict[str, dict], documents: set[str], content: dict[str, str],
+                  planned: list[dict], clusters: dict, ocr: set[str], *,
+                  size: int = SUBSET_SIZE, seed: int = SEED) -> dict:
+    """The subset of ``documents`` the queries stay hardest on (S30), about ``size`` files.
+
+    Kept: every known-item target, its byte-identical copies, every member of each cluster a
+    target belongs to, and every member of each topical query's group. Then a fixed-seed sample
+    per (source, format, language) stratum: first as many files as the stratum has targets,
+    then a fill up to ``size`` that moves each stratum toward its share of ``documents``.
+    OCR-routed PDFs are never sampled (only kept).
+    """
+    by_id = {c["id"]: c for c in clusters["clusters"] + clusters["topics"]}
+    by_content = defaultdict(list)
+    for doc in documents:
+        by_content[content[doc]].append(doc)
+    kept: dict[str, list[str]] = defaultdict(list)
+    for q in in_collection(planned, documents):
+        if q["kind"] == "known-item":
+            kept[q["target"]].append(f"target:{q['qid']}")
+            for doc in by_content[content[q["target"]]]:
+                if doc != q["target"]:
+                    kept[doc].append(f"byte-duplicate:{q['qid']}")
+            for cid in q["clusters"]:
+                for doc in by_id[cid]["members"]:
+                    if doc in documents:
+                        kept[doc].append(f"target-cluster:{cid}")
+        else:
+            for doc in q["members"]:
+                kept[doc].append(f"topical:{q['qid']}")
+    if len(kept) > KEPT_CAP:
+        raise ValueError(f"kept sets hold {len(kept)} files (> {KEPT_CAP}); topical groups need caps")
+    full = Counter(stratum_of(rows[d]) for d in documents)
+    have = Counter(stratum_of(rows[d]) for d in kept)
+    pools = {}
+    for s in sorted(full):
+        pool = sorted(d for d in documents if stratum_of(rows[d]) == s and d not in kept and d not in ocr)
+        random.Random(f"{seed}/{s}").shuffle(pool)
+        pools[s] = pool
+    # Every stratum first gets as many sampled (non-target) files as it has targets, so each
+    # source's targets keep others to be told apart from (distinguishability); then one file
+    # at a time to the stratum furthest below its share (ties: stratum name).
+    targets = Counter(stratum_of(rows[d]) for d, why in kept.items()
+                      if any(r.startswith("target:") for r in why))
+    take = Counter({s: min(targets[s], len(pools[s])) for s in full})
+    for _ in range(max(0, size - len(kept) - sum(take.values()))):
+        open_ = [s for s in full if take[s] < len(pools[s])]
+        if not open_:
+            break
+        s = max(open_, key=lambda s: (size * full[s] / len(documents) - have[s] - take[s], s))
+        take[s] += 1
+    sampled = sorted(d for s in full for d in pools[s][:take[s]])
+    chosen = set(kept) | set(sampled)
+    strata = {s: {"full": full[s], "kept": have[s], "targets": targets[s], "sampled": take[s],
+                  "subset": have[s] + take[s], "share_full": round(full[s] / len(documents), 4),
+                  "share_subset": round((have[s] + take[s]) / len(chosen), 4)} for s in sorted(full)}
+    return {"seed": seed, "size": size, "population": len(documents), "documents": len(chosen),
+            "kept": {d: sorted(set(r)) for d, r in sorted(kept.items())}, "sampled": sampled,
+            "ocr_routed_in_subset": sorted(chosen & ocr), "strata": strata}
+
+
+def subset(size: int) -> int:
+    """Shrink the stored collection to the selection; queries and judgments stay as they are."""
+    c, _ = _collection()
+    rows = _recipe_rows()
+    full = population(rows)
+    evidence = json.loads((WORK / "build" / "second-build-ocr-evidence.json").read_text(encoding="utf-8"))
+    ocr = {d for d, e in evidence.items() if e["route"] in OCR_ROUTES and d in full}
+    planned = [q for q in json.loads((RECORD / "plan.json").read_text(encoding="utf-8"))["queries"]
+               if q["qid"] in c.queries]  # the stored queries, not every planned one
+    content = {d: rows[d]["sha256"] for d in full}
+    chosen = select_subset(rows, full, content, planned, load_clusters(), ocr, size=size)
+    chosen["ocr_routed_in_population"] = sorted(ocr)
+    chosen["ocr_evidence"] = "second build visual-extraction route (ocr_full, ocr_selective)"
+    keep = set(chosen["kept"]) | set(chosen["sampled"])
+    missing = {q for q, judged in c.judgments.items() for d in judged if d not in keep}
+    missing |= {q for q in c.queries if c.queries[q].groups.get("kind") == "topical"
+                and q not in {p["qid"] for p in in_collection(planned, keep)}}
+    if missing:
+        raise ValueError(f"subset drops documents of stored queries: {sorted(missing)[:5]}")
+    _write_json(RECORD / "subset.json", chosen)
+    new = Collection(c.name, c.language, dict(c.queries), dict(c.judgments),
+                     {d: rows[d]["path"] for d in keep}, {d: content[d] for d in keep}, dict(c.metadata))
+    qcoll.write_collection(new, Path(__file__).with_name("recipes") / COLLECTION)
+    config_path = qcoll.CONFIG_DIR / f"{COLLECTION}.json"
+    raw = json.loads(config_path.read_text(encoding="utf-8"))
+    raw["expected"]["documents"] = len(keep)
+    atomic_write_text(config_path, json.dumps(raw, ensure_ascii=False, indent=2) + "\n")
+    print(canonical_json({k: chosen[k] for k in ("population", "documents")}
+                         | {"kept": len(chosen["kept"]), "sampled": len(chosen["sampled"]),
+                            "ocr_routed_in_subset": len(chosen["ocr_routed_in_subset"])}))
+    return 0
+
+
 # --------------------------------------------------------------------------- generate
 
 LEVEL_TEXT = {
@@ -1023,7 +1205,41 @@ def _gate(c: Collection, base_url: str, handle, rounds: int) -> dict:
                                  feedback=triviality_feedback(planned[qid], done[qid]["query"], rare_words(
                                      done[qid]["query"], texts[target], df)))
     done = {q: r for q, r in _accepted().items() if q in planned and meets_gates(planned[q], r, texts)}
-    return gate_report(planned, done, results, records, texts, rows)
+    trivial = triviality_drops(planned, done, results)
+    dropped = {q: {"reason": "triviality", "level": planned[q]["level"], "query": done[q]["query"],
+                   "lexical_rank": results[q]["rank"]} for q in trivial}
+    attempts = defaultdict(list)
+    for row in _jsonl(RECORD / "generation.jsonl"):
+        attempts[row["qid"]].append(row)
+    for qid in sorted(set(planned) - set(done)):
+        # The planned leak/word-limit drops (SPARE): no accepted generation meets the gates.
+        dropped[qid] = {"reason": "gates", "attempts": len(attempts[qid]),
+                        "last_rejection": next((r.get("rejected") or r.get("error") or "no longer meets the gates"
+                                                for r in reversed(attempts[qid])), "never generated")}
+    report = gate_report(planned, {q: r for q, r in done.items() if q not in trivial}, results, records, texts, rows)
+    report["dropped"] = dict(sorted(dropped.items()))
+    report["summary"]["dropped"] = dict(sorted(Counter(d["reason"] for d in dropped.values()).items()))
+    report["summary"]["triviality_drop_seed"] = TRIVIALITY_DROP_SEED
+    return report
+
+
+TRIVIALITY_DROP_SEED = f"{SEED}/triviality-drop"
+
+
+def triviality_drops(planned: dict, done: dict, results: dict) -> list[str]:
+    """The fewest rank-1 queries per partial/vague level whose drop leaves at most half rank 1,
+    sampled by ``TRIVIALITY_DROP_SEED`` among that level's rank-1 queries (never by hand).
+
+    Their targets stay in the corpus. With ``n`` queries of which ``r`` are rank 1, dropping
+    ``k`` of the rank-1 ones passes when ``r - k <= (n - k) / 2``, i.e. ``k >= 2r - n``.
+    """
+    out = []
+    for level in ("partial", "vague"):
+        ids = sorted(q for q in done if planned[q]["kind"] == "known-item" and planned[q]["level"] == level)
+        first = [q for q in ids if results[q]["rank"] == 1]
+        k = max(0, 2 * len(first) - len(ids))
+        out += random.Random(f"{TRIVIALITY_DROP_SEED}/{level}").sample(first, k)
+    return sorted(out)
 
 
 RARE_DF = 5  # a query word found in at most this many documents points straight at its file
@@ -1045,8 +1261,10 @@ def triviality_feedback(q: dict, query: str, rare: list[str]) -> str:
     else:
         hint = ("Write how a person would recall it weeks later, without its most distinctive "
                 "literal words.")
+    low, high = word_bounds(q)
+    # Replacing words tends to add some; the reply must still fit the word limit.
     return (f"Your previous query \"{query}\" finds the file with plain keyword search alone. "
-            f"{hint} Do not repeat the previous query.")
+            f"{hint} Use {low} to {high} words in total. Do not repeat the previous query.")
 
 
 def gate_report(planned, done, results, records, texts, rows) -> dict:
@@ -1170,6 +1388,8 @@ def main(argv=None) -> int:
     p.add_argument("--root", type=Path, help="that engine's index entry root")
     steps.add_parser("clusters")
     steps.add_parser("plan")
+    p = steps.add_parser("subset")
+    p.add_argument("--size", type=int, default=SUBSET_SIZE)
     p = steps.add_parser("generate")
     p.add_argument("--concurrency", type=int, default=4)
     p.add_argument("--retry", action="store_true", help="regenerate queries failing the current gates")
@@ -1184,6 +1404,8 @@ def main(argv=None) -> int:
         return prepare(args.collection, args.timeout_sec)
     if args.step == "extract":
         return extract(args.timeout_sec, args.url, args.root)
+    if args.step == "subset":
+        return subset(args.size)
     if args.step == "generate":
         return generate(args.concurrency, args.retry)
     if args.step == "gate":

@@ -202,7 +202,11 @@ def test_stored_real_use_collection_matches_recipe_and_its_config():
     rows = {d["id"]: d for d in corpus.load_recipe("real-use")["documents"]}
     excluded = json.loads((ruq.RECORD / "excluded.json").read_text(encoding="utf-8"))["documents"]
     assert len(rows) == 2960 and len(excluded) == 70
-    assert set(c.documents) == set(rows) - {e["doc"] for e in excluded}
+    full = ruq.population(rows)
+    assert full == set(rows) - {e["doc"] for e in excluded} and len(full) == 2890
+    chosen = json.loads((ruq.RECORD / "subset.json").read_text(encoding="utf-8"))
+    assert set(c.documents) == set(chosen["kept"]) | set(chosen["sampled"]) <= full
+    assert len(c.documents) == chosen["documents"] == 1000
     assert all(rows[d]["path"] == p and rows[d]["sha256"] == c.content[d] for d, p in c.documents.items())
     assert cfg.layout == "as-is" and cfg.witness_formats == ("md",) and cfg.pending_kinds == ("topical",)
     assert report.pending == len(collections.pending_queries(c, cfg))
@@ -235,9 +239,24 @@ def test_triviality_feedback_names_rare_target_words():
     df = Counter({"priska": 1, "schule": 40, "aschaffenburg": 3})
     rare = ruq.rare_words("Priska Schule Aschaffenburg Ferien", "priska schule aschaffenburg", df)
     assert rare == ["priska", "aschaffenburg"]
-    text = ruq.triviality_feedback({"level": "partial"}, "Priska Schule", rare)
+    text = ruq.triviality_feedback({"kind": "known-item", "level": "partial"}, "Priska Schule", rare)
     assert "priska, aschaffenburg" in text and "Keep at most one" in text
-    assert "weeks later" in ruq.triviality_feedback({"level": "vague"}, "x y", [])
+    assert "Use 2 to 4 words in total" in text  # replacements must not lengthen the query
+    assert "weeks later" in ruq.triviality_feedback({"kind": "known-item", "level": "vague"}, "x y", [])
+
+
+def test_triviality_drops_take_the_fewest_seeded_rank1_queries_per_level():
+    planned = {f"p{i}": {"kind": "known-item", "level": "partial"} for i in range(10)}
+    planned |= {f"v{i}": {"kind": "known-item", "level": "vague"} for i in range(4)}
+    planned |= {"e0": {"kind": "known-item", "level": "exact"}, "t0": {"kind": "topical"}}
+    rank = {f"p{i}": 1 if i < 7 else 3 for i in range(10)} | {f"v{i}": 1 if i < 2 else None for i in range(4)}
+    rank |= {"e0": 1}
+    results = {q: {"rank": r} for q, r in rank.items()}
+    done = dict.fromkeys(planned)
+    drops = ruq.triviality_drops(planned, done, results)
+    assert len(drops) == 4 and all(results[q]["rank"] == 1 and q.startswith("p") for q in drops)
+    assert (7 - 4) / (10 - 4) <= .5 and (7 - 3) / (10 - 3) > .5  # 4 is the fewest that pass
+    assert drops == ruq.triviality_drops(planned, done, results)  # fixed seed, not by hand
 
 
 def test_plan_is_scoped_to_the_documents_the_collection_still_holds():
@@ -249,3 +268,96 @@ def test_plan_is_scoped_to_the_documents_the_collection_still_holds():
     assert [q["qid"] for q in scoped] == ["ki-1", "tp-1"]
     assert scoped[1]["members"] == ["a", "b"]  # a topical query never rests on one document
     assert planned[2]["members"] == ["a", "b", "gone"]  # the stored plan is not rewritten
+
+
+def test_subset_holds_every_target_its_copies_clusters_and_topical_groups():
+    from jseval.quality import collections, corpus
+    c, cfg = collections.resolve_collection("real-use")
+    rows = {d["id"]: d for d in corpus.load_recipe("real-use")["documents"]}
+    full = ruq.population(rows)
+    planned = {q["qid"]: q for q in json.loads((ruq.RECORD / "plan.json").read_text(encoding="utf-8"))["queries"]}
+    clusters = ruq.load_clusters()
+    by_id = {cl["id"]: cl for cl in clusters["clusters"] + clusters["topics"]}
+    docs = set(c.documents)
+    for qid, text in c.queries.items():
+        q = planned[qid]
+        if text.groups["kind"] == "known-item":
+            assert q["target"] in docs and c.judgments[qid][q["target"]] == 2
+            copies = {d for d in full if rows[d]["sha256"] == rows[q["target"]]["sha256"]}
+            members = {d for cid in q["clusters"] for d in by_id[cid]["members"]} & full
+            assert copies | members <= docs, qid
+        else:
+            assert set(q["members"]) & full <= docs, qid
+    chosen = json.loads((ruq.RECORD / "subset.json").read_text(encoding="utf-8"))
+    assert not set(chosen["sampled"]) & set(chosen["ocr_routed_in_population"])  # no extra OCR
+
+
+def _rows(spec):
+    return {doc: {"source": s, "format": f, "language": l} for doc, (s, f, l) in spec.items()}
+
+
+def test_select_subset_keeps_query_sets_and_fills_toward_full_proportions(monkeypatch):
+    spec = {f"m{i}": ("mail", "eml", "en") for i in range(60)}
+    spec |= {f"p{i}": ("prints", "pdf", "de") for i in range(40)}
+    rows = _rows(spec)
+    docs = set(rows)
+    content = {d: d for d in docs} | {"m1": "same", "m2": "same"}  # m2: byte copy of target m1
+    clusters = {"clusters": [{"id": "cl-1", "members": ["p0", "p1", "p2", "gone"]}],
+                "topics": [{"id": "tg-1", "members": ["p5", "p6"]}]}
+    planned = [{"qid": "ki-1", "kind": "known-item", "target": "m1", "clusters": []},
+               {"qid": "ki-2", "kind": "known-item", "target": "p0", "clusters": ["cl-1"]},
+               {"qid": "tp-1", "kind": "topical", "members": ["p5", "p6", "gone"]}]
+    ocr = {f"p{i}" for i in range(10, 40)} | {"p6"}
+    out = ruq.select_subset(rows, docs, content, planned, clusters, ocr, size=20, seed=7)
+    chosen = set(out["kept"]) | set(out["sampled"])
+    assert out["kept"]["m2"] == ["byte-duplicate:ki-1"] and out["kept"]["p6"] == ["topical:tp-1"]
+    assert {"m1", "m2", "p0", "p1", "p2", "p5", "p6"} <= chosen and "gone" not in chosen
+    assert len(chosen) == 20 and not set(out["sampled"]) & ocr  # p6 is kept although OCR'd
+    # Full set is 60% mail: mail is filled toward 12 of 20; prints run out of non-OCR files.
+    assert out["strata"]["mail/eml/en"]["subset"] == 12
+    assert out["strata"]["prints/pdf/de"]["subset"] == 8
+    assert out == ruq.select_subset(rows, docs, content, planned, clusters, ocr, size=20, seed=7)
+    assert out["sampled"] != ruq.select_subset(rows, docs, content, planned, clusters, ocr,
+                                               size=20, seed=8)["sampled"]
+    monkeypatch.setattr(ruq, "KEPT_CAP", 6)  # seven kept files
+    with pytest.raises(ValueError, match="topical groups need caps"):
+        ruq.select_subset(rows, docs, content, planned, clusters, ocr, size=20)
+
+
+def test_select_subset_samples_as_many_others_as_targets_before_the_proportional_fill():
+    spec = {f"m{i}": ("mail", "eml", "en") for i in range(90)}
+    spec |= {f"w{i}": ("wiki", "md", "en") for i in range(10)}
+    rows = _rows(spec)
+    docs = set(rows)
+    planned = [{"qid": f"ki-{i}", "kind": "known-item", "target": f"w{i}", "clusters": []} for i in range(3)]
+    out = ruq.select_subset(rows, docs, {d: d for d in docs}, planned, {"clusters": [], "topics": []},
+                            set(), size=20, seed=7)
+    # The wiki share of 20 is 2, below its three targets; it still gets three other files.
+    assert out["strata"]["wiki/md/en"] == {**out["strata"]["wiki/md/en"], "kept": 3, "targets": 3,
+                                           "sampled": 3, "subset": 6}
+    assert out["strata"]["mail/eml/en"]["sampled"] == 14 and out["documents"] == 20
+    assert not {"w0", "w1", "w2"} & set(out["sampled"])
+
+
+def test_stage_timing_splits_the_build_at_stage_completion_and_counts_pauses():
+    def poll(at, **kw):
+        base = {"queue": 0, "indexedDocuments": 2, "embeddingPendingCount": 0,
+                "chunkEmbeddingPendingCount": 0, "pendingNerCount": 0, "spladePendingCount": 0}
+        return {"at": at, **base, **kw}
+    rows = [{"at": 0, "start": "fresh"}, {"at": 15, "starting": True},
+            poll(30, queue=2, indexedDocuments=0, embeddingPendingCount=1),
+            {"at": 45, "paused": True}, {"at": 60, "paused": True},
+            poll(75, embeddingPendingCount=1, batchTiming={"totalMs": {"embed": 5}}),
+            poll(90, pendingNerCount=3), {"at": 105, "paused": True},
+            poll(120, batchTiming={"totalMs": {"embed": 9, "ner": 4}}), {"at": 130, "done": {}}]
+    t = ruq.stage_timing(rows, 2)
+    assert t["total_seconds"] == 130 and t["paused_seconds_approx"] == 3 * ruq.POLL_SECONDS
+    assert {k: v["seconds"] for k, v in t["stages"].items()} == {
+        "startup": 30, "extraction_ocr": 45, "embedding": 15, "other_enrichment": 30, "confirmation": 10}
+    assert t["stages"]["extraction_ocr"]["paused_seconds_approx"] == 2 * ruq.POLL_SECONDS
+    assert t["incomplete"] == [] and t["engine_batch_ms"] == {"embed": 9, "ner": 4}
+    # A disabled document SPLADE stage keeps its pending count; an enabled one must drain.
+    disabled = [{**r, "spladePendingCount": 2, "spladeEnabled": False} if "queue" in r else r for r in rows]
+    assert ruq.stage_timing(disabled, 2)["incomplete"] == []
+    enabled = [{**r, "spladePendingCount": 2, "spladeEnabled": True} if "queue" in r else r for r in rows]
+    assert ruq.stage_timing(enabled, 2)["incomplete"] == ["other_enrichment"]
