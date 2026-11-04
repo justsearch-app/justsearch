@@ -785,3 +785,14 @@ WebKit do not, and Forward is only testable under the spec's behaviour.
   "note": "Round 3 on 705c73b316: 26 New (repaired entries fail before by assertion), 9 Obsolete (removals verified), 5 Adaptation (whole oracle kept), 1 Incidental; evidence valid. Transcribed by the orchestrator from the verifier's answer (Codex sandbox)."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a1a7ae-9b96-7fa3-845a-7bc5ac8a3efa",
+  "verdict": "accept",
+  "digest": "sha256:637c1a57610cda93a367fffb7d05fcea4d22d694caa4c0c98721d87b35bcf5fe",
+  "note": "After CI on 1b99fa6ae9: the Incidental entry for the test-only list and savedViewState extends coverage without removing anything (units fail on 705c73b316, pass after); the jsharness selector fake follows the Settings control with no oracle weakened (eight independent receipt cases pass before and after); all 41 earlier entries unchanged. Transcribed by the orchestrator from the verifier's answer (Codex sandbox)."
+}
+```
