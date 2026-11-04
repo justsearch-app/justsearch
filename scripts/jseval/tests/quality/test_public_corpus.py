@@ -181,14 +181,130 @@ def test_redirect_checks_target_policy_before_request(corpus, monkeypatch):
 
 
 def test_robots_wildcards_specific_allow_and_terminal_rules(corpus):
-    from urllib.robotparser import RobotFileParser
-    parser = RobotFileParser()
-    parser.parse(['User-agent: *', 'Disallow: /*?*', 'Disallow: /draft*.pdf$',
-                  'Allow: /public?download=1'])
+    parser = corpus._RobotsPolicy(['User-agent: *', 'Disallow: /*?*', 'Disallow: /draft*.pdf$',
+                                  'Allow: /public?download=1'])
     assert not corpus._robots_allowed(parser, 'https://example.org/data?download=1')
     assert not corpus._robots_allowed(parser, 'https://example.org/draft report.pdf')
     assert corpus._robots_allowed(parser, 'https://example.org/draft report.pdf.html')
     assert corpus._robots_allowed(parser, 'https://example.org/public?download=1')
+
+
+@pytest.mark.parametrize('rules,path,allowed', [
+    # RFC 9309 §5.1 and §5.2: prefix rules, longest match and case sensitivity.
+    ('Disallow: /example/\nDisallow: *.gif$\nAllow: /publications/', '/example/page', False),
+    ('Disallow: /example/\nDisallow: *.gif$\nAllow: /publications/', '/image.gif', False),
+    ('Disallow: /example/\nDisallow: *.gif$\nAllow: /publications/', '/image.gif.html', True),
+    ('Disallow: /example/\nDisallow: *.gif$\nAllow: /publications/', '/publications/image.gif', True),
+    ('Allow: /example/page/\nDisallow: /example/page/disallowed.gif',
+     '/example/page/disallowed.gif', False),
+    ('Allow: /example/page/\nDisallow: /example/page/disallowed.gif',
+     '/example/page/allowed.gif', True),
+    ('Disallow: /Private', '/private', True),
+    ('Disallow: /', '', False),
+    ('Allow: /same\nDisallow: /same', '/same', True),
+    ('Disallow: /same\nAllow: /same', '/same', True),
+    ('Disallow: /same*\nAllow: /same$', '/same', True),
+    ('Disallow: /exact$', '/exact', False),
+    ('Disallow: /exact$', '/exact/more', True),
+    ('Disallow: /exact$', '/exact?query=1', True),
+    ('Disallow: /path/*/end$', '/path//end', False),
+    ('Disallow: /path/*/end$', '/path/middle/other/end', False),
+    ('Disallow: /path/*/end$', '/path/middle/end/more', True),
+    ('Disallow: /a*b*c$', '/abc', False),
+    ('Disallow: /a*b*c$', '/abcbxc', False),
+    ('Disallow: /a*b*c$', '/acb', True),
+    ('Disallow: /*?download=*', '/data?download=1', False),
+    ('Disallow: /*?download=*', '/data#?download=1', True),
+    ('Disallow: /data?$', '/data?', False),
+    ('Disallow: /data?$', '/data', True),
+    # RFC 9309 §2.2.2 and §2.2.3: percent-encoding examples and distinctions.
+    ('Disallow: /foo/bar?baz=quz', '/foo/bar?baz=quz', False),
+    ('Disallow: /foo/bar?baz=https%3A%2F%2Ffoo.bar',
+     '/foo/bar?baz=https%3a%2f%2ffoo.bar', False),
+    ('Disallow: /foo/bar/ツ', '/foo/bar/%E3%83%84', False),
+    ('Disallow: /foo/bar/%E3%83%84', '/foo/bar/ツ', False),
+    ('Disallow: /foo/bar/baz', '/foo/bar/%62%61%7A', False),
+    ('Disallow: /foo/bar/%62%61%7A', '/foo/bar/baz', False),
+    ('Disallow: /a%2Fb', '/a/b', True),
+    ('Disallow: /a/b', '/a%2Fb', True),
+    ('Disallow: /a%2Fb', '/a%2fb', False),
+    ('Disallow: /a%3Fb', '/a?b', True),
+    ('Disallow: /a%23b # comment', '/a%23b', False),
+    ('Disallow: /path/file-with-a-%2A.html', '/path/file-with-a-*.html', False),
+    ('Disallow: /path/file-with-a-%2A.html', '/path/file-with-a-name.html', True),
+    ('Disallow: /path/foo-%24', '/path/foo-$', False),
+    ('Disallow: /caf%C3%A9\nAllow: /café', '/café', True),
+    ('Disallow: \nAllow:', '/anything', True),
+])
+def test_robots_rfc9309_path_examples(corpus, rules, path, allowed):
+    policy = corpus._RobotsPolicy(('User-agent: *\n' + rules).splitlines())
+    assert corpus._robots_allowed(policy, 'https://example.org' + path) is allowed
+
+
+@pytest.mark.parametrize('text,path,allowed', [
+    ('User-agent: OtherBot\nDisallow: /private\nUser-agent: *\nDisallow: /fallback',
+     '/fallback', False),
+    ('User-agent: OtherBot\nDisallow: /private', '/private', True),
+    ('Disallow: /private\nUser-agent: *\nAllow: /', '/private', True),
+    ('User-agent: *\nDisallow: /\nUser-agent: JustSearch-quality-corpus', '/private', True),
+    ('User-agent: *\nDisallow: /\nUser-agent: JUSTSEARCH-QUALITY-CORPUS\nDisallow: /private',
+     '/public', True),
+    ('User-agent: OtherBot\nUser-agent: JustSearch-quality-corpus\nDisallow: /private',
+     '/private', False),
+    ('User-agent: JustSearch-quality-corpus\nDisallow: /one\n'
+     'User-agent: OtherBot\nDisallow: /\n'
+     'User-agent: JustSearch-quality-corpus\nDisallow: /two', '/two', False),
+    ('User-agent: JustSearch-quality-corpus\nDisallow: /\n'
+     'User-agent: JustSearch-quality-corpus\nAllow: /public', '/public', True),
+    ('User-agent: *\nDisallow: /one\nUser-agent: *\nDisallow: /two', '/two', False),
+    ('\ufeffuSeR-aGeNt: *\nSitemap: https://example.org/sitemap\n'
+     'not a directive\nDiSaLlOw: /private # reason\n\nAllow: /private/public', '/private', False),
+])
+def test_robots_agent_groups(corpus, text, path, allowed):
+    assert corpus._robots_allowed(corpus._RobotsPolicy(text.splitlines()),
+                                  'https://example.org' + path) is allowed
+
+
+@pytest.mark.parametrize('directives,delay', [
+    ('Crawl-delay: 4', 4),
+    ('Request-rate: 2/10', 5),
+    ('Crawl-delay: 4\nRequest-rate: 2/10', 5),
+    ('Crawl-delay: invalid\nRequest-rate: 0/10', .25),
+    ('Crawl-delay: 20\nUser-agent: JustSearch-quality-corpus\nCrawl-delay: 2', 2),
+    ('Crawl-delay: 20\nUser-agent: JustSearch-quality-corpus\nCrawl-delay: 2\n'
+     'User-agent: JustSearch-quality-corpus\nRequest-rate: 1/6', 6),
+])
+def test_http_robots_pacing_and_timeouts(corpus, monkeypatch, directives, delay):
+    from urllib.response import addinfourl
+    calls, sleeps = [], []
+    def open_request(request, *, timeout):
+        calls.append((request.full_url, timeout))
+        data = ('User-agent: *\n' + directives).encode() if request.full_url.endswith('robots.txt') else b'OK'
+        return addinfourl(io.BytesIO(data), {}, request.full_url, 200)
+    monkeypatch.setattr(corpus, '_document_open', open_request)
+    monkeypatch.setattr(corpus.time, 'monotonic', lambda: 100)
+    monkeypatch.setattr(corpus.time, 'sleep', sleeps.append)
+    client = corpus.PublicHTTP()
+    for _ in range(2):
+        with client.open('https://example.org/document') as response:
+            assert response.read() == b'OK'
+    assert calls == [('https://example.org/robots.txt', 60),
+                     ('https://example.org/document', 120), ('https://example.org/document', 120)]
+    assert sleeps == [0, delay, delay]
+
+
+@pytest.mark.parametrize('failure', [OSError('connection failed'), ValueError('invalid response'),
+                                   HTTPError('https://example.org/robots.txt', 503, 'unreachable', {}, None),
+                                   HTTPError('https://example.org/robots.txt', 429, 'rate limited', {}, None)])
+def test_http_failed_robots_check_refuses_document(corpus, monkeypatch, failure):
+    calls = []
+    def open_request(request, **_):
+        calls.append(request.full_url)
+        raise failure
+    monkeypatch.setattr(corpus, '_document_open', open_request)
+    with pytest.raises(collections.CollectionError, match='robots'):
+        corpus.PublicHTTP().open('https://example.org/document')
+    assert calls == ['https://example.org/robots.txt']
 
 
 @pytest.fixture
@@ -217,6 +333,24 @@ def http_site():
         server.shutdown()
         thread.join()
         server.server_close()
+
+
+def test_real_http_redirect_checks_robots_query_before_target_contact(corpus, http_site):
+    url, routes, calls = http_site
+    routes['/robots.txt'] = (200, {}, b'User-agent: *\nDisallow: /*?download=*\n')
+    routes['/document'] = (302, {'Location': '/private?download=1'}, b'')
+    with pytest.raises(collections.CollectionError, match='robots'):
+        corpus.PublicHTTP().open(url + '/document')
+    assert [path for _, path in calls] == ['/robots.txt', '/document']
+
+
+@pytest.mark.parametrize('status', [403, 404])
+def test_unavailable_robots_permits_document(corpus, http_site, status):
+    url, routes, calls = http_site
+    routes['/robots.txt'] = (status, {}, b'Unavailable')
+    with corpus.PublicHTTP().open(url + '/document') as response:
+        assert response.read() == b'OK'
+    assert [path for _, path in calls] == ['/robots.txt', '/document']
 
 
 def test_robots_download_is_capped(corpus, http_site):

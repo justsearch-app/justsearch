@@ -17,9 +17,8 @@ import shutil
 import tarfile
 import tempfile
 import time
-from urllib.parse import unquote, urljoin, urlsplit
+from urllib.parse import quote, urljoin, urlsplit
 from urllib.request import HTTPRedirectHandler, Request, build_opener
-from urllib.robotparser import RobotFileParser
 from urllib.error import HTTPError
 import zipfile
 
@@ -51,23 +50,90 @@ def _document_open(request, *, timeout):
     return build_opener(_NoRedirect()).open(request, timeout=timeout)
 
 
-def _robots_allowed(parser: RobotFileParser, url: str) -> bool:
-    # RobotFileParser handles groups and crawl-delay, but its matcher treats
-    # RFC 9309 '*' and '$' literally. Apply the RFC longest-match rule here.
-    entry = next((e for e in parser.entries if e.applies_to(USER_AGENT)), parser.default_entry)
-    if entry is None:
-        return True
+def _robots_path(value: str) -> str:
+    # RFC 9309 §2.2.2: decode only unreserved ASCII octets. In particular,
+    # an encoded slash must not become a path separator. Encode literal * and $
+    # here; rule operators are separated before normalization.
+    value = quote(value, safe="/?:@!&'()+,;=[]-._~%")
+    def octet(match):
+        char = chr(int(match[1], 16))
+        return char if char.isascii() and (char.isalnum() or char in '-._~') else match[0].upper()
+    return re.sub(r'%([0-9a-fA-F]{2})', octet, value)
+
+
+class _RobotsPolicy:
+    """RFC 9309 rules and pacing for this fetcher's product token.
+
+    Keep parsing local: urllib.robotparser's representation and matching differ
+    between supported Python versions. Matching groups are merged, with '*' used
+    only when there is no explicit product-token group (§2.2.1).
+    """
+    def __init__(self, lines):
+        groups = []
+        agents, rules, delays = [], [], []
+        has_directive = False
+        for line in lines:
+            field, sep, value = line.lstrip('\ufeff').split('#', 1)[0].partition(':')
+            if not sep:
+                continue
+            field, value = field.strip().lower(), value.strip()
+            if field == 'user-agent':
+                if has_directive:
+                    groups.append((agents, rules, delays))
+                    agents, rules, delays = [], [], []
+                    has_directive = False
+                if value:
+                    agents.append(value.lower())
+            elif agents and field in ('allow', 'disallow', 'crawl-delay', 'request-rate'):
+                has_directive = True
+                if field in ('allow', 'disallow') and value:
+                    terminal = value.endswith('$')
+                    pattern = value[:-1] if terminal else value
+                    pattern = '*'.join(_robots_path(part) for part in pattern.split('*'))
+                    rules.append((pattern, terminal, field == 'allow'))
+                elif field == 'crawl-delay' and re.fullmatch(r'[0-9]+', value):
+                    delays.append(int(value))
+                elif field == 'request-rate' and re.fullmatch(r'[0-9]+/[0-9]+', value):
+                    requests, seconds = map(int, value.split('/'))
+                    if requests:
+                        delays.append(seconds / requests)
+        groups.append((agents, rules, delays))
+        token = USER_AGENT.split('/', 1)[0].lower()
+        selected = [g for g in groups if token in g[0]]
+        if not selected:
+            selected = [g for g in groups if '*' in g[0]]
+        self.rules = [rule for _, rules, _ in selected for rule in rules]
+        self.delay = max((delay for _, _, delays in selected for delay in delays), default=0)
+
+
+def _robots_match(pattern: str, terminal: bool, path: str) -> bool:
+    # Ordered literal chunks implement '*' without regex backtracking on
+    # untrusted patterns. Only the final '$' anchors the end of the path.
+    first, *rest = pattern.split('*')
+    if not path.startswith(first):
+        return False
+    offset = len(first)
+    for n, part in enumerate(rest):
+        if terminal and n == len(rest) - 1:
+            return path.endswith(part) and len(path) - len(part) >= offset
+        found = path.find(part, offset)
+        if found < 0:
+            return False
+        offset = found + len(part)
+    return not terminal or offset == len(path)
+
+
+def _robots_allowed(parser: _RobotsPolicy, url: str) -> bool:
     parts = urlsplit(url)
-    path = unquote(parts.path + ('?' + parts.query if parts.query else ''))
+    path = parts.path or '/'
+    if '?' in url.split('#', 1)[0]:
+        path += '?' + parts.query
+    path = _robots_path(path)
     matches = []
-    for rule in entry.rulelines:
-        pattern = unquote(rule.path)
-        terminal = pattern.endswith('$')
-        if terminal:
-            pattern = pattern[:-1]
-        regex = re.escape(pattern).replace(r'\*', '.*') + ('$' if terminal else '')
-        if re.match(regex, path):
-            matches.append((len(pattern.replace('*', '')), rule.allowance))
+    for pattern, terminal, allowance in parser.rules:
+        if _robots_match(pattern, terminal, path):
+            octets = re.sub(r'%[0-9A-F]{2}', '_', pattern.replace('*', ''))
+            matches.append((len(octets), allowance))
     return max(matches, default=(0, True))[1]
 
 
@@ -198,18 +264,17 @@ class PublicHTTP:
             raise CollectionError(f'too many redirects: {url}')
         host = f'{parts.scheme}://{parts.netloc}'
         if not robots and host not in self.robots:
-            parser = RobotFileParser(host + '/robots.txt')
             try:
-                with self._open(parser.url, allowed=allowed, robots=True) as r:
+                with self._open(host + '/robots.txt', allowed=allowed, robots=True) as r:
                     data = r.read(MAX_ROBOTS_BYTES + 1)
                     if len(data) > MAX_ROBOTS_BYTES:
                         raise CollectionError('robots.txt exceeds byte cap')
-                    parser.parse(data.decode('utf-8', errors='replace').splitlines())
+                    parser = _RobotsPolicy(data.decode('utf-8', errors='replace').splitlines())
             except HTTPError as e:
                 # RFC 9309 §2.3.1.3: a 4xx robots response is unavailable,
                 # not a directive. Rate limiting must still stop the fetch.
                 if 400 <= e.code < 500 and e.code != 429:
-                    parser.parse([])
+                    parser = _RobotsPolicy([])
                 else:
                     raise CollectionError(f'robots.txt fetch disallowed: HTTP {e.code}') from e
                 e.close()
@@ -219,9 +284,7 @@ class PublicHTTP:
         parser = self.robots.get(host) if not robots else None
         if parser is not None and not _robots_allowed(parser, url):
             raise CollectionError(f'robots.txt forbids fetching {url}')
-        rate = parser.request_rate(USER_AGENT) if parser else None
-        delay = max(.25, (parser.crawl_delay(USER_AGENT) or 0) if parser else 0,
-                    rate.seconds / rate.requests if rate and rate.requests else 0)
+        delay = max(.25, parser.delay if parser else 0)
         time.sleep(max(0, self.last.get(host, 0) + delay - time.monotonic()))
         self.last[host] = time.monotonic()
         try:
