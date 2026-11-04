@@ -349,6 +349,39 @@ The user's answer-policy decision is quoted below. P1/P2 here identify the deliv
         "modules/app-agent/src/test/java/io/justsearch/agent/AgentLoopServiceTest.java#indexingPauseInEveryAgentGenerationPhaseStopsWithUnavailable",
         "modules/ui/src/test/java/io/justsearch/ui/api/IndexingPauseDispatchTest.java"
       ]
+    },
+    {
+      "items": [
+        "modules/app-inference/src/test/java/io/justsearch/app/inference/chat/IndexingSmokeProbeAdmissionTest.java",
+        "modules/app-services/src/test/java/io/justsearch/app/services/ai/install/AiInstallIndexingPauseTest.java"
+      ],
+      "class": "New",
+      "repaired": true,
+      "behaviour": "Remaining repair round 3: the Engine-internal post-install smoke probe is exempt from the answer pause at queueing and lease admission. It still honours draining. The real install validation calls OnlineAiServiceImpl and InferenceLifecycleManager against an isolated loopback answer-server fixture while the heavy-indexing signal and policy are on, receives an answer and reaches completed/installedFully without SMOKE_TEST_FAILED. Ordinary questions before and after the probe remain refused and never reach that server; when the heavy-indexing signal clears, an ordinary question answers again with saved answer intent still on. Page, MCP, HTTP and agent attribution, a matching client label without internal transport/trust, and unrelated Engine-internal work cannot take the exemption. Assertion fail-before uses cc6257b9d6 inside a temporary shared clone; the allowed-probe cases fail before, while denied-provenance and drain cases preserve existing behaviour. This is component validation and completion coverage, not a full download/install journey.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "N1",
+          "quote": "Answers on/off (core.set-chat-enabled) keeps files and its meaning; search by exact words and by meaning, indexing and its pacing, energy and manual pause rules, GPU-pressure handling and picture-reading back-off work as today; installs, consent, decline and Repair of parts not switched keep today's behaviour.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-words",
+          "quote": "Wait, model stays (Recommended)",
+          "location": "task t-20261101-uiimpl user turn Q1"
+        },
+        {
+          "kind": "owner-words",
+          "quote": "the post-install smoke test is an Engine-internal probe, not an answer; it is exempt from the answer pause (like picture reading), so install and Repair behave as today (scenario N1).",
+          "location": "task t-20261101-uiimpl request"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/s2-pause-answers-smoke-probe.json",
+      "newChecks": [
+        "modules/app-inference/src/test/java/io/justsearch/app/inference/chat/IndexingSmokeProbeAdmissionTest.java",
+        "modules/app-services/src/test/java/io/justsearch/app/services/ai/install/AiInstallIndexingPauseTest.java"
+      ]
     }
   ]
 }

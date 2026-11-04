@@ -91,10 +91,22 @@ public final class GenerationTracker implements GenerationActivity {
 
   public boolean answersPaused() { return answersPaused.getAsBoolean(); }
 
-  private void requireAnswerAdmission(Kind kind) {
-    if (kind == Kind.GENERATE && answersPaused()) {
+  private void requireAnswerAdmission(Kind kind, EngineWorkHandle work) {
+    if (kind == Kind.GENERATE && answersPaused() && !isInternalSmokeTest(work)) {
       throw new io.justsearch.app.api.chat.AnswersPausedException();
     }
+  }
+
+  private static boolean isInternalSmokeTest(EngineWorkHandle work) {
+    if (work == null) return false;
+    var context = work.context();
+    // HTTP attribution resolves transport on the server; cooperative client labels cannot
+    // claim SYSTEM_INTERNAL. Only this Engine-owned probe is exempt, never other internal answers.
+    return context != null
+        && context.clientKind() == io.justsearch.core.context.EngineContext.ClientKind.INTERNAL
+        && "SYSTEM_INTERNAL".equals(context.transport())
+        && "TRUSTED".equals(context.sourceTier())
+        && "post-install-smoke-test".equals(context.clientId());
   }
   private volatile long epoch;
   private volatile long idleSinceNanos;
@@ -208,14 +220,14 @@ public final class GenerationTracker implements GenerationActivity {
    */
   public Ticket queue(Kind kind, EngineWorkHandle work) {
     Objects.requireNonNull(kind, "kind");
-    requireAnswerAdmission(kind);
+    requireAnswerAdmission(kind, work);
     Runnable lifetime = null;
     if ((kind == Kind.GENERATE || kind == Kind.VDU) && work != null) {
       lifetime = Objects.requireNonNull(generationLifetime.apply(work), "generation release");
     }
     synchronized (monitor) {
       queuedTickets++;
-      return new Ticket(kind, lifetime);
+      return new Ticket(kind, lifetime, work);
     }
   }
 
@@ -401,15 +413,17 @@ public final class GenerationTracker implements GenerationActivity {
    */
   public final class Ticket implements GenerationLease {
     private final Kind kind;
+    private final EngineWorkHandle work;
     private Runnable lifetime;
     private boolean queued = true;
     private boolean leased;
     private boolean leaseOpen;
     private boolean closed;
 
-    private Ticket(Kind kind, Runnable lifetime) {
+    private Ticket(Kind kind, Runnable lifetime, EngineWorkHandle work) {
       this.kind = kind;
       this.lifetime = lifetime;
+      this.work = work;
     }
 
     /**
@@ -427,7 +441,7 @@ public final class GenerationTracker implements GenerationActivity {
           queuedTickets--;
         }
         requireOpenLocked();
-        requireAnswerAdmission(kind);
+        requireAnswerAdmission(kind, work);
         leased = true;
         leaseOpen = true;
         edge = openLeaseLocked(kind);
