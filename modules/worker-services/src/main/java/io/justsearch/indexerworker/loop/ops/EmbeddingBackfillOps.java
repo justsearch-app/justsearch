@@ -43,6 +43,12 @@ public final class EmbeddingBackfillOps {
    *     per-stage timing/counts from this instead of relying on a metrics call inside the op.
    */
   public static StageOutcome processEmbeddingBackfill(BackfillContext context) {
+    return processEmbeddingBackfill(context, null);
+  }
+
+  public static StageOutcome processEmbeddingBackfill(
+      BackfillContext context, EnrichmentSelection selection) {
+    if (selection != null) selection.begin();
     var authority = context.indexingCoordinator().enrichmentAuthority();
     long methodStart = System.nanoTime();
     EnrichmentAccounting accounting = new EnrichmentAccounting();
@@ -54,13 +60,15 @@ public final class EmbeddingBackfillOps {
     EmbeddingProvider selectedProvider = context.embeddingProviderSupplier().get();
     try {
       List<String> pendingIds =
-          context.documentFieldOps().queryDocIdsByField(
-              SchemaFields.EMBEDDING_STATUS,
-              SchemaFields.EMBEDDING_STATUS_PENDING,
-              context.batchSize());
+          EnrichmentSelection.page(selection, context.documentFieldOps(),
+              SchemaFields.EMBEDDING_STATUS, context.batchSize(), false);
 
+      var excluded = context.documentFieldOps().excludedProcessingIds(pendingIds);
+      pendingIds = new ArrayList<>(pendingIds);
+      pendingIds.removeAll(excluded);
       accounting.select(pendingIds, EnrichmentAccounting.Stage.EMBED);
       if (pendingIds.isEmpty()) {
+        if (selection != null) selection.examined(excluded);
         return StageOutcome.none();
       }
 
@@ -81,10 +89,11 @@ public final class EmbeddingBackfillOps {
       long t0 = System.nanoTime();
       List<String> batchDocIds = new ArrayList<>(pendingIds.size());
       List<String> batchContents = new ArrayList<>(pendingIds.size());
-      EnrichmentBatch batch = new EnrichmentBatch(context.documentFieldOps(), context.indexingCoordinator(), pendingIds, MAX_PARENT_BATCH_CHARS, authority).accounting(accounting);
+      EnrichmentBatch batch = new EnrichmentBatch(context.documentFieldOps(), context.indexingCoordinator(), pendingIds, authority, selection, excluded).accounting(accounting);
       List<String> failures = new ArrayList<>();
       long retainedChars = 0;
       for (String docId : batch.ids()) {
+        if (selection != null && !"PENDING".equals(batch.fields(docId).get(SchemaFields.EMBEDDING_STATUS))) continue;
         if (stopped(context, batch, embeddingProvider, "Backfill")) {
           accounting.cancelRemaining();
           break;
@@ -377,6 +386,12 @@ public final class EmbeddingBackfillOps {
    *     docsProcessed/elapsedMs for {@link BackfillScheduler}'s per-stage metrics recording)
    */
   public static StageOutcome processChunkEmbeddingBackfill(BackfillContext context) {
+    return processChunkEmbeddingBackfill(context, null);
+  }
+
+  public static StageOutcome processChunkEmbeddingBackfill(
+      BackfillContext context, EnrichmentSelection selection) {
+    if (selection != null) selection.begin();
     var authority = context.indexingCoordinator().enrichmentAuthority();
     long methodStart = System.nanoTime();
     EnrichmentAccounting accounting = new EnrichmentAccounting();
@@ -392,13 +407,15 @@ public final class EmbeddingBackfillOps {
 
     try {
       List<String> pendingChunkIds =
-          context.documentFieldOps().queryDocIdsByField(
-              SchemaFields.CHUNK_EMBEDDING_STATUS,
-              SchemaFields.EMBEDDING_STATUS_PENDING,
-              context.batchSize());
+          EnrichmentSelection.page(selection, context.documentFieldOps(),
+              SchemaFields.CHUNK_EMBEDDING_STATUS, context.batchSize(), false);
 
+      var excluded = context.documentFieldOps().excludedProcessingIds(pendingChunkIds);
+      pendingChunkIds = new ArrayList<>(pendingChunkIds);
+      pendingChunkIds.removeAll(excluded);
       accounting.select(pendingChunkIds, EnrichmentAccounting.Stage.CHUNK_EMBED);
       if (pendingChunkIds.isEmpty()) {
+        if (selection != null) selection.examined(excluded);
         return new StageOutcome(false, 0, 0, EnrichmentAccounting.Summary.empty(), false);
       }
 
@@ -416,12 +433,13 @@ public final class EmbeddingBackfillOps {
       }
 
       // Phase 1: reconstruct chunk text in one batch (distinct parents are read once).
-      EnrichmentBatch batch = new EnrichmentBatch(context.documentFieldOps(), context.indexingCoordinator(), pendingChunkIds, authority).accounting(accounting);
+      EnrichmentBatch batch = new EnrichmentBatch(context.documentFieldOps(), context.indexingCoordinator(), pendingChunkIds, authority, selection, excluded).accounting(accounting);
       Map<String, String> contentByChunkId = batch.contents();
       List<String> failures = new ArrayList<>();
       List<String> batchChunkIds = new ArrayList<>(pendingChunkIds.size());
       List<String> batchContents = new ArrayList<>(pendingChunkIds.size());
-      for (String chunkId : pendingChunkIds) {
+      for (String chunkId : batch.ids()) {
+        if (selection != null && !"PENDING".equals(batch.fields(chunkId).get(SchemaFields.CHUNK_EMBEDDING_STATUS))) continue;
         try {
           String chunkContent = contentByChunkId.get(chunkId);
           if (chunkContent == null || chunkContent.isBlank()) {

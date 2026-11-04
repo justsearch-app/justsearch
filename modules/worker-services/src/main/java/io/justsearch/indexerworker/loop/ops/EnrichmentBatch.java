@@ -17,28 +17,40 @@ final class EnrichmentBatch {
   private final IndexingCoordinator.EnrichmentAuthority authority;
   private final long deletionEpoch;
   private EnrichmentAccounting accounting;
+  private final EnrichmentSelection selection;
   private final Map<String, DocumentFieldOps.EnrichmentInput> inputs;
+  private final java.util.Set<String> acceptedIds = new java.util.HashSet<>();
 
   EnrichmentBatch(DocumentFieldOps fields, IndexingCoordinator coordinator, List<String> ids)
       throws IOException {
-    this(fields, coordinator, ids, coordinator.enrichmentAuthority());
+    this(fields, coordinator, ids, coordinator.enrichmentAuthority(), null, java.util.Set.of());
   }
 
   EnrichmentBatch(DocumentFieldOps fields, IndexingCoordinator coordinator, List<String> ids,
-      IndexingCoordinator.EnrichmentAuthority authority) throws IOException {
+      IndexingCoordinator.EnrichmentAuthority authority, EnrichmentSelection selection,
+      java.util.Set<String> excluded) throws IOException {
+    this.selection = selection;
     this.coordinator = coordinator;
     this.authority = authority;
     this.deletionEpoch = coordinator.bulkDeleteEpoch();
-    this.inputs = new java.util.LinkedHashMap<>(fields.getEnrichmentInputs(ids));
+    Map<String, DocumentFieldOps.EnrichmentInput> captured;
+    if (selection == null) {
+      captured = fields.getEnrichmentInputs(ids, EmbeddingBackfillOps.MAX_PARENT_BATCH_CHARS);
+    } else {
+      var page = fields.getEnrichmentInputPage(ids, EmbeddingBackfillOps.MAX_PARENT_BATCH_CHARS);
+      captured = page.inputs();
+      selection.collected(captured, page.examinedIds(), excluded);
+    }
+    // Readers provide a map, but the selected keyset prefix owns processing order.
+    var ordered = new java.util.LinkedHashMap<String, DocumentFieldOps.EnrichmentInput>();
+    for (String id : ids) {
+      var input = captured.get(id);
+      if (input != null) ordered.put(id, input);
+    }
+    inputs = java.util.Collections.unmodifiableMap(ordered);
   }
 
-  EnrichmentBatch(DocumentFieldOps fields, IndexingCoordinator coordinator, List<String> ids,
-      long maxContentChars, IndexingCoordinator.EnrichmentAuthority authority) throws IOException {
-    this.coordinator = coordinator;
-    this.authority = authority;
-    this.deletionEpoch = coordinator.bulkDeleteEpoch();
-    this.inputs = fields.getEnrichmentInputs(ids, maxContentChars);
-  }
+  java.util.Set<String> acceptedIds() { return acceptedIds; }
 
   EnrichmentBatch accounting(EnrichmentAccounting accounting) {
     this.accounting = accounting;
@@ -107,10 +119,12 @@ final class EnrichmentBatch {
   }
 
   void computed(String id, EnrichmentAccounting.Stage stage) {
+    if (selection != null) selection.examined(id, stage);
     if (accounting != null) accounting.computed(id, stage);
   }
 
   void started(List<String> ids, EnrichmentAccounting.Stage stage) {
+    if (selection != null) ids.forEach(id -> selection.examined(id, stage));
     if (accounting != null) ids.forEach(id -> accounting.started(id, stage));
   }
 
@@ -128,7 +142,15 @@ final class EnrichmentBatch {
     if (accounting != null) accounting.cancelled(stage, failure);
   }
 
+  private void examined(String id, Map<String, Object> updates) {
+    if (selection == null) return;
+    for (var stage : EnrichmentAccounting.Stage.values()) {
+      if (updates.containsKey(stage.status) || updates.containsKey(stage.retry)) selection.examined(id, stage);
+    }
+  }
+
   boolean update(String id, Map<String, Object> updates) {
+    examined(id, updates);
     if (accounting != null) accounting.computed(id, updates);
     var receipt = inputs.get(id) == null
         ? new io.justsearch.adapters.lucene.runtime.LuceneRuntimeTypes.EnrichmentPublicationReceipt(
@@ -141,8 +163,10 @@ final class EnrichmentBatch {
   }
 
   BatchUpdateResult updateBatch(List<Map.Entry<String, Map<String, Object>>> updates) {
+    updates.forEach(entry -> examined(entry.getKey(), entry.getValue()));
     if (accounting != null) updates.forEach(entry -> accounting.computed(entry.getKey(), entry.getValue()));
     var receipt = publish(updates);
+    acceptedIds.addAll(receipt.acceptedIds());
     if (accounting != null) accounting.published(updates, receipt);
     rejectRetiredOutcomes();
     return receipt.result();

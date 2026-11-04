@@ -1,6 +1,12 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.indexerworker.loop.ops;
 
+import io.justsearch.adapters.lucene.runtime.DocumentFieldOps;
+import io.justsearch.indexerworker.embed.EmbeddingProvider;
+import io.justsearch.indexing.SchemaFields;
+import java.io.IOException;
+import java.util.Objects;
+import java.util.Set;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -45,6 +51,7 @@ public final class WindowedEmbedProgress {
     nextWindow(docId, content);
     Partial partial = byDocId.get(docId);
     if (partial == null || (partial.identity != null && !partial.identity.equals(identity))) {
+      if (!canAdmit(docId)) return;
       partial = new Partial(fingerprintOf(content));
       byDocId.put(docId, partial);
     }
@@ -59,10 +66,12 @@ public final class WindowedEmbedProgress {
 
   public void route(String docId, String content, Route route) {
     nextWindow(docId, content);
+    if (!canAdmit(docId)) return;
     byDocId.computeIfAbsent(docId, ignored -> new Partial(fingerprintOf(content))).route = route;
   }
 
   public void restartWindows(String docId, String content) {
+    if (!canAdmit(docId)) return;
     Partial previous = byDocId.get(docId);
     Partial restart = new Partial(fingerprintOf(content));
     restart.identity = previous == null ? null : previous.identity;
@@ -72,19 +81,53 @@ public final class WindowedEmbedProgress {
 
   /**
    * How many partially-embedded documents may be tracked at once. One entry is {@code
-   * dimension} doubles (~6 KB at 768), so this caps the accumulator at a few MB. Eviction is LRU:
-   * the evicted document simply restarts its windowing later, which is the pre-fix behaviour for
-   * that one document rather than a new failure mode.
+   * dimension} doubles (~6 KB at 768), so this caps the accumulator at a few MB. New owners
+   * wait for a slot; admitted progress and route-only decisions are never evicted.
    */
   private static final int MAX_TRACKED_DOCUMENTS = 256;
 
-  private final Map<String, Partial> byDocId =
-      new LinkedHashMap<>(16, 0.75f, true) {
-        @Override
-        protected boolean removeEldestEntry(Map.Entry<String, Partial> eldest) {
-          return size() > MAX_TRACKED_DOCUMENTS;
-        }
-      };
+  private final Map<String, Partial> byDocId = new LinkedHashMap<>();
+
+  public boolean canAdmit(String docId) {
+    return byDocId.containsKey(docId) || byDocId.size() < MAX_TRACKED_DOCUMENTS;
+  }
+
+  public List<String> owners() { return List.copyOf(byDocId.keySet()); }
+
+  /** Binding identity alone is not resumable work and must not reserve a slot next turn. */
+  void releaseUnused() {
+    byDocId.values().removeIf(partial -> partial.sum == null && partial.route == null);
+  }
+
+  /** Retained owners are bounded; reap through metadata without retaining their text. */
+  void reconcile(DocumentFieldOps fields,
+      Object authority, long sourceEpoch, EmbeddingProvider provider) throws IOException {
+    if (byDocId.isEmpty()) return;
+    var current = fields.getDocumentFieldsBatchOrThrow(owners(), Set.of(
+        SchemaFields.DOC_UID,
+        SchemaFields.CONTENT_SHA256,
+        SchemaFields.SOURCE_SHA256,
+        SchemaFields.CHUNK_PARENT_CONTENT_SHA256,
+        SchemaFields.IS_CHUNK,
+        SchemaFields.EMBEDDING_STATUS,
+        SchemaFields.CHUNK_EMBEDDING_STATUS));
+    byDocId.entrySet().removeIf(entry -> {
+      Identity identity = entry.getValue().identity;
+      var row = current.get(entry.getKey());
+      if (row == null) return true;
+      boolean chunk = "true".equals(row.get(SchemaFields.IS_CHUNK));
+      String status = row.get(chunk ? SchemaFields.CHUNK_EMBEDDING_STATUS
+          : SchemaFields.EMBEDDING_STATUS);
+      return !"PENDING".equals(status) || (identity != null && (
+          identity.authority() != authority || identity.sourceEpoch() != sourceEpoch
+          || identity.provider() != provider || (provider != null && identity.dimension() != provider.dimension())
+          || !Objects.equals(identity.uid(), row.get(SchemaFields.DOC_UID))
+          || !Objects.equals(identity.sourceRevision(), row.get(SchemaFields.SOURCE_SHA256))
+          || !Objects.equals(identity.contentRevision(), row.get(chunk
+              ? SchemaFields.CHUNK_PARENT_CONTENT_SHA256
+              : SchemaFields.CONTENT_SHA256))));
+    });
+  }
 
   /**
    * The fingerprint identifies the content the partial sum was computed from — a document whose
@@ -137,6 +180,7 @@ public final class WindowedEmbedProgress {
     String fingerprint = fingerprintOf(content);
     Partial partial = byDocId.get(docId);
     if (partial == null || !partial.fingerprint.equals(fingerprint)) {
+      if (!canAdmit(docId)) return 0;
       partial = new Partial(fingerprint);
       byDocId.put(docId, partial);
     }

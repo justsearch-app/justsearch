@@ -122,11 +122,14 @@ public final class BackfillScheduler {
 
   /**
    * Cross-cycle per-window accumulator for long documents (round-15 post-round finding). Lives here
-   * because this is the object whose lifetime spans cycles — the pending-ID caches deliberately do
-   * not, so a per-cycle store would restore exactly the defect it removes.
+   * because this object, like the pending cursors, survives idle turns and reader refreshes.
    */
   private final io.justsearch.indexerworker.loop.ops.WindowedEmbedProgress windowedEmbedProgress =
       new io.justsearch.indexerworker.loop.ops.WindowedEmbedProgress();
+
+  /** Per-stage keyset positions survive idle turns and reader refreshes. */
+  private final io.justsearch.indexerworker.loop.ops.EnrichmentSelection enrichmentSelection =
+      new io.justsearch.indexerworker.loop.ops.EnrichmentSelection();
 
   /** Stall detection state (round-15 post-round finding) — see {@link #noteWorkSet}. */
   private long lastWorkSetSignature = 0;
@@ -263,7 +266,7 @@ public final class BackfillScheduler {
       Set<String> publishedDocIds = new HashSet<>();
       CombinedEnrichmentBackfillOps.CombinedOutcome outcome =
           processCombinedBackfillIfApplicable(
-              null, null, batchCommitCounter, cycleDeadlineNanos, embedShareDeadlineNanos,
+              batchCommitCounter, cycleDeadlineNanos, embedShareDeadlineNanos,
               publishedDocIds);
       recordCombinedOutcome(outcome);
       // The mode-selection probe is the batch that re-selects the head of the pending queue each
@@ -277,9 +280,6 @@ public final class BackfillScheduler {
         // between here and the next runIdleCycle() call (the tight loop below stays combined
         // until it drains or is interrupted), so the mode is settled at this point.
         OperationalMetrics.getInstance().recordBackfillMode("combined");
-        // 334 Phase 8/10: tight loop with persistent pending-ID caches across iterations.
-        var parentIdCache = new ArrayDeque<String>();
-        var chunkIdCache = new ArrayDeque<String>();
         backfillDidWork = true;
         // Tempdoc 809 finding 3: an aborted probe means a stop condition came up DURING that batch
         // — pending ingest, the cycle budget, or a bulk deletion that invalidated the documents it
@@ -317,8 +317,6 @@ public final class BackfillScheduler {
                 }
                 CombinedEnrichmentBackfillOps.CombinedOutcome tightLoopOutcome =
                     processCombinedBackfillIfApplicable(
-                        parentIdCache,
-                        chunkIdCache,
                         batchCommitCounter,
                         cycleDeadlineNanos,
                         embedShareDeadlineNanos,
@@ -482,6 +480,7 @@ public final class BackfillScheduler {
     consecutiveSpladeFailures = 0;
     nextSpladeRetryTime = 0;
     windowedEmbedProgress.clear();
+    enrichmentSelection.clear();
     lastWorkSetSignature = 0;
     repeatedWorkSetCycles = 0;
     stallWarnedThisEpisode = false;
@@ -706,8 +705,6 @@ public final class BackfillScheduler {
   }
 
   private CombinedEnrichmentBackfillOps.CombinedOutcome processCombinedBackfillIfApplicable(
-      ArrayDeque<String> parentIdCache,
-      ArrayDeque<String> chunkIdCache,
       int[] batchesSinceCommit,
       long cycleDeadlineNanos,
       long embedShareDeadlineNanos,
@@ -739,8 +736,8 @@ public final class BackfillScheduler {
             resolvedConfigSupplier.get().rag().chunkSpladeEnabled(),
             resolvedConfigSupplier.get().ai().embedding().lateChunkingEnabled(),
             pacing.chunkSlotsPerBatch(),
-            parentIdCache != null ? parentIdCache : new ArrayDeque<>(),
-            chunkIdCache != null ? chunkIdCache : new ArrayDeque<>(),
+            new ArrayDeque<>(),
+            new ArrayDeque<>(),
             batchesSinceCommit != null ? batchesSinceCommit : new int[] {0},
             () -> paceAndCheckStopBackfillWork(cycleDeadlineNanos),
             this::hardStopBackfillWork,
@@ -748,7 +745,7 @@ public final class BackfillScheduler {
             windowedEmbedProgress,
             publishedDocIds,
             () -> System.currentTimeMillis() >= nextSpladeRetryTime,
-            this::recordSpladeBackfillResult));
+            this::recordSpladeBackfillResult), enrichmentSelection);
   }
 
   private StageOutcome processEmbeddingBackfill() {
@@ -768,7 +765,7 @@ public final class BackfillScheduler {
             () -> running.get() && !signalBus.isIndexingHeld(),
             embeddingLifecycle::allowEmbeddingWrites,
             pacing().embeddingBackfillBatchSize(),
-            log));
+            log), enrichmentSelection);
   }
 
   private StageOutcome processChunkEmbeddingBackfill() {
@@ -783,7 +780,7 @@ public final class BackfillScheduler {
             () -> running.get() && !signalBus.isIndexingHeld(),
             embeddingLifecycle::allowEmbeddingWrites,
             pacing().embeddingBackfillBatchSize(),
-            log));
+            log), enrichmentSelection);
   }
 
   private StageOutcome processNerBackfill() {
@@ -796,7 +793,7 @@ public final class BackfillScheduler {
             nerServiceSupplier,
             () -> running.get() && !signalBus.isIndexingHeld(),
             pacing().nerBackfillBatchSize(),
-            log));
+            log), enrichmentSelection);
   }
 
   /**
@@ -836,7 +833,7 @@ public final class BackfillScheduler {
               pacing().bgeM3BackfillBatchSize(),
               true,
               chunkSpladeEnabled(),
-              log));
+              log), enrichmentSelection);
     }
     return SpladeBackfillOps.processSpladeBackfill(
         new SpladeBackfillOps.BackfillContext(
@@ -849,7 +846,7 @@ public final class BackfillScheduler {
             pacing().spladeBackfillBatchSize(),
             true,
             chunkSpladeEnabled(),
-            log));
+            log), enrichmentSelection);
   }
 
   private StageOutcome processSpladeBackfillInterleaved() {
@@ -866,7 +863,7 @@ public final class BackfillScheduler {
               pacing().bgeM3InterleaveBatchSize(),
               false,
               chunkSpladeEnabled(),
-              log));
+              log), enrichmentSelection);
     }
     return SpladeBackfillOps.processSpladeBackfill(
         new SpladeBackfillOps.BackfillContext(
@@ -879,7 +876,7 @@ public final class BackfillScheduler {
             pacing().spladeInterleaveBatchSize(),
             false,
             chunkSpladeEnabled(),
-            log));
+            log), enrichmentSelection);
   }
 
   private void processDisambiguationBackfill() {

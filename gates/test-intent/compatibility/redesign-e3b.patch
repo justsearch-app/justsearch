@@ -1,0 +1,125 @@
+diff --git a/modules/adapters-lucene/src/main/java/io/justsearch/adapters/lucene/runtime/DocumentFieldOps.java b/modules/adapters-lucene/src/main/java/io/justsearch/adapters/lucene/runtime/DocumentFieldOps.java
+index 9fe955c70a..17183616ac 100644
+--- a/modules/adapters-lucene/src/main/java/io/justsearch/adapters/lucene/runtime/DocumentFieldOps.java
++++ b/modules/adapters-lucene/src/main/java/io/justsearch/adapters/lucene/runtime/DocumentFieldOps.java
+@@ -162,6 +162,24 @@ public final class DocumentFieldOps {
+             SchemaFields.SPLADE_STATUS, SchemaFields.NER_STATUS, SchemaFields.VDU_STATUS).contains(field);
+   }
+ 
++  public record EnrichmentInputPage(Map<String, EnrichmentInput> inputs, List<String> examinedIds) {}
++
++  public record PendingIdPage(List<String> ids, boolean exhausted) {}
++
++  public PendingIdPage queryPendingPage(String field, int limit, boolean excludeChunks, String afterId) throws IOException {
++    var ids = queryDocIdsByFieldOrThrow(field, "PENDING", limit, excludeChunks);
++    return new PendingIdPage(ids, ids.size() < limit);
++  }
++
++  public EnrichmentInputPage getEnrichmentInputPage(List<String> ids, long allowance) throws IOException {
++    var inputs = getEnrichmentInputs(ids, allowance);
++    return new EnrichmentInputPage(inputs, List.copyOf(inputs.keySet()));
++  }
++
++  public Map<String, Map<String, String>> getDocumentFieldsBatchOrThrow(List<String> ids, Set<String> fields) throws IOException {
++    return getDocumentFieldsBatch(ids, fields);
++  }
++
+   /** Stored parent identity used to seed/rebuild the Worker document-identity store. */
+   public record StoredDocumentIdentity(String docId, String docUid) {}
+ 
+diff --git a/modules/worker-services/src/main/java/io/justsearch/indexerworker/loop/ops/BgeM3BackfillOps.java b/modules/worker-services/src/main/java/io/justsearch/indexerworker/loop/ops/BgeM3BackfillOps.java
+index 5d540a4c37..8ddc46e470 100644
+--- a/modules/worker-services/src/main/java/io/justsearch/indexerworker/loop/ops/BgeM3BackfillOps.java
++++ b/modules/worker-services/src/main/java/io/justsearch/indexerworker/loop/ops/BgeM3BackfillOps.java
+@@ -60,6 +60,10 @@ public final class BgeM3BackfillOps {
+    *     failed systemically); the record also carries docsProcessed/elapsedMs for {@link
+    *     BackfillScheduler}'s per-stage metrics recording (tempdoc 710 Move 2 item 4).
+    */
++  public static StageOutcome processBgeM3Backfill(BackfillContext context, EnrichmentSelection ignored) {
++    return processBgeM3Backfill(context);
++  }
++
+   public static StageOutcome processBgeM3Backfill(BackfillContext context) {
+     long t0 = System.nanoTime();
+     var authority = context.indexingCoordinator().enrichmentAuthority();
+diff --git a/modules/worker-services/src/main/java/io/justsearch/indexerworker/loop/ops/CombinedEnrichmentBackfillOps.java b/modules/worker-services/src/main/java/io/justsearch/indexerworker/loop/ops/CombinedEnrichmentBackfillOps.java
+index d7e2e10294..dbe86a1550 100644
+--- a/modules/worker-services/src/main/java/io/justsearch/indexerworker/loop/ops/CombinedEnrichmentBackfillOps.java
++++ b/modules/worker-services/src/main/java/io/justsearch/indexerworker/loop/ops/CombinedEnrichmentBackfillOps.java
+@@ -287,6 +287,10 @@ public final class CombinedEnrichmentBackfillOps {
+    *     return for backfillDidWork/mode selection, and {@code outcome.progressed()} is what any
+    *     loop over this method continues on (tempdoc 798).
+    */
++  public static CombinedOutcome processCombinedBackfill(BackfillContext context, EnrichmentSelection ignored) {
++    return processCombinedBackfill(context);
++  }
++
+   public static CombinedOutcome processCombinedBackfill(BackfillContext context) {
+     return processCombinedBackfill(context, BulkPacePolicy.DEFAULTS);
+   }
+diff --git a/modules/worker-services/src/main/java/io/justsearch/indexerworker/loop/ops/EmbeddingBackfillOps.java b/modules/worker-services/src/main/java/io/justsearch/indexerworker/loop/ops/EmbeddingBackfillOps.java
+index ad298edcba..a11aeaf03e 100644
+--- a/modules/worker-services/src/main/java/io/justsearch/indexerworker/loop/ops/EmbeddingBackfillOps.java
++++ b/modules/worker-services/src/main/java/io/justsearch/indexerworker/loop/ops/EmbeddingBackfillOps.java
+@@ -42,6 +42,10 @@ public final class EmbeddingBackfillOps {
+    * @return the batch outcome (tempdoc 710 Move 2 item 4) — {@link BackfillScheduler} records
+    *     per-stage timing/counts from this instead of relying on a metrics call inside the op.
+    */
++  public static StageOutcome processEmbeddingBackfill(BackfillContext context, EnrichmentSelection ignored) {
++    return processEmbeddingBackfill(context);
++  }
++
+   public static StageOutcome processEmbeddingBackfill(BackfillContext context) {
+     var authority = context.indexingCoordinator().enrichmentAuthority();
+     long methodStart = System.nanoTime();
+@@ -376,6 +380,10 @@ public final class EmbeddingBackfillOps {
+    *     tight-loop-control signal (tempdoc 710 Move 2 item 4 — the record also carries
+    *     docsProcessed/elapsedMs for {@link BackfillScheduler}'s per-stage metrics recording)
+    */
++  public static StageOutcome processChunkEmbeddingBackfill(BackfillContext context, EnrichmentSelection ignored) {
++    return processChunkEmbeddingBackfill(context);
++  }
++
+   public static StageOutcome processChunkEmbeddingBackfill(BackfillContext context) {
+     var authority = context.indexingCoordinator().enrichmentAuthority();
+     long methodStart = System.nanoTime();
+diff --git a/modules/worker-services/src/main/java/io/justsearch/indexerworker/loop/ops/NerBackfillOps.java b/modules/worker-services/src/main/java/io/justsearch/indexerworker/loop/ops/NerBackfillOps.java
+index c18ae205e9..14219ba003 100644
+--- a/modules/worker-services/src/main/java/io/justsearch/indexerworker/loop/ops/NerBackfillOps.java
++++ b/modules/worker-services/src/main/java/io/justsearch/indexerworker/loop/ops/NerBackfillOps.java
+@@ -41,6 +41,10 @@ public final class NerBackfillOps {
+    * @return the batch outcome (tempdoc 710 Move 2 item 4) — {@link BackfillScheduler} records
+    *     per-stage timing/counts from this instead of relying on a metrics call inside the op.
+    */
++  public static StageOutcome processNerBackfill(BackfillContext context, EnrichmentSelection ignored) {
++    return processNerBackfill(context);
++  }
++
+   public static StageOutcome processNerBackfill(BackfillContext context) {
+     var authority = context.indexingCoordinator().enrichmentAuthority();
+     NerService selectedService = context.nerServiceSupplier().get();
+diff --git a/modules/worker-services/src/main/java/io/justsearch/indexerworker/loop/ops/SpladeBackfillOps.java b/modules/worker-services/src/main/java/io/justsearch/indexerworker/loop/ops/SpladeBackfillOps.java
+index 208a5bca5a..575dba4823 100644
+--- a/modules/worker-services/src/main/java/io/justsearch/indexerworker/loop/ops/SpladeBackfillOps.java
++++ b/modules/worker-services/src/main/java/io/justsearch/indexerworker/loop/ops/SpladeBackfillOps.java
+@@ -54,6 +54,10 @@ public final class SpladeBackfillOps {
+    *     record also carries docsProcessed/elapsedMs for {@link BackfillScheduler}'s per-stage
+    *     metrics recording (tempdoc 710 Move 2 item 4).
+    */
++  public static StageOutcome processSpladeBackfill(BackfillContext context, EnrichmentSelection ignored) {
++    return processSpladeBackfill(context);
++  }
++
+   public static StageOutcome processSpladeBackfill(BackfillContext context) {
+     var authority = context.indexingCoordinator().enrichmentAuthority();
+     long t0 = System.nanoTime();
+diff --git a/modules/worker-services/src/main/java/io/justsearch/indexerworker/loop/ops/EnrichmentSelection.java b/modules/worker-services/src/main/java/io/justsearch/indexerworker/loop/ops/EnrichmentSelection.java
+new file mode 100644
+index 0000000000..d8d3c73143
+--- /dev/null
++++ b/modules/worker-services/src/main/java/io/justsearch/indexerworker/loop/ops/EnrichmentSelection.java
+@@ -0,0 +1,4 @@
++/* SPDX-License-Identifier: Apache-2.0 */
++package io.justsearch.indexerworker.loop.ops;
++/** Signature adapter for E3b fail-before checks; the baseline remains stateless. */
++public final class EnrichmentSelection {}

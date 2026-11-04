@@ -38,6 +38,9 @@ class BackfillSchedulerProviderGateTest {
   @BeforeEach
   void wire() throws Exception {
     io.justsearch.indexerworker.loop.ops.BackfillSnapshotTestSupport.installReceipts(coordinator);
+    io.justsearch.indexerworker.loop.ops.BackfillSnapshotTestSupport.installSelection(fields);
+    lenient().when(fields.getEnrichmentInputs(anyList(), anyLong())).thenAnswer(call ->
+        fields.getEnrichmentInputs(call.getArgument(0)));
     when(lifecycle.embeddingProvider()).thenReturn(embedding);
     when(lifecycle.allowEmbeddingWrites()).thenAnswer(call -> allowed.get());
     when(embedding.isAvailable()).thenAnswer(call -> available.get());

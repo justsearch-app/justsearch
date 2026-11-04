@@ -230,7 +230,7 @@ class CombinedEnrichmentCycleBudgetTest {
 
   private void seedChunks(int count) {
     for (int i = 0; i < count; i++) {
-      String id = "chunk-" + i;
+      String id = "chunk-" + String.format(java.util.Locale.ROOT,"%02d",i);
       contentByDoc.put(id, "CHUNK:" + id);
       fakeIndex.put(id, new HashMap<>(Map.of(
           SchemaFields.IS_CHUNK, "true",
@@ -484,7 +484,7 @@ class CombinedEnrichmentCycleBudgetTest {
     assertEquals(1, singlePassRequests.get());
     assertEquals(2, batchRequests.size(), "each chunk batch is attempted only once");
     for (int i = 0; i < 16; i++) {
-      var state = fakeIndex.get("chunk-" + i);
+      var state = fakeIndex.get("chunk-" + String.format(java.util.Locale.ROOT,"%02d",i));
       assertEquals("1", state.get(SchemaFields.CHUNK_EMBEDDING_RETRY_COUNT),
           "P4/P10: each failed individual fallback charges exactly one retry");
       assertEquals(SchemaFields.EMBEDDING_STATUS_PENDING,
@@ -645,9 +645,9 @@ class CombinedEnrichmentCycleBudgetTest {
     var outcome = CombinedEnrichmentBackfillOps.processCombinedBackfill(
         timedContext(new WindowedEmbedProgress(), () -> false));
     assertEquals(List.of(
-        "batch:[CHUNK:chunk-0, CHUNK:chunk-1, CHUNK:chunk-2, CHUNK:chunk-3, CHUNK:chunk-4, CHUNK:chunk-5, CHUNK:chunk-6, CHUNK:chunk-7]",
+        "batch:[CHUNK:chunk-00, CHUNK:chunk-01, CHUNK:chunk-02, CHUNK:chunk-03, CHUNK:chunk-04, CHUNK:chunk-05, CHUNK:chunk-06, CHUNK:chunk-07]",
         "single:LONG:parent", "window:parent@0", "window:parent@32",
-        "batch:[CHUNK:chunk-8, CHUNK:chunk-9, CHUNK:chunk-10, CHUNK:chunk-11, CHUNK:chunk-12, CHUNK:chunk-13, CHUNK:chunk-14, CHUNK:chunk-15]",
+        "batch:[CHUNK:chunk-08, CHUNK:chunk-09, CHUNK:chunk-10, CHUNK:chunk-11, CHUNK:chunk-12, CHUNK:chunk-13, CHUNK:chunk-14, CHUNK:chunk-15]",
         "batch:[SHORT:short]"), encoderCalls);
     assertEquals(830, elapsedMs.get(), "R9: encoder work consumes the same modeled budget");
     assertEquals(18, outcome.embedProcessed());

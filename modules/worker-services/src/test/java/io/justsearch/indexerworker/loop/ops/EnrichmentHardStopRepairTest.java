@@ -119,6 +119,7 @@ final class EnrichmentHardStopRepairTest extends LuceneExecutorTestBase {
     metadata.put(status.replace("_status", "_retry_count"), "0");
     if (chunk) metadata.put(SchemaFields.IS_CHUNK, "true");
     var ids = java.util.stream.IntStream.range(0, documentCount).mapToObj(i -> "doc-" + i).toList();
+    BackfillSnapshotTestSupport.installSelection(fields);
     when(fields.queryDocIdsByField(anyString(), anyString(), anyInt())).thenAnswer(call -> {
       String field = call.getArgument(0);
       if (field.equals(SchemaFields.PARENT_DOC_ID)) return route == Route.SINGLE_PASS ? List.of("child") : List.of();

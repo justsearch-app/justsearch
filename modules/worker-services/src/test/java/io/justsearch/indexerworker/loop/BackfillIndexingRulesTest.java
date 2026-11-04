@@ -38,7 +38,9 @@ final class BackfillIndexingRulesTest {
     var writes = mock(IndexingCoordinator.class);
     var counts = mock(IndexCountOps.class);
     var commits = mock(CommitOps.class);
-    BackfillSnapshotTestSupport.install(fields, writes, true, Set.of());
+    BackfillSnapshotTestSupport.install(fields, writes, true, Set.of(SchemaFields.NER_STATUS));
+    when(fields.getDocumentFieldsBatch(anyList(), anySet())).thenReturn(
+        java.util.Map.of("pending",java.util.Map.of(SchemaFields.NER_STATUS,"PENDING")));
     when(fields.queryDocIdsByField(eq(SchemaFields.NER_STATUS), eq(SchemaFields.NER_STATUS_PENDING), anyInt()))
         .thenReturn(List.of("pending"));
     when(fields.getDocumentContent("pending")).thenReturn("content for pending enrichment");

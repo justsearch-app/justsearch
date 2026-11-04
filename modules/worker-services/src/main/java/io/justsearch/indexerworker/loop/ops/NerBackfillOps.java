@@ -42,19 +42,27 @@ public final class NerBackfillOps {
    *     per-stage timing/counts from this instead of relying on a metrics call inside the op.
    */
   public static StageOutcome processNerBackfill(BackfillContext context) {
+    return processNerBackfill(context, null);
+  }
+
+  public static StageOutcome processNerBackfill(
+      BackfillContext context, EnrichmentSelection selection) {
+    if (selection != null) selection.begin();
     var authority = context.indexingCoordinator().enrichmentAuthority();
     NerService selectedService = context.nerServiceSupplier().get();
     long methodStart = System.nanoTime();
     EnrichmentAccounting accounting = new EnrichmentAccounting();
     try {
       List<String> pendingIds =
-          context
-              .documentFieldOps()
-              .queryDocIdsByField(
-                  SchemaFields.NER_STATUS, SchemaFields.NER_STATUS_PENDING, context.batchSize());
+          EnrichmentSelection.page(selection, context.documentFieldOps(),
+              SchemaFields.NER_STATUS, context.batchSize(), false);
 
+      var excluded = context.documentFieldOps().excludedProcessingIds(pendingIds);
+      pendingIds = new ArrayList<>(pendingIds);
+      pendingIds.removeAll(excluded);
       accounting.select(pendingIds, EnrichmentAccounting.Stage.NER);
       if (pendingIds.isEmpty()) {
+        if (selection != null) selection.examined(excluded);
         return StageOutcome.none();
       }
 
@@ -71,10 +79,11 @@ public final class NerBackfillOps {
         accounting.cancelRemaining();
         return StageOutcome.observed(true, 0, methodStart, accounting);
       }
-      EnrichmentBatch batch = new EnrichmentBatch(context.documentFieldOps(), context.indexingCoordinator(), pendingIds, authority).accounting(accounting);
+      EnrichmentBatch batch = new EnrichmentBatch(context.documentFieldOps(), context.indexingCoordinator(), pendingIds, authority, selection, excluded).accounting(accounting);
       BooleanSupplier unavailable = () -> selectedService == null || !selectedService.isAvailable()
           || context.nerServiceSupplier().get() != selectedService;
-      for (String docId : pendingIds) {
+      for (String docId : batch.ids()) {
+        if (selection != null && !"PENDING".equals(batch.fields(docId).get(SchemaFields.NER_STATUS))) continue;
         // NER is CPU-only: interrupt on shutdown, no GPU check. Tempdoc 885 item 3: foreground
         // load paces the per-document loop instead of breaking out of it.
         context.pacing().pace();

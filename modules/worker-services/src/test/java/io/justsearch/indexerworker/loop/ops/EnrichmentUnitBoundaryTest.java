@@ -37,6 +37,7 @@ final class EnrichmentUnitBoundaryTest {
   private List<String> documents = List.of("doc");
 
   private void seed(Route route) throws Exception {
+    BackfillSnapshotTestSupport.installSelection(fields);
     String status = switch (route) {
       case NER -> SchemaFields.NER_STATUS;
       case DENSE_CHUNK -> SchemaFields.CHUNK_EMBEDDING_STATUS;
@@ -53,6 +54,11 @@ final class EnrichmentUnitBoundaryTest {
             : call.getArgument(1).equals(metadata.get(call.getArgument(0))) ? documents : List.of());
     when(fields.queryNonChunkDocIdsByField(anyString(), anyString(), anyInt())).thenAnswer(call ->
         call.getArgument(1).equals(metadata.get(call.getArgument(0))) ? documents : List.of());
+    lenient().when(fields.getDocumentFieldsBatchOrThrow(anyList(), anySet())).thenAnswer(call -> {
+      Map<String, Map<String, String>> rows = new LinkedHashMap<>();
+      for (String id : (List<String>)call.getArgument(0)) rows.put(id, Map.copyOf(metadata));
+      return rows;
+    });
     when(fields.getEnrichmentInputs(anyList())).thenAnswer(call -> {
       List<String> ids = call.getArgument(0);
       Map<String, DocumentFieldOps.EnrichmentInput> result = new LinkedHashMap<>();

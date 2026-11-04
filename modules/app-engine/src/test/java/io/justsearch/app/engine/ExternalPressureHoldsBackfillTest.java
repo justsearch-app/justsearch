@@ -6,12 +6,13 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTimeoutPreemptively;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyLong;
-import static org.mockito.ArgumentMatchers.anySet;
+import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.nullable;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -195,46 +196,48 @@ final class ExternalPressureHoldsBackfillTest {
 
     void pending(int count) throws Exception {
       for (int i = 0; i < count; i++) pending.add("doc-" + i);
-      when(documentFieldOps.queryNonChunkDocIdsByField(
-          eq(SchemaFields.SPLADE_STATUS), eq(SchemaFields.SPLADE_STATUS_PENDING), anyInt()))
+      when(documentFieldOps.queryPendingPage(
+          anyString(), anyInt(), anyBoolean(), nullable(String.class)))
           .thenAnswer(inv -> {
-            int limit = inv.getArgument(2);
+            String stage = inv.getArgument(0);
+            if (!SchemaFields.SPLADE_STATUS.equals(stage)) {
+              return new DocumentFieldOps.PendingIdPage(List.of(), true);
+            }
+            int limit = inv.getArgument(1);
+            String after = inv.getArgument(3);
             synchronized (pending) {
-              return new ArrayList<>(pending).subList(0, Math.min(limit, pending.size()));
+              var remaining = pending.stream().sorted()
+                  .filter(id -> after == null || id.compareTo(after) > 0).toList();
+              return new DocumentFieldOps.PendingIdPage(
+                  remaining.stream().limit(limit).toList(), remaining.size() <= limit);
             }
           });
-      when(documentFieldOps.getDocumentContentBatch(anyList())).thenAnswer(inv -> {
+      when(documentFieldOps.getEnrichmentInputPage(anyList(), anyLong())).thenAnswer(inv -> {
+        // The atomic page read is the same batch boundary as the former content read.
         if (batchStarts.getAndIncrement() == 0) onFirstBatchStart.run();
         List<String> ids = inv.getArgument(0);
-        Map<String, String> content = new HashMap<>();
-        for (String id : ids) content.put(id, "enrichable content for " + id);
-        return content;
-      });
-      when(documentFieldOps.getDocumentFieldsBatch(anyList(), anySet())).thenAnswer(inv -> {
-        List<String> ids = inv.getArgument(0);
-        Map<String, Map<String, String>> fields = new HashMap<>();
+        long budget = inv.getArgument(1);
+        long retained = 0;
+        Map<String, DocumentFieldOps.EnrichmentInput> inputs = new HashMap<>();
+        List<String> examined = new ArrayList<>();
         for (String id : ids) {
-          fields.put(id, Map.of(
+          String content = "enrichable content for " + id;
+          if (!inputs.isEmpty() && retained + content.length() > budget) break;
+          inputs.put(id, new DocumentFieldOps.EnrichmentInput(content, Map.of(
               SchemaFields.SPLADE_STATUS, SchemaFields.SPLADE_STATUS_PENDING,
-              SchemaFields.NER_STATUS, SchemaFields.NER_STATUS_COMPLETED));
+              SchemaFields.NER_STATUS, SchemaFields.NER_STATUS_COMPLETED), null, Map.of()));
+          examined.add(id);
+          retained += content.length();
+          if (retained >= budget) break;
         }
-        return fields;
+        return new DocumentFieldOps.EnrichmentInputPage(inputs, examined);
       });
-      when(indexingCoordinator.updateDocumentsBatch(anyList())).thenAnswer(inv -> {
+      when(indexingCoordinator.publishEnrichmentBatch(anyList(), anyMap())).thenAnswer(inv -> {
         List<Map.Entry<String, ?>> batch = inv.getArgument(0);
         for (var entry : batch) pending.remove(entry.getKey());
-        return new LuceneRuntimeTypes.BatchUpdateResult(batch.size(), 0);
+        return new LuceneRuntimeTypes.EnrichmentPublicationReceipt(
+            batch.stream().map(Map.Entry::getKey).toList(), List.of(), null);
       });
-      when(documentFieldOps.getEnrichmentInputs(anyList())).thenAnswer(inv -> {
-        List<String> ids=inv.getArgument(0);
-        var contents=documentFieldOps.getDocumentContentBatch(ids);
-        var fields=documentFieldOps.getDocumentFieldsBatch(ids,Set.of(SchemaFields.SPLADE_STATUS,SchemaFields.NER_STATUS));
-        Map<String,DocumentFieldOps.EnrichmentInput> result=new HashMap<>();
-        for(String id:ids) result.put(id,new DocumentFieldOps.EnrichmentInput(contents.get(id),fields.getOrDefault(id,Map.of()),null,Map.of()));
-        return result;
-      });
-      when(indexingCoordinator.updateDocumentsBatchIf(anyList(),org.mockito.ArgumentMatchers.anyMap())).thenAnswer(inv ->
-          indexingCoordinator.updateDocumentsBatch(inv.getArgument(0)));
       when(indexCountOps.countByField(anyString(), anyString())).thenReturn(0);
       doAnswer(inv -> {
         ((Runnable) inv.getArgument(0)).run();

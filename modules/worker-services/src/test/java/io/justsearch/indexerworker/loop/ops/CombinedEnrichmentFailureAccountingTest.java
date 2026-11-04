@@ -47,6 +47,7 @@ class CombinedEnrichmentFailureAccountingTest {
   @BeforeEach
   void wire() throws Exception {
     BackfillSnapshotTestSupport.installReceipts(coordinator);
+    BackfillSnapshotTestSupport.installSelection(fields);
     when(embedding.isAvailable()).thenAnswer(call -> embeddingReady.get());
     when(embedding.embedDocumentBatch(anyList())).thenAnswer(call ->
         Collections.nCopies(((List<?>) call.getArgument(0)).size(), new float[] {1, 0}));
@@ -56,6 +57,8 @@ class CombinedEnrichmentFailureAccountingTest {
         matching(call.getArgument(0), call.getArgument(1), false));
     when(fields.queryNonChunkDocIdsByField(anyString(), anyString(), anyInt())).thenAnswer(call ->
         matching(call.getArgument(0), call.getArgument(1), true));
+    lenient().when(fields.getEnrichmentInputs(anyList(), anyLong())).thenAnswer(call ->
+        fields.getEnrichmentInputs(call.getArgument(0)));
     when(fields.getEnrichmentInputs(anyList())).thenAnswer(call -> {
       Map<String, DocumentFieldOps.EnrichmentInput> inputs = new HashMap<>();
       for (String id : (List<String>) call.getArgument(0)) {

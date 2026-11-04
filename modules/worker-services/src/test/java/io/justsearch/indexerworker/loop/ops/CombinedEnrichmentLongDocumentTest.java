@@ -656,6 +656,26 @@ class CombinedEnrichmentLongDocumentTest {
         "skipping ahead of the resume point must be refused, not accepted with a gap");
   }
 
+  @Test
+  void mixedPartialAndRouteOwnersRefuseThe257thWithoutEvictingProgress() {
+    WindowedEmbedProgress progress = new WindowedEmbedProgress();
+    for (int i = 0; i < 256; i++) {
+      String id = "owner-"+i;
+      if (i % 2 == 0) progress.record(id,id,3,0,List.of(new float[]{1,0}));
+      else progress.route(id,id,WindowedEmbedProgress.Route.ORDINARY);
+    }
+    assertEquals(0,progress.record("waiting","waiting",3,0,List.of(new float[]{1,0})),
+        "a full store refuses admission instead of restarting an admitted owner's work");
+    for (int i = 0; i < 256; i++) {
+      String id = "owner-"+i;
+      if (i % 2 == 0) assertEquals(1,progress.nextWindow(id,id),id);
+      else assertEquals(WindowedEmbedProgress.Route.ORDINARY,progress.route(id,id),id);
+    }
+    progress.forget("owner-100");
+    assertEquals(1,progress.record("waiting","waiting",3,0,List.of(new float[]{1,0})));
+    assertEquals(1,progress.nextWindow("owner-0","owner-0"));
+  }
+
   /** PINS: in-flight partials are observable and are dropped by a profiling reset. */
   @Test
   @DisplayName("in-flight partials are tracked and cleared")

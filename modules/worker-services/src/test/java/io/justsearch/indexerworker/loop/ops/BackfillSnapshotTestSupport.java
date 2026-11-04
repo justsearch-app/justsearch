@@ -65,15 +65,21 @@ public final class BackfillSnapshotTestSupport {
   private static void installChecked(DocumentFieldOps fields,IndexingCoordinator coordinator,
       boolean individualContent,Set<String> batchedFields) throws Exception {
     installReceipts(coordinator);
-    lenient().when(fields.getEnrichmentInputs(anyList())).thenAnswer(call ->
-        capture(fields,call.getArgument(0),individualContent,batchedFields));
-    lenient().when(fields.getEnrichmentInputs(anyList(), anyLong())).thenAnswer(call -> {
+    installSelection(fields);
+    lenient().doAnswer(call -> fields.getDocumentFieldsBatch(call.getArgument(0), call.getArgument(1)))
+        .when(fields).getDocumentFieldsBatchOrThrow(anyList(), anySet());
+    lenient().doAnswer(call -> capture(fields,call.getArgument(0),individualContent,batchedFields))
+        .when(fields).getEnrichmentInputs(anyList());
+    lenient().doAnswer(call -> {
       List<String> ids = call.getArgument(0);
       long budget = call.getArgument(1);
       long retained = 0;
+      var captured = individualContent ? Map.<String, DocumentFieldOps.EnrichmentInput>of()
+          : capture(fields,ids,false,batchedFields);
       Map<String, DocumentFieldOps.EnrichmentInput> result = new LinkedHashMap<>();
       for (String id : ids) {
-        var input = capture(fields,List.of(id),true,batchedFields).get(id);
+        var input = individualContent ? capture(fields,List.of(id),true,batchedFields).get(id)
+            : captured.get(id);
         if (input == null) continue;
         long chars = input.content() == null ? 0 : input.content().length();
         if (!result.isEmpty() && retained + chars > budget) break;
@@ -82,12 +88,30 @@ public final class BackfillSnapshotTestSupport {
         if (retained >= budget) break;
       }
       return result;
-    });
-    lenient().when(coordinator.updateDocumentsBatchIf(anyList(), anyMap())).thenAnswer(call -> {
+    }).when(fields).getEnrichmentInputs(anyList(), anyLong());
+    lenient().doAnswer(call -> {
       List<Map.Entry<String, Map<String, Object>>> updates = call.getArgument(0);
       var result = coordinator.updateDocumentsBatch(updates);
       return result == null ? new BatchUpdateResult(updates.size(), 0) : result;
-    });
+    }).when(coordinator).updateDocumentsBatchIf(anyList(), anyMap());
 
+  }
+
+  /** Keep fake-index ordering, content and faults behind the new paged read signatures. */
+  public static void installSelection(DocumentFieldOps fields) throws Exception {
+    lenient().doAnswer(call -> {
+          String stage = call.getArgument(0); int limit = call.getArgument(1);
+          boolean excludeChunks = call.getArgument(2); String after = call.getArgument(3);
+          List<String> ids = excludeChunks ? fields.queryNonChunkDocIdsByField(stage, "PENDING", limit)
+              : fields.queryDocIdsByField(stage, "PENDING", limit);
+          List<String> remaining = ids.stream().sorted().filter(id -> after == null || id.compareTo(after) > 0).toList();
+          return new DocumentFieldOps.PendingIdPage(remaining.stream().limit(limit).toList(), remaining.size() <= limit);
+        }).when(fields).queryPendingPage(anyString(), anyInt(), anyBoolean(), nullable(String.class));
+    lenient().doAnswer(call -> {
+      List<String> ids = call.getArgument(0);
+      var inputs = fields.getEnrichmentInputs(ids, call.getArgument(1));
+      return new DocumentFieldOps.EnrichmentInputPage(inputs,
+          ids.stream().takeWhile(inputs::containsKey).toList());
+    }).when(fields).getEnrichmentInputPage(anyList(), anyLong());
   }
 }
