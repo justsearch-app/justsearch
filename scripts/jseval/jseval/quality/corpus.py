@@ -20,6 +20,7 @@ import time
 from urllib.parse import quote, urljoin, urlsplit
 from urllib.request import HTTPRedirectHandler, Request, build_opener
 from urllib.error import HTTPError
+from urllib.robotparser import RobotFileParser
 import zipfile
 
 from .. import dataset_cache
@@ -64,9 +65,10 @@ def _robots_path(value: str) -> str:
 class _RobotsPolicy:
     """RFC 9309 rules and pacing for this fetcher's product token.
 
-    Keep parsing local: urllib.robotparser's representation and matching differ
-    between supported Python versions. Matching groups are merged, with '*' used
-    only when there is no explicit product-token group (§2.2.1).
+    Access matching stays local: urllib.robotparser's representation and matching
+    differ between supported Python versions. Matching groups are merged, with
+    '*' used only when there is no explicit product-token group (§2.2.1).
+    Standard-library pacing remains a minimum for compatibility with older fetches.
     """
     def __init__(self, lines):
         groups, pacing_groups = [], []
@@ -113,12 +115,18 @@ class _RobotsPolicy:
         if not selected:
             selected = [g for g in groups if '*' in g[0]]
         self.rules = [rule for _, rules in selected for rule in rules]
-        # Keep the pre-RFC pacing minimum for substring-matching agents,
-        # independently of the exact product-token selection for access rules.
-        paced = [g for g in pacing_groups if any(agent in token for agent in g[0])]
+        paced = [g for g in pacing_groups if token in g[0]]
         if not paced:
             paced = [g for g in pacing_groups if '*' in g[0]]
-        self.delay = max((delay for _, delays in paced for delay in delays), default=0)
+        # Use the former fetcher's actual parser for legacy pacing, never access.
+        legacy = RobotFileParser()
+        legacy.parse(lines)
+        rate = legacy.request_rate(USER_AGENT)
+        self.delay = max(
+            max((delay for _, delays in paced for delay in delays), default=0),
+            legacy.crawl_delay(USER_AGENT) or 0,
+            rate.seconds / rate.requests if rate and rate.requests else 0,
+        )
 
 
 def _robots_match(pattern: str, terminal: bool, path: str) -> bool:

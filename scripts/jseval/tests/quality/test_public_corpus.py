@@ -316,6 +316,37 @@ def test_http_robots_pacing_and_timeouts(corpus, monkeypatch, directives, delay)
     assert sleeps == [0, delay, delay]
 
 
+@pytest.mark.parametrize('text,delay', [
+    pytest.param('User-agent: JustSearch\nRequest-rate: 1 / 10', 10,
+                 id='spaced-request-rate'),
+    pytest.param('User-agent: JustSearch\nCrawl-delay: ٨', 8,
+                 id='arabic-indic-crawl-delay'),
+    pytest.param('User-agent:\nCrawl-delay: 8', 8,
+                 id='empty-user-agent'),
+    pytest.param('User-agent: JustSearch\nDisallow: /document\nCrawl-delay: 8', 8,
+                 id='legacy-pacing-does-not-control-access'),
+])
+def test_http_robots_legacy_pacing_minimum(corpus, monkeypatch, text, delay):
+    from urllib.response import addinfourl
+    calls, sleeps = [], []
+    def open_request(request, **_):
+        calls.append(request.full_url)
+        data = text.encode() if request.full_url.endswith('robots.txt') else b'OK'
+        return addinfourl(io.BytesIO(data), {}, request.full_url, 200)
+    monkeypatch.setattr(corpus, '_document_open', open_request)
+    monkeypatch.setattr(corpus.time, 'monotonic', lambda: 100)
+    monkeypatch.setattr(corpus.time, 'sleep', sleeps.append)
+    client = corpus.PublicHTTP()
+    for _ in range(2):
+        with client.open('https://example.org/document') as response:
+            assert response.read() == b'OK'
+    assert calls == ['https://example.org/robots.txt', 'https://example.org/document',
+                     'https://example.org/document']
+    assert sleeps[0] == 0
+    assert len(sleeps) == 3
+    assert all(wait >= delay for wait in sleeps[1:])
+
+
 @pytest.mark.parametrize('failure', [OSError('connection failed'), ValueError('invalid response'),
                                    HTTPError('https://example.org/robots.txt', 503, 'unreachable', {}, None),
                                    HTTPError('https://example.org/robots.txt', 429, 'rate limited', {}, None)])
