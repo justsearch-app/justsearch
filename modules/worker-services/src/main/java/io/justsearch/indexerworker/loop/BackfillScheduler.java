@@ -10,6 +10,8 @@ import io.justsearch.configuration.resolved.ResolvedConfig;
 import io.justsearch.indexerworker.bgem3.BgeM3Encoder;
 import io.justsearch.indexerworker.coordination.WorkerSignalBus;
 import io.justsearch.indexerworker.disambiguation.DisambiguationService;
+import io.justsearch.indexerworker.loop.ops.EnrichmentAccounting;
+import io.justsearch.indexerworker.loop.ops.EnrichmentAccounting.Stage;
 import io.justsearch.indexerworker.loop.ops.BgeM3BackfillOps;
 import io.justsearch.indexerworker.loop.ops.CombinedEnrichmentBackfillOps;
 import io.justsearch.indexerworker.loop.ops.DisambiguationBackfillOps;
@@ -39,9 +41,8 @@ import org.slf4j.LoggerFactory;
  *
  * <p>Tempdoc 516 Slice 4d (Wave 6) — extracted from {@link IndexingLoop}. Owns the per-cycle
  * backfill orchestration: the combined enrichment tight loop, the per-stage fallback path
- * (embedding / chunk-embed / NER / SPLADE), and disambiguation. Owns the SPLADE retry-backoff
- * state ({@code consecutiveSpladeFailures}, {@code nextSpladeRetryTime},
- * {@code lastSpladeInterleaveTime}). The disambiguation service owns reconciliation progress.
+ * (embedding / chunk-embed / NER / SPLADE), and disambiguation. Owns per-stage retry-backoff
+ * state and {@code lastSpladeInterleaveTime}. The disambiguation service owns reconciliation progress.
  *
  * <p>P5 boundary: a concrete final class with three entry points (runIdleCycle,
  * runInterleavedSplade, resetState). No strategy interface.
@@ -99,7 +100,7 @@ public final class BackfillScheduler {
   // live snapshot the same way resolvedConfigSupplier.get().rag().chunkVectorsEnabled() already
   // does elsewhere in this class.
 
-  /** Scheduler-local monotonic domain for cycle and embed-share deadlines only. */
+  /** Scheduler-local monotonic domain for cycle, embed-share and retry deadlines. */
   private final LongSupplier monotonicNanos;
   private final DocumentFieldOps documentFieldOps;
   private final IndexingCoordinator indexingCoordinator;
@@ -117,8 +118,14 @@ public final class BackfillScheduler {
   private final Supplier<DisambiguationService> disambiguationServiceSupplier;
 
   private long lastSpladeInterleaveTime = 0;
-  private int consecutiveSpladeFailures = 0;
-  private long nextSpladeRetryTime = 0;
+  private static final class StageBackoff {
+    Object provider;
+    int failures;
+    long retryNanos;
+  }
+
+  private final java.util.EnumMap<Stage, StageBackoff> stageBackoffs =
+      new java.util.EnumMap<>(Stage.class);
 
   /**
    * Cross-cycle per-window accumulator for long documents (round-15 post-round finding). Lives here
@@ -246,6 +253,7 @@ public final class BackfillScheduler {
    */
   public boolean runIdleCycle() {
     if (signalBus.isIndexingHeld()) return false;
+    for (Stage stage : Stage.values()) backoff(stage);
     boolean backfillDidWork = false;
     final long cycleStartNanos = monotonicNanos.getAsLong();
     final long cycleDeadlineNanos =
@@ -393,7 +401,8 @@ public final class BackfillScheduler {
    * block that used to live inside {@code CombinedEnrichmentBackfillOps.processCombinedBackfill}).
    * A no-op when {@code outcome.attempted()} is false (nothing ran this call).
    */
-  private static void recordCombinedOutcome(CombinedEnrichmentBackfillOps.CombinedOutcome outcome) {
+  private void recordCombinedOutcome(CombinedEnrichmentBackfillOps.CombinedOutcome outcome) {
+    recordStorageResult(outcome.accounting());
     OperationalMetrics.getInstance().recordEnrichmentOutcomes(outcome.accounting().counters());
     if (!outcome.attempted()) {
       return;
@@ -426,7 +435,8 @@ public final class BackfillScheduler {
    * previously froze because none of the individual {@code *BackfillOps} classes recorded
    * anything; only the combined pass did, 710 S-B3 finding).
    */
-  private static void recordStageOutcome(String stageKey, StageOutcome outcome) {
+  private void recordStageOutcome(String stageKey, StageOutcome outcome) {
+    recordStorageResult(outcome.accounting());
     OperationalMetrics metrics = OperationalMetrics.getInstance();
     metrics.recordEnrichmentOutcomes(outcome.accounting().counters());
     metrics.recordEnrichmentCompleted(stageKey, outcome.docsProcessed());
@@ -441,16 +451,17 @@ public final class BackfillScheduler {
    * overhead (~13%).
    */
   public void runInterleavedSplade(long now) {
+    for (Stage stage : Stage.values()) backoff(stage);
     if (spladeEncoderSupplier.get() == null && bgeM3EncoderSupplier.get() == null) return;
     // Spec E section 1.3 item 5: no interleaved sparse batch starts while bulk GPU work is held.
     if (signalBus.isIndexingHeld() || !sparseUnitAllowed()) return;
-    if (now < nextSpladeRetryTime) return;
+    if (!stageAllowed(Stage.SPLADE)) return;
     long spladeIntervalMs = pacing().spladeInterleaveIntervalMs();
     if (now - lastSpladeInterleaveTime < spladeIntervalMs) return;
     StageOutcome outcome = processSpladeBackfillInterleaved();
     recordStageOutcome(BatchTimingKeys.SPLADE, outcome);
     lastSpladeInterleaveTime = System.currentTimeMillis();
-    recordSpladeBackfillResult(outcome.success());
+    if (outcome.accounting().storageFailures().isEmpty()) recordSpladeBackfillResult(outcome.success());
   }
 
   private boolean unitAllowed(boolean gpu) {
@@ -469,8 +480,7 @@ public final class BackfillScheduler {
   /** Resets backoff/latch state. Called from {@code resetForProfiling}. */
   public void resetState() {
     lastSpladeInterleaveTime = 0;
-    consecutiveSpladeFailures = 0;
-    nextSpladeRetryTime = 0;
+    stageBackoffs.clear();
     windowedEmbedProgress.clear();
     enrichmentSelection.clear();
     lastWorkSetSignature = 0;
@@ -483,14 +493,19 @@ public final class BackfillScheduler {
     boolean anyActivity = false;
     boolean embeddingCanProgress = embeddingLifecycle.embeddingProvider().isAvailable()
         && embeddingLifecycle.allowEmbeddingWrites()
-        && unitAllowed(embeddingLifecycle.embeddingProvider().isUsingGpu());
+        && unitAllowed(embeddingLifecycle.embeddingProvider().isUsingGpu())
+        && stageAllowed(Stage.EMBED);
     if (embeddingCanProgress) {
       StageOutcome outcome = processEmbeddingBackfill(cycleDeadlineNanos);
       recordStageOutcome(BatchTimingKeys.EMBED, outcome);
       anyActivity |= outcome.docsProcessed() > 0;
     }
     // Chunk vectors after parent embedding completes. 334 Phase 8 tight loop.
-    if (embeddingCanProgress && resolvedConfigSupplier.get().rag().chunkVectorsEnabled()) {
+    if (embeddingLifecycle.embeddingProvider().isAvailable()
+        && embeddingLifecycle.allowEmbeddingWrites()
+        && unitAllowed(embeddingLifecycle.embeddingProvider().isUsingGpu())
+        && stageAllowed(Stage.CHUNK_EMBED)
+        && resolvedConfigSupplier.get().rag().chunkVectorsEnabled()) {
       int pendingDocEmbeddings =
           indexCountOps.countByField(
               SchemaFields.EMBEDDING_STATUS, SchemaFields.EMBEDDING_STATUS_PENDING);
@@ -505,7 +520,8 @@ public final class BackfillScheduler {
         while (chunkDidWork) {
           if (!running.get() || signalBus.isIndexingHeld() || Thread.currentThread().isInterrupted()) break;
           indexingPacing.pace(); // tempdoc 885 item 3: duty cycle, not a stop
-          if (!unitAllowed(embeddingLifecycle.embeddingProvider().isUsingGpu())) break;
+          if (!unitAllowed(embeddingLifecycle.embeddingProvider().isUsingGpu())
+              || !stageAllowed(Stage.CHUNK_EMBED)) break;
           if (signalBus.hasPendingIngest()) break; // tempdoc 798: primary indexing outranks backfill
           if (monotonicNanos.getAsLong() >= cycleDeadlineNanos) {
             if (anyChunkProgress) {
@@ -533,7 +549,7 @@ public final class BackfillScheduler {
       }
     }
     NerService nerService = nerServiceSupplier.get();
-    if (nerService != null && nerService.isAvailable()) {
+    if (nerService != null && nerService.isAvailable() && stageAllowed(Stage.NER)) {
       boolean embeddingsReady;
       if (!embeddingCanProgress) {
         embeddingsReady = true;
@@ -558,7 +574,7 @@ public final class BackfillScheduler {
     }
     // SPLADE after embedding nearly completes (tempdoc 312 item 39, relaxed 334 item 37).
     if ((spladeEncoderSupplier.get() != null || bgeM3EncoderSupplier.get() != null)
-        && System.currentTimeMillis() >= nextSpladeRetryTime) {
+        && stageAllowed(Stage.SPLADE)) {
       int pendingEmbedForSplade =
           embeddingCanProgress
               ? indexCountOps.countByField(
@@ -569,7 +585,7 @@ public final class BackfillScheduler {
         recordStageOutcome(BatchTimingKeys.SPLADE, outcome);
         anyActivity |= outcome.docsProcessed() > 0;
         boolean success = outcome.success();
-        recordSpladeBackfillResult(success);
+        if (outcome.accounting().storageFailures().isEmpty()) recordSpladeBackfillResult(success);
 
       }
     }
@@ -594,20 +610,66 @@ public final class BackfillScheduler {
     return false;
   }
 
-  private void recordSpladeBackfillResult(boolean success) {
-    if (success) {
-      consecutiveSpladeFailures = 0;
-      nextSpladeRetryTime = 0;
-    } else {
-      consecutiveSpladeFailures++;
-      long backoffMs =
-          BackoffPolicy.spladeBackoffMs(LoopPacingPolicy.idleSleepMs(), consecutiveSpladeFailures);
-      nextSpladeRetryTime = System.currentTimeMillis() + backoffMs;
-      log.warn(
-          "SPLADE backfill failed ({} consecutive), next retry in {}ms",
-          consecutiveSpladeFailures,
-          backoffMs);
+  private Object provider(Stage stage) {
+    BgeM3Encoder bge = bgeM3EncoderSupplier.get();
+    return switch (stage) {
+      case EMBED, CHUNK_EMBED -> bge != null ? bge : embeddingLifecycle.embeddingProvider();
+      case SPLADE -> bge != null ? bge : spladeEncoderSupplier.get();
+      case NER -> nerServiceSupplier.get();
+    };
+  }
+
+  private StageBackoff backoff(Stage stage) {
+    var state = stageBackoffs.computeIfAbsent(stage, ignored -> new StageBackoff());
+    Object current = provider(stage);
+    if (state.provider != current) {
+      state.provider = current;
+      state.failures = 0;
+      state.retryNanos = 0;
     }
+    return state;
+  }
+
+  private boolean stageAllowed(Stage stage) {
+    var state = backoff(stage);
+    return state.failures == 0 || monotonicNanos.getAsLong() >= state.retryNanos;
+  }
+
+  private void recordBackfillResult(Stage stage, boolean success) {
+    var state = stageBackoffs.get(stage);
+    // Results belong to the provider admitted for this turn, even if it retires during publication.
+    if (state != null && state.provider != provider(stage)) {
+      backoff(stage);
+      return;
+    }
+    if (state == null) state = backoff(stage);
+    if (success) {
+      state.failures = 0;
+      state.retryNanos = 0;
+    } else {
+      state.failures = Math.min(state.failures + 1, 63);
+      long backoffMs = BackoffPolicy.spladeBackoffMs(LoopPacingPolicy.idleSleepMs(), state.failures);
+      state.retryNanos = monotonicNanos.getAsLong()
+          + java.util.concurrent.TimeUnit.MILLISECONDS.toNanos(backoffMs);
+      log.warn("{} backfill failed ({} consecutive), next retry in {}ms", stage, state.failures, backoffMs);
+    }
+  }
+
+  private void recordStorageResult(EnrichmentAccounting.Summary summary) {
+    for (Stage stage : Stage.values()) {
+      if (summary.storageFailures().contains(stage)) recordBackfillResult(stage, false);
+      else if (stage != Stage.SPLADE && summary.tickets().entrySet().stream().anyMatch(entry ->
+          entry.getKey().stage() == stage && switch (entry.getValue()) {
+            case PUBLISHED, COMPLETED_EMPTY, FAILED_CHARGED, REJECTED_OUTPUT -> true;
+            default -> false;
+          })) {
+        recordBackfillResult(stage, true);
+      }
+    }
+  }
+
+  private void recordSpladeBackfillResult(boolean success) {
+    recordBackfillResult(Stage.SPLADE, success);
   }
 
   // ==================== Backfill delegates ====================
@@ -695,7 +757,7 @@ public final class BackfillScheduler {
         + (available.ner() ? 1 : 0);
     // docs/tempdocs/711-rmw-preservation-and-followup-designs.md: retain combined publication
     // protection through sparse recovery, even if encoder retirement reduces stage availability.
-    if (availCount < 2 && consecutiveSpladeFailures == 0) {
+    if (availCount < 2 && backoff(Stage.SPLADE).failures == 0) {
       return CombinedEnrichmentBackfillOps.CombinedOutcome.none();
     }
 
@@ -725,11 +787,12 @@ public final class BackfillScheduler {
             () -> monotonicNanos.getAsLong() >= embedShareDeadlineNanos,
             windowedEmbedProgress,
             publishedDocIds,
-            () -> System.currentTimeMillis() >= nextSpladeRetryTime,
-            this::recordSpladeBackfillResult, this::unitAllowed), enrichmentSelection);
+            () -> stageAllowed(Stage.SPLADE),
+            this::recordSpladeBackfillResult, this::unitAllowed, this::stageAllowed), enrichmentSelection);
   }
 
   private StageOutcome processEmbeddingBackfill(long cycleDeadlineNanos) {
+    if (!stageAllowed(Stage.EMBED)) return StageOutcome.none();
     // BGE-M3 handles dense embeddings in its unified backfill pass — skip separate embedding
     if (bgeM3EncoderSupplier.get() != null) {
       log.debug("Embedding backfill skipped: BGE-M3 handles dense embeddings");
@@ -751,6 +814,7 @@ public final class BackfillScheduler {
   }
 
   private StageOutcome processChunkEmbeddingBackfill(long cycleDeadlineNanos) {
+    if (!stageAllowed(Stage.CHUNK_EMBED)) return StageOutcome.none();
     return EmbeddingBackfillOps.processChunkEmbeddingBackfill(
         new EmbeddingBackfillOps.BackfillContext(
             documentFieldOps,
@@ -767,6 +831,7 @@ public final class BackfillScheduler {
   }
 
   private StageOutcome processNerBackfill(long cycleDeadlineNanos) {
+    if (!stageAllowed(Stage.NER)) return StageOutcome.none();
     return NerBackfillOps.processNerBackfill(
         new NerBackfillOps.BackfillContext(
             documentFieldOps,
@@ -799,6 +864,7 @@ public final class BackfillScheduler {
   }
 
   private StageOutcome processSpladeBackfill(long cycleDeadlineNanos) {
+    if (!stageAllowed(Stage.SPLADE)) return StageOutcome.none();
     BgeM3Encoder bge = bgeM3EncoderSupplier.get();
     if (bge != null) {
       return BgeM3BackfillOps.processBgeM3Backfill(
@@ -829,6 +895,7 @@ public final class BackfillScheduler {
   }
 
   private StageOutcome processSpladeBackfillInterleaved() {
+    if (!stageAllowed(Stage.SPLADE)) return StageOutcome.none();
     BgeM3Encoder bge = bgeM3EncoderSupplier.get();
     if (bge != null) {
       return BgeM3BackfillOps.processBgeM3Backfill(

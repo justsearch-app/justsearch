@@ -168,6 +168,38 @@ class BackfillSchedulerSlowBatchTest {
   private Logger schedulerLogger;
   private ListAppender<ILoggingEvent> logAppender;
 
+  private String previousBackfillMode;
+  private final Map<Map<String, java.util.concurrent.atomic.LongAdder>, Map<String, java.util.concurrent.atomic.LongAdder>>
+      previousMetrics = new java.util.IdentityHashMap<>();
+
+  @BeforeEach
+  @SuppressWarnings("unchecked")
+  void saveMetrics() throws Exception {
+    var metrics = io.justsearch.indexerworker.metrics.OperationalMetrics.getInstance();
+    previousBackfillMode = metrics.getBackfillMode();
+    for (String name : List.of("enrichmentCompleted", "batchTimingMs", "batchTimingCount", "enrichmentOutcomes")) {
+      var field = metrics.getClass().getDeclaredField(name);
+      field.setAccessible(true);
+      var counters = (Map<String, java.util.concurrent.atomic.LongAdder>) field.get(metrics);
+      var saved = new HashMap<String, java.util.concurrent.atomic.LongAdder>();
+      counters.forEach((key, value) -> {
+        var copy = new java.util.concurrent.atomic.LongAdder();
+        copy.add(value.sum());
+        saved.put(key, copy);
+      });
+      previousMetrics.put(counters, saved);
+    }
+  }
+
+  @AfterEach
+  void restoreMetrics() {
+    previousMetrics.forEach((counters, saved) -> {
+      counters.clear();
+      counters.putAll(saved);
+    });
+    io.justsearch.indexerworker.metrics.OperationalMetrics.getInstance().recordBackfillMode(previousBackfillMode);
+  }
+
   @BeforeEach
   void wireSlowEmbedBatch() {
     io.justsearch.indexerworker.loop.ops.BackfillSnapshotTestSupport.install(documentFieldOps,indexingCoordinator);
@@ -925,9 +957,10 @@ class BackfillSchedulerSlowBatchTest {
     BackfillScheduler scheduler = scheduler(monotonicNanos::get);
     if (encoderRetires) sparseEncoder = null;
     else {
-      var retryTime = BackfillScheduler.class.getDeclaredField("nextSpladeRetryTime");
-      retryTime.setAccessible(true);
-      retryTime.setLong(scheduler, Long.MAX_VALUE);
+      var failure = BackfillScheduler.class.getDeclaredMethod("recordSpladeBackfillResult", boolean.class);
+      failure.setAccessible(true);
+      // Keep the hold beyond this modeled cycle, as the previous infinite deadline did.
+      for (int count = 0; count < 6; count++) failure.invoke(scheduler, false);
     }
     timeIdleCycle(scheduler);
     assertEquals("COMPLETED", state.get("doc").get(SchemaFields.EMBEDDING_STATUS));
@@ -966,14 +999,16 @@ class BackfillSchedulerSlowBatchTest {
     assertEquals(callsBeforeBackoff, calls.get(), "combined and interleaved paths share backoff");
     assertFalse(state.get("doc").containsKey(SchemaFields.SPLADE_RETRY_COUNT));
     failing.set(false);
-    var retryTime = BackfillScheduler.class.getDeclaredField("nextSpladeRetryTime");
-    retryTime.setAccessible(true);
-    retryTime.setLong(scheduler, 0);
+    monotonicNanos.addAndGet(120_000_000_000L);
     timeIdleCycle(scheduler);
     assertEquals("COMPLETED", state.get("doc").get(SchemaFields.SPLADE_STATUS));
-    var failureCount = BackfillScheduler.class.getDeclaredField("consecutiveSpladeFailures");
+    var backoffs = BackfillScheduler.class.getDeclaredField("stageBackoffs");
+    backoffs.setAccessible(true);
+    var sparseBackoff = ((Map<?, ?>) backoffs.get(scheduler)).get(
+        io.justsearch.indexerworker.loop.ops.EnrichmentAccounting.Stage.SPLADE);
+    var failureCount = sparseBackoff.getClass().getDeclaredField("failures");
     failureCount.setAccessible(true);
-    assertEquals(0, failureCount.getInt(scheduler));
+    assertEquals(0, failureCount.getInt(sparseBackoff));
   }
 
 }
