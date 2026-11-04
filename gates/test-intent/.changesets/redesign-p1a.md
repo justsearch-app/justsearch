@@ -208,3 +208,14 @@ The orchestrator performs the real-system main-index open/search/restart check.
 The builder did not start the shared dev stack.
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a1a520-6610-7870-946b-a317d50e0424",
+  "verdict": "accept",
+  "digest": "sha256:8e0a527eb790252ed68b053edffeffa5fd9f52bd367815877b60d8ff6c070331",
+  "note": "Codex verifier-1 on 4276f76507: all 14 P1a cases fail before for the intended reason and pass after without skips; E1-E7 accept. Live upgrade check assigned to orchestrator."
+}
+```
