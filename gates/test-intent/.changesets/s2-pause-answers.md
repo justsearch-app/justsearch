@@ -9,12 +9,14 @@ author-session: builder-s2-pause-20261104
 
 The user's answer-policy decision is quoted below. P1/P2 here identify the deliver scenarios, not the separately numbered folder-preservation scenarios. Main already writes schema 7; this change adds schema 8 and keeps schema 7 readable. New expectations are component and public-interface checks, not acceptance of the complete running application. Repair-round before-state checks use worktrees inside a temporary shared clone, with no source-repository worktree or object-store writes. Before-state checks use a shared clone inside the session temporary directory, with its own build folders and copied frontend dependencies; no source worktree or another session's service is used. Execution evidence is written only by run-evidence.mjs. The builder writes no acceptance record. The before-state evidence is a direct run in the shared baseline clone: only the existing settings-HTTP interface and Brain switch checks demonstrate assertion fail-before. Tests needing new Engine/generation APIs have candidate evidence only; no missing-helper compilation error is claimed as fail-before. UiSettingsStorePersistenceModeTest uses nested JUnit suites, which run-evidence.mjs cannot resolve from the outer source-file check ID; it is excluded from the evidence selector rather than reported as executed by that runner. The full app-services test task is part of the separate acceptance run; its result is reported in the builder handback.
 
+
+The file-only narrowing entries below supersede all earlier backfill classification descriptions and delegated choices. Historical scenario quotations stay verbatim. Only this narrowing's changed checks receive fresh evidence; earlier route/settings evidence remains unchanged.
+
 ```json
 {
   "entries": [
     {
       "items": [
-        "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/HeavyIndexingStateTest.java",
         "modules/app-inference/src/test/java/io/justsearch/app/inference/chat/IndexingAnswerAdmissionTest.java",
         "modules/app-services/src/test/java/io/justsearch/app/services/settings/AnswerPausePreferenceTest.java",
         "modules/app-services/src/test/java/io/justsearch/app/services/conversation/ConversationIndexingPauseTest.java",
@@ -23,11 +25,10 @@ The user's answer-policy decision is quoted below. P1/P2 here identify the deliv
         "modules/ui/src/test/java/io/justsearch/ui/api/IndexingPauseWireTest.java",
         "modules/ui/src/test/java/io/justsearch/ui/api/mcp/IndexingPauseMcpTest.java",
         "modules/app-agent/src/test/java/io/justsearch/agent/AgentIndexingPauseTest.java",
-        "modules/ui-web/src/shell-v0/views/BrainSurface.answer-pause.test.ts",
         "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.residency.test.ts"
       ],
       "class": "New",
-      "behaviour": "The new pause policy persists independently of answer intent; the Engine classifies pending files and meaning backlog with 50/10 hysteresis and releases on holds, unavailable counts and stopped owners. Only new GENERATE exchanges are refused; admitted leases finish and ASSIST/AUX/VDU remain available. The controller keeps its running server, HTTP/proxy/MCP/SSE identify the pause, agents do not retry a paused admission, and Advanced settings defaults off, saves a witnessed single-field patch, preserves answer intent and converges another window. Tests cover threshold edges, both overlapping backlog orders and restart recomputation; legacy inputs remain valid. These are bounded component/interface checks; the independent verifier still checks the complete running application.",
+      "behaviour": "The new pause policy persists independently of answer intent; file-only backlog classification is covered by the narrowing entries below. Only new GENERATE exchanges are refused; admitted leases finish and ASSIST/AUX/VDU remain available. The controller keeps its running server, HTTP/proxy/MCP/SSE identify the pause, agents do not retry a paused admission, and Advanced settings defaults off, saves a witnessed single-field patch, preserves answer intent and converges another window. Legacy inputs remain valid; the narrowing entries cover the current threshold and restart expectations. These are bounded component/interface checks; the independent verifier still checks the complete running application.",
       "sources": [
         {
           "kind": "owner-adopted-scenario",
@@ -59,14 +60,13 @@ The user's answer-policy decision is quoted below. P1/P2 here identify the deliv
           "kind": "delegated-choice",
           "delegationQuote": "proceed accordingly",
           "delegationLocation": "task t-20261101-uiimpl user turn proceed accordingly",
-          "delegationScope": "Design and implement the adopted indexing pause outcome using the owner's Wait, model stays choice.",
-          "choice": "The settled Engine backlog policy: ON while indexing runs without pause/hold and either pending files or pending embedding documents reaches 50; retain ON until both counts are below 10, or indexing pauses/is held. Picture reading is excluded. Backfill uses its own document backlog, so one deferred single-file embedding never triggers the pause. These are constants, not settings.",
+          "delegationScope": "Design and implement the adopted indexing pause outcome using the owner's Wait, model stays choice; narrow the heavy-indexing signal after exhausted repairs.",
+          "choice": "Heavy indexing = file indexing only. ON when indexing is running and not held, using exactly the holds the file indexing loop itself obeys (manual pause, schedule hold, battery hold, cutover pause, service outage; energy saver alone is not a hold) AND pending + processing indexing files >= 50; OFF when < 10 or held. Hysteresis 50/10, serialized sampling and publication as now. Meaning/embedding backfill, including chunk vectors, never pauses answers. Picture reading never counts.",
           "label": "agent choice"
         }
       ],
       "evidence": "gates/test-intent/evidence/s2-pause-answers-new.json",
       "newChecks": [
-        "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/HeavyIndexingStateTest.java",
         "modules/app-inference/src/test/java/io/justsearch/app/inference/chat/IndexingAnswerAdmissionTest.java",
         "modules/app-services/src/test/java/io/justsearch/app/services/settings/AnswerPausePreferenceTest.java",
         "modules/app-services/src/test/java/io/justsearch/app/services/conversation/ConversationIndexingPauseTest.java",
@@ -75,7 +75,6 @@ The user's answer-policy decision is quoted below. P1/P2 here identify the deliv
         "modules/ui/src/test/java/io/justsearch/ui/api/IndexingPauseWireTest.java",
         "modules/ui/src/test/java/io/justsearch/ui/api/mcp/IndexingPauseMcpTest.java",
         "modules/app-agent/src/test/java/io/justsearch/agent/AgentIndexingPauseTest.java",
-        "modules/ui-web/src/shell-v0/views/BrainSurface.answer-pause.test.ts",
         "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.residency.test.ts"
       ]
     },
@@ -178,7 +177,7 @@ The user's answer-policy decision is quoted below. P1/P2 here identify the deliv
       ],
       "class": "New",
       "repaired": true,
-      "behaviour": "Repair round 1: an INDEXING-refused live page question waits visibly and resends once after a fresh Engine resume observation, including repeated polls, concurrent windows and a status flap while its resumed request is in flight. Editing, Stop waiting, discarding, New and switching answers off cancel continuation; restored copies remain review-only. Backfill backlog only counts while the scheduler can run embeddings (provider available, writes permitted and GPU unit allowed), and counts again when availability returns. The served readiness union accepts INDEXING. Real HTTP title and compaction entry points retain CHAT_UNAVAILABLE, INDEXING and the exact pause wording for synchronous and asynchronous generation refusals without changing saved history, title or summary. The HTTP fixtures refuse at generation, after initial admission. Each repaired expectation has assertion fail-before evidence at b4b0d60ac5. The page fixture now uses the production chunk SSE event; assertions observe the markdown element text property across its shadow boundary.",
+      "behaviour": "Repair round 1: an INDEXING-refused live page question waits visibly and resends once after a fresh Engine resume observation, including repeated polls, concurrent windows and a status flap while its resumed request is in flight. Editing, Stop waiting, discarding, New and switching answers off cancel continuation; restored copies remain review-only. The served readiness union accepts INDEXING. Real HTTP title and compaction entry points retain CHAT_UNAVAILABLE, INDEXING and the exact pause wording for synchronous and asynchronous generation refusals without changing saved history, title or summary. The HTTP fixtures refuse at generation, after initial admission. Each repaired expectation has assertion fail-before evidence at b4b0d60ac5. The page fixture now uses the production chunk SSE event; assertions observe the markdown element text property across its shadow boundary.",
       "sources": [
         {
           "kind": "owner-adopted-scenario",
@@ -214,7 +213,7 @@ The user's answer-policy decision is quoted below. P1/P2 here identify the deliv
       ],
       "class": "New",
       "repaired": true,
-      "behaviour": "Repair round 2: a typed INDEXING refusal inside an HTTP 200 SSE stream enters the same live automatic waiting path as a pre-stream HTTP 503 refusal, for grounded answers and free chat. The browser reads the already-saved unanswered question through the page record-check interface while waiting. Resume retains that visible turn and its turn id, sends once, and preserves a newer draft. The Engine reuses the already-persisted unanswered question across repeated refusals and injects it once, with prior history preserved for persistent shapes. A controlled interleaving captures 50 files, stalls the embedding read, observes manual pause/reset, resumes at 20, then releases the old read; the stale sample cannot restore hysteresis, while a fresh 50-file sample can still enter. Fail-before checks target 69812a2711 in the temporary shared clone.",
+      "behaviour": "Repair round 2: a typed INDEXING refusal inside an HTTP 200 SSE stream enters the same live automatic waiting path as a pre-stream HTTP 503 refusal, for grounded answers and free chat. The browser reads the already-saved unanswered question through the page record-check interface while waiting. Resume retains that visible turn and its turn id, sends once, and preserves a newer draft. The Engine reuses the already-persisted unanswered question across repeated refusals and injects it once, with prior history preserved for persistent shapes. Current file-count sampling and manual-pause/reset checks are covered by the narrowing entries below. Fail-before checks target 69812a2711 in the temporary shared clone.",
       "sources": [
         {
           "kind": "owner-adopted-scenario",
@@ -245,12 +244,11 @@ The user's answer-policy decision is quoted below. P1/P2 here identify the deliv
     },
     {
       "items": [
-        "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/IndexingLoopHeavyIndexingTest.java",
         "modules/app-services/src/test/java/io/justsearch/app/services/conversation/HierarchicalShapeRunnerTest.java"
       ],
       "class": "New",
       "repaired": true,
-      "behaviour": "Repair round 3: sample and publication run under one lock. An older 50-file observation cannot overwrite drain-to-zero followed by 20 new files. Manual hold/reset during a sample clears hysteresis; its existing interleaving now waits for the serialized reset before resuming. A bulk GPU hold does not exclude file ingestion or CPU-runnable embedding backlog; GPU-only embedding backlog remains excluded. Hierarchical sections, final synthesis and single-pass synthesis retain CHAT_UNAVAILABLE, INDEXING, forceAllowed=false and the exact pause wording for synchronous and callback refusals after initial admission, and never synthesize placeholders from a paused section. Baseline c93a9c0f49 supplies assertion fail-before for the race, GPU-held file/CPU backlog and callback section/final refusals; cases already correct on the baseline remain in the same parameterized checks as preservation coverage. Earlier worker evidence references are superseded because this round changes that test file. The same evidence also runs the full modified worker test class on both trees, retaining manual-pause/reset, availability, hold, failure, stopped-owner and recovery coverage.",
+      "behaviour": "Repair round 3: hierarchical sections, final synthesis and single-pass synthesis retain CHAT_UNAVAILABLE, INDEXING, forceAllowed=false and the exact pause wording for synchronous and callback refusals after initial admission, and never synthesize placeholders from a paused section. Baseline c93a9c0f49 supplies assertion fail-before for callback section/final refusals; cases already correct on the baseline remain preservation coverage. Worker signal checks previously grouped in this evidence are superseded by the file-only narrowing entries below.",
       "sources": [
         {
           "kind": "owner-adopted-scenario",
@@ -274,9 +272,6 @@ The user's answer-policy decision is quoted below. P1/P2 here identify the deliv
       ],
       "evidence": "gates/test-intent/evidence/s2-pause-answers-repair3.json",
       "newChecks": [
-        "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/IndexingLoopHeavyIndexingTest.java",
-        "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/IndexingLoopHeavyIndexingTest.java#drainedBacklogThenSmallNewBatchCannotBeOverwrittenByAnOlderSample",
-        "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/IndexingLoopHeavyIndexingTest.java#gpuHoldOnlyExcludesGpuEmbeddingWork",
         "modules/app-services/src/test/java/io/justsearch/app/services/conversation/HierarchicalShapeRunnerTest.java#generationPauseAfterAdmissionRemainsTypedAndStopsThePipeline"
       ]
     },
@@ -381,6 +376,104 @@ The user's answer-policy decision is quoted below. P1/P2 here identify the deliv
       "newChecks": [
         "modules/app-inference/src/test/java/io/justsearch/app/inference/chat/IndexingSmokeProbeAdmissionTest.java",
         "modules/app-services/src/test/java/io/justsearch/app/services/ai/install/AiInstallIndexingPauseTest.java"
+      ]
+    },
+    {
+      "items": [
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/IndexingLoopHeavyIndexingTest.java"
+      ],
+      "class": "New",
+      "repaired": true,
+      "behaviour": "Narrowing: file indexing alone owns the pause. Parent/chunk embedding backlogs of 50 without files do not pause answers; 25 ready + 25 processing files under energy saver and GPU bulk hold do. Actual battery hold clears the pause and releasing it restores the file pause. Fail-before at 121f35e7cb rejects parent-only/combined backlog and energy saver by assertion; the chunk-only case and serialized race/hold/failure/recovery cases pass before as preservation. Deleted backfill-provider classification checks described the superseded scope. Stale-sample interleaving now stalls the file count read, with the same hold/reset oracle. Queue failure replaces the removed embedding-count read failure. All before builds run under the session temporary shared clone, with separate build folders and no source repository worktree writes. The parameterized backlog cases use the class-level selector because JUnit exposes only invocation display names in its XML; a method selector matched no cases and is not claimed as executed. The class captures each invocation and its assertion results.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "P1",
+          "quote": "(user Q1: \"Wait, model stays\") Advanced settings has a \"Pause answers while indexing\" switch, default off (existing installs unchanged). On: while the Engine runs heavy indexing (bulk import, reindex, meaning backfill; not picture reading), new questions from the page, agents and HTTP get an explicit \"Answers paused while indexing\" outcome instead of an answer, an answer already streaming finishes, drafts and conversations are kept, search stays available; when heavy indexing ends (finish, fail, cancel, manual pause) answers resume by themselves with the model still loaded. The saved answers on/off choice is never changed by the pause.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "P2",
+          "quote": "Pause and user intent: switching answers off during a pause keeps them off after indexing; turning the pause switch off mid-indexing resumes answers at once; overlapping indexing work ending in any order releases the pause only when none is left; the choice survives restart and upgrade; a second window converges; Engine recovery mid-pause settles to the right state; a stale window or queue poll cannot hold answers paused. (challenger-4 #11)",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "N2",
+          "quote": "Saved settings keep their meaning across the stored settings schema change (envelope schema 6 today; public API v2): existing installs load with no explicit choice (today's behaviour), older settings versions migrate, corrupt settings are quarantined as today; declinedAiPackages stays acquisition preference only.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-words",
+          "quote": "Wait, model stays (Recommended)",
+          "location": "task t-20261101-uiimpl user turn Q1"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed accordingly",
+          "delegationLocation": "task t-20261101-uiimpl user turn proceed accordingly",
+          "delegationScope": "Design and implement the adopted indexing pause outcome using the owner's Wait, model stays choice; narrow the heavy-indexing signal after exhausted repairs.",
+          "choice": "Heavy indexing = file indexing only. ON when indexing is running and not held, using exactly the holds the file indexing loop itself obeys (manual pause, schedule hold, battery hold, cutover pause, service outage; energy saver alone is not a hold) AND pending + processing indexing files >= 50; OFF when < 10 or held. Hysteresis 50/10, serialized sampling and publication as now. Meaning/embedding backfill, including chunk vectors, never pauses answers. Picture reading never counts.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/s2-pause-answers-files-only.json",
+      "newChecks": [
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/IndexingLoopHeavyIndexingTest.java",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/IndexingLoopHeavyIndexingTest.java#energySaverAndGpuHoldKeepFilesHeavyButBatteryHoldReleases"
+      ]
+    },
+    {
+      "items": [
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/HeavyIndexingStateTest.java",
+        "modules/ui-web/src/shell-v0/views/BrainSurface.answer-pause.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "Narrowing supersedes the former overlapping-backfill expectations. File-only hysteresis retains fixed 50/10 edges, hold reset, restart recomputation and single-file preservation through the reduced signature. Brain Advanced settings describes indexing files (bulk import, reindex), and its paused sentence says answers resume when bulk file indexing ends while the model stays loaded. Existing witnessed-save and second-window expectations remain. These checks have candidate execution evidence; assertion fail-before for the changed signal is separately supplied by IndexingLoopHeavyIndexingTest, without treating the removed helper parameter as fail-before.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "P1",
+          "quote": "(user Q1: \"Wait, model stays\") Advanced settings has a \"Pause answers while indexing\" switch, default off (existing installs unchanged). On: while the Engine runs heavy indexing (bulk import, reindex, meaning backfill; not picture reading), new questions from the page, agents and HTTP get an explicit \"Answers paused while indexing\" outcome instead of an answer, an answer already streaming finishes, drafts and conversations are kept, search stays available; when heavy indexing ends (finish, fail, cancel, manual pause) answers resume by themselves with the model still loaded. The saved answers on/off choice is never changed by the pause.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "P2",
+          "quote": "Pause and user intent: switching answers off during a pause keeps them off after indexing; turning the pause switch off mid-indexing resumes answers at once; overlapping indexing work ending in any order releases the pause only when none is left; the choice survives restart and upgrade; a second window converges; Engine recovery mid-pause settles to the right state; a stale window or queue poll cannot hold answers paused. (challenger-4 #11)",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "N2",
+          "quote": "Saved settings keep their meaning across the stored settings schema change (envelope schema 6 today; public API v2): existing installs load with no explicit choice (today's behaviour), older settings versions migrate, corrupt settings are quarantined as today; declinedAiPackages stays acquisition preference only.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-words",
+          "quote": "Wait, model stays (Recommended)",
+          "location": "task t-20261101-uiimpl user turn Q1"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed accordingly",
+          "delegationLocation": "task t-20261101-uiimpl user turn proceed accordingly",
+          "delegationScope": "Design and implement the adopted indexing pause outcome using the owner's Wait, model stays choice; narrow the heavy-indexing signal after exhausted repairs.",
+          "choice": "Heavy indexing = file indexing only. ON when indexing is running and not held, using exactly the holds the file indexing loop itself obeys (manual pause, schedule hold, battery hold, cutover pause, service outage; energy saver alone is not a hold) AND pending + processing indexing files >= 50; OFF when < 10 or held. Hysteresis 50/10, serialized sampling and publication as now. Meaning/embedding backfill, including chunk vectors, never pauses answers. Picture reading never counts.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/s2-pause-answers-files-wording.json",
+      "newChecks": [
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/HeavyIndexingStateTest.java",
+        "modules/ui-web/src/shell-v0/views/BrainSurface.answer-pause.test.ts"
       ]
     }
   ]

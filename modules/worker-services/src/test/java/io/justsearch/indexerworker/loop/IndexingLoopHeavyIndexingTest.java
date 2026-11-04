@@ -10,7 +10,6 @@ import io.justsearch.core.scheduling.IndexingHold;
 import io.justsearch.indexerworker.coordination.WorkerSignalBus;
 import io.justsearch.indexerworker.loop.pacing.IndexingPacing;
 import io.justsearch.indexerworker.queue.JobQueue;
-import java.io.IOException;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
@@ -20,68 +19,17 @@ import org.junit.jupiter.api.Test;
 
 final class IndexingLoopHeavyIndexingTest {
   @org.junit.jupiter.params.ParameterizedTest
-  @org.junit.jupiter.params.provider.ValueSource(strings = {"unavailable", "writes-disabled", "gpu-held"})
-  void backfillOnlyPausesAnswersWhenItCanProgress(String condition) throws Exception {
-    var available = new AtomicBoolean(true);
-    var allowed = new AtomicBoolean(true);
-    var gpuHeld = new AtomicBoolean();
+  @org.junit.jupiter.params.provider.CsvSource({"50,0", "0,50", "50,50"})
+  void embeddingAndChunkBacklogsAloneNeverPauseAnswers(int parents, int chunks) throws Exception {
     var provider = mock(io.justsearch.indexerworker.embed.EmbeddingProvider.class);
-    when(provider.isAvailable()).thenAnswer(ignored -> available.get());
-    when(provider.isUsingGpu()).thenReturn(true);
-    var compatibility = mock(io.justsearch.indexerworker.embed.EmbeddingCompatibilityController.class);
-    when(compatibility.allowEmbeddingWrites()).thenAnswer(ignored -> allowed.get());
-    var signals = mock(WorkerSignalBus.class);
-    when(signals.isMainGpuActive()).thenAnswer(ignored -> gpuHeld.get());
+    when(provider.isAvailable()).thenReturn(true);
     var queue = mock(JobQueue.class);
     when(queue.jobStateCounts()).thenReturn(new JobQueue.JobStateCounts(0, 0, 0, 0, 0));
     var counts = mock(IndexCountOps.class);
     when(counts.countByFieldOrThrow(SchemaFields.EMBEDDING_STATUS,
-        SchemaFields.EMBEDDING_STATUS_PENDING)).thenReturn(50);
-    var entered = new CountDownLatch(1);
-    var release = new CountDownLatch(1);
-    when(queue.pollPending(anyInt())).thenAnswer(ignored -> {
-      entered.countDown();
-      release.await(30, TimeUnit.SECONDS);
-      return List.of();
-    });
-    var loop = new IndexingLoop(
-        io.justsearch.indexerworker.TestWorkerExecutorRegistrations.ocr(),
-        io.justsearch.indexerworker.TestWorkerExecutorRegistrations.timebox(), queue,
-        mock(IndexingCoordinator.class), mock(CommitOps.class), mock(DocumentFieldOps.class),
-        counts, () -> null, signals, IndexingPacing.unthrottled(),
-        null, null, null, null, null, null, null);
-    loop.getEmbeddingLifecycle().setEmbeddingProvider(provider);
-    loop.getEmbeddingLifecycle().setEmbeddingCompatController(compatibility);
-    try {
-      loop.start();
-      assertTrue(entered.await(5, TimeUnit.SECONDS));
-      assertTrue(loop.heavyIndexing(), "a runnable retained backlog counts");
-      if (condition.equals("unavailable")) available.set(false);
-      else if (condition.equals("writes-disabled")) allowed.set(false);
-      else gpuHeld.set(true);
-      assertFalse(loop.heavyIndexing(), "a retained backlog that cannot run must not pause answers");
-      available.set(true); allowed.set(true); gpuHeld.set(false);
-      assertTrue(loop.heavyIndexing(), "the same backlog counts again when its provider returns");
-    } finally {
-      release.countDown();
-      loop.close();
-    }
-  }
-
-  @org.junit.jupiter.params.ParameterizedTest(name = "{displayName} [{index}] {arguments}")
-  @org.junit.jupiter.params.provider.CsvSource({"50,0,true,true", "0,50,true,false", "0,50,false,true"})
-  void gpuHoldOnlyExcludesGpuEmbeddingWork(long files, int embeddings, boolean gpu, boolean heavy)
-      throws Exception {
-    var signals = mock(WorkerSignalBus.class);
-    when(signals.isBulkHeld()).thenReturn(true);
-    var provider = mock(io.justsearch.indexerworker.embed.EmbeddingProvider.class);
-    when(provider.isAvailable()).thenReturn(true);
-    when(provider.isUsingGpu()).thenReturn(gpu);
-    var queue = mock(JobQueue.class);
-    when(queue.jobStateCounts()).thenReturn(new JobQueue.JobStateCounts(files, files, 0, 0, 0));
-    var counts = mock(IndexCountOps.class);
-    when(counts.countByFieldOrThrow(SchemaFields.EMBEDDING_STATUS,
-        SchemaFields.EMBEDDING_STATUS_PENDING)).thenReturn(embeddings);
+        SchemaFields.EMBEDDING_STATUS_PENDING)).thenReturn(parents);
+    when(counts.countByFieldOrThrow(SchemaFields.CHUNK_EMBEDDING_STATUS,
+        SchemaFields.EMBEDDING_STATUS_PENDING)).thenReturn(chunks);
     var polling = new CountDownLatch(1);
     var release = new CountDownLatch(1);
     when(queue.pollPending(anyInt())).thenAnswer(ignored -> {
@@ -93,13 +41,52 @@ final class IndexingLoopHeavyIndexingTest {
         io.justsearch.indexerworker.TestWorkerExecutorRegistrations.ocr(),
         io.justsearch.indexerworker.TestWorkerExecutorRegistrations.timebox(), queue,
         mock(IndexingCoordinator.class), mock(CommitOps.class), mock(DocumentFieldOps.class),
-        counts, () -> null, signals, IndexingPacing.unthrottled(),
+        counts, () -> null, mock(WorkerSignalBus.class), IndexingPacing.unthrottled(),
         null, null, null, null, null, null, null);
     loop.getEmbeddingLifecycle().setEmbeddingProvider(provider);
     try {
       loop.start();
       assertTrue(polling.await(5, TimeUnit.SECONDS));
-      assertEquals(heavy, loop.heavyIndexing());
+      assertFalse(loop.heavyIndexing(), "meaning backlogs without indexing files never pause answers");
+    } finally {
+      release.countDown();
+      loop.close();
+    }
+  }
+
+  @Test
+  void energySaverAndGpuHoldKeepFilesHeavyButBatteryHoldReleases() throws Exception {
+    var hold = new IndexingHold();
+    var signals = mock(WorkerSignalBus.class);
+    when(signals.indexingHold()).thenReturn(hold);
+    when(signals.isIndexingHeld()).thenAnswer(ignored -> hold.held());
+    when(signals.isEnergyReduced()).thenReturn(true);
+    when(signals.isBulkHeld()).thenReturn(true);
+    var queue = mock(JobQueue.class);
+    // Pending and already-processing files both contribute to the threshold.
+    when(queue.jobStateCounts()).thenReturn(new JobQueue.JobStateCounts(25, 25, 25, 0, 0));
+    var polling = new CountDownLatch(1);
+    var release = new CountDownLatch(1);
+    when(queue.pollPending(anyInt())).thenAnswer(ignored -> {
+      polling.countDown();
+      assertTrue(release.await(30, TimeUnit.SECONDS));
+      return List.of();
+    });
+    var loop = new IndexingLoop(
+        io.justsearch.indexerworker.TestWorkerExecutorRegistrations.ocr(),
+        io.justsearch.indexerworker.TestWorkerExecutorRegistrations.timebox(), queue,
+        mock(IndexingCoordinator.class), mock(CommitOps.class), mock(DocumentFieldOps.class),
+        mock(IndexCountOps.class), () -> null, signals, IndexingPacing.unthrottled(),
+        null, null, null, null, null, null, null);
+    try {
+      loop.start();
+      assertTrue(polling.await(5, TimeUnit.SECONDS));
+      assertTrue(loop.heavyIndexing(), "energy saver and bulk GPU holds do not stop file indexing");
+      hold.setPolicy(false, null, null, null, true);
+      hold.setOnBattery(true);
+      assertFalse(loop.heavyIndexing(), "the battery hold stops file indexing");
+      hold.setOnBattery(false);
+      assertTrue(loop.heavyIndexing(), "releasing battery hold restores file indexing under energy saver");
     } finally {
       release.countDown();
       loop.close();
@@ -181,8 +168,6 @@ final class IndexingLoopHeavyIndexingTest {
     when(signals.indexingHold()).thenReturn(hold);
     when(signals.isIndexingHeld()).thenAnswer(ignored -> hold.held());
     var queue = mock(JobQueue.class);
-    when(queue.jobStateCounts()).thenAnswer(ignored ->
-        new JobQueue.JobStateCounts(files.get(), files.get(), 0, 0, 0));
     var polling = new CountDownLatch(1);
     var releaseLoop = new CountDownLatch(1);
     when(queue.pollPending(anyInt())).thenAnswer(ignored -> {
@@ -193,24 +178,20 @@ final class IndexingLoopHeavyIndexingTest {
     var sampling = new CountDownLatch(1);
     var releaseSample = new CountDownLatch(1);
     var sampler = new java.util.concurrent.atomic.AtomicReference<Thread>();
-    var counts = mock(IndexCountOps.class);
-    when(counts.countByFieldOrThrow(SchemaFields.EMBEDDING_STATUS,
-        SchemaFields.EMBEDDING_STATUS_PENDING)).thenAnswer(ignored -> {
+    when(queue.jobStateCounts()).thenAnswer(ignored -> {
+      long captured = files.get();
       if (Thread.currentThread() == sampler.get()) {
         sampling.countDown();
         assertTrue(releaseSample.await(10, TimeUnit.SECONDS));
       }
-      return 0;
+      return new JobQueue.JobStateCounts(captured, captured, 0, 0, 0);
     });
     var loop = new IndexingLoop(
         io.justsearch.indexerworker.TestWorkerExecutorRegistrations.ocr(),
         io.justsearch.indexerworker.TestWorkerExecutorRegistrations.timebox(), queue,
         mock(IndexingCoordinator.class), mock(CommitOps.class), mock(DocumentFieldOps.class),
-        counts, () -> null, signals, IndexingPacing.unthrottled(),
+        mock(IndexCountOps.class), () -> null, signals, IndexingPacing.unthrottled(),
         null, null, null, null, null, null, null);
-    var provider = mock(io.justsearch.indexerworker.embed.EmbeddingProvider.class);
-    when(provider.isAvailable()).thenReturn(true);
-    loop.getEmbeddingLifecycle().setEmbeddingProvider(provider);
     var stale = new java.util.concurrent.FutureTask<Boolean>(loop::heavyIndexing);
     var thread = new Thread(stale, "heavy-indexing-stale-sample");
     sampler.set(thread);
@@ -218,7 +199,7 @@ final class IndexingLoopHeavyIndexingTest {
       loop.start();
       assertTrue(polling.await(5, TimeUnit.SECONDS));
       thread.start();
-      assertTrue(sampling.await(5, TimeUnit.SECONDS), "50 files captured before the embedding read stalls");
+      assertTrue(sampling.await(5, TimeUnit.SECONDS), "50 files captured before the file count read returns");
       hold.pause(null, "USER_PAUSED");
       var reset = new java.util.concurrent.FutureTask<Boolean>(loop::heavyIndexing);
       var resetThread = new Thread(reset, "heavy-indexing-reset");
@@ -290,24 +271,17 @@ final class IndexingLoopHeavyIndexingTest {
   @Test
   void ownerReadsLiveCountsAndReleasesOnHoldsFailureStopAndRecovery() throws Exception {
     var files = new AtomicLong(50);
-    var embeddings = new AtomicLong();
     var broken = new AtomicBoolean();
-    var energy = new AtomicBoolean();
     var hold = new IndexingHold();
     var signals = mock(WorkerSignalBus.class, invocation -> switch (invocation.getMethod().getName()) {
       case "indexingHold" -> hold;
       case "isIndexingHeld" -> hold.held();
-      case "isEnergyReduced" -> energy.get();
       default -> RETURNS_DEFAULTS.answer(invocation);
     });
     var queue = mock(JobQueue.class);
-    when(queue.jobStateCounts()).thenAnswer(ignored ->
-        new JobQueue.JobStateCounts(files.get(), files.get(), 0, 0, 0));
-    var counts = mock(IndexCountOps.class);
-    when(counts.countByFieldOrThrow(
-        SchemaFields.EMBEDDING_STATUS, SchemaFields.EMBEDDING_STATUS_PENDING)).thenAnswer(ignored -> {
-      if (broken.get()) throw new IOException("index unavailable");
-      return Math.toIntExact(embeddings.get());
+    when(queue.jobStateCounts()).thenAnswer(ignored -> {
+      if (broken.get()) throw new IllegalStateException("queue unavailable");
+      return new JobQueue.JobStateCounts(files.get(), files.get(), 0, 0, 0);
     });
     // Park only this test's writer at its queue boundary; the owner observation stays live.
     var pollEntered = new CountDownLatch(1);
@@ -321,11 +295,8 @@ final class IndexingLoopHeavyIndexingTest {
         io.justsearch.indexerworker.TestWorkerExecutorRegistrations.ocr(),
         io.justsearch.indexerworker.TestWorkerExecutorRegistrations.timebox(), queue,
         mock(IndexingCoordinator.class), mock(CommitOps.class), mock(DocumentFieldOps.class),
-        counts, () -> null, signals, IndexingPacing.unthrottled(),
+        mock(IndexCountOps.class), () -> null, signals, IndexingPacing.unthrottled(),
         null, null, null, null, null, null, null);
-    var provider = mock(io.justsearch.indexerworker.embed.EmbeddingProvider.class);
-    when(provider.isAvailable()).thenReturn(true);
-    loop.getEmbeddingLifecycle().setEmbeddingProvider(provider);
     assertFalse(loop.heavyIndexing());
     try {
       loop.start();
@@ -333,23 +304,18 @@ final class IndexingLoopHeavyIndexingTest {
       assertTrue(loop.heavyIndexing());
       files.set(10);
       assertTrue(loop.heavyIndexing());
-      embeddings.set(50); files.set(0);
-      assertTrue(loop.heavyIndexing());
+      files.set(50);
       hold.pause(null, "USER_PAUSED");
       assertFalse(loop.heavyIndexing());
       hold.resume();
-      assertTrue(loop.heavyIndexing());
-      energy.set(true);
-      assertFalse(loop.heavyIndexing());
-      energy.set(false);
       assertTrue(loop.heavyIndexing());
       broken.set(true);
       assertFalse(loop.heavyIndexing());
       broken.set(false);
       assertTrue(loop.heavyIndexing());
-      embeddings.set(9);
+      files.set(9);
       assertFalse(loop.heavyIndexing());
-      files.set(1); embeddings.set(1);
+      files.set(1);
       assertFalse(loop.heavyIndexing());
     } finally {
       release.countDown();

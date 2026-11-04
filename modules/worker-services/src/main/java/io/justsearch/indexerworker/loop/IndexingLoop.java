@@ -934,7 +934,7 @@ public class IndexingLoop implements Closeable {
     }
 
     } finally {
-      heavyIndexing.update(false, 0, 0);
+      heavyIndexing.update(false, 0);
       try { finalizeShutdownCommit(); }
       finally { if (lease != null) lease.close(); }
     }
@@ -1030,7 +1030,7 @@ public class IndexingLoop implements Closeable {
 
   private boolean pauseForServiceOutage(long deadline) {
     serviceOutagePausedUntilMs = deadline;
-    heavyIndexing.update(false, 0, 0);
+    heavyIndexing.update(false, 0);
     try {
       return sleepAfterError(Math.max(0, deadline - System.currentTimeMillis()));
     } finally {
@@ -1306,24 +1306,25 @@ public class IndexingLoop implements Closeable {
     // Sampling and publication share the reset lock: an older count cannot publish after a
     // newer count has drained the backlog and started a smaller batch.
     synchronized (heavyIndexing) {
-      if (!heavyIndexingCanProgress()) return heavyIndexing.update(false, 0, 0);
+      if (!heavyIndexingCanProgress()) return heavyIndexing.update(false, 0);
       try {
         var counts = jobQueue.jobStateCounts();
-        long embeddings = backfillScheduler.pendingEmbeddingDocuments();
         return heavyIndexing.update(heavyIndexingCanProgress(),
-            counts.pendingReadyCount() + counts.processingCount(), embeddings);
-      } catch (IOException | RuntimeException failure) {
-        // An unavailable index is not running heavy work. Never retain an old automatic pause.
-        heavyIndexing.update(false, 0, 0);
+            counts.pendingReadyCount() + counts.processingCount());
+      } catch (RuntimeException failure) {
+        // An unavailable queue is not running heavy work. Never retain an old automatic pause.
+        heavyIndexing.update(false, 0);
         log.debug("Heavy indexing could not be sampled", failure);
         return false;
       }
     }
   }
 
+  // Match file-processing admission below: energy saver and GPU bulk holds only pace
+  // enrichment; manual, schedule and battery holds share the loop's IndexingHold.
   private boolean heavyIndexingCanProgress() {
     return isRunning() && !cutoverPauseRequested && serviceOutagePausedUntilMs() == 0
-        && !signalBus.isIndexingHeld() && !signalBus.isEnergyReduced();
+        && !signalBus.isIndexingHeld();
   }
 
   /**
@@ -1354,7 +1355,7 @@ public class IndexingLoop implements Closeable {
     synchronized (cutoverPauseMonitor) {
       if (!isRunning()) return loopThread == null || !loopThread.isAlive();
       cutoverPauseRequested = true;
-      heavyIndexing.update(false, 0, 0);
+      heavyIndexing.update(false, 0);
       cutoverPauseMonitor.notifyAll();
       while (!cutoverPaused && isRunning()) {
         long remaining = deadline - System.nanoTime();

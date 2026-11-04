@@ -2423,7 +2423,7 @@ export class BrainSurface extends JfElement {
     return html`
       <div data-testid="brain-simple-panel">
         <h1 class="brain-headline" tabindex="-1">${headline}${aiState === 'installing' && pct !== null ? ` ${pct}%` : ''}</h1>
-        <p class="brain-sentence">${this.inference?.answersPausedWhileIndexing === true && known ? html`Answers resume automatically when heavy indexing ends. The answer model stays loaded.` : this.renderBrainSentence(aiVerdict, installed, features, readingPictures)}</p>
+        <p class="brain-sentence">${this.inference?.answersPausedWhileIndexing === true && known ? html`Answers resume automatically when bulk file indexing ends. The answer model stays loaded.` : this.renderBrainSentence(aiVerdict, installed, features, readingPictures)}</p>
         <div class="brain-status-detail">${aiState === 'connecting' ? html`<jf-pulse-dots></jf-pulse-dots>` : nothing}${known ? (aiState === 'installing' || repairRemedy.kind === 'none' ? sc.sub : repairRemedy.kind === 'manual' ? repairRemedySub(repairRemedy) : nothing) : `Waiting for live install and AI observations. ${indexingActivity.summary}${indexingActivity.detail ? ` — ${indexingActivity.detail}` : ''}`}${this.installStalled() ? html` <span role="status">Download stalled — no recent progress.</span>` : nothing}</div>
         ${known && (!installed || aiState === 'installing' || activationRequired) ? html`<div class="status-row">
           <jf-button class=${primaryAction.primary && !installed ? 'install-action' : ''}
@@ -3243,7 +3243,7 @@ export class BrainSurface extends JfElement {
           <button type="button" aria-expanded=${!!this.expanded.model} @click=${() => this.toggleSection('model')}>${icon({ name: 'folder', size: 14 })} Change</button>
           ${this.expanded.model ? this.settingInput('modelPath', 'Model path') : nothing}
         </div></div>
-        <div class="advanced-row"><div>Pause answers while indexing<p>Wait during heavy indexing; keep the answer model loaded</p></div><div>
+        <div class="advanced-row"><div>Pause answers while indexing<p>Wait while indexing files (bulk import, reindex); keep the answer model loaded</p></div><div>
           <button type="button" class="component-toggle" role="switch" aria-label="Pause answers while indexing"
             aria-checked=${this.rerankerSettings?.pauseAnswersWhileIndexing === true}
             ?disabled=${!this.settingsRead || !this.rerankerSettings?.witness || !!this.busy['answer-pause-switch']}

@@ -74,6 +74,7 @@ it('defaults off, saves only the pause policy, and waits for the witnessed save'
   const el = await mount();
   expect(toggle(el).getAttribute('aria-checked')).toBe('false');
   expect(toggle(el).parentElement!.textContent).toContain('Off');
+  expect(toggle(el).closest('.advanced-row')!.textContent).toContain('indexing files (bulk import, reindex)');
   let release!: () => void;
   holdSave = new Promise(resolve => { release = resolve; });
   toggle(el).click(); await settle(el);
@@ -96,7 +97,7 @@ it('uses the Engine pause observation for wording and converges a second window'
   emit(true); await settle(first); await settle(second);
   expect(toggle(second).getAttribute('aria-checked')).toBe('true');
   expect(first.shadowRoot!.querySelector('h1')!.textContent).toBe('Answers paused while indexing');
-  expect(first.shadowRoot!.querySelector('.brain-sentence')!.textContent).toContain('Answers resume automatically');
+  expect(first.shadowRoot!.querySelector('.brain-sentence')!.textContent).toContain('Answers resume automatically when bulk file indexing ends.');
   expect(first.shadowRoot!.querySelector('.brain-sentence')!.textContent).toContain('answer model stays loaded');
   toggle(second).click(); await settle(second);
   expect(enabled).toBe(false);
