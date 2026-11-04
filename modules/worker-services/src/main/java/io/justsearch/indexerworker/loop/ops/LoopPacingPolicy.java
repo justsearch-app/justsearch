@@ -36,6 +36,11 @@ public final class LoopPacingPolicy {
     return recentlyActive ? ACTIVE_IDLE_SLEEP_MS : idleSleepMillis;
   }
 
+  /** A cold configured GPU can be initialized by bulk acquisition even before it is available. */
+  public static boolean requiresGpu(boolean available, io.justsearch.ort.OrtCudaStatus status) {
+    return available || (status != null && status.configured());
+  }
+
   /**
    * Whether GPU-heavy bulk backfill may run. The two yield reasons are deliberately distinct
    * (tempdoc 630):

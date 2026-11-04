@@ -120,6 +120,7 @@ public final class NerService implements Closeable {
 
     for (String chunk : chunks) {
       try {
+        io.justsearch.indexerworker.inference.LocalSessionAcquisition.checkCancellation();
         BertNerInference.InferenceOutput output = inference.infer(chunk);
         List<BioTagDecoder.Entity> entities =
             BioTagDecoder.decode(output.logits(), output.tokens(), output.wordIds(), labelMapping);
@@ -194,8 +195,10 @@ public final class NerService implements Closeable {
     // Phase 2: Batch inference on all chunks
     List<BertNerInference.InferenceOutput> allOutputs;
     try {
+      io.justsearch.indexerworker.inference.LocalSessionAcquisition.checkCancellation();
       allOutputs = inference.inferBatch(allChunks);
     } catch (OrtException e) {
+      io.justsearch.indexerworker.inference.LocalSessionAcquisition.checkCancellation();
       log.warn("Batched NER inference failed, falling back to per-doc: {}", e.getMessage());
       return contents.stream().map(this::extractEntities).toList();
     }

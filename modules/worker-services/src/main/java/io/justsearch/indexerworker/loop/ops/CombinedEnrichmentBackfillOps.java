@@ -5,6 +5,7 @@ import ai.onnxruntime.OrtException;
 import io.justsearch.adapters.lucene.runtime.CommitOps;
 import io.justsearch.adapters.lucene.runtime.DocumentFieldOps;
 import io.justsearch.adapters.lucene.runtime.IndexingCoordinator;
+import io.justsearch.indexerworker.inference.LocalSessionAcquisition;
 import io.justsearch.indexerworker.loop.pacing.BulkPacePolicy;
 import io.justsearch.indexerworker.loop.pacing.IndexingPacing;
 import io.justsearch.indexerworker.embed.EmbeddingProvider;
@@ -14,7 +15,6 @@ import io.justsearch.indexerworker.ner.NerResult;
 import io.justsearch.indexerworker.ner.NerService;
 import io.justsearch.indexerworker.splade.SpladeEncoder;
 import io.justsearch.indexing.SchemaFields;
-import io.justsearch.core.execution.InferenceRequest;
 import io.justsearch.ort.NativeSessionHandle;
 import io.opentelemetry.api.trace.Span;
 import io.opentelemetry.context.Scope;
@@ -150,11 +150,11 @@ public final class CombinedEnrichmentBackfillOps {
       java.util.ArrayDeque<String> chunkIdCache,
       int[] batchesSinceCommit,
       // Tempdoc 809 finding 3: "stop starting new enrichment work" — the caller's composite of
-      // shutdown, user activity, GPU yield, pending ingest and the remaining cycle budget. Read at
-      // the sub-batch boundaries below, never mid-encode. A context that supplies `() -> false`
+      // shutdown, indexing holds, pending ingest and the remaining cycle budget. Read at
+      // the unit boundaries below, never mid-encode. GPU holds use resource admission. A context that supplies `() -> false`
       // behaves exactly as this pass did before the checkpoints existed.
       BooleanSupplier stopRequestedSupplier,
-      // Hard stops exclude the deadline so accounting can distinguish cancellation from deferral.
+      // Hard stops exclude deadlines and GPU holds; only these cancel inside native operations.
       // Both are checked before every unit, including the first and any classification fallback.
       BooleanSupplier hardStopRequestedSupplier,
       // Round-15 post-round finding: "the embed stage has used its reserved share of the cycle" —
@@ -166,7 +166,28 @@ public final class CombinedEnrichmentBackfillOps {
       WindowedEmbedProgress windowedEmbedProgress,
       Set<String> publishedDocIds,
       BooleanSupplier spladeAllowedSupplier,
-      Consumer<Boolean> spladeBackfillResult) {
+      Consumer<Boolean> spladeBackfillResult,
+      java.util.function.Predicate<Boolean> unitAllowed) {
+    public BackfillContext(
+        DocumentFieldOps documentFieldOps, IndexingCoordinator indexingCoordinator,
+        CommitOps commitOps, IndexingPacing pacing,
+        Supplier<EmbeddingProvider> embeddingProviderSupplier,
+        Supplier<SpladeEncoder> spladeEncoderSupplier, Supplier<NerService> nerServiceSupplier,
+        BooleanSupplier runningSupplier, BooleanSupplier allowEmbeddingWritesSupplier,
+        int batchSize, Logger log, boolean chunkVectorsEnabled, boolean chunkSpladeEnabled,
+        boolean lateChunkingEnabled, int chunkSlotsPerBatch,
+        java.util.ArrayDeque<String> parentIdCache, java.util.ArrayDeque<String> chunkIdCache,
+        int[] batchesSinceCommit, BooleanSupplier stopRequestedSupplier,
+        BooleanSupplier hardStopRequestedSupplier, BooleanSupplier embedShareExhaustedSupplier,
+        WindowedEmbedProgress windowedEmbedProgress, Set<String> publishedDocIds,
+        BooleanSupplier spladeAllowedSupplier, Consumer<Boolean> spladeBackfillResult) {
+      this(documentFieldOps, indexingCoordinator, commitOps, pacing, embeddingProviderSupplier,
+          spladeEncoderSupplier, nerServiceSupplier, runningSupplier, allowEmbeddingWritesSupplier,
+          batchSize, log, chunkVectorsEnabled, chunkSpladeEnabled, lateChunkingEnabled,
+          chunkSlotsPerBatch, parentIdCache, chunkIdCache, batchesSinceCommit, stopRequestedSupplier,
+          hardStopRequestedSupplier, embedShareExhaustedSupplier, windowedEmbedProgress,
+          publishedDocIds, spladeAllowedSupplier, spladeBackfillResult, gpu -> true);
+    }
     public BackfillContext(
         DocumentFieldOps documentFieldOps, IndexingCoordinator indexingCoordinator,
         CommitOps commitOps, IndexingPacing pacing,
@@ -344,13 +365,18 @@ public final class CombinedEnrichmentBackfillOps {
 
       // Phase 0: bounded document-ID pages, independently resumable for each stage.
       EmbeddingProvider selectedEmbeddingProvider = context.embeddingProviderSupplier().get();
-      boolean embedAvailable = embeddingReady(context, selectedEmbeddingProvider);
-      boolean spladeConfigured = context.spladeEncoderSupplier().get() != null;
+      boolean embedAvailable = embeddingReady(context, selectedEmbeddingProvider)
+          && context.unitAllowed().test(selectedEmbeddingProvider.isUsingGpu());
+      SpladeEncoder selectedSplade = context.spladeEncoderSupplier().get();
+      boolean spladeConfigured = selectedSplade != null;
       boolean spladeAvailable = spladeConfigured
-          && context.spladeAllowedSupplier().getAsBoolean();
-      boolean nerAvailable =
-          context.nerServiceSupplier().get() != null
-              && context.nerServiceSupplier().get().isAvailable();
+          && context.spladeAllowedSupplier().getAsBoolean()
+          && context.unitAllowed().test(LoopPacingPolicy.requiresGpu(
+              selectedSplade.isGpuAvailable(), selectedSplade.getOrtCudaStatus()));
+      NerService selectedNer = context.nerServiceSupplier().get();
+      boolean nerAvailable = selectedNer != null && selectedNer.isAvailable()
+          && context.unitAllowed().test(LoopPacingPolicy.requiresGpu(
+              selectedNer.isGpuAvailable(), selectedNer.getOrtCudaStatus()));
 
       // Each stage contributes one bounded page. Interleave stages as before; the
       // unexamined suffix stays behind its stage cursor rather than in an all-ID cache.
@@ -374,9 +400,11 @@ public final class CombinedEnrichmentBackfillOps {
       // Retained owners get served before admitting more work. Reap obsolete identities first.
       context.windowedEmbedProgress().reconcile(context.documentFieldOps(), authority,
           epochAtSelection, selectedEmbeddingProvider);
-      for (String id : context.windowedEmbedProgress().owners()) {
-        if (parents.size() >= context.batchSize()) break;
-        if (!context.publishedDocIds().contains(id)) parents.add(id);
+      if (embedAvailable) {
+        for (String id : context.windowedEmbedProgress().owners()) {
+          if (parents.size() >= context.batchSize()) break;
+          if (!context.publishedDocIds().contains(id)) parents.add(id);
+        }
       }
       int longest = stagePending.stream().mapToInt(List::size).max().orElse(0);
       for (int i = 0; i < longest && parents.size() < context.batchSize(); i++) {
@@ -781,10 +809,11 @@ public final class CombinedEnrichmentBackfillOps {
             pacer.beforeUnit(1);
             if (stopRequested(context, epochAtSelection, authority)
                 || !embeddingReady(context, lateChunkingProvider)) { aborted = true; break; }
+            if (!context.unitAllowed().test(lateChunkingProvider.isUsingGpu())) break;
             try {
               batch.started(List.of(lcDocId), EnrichmentAccounting.Stage.EMBED);
               EmbeddingService.ChunkedEmbedding result =
-                  lateChunkingProvider.embedWithSpans(lcContent, NO_SPANS);
+                  batch.inferenceCancellation(() -> !context.runningSupplier().getAsBoolean() || context.hardStopRequestedSupplier().getAsBoolean(), () -> !embeddingReady(context, lateChunkingProvider)).call(() -> lateChunkingProvider.embedWithSpans(lcContent, NO_SPANS));
               if (result != null && result.primaryVector().length > 0) {
                 accounting.computed(lcDocId, EnrichmentAccounting.Stage.EMBED);
               }
@@ -816,7 +845,10 @@ public final class CombinedEnrichmentBackfillOps {
             } catch (Exception e) {
               if (batch.retired(() -> !embeddingReady(context, lateChunkingProvider),
                   EnrichmentAccounting.Stage.EMBED)) break;
-              accounting.cancelled(EnrichmentAccounting.Stage.EMBED, e);
+              if (accounting.cancelled(EnrichmentAccounting.Stage.EMBED, e)) {
+                aborted |= hardStopRequested(context, epochAtSelection, authority);
+                break;
+              }
               if (!embeddingReady(context, lateChunkingProvider)
                   || (SpladeBackfillOps.isSystemicFailure(e) && !isArenaOomFailure(e))) {
                 break;
@@ -906,11 +938,13 @@ public final class CombinedEnrichmentBackfillOps {
                   abortedOnThisDocument = true;
                   break;
                 }
+                if (!context.unitAllowed().test(provider.isUsingGpu())) break;
                 EmbeddingProvider.WindowSlice slice;
                 try {
                   batch.started(List.of(docId), isChunk ? EnrichmentAccounting.Stage.CHUNK_EMBED
                       : EnrichmentAccounting.Stage.EMBED);
-                  slice = provider.embedDocumentWindows(content, nextWindow, EMBED_WINDOW_SLICE);
+                  int fromWindow = nextWindow;
+                  slice = batch.inferenceCancellation(() -> !context.runningSupplier().getAsBoolean() || context.hardStopRequestedSupplier().getAsBoolean(), () -> !embeddingReady(context, provider)).call(() -> provider.embedDocumentWindows(content, fromWindow, EMBED_WINDOW_SLICE));
                 } finally {
                   pacer.afterUnit(EMBED_WINDOW_SLICE);
                 }
@@ -975,7 +1009,10 @@ public final class CombinedEnrichmentBackfillOps {
                 progress.forget(docId);
                 break;
               }
-              accounting.cancelled(isChunk ? EnrichmentAccounting.Stage.CHUNK_EMBED : EnrichmentAccounting.Stage.EMBED, e);
+              if (accounting.cancelled(isChunk ? EnrichmentAccounting.Stage.CHUNK_EMBED : EnrichmentAccounting.Stage.EMBED, e)) {
+                aborted |= hardStopRequested(context, epochAtSelection, authority);
+                break;
+              }
               context
                   .log()
                   .warn(
@@ -1033,16 +1070,23 @@ public final class CombinedEnrichmentBackfillOps {
               priorityTurnEndedNormally = false;
               break;
             }
+            if (!context.unitAllowed().test(provider.isUsingGpu())) break;
             List<float[]> vectors;
             try {
               for (String id : sliceDocIds) batch.started(List.of(id), chunkIdsInBatch.contains(id)
                   ? EnrichmentAccounting.Stage.CHUNK_EMBED : EnrichmentAccounting.Stage.EMBED);
-              vectors = provider.embedDocumentBatch(embedContents.subList(sliceStart, sliceEnd));
+              List<String> sliceTexts = embedContents.subList(sliceStart, sliceEnd);
+              vectors = batch.inferenceCancellation(() -> !context.runningSupplier().getAsBoolean() || context.hardStopRequestedSupplier().getAsBoolean(), () -> !embeddingReady(context, provider)).call(() -> provider.embedDocumentBatch(sliceTexts));
             } catch (Exception failure) {
               if (batch.retired(() -> !embeddingReady(context, provider),
                   EnrichmentAccounting.Stage.EMBED, EnrichmentAccounting.Stage.CHUNK_EMBED)) break;
-              accounting.cancelled(EnrichmentAccounting.Stage.EMBED, failure);
-              accounting.cancelled(EnrichmentAccounting.Stage.CHUNK_EMBED, failure);
+              boolean cancelled = accounting.cancelled(EnrichmentAccounting.Stage.EMBED, failure);
+              cancelled |= accounting.cancelled(EnrichmentAccounting.Stage.CHUNK_EMBED, failure);
+              if (cancelled) {
+                aborted |= hardStopRequested(context, epochAtSelection, authority);
+                priorityTurnEndedNormally = false;
+                break;
+              }
               if (!embeddingReady(context, provider) || SpladeBackfillOps.isSystemicFailure(failure)) {
                 priorityTurnEndedNormally = false;
                 break;
@@ -1079,9 +1123,11 @@ public final class CombinedEnrichmentBackfillOps {
                 pacer.beforeUnit(1);
                 if (stopRequested(context, epochAtSelection, authority)
                     || !embeddingReady(context, provider)) { aborted = true; break; }
+                if (!context.unitAllowed().test(provider.isUsingGpu())) break;
                 try {
-                  vectors.set(i, provider.embedDocument(embedContents.get(sliceStart + i),
-                      InferenceRequest.background()));
+                  String fallbackText = embedContents.get(sliceStart + i);
+                  vectors.set(i, batch.inferenceCancellation(() -> !context.runningSupplier().getAsBoolean() || context.hardStopRequestedSupplier().getAsBoolean(), () -> !embeddingReady(context, provider)).call(() -> provider.embedDocument(fallbackText,
+                      LocalSessionAcquisition.backgroundInference())));
                   float[] vector = vectors.get(i);
                   if (vector != null && vector.length > 0) {
                     String id = sliceDocIds.get(i);
@@ -1091,8 +1137,13 @@ public final class CombinedEnrichmentBackfillOps {
                 } catch (Exception failure) {
                   if (batch.retired(() -> !embeddingReady(context, provider),
                       EnrichmentAccounting.Stage.EMBED, EnrichmentAccounting.Stage.CHUNK_EMBED)) break;
-                  accounting.cancelled(EnrichmentAccounting.Stage.EMBED, failure);
-                  accounting.cancelled(EnrichmentAccounting.Stage.CHUNK_EMBED, failure);
+                  boolean cancelled = accounting.cancelled(EnrichmentAccounting.Stage.EMBED, failure);
+                  cancelled |= accounting.cancelled(EnrichmentAccounting.Stage.CHUNK_EMBED, failure);
+                  if (cancelled) {
+                aborted |= hardStopRequested(context, epochAtSelection, authority);
+                priorityTurnEndedNormally = false;
+                break;
+              }
                   if (!embeddingReady(context, provider) || SpladeBackfillOps.isSystemicFailure(failure)) {
                     priorityTurnEndedNormally = false;
                     break;
@@ -1189,9 +1240,11 @@ public final class CombinedEnrichmentBackfillOps {
           if (batch.stopped(() -> stopRequested(context, epochAtSelection, authority),
               () -> context.nerServiceSupplier().get() != nerService || !nerService.isAvailable(),
               EnrichmentAccounting.Stage.NER)) { aborted = true; break; }
+          if (!context.unitAllowed().test(LoopPacingPolicy.requiresGpu(
+              nerService.isGpuAvailable(), nerService.getOrtCudaStatus()))) break;
           try {
             batch.started(List.of(docId), EnrichmentAccounting.Stage.NER);
-            List<NerResult> nerBatch = nerService.extractEntitiesBatch(List.of(content));
+            List<NerResult> nerBatch = batch.inferenceCancellation(() -> !context.runningSupplier().getAsBoolean() || context.hardStopRequestedSupplier().getAsBoolean(), () -> context.nerServiceSupplier().get() != nerService || !nerService.isAvailable()).call(() -> nerService.extractEntitiesBatch(List.of(content)));
             NerResult result = nerBatch.isEmpty() ? NerResult.EMPTY : nerBatch.get(0);
             accounting.computed(docId, EnrichmentAccounting.Stage.NER);
             if (batch.retired(() -> context.nerServiceSupplier().get() != nerService || !nerService.isAvailable(),
@@ -1254,11 +1307,13 @@ public final class CombinedEnrichmentBackfillOps {
         pacer.beforeUnit(sliceIds.size());
         if (stopRequested(context, epochAtSelection, authority)
             || context.spladeEncoderSupplier().get() != encoder) { aborted = true; break; }
+        if (!context.unitAllowed().test(LoopPacingPolicy.requiresGpu(
+            encoder.isGpuAvailable(), encoder.getOrtCudaStatus()))) break;
         try {
           attemptedSplade = true;
           accounting.attempted(EnrichmentAccounting.Stage.SPLADE);
           sliceIds.forEach(id -> batch.started(List.of(id), EnrichmentAccounting.Stage.SPLADE));
-          List<Map<String, Float>> vectors = encoder.encodeBatch(texts);
+          List<Map<String, Float>> vectors = batch.inferenceCancellation(() -> !context.runningSupplier().getAsBoolean() || context.hardStopRequestedSupplier().getAsBoolean(), () -> context.spladeEncoderSupplier().get() != encoder).call(() -> encoder.encodeBatch(texts));
           if (vectors == null || vectors.size() != sliceIds.size()) {
             throw new IllegalStateException("SPLADE batch result size mismatch");
           }
@@ -1278,7 +1333,10 @@ public final class CombinedEnrichmentBackfillOps {
         } catch (Exception failure) {
           if (batch.retired(() -> context.spladeEncoderSupplier().get() != encoder,
               EnrichmentAccounting.Stage.SPLADE)) break;
-          accounting.cancelled(EnrichmentAccounting.Stage.SPLADE, failure);
+          if (accounting.cancelled(EnrichmentAccounting.Stage.SPLADE, failure)) {
+            aborted |= hardStopRequested(context, epochAtSelection, authority);
+            break;
+          }
           context.log().warn("Combined backfill: SPLADE slice failed: {}", failure.getMessage());
           if (context.spladeEncoderSupplier().get() != encoder || SpladeBackfillOps.isSystemicFailure(failure)) {
             systemicSpladeFailure = true;

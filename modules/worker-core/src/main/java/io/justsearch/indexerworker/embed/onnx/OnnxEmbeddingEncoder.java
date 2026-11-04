@@ -482,12 +482,14 @@ public final class OnnxEmbeddingEncoder implements Closeable {
 
           long tExtract;
           float[][][] hidden;
+          LocalSessionAcquisition.checkCancellation();
           try (OrtSession.Result result = lease.run(inputs)) {
             tExtract = System.nanoTime();
             // ORT-call timing recorded at the Lease choke point (tempdoc 710 Move 2).
             // last_hidden_state: [batchSize, maxLen, dim]
             hidden = (float[][][]) result.get(0).getValue();
           } catch (OrtException e) {
+            LocalSessionAcquisition.checkCancellation();
             // Tempdoc 710 Move 3: without this, an OOM here propagates as OrtException ->
             // BackendException (OnnxEmbeddingBackend.embedBatch) -> null for the WHOLE caller
             // batch (EmbeddingService.embedDocumentBatch), even though only this ONE sub-batch
@@ -653,6 +655,7 @@ public final class OnnxEmbeddingEncoder implements Closeable {
       if (typesTensor != null) {
         singleInputs.put("token_type_ids", typesTensor);
       }
+      LocalSessionAcquisition.checkCancellation();
       try (OrtSession.Result result = lease.run(singleInputs)) {
         float[][][] out = (float[][][]) result.get(0).getValue();
         return out[0];
@@ -971,6 +974,7 @@ public final class OnnxEmbeddingEncoder implements Closeable {
         try (var lease = GpuCallPacker.acquireForCall(
             sessions, acquisition, EncoderRole.EMBEDDING, 1, seqLen)) {
           ortSpan.setAttribute("encoder.gpu", !lease.isCpu());
+          LocalSessionAcquisition.checkCancellation();
           try (OrtSession.Result result = lease.run(inputs)) {
             // Tempdoc 710 Move 2: ORT-call timing is now recorded at the Lease choke point
             // (structural — was tempdoc 691 Wave 0's per-call-site fix for the B-5 blind spot;

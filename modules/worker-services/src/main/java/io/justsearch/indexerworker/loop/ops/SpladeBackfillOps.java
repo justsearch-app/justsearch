@@ -4,6 +4,7 @@ package io.justsearch.indexerworker.loop.ops;
 import io.justsearch.adapters.lucene.runtime.CommitOps;
 import io.justsearch.adapters.lucene.runtime.DocumentFieldOps;
 import io.justsearch.adapters.lucene.runtime.IndexingCoordinator;
+import io.justsearch.indexerworker.inference.LocalSessionAcquisition;
 import io.justsearch.indexerworker.loop.pacing.BulkPacePolicy;
 import io.justsearch.indexerworker.loop.pacing.IndexingPacing;
 import io.justsearch.indexerworker.splade.SpladeEncoder;
@@ -43,7 +44,22 @@ public final class SpladeBackfillOps {
       // Tempdoc 712/931: chunk docs carry splade_status=PENDING from creation whatever this flag
       // says, so without it here this lane encodes chunk sparse data the flag says not to produce.
       boolean chunkSpladeEnabled,
-      Logger log) {}
+      Logger log,
+      BooleanSupplier unitAllowed) {
+    public BackfillContext(
+        DocumentFieldOps documentFieldOps,
+        IndexingCoordinator indexingCoordinator,
+        CommitOps commitOps,
+        IndexingPacing pacing,
+        Supplier<SpladeEncoder> spladeEncoderSupplier,
+        BooleanSupplier runningSupplier,
+        int batchSize,
+        boolean commitAfterBatch,
+        boolean chunkSpladeEnabled,
+        Logger log) {
+      this(documentFieldOps, indexingCoordinator, commitOps, pacing, spladeEncoderSupplier, runningSupplier, batchSize, commitAfterBatch, chunkSpladeEnabled, log, () -> true);
+    }
+  }
 
   /**
    * Processes a batch of SPLADE backfill documents.
@@ -108,6 +124,7 @@ public final class SpladeBackfillOps {
       List<String> batchContents = new ArrayList<>(pendingIds.size());
       for (String docId : batch.ids()) {
         if (selection != null && !"PENDING".equals(batch.fields(docId).get(SchemaFields.SPLADE_STATUS))) continue;
+        if (!context.unitAllowed().getAsBoolean()) break;
         if (batch.stopped(() -> !context.runningSupplier().getAsBoolean(), unavailable, EnrichmentAccounting.Stage.SPLADE)) {
           accounting.cancelRemaining();
           break;
@@ -168,6 +185,7 @@ public final class SpladeBackfillOps {
             sliceStart += bulkPace.spladePhaseDocs()) {
           int sliceEnd = Math.min(sliceStart + bulkPace.spladePhaseDocs(), batchContents.size());
           pacer.beforeUnit(sliceEnd - sliceStart);
+          if (!context.unitAllowed().getAsBoolean()) break;
           if (batch.stopped(() -> !context.runningSupplier().getAsBoolean(), unavailable, EnrichmentAccounting.Stage.SPLADE)) {
             accounting.cancelRemaining();
             break;
@@ -175,7 +193,8 @@ public final class SpladeBackfillOps {
           List<Map<String, Float>> sliceVecs;
           try {
             batch.started(batchDocIds.subList(sliceStart, sliceEnd), EnrichmentAccounting.Stage.SPLADE);
-            sliceVecs = encoder.encodeBatch(batchContents.subList(sliceStart, sliceEnd));
+            List<String> sliceTexts = batchContents.subList(sliceStart, sliceEnd);
+            sliceVecs = batch.inferenceCancellation(() -> !context.runningSupplier().getAsBoolean(), unavailable).call(() -> encoder.encodeBatch(sliceTexts));
           } finally {
             pacer.afterUnit(sliceEnd - sliceStart);
           }
@@ -201,64 +220,72 @@ public final class SpladeBackfillOps {
         if (batch.retired(unavailable, EnrichmentAccounting.Stage.SPLADE)) {
           return StageOutcome.observed(true, processed, t0, accounting);
         }
-        accounting.cancelled(EnrichmentAccounting.Stage.SPLADE, e);
-        context.log().error("SPLADE batch encoding failed: {}", e.getMessage());
-        if (context.spladeEncoderSupplier().get() != encoder || isSystemicFailure(e)) {
-          commitIfNeeded(context, processed, failed, markedFailed);
-          return StageOutcome.observed(false, processed, t0, accounting);
-        }
-        // Fallback to per-doc encoding
-        for (int i = 0; i < batchDocIds.size(); i++) {
-          if (context.spladeEncoderSupplier().get() != encoder) {
+        boolean cancelled = accounting.cancelled(EnrichmentAccounting.Stage.SPLADE, e);
+        if (!cancelled) {
+          context.log().error("SPLADE batch encoding failed: {}", e.getMessage());
+          if (context.spladeEncoderSupplier().get() != encoder || isSystemicFailure(e)) {
             commitIfNeeded(context, processed, failed, markedFailed);
             return StageOutcome.observed(false, processed, t0, accounting);
           }
-          pacer.beforeUnit(1);
-          if (batch.stopped(() -> !context.runningSupplier().getAsBoolean(), unavailable, EnrichmentAccounting.Stage.SPLADE)) {
-            accounting.cancelRemaining();
-            break;
-          }
-          try {
-            Map<String, Float> sparseVec = encoder.encode(
-                batchContents.get(i), io.justsearch.core.execution.InferenceRequest.background());
-            accounting.computed(batchDocIds.get(i), EnrichmentAccounting.Stage.SPLADE);
-            if (batch.retired(unavailable, EnrichmentAccounting.Stage.SPLADE)) break;
-            Map<String, Object> updates = new HashMap<>();
-            updates.put(SchemaFields.SPLADE, sparseVec);
-            updates.put(SchemaFields.SPLADE_STATUS, spladeStatusFor(sparseVec));
-            updates.put(SchemaFields.SPLADE_RETRY_COUNT, "0");
-            if (batch.update(batchDocIds.get(i), updates)) processed++;
-          } catch (Exception e2) {
-            if (batch.retired(unavailable, EnrichmentAccounting.Stage.SPLADE)) break;
-            accounting.cancelled(EnrichmentAccounting.Stage.SPLADE, e2);
-            if (context.spladeEncoderSupplier().get() != encoder || isSystemicFailure(e2)) {
+          // Fallback to per-doc encoding
+          for (int i = 0; i < batchDocIds.size(); i++) {
+            if (context.spladeEncoderSupplier().get() != encoder) {
               commitIfNeeded(context, processed, failed, markedFailed);
               return StageOutcome.observed(false, processed, t0, accounting);
             }
-            markedFailed +=
-                batch.failure(batchDocIds.get(i), SchemaFields.SPLADE_RETRY_COUNT, SpladeBackfillOps::computeSpladeFailureUpdate);
-            failed++;
+            pacer.beforeUnit(1);
+            if (!context.unitAllowed().getAsBoolean()) break;
+            if (batch.stopped(() -> !context.runningSupplier().getAsBoolean(), unavailable, EnrichmentAccounting.Stage.SPLADE)) {
+              accounting.cancelRemaining();
+              break;
+            }
+            try {
+              String fallbackText = batchContents.get(i);
+              Map<String, Float> sparseVec = batch.inferenceCancellation(() -> !context.runningSupplier().getAsBoolean(), unavailable).call(() -> encoder.encode(
+                  fallbackText, LocalSessionAcquisition.backgroundInference()));
+              accounting.computed(batchDocIds.get(i), EnrichmentAccounting.Stage.SPLADE);
+              if (batch.retired(unavailable, EnrichmentAccounting.Stage.SPLADE)) break;
+              Map<String, Object> updates = new HashMap<>();
+              updates.put(SchemaFields.SPLADE, sparseVec);
+              updates.put(SchemaFields.SPLADE_STATUS, spladeStatusFor(sparseVec));
+              updates.put(SchemaFields.SPLADE_RETRY_COUNT, "0");
+              if (batch.update(batchDocIds.get(i), updates)) processed++;
+            } catch (Exception e2) {
+              if (batch.retired(unavailable, EnrichmentAccounting.Stage.SPLADE)) break;
+              if (accounting.cancelled(EnrichmentAccounting.Stage.SPLADE, e2)) break;
+              if (context.spladeEncoderSupplier().get() != encoder || isSystemicFailure(e2)) {
+                commitIfNeeded(context, processed, failed, markedFailed);
+                return StageOutcome.observed(false, processed, t0, accounting);
+              }
+              markedFailed +=
+                  batch.failure(batchDocIds.get(i), SchemaFields.SPLADE_RETRY_COUNT, SpladeBackfillOps::computeSpladeFailureUpdate);
+              failed++;
+            }
+            pacer.afterUnit(1);
           }
-          pacer.afterUnit(1);
-        }
 
-        // Detect batch-wide systemic failure: batch encode failed AND every per-doc fallback
-        // also failed. This indicates a persistent encoder problem (e.g., GPU OOM, corrupted
-        // session) — not a transient per-doc issue. Signal failure to caller for backoff.
-        boolean systemicFailure = processed == 0 && failed == batchDocIds.size();
-        commitIfNeeded(context, processed, failed, markedFailed);
-        if (systemicFailure) {
-          context
-              .log()
-              .warn(
-                  "SPLADE encoding unavailable: entire batch of {} docs failed — {}",
-                  failed,
-                  e.getMessage());
-          return StageOutcome.observed(false, processed, t0, accounting);
+          // Detect batch-wide systemic failure: batch encode failed AND every per-doc fallback
+          // also failed. This indicates a persistent encoder problem (e.g., GPU OOM, corrupted
+          // session) — not a transient per-doc issue. Signal failure to caller for backoff.
+          boolean systemicFailure = processed == 0 && failed == batchDocIds.size();
+          commitIfNeeded(context, processed, failed, markedFailed);
+          if (systemicFailure) {
+            context
+                .log()
+                .warn(
+                    "SPLADE encoding unavailable: entire batch of {} docs failed — {}",
+                    failed,
+                    e.getMessage());
+            return StageOutcome.observed(false, processed, t0, accounting);
+          }
+          return StageOutcome.observed(true, processed, t0, accounting);
         }
-        return StageOutcome.observed(true, processed, t0, accounting);
       }
 
+      if (sparseVecs.isEmpty()) {
+        commitIfNeeded(context, processed, failed, markedFailed);
+        return StageOutcome.observed(true, processed, t0, accounting);
+      }
       long encodeMs = (System.nanoTime() - t2) / 1_000_000;
 
       // Phase 3: Batch-update all docs with SPLADE vectors (single NRT refresh for batch)
@@ -310,8 +337,7 @@ public final class SpladeBackfillOps {
 
   static boolean isSystemicFailure(Throwable failure) {
     for (Throwable cause = failure; cause != null; cause = cause.getCause()) {
-      if (cause instanceof SessionAcquisitionException
-          || cause instanceof java.util.concurrent.CancellationException) return true;
+      if (cause instanceof SessionAcquisitionException) return true;
       if (CombinedEnrichmentBackfillOps.isArenaOomFailure(cause)) return true;
     }
     return false;
