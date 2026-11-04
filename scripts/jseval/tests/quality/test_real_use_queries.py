@@ -199,8 +199,9 @@ def generation_env(monkeypatch, tmp_path):
 def test_generation_keeps_extra_reply_fields_only_in_work(monkeypatch, generation_env, kind, query):
     marker = "PRIVATE_REPLY_MARKER"
     q = {**generation_env, "kind": kind, "members": ["t"]}
+    # The topic carries document text (an excerpt) in the topical case: it must stay in WORK.
     reply = {"query": query, "diagnostic": marker, "note": marker,
-             "topic": "shared ocean topic" if kind == "topical" else marker}
+             "topic": f"shared ocean topic {marker} " + "excerpt words " * 40}
     monkeypatch.setattr(ruq, "ask_claude", lambda _: (reply, json.dumps(reply)))
     result = ruq.generate_one(q, {"t": {}}, {"t": "unrelated text"}, max_attempts=1)
     committed = (ruq.RECORD / "generation.jsonl").read_text()
@@ -209,10 +210,7 @@ def test_generation_keeps_extra_reply_fields_only_in_work(monkeypatch, generatio
     if query is None:
         assert result is None and "output" not in row and "query" not in row
     else:
-        expected = {"query": query}
-        if kind == "topical":
-            expected["topic"] = reply["topic"]
-        assert row["output"] == expected and result["output"] == expected
+        assert row["output"] == {"query": query}
     assert marker in (ruq.WORK / "generation.jsonl").read_text()
 
 
@@ -267,7 +265,7 @@ def test_stored_generation_records_follow_the_committed_allow_list():
         assert row["feedback"] is None or re.fullmatch(
             r"Your previous query had [0-9]+ words; use [0-9]+ to [0-9]+\.", row["feedback"])
         if row["accepted"]:
-            assert set(row["output"]) <= ({"query", "topic"} if row["template"] == "topical" else {"query"})
+            assert set(row["output"]) == {"query"}, row["attempt_id"]
             assert row["output"]["query"] == row["query"]
             assert row["gates"]["verbatim_leak"] == []
         else:

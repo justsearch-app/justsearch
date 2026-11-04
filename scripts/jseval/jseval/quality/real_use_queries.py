@@ -1007,10 +1007,7 @@ def _generation_record(row: dict) -> dict:
         r"Your previous query had [0-9]+ words; use [0-9]+ to [0-9]+\.", feedback) else None
     if row.get("accepted"):
         out["query"] = row["query"]
-        out["output"] = {"query": row["query"]}
-        topic = row.get("output", {}).get("topic")
-        if row["template"] == "topical" and isinstance(topic, str):
-            out["output"]["topic"] = topic
+        out["output"] = {"query": row["query"]}  # the model's topic text stays in WORK
     if "gates" in row:
         out["gates"] = {"words": row["gates"]["words"]}
         if row.get("accepted"):
