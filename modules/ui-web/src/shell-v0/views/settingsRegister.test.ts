@@ -9,7 +9,9 @@
  * the empty-query contract (`<jf-settings-nav>`'s signal to show the grouped view instead).
  */
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { searchRegister, categoryLabel, type SettingsGroup } from './settingsRegister.js';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+import { searchRegister, categoryLabel, SETTINGS_REGISTER, type SettingsGroup } from './settingsRegister.js';
 import { __seedForTest, __resetForTest } from '../../i18n/resourceCatalog.js';
 import { getViewerAudience, setViewerAudience } from '../state/viewerAudienceState.js';
 import { __resetUserStateForTest } from '../state/UserStateDocument.js';
@@ -180,5 +182,20 @@ describe('categoryLabel', () => {
     expect(
       categoryLabel({ id: 'appearance', kind: 'native', labelKey: 'settings.category.appearance' }),
     ).toBe('Appearance');
+  });
+});
+
+describe('the Layout sub-anchor in the shipped words (shell slice 2)', () => {
+  afterEach(() => __resetForTest());
+
+  it('the Settings search indexes the switcher list by the nav\'s own label: "switcher" finds it, "rail" does not', () => {
+    // The shipped bundle, not a test translation: the nav and the search read the same message.
+    const bundle = readFileSync(resolve('../app-api/src/main/resources/messages/registry-surface.en.properties'), 'utf8');
+    __seedForTest(Object.fromEntries(bundle.split(/\r?\n/).filter((line) => line.startsWith('settings.'))
+      .map((line) => [line.slice(0, line.indexOf('=')), line.slice(line.indexOf('=') + 1)])));
+    const hits = (query: string) => searchRegister(query, SETTINGS_REGISTER)
+      .filter((r) => r.category.id === 'layout' && r.section?.key === 'rail');
+    expect(hits('switcher')).toHaveLength(1);
+    expect(hits('rail')).toEqual([]);
   });
 });

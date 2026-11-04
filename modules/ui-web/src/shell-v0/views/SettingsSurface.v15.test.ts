@@ -392,6 +392,18 @@ describe('SettingsSurface — V1.5 Rail section (the switcher and the More menu)
     expect(listed(root, 'More menu windows')).toEqual(['acme.notes-surface', 'acme.graph-surface']);
   });
 
+  it('X1 the More windows line takes its spacing from the space tokens, not an inline size', async () => {
+    const el = await mountSurface('layout');
+    const list = el.shadowRoot!.querySelector('ul.rail-list[aria-label="More menu windows"]')!;
+    const intro = list.previousElementSibling as HTMLElement;
+    expect(intro.textContent).toContain('Windows listed under More');
+    expect(intro.getAttribute('style')).toBeNull();
+    const css = (el.constructor as unknown as { styles: { cssText: string } | { cssText: string }[] }).styles;
+    const text = (Array.isArray(css) ? css : [css]).map((sheet) => sheet.cssText).join('\n');
+    const rule = [...intro.classList].map((name) => text.match(new RegExp(`p\\.help\\.${name}\\s*\\{([^}]*)\\}`))?.[1]).find(Boolean);
+    expect(rule).toMatch(/margin:\s*var\(--jf-space-\d\)/);
+  });
+
   it('respects userConfig.surfaceOrder for the More windows; the switcher keeps its fixed order', async () => {
     setSurfaceOrder(['acme.graph-surface', 'core.brain-surface', 'acme.notes-surface', 'core.search-v3-surface']);
     const el = await mountSurface('layout');

@@ -6,8 +6,9 @@ import type { FrameStatus, StatusAction, StatusFact, StatusSection } from '../st
 import type { StatusBarItem } from '../commands/StatusBarRegistry.js';
 import { formatRelativeIso } from '../../utils/relativeTime.js';
 import { glyphChar, statusGlyph } from '../utils/statusTone.js';
-// 559 Authority VI — plugin items keep one line and overflow by priority into "…", never clip;
-// a lone item wider than the row wraps inside it instead (L2).
+// 559 Authority VI — plugin items keep one line and overflow by priority into "…";
+// a lone item wider than the row wraps inside it instead, and an element wider than the row is
+// contained by it (L2).
 import { OverflowController } from '../primitives/adaptiveBar.js';
 import './ProvenanceChip.js';
 import './IndexingControls.js';
@@ -93,6 +94,10 @@ export class StatusPanel extends JfElement {
     .plugins { display: flex; flex-wrap: nowrap; align-items: center; gap: var(--jf-space-3); min-width: 0; }
     .plugins.open { flex-wrap: wrap; }
     .plugin { display: flex; flex-wrap: wrap; align-items: center; gap: var(--jf-space-2); max-width: 100%; min-width: 0; }
+    /* L2 — a plugin's own element may be wider than the row (a fixed width, a min-width): the row
+       contains it, never the panel scrolling sideways. Its words stay reachable as the tooltip. */
+    .plugin-body { display: block; min-width: 0; max-inline-size: 100%; overflow: hidden; }
+    .plugin-body > * { max-inline-size: 100%; box-sizing: border-box; }
     .empty { padding: var(--jf-space-4); }
     @media (forced-colors: active) {
       :host::before { background: Canvas; border-color: CanvasText; }
@@ -158,7 +163,8 @@ export class StatusPanel extends JfElement {
     const shown = this.pluginsOpen ? this.plugins : this.plugins.slice(0, Math.max(1, this.overflow.visibleCount));
     const hidden = this.plugins.length - shown.length;
     return html`<div class="plugins ${this.pluginsOpen ? 'open' : ''}" role="group" aria-label="Plugin status">${repeat(shown, item => item.id,
-      item => html`<span class="plugin" data-plugin-item=${item.id}>${this.pluginOutput(item)}<jf-provenance-chip .provenance=${item.provenance}></jf-provenance-chip></span>`)}
+      item => { const output = this.pluginOutput(item); return html`<span class="plugin" data-plugin-item=${item.id}><span class="plugin-body"
+        title=${(typeof output === 'string' ? output : output.textContent ?? '').trim()}>${output}</span><jf-provenance-chip .provenance=${item.provenance}></jf-provenance-chip></span>`; })}
       ${hidden > 0 || this.pluginsOpen && this.overflow.visibleCount < this.plugins.length ? html`<button type="button" aria-expanded=${this.pluginsOpen}
         @click=${() => { this.pluginsOpen = !this.pluginsOpen; }}>${this.pluginsOpen ? 'Fewer' : `… ${hidden} more`}</button>` : nothing}</div>`;
   }

@@ -274,7 +274,7 @@ import type { TransportTag } from '../router/transports.js';
 // Slice 501 — the navigation journal (resume-on-launch and the record of where the reader went).
 // Back and Forward themselves run on browser history (FR3), which the journal follows.
 import { recordNavigation, getJournalState } from '../state/NavigationJournal.js';
-import { canonicalize, parseUrl } from '../router/parser.js';
+import { canonicalize, isSurfaceUrl, parseUrl } from '../router/parser.js';
 import { deriveRichLabel } from '../utils/deriveRichLabel.js';
 // The app's ONE "is the reader typing?" pair (857 PR-A) — adopted here by tempdoc 864 Layer 2(a),
 // which retired this file's private fourth copy of the same descent.
@@ -283,7 +283,7 @@ import {
   isTypingTarget,
   shouldIgnoreKeyEvent,
 } from '../utils/keyboardHandler.js';
-import { modalOwnsFocus } from '../primitives/modality.js';
+import { modalOwnsFocus, openModalDepth } from '../primitives/modality.js';
 import { installSearchSummonBridge } from '../router/tauriBridge.js';
 import { surfaceIcon } from '../utils/surfaceIcons.js';
 import { findCategory } from '../views/settingsRegister.js';
@@ -1559,12 +1559,7 @@ export class Shell extends JfElement {
       if (outcome.status !== 'unresolved' && outcome.status !== 'auto-corrected') return;
       if (!this.shadowRoot) return;
       if (outcome.status === 'unresolved') {
-        // L3 — a short notice that fits the top bar beside the pill at every size; the action names
-        // what to do next. (The raw id it used to repeat is not words a reader uses.)
-        emitEphemeralToast({ message: "Couldn't find that window", severity: 'warning',
-          actionLabel: 'Choose destination', destinations: outcome.alternatives,
-          onAction: () => this.shadowRoot?.querySelector<StatusPill>('jf-status-pill')?.toggle(),
-        });
+        this.unknownWindowNotice(outcome.alternatives);
       } else {
         emitEphemeralToast({ message: `Opened ${outcome.canonicalId} instead of ${outcome.originalId}`, actionLabel: 'Undo auto-correction',
           onAction: () => { void this.intentRouter?.dispatch({ address: { kind: 'navigate', target: outcome.originalId, state: {} }, transport: 'BUTTON' }, { recoveryPolicyOverride: strictPolicy }); },
@@ -1645,8 +1640,8 @@ export class Shell extends JfElement {
     // teardown function is invoked immediately on resolution rather
     // than buried in `sourceTeardowns` after teardown already ran.
     const sources = [
-      createURLSource(),
-      createTauriDeepLinkSource(),
+      createURLSource({ onUnknownSurface: () => this.unknownWindowNotice([]) }),
+      createTauriDeepLinkSource({ onUnknownSurface: () => this.unknownWindowNotice([]) }),
       // Tempdoc 662: subscribes the intent streamId on the shared multiplexer constructed
       // earlier in this method, instead of opening its own EventSource.
       createBackendStreamSource({ multiplex: this.shellEventsMultiplex! }),
@@ -1659,6 +1654,7 @@ export class Shell extends JfElement {
       if (request.kind === 'deepLink') {
         const address = parseUrl(request.url);
         if (address) await router.dispatch({ address, transport: 'URL_DEEPLINK' });
+        else if (isSurfaceUrl(request.url)) this.unknownWindowNotice([]);
       } else {
         await this.summonSearch();
       }
@@ -1907,6 +1903,18 @@ export class Shell extends JfElement {
    * label; `"JustSearch"` as a fallback (surface missing from rail set,
    * label catalog not yet fetched, etc).
    */
+  /**
+   * L3 / C1 — every unknown destination gets the same short notice: it fits the top bar beside the
+   * pill at every size, and its action names what to do next. (The raw id is not words a reader uses.)
+   */
+  private unknownWindowNotice(destinations: readonly { readonly id: string; readonly label: string }[]): void {
+    if (!this.shadowRoot) return;
+    emitEphemeralToast({ message: "Couldn't find that window", severity: 'warning',
+      actionLabel: 'Choose destination', destinations,
+      onAction: () => this.shadowRoot?.querySelector<StatusPill>('jf-status-pill')?.toggle(),
+    });
+  }
+
   private updateDocumentTitle(surfaceId: string): void {
     // §2.A: surface-label resolution (catalog labelKey → id-derived fallback)
     // lives in the one display projector now.
@@ -1965,13 +1973,19 @@ export class Shell extends JfElement {
   }
 
   /**
-   * Record on the Settings entry the area underneath it, or — when the entry already names one (a
-   * reload, Back or Forward onto it) — show that area underneath again.
+   * Record on the Settings entry the area underneath it and the window tab it shows, or — when the
+   * entry already names them (a reload, Back or Forward onto it) — show that area and tab again.
    */
   private keepAreaUnderSettings(): void {
     const entry = (window.history.state as Record<string, unknown> | null) ?? {};
     const over = entry.settingsOver;
     if (typeof over === 'string' && over !== SETTINGS_SURFACE_ID && getSurface(over)) {
+      // FR3 — the window under Settings shows its addressed tab from the start, not its first one.
+      const tab = entry.settingsOverTab;
+      if (typeof tab === 'string' && getSurface(over)?.members?.includes(tab) && this.hostTabs.get(over) !== tab) {
+        this.hostTabs.set(over, tab);
+        requestMemberTab(over, tab);
+      }
       if (over === this.activeId) return;
       this.activeId = over;
       updateShellContext({ activeSurface: over });
@@ -1979,8 +1993,9 @@ export class Shell extends JfElement {
       return;
     }
     if (!this.activeId) return;
+    const tab = this.hostTabs.get(this.activeId);
     try {
-      window.history.replaceState({ ...entry, settingsOver: this.activeId }, '');
+      window.history.replaceState({ ...entry, settingsOver: this.activeId, ...(tab ? { settingsOverTab: tab } : {}) }, '');
     } catch {
       // history API failure is non-fatal.
     }
@@ -2069,6 +2084,12 @@ export class Shell extends JfElement {
     focusRegion(regions, direction);
   }
 
+  /** Alt+Left/Right; on macOS, in a text field Option+Left/Right move the caret by word instead (C8). */
+  private static isBackForwardChord(e: KeyboardEvent): boolean {
+    return e.altKey && !e.ctrlKey && !e.metaKey && !e.shiftKey && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')
+      && !(isMac() && isTypingTarget(deepActiveElement()));
+  }
+
   /**
    * Slice 501 — global keyboard shortcut handler (capture phase).
    * Guards: IME composition, auto-repeat and an open dialog stand every chord down. None of these
@@ -2080,7 +2101,10 @@ export class Shell extends JfElement {
     // Tempdoc 864 Layer 2(d) — these chords navigate and mutate; none of them belongs to a reader
     // who is inside a modal. `showModal()` makes the background inert to the POINTER, but this is a
     // `document` listener and keystrokes made inside the dialog still arrive here.
-    if (modalOwnsFocus()) return;
+    // C9 — the Settings window is a place in history: when it is the only modal, Alt+Left/Right
+    // are its Back and Forward exactly as the browser's are (Back closes it, Forward reopens it).
+    const settingsOnly = openModalDepth() === 1 && !!this.shadowRoot?.querySelector<SettingsWindow>('jf-settings-window')?.open;
+    if (modalOwnsFocus() && !(settingsOnly && Shell.isBackForwardChord(e))) return;
     // Shell slice 2 — Ctrl+1/2/3 switch areas and F6 moves between frame regions. Neither inserts
     // or removes text, so they also work from a text field (the Search composer keeps focus on
     // arrival); AltGr combinations, which do type on many layouts, are excluded above.
@@ -2105,8 +2129,7 @@ export class Shell extends JfElement {
     // to swallow the Forward that followed. The chord is the app's alone, so nothing under it (a
     // tab row's or an option group's arrow keys) also acts on it.
     // On macOS Option+Left/Right move the caret by word, so in a text field the chord stays the text's (C8).
-    if (e.altKey && !e.ctrlKey && !e.metaKey && !e.shiftKey && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')
-      && !(isMac() && isTypingTarget(deepActiveElement()))) {
+    if (Shell.isBackForwardChord(e)) {
       e.preventDefault();
       e.stopPropagation();
       if (e.key === 'ArrowLeft') this.appBack();

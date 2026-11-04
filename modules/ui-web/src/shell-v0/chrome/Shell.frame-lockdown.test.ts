@@ -212,6 +212,52 @@ describe('L3 a notice for a window that does not exist is readable at every size
     expect(await pillCut(page)).toBe(false);
     expect(await page.getByRole('button', { name: 'Choose destination' }).isVisible()).toBe(true);
   }, 120_000);
+
+  it.each(['vendor.nope-window', 'nope-window'])('C1 an unknown destination %s shows the same notice', async (id) => {
+    const page = await open();
+    await page.evaluate((target) => { location.hash = `#justsearch://surface/${target}`; }, id);
+    await settle(page);
+    expect(await readableNotices(page), id).not.toEqual([]);
+    expect(await page.getByRole('button', { name: 'Choose destination' }).isVisible()).toBe(true);
+  }, 120_000);
+});
+
+describe('L2 the status panel never scrolls sideways', () => {
+  it('a plugin item that renders a fixed 1000 px wide element stays inside its row, its words and provenance reachable', async () => {
+    const page = await open();
+    const words = 'Wide plugin: a fixed one-thousand-pixel element with a status line in it';
+    // A string, so the test runner leaves the page's own module imports alone.
+    await page.evaluate(`(async () => {
+      const { registerStatusBarItem } = await import('/src/shell-v0/commands/StatusBarRegistry.ts');
+      const { makePluginProvenance } = await import('/src/shell-v0/primitives/provenance.ts');
+      registerStatusBarItem({ id: 'plugin.wide-element', source: 'plugin', provenance: makePluginProvenance('acme.wide', '1.0.0'),
+        priority: 1, position: 'right',
+        render: () => {
+          const el = document.createElement('div');
+          el.style.width = '1000px';
+          el.style.minWidth = '1000px';
+          el.textContent = ${JSON.stringify(words)};
+          return el;
+        } });
+    })()`);
+    await page.locator('jf-status-pill button.trigger').click();
+    await settle(page, 300);
+    const layout = await page.evaluate(() => {
+      const panelRoot = document.querySelector('jf-shell')!.shadowRoot!.querySelector('jf-status-pill')!.shadowRoot!
+        .querySelector('jf-status-panel')!.shadowRoot!;
+      const panel = panelRoot.querySelector<HTMLElement>('.panel')!;
+      const item = panelRoot.querySelector<HTMLElement>('[data-plugin-item="plugin.wide-element"]')!;
+      const chip = item.querySelector('jf-provenance-chip')!;
+      const box = panel.getBoundingClientRect();
+      const inside = (r: DOMRect) => r.width > 0 && r.left >= box.left - 0.5 && r.right <= box.right + 0.5;
+      const titled = [...item.querySelectorAll<HTMLElement>('[title]')].map(el => el.title);
+      return { scrollWidth: panel.scrollWidth, clientWidth: panel.clientWidth, item: inside(item.getBoundingClientRect()),
+        chip: inside(chip.getBoundingClientRect()), titled };
+    });
+    expect(layout.scrollWidth, JSON.stringify(layout)).toBeLessThanOrEqual(layout.clientWidth);
+    expect(layout, JSON.stringify(layout)).toMatchObject({ item: true, chip: true });
+    expect(layout.titled).toContain(words);
+  }, 120_000);
 });
 
 describe('C9 closing Settings once keeps the area and leaves no Settings entry behind it', () => {
@@ -230,6 +276,21 @@ describe('C9 closing Settings once keeps the area and leaves no Settings entry b
     expect(await where(page)).toMatchObject({ settings: false, stage: 'jf-frame-search-probe', address: SEARCH });
   }, 120_000);
 
+  it('with Settings open, Alt+Left is browser Back and Alt+Right browser Forward', async () => {
+    const page = await open();
+    await area(page, BRAIN);
+    await openSettings(page);
+    expect(await where(page)).toMatchObject({ settings: true, stage: 'jf-brain-surface' });
+    await page.keyboard.press('Alt+ArrowLeft'); await settle(page, 400);
+    expect(await where(page)).toMatchObject({ settings: false, stage: 'jf-brain-surface', address: BRAIN });
+    await page.keyboard.press('Alt+ArrowRight'); await settle(page, 400);
+    expect(await where(page)).toMatchObject({ settings: true, stage: 'jf-brain-surface' });
+    await page.keyboard.press('Escape'); await settle(page, 400);
+    expect(await where(page)).toMatchObject({ settings: false, stage: 'jf-brain-surface', address: BRAIN });
+    await page.keyboard.press('Alt+ArrowLeft'); await settle(page, 400);
+    expect(await where(page)).toMatchObject({ settings: false, stage: 'jf-frame-search-probe', address: SEARCH });
+  }, 120_000);
+
   it('reload with Settings open keeps the area underneath; closing returns to it once', async () => {
     const page = await open();
     await area(page, LIBRARY);
@@ -242,6 +303,36 @@ describe('C9 closing Settings once keeps the area and leaves no Settings entry b
     expect(await where(page)).toMatchObject({ settings: false, stage: 'jf-library-surface', address: LIBRARY });
     await page.goBack(); await settle(page, 400);
     expect(await where(page)).toMatchObject({ settings: false, stage: 'jf-frame-search-probe', address: SEARCH });
+  }, 120_000);
+});
+
+describe('FR3 the window under Settings shows its addressed tab', () => {
+  it('reload with Settings open over Library › Browse shows Browse behind Settings from the start', async () => {
+    const page = await open();
+    await area(page, LIBRARY);
+    await page.getByRole('tab', { name: 'Browse' }).click(); await settle(page);
+    await openSettings(page);
+    // Read through the DOM: the window behind an open modal is inert, out of the accessibility tree.
+    const tabBehind = () => page.evaluate(() => {
+      const find = (root: ParentNode): Element | null => {
+        for (const el of root.querySelectorAll('*')) {
+          if (el.localName === 'jf-library-surface') return el;
+          const inner = el.shadowRoot && find(el.shadowRoot);
+          if (inner) return inner;
+        }
+        return null;
+      };
+      const tabs = find(document)?.shadowRoot?.querySelector('jf-surface-tabs')?.shadowRoot;
+      return tabs?.querySelector('[role="tab"][aria-selected="true"]')?.textContent?.trim() ?? null;
+    });
+    expect(await tabBehind()).toBe('Browse');
+    await page.reload();
+    await page.locator('body[data-ready="true"]').waitFor();
+    await settle(page, 800);
+    expect(await where(page)).toMatchObject({ settings: true, stage: 'jf-library-surface' });
+    expect(await tabBehind()).toBe('Browse');
+    await page.keyboard.press('Escape'); await settle(page, 400);
+    expect([await libraryTab(page), (await where(page)).address]).toEqual(['Browse', `${LIBRARY}?tab=${BROWSE}`]);
   }, 120_000);
 });
 
@@ -344,5 +435,29 @@ describe('X1 forced colours', () => {
       return value;
     });
     expect(selected.colour).toBe(highlight);
+  }, 120_000);
+
+  it.each(['light', 'dark'] as const)('the dark app theme on a %s system palette: every tab label is readable, the selected one too', async (scheme) => {
+    const page = await open();
+    await area(page, LIBRARY);
+    await page.emulateMedia({ forcedColors: 'active', colorScheme: scheme });
+    await settle(page);
+    const system = (keyword: string) => page.evaluate((value) => {
+      const probe = document.createElement('div');
+      probe.style.color = value;
+      document.body.append(probe);
+      const resolved = getComputedStyle(probe).color;
+      probe.remove();
+      return resolved;
+    }, keyword);
+    const [text, canvas, highlight] = [await system('CanvasText'), await system('Canvas'), await system('Highlight')];
+    expect(text).not.toBe(canvas);
+    for (const [name, underline] of [['Folders', highlight], ['Browse', canvas]] as const) {
+      const tab = page.getByRole('tab', { name });
+      await tab.hover(); await settle(page);
+      const look = await tab.evaluate(el => { const c = getComputedStyle(el); return { color: c.color, background: c.backgroundColor, underline: c.borderBottomColor }; });
+      // Selected stays told apart while hovered: its underline is Highlight, the others' is the canvas.
+      expect(look, `${scheme}: ${name}`).toEqual({ color: text, background: canvas, underline });
+    }
   }, 120_000);
 });

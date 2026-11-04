@@ -124,10 +124,14 @@ export class SurfaceTabs extends JfElement {
     }
     /* X1 — forced colours repaint every border, the unselected tab's transparent one included, so
        both tabs drew the same underline. The tab keeps its own system colours: only the selected
-       tab is underlined (a shape, in Highlight), the others have none. */
+       tab is underlined (a shape, in Highlight), the others have none. Every state's label is
+       CanvasText on Canvas: the theme's own text colour (light in the dark theme) never reaches a
+       system palette, light or dark. */
     @media (forced-colors: active) {
-      .tabs button { forced-color-adjust: none; color: CanvasText; background: Canvas; border-bottom-color: Canvas; }
-      .tabs button.active { border-bottom-color: Highlight; }
+      .tabs button, .tabs button.active, .tabs button:hover:not(:disabled) {
+        forced-color-adjust: none; color: CanvasText; background: Canvas; border-bottom-color: Canvas;
+      }
+      .tabs button.active, .tabs button.active:hover:not(:disabled) { border-bottom-color: Highlight; }
     }
     /* 578 §9.4.B — the TRUST member keeps a visible audit marker so its trust framing survives
        living beside DIAGNOSTIC members. Uses existing role tokens only (no new colour). */

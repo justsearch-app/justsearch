@@ -24,7 +24,7 @@
  * source registers, the URL boot/popstate ingress has one home.
  */
 
-import { parseUrl } from '../parser.js';
+import { isSurfaceUrl, parseUrl } from '../parser.js';
 import type { Intent } from '../types.js';
 import type { IntentSource, SourceDispatch } from './IntentSource.js';
 
@@ -35,6 +35,8 @@ export interface URLSourceConfig {
    * teardown are no-ops.
    */
   windowImpl?: Window;
+  /** C1 — a window address the grammar rejects (an id no window can have): the frame says so. */
+  onUnknownSurface?: (url: string) => void;
 }
 
 /** Stable Manifest-tier id this source corresponds to. */
@@ -90,7 +92,7 @@ export function createURLSource(config: URLSourceConfig = {}): IntentSource {
       // router for nav intents. After this source dispatches into the router
       // and the NavigationHandler distributes state, the state-drop defect is
       // fixed by construction.
-      const intent = parseHash(win);
+      const intent = parseHash(win, config.onUnknownSurface);
       if (intent) {
         const navigation = win.performance?.getEntriesByType?.('navigation')[0] as PerformanceNavigationTiming | undefined;
         const restored = navigation?.type !== 'navigate';
@@ -102,7 +104,7 @@ export function createURLSource(config: URLSourceConfig = {}): IntentSource {
       const handler = (event: PopStateEvent) => {
         const origin = event.isTrusted && pending?.url === win.location.href ? pending.origin : 'restore';
         clearPending();
-        const popped = parseHash(win);
+        const popped = parseHash(win, config.onUnknownSurface);
         if (popped) {
           dispatch(popped, { pushHistory: false, taskOrigin: origin });
         }
@@ -129,7 +131,7 @@ export function createURLSource(config: URLSourceConfig = {}): IntentSource {
  *     `URL_BAR` from `URL_DEEPLINK` (the Tauri OS-level entry); paste is
  *     `URL_BAR`.
  */
-function parseHash(win: Window): Intent | null {
+function parseHash(win: Window, onUnknownSurface?: (url: string) => void): Intent | null {
   const fragment = win.location.hash;
   if (!fragment || !fragment.startsWith('#justsearch://')) return null;
   const url = fragment.slice(1);
@@ -140,6 +142,7 @@ function parseHash(win: Window): Intent | null {
     // need to see malformed input so a typo'd bookmark or stale
     // shareable URL doesn't fail silently.
     console.warn(`[URLSource] received un-parseable justsearch:// URL: ${url}`);
+    if (isSurfaceUrl(url)) onUnknownSurface?.(url);
     return null;
   }
   return {

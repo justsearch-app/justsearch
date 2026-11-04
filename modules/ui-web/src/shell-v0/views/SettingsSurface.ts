@@ -792,6 +792,10 @@ export class SettingsSurface extends JfElement {
       color: var(--text-secondary);
       line-height: 1.5;
     }
+    /* The heading line over a second list in one section (Layout › More windows). */
+    p.help.list-intro {
+      margin: var(--jf-space-3) 0 var(--jf-space-2) 0;
+    }
     /* Slice 477 H1 — V1.5 user-authorship sections */
     .rail-list,
     .plugin-list {
@@ -2285,7 +2289,7 @@ export class SettingsSurface extends JfElement {
           ${areas.map((s) => row(s, 'switcher'))}
         </ul>
         ${windows.length > 0 ? html`
-          <p class="help" style="margin: 0.75rem 0 0.5rem 0">Windows listed under More (⋯).</p>
+          <p class="help list-intro">Windows listed under More (⋯).</p>
           <ul class="rail-list" aria-label="More menu windows">
             ${windows.map((s, idx) => row(s, 'More menu', { idx, last: windows.length - 1 }))}
           </ul>` : nothing}

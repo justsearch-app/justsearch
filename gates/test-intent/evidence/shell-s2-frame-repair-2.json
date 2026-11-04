@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
   },
-  "createdAt": "2026-11-04T13:43:39.717Z",
-  "revision": "6fe76d255f0115b08fb4ef9125e2aa4bd44811a3",
-  "tree": "77fc70f201d724e6ac42238b13990a3f5743d852",
+  "createdAt": "2026-11-04T15:40:48.377Z",
+  "revision": "38c6e7027f4f254a678f273d15b167e2958d562b",
+  "tree": "a628fb883e8f2fdc3c005f16bfb37e06b8b44d97",
   "environment": {
     "platform": "linux",
     "arch": "x64",
@@ -18,16 +18,16 @@
   },
   "runs": [
     {
-      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/chrome/Shell.frame-lockdown.test.ts\" --config vitest.config.lockdown.ts --reporter=json --outputFile=\"/home/elias/.cache/am/stqej_cs/tmp/test-intent-vitest-28316-1793799692992.json\"",
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/chrome/Shell.frame-lockdown.test.ts\" --config vitest.config.lockdown.ts --reporter=json --outputFile=\"/home/elias/.cache/am/rv_1re3g/tmp/test-intent-vitest-27980-1793806646219.json\"",
       "cwd": "modules/ui-web",
       "exitCode": 0,
-      "durationMs": 70033
+      "durationMs": 108643
     },
     {
-      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/chrome/Shell.navigation.test.ts\" \"src/shell-v0/chrome/Shell.globalKeys.test.ts\" \"src/shell-v0/views/SettingsSurface.v15.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/stqej_cs/tmp/test-intent-vitest-28316-1793799763026.json\"",
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/chrome/Shell.navigation.test.ts\" \"src/shell-v0/chrome/Shell.globalKeys.test.ts\" \"src/shell-v0/views/SettingsSurface.v15.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/rv_1re3g/tmp/test-intent-vitest-27980-1793806754864.json\"",
       "cwd": "modules/ui-web",
       "exitCode": 0,
-      "durationMs": 4595
+      "durationMs": 7281
     }
   ],
   "checks": [
@@ -35,7 +35,7 @@
       "id": "modules/ui-web/src/shell-v0/chrome/Shell.frame-lockdown.test.ts#600×400: the notice can be read, the pill is not cut and \"Choose destination\" is offered",
       "file": "modules/ui-web/src/shell-v0/chrome/Shell.frame-lockdown.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:f7f2fdf933cc6d7373e0a60185b15cd8717ac9f8f12e418b9adc1da84d3a619d",
+      "contentDigest": "sha256:635554c328d7b4a244d51664a4e67f99c0233730dd0fffcdd2ecfc83a6103d47",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -50,7 +50,7 @@
       "id": "modules/ui-web/src/shell-v0/chrome/Shell.frame-lockdown.test.ts#Settings, browser Back, browser Forward, close: the next Back does not reopen Settings",
       "file": "modules/ui-web/src/shell-v0/chrome/Shell.frame-lockdown.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:f7f2fdf933cc6d7373e0a60185b15cd8717ac9f8f12e418b9adc1da84d3a619d",
+      "contentDigest": "sha256:635554c328d7b4a244d51664a4e67f99c0233730dd0fffcdd2ecfc83a6103d47",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -65,7 +65,7 @@
       "id": "modules/ui-web/src/shell-v0/chrome/Shell.frame-lockdown.test.ts#reload with Settings open keeps the area underneath; closing returns to it once",
       "file": "modules/ui-web/src/shell-v0/chrome/Shell.frame-lockdown.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:f7f2fdf933cc6d7373e0a60185b15cd8717ac9f8f12e418b9adc1da84d3a619d",
+      "contentDigest": "sha256:635554c328d7b4a244d51664a4e67f99c0233730dd0fffcdd2ecfc83a6103d47",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -80,7 +80,7 @@
       "id": "modules/ui-web/src/shell-v0/chrome/Shell.frame-lockdown.test.ts#a link to Settings › Developer opens Developer, and reload keeps it, while the engine is slow to answer",
       "file": "modules/ui-web/src/shell-v0/chrome/Shell.frame-lockdown.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:f7f2fdf933cc6d7373e0a60185b15cd8717ac9f8f12e418b9adc1da84d3a619d",
+      "contentDigest": "sha256:635554c328d7b4a244d51664a4e67f99c0233730dd0fffcdd2ecfc83a6103d47",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -95,7 +95,7 @@
       "id": "modules/ui-web/src/shell-v0/chrome/Shell.frame-lockdown.test.ts#Back into Search puts focus in its text box; Alt+Right still goes Forward and edits nothing",
       "file": "modules/ui-web/src/shell-v0/chrome/Shell.frame-lockdown.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:f7f2fdf933cc6d7373e0a60185b15cd8717ac9f8f12e418b9adc1da84d3a619d",
+      "contentDigest": "sha256:635554c328d7b4a244d51664a4e67f99c0233730dd0fffcdd2ecfc83a6103d47",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -110,7 +110,7 @@
       "id": "modules/ui-web/src/shell-v0/chrome/Shell.frame-lockdown.test.ts#Library › Browse adds an entry; Alt+arrows, mouse buttons and browser buttons all land on the same tabs",
       "file": "modules/ui-web/src/shell-v0/chrome/Shell.frame-lockdown.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:f7f2fdf933cc6d7373e0a60185b15cd8717ac9f8f12e418b9adc1da84d3a619d",
+      "contentDigest": "sha256:635554c328d7b4a244d51664a4e67f99c0233730dd0fffcdd2ecfc83a6103d47",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -125,7 +125,7 @@
       "id": "modules/ui-web/src/shell-v0/chrome/Shell.frame-lockdown.test.ts#opening an area from the Ctrl+K palette is one step: one Back returns",
       "file": "modules/ui-web/src/shell-v0/chrome/Shell.frame-lockdown.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:f7f2fdf933cc6d7373e0a60185b15cd8717ac9f8f12e418b9adc1da84d3a619d",
+      "contentDigest": "sha256:635554c328d7b4a244d51664a4e67f99c0233730dd0fffcdd2ecfc83a6103d47",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -140,7 +140,7 @@
       "id": "modules/ui-web/src/shell-v0/chrome/Shell.frame-lockdown.test.ts#the selected window tab is told apart from the others by a shape in a system colour",
       "file": "modules/ui-web/src/shell-v0/chrome/Shell.frame-lockdown.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:f7f2fdf933cc6d7373e0a60185b15cd8717ac9f8f12e418b9adc1da84d3a619d",
+      "contentDigest": "sha256:635554c328d7b4a244d51664a4e67f99c0233730dd0fffcdd2ecfc83a6103d47",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -170,7 +170,7 @@
       "id": "modules/ui-web/src/shell-v0/chrome/Shell.globalKeys.test.ts#FR3: Alt+Left/Right are claimed in a <select>, a shadow <input> and a <textarea>, and reach nothing under them",
       "file": "modules/ui-web/src/shell-v0/chrome/Shell.globalKeys.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:093fd928f6bf1e7d25eb22ae10cd2d990f8dfce2f352cc4cead0bb5adb9b9a2a",
+      "contentDigest": "sha256:9dfda1257fd9623fd337103da96ccce2cce6d1091f07b2d480749ab09a407dae",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -185,7 +185,7 @@
       "id": "modules/ui-web/src/shell-v0/views/SettingsSurface.v15.test.ts#lists the switcher areas in the switcher order, then the More windows in catalog order, in the design words",
       "file": "modules/ui-web/src/shell-v0/views/SettingsSurface.v15.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:4d5a826d2bb3ed570c43a3f532a36c513b6aa6be990a4de8919d48c9d5ed9814",
+      "contentDigest": "sha256:173a3602f38faecbc46402d9c3844567233ff125c84a635f587b068756139ec4",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -200,7 +200,7 @@
       "id": "modules/ui-web/src/shell-v0/views/SettingsSurface.v15.test.ts#respects userConfig.surfaceOrder for the More windows; the switcher keeps its fixed order",
       "file": "modules/ui-web/src/shell-v0/views/SettingsSurface.v15.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:4d5a826d2bb3ed570c43a3f532a36c513b6aa6be990a4de8919d48c9d5ed9814",
+      "contentDigest": "sha256:173a3602f38faecbc46402d9c3844567233ff125c84a635f587b068756139ec4",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -219,25 +219,25 @@
     "patches": [],
     "runs": [
       {
-        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/chrome/Shell.frame-lockdown.test.ts\" --config vitest.config.lockdown.ts --reporter=json --outputFile=\"/home/elias/.cache/am/stqej_cs/tmp/test-intent-vitest-28316-1793799768892.json\"",
+        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/chrome/Shell.frame-lockdown.test.ts\" --config vitest.config.lockdown.ts --reporter=json --outputFile=\"/home/elias/.cache/am/rv_1re3g/tmp/test-intent-vitest-27980-1793806764000.json\"",
         "cwd": "<before-worktree>",
         "exitCode": 1,
-        "durationMs": 46294,
-        "output": "JSON report written to /home/elias/.cache/am/stqej_cs/tmp/test-intent-vitest-28316-1793799768892.json\n\n"
+        "durationMs": 77741,
+        "output": "JSON report written to /home/elias/.cache/am/rv_1re3g/tmp/test-intent-vitest-27980-1793806764000.json\n\n"
       },
       {
-        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/chrome/Shell.navigation.test.ts\" \"src/shell-v0/chrome/Shell.globalKeys.test.ts\" \"src/shell-v0/views/SettingsSurface.v15.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/stqej_cs/tmp/test-intent-vitest-28316-1793799815187.json\"",
+        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/chrome/Shell.navigation.test.ts\" \"src/shell-v0/chrome/Shell.globalKeys.test.ts\" \"src/shell-v0/views/SettingsSurface.v15.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/rv_1re3g/tmp/test-intent-vitest-27980-1793806841741.json\"",
         "cwd": "<before-worktree>",
         "exitCode": 1,
-        "durationMs": 4287,
-        "output": "JSON report written to /home/elias/.cache/am/stqej_cs/tmp/test-intent-vitest-28316-1793799815187.json\n\n"
+        "durationMs": 6357,
+        "output": "JSON report written to /home/elias/.cache/am/rv_1re3g/tmp/test-intent-vitest-27980-1793806841741.json\n\n"
       }
     ],
     "checks": [
       {
         "id": "modules/ui-web/src/shell-v0/chrome/Shell.frame-lockdown.test.ts#600×400: the notice can be read, the pill is not cut and \"Choose destination\" is offered",
         "classification": "assertion",
-        "detail": "L3 a notice for a window that does not exist is readable at every size 600×400: the notice can be read, the pill is not cut and \"Choose destination\" is offered:  AssertionError: 600×400: expected [] to not deeply equal []\n    at /home/elias/.cache/am/stqej_cs/tmp/test-intent-before-Q4oeoq/modules/ui-web/src/shell-v0/chrome/Shell.frame-lockdown.test.ts:211:67\n    at file:///home/elias/dev/justsearch/.claude/worktrees/shell-s2/modules/ui-web/node_modules/@vite"
+        "detail": "L3 a notice for a window that does not exist is readable at every size 600×400: the notice can be read, the pill is not cut and \"Choose destination\" is offered:  AssertionError: 600×400: expected [] to not deeply equal []\n    at /home/elias/.cache/am/rv_1re3g/tmp/test-intent-before-ERuURV/modules/ui-web/src/shell-v0/chrome/Shell.frame-lockdown.test.ts:211:67\n    at file:///home/elias/dev/justsearch/.claude/worktrees/shell-s2/modules/ui-web/node_modules/@vite"
       },
       {
         "id": "modules/ui-web/src/shell-v0/chrome/Shell.frame-lockdown.test.ts#Settings, browser Back, browser Forward, close: the next Back does not reopen Settings",
@@ -262,7 +262,7 @@
       {
         "id": "modules/ui-web/src/shell-v0/chrome/Shell.frame-lockdown.test.ts#Library › Browse adds an entry; Alt+arrows, mouse buttons and browser buttons all land on the same tabs",
         "classification": "assertion",
-        "detail": "FR3 a window tab is a step in history Library › Browse adds an entry; Alt+arrows, mouse buttons and browser buttons all land on the same tabs:  AssertionError: expected 4 to be 5 // Object.is equality\n    at /home/elias/.cache/am/stqej_cs/tmp/test-intent-before-Q4oeoq/modules/ui-web/src/shell-v0/chrome/Shell.frame-lockdown.test.ts:285:55\n    at file:///home/elias/dev/justsearch/.claude/worktrees/shell-s2/modules/ui-web/node_modules/@vitest/"
+        "detail": "FR3 a window tab is a step in history Library › Browse adds an entry; Alt+arrows, mouse buttons and browser buttons all land on the same tabs:  AssertionError: expected 4 to be 5 // Object.is equality\n    at /home/elias/.cache/am/rv_1re3g/tmp/test-intent-before-ERuURV/modules/ui-web/src/shell-v0/chrome/Shell.frame-lockdown.test.ts:376:55\n    at file:///home/elias/dev/justsearch/.claude/worktrees/shell-s2/modules/ui-web/node_modules/@vitest/"
       },
       {
         "id": "modules/ui-web/src/shell-v0/chrome/Shell.frame-lockdown.test.ts#opening an area from the Ctrl+K palette is one step: one Back returns",
@@ -272,29 +272,29 @@
       {
         "id": "modules/ui-web/src/shell-v0/chrome/Shell.frame-lockdown.test.ts#the selected window tab is told apart from the others by a shape in a system colour",
         "classification": "assertion",
-        "detail": "X1 forced colours the selected window tab is told apart from the others by a shape in a system colour:  AssertionError: {\"underline\":true,\"colour\":\"rgb(0, 0, 0)\"}: expected true to be false // Object.is equality\n    at /home/elias/.cache/am/stqej_cs/tmp/test-intent-before-Q4oeoq/modules/ui-web/src/shell-v0/chrome/Shell.frame-lockdown.test.ts:336:52\n    at file:///home/elias/dev/justsearch/.claude/work"
+        "detail": "X1 forced colours the selected window tab is told apart from the others by a shape in a system colour:  AssertionError: {\"underline\":true,\"colour\":\"rgb(0, 0, 0)\"}: expected true to be false // Object.is equality\n    at /home/elias/.cache/am/rv_1re3g/tmp/test-intent-before-ERuURV/modules/ui-web/src/shell-v0/chrome/Shell.frame-lockdown.test.ts:427:52\n    at file:///home/elias/dev/justsearch/.claude/work"
       },
       {
         "id": "modules/ui-web/src/shell-v0/chrome/Shell.navigation.test.ts#a tab click names the tab in the address as a new entry; Back returns to the tab before; Forward and reload restore it",
         "classification": "assertion",
-        "detail": "FR3 the window tab is part of the address a tab click names the tab in the address as a new entry; Back returns to the tab before; Forward and reload restore it:  AssertionError: expected 35 to be 36 // Object.is equality\n    at /home/elias/.cache/am/stqej_cs/tmp/test-intent-before-Q4oeoq/modules/ui-web/src/shell-v0/chrome/Shell.navigation.test.ts:315:35\n    at file:///home/elias/dev/justsearch/.claude/worktrees/shell-s2/modules/ui-web/node_modules/@vitest/ru"
+        "detail": "FR3 the window tab is part of the address a tab click names the tab in the address as a new entry; Back returns to the tab before; Forward and reload restore it:  AssertionError: expected 35 to be 36 // Object.is equality\n    at /home/elias/.cache/am/rv_1re3g/tmp/test-intent-before-ERuURV/modules/ui-web/src/shell-v0/chrome/Shell.navigation.test.ts:315:35\n    at file:///home/elias/dev/justsearch/.claude/worktrees/shell-s2/modules/ui-web/node_modules/@vitest/ru"
       },
       {
         "id": "modules/ui-web/src/shell-v0/chrome/Shell.globalKeys.test.ts#FR3: Alt+Left/Right are claimed in a <select>, a shadow <input> and a <textarea>, and reach nothing under them",
         "classification": "assertion",
-        "detail": "Shell global chords and their guards (tempdoc 864 Layer 2) FR3: Alt+Left/Right are claimed in a <select>, a shadow <input> and a <textarea>, and reach nothing under them:  AssertionError: select Alt+Left: expected false to be true // Object.is equality\n    at /home/elias/.cache/am/stqej_cs/tmp/test-intent-before-Q4oeoq/modules/ui-web/src/shell-v0/chrome/Shell.globalKeys.test.ts:146:93\n    at file:///home/elias/dev/justsearch/.claude/worktrees/shell-s2/modules/ui-web/n"
+        "detail": "Shell global chords and their guards (tempdoc 864 Layer 2) FR3: Alt+Left/Right are claimed in a <select>, a shadow <input> and a <textarea>, and reach nothing under them:  AssertionError: select Alt+Left: expected false to be true // Object.is equality\n    at /home/elias/.cache/am/rv_1re3g/tmp/test-intent-before-ERuURV/modules/ui-web/src/shell-v0/chrome/Shell.globalKeys.test.ts:146:93\n    at file:///home/elias/dev/justsearch/.claude/worktrees/shell-s2/modules/ui-web/n"
       },
       {
         "id": "modules/ui-web/src/shell-v0/views/SettingsSurface.v15.test.ts#lists the switcher areas in the switcher order, then the More windows in catalog order, in the design words",
         "classification": "assertion",
-        "detail": "SettingsSurface — V1.5 Rail section (the switcher and the More menu) lists the switcher areas in the switcher order, then the More windows in catalog order, in the design words:  AssertionError: expected [ 'Notes', 'Brain', 'System', …(3) ] to deeply equal [ 'Search', 'Library', 'Brain', …(2) ]\n    at /home/elias/.cache/am/stqej_cs/tmp/test-intent-before-Q4oeoq/modules/ui-web/src/shell-v0/views/SettingsSurface.v15.test.ts:383:26\n    at runNextTicks (node:internal/process/tas"
+        "detail": "SettingsSurface — V1.5 Rail section (the switcher and the More menu) lists the switcher areas in the switcher order, then the More windows in catalog order, in the design words:  AssertionError: expected [ 'Notes', 'Brain', 'System', …(3) ] to deeply equal [ 'Search', 'Library', 'Brain', …(2) ]\n    at /home/elias/.cache/am/rv_1re3g/tmp/test-intent-before-ERuURV/modules/ui-web/src/shell-v0/views/SettingsSurface.v15.test.ts:383:26\n    at runNextTicks (node:internal/process/tas"
       },
       {
         "id": "modules/ui-web/src/shell-v0/views/SettingsSurface.v15.test.ts#respects userConfig.surfaceOrder for the More windows; the switcher keeps its fixed order",
         "classification": "assertion",
-        "detail": "SettingsSurface — V1.5 Rail section (the switcher and the More menu) respects userConfig.surfaceOrder for the More windows; the switcher keeps its fixed order:  AssertionError: expected [ 'Graph', 'Brain', 'Notes', …(3) ] to deeply equal [ 'Search', 'Library', 'Brain', …(2) ]\n    at /home/elias/.cache/am/stqej_cs/tmp/test-intent-before-Q4oeoq/modules/ui-web/src/shell-v0/views/SettingsSurface.v15.test.ts:399:26\n    at runNextTicks (node:internal/process/task"
+        "detail": "SettingsSurface — V1.5 Rail section (the switcher and the More menu) respects userConfig.surfaceOrder for the More windows; the switcher keeps its fixed order:  AssertionError: expected [ 'Graph', 'Brain', 'Notes', …(3) ] to deeply equal [ 'Search', 'Library', 'Brain', …(2) ]\n    at /home/elias/.cache/am/rv_1re3g/tmp/test-intent-before-ERuURV/modules/ui-web/src/shell-v0/views/SettingsSurface.v15.test.ts:411:26\n    at runNextTicks (node:internal/process/task"
       }
     ]
   },
-  "digest": "sha256:d49b738e0f6795a789b07efc5031984b1bba7019d93ccbe8cae63af3456968e4"
+  "digest": "sha256:58020acf6788e5e32d00fa841c8baa076384aee44a101eb0e3953beddfd08361"
 }

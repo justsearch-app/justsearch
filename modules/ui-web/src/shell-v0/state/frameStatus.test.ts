@@ -4,6 +4,7 @@ import { deriveFrameStatus, completedLongWork, FINISHED_DWELL_MS, authorizationD
   type StatusFact } from './frameStatus.js';
 import type { AiState } from './aiStateStore.js';
 import type { AdvisoryRecord } from '../components/advisory/AdvisoryStore.js';
+import { projectBackend, type BackendLedgerEntry } from '../operations/ActionLedgerClient.js';
 const now = 100_000;
 const RECONNECT_GRACE_MS = 10_000;
 type FrameStatusInput = Parameters<typeof deriveFrameStatus>[0];
@@ -140,6 +141,32 @@ describe('frame status projection', () => {
     // Another request waiting does not hold back this one's history.
     const other = derive({ authorizations: [{ ...request, pendingId: 'p-other' }], advisories: [broadcast] });
     expect(other.sections.earlier.map(f => f.id)).toEqual(['advisory:auth-wait']);
+  });
+  it('L4b an MCP request also recorded as a GATED ledger row waits in Needs you only; the row joins Earlier once it is answered or expires', () => {
+    // The real shapes: PendingAuthorizationAdvisoryProjector's advisory (classExtras pendingId,
+    // operationId, riskTier, gateBehavior, expiresAt) and ActionLedgerProjection.toWireRow's gate row
+    // for the same firing (no pending id), projected by the ledger client the controller uses.
+    const expiresAt = new Date(now + 120_000).toISOString();
+    const request = { pendingId: '7f1c2a9e-mcp', operationId: 'core.ingest-files', expiresAt };
+    const broadcast: AdvisoryRecord = { key: '7f1c2a9e-mcp', origin: 'stream', acknowledged: false, sourceRenderHint: 'REQUIRES_ACK', event: {
+      id: '7f1c2a9e-mcp', classId: 'authorization.pending', occurredAt: new Date(now - 1_000).toISOString(), renderHint: 'REQUIRES_ACK',
+      classExtras: { pendingId: '7f1c2a9e-mcp', operationId: 'core.ingest-files', riskTier: 'MEDIUM', gateBehavior: 'CONFIRM', expiresAt },
+      diagnosticsLink: null, provenance: null, primaryAction: null, bodyI18nKey: null } };
+    const row = (occurredAt: string, disposition: string): BackendLedgerEntry => ({ id: `gate:${occurredAt}:core.ingest-files:${disposition}`,
+      kind: 'gate', occurredAt, originator: 'agent', transport: 'MCP', operationId: 'core.ingest-files', outcome: disposition,
+      disposition, gateBehavior: 'CONFIRM', sourceTier: 'USER' } as BackendLedgerEntry);
+    const gated = projectBackend(row(new Date(now - 1_000).toISOString(), 'GATED'));
+    const earlierGate = projectBackend(row(new Date(now - 3_600_000).toISOString(), 'GATED'));
+    const requested = (m: ReturnType<typeof derive>) => m.sections.earlier.filter(f => f.title.startsWith('Approval requested')).map(f => f.id);
+    const waiting = derive({ authorizations: [request], advisories: [broadcast], activity: [earlierGate, gated] });
+    expect(waiting.sections.needs.map(f => f.id)).toEqual(['authorization:7f1c2a9e-mcp']);
+    // The earlier, already answered request for the same operation stays history.
+    expect(requested(waiting)).toEqual([`activity:${earlierGate.id}`]);
+    const answered = derive({ authorizations: [], advisories: [broadcast], activity: [earlierGate, gated] });
+    expect(answered.sections.needs).toEqual([]);
+    expect(requested(answered)).toEqual(expect.arrayContaining([`activity:${gated.id}`, `activity:${earlierGate.id}`]));
+    const expired = derive({ authorizations: [{ ...request, expiresAt: new Date(now - 1).toISOString() }], advisories: [broadcast], activity: [gated] });
+    expect(requested(expired)).toEqual(expect.arrayContaining([`activity:${gated.id}`]));
   });
   it('ST1 working shows the most important running item with its measured progress only', () => {
     const indexing = ai({ status: { worker: { core: { indexState: 'INDEXING', pendingJobs: 400 }, enrichment: {} } } as AiState['status'], episodeMaxPendingJobs: 1600 });

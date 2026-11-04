@@ -44,6 +44,19 @@ field, so there the app leaves the chord to the text; it fails before on 8a6eb41
 (`gates/test-intent/evidence/shell-s2-frame-repair-3.json`). The Settings nav anchor for the
 layout's area list reads "Switcher" (backend message `settings.section.rail`).
 
+Frame repair on 38c6e7027f fails before on 38c6e7027f with assertion failures
+(`gates/test-intent/evidence/shell-s2-frame-repair-4.json`), the layout and colour cases in a real
+browser (`Shell.frame-lockdown.test.ts`): L2 a plugin element wider than the status panel (the row
+now contains it in a clipping body whose tooltip carries its words), C1 window addresses the id
+grammar rejects (`vendor.nope-window`, a bare id), which the URL and deep-link sources dropped
+silently and now report as the same unknown-destination notice, C9 Alt+Left/Right with Settings as
+the only modal, FR3 the window tab under Settings after a reload (the Settings history entry also
+records the tab it opened over, `settingsOverTab`, next to `settingsOver`), X1 the selected tab's
+label in forced colours (the theme's text colour outranked CanvasText), X1 the inline margin in
+Settings › Layout, and L4b's ledger path (the GATED row of a waiting MCP request; the ledger's gate
+facet now carries the raw `operationId`). The Settings search reads the Layout anchor's label from
+the same backend message as the nav (`settings.section.rail`); it has no copy of its own.
+
 `Shell.navigation.test.ts` restores the HTML session-history rule for `replaceState` in its own run:
 happy-dom 21 drops the entries after the current one on `replaceState`, which Chromium, WebView2 and
 WebKit do not, and Forward is only testable under the spec's behaviour.
@@ -588,6 +601,137 @@ WebKit do not, and Forward is only testable under the spec's behaviour.
       ],
       "evidence": "gates/test-intent/evidence/shell-s2-frame-new.json",
       "newChecks": ["modules/ui-web/src/shell-v0/views/SettingsSurface.v15.test.ts#move-down arrow on the first More window updates surfaceOrder; the switcher areas have no arrows"]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/chrome/Shell.frame-lockdown.test.ts"
+      ],
+      "class": "New",
+      "repaired": true,
+      "behaviour": "Frame repair on 38c6e7027f, in headless Chromium over the real Shell: (L2) a plugin status item that renders a fixed 1000 px wide element stays inside the status panel (no sideways scroll), its provenance chip inside the panel and its words as the item's tooltip; (C1) an address naming `vendor.nope-window` or the bare `nope-window` (ids the address grammar rejects) shows the same readable 'Couldn't find that window' notice with 'Choose destination' as an unknown `core.` id; (C9) with Settings open, Alt+Left closes it like browser Back and Alt+Right reopens it like Forward, and after Escape one Alt+Left returns to the view before; (FR3) reload with Settings open over Library › Browse shows Browse behind Settings from the start and after closing; (X1) with the dark app theme in forced colours on a light and on a dark system palette, both tab labels are CanvasText on Canvas while hovered, the selected one keeping its Highlight underline.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261103-shell",
+          "scenario": "L2",
+          "quote": "Expected: one item always shows directly (wrapping or truncating with its full text available); \"… N more\" only when there are more items than fit, and never hides the only item. Provenance stays visible.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261103-shell",
+          "scenario": "L3",
+          "quote": "Expected: in the new top bar it shows without truncating the pill or wrapping, at all three sizes.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261103-shell",
+          "scenario": "C1",
+          "quote": "Ordinary operation feedback keeps a visible, accessible destination with the panel closed: clipboard failures, unknown destinations, operation failures and successes of the user's own actions show at the place of the action (inline receipt) or in the pill; never silently dropped (ST10, DE5).",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261103-shell",
+          "scenario": "C9",
+          "quote": "Settings dismissal history: direct Settings entry and section deep links, reload, backdrop, Escape and browser Back/Forward close it once, keep the underlying area, and never need a second Back.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261103-shell",
+          "scenario": "FR3",
+          "quote": "Back and forward (Alt+Left/Right, mouse buttons) work reliably: same-surface navigation keeps the earlier entry; Back then Forward returns to the later view; browser history and the stage stay in step.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261103-shell",
+          "scenario": "FR3",
+          "quote": "The window tab and Settings section are part of the address.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261103-shell",
+          "scenario": "X1",
+          "quote": "no new hard-coded colours, sizes or z-indexes (ui-web gates).",
+          "label": "agent-drafted, owner-adopted"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/shell-s2-frame-repair-4.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/chrome/Shell.frame-lockdown.test.ts#a plugin item that renders a fixed 1000 px wide element stays inside its row, its words and provenance reachable",
+        "modules/ui-web/src/shell-v0/chrome/Shell.frame-lockdown.test.ts#C1 an unknown destination vendor.nope-window shows the same notice",
+        "modules/ui-web/src/shell-v0/chrome/Shell.frame-lockdown.test.ts#C1 an unknown destination nope-window shows the same notice",
+        "modules/ui-web/src/shell-v0/chrome/Shell.frame-lockdown.test.ts#with Settings open, Alt+Left is browser Back and Alt+Right browser Forward",
+        "modules/ui-web/src/shell-v0/chrome/Shell.frame-lockdown.test.ts#reload with Settings open over Library › Browse shows Browse behind Settings from the start",
+        "modules/ui-web/src/shell-v0/chrome/Shell.frame-lockdown.test.ts#the dark app theme on a light system palette: every tab label is readable, the selected one too",
+        "modules/ui-web/src/shell-v0/chrome/Shell.frame-lockdown.test.ts#the dark app theme on a dark system palette: every tab label is readable, the selected one too"
+      ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/state/frameStatus.test.ts"
+      ],
+      "class": "New",
+      "repaired": true,
+      "behaviour": "L4b on the ledger path: an MCP request that is also recorded as a GATED action-ledger row ('Approval requested: <operation>', no pending id) and broadcast as an `authorization.pending` advisory (the projector's real classExtras) is in Needs you only while it waits; the GATED row joins Earlier once the request is answered or expires; an older, answered request for the same operation stays in Earlier meanwhile.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261103-shell",
+          "scenario": "L4b",
+          "quote": "Expected: a needs-you item appears only in Needs you while it waits; it enters Earlier once answered, expired or withdrawn.",
+          "label": "agent-drafted, owner-adopted"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/shell-s2-frame-repair-4.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/state/frameStatus.test.ts#L4b an MCP request also recorded as a GATED ledger row waits in Needs you only; the row joins Earlier once it is answered or expires"
+      ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/views/SettingsSurface.v15.test.ts"
+      ],
+      "class": "New",
+      "repaired": true,
+      "behaviour": "X1: the 'Windows listed under More (⋯)' line in Settings › Layout carries no inline style; its spacing is a class rule on the space tokens (`--jf-space-*`).",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261103-shell",
+          "scenario": "X1",
+          "quote": "no new hard-coded colours, sizes or z-indexes (ui-web gates).",
+          "label": "agent-drafted, owner-adopted"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/shell-s2-frame-repair-4.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/views/SettingsSurface.v15.test.ts#X1 the More windows line takes its spacing from the space tokens, not an inline size"
+      ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/views/settingsRegister.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "With the shipped message bundle, the Settings search finds Layout's area list by the nav's own label: 'switcher' finds it and 'rail' does not (the search reads the same backend message, `settings.section.rail`, as the nav).",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261103-shell",
+          "scenario": "FR1",
+          "quote": "Top bar replaces title bar and rail: brand, switcher (Search, Library, AI Brain), status pill, Settings, More (⋯).",
+          "label": "agent-drafted, owner-adopted"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/shell-s2-frame-new.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/views/settingsRegister.test.ts#the Settings search indexes the switcher list by the nav's own label: \"switcher\" finds it, \"rail\" does not"
+      ]
     }
   ]
 }
