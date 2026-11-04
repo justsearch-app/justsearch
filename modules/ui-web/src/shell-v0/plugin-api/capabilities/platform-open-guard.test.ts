@@ -7,10 +7,10 @@ vi.mock('@tauri-apps/api/core', () => ({ invoke: native.invoke }));
 import { createPlatformApi, openLocalFile } from './platform.js';
 import { EPHEMERAL_TOAST_EVENT, type EphemeralToastSpec } from '../../components/advisory/ephemeralToast.js';
 import { AdvisoryStore } from '../../components/advisory/AdvisoryStore.js';
-import '../../components/advisory/AdvisoryToastHost.js';
+import '../../components/StatusPill.js';
 import '../../views/BrowseSurface.js';
 import '../../components/chat/CitationsPanel.js';
-import { AdvisoryToastHost } from '../../components/advisory/AdvisoryToastHost.js';
+import { StatusPill } from '../../components/StatusPill.js';
 import { BrowseSurface } from '../../views/BrowseSurface.js';
 import { CitationsPanel } from '../../components/chat/CitationsPanel.js';
 import { createMockHostApi } from '../testHostApi.js';
@@ -21,7 +21,7 @@ const path = '/docs/crafted.desktop';
 const refusal = 'Opening .desktop files is not allowed. Use Show in folder instead.';
 let messages: EphemeralToastSpec[];
 let store: AdvisoryStore;
-let toast: AdvisoryToastHost;
+let toast: StatusPill;
 const onToast = (event: Event) => { messages.push((event as CustomEvent<EphemeralToastSpec>).detail); };
 
 async function settled(): Promise<void> {
@@ -39,7 +39,7 @@ beforeEach(() => {
   document.addEventListener(EPHEMERAL_TOAST_EVENT, onToast);
   store = new AdvisoryStore();
   store.start();
-  toast = document.createElement('jf-advisory-toast-host') as AdvisoryToastHost;
+  toast = new StatusPill();
   toast.store = store;
   document.body.appendChild(toast);
 });

@@ -1,0 +1,1726 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
+  },
+  "createdAt": "2026-11-04T00:05:12.265Z",
+  "revision": "ffa2a5833396157d299c95275d84275c438cae13",
+  "tree": "a0fd3e57aebe7f409741791501c944d3e10b57ee",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/state/frameStatus.test.ts\" \"src/shell-v0/components/StatusPanel.approvals.test.ts\" \"src/shell-v0/components/StatusPanel.history.test.ts\" \"src/shell-v0/components/StatusPanel.running.test.ts\" \"src/shell-v0/components/StatusPill.design.test.ts\" \"src/shell-v0/components/StatusPill.feedback.test.ts\" \"src/shell-v0/components/StatusPill.test.ts\" \"src/shell-v0/components/StatusPill.transitions.test.ts\" \"src/shell-v0/components/RetiredStatusElements.test.ts\" \"src/shell-v0/views/ActivitySurface.actions.test.ts\" \"src/shell-v0/chrome/Shell.test.ts\" \"src/shell-v0/components/IndexingPause.test.ts\" \"src/shell-v0/components/indexingTaskWaiting.test.ts\" \"src/shell-v0/substrates/tasks/indexingJobsQueueRail.test.ts\" \"src/shell-v0/components/AuthorizationHost.toplayer.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/_qphb1n6/tmp/test-intent-vitest-13294-1793750697011.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 15241
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/state/frameStatus.test.ts#frame status projection ST1 keeps concurrent facts discoverable while the pill chooses one urgency",
+      "file": "modules/ui-web/src/shell-v0/state/frameStatus.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:7a302e4f122e95a70e6e8a534ec6ca1023f624b93dfd7ed0ddd6bf9645c3d1f5",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "frame status projection ST1 keeps concurrent facts discoverable while the pill chooses one urgency",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/state/frameStatus.test.ts#frame status projection ST2 separates contact from poll freshness and waits a full poll before unreachable",
+      "file": "modules/ui-web/src/shell-v0/state/frameStatus.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:7a302e4f122e95a70e6e8a534ec6ca1023f624b93dfd7ed0ddd6bf9645c3d1f5",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "frame status projection ST2 separates contact from poll freshness and waits a full poll before unreachable",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/state/frameStatus.test.ts#frame status projection ST6 durable acceptance and gaps suppress an invocation-return completion",
+      "file": "modules/ui-web/src/shell-v0/state/frameStatus.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:7a302e4f122e95a70e6e8a534ec6ca1023f624b93dfd7ed0ddd6bf9645c3d1f5",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "frame status projection ST6 durable acceptance and gaps suppress an invocation-return completion",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/state/frameStatus.test.ts#frame status projection ST7 read state never decides active/resolved and Earlier stays newest first",
+      "file": "modules/ui-web/src/shell-v0/state/frameStatus.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:7a302e4f122e95a70e6e8a534ec6ca1023f624b93dfd7ed0ddd6bf9645c3d1f5",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "frame status projection ST7 read state never decides active/resolved and Earlier stays newest first",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/state/frameStatus.test.ts#frame status projection ST8 C6 terminal replay is silent; only an observed active-to-ready edge completes",
+      "file": "modules/ui-web/src/shell-v0/state/frameStatus.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:7a302e4f122e95a70e6e8a534ec6ca1023f624b93dfd7ed0ddd6bf9645c3d1f5",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "frame status projection ST8 C6 terminal replay is silent; only an observed active-to-ready edge completes",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/state/frameStatus.test.ts#frame status projection ST6 AI downloads preserve measured progress and the existing pause/resume route",
+      "file": "modules/ui-web/src/shell-v0/state/frameStatus.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:7a302e4f122e95a70e6e8a534ec6ca1023f624b93dfd7ed0ddd6bf9645c3d1f5",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "frame status projection ST6 AI downloads preserve measured progress and the existing pause/resume route",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/state/frameStatus.test.ts#frame status projection ref-09 agent request deadlines read as their consequence relative to now, never as a raw time",
+      "file": "modules/ui-web/src/shell-v0/state/frameStatus.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:7a302e4f122e95a70e6e8a534ec6ca1023f624b93dfd7ed0ddd6bf9645c3d1f5",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "frame status projection ref-09 agent request deadlines read as their consequence relative to now, never as a raw time",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/state/frameStatus.test.ts#frame status projection ref-09 the needs-you pill carries its count for the badge",
+      "file": "modules/ui-web/src/shell-v0/state/frameStatus.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:7a302e4f122e95a70e6e8a534ec6ca1023f624b93dfd7ed0ddd6bf9645c3d1f5",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "frame status projection ref-09 the needs-you pill carries its count for the badge",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/state/frameStatus.test.ts#frame status projection C12 the broadcast advisory and the request-scoped prompt for one authorization give one decision route",
+      "file": "modules/ui-web/src/shell-v0/state/frameStatus.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:7a302e4f122e95a70e6e8a534ec6ca1023f624b93dfd7ed0ddd6bf9645c3d1f5",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "frame status projection C12 the broadcast advisory and the request-scoped prompt for one authorization give one decision route",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/state/frameStatus.test.ts#frame status projection ST1 working shows the most important running item with its measured progress only",
+      "file": "modules/ui-web/src/shell-v0/state/frameStatus.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:7a302e4f122e95a70e6e8a534ec6ca1023f624b93dfd7ed0ddd6bf9645c3d1f5",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "frame status projection ST1 working shows the most important running item with its measured progress only",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/state/frameStatus.test.ts#frame status projection ST2 a reachable engine with a stale poll says checking, never reconnecting, and never claims calm",
+      "file": "modules/ui-web/src/shell-v0/state/frameStatus.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:7a302e4f122e95a70e6e8a534ec6ca1023f624b93dfd7ed0ddd6bf9645c3d1f5",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "frame status projection ST2 a reachable engine with a stale poll says checking, never reconnecting, and never claims calm",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/state/frameStatus.test.ts#frame status projection C12 deduplicates the same backend authorization by pending id",
+      "file": "modules/ui-web/src/shell-v0/state/frameStatus.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:7a302e4f122e95a70e6e8a534ec6ca1023f624b93dfd7ed0ddd6bf9645c3d1f5",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "frame status projection C12 deduplicates the same backend authorization by pending id",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/state/frameStatus.test.ts#indexing detail moved from the task tray (813 §5/§20) stage rows mark only finished stages, extraction has no fraction, and file rows come after stages",
+      "file": "modules/ui-web/src/shell-v0/state/frameStatus.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:7a302e4f122e95a70e6e8a534ec6ca1023f624b93dfd7ed0ddd6bf9645c3d1f5",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "indexing detail moved from the task tray (813 §5/§20) stage rows mark only finished stages, extraction has no fraction, and file rows come after stages",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/state/frameStatus.test.ts#indexing detail moved from the task tray (813 §5/§20) a terminal indexing failure is a current problem, never a completion",
+      "file": "modules/ui-web/src/shell-v0/state/frameStatus.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:7a302e4f122e95a70e6e8a534ec6ca1023f624b93dfd7ed0ddd6bf9645c3d1f5",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "indexing detail moved from the task tray (813 §5/§20) a terminal indexing failure is a current problem, never a completion",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/state/frameStatus.test.ts#concurrent source facts ST1 search restriction index.failed precedes decisions and remains actionable",
+      "file": "modules/ui-web/src/shell-v0/state/frameStatus.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:7a302e4f122e95a70e6e8a534ec6ca1023f624b93dfd7ed0ddd6bf9645c3d1f5",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "concurrent source facts ST1 search restriction index.failed precedes decisions and remains actionable",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/state/frameStatus.test.ts#concurrent source facts ST1 search restriction index.blocked_legacy precedes decisions and remains actionable",
+      "file": "modules/ui-web/src/shell-v0/state/frameStatus.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:7a302e4f122e95a70e6e8a534ec6ca1023f624b93dfd7ed0ddd6bf9645c3d1f5",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "concurrent source facts ST1 search restriction index.blocked_legacy precedes decisions and remains actionable",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/state/frameStatus.test.ts#concurrent source facts ST1 search restriction index.schema_open_refused precedes decisions and remains actionable",
+      "file": "modules/ui-web/src/shell-v0/state/frameStatus.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:7a302e4f122e95a70e6e8a534ec6ca1023f624b93dfd7ed0ddd6bf9645c3d1f5",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "concurrent source facts ST1 search restriction index.schema_open_refused precedes decisions and remains actionable",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/state/frameStatus.test.ts#concurrent source facts ST4 keeps all decisions, holds and running work visible together, including all overlapping holds",
+      "file": "modules/ui-web/src/shell-v0/state/frameStatus.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:7a302e4f122e95a70e6e8a534ec6ca1023f624b93dfd7ed0ddd6bf9645c3d1f5",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "concurrent source facts ST4 keeps all decisions, holds and running work visible together, including all overlapping holds",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/state/frameStatus.test.ts#concurrent source facts ST5 active folder failures and AI failure leave Problems on recovery without turning acknowledgement into recovery",
+      "file": "modules/ui-web/src/shell-v0/state/frameStatus.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:7a302e4f122e95a70e6e8a534ec6ca1023f624b93dfd7ed0ddd6bf9645c3d1f5",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "concurrent source facts ST5 active folder failures and AI failure leave Problems on recovery without turning acknowledgement into recovery",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/state/frameStatus.test.ts#concurrent source facts ST6 answering, per-folder work, rebuild and background runs retain separate freshness and real fractions",
+      "file": "modules/ui-web/src/shell-v0/state/frameStatus.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:7a302e4f122e95a70e6e8a534ec6ca1023f624b93dfd7ed0ddd6bf9645c3d1f5",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "concurrent source facts ST6 answering, per-folder work, rebuild and background runs retain separate freshness and real fractions",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/state/frameStatus.test.ts#concurrent source facts ST7 unread sorts ahead of a newer read item and remains separate from seen and active state",
+      "file": "modules/ui-web/src/shell-v0/state/frameStatus.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:7a302e4f122e95a70e6e8a534ec6ca1023f624b93dfd7ed0ddd6bf9645c3d1f5",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "concurrent source facts ST7 unread sorts ahead of a newer read item and remains separate from seen and active state",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/state/frameStatus.test.ts#concurrent source facts ST4 update available retains its existing Settings action",
+      "file": "modules/ui-web/src/shell-v0/state/frameStatus.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:7a302e4f122e95a70e6e8a534ec6ca1023f624b93dfd7ed0ddd6bf9645c3d1f5",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "concurrent source facts ST4 update available retains its existing Settings action",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/state/frameStatus.test.ts#concurrent source facts ST4 update repair_required retains its existing Settings action",
+      "file": "modules/ui-web/src/shell-v0/state/frameStatus.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:7a302e4f122e95a70e6e8a534ec6ca1023f624b93dfd7ed0ddd6bf9645c3d1f5",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "concurrent source facts ST4 update repair_required retains its existing Settings action",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/StatusPanel.approvals.test.ts#Needs you (moved from proposed-effect cards and agent activity) accept executes once and records acceptance; reject records rejection without applying",
+      "file": "modules/ui-web/src/shell-v0/components/StatusPanel.approvals.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:4cb28912ccf89184bc22fae407680acc710db5fae9c14abdc782ec3a77484393",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Needs you (moved from proposed-effect cards and agent activity) accept executes once and records acceptance; reject records rejection without applying",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/StatusPanel.approvals.test.ts#Needs you (moved from proposed-effect cards and agent activity) multiple proposals preserve rationale and rank the least-confident first without inventing confidence",
+      "file": "modules/ui-web/src/shell-v0/components/StatusPanel.approvals.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:4cb28912ccf89184bc22fae407680acc710db5fae9c14abdc782ec3a77484393",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Needs you (moved from proposed-effect cards and agent activity) multiple proposals preserve rationale and rank the least-confident first without inventing confidence",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/StatusPanel.approvals.test.ts#Needs you (moved from proposed-effect cards and agent activity) HIGH/agent requires the exact typed operation and preserves consent provenance",
+      "file": "modules/ui-web/src/shell-v0/components/StatusPanel.approvals.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:4cb28912ccf89184bc22fae407680acc710db5fae9c14abdc782ec3a77484393",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Needs you (moved from proposed-effect cards and agent activity) HIGH/agent requires the exact typed operation and preserves consent provenance",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/StatusPanel.approvals.test.ts#Needs you (moved from proposed-effect cards and agent activity) HIGH/user requires the exact typed operation and preserves consent provenance",
+      "file": "modules/ui-web/src/shell-v0/components/StatusPanel.approvals.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:4cb28912ccf89184bc22fae407680acc710db5fae9c14abdc782ec3a77484393",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Needs you (moved from proposed-effect cards and agent activity) HIGH/user requires the exact typed operation and preserves consent provenance",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/StatusPanel.approvals.test.ts#Needs you (moved from proposed-effect cards and agent activity) MEDIUM/agent requires the exact typed operation and preserves consent provenance",
+      "file": "modules/ui-web/src/shell-v0/components/StatusPanel.approvals.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:4cb28912ccf89184bc22fae407680acc710db5fae9c14abdc782ec3a77484393",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Needs you (moved from proposed-effect cards and agent activity) MEDIUM/agent requires the exact typed operation and preserves consent provenance",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/StatusPanel.approvals.test.ts#Needs you (moved from proposed-effect cards and agent activity) user MEDIUM proposal dispatches without a ceremony or client-minted confirmation token",
+      "file": "modules/ui-web/src/shell-v0/components/StatusPanel.approvals.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:4cb28912ccf89184bc22fae407680acc710db5fae9c14abdc782ec3a77484393",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Needs you (moved from proposed-effect cards and agent activity) user MEDIUM proposal dispatches without a ceremony or client-minted confirmation token",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/StatusPanel.approvals.test.ts#Needs you (moved from proposed-effect cards and agent activity) plugin capability requests remain reachable through the protected host",
+      "file": "modules/ui-web/src/shell-v0/components/StatusPanel.approvals.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:4cb28912ccf89184bc22fae407680acc710db5fae9c14abdc782ec3a77484393",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Needs you (moved from proposed-effect cards and agent activity) plugin capability requests remain reachable through the protected host",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/StatusPanel.approvals.test.ts#Needs you (moved from proposed-effect cards and agent activity) C12 announcement and panel representations share one decision; stale clicks cannot approve the next request",
+      "file": "modules/ui-web/src/shell-v0/components/StatusPanel.approvals.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:4cb28912ccf89184bc22fae407680acc710db5fae9c14abdc782ec3a77484393",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Needs you (moved from proposed-effect cards and agent activity) C12 announcement and panel representations share one decision; stale clicks cannot approve the next request",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/StatusPanel.history.test.ts#Earlier (moved from the inbox drawer) omits empty sections; calm has one line and the two history destinations",
+      "file": "modules/ui-web/src/shell-v0/components/StatusPanel.history.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:323ca9f2d746fbdbb2a9fc2d9ce0176fbf283e9fb399d22f62645d9afa657203",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Earlier (moved from the inbox drawer) omits empty sections; calm has one line and the two history destinations",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/StatusPanel.history.test.ts#Earlier (moved from the inbox drawer) unread comes first, then newest within read state; history does not reactivate a resolved condition",
+      "file": "modules/ui-web/src/shell-v0/components/StatusPanel.history.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:323ca9f2d746fbdbb2a9fc2d9ce0176fbf283e9fb399d22f62645d9afa657203",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Earlier (moved from the inbox drawer) unread comes first, then newest within read state; history does not reactivate a resolved condition",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/StatusPanel.history.test.ts#Earlier (moved from the inbox drawer) Mark all read uses the existing acknowledgement and stays focusable with a reason when already read",
+      "file": "modules/ui-web/src/shell-v0/components/StatusPanel.history.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:323ca9f2d746fbdbb2a9fc2d9ce0176fbf283e9fb399d22f62645d9afa657203",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Earlier (moved from the inbox drawer) Mark all read uses the existing acknowledgement and stays focusable with a reason when already read",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/StatusPanel.history.test.ts#Earlier (moved from the inbox drawer) diagnostics preserve safe navigation or plain text for https://example.test/diagnostics",
+      "file": "modules/ui-web/src/shell-v0/components/StatusPanel.history.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:323ca9f2d746fbdbb2a9fc2d9ce0176fbf283e9fb399d22f62645d9afa657203",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Earlier (moved from the inbox drawer) diagnostics preserve safe navigation or plain text for https://example.test/diagnostics",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/StatusPanel.history.test.ts#Earlier (moved from the inbox drawer) diagnostics preserve safe navigation or plain text for diagnostics.i18n.key",
+      "file": "modules/ui-web/src/shell-v0/components/StatusPanel.history.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:323ca9f2d746fbdbb2a9fc2d9ce0176fbf283e9fb399d22f62645d9afa657203",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Earlier (moved from the inbox drawer) diagnostics preserve safe navigation or plain text for diagnostics.i18n.key",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/StatusPanel.history.test.ts#Earlier (moved from the inbox drawer) diagnostics preserve safe navigation or plain text for javascript:alert(1)",
+      "file": "modules/ui-web/src/shell-v0/components/StatusPanel.history.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:323ca9f2d746fbdbb2a9fc2d9ce0176fbf283e9fb399d22f62645d9afa657203",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Earlier (moved from the inbox drawer) diagnostics preserve safe navigation or plain text for javascript:alert(1)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/StatusPanel.history.test.ts#Earlier (moved from the inbox drawer) retains local receipts in Earlier without making them unread",
+      "file": "modules/ui-web/src/shell-v0/components/StatusPanel.history.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:323ca9f2d746fbdbb2a9fc2d9ce0176fbf283e9fb399d22f62645d9afa657203",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Earlier (moved from the inbox drawer) retains local receipts in Earlier without making them unread",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/StatusPanel.history.test.ts#Earlier (moved from the inbox drawer) unknown advisory classes use default chrome, without exposing their raw class id as the title",
+      "file": "modules/ui-web/src/shell-v0/components/StatusPanel.history.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:323ca9f2d746fbdbb2a9fc2d9ce0176fbf283e9fb399d22f62645d9afa657203",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Earlier (moved from the inbox drawer) unknown advisory classes use default chrome, without exposing their raw class id as the title",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/StatusPanel.history.test.ts#Earlier (moved from the inbox drawer) humanizes recoverable conditions, authored reasons and operation actions",
+      "file": "modules/ui-web/src/shell-v0/components/StatusPanel.history.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:323ca9f2d746fbdbb2a9fc2d9ce0176fbf283e9fb399d22f62645d9afa657203",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Earlier (moved from the inbox drawer) humanizes recoverable conditions, authored reasons and operation actions",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/StatusPanel.history.test.ts#Earlier (moved from the inbox drawer) forget offers reindexing while backend supported reversal alone is called Undo",
+      "file": "modules/ui-web/src/shell-v0/components/StatusPanel.history.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:323ca9f2d746fbdbb2a9fc2d9ce0176fbf283e9fb399d22f62645d9afa657203",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Earlier (moved from the inbox drawer) forget offers reindexing while backend supported reversal alone is called Undo",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/StatusPanel.running.test.ts#Running (moved from the task tray and indexing overlay) an observed drain supplies 1600 remaining and the honest fraction null",
+      "file": "modules/ui-web/src/shell-v0/components/StatusPanel.running.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:16d8aeb7ef38ced4ecbb40e0273affd8b29af3228149ff4f5fcaec3246e18d6d",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Running (moved from the task tray and indexing overlay) an observed drain supplies 1600 remaining and the honest fraction null",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/StatusPanel.running.test.ts#Running (moved from the task tray and indexing overlay) an observed drain supplies 400 remaining and the honest fraction 75",
+      "file": "modules/ui-web/src/shell-v0/components/StatusPanel.running.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:16d8aeb7ef38ced4ecbb40e0273affd8b29af3228149ff4f5fcaec3246e18d6d",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Running (moved from the task tray and indexing overlay) an observed drain supplies 400 remaining and the honest fraction 75",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/StatusPanel.running.test.ts#Running (moved from the task tray and indexing overlay) enrichment stays discoverable without SSE tasks and exposes its real stage fractions",
+      "file": "modules/ui-web/src/shell-v0/components/StatusPanel.running.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:16d8aeb7ef38ced4ecbb40e0273affd8b29af3228149ff4f5fcaec3246e18d6d",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Running (moved from the task tray and indexing overlay) enrichment stays discoverable without SSE tasks and exposes its real stage fractions",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/StatusPanel.running.test.ts#Running (moved from the task tray and indexing overlay) blocked meaning search never announces completion or invents an enrichment fraction",
+      "file": "modules/ui-web/src/shell-v0/components/StatusPanel.running.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:16d8aeb7ef38ced4ecbb40e0273affd8b29af3228149ff4f5fcaec3246e18d6d",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Running (moved from the task tray and indexing overlay) blocked meaning search never announces completion or invents an enrichment fraction",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/StatusPanel.running.test.ts#Running (moved from the task tray and indexing overlay) persisted vectors with the model removed do not fabricate unfinished work",
+      "file": "modules/ui-web/src/shell-v0/components/StatusPanel.running.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:16d8aeb7ef38ced4ecbb40e0273affd8b29af3228149ff4f5fcaec3246e18d6d",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Running (moved from the task tray and indexing overlay) persisted vectors with the model removed do not fabricate unfinished work",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/StatusPanel.running.test.ts#Running (moved from the task tray and indexing overlay) stale retained indexing suppresses bars and qualifies its last-known activity",
+      "file": "modules/ui-web/src/shell-v0/components/StatusPanel.running.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:16d8aeb7ef38ced4ecbb40e0273affd8b29af3228149ff4f5fcaec3246e18d6d",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Running (moved from the task tray and indexing overlay) stale retained indexing suppresses bars and qualifies its last-known activity",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/StatusPanel.running.test.ts#Running (moved from the task tray and indexing overlay) a missing observation provides no counts, percentage or ETA",
+      "file": "modules/ui-web/src/shell-v0/components/StatusPanel.running.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:16d8aeb7ef38ced4ecbb40e0273affd8b29af3228149ff4f5fcaec3246e18d6d",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Running (moved from the task tray and indexing overlay) a missing observation provides no counts, percentage or ETA",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/StatusPanel.running.test.ts#Running (moved from the task tray and indexing overlay) stage failures and missing artifacts are never presented as finished",
+      "file": "modules/ui-web/src/shell-v0/components/StatusPanel.running.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:16d8aeb7ef38ced4ecbb40e0273affd8b29af3228149ff4f5fcaec3246e18d6d",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Running (moved from the task tray and indexing overlay) stage failures and missing artifacts are never presented as finished",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/StatusPanel.running.test.ts#progress readout facts only a faithful byte weight is shown (null)",
+      "file": "modules/ui-web/src/shell-v0/components/StatusPanel.running.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:16d8aeb7ef38ced4ecbb40e0273affd8b29af3228149ff4f5fcaec3246e18d6d",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "progress readout facts only a faithful byte weight is shown (null)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/StatusPanel.running.test.ts#progress readout facts only a faithful byte weight is shown (8589934592)",
+      "file": "modules/ui-web/src/shell-v0/components/StatusPanel.running.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:16d8aeb7ef38ced4ecbb40e0273affd8b29af3228149ff4f5fcaec3246e18d6d",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "progress readout facts only a faithful byte weight is shown (8589934592)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/StatusPanel.running.test.ts#progress readout facts indexing and meaning-search estimates use their own rates and retain the indicative qualifier",
+      "file": "modules/ui-web/src/shell-v0/components/StatusPanel.running.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:16d8aeb7ef38ced4ecbb40e0273affd8b29af3228149ff4f5fcaec3246e18d6d",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "progress readout facts indexing and meaning-search estimates use their own rates and retain the indicative qualifier",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/StatusPanel.running.test.ts#progress readout facts unknown fractions and estimates leave no invented placeholders",
+      "file": "modules/ui-web/src/shell-v0/components/StatusPanel.running.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:16d8aeb7ef38ced4ecbb40e0273affd8b29af3228149ff4f5fcaec3246e18d6d",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "progress readout facts unknown fractions and estimates leave no invented placeholders",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/StatusPill.design.test.ts#status pill drawing ref-09 needs you shows its count in a badge followed by the words, and names both",
+      "file": "modules/ui-web/src/shell-v0/components/StatusPill.design.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:9164a2fc573591886964f8f4e9374af794d69c6ae7090e90671fe664af59c2ce",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "status pill drawing ref-09 needs you shows its count in a badge followed by the words, and names both",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/StatusPill.design.test.ts#status pill drawing working with a known fraction draws a ring instead of \"· N%\" text; unknown fractions draw none",
+      "file": "modules/ui-web/src/shell-v0/components/StatusPill.design.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:9164a2fc573591886964f8f4e9374af794d69c6ae7090e90671fe664af59c2ce",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "status pill drawing working with a known fraction draws a ring instead of \"· N%\" text; unknown fractions draw none",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/StatusPill.design.test.ts#status pill drawing below 1000 px the pill is an icon (badge or dot) with the same accessible name, without truncated text",
+      "file": "modules/ui-web/src/shell-v0/components/StatusPill.design.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:9164a2fc573591886964f8f4e9374af794d69c6ae7090e90671fe664af59c2ce",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "status pill drawing below 1000 px the pill is an icon (badge or dot) with the same accessible name, without truncated text",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/StatusPill.design.test.ts#status pill drawing ref-07 the undo notice names Ctrl+Z, and the shell undo command reverses that notice once",
+      "file": "modules/ui-web/src/shell-v0/components/StatusPill.design.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:9164a2fc573591886964f8f4e9374af794d69c6ae7090e90671fe664af59c2ce",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "status pill drawing ref-07 the undo notice names Ctrl+Z, and the shell undo command reverses that notice once",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/StatusPill.design.test.ts#status pill drawing a notice whose action is not an undo neither claims Ctrl+Z nor takes the undo command",
+      "file": "modules/ui-web/src/shell-v0/components/StatusPill.design.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:9164a2fc573591886964f8f4e9374af794d69c6ae7090e90671fe664af59c2ce",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "status pill drawing a notice whose action is not an undo neither claims Ctrl+Z nor takes the undo command",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/StatusPill.feedback.test.ts#status feedback ownership C1 ST7 local action outcomes stay visible in the closed pill and recoverable in Earlier",
+      "file": "modules/ui-web/src/shell-v0/components/StatusPill.feedback.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:45da62afc2f6523a8fade6786fa23e705f883d554008e62a2a5bed30a9678af2",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "status feedback ownership C1 ST7 local action outcomes stay visible in the closed pill and recoverable in Earlier",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/StatusPill.feedback.test.ts#status feedback ownership ST8 a witnessed active-to-ready edge completes once; initial ready and reconnect replay stay silent",
+      "file": "modules/ui-web/src/shell-v0/components/StatusPill.feedback.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:45da62afc2f6523a8fade6786fa23e705f883d554008e62a2a5bed30a9678af2",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "status feedback ownership ST8 a witnessed active-to-ready edge completes once; initial ready and reconnect replay stay silent",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/StatusPill.feedback.test.ts#status feedback ownership undo pauses while hovered or focused, survives a concurrent arrival, and keeps its action identity",
+      "file": "modules/ui-web/src/shell-v0/components/StatusPill.feedback.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:45da62afc2f6523a8fade6786fa23e705f883d554008e62a2a5bed30a9678af2",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "status feedback ownership undo pauses while hovered or focused, survives a concurrent arrival, and keeps its action identity",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/StatusPill.feedback.test.ts#status feedback ownership C6 retained snapshots and late discovery stay silent; live REQUIRES_ACK arrivals retain desktop escalation",
+      "file": "modules/ui-web/src/shell-v0/components/StatusPill.feedback.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:45da62afc2f6523a8fade6786fa23e705f883d554008e62a2a5bed30a9678af2",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "status feedback ownership C6 retained snapshots and late discovery stay silent; live REQUIRES_ACK arrivals retain desktop escalation",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/StatusPill.feedback.test.ts#status feedback ownership ST5 plugin errors leave active Problems on recovery and keep history; copy failures have visible feedback",
+      "file": "modules/ui-web/src/shell-v0/components/StatusPill.feedback.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:45da62afc2f6523a8fade6786fa23e705f883d554008e62a2a5bed30a9678af2",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "status feedback ownership ST5 plugin errors leave active Problems on recovery and keep history; copy failures have visible feedback",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/StatusPill.test.ts#status pill and panel ST3 opens, closes on pill, Escape and outside pointer, and returns focus",
+      "file": "modules/ui-web/src/shell-v0/components/StatusPill.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:742ec30eafb0f90a5d5fcbf968963747fa7afd0a48cae41e9c43824e1c4c3685",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "status pill and panel ST3 opens, closes on pill, Escape and outside pointer, and returns focus",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/StatusPill.test.ts#status pill and panel C10 teardown and remount keep exactly one activity subscription",
+      "file": "modules/ui-web/src/shell-v0/components/StatusPill.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:742ec30eafb0f90a5d5fcbf968963747fa7afd0a48cae41e9c43824e1c4c3685",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "status pill and panel C10 teardown and remount keep exactly one activity subscription",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/StatusPill.test.ts#status pill and panel ST3 C8 shortcut yields to typing, IME, repeat and modal ownership",
+      "file": "modules/ui-web/src/shell-v0/components/StatusPill.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:742ec30eafb0f90a5d5fcbf968963747fa7afd0a48cae41e9c43824e1c4c3685",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "status pill and panel ST3 C8 shortcut yields to typing, IME, repeat and modal ownership",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/StatusPill.test.ts#status pill and panel ST15 updates preserve the scrolling element, expanded row and keyed plugin node",
+      "file": "modules/ui-web/src/shell-v0/components/StatusPill.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:742ec30eafb0f90a5d5fcbf968963747fa7afd0a48cae41e9c43824e1c4c3685",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "status pill and panel ST15 updates preserve the scrolling element, expanded row and keyed plugin node",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/StatusPill.test.ts#status pill and panel ST9 renders original plugin content and provenance, removes on uninstall, and layout only hides plugins",
+      "file": "modules/ui-web/src/shell-v0/components/StatusPill.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:742ec30eafb0f90a5d5fcbf968963747fa7afd0a48cae41e9c43824e1c4c3685",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "status pill and panel ST9 renders original plugin content and provenance, removes on uninstall, and layout only hides plugins",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/StatusPill.test.ts#status pill and panel ST15 window switch closes the panel; teardown removes keyboard and blur listeners",
+      "file": "modules/ui-web/src/shell-v0/components/StatusPill.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:742ec30eafb0f90a5d5fcbf968963747fa7afd0a48cae41e9c43824e1c4c3685",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "status pill and panel ST15 window switch closes the panel; teardown removes keyboard and blur listeners",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/StatusPill.transitions.test.ts#verdict and AI-engine announcers (595 §15.1 E1, moved from the status bar) mirrors the verdict politely and an error verdict assertively, never as \"All systems operational\"",
+      "file": "modules/ui-web/src/shell-v0/components/StatusPill.transitions.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:f94feb36ae0b899e6f57b7d8769564bb7ec056dc2711a1e4baf16b449d611341",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "verdict and AI-engine announcers (595 §15.1 E1, moved from the status bar) mirrors the verdict politely and an error verdict assertively, never as \"All systems operational\"",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/StatusPill.transitions.test.ts#verdict and AI-engine announcers (595 §15.1 E1, moved from the status bar) announces the AI engine through its sibling region",
+      "file": "modules/ui-web/src/shell-v0/components/StatusPill.transitions.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:f94feb36ae0b899e6f57b7d8769564bb7ec056dc2711a1e4baf16b449d611341",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "verdict and AI-engine announcers (595 §15.1 E1, moved from the status bar) announces the AI engine through its sibling region",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/StatusPill.transitions.test.ts#completion edges (595 §15.3 N1, 663 AI engine; ST8, C6) a witnessed transition completes once, through an intermediate checking stop",
+      "file": "modules/ui-web/src/shell-v0/components/StatusPill.transitions.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:f94feb36ae0b899e6f57b7d8769564bb7ec056dc2711a1e4baf16b449d611341",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "completion edges (595 §15.3 N1, 663 AI engine; ST8, C6) a witnessed transition completes once, through an intermediate checking stop",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/StatusPill.transitions.test.ts#completion edges (595 §15.3 N1, 663 AI engine; ST8, C6) first load and reconnect never announce a completion (C6)",
+      "file": "modules/ui-web/src/shell-v0/components/StatusPill.transitions.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:f94feb36ae0b899e6f57b7d8769564bb7ec056dc2711a1e4baf16b449d611341",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "completion edges (595 §15.3 N1, 663 AI engine; ST8, C6) first load and reconnect never announce a completion (C6)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/StatusPill.transitions.test.ts#completion edges (595 §15.3 N1, 663 AI engine; ST8, C6) an indexing transition and its ready edge announce one completion, not two",
+      "file": "modules/ui-web/src/shell-v0/components/StatusPill.transitions.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:f94feb36ae0b899e6f57b7d8769564bb7ec056dc2711a1e4baf16b449d611341",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "completion edges (595 §15.3 N1, 663 AI engine; ST8, C6) an indexing transition and its ready edge announce one completion, not two",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/StatusPill.transitions.test.ts#completion edges (595 §15.3 N1, 663 AI engine; ST8, C6) installing → online fires exactly one outcome",
+      "file": "modules/ui-web/src/shell-v0/components/StatusPill.transitions.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:f94feb36ae0b899e6f57b7d8769564bb7ec056dc2711a1e4baf16b449d611341",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "completion edges (595 §15.3 N1, 663 AI engine; ST8, C6) installing → online fires exactly one outcome",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/StatusPill.transitions.test.ts#completion edges (595 §15.3 N1, 663 AI engine; ST8, C6) installing → install_failed fires exactly one outcome",
+      "file": "modules/ui-web/src/shell-v0/components/StatusPill.transitions.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:f94feb36ae0b899e6f57b7d8769564bb7ec056dc2711a1e4baf16b449d611341",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "completion edges (595 §15.3 N1, 663 AI engine; ST8, C6) installing → install_failed fires exactly one outcome",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/StatusPill.transitions.test.ts#own-action receipts and desktop escalation (C1, ST14) a local warning receipt announces assertive",
+      "file": "modules/ui-web/src/shell-v0/components/StatusPill.transitions.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:f94feb36ae0b899e6f57b7d8769564bb7ec056dc2711a1e4baf16b449d611341",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "own-action receipts and desktop escalation (C1, ST14) a local warning receipt announces assertive",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/StatusPill.transitions.test.ts#own-action receipts and desktop escalation (C1, ST14) a local success receipt announces polite",
+      "file": "modules/ui-web/src/shell-v0/components/StatusPill.transitions.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:f94feb36ae0b899e6f57b7d8769564bb7ec056dc2711a1e4baf16b449d611341",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "own-action receipts and desktop escalation (C1, ST14) a local success receipt announces polite",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/StatusPill.transitions.test.ts#own-action receipts and desktop escalation (C1, ST14) a local info receipt announces polite",
+      "file": "modules/ui-web/src/shell-v0/components/StatusPill.transitions.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:f94feb36ae0b899e6f57b7d8769564bb7ec056dc2711a1e4baf16b449d611341",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "own-action receipts and desktop escalation (C1, ST14) a local info receipt announces polite",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/StatusPill.transitions.test.ts#own-action receipts and desktop escalation (C1, ST14) only a live REQUIRES_ACK arrival while unfocused reaches the desktop",
+      "file": "modules/ui-web/src/shell-v0/components/StatusPill.transitions.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:f94feb36ae0b899e6f57b7d8769564bb7ec056dc2711a1e4baf16b449d611341",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "own-action receipts and desktop escalation (C1, ST14) only a live REQUIRES_ACK arrival while unfocused reaches the desktop",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/StatusPill.transitions.test.ts#ST6 durable operations finish with the backend, not on invocation return keeps the invocation task running until the operation history reports complete",
+      "file": "modules/ui-web/src/shell-v0/components/StatusPill.transitions.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:f94feb36ae0b899e6f57b7d8769564bb7ec056dc2711a1e4baf16b449d611341",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "ST6 durable operations finish with the backend, not on invocation return keeps the invocation task running until the operation history reports complete",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/StatusPill.transitions.test.ts#ST6 durable operations finish with the backend, not on invocation return complete-with-gaps stays a decision and never finishes the task",
+      "file": "modules/ui-web/src/shell-v0/components/StatusPill.transitions.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:f94feb36ae0b899e6f57b7d8769564bb7ec056dc2711a1e4baf16b449d611341",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "ST6 durable operations finish with the backend, not on invocation return complete-with-gaps stays a decision and never finishes the task",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/StatusPill.transitions.test.ts#ST6 durable operations finish with the backend, not on invocation return a response arriving after teardown cannot write into the remounted pill",
+      "file": "modules/ui-web/src/shell-v0/components/StatusPill.transitions.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:f94feb36ae0b899e6f57b7d8769564bb7ec056dc2711a1e4baf16b449d611341",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "ST6 durable operations finish with the backend, not on invocation return a response arriving after teardown cannot write into the remounted pill",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/StatusPill.transitions.test.ts#ST1/ST9 calm pill keeps the \"Up to date\" accessible name (the label hides by width only) and counts plugin items",
+      "file": "modules/ui-web/src/shell-v0/components/StatusPill.transitions.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:f94feb36ae0b899e6f57b7d8769564bb7ec056dc2711a1e4baf16b449d611341",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "ST1/ST9 calm pill keeps the \"Up to date\" accessible name (the label hides by width only) and counts plugin items",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/StatusPill.transitions.test.ts#task rows and announcements moved from the task tray and status bar a cancellable running task shows its measured progress and cancels through the substrate",
+      "file": "modules/ui-web/src/shell-v0/components/StatusPill.transitions.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:f94feb36ae0b899e6f57b7d8769564bb7ec056dc2711a1e4baf16b449d611341",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "task rows and announcements moved from the task tray and status bar a cancellable running task shows its measured progress and cancels through the substrate",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/StatusPill.transitions.test.ts#task rows and announcements moved from the task tray and status bar announces retry waiting with its backlog and deadline",
+      "file": "modules/ui-web/src/shell-v0/components/StatusPill.transitions.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:f94feb36ae0b899e6f57b7d8769564bb7ec056dc2711a1e4baf16b449d611341",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "task rows and announcements moved from the task tray and status bar announces retry waiting with its backlog and deadline",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/RetiredStatusElements.test.ts#ST10 frozen jf-status-deck is defined and inert without transports or listeners",
+      "file": "modules/ui-web/src/shell-v0/components/RetiredStatusElements.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:ac6cb858afb43ea086b7309917447d6559f3262acb17e0e425e31f97d7bfb31d",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "ST10 frozen jf-status-deck is defined and inert without transports or listeners",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/RetiredStatusElements.test.ts#ST10 frozen jf-task-list is defined and inert without transports or listeners",
+      "file": "modules/ui-web/src/shell-v0/components/RetiredStatusElements.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:ac6cb858afb43ea086b7309917447d6559f3262acb17e0e425e31f97d7bfb31d",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "ST10 frozen jf-task-list is defined and inert without transports or listeners",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/RetiredStatusElements.test.ts#ST10 frozen jf-pending-effect-queue is defined and inert without transports or listeners",
+      "file": "modules/ui-web/src/shell-v0/components/RetiredStatusElements.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:ac6cb858afb43ea086b7309917447d6559f3262acb17e0e425e31f97d7bfb31d",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "ST10 frozen jf-pending-effect-queue is defined and inert without transports or listeners",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/RetiredStatusElements.test.ts#ST10 frozen jf-agent-activity-panel is defined and inert without transports or listeners",
+      "file": "modules/ui-web/src/shell-v0/components/RetiredStatusElements.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:ac6cb858afb43ea086b7309917447d6559f3262acb17e0e425e31f97d7bfb31d",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "ST10 frozen jf-agent-activity-panel is defined and inert without transports or listeners",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/RetiredStatusElements.test.ts#ST10 frozen jf-ai-activity-digest is defined and inert without transports or listeners",
+      "file": "modules/ui-web/src/shell-v0/components/RetiredStatusElements.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:ac6cb858afb43ea086b7309917447d6559f3262acb17e0e425e31f97d7bfb31d",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "ST10 frozen jf-ai-activity-digest is defined and inert without transports or listeners",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/RetiredStatusElements.test.ts#ST10 frozen jf-app-update-banner is defined and inert without transports or listeners",
+      "file": "modules/ui-web/src/shell-v0/components/RetiredStatusElements.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:ac6cb858afb43ea086b7309917447d6559f3262acb17e0e425e31f97d7bfb31d",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "ST10 frozen jf-app-update-banner is defined and inert without transports or listeners",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/RetiredStatusElements.test.ts#ST10 frozen jf-plugin-error-overlay is defined and inert without transports or listeners",
+      "file": "modules/ui-web/src/shell-v0/components/RetiredStatusElements.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:ac6cb858afb43ea086b7309917447d6559f3262acb17e0e425e31f97d7bfb31d",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "ST10 frozen jf-plugin-error-overlay is defined and inert without transports or listeners",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/RetiredStatusElements.test.ts#ST10 frozen jf-indexing-overlay is defined and inert without transports or listeners",
+      "file": "modules/ui-web/src/shell-v0/components/RetiredStatusElements.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:ac6cb858afb43ea086b7309917447d6559f3262acb17e0e425e31f97d7bfb31d",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "ST10 frozen jf-indexing-overlay is defined and inert without transports or listeners",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/RetiredStatusElements.test.ts#ST10 frozen jf-indexing-overlay-host is defined and inert without transports or listeners",
+      "file": "modules/ui-web/src/shell-v0/components/RetiredStatusElements.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:ac6cb858afb43ea086b7309917447d6559f3262acb17e0e425e31f97d7bfb31d",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "ST10 frozen jf-indexing-overlay-host is defined and inert without transports or listeners",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/RetiredStatusElements.test.ts#ST10 frozen jf-advisory-toast-host is defined and inert without transports or listeners",
+      "file": "modules/ui-web/src/shell-v0/components/RetiredStatusElements.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:ac6cb858afb43ea086b7309917447d6559f3262acb17e0e425e31f97d7bfb31d",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "ST10 frozen jf-advisory-toast-host is defined and inert without transports or listeners",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/RetiredStatusElements.test.ts#ST10 frozen jf-advisory-inbox-drawer is defined and inert without transports or listeners",
+      "file": "modules/ui-web/src/shell-v0/components/RetiredStatusElements.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:ac6cb858afb43ea086b7309917447d6559f3262acb17e0e425e31f97d7bfb31d",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "ST10 frozen jf-advisory-inbox-drawer is defined and inert without transports or listeners",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/RetiredStatusElements.test.ts#ST10 frozen jf-advisory-rail-badge is defined and inert without transports or listeners",
+      "file": "modules/ui-web/src/shell-v0/components/RetiredStatusElements.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:ac6cb858afb43ea086b7309917447d6559f3262acb17e0e425e31f97d7bfb31d",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "ST10 frozen jf-advisory-rail-badge is defined and inert without transports or listeners",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/RetiredStatusElements.test.ts#ST10 frozen jf-resolution-toast is defined and inert without transports or listeners",
+      "file": "modules/ui-web/src/shell-v0/components/RetiredStatusElements.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:ac6cb858afb43ea086b7309917447d6559f3262acb17e0e425e31f97d7bfb31d",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "ST10 frozen jf-resolution-toast is defined and inert without transports or listeners",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/RetiredStatusElements.test.ts#the frame decision entry and read view remain reserved from authored presentations",
+      "file": "modules/ui-web/src/shell-v0/components/RetiredStatusElements.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:ac6cb858afb43ea086b7309917447d6559f3262acb17e0e425e31f97d7bfb31d",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "the frame decision entry and read view remain reserved from authored presentations",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/ActivitySurface.actions.test.ts#Activity owns the retired digest actions 543-fwd #8 — \"Undo all AI actions\" stages a confirm preview, then confirm undoes",
+      "file": "modules/ui-web/src/shell-v0/views/ActivitySurface.actions.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:4e7026f1bff4cdf0a93691e678e3f9b5a60aea4756e0bee2c75cea3a6df0b380",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Activity owns the retired digest actions 543-fwd #8 — \"Undo all AI actions\" stages a confirm preview, then confirm undoes",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/ActivitySurface.actions.test.ts#Activity owns the retired digest actions 543-fwd #9 — \"Save as macro\" captures the agent's actions into a macro",
+      "file": "modules/ui-web/src/shell-v0/views/ActivitySurface.actions.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:4e7026f1bff4cdf0a93691e678e3f9b5a60aea4756e0bee2c75cea3a6df0b380",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Activity owns the retired digest actions 543-fwd #9 — \"Save as macro\" captures the agent's actions into a macro",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/ActivitySurface.actions.test.ts#Activity owns the retired digest actions 577 #16 — the undo-confirm names the irreversible remainder (honest partial undo)",
+      "file": "modules/ui-web/src/shell-v0/views/ActivitySurface.actions.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:4e7026f1bff4cdf0a93691e678e3f9b5a60aea4756e0bee2c75cea3a6df0b380",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Activity owns the retired digest actions 577 #16 — the undo-confirm names the irreversible remainder (honest partial undo)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/chrome/Shell.test.ts#Shell — settings window vs. stage navigation (tempdoc 855) ST15 opening Settings or switching windows closes the status panel and returns focus to the pill",
+      "file": "modules/ui-web/src/shell-v0/chrome/Shell.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:577fe6ec5b964f6566d625d4166bcaf10c21c579d2fb52fdfd91baad22f89a0c",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Shell — settings window vs. stage navigation (tempdoc 855) ST15 opening Settings or switching windows closes the status panel and returns focus to the pill",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/IndexingPause.test.ts#WP3.7 verifier layout and focus repairs F2 preserves a sensible focus and announces remote quiet-queue Resume once",
+      "file": "modules/ui-web/src/shell-v0/components/IndexingPause.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:9b1291b703d0e767468d873257d6eefdce5f3803d3a80880802c56b579f00470",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "WP3.7 verifier layout and focus repairs F2 preserves a sensible focus and announces remote quiet-queue Resume once",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/IndexingPause.test.ts#WP3.7 verifier layout and focus repairs C7 an accepted resume reads \"resuming\" until the engine reports work; a failed resume says so",
+      "file": "modules/ui-web/src/shell-v0/components/IndexingPause.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:9b1291b703d0e767468d873257d6eefdce5f3803d3a80880802c56b579f00470",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "WP3.7 verifier layout and focus repairs C7 an accepted resume reads \"resuming\" until the engine reports work; a failed resume says so",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/indexingTaskWaiting.test.ts#withdraws delayed file work from the running chip while preserving independent agent work",
+      "file": "modules/ui-web/src/shell-v0/components/indexingTaskWaiting.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:8806cac6ea45a6f4570d814ebfa835c1e5515b4b17dad6764187799e31eed7ab",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "withdraws delayed file work from the running chip while preserving independent agent work",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/substrates/tasks/indexingJobsQueueRail.test.ts#standalone million-row rail shows one real queued count, retry until claim, liveness, both failures, DONE, cancel and resync",
+      "file": "modules/ui-web/src/shell-v0/substrates/tasks/indexingJobsQueueRail.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:378fd7e34e27f29352a626e8fd63428748a81d8ec2a75d73164b969864753a6c",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "standalone million-row rail shows one real queued count, retry until claim, liveness, both failures, DONE, cancel and resync",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/substrates/tasks/indexingJobsQueueRail.test.ts#multiplexed million-row rail shows one real queued count, retry until claim, liveness, both failures, DONE, cancel and resync",
+      "file": "modules/ui-web/src/shell-v0/substrates/tasks/indexingJobsQueueRail.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:378fd7e34e27f29352a626e8fd63428748a81d8ec2a75d73164b969864753a6c",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "multiplexed million-row rail shows one real queued count, retry until claim, liveness, both failures, DONE, cancel and resync",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/AuthorizationHost.toplayer.test.ts#Move 4 — trusted ceremony on the Top Layer A1 selecting typed → capability from the status panel applies the selected prompt’s own modality",
+      "file": "modules/ui-web/src/shell-v0/components/AuthorizationHost.toplayer.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:dec34d963aa26659944acc62e00d9b1b17b84aca4b30d9d1dc409aeb40242699",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Move 4 — trusted ceremony on the Top Layer A1 selecting typed → capability from the status panel applies the selected prompt’s own modality",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/AuthorizationHost.toplayer.test.ts#Move 4 — trusted ceremony on the Top Layer A1 selecting capability → typed from the status panel applies the selected prompt’s own modality",
+      "file": "modules/ui-web/src/shell-v0/components/AuthorizationHost.toplayer.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:dec34d963aa26659944acc62e00d9b1b17b84aca4b30d9d1dc409aeb40242699",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Move 4 — trusted ceremony on the Top Layer A1 selecting capability → typed from the status panel applies the selected prompt’s own modality",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/StatusPill.test.ts#status pill and panel B4 the palette entry \"What's going on\" opens the panel once the palette has closed",
+      "file": "modules/ui-web/src/shell-v0/components/StatusPill.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:742ec30eafb0f90a5d5fcbf968963747fa7afd0a48cae41e9c43824e1c4c3685",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "status pill and panel B4 the palette entry \"What's going on\" opens the panel once the palette has closed",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/state/frameStatus.test.ts#round 7 repairs R1 a passing notice never takes the pill from a more urgent state; engine waits say nothing while unreachable",
+      "file": "modules/ui-web/src/shell-v0/state/frameStatus.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:7a302e4f122e95a70e6e8a534ec6ca1023f624b93dfd7ed0ddd6bf9645c3d1f5",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "round 7 repairs R1 a passing notice never takes the pill from a more urgent state; engine waits say nothing while unreachable",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:ed37a03a87ac6103a364e9b94239603274b9df7972390b94c667338e52b64f82"
+}

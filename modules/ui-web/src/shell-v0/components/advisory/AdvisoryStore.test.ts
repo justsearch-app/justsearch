@@ -153,6 +153,19 @@ describe('advisoryReducer', () => {
     expect(next.lastFrameKind).toBe('update');
   });
 
+  it('C6 only an UPDATE after the snapshot is a live arrival; snapshots and pre-snapshot updates are replay', () => {
+    const second: AdvisoryEvent = { ...SAMPLE_EVENT, id: 'operation.completed:core.ping-backend:FAILURE', occurredAt: '2026-05-12T10:01:00Z' };
+    const third: AdvisoryEvent = { ...SAMPLE_EVENT, id: 'operation.completed:core.ping-backend:THIRD', occurredAt: '2026-05-12T10:02:00Z' };
+    const early = advisoryReducer({ advisories: [], lastFrameKind: 'initial' }, makeEnvelope('UPDATE', second, 1));
+    expect(early.liveKeys).toEqual([]);
+    const snapshot = advisoryReducer(early, makeEnvelope('LIFECYCLE', { kind: 'snapshot', advisories: [SAMPLE_EVENT, second] }));
+    expect(snapshot.liveKeys).toEqual([]);
+    const live = advisoryReducer(snapshot, makeEnvelope('UPDATE', third, 3));
+    expect(live.liveKeys).toEqual([advisoryKey(third)]);
+    // A reconnect snapshot replays history: nothing in it is a new arrival.
+    expect(advisoryReducer(live, makeEnvelope('LIFECYCLE', { kind: 'snapshot', advisories: [SAMPLE_EVENT, second, third] })).liveKeys).toEqual([]);
+  });
+
   it('UPDATE with malformed payload preserves the state', () => {
     const initial = { advisories: [SAMPLE_EVENT], lastFrameKind: 'snapshot' as const };
     const env = makeEnvelope('UPDATE', { not: 'an event' }, 2);

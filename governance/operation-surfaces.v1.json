@@ -308,13 +308,22 @@
       "note": "Authorization prompts answered elsewhere: the bridge listens to the action-ledger stream as a wake-up signal and re-reads pending authorizations from the operation client; it keeps no lifecycle model of its own."
     },
     {
-      "id": "fe-ai-activity-digest",
+      "id": "fe-frame-status-projection",
       "kind": "consumer",
       "lang": "ts",
-      "path": "modules/ui-web/src/shell-v0/components/AiActivityDigest.ts",
-      "guard": "exempt:consumer reads UnifiedActionEntry/ActionLedgerClient for display; no projection law to mutate-guard",
+      "path": "modules/ui-web/src/shell-v0/state/frameStatus.ts",
+      "guard": "exempt:pure read-only derivation of the status pill and panel from existing sources (UnifiedActionEntry, OperationOutcomeView); no lifecycle law of its own to mutate-guard",
       "consumesProjection": "fe-action-ledger-client",
-      "note": "Tempdoc 561: the AI activity digest reads the action-ledger client's UnifiedActionEntry stream; a read-only consumer, not an independent model. Declared to close the operation-surface undeclared-surface gap (576 repo-green)."
+      "note": "Shell S1 (ST10): the status pill/panel derivation replaces the retired AI activity digest as the ledger consumer. Action-ledger entries list in Earlier; durable operation outcomes are read as GET /api/operation-history receipts (operation-outcome-http). A projection, not an independent model."
+    },
+    {
+      "id": "fe-frame-status-controller",
+      "kind": "consumer",
+      "lang": "ts",
+      "path": "modules/ui-web/src/shell-v0/controllers/frameStatusController.ts",
+      "guard": "exempt:consumer feeds the shared ledger stream and keyed operation receipts into the frame derivation; no projection law to mutate-guard",
+      "consumesProjection": "fe-action-ledger-client",
+      "note": "Shell S1: always-mounted status owner. Opens the action-ledger client on the shared multiplex and re-reads operation-outcome receipts on the status cadence; it retains the last receipt and never invents a lifecycle state."
     },
     {
       "id": "fe-trust-channel",
@@ -324,15 +333,6 @@
       "guard": "exempt:consumer reads ActionLedgerClient for display; no projection law to mutate-guard",
       "consumesProjection": "fe-action-ledger-client",
       "note": "Tempdoc 561: the plugin-api trust channel reads the action-ledger client; a read-only consumer, not an independent model. Declared to close the operation-surface undeclared-surface gap (576 repo-green)."
-    },
-    {
-      "id": "fe-agent-recall",
-      "kind": "consumer",
-      "lang": "ts",
-      "path": "modules/ui-web/src/shell-v0/substrates/recall/agentRecall.ts",
-      "guard": "exempt:consumer reads UnifiedActionEntry/ActionLedgerClient for display; no projection law to mutate-guard",
-      "consumesProjection": "fe-action-ledger-client",
-      "note": "Tempdoc 561: the agent-recall substrate reads the action-ledger client's UnifiedActionEntry stream; a read-only consumer, not an independent model. Declared to close the operation-surface undeclared-surface gap (576 repo-green)."
     },
     {
       "id": "interaction-thread-controller",

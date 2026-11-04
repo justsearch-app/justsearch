@@ -27,6 +27,7 @@ import { subscribeStatus } from '../utils/statusPoll.js';
 export interface AuthorizationPrompt {
   /** Backend-issued id; the only thing the approval references. */
   readonly pendingId: string;
+  readonly expiresAt?: string;
   /** The gated operation, for display + the typed-confirm word. */
   readonly operationId: string;
   /** 'INLINE_CONFIRM' (one-click) | 'TYPED_CONFIRM' (type the op id) — drives the ceremony. */

@@ -28,6 +28,8 @@ export const RESERVED_COMPONENTS: ReadonlySet<string> = new Set([
   'jf-authorization-host', // the trusted approval ceremony (Move 4) — never skin-mountable
   'jf-provenance-badge', // the "non-core element" trust indicator
   'jf-overlay-host', // the reserved overlay/slot authority
+  'jf-status-pill', // host-owned status and decision entry point
+  'jf-status-panel', // host-owned status and decision read view
   'jf-shell', // the chrome shell (kernel-owned)
   'jf-engine-recovery', // native update/recovery controls belong to desktop boot, not user layouts
   'jf-action-ledger', // tempdoc 571 — the trust read-view (Activity's Outcome face): the authorization

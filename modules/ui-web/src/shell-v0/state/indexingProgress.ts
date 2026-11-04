@@ -69,7 +69,7 @@ export interface EnrichmentApplicability {
  * capability tiers on the surface and machine stages in the disclosure, so the user-facing wording
  * belongs to the consuming surface, not to this projection.
  */
-export interface EnrichingStageRow {
+interface EnrichingStageRow {
   readonly id: 'embedding' | 'splade' | 'ner' | 'chunkVectors' | 'chunkSplade';
   readonly total: number;
   readonly pending: number;

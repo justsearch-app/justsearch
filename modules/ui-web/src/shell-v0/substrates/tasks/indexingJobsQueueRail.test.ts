@@ -1,8 +1,8 @@
 // @vitest-environment happy-dom
 // SPDX-License-Identifier: Apache-2.0
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import '../../components/TaskList.js';
-import type { TaskList } from '../../components/TaskList.js';
+import { StatusPill } from '../../components/StatusPill.js';
+import type { StatusPanel } from '../../components/StatusPanel.js';
 import { __feedForTest, __resetAiStateForTest } from '../../state/aiStateStore.js';
 import { __resetTasksForTest, getTask, listTasks } from './index.js';
 import { projectJobsToTasks, startIndexingJobsBridge, __setResolveHashForTest, __resetResolvedLabelsForTest } from './indexingJobsBridge.js';
@@ -22,16 +22,27 @@ function status(queued: number, processing = 1, failed = 1001): void {
       migration: { pendingJobsCount: queued, processingJobsCount: processing }, failure: { failedJobs: failed } },
   } as StatusResponse });
 }
+const panel = (pill: StatusPill) => pill.shadowRoot!.querySelector<StatusPanel>('jf-status-panel')!;
+/** Opens the indexing row's disclosure (kept open across live updates) and reads one rendered detail line. */
+async function detail(pill: StatusPill, id: string): Promise<string | null> {
+  const root = panel(pill).shadowRoot!;
+  const toggle = root.querySelector<HTMLButtonElement>('article[data-fact="indexing"] button[aria-expanded="false"]');
+  if (toggle) { toggle.click(); await panel(pill).updateComplete; }
+  return root.querySelector(`[data-detail="${id}"]`)?.textContent ?? null;
+}
+const queuedRows = (pill: StatusPill) => panel(pill).shadowRoot!.querySelectorAll('[data-detail="queued"]');
 let stop: (() => void) | undefined;
 let multiplex: MultiplexedStream | undefined;
 beforeEach(() => {
   __resetAiStateForTest(); __resetTasksForTest(); __resetEnvelopeStreamPoolForTest(); __resetResolvedLabelsForTest();
   __setResolveHashForTest(async () => null);
+  // The pill reads folders/presence on the status cadence; never let a test reach a real origin.
+  vi.stubGlobal('fetch', vi.fn(async () => new Response('{}', { status: 503 })));
 });
 afterEach(() => {
   stop?.(); multiplex?.stop(); stop = undefined; multiplex = undefined;
   document.body.replaceChildren(); __resetAiStateForTest(); __resetTasksForTest(); __resetEnvelopeStreamPoolForTest();
-  __setResolveHashForTest(null); vi.useRealTimers();
+  __setResolveHashForTest(null); vi.useRealTimers(); vi.unstubAllGlobals();
 });
 
 for (const transport of ['standalone', 'multiplexed'] as const) {
@@ -52,20 +63,20 @@ for (const transport of ['standalone', 'multiplexed'] as const) {
       const row = (pathHash: string, state: string) => ({ pathHash, state, collection: 'docs', lastUpdatedMs: Date.now() });
       const resolver = vi.fn(async () => null);
       __setResolveHashForTest(resolver);
-      const rail = document.createElement('jf-task-list') as TaskList;
+      const rail = new StatusPill();
       document.body.append(rail); status(700000, 16);
       send('LIFECYCLE', { kind: 'snapshot', items: [row('active', 'PROCESSING'), row('retry', 'FAILED'), row('gaveup', 'RETRY_EXHAUSTED')] });
-      await Promise.resolve(); await Promise.resolve(); await rail.updateComplete;
-      expect(rail.shadowRoot!.querySelectorAll('[data-testid="task-queued-aggregate"]')).toHaveLength(1);
-      expect(rail.shadowRoot!.querySelector('[data-testid="task-queued-aggregate"]')?.textContent).toContain(`${formatCount(700000)} files queued`);
-      expect(rail.shadowRoot!.querySelector('[data-testid="task-queue-totals"]')?.textContent).toContain(`${formatCount(1001)} failed`);
+      await Promise.resolve(); await Promise.resolve(); await rail.updateComplete; await panel(rail).updateComplete;
+      expect(await detail(rail, 'queued')).toContain(`${formatCount(700000)} files queued`);
+      expect(queuedRows(rail)).toHaveLength(1);
+      expect(await detail(rail, 'failed-files')).toContain(`${formatCount(1001)} failed`);
       expect(getTask('idxjob:active')?.status).toBe('running');
       expect(getTask('idxjob:retry')?.status).toBe('failed');
       expect(getTask('idxjob:gaveup')?.label).toContain('gave up');
       send('UPDATE', { kind: 'update', row: row('retry', 'PENDING') }); status(700001, 16, 1000);
-      await Promise.resolve(); await Promise.resolve(); await rail.updateComplete;
+      await Promise.resolve(); await Promise.resolve(); await rail.updateComplete; await panel(rail).updateComplete;
       expect(getTask('idxjob:retry')).toBeUndefined();
-      expect(rail.shadowRoot!.querySelector('[data-testid="task-queued-aggregate"]')?.textContent).toContain(`${formatCount(700001)} files queued`);
+      expect(await detail(rail, 'queued')).toContain(`${formatCount(700001)} files queued`);
       send('UPDATE', { kind: 'update', row: row('retry', 'PROCESSING') }); status(700000, 17, 1000);
       expect(getTask('idxjob:retry')?.status).toBe('running');
       vi.advanceTimersByTime(120000);
@@ -77,16 +88,19 @@ for (const transport of ['standalone', 'multiplexed'] as const) {
       send('UPDATE', { kind: 'delete', primaryKeyValue: 'active' });
       expect(getTask('idxjob:active')).toBeUndefined();
       status(0, 0, 1000);
-      await Promise.resolve(); await Promise.resolve(); await rail.updateComplete;
-      expect(rail.shadowRoot!.querySelector('[data-testid="task-queued-aggregate"]')).toBeNull();
+      await Promise.resolve(); await Promise.resolve(); await rail.updateComplete; await panel(rail).updateComplete;
+      expect(queuedRows(rail)).toHaveLength(0);
       send('UPDATE', { kind: 'snapshot-replaced', items: [row('reload', 'PROCESSING')] });
       expect(listTasks().map(t => t.id)).toEqual(['idxjob:reload']);
       expect(resolver.mock.calls.length).toBeLessThanOrEqual(200 + 17);
-      await Promise.resolve(); await Promise.resolve(); await rail.updateComplete;
-      rail.shadowRoot!.querySelector<HTMLButtonElement>('[data-testid="tasks-disclosure"]')!.click();
-      await Promise.resolve(); await Promise.resolve(); await rail.updateComplete;
-      expect(rail.shadowRoot!.querySelector('[data-testid="task-window-notice"]')?.textContent).toContain('window');
-      expect(rail.shadowRoot!.querySelectorAll('.task').length).toBeLessThanOrEqual(8);
+      await Promise.resolve(); await Promise.resolve(); await rail.updateComplete; await panel(rail).updateComplete;
+      panel(rail).shadowRoot!.querySelector<HTMLButtonElement>('article[data-fact="indexing-files"] [aria-expanded="false"]')!.click();
+      await Promise.resolve(); await Promise.resolve(); await rail.updateComplete; await panel(rail).updateComplete;
+      expect(panel(rail).shadowRoot!.querySelector('[data-detail="file-window"]')?.textContent).toContain('window');
+      // The aggregate reads ready; the retained SSE row is qualified, never a live claim.
+      expect(panel(rail).shadowRoot!.querySelector('[data-detail="idxjob:reload"]')?.textContent).toContain('last observed running');
+      expect(rail.status.model.pill.kind).not.toBe('working');
+      expect(panel(rail).shadowRoot!.querySelectorAll('[data-detail^="idxjob:"]').length).toBeLessThanOrEqual(8);
     });
   });
 }
@@ -128,7 +142,7 @@ it('renders only eight file tasks at 700k queued, with at most window plus concu
   __setResolveHashForTest(resolver);
   const source = new Source();
   stop = startIndexingJobsBridge('http://test', { eventSourceFactory: () => source as unknown as EventSource });
-  const rail = document.createElement('jf-task-list') as TaskList;
+  const rail = new StatusPill();
   document.body.append(rail);
   status(700000, 16, 1001);
   source.emit({ streamId: 'indexing-jobs/v1', frameKind: 'LIFECYCLE', seq: 1,
@@ -137,12 +151,10 @@ it('renders only eight file tasks at 700k queued, with at most window plus concu
         state: i < 16 ? 'PROCESSING' : 'FAILED', collection: 'docs', lastUpdatedMs: Date.now() })),
     } });
   await vi.waitFor(() => expect(resolver).toHaveBeenCalledTimes(216));
-  await rail.updateComplete;
-  rail.shadowRoot!.querySelector<HTMLButtonElement>('[data-testid="tasks-disclosure"]')!.click();
-  await rail.updateComplete;
-  expect(rail.shadowRoot!.querySelectorAll('.task')).toHaveLength(8);
-  expect(rail.shadowRoot!.querySelectorAll('[data-testid="task-queued-aggregate"]')).toHaveLength(1);
-  expect(rail.shadowRoot!.querySelector('[data-testid="task-queued-aggregate"]')?.textContent).toContain(`${formatCount(700000)} files queued`);
-  expect(rail.shadowRoot!.querySelector('[data-testid="task-queue-totals"]')?.textContent).toContain(`${formatCount(1001)} failed`);
+  await rail.updateComplete; await panel(rail).updateComplete;
+  expect(await detail(rail, 'queued')).toContain(`${formatCount(700000)} files queued`);
+  expect(panel(rail).shadowRoot!.querySelectorAll('[data-detail^="idxjob:"]')).toHaveLength(8);
+  expect(queuedRows(rail)).toHaveLength(1);
+  expect(await detail(rail, 'failed-files')).toContain(`${formatCount(1001)} failed`);
   expect(listTasks().length).toBeLessThanOrEqual(216);
 });

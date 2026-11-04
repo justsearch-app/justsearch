@@ -9,8 +9,8 @@
       "registryFile": "modules/ui-web/src/shell-v0/commands/StatusBarRegistry.ts",
       "registryType": "StatusBarItem",
       "priorityField": "priority",
-      "rendererFile": "modules/ui-web/src/shell-v0/components/StatusDeck.ts",
-      "note": "The first adaptive region — the bottom telemetry bar. Items declare `priority` (overflow order) + `overflow` (per-item policy: pinned items never hide). StatusDeck composes OverflowController and does not naked-clip its :host."
+      "rendererFile": "modules/ui-web/src/shell-v0/components/StatusPanel.ts",
+      "note": "The first adaptive region — plugin status items. The bottom status bar (StatusDeck) retired with the frame status pill (S1); plugin items now render in the status panel's one-line plugin row. Items declare `priority` (overflow order) + `overflow` (per-item policy: pinned items never hide). StatusPanel composes OverflowController for that row and does not naked-clip its :host."
     }
   ],
   "densityNote": "Tempdoc 565 §19 — the FILL half of the Adaptivity authority (559 §4: 'overflow + fill'). The `regions` above are the OVERFLOW half (which leading items of a row fit a width). A `densityElement` is the FILL half: an element that renders at MULTIPLE SCALES must project its REPRESENTATION from its measured box — below the legible threshold a glyph char collapses to a dot/shape, so 'an illegible-at-scale glyph' is unrepresentable by construction. Each element composes the `densityPrimitive` DensityController (the ResizeObserver-backed sibling of OverflowController); a new multi-scale element must be ADDED here AND built from it (the discovery step), not hand-fix one representation that fails small.",

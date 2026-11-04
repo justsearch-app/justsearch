@@ -1715,17 +1715,18 @@ export class HealthSurface extends JfElement {
     if (refusal) return html`<div class="card section recommended"><h3>${refusal.headline}</h3><p>${refusal.body}</p></div>`;
     // 595 §4.2 — the footer rollup CONSUMES the same one verdict the header does,
     // so the two can no longer disagree on a boundary value (the §1.1 split: a
-    // 'Service degraded' header beside a '✓ All systems operational' footer). The
+    // 'Service degraded' header beside a '✓ Up to date' footer). The
     // verdict already encodes connecting / transitioning / checking / degraded /
     // unreachable; the footer only adds the green "✓" affordance for operational.
-    const activity = this.indexingProgress().activity;
+    const progress = this.indexingProgress();
+    const activity = progress.activity;
     const indexingSummary = html`<p data-testid="health-indexing-summary">${activity.summary}${activity.detail ? ` — ${activity.detail}` : ''}</p>`;
     if (this.recommendedActions.size === 0) {
       const v = this.verdict;
       if (v.kind === 'operational' && activity.confirmed) {
         return html`
           <div class="card section recommended all-healthy">
-            <h3>✓ All systems operational</h3>
+            <h3>✓ ${progress.phase === 'ready' ? 'Up to date' : 'Search available'}</h3>
             <p>No recoverable conditions active.</p>
             ${indexingSummary}
           </div>

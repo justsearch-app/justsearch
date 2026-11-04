@@ -47,6 +47,7 @@ async function approve(denied = false) {
   await (button as unknown as { updateComplete: Promise<unknown> }).updateComplete;
   const control = button.shadowRoot!.querySelector('jf-control')!;
   await (control as unknown as { updateComplete: Promise<unknown> }).updateComplete;
+  vi.advanceTimersByTime(400); // the prompt arms before it accepts a decision
   control.shadowRoot!.querySelector('button')!.click();
   await settle();
 }

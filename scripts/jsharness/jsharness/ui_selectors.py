@@ -77,7 +77,21 @@ CSS_DENSITY_SLIDER = (
     'jf-settings-window jf-settings-surface '
     'jf-discrete-slider input[type="range"][aria-label="Density"]'
 )
-CSS_TOAST = '.toast'
+# Frame status (S1): the advisory toast host retired. An own-action or ephemeral advisory
+# ('jf-advisory-ephemeral') shows briefly IN the title-bar pill — the trigger takes the `notice`
+# class and the message as its text and accessible name — or, while a more urgent state holds the
+# pill (`transientPlacement`: unreachable / limited / needs / problems), BESIDE it as
+# `data-testid="status-notice"`. Either way the record stays in the status panel's Earlier section
+# as an `article[data-fact="advisory:local:<n>"]` row, rendered while the panel is closed too.
+CSS_STATUS_PILL_TRIGGER = 'jf-status-pill button.trigger'
+CSS_STATUS_PILL_BADGE = 'jf-status-pill button.trigger jf-status-badge'
+CSS_STATUS_NOTICE_IN_PILL = 'jf-status-pill button.trigger.notice'
+CSS_STATUS_NOTICE_BESIDE = 'jf-status-pill [data-testid="status-notice"]'
+CSS_STATUS_POLITE_ANNOUNCER = 'jf-status-pill span[role="status"][aria-live="polite"]'
+CSS_STATUS_ASSERTIVE_ANNOUNCER = 'jf-status-pill span[role="alert"][aria-live="assertive"]'
+CSS_STATUS_EARLIER_LOCAL_ROW = 'jf-status-panel section[aria-label="Earlier"] article[data-fact^="advisory:local:"]'
+# Pill kinds whose state keeps the pill while a notice shows beside it (`transientPlacement`).
+STATUS_PILL_URGENT_KINDS = ('unreachable', 'limited', 'needs', 'problems')
 # The Library surface's LOADING branch, for the `skeleton-library` step. There is no
 # `data-testid` here and none is added: the surface already has an observable loading state —
 # `LibrarySurface.render()` swaps in a single `<div class="empty">Loading…</div>` while the

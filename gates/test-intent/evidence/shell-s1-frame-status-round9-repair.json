@@ -1,0 +1,420 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
+  },
+  "createdAt": "2026-11-04T01:11:04.406Z",
+  "revision": "2cfacd7576a92e76df975710cdbb33679b136bca",
+  "tree": "ee30350cbde49380549f2c31d8517fd20c4b3ed9",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/components/AuthorizationHost.activation.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/mh5fno0e/tmp/test-intent-vitest-35379-1793754602830.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 2360
+    },
+    {
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/components/AuthorizationHost.activation-lockdown.test.ts\" --config vitest.config.lockdown.ts --reporter=json --outputFile=\"/home/elias/.cache/am/mh5fno0e/tmp/test-intent-vitest-35379-1793754605195.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 26691
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/components/AuthorizationHost.activation.test.ts#a double-click answers only the first queued lightweight prompt",
+      "file": "modules/ui-web/src/shell-v0/components/AuthorizationHost.activation.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:e21d39c859f06f3b800b6fcb5bb4b66be02726b8567f705be0916bc451719ad2",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "a double-click answers only the first queued lightweight prompt",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/AuthorizationHost.activation.test.ts#a double-click answers only the first queued typed prompt",
+      "file": "modules/ui-web/src/shell-v0/components/AuthorizationHost.activation.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:e21d39c859f06f3b800b6fcb5bb4b66be02726b8567f705be0916bc451719ad2",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "a double-click answers only the first queued typed prompt",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/AuthorizationHost.activation.test.ts#a double-click answers only the first queued capability prompt",
+      "file": "modules/ui-web/src/shell-v0/components/AuthorizationHost.activation.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:e21d39c859f06f3b800b6fcb5bb4b66be02726b8567f705be0916bc451719ad2",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "a double-click answers only the first queued capability prompt",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/AuthorizationHost.activation.test.ts#repeated activation of the same native button answers only the first lightweight prompt",
+      "file": "modules/ui-web/src/shell-v0/components/AuthorizationHost.activation.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:e21d39c859f06f3b800b6fcb5bb4b66be02726b8567f705be0916bc451719ad2",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "repeated activation of the same native button answers only the first lightweight prompt",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/AuthorizationHost.activation.test.ts#repeated activation of the same native button answers only the first typed prompt",
+      "file": "modules/ui-web/src/shell-v0/components/AuthorizationHost.activation.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:e21d39c859f06f3b800b6fcb5bb4b66be02726b8567f705be0916bc451719ad2",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "repeated activation of the same native button answers only the first typed prompt",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/AuthorizationHost.activation.test.ts#repeated activation of the same native button answers only the first capability prompt",
+      "file": "modules/ui-web/src/shell-v0/components/AuthorizationHost.activation.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:e21d39c859f06f3b800b6fcb5bb4b66be02726b8567f705be0916bc451719ad2",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "repeated activation of the same native button answers only the first capability prompt",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/AuthorizationHost.activation.test.ts#held Enter auto-repeat answers only the first lightweight prompt",
+      "file": "modules/ui-web/src/shell-v0/components/AuthorizationHost.activation.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:e21d39c859f06f3b800b6fcb5bb4b66be02726b8567f705be0916bc451719ad2",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "held Enter auto-repeat answers only the first lightweight prompt",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/AuthorizationHost.activation.test.ts#held Enter auto-repeat answers only the first typed prompt",
+      "file": "modules/ui-web/src/shell-v0/components/AuthorizationHost.activation.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:e21d39c859f06f3b800b6fcb5bb4b66be02726b8567f705be0916bc451719ad2",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "held Enter auto-repeat answers only the first typed prompt",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/AuthorizationHost.activation.test.ts#held Enter auto-repeat answers only the first capability prompt",
+      "file": "modules/ui-web/src/shell-v0/components/AuthorizationHost.activation.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:e21d39c859f06f3b800b6fcb5bb4b66be02726b8567f705be0916bc451719ad2",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "held Enter auto-repeat answers only the first capability prompt",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/AuthorizationHost.activation.test.ts#a key pressed again before the next prompt arms does not answer it (\"Enter\")",
+      "file": "modules/ui-web/src/shell-v0/components/AuthorizationHost.activation.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:e21d39c859f06f3b800b6fcb5bb4b66be02726b8567f705be0916bc451719ad2",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "a key pressed again before the next prompt arms does not answer it (\"Enter\")",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/AuthorizationHost.activation.test.ts#a key pressed again before the next prompt arms does not answer it (\" \")",
+      "file": "modules/ui-web/src/shell-v0/components/AuthorizationHost.activation.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:e21d39c859f06f3b800b6fcb5bb4b66be02726b8567f705be0916bc451719ad2",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "a key pressed again before the next prompt arms does not answer it (\" \")",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/AuthorizationHost.activation.test.ts#a pointer press that began before the next prompt armed does not answer it",
+      "file": "modules/ui-web/src/shell-v0/components/AuthorizationHost.activation.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:e21d39c859f06f3b800b6fcb5bb4b66be02726b8567f705be0916bc451719ad2",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "a pointer press that began before the next prompt armed does not answer it",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/AuthorizationHost.activation.test.ts#a fresh \"Enter\" press after the delay answers the next prompt on release",
+      "file": "modules/ui-web/src/shell-v0/components/AuthorizationHost.activation.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:e21d39c859f06f3b800b6fcb5bb4b66be02726b8567f705be0916bc451719ad2",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "a fresh \"Enter\" press after the delay answers the next prompt on release",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/AuthorizationHost.activation.test.ts#assistive-technology activation (no pointer or key press) answers an armed prompt",
+      "file": "modules/ui-web/src/shell-v0/components/AuthorizationHost.activation.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:e21d39c859f06f3b800b6fcb5bb4b66be02726b8567f705be0916bc451719ad2",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "assistive-technology activation (no pointer or key press) answers an armed prompt",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/AuthorizationHost.activation.test.ts#Review re-presents the open prompt: the activation that asked for it cannot answer it",
+      "file": "modules/ui-web/src/shell-v0/components/AuthorizationHost.activation.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:e21d39c859f06f3b800b6fcb5bb4b66be02726b8567f705be0916bc451719ad2",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Review re-presents the open prompt: the activation that asked for it cannot answer it",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/AuthorizationHost.activation-lockdown.test.ts#a native double-click on Allow always grants only the first plugin, across reload",
+      "file": "modules/ui-web/src/shell-v0/components/AuthorizationHost.activation-lockdown.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:95b362a97ebe21bb47e5a42c810983a841255d9c545fed0fff0dee76975fbb47",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "a native double-click on Allow always grants only the first plugin, across reload",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/AuthorizationHost.activation-lockdown.test.ts#repeated native activation of the same button answers one prompt",
+      "file": "modules/ui-web/src/shell-v0/components/AuthorizationHost.activation-lockdown.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:95b362a97ebe21bb47e5a42c810983a841255d9c545fed0fff0dee76975fbb47",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "repeated native activation of the same button answers one prompt",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/AuthorizationHost.activation-lockdown.test.ts#Enter pressed and held on the next prompt before it arms answers nothing",
+      "file": "modules/ui-web/src/shell-v0/components/AuthorizationHost.activation-lockdown.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:95b362a97ebe21bb47e5a42c810983a841255d9c545fed0fff0dee76975fbb47",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Enter pressed and held on the next prompt before it arms answers nothing",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "ffa2a58333",
+    "revision": "ffa2a5833396157d299c95275d84275c438cae13",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/components/AuthorizationHost.activation.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/mh5fno0e/tmp/test-intent-vitest-35379-1793754634173.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 2425,
+        "output": "JSON report written to /home/elias/.cache/am/mh5fno0e/tmp/test-intent-vitest-35379-1793754634173.json\n\n"
+      },
+      {
+        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/components/AuthorizationHost.activation-lockdown.test.ts\" --config vitest.config.lockdown.ts --reporter=json --outputFile=\"/home/elias/.cache/am/mh5fno0e/tmp/test-intent-vitest-35379-1793754636600.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 27364,
+        "output": "JSON report written to /home/elias/.cache/am/mh5fno0e/tmp/test-intent-vitest-35379-1793754636600.json\n\n"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui-web/src/shell-v0/components/AuthorizationHost.activation.test.ts#a double-click answers only the first queued lightweight prompt",
+        "classification": "assertion",
+        "detail": "a double-click answers only the first queued lightweight prompt:  AssertionError: expected true to be false // Object.is equality\n    at /home/elias/.cache/am/mh5fno0e/tmp/test-intent-before-NMaFCV/modules/ui-web/src/shell-v0/components/AuthorizationHost.activation.test.ts:103:50\n    at processTicksAndRejections (node:internal/process/task_queues:104:5)\n    at fil"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/AuthorizationHost.activation.test.ts#a double-click answers only the first queued typed prompt",
+        "classification": "assertion",
+        "detail": "a double-click answers only the first queued typed prompt:  AssertionError: expected true to be false // Object.is equality\n    at /home/elias/.cache/am/mh5fno0e/tmp/test-intent-before-NMaFCV/modules/ui-web/src/shell-v0/components/AuthorizationHost.activation.test.ts:103:50\n    at runNextTicks (node:internal/process/task_queues:65:5)\n    at processTimers (no"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/AuthorizationHost.activation.test.ts#a double-click answers only the first queued capability prompt",
+        "classification": "assertion",
+        "detail": "a double-click answers only the first queued capability prompt:  AssertionError: expected true to be false // Object.is equality\n    at /home/elias/.cache/am/mh5fno0e/tmp/test-intent-before-NMaFCV/modules/ui-web/src/shell-v0/components/AuthorizationHost.activation.test.ts:103:50\n    at file:///home/elias/dev/justsearch/modules/ui-web/node_modules/@vitest/runner/d"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/AuthorizationHost.activation.test.ts#repeated activation of the same native button answers only the first lightweight prompt",
+        "classification": "assertion",
+        "detail": "repeated activation of the same native button answers only the first lightweight prompt:  AssertionError: expected true to be false // Object.is equality\n    at /home/elias/.cache/am/mh5fno0e/tmp/test-intent-before-NMaFCV/modules/ui-web/src/shell-v0/components/AuthorizationHost.activation.test.ts:118:50\n    at file:///home/elias/dev/justsearch/modules/ui-web/node_modules/@vitest/runner/d"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/AuthorizationHost.activation.test.ts#repeated activation of the same native button answers only the first typed prompt",
+        "classification": "assertion",
+        "detail": "repeated activation of the same native button answers only the first typed prompt:  AssertionError: expected true to be false // Object.is equality\n    at /home/elias/.cache/am/mh5fno0e/tmp/test-intent-before-NMaFCV/modules/ui-web/src/shell-v0/components/AuthorizationHost.activation.test.ts:118:50\n    at file:///home/elias/dev/justsearch/modules/ui-web/node_modules/@vitest/runner/d"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/AuthorizationHost.activation.test.ts#repeated activation of the same native button answers only the first capability prompt",
+        "classification": "assertion",
+        "detail": "repeated activation of the same native button answers only the first capability prompt:  AssertionError: capability-allow-always is on screen: a prompt is still waiting for its decision: expected null not to be null\n    at nativeButton (/home/elias/.cache/am/mh5fno0e/tmp/test-intent-before-NMaFCV/modules/ui-web/src/shell-v0/components/AuthorizationHost.activation.test.ts:56:90)\n    at /"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/AuthorizationHost.activation.test.ts#held Enter auto-repeat answers only the first lightweight prompt",
+        "classification": "assertion",
+        "detail": "held Enter auto-repeat answers only the first lightweight prompt:  AssertionError: authorization-approve is on screen: a prompt is still waiting for its decision: expected null not to be null\n    at nativeButton (/home/elias/.cache/am/mh5fno0e/tmp/test-intent-before-NMaFCV/modules/ui-web/src/shell-v0/components/AuthorizationHost.activation.test.ts:56:90)\n    at /ho"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/AuthorizationHost.activation.test.ts#held Enter auto-repeat answers only the first typed prompt",
+        "classification": "assertion",
+        "detail": "held Enter auto-repeat answers only the first typed prompt:  AssertionError: authorization-deny is on screen: a prompt is still waiting for its decision: expected null not to be null\n    at nativeButton (/home/elias/.cache/am/mh5fno0e/tmp/test-intent-before-NMaFCV/modules/ui-web/src/shell-v0/components/AuthorizationHost.activation.test.ts:56:90)\n    at /home/"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/AuthorizationHost.activation.test.ts#held Enter auto-repeat answers only the first capability prompt",
+        "classification": "assertion",
+        "detail": "held Enter auto-repeat answers only the first capability prompt:  AssertionError: capability-allow-always is on screen: a prompt is still waiting for its decision: expected null not to be null\n    at nativeButton (/home/elias/.cache/am/mh5fno0e/tmp/test-intent-before-NMaFCV/modules/ui-web/src/shell-v0/components/AuthorizationHost.activation.test.ts:56:90)\n    at /"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/AuthorizationHost.activation.test.ts#a key pressed again before the next prompt arms does not answer it (\"Enter\")",
+        "classification": "assertion",
+        "detail": "a key pressed again before the next prompt arms does not answer it (\"Enter\"):  AssertionError: expected true to be false // Object.is equality\n    at /home/elias/.cache/am/mh5fno0e/tmp/test-intent-before-NMaFCV/modules/ui-web/src/shell-v0/components/AuthorizationHost.activation.test.ts:150:58\n    at file:///home/elias/dev/justsearch/modules/ui-web/node_modules/@vitest/runner/d"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/AuthorizationHost.activation.test.ts#a key pressed again before the next prompt arms does not answer it (\" \")",
+        "classification": "assertion",
+        "detail": "a key pressed again before the next prompt arms does not answer it (\" \"):  AssertionError: expected true to be false // Object.is equality\n    at /home/elias/.cache/am/mh5fno0e/tmp/test-intent-before-NMaFCV/modules/ui-web/src/shell-v0/components/AuthorizationHost.activation.test.ts:150:58\n    at file:///home/elias/dev/justsearch/modules/ui-web/node_modules/@vitest/runner/d"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/AuthorizationHost.activation.test.ts#a pointer press that began before the next prompt armed does not answer it",
+        "classification": "assertion",
+        "detail": "a pointer press that began before the next prompt armed does not answer it:  AssertionError: expected true to be false // Object.is equality\n    at /home/elias/.cache/am/mh5fno0e/tmp/test-intent-before-NMaFCV/modules/ui-web/src/shell-v0/components/AuthorizationHost.activation.test.ts:163:58\n    at file:///home/elias/dev/justsearch/modules/ui-web/node_modules/@vitest/runner/d"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/AuthorizationHost.activation.test.ts#a fresh \"Enter\" press after the delay answers the next prompt on release",
+        "classification": "assertion",
+        "detail": "a fresh \"Enter\" press after the delay answers the next prompt on release:  AssertionError: expected [ { kind: 'authorize', …(2) } ] to have a length of 2 but got 1\n    at Proxy.<anonymous> (file:///home/elias/dev/justsearch/modules/ui-web/node_modules/@vitest/expect/dist/index.js:1389:20)\n    at Proxy.<anonymous> (file:///home/elias/dev/justsearch/modules/ui-web/node_modul"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/AuthorizationHost.activation.test.ts#assistive-technology activation (no pointer or key press) answers an armed prompt",
+        "classification": "assertion",
+        "detail": "assistive-technology activation (no pointer or key press) answers an armed prompt:  AssertionError: expected [] to have a length of 1 but got +0\n    at Proxy.<anonymous> (file:///home/elias/dev/justsearch/modules/ui-web/node_modules/@vitest/expect/dist/index.js:1389:20)\n    at Proxy.<anonymous> (file:///home/elias/dev/justsearch/modules/ui-web/node_modules/@vitest/expect/dist/index"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/AuthorizationHost.activation.test.ts#Review re-presents the open prompt: the activation that asked for it cannot answer it",
+        "classification": "assertion",
+        "detail": "Review re-presents the open prompt: the activation that asked for it cannot answer it:  AssertionError: expected [] to have a length of 1 but got +0\n    at Proxy.<anonymous> (file:///home/elias/dev/justsearch/modules/ui-web/node_modules/@vitest/expect/dist/index.js:1389:20)\n    at Proxy.<anonymous> (file:///home/elias/dev/justsearch/modules/ui-web/node_modules/@vitest/expect/dist/index"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/AuthorizationHost.activation-lockdown.test.ts#a native double-click on Allow always grants only the first plugin, across reload",
+        "classification": "assertion",
+        "detail": "a native double-click on Allow always grants only the first plugin, across reload:  AssertionError: expected { first: 'allow-always', …(1) } to deeply equal { first: 'allow-always', second: null }\n    at /home/elias/.cache/am/mh5fno0e/tmp/test-intent-before-NMaFCV/modules/ui-web/src/shell-v0/components/AuthorizationHost.activation-lockdown.test.ts:128:23\n    at file:///home/elias/d"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/AuthorizationHost.activation-lockdown.test.ts#repeated native activation of the same button answers one prompt",
+        "classification": "assertion",
+        "detail": "repeated native activation of the same button answers one prompt:  AssertionError: expected { first: 'allow-always', …(1) } to deeply equal { first: 'allow-always', second: null }\n    at /home/elias/.cache/am/mh5fno0e/tmp/test-intent-before-NMaFCV/modules/ui-web/src/shell-v0/components/AuthorizationHost.activation-lockdown.test.ts:144:23\n    at file:///home/elias/d"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/AuthorizationHost.activation-lockdown.test.ts#Enter pressed and held on the next prompt before it arms answers nothing",
+        "classification": "assertion",
+        "detail": "Enter pressed and held on the next prompt before it arms answers nothing:  AssertionError: expected 'deny' to be null\n    at /home/elias/.cache/am/mh5fno0e/tmp/test-intent-before-NMaFCV/modules/ui-web/src/shell-v0/components/AuthorizationHost.activation-lockdown.test.ts:166:30\n    at file:///home/elias/dev/justsearch/modules/ui-web/node_modules/@vitest/runner/dist/chunk-ar"
+      }
+    ]
+  },
+  "digest": "sha256:a69b1dee2bab8f6760cb3dc2d54f547f7690e10928c8573302d00fd45e7f2cd6"
+}

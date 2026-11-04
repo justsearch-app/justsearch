@@ -1,0 +1,267 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
+  },
+  "createdAt": "2026-11-03T20:53:52.230Z",
+  "revision": "cfb127d2172f7ce083bd56fdac9475cd0cb7356a",
+  "tree": "6ccc446bc4abf797feb22653ab82db453a58302c",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/components/StatusPill.precedence.test.ts\" \"src/shell-v0/state/frameStatus.test.ts\" \"src/shell-v0/operations/ActionLedgerClient.test.ts\" \"src/shell-v0/views/LibrarySurface.folderActions.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/hhlmlds7/tmp/test-intent-vitest-7863-1793739222096.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 4159
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/components/StatusPill.precedence.test.ts#R1 notice precedence needs you keeps the pill while a notice shows beside it; hovering the open pill cannot hold the notice past its window",
+      "file": "modules/ui-web/src/shell-v0/components/StatusPill.precedence.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:d26390f576c853e93dabbb60c2674e6645d729b7735dbb263eab96c26d9148d4",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "R1 notice precedence needs you keeps the pill while a notice shows beside it; hovering the open pill cannot hold the notice past its window",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/StatusPill.precedence.test.ts#R1 notice precedence an own-action undo keeps its action beside an urgent pill and the pill keeps its state",
+      "file": "modules/ui-web/src/shell-v0/components/StatusPill.precedence.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:d26390f576c853e93dabbb60c2674e6645d729b7735dbb263eab96c26d9148d4",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "R1 notice precedence an own-action undo keeps its action beside an urgent pill and the pill keeps its state",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/StatusPill.precedence.test.ts#R1 notice precedence an unreachable engine keeps the pill through repeated update-wait notices, and the panel header agrees",
+      "file": "modules/ui-web/src/shell-v0/components/StatusPill.precedence.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:d26390f576c853e93dabbb60c2674e6645d729b7735dbb263eab96c26d9148d4",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "R1 notice precedence an unreachable engine keeps the pill through repeated update-wait notices, and the panel header agrees",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/StatusPill.precedence.test.ts#R2 R4 panel placement R2 the page dim starts below the bar the pill sits in",
+      "file": "modules/ui-web/src/shell-v0/components/StatusPill.precedence.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:d26390f576c853e93dabbb60c2674e6645d729b7735dbb263eab96c26d9148d4",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "R2 R4 panel placement R2 the page dim starts below the bar the pill sits in",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/StatusPill.precedence.test.ts#R2 R4 panel placement R4 at 600 px the panel keeps an 8 px margin from both edges and the arrow stays on its top edge, pointing at the pill",
+      "file": "modules/ui-web/src/shell-v0/components/StatusPill.precedence.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:d26390f576c853e93dabbb60c2674e6645d729b7735dbb263eab96c26d9148d4",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "R2 R4 panel placement R4 at 600 px the panel keeps an 8 px margin from both edges and the arrow stays on its top edge, pointing at the pill",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/state/frameStatus.test.ts#round 7 repairs R3 permission rows read in plain words, never the raw grant action",
+      "file": "modules/ui-web/src/shell-v0/state/frameStatus.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:7a302e4f122e95a70e6e8a534ec6ca1023f624b93dfd7ed0ddd6bf9645c3d1f5",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "round 7 repairs R3 permission rows read in plain words, never the raw grant action",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/state/frameStatus.test.ts#round 7 repairs R3 a removal notice keeps its add-again action and plain consequence in Earlier",
+      "file": "modules/ui-web/src/shell-v0/state/frameStatus.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:7a302e4f122e95a70e6e8a534ec6ca1023f624b93dfd7ed0ddd6bf9645c3d1f5",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "round 7 repairs R3 a removal notice keeps its add-again action and plain consequence in Earlier",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/operations/ActionLedgerClient.test.ts#scan rollup + index tiering (tempdoc 812) R3 grant rows carry their action and humanized subject as a structured facet",
+      "file": "modules/ui-web/src/shell-v0/operations/ActionLedgerClient.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:e641256e9ad97a24de611ac48ff5d1c4c21d0f90795b750e34b80ddc9d967408",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "scan rollup + index tiering (tempdoc 812) R3 grant rows carry their action and humanized subject as a structured facet",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/LibrarySurface.folderActions.test.ts#R3 a completed removal offers to add the same folder again, once, with its plain consequence",
+      "file": "modules/ui-web/src/shell-v0/views/LibrarySurface.folderActions.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:7f97f0a0ffb94698a9a8265ada061cc05e7880fb2244093a06fe43ed78fb97a0",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "R3 a completed removal offers to add the same folder again, once, with its plain consequence",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/LibrarySurface.folderActions.test.ts#R3 a failed add-again says so and can be tried again",
+      "file": "modules/ui-web/src/shell-v0/views/LibrarySurface.folderActions.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:7f97f0a0ffb94698a9a8265ada061cc05e7880fb2244093a06fe43ed78fb97a0",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "R3 a failed add-again says so and can be tried again",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/state/frameStatus.test.ts#round 7 repairs R4 folder rows are named by folder with the path as detail, never by collection",
+      "file": "modules/ui-web/src/shell-v0/state/frameStatus.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:7a302e4f122e95a70e6e8a534ec6ca1023f624b93dfd7ed0ddd6bf9645c3d1f5",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "round 7 repairs R4 folder rows are named by folder with the path as detail, never by collection",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "725072fa82",
+    "revision": "725072fa82688f6e019c466673de2e0abbac4b7f",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/components/StatusPill.precedence.test.ts\" \"src/shell-v0/state/frameStatus.test.ts\" \"src/shell-v0/operations/ActionLedgerClient.test.ts\" \"src/shell-v0/views/LibrarySurface.folderActions.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/hhlmlds7/tmp/test-intent-vitest-7863-1793739229467.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 2468,
+        "output": "JSON report written to /home/elias/.cache/am/hhlmlds7/tmp/test-intent-vitest-7863-1793739229467.json\n\n"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui-web/src/shell-v0/components/StatusPill.precedence.test.ts#R1 notice precedence needs you keeps the pill while a notice shows beside it; hovering the open pill cannot hold the notice past its window",
+        "classification": "assertion",
+        "detail": "R1 notice precedence needs you keeps the pill while a notice shows beside it; hovering the open pill cannot hold the notice past its window:  AssertionError: expected 'Search is up to date' to be '1 needs you' // Object.is equality\n    at /home/elias/.cache/am/hhlmlds7/tmp/test-intent-before-OqYNwT/modules/ui-web/src/shell-v0/components/StatusPill.precedence.test.ts:60:50\n    at processTicksAndRejections (node:internal/process/task_queues"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/StatusPill.precedence.test.ts#R1 notice precedence an own-action undo keeps its action beside an urgent pill and the pill keeps its state",
+        "classification": "assertion",
+        "detail": "R1 notice precedence an own-action undo keeps its action beside an urgent pill and the pill keeps its state:  AssertionError: expected 'Skip rule added' to be '1 needs you' // Object.is equality\n    at /home/elias/.cache/am/hhlmlds7/tmp/test-intent-before-OqYNwT/modules/ui-web/src/shell-v0/components/StatusPill.precedence.test.ts:80:50\n    at file:///home/elias/dev/justsearch/modules/ui-web/node_modules/@vi"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/StatusPill.precedence.test.ts#R1 notice precedence an unreachable engine keeps the pill through repeated update-wait notices, and the panel header agrees",
+        "classification": "assertion",
+        "detail": "R1 notice precedence an unreachable engine keeps the pill through repeated update-wait notices, and the panel header agrees:  AssertionError: expected 'JustSearch is preparing an update. Wa…' to be 'Can\\'t reach the engine' // Object.is equality\n    at /home/elias/.cache/am/hhlmlds7/tmp/test-intent-before-OqYNwT/modules/ui-web/src/shell-v0/components/StatusPill.precedence.test.ts:94:52\n    at file:///home/elias/dev/justsea"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/StatusPill.precedence.test.ts#R2 R4 panel placement R2 the page dim starts below the bar the pill sits in",
+        "classification": "assertion",
+        "detail": "R2 R4 panel placement R2 the page dim starts below the bar the pill sits in:  AssertionError: expected '' to be '56px' // Object.is equality\n    at /home/elias/.cache/am/hhlmlds7/tmp/test-intent-before-OqYNwT/modules/ui-web/src/shell-v0/components/StatusPill.precedence.test.ts:108:67\n    at file:///home/elias/dev/justsearch/modules/ui-web/node_modules/@vitest/runner/dist/chun"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/StatusPill.precedence.test.ts#R2 R4 panel placement R4 at 600 px the panel keeps an 8 px margin from both edges and the arrow stays on its top edge, pointing at the pill",
+        "classification": "assertion",
+        "detail": "R2 R4 panel placement R4 at 600 px the panel keeps an 8 px margin from both edges and the arrow stays on its top edge, pointing at the pill:  AssertionError: expected 6 to be greater than or equal to 8\n    at /home/elias/.cache/am/hhlmlds7/tmp/test-intent-before-OqYNwT/modules/ui-web/src/shell-v0/components/StatusPill.precedence.test.ts:121:31\n    at file:///home/elias/dev/justsearch/modules/ui-web/node_modules/@vitest/runner/dist/chunk-a"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/state/frameStatus.test.ts#round 7 repairs R3 permission rows read in plain words, never the raw grant action",
+        "classification": "assertion",
+        "detail": "round 7 repairs R3 permission rows read in plain words, never the raw grant action:  AssertionError: expected [ undefined, undefined, …(2) ] to deeply equal ArrayContaining{…}\n    at /home/elias/.cache/am/hhlmlds7/tmp/test-intent-before-OqYNwT/modules/ui-web/src/shell-v0/state/frameStatus.test.ts:247:37\n    at file:///home/elias/dev/justsearch/modules/ui-web/node_modules/@vitest/run"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/state/frameStatus.test.ts#round 7 repairs R3 a removal notice keeps its add-again action and plain consequence in Earlier",
+        "classification": "assertion",
+        "detail": "round 7 repairs R3 a removal notice keeps its add-again action and plain consequence in Earlier:  AssertionError: expected '' to contain 'reads its files again'\n    at /home/elias/.cache/am/hhlmlds7/tmp/test-intent-before-OqYNwT/modules/ui-web/src/shell-v0/state/frameStatus.test.ts:262:30\n    at file:///home/elias/dev/justsearch/modules/ui-web/node_modules/@vitest/runner/dist/chunk-artifact.js:3"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/operations/ActionLedgerClient.test.ts#scan rollup + index tiering (tempdoc 812) R3 grant rows carry their action and humanized subject as a structured facet",
+        "classification": "assertion",
+        "detail": "scan rollup + index tiering (tempdoc 812) R3 grant rows carry their action and humanized subject as a structured facet:  AssertionError: expected undefined to be 'CONSUMED' // Object.is equality\n    at /home/elias/.cache/am/hhlmlds7/tmp/test-intent-before-OqYNwT/modules/ui-web/src/shell-v0/operations/ActionLedgerClient.test.ts:627:31\n    at file:///home/elias/dev/justsearch/modules/ui-web/node_modules/@vitest/runner/d"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/LibrarySurface.folderActions.test.ts#R3 a completed removal offers to add the same folder again, once, with its plain consequence",
+        "classification": "assertion",
+        "detail": "R3 a completed removal offers to add the same folder again, once, with its plain consequence:  AssertionError: expected [] to include 'Add docs again'\n    at Proxy.<anonymous> (file:///home/elias/dev/justsearch/modules/ui-web/node_modules/@vitest/expect/dist/index.js:1319:15)\n    at Proxy.<anonymous> (file:///home/elias/dev/justsearch/modules/ui-web/node_modules/@vitest/expect/dist/index.js:1"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/LibrarySurface.folderActions.test.ts#R3 a failed add-again says so and can be tried again",
+        "classification": "assertion",
+        "detail": "R3 a failed add-again says so and can be tried again:  AssertionError: expected [] to include 'Add docs again'\n    at Proxy.<anonymous> (file:///home/elias/dev/justsearch/modules/ui-web/node_modules/@vitest/expect/dist/index.js:1319:15)\n    at Proxy.<anonymous> (file:///home/elias/dev/justsearch/modules/ui-web/node_modules/@vitest/expect/dist/index.js:1"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/state/frameStatus.test.ts#round 7 repairs R4 folder rows are named by folder with the path as detail, never by collection",
+        "classification": "assertion",
+        "detail": "round 7 repairs R4 folder rows are named by folder with the path as detail, never by collection:  AssertionError: expected 'default: default · Indexing · 3 remai…' to match /^Documents: /\n    at /home/elias/.cache/am/hhlmlds7/tmp/test-intent-before-OqYNwT/modules/ui-web/src/shell-v0/state/frameStatus.test.ts:270:24\n    at file:///home/elias/dev/justsearch/modules/ui-web/node_modules/@vitest/runn"
+      }
+    ]
+  },
+  "digest": "sha256:544159780290d03e755e9b4099265dcc7638f89f55bfd1d285c9eaba398828f5"
+}

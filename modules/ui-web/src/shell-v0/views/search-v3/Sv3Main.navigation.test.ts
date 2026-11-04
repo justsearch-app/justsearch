@@ -22,7 +22,6 @@
 import { describe, it, expect, afterEach, vi } from 'vitest';
 import './Sv3Main.js';
 import './Sv3Palette.js';
-import '../../components/IndexingOverlay.js';
 import type { Sv3Main } from './Sv3Main.js';
 import type { Sv3Palette } from './Sv3Palette.js';
 import { __resetModalityForTest } from '../../primitives/modality.js';
@@ -849,30 +848,9 @@ describe('857 PR-A — the guards', () => {
     expect(jumpTo, 'the guard released with the modal').toHaveBeenCalledTimes(1);
     palette.remove();
   });
-
-  /**
-   * Tempdoc 864 review F2 — the same guard, driven by a DIFFERENT modal: the full-screen indexing
-   * overlay. It is `role="dialog" aria-modal="true"` over a click-swallowing backdrop, and until F2
-   * it did not join the modality authority, so `j` kept walking the transcript underneath it — the
-   * L10 shape with different chrome. Asserted through the real element rather than through the
-   * authority directly, so the case fails if the overlay ever stops entering it.
-   */
-  it('864 F2: stands down while the indexing overlay is up', async () => {
-    const { nav } = await transcript();
-    const overlay = document.createElement('jf-indexing-overlay');
-    document.body.appendChild(overlay);
-    await (overlay as unknown as { updateComplete: Promise<unknown> }).updateComplete;
-
-    const jumpTo = vi.spyOn(nav, 'jumpTo').mockImplementation(() => {});
-    const underAModal = new KeyboardEvent('keydown', { key: 'j', bubbles: true, cancelable: true });
-    window.dispatchEvent(underAModal);
-    expect(jumpTo, 'j drove the transcript under a full-screen indexing overlay').not.toHaveBeenCalled();
-    expect(underAModal.defaultPrevented).toBe(false);
-
-    overlay.remove();
-    press('j');
-    expect(jumpTo, 'the guard released with the overlay').toHaveBeenCalledTimes(1);
-  });
+  // Tempdoc 864 review F2 (the indexing overlay as a second modal) retired with that overlay in
+  // the frame status slice: indexing progress moved into the non-modal status panel. The modality
+  // guard itself stays pinned by the palette case above.
 });
 
 describe('857 PR-A — active() is host state, and false in every non-transcript arm', () => {

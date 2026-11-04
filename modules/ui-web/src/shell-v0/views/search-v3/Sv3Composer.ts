@@ -2159,7 +2159,7 @@ export class Sv3Composer extends JfElement {
    * the two BUTTONS inside it made every disclosure toggle fire six attribute mutations in an
    * `atomic` polite region, re-announcing "Semantic search degraded. Open Health Hide what is
    * reduced" on each open and close. The state change is already announced, correctly, by the
-   * shell's always-mounted verdict announcer ("All systems operational" → "Service degraded"), so
+   * shell's always-mounted verdict announcer ("Search available" → "Service degraded"), so
    * this banner is a rendering of that fact and not a second announcer of it.
    */
   private degradationBanner(): TemplateResult | typeof nothing {

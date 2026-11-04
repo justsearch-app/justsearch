@@ -1,0 +1,287 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
+  },
+  "createdAt": "2026-11-04T00:04:53.161Z",
+  "revision": "ffa2a5833396157d299c95275d84275c438cae13",
+  "tree": "f2c2df1fed48603b253cc1a16a9b696221c9bcc1",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/components/AuthorizationHost.toplayer.test.ts\" \"src/shell-v0/state/frameStatus.test.ts\" \"src/shell-v0/operations/pendingAuthorizationBridge.test.ts\" \"src/shell-v0/components/StatusPill.feedback.test.ts\" \"src/shell-v0/components/StatusPill.test.ts\" \"src/shell-v0/components/StatusPanel.landmarks.test.ts\" \"src/shell-v0/components/StatusPanel.history.test.ts\" \"src/shell-v0/components/StatusPill.design.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/_qphb1n6/tmp/test-intent-vitest-12990-1793750680231.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 4650
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/components/AuthorizationHost.toplayer.test.ts#Move 4 — trusted ceremony on the Top Layer A1 selecting lightweight → typed from the status panel applies the selected prompt’s own modality",
+      "file": "modules/ui-web/src/shell-v0/components/AuthorizationHost.toplayer.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:dec34d963aa26659944acc62e00d9b1b17b84aca4b30d9d1dc409aeb40242699",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Move 4 — trusted ceremony on the Top Layer A1 selecting lightweight → typed from the status panel applies the selected prompt’s own modality",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/AuthorizationHost.toplayer.test.ts#Move 4 — trusted ceremony on the Top Layer A1 selecting lightweight → capability from the status panel applies the selected prompt’s own modality",
+      "file": "modules/ui-web/src/shell-v0/components/AuthorizationHost.toplayer.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:dec34d963aa26659944acc62e00d9b1b17b84aca4b30d9d1dc409aeb40242699",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Move 4 — trusted ceremony on the Top Layer A1 selecting lightweight → capability from the status panel applies the selected prompt’s own modality",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/AuthorizationHost.toplayer.test.ts#Move 4 — trusted ceremony on the Top Layer A1 selecting typed → lightweight from the status panel applies the selected prompt’s own modality",
+      "file": "modules/ui-web/src/shell-v0/components/AuthorizationHost.toplayer.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:dec34d963aa26659944acc62e00d9b1b17b84aca4b30d9d1dc409aeb40242699",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Move 4 — trusted ceremony on the Top Layer A1 selecting typed → lightweight from the status panel applies the selected prompt’s own modality",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/AuthorizationHost.toplayer.test.ts#Move 4 — trusted ceremony on the Top Layer A1 selecting capability → lightweight from the status panel applies the selected prompt’s own modality",
+      "file": "modules/ui-web/src/shell-v0/components/AuthorizationHost.toplayer.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:dec34d963aa26659944acc62e00d9b1b17b84aca4b30d9d1dc409aeb40242699",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Move 4 — trusted ceremony on the Top Layer A1 selecting capability → lightweight from the status panel applies the selected prompt’s own modality",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/state/frameStatus.test.ts#concurrent source facts B1 a folder whose scan errored is a problem right now, as the Library headline counts it, and the pill never claims calm",
+      "file": "modules/ui-web/src/shell-v0/state/frameStatus.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:7a302e4f122e95a70e6e8a534ec6ca1023f624b93dfd7ed0ddd6bf9645c3d1f5",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "concurrent source facts B1 a folder whose scan errored is a problem right now, as the Library headline counts it, and the pill never claims calm",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/operations/pendingAuthorizationBridge.test.ts#pendingAuthorizationBridge (tempdoc 655) B2 after a reload or in a second window, requests still waiting in the Engine rejoin the ceremony queue once",
+      "file": "modules/ui-web/src/shell-v0/operations/pendingAuthorizationBridge.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:ddb943deee894cf686b8624449d7d2df9d5d7609ce794d1c3318fd151ecd3025",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "pendingAuthorizationBridge (tempdoc 655) B2 after a reload or in a second window, requests still waiting in the Engine rejoin the ceremony queue once",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/StatusPill.feedback.test.ts#status feedback ownership B3 C6 a hold observed at startup or after a reconnect is silent; a live hold arrival is announced once in plain grammar",
+      "file": "modules/ui-web/src/shell-v0/components/StatusPill.feedback.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:45da62afc2f6523a8fade6786fa23e705f883d554008e62a2a5bed30a9678af2",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "status feedback ownership B3 C6 a hold observed at startup or after a reconnect is silent; a live hold arrival is announced once in plain grammar",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/StatusPill.test.ts#status pill and panel B4 C8 one overlay at a time: the shortcut stands down under either palette, and opening a palette closes the panel",
+      "file": "modules/ui-web/src/shell-v0/components/StatusPill.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:742ec30eafb0f90a5d5fcbf968963747fa7afd0a48cae41e9c43824e1c4c3685",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "status pill and panel B4 C8 one overlay at a time: the shortcut stands down under either palette, and opening a palette closes the panel",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/StatusPanel.landmarks.test.ts#B5 X2 the open panel adds no page-level banner or contentinfo landmark",
+      "file": "modules/ui-web/src/shell-v0/components/StatusPanel.landmarks.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:b68036376a29841b84c245f5abe25e76b63db242f63457f047505e325b0942f4",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "B5 X2 the open panel adds no page-level banner or contentinfo landmark",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/StatusPanel.history.test.ts#Earlier (moved from the inbox drawer) a failed operation reads as a failure in Earlier, and ledger codes read as plain words",
+      "file": "modules/ui-web/src/shell-v0/components/StatusPanel.history.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:323ca9f2d746fbdbb2a9fc2d9ce0176fbf283e9fb399d22f62645d9afa657203",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Earlier (moved from the inbox drawer) a failed operation reads as a failure in Earlier, and ledger codes read as plain words",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/StatusPanel.history.test.ts#Earlier (moved from the inbox drawer) row titles share one icon column that never stretches with the title",
+      "file": "modules/ui-web/src/shell-v0/components/StatusPanel.history.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:323ca9f2d746fbdbb2a9fc2d9ce0176fbf283e9fb399d22f62645d9afa657203",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Earlier (moved from the inbox drawer) row titles share one icon column that never stretches with the title",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/StatusPill.design.test.ts#status pill drawing at 600 px the panel arrow points at the pill where the panel had to shift to fit",
+      "file": "modules/ui-web/src/shell-v0/components/StatusPill.design.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:9164a2fc573591886964f8f4e9374af794d69c6ae7090e90671fe664af59c2ce",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "status pill drawing at 600 px the panel arrow points at the pill where the panel had to shift to fit",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "e712564247",
+    "revision": "e712564247744ae9c69df862bc38319e7c1d0c49",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/components/AuthorizationHost.toplayer.test.ts\" \"src/shell-v0/state/frameStatus.test.ts\" \"src/shell-v0/operations/pendingAuthorizationBridge.test.ts\" \"src/shell-v0/components/StatusPill.feedback.test.ts\" \"src/shell-v0/components/StatusPill.test.ts\" \"src/shell-v0/components/StatusPanel.landmarks.test.ts\" \"src/shell-v0/components/StatusPanel.history.test.ts\" \"src/shell-v0/components/StatusPill.design.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/_qphb1n6/tmp/test-intent-vitest-12990-1793750687268.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 5282,
+        "output": "JSON report written to /home/elias/.cache/am/_qphb1n6/tmp/test-intent-vitest-12990-1793750687268.json\n\n"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui-web/src/shell-v0/components/AuthorizationHost.toplayer.test.ts#Move 4 — trusted ceremony on the Top Layer A1 selecting lightweight → typed from the status panel applies the selected prompt’s own modality",
+        "classification": "assertion",
+        "detail": "Move 4 — trusted ceremony on the Top Layer A1 selecting lightweight → typed from the status panel applies the selected prompt’s own modality:  AssertionError: typed modality: expected false to be true // Object.is equality\n    at /home/elias/.cache/am/_qphb1n6/tmp/test-intent-before-PDPgGq/modules/ui-web/src/shell-v0/components/AuthorizationHost.toplayer.test.ts:124:54\n    at file:///home/elias/dev/justsearch/modules/ui-web/node_modules/@v"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/AuthorizationHost.toplayer.test.ts#Move 4 — trusted ceremony on the Top Layer A1 selecting lightweight → capability from the status panel applies the selected prompt’s own modality",
+        "classification": "assertion",
+        "detail": "Move 4 — trusted ceremony on the Top Layer A1 selecting lightweight → capability from the status panel applies the selected prompt’s own modality:  AssertionError: capability modality: expected false to be true // Object.is equality\n    at /home/elias/.cache/am/_qphb1n6/tmp/test-intent-before-PDPgGq/modules/ui-web/src/shell-v0/components/AuthorizationHost.toplayer.test.ts:124:54\n    at file:///home/elias/dev/justsearch/modules/ui-web/node_modul"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/AuthorizationHost.toplayer.test.ts#Move 4 — trusted ceremony on the Top Layer A1 selecting typed → lightweight from the status panel applies the selected prompt’s own modality",
+        "classification": "assertion",
+        "detail": "Move 4 — trusted ceremony on the Top Layer A1 selecting typed → lightweight from the status panel applies the selected prompt’s own modality:  AssertionError: lightweight modality: expected true to be false // Object.is equality\n    at /home/elias/.cache/am/_qphb1n6/tmp/test-intent-before-PDPgGq/modules/ui-web/src/shell-v0/components/AuthorizationHost.toplayer.test.ts:124:54\n    at file:///home/elias/dev/justsearch/modules/ui-web/node_modu"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/AuthorizationHost.toplayer.test.ts#Move 4 — trusted ceremony on the Top Layer A1 selecting capability → lightweight from the status panel applies the selected prompt’s own modality",
+        "classification": "assertion",
+        "detail": "Move 4 — trusted ceremony on the Top Layer A1 selecting capability → lightweight from the status panel applies the selected prompt’s own modality:  AssertionError: lightweight modality: expected true to be false // Object.is equality\n    at /home/elias/.cache/am/_qphb1n6/tmp/test-intent-before-PDPgGq/modules/ui-web/src/shell-v0/components/AuthorizationHost.toplayer.test.ts:124:54\n    at file:///home/elias/dev/justsearch/modules/ui-web/node_modu"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/state/frameStatus.test.ts#concurrent source facts B1 a folder whose scan errored is a problem right now, as the Library headline counts it, and the pill never claims calm",
+        "classification": "assertion",
+        "detail": "concurrent source facts B1 a folder whose scan errored is a problem right now, as the Library headline counts it, and the pill never claims calm:  AssertionError: expected undefined to be 'Locked needs attention' // Object.is equality\n    at /home/elias/.cache/am/_qphb1n6/tmp/test-intent-before-PDPgGq/modules/ui-web/src/shell-v0/state/frameStatus.test.ts:205:24\n    at file:///home/elias/dev/justsearch/modules/ui-web/node_modules/@vitest/runner"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/operations/pendingAuthorizationBridge.test.ts#pendingAuthorizationBridge (tempdoc 655) B2 after a reload or in a second window, requests still waiting in the Engine rejoin the ceremony queue once",
+        "classification": "assertion",
+        "detail": "pendingAuthorizationBridge (tempdoc 655) B2 after a reload or in a second window, requests still waiting in the Engine rejoin the ceremony queue once:  AssertionError: expected \"vi.fn()\" to be called 1 times, but got 0 times\n    at /home/elias/.cache/am/_qphb1n6/tmp/test-intent-before-PDPgGq/modules/ui-web/src/shell-v0/operations/pendingAuthorizationBridge.test.ts:151:38\n    at processTicksAndRejections (node:internal/process/task_queues:104:5)"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/StatusPill.feedback.test.ts#status feedback ownership B3 C6 a hold observed at startup or after a reconnect is silent; a live hold arrival is announced once in plain grammar",
+        "classification": "assertion",
+        "detail": "status feedback ownership B3 C6 a hold observed at startup or after a reconnect is silent; a live hold arrival is announced once in plain grammar:  AssertionError: expected '1 items need you.' to be '' // Object.is equality\n    at /home/elias/.cache/am/_qphb1n6/tmp/test-intent-before-PDPgGq/modules/ui-web/src/shell-v0/components/StatusPill.feedback.test.ts:83:35\n    at file:///home/elias/dev/justsearch/modules/ui-web/node_modules/@vitest/runner"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/StatusPill.test.ts#status pill and panel B4 C8 one overlay at a time: the shortcut stands down under either palette, and opening a palette closes the panel",
+        "classification": "assertion",
+        "detail": "status pill and panel B4 C8 one overlay at a time: the shortcut stands down under either palette, and opening a palette closes the panel:  AssertionError: shell palette: opening the palette closes the panel: expected true to be false // Object.is equality\n    at /home/elias/.cache/am/_qphb1n6/tmp/test-intent-before-PDPgGq/modules/ui-web/src/shell-v0/components/StatusPill.test.ts:80:76\n    at file:///home/elias/dev/justsearch/modules/ui"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/StatusPanel.landmarks.test.ts#B5 X2 the open panel adds no page-level banner or contentinfo landmark",
+        "classification": "assertion",
+        "detail": "B5 X2 the open panel adds no page-level banner or contentinfo landmark:  AssertionError: expected …(2) to have a length of +0 but got 2\n    at Proxy.<anonymous> (file:///home/elias/dev/justsearch/modules/ui-web/node_modules/@vitest/expect/dist/index.js:1389:20)\n    at Proxy.<anonymous> (file:///home/elias/dev/justsearch/modules/ui-web/node_modules/@vitest/expect/dist/ind"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/StatusPanel.history.test.ts#Earlier (moved from the inbox drawer) a failed operation reads as a failure in Earlier, and ledger codes read as plain words",
+        "classification": "assertion",
+        "detail": "Earlier (moved from the inbox drawer) a failed operation reads as a failure in Earlier, and ledger codes read as plain words:  AssertionError: advisory:failed: expected '✓' to be '✕' // Object.is equality\n    at /home/elias/.cache/am/_qphb1n6/tmp/test-intent-before-PDPgGq/modules/ui-web/src/shell-v0/components/StatusPanel.history.test.ts:99:69\n    at file:///home/elias/dev/justsearch/modules/ui-web/node_modules/@vitest/runn"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/StatusPanel.history.test.ts#Earlier (moved from the inbox drawer) row titles share one icon column that never stretches with the title",
+        "classification": "assertion",
+        "detail": "Earlier (moved from the inbox drawer) row titles share one icon column that never stretches with the title:  AssertionError: expected '\\n    :host { display: block; color: …' to match /\\.state-icon\\s*\\{[^}]*flex:\\s*none[^}…/\n    at /home/elias/.cache/am/_qphb1n6/tmp/test-intent-before-PDPgGq/modules/ui-web/src/shell-v0/components/StatusPanel.history.test.ts:110:17\n    at file:///home/elias/dev/justsearch/m"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/StatusPill.design.test.ts#status pill drawing at 600 px the panel arrow points at the pill where the panel had to shift to fit",
+        "classification": "assertion",
+        "detail": "status pill drawing at 600 px the panel arrow points at the pill where the panel had to shift to fit:  AssertionError: expected '50px' to be 'calc(318px - var(--jf-space-2) / 2)' // Object.is equality\n    at /home/elias/.cache/am/_qphb1n6/tmp/test-intent-before-PDPgGq/modules/ui-web/src/shell-v0/components/StatusPill.design.test.ts:125:71\n    at file:///home/elias/dev/justsearch/modules/ui-web/node_m"
+      }
+    ]
+  },
+  "digest": "sha256:a8346dc91f0777631a5e5d6df59773ca4e7fa646bc8b87cdd31a4d56bf2fdbda"
+}

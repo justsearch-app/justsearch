@@ -88,6 +88,7 @@ it('mounted authorization host and real pending bridge refresh after the typed a
   await (approve as unknown as { updateComplete: Promise<unknown> }).updateComplete;
   const control = approve.shadowRoot!.querySelector('jf-control')!;
   await (control as unknown as { updateComplete: Promise<unknown> }).updateComplete;
+  vi.advanceTimersByTime(400); // the prompt arms before it accepts a decision
   (control.shadowRoot!.querySelector('button') as HTMLButtonElement).click();
   await vi.advanceTimersByTimeAsync(0); await host.updateComplete;
   expect(state(), 'the real approval bridge must reach canonical completion').toBe('OFF'); expect(fresh()).toHaveLength(1);

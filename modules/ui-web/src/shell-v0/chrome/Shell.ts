@@ -65,21 +65,16 @@ import {
 import { applyPresentation, listPresentations } from '../state/presentationState.js';
 import './OverlayHost.js';
 import '../components/DragOverlay.js';
-import '../components/IndexingOverlay.js';
-import '../components/StatusDeck.js';
+import '../components/StatusPill.js';
+import '../components/RetiredStatusElements.js';
+import { undoStatusNotice, type StatusPill } from '../components/StatusPill.js';
 // §21.E — register the PendingEffect chrome surface. Renders nothing
 // when the queue is empty; floats in lower-right when a proposal lands.
-import '../components/PendingEffectQueue.js';
-import '../components/AiActivityDigest.js';
-import '../components/TaskList.js';
-import '../components/AgentActivityPanel.js';
 import '../components/RetrospectivePanel.js';
 import '../components/FailedJobsDrawer.js';
 import '../components/SourcesPane.js';
 import '../components/ContextInspectorPane.js';
-import '../components/AppUpdateBanner.js';
 import { startAppUpdateMonitor } from '../state/appUpdateState.js';
-import type { AgentActivityPanel } from '../components/AgentActivityPanel.js';
 // §25.β3 — elicit chrome surface (modal form host for Action handlers
 // asking the user mid-invocation questions).
 import '../components/ElicitHost.js';
@@ -121,10 +116,6 @@ import type { BookmarksPopover } from '../components/BookmarksPopover.js';
 // Slice 490 §4.D — Advisory chrome: toast host (HUD), inbox drawer
 // (DRAWER), rail badge (RAIL). All three subscribe to a shell-owned
 // AdvisoryStore (Group B4 follow-up — replaces the singleton pattern).
-import '../components/advisory/AdvisoryToastHost.js';
-import '../components/advisory/AdvisoryInboxDrawer.js';
-import '../components/advisory/AdvisoryRailBadge.js';
-import type { AdvisoryInboxDrawer } from '../components/advisory/AdvisoryInboxDrawer.js';
 import {
   type AdvisoryStore,
   createAdvisoryStore,
@@ -167,7 +158,7 @@ import {
 // 543-fwd #1 — journal-suppressed dispatcher for the cursor-based undo/redo.
 import { dispatchEffectToChrome } from '../substrates/actions/index.js';
 // §32 R-E1 — track agent operations as long-running tasks.
-import { startTask, completeTask } from '../substrates/tasks/index.js';
+import { startTask, completeTask, bindTaskOperation } from '../substrates/tasks/index.js';
 // §32 #1 — project the backend indexing-jobs stream into the Task tray.
 import { startIndexingJobsBridge } from '../substrates/tasks/indexingJobsBridge.js';
 // Tempdoc 840 Phase 5 — project the staged AI model acquisition into the SAME Task tray, so the
@@ -235,7 +226,6 @@ import {
   projectOperationsToActions,
 } from '../substrates/actions/index.js';
 import { emitEphemeralToast } from '../components/advisory/ephemeralToast.js';
-import '../components/PluginErrorOverlay.js';
 // Tempdoc 521 §16.4 — walkthrough card lit element (side-effect register).
 import '../components/WalkthroughCard.js';
 // Tempdoc 521 §16.7 deeper (Phase B) — split-stage right-pane picker.
@@ -637,12 +627,10 @@ export class Shell extends JfElement {
          (tokens.css) instead of an inline literal, so a viewport-docked overlay can reserve the
          same band the rail actually occupies rather than re-deriving it. */
       grid-template-columns: var(--rail-width) minmax(0, 1fr);
-      grid-template-rows: 2.5rem auto 1fr 1.75rem;
+      grid-template-rows: 2.5rem minmax(0, 1fr);
       grid-template-areas:
         'topbar topbar'
-        'update update'
-        'rail   stage'
-        'rail   status';
+        'rail   stage';
       width: 100vw;
       height: 100vh;
       box-sizing: border-box;
@@ -677,9 +665,8 @@ export class Shell extends JfElement {
       grid-area: stage;
       overflow: auto;
     }
-    jf-status-deck {
-      grid-area: status;
-    }
+    jf-status-pill { max-width: 40%; min-width: 0; flex-shrink: 1; }
+    .surface-title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     /* Slice 501 — navigation chrome buttons. */
     .nav-btn,
     jf-control.nav-btn::part(control) {
@@ -862,6 +849,9 @@ export class Shell extends JfElement {
     // frontend request (an MCP tool call) via the same `<jf-authorization-host>` ceremony.
     this.pendingAuthorizationBridgeStop = startPendingAuthorizationBridge(this.apiBase, {
       multiplex: this.shellEventsMultiplex ?? undefined,
+      // B2 — after a reload or in a second window, the retained advisory snapshot re-discovers
+      // requests still waiting in the Engine; they rejoin the same ceremony queue (Needs you).
+      retained: this.advisoryStore,
     });
     // Tempdoc 550 thesis I (process-spanning ONE log): bridge FE-local effects into the one
     // authoritative backend action-event log, so the activity timeline is one log (no read-time
@@ -941,14 +931,15 @@ export class Shell extends JfElement {
     try {
       registerKernelAction({
         id: 'core.action.shell.show-agent-activity',
-        title: 'Show Agent Activity',
+        title: "What's going on",
+        shortcut: 'Ctrl+Shift+S',
         category: 'Diagnostics',
         provenance: CORE_PROVENANCE,
         handler: () => {
           const panel = this.shadowRoot?.querySelector(
-            'jf-agent-activity-panel',
-          ) as AgentActivityPanel | null;
-          if (panel) panel.open = !panel.open;
+            'jf-status-pill',
+          ) as StatusPill | null;
+          panel?.toggle();
           return { kind: 'noop' as const };
         },
       });
@@ -968,6 +959,8 @@ export class Shell extends JfElement {
         category: 'Edit',
         provenance: CORE_PROVENANCE,
         handler: () => {
+          // The undo notice in the status pill names what Ctrl+Z reverses while it is showing.
+          if (undoStatusNotice()) return { kind: 'noop' as const };
           const undone = undoLastEffect((e) => dispatchEffectToChrome(e));
           dispatchEffectToChrome({
             kind: 'toast',
@@ -1219,7 +1212,11 @@ export class Shell extends JfElement {
               async () => await client.peekPending(prompt.pendingId) !== null) },
         )
         .then((result) => {
-          if (taskId) completeTask(taskId, 'succeeded');
+          if (taskId) {
+            const key = result.structuredData?.operationKey;
+            if (typeof key === 'string') bindTaskOperation(taskId, key);
+            else completeTask(taskId, 'succeeded');
+          }
           // §32 U2 — undoSupported ops return an executionId; associate it
           // with the journal entry so the audit log can offer "Undo"
           // (→ POST /api/undo/{operationId}).
@@ -1561,6 +1558,7 @@ export class Shell extends JfElement {
       setActiveSurface: (id) => {
         // Slice 496 P1+P6 — track previous surface for navigation toast.
         const prev = this.activeId;
+        this.shadowRoot?.querySelector<StatusPill>('jf-status-pill')?.dismissForWindowChange();
         this.activeId = id;
         // Tempdoc 508 §11.1 / §13.1 — drive ShellContext so all four
         // registries (commands, context actions, inspector tabs,
@@ -1622,6 +1620,9 @@ export class Shell extends JfElement {
         if (id !== SETTINGS_SURFACE_ID) return;
         const win = this.shadowRoot?.querySelector('jf-settings-window') as SettingsWindow | null;
         if (!win) return;
+        // ST15 — the status panel is a popover over the page, never under a window: close it first
+        // so Settings records the pill (not a hidden panel row) as the element to return focus to.
+        this.shadowRoot?.querySelector<StatusPill>('jf-status-pill')?.dismissForWindowChange();
         // Tempdoc 855 §11.1 D4 — remember whether THIS open-episode added a history entry. Only the
         // opening navigation can, and a repeat navigation while the window is already open pushes
         // nothing (the D3 duplicate skip), so the flag is captured on the closed→open transition and
@@ -1691,23 +1692,15 @@ export class Shell extends JfElement {
       if (t !== 'URL_BAR' && t !== 'URL_DEEPLINK') return;
       if (outcome.status !== 'unresolved' && outcome.status !== 'auto-corrected') return;
       if (!this.shadowRoot) return;
-      let toast = this.shadowRoot.querySelector('jf-resolution-toast') as import('../components/chat/ResolutionToast.js').ResolutionToast | null;
-      if (!toast) {
-        import('../components/chat/ResolutionToast.js');
-        toast = document.createElement('jf-resolution-toast') as import('../components/chat/ResolutionToast.js').ResolutionToast;
-        this.shadowRoot.appendChild(toast);
-        toast.addEventListener('undo-auto-correct', ((e: CustomEvent<{ originalId: string }>) => {
-          if (!this.intentRouter) return;
-          void this.intentRouter.dispatch(
-            { address: { kind: 'navigate', target: e.detail.originalId, state: {} }, transport: 'BUTTON' },
-            { recoveryPolicyOverride: strictPolicy },
-          );
-        }) as EventListener);
-      }
       if (outcome.status === 'unresolved') {
-        toast.show(outcome.attemptedId, outcome.alternatives);
-      } else if (outcome.status === 'auto-corrected') {
-        toast.showAutoCorrection(outcome.originalId, outcome.canonicalId);
+        emitEphemeralToast({ message: `Couldn't find ${outcome.attemptedId}. Choose a destination in status.`, severity: 'warning',
+          actionLabel: 'Choose destination', destinations: outcome.alternatives,
+          onAction: () => this.shadowRoot?.querySelector<StatusPill>('jf-status-pill')?.toggle(),
+        });
+      } else {
+        emitEphemeralToast({ message: `Opened ${outcome.canonicalId} instead of ${outcome.originalId}`, actionLabel: 'Undo auto-correction',
+          onAction: () => { void this.intentRouter?.dispatch({ address: { kind: 'navigate', target: outcome.originalId, state: {} }, transport: 'BUTTON' }, { recoveryPolicyOverride: strictPolicy }); },
+        });
       }
     });
     // Slice 501 — record navigations in the journal for back/forward,
@@ -2534,6 +2527,11 @@ export class Shell extends JfElement {
         ></jf-recents-menu>
         <h1 class="surface-title">${active ? present({ kind: 'surface', id: active.id }).label : ''}</h1>
         <span class="spacer"></span>
+        <jf-status-pill .store=${this.advisoryStore} api-base=${this.apiBase}
+          .pluginsVisible=${this.isStatusDeckVisible()}
+          .multiplex=${this.shellEventsMultiplex}
+          .authorizationHost=${() => this.shadowRoot?.querySelector('jf-authorization-host') ?? null}
+        ></jf-status-pill>
         ${this.renderUiModeToggle()}
         <button
           type="button"
@@ -2568,7 +2566,6 @@ export class Shell extends JfElement {
               : 'Copy URL'}
         </button>
       </div>
-      <jf-app-update-banner hidden></jf-app-update-banner>
       ${this.isRailVisible() ? html`<jf-rail
         role=${placementToLandmarkRole('RAIL')}
         aria-label="Surfaces"
@@ -2582,14 +2579,6 @@ export class Shell extends JfElement {
           this.handleRailClick(e.detail.id)}
         @rail-expand-toggle=${() => setRailExpanded(!(this.userConfig?.railExpanded ?? false))}
       >
-        <!-- Slice 490 §4.D / Group B3 — rail-mounted badge slotted into
-             <jf-rail>'s "bottom-chrome" region, honoring Placement.RAIL.
-             Store injected directly (Group B4 follow-up). -->
-        <jf-advisory-rail-badge
-          slot="bottom-chrome"
-          .store=${this.advisoryStore}
-          @advisory-toggle-inbox=${this.handleAdvisoryToggle}
-        ></jf-advisory-rail-badge>
       </jf-rail>` : nothing}
       <div class="stage" role=${placementToLandmarkRole('STAGE')} aria-label="Main content">
         <jf-stage
@@ -2603,9 +2592,6 @@ export class Shell extends JfElement {
           api-base=${this.apiBase}
         ></jf-stage>
       </div>
-      ${this.isStatusDeckVisible()
-        ? html`<jf-status-deck role=${placementToLandmarkRole('STATUS')} api-base=${this.apiBase}></jf-status-deck>`
-        : nothing}
       <!-- Search Thread S6 — the jf-inspector-pane drawer mount retired; jf-document-pane
            renders inside UnifiedChatView's own conversation-zone column instead. -->
       <!-- Tempdoc 559 Authority I: viewport-docked chrome overlays dock into the
@@ -2614,30 +2600,13 @@ export class Shell extends JfElement {
            clusters; they remain direct children below for now. -->
       <jf-overlay-host>
         <jf-provenance-badge slot="top-right"></jf-provenance-badge>
-        ${/* Tempdoc 577 §2.12 Phase 5 — the "since you last looked" digest moves OFF the top-right
-            slot, which collides with the chat affordance bar's posture dial + History toggle (the
-            digest's pointer-events:auto box intercepted their clicks — live-audit §2.11 #5). The
-            top-center transient slot clears the top-right run controls. */ ''}
-        <jf-ai-activity-digest
-          slot="top-center"
-          api-base=${this.apiBase}
-          .multiplex=${this.shellEventsMultiplex}
-        ></jf-ai-activity-digest>
-        <jf-advisory-toast-host
-          slot="top-right"
-          .store=${this.advisoryStore}
-          .operationClient=${this.operationClient}
-        ></jf-advisory-toast-host>
-        <jf-task-list slot="bottom-left" api-base=${this.apiBase}></jf-task-list>
         ${this.renderNarrowReadingPane([active?.id, secondary?.id].some(id => id !== undefined && canonicalSplitSurfaceId(id) === INTERACTION_SURFACE_ID))}
-        <jf-pending-effect-queue slot="bottom-right"></jf-pending-effect-queue>
         <!-- center slot: full-screen modals (one shows at a time). -->
         <jf-drag-overlay
           slot="center"
           ?active=${this.dragActive}
           drag-kind=${this.dragKind ?? ''}
         ></jf-drag-overlay>
-        <jf-indexing-overlay-host slot="center" api-base=${this.apiBase}></jf-indexing-overlay-host>
         <jf-command-palette slot="center"></jf-command-palette>
         ${/* Tempdoc 855 — the settings window. Declared once here (the palette pattern) and kept
               mounted so the hosted surface stays connected while closed (§11.2). */ ''}
@@ -2648,11 +2617,10 @@ export class Shell extends JfElement {
           @settings-window-close=${() => this.onSettingsWindowClose()}
         ></jf-settings-window>
         <jf-elicit-host slot="center"></jf-elicit-host>
-        <jf-authorization-host slot="center"></jf-authorization-host>
+        <jf-authorization-host slot="center"
+          @status-requests-changed=${() => this.shadowRoot?.querySelector<StatusPill>('jf-status-pill')?.status.refresh()}></jf-authorization-host>
         <jf-macro-dry-run slot="center"></jf-macro-dry-run>
-        <jf-plugin-error-overlay slot="top-right"></jf-plugin-error-overlay>
         ${import.meta.env.DEV ? html`<jf-agent-emitter-demo slot="bottom-center"></jf-agent-emitter-demo>` : nothing}
-        <jf-agent-activity-panel slot="right-drawer"></jf-agent-activity-panel>
         ${/* Tempdoc 561 surface tier: the agent retrospective (Sessions/Timeline/History) folded into
               the one window as a right-drawer panel — replaces the retired standalone agent surface. */ ''}
         <jf-interaction-retrospective-panel
@@ -2678,15 +2646,6 @@ export class Shell extends JfElement {
           aria-label="What the assistant sees"
         ></jf-context-inspector-pane>
         <jf-walkthrough-card slot="bottom-left"></jf-walkthrough-card>
-        <!-- Slice 490 §4.D — Advisory inbox drawer in the OverlayHost right-drawer slot. -->
-        <jf-advisory-inbox-drawer
-          slot="right-drawer"
-          id="advisory-inbox-drawer"
-          role=${placementToLandmarkRole('DRAWER')}
-          aria-label="Advisories"
-          .store=${this.advisoryStore}
-          .operationClient=${this.operationClient}
-        ></jf-advisory-inbox-drawer>
         <!-- Tempdoc 599 §16/B1 — per-folder failed-files drill-down (right-drawer). -->
         <jf-failed-jobs-drawer
           slot="right-drawer"
@@ -2716,12 +2675,7 @@ export class Shell extends JfElement {
     `;
   }
 
-  private handleAdvisoryToggle(): void {
-    const drawer = this.renderRoot.querySelector(
-      '#advisory-inbox-drawer',
-    ) as AdvisoryInboxDrawer | null;
-    drawer?.toggle();
-  }
+
 }
 
 if (typeof customElements !== 'undefined' && !customElements.get('jf-shell')) {
@@ -2894,7 +2848,6 @@ export class Rail extends JfElement {
     const isActive = this.active === s.id;
     const isAiDependent = this.aiDependentIds.has(s.id);
     const dimmed = isAiDependent && !this.aiChatAvailable && !isActive;
-    const showDot = isAiDependent && this.aiActivity !== 'idle';
     const classes = [isActive ? 'active' : '', dimmed ? 'ai-dimmed' : ''].filter(Boolean).join(' ');
     // Tempdoc 602 R8 — icon-only rail control: name the intent for surfaces whose
     // glyph under-specifies it (Library's folder-plus reads as "new"); else the label.
@@ -2911,7 +2864,6 @@ export class Rail extends JfElement {
       >
         <span class="btn-wrap">
           ${icon({ name: iconName, size: 18 })}
-          ${showDot ? html`<span class="activity-dot"></span>` : nothing}
         </span>
         ${this.expanded ? html`<span class="rail-label">${railName}</span>` : nothing}
       </button>

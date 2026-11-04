@@ -51,6 +51,7 @@ export interface OperationInvocationSuccess {
 
 /** Tempdoc 655 fix pass — decision content for a pending authorization, fetched by id. */
 export interface PendingAuthorizationDetail {
+  expiresAt?: string;
   pendingId: string;
   operationId: string;
   argsSummary: string;

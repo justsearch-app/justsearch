@@ -111,7 +111,7 @@
       "modules/ui-web/src/shell-v0/components/chat/RunNode.ts",
       "modules/ui-web/src/shell-v0/components/chat/ToolCallCard.ts",
       "modules/ui-web/src/shell-v0/components/eventRow.ts",
-      "modules/ui-web/src/shell-v0/components/advisory/AdvisoryInboxDrawer.ts",
+      "modules/ui-web/src/shell-v0/components/StatusPanel.ts",
       "modules/ui-web/src/shell-v0/components/StatusBadge.ts",
       "modules/ui-web/src/shell-v0/components/StatusDot.ts",
       "modules/ui-web/src/shell-v0/components/ErrorAlert.ts",

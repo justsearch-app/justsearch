@@ -71,6 +71,7 @@ export type ComponentTag =
   | 'jf-indexing-controls'
   | 'jf-indexing-overlay'
   | 'jf-indexing-overlay-host'
+  | 'jf-indexing-rules-editor'
   | 'jf-ingestion-summary'
   | 'jf-interaction-retrospective-panel'
   | 'jf-library-surface'
@@ -128,11 +129,15 @@ export type ComponentTag =
   | 'jf-status-card'
   | 'jf-status-deck'
   | 'jf-status-dot'
+  | 'jf-status-panel'
+  | 'jf-status-pill'
   | 'jf-summarize-view'
   | 'jf-surface-tabs'
   | 'jf-sv3-composer'
   | 'jf-sv3-context-bar'
+  | 'jf-sv3-conversation-export'
   | 'jf-sv3-empty'
+  | 'jf-sv3-filters'
   | 'jf-sv3-main'
   | 'jf-sv3-palette'
   | 'jf-sv3-pane'
@@ -221,6 +226,7 @@ export const COMPONENT_TAGS: readonly ComponentTag[] = [
   'jf-indexing-controls',
   'jf-indexing-overlay',
   'jf-indexing-overlay-host',
+  'jf-indexing-rules-editor',
   'jf-ingestion-summary',
   'jf-interaction-retrospective-panel',
   'jf-library-surface',
@@ -278,11 +284,15 @@ export const COMPONENT_TAGS: readonly ComponentTag[] = [
   'jf-status-card',
   'jf-status-deck',
   'jf-status-dot',
+  'jf-status-panel',
+  'jf-status-pill',
   'jf-summarize-view',
   'jf-surface-tabs',
   'jf-sv3-composer',
   'jf-sv3-context-bar',
+  'jf-sv3-conversation-export',
   'jf-sv3-empty',
+  'jf-sv3-filters',
   'jf-sv3-main',
   'jf-sv3-palette',
   'jf-sv3-pane',

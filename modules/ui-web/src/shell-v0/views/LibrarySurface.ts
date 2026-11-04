@@ -38,6 +38,8 @@ import '../components/SurfaceTabs.js';
 import type { SurfaceTabs, SurfaceTabItem } from '../components/SurfaceTabs.js';
 import { getSurface } from '../../api/registry/SurfaceCatalogClient.js';
 import { present } from '../display/present.js';
+import { emitEphemeralToast } from '../components/advisory/ephemeralToast.js';
+import { folderName } from '../state/frameStatus.js';
 import { takeIndexingRuleFocus, subscribeIndexingRuleFocus, type IndexingRuleControl } from '../router/indexingRuleIntent.js';
 import { takeMemberTabIntent, subscribeMemberTab } from '../router/memberTabIntent.js';
 import { resolvePathLazy } from '../hooks/resolvePathLazy.js';
@@ -63,6 +65,7 @@ import {
 import { operationOutcomeViewSchema, type OperationOutcomeView } from '../../api/generated/schema-types/index.js';
 // Tempdoc 599 §9.1 — the ONE per-folder status derivation; the row glyph + meta line project from it.
 import {
+  folderAttention,
   folderStatus,
   rememberFailedCounts,
   rootCoverage,
@@ -1697,6 +1700,34 @@ export class LibrarySurface extends JfElement {
     return AVAILABLE;
   }
 
+  /**
+   * R3 — removal has no undo. The notice (pill, then Earlier) offers to add the same folder again,
+   * which reads its files again. It does not depend on the Library staying open.
+   */
+  private offerAddAgain(path: string, collection: string | undefined, nested: number): void {
+    const name = folderName(path);
+    const host = this.host_;
+    let adding = false;
+    emitEphemeralToast({
+      message: `Removed ${name} from your library`,
+      detail: `${path}. Adding it again reads its files again${nested ? `; the ${nested === 1 ? 'folder' : `${nested} folders`} inside it must be added separately` : ''}.`,
+      actionLabel: `Add ${name} again`,
+      onAction: () => {
+        if (adding) return;
+        adding = true;
+        void host.data.invokeOperation(OP_ADD, collection && collection !== 'default' ? { path, collection } : { path })
+          .then(result => {
+            if (!result.success) throw new Error(result.message || 'Add refused');
+            emitEphemeralToast({ message: `Added ${name} again. Reading its files.`, severity: 'success' });
+          })
+          .catch((err: unknown) => {
+            adding = false;
+            emitEphemeralToast({ message: `Could not add ${name} again. ${err instanceof Error ? err.message : String(err)}`, severity: 'error' });
+          });
+      },
+    });
+  }
+
   private async handleRemoveRoot(pathHash: string): Promise<void> {
     if (this.removingHashes.has(pathHash) || this.confirmingHashes.has(pathHash)) return;
     const resolved = this.resolvedPaths[pathHash];
@@ -1737,6 +1768,7 @@ export class LibrarySurface extends JfElement {
         { confirmLabel: 'Remove', destructive: true });
       if (!ok || serial !== this.surfaceSerial) return;
       if ([pathHash, ...nestedHashes].some(hash => this.removingHashes.has(hash))) return;
+      const collection = this.roots.find(root => root.pathHash === pathHash)?.collection;
       affected = [pathHash, ...nestedHashes];
       this.removingHashes = new Set([...this.removingHashes, ...affected]);
       acquired = true;
@@ -1768,6 +1800,7 @@ export class LibrarySurface extends JfElement {
         this.refreshSerial++;
         this.roots = this.roots.filter(root => !affected.includes(root.pathHash ?? ''));
         this.actionMessage = enclosing ? 'Folder removed. Its files stay searchable through the enclosing watched folder.' : 'Folder removed from Library and search results.';
+        this.offerAddAgain(resolved, collection, nested.length);
         await this.refresh({ live: true, force: true });
         if (serial === this.surfaceSerial) {
           await this.updateComplete;
@@ -1994,23 +2027,18 @@ export class LibrarySurface extends JfElement {
       const hash = root.pathHash ?? '';
       const name = folderRowLabel(hash, this.resolvedPaths[hash]).label;
       const status = this.rowStatus(root);
-      if (status.state === 'unavailable') items.push({ key: `missing:${hash}`, title: `${name} can't be found`,
-        detail: 'Reconnect the drive or remove it. Last-known indexed content may still be searchable; reindex cannot cover this folder while it is offline.',
-        actions: html`<jf-operation context="button" operation-id="core.reconcile-root" .args=${{ pathHash: hash }} api-base=${this.apiBase}
+      for (const item of folderAttention(root, status, name)) items.push({ key: item.key, title: item.title, detail: item.detail,
+        actions: item.kind === 'missing' ? html`<jf-operation context="button" operation-id="core.reconcile-root" .args=${{ pathHash: hash }} api-base=${this.apiBase}
           @op-success=${() => void this.refresh({ force: true })}></jf-operation>
           <jf-button variant="ghost" label="Remove from library" .disabled=${this.removingHashes.has(hash)}
-            .onActivate=${() => this.handleRemoveRoot(hash)}>Remove from library</jf-button>` });
-      else if (root.walkError) items.push({ key: `walk:${hash}`, title: `${name} needs attention`, detail: root.walkError,
-        actions: html`<jf-button variant="ghost" .disabled=${this.removingHashes.has(hash)}
+            .onActivate=${() => this.handleRemoveRoot(hash)}>Remove from library</jf-button>`
+          : item.kind === 'walk' ? html`<jf-button variant="ghost" .disabled=${this.removingHashes.has(hash)}
           .onActivate=${() => root.walkError?.startsWith('Removal incomplete.') ? this.handleRemoveRoot(hash) : this.handleReindexToVerify()}
-          >${root.walkError.startsWith('Removal incomplete.') ? 'Retry removal' : 'Reindex'}</jf-button>` });
-      if (status.failed > 0) items.push({ key: `files:${hash}`, title: `${status.failed} ${status.failed === 1 ? 'file needs' : 'files need'} review · ${name}${status.failedIsLastKnown ? ' · last known' : ''}`,
-        detail: 'Review the named files and their reasons, including unreadable sources, exhausted retries and extraction failures.',
-        actions: html`<jf-failed-jobs-drawer inline .folderPathHash=${hash} .observedCount=${status.failed}
+          >${root.walkError?.startsWith('Removal incomplete.') ? 'Retry removal' : 'Reindex'}</jf-button>`
+          : item.kind === 'files' ? html`<jf-failed-jobs-drawer inline .folderPathHash=${hash} .observedCount=${status.failed}
           .lastKnown=${status.failedIsLastKnown === true} .host_=${this.host_} api-base=${this.apiBase}></jf-failed-jobs-drawer>
-          <jf-button variant="ghost" .onActivate=${() => openFailedJobs(hash)}>Open failed-files list</jf-button>` });
-      if (status.state === 'unverified') items.push({ key: `deletions:${hash}`, title: `${name}: deletions not verified`,
-        detail: 'Some stale entries may remain searchable.', actions: html`<jf-button variant="ghost" label="Reindex to verify"
+          <jf-button variant="ghost" .onActivate=${() => openFailedJobs(hash)}>Open failed-files list</jf-button>`
+          : html`<jf-button variant="ghost" label="Reindex to verify"
           .disabled=${this.removingHashes.has(hash)} .onActivate=${() => this.handleReindexToVerify()}>Reindex to verify</jf-button>` });
     }
     const hold = this.indexingActivity.confirmed ? this.indexProgress : this.lastKnownHold;

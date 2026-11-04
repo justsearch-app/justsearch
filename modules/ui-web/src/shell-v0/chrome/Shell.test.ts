@@ -54,6 +54,7 @@ import {
 } from '../state/searchState.js';
 import { getInspectorState, resetInspectorState } from '../state/inspectorState.js';
 import { SettingsWindow } from './SettingsWindow.js';
+import type { StatusPill } from '../components/StatusPill.js';
 import type { Surface, SurfaceCatalog } from '../../api/types/surface.js';
 import type { StateSnapshot } from '../router/types.js';
 import type { TransportTag } from '../router/transports.js';
@@ -213,7 +214,7 @@ describe('Shell — slice 492 substrate integration', () => {
     type Rendered = HTMLElement & { updateComplete: Promise<unknown> };
     const search = shell.shadowRoot!.querySelector('jf-stage')!.shadowRoot!.querySelector('jf-sv3-window') as Rendered;
     expect(search, 'production Search really mounted in Shell').not.toBeNull();
-    const deck = shell.shadowRoot!.querySelector('jf-status-deck') as Rendered;
+    const deck = shell.shadowRoot!.querySelector('jf-status-pill') as Rendered;
     expect(deck).not.toBeNull();
     async function feed(reasons: string[], jobs = 4): Promise<void> {
       __feedForTest({ status: { worker: {
@@ -717,6 +718,25 @@ describe('Shell — settings window vs. stage navigation (tempdoc 855)', () => {
     expect(win!.shadowRoot?.querySelector('dialog')?.open).toBe(false);
     expect(backSpy).not.toHaveBeenCalled();
     backSpy.mockRestore();
+  });
+
+  it('ST15 opening Settings or switching windows closes the status panel and returns focus to the pill', async () => {
+    const shell = await renderShell();
+    const pill = shell.shadowRoot!.querySelector('jf-status-pill') as StatusPill;
+    const win = shell.shadowRoot!.querySelector('jf-settings-window') as SettingsWindow;
+    const settle = async () => { await new Promise((r) => setTimeout(r, 10)); await win.updateComplete; await pill.updateComplete; };
+    pill.toggle(); await settle();
+    expect(pill.open).toBe(true);
+    shell.activateSurface(SETTINGS_ID, {}, 'RAIL'); await settle();
+    expect(win.open).toBe(true);
+    expect(pill.open, 'the popover never stays open under a window').toBe(false);
+    vi.spyOn(window.history, 'back').mockImplementation(() => undefined);
+    shell.activateSurface('core.library-surface', {}, 'RAIL'); await settle();
+    pill.toggle(); await settle();
+    expect(pill.open).toBe(true);
+    shell.activateSurface(SEARCH.id, {}, 'RAIL'); await settle();
+    expect(pill.open).toBe(false);
+    expect(shell.shadowRoot!.activeElement, 'focus returns to the pill, not the page body').toBe(pill);
   });
 
   it('a stage navigation while the window is CLOSED touches nothing (no stray dismiss path)', async () => {

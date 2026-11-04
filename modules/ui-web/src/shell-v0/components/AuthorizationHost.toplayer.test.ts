@@ -17,6 +17,7 @@ import { requestCapability, listPendingConsentRequests, resolveConsentRequest } 
 let host: AuthorizationHost;
 
 beforeEach(() => {
+  vi.useFakeTimers({ toFake: ['performance'] });
   host = document.createElement('jf-authorization-host') as AuthorizationHost;
   document.body.appendChild(host);
 });
@@ -26,6 +27,7 @@ afterEach(() => {
   setAuthorizationPresenter(null);
   for (const request of listPendingConsentRequests()) resolveConsentRequest(request.id, 'deny');
   vi.restoreAllMocks();
+  vi.useRealTimers();
 });
 
 async function settle(): Promise<void> {
@@ -69,6 +71,7 @@ describe('Move 4 — trusted ceremony on the Top Layer', () => {
         await (button as unknown as { updateComplete: Promise<unknown> }).updateComplete;
         const control = button.shadowRoot!.querySelector('jf-control')!;
         await (control as unknown as { updateComplete: Promise<unknown> }).updateComplete;
+        vi.advanceTimersByTime(400); // the prompt arms before it accepts a decision
         control.shadowRoot!.querySelector('button')!.click();
         await settle();
       };
@@ -88,6 +91,42 @@ describe('Move 4 — trusted ceremony on the Top Layer', () => {
       } finally {
         invoker.remove();
       }
+    },
+  );
+
+  it.each(kinds.flatMap(first => kinds.filter(second => second !== first).map(second => [first, second] as const)))(
+    'A1 selecting %s → %s from the status panel applies the selected prompt’s own modality', async (first, second) => {
+      await settle();
+      const dialog = host.shadowRoot!.querySelector('dialog')!;
+      const modal = vi.spyOn(dialog, 'showModal');
+      const nonModal = vi.spyOn(dialog, 'show');
+      const id = (kind: Kind, name: string) => kind === 'capability'
+        ? String(listPendingConsentRequests().find(r => r.contributorId === `plugin.${name}`)!.id) : name;
+      enqueue(first, 'first');
+      enqueue(second, 'second');
+      await settle();
+      // The first opens on arrival in its own modality; the status panel lists both.
+      expect(dialog.open).toBe(true);
+      expect(modalOwnsFocus()).toBe(first !== 'lightweight');
+      expect(host.statusRequests()).toHaveLength(2);
+      // Reviewing the open one keeps it open in the same modality.
+      host.reviewStatusRequest(id(first, 'first'));
+      await settle();
+      expect(dialog.open).toBe(true);
+      expect(modalOwnsFocus()).toBe(first !== 'lightweight');
+      modal.mockClear(); nonModal.mockClear();
+      // The first stays open (undecided) while the user selects the second from the panel.
+      host.reviewStatusRequest(id(second, 'second'));
+      await settle();
+      expect(dialog.open).toBe(true);
+      expect(host.shadowRoot!.querySelector('dialog')!.getAttribute('data-testid'))
+        .toBe(second === 'capability' ? 'capability-ceremony' : 'authorization-ceremony');
+      expect(modalOwnsFocus(), `${second} modality`).toBe(second !== 'lightweight');
+      expect(document.documentElement.style.overflow).toBe(second === 'lightweight' ? '' : 'hidden');
+      if ((first === 'lightweight') !== (second === 'lightweight')) {
+        expect(second === 'lightweight' ? nonModal : modal, `${second} reopened in its own mode`).toHaveBeenCalledTimes(1);
+      }
+      expect(second === 'lightweight' ? modal : nonModal).not.toHaveBeenCalled();
     },
   );
 

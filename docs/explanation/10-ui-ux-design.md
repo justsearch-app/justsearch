@@ -61,15 +61,16 @@ Some floating panels use blur; backdrop blur and a glass aesthetic are not UI re
 
 `chrome/Shell.ts` renders the following structure. `layout/LayoutManifest.ts` describes
 visibility and composition of the `rail`, `stage` and `statusBar` regions; it does not
-imply five fixed functional zones.
+imply five fixed functional zones. `statusBar.visible` now controls only plugin status
+items in the status panel; the title-bar status pill remains available.
 
 | Shell part | Responsibility |
 |---|---|
-| Title bar | App name, back/forward navigation, recent views, active surface title, Simple/Detailed control, bookmarks and Copy URL |
+| Title bar | App name, back/forward navigation, recent views, active surface title, status pill, Simple/Detailed control, bookmarks and Copy URL |
 | Rail | Catalog-driven navigation; Simple mode withholds optional diagnostic surfaces |
 | Stage | The active surface; layouts can also compose a second surface in a split stage |
-| Status bar (`jf-status-deck`) | Connection, file/index/memory facts, AI activity and active work, subject to available space |
-| Overlay slots (`jf-overlay-host`) | Command palette, Settings, tasks, notices, reading drawers and other transient surfaces in named slots |
+| Status pill and panel (`jf-status-pill`, `jf-status-panel`) | One status in the title bar; the pill opens current conditions, work and earlier activity over the page |
+| Overlay slots (`jf-overlay-host`) | Command palette, Settings, authorization dialogs, reading drawers and other transient surfaces in named slots |
 
 ### Main windows
 
@@ -111,14 +112,44 @@ from Appearance through a launch link, per the plugin-presentation boundary
 deep-linkable: for example, `core.security-surface` opens the Settings window at its
 member category through the member-to-host redirect.
 
-### Status bar
+### Status pill and panel
 
-The status deck is a compact projection of shared state, not a second source of facts.
-Connection and memory signals are pinned while lower-priority facts can yield as space
-shrinks. Counts and sizes distinguish observed, last-known and unknown values. Queue and
-enrichment activity appears when relevant. The Help surface supplies keyboard guidance.
+One status pill in the title bar projects shared state (`components/StatusPill.ts`,
+`components/StatusPanel.ts` and `state/frameStatus.ts`). It chooses one state in this
+order: engine unreachable → search limited → needs you → problems → working → just
+finished → calm, “Up to date”. Calm requires a fresh observation that search is ready;
+it does not claim that every AI service is healthy. Missing or stale observations say
+that status is being checked or show last-seen information. Needs you shows a count;
+working shows progress when known. Below 1000 px the pill uses an icon, count or ring,
+while keeping its accessible name.
 
-### Progress vocabulary (Tasks panel, Health, folder rows)
+Clicking the pill or pressing Ctrl+Shift+S opens “What's going on” over the page,
+anchored below the pill. Escape, an outside click, the close button or the pill closes
+the panel and returns focus to the pill. Its sections appear in this order, omitting
+empty sections:
+
+- **Needs you:** approvals, proposed actions, plugin permission requests, indexing holds,
+  update or repair decisions, and rebuild decisions, with their available actions.
+  Requests that require typed confirmation or permission consent use the protected dialog.
+- **Problems right now:** active problems such as unavailable folders, unreadable files,
+  limited search, plugin load failures and failed AI installation.
+- **Running:** indexing and enrichment, rebuilds, AI downloads, operations and background
+  tasks, with progress and controls where available.
+- **Earlier:** action feedback, advisories and completed work, with details, read/unread
+  state and Mark all read. Reversal actions appear only where supported.
+
+Plugin status items render in a separate plugin row, with overflow available through
+“more”. The footer links to Activity (“All activity”) and Health. An empty panel says
+whether search is up to date or its status is still being checked.
+
+Feedback from the user's own actions appears inside the pill for a few seconds. While
+the pill shows engine unreachable, search limited, needs you or problems, that feedback
+appears beside it instead. In both cases it remains available in Earlier. Status
+transitions and action feedback are announced to screen readers. The panel updates
+while open, preserving expanded details; switching windows closes it. The Help surface
+supplies keyboard guidance.
+
+### Progress vocabulary (status panel, Health, folder rows)
 
 Every surface that reports indexing progress uses one set of words, and derives its
 numbers from one place — the `selectIndexingProgress` projection over the `/api/status`

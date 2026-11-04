@@ -130,6 +130,15 @@ export type TokenName =
   | '--font-size-sm'
   | '--font-size-xl'
   | '--font-size-xs'
+  | '--frame-focus-width'
+  | '--frame-hairline'
+  | '--frame-panel-radius'
+  | '--frame-pill-radius'
+  | '--frame-status-dim'
+  | '--frame-status-dot'
+  | '--frame-status-panel-top'
+  | '--frame-status-panel-width'
+  | '--frame-status-ring'
   | '--glass-blur'
   | '--glass-blur-elevated'
   | '--glass-blur-scale'
@@ -355,6 +364,15 @@ export const TOKEN_NAMES: readonly TokenName[] = [
   '--font-size-sm',
   '--font-size-xl',
   '--font-size-xs',
+  '--frame-focus-width',
+  '--frame-hairline',
+  '--frame-panel-radius',
+  '--frame-pill-radius',
+  '--frame-status-dim',
+  '--frame-status-dot',
+  '--frame-status-panel-top',
+  '--frame-status-panel-width',
+  '--frame-status-ring',
   '--glass-blur',
   '--glass-blur-elevated',
   '--glass-blur-scale',

@@ -32,11 +32,6 @@ export function mapKnown<T, R>(m: Maybe<T>, f: (value: T) => R): Maybe<R> {
   return m.known ? known(f(m.value)) : UNKNOWN;
 }
 
-/** Read a Known value or fall back (use only where a placeholder is acceptable). */
-export function orElse<T>(m: Maybe<T>, fallback: T): T {
-  return m.known ? m.value : fallback;
-}
-
 /**
  * Total fold over `(value, stability)` — tempdoc 595 §4.3. `whenKnown` is binary
  * (known vs unknown), but a value can be Known yet PROVISIONAL: a rebuild's worker

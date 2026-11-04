@@ -23,7 +23,7 @@
  * `core.operation-history`.
  */
 
-import { html, css, type TemplateResult } from 'lit';
+import { html, css, nothing, type TemplateResult } from 'lit';
 import { JfElement } from '../primitives/JfElement.js';
 import { surfaceLayoutStyles } from '../primitives/surfaceLayout.js';
 import '../components/ResourceView.js';
@@ -31,17 +31,50 @@ import '../components/ResourceView.js';
 // chronological, originator-attributed, LIVE stream over operations + navigations + gates + FE
 // effects). Side-effect import registers <jf-action-ledger>.
 import '../components/ActionLedgerView.js';
+import '../components/Button.js';
+import '../components/EffectLine.js';
+import { listJournalByOriginator, previewUndoAllByOriginator, undoAllByOriginator, subscribeJournal,
+  type JournalEntry } from '../substrates/effects/index.js';
+import { applyEffect } from '../substrates/actions/index.js';
+import { defineMacroFromEffects } from '../substrates/macros/index.js';
+import { getSeenCursor } from '../substrates/recall/recallCursor.js';
 
 export class ActivitySurface extends JfElement {
   static properties = {
     apiBase: { type: String, attribute: 'api-base' },
+    undoPreview: { state: true },
   } as const;
 
   declare apiBase: string;
+  declare undoPreview: readonly JournalEntry[];
+  private stopJournal: (() => void) | undefined;
 
   constructor() {
     super();
     this.apiBase = '';
+    this.undoPreview = [];
+  }
+
+  override connectedCallback(): void {
+    super.connectedCallback();
+    this.stopJournal = subscribeJournal(() => this.requestUpdate());
+  }
+  override disconnectedCallback(): void {
+    this.stopJournal?.(); this.stopJournal = undefined;
+    super.disconnectedCallback();
+  }
+
+  private confirmUndo(): void {
+    this.undoPreview = [];
+    const count = undoAllByOriginator('agent', applyEffect);
+    applyEffect({ kind: 'toast', message: count ? `Undid ${count} AI action${count === 1 ? '' : 's'}` : 'Nothing to undo', severity: 'info' });
+  }
+  private async saveMacro(): Promise<void> {
+    const effects = listJournalByOriginator('agent')
+      .filter(e => e.invokedAt > getSeenCursor() && e.pendingOutcome !== 'rejected').map(e => e.effect);
+    if (effects.length) await defineMacroFromEffects(effects, {
+      description: `Save what the assistant just did (${effects.length} action${effects.length === 1 ? '' : 's'}) as a reusable macro. It will surface in the command palette under "Macros".`,
+    });
   }
 
   // Tempdoc 559 Authority I: the :host / .header / .body region contract is
@@ -69,6 +102,8 @@ export class ActivitySurface extends JfElement {
     .section-label:first-child {
       margin-top: 0;
     }
+    .agent-actions { display: flex; flex-wrap: wrap; gap: var(--jf-space-2); margin-block: var(--jf-space-3); }
+    .undo-preview { padding: var(--jf-space-3); border: var(--frame-hairline) solid var(--border-default); }
   `,
   ];
 
@@ -86,6 +121,23 @@ export class ActivitySurface extends JfElement {
         </div>
       </div>
       <div class="body">
+        ${listJournalByOriginator('agent').some(e => e.pendingOutcome !== 'rejected') ? html`
+          <div class="agent-actions">
+            <jf-button size="sm" label="Undo all AI actions" data-testid="activity-undo-all"
+              .onActivate=${() => { this.undoPreview = previewUndoAllByOriginator('agent');
+                if (!this.undoPreview.length) applyEffect({ kind: 'toast', message: 'Nothing to undo', severity: 'info' }); }}>Undo all AI actions</jf-button>
+            <jf-button size="sm" label="Save as macro" data-testid="activity-save-macro"
+              .onActivate=${() => void this.saveMacro()}>Save as macro</jf-button>
+          </div>` : nothing}
+        ${this.undoPreview.length ? html`<section class="undo-preview" aria-label="Confirm undo AI actions" data-testid="activity-undo-confirm">
+          <p>Undo these ${this.undoPreview.length} AI actions?</p>
+          <ul>${this.undoPreview.map(e => html`<li data-testid="activity-undo-row"><jf-effect-line .effect=${e.effect}></jf-effect-line></li>`)}</ul>
+          ${listJournalByOriginator('agent').filter(e => e.pendingOutcome !== 'rejected'
+            && !this.undoPreview.some(p => p.id === e.id)).length ? html`<p data-testid="activity-irreversible">${listJournalByOriginator('agent').filter(e => e.pendingOutcome !== 'rejected'
+              && !this.undoPreview.some(p => p.id === e.id)).length} other actions can't be undone and will remain.</p>` : nothing}
+          <jf-button size="sm" variant="danger" label="Undo all" data-testid="activity-undo-confirm-yes" .onActivate=${() => this.confirmUndo()}>Undo all</jf-button>
+          <jf-button size="sm" label="Cancel" data-testid="activity-undo-confirm-cancel" .onActivate=${() => { this.undoPreview = []; }}>Cancel</jf-button>
+        </section>` : nothing}
         <!-- Tempdoc 550 thesis II (Outcome read-view): the unified, LIVE action-ledger —
              one chronological, originator-attributed stream over operations + navigations +
              trust-gate firings + FE-local effects. This is the 550 Outcome face. -->

@@ -26,6 +26,7 @@
 import { html, css, nothing, type TemplateResult } from 'lit';
 import { JfElement } from '../../primitives/JfElement.js';
 import { ModalityController } from '../../primitives/modality.js';
+import { closeOthersInLayer } from '../../state/transientLayerArbiter.js';
 import { sv3Shared } from './sv3-shared-styles.js';
 import {
   COMMAND_GROUPS,
@@ -423,6 +424,8 @@ export class Sv3Palette extends JfElement {
     this.invoker = invoker;
     this.query = '';
     this.highlight = 0;
+    // One overlay at a time: opening the palette closes any open popover (the status panel included).
+    closeOthersInLayer('transient', 'sv3-palette');
     this.open = true;
     this.modality.enter();
     await this.updateComplete;

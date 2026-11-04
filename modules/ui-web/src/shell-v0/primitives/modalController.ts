@@ -68,13 +68,14 @@ export class ModalController implements ReactiveController {
 
   /**
    * Close the modal: close the dialog, then release scroll-lock + restore focus. Idempotent.
+   * A dialog the platform already closed (Escape, `dialog.close()`) still releases its modality
+   * here, so a host's `close` listener can end the contract the same way its own close does.
    * `skipFocusRestore` passes straight through to {@link ModalityController.exit} (855 §11.2
    * merge-blocker) — for a navigation-initiated close where the address already moved elsewhere.
    */
   close(opts?: { skipFocusRestore?: boolean }): void {
     const dlg = this.opts.dialog();
-    if (!dlg || !dlg.open) return;
-    dlg.close();
+    if (dlg?.open) dlg.close();
     this.modality.exit(opts);
   }
 

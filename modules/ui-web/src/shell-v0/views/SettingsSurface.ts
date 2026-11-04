@@ -2372,13 +2372,15 @@ export class SettingsSurface extends JfElement {
       const manifest = await this.installFromUrl(url);
       this.plugins = getSessionPluginRegistry().list();
       this.recordTrustState(manifest.id, url);
+      const { dispatchPluginLoaded } = await import('../state/pluginLoadEvents.js');
+      dispatchPluginLoaded(url);
       if (input) input.value = '';
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       const stack = err instanceof Error ? err.stack : undefined;
       this.error = message;
       // Tempdoc 508 §6.2 — dispatch plugin load error to overlay
-      const { dispatchPluginError } = await import('../components/PluginErrorOverlay.js');
+      const { dispatchPluginError } = await import('../state/pluginLoadEvents.js');
       dispatchPluginError({ pluginUrl: url, message, stack });
     }
   }
@@ -2451,6 +2453,8 @@ export class SettingsSurface extends JfElement {
       const manifest = await this.installFromUrl(url, source);
       this.plugins = registry.list();
       this.recordTrustState(manifest.id, url);
+      const { dispatchPluginLoaded } = await import('../state/pluginLoadEvents.js');
+      dispatchPluginLoaded(url);
     } catch (err) {
       this.error = err instanceof Error ? err.message : String(err);
     }

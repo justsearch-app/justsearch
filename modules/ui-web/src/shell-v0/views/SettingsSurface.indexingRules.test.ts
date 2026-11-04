@@ -4,7 +4,8 @@ import { takeIndexingRuleFocus } from '../router/indexingRuleIntent.js';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import './SettingsSurface.js';
 import './LibrarySurface.js';
-import '../components/TaskList.js';
+import { StatusPill } from '../components/StatusPill.js';
+import type { StatusPanel } from '../components/StatusPanel.js';
 import type { IndexingRulesEditor } from '../components/IndexingRulesEditor.js';
 import type { LibrarySurface } from './LibrarySurface.js';
 import type { StatusSnapshot } from '../state/aiStateStore.js';
@@ -242,9 +243,14 @@ describe('WP3.8b policy status and actions', () => {
     expect(c.shadowRoot!.textContent).toContain('still held by indexing hours'); resume.click(); await settle(c);
     expect(fetchMock.mock.calls.some(call => String(call[0]).endsWith('/core.indexing-resume/invoke'))).toBe(false);
   });
-  for (const tag of ['jf-library-surface', 'jf-task-list']) {
+  // The retired task tray's hold row now lives in the status panel's Needs you section.
+  for (const tag of ['jf-library-surface', 'jf-status-pill']) {
     it(`D5 ${tag} names schedule holds for queued work`, async () => {
-      observe(['schedule']); const el = await mount(tag); expect(el.shadowRoot!.textContent).toContain('Outside indexing hours');
+      observe(['schedule']); const mounted = await mount(tag);
+      if (mounted instanceof StatusPill) { mounted.open = true; await settle(mounted); }
+      const el = mounted instanceof StatusPill ? mounted.shadowRoot!.querySelector<StatusPanel>('jf-status-panel')! : mounted;
+      await settle(el);
+      expect(el.shadowRoot!.textContent).toContain('Outside indexing hours');
       expect(el.shadowRoot!.textContent).not.toContain('Work is waiting for Resume'); const controls = [...el.shadowRoot!.querySelectorAll<Mounted>('jf-indexing-controls')];
       for (const c of controls) await settle(c);
       const remedy = tag === 'jf-library-surface' ? controls.find(c => !c.hasAttribute('toolbar')) : controls[0];

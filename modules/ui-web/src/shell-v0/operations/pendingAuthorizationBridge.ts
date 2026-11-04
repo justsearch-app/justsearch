@@ -52,6 +52,17 @@ interface PendingAuthorizationPayload {
   readonly gateBehavior?: string;
 }
 
+/**
+ * B2 — the retained side of the same pending store: the advisory stream's snapshot keeps every
+ * MCP `authorization.pending` record (routing info only, the same fields as the broadcast), so a
+ * reload or a second window re-discovers requests whose one-shot broadcast it never saw.
+ */
+interface RetainedPendingSource {
+  subscribe(listener: (snapshot: { readonly advisories: readonly {
+    readonly event: { readonly classId: string; readonly classExtras: Readonly<Record<string, unknown>> };
+  }[] }) => void): () => void;
+}
+
 /** Bounded so a long-running session's dedup set can't grow unbounded. */
 const HANDLED_LRU_SIZE = 500;
 
@@ -66,7 +77,7 @@ const HANDLED_LRU_SIZE = 500;
  */
 export function startPendingAuthorizationBridge(
   apiBase: string,
-  opts: { multiplex?: MultiplexedStream } = {},
+  opts: { multiplex?: MultiplexedStream; retained?: RetainedPendingSource | null } = {},
 ): () => void {
   if (!opts.multiplex) {
     return () => {};
@@ -112,34 +123,52 @@ export function startPendingAuthorizationBridge(
         return { lastPayload: env.payload as PendingAuthorizationPayload | null };
       },
     }),
-    (snapshot) => {
-      const payload = snapshot.payload.lastPayload;
-      if (!payload?.pendingId || !payload.operationId) {
-        return;
-      }
-      // These user-only operations always have their own exact-target ceremony in the
-      // originating window. A broadcast may precede its 428; it must never offer a second
-      // route that can execute while that window still offers Cancel.
-      if (payload.operationId === 'core.forget-indexed-path' || payload.operationId === 'core.retry-forget'
-          || payload.operationId === 'core.withdraw-forget') return;
-      if (handledIds.has(payload.pendingId)) {
-        return;
-      }
-      handledIds.set(payload.pendingId, true);
-      while (handledIds.size > HANDLED_LRU_SIZE) {
-        const oldest = handledIds.keys().next().value;
-        if (oldest === undefined) break;
-        handledIds.delete(oldest);
-      }
-      const entry = { checking: false };
-      waiting.set(payload.pendingId, entry);
-      void presentAndExecute(apiBase, payload, () => !stopped && waiting.get(payload.pendingId!) === entry)
-        .finally(() => waiting.delete(payload.pendingId!));
-    },
+    (snapshot) => admit(snapshot.payload.lastPayload, false),
   );
+  const str = (value: unknown): string | undefined => typeof value === 'string' && value ? value : undefined;
+  const stopRetained = opts.retained?.subscribe(retained => {
+    for (const record of retained.advisories) {
+      if (record.event.classId !== 'authorization.pending') continue;
+      const extras = record.event.classExtras;
+      const expiresAt = str(extras.expiresAt);
+      // An expired request cannot be approved; read state never decides validity (peek does).
+      if (expiresAt && Date.parse(expiresAt) <= Date.now()) continue;
+      admit({ pendingId: str(extras.pendingId), operationId: str(extras.operationId),
+        gateBehavior: str(extras.gateBehavior), riskTier: str(extras.riskTier) }, true);
+    }
+  });
+
+  function admit(payload: PendingAuthorizationPayload | null, retained: boolean): void {
+    if (!payload?.pendingId || !payload.operationId) {
+      return;
+    }
+    // These user-only operations always have their own exact-target ceremony in the
+    // originating window. A broadcast may precede its 428; it must never offer a second
+    // route that can execute while that window still offers Cancel.
+    if (payload.operationId === 'core.forget-indexed-path' || payload.operationId === 'core.retry-forget'
+        || payload.operationId === 'core.withdraw-forget') return;
+    if (handledIds.has(payload.pendingId)) {
+      return;
+    }
+    handledIds.set(payload.pendingId, true);
+    while (handledIds.size > HANDLED_LRU_SIZE) {
+      const oldest = handledIds.keys().next().value;
+      if (oldest === undefined) break;
+      handledIds.delete(oldest);
+    }
+    const entry = { checking: false };
+    const pendingId = payload.pendingId;
+    waiting.set(pendingId, entry);
+    // A retained request whose state could not be read (or whose host was not mounted yet) is
+    // tried again on the next snapshot: a transport failure is neither expiry nor an answer.
+    const retry = retained ? () => { if (!stopped) handledIds.delete(pendingId); } : undefined;
+    void presentAndExecute(apiBase, payload, () => !stopped && waiting.get(pendingId) === entry, retry)
+      .finally(() => { if (waiting.get(pendingId) === entry) waiting.delete(pendingId); });
+  }
 
   return () => {
     stopped = true;
+    stopRetained?.();
     stopActivity();
     stopStatus();
     stopSub();
@@ -152,6 +181,8 @@ async function presentAndExecute(
   apiBase: string,
   payload: PendingAuthorizationPayload,
   isCurrent: () => boolean,
+  /** Retained discoveries only: the request could not be presented now and may be tried again. */
+  retry?: () => void,
 ): Promise<void> {
   const pendingId = payload.pendingId as string;
   const client = getOperationClient(apiBase);
@@ -164,6 +195,7 @@ async function presentAndExecute(
     detail = await client.peekPending(pendingId);
   } catch (err) {
     console.warn('Tempdoc 655: failed to fetch pending authorization detail', err);
+    retry?.();
     return;
   }
   if (!isCurrent()) return;
@@ -174,6 +206,7 @@ async function presentAndExecute(
 
   const prompt: AuthorizationPrompt = {
     pendingId,
+    ...(detail.expiresAt ? { expiresAt: detail.expiresAt } : {}),
     operationId: detail.operationId,
     gateBehavior: payload.gateBehavior ?? detail.gateBehavior ?? 'TYPED_CONFIRM',
     ...(detail.riskTier ? { riskTier: detail.riskTier } : {}),
@@ -183,6 +216,11 @@ async function presentAndExecute(
   };
   const decision = await requestAuthorization(prompt);
   if (!isCurrent() || decision.superseded) return;
+  if (decision.failedClosed && retry) {
+    // Discovered from the retained snapshot with no ceremony host (yet): stay pending, unreported.
+    retry();
+    return;
+  }
   if (decision.failedClosed) {
     // Tempdoc 807 item 4: an explicit human deny is a decision and needs no message — but a
     // FAIL-CLOSED outcome (no host mounted, or a mounted host torn down with this ceremony still

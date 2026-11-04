@@ -312,6 +312,6 @@ export default defineConfig(({ command, mode }) => {
     // signal that `host_` wasn't forwarded; test contexts deliberately
     // exercise the fallback path with mocks, so the warning is noise
     // there.
-    setupFiles: ['./src/__test-setup__/streamViaHostSuppress.ts'],
+    setupFiles: ['./src/__test-setup__/streamViaHostSuppress.ts', './src/__test-setup__/happyDomShadowFocus.ts'],
   },
 }})

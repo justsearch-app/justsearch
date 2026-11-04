@@ -1,0 +1,309 @@
+// SPDX-License-Identifier: Apache-2.0
+// Real pointer and keyboard activation in headless Chromium: one interaction answers one prompt.
+// Run: npx vitest run --config vitest.config.lockdown.ts src/shell-v0/components/AuthorizationHost.activation-lockdown.test.ts
+// Requires the same installed Chromium as boot-lockdown.test.ts; no Engine is needed.
+import { afterAll, afterEach, beforeAll, expect, it } from 'vitest';
+import { createServer, type ViteDevServer } from 'vite';
+import { chromium, type Browser, type BrowserContext, type BrowserServer, type Page } from 'playwright-core';
+import { mkdtemp, mkdir, rm } from 'node:fs/promises';
+import path from 'node:path';
+
+let server: ViteDevServer;
+let browserServer: BrowserServer;
+let browser: Browser;
+let context: BrowserContext;
+let output: string;
+let url: string;
+
+interface ConsentState { granted: Record<string, string | null>; pending: string[]; stored: string }
+declare global {
+  interface Window {
+    requestPlugin(id: string): void;
+    consentState(): ConsentState;
+    requestApproval(id: string, typed: boolean): void;
+  }
+}
+
+beforeAll(async () => {
+  const temporaryRoot = path.resolve('../..', 'tmp');
+  await mkdir(temporaryRoot, { recursive: true });
+  output = await mkdtemp(path.join(temporaryRoot, 'authorization-activation-'));
+  server = await createServer({
+    configFile: false,
+    root: process.cwd(),
+    cacheDir: output,
+    publicDir: false,
+    logLevel: 'silent',
+    server: { host: '127.0.0.1', port: 0 },
+    plugins: [{
+      name: 'isolated-authorization-host',
+      configureServer(vite) {
+        vite.middlewares.use('/authorization-activation', (_req, res) => {
+          res.setHeader('Content-Type', 'text/html');
+          res.end(`<!doctype html><html style="font-size:16px"><head>
+            <link rel="stylesheet" href="/src/styles/tokens.css">
+            </head><body><script type="module">
+            import '/src/shell-v0/components/AuthorizationHost.ts';
+            import '/src/shell-v0/components/StatusPill.ts';
+            import { requestCapability, checkCapability, listPendingConsentRequests, restoreConsentFromStorage }
+              from '/src/shell-v0/substrates/consent/index.ts';
+            import { requestAuthorization } from '/src/shell-v0/operations/authorizationBroker.ts';
+            import { OperationClient } from '/src/shell-v0/operations/OperationClient.ts';
+            restoreConsentFromStorage();
+            window.requestPlugin = id => { void requestCapability({ contributorId: 'plugin.' + id, capability: 'fs.read' }); };
+            // An approved operation is approved over HTTP, as OperationClient does after the ceremony.
+            const client = new OperationClient({ apiBase: '', fetchImpl: (input, init) => fetch(input, init) });
+            window.requestApproval = (id, typed) => {
+              void requestAuthorization({ pendingId: id, operationId: 'core.' + id, gateBehavior: typed ? 'TYPED_CONFIRM' : 'INLINE_CONFIRM' })
+                .then(decision => decision.approved ? client.approveByPendingId(id, decision.allowAlways) : null);
+            };
+            window.consentState = () => ({
+              granted: Object.fromEntries(['first', 'second'].map(id => [id, checkCapability('plugin.' + id, 'fs.read') ?? null])),
+              pending: listPendingConsentRequests().map(request => request.contributorId),
+              stored: JSON.stringify(localStorage),
+            });
+            const host = document.createElement('jf-authorization-host');
+            const pill = document.createElement('jf-status-pill');
+            pill.authorizationHost = () => host;
+            host.addEventListener('status-requests-changed', () => pill.status.refresh());
+            document.body.append(pill, host);
+            document.body.dataset.ready = 'true';
+            </script></body></html>`);
+        });
+      },
+    }],
+  });
+  await server.listen();
+  const address = server.httpServer!.address();
+  if (!address || typeof address === 'string') throw new Error('No private Vite port');
+  url = `http://127.0.0.1:${address.port}/authorization-activation`;
+  // Playwright creates its fresh --user-data-dir under the caller's short TMPDIR.
+  const env = { ...process.env, CUDA_VISIBLE_DEVICES: '-1', TMPDIR: process.env.TMPDIR ?? output };
+  for (const name of ['DISPLAY', 'WAYLAND_DISPLAY']) Reflect.deleteProperty(env, name);
+  browserServer = await chromium.launchServer({ headless: true, args: ['--disable-gpu'], env });
+  console.info('Owned headless Chromium PID:', browserServer.process().pid);
+  browser = await chromium.connect(browserServer.wsEndpoint());
+  // Load the page once so Vite's first transform and dependency optimization (the status pill's
+  // import graph) are not paid inside the first case's time limit.
+  const warm = await browser.newContext();
+  const page = await warm.newPage();
+  await page.goto(url);
+  await page.locator('body[data-ready="true"]').waitFor({ timeout: 45_000 });
+  await warm.close();
+}, 60_000);
+
+afterEach(async () => { await context?.close(); });
+afterAll(async () => {
+  await browser?.close();
+  await browserServer?.close();
+  await server?.close();
+  if (output) await rm(output, { recursive: true, force: true });
+});
+
+/** Two plugin capability requests queued; the first prompt has been on screen long enough to arm. */
+async function twoQueued(): Promise<Page> {
+  context = await browser.newContext({ viewport: { width: 1024, height: 768 } });
+  const page = await context.newPage();
+  await page.goto(url);
+  await page.locator('body[data-ready="true"]').waitFor();
+  await page.evaluate(() => { window.requestPlugin('first'); window.requestPlugin('second'); });
+  await page.getByText('plugin.first requests permission').waitFor();
+  await page.waitForTimeout(600);
+  return page;
+}
+
+const state = (page: Page) => page.evaluate(() => window.consentState());
+
+async function afterReload(page: Page): Promise<ConsentState> {
+  await page.reload();
+  await page.locator('body[data-ready="true"]').waitFor();
+  return state(page);
+}
+
+it('a native double-click on Allow always grants only the first plugin, across reload', async () => {
+  const page = await twoQueued();
+  await page.getByTestId('capability-allow-always').dblclick();
+  await page.waitForTimeout(600);
+  const now = await state(page);
+  expect(now.granted).toEqual({ first: 'allow-always', second: null });
+  expect(now.pending).toEqual(['plugin.second']);
+  const reloaded = await afterReload(page);
+  expect(reloaded.granted).toEqual({ first: 'allow-always', second: null });
+  expect(reloaded.stored).not.toContain('plugin.second');
+});
+
+it('repeated native activation of the same button answers one prompt', async () => {
+  const page = await twoQueued();
+  const box = (await page.getByTestId('capability-allow-always').boundingBox())!;
+  for (let i = 0; i < 4; ++i) {
+    await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+    await page.waitForTimeout(60);
+  }
+  await page.waitForTimeout(600);
+  const now = await state(page);
+  expect(now.granted).toEqual({ first: 'allow-always', second: null });
+  expect(now.pending).toEqual(['plugin.second']);
+  expect((await afterReload(page)).granted.second).toBeNull();
+});
+
+it('Enter pressed and held on the next prompt before it arms answers nothing', async () => {
+  const page = await twoQueued();
+  await page.getByTestId('capability-allow-always').locator('button').focus();
+  await page.keyboard.press('Enter');
+  await page.getByText('plugin.second requests permission').waitFor();
+  expect((await state(page)).granted.first).toBe('allow-always');
+  // Straight onto the next prompt's first decision button, then the key is held: one keydown, the
+  // platform's auto-repeat keydowns, the release.
+  await page.keyboard.press('Tab');
+  await page.keyboard.down('Enter');
+  for (let i = 0; i < 12; ++i) {
+    await page.waitForTimeout(50);
+    await page.keyboard.down('Enter');
+  }
+  await page.keyboard.up('Enter');
+  await page.waitForTimeout(100);
+  const now = await state(page);
+  expect(now.granted.second).toBeNull();
+  expect(now.pending).toEqual(['plugin.second']);
+});
+
+it('a fresh Enter press after the delay answers the next prompt exactly once', async () => {
+  const page = await twoQueued();
+  await page.getByTestId('capability-allow-always').locator('button').focus();
+  await page.keyboard.press('Enter');
+  await page.getByText('plugin.second requests permission').waitFor();
+  await page.keyboard.press('Tab');
+  await page.waitForTimeout(450);
+  await page.keyboard.press('Enter');
+  await page.waitForTimeout(100);
+  const now = await state(page);
+  expect(now.granted).toEqual({ first: 'allow-always', second: 'deny' });
+  expect(now.pending).toEqual([]);
+});
+
+it('a deliberate click after the delay answers the next prompt exactly once', async () => {
+  const page = await twoQueued();
+  await page.getByTestId('capability-allow-always').click();
+  await page.getByText('plugin.second requests permission').waitFor();
+  await page.waitForTimeout(450);
+  await page.getByTestId('capability-deny').click();
+  await page.waitForTimeout(100);
+  const now = await state(page);
+  expect(now.granted).toEqual({ first: 'allow-always', second: 'deny' });
+  expect(now.pending).toEqual([]);
+  expect(await page.locator('jf-authorization-host').evaluate(host => host.shadowRoot!.querySelector('dialog')!.open)).toBe(false);
+});
+
+/** The JSON bodies of every POST /api/authorizations/approve the page sent. */
+async function approvals(page: Page): Promise<Array<{ pendingId: string; allowAlways: boolean }>> {
+  const bodies: Array<{ pendingId: string; allowAlways: boolean }> = [];
+  await page.route('**/api/authorizations/approve', route => {
+    bodies.push(route.request().postDataJSON() as { pendingId: string; allowAlways: boolean });
+    return route.fulfill({ json: {} });
+  });
+  return bodies;
+}
+
+async function opened(): Promise<Page> {
+  context = await browser.newContext({ viewport: { width: 1024, height: 768 } });
+  const page = await context.newPage();
+  await page.goto(url);
+  await page.locator('body[data-ready="true"]').waitFor();
+  return page;
+}
+
+it.each(['checkbox', 'label'] as const)('S1 a %s click on the next approval’s Always allow 30 ms after it appears does not tick it; a later deliberate Approve sends allowAlways false', async part => {
+  const page = await opened();
+  const sent = await approvals(page);
+  await page.evaluate(() => { window.requestApproval('first', false); window.requestApproval('second', false); });
+  await page.getByText('core.first').waitFor();
+  await page.waitForTimeout(600);
+  // The next prompt lays out like the first: a stray click lands where the first one's control was.
+  const box = page.getByTestId('authorization-allow-always').locator('input');
+  const at = (await (part === 'checkbox' ? box : page.getByText('Always allow this action')).boundingBox())!;
+  await page.getByTestId('authorization-approve').click();
+  await page.getByText('core.second').waitFor();
+  const appeared = Date.now();
+  await page.waitForTimeout(30);
+  await page.mouse.click(at.x + at.width / 2, at.y + at.height / 2);
+  expect(Date.now() - appeared, 'the click landed before the prompt armed').toBeLessThan(300);
+  expect(await box.isChecked(), 'the early click did not tick it').toBe(false);
+  await page.waitForTimeout(450);
+  await page.getByTestId('authorization-approve').click();
+  await expect.poll(() => sent.length).toBe(2);
+  expect(sent).toEqual([{ pendingId: 'first', allowAlways: false }, { pendingId: 'second', allowAlways: false }]);
+});
+
+it('S1 a deliberate click on Always allow after arming ticks it and the approval sends allowAlways true', async () => {
+  const page = await opened();
+  const sent = await approvals(page);
+  await page.evaluate(() => window.requestApproval('only', false));
+  await page.getByText('core.only').waitFor();
+  await page.waitForTimeout(450);
+  await page.getByText('Always allow this action').click();
+  expect(await page.getByTestId('authorization-allow-always').locator('input').isChecked()).toBe(true);
+  await page.getByTestId('authorization-approve').click();
+  await expect.poll(() => sent.length).toBe(1);
+  expect(sent).toEqual([{ pendingId: 'only', allowAlways: true }]);
+});
+
+it('S1 a key pressed in the next typed approval before it arms, and its auto-repeat after, enters nothing; typing after it arms does', async () => {
+  const page = await opened();
+  const sent = await approvals(page);
+  await page.evaluate(() => { window.requestApproval('first', true); window.requestApproval('second', true); });
+  await page.getByText('core.first').first().waitFor();
+  await page.waitForTimeout(600);
+  await page.getByTestId('authorization-deny').click();
+  await page.getByText('core.second').first().waitFor();
+  const field = page.getByTestId('authorization-typed-input');
+  await field.focus();
+  const appeared = Date.now();
+  await page.keyboard.down('c');
+  expect(Date.now() - appeared, 'the key went down before the prompt armed').toBeLessThan(300);
+  // Held past the arming delay: the platform's auto-repeat keydowns.
+  await page.waitForTimeout(450);
+  for (let i = 0; i < 5; ++i) await page.keyboard.down('c');
+  await page.keyboard.up('c');
+  expect(await field.inputValue(), 'nothing typed by a press begun before arming').toBe('');
+  await page.keyboard.type('core.second');
+  expect(await field.inputValue()).toBe('core.second');
+  await page.getByTestId('authorization-approve').click();
+  await expect.poll(() => sent.length).toBe(1);
+  expect(sent).toEqual([{ pendingId: 'second', allowAlways: false }]);
+});
+
+type Close = 'Escape' | 'dialog.close()';
+const closes: Array<[string, Close]> = (['typed', 'capability', 'lightweight'] as const)
+  .flatMap(kind => (['Escape', 'dialog.close()'] as const).map(close => [kind, close] as [string, Close]))
+  .filter(([kind, close]) => !(kind === 'lightweight' && close === 'Escape')); // a non-modal dialog has no Escape close
+
+it.each(closes)('S2 a %s ceremony closed by %s releases modality; the pill opens the panel and Review reopens it in its modality', async (kind, close) => {
+  const page = await opened();
+  const sent = await approvals(page);
+  if (kind === 'capability') await page.evaluate(() => window.requestPlugin('first'));
+  else await page.evaluate(typed => window.requestApproval('arrival', typed), kind === 'typed');
+  const dialog = page.locator('jf-authorization-host dialog');
+  await expect.poll(() => dialog.evaluate(d => (d as HTMLDialogElement).open)).toBe(true);
+  const modal = kind !== 'lightweight';
+  expect(await dialog.evaluate(d => d.matches(':modal'))).toBe(modal);
+  await page.waitForTimeout(450);
+  if (close === 'Escape') {
+    await page.getByTestId(kind === 'capability' ? 'capability-deny' : 'authorization-deny').locator('button').focus();
+    // The first Escape is refused (cancel prevented); the platform closes a modal on a repeated one.
+    for (let i = 0; i < 3 && await dialog.evaluate(d => (d as HTMLDialogElement).open); ++i) await page.keyboard.press('Escape');
+  } else await dialog.evaluate(d => (d as HTMLDialogElement).close());
+  await expect.poll(() => dialog.evaluate(d => (d as HTMLDialogElement).open)).toBe(false);
+  // The platform queues the close event after the dialog closes; the host releases on that event.
+  await expect.poll(() => page.evaluate(() => document.documentElement.style.overflow), { message: 'scroll lock released' }).toBe('');
+  const panel = page.locator('jf-status-pill jf-status-panel');
+  const row = panel.locator(kind === 'capability' ? '[data-fact^="consent:"]' : '[data-fact="authorization:arrival"]');
+  await page.locator('jf-status-pill .trigger').click();
+  await expect.poll(() => panel.evaluate(p => !p.hasAttribute('hidden')), { message: 'the pill opens the panel' }).toBe(true);
+  await row.getByRole('button', { name: /^Review/ }).click();
+  await expect.poll(() => dialog.evaluate(d => (d as HTMLDialogElement).open), { message: 'Review reopens it' }).toBe(true);
+  expect(await dialog.evaluate(d => d.matches(':modal')), 'in its own modality').toBe(modal);
+  expect(await page.evaluate(() => document.documentElement.style.overflow)).toBe(modal ? 'hidden' : '');
+  expect(await dialog.getAttribute('data-testid')).toBe(kind === 'capability' ? 'capability-ceremony' : 'authorization-ceremony');
+  expect(sent, 'nothing was decided').toEqual([]);
+  expect((await state(page)).pending).toEqual(kind === 'capability' ? ['plugin.first'] : []);
+});

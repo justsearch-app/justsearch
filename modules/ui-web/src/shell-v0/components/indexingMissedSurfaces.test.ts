@@ -6,9 +6,10 @@ import '../views/BrowseSurface.js';
 import '../views/BrainSurface.js';
 import '../views/HealthSurface.js';
 import '../views/search-v3/SearchV3View.js';
-import './StatusDeck.js';
+import { StatusPanel } from './StatusPanel.js';
+import { StatusPill } from './StatusPill.js';
+import { deriveFrameStatus } from '../state/frameStatus.js';
 import './LivenessReadout.js';
-import { IndexingOverlay } from './IndexingOverlay.js';
 import { __feedForTest, __resetAiStateForTest, __tickClockForTest, getAiState, type AiState, type StatusSnapshot } from '../state/aiStateStore.js';
 import { selectIndexingProgress } from '../state/indexingProgress.js';
 import { readinessNotice, reasonFor } from '../state/readinessNotice.js';
@@ -97,11 +98,13 @@ describe('WP3.3 independent inventory regressions', () => {
       expect(text).not.toContain('No watched folders');
     }
   });
-  it('S33.4 S33.6 migration mode pills qualify retained rebuilding while preserving fresh migration', () => {
+  it('S33.4 S33.6 migration status qualifies retained rebuilding while preserving fresh migration', () => {
     for (const which of CASES) {
       const state = observe(which, 4, true);
-      expect(surface('jf-status-deck', state).inferenceChipReadout().label, which).toBe(['Engine gone', 'unavailable'].includes(which) ? state.statusLabel
-        : isUnconfirmed(which) ? UNKNOWN : state.statusLabel);
+      const model = deriveFrameStatus({ ai: state, now: Date.now(), contactLostAt: null });
+      const rebuild = model.sections.running.find(r => r.id === 'rebuilding')!;
+      expect(rebuild.stale, which).toBe(isUnconfirmed(which));
+      if (isUnconfirmed(which)) expect(rebuild.percent).toBeNull();
     }
   });
   it('S33.4 S33.6 declared liveness readouts qualify retained migration and its accessible name', () => {
@@ -114,38 +117,26 @@ describe('WP3.3 independent inventory regressions', () => {
       } else expect(readout.textContent).toContain(state.statusLabel);
     }
   });
-  it('S33.1 S33.4 overlay activity animation stops during deferred work and uncertainty, then resumes', () => {
-    const style = document.createElement('style'); style.textContent = IndexingOverlay.styles.cssText; document.body.append(style);
-    const host = document.createElement('jf-indexing-overlay-host');
-    const container = document.createElement('div'); document.body.append(container);
+  it('S33.1 S33.4 Running suppresses progress during deferred work and uncertainty, then resumes', () => {
     for (const which of [...CASES, 'chat'] as const) for (const jobs of [0, 4]) {
       const state = observe(which, jobs);
-      Object.assign(host, { aiState: state });
-      const hosted = dom((host as unknown as Surface).render());
-      const el = hosted.querySelector('jf-indexing-overlay') as IndexingOverlay | null;
-      if (which === 'Engine gone') {
-        expect(el).toBeNull();
-        continue;
-      }
-      expect(el, `${which}: ${jobs} files`).not.toBeNull();
-      render(el!.render(), container);
-      const animation = getComputedStyle(container.querySelector('.icon-box')!).animation;
-      expect(animation.includes('spin'), `${which}: ${jobs} files`).toBe(!isUnconfirmed(which) && (jobs > 0 || which === 'chat'));
+      const panel = new StatusPanel(); panel.model = deriveFrameStatus({ ai: state, now: Date.now(), contactLostAt: null });
+      const progress = dom(panel.render()).querySelector('[data-fact="indexing"] progress');
+      // An indeterminate file-drain bar is allowed only for confirmed file work.
+      expect(progress !== null, `${which}: ${jobs} files`).toBe(!isUnconfirmed(which) && (jobs > 0 || which === 'chat'));
     }
   });
   it('S33.4 S33.6 migration announcements use one region and withdraw stale rebuild claims', async () => {
-    const initial = observe('chat', 4, true);
-    const deck = surface('jf-status-deck', initial);
-    const output = dom(deck.render());
-    document.body.append(output);
-    await Promise.resolve();
-    const before = [...output.querySelectorAll('jf-system-notice')].filter(n => n.textContent?.includes('Rebuilding'));
-    expect(before.length).toBe(1);
-    deck.aiState = observe('indexing stale', 4, true);
-    render(deck.render(), output);
+    const pill = new StatusPill(); pill.status.ai = observe('chat', 4, true); pill.status.refresh();
+    const output = dom(pill.render()); document.body.append(output); await Promise.resolve();
+    expect(output.querySelectorAll('[data-testid="indexing-announcer"]')).toHaveLength(1);
+    const notices = () => [...output.querySelectorAll('jf-system-notice')].filter(n => n.textContent?.includes('Rebuilding'));
+    expect(notices().length).toBe(1);
+    pill.status.ai = observe('indexing stale', 4, true); pill.status.refresh(); render(pill.render(), output);
     await Promise.resolve();
     expect(output.querySelector('[data-testid="indexing-announcer"]')?.textContent).toContain(UNKNOWN);
-    expect([...output.querySelectorAll('jf-system-notice')].some(n => n.textContent?.includes('Rebuilding'))).toBe(false);
+    expect(notices().length).toBe(0);
+    expect(pill.status.model.sections.running.find(r => r.id === 'rebuilding')!.stale).toBe(true);
   });
   it('S33.4 Brain runtime queues use worker counts and confirmation even with fresh inference contact', () => {
     for (const which of CASES) {
