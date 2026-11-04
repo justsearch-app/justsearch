@@ -61,6 +61,11 @@ Installer SHA-256 (also in [`SHA256SUMS`](https://github.com/justsearch-app/just
 Full walkthrough (hash and publisher verification, Windows reputation guidance,
 build-from-source alternative): [`docs/how-to/verify-your-download.md`](docs/how-to/verify-your-download.md).
 
+**Official downloads.** JustSearch is free. The app and its MCP bundle are published only on this
+repository's [Releases page](https://github.com/justsearch-app/justsearch/releases), signed by Elias Justus.
+A copy sold for money, or offered by another store or site, does not come from this project; please
+report it in an [issue](https://github.com/justsearch-app/justsearch/issues).
+
 ## System requirements
 
 | | |
