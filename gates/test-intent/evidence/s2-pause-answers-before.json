@@ -1,0 +1,299 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
+  },
+  "createdAt": "2026-11-04T11:39:39.603Z",
+  "revision": "a07eb770d626ed707748b9ce0d42ddda29816290",
+  "tree": "686af8b62acaa67e3f90fc17702dc7341c071b58",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": "openjdk version \"25.0.4.1\" 2026-08-18 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "./gradlew :modules:ui:test --tests \"io.justsearch.ui.api.AnswerPauseSettingsHttpTest\" --tests \"io.justsearch.ui.api.ChatRefusalWireTest\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
+      "cwd": ".",
+      "exitCode": 1,
+      "durationMs": 7978,
+      "output": "Starting a Gradle Daemon, 1 incompatible and 7 stopped Daemons could not be reused, use --status for details\nReusing configuration cache.\nProblem found: Configuration Cache warn mode is enabled (id: validation:configuration-cache:configuration-cache-warn-mode)\n  Configuration Cache warn mode is ENABLED. Configuration Cache constraint violations are being ignored. Build outputs may be incorrect and the build may crash unexpectedly. Use this only to discover configuration cache incompatibilities. Do not use this to produce artifacts.\n> Task :modules:api-contract-projection-java:protobufDummy UP-TO-DATE\n> Task :modules:api-contract-projection-java:extractIncludeProto UP-TO-DATE\n> Task :modules:core-contracts:compileJava UP-TO-DATE\n> Task :modules:core:compileJava UP-TO-DATE\n> Task :modules:infra-core:compileJava UP-TO-DATE\n> Task :modules:extension-substrate:compileJava UP-TO-DATE\n> Task :modules:api-contract-projection-java:extractProto UP-TO-DATE\n> Task :modules:app-agent-api:processResources NO-SOURCE\n> Task :modules:app-api:buildLinuxBoundExec UP-TO-DATE\n> Task :modules:indexing:compileJava UP-TO-DATE\n> Task :modules:app-api:processResources UP-TO-DATE\n> Task :modules:core:processResources NO-SOURCE\n> Task :modules:configuration:processResources UP-TO-DATE\n> Task :modules:core-contracts:processResources NO-SOURCE\n> Task :modules:extension-substrate:processResources NO-SOURCE\n> Task :modules:ipc-common:protobufDummy UP-TO-DATE\n> Task :modules:ipc-common:extractProto UP-TO-DATE\n> Task :modules:api-contract-projection-java:extractProtovalidateProtos UP-TO-DATE\n> Task :modules:telemetry:compileJava UP-TO-DATE\n> Task :modules:configuration:compileJava UP-TO-DATE\n> Task :modules:prompt-support:compileJava UP-TO-DATE\n> Task :modules:app-config:compileJava UP-TO-DATE\n> Task :modules:ui:syncSsotSchemas UP-TO-DATE\n> Task :modules:app-util:compileJava UP-TO-DATE\n> Task :modules:api-contract-projection-java:processProtoResources UP-TO-DATE\n> Task :modules:app-agent-api:compileJava UP-TO-DATE\n> Task :modules:ort-common:compileJava UP-TO-DATE\n> Task :modules:ui:processResources UP-TO-DATE\n> Task :modules:adapters-lucene:syncSsotCatalogs UP-TO-DATE\n> Task :modules:api-contract-projection-java:processResources UP-TO-DATE\n> Task :modules:adapters-lucene:compileJava UP-TO-DATE\n> Task :modules:ai-backend:processResources UP-TO-DATE\n> Task :modules:app-agent-api:classes UP-TO-DATE\n> Task :modules:api-contract-projection-java:generateProto UP-TO-DATE\n> Task :modules:adapters-lucene:processResources UP-TO-DATE\n> Task :modules:adapters-lucene:classes UP-TO-DATE\n> Task :modules:app-agent:processResources NO-SOURCE\n> Task :modules:app-config:processResources NO-SOURCE\n> Task :modules:adapters-lucene:jar UP-TO-DATE\n> Task :modules:app-agent-api:jar UP-TO-DATE\n> Task :modules:reranker:compileJava UP-TO-DATE\n> Task :modules:app-config:classes UP-TO-DATE\n> Task :modules:app-inference:processResources NO-SOURCE\n> Task :modules:app-config:jar UP-TO-DATE\n> Task :modules:app-engine:processResources UP-TO-DATE\n> Task :modules:app-util:processResources NO-SOURCE\n> Task :modules:app-observability:processResources UP-TO-DATE\n> Task :modules:configuration:classes UP-TO-DATE\n> Task :modules:app-util:classes UP-TO-DATE\n> Task :modules:configuration:compileTestFixturesJava UP-TO-DATE\n> Task :modules:app-util:jar UP-TO-DATE\n> Task :modules:configuration:processTestFixturesResources NO-SOURCE\n> Task :modules:core:classes UP-TO-DATE\n> Task :modules:configuration:jar UP-TO-DATE\n> Task :modules:configuration:testFixturesClasses UP-TO-DATE\n> Task :modules:configuration:testFixturesJar UP-TO-DATE\n> Task :modules:core:jar UP-TO-DATE\n> Task :modules:core-contracts:classes UP-TO-DATE\n> Task :modules:core:processTestFixturesResources NO-SOURCE\n> Task :modules:extension-substrate:classes UP-TO-DATE\n> Task :modules:core:compileTestFixturesJava UP-TO-DATE\n> Task :modules:core:testFixturesClasses UP-TO-DATE\n> Task :modules:core-contracts:jar UP-TO-DATE\n> Task :modules:extension-substrate:jar UP-TO-DATE\n> Task :modules:gpu-bridge:processResources NO-SOURCE\n> Task :modules:core:testFixturesJar UP-TO-DATE\n> Task :modules:indexer-worker:processResources NO-SOURCE\n> Task :modules:indexing:processResources NO-SOURCE\n> Task :modules:infra-core:processResources NO-SOURCE\n> Task :modules:indexing:classes UP-TO-DATE\n> Task :modules:infra-core:classes UP-TO-DATE\n> Task :modules:ipc-common:processProtoResources UP-TO-DATE\n> Task :modules:infra-core:jar UP-TO-DATE\n> Task :modules:indexing:jar UP-TO-DATE\n> Task :modules:ort-common:processResources NO-SOURCE\n> Task :modules:ipc-common:processResources UP-TO-DATE\n> Task :modules:ort-common:classes UP-TO-DATE\n> Task :modules:prompt-support:processResources NO-SOURCE\n> Task :modules:prompt-support:classes UP-TO-DATE\n> Task :modules:reranker:processResources NO-SOURCE\n> Task :modules:api-contract-projection-java:compileJava UP-TO-DATE\n> Task :modules:api-contract-projection-java:classes UP-TO-DATE\n> Task :modules:ort-common:jar UP-TO-DATE\n> Task :modules:reranker:classes UP-TO-DATE\n> Task :modules:app-services:processResources UP-TO-DATE\n> Task :modules:prompt-support:jar UP-TO-DATE\n> Task :modules:api-contract-projection-java:jar UP-TO-DATE\n> Task :modules:telemetry:processResources NO-SOURCE\n> Task :modules:worker-core:processResources NO-SOURCE\n> Task :modules:reranker:jar UP-TO-DATE\n> Task :modules:telemetry:classes UP-TO-DATE\n> Task :modules:ui:processTestResources UP-TO-DATE\n> Task :modules:worker-services:processResources NO-SOURCE\n> Task :modules:telemetry:jar UP-TO-DATE\n> Task :modules:ipc-common:extractIncludeProto UP-TO-DATE\n> Task :modules:app-api:compileJava UP-TO-DATE\n> Task :modules:app-api:classes UP-TO-DATE\n> Task :modules:app-api:jar UP-TO-DATE\n> Task :modules:ipc-common:generateProto UP-TO-DATE\n> Task :modules:ai-backend:compileJava UP-TO-DATE\n> Task :modules:ai-backend:classes UP-TO-DATE\n> Task :modules:ai-backend:jar UP-TO-DATE\n> Task :modules:gpu-bridge:compileJava UP-TO-DATE\n> Task :modules:gpu-bridge:classes UP-TO-DATE\n> Task :modules:app-agent:compileJava UP-TO-DATE\n> Task :modules:app-agent:classes UP-TO-DATE\n> Task :modules:gpu-bridge:jar UP-TO-DATE\n> Task :modules:app-agent:jar UP-TO-DATE\n> Task :modules:app-inference:compileJava UP-TO-DATE\n> Task :modules:app-inference:classes UP-TO-DATE\n> Task :modules:worker-core:compileJava UP-TO-DATE\n> Task :modules:worker-core:classes UP-TO-DATE\n> Task :modules:worker-core:jar UP-TO-DATE\n> Task :modules:app-inference:jar UP-TO-DATE\n> Task :modules:ipc-common:compileJava UP-TO-DATE\n> Task :modules:ipc-common:classes UP-TO-DATE\n> Task :modules:ipc-common:jar UP-TO-DATE\n> Task :modules:app-observability:compileJava UP-TO-DATE\n> Task :modules:app-observability:classes UP-TO-DATE\n> Task :modules:app-observability:jar UP-TO-DATE\n> Task :modules:worker-services:compileJava UP-TO-DATE\n> Task :modules:worker-services:classes UP-TO-DATE\n> Task :modules:worker-services:jar UP-TO-DATE\n> Task :modules:indexer-worker:compileJava UP-TO-DATE\n> Task :modules:indexer-worker:classes UP-TO-DATE\n> Task :modules:indexer-worker:jar UP-TO-DATE\n> Task :modules:app-services:compileJava UP-TO-DATE\n> Task :modules:app-services:classes UP-TO-DATE\n> Task :modules:app-services:jar UP-TO-DATE\n> Task :modules:app-engine:compileJava UP-TO-DATE\n> Task :modules:app-engine:classes UP-TO-DATE\n> Task :modules:app-engine:jar UP-TO-DATE\n> Task :modules:ui:compileJava UP-TO-DATE\n> Task :modules:ui:classes UP-TO-DATE\n> Task :modules:ui:jar UP-TO-DATE\n> Task :modules:ui:compileTestJava UP-TO-DATE\n> Task :modules:ui:testClasses UP-TO-DATE\n\n> Task :modules:ui:test\n\nAnswerPauseSettingsHttpTest > witnessedPolicyPatchPersistsAndAStaleWindowCannotOverwriteIt(Path) FAILED\n    org.opentest4j.AssertionFailedError at AnswerPauseSettingsHttpTest.java:53\n\n> Task :modules:ui:test FAILED\n> Task :modules:ui:jacocoTestReport SKIPPED\n\n[Incubating] Problems report is available at: file:///home/elias/.cache/am/00fn8lmv/tmp/before/build/reports/problems/problems-report.html\n85 actionable tasks: 1 executed, 84 up-to-date\nConfiguration cache entry reused.\n\nOpenJDK 64-Bit Server VM warning: Sharing is only supported for boot loader classes because bootstrap classpath has been appended\n\n3 tests completed, 1 failed\n\nFAILURE: Build failed with an exception.\n\n* What went wrong:\nExecution failed for task ':modules:ui:test'.\n> There were failing tests. See the report at: file:///home/elias/.cache/am/00fn8lmv/tmp/before/modules/ui/build/reports/tests/test/index.html\n\nBUILD FAILED in 7s\n"
+    },
+    {
+      "command": "./gradlew :modules:app-services:test --tests \"io.justsearch.app.services.settings.LiteralExclusionSettingsTest\" --tests \"io.justsearch.app.services.settings.RerankerPreferenceTest\" --tests \"io.justsearch.app.services.settings.UiSettingsStoreContextLengthMigrationTest\" --tests \"io.justsearch.app.services.settings.UiSettingsStoreRevisionTest\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 8108
+    },
+    {
+      "command": "./gradlew :modules:app-api:test --tests \"io.justsearch.app.api.chat.ChatVocabularyTest\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 1898
+    },
+    {
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/BrainSurface.answer-pause.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/00fn8lmv/tmp/test-intent-vitest-113-1793792378481.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 1,
+      "durationMs": 1121,
+      "output": "JSON report written to /home/elias/.cache/am/00fn8lmv/tmp/test-intent-vitest-113-1793792378481.json\n\n"
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/AnswerPauseSettingsHttpTest.java",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/AnswerPauseSettingsHttpTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:84d4b111fda384674c2e11e13915dcde2dc34bf65efff1e1feda3d2b58a48721",
+      "executed": true,
+      "skipped": false,
+      "outcome": "failed",
+      "cases": [
+        {
+          "name": "witnessedPolicyPatchPersistsAndAStaleWindowCannotOverwriteIt(Path)",
+          "status": "failed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/BrainSurface.answer-pause.test.ts",
+      "file": "modules/ui-web/src/shell-v0/views/BrainSurface.answer-pause.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:5c2dd34e132b92453989a4ce225754a684b9af4f66e4c770ba01c4de9a8746df",
+      "executed": true,
+      "skipped": false,
+      "outcome": "failed",
+      "cases": [
+        {
+          "name": "defaults off, saves only the pause policy, and waits for the witnessed save",
+          "status": "failed"
+        },
+        {
+          "name": "uses the Engine pause observation for wording and converges a second window",
+          "status": "failed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/settings/LiteralExclusionSettingsTest.java",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/settings/LiteralExclusionSettingsTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:8ee71751d9ec7fd9ccf3b3c51bf658f6ae5bf73736cd0d3a9ce9375315a43ab1",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "RF55V6ExactEntriesSurviveSaveReloadWithUnrelatedFieldsAndLegacyFallbacks()",
+          "status": "passed"
+        },
+        {
+          "name": "RF55PublicSaveCanRetainOrRemoveExactTokensButCannotCreateOrModifyThem()",
+          "status": "passed"
+        },
+        {
+          "name": "RF55EveryLegacyVersionKeepsItsStringMeaningAndCannotCarryTypedState()",
+          "status": "passed"
+        },
+        {
+          "name": "RF55ResetClearsLegacyAndPrecisePolicyTogether()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/settings/RerankerPreferenceTest.java",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/settings/RerankerPreferenceTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:9dd82b5c2012a6f12a03ba3f6de9a4e5d128d328f2f4b66b079fe5faa36025a5",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "currentEnvelopeReopensOffAndExactSelectionAfterRestart(Path)",
+          "status": "passed"
+        },
+        {
+          "name": "patchRetainsFilesAndIdentityUntilTheUserChangesThePath(Path)",
+          "status": "passed"
+        },
+        {
+          "name": "schemaSixMigrationKeepsDisabledWitnessAndAcquisitionPreferences(Path)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/settings/UiSettingsStoreContextLengthMigrationTest.java",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/settings/UiSettingsStoreContextLengthMigrationTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:206f9c9d84469123942da504311dd00d0aa2ba5ddfb2544508d98a1220258e26",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "migration is idempotent across repeated loads before the next accepted replacement",
+          "status": "passed"
+        },
+        {
+          "name": "a schema-1 file is migratable, not fatal and not quarantined",
+          "status": "passed"
+        },
+        {
+          "name": "an unversioned legacy file migrates the same way",
+          "status": "passed"
+        },
+        {
+          "name": "schema-1 contextLength 4096 (the old default) migrates to 0 = auto",
+          "status": "passed"
+        },
+        {
+          "name": "a FUTURE version is still fatal — migrating forward is not the same as downgrading",
+          "status": "passed"
+        },
+        {
+          "name": "a prepared replacement after migration rewrites the file at the current version",
+          "status": "passed"
+        },
+        {
+          "name": "at schema 2 a deliberate 4096 is left alone — the migration is not re-applied",
+          "status": "passed"
+        },
+        {
+          "name": "a schema-1 value that is not the old default is preserved as a real override",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/settings/UiSettingsStoreRevisionTest.java",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/settings/UiSettingsStoreRevisionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:82f54bf7595b296c74f8d4f145d6946c5ed505a12f80798395e7a56f1dc45659",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "preparesPrivateCandidateBeforeReplacingFile()",
+          "status": "passed"
+        },
+        {
+          "name": "earlierV5QuerySelectionWithoutRuntimeDescriptorRemainsReadable()",
+          "status": "passed"
+        },
+        {
+          "name": "exactProjectionPreservesAcceptedCandidateRatherThanStampingTransientWindowTime()",
+          "status": "passed"
+        },
+        {
+          "name": "incompleteEnvelopesCannotMasqueradeAsLegacyDefaults()",
+          "status": "passed"
+        },
+        {
+          "name": "nonDirectoryParentCannotProveEmptyStore()",
+          "status": "passed"
+        },
+        {
+          "name": "legacyTwoStartsAtZeroAndOldReaderRefusesThree()",
+          "status": "passed"
+        },
+        {
+          "name": "queryRoleSelectionRejectsMixedModelAndTokenizerDirectories()",
+          "status": "passed"
+        },
+        {
+          "name": "invalidWitnessCannotBecomeSuccessfulDefaultDuringInspection()",
+          "status": "passed"
+        },
+        {
+          "name": "foreignPreparationAndReadOnlyModeCannotWrite()",
+          "status": "passed"
+        },
+        {
+          "name": "oversizedVersionCannotWrapIntoReadableLegacySchema()",
+          "status": "passed"
+        },
+        {
+          "name": "queryRoleSelectionDistinguishesLegacyFromDisabledAndSurvivesReboot()",
+          "status": "passed"
+        },
+        {
+          "name": "recoveryNotificationIsOutsideReplacement()",
+          "status": "passed"
+        },
+        {
+          "name": "explicitNullQuerySelectionIsNotLegacyFallback()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/ChatRefusalWireTest.java",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/ChatRefusalWireTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:8e6ca7290f9923d075b6aa3b67be84877b5e7c7a25b755a0c8a1344be9ec34f0",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "externalServerRefusalKeepsItsNamedWireReason()",
+          "status": "passed"
+        },
+        {
+          "name": "everyRefusalReasonMapsToItsWireCodeAndTheBodyConformsToTheSchema()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-api/src/test/java/io/justsearch/app/api/chat/ChatVocabularyTest.java",
+      "file": "modules/app-api/src/test/java/io/justsearch/app/api/chat/ChatVocabularyTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:d228a9c561fafa0ff8f2cd1725b645955435d01fd0f605f07d358ec34f0285de",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "wire casing is the constant name",
+          "status": "passed"
+        },
+        {
+          "name": "ChatStatus: generating is exactly inFlight > 0",
+          "status": "passed"
+        },
+        {
+          "name": "ChatStatus: each reason slot is legal only in its own state",
+          "status": "passed"
+        },
+        {
+          "name": "ChatRefusal and Demand reject negative durations",
+          "status": "passed"
+        },
+        {
+          "name": "ChatStatus: UNLOADED needs a reason, and a pressure unload names gpu_busy or game_mode",
+          "status": "passed"
+        },
+        {
+          "name": "exactMembers() — every enum keeps its members and the additive external-server refusal",
+          "status": "passed"
+        },
+        {
+          "name": "Activation names its reason exactly when not effective",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:1dba32a29dd65bc20dd8c490cab20712f2e1a960a6b69d51d6e779df8619ea96"
+}

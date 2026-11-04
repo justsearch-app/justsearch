@@ -125,6 +125,26 @@ final class ChatResidencyTest {
   // ==================== U19 and T21 ====================
 
   @Test
+  void indexingPauseRefusesAnswersWithoutUnloadingAndPolicyOffReopensImmediately() throws Exception {
+    var c = running();
+    var paused = new AtomicBoolean(true);
+    c.setAnswersPaused(paused::get);
+    for (var kind : List.of(DemandKind.HUMAN_CHAT, DemandKind.AGENT_CHAT, DemandKind.BACKGROUND)) {
+      var failure = refused(c, demand(kind, EngineContext.ClientKind.WEBVIEW));
+      assertEquals(RefusalReason.INDEXING, failure.reason());
+      assertFalse(failure.forceAllowed());
+    }
+    assertTrue(actuator.running.get());
+    assertEquals(List.of(), unloads());
+    assertEquals(List.of(), actuator.policies.stream()
+        .filter(p -> p.reason() == StopReason.RESIDENCY_PRESSURE).toList());
+    paused.set(false);
+    c.demand(demand(DemandKind.HUMAN_CHAT, EngineContext.ClientKind.WEBVIEW))
+        .toCompletableFuture().get(5, TimeUnit.SECONDS);
+    assertTrue(actuator.running.get());
+  }
+
+  @Test
   void u19NoPressureNeverUnloadsAnIdleServer() throws Exception {
     var c = running();
     c.reportPressure(PressureSignal.NONE);

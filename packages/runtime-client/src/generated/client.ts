@@ -13,6 +13,7 @@ export type ApiErrorResponseReason = typeof ApiErrorResponseReason[keyof typeof 
 
 
 export const ApiErrorResponseReason = {
+  INDEXING: 'INDEXING',
   GPU_BUSY: 'GPU_BUSY',
   GAME_MODE: 'GAME_MODE',
   RELOAD_BACKOFF: 'RELOAD_BACKOFF',
@@ -306,7 +307,7 @@ export type RuntimeReadyUnavailableResponse = {
   forceAllowed?: boolean;
   i18nKey?: string;
   /** A chat refusal's reason (Spec A step 9): why this one request was not admitted. Present only on chat refusals. */
-  reason?: 'GPU_BUSY' | 'GAME_MODE' | 'RELOAD_BACKOFF' | 'LOADING' | 'BUSY' | 'OFF' | 'FAILED' | 'REFUSED' | 'ENGINE_STOPPING' | 'DEVICE_RECOVERING' | 'SELF_TEST' | 'EXTERNAL_SERVER';
+  reason?: 'INDEXING' | 'GPU_BUSY' | 'GAME_MODE' | 'RELOAD_BACKOFF' | 'LOADING' | 'BUSY' | 'OFF' | 'FAILED' | 'REFUSED' | 'ENGINE_STOPPING' | 'DEVICE_RECOVERING' | 'SELF_TEST' | 'EXTERNAL_SERVER';
   requestId?: string;
   /**
      * When present, the earliest useful retry in milliseconds (a TRANSIENT refusal such as CHAT_UNAVAILABLE). Absent when the Engine does not know.

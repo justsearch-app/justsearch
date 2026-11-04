@@ -37,7 +37,7 @@ public final class SettingsV2Projection {
     return new SettingsV2(ui, llm, indexPaths, persistenceMode.name().toLowerCase(Locale.ROOT),
         witness, null, null, settings.configuredApiPort(), null,
         blankToNull(settings.getRerankerModelPath()),
-        blankToNull(settings.getCitationScorerModelPath()), null, settings.getRerankerEnabled());
+        blankToNull(settings.getCitationScorerModelPath()), null, settings.getRerankerEnabled(), null, settings.getPauseAnswersWhileIndexing());
   }
 
   private static String blankToNull(String value) {

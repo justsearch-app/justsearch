@@ -595,6 +595,12 @@ final class AgentStepRunner {
           session.markTerminated(TerminalDisposition.CANCELLED, null, session.cancellationTrigger());
           checkpointer.checkpoint(sessionId, session, "CANCELLED", cancelled.reasonCode());
           return IterationOutcome.terminated(false);
+        } catch (io.justsearch.app.api.chat.AnswersPausedException paused) {
+          errorEmitter.emitError(sink, paused.getMessage(), AgentErrorCode.UNAVAILABLE,
+              AgentErrorClass.TRANSIENT, RetryAction.ABORT, null);
+          session.markTerminated(TerminalDisposition.ERRORED, AgentErrorCode.UNAVAILABLE, null);
+          checkpointer.checkpoint(sessionId, session, "ERROR", paused.getMessage());
+          return IterationOutcome.terminated(false);
         } catch (Exception e) {
           errorEmitter.emitError(
               sink,
@@ -640,6 +646,9 @@ final class AgentStepRunner {
                 result = escalated;
               }
             } catch (RuntimeException e) {
+              if (io.justsearch.app.api.chat.AnswersPausedException.causedByPause(e)) {
+                throw new io.justsearch.app.api.chat.AnswersPausedException();
+              }
               LOG.warn("Handoff escalation failed, falling through to text response", e);
             }
           }

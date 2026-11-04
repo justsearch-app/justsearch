@@ -129,6 +129,12 @@ public final class ApiErrorHandler {
     /** Writes any refusal that happened before the request ran: admission, serving, executor. */
     public static boolean writeExecutorRefusal(io.javalin.http.Context ctx, Exception failure,
             Telemetry telemetry) {
+        if (io.justsearch.app.api.chat.AnswersPausedException.causedByPause(failure)) {
+            ctx.status(503).json(ChatResidencyGate.refusalBody(
+                new io.justsearch.app.api.chat.ChatRefusal(io.justsearch.app.api.chat.RefusalReason.INDEXING,
+                    java.util.Optional.empty(), false), null, null));
+            return true;
+        }
         var admission = admissionRefusal(failure);
         if (admission != null) {
             recordError(telemetry, resolve(admission), routeOf(ctx));
@@ -307,6 +313,9 @@ public final class ApiErrorHandler {
      * typed exceptions first, then standard Java exceptions, then message hints.
      */
     public static ApiErrorCode resolve(Exception e) {
+        if (io.justsearch.app.api.chat.AnswersPausedException.causedByPause(e)) {
+            return ApiErrorCode.CHAT_UNAVAILABLE;
+        }
         if (e == null) {
             return ApiErrorCode.INTERNAL_ERROR;
         }

@@ -53,6 +53,46 @@ import org.junit.jupiter.api.io.TempDir;
 class AgentLoopServiceTest {
   @TempDir Path tempDir;
 
+  @org.junit.jupiter.params.ParameterizedTest(name = "{displayName} [{index}] {arguments}")
+  @org.junit.jupiter.params.provider.CsvSource({
+      "ceiling,false", "ceiling,true", "escalation,false", "escalation,true", "ordinary,true"
+  })
+  void indexingPauseInEveryAgentGenerationPhaseStopsWithUnavailable(String phase, boolean synchronous) {
+    var calls = new java.util.concurrent.atomic.AtomicInteger();
+    int refusedCall = phase.equals("ordinary") ? 1 : phase.equals("ceiling") ? 2 : 3;
+    var scripted = new ScriptedAiService(
+        ScriptedResponse.toolCall("search-call", "core_search_index", "{\"query\":\"architecture\"}"),
+        ScriptedResponse.textOnly("Here are the top candidates"));
+    var ai = (OnlineAiService) java.lang.reflect.Proxy.newProxyInstance(
+        OnlineAiService.class.getClassLoader(), new Class<?>[] {OnlineAiService.class},
+        (proxy, method, args) -> {
+          if (method.getName().equals("stream") && calls.incrementAndGet() == refusedCall) {
+            var failure = new java.util.concurrent.CompletionException(
+                new io.justsearch.app.api.chat.AnswersPausedException());
+            if (synchronous) throw failure;
+            ((OnlineAiService.StreamSink) args[1]).onError().accept(failure);
+            return null;
+          }
+          return method.invoke(scripted, args);
+        });
+    var service = buildService(ai, new StubTool("search_index", RiskTier.LOW, "found"),
+        new StubTool("ingest_files", RiskTier.LOW, "ok"));
+    var profiles = phase.equals("escalation") ? List.of(
+        new AgentProfile("primary", "Primary", null, List.of("core_search_index")),
+        new AgentProfile("organizer", "Organizer", null, List.of("core_ingest_files"))) : List.<AgentProfile>of();
+    var request = new AgentRequest(userMessage("Find and ingest the architecture overview"), List.of(),
+        phase.equals("ceiling") ? 1 : 10, profiles, profiles.isEmpty() ? null : "primary");
+    var events = runWithRequest(service, request);
+    var error = lastEventOfType(events, AgentEvent.AgentError.class);
+    assertNotNull(error, "every refused generation must report the pause");
+    assertEquals("UNAVAILABLE", error.errorCode());
+    assertEquals("Answers paused while indexing", error.error());
+    assertEquals("TRANSIENT", error.errorClass());
+    assertEquals("ABORT", error.retryAction());
+    assertNull(lastEventOfType(events, AgentEvent.AgentDone.class));
+    assertEquals(refusedCall, calls.get(), "a paused generation must not retry or fall through");
+  }
+
   // ---------------------------------------------------------------------------
   // Text-only response
   // ---------------------------------------------------------------------------

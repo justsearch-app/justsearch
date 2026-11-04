@@ -73,6 +73,7 @@
         "reason": {
           "type": "string",
           "enum": [
+            "INDEXING",
             "GPU_BUSY",
             "GAME_MODE",
             "RELOAD_BACKOFF",

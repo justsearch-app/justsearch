@@ -227,6 +227,9 @@ public final class WorkflowShapeRunner implements ShapeRunner {
               lastOutput = outcome.output();
             }
           }
+        } catch (io.justsearch.app.api.chat.AnswersPausedException paused) {
+          psink.accept(ConversationEngine.refusalEvent(paused));
+          return;
         } catch (WorkflowAbortedException aborted) {
           emitError(psink, aborted.getMessage(), "WORKFLOW_FAILED");
           return;
@@ -302,6 +305,7 @@ public final class WorkflowShapeRunner implements ShapeRunner {
 
     StringBuilder captured = new StringBuilder();
     String[] errorMessage = {null};
+    boolean[] answersPaused = {false};
     Consumer<SseEvent> filtered =
         ev -> {
           switch (ev.name()) {
@@ -314,6 +318,8 @@ public final class WorkflowShapeRunner implements ShapeRunner {
             }
             case "reasoning_chunk" -> sink.accept(ev);
             case "error" -> {
+              answersPaused[0] = "CHAT_UNAVAILABLE".equals(ev.payload().get("errorCode"))
+                  && "INDEXING".equals(ev.payload().get("reason"));
               Object err = ev.payload().get("error");
               errorMessage[0] = err == null ? "LLM step failed" : err.toString();
             }
@@ -325,6 +331,7 @@ public final class WorkflowShapeRunner implements ShapeRunner {
         };
 
     engineSupplier.get().run(step.shape(), subBody, audience, filtered, engineContext, background);
+    if (answersPaused[0]) throw new io.justsearch.app.api.chat.AnswersPausedException();
     if (errorMessage[0] != null) {
       throw new WorkflowAbortedException(
           "LLM step '" + step.nodeId() + "' failed: " + errorMessage[0]);

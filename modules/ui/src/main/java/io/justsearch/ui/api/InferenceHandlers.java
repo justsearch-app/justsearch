@@ -139,6 +139,10 @@ final class InferenceHandlers {
         .embeddingQueueSize(countPendingEmbeddings(engineContext))
         .vduQueueSize(countPendingVdu(engineContext));
 
+    if (onlineAi instanceof io.justsearch.app.api.OnlineAiRuntimeIntrospection status) {
+      builder.answersPausedWhileIndexing(status.answersPausedWhileIndexing());
+    }
+
     // External server adoption diagnostics, CUDA warnings, and startup timer (best-effort; additive fields).
     if (onlineAi instanceof io.justsearch.app.api.OnlineAiRuntimeIntrospection introspection) {
       try {

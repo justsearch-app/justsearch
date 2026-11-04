@@ -90,6 +90,9 @@ public final class KnowledgeServerBootstrap implements Closeable {
      */
     private final WorkerHost workerHost;
 
+    /** Engine owner observation, independent of the window status cache. */
+    public boolean heavyIndexing() { return workerHost.heavyIndexing(); }
+
     /** The Engine's Retry-After for a capture refused while no verified client can serve. */
     private final int retryAfterSeconds;
 

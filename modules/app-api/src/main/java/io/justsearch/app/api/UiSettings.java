@@ -298,6 +298,11 @@ public final class UiSettings {
   private String rerankerModelPath = "";
   // Null preserves legacy query-role authority; false keeps the installed files unused.
   private Boolean rerankerEnabled;
+  // Absent preserves existing installs: answers are never automatically paused.
+  private Boolean pauseAnswersWhileIndexing;
+
+  public Boolean getPauseAnswersWhileIndexing() { return pauseAnswersWhileIndexing; }
+  public void setPauseAnswersWhileIndexing(Boolean enabled) { pauseAnswersWhileIndexing = enabled; }
   private long rerankerPreferenceRevision;
   private io.justsearch.app.api.settings.QueryRoleSelection.Role rerankerRestoreSelection;
 

@@ -4,12 +4,12 @@ import { settingsV2Schema, type SettingsV2 } from './generated/schema-types/sett
 
 export type SettingsWitness = NonNullable<SettingsV2['witness']>;
 export type SettingsPatch = Pick<SettingsV2, 'ui' | 'llm' | 'indexPaths' | 'apiPort'
-  | 'rerankerModelPath' | 'citationScorerModelPath' | 'rerankerEnabled' | 'rerankerSwitchIntent'>;
+  | 'rerankerModelPath' | 'citationScorerModelPath' | 'rerankerEnabled' | 'rerankerSwitchIntent' | 'pauseAnswersWhileIndexing'>;
 export type SettingsTransport = (path: string, init?: RequestInit) => Promise<Response>;
 const ENDPOINT = '/api/settings/v2';
 const UUID_V7 = /^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
 const patchSchema = settingsV2Schema.pick({ ui: true, llm: true, indexPaths: true,
-  apiPort: true, rerankerModelPath: true, citationScorerModelPath: true, rerankerEnabled: true, rerankerSwitchIntent: true });
+  apiPort: true, rerankerModelPath: true, citationScorerModelPath: true, rerankerEnabled: true, rerankerSwitchIntent: true, pauseAnswersWhileIndexing: true });
 
 export interface SettingsAttempt {
   readonly operationKey: string;

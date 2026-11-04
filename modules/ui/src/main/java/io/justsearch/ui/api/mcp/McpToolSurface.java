@@ -2348,6 +2348,10 @@ public final class McpToolSurface {
     }
     // Spec A step 9: a chat refusal keeps its typed reason, retry time and forceAllowed.
     if (e instanceof io.justsearch.app.api.chat.ChatRefusal refusal) return errorContent(refusal);
+    if (io.justsearch.app.api.chat.AnswersPausedException.causedByPause(e)) {
+      return errorContent(new io.justsearch.app.api.chat.ChatRefusal(
+          io.justsearch.app.api.chat.RefusalReason.INDEXING, Optional.empty(), false));
+    }
     String detail = e.getMessage() != null ? e.getMessage() : "no additional detail";
     String message = tool
         + " failed: "

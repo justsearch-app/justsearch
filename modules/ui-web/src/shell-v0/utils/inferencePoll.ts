@@ -18,6 +18,7 @@ export interface InferenceSnapshot {
   mode?: 'online' | 'indexing' | 'transitioning' | 'offline';
   available?: boolean;
   starting?: boolean;
+  answersPausedWhileIndexing?: boolean | null;
   embeddingQueueSize?: number;
   vduQueueSize?: number;
   llmContextTokens?: number | null;

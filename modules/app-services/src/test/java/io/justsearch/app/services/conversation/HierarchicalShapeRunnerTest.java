@@ -176,6 +176,53 @@ final class HierarchicalShapeRunnerTest {
     assertEquals(false, done.payload().get("hierarchical"));
   }
 
+  @org.junit.jupiter.params.ParameterizedTest(name = "{displayName} [{index}] {arguments}")
+  @org.junit.jupiter.params.provider.CsvSource({
+      "section,false", "section,true", "synthesis,false", "synthesis,true", "single,false", "single,true"
+  })
+  void generationPauseAfterAdmissionRemainsTypedAndStopsThePipeline(String phase, boolean synchronous) {
+    var calls = new AtomicInteger();
+    var sectionCalls = new AtomicInteger();
+    OnlineAiService ai = new StubAi(List.of()) {
+      @Override
+      public void stream(StreamRequest request, StreamSink sink) {
+        calls.incrementAndGet();
+        boolean section = request.maxTokens() == 512;
+        if (section) sectionCalls.incrementAndGet();
+        if ((phase.equals("section") && section) || (!phase.equals("section") && !section)) {
+          var paused = new java.util.concurrent.CompletionException(
+              new io.justsearch.app.api.chat.AnswersPausedException());
+          if (synchronous) throw paused;
+          sink.onError().accept(paused);
+          return;
+        }
+        sink.onContent().accept("section summary");
+        sink.onComplete().accept("stop");
+      }
+    };
+    var docs = new StubDocs(Map.of("doc", new DocumentRecord("doc",
+        phase.equals("single") ? "tiny content" : "x".repeat(90_000), Map.of())));
+    var runner = new HierarchicalShapeRunner(() -> ai, () -> docs);
+    var events = new ArrayList<SseEvent>();
+    runner.run(Map.of("docId", "doc"), Audience.USER, events::add,
+        io.justsearch.app.services.TestEngineContexts.internal());
+    var errors = events.stream().filter(e -> e.name().equals("error")).toList();
+    assertEquals(1, errors.size());
+    assertEquals("CHAT_UNAVAILABLE", errors.getFirst().payload().get("errorCode"));
+    assertEquals("INDEXING", errors.getFirst().payload().get("reason"));
+    assertEquals(false, errors.getFirst().payload().get("forceAllowed"));
+    assertEquals("Answers paused while indexing", errors.getFirst().payload().get("error"));
+    assertFalse(events.stream().anyMatch(e -> e.name().equals("done") || e.name().equals("chunk")));
+    if (phase.equals("section")) {
+      assertEquals(1, calls.get(), "a paused section must abort before placeholders or synthesis");
+    } else if (phase.equals("synthesis")) {
+      assertTrue(sectionCalls.get() > 0, "final-generation refusal follows successful sections");
+      assertEquals(sectionCalls.get() + 1, calls.get());
+    } else {
+      assertEquals(1, calls.get());
+    }
+  }
+
   // ---- fixtures ----
 
   private static final class StubDocs implements DocumentService {
@@ -192,7 +239,7 @@ final class HierarchicalShapeRunnerTest {
   }
 
   /** Stub OnlineAiService — answers each streamChat call with the next scripted response. */
-  private static final class StubAi implements OnlineAiService {
+  private static class StubAi implements OnlineAiService {
     private final List<String> responses;
     private final AtomicInteger idx = new AtomicInteger(0);
 

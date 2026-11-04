@@ -13,7 +13,7 @@ package io.justsearch.app.api.chat;
  * <p>It extends {@link IllegalStateException} so existing callers that already catch an unusable
  * generative component keep working.
  */
-public final class GenerationUnavailableException extends IllegalStateException {
+public class GenerationUnavailableException extends IllegalStateException {
   private static final long serialVersionUID = 1L;
 
   public GenerationUnavailableException(String message) {

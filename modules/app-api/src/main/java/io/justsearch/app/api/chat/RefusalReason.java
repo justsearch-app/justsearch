@@ -6,6 +6,7 @@ package io.justsearch.app.api.chat;
  * {@code CHAT_UNAVAILABLE} error) and is never a state.
  */
 public enum RefusalReason {
+  INDEXING,
   GPU_BUSY,
   GAME_MODE,
   RELOAD_BACKOFF,

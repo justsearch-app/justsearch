@@ -1061,7 +1061,7 @@ export class SearchV3View extends JfElement {
     search: () => this.search,
     submitTurn: (question, now, kind, target, shape, selectionKind, dispatchTurnId) => {
       this.sessions = submitInSession(this.sessions, question, now, kind, target, shape, selectionKind, dispatchTurnId);
-      return latestTurnRef(this.sessions);
+      return latestTurnRef(this.sessions, dispatchTurnId);
     },
     dropTurn: ref => { this.sessions = dropTurn(this.sessions, ref); },
     setReasoning: (ref, blocks) => { this.sessions = setTurnReasoning(this.sessions, ref, blocks); },
@@ -1239,6 +1239,7 @@ export class SearchV3View extends JfElement {
       const reconnected = this.aiSnapshot?.connection.reachable === false && snapshot.connection.reachable;
       this.aiSnapshot = snapshot;
       this.applyLockState(snapshot);
+      this.draftDomain.onAnswerStatus(snapshot);
       if (reconnected) this.contextDomain.retryContextOnReconnect();
     });
     // Inventory E3 — the app-wide Simple/Detailed authority. Nothing is COPIED into this element:

@@ -663,6 +663,12 @@ public final class AgentLoopService implements AgentService {
       sink.accept(session.cancellationEvent());
       session.markTerminated(TerminalDisposition.CANCELLED, null, session.cancellationTrigger());
       checkpoint(sessionId, session, LifecycleState.CANCELLED.name(), cancelled.reasonCode());
+    } catch (io.justsearch.app.api.chat.AnswersPausedException paused) {
+      agentSuccess = false;
+      emitError(sink, paused.getMessage(), AgentErrorCode.UNAVAILABLE,
+          AgentErrorClass.TRANSIENT, RetryAction.ABORT, null);
+      session.markTerminated(TerminalDisposition.ERRORED, AgentErrorCode.UNAVAILABLE, null);
+      checkpoint(sessionId, session, LifecycleState.ERROR.name(), paused.getMessage());
     } catch (Exception e) {
       LOG.error("Agent loop error", e);
       agentSpan.recordException(e);

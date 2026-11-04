@@ -1,0 +1,257 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
+  },
+  "createdAt": "2026-11-04T11:38:12.386Z",
+  "revision": "a07eb770d626ed707748b9ce0d42ddda29816290",
+  "tree": "76992b16e7848d2a9c5bd647d62056e3e352a18c",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": "openjdk version \"25.0.4.1\" 2026-08-18 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "./gradlew :modules:app-services:test --tests \"io.justsearch.app.services.settings.LiteralExclusionSettingsTest\" --tests \"io.justsearch.app.services.settings.RerankerPreferenceTest\" --tests \"io.justsearch.app.services.settings.UiSettingsStoreContextLengthMigrationTest\" --tests \"io.justsearch.app.services.settings.UiSettingsStoreRevisionTest\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 4909
+    },
+    {
+      "command": "./gradlew :modules:ui:test --tests \"io.justsearch.ui.api.ChatRefusalWireTest\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 4235
+    },
+    {
+      "command": "./gradlew :modules:app-api:test --tests \"io.justsearch.app.api.chat.ChatVocabularyTest\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 3315
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/settings/LiteralExclusionSettingsTest.java",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/settings/LiteralExclusionSettingsTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:affeae2c9c72d3e01945c2fab4f84eebea35cfffc0922a5535e61595f4c8ecfd",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "RF55V6ExactEntriesSurviveSaveReloadWithUnrelatedFieldsAndLegacyFallbacks()",
+          "status": "passed"
+        },
+        {
+          "name": "RF55PublicSaveCanRetainOrRemoveExactTokensButCannotCreateOrModifyThem()",
+          "status": "passed"
+        },
+        {
+          "name": "RF55EveryLegacyVersionKeepsItsStringMeaningAndCannotCarryTypedState()",
+          "status": "passed"
+        },
+        {
+          "name": "RF55ResetClearsLegacyAndPrecisePolicyTogether()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/settings/RerankerPreferenceTest.java",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/settings/RerankerPreferenceTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:614f46e1f46839999984689679e54d20504f8b38efe3e5e005b8fb1dba138d22",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "currentEnvelopeReopensOffAndExactSelectionAfterRestart(Path)",
+          "status": "passed"
+        },
+        {
+          "name": "patchRetainsFilesAndIdentityUntilTheUserChangesThePath(Path)",
+          "status": "passed"
+        },
+        {
+          "name": "schemaSixMigrationKeepsDisabledWitnessAndAcquisitionPreferences(Path)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/settings/UiSettingsStoreContextLengthMigrationTest.java",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/settings/UiSettingsStoreContextLengthMigrationTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:6d688f0b182041a068a931687bd4babbbd85377d27f2f10b2e15e50a012d3092",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "migration is idempotent across repeated loads before the next accepted replacement",
+          "status": "passed"
+        },
+        {
+          "name": "a schema-1 file is migratable, not fatal and not quarantined",
+          "status": "passed"
+        },
+        {
+          "name": "an unversioned legacy file migrates the same way",
+          "status": "passed"
+        },
+        {
+          "name": "schema-1 contextLength 4096 (the old default) migrates to 0 = auto",
+          "status": "passed"
+        },
+        {
+          "name": "a FUTURE version is still fatal — migrating forward is not the same as downgrading",
+          "status": "passed"
+        },
+        {
+          "name": "a prepared replacement after migration rewrites the file at the current version",
+          "status": "passed"
+        },
+        {
+          "name": "at schema 2 a deliberate 4096 is left alone — the migration is not re-applied",
+          "status": "passed"
+        },
+        {
+          "name": "a schema-1 value that is not the old default is preserved as a real override",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/settings/UiSettingsStoreRevisionTest.java",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/settings/UiSettingsStoreRevisionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:ae4d34a29b873ad04d6cf52e8990769059df18ce2b6606de5c64dd390d8133d5",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "preparesPrivateCandidateBeforeReplacingFile()",
+          "status": "passed"
+        },
+        {
+          "name": "earlierV5QuerySelectionWithoutRuntimeDescriptorRemainsReadable()",
+          "status": "passed"
+        },
+        {
+          "name": "exactProjectionPreservesAcceptedCandidateRatherThanStampingTransientWindowTime()",
+          "status": "passed"
+        },
+        {
+          "name": "incompleteEnvelopesCannotMasqueradeAsLegacyDefaults()",
+          "status": "passed"
+        },
+        {
+          "name": "nonDirectoryParentCannotProveEmptyStore()",
+          "status": "passed"
+        },
+        {
+          "name": "legacyTwoStartsAtZeroAndOldReaderRefusesThree()",
+          "status": "passed"
+        },
+        {
+          "name": "queryRoleSelectionRejectsMixedModelAndTokenizerDirectories()",
+          "status": "passed"
+        },
+        {
+          "name": "invalidWitnessCannotBecomeSuccessfulDefaultDuringInspection()",
+          "status": "passed"
+        },
+        {
+          "name": "foreignPreparationAndReadOnlyModeCannotWrite()",
+          "status": "passed"
+        },
+        {
+          "name": "oversizedVersionCannotWrapIntoReadableLegacySchema()",
+          "status": "passed"
+        },
+        {
+          "name": "queryRoleSelectionDistinguishesLegacyFromDisabledAndSurvivesReboot()",
+          "status": "passed"
+        },
+        {
+          "name": "recoveryNotificationIsOutsideReplacement()",
+          "status": "passed"
+        },
+        {
+          "name": "explicitNullQuerySelectionIsNotLegacyFallback()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/ChatRefusalWireTest.java",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/ChatRefusalWireTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:be2e85b0ffddb61474ddcf4877540a4496aae8cf5e384784fceda1271c3d5209",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "externalServerRefusalKeepsItsNamedWireReason()",
+          "status": "passed"
+        },
+        {
+          "name": "everyRefusalReasonMapsToItsWireCodeAndTheBodyConformsToTheSchema()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-api/src/test/java/io/justsearch/app/api/chat/ChatVocabularyTest.java",
+      "file": "modules/app-api/src/test/java/io/justsearch/app/api/chat/ChatVocabularyTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:946afcd0a5dd7edfe903f12a114a5d52e7343bef40e32657c47c8dabc5321989",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "wire casing is the constant name",
+          "status": "passed"
+        },
+        {
+          "name": "ChatStatus: generating is exactly inFlight > 0",
+          "status": "passed"
+        },
+        {
+          "name": "ChatStatus: each reason slot is legal only in its own state",
+          "status": "passed"
+        },
+        {
+          "name": "ChatRefusal and Demand reject negative durations",
+          "status": "passed"
+        },
+        {
+          "name": "ChatStatus: UNLOADED needs a reason, and a pressure unload names gpu_busy or game_mode",
+          "status": "passed"
+        },
+        {
+          "name": "exactMembers() — every enum keeps its members and the additive external-server refusal",
+          "status": "passed"
+        },
+        {
+          "name": "Activation names its reason exactly when not effective",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:5c479c755a99c4a2a501b8b158b88d7ce61ec2ecc34245810ef47aef7ebec372"
+}

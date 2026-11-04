@@ -1831,6 +1831,12 @@ public final class ChatServerControllerImpl
         + "); a chat request loads it again"));
   }
 
+  private volatile java.util.function.BooleanSupplier answersPaused = () -> false;
+
+  public void setAnswersPaused(java.util.function.BooleanSupplier paused) {
+    answersPaused = Objects.requireNonNull(paused, "paused");
+  }
+
   @Override
   public CompletionStage<Void> demand(Demand demand) throws ChatRefusal {
     Objects.requireNonNull(demand, "demand");
@@ -1839,6 +1845,10 @@ public final class ChatServerControllerImpl
     // Only a person's chat may be forced; anything else that says HUMAN_CHAT is an agent (F8).
     if (kind == DemandKind.HUMAN_CHAT && !person) kind = DemandKind.AGENT_CHAT;
     boolean human = kind == DemandKind.HUMAN_CHAT;
+    if ((human || kind == DemandKind.AGENT_CHAT || kind == DemandKind.BACKGROUND)
+        && answersPaused.getAsBoolean()) {
+      throw new ChatRefusal(RefusalReason.INDEXING, java.util.Optional.empty(), false);
+    }
     boolean replying = kind == DemandKind.BACKGROUND && replying();
     observeRunning();
     PressureSignal signal = effectivePressure();

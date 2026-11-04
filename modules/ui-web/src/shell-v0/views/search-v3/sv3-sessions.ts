@@ -519,6 +519,14 @@ export function submitInSession(
       activeId: created.id,
     };
   }
+  const pending = dispatchTurnId === undefined ? undefined : active.turns
+    .find(turn => turn.dispatchTurnId === dispatchTurnId && turn.status === 'unfinished' && !turn.savedOutcome);
+  if (pending) {
+    // An indexing refusal continues the saved question, keeping its record and visible identity.
+    return { ...list, sessions: list.sessions.map(session => session.id !== active.id ? session
+      : { ...session, updatedAt: now, turns: session.turns.map(turn => turn.id !== pending.id ? turn
+        : { ...turn, status: 'streaming', detail: '', askedAt: now }) }) };
+  }
   return {
     ...list,
     sessions: list.sessions.map((session) =>
@@ -537,9 +545,10 @@ export function submitInSession(
 }
 
 /** The turn a just-returned {@link submitInSession} opened, or null if nothing is active. */
-export function latestTurnRef(list: Sv3SessionList): Sv3TurnRef | null {
+export function latestTurnRef(list: Sv3SessionList, dispatchTurnId?: string): Sv3TurnRef | null {
   const active = list.activeId === null ? null : sessionById(list, list.activeId);
-  const turn = active?.turns.at(-1);
+  const turn = dispatchTurnId === undefined ? active?.turns.at(-1)
+    : active?.turns.find(candidate => candidate.dispatchTurnId === dispatchTurnId);
   if (active === undefined || active === null || turn === undefined) return null;
   return { sessionId: active.id, turnId: turn.id };
 }

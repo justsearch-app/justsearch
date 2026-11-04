@@ -1,0 +1,75 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
+  },
+  "createdAt": "2026-11-04T16:06:42.481Z",
+  "revision": "121f35e7cb47f31a248f2bd703fd17b2bd42d872",
+  "tree": "38799dc6f62e7eb1bb1d2fccead512357d643a3b",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": "openjdk version \"25.0.4.1\" 2026-08-18 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "./gradlew :modules:worker-services:test --tests \"io.justsearch.indexerworker.loop.HeavyIndexingStateTest\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 14609
+    },
+    {
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/BrainSurface.answer-pause.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/vw9gth08/tmp/test-intent-vitest-430-1793808400450.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 2030
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/HeavyIndexingStateTest.java",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/HeavyIndexingStateTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:6b1106a0ae390340a351a47293507e77fb46332f4e961aff1b650dad086a852f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "holdAndRestartRecomputeAndSingleFileUpdatesNeverEnter()",
+          "status": "passed"
+        },
+        {
+          "name": "fileThresholdsUseHysteresis()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/BrainSurface.answer-pause.test.ts",
+      "file": "modules/ui-web/src/shell-v0/views/BrainSurface.answer-pause.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:df5b8b8664014f373db558c6c2d45d0d1c5b302a222d738e0677b8b1fc13730a",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "defaults off, saves only the pause policy, and waits for the witnessed save",
+          "status": "passed"
+        },
+        {
+          "name": "uses the Engine pause observation for wording and converges a second window",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:60b7ca1b40abdb149a4e40ac9fadf2a50a31f9382c4aca95d6ac7d3761fb3304"
+}

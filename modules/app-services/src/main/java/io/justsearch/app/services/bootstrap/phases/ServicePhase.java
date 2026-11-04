@@ -191,6 +191,13 @@ public final class ServicePhase {
     // (moved from below) so the runtime reconciler can read the online-AI policy ceiling.
     EnterprisePolicyService enterprisePolicy = new EnterprisePolicyServiceImpl();
     if (in.inferenceManager() != null) {
+      in.inferenceManager().setAnswersPaused(() -> {
+        var settings = in.settingsStore().load();
+        if (!Boolean.TRUE.equals(settings.getChatEnabled())
+            || !Boolean.TRUE.equals(settings.getPauseAnswersWhileIndexing())) return false;
+        var worker = in.knowledgeServerBootstrapSupplier().get();
+        return worker != null && worker.heavyIndexing();
+      });
       onlineAiService = new OnlineAiServiceImpl(in.engineAdmission(), in.inferenceManager());
       gpuListener = InferenceWiring.wireGpuStatusBroadcast(
           in.inferenceManager(), in.knowledgeServerBootstrapSupplier());

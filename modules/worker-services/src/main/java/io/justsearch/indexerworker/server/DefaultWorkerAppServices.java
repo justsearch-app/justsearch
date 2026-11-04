@@ -1373,6 +1373,11 @@ public final class DefaultWorkerAppServices implements WorkerAppServices {
   }
 
   @Override
+  public boolean heavyIndexing() {
+    return indexingLoop != null && indexingLoop.heavyIndexing();
+  }
+
+  @Override
   public String indexingLoopState() {
     return indexingLoop != null ? indexingLoop.getCurrentState() : "STARTING";
   }
@@ -1524,6 +1529,7 @@ public final class DefaultWorkerAppServices implements WorkerAppServices {
     @Override public WorkerHealthService healthService() { return lexicalHealth; }
     @Override public void startIndexingLoop() { incumbent.startIndexingLoop(); }
     @Override public String indexingLoopState() { return incumbent.indexingLoopState(); }
+    @Override public boolean heavyIndexing() { return incumbent.heavyIndexing(); }
     @Override public boolean recordedWriterReady() { return incumbent.recordedWriterReady(); }
     @Override public IndexingPacing indexingPacing() { return incumbent.indexingPacing(); }
     @Override public void wireEmbeddingProvider(EmbeddingProvider provider) {

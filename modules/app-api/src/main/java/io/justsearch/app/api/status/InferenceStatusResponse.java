@@ -46,4 +46,5 @@ public record InferenceStatusResponse(
     // fit/override/stepped-from, free VRAM at plan time, slots, KV type). Null when the process
     // launched no server. `llmContextTokens` above stays the OBSERVED window from /props; this is
     // the INTENT, and the two are deliberately separate fields.
-    ContextWindow contextWindow) {}
+    ContextWindow contextWindow,
+    Boolean answersPausedWhileIndexing) {}
