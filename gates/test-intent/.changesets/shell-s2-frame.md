@@ -449,6 +449,20 @@ WebKit do not, and Forward is only testable under the spec's behaviour.
       "newChecks": ["modules/ui-web/src/shell-v0/chrome/RetiredFrameElements.test.ts"]
     },
     {
+      "items": ["gates/test-intent/test-support-paths.v1.json", "modules/ui-web/src/shell-v0/state/savedViewState.ts"],
+      "class": "Incidental",
+      "sources": [
+        { "kind": "owner-adopted-scenario", "task": "t-20261103-shell", "scenario": "FR4", "quote": "Removed from everyday chrome: Copy URL, bookmarks button and list, recents menu, Simple/Detailed toggle in the title bar, backend address. Bookmarks and recents data stay stored; their reachability decided in S6 (palette and developer group).", "label": "agent-drafted, owner-adopted" }
+      ],
+      "assessment": {
+        "purpose": "The bookmarks list (components/BookmarksPopover.ts) and the Shell bookmark toggle were the only production importers of state/savedViewState.ts; with them retired (FR4) only tests import it, so the static scan lists it as a test-only file. The module is unchanged and kept: the saved bookmarks stay stored and a later slice (S6) decides where they are reached from.",
+        "callersAndStateOwners": "UserStateDocument owns the savedViews slice; savedViewState is a projection over it. Callers now: savedViewState.test, windowCutover.test, UserStateDocument.profileSwitchRebind.test, Shell.navigation.test (FR6: pre-change bookmarks still load).",
+        "indirectBehaviours": "None: one path added to the list; no file content changes. The stored savedViews data and its format are untouched.",
+        "evidence": "test-intent units (42/42, incl. 'every frontend file only tests import is in the committed list') pass after the addition; the CI Public claims job failed on this list before it.",
+        "unresolvedRisks": "Production-unused code until S6 decides bookmark reachability; S6 removes it if bookmarks stay unreachable."
+      }
+    },
+    {
       "items": ["modules/ui-web/src/shell-v0/themes/token-names.generated.ts"],
       "class": "Incidental",
       "sources": [
