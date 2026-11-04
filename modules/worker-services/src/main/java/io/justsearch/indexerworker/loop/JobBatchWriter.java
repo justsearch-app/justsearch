@@ -70,6 +70,7 @@ public final class JobBatchWriter {
   private final BooleanSupplier chunkSpladeEnabledSupplier;
   private final Supplier<RunningRuntime> activeLexicalSource;
   private final FileMutationFence fileMutationFence;
+  private io.justsearch.indexerworker.services.StorageObservationSnapshot storageSnapshot;
   private final BatchServiceFailures writeFailures = new BatchServiceFailures();
   private java.util.function.BiPredicate<java.nio.file.Path, java.nio.file.Path> fileExclusions =
       io.justsearch.indexerworker.ingest.IngestionSkipPolicy::shouldSkipWithinRoot;
@@ -117,6 +118,7 @@ public final class JobBatchWriter {
 
   void beginBatch() {
     writeFailures.begin();
+    storageSnapshot = null;
   }
 
   boolean deferredBatch() {
@@ -200,6 +202,15 @@ public final class JobBatchWriter {
               ex.docUid()),
           chunkPlan);
 
+      if (storageSnapshot == null) {
+        storageSnapshot = io.justsearch.indexerworker.services.StorageObservationSnapshot.capture();
+      }
+      var envelope = storageSnapshot.envelope(
+          ex.sourceRealPath() == null ? ex.filePath() : ex.sourceRealPath(), ex.envelope().originId()).fields();
+      var fields = new java.util.HashMap<>(doc.fields());
+      fields.putAll(envelope);
+      doc = new IndexDocument(fields);
+
       long writeStart = System.currentTimeMillis();
       publishedPath = String.valueOf(doc.fields().get(SchemaFields.PATH));
       RunningRuntime lexicalSource = activeLexicalSource.get();
@@ -218,10 +229,13 @@ public final class JobBatchWriter {
                     ex.envelope().sizeBytes(), ex.envelope().modifiedAtMs(), ex.sourceSha256()),
                 ex.docUid()),
             chunkPlan);
+        var lexicalFields = new java.util.HashMap<>(lexicalDocument.fields());
+        lexicalFields.putAll(envelope);
+        lexicalDocument = new IndexDocument(lexicalFields);
         lexicalSource.indexingCoordinator().indexSingle(lexicalDocument);
         IndexingDocumentOps.indexDeclaredChunks(ex.filePath(), ex.artifact().result(),
             lexicalSource.indexingCoordinator(), lexicalMetadata, ex.collection(), ex.docUid(),
-            false, chunkPlan);
+            false, chunkPlan, envelope);
       }
       boolean acceptedEmbedding = indexingCoordinator.indexSingle(doc);
       // Tempdoc 819 / 821 §O.1 (+ #470 D2): when the document carries a completed embedding (the
@@ -242,7 +256,7 @@ public final class JobBatchWriter {
               ex.collection(),
               ex.docUid(),
               chunkSpladeEnabledSupplier.getAsBoolean(),
-              chunkPlan);
+              chunkPlan, envelope);
       if (chunksIndexed > 0) {
         indexedDelta.accept(chunksIndexed);
         log.debug("Indexed {} chunks for: {}", chunksIndexed, ex.filePath().getFileName());

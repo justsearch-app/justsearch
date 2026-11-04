@@ -19,8 +19,8 @@ import org.slf4j.Logger;
 /**
  * NER entity extraction backfill for documents with {@code ner_status=PENDING}.
  *
- * <p>Runs after embedding backfill is complete (NER facets are supplementary). CPU-only — no GPU
- * conflict management needed.
+ * <p>Runs after embedding backfill is complete (NER facets are supplementary). Resource admission
+ * is checked per document independently of hard cancellation inside inference.
  */
 public final class NerBackfillOps {
   private NerBackfillOps() {}
@@ -33,7 +33,20 @@ public final class NerBackfillOps {
       Supplier<NerService> nerServiceSupplier,
       BooleanSupplier runningSupplier,
       int batchSize,
-      Logger log) {}
+      Logger log,
+      BooleanSupplier unitAllowed) {
+    public BackfillContext(
+        DocumentFieldOps documentFieldOps,
+        IndexingCoordinator indexingCoordinator,
+        CommitOps commitOps,
+        IndexingPacing pacing,
+        Supplier<NerService> nerServiceSupplier,
+        BooleanSupplier runningSupplier,
+        int batchSize,
+        Logger log) {
+      this(documentFieldOps, indexingCoordinator, commitOps, pacing, nerServiceSupplier, runningSupplier, batchSize, log, () -> true);
+    }
+  }
 
   /**
    * Processes one batch of NER backfill.
@@ -84,9 +97,10 @@ public final class NerBackfillOps {
           || context.nerServiceSupplier().get() != selectedService;
       for (String docId : batch.ids()) {
         if (selection != null && !"PENDING".equals(batch.fields(docId).get(SchemaFields.NER_STATUS))) continue;
-        // NER is CPU-only: interrupt on shutdown, no GPU check. Tempdoc 885 item 3: foreground
-        // load paces the per-document loop instead of breaking out of it.
+        // Tempdoc 885 item 3: foreground load paces the per-document loop. Resource holds
+        // defer this unit; hard stops also reach its internal native-call boundaries.
         context.pacing().pace();
+        if (!context.unitAllowed().getAsBoolean()) break;
         if (batch.stopped(() -> !context.runningSupplier().getAsBoolean(), unavailable, EnrichmentAccounting.Stage.NER)) {
           accounting.cancelRemaining();
           context.log().debug("NER backfill interrupted: loop stopping");
@@ -113,7 +127,7 @@ public final class NerBackfillOps {
             break;
           }
           batch.started(List.of(docId), EnrichmentAccounting.Stage.NER);
-          List<NerResult> nerBatch = nerService.extractEntitiesBatch(List.of(content));
+          List<NerResult> nerBatch = batch.inferenceCancellation(() -> !context.runningSupplier().getAsBoolean(), unavailable).call(() -> nerService.extractEntitiesBatch(List.of(content)));
           NerResult result = nerBatch.isEmpty() ? NerResult.EMPTY : nerBatch.get(0);
 
           Map<String, Object> updates = new HashMap<>();

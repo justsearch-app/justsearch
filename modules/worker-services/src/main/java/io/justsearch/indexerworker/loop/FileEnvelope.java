@@ -2,10 +2,12 @@
 package io.justsearch.indexerworker.loop;
 
 /** Trusted source witness carried unchanged from admission through publication. */
-record FileEnvelope(FileFreshnessSnapshot snapshot) {
+record FileEnvelope(FileFreshnessSnapshot snapshot, String originId) {
   static FileEnvelope fromSnapshot(FileFreshnessSnapshot snapshot) {
-    return new FileEnvelope(snapshot);
+    return new FileEnvelope(snapshot, null);
   }
+
+  FileEnvelope withOrigin(String id) { return new FileEnvelope(snapshot, id); }
 
   String normalizedPath() { return snapshot.normalizedPath(); }
   String pathHash() { return snapshot.pathHash(); }

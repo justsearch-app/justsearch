@@ -4,7 +4,7 @@ package io.justsearch.indexerworker.loop.ops;
 import io.justsearch.adapters.lucene.runtime.CommitOps;
 import io.justsearch.adapters.lucene.runtime.DocumentFieldOps;
 import io.justsearch.adapters.lucene.runtime.IndexingCoordinator;
-import io.justsearch.core.execution.InferenceRequest;
+import io.justsearch.indexerworker.inference.LocalSessionAcquisition;
 import io.justsearch.indexerworker.coordination.WorkerSignalBus;
 import io.justsearch.indexerworker.loop.pacing.IndexingPacing;
 import io.justsearch.indexerworker.embed.EmbeddingProvider;
@@ -34,7 +34,22 @@ public final class EmbeddingBackfillOps {
       BooleanSupplier runningSupplier,
       BooleanSupplier allowEmbeddingWritesSupplier,
       int batchSize,
-      Logger log) {}
+      Logger log,
+      BooleanSupplier unitAllowed) {
+    public BackfillContext(
+        DocumentFieldOps documentFieldOps,
+        IndexingCoordinator indexingCoordinator,
+        CommitOps commitOps,
+        WorkerSignalBus signalBus,
+        IndexingPacing pacing,
+        Supplier<EmbeddingProvider> embeddingProviderSupplier,
+        BooleanSupplier runningSupplier,
+        BooleanSupplier allowEmbeddingWritesSupplier,
+        int batchSize,
+        Logger log) {
+      this(documentFieldOps, indexingCoordinator, commitOps, signalBus, pacing, embeddingProviderSupplier, runningSupplier, allowEmbeddingWritesSupplier, batchSize, log, () -> true);
+    }
+  }
 
   /**
    * Processes one batch of parent-doc embedding backfill.
@@ -133,7 +148,7 @@ public final class EmbeddingBackfillOps {
 
       // Phase 2: Batch embed all collected content
       batch.started(batchDocIds, EnrichmentAccounting.Stage.EMBED);
-      List<float[]> vectors = embeddingProvider.embedDocumentBatch(batchContents);
+      List<float[]> vectors = batch.inferenceCancellation(() -> !context.runningSupplier().getAsBoolean(), () -> providerRetired(context, embeddingProvider)).call(() -> embeddingProvider.embedDocumentBatch(batchContents));
       if (vectors != null && vectors.size() == batchDocIds.size()) {
         for (int i = 0; i < vectors.size(); i++) {
           if (vectors.get(i) != null && vectors.get(i).length > 0) {
@@ -251,9 +266,10 @@ public final class EmbeddingBackfillOps {
 
   private static boolean stopped(BackfillContext context, EnrichmentBatch batch,
       EmbeddingProvider provider, String label) {
-    return batch.stopped(() -> checkInterrupt(context, provider, label),
+    boolean stopped = batch.stopped(() -> checkInterrupt(context, provider, label),
         () -> providerRetired(context, provider),
         EnrichmentAccounting.Stage.EMBED, EnrichmentAccounting.Stage.CHUNK_EMBED);
+    return stopped || !context.unitAllowed().getAsBoolean();
   }
 
   private static boolean providerRetired(BackfillContext context, EmbeddingProvider provider) {
@@ -326,7 +342,7 @@ public final class EmbeddingBackfillOps {
     int failed = 0;
     try {
       if (stopped(context, batch, embeddingProvider, "Backfill")) return null;
-      float[] vector = embeddingProvider.embedDocument(content, InferenceRequest.background());
+      float[] vector = batch.inferenceCancellation(() -> !context.runningSupplier().getAsBoolean(), () -> providerRetired(context, embeddingProvider)).call(() -> embeddingProvider.embedDocument(content, LocalSessionAcquisition.backgroundInference()));
       if (vector != null && vector.length > 0) batch.computed(docId, EnrichmentAccounting.Stage.EMBED);
       if (providerRetired(context, embeddingProvider)) {
         batch.retired(EnrichmentAccounting.Stage.EMBED);
@@ -344,7 +360,7 @@ public final class EmbeddingBackfillOps {
       }
     } catch (Exception e) {
       if (batch.retired(() -> providerRetired(context, embeddingProvider), EnrichmentAccounting.Stage.EMBED)) return null;
-      batch.cancelled(EnrichmentAccounting.Stage.EMBED, e);
+      if (batch.cancelled(EnrichmentAccounting.Stage.EMBED, e)) return null;
       if (checkInterrupt(context, embeddingProvider, "Backfill")
           || SpladeBackfillOps.isSystemicFailure(e)) return null;
       context.log().error("Backfill failed for doc {}: {}", docId, e.getMessage());
@@ -474,7 +490,7 @@ public final class EmbeddingBackfillOps {
 
       // Phase 2: Batch embed
       batch.started(batchChunkIds, EnrichmentAccounting.Stage.CHUNK_EMBED);
-      List<float[]> vectors = embeddingProvider.embedDocumentBatch(batchContents);
+      List<float[]> vectors = batch.inferenceCancellation(() -> !context.runningSupplier().getAsBoolean(), () -> providerRetired(context, embeddingProvider)).call(() -> embeddingProvider.embedDocumentBatch(batchContents));
       if (vectors != null && vectors.size() == batchChunkIds.size()) {
         for (int i = 0; i < vectors.size(); i++) {
           if (vectors.get(i) != null && vectors.get(i).length > 0) {
@@ -509,8 +525,9 @@ public final class EmbeddingBackfillOps {
           if (stopped(context, batch, embeddingProvider, "Chunk backfill")) { accounting.cancelRemaining(); break; }
           String chunkId = batchChunkIds.get(i);
           try {
+            String fallbackText = batchContents.get(i);
             float[] vector =
-                embeddingProvider.embedDocument(batchContents.get(i), InferenceRequest.background());
+                batch.inferenceCancellation(() -> !context.runningSupplier().getAsBoolean(), () -> providerRetired(context, embeddingProvider)).call(() -> embeddingProvider.embedDocument(fallbackText, LocalSessionAcquisition.backgroundInference()));
             if (vector != null && vector.length > 0) batch.computed(chunkId, EnrichmentAccounting.Stage.CHUNK_EMBED);
             if (providerRetired(context, embeddingProvider)) {
               batch.retired(EnrichmentAccounting.Stage.CHUNK_EMBED);
@@ -528,7 +545,7 @@ public final class EmbeddingBackfillOps {
             }
           } catch (Exception e) {
             if (batch.retired(() -> providerRetired(context, embeddingProvider), EnrichmentAccounting.Stage.CHUNK_EMBED)) break;
-            accounting.cancelled(EnrichmentAccounting.Stage.CHUNK_EMBED, e);
+            if (accounting.cancelled(EnrichmentAccounting.Stage.CHUNK_EMBED, e)) break;
             if (stopped(context, batch, embeddingProvider, "Chunk backfill")
                 || SpladeBackfillOps.isSystemicFailure(e)) break;
             context.log().error("Chunk backfill failed for {}: {}", chunkId, e.getMessage());

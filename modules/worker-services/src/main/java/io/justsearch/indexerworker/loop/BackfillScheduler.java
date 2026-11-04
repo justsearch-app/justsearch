@@ -253,14 +253,7 @@ public final class BackfillScheduler {
     final long embedShareDeadlineNanos =
         cycleStartNanos + java.util.concurrent.TimeUnit.MILLISECONDS.toNanos(EMBED_BUDGET_SHARE_MS);
 
-    boolean bulkHeld = signalBus.isBulkHeld();
-    boolean runBackfill =
-        LoopPacingPolicy.shouldRunBackfill(
-            signalBus.isMainGpuActive(),
-            signalBus.isEnergyReduced(),
-            bulkHeld,
-            bulkHeld && sparseOrNerOnGpu(),
-            embeddingLifecycle.embeddingProvider());
+    boolean runBackfill = !signalBus.isEnergyReduced();
     if (runBackfill) {
       var batchCommitCounter = new int[] {0};
       Set<String> publishedDocIds = new HashSet<>();
@@ -280,7 +273,7 @@ public final class BackfillScheduler {
         // between here and the next runIdleCycle() call (the tight loop below stays combined
         // until it drains or is interrupted), so the mode is settled at this point.
         OperationalMetrics.getInstance().recordBackfillMode("combined");
-        backfillDidWork = true;
+        backfillDidWork = outcome.wroteAnything();
         // Tempdoc 809 finding 3: an aborted probe means a stop condition came up DURING that batch
         // — pending ingest, the cycle budget, or a bulk deletion that invalidated the documents it
         // had selected. Starting a fresh tight-loop batch would re-select and re-encode against
@@ -307,7 +300,7 @@ public final class BackfillScheduler {
                 if (!running.get() || signalBus.isIndexingHeld() || Thread.currentThread().isInterrupted()) break;
                 // Tempdoc 885 item 3: yield to foreground load, do not abandon the cycle for it.
                 indexingPacing.pace();
-                if (signalBus.shouldYieldGpuBackfill()) break; // tempdoc 630: GPU-claimed OR energy-reduced
+                if (signalBus.isEnergyReduced()) break; // tempdoc 630: energy-reduced
                 // Tempdoc 798: primary indexing outranks background enrichment. Backfill resumes
                 // next idle cycle; a queued ingest job the user is waiting on cannot.
                 if (signalBus.hasPendingIngest()) break;
@@ -374,9 +367,8 @@ public final class BackfillScheduler {
         // purpose (710 S-B3), so an operator polling DURING a long individual pass must see
         // "individual" rather than the previous cycle's value.
         OperationalMetrics.getInstance().recordBackfillMode("individual");
-        IndividualOutcome individual = runIndividualBackfills(cycleDeadlineNanos);
-        backfillDidWork = individual.didWork();
-        if (!individual.anyActivity()) {
+        backfillDidWork = runIndividualBackfills(cycleDeadlineNanos);
+        if (!backfillDidWork) {
           // ...but a pass that ran and advanced NOTHING is exactly what getBackfillMode() documents
           // as "idle" ("no backfill work was available/eligible last cycle"). Leaving "individual"
           // standing left a last-known gauge looking like live activity for as long as the worker
@@ -389,8 +381,9 @@ public final class BackfillScheduler {
       OperationalMetrics.getInstance().recordBackfillMode("idle");
     }
 
-    // Disambiguation is gated on no-other-work-this-cycle and never flips backfillDidWork.
-    runDisambiguationIfReady(backfillDidWork);
+    if (!signalBus.isEnergyReduced() && monotonicNanos.getAsLong() < cycleDeadlineNanos) {
+      backfillDidWork |= runDisambiguationIfReady(backfillDidWork);
+    }
     return backfillDidWork;
   }
 
@@ -450,7 +443,7 @@ public final class BackfillScheduler {
   public void runInterleavedSplade(long now) {
     if (spladeEncoderSupplier.get() == null && bgeM3EncoderSupplier.get() == null) return;
     // Spec E section 1.3 item 5: no interleaved sparse batch starts while bulk GPU work is held.
-    if (signalBus.isIndexingHeld() || signalBus.isBulkHeld()) return;
+    if (signalBus.isIndexingHeld() || !sparseUnitAllowed()) return;
     if (now < nextSpladeRetryTime) return;
     long spladeIntervalMs = pacing().spladeInterleaveIntervalMs();
     if (now - lastSpladeInterleaveTime < spladeIntervalMs) return;
@@ -460,18 +453,17 @@ public final class BackfillScheduler {
     recordSpladeBackfillResult(outcome.success());
   }
 
-  /**
-   * Whether the sparse (SPLADE or BGE-M3) or NER bulk encoder runs on the GPU (Spec E section 1.3
-   * item 2): cycle entry is skipped under the bulk hold when any bulk encoder is on the GPU, not
-   * just embedding.
-   */
-  private boolean sparseOrNerOnGpu() {
-    SpladeEncoder splade = spladeEncoderSupplier.get();
-    if (splade != null && splade.isGpuAvailable()) return true;
+  private boolean unitAllowed(boolean gpu) {
+    return !signalBus.isEnergyReduced()
+        && (!gpu || (!signalBus.isBulkHeld() && !signalBus.isMainGpuActive()));
+  }
+
+  private boolean sparseUnitAllowed() {
     BgeM3Encoder bge = bgeM3EncoderSupplier.get();
-    if (bge != null && bge.isGpuAvailable()) return true;
-    NerService ner = nerServiceSupplier.get();
-    return ner != null && ner.isGpuAvailable();
+    SpladeEncoder sparse = spladeEncoderSupplier.get();
+    return unitAllowed(bge != null
+        ? !bge.isBulkOnCpu() && LoopPacingPolicy.requiresGpu(bge.isGpuAvailable(), bge.getOrtCudaStatus())
+        : sparse != null && LoopPacingPolicy.requiresGpu(sparse.isGpuAvailable(), sparse.getOrtCudaStatus()));
   }
 
   /** Resets backoff/latch state. Called from {@code resetForProfiling}. */
@@ -486,27 +478,14 @@ public final class BackfillScheduler {
     stallWarnedThisEpisode = false;
   }
 
-  /**
-   * What one individual-backfill pass did, on the two axes this loop keeps deliberately separate.
-   *
-   * <p>{@code didWork} drives the caller's active-vs-truly-idle SLEEP pacing and keeps its exact
-   * historical semantics (only the chunk tight-loop and a SPLADE pass over a non-empty backlog set
-   * it — a parent-embedding batch does not). {@code anyActivity} answers the OPERATOR GAUGE's
-   * different question: did any stage actually advance a document this cycle. Tempdoc 798 already
-   * draws this line for the combined branch ("Mode selection reads ACTIVITY... the tight loop reads
-   * PROGRESS... conflating them is what livelocked ingest"); reusing {@code didWork} for the gauge
-   * would stamp "idle" over a cycle that embedded a batch, which is the same lie in the other
-   * direction.
-   */
-  private record IndividualOutcome(boolean didWork, boolean anyActivity) {}
-
-  private IndividualOutcome runIndividualBackfills(long cycleDeadlineNanos) {
-    boolean backfillDidWork = false;
+  /** Reports useful advancement for sleep pacing, preserving stage continuation rules. */
+  private boolean runIndividualBackfills(long cycleDeadlineNanos) {
     boolean anyActivity = false;
     boolean embeddingCanProgress = embeddingLifecycle.embeddingProvider().isAvailable()
-        && embeddingLifecycle.allowEmbeddingWrites();
+        && embeddingLifecycle.allowEmbeddingWrites()
+        && unitAllowed(embeddingLifecycle.embeddingProvider().isUsingGpu());
     if (embeddingCanProgress) {
-      StageOutcome outcome = processEmbeddingBackfill();
+      StageOutcome outcome = processEmbeddingBackfill(cycleDeadlineNanos);
       recordStageOutcome(BatchTimingKeys.EMBED, outcome);
       anyActivity |= outcome.docsProcessed() > 0;
     }
@@ -516,7 +495,7 @@ public final class BackfillScheduler {
           indexCountOps.countByField(
               SchemaFields.EMBEDDING_STATUS, SchemaFields.EMBEDDING_STATUS_PENDING);
       if (pendingDocEmbeddings == 0) {
-        StageOutcome chunkOutcome = processChunkEmbeddingBackfill();
+        StageOutcome chunkOutcome = processChunkEmbeddingBackfill(cycleDeadlineNanos);
         recordStageOutcome(BatchTimingKeys.EMBED, chunkOutcome);
         anyActivity |= chunkOutcome.docsProcessed() > 0;
         boolean chunkDidWork = chunkOutcome.success();
@@ -524,10 +503,9 @@ public final class BackfillScheduler {
         // were genuinely embedding is a healthy long cycle, not non-convergence.
         boolean anyChunkProgress = chunkOutcome.docsProcessed() > 0;
         while (chunkDidWork) {
-          backfillDidWork = true;
           if (!running.get() || signalBus.isIndexingHeld() || Thread.currentThread().isInterrupted()) break;
           indexingPacing.pace(); // tempdoc 885 item 3: duty cycle, not a stop
-          if (signalBus.shouldYieldGpuBackfill()) break; // tempdoc 630: GPU-claimed OR energy-reduced
+          if (!unitAllowed(embeddingLifecycle.embeddingProvider().isUsingGpu())) break;
           if (signalBus.hasPendingIngest()) break; // tempdoc 798: primary indexing outranks backfill
           if (monotonicNanos.getAsLong() >= cycleDeadlineNanos) {
             if (anyChunkProgress) {
@@ -544,7 +522,7 @@ public final class BackfillScheduler {
             }
             break;
           }
-          chunkOutcome = processChunkEmbeddingBackfill();
+          chunkOutcome = processChunkEmbeddingBackfill(cycleDeadlineNanos);
           recordStageOutcome(BatchTimingKeys.EMBED, chunkOutcome);
           chunkDidWork = chunkOutcome.success();
           if (chunkOutcome.docsProcessed() > 0) {
@@ -573,7 +551,7 @@ public final class BackfillScheduler {
         embeddingsReady = pendingEmbeddings == 0 && !chunksPending;
       }
       if (embeddingsReady) {
-        StageOutcome outcome = processNerBackfill();
+        StageOutcome outcome = processNerBackfill(cycleDeadlineNanos);
         recordStageOutcome(BatchTimingKeys.NER, outcome);
         anyActivity |= outcome.docsProcessed() > 0;
       }
@@ -587,35 +565,33 @@ public final class BackfillScheduler {
                   SchemaFields.EMBEDDING_STATUS, SchemaFields.EMBEDDING_STATUS_PENDING)
               : 0;
       if (pendingEmbedForSplade < pacing().embeddingBackfillBatchSize()) {
-        int spladePendingBefore = spladePendingCount();
-        StageOutcome outcome = processSpladeBackfill();
+        StageOutcome outcome = processSpladeBackfill(cycleDeadlineNanos);
         recordStageOutcome(BatchTimingKeys.SPLADE, outcome);
         anyActivity |= outcome.docsProcessed() > 0;
         boolean success = outcome.success();
         recordSpladeBackfillResult(success);
-        if (success && spladePendingBefore > 0) {
-          backfillDidWork = true;
-        }
+
       }
     }
-    return new IndividualOutcome(backfillDidWork, anyActivity);
+    return anyActivity;
   }
 
-  private void runDisambiguationIfReady(boolean alreadyDidWork) {
+  private boolean runDisambiguationIfReady(boolean alreadyDidWork) {
     // 334 Phase 8: Disambiguation only when no enrichment work pending.
     DisambiguationService disambiguationService = disambiguationServiceSupplier.get();
     if (alreadyDidWork
         || disambiguationService == null
         || !disambiguationService.isAvailable()) {
-      return;
+      return false;
     }
     try {
       if (indexCountOps.countByFieldOrThrow(
-          SchemaFields.NER_STATUS, SchemaFields.NER_STATUS_PENDING) != 0) return;
-      processDisambiguationBackfill();
+          SchemaFields.NER_STATUS, SchemaFields.NER_STATUS_PENDING) != 0) return false;
+      return processDisambiguationBackfill();
     } catch (java.io.IOException failure) {
       log.warn("Cannot establish disambiguation readiness; retrying next cycle", failure);
     }
+    return false;
   }
 
   private void recordSpladeBackfillResult(boolean success) {
@@ -700,7 +676,7 @@ public final class BackfillScheduler {
     return !running.get()
         || signalBus.isIndexingHeld()
         || Thread.currentThread().isInterrupted()
-        || signalBus.shouldYieldGpuBackfill()
+        || signalBus.isEnergyReduced()
         || signalBus.hasPendingIngest();
   }
 
@@ -709,6 +685,11 @@ public final class BackfillScheduler {
       long cycleDeadlineNanos,
       long embedShareDeadlineNanos,
       Set<String> publishedDocIds) {
+    // BGE-M3 owns the dense/sparse pair in the individual unified pass; this combined
+    // implementation serves the separate dense, SPLADE and NER encoders only.
+    if (bgeM3EncoderSupplier.get() != null) {
+      return CombinedEnrichmentBackfillOps.CombinedOutcome.none();
+    }
     StageAvailability available = stageAvailability();
     int availCount = (available.embedding() ? 1 : 0) + (available.sparse() ? 1 : 0)
         + (available.ner() ? 1 : 0);
@@ -745,10 +726,10 @@ public final class BackfillScheduler {
             windowedEmbedProgress,
             publishedDocIds,
             () -> System.currentTimeMillis() >= nextSpladeRetryTime,
-            this::recordSpladeBackfillResult), enrichmentSelection);
+            this::recordSpladeBackfillResult, this::unitAllowed), enrichmentSelection);
   }
 
-  private StageOutcome processEmbeddingBackfill() {
+  private StageOutcome processEmbeddingBackfill(long cycleDeadlineNanos) {
     // BGE-M3 handles dense embeddings in its unified backfill pass — skip separate embedding
     if (bgeM3EncoderSupplier.get() != null) {
       log.debug("Embedding backfill skipped: BGE-M3 handles dense embeddings");
@@ -765,10 +746,11 @@ public final class BackfillScheduler {
             () -> running.get() && !signalBus.isIndexingHeld(),
             embeddingLifecycle::allowEmbeddingWrites,
             pacing().embeddingBackfillBatchSize(),
-            log), enrichmentSelection);
+            log, () -> monotonicNanos.getAsLong() < cycleDeadlineNanos
+                && unitAllowed(embeddingLifecycle.embeddingProvider().isUsingGpu())), enrichmentSelection);
   }
 
-  private StageOutcome processChunkEmbeddingBackfill() {
+  private StageOutcome processChunkEmbeddingBackfill(long cycleDeadlineNanos) {
     return EmbeddingBackfillOps.processChunkEmbeddingBackfill(
         new EmbeddingBackfillOps.BackfillContext(
             documentFieldOps,
@@ -780,10 +762,11 @@ public final class BackfillScheduler {
             () -> running.get() && !signalBus.isIndexingHeld(),
             embeddingLifecycle::allowEmbeddingWrites,
             pacing().embeddingBackfillBatchSize(),
-            log), enrichmentSelection);
+            log, () -> monotonicNanos.getAsLong() < cycleDeadlineNanos
+                && unitAllowed(embeddingLifecycle.embeddingProvider().isUsingGpu())), enrichmentSelection);
   }
 
-  private StageOutcome processNerBackfill() {
+  private StageOutcome processNerBackfill(long cycleDeadlineNanos) {
     return NerBackfillOps.processNerBackfill(
         new NerBackfillOps.BackfillContext(
             documentFieldOps,
@@ -793,7 +776,12 @@ public final class BackfillScheduler {
             nerServiceSupplier,
             () -> running.get() && !signalBus.isIndexingHeld(),
             pacing().nerBackfillBatchSize(),
-            log), enrichmentSelection);
+            log, () -> {
+              NerService current = nerServiceSupplier.get();
+              return monotonicNanos.getAsLong() < cycleDeadlineNanos
+                  && unitAllowed(current != null && LoopPacingPolicy.requiresGpu(
+                      current.isGpuAvailable(), current.getOrtCudaStatus()));
+            }), enrichmentSelection);
   }
 
   /**
@@ -810,16 +798,7 @@ public final class BackfillScheduler {
     return resolvedConfigSupplier.get().rag().chunkSpladeEnabled();
   }
 
-  /** Outstanding SPLADE work over the population the lanes will actually select from. */
-  private int spladePendingCount() {
-    return chunkSpladeEnabled()
-        ? indexCountOps.countByField(
-            SchemaFields.SPLADE_STATUS, SchemaFields.SPLADE_STATUS_PENDING)
-        : indexCountOps.countNonChunkByField(
-            SchemaFields.SPLADE_STATUS, SchemaFields.SPLADE_STATUS_PENDING);
-  }
-
-  private StageOutcome processSpladeBackfill() {
+  private StageOutcome processSpladeBackfill(long cycleDeadlineNanos) {
     BgeM3Encoder bge = bgeM3EncoderSupplier.get();
     if (bge != null) {
       return BgeM3BackfillOps.processBgeM3Backfill(
@@ -833,7 +812,7 @@ public final class BackfillScheduler {
               pacing().bgeM3BackfillBatchSize(),
               true,
               chunkSpladeEnabled(),
-              log), enrichmentSelection);
+              log, () -> monotonicNanos.getAsLong() < cycleDeadlineNanos && sparseUnitAllowed()), enrichmentSelection);
     }
     return SpladeBackfillOps.processSpladeBackfill(
         new SpladeBackfillOps.BackfillContext(
@@ -846,7 +825,7 @@ public final class BackfillScheduler {
             pacing().spladeBackfillBatchSize(),
             true,
             chunkSpladeEnabled(),
-            log), enrichmentSelection);
+            log, () -> monotonicNanos.getAsLong() < cycleDeadlineNanos && sparseUnitAllowed()), enrichmentSelection);
   }
 
   private StageOutcome processSpladeBackfillInterleaved() {
@@ -863,7 +842,7 @@ public final class BackfillScheduler {
               pacing().bgeM3InterleaveBatchSize(),
               false,
               chunkSpladeEnabled(),
-              log), enrichmentSelection);
+              log, this::sparseUnitAllowed), enrichmentSelection);
     }
     return SpladeBackfillOps.processSpladeBackfill(
         new SpladeBackfillOps.BackfillContext(
@@ -876,11 +855,11 @@ public final class BackfillScheduler {
             pacing().spladeInterleaveBatchSize(),
             false,
             chunkSpladeEnabled(),
-            log), enrichmentSelection);
+            log, this::sparseUnitAllowed), enrichmentSelection);
   }
 
-  private void processDisambiguationBackfill() {
-    DisambiguationBackfillOps.processDisambiguationBackfill(
+  private boolean processDisambiguationBackfill() {
+    return DisambiguationBackfillOps.processDisambiguationBackfill(
         new DisambiguationBackfillOps.BackfillContext(
             documentFieldOps,
             indexingPacing,

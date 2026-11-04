@@ -2,6 +2,8 @@
 package io.justsearch.indexerworker.queue;
 
 import io.justsearch.app.api.indexing.SourceOrigin;
+import io.justsearch.indexerworker.util.PathNormalizer;
+import java.nio.file.Path;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.util.List;
@@ -10,6 +12,43 @@ import java.util.List;
 final class SqliteSourceOrigins {
   private static final tools.jackson.databind.ObjectMapper JSON = new tools.jackson.databind.ObjectMapper();
   private SqliteSourceOrigins() {}
+
+  static java.util.Optional<String> find(Connection connection, JobQueue.IndexJob claim) throws SQLException {
+    if (claim.ingestionRoot() == null) return java.util.Optional.empty();
+    String root = PathNormalizer.normalizeKey(claim.ingestionRoot());
+    if (claim.scanId() != null) {
+      try (var query = connection.prepareStatement("""
+          SELECT origin_id, normalized_root FROM source_origin
+          WHERE kind='IMPORT' AND operation_key=?
+          """)) {
+        query.setString(1, claim.scanId());
+        try (var rows = query.executeQuery()) {
+          while (rows.next()) {
+            if (root.equals(PathNormalizer.normalizeKey(Path.of(rows.getString(2))))) {
+              return java.util.Optional.of(rows.getString(1));
+            }
+          }
+        }
+      }
+    }
+    // Recorded import replays without an origin remain unknown; exact-file jobs own themselves.
+    if (claim.walkEpoch() != null || root.equals(PathNormalizer.normalizeKey(claim.path()))) {
+      return java.util.Optional.empty();
+    }
+    try (var query = connection.prepareStatement("""
+        SELECT origin_id, normalized_root FROM source_origin WHERE kind='WATCHED'
+        ORDER BY accepted_at DESC, origin_id DESC
+        """)) {
+      try (var rows = query.executeQuery()) {
+        while (rows.next()) {
+          if (root.equals(PathNormalizer.normalizeKey(Path.of(rows.getString(2))))) {
+            return java.util.Optional.of(rows.getString(1));
+          }
+        }
+        return java.util.Optional.empty();
+      }
+    }
+  }
 
   static void record(Connection connection, List<SourceOrigin> origins) throws SQLException {
     try (var insert = connection.prepareStatement("""

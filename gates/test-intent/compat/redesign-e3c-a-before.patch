@@ -1,0 +1,58 @@
+diff --git a/modules/worker-core/src/main/java/io/justsearch/indexerworker/bgem3/BgeM3Encoder.java b/modules/worker-core/src/main/java/io/justsearch/indexerworker/bgem3/BgeM3Encoder.java
+index 636344dcd8..8e690711dd 100644
+--- a/modules/worker-core/src/main/java/io/justsearch/indexerworker/bgem3/BgeM3Encoder.java
++++ b/modules/worker-core/src/main/java/io/justsearch/indexerworker/bgem3/BgeM3Encoder.java
+@@ -223,6 +223,8 @@ public class BgeM3Encoder implements AutoCloseable {
+     return tokenizer;
+   }
+ 
++  public boolean isBulkOnCpu() { return false; }
++
+   public boolean isGpuAvailable() {
+     return sessions.isGpuAvailable();
+   }
+diff --git a/modules/worker-core/src/main/java/io/justsearch/indexerworker/inference/LocalSessionAcquisition.java b/modules/worker-core/src/main/java/io/justsearch/indexerworker/inference/LocalSessionAcquisition.java
+index e2a8d8eb9a..ce339b816a 100644
+--- a/modules/worker-core/src/main/java/io/justsearch/indexerworker/inference/LocalSessionAcquisition.java
++++ b/modules/worker-core/src/main/java/io/justsearch/indexerworker/inference/LocalSessionAcquisition.java
+@@ -16,6 +16,13 @@ public final class LocalSessionAcquisition {
+ 
+   private LocalSessionAcquisition() {}
+ 
++  public static ScopedValue.Carrier withCancellation(java.util.function.BooleanSupplier cancelled) {
++    return ScopedValue.where(ScopedValue.newInstance(), cancelled);
++  }
++
++  public static void checkCancellation() {}
++
++
+   public static SessionAcquisitionRequest foreground() {
+     return SessionAcquisitionRequest.within(
+         SessionAcquisitionRequest.Urgency.FOREGROUND, ACQUIRE_TIMEOUT);
+diff --git a/modules/worker-services/src/main/java/io/justsearch/indexerworker/loop/ops/CombinedEnrichmentBackfillOps.java b/modules/worker-services/src/main/java/io/justsearch/indexerworker/loop/ops/CombinedEnrichmentBackfillOps.java
+index 1eecd89e20..60744d1182 100644
+--- a/modules/worker-services/src/main/java/io/justsearch/indexerworker/loop/ops/CombinedEnrichmentBackfillOps.java
++++ b/modules/worker-services/src/main/java/io/justsearch/indexerworker/loop/ops/CombinedEnrichmentBackfillOps.java
+@@ -167,6 +167,22 @@ public final class CombinedEnrichmentBackfillOps {
+       Set<String> publishedDocIds,
+       BooleanSupplier spladeAllowedSupplier,
+       Consumer<Boolean> spladeBackfillResult) {
++    public BackfillContext(
++        DocumentFieldOps documentFieldOps, IndexingCoordinator indexingCoordinator,
++        CommitOps commitOps, IndexingPacing pacing,
++        Supplier<EmbeddingProvider> embeddingProviderSupplier,
++        Supplier<SpladeEncoder> spladeEncoderSupplier, Supplier<NerService> nerServiceSupplier,
++        BooleanSupplier runningSupplier, BooleanSupplier allowEmbeddingWritesSupplier,
++        int batchSize, Logger log, boolean chunkVectorsEnabled, boolean chunkSpladeEnabled,
++        boolean lateChunkingEnabled, int chunkSlotsPerBatch,
++        java.util.ArrayDeque<String> parentIdCache, java.util.ArrayDeque<String> chunkIdCache,
++        int[] batchesSinceCommit, BooleanSupplier stopRequestedSupplier,
++        BooleanSupplier hardStopRequestedSupplier, BooleanSupplier embedShareExhaustedSupplier,
++        WindowedEmbedProgress windowedEmbedProgress, Set<String> publishedDocIds,
++        BooleanSupplier spladeAllowedSupplier, Consumer<Boolean> spladeBackfillResult,
++        java.util.function.Predicate<Boolean> unitAllowed) {
++      this(documentFieldOps, indexingCoordinator, commitOps, pacing, embeddingProviderSupplier, spladeEncoderSupplier, nerServiceSupplier, runningSupplier, allowEmbeddingWritesSupplier, batchSize, log, chunkVectorsEnabled, chunkSpladeEnabled, lateChunkingEnabled, chunkSlotsPerBatch, parentIdCache, chunkIdCache, batchesSinceCommit, stopRequestedSupplier, hardStopRequestedSupplier, embedShareExhaustedSupplier, windowedEmbedProgress, publishedDocIds, spladeAllowedSupplier, spladeBackfillResult);
++    }
+     public BackfillContext(
+         DocumentFieldOps documentFieldOps, IndexingCoordinator indexingCoordinator,
+         CommitOps commitOps, IndexingPacing pacing,

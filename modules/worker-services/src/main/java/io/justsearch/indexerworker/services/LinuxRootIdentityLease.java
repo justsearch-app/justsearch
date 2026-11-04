@@ -237,6 +237,44 @@ final class LinuxRootIdentityLease implements RootIdentityLease {
     return found;
   }
 
+  /** One UUID directory discovery for a publication batch, keyed by Linux major:minor. */
+  static Map<String, String> readUuidDevices(Path directory) throws IOException {
+    Map<String, List<String>> candidates = new java.util.HashMap<>();
+    try (DirectoryStream<Path> entries = Files.newDirectoryStream(directory)) {
+      for (Path entry : entries) {
+        if (!Files.isSymbolicLink(entry)) continue;
+        Map<String, Object> attributes = Files.readAttributes(entry, "unix:rdev,mode");
+        if ((((Number) attributes.get("mode")).intValue() & 0170000) != BLOCK_DEVICE) continue;
+        String device = deviceNumber(((Number) attributes.get("rdev")).longValue());
+        candidates.computeIfAbsent(device, ignored -> new ArrayList<>()).add(entry.getFileName().toString());
+      }
+    }
+    return uniqueUuidDevices(candidates);
+  }
+
+  static Map<String, String> uniqueUuidDevices(Map<String, List<String>> candidates) {
+    Map<String, String> devices = new java.util.HashMap<>();
+    candidates.forEach((device, aliases) -> {
+      if (aliases.size() == 1 && UUID.matcher(aliases.getFirst()).matches()) {
+        devices.put(device, aliases.getFirst().toLowerCase(Locale.ROOT));
+      }
+    });
+    return Map.copyOf(devices);
+  }
+
+  /** btrfs mountinfo can name an anonymous device; resolve its source once per mount, not file. */
+  static String sourceDevice(Mount mount) throws IOException {
+    Path source = Path.of(mount.source());
+    if (source.isAbsolute()) {
+      Map<String, Object> attributes = Files.readAttributes(source, "unix:rdev,mode");
+      if ((((Number) attributes.get("mode")).intValue() & 0170000) == BLOCK_DEVICE) {
+        return deviceNumber(((Number) attributes.get("rdev")).longValue());
+      }
+    }
+    // An anonymous mount without a block source cannot supply a persistent device identity.
+    return mount.device().startsWith("0:") ? null : mount.device();
+  }
+
   static String encodeVolume(String uuid, String type, Path filesystemRoot) {
     if (!UUID.matcher(uuid).matches() || !TYPE.matcher(type).matches()
         || !filesystemRoot.isAbsolute()) {

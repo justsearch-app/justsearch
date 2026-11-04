@@ -675,10 +675,12 @@ public final class SpladeEncoder implements Closeable {
             ensurePinnedOutput(batch, inferLen, vocabSize);
             Map<String, OnnxValue> pinnedOutputs = Map.of(outputName, pinnedOutputTensor);
             // Run into the pinned tensor (caller-managed; not closed here).
+            LocalSessionAcquisition.checkCancellation();
             lease.runPinned(inputs, pinnedOutputs);
             pinnedOutputBuffer.clear();
             buf = pinnedOutputBuffer;
           } catch (OrtException e) {
+            LocalSessionAcquisition.checkCancellation();
             // Tempdoc 397 §14.5 W3 + W4: lease.isCpu() replaces session-identity compare;
             // acquireCpu() replaces the bare peekCpuSession() reach for explicit CPU fallback.
             if (!lease.isCpu() && NativeSessionHandle.isBfcArenaFailure(e)) {
@@ -705,6 +707,7 @@ public final class SpladeEncoder implements Closeable {
           try {
             buf = runHeapFallback(lease, inputs, batch, inferLen);
           } catch (OrtException e) {
+            LocalSessionAcquisition.checkCancellation();
             if (!lease.isCpu() && NativeSessionHandle.isBfcArenaFailure(e)) {
               log.info(
                   "SPLADE GPU arena allocation failed (batch={}, seqLen={}), using CPU fallback",
@@ -814,6 +817,7 @@ public final class SpladeEncoder implements Closeable {
         try {
           buf = runHeapFallback(lease, inputs, 1, seqLen);
         } catch (OrtException e) {
+            LocalSessionAcquisition.checkCancellation();
           if (!lease.isCpu() && NativeSessionHandle.isBfcArenaFailure(e)) {
             log.info("SPLADE GPU arena allocation failed (single, seqLen={}), using CPU fallback",
                 seqLen);
@@ -920,6 +924,7 @@ public final class SpladeEncoder implements Closeable {
           ORT_TRACER, "splade", batch, maxLen);
       ortSpan.setAttribute("encoder.gpu", !lease.isCpu());
       try (Scope _ = ortSpan.makeCurrent()) {
+      LocalSessionAcquisition.checkCancellation();
       try (OrtSession.Result result = lease.run(inputs)) {
         long tPost = System.nanoTime();
         // ORT-call timing recorded at the Lease choke point (tempdoc 710 Move 2).
@@ -978,6 +983,7 @@ public final class SpladeEncoder implements Closeable {
         ortSpan.end();
       }
     } catch (OrtException e) {
+            LocalSessionAcquisition.checkCancellation();
       // GPU BFC arena failure → retry the whole batch on the CPU session.
       // Matches the MLM_LOGITS path's batched-CPU-fallback strategy at lines ~537-548.
       // Tempdoc 397 §14.9: the "was this GPU?" check uses lease.isCpu() (§14.5 W3); acquireCpu()
@@ -1027,6 +1033,7 @@ public final class SpladeEncoder implements Closeable {
           ORT_TRACER, "splade", 1, seqLen);
       ortSpan.setAttribute("encoder.gpu", !lease.isCpu());
       try (Scope _ = ortSpan.makeCurrent()) {
+      LocalSessionAcquisition.checkCancellation();
       try (OrtSession.Result result = lease.run(inputs)) {
         long tPost = System.nanoTime();
         // ORT-call timing recorded at the Lease choke point (tempdoc 710 Move 2).
@@ -1072,6 +1079,7 @@ public final class SpladeEncoder implements Closeable {
   private FloatBuffer runHeapFallback(
       SessionHandle.Lease lease, Map<String, OnnxTensor> inputs, int batch, int len)
       throws OrtException {
+    LocalSessionAcquisition.checkCancellation();
     try (OrtSession.Result result = lease.run(inputs)) {
       OnnxTensor outputTensor = (OnnxTensor) result.get(0);
       long[] outShape = outputTensor.getInfo().getShape();

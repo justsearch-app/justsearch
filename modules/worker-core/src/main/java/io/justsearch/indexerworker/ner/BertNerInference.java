@@ -314,6 +314,7 @@ public final class BertNerInference implements Closeable {
           Span ortSpan = EncoderOrtRunSpans.maybeOrtRun(ORT_TRACER, "ner", 1, seqLen);
           ortSpan.setAttribute("encoder.gpu", !lease.isCpu());
           try {
+            LocalSessionAcquisition.checkCancellation();
             try (Scope _ = ortSpan.makeCurrent();
                  OrtSession.Result result = lease.run(inputs)) {
             long t3 = System.nanoTime();
@@ -506,6 +507,7 @@ public final class BertNerInference implements Closeable {
               // recordOrtCall needed here (this is the exact NER batched-path gap tempdoc 691
               // B-5 shipped under the old per-call-site regime; the choke point makes it
               // structurally impossible to omit again).
+              LocalSessionAcquisition.checkCancellation();
               try (Scope _ = ortSpan.makeCurrent();
                    OrtSession.Result result = lease.run(inputs)) {
                 float[][][] output3d = (float[][][]) result.get(0).getValue();
