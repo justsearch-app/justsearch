@@ -1,0 +1,41 @@
+{
+  "schema": "jseval.quality.config.v1",
+  "collection": "real-use-slice",
+  "language": "mul",
+  "source": {
+    "kind": "public-recipe",
+    "recipe": "real-use",
+    "slice": "real-use-slice"
+  },
+  "judgments": "pooled",
+  "layout": "as-is",
+  "witness_formats": [
+    "md"
+  ],
+  "groups": [
+    "lang",
+    "kind"
+  ],
+  "expected": {
+    "queries": 50,
+    "judgments": 50,
+    "positives": 50,
+    "grades": {
+      "2": 50
+    },
+    "documents": 50
+  },
+  "margins": {
+    "default": 0.01
+  },
+  "alpha": 0.05,
+  "bootstrap": {
+    "resamples": 10000,
+    "seed": 20261102
+  },
+  "unjudged": {
+    "max_differing_share": 0.1
+  },
+  "min_group_size": 20,
+  "notes": "First 50-file slice: 26 English and 24 German documents from all seven sources, mixed original formats and six paragraph-only Markdown notes. Each 2–4-word file-name query is a half-remembered known item; grade 2 only for its file. Initial positive-only labels; further queries and judgments belong to later passes. The byte digest covers every original; probe passages use only Markdown notes verified through the real extraction/index lifecycle. The lang group denotes target-document language, including queries that borrow the other language's vocabulary or word order."
+}

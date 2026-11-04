@@ -5,7 +5,7 @@ Stored format (one directory per collection)::
     queries.jsonl       {"qid", "text", "groups"} per line, sorted by qid
     qrels.tsv           canonical TREC qrels (graded, complete: unjudged = non-relevant)
     manifest.tsv        relpath \\t doc_id, sorted by relpath
-    content.tsv         doc_id \\t sha256 of the document's text (types.document_text), by doc_id
+    content.tsv         doc_id \\t sha256 of materialized source bytes, by doc_id
     collection.v1.json  name, language, version, the four digests, counts, metadata
 
 Builders (all deterministic, offline once ``ir_datasets`` has its files cached — it reads
@@ -84,6 +84,21 @@ class QualityConfig:
     min_group_size: int = 20
     most_changed: int = 10
     top: int = 5
+    layout: str = "opaque"
+    witness_formats: tuple[str, ...] = ("txt",)
+
+    def __post_init__(self) -> None:
+        if self.layout not in ("opaque", "as-is"):
+            raise CollectionError(f"unknown collection layout: {self.layout!r}")
+        if (not self.witness_formats or
+                any(f not in ("txt", "md", "html", "eml") for f in self.witness_formats)):
+            raise CollectionError("witness_formats must list verified text formats")
+
+    def identity_metadata(self) -> dict:
+        # Keep the historical defaults byte-for-byte compatible.
+        return {**({"layout": self.layout} if self.layout != "opaque" else {}),
+                **({"witness_formats": list(self.witness_formats)}
+                   if self.witness_formats != ("txt",) else {})}
 
     def margin(self, group: str) -> float:
         return float(self.margins.get(group, self.margins["default"]))
@@ -110,7 +125,9 @@ class QualityConfig:
                    seed=int(boot.get("seed", 20261102)),
                    max_differing_unjudged_share=float(unj.get("max_differing_share", 0.10)),
                    min_group_size=int(d.get("min_group_size", 20)),
-                   most_changed=int(rep.get("most_changed", 10)), top=int(rep.get("top", 5)))
+                   most_changed=int(rep.get("most_changed", 10)), top=int(rep.get("top", 5)),
+                   layout=d.get("layout", "opaque"),
+                   witness_formats=tuple(d.get("witness_formats", ["txt"])))
 
 
 def known_aliases() -> list[str]:
@@ -256,6 +273,9 @@ def doc_relpath(doc_id: str) -> str:
 
 def build(cfg: QualityConfig, *, path: str | os.PathLike | None = None) -> Collection:
     kind = cfg.source.get("kind")
+    if kind == "public-recipe":
+        from .corpus import build_collection
+        return build_collection(cfg)
     if kind == "ir_datasets":
         return build_ir_datasets(cfg)
     if kind == "miracl-pool":
@@ -279,7 +299,7 @@ def build(cfg: QualityConfig, *, path: str | os.PathLike | None = None) -> Colle
 def _metadata(cfg: QualityConfig, **extra: Any) -> dict:
     import ir_datasets
 
-    return {"config": cfg.collection, "source": dict(cfg.source),
+    return {"config": cfg.collection, "source": dict(cfg.source), **cfg.identity_metadata(),
             "ir_datasets_version": ir_datasets.__version__, **extra}
 
 
@@ -418,7 +438,8 @@ def from_beir_dir(dataset_dir: str | os.PathLike, cfg: QualityConfig) -> Collect
         return Collection(cfg.collection, cfg.language,
                           {q: t for q, t in queries.items() if q in judgments}, judgments,
                           documents, content,
-                          {"config": cfg.collection, "source": {**cfg.source, "path": str(d)}})
+                          {"config": cfg.collection, "source": {**cfg.source, "path": str(d)},
+                           **cfg.identity_metadata()})
     except ValueError as e:
         raise CollectionError(f"{d}: {e}") from None
 
@@ -437,12 +458,16 @@ def _jsonl_rows(path: Path):
 
 
 def write_documents(c: Collection, out_root: str | os.PathLike) -> int:
-    """Write every pool document's text (:func:`document_text`) at its manifest path under
-    ``out_root``, so an engine can index exactly the collection. Official sources only. A text
-    whose hash differs from the collection's content hash is refused before it is written."""
-    import ir_datasets
+    """Materialize verified source bytes at every manifest path under ``out_root``.
 
+    Official text datasets use UTF-8 :func:`document_text`; public recipes copy
+    original bytes. Source hashes must agree with the frozen collection.
+    """
     source = c.metadata.get("source", {})
+    if source.get("kind") == "public-recipe":
+        from .corpus import copy_documents
+        return copy_documents(c, Path(out_root))
+    import ir_datasets
     if source.get("kind") == "beir-dir":
         docs = ((row['_id'], document_text(row.get('title') or '', row['text']))
                 for _, row in _jsonl_rows(Path(source['path']) / 'corpus.jsonl')

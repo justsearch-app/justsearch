@@ -265,8 +265,9 @@ def _quarantine(root: Path, data: Path, c: Collection, key: str, reason: str) ->
 
 
 def _materialize(c: Collection, config: IndexConfig, root: Path) -> Collection:
-    """Salted opaque filenames; preserve the collection's canonical identity separately."""
+    """Verify source bytes and materialize the collection's declared layout."""
     docs = root / "documents"
+    as_is = c.metadata.get("layout", "opaque") == "as-is"
     if not docs.exists():
         staging = root / "documents.partial"
         if staging.exists():
@@ -296,8 +297,10 @@ def _materialize(c: Collection, config: IndexConfig, root: Path) -> Collection:
             src = staging / rel
             if _file_hash(src) != c.content[doc]:
                 raise IndexRefused(f"source content digest differs for {doc}")
-            name = hashlib.sha256(bytes.fromhex(salt) + doc.encode()).hexdigest() + ".txt"
-            shutil.copyfile(src, opaque / name)
+            name = rel if as_is else hashlib.sha256(bytes.fromhex(salt) + doc.encode()).hexdigest() + ".txt"
+            target = opaque / name
+            target.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copyfile(src, target)
             manifest[doc] = name
         _write(root / "materialized.json", manifest)
         atomic_write_text(root / "manifest.tsv", canonical_manifest_text(manifest))
@@ -306,10 +309,16 @@ def _materialize(c: Collection, config: IndexConfig, root: Path) -> Collection:
     manifest = _json(root / "materialized.json")
     if set(manifest) != set(c.documents) or len(set(manifest.values())) != len(manifest):
         raise IndexRefused("materialized manifest differs from collection")
-    if {p.name for p in docs.iterdir()} != set(manifest.values()):
+    if as_is and manifest != c.documents:
+        raise IndexRefused("materialized as-is paths differ from collection")
+    population = list(docs.rglob("*"))
+    if (any(p.is_symlink() or (not as_is and p.is_dir()) for p in population)
+            or {p.relative_to(docs).as_posix() for p in population if p.is_file()} != set(manifest.values())):
         raise IndexRefused("materialized population differs from collection")
     for doc, rel in manifest.items():
-        if Path(rel).name != rel or _file_hash(docs / rel) != c.content[doc]:
+        p = docs / rel
+        if (not p.resolve().is_relative_to(docs.resolve()) or p.is_symlink()
+                or (not as_is and Path(rel).name != rel) or _file_hash(p) != c.content[doc]):
             raise IndexRefused(f"materialized content digest differs for {doc}")
     return Collection(c.name, c.language, c.queries, c.judgments, manifest, c.content, c.metadata)
 
@@ -461,6 +470,22 @@ def _canary_query(base_url: str, candidates) -> str:
     raise IndexRefused(f"no canary query executes {', '.join(CANARY_STAGES)}: {seen[:3]}")
 
 
+def _witness_documents(c: Collection, m: Collection, docs: Path, sample_size: int):
+    formats = c.metadata.get("witness_formats", ["txt"])
+    prohibited = set()
+    source = c.metadata.get("source", {})
+    if source.get("kind") == "public-recipe":
+        from .corpus import load_recipe
+        prohibited = {d["id"] for d in load_recipe(source["recipe"])["documents"]
+                      if d["source"] in ("govdocs1", "safedocs")}
+    eligible = [doc for doc in m.documents
+                if doc not in prohibited and Path(c.documents[doc]).suffix.lstrip(".") in formats]
+    if not eligible:
+        raise IndexRefused("collection has no eligible probe witness document")
+    longest = max(eligible, key=lambda doc: ((docs / m.documents[doc]).stat().st_size, doc))
+    return longest, sorted(set([longest] + sorted(eligible)[:max(0, sample_size - 1)]))
+
+
 def witness(base_url: str, c: Collection, m: Collection, docs: Path,
             config: IndexConfig) -> dict:
     """Read full live population/content and deterministic first/late sample probes."""
@@ -493,8 +518,7 @@ def witness(base_url: str, c: Collection, m: Collection, docs: Path,
             texts[doc] = _preview(client, by_doc[doc], c.content[doc])
             hashes[doc] = sha256_text(texts[doc])
         # Longest document is always included, independent of input/dict order.
-        longest = max(texts, key=lambda doc: ((docs / m.documents[doc]).stat().st_size, doc))
-        samples = sorted(set([longest] + sorted(texts)[:max(0, config.sample_size - 1)]))
+        longest, samples = _witness_documents(c, m, docs, config.sample_size)
         sample, probes = {}, []
         normalized = {doc: " ".join(text.split()).casefold() for doc, text in texts.items()}
         for doc in samples:

@@ -1,0 +1,30 @@
+{
+  "content_sha256": "4b64ce5be921ef91b298280efda7b2b512a7e044792831c342a57cdf66cbc2fc",
+  "counts": {
+    "documents": 50,
+    "grades": {
+      "2": 50
+    },
+    "judgments": 50,
+    "positives": 50,
+    "queries": 50
+  },
+  "judgments_sha256": "1649db3b28c4dd3aa0e3dd0ca241fdfa1790556633f1e2f9b3208490a0b34efc",
+  "language": "mul",
+  "manifest_sha256": "e559a15eff13b5527b7bd568ba7c2890cc6154396f9e1ea8ffffd69aa3ea4197",
+  "metadata": {
+    "config": "real-use-slice",
+    "layout": "as-is",
+    "source": {
+      "kind": "public-recipe",
+      "recipe": "real-use",
+      "slice": "real-use-slice"
+    },
+    "witness_formats": [
+      "md"
+    ]
+  },
+  "name": "real-use-slice",
+  "schema": "jseval.quality.collection.v1",
+  "version": "475e0adcb3a312a31a37ce0127b2145d0938bbb1d6d14f36ffaf470d53c2580a"
+}

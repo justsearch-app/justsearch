@@ -37,5 +37,8 @@ jseval = "jseval.cli:main"
 [tool.setuptools.packages.find]
 where = ["."]
 
+[tool.setuptools.package-data]
+"jseval.quality" = ["config/*.json", "recipes/*.json", "recipes/*.tsv", "recipes/*.md", "recipes/real-use-slice/*"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
