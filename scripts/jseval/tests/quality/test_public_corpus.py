@@ -428,6 +428,70 @@ def test_wikipedia_html_keeps_article_structure_without_chrome(corpus):
         corpus.wikipedia_html('<html><p>Error page</p></html>', 'Energy')
 
 
+def test_wikipedia_html_prefers_article_to_coordinate_indicator(corpus):
+    article = '<div class="mw-content-ltr mw-parser-output"><p>Article text.</p></div>'
+    indicator = ('<div class="mw-indicators"><div class="mw-parser-output">'
+                 '<span>Coordinates</span></div></div>')
+    assert corpus.wikipedia_html(indicator + article, 'Energy') == corpus.wikipedia_html(
+        article, 'Energy')
+
+
+@pytest.mark.parametrize('transform', ['wikipedia-note', 'wikipedia-html'])
+@pytest.mark.parametrize('body', ['', '<p> \n </p>', '<script>active()</script>'])
+def test_wikipedia_empty_body_refused_before_cache_publication(
+        corpus, fixture_recipe, tmp_path, monkeypatch, transform, body):
+    recipe = deepcopy(fixture_recipe)
+    recipe['artifacts'] = recipe['artifacts'][-1:]
+    recipe['documents'] = recipe['documents'][-1:]
+    doc, artifact = recipe['documents'][0], recipe['artifacts'][0]
+    doc['transform'] = transform
+    # Even a pin for the old title-only result must not publish an empty body.
+    title = doc['title']
+    empty = (title + '\n\n\n').encode() if transform == 'wikipedia-note' else (
+        f'<!doctype html>\n<html><head><meta charset="utf-8"><title>{title}</title>'
+        f'</head><body><h1>{title}</h1></body></html>\n').encode()
+    doc.update(bytes=len(empty), sha256=hashlib.sha256(empty).hexdigest())
+    monkeypatch.setenv('JUSTSEARCH_DATASET_CACHE', str(tmp_path / 'empty-wikipedia'))
+    payload = f'<div class="mw-parser-output">{body}</div>'.encode()
+    monkeypatch.setattr(corpus.PublicHTTP, 'open', lambda *_a, **_k: io.BytesIO(payload))
+    with pytest.raises(collections.CollectionError, match='body empty'):
+        corpus.fetch(recipe)
+    assert dataset_cache.lookup('public-real-use', {k: artifact[k] for k in ('url', 'sha256')},
+                                filenames=['payload']) is None
+
+
+def test_wikipedia_html_refuses_deep_nesting(corpus):
+    at_limit = ('<div class="mw-parser-output"><p>' + '<span>' * 254
+                + 'Article.' + '</span>' * 254 + '</p></div>')
+    assert b'<p>Article.</p>' in corpus.wikipedia_html(at_limit, 'Energy')
+    html = '<div class="mw-parser-output"><p>Article.</p>' + '<span>' * 256
+    with pytest.raises(collections.CollectionError, match='nesting'):
+        corpus.wikipedia_html(html, 'Energy')
+
+
+def test_wikipedia_unmatched_closes_have_bounded_work(corpus):
+    import sys
+    # Count executed handler lines instead of relying on machine speed. A scan
+    # of the 128 open nodes per unmatched close exceeds this fixed work budget.
+    closes = 4096
+    html = ('<div class="mw-parser-output"><p>Article.</p>' + '<span>' * 128
+            + '</unmatched>' * closes + '</div>')
+    lines = 0
+    def budget(frame, event, arg):
+        nonlocal lines
+        if (event == 'line' and frame.f_code.co_filename == corpus.__file__
+                and frame.f_code.co_name == 'handle_endtag'):
+            lines += 1
+            assert lines < closes * 32, 'closing-tag work exceeds fixed per-tag budget'
+        return budget
+    previous = sys.gettrace()
+    try:
+        sys.settrace(budget)
+        assert b'<p>Article.</p>' in corpus.wikipedia_html(html, 'Energy')
+    finally:
+        sys.settrace(previous)
+
+
 @pytest.mark.parametrize('change', ['raw', 'article'])
 def test_wikipedia_html_identity_and_download_bound(corpus, fixture_recipe, tmp_path, monkeypatch, change):
     recipe = deepcopy(fixture_recipe)

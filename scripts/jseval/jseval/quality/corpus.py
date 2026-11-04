@@ -38,6 +38,7 @@ MAX_ROBOTS_BYTES = 512 * 1024
 MAX_TAR_EXPANDED_BYTES = 2 * 1024 ** 3
 # Raw Wikipedia HTML is informational, but downloads must still be bounded.
 MAX_WIKIPEDIA_HTML_BYTES = 16 * 1024 ** 2
+MAX_WIKIPEDIA_NESTING = 256
 WIKIPEDIA_TRANSFORMS = ('wikipedia-note', 'wikipedia-html')
 
 
@@ -343,7 +344,11 @@ def wikipedia_note(html: str, title: str) -> bytes:
                 self.current = None
 
     parser = Paragraphs()
+    if len(html.encode('utf-8')) > MAX_WIKIPEDIA_HTML_BYTES:
+        raise CollectionError('Wikipedia byte cap exceeded')
     parser.feed(html)
+    if not parser.parts:
+        raise CollectionError('Wikipedia article body empty')
     return (title + '\n\n' + '\n\n'.join(parser.parts) + '\n').encode('utf-8')
 
 
@@ -366,13 +371,20 @@ def wikipedia_html(html: str, title: str) -> bytes:
             super().__init__()
             self.root = None
             self.stack = []
+            self.open_tags = Counter()
+            self.content_root = False
 
         def handle_starttag(self, tag, attrs):
             attrs = dict(attrs)
             classes = set((attrs.get('class') or '').split())
             if not self.stack:
-                if self.root is not None or 'mw-parser-output' not in classes:
+                # Coordinate indicators can precede the article and also use
+                # mw-parser-output. Prefer the language-marked content root.
+                content_root = bool(classes & {'mw-content-ltr', 'mw-content-rtl'})
+                if ('mw-parser-output' not in classes or self.content_root
+                        or (self.root is not None and not content_root)):
                     return
+                self.content_root = content_root
             node = [tag, classes, []]
             if self.stack:
                 self.stack[-1][2].append(node)
@@ -380,16 +392,25 @@ def wikipedia_html(html: str, title: str) -> bytes:
                 self.root = node
             if tag not in {'area', 'base', 'br', 'col', 'embed', 'hr', 'img', 'input',
                            'link', 'meta', 'param', 'source', 'track', 'wbr'}:
+                if len(self.stack) >= MAX_WIKIPEDIA_NESTING:
+                    raise CollectionError('Wikipedia nesting exceeds fixed cap')
                 self.stack.append(node)
+                self.open_tags[tag] += 1
 
         def handle_startendtag(self, tag, attrs):
             self.handle_starttag(tag, attrs)
             self.handle_endtag(tag)
 
         def handle_endtag(self, tag):
-            for i in range(len(self.stack) - 1, -1, -1):
-                if self.stack[i][0] == tag:
-                    del self.stack[i:]
+            # Unmatched closes cost O(1); matched closes pop each node once.
+            if not self.open_tags.get(tag):
+                return
+            while self.stack:
+                name = self.stack.pop()[0]
+                self.open_tags[name] -= 1
+                if not self.open_tags[name]:
+                    del self.open_tags[name]
+                if name == tag:
                     break
 
         def handle_data(self, data):
@@ -411,12 +432,17 @@ def wikipedia_html(html: str, title: str) -> bytes:
         return text
 
     parser = Article()
+    if len(html.encode('utf-8')) > MAX_WIKIPEDIA_HTML_BYTES:
+        raise CollectionError('Wikipedia byte cap exceeded')
     parser.feed(html)
     if parser.root is None:
         raise CollectionError('Wikipedia article body missing')
+    article = render(parser.root)
+    if not re.sub(r'<[^>]*>', '', article).strip():
+        raise CollectionError('Wikipedia article body empty')
     title = escape(title)
     return (f'<!doctype html>\n<html><head><meta charset="utf-8"><title>{title}</title>'
-            f'</head><body><h1>{title}</h1>{render(parser.root)}</body></html>\n').encode('utf-8')
+            f'</head><body><h1>{title}</h1>{article}</body></html>\n').encode('utf-8')
 
 
 def _wikipedia_derive(html: str, doc: dict) -> bytes:

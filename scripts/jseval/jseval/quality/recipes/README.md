@@ -30,7 +30,10 @@ sequential, observes robots rules (including wildcard rules, crawl delays and
 request rates), checks redirects before requesting their targets, and stops on
 rate limits. Raw downloads use `jseval.dataset_cache`. Wikipedia derivations are
 verified before cache publication and again on cache reads; their raw downloads
-have a fixed 16 MiB cap. Every other source retains its recorded raw size cap.
+have a fixed 16 MiB cap. HTML derivation refuses nesting beyond 256 elements;
+unmatched closing tags take constant work and matched closes pop each node once.
+Both Wikipedia derivations refuse an empty article body. Every other source
+retains its recorded raw size cap.
 The quality lifecycle
 retains its existing clean-engine, prepared-distribution and admission checks;
 Gradle builds use `js-gradle-slot`.
@@ -69,6 +72,14 @@ and three Markdown notes (Energieübertragung, Visit the main page [z], Wind pow
 from the same recorded revisions. Every changed document, revision, prior digest
 and replacement digest is listed in [real-use.wikipedia-repins.tsv](real-use.wikipedia-repins.tsv).
 No slice member changed, so its content digests, queries and judgments are unchanged.
+
+The article-root repair additionally re-pinned Bajgora Wind Farm, Güssing,
+Novar Wind Farm, Ravina Project Toronto, Tehri Dam and Wildpoldsried from their
+same recorded revisions. Their coordinate indicators also carry
+`mw-parser-output`; derivation now prefers the language-marked article root.
+The six additional rows in the repinning table record the title-only digests
+and the corrected article digests. No articles were replaced and none belong
+to the slice.
 
 The Wikipedia share is 70 below target (28%, within the allowed adjustment): the
 chosen category candidates were exhausted or rate limited. EUR-Lex contributes
