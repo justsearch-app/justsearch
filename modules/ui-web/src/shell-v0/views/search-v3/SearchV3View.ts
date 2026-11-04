@@ -1239,6 +1239,7 @@ export class SearchV3View extends JfElement {
       const reconnected = this.aiSnapshot?.connection.reachable === false && snapshot.connection.reachable;
       this.aiSnapshot = snapshot;
       this.applyLockState(snapshot);
+      this.draftDomain.onAnswerStatus(snapshot);
       if (reconnected) this.contextDomain.retryContextOnReconnect();
     });
     // Inventory E3 — the app-wide Simple/Detailed authority. Nothing is COPIED into this element:

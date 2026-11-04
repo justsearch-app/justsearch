@@ -48,6 +48,14 @@ final class IndexingPauseWireTest {
   }
 
   @Test
+  void readinessUnionAcceptsTheTypedIndexingRefusal() throws Exception {
+    var body = ChatResidencyGate.refusalBody(
+        new ChatRefusal(RefusalReason.INDEXING, Optional.empty(), false), null, null);
+    ContractSchemaAssertions.assertConforms("readiness indexing pause", "runtime-ready-unavailable-response.v1.json",
+        new tools.jackson.databind.ObjectMapper().writeValueAsString(body));
+  }
+
+  @Test
   void proxyKeepsThePausedOutcomeWhenIndexingStartsAfterTheFirstGate() throws Exception {
     var http = mock(HttpClient.class);
     var ctx = mock(Context.class);

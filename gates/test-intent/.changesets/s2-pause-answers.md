@@ -7,7 +7,7 @@ author-session: builder-s2-pause-20261104
 
 # Test-intent entries
 
-The user's answer-policy decision is quoted below. P1/P2 here identify the deliver scenarios, not the separately numbered folder-preservation scenarios. Main already writes schema 7; this change adds schema 8 and keeps schema 7 readable. New expectations are component and public-interface checks, not acceptance of the complete running application. Before-state checks use a shared clone inside the session temporary directory, with its own build folders and copied frontend dependencies; no source worktree or another session's service is used. Execution evidence is written only by run-evidence.mjs. The builder writes no acceptance record. The before-state evidence is a direct run in the shared baseline clone: only the existing settings-HTTP interface and Brain switch checks demonstrate assertion fail-before. Tests needing new Engine/generation APIs have candidate evidence only; no missing-helper compilation error is claimed as fail-before. UiSettingsStorePersistenceModeTest uses nested JUnit suites, which run-evidence.mjs cannot resolve from the outer source-file check ID; it is covered by the full app-services test task (5,061 tests, zero failures) and excluded from the evidence selector rather than reported as executed by that runner.
+The user's answer-policy decision is quoted below. P1/P2 here identify the deliver scenarios, not the separately numbered folder-preservation scenarios. Main already writes schema 7; this change adds schema 8 and keeps schema 7 readable. New expectations are component and public-interface checks, not acceptance of the complete running application. Repair-round before-state checks use worktrees inside a temporary shared clone, with no source-repository worktree or object-store writes. Before-state checks use a shared clone inside the session temporary directory, with its own build folders and copied frontend dependencies; no source worktree or another session's service is used. Execution evidence is written only by run-evidence.mjs. The builder writes no acceptance record. The before-state evidence is a direct run in the shared baseline clone: only the existing settings-HTTP interface and Brain switch checks demonstrate assertion fail-before. Tests needing new Engine/generation APIs have candidate evidence only; no missing-helper compilation error is claimed as fail-before. UiSettingsStorePersistenceModeTest uses nested JUnit suites, which run-evidence.mjs cannot resolve from the outer source-file check ID; it is excluded from the evidence selector rather than reported as executed by that runner. The full app-services test task is part of the separate acceptance run; its result is reported in the builder handback.
 
 ```json
 {
@@ -78,7 +78,7 @@ The user's answer-policy decision is quoted below. P1/P2 here identify the deliv
         "modules/ui/src/test/java/io/justsearch/ui/api/mcp/IndexingPauseMcpTest.java",
         "modules/app-agent/src/test/java/io/justsearch/agent/AgentIndexingPauseTest.java",
         "modules/ui-web/src/shell-v0/views/BrainSurface.answer-pause.test.ts",
-        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.residency.test.ts#keeps an indexing-paused question and a newer draft across same-tab reload"
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.residency.test.ts"
       ]
     },
     {
@@ -171,6 +171,45 @@ The user's answer-policy decision is quoted below. P1/P2 here identify the deliv
         }
       ],
       "evidence": "gates/test-intent/evidence/s2-pause-answers-preserved.json"
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.residency.test.ts",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/IndexingLoopHeavyIndexingTest.java",
+        "modules/ui/src/test/java/io/justsearch/ui/api/IndexingPauseWireTest.java",
+        "modules/ui/src/test/java/io/justsearch/ui/api/IndexingPauseGenerationHttpTest.java"
+      ],
+      "class": "New",
+      "repaired": true,
+      "behaviour": "Repair round 1: an INDEXING-refused live page question waits visibly and resends once after a fresh Engine resume observation, including repeated polls, concurrent windows and a status flap while its resumed request is in flight. Editing, Stop waiting, discarding, New and switching answers off cancel continuation; restored copies remain review-only. Backfill backlog only counts while the scheduler can run embeddings (provider available, writes permitted and GPU unit allowed), and counts again when availability returns. The served readiness union accepts INDEXING. Real HTTP title and compaction entry points retain CHAT_UNAVAILABLE, INDEXING and the exact pause wording for synchronous and asynchronous generation refusals without changing saved history, title or summary. The HTTP fixtures refuse at generation, after initial admission. Each repaired expectation has assertion fail-before evidence at b4b0d60ac5. The page fixture now uses the production chunk SSE event; assertions observe the markdown element text property across its shadow boundary.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "P1",
+          "quote": "(user Q1: \"Wait, model stays\") Advanced settings has a \"Pause answers while indexing\" switch, default off (existing installs unchanged). On: while the Engine runs heavy indexing (bulk import, reindex, meaning backfill; not picture reading), new questions from the page, agents and HTTP get an explicit \"Answers paused while indexing\" outcome instead of an answer, an answer already streaming finishes, drafts and conversations are kept, search stays available; when heavy indexing ends (finish, fail, cancel, manual pause) answers resume by themselves with the model still loaded. The saved answers on/off choice is never changed by the pause.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "P2",
+          "quote": "Pause and user intent: switching answers off during a pause keeps them off after indexing; turning the pause switch off mid-indexing resumes answers at once; overlapping indexing work ending in any order releases the pause only when none is left; the choice survives restart and upgrade; a second window converges; Engine recovery mid-pause settles to the right state; a stale window or queue poll cannot hold answers paused. (challenger-4 #11)",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-words",
+          "quote": "Wait, model stays (Recommended)",
+          "location": "task t-20261101-uiimpl user turn Q1"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/s2-pause-answers-repair.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.residency.test.ts#automatically answers an indexing-paused question once after Engine resume across repeated polls and windows",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/IndexingLoopHeavyIndexingTest.java",
+        "modules/ui/src/test/java/io/justsearch/ui/api/IndexingPauseWireTest.java#readinessUnionAcceptsTheTypedIndexingRefusal",
+        "modules/ui/src/test/java/io/justsearch/ui/api/IndexingPauseGenerationHttpTest.java"
+      ]
     }
   ]
 }

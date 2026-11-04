@@ -19,6 +19,55 @@ import java.util.concurrent.atomic.AtomicLong;
 import org.junit.jupiter.api.Test;
 
 final class IndexingLoopHeavyIndexingTest {
+  @org.junit.jupiter.params.ParameterizedTest
+  @org.junit.jupiter.params.provider.ValueSource(strings = {"unavailable", "writes-disabled", "gpu-held"})
+  void backfillOnlyPausesAnswersWhenItCanProgress(String condition) throws Exception {
+    var available = new AtomicBoolean(true);
+    var allowed = new AtomicBoolean(true);
+    var gpuHeld = new AtomicBoolean();
+    var provider = mock(io.justsearch.indexerworker.embed.EmbeddingProvider.class);
+    when(provider.isAvailable()).thenAnswer(ignored -> available.get());
+    when(provider.isUsingGpu()).thenReturn(true);
+    var compatibility = mock(io.justsearch.indexerworker.embed.EmbeddingCompatibilityController.class);
+    when(compatibility.allowEmbeddingWrites()).thenAnswer(ignored -> allowed.get());
+    var signals = mock(WorkerSignalBus.class);
+    when(signals.isMainGpuActive()).thenAnswer(ignored -> gpuHeld.get());
+    var queue = mock(JobQueue.class);
+    when(queue.jobStateCounts()).thenReturn(new JobQueue.JobStateCounts(0, 0, 0, 0, 0));
+    var counts = mock(IndexCountOps.class);
+    when(counts.countByFieldOrThrow(SchemaFields.EMBEDDING_STATUS,
+        SchemaFields.EMBEDDING_STATUS_PENDING)).thenReturn(50);
+    var entered = new CountDownLatch(1);
+    var release = new CountDownLatch(1);
+    when(queue.pollPending(anyInt())).thenAnswer(ignored -> {
+      entered.countDown();
+      release.await(30, TimeUnit.SECONDS);
+      return List.of();
+    });
+    var loop = new IndexingLoop(
+        io.justsearch.indexerworker.TestWorkerExecutorRegistrations.ocr(),
+        io.justsearch.indexerworker.TestWorkerExecutorRegistrations.timebox(), queue,
+        mock(IndexingCoordinator.class), mock(CommitOps.class), mock(DocumentFieldOps.class),
+        counts, () -> null, signals, IndexingPacing.unthrottled(),
+        null, null, null, null, null, null, null);
+    loop.getEmbeddingLifecycle().setEmbeddingProvider(provider);
+    loop.getEmbeddingLifecycle().setEmbeddingCompatController(compatibility);
+    try {
+      loop.start();
+      assertTrue(entered.await(5, TimeUnit.SECONDS));
+      assertTrue(loop.heavyIndexing(), "a runnable retained backlog counts");
+      if (condition.equals("unavailable")) available.set(false);
+      else if (condition.equals("writes-disabled")) allowed.set(false);
+      else gpuHeld.set(true);
+      assertFalse(loop.heavyIndexing(), "a retained backlog that cannot run must not pause answers");
+      available.set(true); allowed.set(true); gpuHeld.set(false);
+      assertTrue(loop.heavyIndexing(), "the same backlog counts again when its provider returns");
+    } finally {
+      release.countDown();
+      loop.close();
+    }
+  }
+
   @Test
   void anOwnerObservedPauseResetsHysteresisWithoutAWindowReadingIt() throws Exception {
     var files = new AtomicLong(50);
@@ -103,6 +152,9 @@ final class IndexingLoopHeavyIndexingTest {
         mock(IndexingCoordinator.class), mock(CommitOps.class), mock(DocumentFieldOps.class),
         counts, () -> null, signals, IndexingPacing.unthrottled(),
         null, null, null, null, null, null, null);
+    var provider = mock(io.justsearch.indexerworker.embed.EmbeddingProvider.class);
+    when(provider.isAvailable()).thenReturn(true);
+    loop.getEmbeddingLifecycle().setEmbeddingProvider(provider);
     assertFalse(loop.heavyIndexing());
     try {
       loop.start();

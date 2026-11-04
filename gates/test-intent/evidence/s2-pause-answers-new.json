@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
   },
-  "createdAt": "2026-11-04T11:35:39.598Z",
-  "revision": "a07eb770d626ed707748b9ce0d42ddda29816290",
-  "tree": "5f5dbaa8309e4dd795ee1aa76d8dedc99714c55c",
+  "createdAt": "2026-11-04T12:26:35.017Z",
+  "revision": "b4b0d60ac51a33ce4939ddbde43494cd44f5577b",
+  "tree": "8a342dc0b8c8015a0a6ae7afce753ed99c4f1307",
   "environment": {
     "platform": "linux",
     "arch": "x64",
@@ -21,37 +21,37 @@
       "command": "./gradlew :modules:worker-services:test --tests \"io.justsearch.indexerworker.loop.HeavyIndexingStateTest\" --tests \"io.justsearch.indexerworker.loop.IndexingLoopHeavyIndexingTest\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 12190
+      "durationMs": 21469
     },
     {
       "command": "./gradlew :modules:app-inference:test --tests \"io.justsearch.app.inference.chat.IndexingAnswerAdmissionTest\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 1954
+      "durationMs": 3210
     },
     {
       "command": "./gradlew :modules:app-services:test --tests \"io.justsearch.app.services.settings.AnswerPausePreferenceTest\" --tests \"io.justsearch.app.services.conversation.ConversationIndexingPauseTest\" --tests \"io.justsearch.app.services.chat.ChatResidencyTest.indexingPauseRefusesAnswersWithoutUnloadingAndPolicyOffReopensImmediately\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 3264
+      "durationMs": 4021
     },
     {
       "command": "./gradlew :modules:ui:test --tests \"io.justsearch.ui.api.AnswerPauseSettingsHttpTest\" --tests \"io.justsearch.ui.api.IndexingPauseWireTest\" --tests \"io.justsearch.ui.api.mcp.IndexingPauseMcpTest\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 9266
+      "durationMs": 5134
     },
     {
       "command": "./gradlew :modules:app-agent:test --tests \"io.justsearch.agent.AgentIndexingPauseTest\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 1900
+      "durationMs": 2674
     },
     {
-      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/BrainSurface.answer-pause.test.ts\" \"src/shell-v0/views/search-v3/SearchV3View.residency.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/00fn8lmv/tmp/test-intent-vitest-244-1793792131050.json\"",
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/BrainSurface.answer-pause.test.ts\" \"src/shell-v0/views/search-v3/SearchV3View.residency.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/9w92so1n/tmp/test-intent-vitest-1206-1793795187285.json\"",
       "cwd": "modules/ui-web",
       "exitCode": 0,
-      "durationMs": 8547
+      "durationMs": 7730
     }
   ],
   "checks": [
@@ -78,11 +78,23 @@
       "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/IndexingLoopHeavyIndexingTest.java",
       "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/IndexingLoopHeavyIndexingTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:eedcef454f43705debf81201430bb949de99d80f32581f5780a4969f65a6ce99",
+      "contentDigest": "sha256:58dc840a790db42edecf27f8758eef1a5ec368b7674edb2368fe63776adb6ce6",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
       "cases": [
+        {
+          "name": "[1] unavailable",
+          "status": "passed"
+        },
+        {
+          "name": "[2] writes-disabled",
+          "status": "passed"
+        },
+        {
+          "name": "[3] gpu-held",
+          "status": "passed"
+        },
         {
           "name": "ownerReadsLiveCountsAndReleasesOnHoldsFailureStopAndRecovery()",
           "status": "passed"
@@ -176,11 +188,15 @@
       "id": "modules/ui/src/test/java/io/justsearch/ui/api/IndexingPauseWireTest.java",
       "file": "modules/ui/src/test/java/io/justsearch/ui/api/IndexingPauseWireTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:716358f43888e927e4ea806059be771325bde012ba828b17dbfe70701fff6568",
+      "contentDigest": "sha256:4154f47663a5993b1ce5bfa9279d0105ebf8432f7ec1e202c3f4fae3675debb4",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
       "cases": [
+        {
+          "name": "readinessUnionAcceptsTheTypedIndexingRefusal()",
+          "status": "passed"
+        },
         {
           "name": "aPauseAfterChatDispatchStillFailsOnTheRunWithItsExplicitReason()",
           "status": "passed"
@@ -245,21 +261,517 @@
       ]
     },
     {
-      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.residency.test.ts#keeps an indexing-paused question and a newer draft across same-tab reload",
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.residency.test.ts",
       "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.residency.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:8a69c2e02adeda5dd67d893e56ba533a9653a6e10400a2863c9007ff12fd628f",
+      "contentDigest": "sha256:04fb95c2b82cd35d71510c5e974184279b99f662ad39ee37801c7c088ec73887",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
       "cases": [
         {
+          "name": "NR15 human admission and RR15 refusal recovery automatically answers an indexing-paused question once after Engine resume across repeated polls and windows",
+          "status": "passed"
+        },
+        {
+          "name": "NR15 human admission and RR15 refusal recovery cancels automatic indexing continuation on edit",
+          "status": "passed"
+        },
+        {
+          "name": "NR15 human admission and RR15 refusal recovery cancels automatic indexing continuation on cancel",
+          "status": "passed"
+        },
+        {
+          "name": "NR15 human admission and RR15 refusal recovery cancels automatic indexing continuation on discard",
+          "status": "passed"
+        },
+        {
+          "name": "NR15 human admission and RR15 refusal recovery cancels automatic indexing continuation on new",
+          "status": "passed"
+        },
+        {
+          "name": "NR15 human admission and RR15 refusal recovery cancels automatic indexing continuation on answers off",
+          "status": "passed"
+        },
+        {
           "name": "NR15 human admission and RR15 refusal recovery keeps an indexing-paused question and a newer draft across same-tab reload",
+          "status": "passed"
+        },
+        {
+          "name": "NR15 human admission and RR15 refusal recovery marks explicit human Send and removes an unaccepted optimistic answer",
+          "status": "passed"
+        },
+        {
+          "name": "NR15 human admission and RR15 refusal recovery allows human Send from positively unloaded chat without granting Delegate or force",
+          "status": "passed"
+        },
+        {
+          "name": "NR15 human admission and RR15 refusal recovery zero documents do not block human core.free-chat (unloaded=false)",
+          "status": "passed"
+        },
+        {
+          "name": "NR15 human admission and RR15 refusal recovery zero documents do not block human core.free-chat (unloaded=true)",
+          "status": "passed"
+        },
+        {
+          "name": "NR15 human admission and RR15 refusal recovery zero documents do not block human core.extract (unloaded=false)",
+          "status": "passed"
+        },
+        {
+          "name": "NR15 human admission and RR15 refusal recovery zero documents do not block human core.extract (unloaded=true)",
+          "status": "passed"
+        },
+        {
+          "name": "NR15 human admission and RR15 refusal recovery retains A and newer B across same-tab reload, review-only",
+          "status": "passed"
+        },
+        {
+          "name": "NR15 human admission and RR15 refusal recovery one explicit force continues captured A exactly once after 200 without a READY poll",
+          "status": "passed"
+        },
+        {
+          "name": "NR15 human admission and RR15 refusal recovery one explicit force continues captured A exactly once after 202 without a READY poll",
+          "status": "passed"
+        },
+        {
+          "name": "NR15 human admission and RR15 refusal recovery unknown transport delivery never claims not sent or offers blind retry",
+          "status": "passed"
+        },
+        {
+          "name": "NR15 human admission and RR15 refusal recovery uses authoritative GPU_BUSY forceAllowed=true without automatic dispatch",
+          "status": "passed"
+        },
+        {
+          "name": "NR15 human admission and RR15 refusal recovery uses authoritative GPU_BUSY forceAllowed=false without automatic dispatch",
+          "status": "passed"
+        },
+        {
+          "name": "NR15 human admission and RR15 refusal recovery uses authoritative GAME_MODE forceAllowed=true without automatic dispatch",
+          "status": "passed"
+        },
+        {
+          "name": "NR15 human admission and RR15 refusal recovery uses authoritative GAME_MODE forceAllowed=false without automatic dispatch",
+          "status": "passed"
+        },
+        {
+          "name": "NR15 human admission and RR15 refusal recovery uses authoritative RELOAD_BACKOFF forceAllowed=true without automatic dispatch",
+          "status": "passed"
+        },
+        {
+          "name": "NR15 human admission and RR15 refusal recovery uses authoritative RELOAD_BACKOFF forceAllowed=false without automatic dispatch",
+          "status": "passed"
+        },
+        {
+          "name": "NR15 human admission and RR15 refusal recovery uses authoritative LOADING forceAllowed=false without automatic dispatch",
+          "status": "passed"
+        },
+        {
+          "name": "NR15 human admission and RR15 refusal recovery uses authoritative HELD_MODEL forceAllowed=false without automatic dispatch",
+          "status": "passed"
+        },
+        {
+          "name": "NR15 human admission and RR15 refusal recovery different during force revokes continuation and preserves the retained question",
+          "status": "passed"
+        },
+        {
+          "name": "NR15 human admission and RR15 refusal recovery same during force revokes continuation and preserves the retained question",
+          "status": "passed"
+        },
+        {
+          "name": "NR15 human admission and RR15 refusal recovery away-and-back during force revokes continuation and preserves the retained question",
+          "status": "passed"
+        },
+        {
+          "name": "NR15 human admission and RR15 refusal recovery empty during force revokes continuation and preserves the retained question",
+          "status": "passed"
+        },
+        {
+          "name": "NR15 human admission and RR15 refusal recovery ime during force revokes continuation and preserves the retained question",
+          "status": "passed"
+        },
+        {
+          "name": "NR15 human admission and RR15 refusal recovery hide during force revokes continuation and preserves the retained question",
+          "status": "passed"
+        },
+        {
+          "name": "NR15 human admission and RR15 refusal recovery pagehide during force revokes continuation and preserves the retained question",
+          "status": "passed"
+        },
+        {
+          "name": "NR15 human admission and RR15 refusal recovery disconnect during force revokes continuation and preserves the retained question",
+          "status": "passed"
+        },
+        {
+          "name": "NR15 human admission and RR15 refusal recovery New during force revokes continuation and preserves the retained question",
+          "status": "passed"
+        },
+        {
+          "name": "NR15 human admission and RR15 refusal recovery Stop during force revokes continuation and preserves the retained question",
+          "status": "passed"
+        },
+        {
+          "name": "NR15 human admission and RR15 refusal recovery Stop during admission cannot be undone by a late typed LOADING refusal",
+          "status": "passed"
+        },
+        {
+          "name": "NR15 human admission and RR15 refusal recovery a second unresolved submission cannot replace retained A with newer B",
+          "status": "passed"
+        },
+        {
+          "name": "NR15 human admission and RR15 refusal recovery refuses issuance when session retention fails, preserving raw and live input",
+          "status": "passed"
+        },
+        {
+          "name": "NR15 human admission and RR15 refusal recovery rejects singleton-array shape without touching any stored or live text",
+          "status": "passed"
+        },
+        {
+          "name": "NR15 human admission and RR15 refusal recovery rejects singleton-array effort without touching any stored or live text",
+          "status": "passed"
+        },
+        {
+          "name": "NR15 human admission and RR15 refusal recovery rejects singleton-array delivery without touching any stored or live text",
+          "status": "passed"
+        },
+        {
+          "name": "NR15 human admission and RR15 refusal recovery EOF without a terminal remains unknown delivery and blocks a second submission",
+          "status": "passed"
+        },
+        {
+          "name": "NR15 human admission and RR15 refusal recovery changing the chosen file through the card action during force revokes the old task",
+          "status": "passed"
+        },
+        {
+          "name": "NR15 human admission and RR15 refusal recovery compatibility free-chat composer owns clearing its submitted draft",
+          "status": "passed"
+        },
+        {
+          "name": "NR15 human admission and RR15 refusal recovery malformed attachment preserves its bytes and blocks unsafe issuance",
+          "status": "passed"
+        },
+        {
+          "name": "NR15 human admission and RR15 refusal recovery version attachment preserves its bytes and blocks unsafe issuance",
+          "status": "passed"
+        },
+        {
+          "name": "NR15 human admission and RR15 refusal recovery unknown-field attachment preserves its bytes and blocks unsafe issuance",
+          "status": "passed"
+        },
+        {
+          "name": "NR15 human admission and RR15 refusal recovery oversize attachment preserves its bytes and blocks unsafe issuance",
+          "status": "passed"
+        },
+        {
+          "name": "NR15 human admission and RR15 refusal recovery UTF8 input bounds refuse before issuance, without truncation",
+          "status": "passed"
+        },
+        {
+          "name": "NR15 human admission and RR15 refusal recovery ready then explicit off keeps human Send unavailable and draft intact",
+          "status": "passed"
+        },
+        {
+          "name": "NR15 human admission and RR15 refusal recovery unknown-delivery retention ACK failure blocks issuance before clearing the composer",
+          "status": "passed"
+        },
+        {
+          "name": "NR15 human admission and RR15 refusal recovery failed retirement keeps A and the newer B companion in existing bytes and live input",
+          "status": "passed"
+        },
+        {
+          "name": "NR15 human admission and RR15 refusal recovery retiring a task after navigation retains the originating newer draft",
+          "status": "passed"
+        },
+        {
+          "name": "NR15 human admission and RR15 refusal recovery initial context wait respects newer text without losing captured A",
+          "status": "passed"
+        },
+        {
+          "name": "NR15 human admission and RR15 refusal recovery initial context wait respects same-text assignment without losing captured A",
+          "status": "passed"
+        },
+        {
+          "name": "NR15 human admission and RR15 refusal recovery initial context wait respects navigation away and back without losing captured A",
+          "status": "passed"
+        },
+        {
+          "name": "NR15 human admission and RR15 refusal recovery initial context wait respects discard without losing captured A",
+          "status": "passed"
+        },
+        {
+          "name": "NR15 human admission and RR15 refusal recovery done retires the unresolved slot and allows another fresh submission",
+          "status": "passed"
+        },
+        {
+          "name": "NR15 human admission and RR15 refusal recovery CANCELLED retires the unresolved slot and allows another fresh submission",
+          "status": "passed"
+        },
+        {
+          "name": "NR15 human admission and RR15 refusal recovery overlapping same-owner mounts reject a stale writer without overwriting the first task",
+          "status": "passed"
+        },
+        {
+          "name": "NR15 human admission and RR15 refusal recovery main and known compatibility shape owners retain independent unresolved slots",
+          "status": "passed"
+        },
+        {
+          "name": "NR15 human admission and RR15 refusal recovery schema during force requires review and never dispatches the abandoned continuation",
+          "status": "passed"
+        },
+        {
+          "name": "NR15 human admission and RR15 refusal recovery effort during force requires review and never dispatches the abandoned continuation",
+          "status": "passed"
+        },
+        {
+          "name": "NR15 human admission and RR15 refusal recovery tier during force requires review and never dispatches the abandoned continuation",
+          "status": "passed"
+        },
+        {
+          "name": "NR15 human admission and RR15 refusal recovery selection during force requires review and never dispatches the abandoned continuation",
+          "status": "passed"
+        },
+        {
+          "name": "NR15 human admission and RR15 refusal recovery clear selection during force requires review and never dispatches the abandoned continuation",
+          "status": "passed"
+        },
+        {
+          "name": "NR15 human admission and RR15 refusal recovery context during force requires review and never dispatches the abandoned continuation",
+          "status": "passed"
+        },
+        {
+          "name": "NR15 human admission and RR15 refusal recovery handoff during force requires review and never dispatches the abandoned continuation",
+          "status": "passed"
+        },
+        {
+          "name": "NR15 human admission and RR15 refusal recovery navigation during force requires review and never dispatches the abandoned continuation",
+          "status": "passed"
+        },
+        {
+          "name": "NR15 human admission and RR15 refusal recovery reload during force requires review and never dispatches the abandoned continuation",
+          "status": "passed"
+        },
+        {
+          "name": "NR15 human admission and RR15 refusal recovery free-chat compatibility sends subsequent turns with zero documents and preserves newer input",
+          "status": "passed"
+        },
+        {
+          "name": "NR15 human admission and RR15 refusal recovery a model-answer turn action never clears or restores unrelated composer text on success",
+          "status": "passed"
+        },
+        {
+          "name": "NR15 human admission and RR15 refusal recovery a model-answer turn action never clears or restores unrelated composer text on refusal",
+          "status": "passed"
+        },
+        {
+          "name": "NR15 human admission and RR15 refusal recovery grounded Ask still requires indexed documents and never falls through to model or Delegate",
+          "status": "passed"
+        },
+        {
+          "name": "NR15 human admission and RR15 refusal recovery DS1 scope-count cap refuses before replacing current text/settings or any request",
+          "status": "passed"
+        },
+        {
+          "name": "NR15 human admission and RR15 refusal recovery DS1 scope-id-UTF8 cap refuses before replacing current text/settings or any request",
+          "status": "passed"
+        },
+        {
+          "name": "NR15 human admission and RR15 refusal recovery DS1 schema-UTF8 cap refuses before replacing current text/settings or any request",
+          "status": "passed"
+        },
+        {
+          "name": "NR15 human admission and RR15 refusal recovery DS1 serialized-UTF8 cap refuses before replacing current text/settings or any request",
+          "status": "passed"
+        },
+        {
+          "name": "NR15 human admission and RR15 refusal recovery invalid task-field attachment fails closed and leaves exact durable bytes and raw text",
+          "status": "passed"
+        },
+        {
+          "name": "NR15 human admission and RR15 refusal recovery invalid draft-field attachment fails closed and leaves exact durable bytes and raw text",
+          "status": "passed"
+        },
+        {
+          "name": "NR15 human admission and RR15 refusal recovery invalid payload-field attachment fails closed and leaves exact durable bytes and raw text",
+          "status": "passed"
+        },
+        {
+          "name": "NR15 human admission and RR15 refusal recovery invalid scope-type attachment fails closed and leaves exact durable bytes and raw text",
+          "status": "passed"
+        },
+        {
+          "name": "NR15 human admission and RR15 refusal recovery invalid scope-count attachment fails closed and leaves exact durable bytes and raw text",
+          "status": "passed"
+        },
+        {
+          "name": "NR15 human admission and RR15 refusal recovery invalid raw-type attachment fails closed and leaves exact durable bytes and raw text",
+          "status": "passed"
+        },
+        {
+          "name": "NR15 human admission and RR15 refusal recovery invalid raw-UTF8 attachment fails closed and leaves exact durable bytes and raw text",
+          "status": "passed"
+        },
+        {
+          "name": "NR15 human admission and RR15 refusal recovery invalid draft-UTF8 attachment fails closed and leaves exact durable bytes and raw text",
+          "status": "passed"
+        },
+        {
+          "name": "NR15 human admission and RR15 refusal recovery invalid schema-type attachment fails closed and leaves exact durable bytes and raw text",
+          "status": "passed"
+        },
+        {
+          "name": "NR15 human admission and RR15 refusal recovery invalid schema-UTF8 attachment fails closed and leaves exact durable bytes and raw text",
+          "status": "passed"
+        },
+        {
+          "name": "NR15 human admission and RR15 refusal recovery invalid place-type attachment fails closed and leaves exact durable bytes and raw text",
+          "status": "passed"
+        },
+        {
+          "name": "NR15 human admission and RR15 refusal recovery invalid record-type attachment fails closed and leaves exact durable bytes and raw text",
+          "status": "passed"
+        },
+        {
+          "name": "NR15 human admission and RR15 refusal recovery invalid reselection-type attachment fails closed and leaves exact durable bytes and raw text",
+          "status": "passed"
+        },
+        {
+          "name": "NR15 human admission and RR15 refusal recovery invalid effort-value attachment fails closed and leaves exact durable bytes and raw text",
+          "status": "passed"
+        },
+        {
+          "name": "NR15 human admission and RR15 refusal recovery invalid delivery-value attachment fails closed and leaves exact durable bytes and raw text",
+          "status": "passed"
+        },
+        {
+          "name": "NR15 human admission and RR15 refusal recovery invalid three-places attachment fails closed and leaves exact durable bytes and raw text",
+          "status": "passed"
+        },
+        {
+          "name": "NR15 human admission and RR15 refusal recovery invalid typed-version attachment fails closed and leaves exact durable bytes and raw text",
+          "status": "passed"
+        },
+        {
+          "name": "NR15 human admission and RR15 refusal recovery invalid incarnation-type attachment fails closed and leaves exact durable bytes and raw text",
+          "status": "passed"
+        },
+        {
+          "name": "NR15 human admission and RR15 refusal recovery invalid preparation-kind-array attachment fails closed and leaves exact durable bytes and raw text",
+          "status": "passed"
+        },
+        {
+          "name": "NR15 human admission and RR15 refusal recovery invalid preparation-scope-kind-array attachment fails closed and leaves exact durable bytes and raw text",
+          "status": "passed"
+        },
+        {
+          "name": "NR15 human admission and RR15 refusal recovery DS1 raw preserves raw C and session B before refusing a third incoming snapshot",
+          "status": "passed"
+        },
+        {
+          "name": "NR15 human admission and RR15 refusal recovery DS1 incoming preserves raw C and session B before refusing a third incoming snapshot",
+          "status": "passed"
+        },
+        {
+          "name": "NR15 human admission and RR15 refusal recovery tab-isolated Storage realms retain distinct tasks and a copied attachment restores only for review",
+          "status": "passed"
+        },
+        {
+          "name": "NR15 human admission and RR15 refusal recovery summarize preserves its exact live passage but persists no excerpt, history or force authority",
+          "status": "passed"
+        },
+        {
+          "name": "NR15 human admission and RR15 refusal recovery Explain retention excludes the embedded backend ranking trace and preserves user instructions",
+          "status": "passed"
+        },
+        {
+          "name": "NR15 human admission and RR15 refusal recovery an overlapping stale owner cannot retire a task after its live owner retries back to the same inputs",
+          "status": "passed"
+        },
+        {
+          "name": "NR15 human admission and RR15 refusal recovery DS1 saved core.rag-ask Retry/Edit require their own exact scope and preserve B",
+          "status": "passed"
+        },
+        {
+          "name": "NR15 human admission and RR15 refusal recovery DS1 saved core.free-chat Retry/Edit require their own exact scope and preserve B",
+          "status": "passed"
+        },
+        {
+          "name": "NR15 human admission and RR15 refusal recovery an explicit force retains its lock through the follow-up dispatch",
+          "status": "passed"
+        },
+        {
+          "name": "NR15 human admission and RR15 refusal recovery a stale force control cannot load or dispatch after explicit retirement",
+          "status": "passed"
+        },
+        {
+          "name": "NR15 human admission and RR15 refusal recovery a transport load failure retains A and newer input without a follow-up dispatch",
+          "status": "passed"
+        },
+        {
+          "name": "NR15 human admission and RR15 refusal recovery a http load failure retains A and newer input without a follow-up dispatch",
+          "status": "passed"
+        },
+        {
+          "name": "NR15 human admission and RR15 refusal recovery a typed load failure retains A and newer input without a follow-up dispatch",
+          "status": "passed"
+        },
+        {
+          "name": "NR15 human admission and RR15 refusal recovery untyped HTTP rejection remains delivery unknown with no inferred force authority",
+          "status": "passed"
+        },
+        {
+          "name": "NR15 human admission and RR15 refusal recovery force continuation rechecks off status without granting background readiness",
+          "status": "passed"
+        },
+        {
+          "name": "NR15 human admission and RR15 refusal recovery force continuation rechecks failed status without granting background readiness",
+          "status": "passed"
+        },
+        {
+          "name": "NR15 human admission and RR15 refusal recovery force continuation rechecks loading status without granting background readiness",
+          "status": "passed"
+        },
+        {
+          "name": "NR15 human admission and RR15 refusal recovery exact UTF8 user-text and scope limits are accepted, with captured effort and scope intact",
+          "status": "passed"
+        },
+        {
+          "name": "NR15 human admission and RR15 refusal recovery exact schema UTF8 limit is accepted for typed Structured",
+          "status": "passed"
+        },
+        {
+          "name": "NR15 human admission and RR15 refusal recovery Stop through late transport loss stays revoked and cannot become a saved stopped claim",
+          "status": "passed"
+        },
+        {
+          "name": "NR15 human admission and RR15 refusal recovery choosing a file after a free-chat handoff replaces its model-only preparation",
+          "status": "passed"
+        },
+        {
+          "name": "NR15 human admission and RR15 refusal recovery supported Summarize with a passage does not acquire an indexed-document prerequisite",
+          "status": "passed"
+        },
+        {
+          "name": "NR15 human admission and RR15 refusal recovery the real chosen-result Ask control remains operable for human admission while unloaded",
+          "status": "passed"
+        },
+        {
+          "name": "NR15 human admission and RR15 refusal recovery confirmed deletion during force revokes the old target without sending Stop",
+          "status": "passed"
+        },
+        {
+          "name": "NR15 human admission and RR15 refusal recovery ordinary Retry becomes available after its interval but the timer never submits",
+          "status": "passed"
+        },
+        {
+          "name": "NR15 human admission and RR15 refusal recovery context that changes during the follow-up confirmation cannot replace the captured force context",
+          "status": "passed"
+        },
+        {
+          "name": "NR15 human admission and RR15 refusal recovery a forced Structured success consumes only its original one-send file preparation",
           "status": "passed"
         }
       ]
     }
   ],
   "failBefore": null,
-  "digest": "sha256:1276ce94b665d9e3ead0aa9b5e24aae0728f86b302b5f5d9ae0b060bd8367ed4"
+  "digest": "sha256:1e6f0dda177f919fa5f364f67fe8f40348bc3e011fbdb91138e99cf6cf0937ab"
 }

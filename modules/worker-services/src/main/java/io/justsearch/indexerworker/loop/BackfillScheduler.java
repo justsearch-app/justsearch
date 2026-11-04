@@ -234,6 +234,7 @@ public final class BackfillScheduler {
 
   /** Pending meaning documents, read from the same index the backfill runner owns. */
   long pendingEmbeddingDocuments() throws java.io.IOException {
+    if (!embeddingCanProgress()) return 0;
     return indexCountOps.countByFieldOrThrow(
         SchemaFields.EMBEDDING_STATUS, SchemaFields.EMBEDDING_STATUS_PENDING);
   }
@@ -459,6 +460,12 @@ public final class BackfillScheduler {
     recordSpladeBackfillResult(outcome.success());
   }
 
+  private boolean embeddingCanProgress() {
+    var provider = embeddingLifecycle.embeddingProvider();
+    return provider.isAvailable() && embeddingLifecycle.allowEmbeddingWrites()
+        && unitAllowed(provider.isUsingGpu());
+  }
+
   private boolean unitAllowed(boolean gpu) {
     return !signalBus.isEnergyReduced()
         && (!gpu || (!signalBus.isBulkHeld() && !signalBus.isMainGpuActive()));
@@ -487,9 +494,7 @@ public final class BackfillScheduler {
   /** Reports useful advancement for sleep pacing, preserving stage continuation rules. */
   private boolean runIndividualBackfills(long cycleDeadlineNanos) {
     boolean anyActivity = false;
-    boolean embeddingCanProgress = embeddingLifecycle.embeddingProvider().isAvailable()
-        && embeddingLifecycle.allowEmbeddingWrites()
-        && unitAllowed(embeddingLifecycle.embeddingProvider().isUsingGpu());
+    boolean embeddingCanProgress = embeddingCanProgress();
     if (embeddingCanProgress) {
       StageOutcome outcome = processEmbeddingBackfill(cycleDeadlineNanos);
       recordStageOutcome(BatchTimingKeys.EMBED, outcome);
