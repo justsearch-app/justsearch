@@ -186,9 +186,9 @@ public final class AuthorizationController {
       // Stop revokes only non-user grants — a user's own TRUSTED approval is not cancelled.
       var approved = pending.get();
       String capsule = approved.preparationNonce() == null
-          ? capsuleService.mint(approved.operationId(), approved.argsJson(), approved.sourceTier())
+          ? capsuleService.mint(approved.operationId(), approved.argsJson(), approved.sourceTier(), approved.id())
           : capsuleService.mintPrepared(approved.operationId(), approved.argsJson(), approved.sourceTier(),
-              approved.operationKey(), approved.preparationNonce());
+              approved.operationKey(), approved.preparationNonce(), approved.id());
       // Tempdoc 550 thesis IV: an explicit "allow always" gesture records a durable grant for this
       // (operation, sourceTier), so future invocations auto-approve at the gate without re-prompting.
       // Tempdoc 875 C.2: NOT for a HIGH-risk operation — the gate's risk ceiling would ignore such a

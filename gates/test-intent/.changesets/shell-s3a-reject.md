@@ -44,7 +44,6 @@ No independent acceptance is claimed by this builder.
       "newChecks": [
         "modules/ui-web/src/shell-v0/operations/authorizationReject.test.ts",
         "modules/ui-web/src/shell-v0/state/frameStatus.authorization.test.ts#L5 pairs by exact pending id when an older request waits and a newer request was answered",
-        "modules/ui-web/src/shell-v0/state/frameStatus.authorization.test.ts#Earlier names an expired request instead of saying approval requested",
         "modules/ui-web/src/shell-v0/state/frameStatus.authorization.test.ts#Earlier names an allowed request and retires its keyed GATED row"
       ]
     },
@@ -135,7 +134,80 @@ No independent acceptance is claimed by this builder.
       "moved": [
         "signature"
       ],
-      "whatMoved": "The pending-store stub and verifications use the create overload with the gate's pendingId as the final argument and assert that exact link. The whole oracle is kept: the server-minted key and preparation nonce survive without a caller key; the caller-supplied key is retained separately from public arguments; public arguments contain no operationKey; the error response still routes approval to the app. Exact public-argument equality is also asserted."
+      "whatMoved": "The pending-store stub and verifications use the create overload with the gate's pendingId as the final argument and assert that exact link. The whole oracle is kept: the server-minted key and preparation nonce survive without a caller key; the caller-supplied key is retained separately from public arguments; public arguments contain no operationKey; the error response still routes approval to the app. Exact public-argument equality is classified separately as New below."
+    },
+    {
+      "items": [
+        "modules/ui/src/test/java/io/justsearch/ui/api/mcp/McpOperationKeyTest.java"
+      ],
+      "class": "New",
+      "behaviour": "Exact public-argument JSON equality is a new check in both keyed and server-minted-key approval paths, in addition to preserving key separation and nonce linkage.",
+      "sources": [
+        {
+          "kind": "owner-words",
+          "quote": "McpOperationKeyTest.java's added exact-JSON assertions are new checks: give them a New entry with source and evidence",
+          "location": "task t-20261103-shell request (S3a repair brief, 2026-11-04; ea4e44dfb5 independent-check failures)"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/shell-s3a-repair-key-json.json",
+      "newChecks": [
+        "modules/ui/src/test/java/io/justsearch/ui/api/mcp/McpOperationKeyTest.java#approvalRetainsKeyAndPublicArguments",
+        "modules/ui/src/test/java/io/justsearch/ui/api/mcp/McpOperationKeyTest.java#preparedGateRetainsServerMintedKeyAndNonceWithoutCallerKey"
+      ]
+    },
+    {
+      "items": [
+        "modules/ui/src/test/java/io/justsearch/ui/api/McpAuthorizationDecisionHttpTest.java"
+      ],
+      "class": "New",
+      "behaviour": "Loopback /mcp rejection yields terminal failed/USER_DENIED using existing fields. Same-key replay cannot dispatch or announce another pending; a fresh key can. Approving a newer waiting request for Apply Excludes or ingest publishes exactly one keyed APPROVED row and executes once, for public-only and frozen-preparation capsules.",
+      "sources": [
+        {
+          "kind": "owner-words",
+          "quote": "after a reject, the outcome tool reports a terminal \"denied by the user\" for that operation key, and a repeated call with the same key returns that denial without creating a new pending request or prompt; a call with a new key is a new request. No other change to the MCP protocol's shape",
+          "location": "task t-20261103-shell request (S3a repair brief, 2026-11-04; ea4e44dfb5 independent-check failures)"
+        },
+        {
+          "kind": "owner-words",
+          "quote": "one Earlier row per decision. Execution already happens once; keep that.",
+          "location": "task t-20261103-shell request (S3a repair brief, 2026-11-04; ea4e44dfb5 independent-check failures)"
+        }
+      ],
+      "repaired": true,
+      "evidence": "gates/test-intent/evidence/shell-s3a-repair-decisions.json",
+      "newChecks": [
+        "modules/ui/src/test/java/io/justsearch/ui/api/McpAuthorizationDecisionHttpTest.java"
+      ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/state/frameStatus.authorization.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "Expired advisory-only history, terminal EXPIRED ledger rows and expired keyed GATED rows all read Denied automatically. The old exact Expired wording assertion is rewritten to the explicit owner wording decision.",
+      "sources": [
+        {
+          "kind": "owner-words",
+          "quote": "an expired request's Earlier row reads \"Denied automatically\" (matching the waiting text \"Denied automatically in N min\"), not \"Expired\". Denied by you and Allowed unchanged.",
+          "location": "task t-20261103-shell request (S3a repair brief, 2026-11-04; ea4e44dfb5 independent-check failures)"
+        }
+      ],
+      "repaired": true,
+      "evidence": "gates/test-intent/evidence/shell-s3a-repair-expiry.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/state/frameStatus.authorization.test.ts#Earlier names an expired request instead of saying approval requested",
+        "modules/ui-web/src/shell-v0/state/frameStatus.authorization.test.ts#Earlier names automatic denial for both terminal ledger expiry and a stale keyed waiting row"
+      ]
+    },
+    {
+      "items": [
+        "modules/ui/src/test/java/io/justsearch/ui/api/AuthorizationControllerTest.java"
+      ],
+      "class": "Adaptation",
+      "moved": [
+        "signature"
+      ],
+      "whatMoved": "The late capsule-mint admission failure is injected into and verified on the pending-aware mint overload. All late-refusal, retryUnsafe, consumed-pending and no-dispatch assertions are retained."
     }
   ]
 }

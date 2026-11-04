@@ -45,7 +45,7 @@ public final class PendingAuthorizationStore {
 
   private final ConcurrentHashMap<String, PendingAuthorization> pendings = new ConcurrentHashMap<>();
   // Recent terminal decisions are process-local, just like pending ids and capsule keys.
-  private final java.util.Map<String, String> rejected = new java.util.LinkedHashMap<>();
+  private final java.util.Map<String, Rejection> rejected = new java.util.LinkedHashMap<>();
   private java.util.function.BiConsumer<PendingAuthorization,
       io.justsearch.app.observability.operations.AuthorizationDisposition> changeListener = (p, d) -> {};
 
@@ -63,6 +63,15 @@ public final class PendingAuthorizationStore {
             pending.gateBehavior(), pending.createdAt(), pending.expiresAt(), pending.transport(), disposition.name()));
       }
     };
+  }
+
+  private record Rejection(String operationKey, Instant deniedAt) {}
+
+  /** Recent process-local decisions, addressed by the agent's original operation key. */
+  public synchronized Optional<Instant> rejectedAt(String operationKey) {
+    if (operationKey == null) return Optional.empty();
+    return rejected.values().stream().filter(row -> operationKey.equals(row.operationKey()))
+        .map(Rejection::deniedAt).findFirst();
   }
 
   public synchronized boolean wasRejected(String id) {
@@ -264,7 +273,7 @@ public final class PendingAuthorizationStore {
     var pending = peek(id);
     if (pending.isEmpty()) return Optional.empty();
     pendings.remove(id);
-    rejected.put(id, id);
+    rejected.put(id, new Rejection(pending.get().operationKey(), clock.instant()));
     while (rejected.size() > MAX_ENTRIES) rejected.remove(rejected.keySet().iterator().next());
     publish(pending.get(), io.justsearch.app.observability.operations.AuthorizationDisposition.DENIED);
     return pending;

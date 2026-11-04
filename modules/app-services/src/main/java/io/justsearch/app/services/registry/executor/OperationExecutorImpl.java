@@ -963,9 +963,11 @@ public final class OperationExecutorImpl implements OperationDispatcher {
                 : capsuleService.consumePreparedDeferred(token, op.id().value(), argumentsJson, operationKey, preparationNonce);
         if (consumed.isPresent()) {
           publications.add(consumed.orElseThrow()::publish);
-          // Tempdoc 550 Outcome face: record the gate firing as APPROVED, then proceed.
-          publications.add(() -> emitGateOutcome(op, provenance, sourceTier, gate,
-              io.justsearch.app.observability.operations.AuthorizationDisposition.APPROVED));
+          // Pending approval already published its keyed decision; direct capsules still need one.
+          if (consumed.orElseThrow().pendingId() == null) {
+            publications.add(() -> emitGateOutcome(op, provenance, sourceTier, gate,
+                io.justsearch.app.observability.operations.AuthorizationDisposition.APPROVED));
+          }
           if (preparationNonce != null
               && continuationPreparation(op, prepared, operationKey)) {
             return new OperationAuthorizationBasis.PreparedContinuation(operationKey, preparationNonce);

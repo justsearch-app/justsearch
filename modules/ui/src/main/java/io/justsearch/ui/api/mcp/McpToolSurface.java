@@ -593,7 +593,16 @@ public final class McpToolSurface {
     HeadAssembly facade = appFacadeLookup.get();
     if (facade == null) return errorContent("Operation history is unavailable", ApiErrorCode.SERVICE_UNAVAILABLE);
     try {
-      var outcome = facade.operationOutcome((String) arguments.get("operationKey"));
+      String key = (String) arguments.get("operationKey");
+      var outcome = facade.operationOutcome(key);
+      var deniedAt = pendingAuthorizationStore == null ? Optional.<java.time.Instant>empty()
+          : pendingAuthorizationStore.rejectedAt(key);
+      if (deniedAt.isPresent()) {
+        outcome = new io.justsearch.app.api.operations.OperationOutcomeView(
+            io.justsearch.app.api.operations.OperationOutcomeView.State.FAILED, null,
+            outcome.historySince(), null, deniedAt.get().toEpochMilli(), null, null,
+            "USER_DENIED", null, "Operation denied by the user");
+      }
       return Map.of("content", List.of(Map.of("type", "text", "text", MAPPER.writeValueAsString(outcome))),
           "structuredContent", outcome);
     } catch (OperationStoreException e) {
@@ -1628,6 +1637,10 @@ public final class McpToolSurface {
         throw new OperationStoreException(OperationStoreException.Code.INVALID_OPERATION_KEY, null);
       }
       String operationKey = (String) rawKey;
+      if (pendingAuthorizationStore != null && pendingAuthorizationStore.rejectedAt(operationKey).isPresent()) {
+        return errorContent(Map.of("error", "Operation denied by the user", "errorCode", "USER_DENIED",
+            "retryable", false, "operationKey", operationKey));
+      }
       String argsJson = MAPPER.writeValueAsString(publicArguments);
       // Tempdoc 655: validate against the Operation's OWN declared schema — the real enforcement
       // schema, not a second MCP-authored literal — before dispatch, so a malformed call gets a

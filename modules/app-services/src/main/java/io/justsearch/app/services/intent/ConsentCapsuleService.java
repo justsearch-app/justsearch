@@ -69,7 +69,13 @@ public final class ConsentCapsuleService
   @Override
   public String mintPrepared(String operationId, String argumentsJson,
       io.justsearch.agent.api.registry.SourceTier sourceTier, String operationKey, UUID preparationNonce) {
-    return mintBound(operationId, preparedDigest(argumentsJson, operationKey, preparationNonce), sourceTier);
+    return mintBound(operationId, preparedDigest(argumentsJson, operationKey, preparationNonce), sourceTier, null);
+  }
+
+  @Override
+  public String mintPrepared(String operationId, String argumentsJson,
+      io.justsearch.agent.api.registry.SourceTier sourceTier, String operationKey, UUID preparationNonce, String pendingId) {
+    return mintBound(operationId, preparedDigest(argumentsJson, operationKey, preparationNonce), sourceTier, pendingId);
   }
 
   @Override
@@ -119,7 +125,7 @@ public final class ConsentCapsuleService
    * revocation can be scoped to non-user grants (tempdoc 550 critical-analysis F3).
    */
   private record GrantMeta(
-      Instant expiry, String subject, io.justsearch.agent.api.registry.SourceTier sourceTier) {}
+      Instant expiry, String subject, io.justsearch.agent.api.registry.SourceTier sourceTier, String pendingId) {}
 
   // Tempdoc 550 thesis IV — one audit: grant lifecycle (ISSUED / CONSUMED / REVOKED) recorded into
   // the one action-event log. Nullable: unset → no audit emission (legacy/test paths).
@@ -155,11 +161,17 @@ public final class ConsentCapsuleService
   @Override
   public String mint(
       String operationId, String argsJson, io.justsearch.agent.api.registry.SourceTier sourceTier) {
-    return mintBound(operationId, CanonicalOperationArguments.digest(Objects.requireNonNull(argsJson, "argsJson")), sourceTier);
+    return mintBound(operationId, CanonicalOperationArguments.digest(Objects.requireNonNull(argsJson, "argsJson")), sourceTier, null);
+  }
+
+  @Override
+  public String mint(String operationId, String argsJson,
+      io.justsearch.agent.api.registry.SourceTier sourceTier, String pendingId) {
+    return mintBound(operationId, CanonicalOperationArguments.digest(Objects.requireNonNull(argsJson, "argsJson")), sourceTier, pendingId);
   }
 
   private String mintBound(String operationId, String argumentDigest,
-      io.justsearch.agent.api.registry.SourceTier sourceTier) {
+      io.justsearch.agent.api.registry.SourceTier sourceTier, String pendingId) {
     Objects.requireNonNull(operationId, "operationId");
     Objects.requireNonNull(sourceTier, "sourceTier");
     String grantId = UUID.randomUUID().toString();
@@ -179,7 +191,7 @@ public final class ConsentCapsuleService
     // forever. Sweeping on mint bounds liveGrants to the unexpired set (drops subject + expiry
     // together — no leak).
     liveGrants.values().removeIf(meta -> now.isAfter(meta.expiry()));
-    liveGrants.put(grantId, new GrantMeta(expiry, operationId, sourceTier));
+    liveGrants.put(grantId, new GrantMeta(expiry, operationId, sourceTier, pendingId));
     String payload = encode(capsule);
     String mac = base64(hmac(payload.getBytes(StandardCharsets.UTF_8)));
     emitGrant(grantId, "ISSUED", operationId, now);
@@ -312,12 +324,16 @@ public final class ConsentCapsuleService
     }
     // Single-use: consume the grant id iff still live. remove() is atomic, so concurrent
     // double-spend resolves to exactly one winner.
-    if (liveGrants.remove(capsule.grantId()) == null) return Optional.empty();
+    var meta = liveGrants.remove(capsule.grantId());
+    if (meta == null) return Optional.empty();
     Instant consumedAt = clock.instant();
     AtomicBoolean published = new AtomicBoolean();
-    return Optional.of(() -> {
-      if (published.compareAndSet(false, true)) {
-        emitGrant(capsule.grantId(), "CONSUMED", operationId, consumedAt);
+    return Optional.of(new ConsentCapsuleAuthority.Consumption() {
+      @Override public String pendingId() { return meta.pendingId(); }
+      @Override public void publish() {
+        if (published.compareAndSet(false, true)) {
+          emitGrant(capsule.grantId(), "CONSUMED", operationId, consumedAt);
+        }
       }
     });
   }

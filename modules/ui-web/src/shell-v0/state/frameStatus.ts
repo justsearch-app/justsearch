@@ -154,7 +154,7 @@ function activityWords(entry: UnifiedActionEntry): { title: string; detail?: str
   if (entry.gate) {
     const { disposition, operation } = entry.gate;
     return disposition === 'DENIED' ? { title: `${entry.gate.pendingId ? 'Denied by you' : 'Approval denied'}: ${operation}`, tone: 'failure' }
-      : disposition === 'EXPIRED' ? { title: `Expired: ${operation}`, tone: 'neutral' }
+      : disposition === 'EXPIRED' ? { title: `Denied automatically: ${operation}`, tone: 'neutral' }
       : disposition === 'APPROVED' ? { title: `${entry.gate.pendingId ? 'Allowed' : 'Approved'}: ${operation}`, tone: 'success' }
         : { title: `Approval requested: ${operation}`, tone: 'warning' };
   }
@@ -196,7 +196,7 @@ export function deriveFrameStatus(input: FrameStatusInput): FrameStatus {
       if (waiting.has(id) || terminal.has(id)) continue;
       const expired = typeof extras.expiresAt === 'string' && Date.parse(extras.expiresAt) <= now;
       const outcome = extras.disposition === 'DENIED' ? 'Denied by you' : extras.disposition === 'APPROVED'
-        ? 'Allowed' : extras.disposition === 'EXPIRED' || expired ? 'Expired' : 'Approval no longer pending';
+        ? 'Allowed' : extras.disposition === 'EXPIRED' || expired ? 'Denied automatically' : 'Approval no longer pending';
       add({ ...advisoryStatusFact(record), title: outcome,
         tone: outcome === 'Allowed' ? 'success' : outcome === 'Denied by you' ? 'failure' : 'neutral', actions: [] });
       continue;
@@ -216,7 +216,7 @@ export function deriveFrameStatus(input: FrameStatusInput): FrameStatus {
       && record.event.classExtras.pendingId === pendingId && typeof record.event.classExtras.expiresAt === 'string'
       && Date.parse(record.event.classExtras.expiresAt) <= now);
     const words = entry.gate?.disposition === 'GATED' && pendingId
-      ? { title: `${expiry ? 'Expired' : 'Approval no longer pending'}: ${entry.gate.operation}`, tone: 'neutral' as const }
+      ? { title: `${expiry ? 'Denied automatically' : 'Approval no longer pending'}: ${entry.gate.operation}`, tone: 'neutral' as const }
       : activityWords(entry);
     add({ id: `activity:${entry.id}`, section: 'earlier', title: words.title,
       ...(words.detail ? { detail: words.detail } : {}), tone: words.tone, occurredAt: entry.occurredAt,

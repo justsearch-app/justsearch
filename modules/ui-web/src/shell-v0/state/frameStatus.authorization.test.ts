@@ -34,7 +34,7 @@ it('Earlier names an expired request instead of saying approval requested', () =
   } } as AdvisoryRecord;
   const model = deriveFrameStatus({ ai: null, now, contactLostAt: null, advisories: [advisory] });
   expect(model.sections.needs).toHaveLength(0);
-  expect(model.sections.earlier[0]!.title).toBe('Expired');
+  expect(model.sections.earlier[0]!.title).toBe('Denied automatically');
 });
 it('Earlier names an allowed request and retires its keyed GATED row', () => {
   const model = deriveFrameStatus({ ai: null, now, contactLostAt: null,
@@ -43,4 +43,19 @@ it('Earlier names an allowed request and retires its keyed GATED row', () => {
   });
   expect(model.sections.earlier).toHaveLength(1);
   expect(model.sections.earlier[0]!.title).toContain('Allowed');
+});
+
+it('Earlier names automatic denial for both terminal ledger expiry and a stale keyed waiting row', () => {
+  for (const disposition of ['EXPIRED', 'GATED']) {
+    const advisory = { key: 'expired', acknowledged: false, origin: 'stream', sourceRenderHint: 'REQUIRES_ACK', event: {
+      id: 'expired', classId: 'authorization.pending', occurredAt: new Date(now - 600_000).toISOString(),
+      renderHint: 'REQUIRES_ACK', classExtras: { pendingId: 'expired', operationId: 'core.apply-excludes',
+        expiresAt: new Date(now - 1000).toISOString() },
+    } } as AdvisoryRecord;
+    const model = deriveFrameStatus({ ai: null, now, contactLostAt: null, advisories: [advisory],
+      activity: unifiedActivity([gate('expiry', 'expired', disposition, -1000)], []),
+    });
+    expect(model.sections.needs).toHaveLength(0);
+    expect(model.sections.earlier.find(row => row.id === 'activity:expiry')!.title).toContain('Denied automatically');
+  }
 });

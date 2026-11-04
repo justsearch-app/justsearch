@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
   },
-  "createdAt": "2026-11-04T19:06:28.696Z",
-  "revision": "516e1439146f4661ce156872f860f3c53baf33e3",
-  "tree": "801134cf90108772ac8f8f695dc9b75ffa3096ad",
+  "createdAt": "2026-11-04T20:23:02.045Z",
+  "revision": "ea4e44dfb50f827e46d7dde82d18ac0e2186d37d",
+  "tree": "64d082ac2042e0edd66f2c7363bb22f8150a55d9",
   "environment": {
     "platform": "linux",
     "arch": "x64",
@@ -18,10 +18,10 @@
   },
   "runs": [
     {
-      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/state/frameStatus.authorization.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/zc6f1p_5/tmp/test-intent-vitest-391-1793819187510.json\"",
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/state/frameStatus.authorization.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/jni6nkpb/tmp/test-intent-vitest-2140-1793823778041.json\"",
       "cwd": "modules/ui-web",
       "exitCode": 0,
-      "durationMs": 1184
+      "durationMs": 4003
     }
   ],
   "checks": [
@@ -29,7 +29,7 @@
       "id": "modules/ui-web/src/shell-v0/state/frameStatus.authorization.test.ts#legacy gate rows without a pending id never hide an answered row for the same operation",
       "file": "modules/ui-web/src/shell-v0/state/frameStatus.authorization.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:7777eeef0a509fb0b3cfaee35beaf02aea88c2c4e99d12d406ca830a411d3df1",
+      "contentDigest": "sha256:7dc2a86e5590e88691151b6ac3fc7b3947eaf80931d537a22fc74cbad8f596f9",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -42,5 +42,5 @@
     }
   ],
   "failBefore": null,
-  "digest": "sha256:9c9c0701cac8833bef9d2eafc28035f2b75a55b1307893dc94fd69bb9c1f529c"
+  "digest": "sha256:7b312a4bfd85f0677d00e4f2ce8d5fd5a0d9eb46073035f84ca1dbe4e6fac908"
 }
