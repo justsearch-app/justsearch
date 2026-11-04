@@ -27,6 +27,8 @@ import { subscribeStatus } from '../utils/statusPoll.js';
 export interface AuthorizationPrompt {
   /** Backend-issued id; the only thing the approval references. */
   readonly pendingId: string;
+  /** Cancel this Engine pending before resolving a human denial. Other gate registries own their rejection. */
+  readonly reject?: () => Promise<void>;
   readonly expiresAt?: string;
   /** The gated operation, for display + the typed-confirm word. */
   readonly operationId: string;

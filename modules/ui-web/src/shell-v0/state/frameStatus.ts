@@ -153,8 +153,9 @@ function activityWords(entry: UnifiedActionEntry): { title: string; detail?: str
   }
   if (entry.gate) {
     const { disposition, operation } = entry.gate;
-    return disposition === 'DENIED' ? { title: `Approval denied: ${operation}`, tone: 'failure' }
-      : disposition === 'APPROVED' ? { title: `Approved: ${operation}`, tone: 'success' }
+    return disposition === 'DENIED' ? { title: `${entry.gate.pendingId ? 'Denied by you' : 'Approval denied'}: ${operation}`, tone: 'failure' }
+      : disposition === 'EXPIRED' ? { title: `Expired: ${operation}`, tone: 'neutral' }
+      : disposition === 'APPROVED' ? { title: `${entry.gate.pendingId ? 'Allowed' : 'Approved'}: ${operation}`, tone: 'success' }
         : { title: `Approval requested: ${operation}`, tone: 'warning' };
   }
   const outcome = ({ SUCCESS: ['Completed', 'success'], FAILURE: ['Failed', 'failure'], FAILED: ['Failed', 'failure'],
@@ -184,14 +185,36 @@ export function deriveFrameStatus(input: FrameStatusInput): FrameStatus {
     if (!sections[fact.section].some(row => row.id === fact.id)) sections[fact.section].push(fact);
   };
   for (const fact of input.conditions ?? []) add(fact);
+  const waiting = new Set((input.authorizations ?? []).filter(request =>
+    !request.expiresAt || Date.parse(request.expiresAt) > now).map(request => request.pendingId));
+  const terminal = new Map((input.activity ?? []).flatMap(entry => entry.gate?.pendingId
+    && entry.gate.disposition !== 'GATED' ? [[entry.gate.pendingId, entry] as const] : []));
   for (const record of input.advisories ?? []) {
+    if (record.event.classId === 'authorization.pending') {
+      const extras = record.event.classExtras;
+      const id = typeof extras.pendingId === 'string' ? extras.pendingId : '';
+      if (waiting.has(id) || terminal.has(id)) continue;
+      const expired = typeof extras.expiresAt === 'string' && Date.parse(extras.expiresAt) <= now;
+      const outcome = extras.disposition === 'DENIED' ? 'Denied by you' : extras.disposition === 'APPROVED'
+        ? 'Allowed' : extras.disposition === 'EXPIRED' || expired ? 'Expired' : 'Approval no longer pending';
+      add({ ...advisoryStatusFact(record), title: outcome,
+        tone: outcome === 'Allowed' ? 'success' : outcome === 'Denied by you' ? 'failure' : 'neutral', actions: [] });
+      continue;
+    }
     const fact = advisoryStatusFact(record);
     // Retained authorization advisories are history, never another execution route.
     add(record.event.classId === 'authorization.pending' ? { ...fact, actions: [] } : fact);
   }
   for (const entry of input.activity ?? []) {
     if (entry.isRoutine || entry.operationOutcomeKey) continue;
-    const words = activityWords(entry);
+    const pendingId = entry.gate?.pendingId;
+    if (pendingId && (waiting.has(pendingId) || entry.gate?.disposition === 'GATED' && terminal.has(pendingId))) continue;
+    const expiry = pendingId && input.advisories?.some(record => record.event.classId === 'authorization.pending'
+      && record.event.classExtras.pendingId === pendingId && typeof record.event.classExtras.expiresAt === 'string'
+      && Date.parse(record.event.classExtras.expiresAt) <= now);
+    const words = entry.gate?.disposition === 'GATED' && pendingId
+      ? { title: `${expiry ? 'Expired' : 'Approval no longer pending'}: ${entry.gate.operation}`, tone: 'neutral' as const }
+      : activityWords(entry);
     add({ id: `activity:${entry.id}`, section: 'earlier', title: words.title,
       ...(words.detail ? { detail: words.detail } : {}), tone: words.tone, occurredAt: entry.occurredAt,
       actions: [go('All activity', 'core.activity-surface')] });
@@ -215,7 +238,7 @@ export function deriveFrameStatus(input: FrameStatusInput): FrameStatus {
   }
   // Deduplicate the broadcast and request-scoped representations by the engine-issued identity.
   for (const request of input.authorizations ?? []) {
-    if (request.expiresAt && Date.parse(request.expiresAt) <= now) continue;
+    if (terminal.has(request.pendingId) || request.expiresAt && Date.parse(request.expiresAt) <= now) continue;
     add({ id: `authorization:${request.pendingId}`, section: 'needs',
       title: `${request.requestedBy ?? 'An agent'} requests ${present({ kind: 'operation', id: request.operationId }).label}`,
       ...(request.argsSummary ? { detail: request.argsSummary } : {}),

@@ -179,7 +179,7 @@ public final class AuthorizationController {
         // "the thing you're approving is no longer pending" from a malformed request.
         ctx.status(410)
             .contentType("application/json")
-            .result("{\"error\":\"pending authorization not found or expired\"}");
+            .result(MAPPER.writeValueAsString(Map.of("error", terminalRefusal(pendingNode.asText()))));
         return;
       }
       // Tempdoc 550 F3: record the authorized action's source tier so an emergency Global Hard
@@ -226,6 +226,35 @@ public final class AuthorizationController {
     }
   }
 
+  /** POST /api/authorizations/reject {pendingId}: single-use, with no capsule or dispatch. */
+  public void handleReject(Context ctx) {
+    if (!WindowAuthority.require(ctx)) return;
+    try {
+      var body = MAPPER.readTree(ctx.body() == null || ctx.body().isBlank() ? "{}" : ctx.body());
+      String id = textField(body, "pendingId");
+      if (id == null) {
+        ctx.status(400).json(Map.of("error", "missing pendingId"));
+        return;
+      }
+      if (pendingStore == null) {
+        ctx.status(400).json(Map.of("error", "pendingId approval not available"));
+        return;
+      }
+      if (pendingStore.reject(id).isEmpty()) {
+        ctx.status(410).json(Map.of("error", terminalRefusal(id)));
+        return;
+      }
+      ctx.json(Map.of("pendingId", id, "rejected", true));
+    } catch (Exception failure) {
+      ctx.status(400).json(Map.of("error", "bad request"));
+    }
+  }
+
+  private String terminalRefusal(String id) {
+    return pendingStore != null && pendingStore.wasRejected(id)
+        ? "pending authorization denied by the user" : "pending authorization not found or expired";
+  }
+
   private static io.justsearch.core.context.EngineContext childContext(
       io.justsearch.app.services.intent.PendingAuthorization pending) {
     var origin = pending.engineContext();
@@ -260,7 +289,7 @@ public final class AuthorizationController {
       // Unknown, expired, or already consumed — 404, matching handleApprove's fail-closed shape
       // for an id that no longer resolves to anything (410 there is "was valid, now isn't"; 404
       // here also covers "never existed" for a GET, so 404 rather than 410 is the better fit).
-      ctx.status(404).contentType("application/json").result("{\"error\":\"pending authorization not found or expired\"}");
+      ctx.status(404).json(Map.of("error", terminalRefusal(id)));
       return;
     }
     var p = pending.get();

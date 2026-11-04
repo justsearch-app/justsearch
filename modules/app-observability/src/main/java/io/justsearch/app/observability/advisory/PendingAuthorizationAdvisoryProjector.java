@@ -62,7 +62,7 @@ public final class PendingAuthorizationAdvisoryProjector
 
   @Override
   public Optional<AdvisoryProjection> project(PendingAuthorizationEvent event) {
-    if (event.transport() != TransportTag.MCP) {
+    if (event.transport() != TransportTag.MCP || !"GATED".equals(event.disposition())) {
       return Optional.empty();
     }
     Map<String, Object> extras = new LinkedHashMap<>();

@@ -52,6 +52,7 @@ export interface BackendLedgerEntry {
   readonly targetSurface?: string;
   readonly sourceId?: string;
   // Tempdoc 550 Outcome face — present on kind='gate' rows (trust-gate firings).
+  readonly pendingId?: string;
   readonly disposition?: string; // GATED | DENIED | APPROVED
   readonly gateBehavior?: string;
   // Tempdoc 550 G6 — backend execution id for undo-supported operations. The FE links it to
@@ -114,7 +115,7 @@ export interface UnifiedActionEntry {
    * Present on trust-gate rows: the structured disposition (GATED | DENIED | APPROVED) and the
    * humanized operation, so a presenter can word the row without parsing {@link label}.
    */
-  readonly gate?: { readonly disposition: string; readonly operation: string };
+  readonly gate?: { readonly disposition: string; readonly operation: string; readonly pendingId?: string };
   /** Present on grant-lifecycle rows: the structured action (ISSUED | CONSUMED | REVOKED) and the humanized subject. */
   readonly grant?: { readonly action: string; readonly subject: string };
   /**
@@ -311,7 +312,7 @@ export function projectBackend(e: BackendLedgerEntry): UnifiedActionEntry {
     // tempdoc 558 Deepening 3 — structured outcome (operation rows: SUCCESS/FAILURE/UNDONE; absent
     // elsewhere). Conditional-spread so an absent outcome stays absent (exactOptionalPropertyTypes-safe).
     ...(e.outcome ? { outcome: e.outcome } : {}),
-    ...(e.kind === 'gate' && e.disposition ? { gate: { disposition: e.disposition, operation: opLabel(e.operationId) } } : {}),
+    ...(e.kind === 'gate' && e.disposition ? { gate: { disposition: e.disposition, operation: opLabel(e.operationId), ...(e.pendingId ? { pendingId: e.pendingId } : {}) } } : {}),
     ...(e.kind === 'grant' && e.action ? { grant: { action: e.action, subject: e.subject ? opLabel(e.subject) : '' } } : {}),
     ...(e.kind === 'operation'
       && ['core.bulk-reindex', 'core.rebuild-index', 'core.activate-installed-models'].includes(e.operationId ?? '')

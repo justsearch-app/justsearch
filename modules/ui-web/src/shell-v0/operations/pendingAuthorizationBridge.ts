@@ -46,6 +46,7 @@ import { subscribeStatus } from '../utils/statusPoll.js';
 /** Wire shape of the SLIMMED `PendingAuthorizationEvent` — routing info only, no decision content. */
 interface PendingAuthorizationPayload {
   readonly pendingId?: string;
+  readonly disposition?: string;
   readonly operationId?: string;
   readonly sourceTier?: string;
   readonly riskTier?: string;
@@ -142,6 +143,12 @@ export function startPendingAuthorizationBridge(
     if (!payload?.pendingId || !payload.operationId) {
       return;
     }
+    if (payload.disposition && payload.disposition !== 'GATED') {
+      handledIds.set(payload.pendingId, true);
+      waiting.delete(payload.pendingId);
+      withdrawAuthorization(payload.pendingId);
+      return;
+    }
     // These user-only operations always have their own exact-target ceremony in the
     // originating window. A broadcast may precede its 428; it must never offer a second
     // route that can execute while that window still offers Cancel.
@@ -206,6 +213,7 @@ async function presentAndExecute(
 
   const prompt: AuthorizationPrompt = {
     pendingId,
+    reject: () => client.rejectPending(pendingId),
     ...(detail.expiresAt ? { expiresAt: detail.expiresAt } : {}),
     operationId: detail.operationId,
     gateBehavior: payload.gateBehavior ?? detail.gateBehavior ?? 'TYPED_CONFIRM',
@@ -228,8 +236,6 @@ async function presentAndExecute(
     // dismissed, nothing dispatched, and nothing told the user why. Same channel as every other
     // outcome this function reports.
     reportExecutionFailure(prompt, 'the approval ceremony closed before the decision was sent');
-    // The pending record itself expires server-side (5-minute TTL) if never approved; there is no
-    // separate "reject" round trip to make for an MCP-originated pending.
     return;
   }
 

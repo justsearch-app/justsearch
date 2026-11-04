@@ -108,14 +108,14 @@ public final class ActionLedgerProjection {
             gate.operationId(),
             gate.disposition().name(),
             gate.gateBehavior().name(),
-            gate.sourceTier().name()),
+            gate.sourceTier().name(), gate.pendingId()),
         gate.occurredAt(),
         originatorOf(gate.transport()),
         gate.transport().name(),
         gate.operationId(),
         gate.disposition().name(),
         gate.gateBehavior().name(),
-        gate.sourceTier().name());
+        gate.sourceTier().name(), Optional.ofNullable(gate.pendingId()));
   }
 
   /**
@@ -181,6 +181,7 @@ public final class ActionLedgerProjection {
         m.put("outcome", gate.disposition()); // outcome column mirrors disposition for gates
         m.put("gateBehavior", gate.gateBehavior());
         m.put("sourceTier", gate.sourceTier());
+        gate.pendingId().ifPresent(id -> m.put("pendingId", id));
       }
       case ActionEvent.Grant grant -> {
         m.put("grantId", grant.grantId());
@@ -295,7 +296,7 @@ public final class ActionLedgerProjection {
                     str(row, "operationId"),
                     str(row, "disposition"),
                     str(row, "gateBehavior"),
-                    str(row, "sourceTier"));
+                    str(row, "sourceTier"), optional(row, "pendingId"));
             case "grant" ->
                 new ActionEvent.Grant(
                     id,

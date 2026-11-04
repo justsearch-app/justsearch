@@ -61,6 +61,10 @@ beforeEach(async () => {
       const exists = (id !== detail.pendingId || pending) && !goneIds.has(id);
       return new Response(JSON.stringify(exists ? { ...detail, pendingId: id } : {}), { status: exists ? lookupStatus : 404 });
     }
+    if (String(input).endsWith('/api/authorizations/reject')) {
+      return new Response(JSON.stringify(pending ? { rejected: true } : { error: 'no longer pending' }),
+        { status: pending ? 200 : 410 });
+    }
     if (String(input).endsWith('/api/authorizations/approve')) {
       writes++;
       pending = false;

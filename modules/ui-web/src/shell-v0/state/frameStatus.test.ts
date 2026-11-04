@@ -116,8 +116,8 @@ describe('frame status projection', () => {
     const m = derive({ authorizations: [request], advisories: [broadcast] });
     expect(m.sections.needs.map(f => f.id)).toEqual(['authorization:exact-target1']);
     expect(m.sections.needs[0]!.actions).toEqual([{ kind: 'authorization', target: 'exact-target1', label: 'Review request' }]);
-    // The retained broadcast is history only: it can never execute the decision a second time.
-    expect(m.sections.earlier.find(f => f.id === 'advisory:auth-adv')!.actions).toEqual([]);
+    // L5: while waiting, its broadcast cannot duplicate the request in Earlier.
+    expect(m.sections.earlier.find(f => f.id === 'advisory:auth-adv')).toBeUndefined();
     // Answered elsewhere / withdrawn: the request leaves, the history stays inert.
     const answered = derive({ authorizations: [], advisories: [broadcast] });
     expect(answered.sections.needs).toEqual([]);

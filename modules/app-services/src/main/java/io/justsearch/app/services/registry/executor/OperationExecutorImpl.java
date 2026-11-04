@@ -559,7 +559,7 @@ public final class OperationExecutorImpl implements OperationDispatcher {
       if (required.preparationNonce() == null) throw required;
       var preview = Objects.requireNonNull(invocation.handler().approvalPreview(invocation.value()), "approvalPreview");
       throw new ConfirmationRequiredException(required.operationRef(), required.gateBehavior(), required.declaredStrategy(),
-          required.sourceTier(), required.operationKey(), required.preparationNonce(), preview);
+          required.sourceTier(), required.operationKey(), required.preparationNonce(), preview, required.pendingId());
     }
   }
 
@@ -972,10 +972,11 @@ public final class OperationExecutorImpl implements OperationDispatcher {
           }
           return new OperationAuthorizationBasis.EphemeralCapsule();
         }
-        publications.add(() -> emitGateOutcome(op, provenance, sourceTier, gate,
-            io.justsearch.app.observability.operations.AuthorizationDisposition.GATED));
-        throw new ConfirmationRequiredException(op.id(), gate, op.policy().confirm(), sourceTier,
+        var required = new ConfirmationRequiredException(op.id(), gate, op.policy().confirm(), sourceTier,
             operationKey, preparationNonce);
+        publications.add(() -> emitGateOutcome(op, provenance, sourceTier, gate,
+            io.justsearch.app.observability.operations.AuthorizationDisposition.GATED, required.pendingId()));
+        throw required;
       }
       case DENY -> {
         publications.add(() -> emitGateOutcome(op, provenance, sourceTier, gate,
@@ -1004,6 +1005,12 @@ public final class OperationExecutorImpl implements OperationDispatcher {
       SourceTier sourceTier,
       GateBehavior gate,
       io.justsearch.app.observability.operations.AuthorizationDisposition disposition) {
+    emitGateOutcome(op, provenance, sourceTier, gate, disposition, null);
+  }
+
+  private void emitGateOutcome(Operation op, InvocationProvenance provenance, SourceTier sourceTier,
+      GateBehavior gate, io.justsearch.app.observability.operations.AuthorizationDisposition disposition,
+      String pendingId) {
     if (authorizationOutcomeEmitter == null) {
       return;
     }
@@ -1016,7 +1023,7 @@ public final class OperationExecutorImpl implements OperationDispatcher {
               op.policy().risk(),
               gate,
               disposition,
-              clock.instant()));
+              clock.instant(), pendingId));
     } catch (RuntimeException e) {
       // Security-gate-adjacent (tempdoc 550): the gate-firing emit is ADDITIVE. The emitter now
       // also fans the firing into the unified action-ledger change-stream (SSE publish +

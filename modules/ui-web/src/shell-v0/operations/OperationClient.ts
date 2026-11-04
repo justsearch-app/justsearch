@@ -320,13 +320,14 @@ export class OperationClient {
       consented?: boolean;
       requestConsent?: (prompt: {
         pendingId: string;
+        reject?: () => Promise<void>;
         operationId: string;
         gateBehavior: string;
         riskTier?: string;
         undoSupported?: boolean;
         argsSummary?: string;
         purpose?: string;
-      }) => Promise<{ approved: boolean; allowAlways: boolean; superseded?: boolean }>;
+      }) => Promise<{ approved: boolean; allowAlways: boolean; superseded?: boolean; failedClosed?: boolean }>;
     } = {},
   ): Promise<OperationInvocationSuccess> {
     // Preserve the exact JSON input sent before the asynchronous ceremony. A caller can
@@ -346,7 +347,9 @@ export class OperationClient {
           // Tempdoc 550 P1: enrich the prompt with the 428's decision context (carried on the
           // error's details bag) + the gate message as the purpose.
           const d = err.errorDetails ?? {};
+          let rejected = false;
           const decision = await opts.requestConsent({
+            reject: async () => { await this.rejectPending(err.pendingId!); rejected = true; },
             pendingId: err.pendingId,
             operationId,
             gateBehavior: err.gateBehavior ?? '',
@@ -358,6 +361,7 @@ export class OperationClient {
           if (decision.superseded) {
             throw new OperationError('Approval request is no longer pending', 'AUTHORIZATION_NO_LONGER_PENDING');
           }
+          if (!decision.approved && !decision.failedClosed && !rejected) await this.rejectPending(err.pendingId);
           approved = decision.approved;
           allowAlways = decision.allowAlways; // tempdoc 550 thesis IV: "allow always" → durable grant
         }
@@ -425,6 +429,24 @@ export class OperationClient {
     return { capsule: parsed.capsule,
       ...(parsed.operationKey ? { operationKey: parsed.operationKey } : {}),
       ...(parsed.preparationNonce ? { preparationNonce: parsed.preparationNonce } : {}) };
+  }
+
+  /** A terminal 410 is an idempotent cancellation acknowledgement, never execution authority. */
+  async rejectPending(pendingId: string): Promise<void> {
+    if (!pendingId) throw new OperationError('pendingId required', 'BAD_REQUEST');
+    let response: Response;
+    try {
+      response = await this.fetchImpl(`${this.apiBase}/api/authorizations/reject`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ pendingId }),
+      });
+    } catch {
+      throw new OperationError('The request could not be cancelled. Try again.', 'NETWORK_ERROR');
+    }
+    if (response.status === 410) return;
+    const body = await response.json().catch(() => null) as { rejected?: boolean } | null;
+    if (!response.ok || body?.rejected !== true) {
+      throw new OperationError('The request could not be cancelled. Try again.', 'AUTHORIZATION_REJECT_FAILED', response.status);
+    }
   }
 
   private async approveGate(gate: OperationError, allowAlways: boolean): Promise<OperationApproval> {
@@ -634,13 +656,14 @@ export class OperationClient {
       consented?: boolean;
       requestConsent?: (prompt: {
         pendingId: string;
+        reject?: () => Promise<void>;
         operationId: string;
         gateBehavior: string;
         riskTier?: string;
         undoSupported?: boolean;
         argsSummary?: string;
         purpose?: string;
-      }) => Promise<{ approved: boolean; allowAlways: boolean; superseded?: boolean }>;
+      }) => Promise<{ approved: boolean; allowAlways: boolean; superseded?: boolean; failedClosed?: boolean }>;
     } = {},
   ): Promise<OperationInvocationSuccess> {
     const { transport, idempotencyKey, preparationNonce } = opts;
@@ -656,7 +679,9 @@ export class OperationClient {
         let allowAlways = false;
         if (!approved && opts.requestConsent) {
           const d = err.errorDetails ?? {};
+          let rejected = false;
           const decision = await opts.requestConsent({
+            reject: async () => { await this.rejectPending(err.pendingId!); rejected = true; },
             pendingId: err.pendingId,
             operationId,
             gateBehavior: err.gateBehavior ?? '',
@@ -670,6 +695,7 @@ export class OperationClient {
           if (decision.superseded) {
             throw new OperationError('Approval request is no longer pending', 'AUTHORIZATION_NO_LONGER_PENDING');
           }
+          if (!decision.approved && !decision.failedClosed && !rejected) await this.rejectPending(err.pendingId);
           approved = decision.approved;
           allowAlways = decision.allowAlways;
         }

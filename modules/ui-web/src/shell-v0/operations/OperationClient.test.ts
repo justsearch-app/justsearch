@@ -375,6 +375,7 @@ describe('OperationClient', () => {
     expect(prompts).toEqual([
       {
         pendingId: 'pa-7',
+        reject: expect.any(Function),
         operationId: 'core.bulk-reindex',
         gateBehavior: 'TYPED_CONFIRM',
         purpose: 'Operation core.bulk-reindex failed',
@@ -385,9 +386,9 @@ describe('OperationClient', () => {
   it('invokeWithConsent (invoke-first): requestConsent declines → the gate error is rethrown, no approve', async () => {
     const fetchImpl = vi
       .fn<typeof fetch>()
-      .mockResolvedValue(
+      .mockResolvedValueOnce(
         fakeResponse({ success: false, errorClass: 'CONFIRMATION_REQUIRED', pendingId: 'pa-8' }, 428),
-      );
+      ).mockResolvedValue(fakeResponse({ rejected: true }));
     const client = new OperationClient({ apiBase: 'http://localhost:33221', fetchImpl });
 
     await expect(
@@ -449,6 +450,7 @@ describe('OperationClient.undo — trust-gated reversal (tempdoc 875 §C.7)', ()
     expect(prompts).toEqual([
       {
         pendingId: 'pa-undo-7',
+        reject: expect.any(Function),
         operationId: 'core_file_operations',
         gateBehavior: 'TYPED_CONFIRM',
         riskTier: 'HIGH',
@@ -496,6 +498,9 @@ describe('OperationClient.undo — trust-gated reversal (tempdoc 875 §C.7)', ()
 
   it('a declined ceremony rethrows the gate error and never mints a capsule', async () => {
     const fetchImpl = gatedUndoFetch({ pendingId: 'pa-undo-9', gateBehavior: 'TYPED_CONFIRM' });
+    fetchImpl.mockImplementationOnce(async () => fakeResponse({ success: false,
+      errorClass: 'CONFIRMATION_REQUIRED', pendingId: 'pa-undo-9', gateBehavior: 'TYPED_CONFIRM' }, 428))
+      .mockImplementationOnce(async () => fakeResponse({ rejected: true }));
     const client = new OperationClient({ apiBase: 'http://localhost:33221', fetchImpl });
 
     await expect(

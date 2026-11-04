@@ -542,7 +542,7 @@ public final class OperationsController {
               e.gateBehavior(),
               e.getMessage(),
               null,
-              provenance.transport(), RequestEngineContext.get(ctx), provenance, stableKey, undo, e.preparationNonce(), e.approvalPreview());
+              provenance.transport(), RequestEngineContext.get(ctx), provenance, stableKey, undo, e.preparationNonce(), e.approvalPreview(), e.pendingId());
       body.put("pendingId", pendingId);
       // Tempdoc 655: also broadcast on the pending-authorization SSE stream, so the shell
       // (already open, potentially on a different view than whatever triggered this 428) has one
