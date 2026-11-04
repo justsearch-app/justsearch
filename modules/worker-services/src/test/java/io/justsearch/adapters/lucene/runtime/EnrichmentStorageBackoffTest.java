@@ -336,6 +336,116 @@ class EnrichmentStorageBackoffTest extends LuceneExecutorTestBase {
     }
   }
 
+  @ParameterizedTest(name = "{displayName} [{index}] {arguments}")
+  @ValueSource(strings = {"embed", "chunk", "ner", "sparse", "bge", "interleaved", "bge-interleaved"})
+  void interruptedWriterCancellationDoesNotBecomeStorageBackoff(String stage) throws Exception {
+    boolean interrupted = Thread.currentThread().isInterrupted();
+    try (var h = new Harness("interrupted-writer")) {
+      h.enable(stage); h.seedThree(stage);
+      h.beforePublicationFailure = () -> Thread.currentThread().interrupt();
+      h.publicationFailure = new java.nio.channels.ClosedByInterruptException();
+      h.failSecondMutation();
+      try { h.turn(stage); } finally { Thread.interrupted(); }
+      assertCancelledSuffixRecovers(h, stage);
+    } finally {
+      Thread.interrupted();
+      if (interrupted) Thread.currentThread().interrupt();
+    }
+  }
+
+  static java.util.stream.Stream<Arguments> interruptedIoFailures() {
+    return java.util.stream.Stream.of("embed", "chunk", "ner", "sparse", "bge", "interleaved", "bge-interleaved")
+        .flatMap(stage -> java.util.stream.Stream.of("interrupted-io", "closed-by-interrupt", "file-lock")
+            .map(failure -> Arguments.of(stage, failure)));
+  }
+
+  @ParameterizedTest(name = "{displayName} [{index}] {arguments}")
+  @MethodSource("interruptedIoFailures")
+  void wrappedInterruptedIoWithoutThreadFlagNeverBacksOff(String stage, String failure) throws Exception {
+    try (var h = new Harness("interrupted-io")) {
+      h.enable(stage); h.seedThree(stage);
+      IOException cause = switch (failure) {
+        case "interrupted-io" -> new java.io.InterruptedIOException();
+        case "closed-by-interrupt" -> new java.nio.channels.ClosedByInterruptException();
+        default -> new java.nio.channels.FileLockInterruptionException();
+      };
+      h.publicationFailure = new RuntimeException("wrapped interruption", cause);
+      h.failSecondMutation(); h.turn(stage);
+      assertCancelledSuffixRecovers(h, stage);
+    }
+  }
+
+  static java.util.stream.Stream<Arguments> publicationHardStops() {
+    return java.util.stream.Stream.of("embed", "chunk", "ner", "sparse", "bge", "interleaved", "bge-interleaved")
+        .flatMap(stage -> java.util.stream.Stream.of("shutdown", "hold", "source", "provider", "authority")
+            .map(stop -> Arguments.of(stage, stop)));
+  }
+
+  @ParameterizedTest(name = "{displayName} [{index}] {arguments}")
+  @MethodSource("publicationHardStops")
+  void publicationFailureDuringHardStopNeverBacksOff(String stage, String stop) throws Exception {
+    try (var h = new Harness("stopped-writer")) {
+      h.enable(stage); h.seedThree(stage);
+      h.beforePublicationFailure = switch (stop) {
+        case "shutdown" -> () -> h.running.set(false);
+        case "hold" -> () -> h.held.set(true);
+        case "source" -> () -> h.runtime.session().bulkDeleteEpoch.incrementAndGet();
+        case "authority" -> () -> h.runtime.indexingCoordinator().transitionEnrichmentAuthority(() -> {});
+        default -> () -> {
+          if (stage.equals("embed") || stage.equals("chunk")) h.denseEnabled = false;
+          else if (stage.equals("ner")) when(h.ner.isAvailable()).thenReturn(false);
+          else if (stage.startsWith("bge")) h.bgeEnabled = false;
+          else h.sparseEnabled = false;
+        };
+      };
+      h.failSecondMutation(); h.turn(stage);
+      h.running.set(true); h.held.set(false); h.enable(stage);
+      when(h.ner.isAvailable()).thenReturn(true);
+      assertCancelledSuffixRecovers(h, stage);
+    }
+  }
+
+  private void assertCancelledSuffixRecovers(Harness h, String stage) throws Exception {
+    h.refresh();
+    assertEquals(List.of("a"), h.receipts.getFirst().acceptedIds());
+    assertNotNull(h.receipts.getFirst().failure());
+    assertEquals(stage.equals("ner") ? "COMPLETED_EMPTY" : "COMPLETED", h.value("a", status(stage)));
+    for (String id : List.of("b", "c")) {
+      assertEquals("PENDING", h.value(id, status(stage)));
+      assertEquals("2", h.value(id, retry(stage)));
+    }
+    h.fail.set(false);
+    for (int cycle = 0; cycle < 6; cycle++) h.turn(stage);
+    h.refresh();
+    for (String id : List.of("b", "c")) {
+      assertEquals(stage.equals("ner") ? "COMPLETED_EMPTY" : "COMPLETED", h.value(id, status(stage)),
+          "cancellation leaves the suffix eligible on the same clock");
+    }
+  }
+
+  @ParameterizedTest(name = "{displayName} [{index}] {arguments}")
+  @ValueSource(strings = {"embed", "chunk", "ner", "sparse", "bge", "interleaved", "bge-interleaved"})
+  void closedWriterWithoutHardStopRemainsSystemic(String stage) throws Exception {
+    try (var h = new Harness("closed-writer")) {
+      h.enable(stage); h.seedThree(stage);
+      h.publicationFailure = new org.apache.lucene.store.AlreadyClosedException("writer closed");
+      h.failSecondMutation(); h.turn(stage); h.refresh();
+      assertEquals(List.of("a"), h.receipts.getFirst().acceptedIds());
+      int calls = h.calls.get(); h.fail.set(false);
+      for (int cycle = 0; cycle < 6; cycle++) h.turn(stage);
+      h.refresh();
+      assertEquals(calls, h.calls.get(), "closed writer without cancellation starts systemic backoff");
+      for (String id : List.of("b", "c")) {
+        assertEquals("PENDING", h.value(id, status(stage)));
+        assertEquals("2", h.value(id, retry(stage)));
+      }
+      h.clock.addAndGet(120_000_000_000L);
+      for (int cycle = 0; cycle < 6; cycle++) h.turn(stage);
+      h.refresh();
+      assertEquals(stage.equals("ner") ? "COMPLETED_EMPTY" : "COMPLETED", h.value("c", status(stage)));
+    }
+  }
+
   @Test void acceptedPrefixReceiptsAlreadyHoldOnTheBase() throws Exception {
     try (var h = new Harness("receipt")) {
       h.enable("ner"); h.seedThree("ner"); h.failSecondMutation(); h.scheduler.runIdleCycle();
@@ -364,6 +474,8 @@ class EnrichmentStorageBackoffTest extends LuceneExecutorTestBase {
     final RunningRuntime runtime;
     final AtomicLong clock = new AtomicLong();
     final AtomicBoolean fail = new AtomicBoolean();
+    final AtomicBoolean running = new AtomicBoolean(true), held = new AtomicBoolean();
+    Runnable beforePublicationFailure = () -> {};
     Throwable publicationFailure = new IOException("injected systemic storage outage");
     final AtomicInteger writes = new AtomicInteger(), calls = new AtomicInteger(), sparseCalls = new AtomicInteger(), nerCalls = new AtomicInteger();
     final List<LuceneRuntimeTypes.EnrichmentPublicationReceipt> receipts = new ArrayList<>();
@@ -391,7 +503,10 @@ class EnrichmentStorageBackoffTest extends LuceneExecutorTestBase {
       original = runtime.session().snapshot;
       var writer = mock(IndexWriter.class, org.mockito.AdditionalAnswers.delegatesTo(original.writer()));
       doAnswer(call -> {
-        if (fail.get() && writes.incrementAndGet() == 2) throw publicationFailure;
+        if (fail.get() && writes.incrementAndGet() == 2) {
+          beforePublicationFailure.run();
+          throw publicationFailure;
+        }
         return original.writer().updateDocument(call.getArgument(0), call.getArgument(1));
       }).when(writer).updateDocument(any(Term.class), any());
       runtime.session().snapshot = new LifecycleSnapshot(original.directory(), writer, original.searcherManager(),
@@ -404,6 +519,7 @@ class EnrichmentStorageBackoffTest extends LuceneExecutorTestBase {
         receipts.add(receipt); return receipt;
       }).when(coordinator).publishEnrichmentBatch(anyList(), anyMap(), any());
       var signals = mock(WorkerSignalBus.class);
+      when(signals.isIndexingHeld()).thenAnswer(call -> held.get());
       var lifecycle = mock(EmbeddingProviderLifecycle.class);
       when(lifecycle.embeddingProvider()).thenAnswer(call -> dense);
       when(lifecycle.allowEmbeddingWrites()).thenReturn(true);
@@ -423,7 +539,7 @@ class EnrichmentStorageBackoffTest extends LuceneExecutorTestBase {
           AtomicBoolean.class, Supplier.class, Supplier.class, Supplier.class, Supplier.class, Supplier.class, LongSupplier.class);
       ctor.setAccessible(true);
       scheduler = ctor.newInstance(runtime.documentFieldOps(), coordinator, runtime.indexCountOps(), runtime.commitOps(),
-          signals, IndexingPacing.unthrottled(), lifecycle, new AtomicBoolean(true), (Supplier<ResolvedConfig>) () -> config,
+          signals, IndexingPacing.unthrottled(), lifecycle, running, (Supplier<ResolvedConfig>) () -> config,
           (Supplier<SpladeEncoder>) () -> sparseEnabled ? sparse : null,
           (Supplier<BgeM3Encoder>) () -> bgeEnabled ? bge : null,
           (Supplier<NerService>) () -> nerEnabled ? ner : null,

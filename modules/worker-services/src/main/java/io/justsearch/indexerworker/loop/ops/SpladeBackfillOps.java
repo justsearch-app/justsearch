@@ -79,7 +79,12 @@ public final class SpladeBackfillOps {
     if (selection != null) selection.begin();
     var authority = context.indexingCoordinator().enrichmentAuthority();
     long t0 = System.nanoTime();
-    EnrichmentAccounting accounting = new EnrichmentAccounting();
+    SpladeEncoder encoder = context.spladeEncoderSupplier().get();
+    long cancellationEpoch = context.indexingCoordinator().bulkDeleteEpoch();
+    EnrichmentAccounting accounting = new EnrichmentAccounting(stage ->
+        EnrichmentBatch.hardStop(() -> !context.runningSupplier().getAsBoolean(),
+            context.indexingCoordinator(), cancellationEpoch, authority)
+            || context.spladeEncoderSupplier().get() != encoder);
     try {
       List<String> pendingIds =
           context.chunkSpladeEnabled()
@@ -98,7 +103,6 @@ public final class SpladeBackfillOps {
         return StageOutcome.none();
       }
 
-      SpladeEncoder encoder = context.spladeEncoderSupplier().get();
       if (encoder == null) {
         context.log().debug("SPLADE backfill: encoder unavailable, stopping batch");
         return StageOutcome.observed(true, 0, t0, accounting);

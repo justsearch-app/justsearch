@@ -66,13 +66,17 @@ public final class EmbeddingBackfillOps {
     if (selection != null) selection.begin();
     var authority = context.indexingCoordinator().enrichmentAuthority();
     long methodStart = System.nanoTime();
-    EnrichmentAccounting accounting = new EnrichmentAccounting();
+    EmbeddingProvider selectedProvider = context.embeddingProviderSupplier().get();
+    long cancellationEpoch = context.indexingCoordinator().bulkDeleteEpoch();
+    EnrichmentAccounting accounting = new EnrichmentAccounting(stage ->
+        EnrichmentBatch.hardStop(() -> !context.runningSupplier().getAsBoolean(),
+            context.indexingCoordinator(), cancellationEpoch, authority)
+            || providerRetired(context, selectedProvider));
     if (!context.allowEmbeddingWritesSupplier().getAsBoolean()) {
       context.log().trace("Embedding backfill skipped: writes blocked by compatibility controller");
       return StageOutcome.none();
     }
 
-    EmbeddingProvider selectedProvider = context.embeddingProviderSupplier().get();
     try {
       List<String> pendingIds =
           EnrichmentSelection.page(selection, context.documentFieldOps(),
@@ -411,13 +415,17 @@ public final class EmbeddingBackfillOps {
     if (selection != null) selection.begin();
     var authority = context.indexingCoordinator().enrichmentAuthority();
     long methodStart = System.nanoTime();
-    EnrichmentAccounting accounting = new EnrichmentAccounting();
+    EmbeddingProvider selectedProvider = context.embeddingProviderSupplier().get();
+    long cancellationEpoch = context.indexingCoordinator().bulkDeleteEpoch();
+    EnrichmentAccounting accounting = new EnrichmentAccounting(stage ->
+        EnrichmentBatch.hardStop(() -> !context.runningSupplier().getAsBoolean(),
+            context.indexingCoordinator(), cancellationEpoch, authority)
+            || providerRetired(context, selectedProvider));
     if (!context.allowEmbeddingWritesSupplier().getAsBoolean()) {
       context.log().trace("Chunk embedding backfill skipped: writes blocked by compatibility controller");
       return new StageOutcome(false, 0, 0, EnrichmentAccounting.Summary.empty(), false);
     }
 
-    EmbeddingProvider selectedProvider = context.embeddingProviderSupplier().get();
     if (selectedProvider == null || !selectedProvider.isAvailable()) {
       return StageOutcome.none();
     }

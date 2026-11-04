@@ -85,7 +85,12 @@ public final class BgeM3BackfillOps {
     if (selection != null) selection.begin();
     long t0 = System.nanoTime();
     var authority = context.indexingCoordinator().enrichmentAuthority();
-    EnrichmentAccounting accounting = new EnrichmentAccounting();
+    BgeM3Encoder encoder = context.encoderSupplier().get();
+    long cancellationEpoch = context.indexingCoordinator().bulkDeleteEpoch();
+    EnrichmentAccounting accounting = new EnrichmentAccounting(stage ->
+        EnrichmentBatch.hardStop(() -> !context.runningSupplier().getAsBoolean(),
+            context.indexingCoordinator(), cancellationEpoch, authority)
+            || context.encoderSupplier().get() != encoder);
     try {
       List<String> pendingIds =
           context.chunkSpladeEnabled()
@@ -104,7 +109,6 @@ public final class BgeM3BackfillOps {
         return StageOutcome.none();
       }
 
-      BgeM3Encoder encoder = context.encoderSupplier().get();
       if (encoder == null) {
         context.log().debug("BGE-M3 backfill: encoder unavailable, stopping batch");
         return StageOutcome.none();

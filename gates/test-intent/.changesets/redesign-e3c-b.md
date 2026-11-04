@@ -42,26 +42,26 @@ orchestrator owns the ordinary short-backlog smoke check. No shared dev stack is
       ],
       "class": "New",
       "repaired": true,
-      "behaviour": "Real Lucene publication faults on the second mutation preserve exact accepted-prefix receipts and nonzero suffix retry counts. Dense parent, dense chunk and NER stages back off across individual and combined idle service; combined writes hold every stage represented in unaccepted rows, with busy sparse service sharing the same hold. Accepted-only and unrepresented stages remain eligible. Each provider replacement clears only its stage hold. Per-document fallback stops before another native call or retry write after systemic publication failure. Controlled expiry revisits pending rows behind independent cursors. Accepted dense owners release retained slots on a later write failure, unaccepted complete owners remain recoverable without recomputing windows, and retained ownership stays bounded while independent NER advances. All changed fixtures restore singleton metrics after each test. Publication cancellation in individual and interleaved sparse/BGE service remains pending without a retry charge or systemic backoff, retaining the accepted prefix.",
+      "behaviour": "Real Lucene publication faults on the second mutation preserve exact accepted-prefix receipts and nonzero suffix retry counts. Dense parent, dense chunk and NER stages back off across individual and combined idle service; combined writes hold every stage represented in unaccepted rows, with busy sparse service sharing the same hold. Accepted-only and unrepresented stages remain eligible. Each provider replacement clears only its stage hold. Per-document fallback stops before another native call or retry write after systemic publication failure. Controlled expiry revisits pending rows behind independent cursors. Accepted dense owners release retained slots on a later write failure, unaccepted complete owners remain recoverable without recomputing windows, and retained ownership stays bounded while independent NER advances. All changed fixtures restore singleton metrics after each test. Publication cancellation retains the accepted prefix and leaves the suffix pending without a retry charge or systemic backoff. Interrupted writer failures, wrapped InterruptedIOException, ClosedByInterruptException and FileLockInterruptionException, and ordinary publication failures observed during shutdown, indexing hold, source invalidation, provider retirement or authority revocation leave all seven stage/service variants immediately eligible. An AlreadyClosedException without a hard stop remains systemic and recovers only after controlled expiry.",
       "sources": [
         {
           "kind": "owner-words",
-          "location": "E3c-b builder assignment, E3c-4",
+          "location": "task redesign-e3c request",
           "quote": "A systemic failure of a write backs off every stage represented in that write's unaccepted rows. Other stages stay eligible; their own writes may then fail and back off on their own (shared infrastructure), but they are not pre-emptively held."
         },
         {
           "kind": "owner-words",
-          "location": "E3c-b builder assignment, E3c-6",
+          "location": "task redesign-e3c request",
           "quote": "An accepted dense owner releases its retained slot even when a later row of the same write fails; unaccepted complete owners stay recoverable. A later genuine row failure charges exactly one retry."
         },
         {
           "kind": "owner-words",
-          "location": "E3c-b builder assignment, Decisions",
+          "location": "task redesign-e3c request",
           "quote": "One backoff per stage, shared by idle, individual, combined and interleaved service; controlled expiry (the existing SPLADE scheduler backoff schedule, generalised per stage); reset when that stage's provider changes. In memory only; nothing implies crash-persistent backoff."
         },
         {
           "kind": "owner-words",
-          "location": "E3c-b builder assignment, Decisions",
+          "location": "task redesign-e3c request",
           "quote": "Row-local failures (E2: one bad row between healthy peers), stale or retired rejections and cancellation are never systemic and set no backoff."
         }
       ],
@@ -74,7 +74,11 @@ orchestrator owns the ordinary short-backlog smoke check. No shared dev stack is
         "modules/worker-services/src/test/java/io/justsearch/adapters/lucene/runtime/EnrichmentStorageBackoffTest.java#aStageRepresentedOnlyInTheAcceptedPrefixRemainsEligible",
         "modules/worker-services/src/test/java/io/justsearch/adapters/lucene/runtime/EnrichmentStorageBackoffTest.java#systemicPublicationInPerDocumentFallbackStopsBeforeAnotherNativeCall",
         "modules/worker-services/src/test/java/io/justsearch/adapters/lucene/runtime/EnrichmentStorageBackoffTest.java#expiredStageEventuallyWrapsItsCursorWhileTheIndependentStageKeepsAdvancing",
-        "modules/worker-services/src/test/java/io/justsearch/adapters/lucene/runtime/EnrichmentStorageBackoffTest.java#publicationCancellationNeverBacksOffOrChargesTheUnacceptedSuffix"
+        "modules/worker-services/src/test/java/io/justsearch/adapters/lucene/runtime/EnrichmentStorageBackoffTest.java#publicationCancellationNeverBacksOffOrChargesTheUnacceptedSuffix",
+        "modules/worker-services/src/test/java/io/justsearch/adapters/lucene/runtime/EnrichmentStorageBackoffTest.java#interruptedWriterCancellationDoesNotBecomeStorageBackoff",
+        "modules/worker-services/src/test/java/io/justsearch/adapters/lucene/runtime/EnrichmentStorageBackoffTest.java#wrappedInterruptedIoWithoutThreadFlagNeverBacksOff",
+        "modules/worker-services/src/test/java/io/justsearch/adapters/lucene/runtime/EnrichmentStorageBackoffTest.java#publicationFailureDuringHardStopNeverBacksOff",
+        "modules/worker-services/src/test/java/io/justsearch/adapters/lucene/runtime/EnrichmentStorageBackoffTest.java#closedWriterWithoutHardStopRemainsSystemic"
       ]
     },
     {
@@ -107,7 +111,11 @@ env -u DISPLAY -u WAYLAND_DISPLAY js-gradle-slot node scripts/governance/gates/t
   --check modules/worker-services/src/test/java/io/justsearch/adapters/lucene/runtime/EnrichmentStorageBackoffTest.java#aStageRepresentedOnlyInTheAcceptedPrefixRemainsEligible \
   --check modules/worker-services/src/test/java/io/justsearch/adapters/lucene/runtime/EnrichmentStorageBackoffTest.java#systemicPublicationInPerDocumentFallbackStopsBeforeAnotherNativeCall \
   --check modules/worker-services/src/test/java/io/justsearch/adapters/lucene/runtime/EnrichmentStorageBackoffTest.java#expiredStageEventuallyWrapsItsCursorWhileTheIndependentStageKeepsAdvancing \
-  --check modules/worker-services/src/test/java/io/justsearch/adapters/lucene/runtime/EnrichmentStorageBackoffTest.java#publicationCancellationNeverBacksOffOrChargesTheUnacceptedSuffix
+  --check modules/worker-services/src/test/java/io/justsearch/adapters/lucene/runtime/EnrichmentStorageBackoffTest.java#publicationCancellationNeverBacksOffOrChargesTheUnacceptedSuffix \
+  --check modules/worker-services/src/test/java/io/justsearch/adapters/lucene/runtime/EnrichmentStorageBackoffTest.java#interruptedWriterCancellationDoesNotBecomeStorageBackoff \
+  --check modules/worker-services/src/test/java/io/justsearch/adapters/lucene/runtime/EnrichmentStorageBackoffTest.java#wrappedInterruptedIoWithoutThreadFlagNeverBacksOff \
+  --check modules/worker-services/src/test/java/io/justsearch/adapters/lucene/runtime/EnrichmentStorageBackoffTest.java#publicationFailureDuringHardStopNeverBacksOff \
+  --check modules/worker-services/src/test/java/io/justsearch/adapters/lucene/runtime/EnrichmentStorageBackoffTest.java#closedWriterWithoutHardStopRemainsSystemic
 ```
 
 ```bash

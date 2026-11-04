@@ -362,14 +362,24 @@ public final class CombinedEnrichmentBackfillOps {
     // Tempdoc 809 finding 3 — interruption bookkeeping, hoisted with the accumulators above so the
     // catch block below can report it too.
     boolean aborted = false;
-    EnrichmentAccounting accounting = new EnrichmentAccounting();
     var authority = context.indexingCoordinator().enrichmentAuthority();
+    // Capture source identity before selection for both checkpoints and failure classification.
+    long epochAtSelection = context.indexingCoordinator().bulkDeleteEpoch();
+    EmbeddingProvider selectedEmbeddingProvider = context.embeddingProviderSupplier().get();
+    SpladeEncoder selectedSplade = context.spladeEncoderSupplier().get();
+    NerService selectedNer = context.nerServiceSupplier().get();
+    EnrichmentAccounting accounting = new EnrichmentAccounting(stage ->
+        hardStopRequested(context, epochAtSelection, authority) || switch (stage) {
+          case EMBED, CHUNK_EMBED -> !embeddingReady(context, selectedEmbeddingProvider);
+          case SPLADE -> context.spladeEncoderSupplier().get() != selectedSplade;
+          case NER -> selectedNer == null || !selectedNer.isAvailable()
+              || context.nerServiceSupplier().get() != selectedNer;
+        });
     long attemptStart = System.nanoTime();
     long phaseStart = attemptStart;
     String activePhase = "fetch";
     Map<String, Map<String, Object>> updatesByDocId = new LinkedHashMap<>();
     int unitsDone = 0;
-    long epochAtSelection;
     // Round-15 post-round finding: stamped as soon as this batch's selection + routing is final, so
     // the catch path below reports the same work-set the success path does.
     long workSetSignature = 0;
@@ -380,24 +390,16 @@ public final class CombinedEnrichmentBackfillOps {
     Span enrichmentSpan = EncoderOrtRunSpans.maybeEnrichmentBatch();
     try (Scope _ = enrichmentSpan.makeCurrent()) {
     try {
-      // Tempdoc 809 finding 3: the bulk-deletion epoch as it stood when this batch chose its
-      // documents. Captured before the pending-ID queries so a root removal racing the selection is
-      // caught too, and re-read at every checkpoint below.
-      epochAtSelection = context.indexingCoordinator().bulkDeleteEpoch();
-
       // Phase 0: bounded document-ID pages, independently resumable for each stage.
-      EmbeddingProvider selectedEmbeddingProvider = context.embeddingProviderSupplier().get();
       boolean embedAvailable = (context.stageAllowed().test(EnrichmentAccounting.Stage.EMBED)
           || context.stageAllowed().test(EnrichmentAccounting.Stage.CHUNK_EMBED))
           && embeddingReady(context, selectedEmbeddingProvider)
           && context.unitAllowed().test(selectedEmbeddingProvider.isUsingGpu());
-      SpladeEncoder selectedSplade = context.spladeEncoderSupplier().get();
       boolean spladeConfigured = selectedSplade != null;
       boolean spladeAvailable = spladeConfigured
           && context.spladeAllowedSupplier().getAsBoolean()
           && context.unitAllowed().test(LoopPacingPolicy.requiresGpu(
               selectedSplade.isGpuAvailable(), selectedSplade.getOrtCudaStatus()));
-      NerService selectedNer = context.nerServiceSupplier().get();
       boolean nerAvailable = context.stageAllowed().test(EnrichmentAccounting.Stage.NER)
           && selectedNer != null && selectedNer.isAvailable()
           && context.unitAllowed().test(LoopPacingPolicy.requiresGpu(
@@ -888,6 +890,13 @@ public final class CombinedEnrichmentBackfillOps {
               if (batch.retired(() -> !embeddingReady(context, lateChunkingProvider),
                   EnrichmentAccounting.Stage.EMBED)) break;
               if (accounting.cancelled(EnrichmentAccounting.Stage.EMBED, e)) {
+                if (isArenaOomFailure(e)) {
+                  // Classification is a completed routing decision even when a hard stop
+                  // prevents the fallback from starting in this turn.
+                  boolean windows = EmbeddingProvider.exposesDocumentWindows(lateChunkingProvider);
+                  context.windowedEmbedProgress().route(lcDocId, lcContent,
+                      windows ? WindowedEmbedProgress.Route.WINDOW : WindowedEmbedProgress.Route.ORDINARY);
+                }
                 aborted |= hardStopRequested(context, epochAtSelection, authority);
                 break;
               }
