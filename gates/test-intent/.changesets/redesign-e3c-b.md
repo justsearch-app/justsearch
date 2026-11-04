@@ -154,3 +154,14 @@ folders; use the base's original SlowBatch fixture there. Repair selectors trans
 the new test source and need no compatibility patch or production overlay.
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a1a6fe-6dd3-7310-a8a6-85f926f07b37",
+  "verdict": "accept",
+  "digest": "sha256:28ae1f171673e8fafcaf80fe2546a41fab79c77eb3dcb681324b8df0ee511bc2",
+  "note": "Codex verifier-2 on 743b5bdb88: entry 1 New accept, entry 2 Adaptation accept. E3c-4, E3c-6 and classification rows 1-6 pass in all seven variants; 12 repair selectors fail before by assertion and pass after; E3c-a, Q1-Q4, P1-P6 preserved. A cycle-wide one-retry bound for chunk units is E4, not E3c-b."
+}
+```
