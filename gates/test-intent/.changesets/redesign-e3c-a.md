@@ -258,3 +258,14 @@ GPU holds and internal native-call correlation rest on the component checks unle
 tracing supplies document identity. No shared dev stack is started by this candidate.
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a1a573-61fb-7503-9ba4-f9802e5d9642",
+  "verdict": "reject",
+  "digest": "sha256:961ec4b099cb8592a271e5d531adb5d69cb09dd094894e2e0557c4da4b6344ba",
+  "note": "Codex verifier-1 on 8e7f97e5cd: entries 1,3,4,5,6 accept; entry 2 (BackfillResourceAdmissionTest) reject: leaves OperationalMetrics singleton changed (backfillMode idle->individual, completions {}->{embed=1}), no after-test restoration. Separate product failure: cancelled SPLADE error fallback drops the completed 64-row prefix."
+}
+```
