@@ -1,0 +1,494 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
+  },
+  "createdAt": "2026-11-04T18:10:21.300Z",
+  "revision": "104a30194c771c64b13b47d6bbfe65b60e01c0c4",
+  "tree": "1ecc6deff2b36fd9b87a6fba2fa02f24b2b580cc",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": "openjdk version \"25.0.4.1\" 2026-08-18 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "./gradlew :modules:worker-services:test --tests \"io.justsearch.indexerworker.extract.ContainerExpansionBudgetTest.packageExcessRefusesBeforeAnyMemberStreamOpens\" --tests \"io.justsearch.indexerworker.extract.ContainerExpansionBudgetTest.spoofedPackagesAndGenericMembersKeepExpansionAndByteCeilings\" --tests \"io.justsearch.indexerworker.extract.ContainerExpansionBudgetTest.manyTinyMembersRefuseAtFirstExcessBeforeAnyInflation\" --tests \"io.justsearch.indexerworker.extract.ContainerExpansionBudgetTest.oversizedNameRefusesBeforeEarlierAdmittedMemberInflates\" --tests \"io.justsearch.indexerworker.extract.ContainerExpansionBudgetTest.aggregateMetadataRefusesBeforeInflation\" --tests \"io.justsearch.indexerworker.extract.ContainerExpansionBudgetTest.exactMemberBoundaryStillInflatesBothViews\" --tests \"io.justsearch.indexerworker.extract.ContainerExpansionBudgetTest.nestedInspectionsShareTheDocumentMemberBudget\" --tests \"io.justsearch.indexerworker.extract.ArchiveExtractionLimitsTest.strictRatioRejectsNonOutputOdtAndOoxmlPartsWithoutEmbeddedCallbacks\" --tests \"io.justsearch.indexerworker.extract.ArchiveExtractionLimitsTest.embeddedOoxmlUsesTheSameInternalExpansionPolicy\" --tests \"io.justsearch.indexerworker.extract.ArchiveExtractionLimitsTest.standaloneFlatParsingRejectsNonOutputOdtExpansion\" --tests \"io.justsearch.indexerworker.extract.ArchiveExtractionLimitsTest.preparedInputCannotBeReplacedBetweenInspectionAndParsing\" --tests \"io.justsearch.indexerworker.extract.ArchiveExtractionLimitsTest.realArchiveReportsObservedResourcesAndNestedDepth\" --tests \"io.justsearch.indexerworker.extract.ArchiveExtractionLimitsTest.rejectsThreeHundredMembersWithoutFlatFallbackBypass\" --tests \"io.justsearch.indexerworker.extract.ArchiveExtractionLimitsTest.rejectsDeepRealArchive\" --tests \"io.justsearch.indexerworker.extract.ArchiveExtractionLimitsTest.rejectsExpansionBelowInputAndTextCaps\" --tests \"io.justsearch.indexerworker.extract.ArchiveExtractionLimitsTest.flatFallbackRetainsConfiguredPolicy\" --tests \"io.justsearch.indexerworker.extract.ArchiveExtractionLimitsTest.realChildKeepsDepthAndExpansionReasonsAndAcceptsNormalFileAfterwards\" --tests \"io.justsearch.indexerworker.extract.HostilePackageAdmissionTest.localOnlyDuplicateDirectoryMisleadingAndOverlappingMembersCannotBypassInspection\" --tests \"io.justsearch.indexerworker.extract.HostilePackageAdmissionTest.packageAndDocumentTotalsAndEffectiveByteCeilingsRemainIndependentOfMemberRatio\" --tests \"io.justsearch.indexerworker.extract.HostilePackageAdmissionTest.genericMemberBetweenOneAndTwoHundredRatioStillRefusesWithPadding\" --tests \"io.justsearch.indexerworker.extract.PinnedZipQuineTest.pinnedSelfReproducingZipRefusesThroughRealChildAndNextFileSucceeds\" --tests \"io.justsearch.indexerworker.services.SyncExtractionPolicyTest.currentEffectivePolicyKeepsUnchangedFilesSkipped\" --tests \"io.justsearch.indexerworker.extract.TikaExtractionPolicyWorkerLimitsTest.defaultEquivalentLimitsKeepDefaultIdentity\" --tests \"io.justsearch.indexerworker.extract.PreparedExtractionInputTest.disguisedZipAndPreambleAcrossBufferBoundaryRetainExpansionBudget\" --tests \"io.justsearch.indexerworker.extract.PersistentExtractionSandboxTest.hangingChildIsKilledAtTheDeadlineAndTheNextRequestSucceeds\" --tests \"io.justsearch.indexerworker.extract.AdversarialCorpusIngestionTest.pythonBytecodeFileIsSkippedByExtension\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 19867
+    },
+    {
+      "command": "./gradlew :modules:indexer-worker:test --tests \"io.justsearch.indexerworker.loop.RestoredMtimeQueuedRestartTest.unchangedQueuedFileSkipsExtractionAcrossRestarts\" --tests \"io.justsearch.indexerworker.loop.OfficePackageRetryTest.childBudgetReasonsRemainExactInTheSqliteLedger\" --tests \"io.justsearch.indexerworker.services.WorkerIngestServiceTest.cancelThroughServiceRecordsSkippedOutcomeAndStopsPendingWork\" --tests \"io.justsearch.indexerworker.loop.RestoredMtimeQueuedRestartTest.acceptedOrdinaryForceRunsOnceAfterUnforcedRecordedWalkSeals\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 34571
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/ContainerExpansionBudgetTest.java#packageExcessRefusesBeforeAnyMemberStreamOpens",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/ContainerExpansionBudgetTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:09e2f36494108a2474dffc1183f6e573e879042db0c7f997ebeb53823645d04a",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "packageExcessRefusesBeforeAnyMemberStreamOpens()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/ContainerExpansionBudgetTest.java#spoofedPackagesAndGenericMembersKeepExpansionAndByteCeilings",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/ContainerExpansionBudgetTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:09e2f36494108a2474dffc1183f6e573e879042db0c7f997ebeb53823645d04a",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "spoofedPackagesAndGenericMembersKeepExpansionAndByteCeilings()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/ContainerExpansionBudgetTest.java#manyTinyMembersRefuseAtFirstExcessBeforeAnyInflation",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/ContainerExpansionBudgetTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:09e2f36494108a2474dffc1183f6e573e879042db0c7f997ebeb53823645d04a",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "manyTinyMembersRefuseAtFirstExcessBeforeAnyInflation()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/ContainerExpansionBudgetTest.java#oversizedNameRefusesBeforeEarlierAdmittedMemberInflates",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/ContainerExpansionBudgetTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:09e2f36494108a2474dffc1183f6e573e879042db0c7f997ebeb53823645d04a",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "oversizedNameRefusesBeforeEarlierAdmittedMemberInflates()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/ContainerExpansionBudgetTest.java#aggregateMetadataRefusesBeforeInflation",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/ContainerExpansionBudgetTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:09e2f36494108a2474dffc1183f6e573e879042db0c7f997ebeb53823645d04a",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aggregateMetadataRefusesBeforeInflation()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/ContainerExpansionBudgetTest.java#exactMemberBoundaryStillInflatesBothViews",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/ContainerExpansionBudgetTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:09e2f36494108a2474dffc1183f6e573e879042db0c7f997ebeb53823645d04a",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "exactMemberBoundaryStillInflatesBothViews()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/ContainerExpansionBudgetTest.java#nestedInspectionsShareTheDocumentMemberBudget",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/ContainerExpansionBudgetTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:09e2f36494108a2474dffc1183f6e573e879042db0c7f997ebeb53823645d04a",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "nestedInspectionsShareTheDocumentMemberBudget()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/ArchiveExtractionLimitsTest.java#strictRatioRejectsNonOutputOdtAndOoxmlPartsWithoutEmbeddedCallbacks",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/ArchiveExtractionLimitsTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:7c8ab1f559a3e46ca86a906ec4069afa4e93472adc96b4bea3505ab50359e980",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "strictRatioRejectsNonOutputOdtAndOoxmlPartsWithoutEmbeddedCallbacks()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/ArchiveExtractionLimitsTest.java#embeddedOoxmlUsesTheSameInternalExpansionPolicy",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/ArchiveExtractionLimitsTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:7c8ab1f559a3e46ca86a906ec4069afa4e93472adc96b4bea3505ab50359e980",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "embeddedOoxmlUsesTheSameInternalExpansionPolicy()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/ArchiveExtractionLimitsTest.java#standaloneFlatParsingRejectsNonOutputOdtExpansion",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/ArchiveExtractionLimitsTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:7c8ab1f559a3e46ca86a906ec4069afa4e93472adc96b4bea3505ab50359e980",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "standaloneFlatParsingRejectsNonOutputOdtExpansion()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/ArchiveExtractionLimitsTest.java#preparedInputCannotBeReplacedBetweenInspectionAndParsing",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/ArchiveExtractionLimitsTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:7c8ab1f559a3e46ca86a906ec4069afa4e93472adc96b4bea3505ab50359e980",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "preparedInputCannotBeReplacedBetweenInspectionAndParsing()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/ArchiveExtractionLimitsTest.java#realArchiveReportsObservedResourcesAndNestedDepth",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/ArchiveExtractionLimitsTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:7c8ab1f559a3e46ca86a906ec4069afa4e93472adc96b4bea3505ab50359e980",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "realArchiveReportsObservedResourcesAndNestedDepth()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/ArchiveExtractionLimitsTest.java#rejectsThreeHundredMembersWithoutFlatFallbackBypass",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/ArchiveExtractionLimitsTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:7c8ab1f559a3e46ca86a906ec4069afa4e93472adc96b4bea3505ab50359e980",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "rejectsThreeHundredMembersWithoutFlatFallbackBypass()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/ArchiveExtractionLimitsTest.java#rejectsDeepRealArchive",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/ArchiveExtractionLimitsTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:7c8ab1f559a3e46ca86a906ec4069afa4e93472adc96b4bea3505ab50359e980",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "rejectsDeepRealArchive()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/ArchiveExtractionLimitsTest.java#rejectsExpansionBelowInputAndTextCaps",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/ArchiveExtractionLimitsTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:7c8ab1f559a3e46ca86a906ec4069afa4e93472adc96b4bea3505ab50359e980",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "rejectsExpansionBelowInputAndTextCaps()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/ArchiveExtractionLimitsTest.java#flatFallbackRetainsConfiguredPolicy",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/ArchiveExtractionLimitsTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:7c8ab1f559a3e46ca86a906ec4069afa4e93472adc96b4bea3505ab50359e980",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "flatFallbackRetainsConfiguredPolicy()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/ArchiveExtractionLimitsTest.java#realChildKeepsDepthAndExpansionReasonsAndAcceptsNormalFileAfterwards",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/ArchiveExtractionLimitsTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:7c8ab1f559a3e46ca86a906ec4069afa4e93472adc96b4bea3505ab50359e980",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "realChildKeepsDepthAndExpansionReasonsAndAcceptsNormalFileAfterwards()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/HostilePackageAdmissionTest.java#localOnlyDuplicateDirectoryMisleadingAndOverlappingMembersCannotBypassInspection",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/HostilePackageAdmissionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:bbfbf5467b225e29490c908063d71ca283bbb667e04fb87b326d2b8e17695983",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "localOnlyDuplicateDirectoryMisleadingAndOverlappingMembersCannotBypassInspection()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/HostilePackageAdmissionTest.java#packageAndDocumentTotalsAndEffectiveByteCeilingsRemainIndependentOfMemberRatio",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/HostilePackageAdmissionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:bbfbf5467b225e29490c908063d71ca283bbb667e04fb87b326d2b8e17695983",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "packageAndDocumentTotalsAndEffectiveByteCeilingsRemainIndependentOfMemberRatio()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/HostilePackageAdmissionTest.java#genericMemberBetweenOneAndTwoHundredRatioStillRefusesWithPadding",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/HostilePackageAdmissionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:bbfbf5467b225e29490c908063d71ca283bbb667e04fb87b326d2b8e17695983",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "genericMemberBetweenOneAndTwoHundredRatioStillRefusesWithPadding()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/PinnedZipQuineTest.java#pinnedSelfReproducingZipRefusesThroughRealChildAndNextFileSucceeds",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/PinnedZipQuineTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:3dabe56e12b5b8075c2e78da2f3392aa5dabab6f84ae2184f33e789b9e8ba276",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "pinnedSelfReproducingZipRefusesThroughRealChildAndNextFileSucceeds()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/SyncExtractionPolicyTest.java#currentEffectivePolicyKeepsUnchangedFilesSkipped",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/SyncExtractionPolicyTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:f3db621615b27e955b8e786ce9e9f3711ecd36080251c6b8c3c81ff6e38c4602",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "currentEffectivePolicyKeepsUnchangedFilesSkipped(String) [1] default",
+          "status": "passed"
+        },
+        {
+          "name": "currentEffectivePolicyKeepsUnchangedFilesSkipped(String) [2] configured",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/TikaExtractionPolicyWorkerLimitsTest.java#defaultEquivalentLimitsKeepDefaultIdentity",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/TikaExtractionPolicyWorkerLimitsTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:c6ee5479d6a6c94308eb3aaefab04dd6cdef990d1b928679942a52d926a77308",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "defaultEquivalentLimitsKeepDefaultIdentity()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/PreparedExtractionInputTest.java#disguisedZipAndPreambleAcrossBufferBoundaryRetainExpansionBudget",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/PreparedExtractionInputTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:50f60dc5a06ac17d9cbb4b6c893b5b0b365b31908e60357b87ea7a76daeda80e",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "disguisedZipAndPreambleAcrossBufferBoundaryRetainExpansionBudget()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/PersistentExtractionSandboxTest.java#hangingChildIsKilledAtTheDeadlineAndTheNextRequestSucceeds",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/PersistentExtractionSandboxTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:081c8a60c8c325ae2021a5cf8eb6fafdf306747d36455e09f6bf6707e4343204",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "hangingChildIsKilledAtTheDeadlineAndTheNextRequestSucceeds()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/RestoredMtimeQueuedRestartTest.java#unchangedQueuedFileSkipsExtractionAcrossRestarts",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/RestoredMtimeQueuedRestartTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:d70ee1665814d41ad6f01b6500838f85c6f3645db3f42b06f3968b530f5e8cb9",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "unchangedQueuedFileSkipsExtractionAcrossRestarts()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/OfficePackageRetryTest.java#childBudgetReasonsRemainExactInTheSqliteLedger",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/OfficePackageRetryTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:77e04e94719d6b5b60095b8868434d0c77498f4dd3369213e890e205bb67e227",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "childBudgetReasonsRemainExactInTheSqliteLedger()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/WorkerIngestServiceTest.java#cancelThroughServiceRecordsSkippedOutcomeAndStopsPendingWork",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/WorkerIngestServiceTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:3a6c81bae9a5b96c7191f02ee0d4f094e9fbc2f331d69cdd6f47e6080bf31e86",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "cancelThroughServiceRecordsSkippedOutcomeAndStopsPendingWork(String) [1] pending",
+          "status": "passed"
+        },
+        {
+          "name": "cancelThroughServiceRecordsSkippedOutcomeAndStopsPendingWork(String) [2] retry",
+          "status": "passed"
+        },
+        {
+          "name": "cancelThroughServiceRecordsSkippedOutcomeAndStopsPendingWork(String) [3] recorded",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/RestoredMtimeQueuedRestartTest.java#acceptedOrdinaryForceRunsOnceAfterUnforcedRecordedWalkSeals",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/RestoredMtimeQueuedRestartTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:d70ee1665814d41ad6f01b6500838f85c6f3645db3f42b06f3968b530f5e8cb9",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "acceptedOrdinaryForceRunsOnceAfterUnforcedRecordedWalkSeals()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/AdversarialCorpusIngestionTest.java#pythonBytecodeFileIsSkippedByExtension",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/AdversarialCorpusIngestionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:8381bbe3c234612e066e98dff89255a20aadafb6d6041a2cfe591d0f20c45d8f",
+      "executed": false,
+      "skipped": false,
+      "outcome": "not-found",
+      "cases": []
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:599d8631204a5b3695d89751afddce025debae90134cc9ddea974baab109d72f"
+}
