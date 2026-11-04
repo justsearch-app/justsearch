@@ -1,13 +1,14 @@
 """Checksum-pinned public file recipes. Document bytes never belong in Git.
 
 Archive handling routes member bytes only; it never invokes a document parser.
-Only Wikipedia's explicitly declared HTML-to-note derivation interprets content.
+Only Wikipedia's explicitly declared note/HTML derivations interpret content.
 """
 from __future__ import annotations
 
 from collections import Counter, defaultdict
 import gzip
 import hashlib
+from html import escape
 from html.parser import HTMLParser
 import json
 from pathlib import Path
@@ -35,6 +36,9 @@ MAX_ROBOTS_BYTES = 512 * 1024
 # The pinned Enron tar expands to 1,823,016,960 bytes, including tar metadata.
 # A fixed 2 GiB ceiling leaves margin without trusting recipe-supplied limits.
 MAX_TAR_EXPANDED_BYTES = 2 * 1024 ** 3
+# Raw Wikipedia HTML is informational, but downloads must still be bounded.
+MAX_WIKIPEDIA_HTML_BYTES = 16 * 1024 ** 2
+WIKIPEDIA_TRANSFORMS = ('wikipedia-note', 'wikipedia-html')
 
 
 class _NoRedirect(HTTPRedirectHandler):
@@ -161,12 +165,13 @@ def validate_recipe(recipe: dict) -> None:
         if bool(artifacts[d['artifact']].get('archive')) != bool(d.get('member')):
             raise ValueError('archive documents need a member, direct documents must not have one')
         transform = d.get('transform', 'copy')
-        if transform not in ('copy', 'wikipedia-note'):
+        if transform not in ('copy', *WIKIPEDIA_TRANSFORMS):
             raise ValueError('unknown derivation')
-        if transform == 'wikipedia-note' and d['source'] != 'wikipedia':
-            raise ValueError('only Wikipedia HTML may be converted to notes')
-        if transform == 'wikipedia-note' and not d.get('title'):
-            raise ValueError('Wikipedia note needs a title')
+        if transform in WIKIPEDIA_TRANSFORMS:
+            if d['source'] != 'wikipedia' or artifacts[d['artifact']].get('archive'):
+                raise ValueError('only Wikipedia HTML may be derived')
+            if not d.get('title'):
+                raise ValueError('Wikipedia derivation needs a title')
 
 
 class PublicHTTP:
@@ -233,7 +238,7 @@ class PublicHTTP:
         return response
 
 
-def _raw(a: dict, *, fetch: bool, client: PublicHTTP | None = None) -> Path:
+def _raw(a: dict, *, fetch: bool, client: PublicHTTP | None = None, documents=()) -> Path:
     root = dataset_cache.cache_root()
     if root is None:
         raise CollectionError('set JUSTSEARCH_DATASET_CACHE under the quality cache')
@@ -241,16 +246,32 @@ def _raw(a: dict, *, fetch: bool, client: PublicHTTP | None = None) -> Path:
     params = {k: a[k] for k in ('url', 'sha256')}
     if a.get('headers'):
         params['headers'] = a['headers']
+    derived = bool(documents) and all(
+        d['source'] == 'wikipedia' and d.get('transform') in WIKIPEDIA_TRANSFORMS
+        for d in documents)
+
+    def verify(path):
+        if derived:
+            html = path.read_text(encoding='utf-8')
+            for d in documents:
+                data = _wikipedia_derive(html, d)
+                if len(data) != d['bytes'] or hashlib.sha256(data).hexdigest() != d['sha256']:
+                    raise CollectionError(f'checksum mismatch: {d["path"]}')
+        else:
+            _verify(path, a)
+
     hit = dataset_cache.lookup('public-real-use', params, filenames=['payload'])
     if hit is None and fetch:
         def populate(dest):
             with client.open(a['url'], a.get('headers')) as response:
-                _write_member(response, dest / 'payload', a)
+                _write_member(response, dest / 'payload', a, derived=derived)
+            if derived:
+                verify(dest / 'payload')
         hit = dataset_cache.store('public-real-use', params, filenames=['payload'], populate=populate)
     if hit is None:
         raise CollectionError(f'raw artifact missing or corrupt: {a["id"]}; run quality corpus fetch real-use')
     path = hit / 'payload'
-    _verify(path, a)
+    verify(path)
     return path
 
 
@@ -262,22 +283,27 @@ def _verify(path: Path, row: dict):
 def fetch(recipe: dict) -> dict:
     validate_recipe(recipe)
     client = PublicHTTP(recipe.get('redirect_hosts'))
+    by_artifact = defaultdict(list)
+    for d in recipe['documents']:
+        by_artifact[d['artifact']].append(d)
     for a in recipe['artifacts']:
-        _raw(a, fetch=True, client=client)
+        _raw(a, fetch=True, client=client, documents=by_artifact[a['id']])
     return summary(recipe)
 
 
-def _write_member(stream, target, row):
+def _write_member(stream, target, row, *, derived=False):
     target.parent.mkdir(parents=True, exist_ok=True)
     # A bounded copy refuses decompression bombs and recipe size mistakes.
-    remaining = row['bytes']
+    remaining = MAX_WIKIPEDIA_HTML_BYTES if derived else row['bytes']
     with target.open('wb') as out:
         while block := stream.read(min(1024 * 1024, remaining + 1)):
             remaining -= len(block)
             if remaining < 0:
-                raise CollectionError(f'download/member exceeds recorded size: {row.get("path", row.get("url"))}')
+                limit = 'Wikipedia byte cap' if derived else 'recorded size'
+                raise CollectionError(f'download/member exceeds {limit}: {row.get("path", row.get("url"))}')
             out.write(block)
-    _verify(target, row)
+    if not derived:
+        _verify(target, row)
 
 
 class _BoundedTar:
@@ -321,6 +347,83 @@ def wikipedia_note(html: str, title: str) -> bytes:
     return (title + '\n\n' + '\n\n'.join(parser.parts) + '\n').encode('utf-8')
 
 
+def wikipedia_html(html: str, title: str) -> bytes:
+    """Minimal saved article: semantic blocks and text, without page chrome.
+
+    Keep no source attributes, links or active content. Inline wrappers are
+    flattened; headings, paragraphs, lists and tables retain their structure.
+    """
+    blocks = {'h2', 'h3', 'h4', 'h5', 'h6', 'p', 'ul', 'ol', 'li', 'dl', 'dt', 'dd',
+              'table', 'caption', 'thead', 'tbody', 'tfoot', 'tr', 'th', 'td'}
+    excluded_tags = {'script', 'style', 'noscript', 'nav', 'figure'}
+    excluded_classes = {'reference', 'mw-editsection', 'navbox', 'vertical-navbox', 'navigation',
+                        'sidebar', 'ambox', 'tmbox', 'fmbox', 'ombox', 'cmbox',
+                        'mbox-small', 'hatnote', 'metadata', 'noprint', 'toc',
+                        'sistersitebox', 'shortdescription', 'mw-empty-elt'}
+
+    class Article(HTMLParser):
+        def __init__(self):
+            super().__init__()
+            self.root = None
+            self.stack = []
+
+        def handle_starttag(self, tag, attrs):
+            attrs = dict(attrs)
+            classes = set((attrs.get('class') or '').split())
+            if not self.stack:
+                if self.root is not None or 'mw-parser-output' not in classes:
+                    return
+            node = [tag, classes, []]
+            if self.stack:
+                self.stack[-1][2].append(node)
+            else:
+                self.root = node
+            if tag not in {'area', 'base', 'br', 'col', 'embed', 'hr', 'img', 'input',
+                           'link', 'meta', 'param', 'source', 'track', 'wbr'}:
+                self.stack.append(node)
+
+        def handle_startendtag(self, tag, attrs):
+            self.handle_starttag(tag, attrs)
+            self.handle_endtag(tag)
+
+        def handle_endtag(self, tag):
+            for i in range(len(self.stack) - 1, -1, -1):
+                if self.stack[i][0] == tag:
+                    del self.stack[i:]
+                    break
+
+        def handle_data(self, data):
+            if self.stack:
+                self.stack[-1][2].append(data)
+
+    def render(node, in_block=False):
+        if isinstance(node, str):
+            return escape(re.sub(r'\s+', ' ', node), quote=False) if in_block else ''
+        tag, classes, children = node
+        if tag in excluded_tags or classes & excluded_classes:
+            return ''
+        if tag == 'br':
+            return ' ' if in_block else ''
+        text = ''.join(render(child, in_block or tag in blocks) for child in children)
+        if tag in blocks:
+            text = text.strip()
+            return f'<{tag}>{text}</{tag}>' if text else ''
+        return text
+
+    parser = Article()
+    parser.feed(html)
+    if parser.root is None:
+        raise CollectionError('Wikipedia article body missing')
+    title = escape(title)
+    return (f'<!doctype html>\n<html><head><meta charset="utf-8"><title>{title}</title>'
+            f'</head><body><h1>{title}</h1>{render(parser.root)}</body></html>\n').encode('utf-8')
+
+
+def _wikipedia_derive(html: str, doc: dict) -> bytes:
+    transform = wikipedia_note if doc['transform'] == 'wikipedia-note' else wikipedia_html
+    return transform(html, doc['title'])
+
+
 def materialize(recipe: dict, out: Path | None = None) -> Path:
     validate_recipe(recipe)
     out = cache_path(out or CACHE_ROOT / 'sources/real-use-v1')
@@ -337,7 +440,7 @@ def materialize(recipe: dict, out: Path | None = None) -> Path:
             rows = by_artifact[a['id']]
             if not rows:
                 continue
-            path = _raw(a, fetch=False)
+            path = _raw(a, fetch=False, documents=rows)
             if a.get('archive') == 'zip':
                 with zipfile.ZipFile(path) as archive:
                     for d in rows:
@@ -366,8 +469,8 @@ def materialize(recipe: dict, out: Path | None = None) -> Path:
                 for d in rows:
                     target = staging / d['path']
                     target.parent.mkdir(parents=True, exist_ok=True)
-                    if d.get('transform') == 'wikipedia-note':
-                        target.write_bytes(wikipedia_note(path.read_text(encoding='utf-8'), d['title']))
+                    if d.get('transform') in WIKIPEDIA_TRANSFORMS:
+                        target.write_bytes(_wikipedia_derive(path.read_text(encoding='utf-8'), d))
                     else:
                         shutil.copyfile(path, target)
                     _verify(target, d)

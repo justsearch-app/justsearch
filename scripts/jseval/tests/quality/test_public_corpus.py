@@ -346,8 +346,14 @@ def test_committed_recipe_and_slice(corpus):
     assert len({d['path'].casefold() for d in recipe['documents']}) == len(recipe['documents'])
     assert {'pdf', 'doc', 'xls', 'ppt', 'html', 'txt', 'csv', 'eml', 'md'} <= {
         d['format'] for d in recipe['documents']}
-    from urllib.parse import urlsplit
+    from urllib.parse import parse_qs, urlsplit
+    artifacts = {a['id']: a for a in recipe['artifacts']}
     for d in recipe['documents']:
+        if d['source'] == 'wikipedia':
+            url = urlsplit(artifacts[d['artifact']]['url'])
+            assert url.path.startswith('/wiki/')
+            assert parse_qs(url.query) == {'oldid': [d['revision']]}
+            assert d['transform'] == ('wikipedia-html' if d['format'] == 'html' else 'wikipedia-note')
         if d['source'] == 'govdata':
             assert d['license']['name'] in ('dl-de/by-2.0', 'dl-de/zero-2.0')
             assert d['bytes'] <= 512000
@@ -373,3 +379,85 @@ def test_committed_recipe_and_slice(corpus):
         assert query.groups['kind'] == 'file-name'
         doc, = c.judgments[qid]
         assert Path(c.documents[doc]).stem.casefold() != query.text.casefold()
+
+
+@pytest.mark.parametrize('changed_note', [False, True])
+def test_wikipedia_identity_is_derived_before_cache_publication(
+        corpus, fixture_recipe, tmp_path, monkeypatch, changed_note):
+    recipe = deepcopy(fixture_recipe)
+    recipe['artifacts'] = recipe['artifacts'][-1:]
+    recipe['documents'] = recipe['documents'][-1:]
+    artifact = recipe['artifacts'][0]
+    monkeypatch.setenv('JUSTSEARCH_DATASET_CACHE', str(tmp_path / 'fresh-wikipedia'))
+    content = b'Changed article.' if changed_note else b'Clean energy &amp; storage.'
+    payload = b'<body><p>' + content + b'</p></body>'
+    monkeypatch.setattr(corpus.PublicHTTP, 'open', lambda *_a, **_k: io.BytesIO(payload))
+    if changed_note:
+        with pytest.raises(collections.CollectionError, match='checksum mismatch'):
+            corpus.fetch(recipe)
+        assert dataset_cache.lookup('public-real-use', {k: artifact[k] for k in ('url', 'sha256')},
+                                    filenames=['payload']) is None
+    else:
+        assert corpus.fetch(recipe)['files'] == 1
+        root = corpus.materialize(recipe, tmp_path / 'derived-note')
+        assert (root / recipe['documents'][0]['path']).read_bytes() == (
+            b'Energy storage\n\nClean energy & storage.\n')
+
+
+def test_wikipedia_html_keeps_article_structure_without_chrome(corpus):
+    article = '''<div class="mw-parser-output"><div class="hatnote"><p>Banner</p></div>
+      <p>Energy <b>storage</b> &amp; supply.<sup class="reference">[1]</sup></p>
+      <p>Area in m<sup>2</sup>; CO<sub>2</sub> emissions.</p>
+      <div class="mw-heading"><h2 id="volatile">Options</h2>
+      <span class="mw-editsection">[edit]</span></div>
+      <ul><li>Heat</li><li>Electricity</li></ul>
+      <table class="wikitable"><caption>Values</caption><tr><th>Power</th><td>20<br>MW</td></tr></table>
+      <div class="navbox"><ul><li>Navigation</li></ul></div>
+      <script>bad()</script><style>p {color: red}</style></div>'''
+    first = corpus.wikipedia_html('<nav><p>Menu</p></nav>' + article, 'Energy & storage')
+    second = corpus.wikipedia_html('<script>new skin</script>' + article.replace('volatile', 'other'),
+                                   'Energy & storage')
+    assert first == second == (
+        '<!doctype html>\n<html><head><meta charset="utf-8"><title>Energy &amp; storage</title>'
+        '</head><body><h1>Energy &amp; storage</h1><p>Energy storage &amp; supply.</p>'
+        '<p>Area in m2; CO2 emissions.</p>'
+        '<h2>Options</h2><ul><li>Heat</li><li>Electricity</li></ul>'
+        '<table><caption>Values</caption><tr><th>Power</th><td>20 MW</td></tr></table>'
+        '</body></html>\n').encode()
+    with pytest.raises(collections.CollectionError, match='body missing'):
+        corpus.wikipedia_html('<html><p>Error page</p></html>', 'Energy')
+
+
+@pytest.mark.parametrize('change', ['raw', 'article'])
+def test_wikipedia_html_identity_and_download_bound(corpus, fixture_recipe, tmp_path, monkeypatch, change):
+    recipe = deepcopy(fixture_recipe)
+    recipe['artifacts'] = recipe['artifacts'][-1:]
+    recipe['documents'] = recipe['documents'][-1:]
+    doc = recipe['documents'][0]
+    original = '<div class="mw-parser-output"><p>Energy storage.</p></div>'
+    expected = corpus.wikipedia_html(original, doc['title'])
+    doc.update(transform='wikipedia-html', path='Personal/Reference.html', format='html',
+               bytes=len(expected), sha256=hashlib.sha256(expected).hexdigest())
+    monkeypatch.setenv('JUSTSEARCH_DATASET_CACHE', str(tmp_path / 'fresh-html'))
+    payload = ('<script>new skin</script>' + original.replace(
+        'Energy storage.', 'Changed content.' if change == 'article' else 'Energy storage.')).encode()
+    monkeypatch.setattr(corpus.PublicHTTP, 'open', lambda *_a, **_k: io.BytesIO(payload))
+    if change == 'article':
+        with pytest.raises(collections.CollectionError, match='checksum mismatch'):
+            corpus.fetch(recipe)
+    else:
+        assert corpus.fetch(recipe)['files'] == 1
+        root = corpus.materialize(recipe, tmp_path / 'derived-html')
+        assert (root / doc['path']).read_bytes() == expected
+    monkeypatch.setenv('JUSTSEARCH_DATASET_CACHE', str(tmp_path / 'bounded-html'))
+    monkeypatch.setattr(corpus, 'MAX_WIKIPEDIA_HTML_BYTES', len(payload) - 1)
+    with pytest.raises(collections.CollectionError, match='Wikipedia byte cap'):
+        corpus.fetch(recipe)
+
+
+@pytest.mark.parametrize('transform', ['wikipedia-note', 'wikipedia-html'])
+def test_wikipedia_derivations_cannot_relax_other_sources(corpus, fixture_recipe, transform):
+    doc = fixture_recipe['documents'][0]
+    doc.update(transform=transform, title='Other source')
+    with pytest.raises(ValueError, match='only Wikipedia'):
+        corpus.validate_recipe(fixture_recipe)

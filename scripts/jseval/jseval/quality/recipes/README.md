@@ -1,10 +1,13 @@
 # Public real-use corpus v1
 
 This directory contains recipes, provenance, filenames and judgments. It contains
-no document bytes. `real-use.json` pins each raw artifact and each resulting file
-by SHA-256 and length. `real-use.manifest.tsv` maps realistic relative paths to
-opaque document IDs. A changed upstream response fails verification; fetching
-does not silently update the recipe.
+no document bytes. `real-use.json` pins each resulting file by SHA-256 and length.
+All sources except Wikipedia also require exact raw artifact checksums and lengths.
+Wikipedia fetches each recorded revision through `/wiki/TITLE?oldid=REV`; its raw
+HTML checksum and length describe the acquisition response as information only.
+Skin/rendering changes are accepted only when the derived file stays identical.
+`real-use.manifest.tsv` maps realistic relative paths to opaque document IDs.
+Changed document bytes fail verification; fetching never updates the recipe.
 
 From an installed `scripts/jseval` environment:
 
@@ -25,7 +28,10 @@ Materialization uses `~/.cache/justsearch-quality/sources/real-use-v1/`.
 it verifies every file even when the destination already exists. The fetcher is
 sequential, observes robots rules (including wildcard rules, crawl delays and
 request rates), checks redirects before requesting their targets, and stops on
-rate limits. Raw downloads use `jseval.dataset_cache`. The quality lifecycle
+rate limits. Raw downloads use `jseval.dataset_cache`. Wikipedia derivations are
+verified before cache publication and again on cache reads; their raw downloads
+have a fixed 16 MiB cap. Every other source retains its recorded raw size cap.
+The quality lifecycle
 retains its existing clean-engine, prepared-distribution and admission checks;
 Gradle builds use `js-gradle-slot`.
 
@@ -44,7 +50,7 @@ after the selected members. The pinned Enron tar expands to 1,823,016,960 bytes.
 | Bundestag | 450 | 405 Drucksachen in fixed-seed number runs and 45 Plenarprotokolle across Wahlperioden 18–20; public document server, no API key. Official works; attribution to Deutscher Bundestag/Bundesrat – DIP. |
 | EUR-Lex | 430 | 200 acts in German and English, ten PDF counterparts and twenty consolidated versions. Published Cellar RDF metadata and Publications Office Cellar-backed download handler; EU reuse with attribution. |
 | GovData | 200 | 40 CSV and 160 XLSX files, explicit distribution-level dl-de/by-2.0 or dl-de/zero-2.0 only, at most 512 kB. GovData catalogue metadata published through data.europa.eu. |
-| Wikipedia | 180 | 125 English and 55 German HTML/Markdown notes from related energy/climate categories. Permitted article/category pages; paragraph-only Markdown derivation. CC BY-SA 4.0 with article/revision attribution. |
+| Wikipedia | 180 | 125 English and 55 German notes from related energy/climate categories, fetched by recorded revision. 91 paragraph-only Markdown notes and 89 minimal saved article HTML pages. CC BY-SA 4.0 with article/revision attribution. |
 | SafeDocs | 200 | Published Tika language `deu`, page count 1–40 and provenance joined by `url_id`; `.de`, `.at`, `.ch` hosts, at most 2 MiB. Third-party rights retained. |
 
 Total: **2,960 files**, 1,120 German and 1,840 English. The recipe records per-file
@@ -54,6 +60,15 @@ with per-document fields overriding the shared values. Individual article,
 revision and dataset attributions remain on their document rows. Its
 `selection` entries record methods and hashes of selection metadata. Selection
 metadata does not need downloading again to reproduce the pinned files.
+
+Wikipedia HTML pages retain the article title, headings, paragraphs, lists and
+tables from `mw-parser-output`. Source attributes and links are removed; skin,
+navigation, scripts, styles, edit links and banners are excluded. Only Wikipedia
+may use either derivation. The revision-pinning repair re-pinned all 89 HTML files
+and three Markdown notes (Energieübertragung, Visit the main page [z], Wind power)
+from the same recorded revisions. Every changed document, revision, prior digest
+and replacement digest is listed in [real-use.wikipedia-repins.tsv](real-use.wikipedia-repins.tsv).
+No slice member changed, so its content digests, queries and judgments are unchanged.
 
 The Wikipedia share is 70 below target (28%, within the allowed adjustment): the
 chosen category candidates were exhausted or rate limited. EUR-Lex contributes
