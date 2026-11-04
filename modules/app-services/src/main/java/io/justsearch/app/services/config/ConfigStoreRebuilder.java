@@ -105,8 +105,13 @@ public final class ConfigStoreRebuilder {
           "chatProfile", chatProfile.id());
       builder.put(EnvRegistry.VLM_MODEL.configKey(), ACTIVATION_ORDINAL, ACTIVATION_SOURCE,
           "chatProfile", chatProfile.modelFile());
-      builder.put(EnvRegistry.MMPROJ_MODEL.configKey(), ACTIVATION_ORDINAL, ACTIVATION_SOURCE,
-          "chatProfile", chatProfile.mmprojFile());
+      // A profile supplies a companion only when no per-file choice was resolved. In
+      // particular, the saved Off and genuine operator paths must survive activation.
+      var projector = selected.resolution(EnvRegistry.MMPROJ_MODEL.configKey());
+      if (projector == null || !projector.isResolved() || "default".equals(projector.sourceName())) {
+        builder.put(EnvRegistry.MMPROJ_MODEL.configKey(), ACTIVATION_ORDINAL, ACTIVATION_SOURCE,
+            "chatProfile", chatProfile.mmprojFile());
+      }
       selected = builder.build();
     }
     Map<String, String> derived = new LinkedHashMap<>();

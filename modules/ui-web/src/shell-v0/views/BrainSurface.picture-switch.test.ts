@@ -24,6 +24,8 @@ let operationArgs: unknown[];
 let refusal: string | null;
 let wait: Promise<void> | null;
 let override: boolean | null = null;
+let interrupt: 'before' | 'after' | null = null;
+const receipts = new Map<string, unknown>();
 function emit(active: boolean) {
   store.current = { ...store.current, runtimeStatus: { active: { mmprojActive: active }, onnxFeatures: [{ id: 'reranker',
     status: active ? 'active' : 'inactive', reason: active ? 'explicit_path' : 'disabled', modelActive: active }] } };
@@ -44,6 +46,7 @@ function switches(el: Brain) {
   return [...el.shadowRoot!.querySelectorAll<HTMLButtonElement>('[role="switch"][aria-label="Use Text in scans and images"]')];
 }
 beforeEach(() => {
+  interrupt = null; receipts.clear();
   enabled = null; override = null; witness = { acceptedRevision: 0, lastCommittedOperationKey: null };
   posts = []; operations = []; operationArgs = []; refusal = null; wait = null;
   preview = { totalDownloadBytes: 0, components: ['embedding', 'reranker', 'chat'].map(id => ({
@@ -60,11 +63,16 @@ beforeEach(() => {
     const path = String(input);
     if (path.endsWith('/api/settings/v2') && init?.method === 'POST') {
       const body = JSON.parse(String(init.body)); posts.push(body); await wait;
+      if (interrupt === 'before') { interrupt = null; throw new Error('Delivery interrupted'); }
+      if (receipts.has(body.operationKey)) return json(receipts.get(body.operationKey));
       if (refusal) return json({ errorCode: 'PICTURE_READING_OVERRIDDEN', error: refusal }, 409);
       if (body.witness.acceptedRevision !== witness.acceptedRevision) return json({ errorCode: 'VERSION_CONFLICT' }, 409);
       enabled = body.pictureReadingEnabled;
       witness = { acceptedRevision: witness.acceptedRevision + 1, lastCommittedOperationKey: body.operationKey };
-      return json({ state: 'COMPLETE', operationKey: body.operationKey, witness, pictureReadingEnabled: enabled });
+      const receipt = { state: 'COMPLETE', operationKey: body.operationKey, witness, pictureReadingEnabled: enabled };
+      receipts.set(body.operationKey, receipt);
+      if (interrupt === 'after') { interrupt = null; throw new Error('Receipt interrupted'); }
+      return json(receipt);
     }
     if (path.endsWith('/api/settings/v2')) return json({ ui: { chatEnabled: true }, pictureReadingEnabled: enabled, pictureReadingOverrideEnabled: override, witness });
     if (path.endsWith('/plan-preview')) return json(preview);
@@ -79,6 +87,49 @@ beforeEach(() => {
 afterEach(() => { document.body.innerHTML = ''; store.listeners.clear(); vi.unstubAllGlobals(); });
 
 describe('picture reading live switch', () => {
+  it('reconciles an interrupted delivery with an unchanged witness using the original attempt', async () => {
+    const el = await mount();
+    interrupt = 'before';
+    switches(el)[0]!.click(); await settle(el);
+    expect(witness.acceptedRevision).toBe(0);
+    expect(el.shadowRoot!.textContent).toContain('Unknown — checking picture reading after an interrupted change');
+    window.dispatchEvent(new Event('focus')); await settle(el);
+    expect(posts).toHaveLength(2);
+    expect(posts[1]).toEqual(posts[0]);
+    expect(switches(el).map(b => b.getAttribute('aria-checked'))).toEqual(['false', 'false']);
+    expect(el.shadowRoot!.textContent).toContain('Off - files and read text kept');
+    expect(el.shadowRoot!.textContent).not.toContain('Unknown — checking picture reading after an interrupted change');
+  });
+
+  it('reconciles an interrupted receipt with a changed witness by replaying the original attempt', async () => {
+    const el = await mount();
+    interrupt = 'after';
+    switches(el)[0]!.click(); await settle(el);
+    expect(witness.acceptedRevision).toBe(1);
+    expect(el.shadowRoot!.textContent).toContain('Unknown — checking picture reading after an interrupted change');
+    window.dispatchEvent(new Event('focus')); await settle(el);
+    expect(posts).toHaveLength(2);
+    expect(posts[1]).toEqual(posts[0]);
+    expect(witness.acceptedRevision).toBe(1);
+    expect(el.shadowRoot!.textContent).toContain('Off - files and read text kept');
+    expect(el.shadowRoot!.textContent).not.toContain('Unknown — checking picture reading after an interrupted change');
+  });
+
+  it('clears interrupted uncertainty when the original attempt is refused with an unchanged witness', async () => {
+    const el = await mount();
+    interrupt = 'before';
+    switches(el)[0]!.click(); await settle(el);
+    expect(el.shadowRoot!.textContent).toContain('Unknown — checking picture reading after an interrupted change');
+    refusal = 'Text in scans and images cannot be switched while using a user-run answer server';
+    window.dispatchEvent(new Event('focus')); await settle(el);
+    expect(posts).toHaveLength(2);
+    expect(posts[1]).toEqual(posts[0]);
+    expect(witness.acceptedRevision).toBe(0);
+    expect(switches(el).map(b => b.getAttribute('aria-checked'))).toEqual(['true', 'true']);
+    expect(el.shadowRoot!.textContent).not.toContain('Unknown — checking picture reading after an interrupted change');
+    expect(el.shadowRoot!.textContent).toContain(refusal);
+  });
+
   it('shares both switches and waits for the applied receipt before showing Off', async () => {
     const el = await mount();
     expect(switches(el).map(b => b.getAttribute('aria-checked'))).toEqual(['true', 'true']);

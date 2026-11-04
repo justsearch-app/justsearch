@@ -77,7 +77,7 @@ public final class GenerativeSettingsComponentOwner implements FixedSettingsComp
     boolean switchingPictures = changedKeys.contains("pictureReadingEnabled");
     if (switchingPictures) {
       var override = desired.resolution("justsearch.mmproj.model");
-      if (override != null && override.isResolved() && override.sourceOrdinal() >= 400) {
+      if (override != null && override.isResolved() && Set.of("env_var", "jvm_arg", "yaml").contains(override.sourceName())) {
         throw refused("PICTURE_READING_OVERRIDDEN",
             "Text in scans and images is controlled by an operator override; change that override first",
             Map.of("source", override.sourceName()), null);
@@ -140,9 +140,8 @@ public final class GenerativeSettingsComponentOwner implements FixedSettingsComp
         throw refused(PREPARATION_REFUSED, "Chat profile model is unavailable",
             Map.of("profile", profile.id(), "model", model.toString()), null);
       }
-      Path mmproj = modelsDir.resolve(profile.mmprojFile());
       inference = new InferenceConfig(inference.serverExecutable(), model,
-          Files.isRegularFile(mmproj) ? mmproj : null, inference.serverPort(),
+          inference.mmprojPath(), inference.serverPort(),
           inference.contextSize(), inference.gpuLayers(), inference.vduMode(), profile.id(),
           inference.chatPromptCacheMiB());
     }

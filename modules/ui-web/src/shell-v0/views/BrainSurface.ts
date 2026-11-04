@@ -21,7 +21,7 @@ import '../components/SurfaceTabs.js';
 import type { SurfaceTabItem } from '../components/SurfaceTabs.js';
 import { getSurface } from '../../api/registry/SurfaceCatalogClient.js';
 import { authorizedFetch } from '../api/authorizedFetch.js';
-import { saveAbsoluteSettings, createSettingsAttempt, executeSettingsAttempt, requireSettingsWitness, SettingsAttemptError } from '../../api/settingsAttempt.js';
+import { saveAbsoluteSettings, createSettingsAttempt, executeSettingsAttempt, requireSettingsWitness, SettingsAttemptError, type SettingsAttempt } from '../../api/settingsAttempt.js';
 import type { SettingsV2 } from '../../api/generated/schema-types/settings-v2.js';
 import { present } from '../display/present.js';
 import { formatBytes } from '../display/format.js';
@@ -616,6 +616,7 @@ export class BrainSurface extends JfElement {
   private featureOpener: HTMLElement | null = null;
   private consentFeature: string | null = null;
   private pictureUncertain = false;
+  private pictureAttempt: SettingsAttempt | null = null;
   private pictureApplied: boolean | null = null;
   private pictureTargetEnabled = false;
   declare featureInfo: BrainFeatureId | null;
@@ -1329,6 +1330,25 @@ export class BrainSurface extends JfElement {
     const revision = ++this.refreshRevision;
     const choice = this.choiceRevision;
     const llmRevision = this.llmRevision;
+    const attempt = this.pictureAttempt;
+    if (attempt) {
+      try {
+        const result = await executeSettingsAttempt(
+          (path, init) => authorizedFetch(this.base() + path, init), attempt);
+        if (!this.isConnected || revision !== this.refreshRevision || choice !== this.choiceRevision) return;
+        this.pictureApplied = JSON.parse(attempt.body).pictureReadingEnabled as boolean;
+        this.rerankerSettings = { ...this.rerankerSettings, witness: result.witness };
+        this.runtimeError = null;
+      } catch (error) {
+        if (!this.isConnected || revision !== this.refreshRevision || choice !== this.choiceRevision) return;
+        if (!(error instanceof SettingsAttemptError)
+            || ['SETTINGS_COMPLETION_UNKNOWN', 'SETTINGS_RECEIPT_INVALID'].includes(error.code)) return;
+        this.pictureApplied = null;
+        this.runtimeError = error.message;
+      }
+      this.pictureAttempt = null;
+      this.pictureUncertain = false;
+    }
     const settings = await this.fetchJson<SettingsV2>('/api/settings/v2');
     if (!this.isConnected || revision !== this.refreshRevision || choice !== this.choiceRevision || !settings) return;
     this.settingsRead = true;
@@ -1336,7 +1356,6 @@ export class BrainSurface extends JfElement {
         || this.rerankerSettings?.witness?.lastCommittedOperationKey !== settings.witness?.lastCommittedOperationKey) {
       this.rerankerApplied = null;
       this.pictureApplied = null;
-      this.pictureUncertain = false;
     }
     this.rerankerSettings = settings;
     this.settings = { ...(settings.ui ?? {}), mode: getUiMode() } as UiSettings;
@@ -1484,6 +1503,7 @@ export class BrainSurface extends JfElement {
         : 'On',
       size: null, switchable: installed,
       blockedReason: !live ? 'Checking AI status before changing features.'
+        : this.pictureUncertain ? 'Checking the interrupted picture reading change.'
         : pictureOverride != null ? 'Text in scans and images is controlled by an operator override; change that override first'
         : features.chat.availability === 'unavailable' ? 'Text in scans and images is unavailable on this computer'
         : !this.settingsRead || !this.rerankerSettings?.witness ? 'Saved picture reading choice is not known. Refresh settings before changing it.'
@@ -2028,6 +2048,7 @@ export class BrainSurface extends JfElement {
       } catch (error) {
         if (error instanceof SettingsAttemptError
             && ['SETTINGS_COMPLETION_UNKNOWN', 'SETTINGS_RECEIPT_INVALID'].includes(error.code)) {
+          this.pictureAttempt = attempt;
           this.pictureUncertain = true;
         }
         throw error;
