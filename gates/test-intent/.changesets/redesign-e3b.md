@@ -177,7 +177,7 @@ The oversized-parent preservation check exercises that ordering through the real
       ],
       "class": "New",
       "repaired": false,
-      "behaviour": "A 200-document page plus content/proof collection issues 201 Lucene collector searches for either 1,000 or 50,000 pending parents. This is a preservation/throughput measurement, not a fail-before repair check.",
+      "behaviour": "A 200-document page plus content/proof collection issues at most one keyset page query plus one content/proof lookup per selected id (201 measured on both trees) for either 1,000 or 50,000 pending parents. This is a preservation/throughput ceiling, not a fail-before repair check.",
       "sources": [
         {
           "kind": "owner-words",
@@ -261,3 +261,14 @@ env -u DISPLAY -u WAYLAND_DISPLAY js-gradle-slot node scripts/governance/gates/t
 The orchestrator owns the dev-stack backlog/heap check. No shared dev stack is started by the builder.
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a1a45d-53f4-7b63-8b22-9be154e56600",
+  "verdict": "reject",
+  "digest": "sha256:f4b59dd0df2cef2d73a509db7819482593c31ddd56a60494c47fc7c62d06470c",
+  "note": "Codex acceptor-4 on 0351cab29d: entries 1-6 and 8 accept; entry 7 rejected - P5 is a ceiling but the check requires exactly 201 searches, which would reject a correct optimization."
+}
+```

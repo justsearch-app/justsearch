@@ -179,7 +179,8 @@ class SpladePendingSelectionTest extends LuceneExecutorTestBase {
           return invocation.getMethod().getName().equals("search") && args.length == 2
               && args[1] instanceof org.apache.lucene.search.CollectorManager;
         }).count();
-        assertEquals(201,queries,"one keyset page plus 200 content/proof lookups, independent of backlog");
+        assertTrue(queries <= 1 + ids.size(),
+            "at most one keyset page plus one content/proof lookup per selected id, independent of backlog: " + queries);
         System.out.println("E3b P5 backlog="+backlog+" page=200 indexQueries="+queries);
       }
     }
