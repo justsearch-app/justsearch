@@ -4,8 +4,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { fetchWithAdmissionWait } from './admissionFetch.js';
 import { EPHEMERAL_TOAST_EVENT, type EphemeralToastSpec } from '../shell-v0/components/advisory/ephemeralToast.js';
 
-function refused(code: string, retrySafe = true): Response {
-  return new Response(JSON.stringify({ errorCode: code, retrySafe, errorClass: 'TRANSIENT', retryable: true }), {
+function refused(code: string, retrySafe = true, preparationId: string | null = code === 'UPGRADE_PREPARING' ? 'prep-1' : null): Response {
+  // The upgrade refusal (ApiSecurityFilters) names its preparation; an engine that is closing
+  // answers the same code without one (RequestEngineWork.writeRefusal).
+  return new Response(JSON.stringify({ errorCode: code, retrySafe, errorClass: 'TRANSIENT', retryable: true,
+    ...(preparationId ? { preparationId } : {}) }), {
     status: code === 'UPGRADE_PREPARING' ? 503 : 429,
     headers: { 'Retry-After': '2', 'Content-Type': 'application/json' },
   });
@@ -33,6 +36,34 @@ describe('pre-execution admission waits', () => {
       expect(send).toHaveBeenCalledTimes(2);
       expect(send.mock.calls[1]?.[1]?.body).toBe('{"query":"probe"}');
     });
+
+  it('L4a a closing engine (no upgrade preparation) waits and retries without announcing an update', async () => {
+    const send = vi.fn().mockResolvedValueOnce(refused('UPGRADE_PREPARING', true, null)).mockResolvedValueOnce(new Response('{}'));
+    const notices: EphemeralToastSpec[] = [];
+    const listener = (event: Event) => notices.push((event as CustomEvent<EphemeralToastSpec>).detail);
+    document.addEventListener(EPHEMERAL_TOAST_EVENT, listener);
+    try {
+      const result = fetchWithAdmissionWait(send, 'http://localhost/api/knowledge/search', { method: 'POST', body: '{}' });
+      await vi.advanceTimersByTimeAsync(2_000);
+      expect((await result).status).toBe(200);
+      expect(send).toHaveBeenCalledTimes(2);
+      expect(notices.map(n => n.message)).toEqual([]);
+    } finally {
+      document.removeEventListener(EPHEMERAL_TOAST_EVENT, listener);
+    }
+  });
+
+  it('L4a only a refusal naming an upgrade preparation says an update is being prepared', async () => {
+    const send = vi.fn().mockResolvedValueOnce(refused('UPGRADE_PREPARING')).mockResolvedValueOnce(new Response('{}'));
+    const notice = new Promise<EphemeralToastSpec>((resolve) => {
+      document.addEventListener(EPHEMERAL_TOAST_EVENT,
+        (event) => resolve((event as CustomEvent<EphemeralToastSpec>).detail), { once: true });
+    });
+    const result = fetchWithAdmissionWait(send, 'http://localhost/api/x', { method: 'POST', body: '{}' });
+    expect((await notice).message).toBe('JustSearch is preparing an update. Waiting to reconnect.');
+    await vi.advanceTimersByTimeAsync(2_000);
+    expect((await result).status).toBe(200);
+  });
 
   it('aborting the wait clears its timer and never resubmits the action', async () => {
     const abort = new AbortController();

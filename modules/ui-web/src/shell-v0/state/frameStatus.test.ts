@@ -116,12 +116,30 @@ describe('frame status projection', () => {
     const m = derive({ authorizations: [request], advisories: [broadcast] });
     expect(m.sections.needs.map(f => f.id)).toEqual(['authorization:exact-target1']);
     expect(m.sections.needs[0]!.actions).toEqual([{ kind: 'authorization', target: 'exact-target1', label: 'Review request' }]);
-    // The retained broadcast is history only: it can never execute the decision a second time.
-    expect(m.sections.earlier.find(f => f.id === 'advisory:auth-adv')!.actions).toEqual([]);
+    // L4b — while the request waits it lives in Needs you only, never also as an Earlier row.
+    expect(m.sections.earlier.map(f => f.id)).not.toContain('advisory:auth-adv');
     // Answered elsewhere / withdrawn: the request leaves, the history stays inert.
     const answered = derive({ authorizations: [], advisories: [broadcast] });
     expect(answered.sections.needs).toEqual([]);
     expect(answered.sections.earlier[0]!.actions).toEqual([]);
+  });
+  it('L4b a waiting approval is in Needs you only; it enters Earlier once answered, expired or withdrawn', () => {
+    const request = { pendingId: 'p-wait', operationId: 'core.reindex', expiresAt: new Date(now + 50_000).toISOString() };
+    const broadcast: AdvisoryRecord = { ...advisory(), key: 'auth-wait', sourceRenderHint: 'REQUIRES_ACK', event: { ...advisory().event, id: 'auth-wait',
+      classId: 'authorization.pending', renderHint: 'REQUIRES_ACK', classExtras: { pendingId: 'p-wait', operationId: 'core.reindex' } } };
+    const waiting = derive({ authorizations: [request], advisories: [broadcast] });
+    expect(waiting.sections.needs.map(f => f.id)).toEqual(['authorization:p-wait']);
+    expect(waiting.sections.earlier.map(f => f.id)).toEqual([]);
+    // Expired: the request cannot be answered any more; the history row (inert, unread) appears.
+    const expired = derive({ authorizations: [{ ...request, expiresAt: new Date(now - 1).toISOString() }], advisories: [broadcast] });
+    expect(expired.sections.needs).toEqual([]);
+    expect(expired.sections.earlier.map(f => [f.id, f.unread, f.actions])).toEqual([['advisory:auth-wait', true, []]]);
+    // Answered or withdrawn: the request left `authorizations`.
+    const answered = derive({ authorizations: [], advisories: [broadcast] });
+    expect(answered.sections.earlier.map(f => f.id)).toEqual(['advisory:auth-wait']);
+    // Another request waiting does not hold back this one's history.
+    const other = derive({ authorizations: [{ ...request, pendingId: 'p-other' }], advisories: [broadcast] });
+    expect(other.sections.earlier.map(f => f.id)).toEqual(['advisory:auth-wait']);
   });
   it('ST1 working shows the most important running item with its measured progress only', () => {
     const indexing = ai({ status: { worker: { core: { indexState: 'INDEXING', pendingJobs: 400 }, enrichment: {} } } as AiState['status'], episodeMaxPendingJobs: 1600 });

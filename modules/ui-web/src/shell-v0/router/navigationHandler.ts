@@ -51,6 +51,7 @@ import type { StoreAdapter } from './storeRegistry.js';
 import type { ShellAddressNavigation, StateSnapshot } from './types.js';
 import {
   activateProjection,
+  adoptCurrentEntry,
   currentAddress,
   flushPendingNavigationWrite,
   pushAddress,
@@ -189,18 +190,18 @@ export function createNavigationHandler(config: NavigationHandlerConfig): Naviga
         if (peekSearchV3Handoff()?.refused) takeSearchV3Handoff();
         applyState(addr.target, addr.state, traversal);
         // Tempdoc 855 §11.1 D3 — never stack a SECOND entry for the address we are already on.
-        // Re-navigating to Settings (rail affordance pressed twice, a command-palette repeat) would
+        // Re-navigating to Settings (the Settings button pressed twice, a command-palette repeat) would
         // otherwise push a duplicate entry, and the window's `history.back()` would land back on the
         // settings address — i.e. Escape would appear to re-open the window.
         const alreadyHere = currentAddress()?.target === addr.target;
-        const pushed = options?.push !== false && !alreadyHere;
-        if (pushed) {
-          pushAddress({
-            kind: 'navigate',
-            target: addr.target,
-            state: addr.state,
-          });
-        }
+        // `pushed` is what history actually did: pushAddress declines to stack a duplicate of the
+        // current address, and closing must then move forward rather than leave the app.
+        const pushed = options?.push !== false && !alreadyHere && pushAddress({
+          kind: 'navigate',
+          target: addr.target,
+          state: addr.state,
+        });
+        if (options?.push === false) adoptCurrentEntry(addr.target);
         config.openModal?.(addr.target, addr.state, { pushed });
         return;
       }
@@ -243,6 +244,10 @@ export function createNavigationHandler(config: NavigationHandlerConfig): Naviga
           target: addr.target,
           state: pending?.origin === 'fresh' ? incomingState : addr.state,
         });
+      } else {
+        // The browser already moved (Back, Forward, a pasted address): the entry it landed on
+        // becomes an app entry with its position and journal marker (FR3).
+        adoptCurrentEntry(addr.target);
       }
 
       // 4. Activate the projector so subsequent store changes propagate to the URL.

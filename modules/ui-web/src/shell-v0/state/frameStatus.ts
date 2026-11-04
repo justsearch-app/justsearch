@@ -184,7 +184,14 @@ export function deriveFrameStatus(input: FrameStatusInput): FrameStatus {
     if (!sections[fact.section].some(row => row.id === fact.id)) sections[fact.section].push(fact);
   };
   for (const fact of input.conditions ?? []) add(fact);
+  // L4b — a request that still waits lives in Needs you only; its advisory joins Earlier once the
+  // request is answered, expires or is withdrawn (it then leaves `authorizations`).
+  const waiting = new Set((input.authorizations ?? [])
+    .filter(request => !request.expiresAt || Date.parse(request.expiresAt) > now)
+    .map(request => request.pendingId));
   for (const record of input.advisories ?? []) {
+    const pendingId = record.event.classExtras.pendingId;
+    if (record.event.classId === 'authorization.pending' && typeof pendingId === 'string' && waiting.has(pendingId)) continue;
     const fact = advisoryStatusFact(record);
     // Retained authorization advisories are history, never another execution route.
     add(record.event.classId === 'authorization.pending' ? { ...fact, actions: [] } : fact);

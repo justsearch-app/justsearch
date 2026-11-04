@@ -2,7 +2,7 @@
 
 TypeScript + [Lit](https://lit.dev/) web components frontend for JustSearch,
 built with Vite. The production UI is the `shell-v0` custom-element chrome
-(`<jf-shell>` + `<jf-rail>` + `<jf-stage>`) mounted from `src/main.jsx` — see
+(`<jf-shell>` + `<jf-top-bar>` + `<jf-stage>`) mounted from `src/main.jsx` — see
 ADR-0032 (`docs/decisions/0032-fe-lit-web-components.md`) for why the earlier
 React stack was retired.
 

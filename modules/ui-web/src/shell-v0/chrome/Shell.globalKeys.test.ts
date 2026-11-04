@@ -4,7 +4,8 @@
  * The Shell's global chords and the ONE typing guard (tempdoc 864 Layer 2(a)).
  *
  * `handleGlobalKey` is a raw `document`-capture listener guarding the app's most powerful chords
- * (`Alt+←/→` history, `Ctrl+D`, `Ctrl+Shift+A`). Until 864 it carried a PRIVATE copy of the shadow
+ * (`Alt+←/→` history, `Ctrl+Shift+A`; shell slice 2 adds `Ctrl+1/2/3`, `F6` and `F1` and retired
+ * `Ctrl+D` with the bookmarks button). Until 864 it carried a PRIVATE copy of the shadow
  * descent that omitted `SELECT` — precisely the omission tempdoc 857 PR-A was written to close on the
  * other copies — so a chord pressed while a `<select>` had focus fired over the reader's native
  * type-ahead. It now asks `isTypingTarget(deepActiveElement())`, the app's one definition.
@@ -62,7 +63,7 @@ function seedSurfaces(): void {
 }
 
 /** A focusable control of the given tag, inside a shadow root the chord's target retargets to. */
-function focusInShadow(tag: 'select' | 'button'): HTMLElement {
+function focusInShadow(tag: 'select' | 'button' | 'textarea'): HTMLElement {
   const host = document.createElement('div');
   host.className = 'probe-host';
   document.body.appendChild(host);
@@ -133,14 +134,28 @@ describe('Shell global chords — the shared typing guard (tempdoc 864 Layer 2(a
 
   it('leaves a chord alone while a <select> has focus — the omission 857 closed elsewhere', () => {
     focusInShadow('select');
-    expect(press({ key: 'd', ctrlKey: true }).defaultPrevented).toBe(false);
     expect(press({ key: 'ArrowLeft', altKey: true }).defaultPrevented).toBe(false);
+    expect(press({ key: 'ArrowRight', altKey: true }).defaultPrevented).toBe(false);
   });
 
   it('still claims the same chord when focus is on a control the reader does NOT type into', () => {
     focusInShadow('button');
-    expect(press({ key: 'd', ctrlKey: true }).defaultPrevented).toBe(true);
     expect(press({ key: 'ArrowLeft', altKey: true }).defaultPrevented).toBe(true);
+    expect(press({ key: 'ArrowRight', altKey: true }).defaultPrevented).toBe(true);
+  });
+
+  /**
+   * C8 — Ctrl+1/2/3 and F6 neither insert nor remove text, so they work from a text field (the
+   * Search composer keeps focus on arrival); AltGr (reported as Ctrl+Alt) types characters on many
+   * layouts and is never taken. Ctrl+D (retired with the bookmarks button, FR4) is no chord now.
+   */
+  it('C8: area keys and F6 work from a text field; an AltGr combination is left to typing', () => {
+    focusInShadow('textarea');
+    expect(press({ key: '2', code: 'Digit2', ctrlKey: true }).defaultPrevented).toBe(true);
+    expect(press({ key: 'F6' }).defaultPrevented).toBe(true);
+    expect(press({ key: '²', code: 'Digit2', ctrlKey: true, altKey: true }).defaultPrevented).toBe(false);
+    expect(press({ key: '@', code: 'Digit2', ctrlKey: true, shiftKey: true }).defaultPrevented).toBe(false);
+    expect(press({ key: 'd', ctrlKey: true }).defaultPrevented).toBe(false);
   });
 
   /**
@@ -151,9 +166,11 @@ describe('Shell global chords — the shared typing guard (tempdoc 864 Layer 2(a
    */
   it('864: ignores an IME-composing chord and an auto-repeat chord', () => {
     focusInShadow('button');
-    expect(press({ key: 'd', ctrlKey: true, isComposing: true }).defaultPrevented).toBe(false);
-    expect(press({ key: 'd', ctrlKey: true, repeat: true }).defaultPrevented).toBe(false);
-    expect(press({ key: 'd', ctrlKey: true }).defaultPrevented).toBe(true);
+    for (const chord of [{ key: '2', code: 'Digit2', ctrlKey: true }, { key: 'F6' }, { key: 'F1' }, { key: 'ArrowLeft', altKey: true }]) {
+      expect(press({ ...chord, isComposing: true }).defaultPrevented, `${chord.key} composing`).toBe(false);
+      expect(press({ ...chord, repeat: true }).defaultPrevented, `${chord.key} repeat`).toBe(false);
+      expect(press(chord).defaultPrevented, `${chord.key} plain`).toBe(true);
+    }
   });
 
   /**
@@ -171,12 +188,14 @@ describe('Shell global chords — the shared typing guard (tempdoc 864 Layer 2(a
     });
     modality.enter();
     try {
-      expect(press({ key: 'd', ctrlKey: true }).defaultPrevented).toBe(false);
+      expect(press({ key: '2', code: 'Digit2', ctrlKey: true }).defaultPrevented).toBe(false);
+      expect(press({ key: 'F6' }).defaultPrevented).toBe(false);
+      expect(press({ key: 'F1' }).defaultPrevented).toBe(false);
       expect(press({ key: 'A', ctrlKey: true, shiftKey: true }).defaultPrevented).toBe(false);
     } finally {
       modality.exit({ skipFocusRestore: true });
     }
-    expect(press({ key: 'd', ctrlKey: true }).defaultPrevented).toBe(true);
+    expect(press({ key: '2', code: 'Digit2', ctrlKey: true }).defaultPrevented).toBe(true);
   });
 
   it('leaves a chord alone while a shadow-nested <input> has focus', () => {
@@ -186,6 +205,6 @@ describe('Shell global chords — the shared typing guard (tempdoc 864 Layer 2(a
     const input = document.createElement('input');
     host.attachShadow({ mode: 'open' }).appendChild(input);
     input.focus();
-    expect(press({ key: 'd', ctrlKey: true }).defaultPrevented).toBe(false);
+    expect(press({ key: 'ArrowLeft', altKey: true }).defaultPrevented).toBe(false);
   });
 });

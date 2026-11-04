@@ -158,6 +158,7 @@ export type ComponentTag =
   | 'jf-timeseries-sparkline'
   | 'jf-toggle-switch'
   | 'jf-tool-call-card'
+  | 'jf-top-bar'
   | 'jf-unified-chat-view'
   | 'jf-vertical-layout'
   | 'jf-walkthrough-card'
@@ -313,6 +314,7 @@ export const COMPONENT_TAGS: readonly ComponentTag[] = [
   'jf-timeseries-sparkline',
   'jf-toggle-switch',
   'jf-tool-call-card',
+  'jf-top-bar',
   'jf-unified-chat-view',
   'jf-vertical-layout',
   'jf-walkthrough-card',

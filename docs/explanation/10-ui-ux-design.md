@@ -59,36 +59,64 @@ Some floating panels use blur; backdrop blur and a glass aesthetic are not UI re
 
 ## 2. Shell structure
 
-`chrome/Shell.ts` renders the following structure. `layout/LayoutManifest.ts` describes
-visibility and composition of the `rail`, `stage` and `statusBar` regions; it does not
-imply five fixed functional zones. `statusBar.visible` now controls only plugin status
-items in the status panel; the title-bar status pill remains available.
+`chrome/Shell.ts` renders one top bar over the window area. The page has three landmarks:
+the top bar (banner), its area switcher (navigation) and the window area (main).
 
 | Shell part | Responsibility |
 |---|---|
-| Title bar | App name, back/forward navigation, recent views, active surface title, status pill, Simple/Detailed control, bookmarks and Copy URL |
-| Rail | Catalog-driven navigation; Simple mode withholds optional diagnostic surfaces |
-| Stage | The active surface; layouts can also compose a second surface in a split stage |
-| Status pill and panel (`jf-status-pill`, `jf-status-panel`) | One status in the title bar; the pill opens current conditions, work and earlier activity over the page |
+| Top bar (`chrome/TopBar.ts`, `jf-top-bar`) | Brand; the area switcher; the status pill; Settings; the More (⋯) menu |
+| Area switcher | Search, Library and AI Brain, in that order (Ctrl+1, Ctrl+2, Ctrl+3; tooltips name the shortcut). Below 1000 px only the active area keeps its visible label; below 720 px the bar shows the brand dot, one button naming the active area that opens the three areas as a menu, the pill as an icon, Settings and More |
+| More (⋯) menu | System (Health, Activity, Logs), Help & shortcuts (F1) and About; windows contributed by the catalog or plugins under “More”; a Developer group (API explorer, Copy link to this view, Show backend address) only while the developer view tier is on (Settings › Developer › View tier) |
+| Window tab row | A window's own tabs at its top (Library: Folders, Browse; AI Brain: AI Brain, Memory; System: Health, Logs, Activity) and its window actions. Search has none |
+| Stage | The active window; layouts can also compose a second window in a split stage, with a picker for the second pane |
+| Status pill and panel (`jf-status-pill`, `jf-status-panel`) | One status in the top bar; the pill opens current conditions, work and earlier activity over the page |
 | Overlay slots (`jf-overlay-host`) | Command palette, Settings, authorization dialogs, reading drawers and other transient surfaces in named slots |
+
+`layout/LayoutManifest.ts` keeps its `rail`, `stage` and `statusBar` zones for saved
+layouts and plugin layouts. `rail.visible: false` (Focus, Zen and custom layouts) hides the
+area switcher; the areas stay reachable through Ctrl+1/2/3 and the command palette, and
+`rail.surfaces` limits the windows the switcher and the More menu list.
+`statusBar.visible: false` hides plugin status items in the status panel and the pill's
+plugin count, never notices or needs-you items. A split stage keeps its second pane.
+The retired rail and title-bar elements (`jf-rail`, `jf-recents-menu`,
+`jf-bookmarks-popover`) stay in the presentation vocabulary as inert elements, so a
+presentation that names one still loads. Saved bookmarks and the navigation journal stay
+stored; the title bar's bookmark, recent-views and Copy URL controls and its Simple/Detailed
+toggle are gone (Settings › Appearance › Detail level remains).
+
+### Addresses, Back and Forward
+
+Every view has a `justsearch://surface/<id>` address in the URL hash. A window's open tab is
+part of it (`?tab=<tab id>`, for example `core.library-surface?tab=core.browse-surface`), and
+so is the Settings section (`core.settings-surface?section=<category>`); changing either
+replaces the address rather than adding a history entry. Member and retired surface IDs
+remain deep-linkable and open their host window on the right tab.
+
+Back and Forward (Alt+Left/Right and the mouse's back and forward buttons) run on the
+browser's own history, so the address and the window shown never disagree; the navigation
+journal follows each entry by an identifier stored with it and resumes the last view on a
+bare launch. Back does nothing on the first view the app owns. In a text field Alt+Left/Right
+are left to the platform, whose history traversal is the same history.
 
 ### Main windows
 
 - **Search** is one interaction window for retrieval, cited answers and delegated work.
   It starts in Search (keyword retrieval requires no model); the user can choose Ask or
   Delegate. A session sidebar keeps past conversations reachable. Legacy mode-specific
-  surface IDs remain compatibility addresses rather than extra rail destinations.
+  surface IDs remain compatibility addresses rather than extra destinations.
 - **Library** manages indexed sources and folders, their state, exclusions and recovery actions.
 - **AI Brain** presents AI installation and readiness; engine configuration sits behind
   its own Advanced settings disclosure, independent of the app-wide Detailed mode. It surfaces schema incompatibility and enrichment readiness
   rather than treating a drained job queue as complete semantic coverage.
-- **System** hosts diagnostic surfaces including Health, Logs and Activity. Health shows
-  observed system and indexing facts and the recent inference transition history.
-- **Settings** is a modal window opened from the rail, command palette or a deep link.
+- **System** hosts diagnostic surfaces including Health, Logs and Activity, reached from
+  More › System. Health shows observed system and indexing facts and the recent inference
+  transition history.
+- **Settings** is a modal window opened from the top bar's Settings button, the command
+  palette or a deep link.
 
 ### Settings window
 
-`core.settings-surface` uses `Placement.MODAL`. Navigating to it — from the rail, the command palette, or a deep-link URL —
+`core.settings-surface` uses `Placement.MODAL`. Navigating to it — from the top bar, the command palette, or a deep-link URL —
 opens `<jf-settings-window>` (`shell-v0/chrome/SettingsWindow.ts`), a chrome-level
 element in `OverlayHost`'s `center` slot (the same dock as the command palette),
 instead of mounting into the Stage; the Stage's active surface is untouched
@@ -114,7 +142,7 @@ member category through the member-to-host redirect.
 
 ### Status pill and panel
 
-One status pill in the title bar projects shared state (`components/StatusPill.ts`,
+One status pill in the top bar projects shared state (`components/StatusPill.ts`,
 `components/StatusPanel.ts` and `state/frameStatus.ts`). It chooses one state in this
 order: engine unreachable → search limited → needs you → problems → working → just
 finished → calm, “Up to date”. Calm requires a fresh observation that search is ready;
@@ -138,13 +166,16 @@ empty sections:
 - **Earlier:** action feedback, advisories and completed work, with details, read/unread
   state and Mark all read. Reversal actions appear only where supported.
 
-Plugin status items render in a separate plugin row, with overflow available through
-“more”. The footer links to Activity (“All activity”) and Health. An empty panel says
+Plugin status items render in a separate plugin row. The first item always shows,
+wrapping inside the row; further items that do not fit collect under “… N more”. The footer links to Activity (“All activity”) and Health. An empty panel says
 whether search is up to date or its status is still being checked.
 
 Feedback from the user's own actions appears inside the pill for a few seconds. While
 the pill shows engine unreachable, search limited, needs you or problems, that feedback
-appears beside it instead. In both cases it remains available in Earlier. Status
+appears beside it instead. In both cases it remains available in Earlier. The top bar
+makes room for the pill's words rather than truncating them; below 720 px the pill is its
+icon and the notice keeps its action. A request waiting for the reader appears only under
+Needs you; it joins Earlier once answered, expired or withdrawn. Status
 transitions and action feedback are announced to screen readers. The panel updates
 while open, preserving expanded details; switching windows closes it. The Help surface
 supplies keyboard guidance.
@@ -202,6 +233,13 @@ and its context disclosures.
 Use registered commands and keybindings for primary actions. In the composer, Enter
 submits at the chosen tier, Shift+Enter adds a newline and Ctrl/Cmd+Enter delegates;
 composition by an input method editor takes precedence. Tab follows reachable controls.
+
+The frame's keys: Ctrl+1/2/3 switch areas, F6 and Shift+F6 move between the top bar, the
+window tab row, the content and the details pane (skipping regions a window does not have),
+F1 opens Help & shortcuts, and Alt+Left/Right go back and forward. None of them fires during
+input-method composition, on key repeat or while a dialog owns the keyboard; Ctrl+1/2/3 and
+F6 also work from a text field because they do not edit text (AltGr combinations, which do
+type on many layouts, are left alone).
 
 Dropping folders onto the shell dispatches the add-to-index action. Result context menus
 expose the actions appropriate to the result through the shared menu; do not promise a

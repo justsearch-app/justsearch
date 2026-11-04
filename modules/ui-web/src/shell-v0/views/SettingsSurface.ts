@@ -1092,6 +1092,13 @@ export class SettingsSurface extends JfElement {
 
   override updated(changed: PropertyValues): void {
     super.updated(changed);
+    // Shell slice 2 — the open section is part of the address (`?section=<category id>`); the
+    // frame replaces the address when it changes, so Back still closes the window in one step.
+    if (changed.has('activeCategory')) {
+      this.dispatchEvent(new CustomEvent('settings-section-change', {
+        detail: { id: this.activeCategory }, bubbles: true, composed: true,
+      }));
+    }
     if (this.recoveryFocusRequested) void this.focusPendingSettingsRecovery();
     // 569 Move 6 — apply-time RUNTIME conformance: once per applied presentation, audit the
     // declared region's RENDERED DOM (computed-contrast oracle). A failure quarantines the region

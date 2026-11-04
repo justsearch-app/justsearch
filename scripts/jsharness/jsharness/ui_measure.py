@@ -428,7 +428,7 @@ _JS_GEOMETRY = """(extraSels) => {
         return s;
     };
     const sels = ['[role="banner"]','[role="navigation"]','[role="main"]','main','.zone-stage','h1',
-                  '[data-surface-id]','jf-rail','jf-stage','jf-inspector-pane'].concat(extraSels || []);
+                  '[data-surface-id]','jf-top-bar','jf-stage','jf-inspector-pane'].concat(extraSels || []);
     const elements = {};
     for (const s of sels) { const e = deepQuery(s); if (e) elements[s] = pick(e); }
     const scrollableRegions = [];

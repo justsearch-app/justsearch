@@ -130,8 +130,13 @@ export type TokenName =
   | '--font-size-sm'
   | '--font-size-xl'
   | '--font-size-xs'
+  | '--frame-brand-dot'
+  | '--frame-brand-halo'
+  | '--frame-control-radius'
+  | '--frame-control-size'
   | '--frame-focus-width'
   | '--frame-hairline'
+  | '--frame-menu-width'
   | '--frame-panel-radius'
   | '--frame-pill-radius'
   | '--frame-status-dim'
@@ -139,6 +144,7 @@ export type TokenName =
   | '--frame-status-panel-top'
   | '--frame-status-panel-width'
   | '--frame-status-ring'
+  | '--frame-topbar-height'
   | '--glass-blur'
   | '--glass-blur-elevated'
   | '--glass-blur-scale'
@@ -364,8 +370,13 @@ export const TOKEN_NAMES: readonly TokenName[] = [
   '--font-size-sm',
   '--font-size-xl',
   '--font-size-xs',
+  '--frame-brand-dot',
+  '--frame-brand-halo',
+  '--frame-control-radius',
+  '--frame-control-size',
   '--frame-focus-width',
   '--frame-hairline',
+  '--frame-menu-width',
   '--frame-panel-radius',
   '--frame-pill-radius',
   '--frame-status-dim',
@@ -373,6 +384,7 @@ export const TOKEN_NAMES: readonly TokenName[] = [
   '--frame-status-panel-top',
   '--frame-status-panel-width',
   '--frame-status-ring',
+  '--frame-topbar-height',
   '--glass-blur',
   '--glass-blur-elevated',
   '--glass-blur-scale',

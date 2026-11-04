@@ -12,8 +12,8 @@
 import { describe, it, expect, afterEach, beforeEach, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import '../../chrome/Shell.js'; // registers the real rail, even when Rail is only a type
-import type { Rail } from '../../chrome/Shell.js';
+import '../../chrome/Shell.js'; // registers the real top bar, even when TopBar is only a type
+import type { TopBar } from '../../chrome/TopBar.js';
 import { present } from '../../display/present.js';
 import { CORE_PROVENANCE } from '../../primitives/provenance.js';
 import {
@@ -150,7 +150,7 @@ describe('the window mounts with its five regions', () => {
     expect(live[0]?.getAttribute('data-testid')).toBe('sv3-topbar-palette');
   });
 
-  it('W7 renders Search in the title band and rail using the real catalog message bundle', async () => {
+  it('W7 renders Search in the title band and the top bar switcher using the real catalog message bundle', async () => {
     const contribution = createCorePluginManifest().capabilities.surfaces!
       .find(s => s.id === 'core.search-v3-surface')!;
     // Read the shipped bundle rather than inventing a translation in a test fixture. The
@@ -184,15 +184,19 @@ describe('the window mounts with its five regions', () => {
     const topbar = await region(el, 'jf-sv3-topbar');
     expect(topbar.shadowRoot?.querySelector('[data-testid="sv3-topbar-title"]')?.textContent)
       .toBe('Search');
-    const rail = document.createElement('jf-rail') as Rail;
-    rail.surfaces = [surface];
-    rail.expanded = true;
-    document.body.appendChild(rail);
-    await rail.updateComplete;
-    const entry = rail.shadowRoot!.querySelector('[data-surface-id="core.search-v3-surface"]')!;
-    expect(entry.querySelector('.rail-label')?.textContent).toBe('Search');
+    // Shell slice 2 — the window's frame entry is the top bar's switcher segment (was the rail
+    // button); it carries the same catalog label, as visible text and accessible name, and its
+    // tooltip adds the shortcut ("Search · Ctrl+1", design-system §2).
+    const bar = document.createElement('jf-top-bar') as TopBar;
+    bar.areas = [{ id: surface.id, label: present({ kind: 'surface', id: surface.id }).label, icon: 'search', shortcut: 'Ctrl+1' }];
+    bar.activeId = surface.id;
+    document.body.appendChild(bar);
+    await bar.updateComplete;
+    const entry = bar.shadowRoot!.querySelector('[data-surface-id="core.search-v3-surface"]')!;
+    expect(entry.querySelector('.label')?.textContent).toBe('Search');
     expect(entry.getAttribute('aria-label')).toBe('Search');
-    expect(entry.getAttribute('title')).toBe('Search');
+    expect(entry.getAttribute('title')).toBe('Search · Ctrl+1');
+    bar.remove();
   });
 
   it('opens with an empty sidebar: no sessions until this window has searched', async () => {
