@@ -162,3 +162,14 @@ RediscoveryAdmissionTest, MaintenanceSyncClaimTest and ordinaryProcessBatchSurvi
 No Deliver item was moved to preservation.
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a1a7ed-df61-7ff0-b1ec-ee351d71e4aa",
+  "verdict": "accept",
+  "digest": "sha256:9246473b0dfc753a56574ae64602ee92b5d8b59568537c7b20c05d4c813199ee",
+  "note": "Codex acceptor on 685963f28a: entry 1 New accept; FUD1-FUD4 and P1-P3 citations match the settled scenarios; both evidence files valid against current sources. Component verification: Codex verifier-1 01a1a7bf on e3b90f7b04 (FUD1-4 fail before / pass after; P1-P3 pass both)."
+}
+```
