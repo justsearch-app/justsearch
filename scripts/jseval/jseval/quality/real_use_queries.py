@@ -36,6 +36,7 @@ import os
 from pathlib import Path
 import random
 import re
+import shlex
 import statistics
 import subprocess
 import sys
@@ -1173,18 +1174,6 @@ def generate(concurrency: int, retry: bool = False) -> int:
 # --------------------------------------------------------------------------- gate
 
 
-class _Ranker:
-    """Delivered hit locations -> doc ids through an index entry's materialization manifest."""
-
-    def __init__(self, root: Path, c: Collection):
-        self.m = Collection(c.name, c.language, c.queries, c.judgments,
-                            ix._json(root / "materialized.json"), c.content, c.metadata)
-        self.documents = root / "documents"
-
-    def ranked_doc_ids(self, locations) -> list[str]:
-        return self.m.ranked_doc_ids(locations, self.documents)
-
-
 # Keyword search alone (S30 triviality): the lexical leg, with the cross-encoder reranker,
 # LambdaMART, query expansion and freshness off, so a rank depends only on the engine and the
 # documents. Each response's trace must show it (``KEYWORD_OFF`` stages never executed),
@@ -1202,8 +1191,9 @@ def keyword_stages(body: dict) -> dict[str, str | None]:
     stages = {st.get("id"): st.get("status") for st in (body.get("searchTrace") or {}).get("stages", [])}
     if stages.get("sparse-retrieval") != "executed" or any(stages.get(st) == "executed" for st in KEYWORD_OFF):
         raise ValueError(f"search was not keyword search alone: {stages}")
-    # This trace stage also covers rule-based classification; only boosts imply LLM influence.
-    if (body.get("queryUnderstanding") or {}).get("boosts"):
+    # The stage also covers rule-based classification. Applied boosts imply LLM influence,
+    # but their absence is insufficient: date-only boosts are omitted from this metadata.
+    if (body.get("queryUnderstanding") or {}).get("appliedBoosts"):
         raise ValueError("search was not keyword search alone: query-understanding boosts")
     return stages
 
@@ -1235,27 +1225,47 @@ def lexical_ranks(handle, client, items: list[tuple[str, str, str]],
     return out
 
 
-def gate(timeout_sec: float, url: str | None = None, root: Path | None = None,
-         cache_root: Path | None = None) -> int:
-    """Gates and the keyword-alone measurement on the prepared index or on a running build engine.
+def require_keyword_environment(env: dict) -> None:
+    """Refuse before engine startup: response metadata omits date-only QU boosts.
+
+    QueryUnderstandingService.extractIfAvailable returns before inference when the search
+    config's queryUnderstandingEnabled is false (lines 172, 223-227). Its default is false
+    (ResolvedConfigBuilder:1442); no UI setting contributes this key. JVM properties outrank
+    environment variables (ResolvedConfigBuilder:205-206), so check those inputs as well.
+    """
+    if (env.get("JUSTSEARCH_QU_ENABLED", "false").strip().lower() != "false"
+            or env.get("JUSTSEARCH_LLM_ENABLED", "").strip().lower() != "false"):
+        raise ValueError("keyword measurement requires JUSTSEARCH_QU_ENABLED absent or false "
+                         "and JUSTSEARCH_LLM_ENABLED=false")
+    for name in ("JAVA_OPTS", "UI_OPTS", "JAVA_TOOL_OPTIONS", "JDK_JAVA_OPTIONS", "_JAVA_OPTIONS"):
+        for option in shlex.split(env.get(name, os.environ.get(name, ""))):
+            key, _, value = option.partition("=")
+            # Argument/VM option files could hide an overriding property.
+            if (option.startswith(("@", "-XX:VMOptionsFile=", "-XX:Flags="))
+                    or (key in ("-Djustsearch.qu.enabled", "-Djustsearch.llm.enabled")
+                        and value.strip().lower() != "false")):
+                raise ValueError(f"keyword measurement refuses JVM override in {name}: {option}")
+
+
+def gate(timeout_sec: float, cache_root: Path | None = None) -> int:
+    """Gates and the keyword-alone measurement on a core-started prepared index.
 
     On the prepared index this is scoring: it runs only inside the core's exclusive window
     (``scripts/dev/admission.py exclusive``) and never builds; ``quality prepare`` builds.
     """
     c, _ = _collection()
-    if url:
-        report = _gate(c, url, _Ranker(root, c))
-        report["engine"] = "build engine (lexical index complete)"
-    else:
-        from .run import require_exclusive
-        require_exclusive(ix.REPO_ROOT)
-        config = replace(ix.IndexConfig(), timeout_sec=timeout_sec)
-        config = replace(config, cache_root=cache_root) if cache_root else config
-        with ix.prepare_index(c, config, prepared_only=True) as handle:
-            handle.wait(prepared_only=True)
-            report = _gate(c, handle.base_url, handle)
-            report["generation"] = handle.index_state.get("generation")
-            # The index key holds machine-specific hashes; it stays out of committed records.
+    from .run import require_exclusive
+    require_exclusive(ix.REPO_ROOT)
+    config = replace(ix.IndexConfig(), timeout_sec=timeout_sec)
+    config = replace(config, cache_root=cache_root) if cache_root else config
+    with ix.prepare_index(c, config, prepared_only=True) as handle:
+        # prepared_only returns an unstarted handle; wait() starts the isolated engine with
+        # exactly handle.env. Never measure on an engine whose QU state we cannot control.
+        require_keyword_environment(handle.env)
+        handle.wait(prepared_only=True)
+        report = _gate(c, handle.base_url, handle)
+        report["generation"] = handle.index_state.get("generation")
+        # The index key holds machine-specific hashes; it stays out of committed records.
     _write_json(RECORD / "gates.json", report)
     print(canonical_json(report["summary"]))
     return 0
@@ -1438,8 +1448,6 @@ def main(argv=None) -> int:
     p.add_argument("--retry", action="store_true", help="regenerate queries failing the current gates")
     p = steps.add_parser("gate")
     p.add_argument("--timeout-sec", type=float, default=3 * 3600)
-    p.add_argument("--url", help="a running build engine of this collection (with --root)")
-    p.add_argument("--root", type=Path, help="that engine's index entry root")
     p.add_argument("--cache-root", type=Path, help="index cache root (default: the quality cache)")
     steps.add_parser("write")
     args = parser.parse_args(argv)
@@ -1452,7 +1460,7 @@ def main(argv=None) -> int:
     if args.step == "generate":
         return generate(args.concurrency, args.retry)
     if args.step == "gate":
-        return gate(args.timeout_sec, args.url, args.root, args.cache_root)
+        return gate(args.timeout_sec, args.cache_root)
     return {"clusters": clusters, "plan": plan, "write": write}[args.step]()
 
 

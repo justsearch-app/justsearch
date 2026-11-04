@@ -209,10 +209,32 @@ queries pending labels.
 
 Triviality is measured, not gated. The `gate` step ranks every known-item
 target with keyword search alone (the lexical leg, with the reranker and every
-model stage off) on the creation build, and records each query's rank and the
-share at rank 1 per recall level in `gates.json`. No query is dropped or
-rewritten to change that share. The gate refuses responses with model-derived
-query-understanding boosts; rule-based answer-type classification is accepted.
+model stage off) on a core-started engine serving the prepared index, and records
+each query's rank and the share at rank 1 per recall level in `gates.json`. No query is dropped or
+rewritten to change that share. To measure again, run `python -m
+jseval.quality.real_use_queries gate` inside the core's exclusive scoring window
+after `quality prepare`. The gate starts only the prepared index's own engine;
+it accepts neither `--url` nor `--root`.
+
+Before starting that engine, the gate requires its environment to have
+`JUSTSEARCH_QU_ENABLED` absent or `false` and `JUSTSEARCH_LLM_ENABLED=false`.
+The core pins `JUSTSEARCH_HOME` to the index's isolated data directory
+(`index.py:215–221`). The captured search config's `queryUnderstandingEnabled`
+defaults to false (`ResolvedConfigBuilder.java:1442`); UI settings contribute
+no override for this key (`ConfigStoreRebuilder.contributeUiSettings`).
+`KnowledgeSearchEngine.java:896–899` passes that switch to extraction, and
+`QueryUnderstandingService.java:172–173,223–227` returns before inference if
+it is false or the AI service is unavailable. JVM `-Djustsearch.qu.enabled`
+and `-Djustsearch.llm.enabled` overrides must also be absent or false, since
+JVM properties outrank environment variables (`ResolvedConfigBuilder.java:205–206`).
+The gate checks all five Java option variables, including `_JAVA_OPTIONS`,
+and refuses option files that could hide overrides. The search request stays
+unchanged. As a second check it refuses a nonempty
+`queryUnderstanding.appliedBoosts`, the field in the response schema.
+Rule-based answer-type classification is accepted. A date-only model boost
+can be absent from that metadata (`KnowledgeSearchEngine.java:1486–1500`),
+so the pre-start check is necessary: extraction cannot run at all.
+
 Keyword search alone ranks the target first for:
 
 | recall level | rank 1 | queries | share |

@@ -528,18 +528,92 @@ def test_triviality_refuses_a_rank_a_model_stage_shaped(stage):
 
 
 def test_triviality_refuses_query_understanding_boosts():
+    from jsonschema import validate
+    qu = {"appliedBoosts": {"entity_organizations": ["Acme"]},
+          "expectedAnswerType": "LOOKUP", "latencyMs": 20}
+    schema = json.loads((ruq.ix.REPO_ROOT / "SSOT/schemas/knowledge-search-response.v1.json").read_text())
+    validate(qu, schema["properties"]["queryUnderstanding"])
+    assert set(qu) <= schema["properties"]["queryUnderstanding"]["properties"].keys()
     client = _SearchClient({**KEYWORD_TRACE, "query-understanding": "executed"},
-                           {"boosts": {"entity_organizations": ["Acme"]}, "answerType": "LOOKUP"})
+                           qu)
     with pytest.raises(ValueError, match="query-understanding boosts"):
         ruq.lexical_ranks(_Handle(), client, [("ki-1", "budget memo", "doc-a")])
 
 
-@pytest.mark.parametrize("query_understanding", [None, {"answerType": "LOOKUP"},
-                                                {"boosts": {}, "answerType": "LOOKUP"}])
+@pytest.mark.parametrize("query_understanding", [None, {"expectedAnswerType": "LOOKUP"},
+                                                {"appliedBoosts": {}, "expectedAnswerType": "LOOKUP"}])
 def test_triviality_accepts_query_understanding_without_boosts(query_understanding):
     # Classification can execute this trace stage without an LLM shaping the rank.
     client = _SearchClient({**KEYWORD_TRACE, "query-understanding": "executed"}, query_understanding)
     assert ruq.lexical_ranks(_Handle(), client, [("ki-1", "budget memo", "doc-a")]) == {"ki-1": 1}
+
+
+@pytest.mark.parametrize("option", ["--url", "--root"])
+def test_gate_has_no_external_engine_path(option, capsys):
+    with pytest.raises(SystemExit) as refused:
+        ruq.main(["gate", option, "external"])
+    assert refused.value.code == 2
+    assert "unrecognized arguments" in capsys.readouterr().err
+
+
+@pytest.mark.parametrize("env", [
+    {"JUSTSEARCH_QU_ENABLED": "true", "JUSTSEARCH_LLM_ENABLED": "false"},
+    {"JUSTSEARCH_QU_ENABLED": "false", "JUSTSEARCH_LLM_ENABLED": "true"},
+    {},  # LLM defaults to enabled in Java; absence is insufficient.
+    *[{"JUSTSEARCH_LLM_ENABLED": "false", name: value}
+      for name in ("JAVA_OPTS", "UI_OPTS", "JAVA_TOOL_OPTIONS", "JDK_JAVA_OPTIONS", "_JAVA_OPTIONS")
+      for value in ("-Djustsearch.qu.enabled=true", "-Djustsearch.llm.enabled=on", "@hidden-options")],
+])
+def test_gate_refuses_before_start_or_date_only_extraction(env, monkeypatch):
+    from jseval.quality import run
+    from contextlib import nullcontext
+    from types import SimpleNamespace
+
+    def forbidden(*args, **kwargs):
+        # QueryUnderstandingService:172 returns before inference when the captured search
+        # config is disabled (isAvailable:223-227). This blocks date-only output too, even
+        # though buildQueryUnderstanding:1486-1500 cannot report its publication range.
+        raise AssertionError("engine started or a search could extract date-only boosts")
+
+    monkeypatch.setattr(ruq, "_collection", lambda: (object(), {}))
+    monkeypatch.setattr(run, "require_exclusive", lambda root: None)
+    monkeypatch.setattr(ruq.ix, "prepare_index", lambda c, cfg, *, prepared_only:
+                        nullcontext(SimpleNamespace(env=env, wait=forbidden)))
+    monkeypatch.setattr(ruq, "_gate", forbidden)
+    with pytest.raises(ValueError, match="keyword measurement"):
+        ruq.gate(1)
+
+
+@pytest.mark.parametrize("qu", [None, "false"])
+def test_gate_starts_only_the_prepared_engine_with_qu_unavailable(qu, monkeypatch, tmp_path):
+    from contextlib import nullcontext
+    from types import SimpleNamespace
+    from jseval.quality import run
+    env = {"JUSTSEARCH_LLM_ENABLED": "false", "JAVA_TOOL_OPTIONS": "-Djava.awt.headless=true"}
+    if qu is not None:
+        env["JUSTSEARCH_QU_ENABLED"] = qu
+    events = []
+    handle = SimpleNamespace(env=env, base_url="http://owned-engine", index_state={"generation": 7},
+                             wait=lambda *, prepared_only: events.append(("start", prepared_only)))
+    c = object()
+
+    def prepare(collection, config, *, prepared_only):
+        assert collection is c and prepared_only
+        events.append(("prepare", prepared_only))
+        return nullcontext(handle)
+
+    def measure(collection, url, actual):
+        assert collection is c and actual is handle and url == handle.base_url
+        assert events == [("prepare", True), ("start", True)]
+        return {"summary": {}}
+
+    monkeypatch.setattr(ruq, "RECORD", tmp_path)
+    monkeypatch.setattr(ruq, "_collection", lambda: (c, {}))
+    monkeypatch.setattr(run, "require_exclusive", lambda root: None)
+    monkeypatch.setattr(ruq.ix, "prepare_index", prepare)
+    monkeypatch.setattr(ruq, "_gate", measure)
+    assert ruq.gate(1) == 0
+    assert json.loads((tmp_path / "gates.json").read_text())["generation"] == 7
 
 
 def test_prepare_applies_the_collection_configs_deadline_and_keeps_the_default_elsewhere(tmp_path, monkeypatch):
