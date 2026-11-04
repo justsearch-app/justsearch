@@ -445,3 +445,14 @@ no `--before` in the preservation evidence command, because that flag requires a
 The real-system corpus/upgrade run and configuration/hash pinning remain independent verification.
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "820469ae-b06e-4b51-a0b8-23d7cf754311",
+  "verdict": "accept",
+  "digest": "sha256:c2bbe2ff1997167945db380e98136e45e1a3eb03937547ea16a11d1e3bc11f56",
+  "note": "Claude verifier (CLAUDE_CODE_SESSION_ID) on 1745171ffe after a Codex verifier was stopped by its provider's content filter: all entries accept; FU5-1..4 fail before by assertion and pass after; 45 corpus files extract incl. the 610-part deck's last slide; P1-P5 hold; pythonBytecodeFileIsSkippedByExtension runs and passes on both trees. Pre-existing on main: a forged compressed size widens a member's own ratio limit (package 100x and 100 MiB ceiling still bound it); recorded as a follow-up."
+}
+```
