@@ -16,14 +16,48 @@ import io.justsearch.indexerworker.loop.ops.LoopPacingPolicy;
 import io.justsearch.indexerworker.loop.pacing.IndexingPacing;
 import io.justsearch.indexerworker.ner.*;
 import io.justsearch.indexerworker.splade.SpladeEncoder;
+import io.justsearch.indexerworker.metrics.OperationalMetrics;
 import io.justsearch.indexing.SchemaFields;
 import java.util.*;
 import java.util.concurrent.atomic.*;
+import java.util.concurrent.atomic.LongAdder;
 import org.junit.jupiter.api.*;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.*;
 
 final class BackfillResourceAdmissionTest {
+  private String previousBackfillMode;
+  private final Map<Map<String, LongAdder>, Map<String, LongAdder>> previousMetrics =
+      new IdentityHashMap<>();
+
+  @BeforeEach
+  @SuppressWarnings("unchecked")
+  void saveMetrics() throws Exception {
+    var metrics = OperationalMetrics.getInstance();
+    previousBackfillMode = metrics.getBackfillMode();
+    for (String name : List.of("enrichmentCompleted", "batchTimingMs", "batchTimingCount", "enrichmentOutcomes")) {
+      var field = OperationalMetrics.class.getDeclaredField(name);
+      field.setAccessible(true);
+      var counters = (Map<String, LongAdder>) field.get(metrics);
+      var saved = new HashMap<String, LongAdder>();
+      counters.forEach((key, value) -> {
+        var copy = new LongAdder();
+        copy.add(value.sum());
+        saved.put(key, copy);
+      });
+      previousMetrics.put(counters, saved);
+    }
+  }
+
+  @AfterEach
+  void restoreMetrics() {
+    previousMetrics.forEach((counters, saved) -> {
+      counters.clear();
+      counters.putAll(saved);
+    });
+    OperationalMetrics.getInstance().recordBackfillMode(previousBackfillMode);
+  }
+
   private final DocumentFieldOps fields = mock(DocumentFieldOps.class);
   private final IndexingCoordinator coordinator = mock(IndexingCoordinator.class);
   private final IndexCountOps counts = mock(IndexCountOps.class);

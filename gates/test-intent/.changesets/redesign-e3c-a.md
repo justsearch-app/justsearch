@@ -22,15 +22,17 @@ sub-batches. Controls establish that every path has at least two calls, without 
 The real-writer matrix starts retry counts at 2, checks PENDING after cancellation, and checks
 completion with retry count 0 after resume. Provider and authority replacement retain E3a's
 publication rejection semantics. The separate dense retention check preserves 32 prior windows,
-discards the incomplete slice and resumes at 32. The sparse-prefix check retains publication
-credit for the first completed 64-document slice and leaves its cancelled suffix pending.
+discards the incomplete slice and resumes at 32. The sparse-prefix checks retain publication
+credit for the first completed 64-document slice and leave its cancelled suffix pending,
+including cancellation inside per-document fallback after a later batch slice fails. Fallback
+starts at the unfinished suffix and never re-encodes the completed prefix.
 
 Existing correct behavior moved to preservation: interruption during native-session acquisition
 (SessionAcquisitionRequest and the existing E3a interruption matrix), combined unit-boundary
 cycle deadlines, retained-window activity, chunk-only activity, source/provider/authority fencing,
 D126 publication receipts, E1 disposition/timing and E2 row isolation. The new deadline check also
 proves current NER/SPLADE operations finish after the cycle deadline while the next unit defers.
-The pre-existing parent-only gauge check explicitly pinned false sleep pacing. E3c-a changes that one expectation to true; its completion and mode assertions stay. The existing sparse-prefix accounting pin changes from no acceptance to 64 published completed rows and one cancelled suffix, following the settled preservation-of-completed-results rule. The Engine pressure fixture explicitly identifies GPU encoders and observes the sparse encode boundary rather than content selection. The existing BGE-M3 unified-pass ownership also determines combined-mode eligibility; unit order, quantum, tight-loop continuation rules and fairness are unchanged. No test selection or shared test helper changes.
+The pre-existing parent-only gauge check explicitly pinned false sleep pacing. E3c-a changes that one expectation to true; its completion and mode assertions stay. The existing sparse-prefix accounting pin changes from no acceptance to 64 published completed rows and one cancelled suffix, following the settled preservation-of-completed-results rule. The Engine pressure fixture explicitly identifies GPU encoders and observes the sparse encode boundary rather than content selection. The existing BGE-M3 unified-pass ownership also determines combined-mode eligibility; unit order, quantum, tight-loop continuation rules and fairness are unchanged. The resource-admission, scheduler-mode and Engine-pressure fixtures save and restore their process-wide backfill mode, completion, timing and outcome counters after every test. The native fixture already restores its encoder registry; the other edited fixtures call operations directly without recording singleton metrics. No test selection or shared test helper changes.
 
 The before compatibility patch adds only inert production signatures for the scoped cancellation
 entry/check methods, the BGE-M3 CPU-plan accessor, and the resource-predicate context constructor. It deliberately does not connect the scope to acquisition requests or change the base admission logic. All repair
@@ -65,8 +67,13 @@ The native control and preservation methods must not be included in the repair s
       ],
       "class": "New",
       "repaired": true,
-      "behaviour": "Bulk pressure and main-GPU ownership admit eligible CPU units in combined and interleaved service, recheck a hold raised between units, and report successful parent, NER and acknowledged reconciliation work for active sleep. Empty turns stay idle and energy saving blocks CPU work. Cold configured GPU owners are gated before lazy initialization, and the existing unconditional BGE-M3 CPU-plan route advances in idle and interleaved service even with a warm query GPU. BGE-M3 remains owned by its existing individual unified pass, so a held NER GPU cannot strand the CPU BGE owner in a combined pass that does not implement BGE-M3.",
+      "behaviour": "The fixture restores prior singleton backfill mode, completion, timing and outcome counters after every test. Bulk pressure and main-GPU ownership admit eligible CPU units in combined and interleaved service, recheck a hold raised between units, and report successful parent, NER and acknowledged reconciliation work for active sleep. Empty turns stay idle and energy saving blocks CPU work. Cold configured GPU owners are gated before lazy initialization, and the existing unconditional BGE-M3 CPU-plan route advances in idle and interleaved service even with a warm query GPU. BGE-M3 remains owned by its existing individual unified pass, so a held NER GPU cannot strand the CPU BGE owner in a combined pass that does not implement BGE-M3.",
       "sources": [
+        {
+          "kind": "owner-words",
+          "location": "task redesign-e3c request",
+          "quote": "Restore shared state after each test the way BackgroundInferenceCancellationTest already does. Check the other new or edited test files of this candidate for the same leak."
+        },
         {
           "kind": "owner-words",
           "location": "task redesign-e3c request",
@@ -102,7 +109,7 @@ The native control and preservation methods must not be included in the repair s
       ],
       "class": "New",
       "repaired": true,
-      "behaviour": "Each non-interrupt hard-stop reason reaches internal operation requests on all eleven service routes through the real Lucene writer; pending rows keep retry count 2 and complete after resumption. Cancellation keeps earlier completed sparse slices, sets no systemic failure, and preserves prior dense slices with active-pacing credit. Cycle deadlines finish current NER/SPLADE operations and defer the next unit. One hundred retained held GPU owners keep their valid slices while an independent CPU NER row is selected and published in the same turn.",
+      "behaviour": "Each non-interrupt hard-stop reason reaches internal operation requests on all eleven service routes through the real Lucene writer; pending rows keep retry count 2 and complete after resumption. Cancellation keeps earlier completed sparse slices, including when an ordinary later slice error enters a per-document fallback that is internally cancelled; completed rows publish once, only the unfinished suffix reaches fallback, retries remain unchanged, and cancellation sets no systemic failure. Prior dense slices retain their active-pacing credit. Cycle deadlines finish current NER/SPLADE operations and defer the next unit. One hundred retained held GPU owners keep their valid slices while an independent CPU NER row is selected and published in the same turn.",
       "sources": [
         {
           "kind": "owner-words",
@@ -119,6 +126,7 @@ The native control and preservation methods must not be included in the repair s
       "newChecks": [
         "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/EnrichmentInternalStopTest.java#everyHardStopReachesInternalCallsWithoutPublishingOrChargingRetries",
         "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/EnrichmentInternalStopTest.java#cancellationPreservesCompletedSparseSlicesWithoutSettingBackoff",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/EnrichmentInternalStopTest.java#cancellationInErrorFallbackKeepsAnEarlierCompletedSparseSlice",
         "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/EnrichmentInternalStopTest.java#anInternalDenseStopKeepsEarlierValidSlicesAndTheirActivePacingCredit",
         "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/EnrichmentInternalStopTest.java#heldGpuRetainedOwnersCannotOccupyTheCpuSelection"
       ]
@@ -129,8 +137,13 @@ The native control and preservation methods must not be included in the repair s
       ],
       "class": "New",
       "repaired": true,
-      "behaviour": "The existing successful parent-only mode check now expects active sleep as required by E3c-a. Its seeded document, completion metric and individual-mode assertions remain intact. The stale false-pacing comment and method display annotation are removed; no existing check is weakened.",
+      "behaviour": "The existing successful parent-only mode check now expects active sleep as required by E3c-a. Its seeded document, completion metric and individual-mode assertions remain intact. The stale false-pacing comment and method display annotation are removed. The fixture now restores its prior singleton backfill mode, completion, timing and outcome counters after every test; no existing check is weakened.",
       "sources": [
+        {
+          "kind": "owner-words",
+          "location": "task redesign-e3c request",
+          "quote": "Restore shared state after each test the way BackgroundInferenceCancellationTest already does. Check the other new or edited test files of this candidate for the same leak."
+        },
         {
           "kind": "owner-words",
           "location": "task redesign-e3c request",
@@ -175,8 +188,13 @@ The native control and preservation methods must not be included in the repair s
         "instrumentation",
         "input re-encoding"
       ],
-      "whatMoved": "Both existing GPU-pressure fixtures now explicitly stub isGpuAvailable=true for the encoder they describe as GPU work. The combined check observes native SPLADE encode invocations (one admitted GPU slice), replacing the content-collection marker that now also runs for CPU eligibility. The original pressure samples, raise timing, deadline, held reason, no later GPU-call assertion and clear/resume checks stay. The BGE-M3 check retains all assertions, including one collection and zero encodes before clear. The adapted checks pass on main and the candidate.",
+      "whatMoved": "Both existing GPU-pressure fixtures now explicitly stub isGpuAvailable=true for the encoder they describe as GPU work. The combined check observes native SPLADE encode invocations (one admitted GPU slice), replacing the content-collection marker that now also runs for CPU eligibility. The original pressure samples, raise timing, deadline, held reason, no later GPU-call assertion and clear/resume checks stay. The BGE-M3 check retains all assertions, including one collection and zero encodes before clear. The fixture restores its prior singleton backfill mode, completion, timing and outcome counters after every test. The adapted checks pass on main and the candidate.",
       "sources": [
+        {
+          "kind": "owner-words",
+          "location": "task redesign-e3c request",
+          "quote": "Restore shared state after each test the way BackgroundInferenceCancellationTest already does. Check the other new or edited test files of this candidate for the same leak."
+        },
         {
           "kind": "owner-words",
           "location": "task redesign-e3c request",
@@ -206,6 +224,7 @@ env -u DISPLAY -u WAYLAND_DISPLAY js-gradle-slot node scripts/governance/gates/t
   --check modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/BackfillResourceAdmissionTest.java#acknowledgedIndividualWorkSelectsActiveSleep \
   --check modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/EnrichmentInternalStopTest.java#everyHardStopReachesInternalCallsWithoutPublishingOrChargingRetries \
   --check modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/EnrichmentInternalStopTest.java#cancellationPreservesCompletedSparseSlicesWithoutSettingBackoff \
+  --check modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/EnrichmentInternalStopTest.java#cancellationInErrorFallbackKeepsAnEarlierCompletedSparseSlice \
   --check modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/EnrichmentInternalStopTest.java#anInternalDenseStopKeepsEarlierValidSlicesAndTheirActivePacingCredit \
   --check modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/BackfillSchedulerModeRecordingTest.java#individualMode_withWorkDone_keepsIndividual \
   --check modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/EnrichmentAttemptAccountingTest.java#individualSpladeRetainsComputedPrefixWhenALaterSliceIsCancelled \

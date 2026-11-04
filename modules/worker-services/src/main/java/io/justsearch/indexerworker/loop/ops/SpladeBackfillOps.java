@@ -171,9 +171,9 @@ public final class SpladeBackfillOps {
       // Phase 2: Batch encode with SPLADE. Spec D §3.3: the idle-branch batch is 200 documents
       // (justsearch.backfill.splade_batch_size), measured at 2.5 s in one call (M5) — past the
       // ~1 s a bulk producer may hold the GPU between yields (ADR-0050 decision 2). It is encoded
-      // in spladePhaseDocs slices with a pace point between them; the outcome is unchanged: any
-      // failing slice sends the whole batch to the per-document fallback, as a failing single
-      // call did.
+      // in spladePhaseDocs slices with a pace point between them. Any
+      // failing slice sends only its unfinished suffix to the per-document fallback. Earlier
+      // completed slices retain their results even if a fallback operation is cancelled.
       long t2 = System.nanoTime();
       BulkPacePolicy bulkPace = BulkPacePolicy.DEFAULTS;
       BulkPacePolicy.PhasePacer pacer = new BulkPacePolicy.PhasePacer(context.pacing());
@@ -227,8 +227,10 @@ public final class SpladeBackfillOps {
             commitIfNeeded(context, processed, failed, markedFailed);
             return StageOutcome.observed(false, processed, t0, accounting);
           }
-          // Fallback to per-doc encoding
-          for (int i = 0; i < batchDocIds.size(); i++) {
+          // Publish completed slices before fallback so its cancellation cannot discard them.
+          processed += publishSparseVectors(batch, batchDocIds, sparseVecs);
+          // Fallback to per-doc encoding for only the unfinished suffix.
+          for (int i = sparseVecs.size(); i < batchDocIds.size(); i++) {
             if (context.spladeEncoderSupplier().get() != encoder) {
               commitIfNeeded(context, processed, failed, markedFailed);
               return StageOutcome.observed(false, processed, t0, accounting);
@@ -290,18 +292,8 @@ public final class SpladeBackfillOps {
 
       // Phase 3: Batch-update all docs with SPLADE vectors (single NRT refresh for batch)
       long t3 = System.nanoTime();
-      List<Map.Entry<String, Map<String, Object>>> batchUpdates =
-          new ArrayList<>(batchDocIds.size());
-      for (int i = 0; i < sparseVecs.size(); i++) {
-        Map<String, Object> updates = new HashMap<>();
-        updates.put(SchemaFields.SPLADE, sparseVecs.get(i));
-        updates.put(SchemaFields.SPLADE_STATUS, spladeStatusFor(sparseVecs.get(i)));
-        updates.put(SchemaFields.SPLADE_RETRY_COUNT, "0");
-        batchUpdates.add(Map.entry(batchDocIds.get(i), updates));
-      }
-      var batchResult = batch.updateBatch(batchUpdates);
+      processed += publishSparseVectors(batch, batchDocIds, sparseVecs);
       batch.rejectRetiredOutcomes();
-      processed += batchResult.updatedCount();
       long writeMs = (System.nanoTime() - t3) / 1_000_000;
 
       long t4 = System.nanoTime();
@@ -333,6 +325,20 @@ public final class SpladeBackfillOps {
       context.log().error("Error during SPLADE backfill", e);
       return StageOutcome.observed(false, 0, t0, accounting);
     }
+  }
+
+  private static int publishSparseVectors(
+      EnrichmentBatch batch, List<String> docIds, List<Map<String, Float>> sparseVecs) {
+    if (sparseVecs.isEmpty()) return 0;
+    List<Map.Entry<String, Map<String, Object>>> updates = new ArrayList<>(sparseVecs.size());
+    for (int i = 0; i < sparseVecs.size(); i++) {
+      Map<String, Object> fields = new HashMap<>();
+      fields.put(SchemaFields.SPLADE, sparseVecs.get(i));
+      fields.put(SchemaFields.SPLADE_STATUS, spladeStatusFor(sparseVecs.get(i)));
+      fields.put(SchemaFields.SPLADE_RETRY_COUNT, "0");
+      updates.add(Map.entry(docIds.get(i), fields));
+    }
+    return batch.updateBatch(updates).updatedCount();
   }
 
   static boolean isSystemicFailure(Throwable failure) {

@@ -74,6 +74,54 @@ final class EnrichmentInternalStopTest extends LuceneExecutorTestBase {
     }
   }
 
+  @org.junit.jupiter.api.Test
+  void cancellationInErrorFallbackKeepsAnEarlierCompletedSparseSlice() throws Exception {
+    try (var runtime = IndexSchema.fromCatalog(catalog()).atPath(directory)
+        .withExecutorRegistrations(testLuceneExecutors()).open()) {
+      runtime.commitOps().stopCommitTimer();
+      int prefix = io.justsearch.indexerworker.loop.pacing.BulkPacePolicy.DEFAULTS.spladePhaseDocs();
+      for (int i = 0; i <= prefix; i++) {
+        String id = String.format(Locale.ROOT, "doc%03d", i);
+        runtime.indexingCoordinator().indexSingle(new IndexDocument(Map.of(
+            SchemaFields.DOC_ID, id, SchemaFields.DOC_UID, id, SchemaFields.CONTENT, "document " + id,
+            SchemaFields.CONTENT_SHA256, ChunkParentRevision.sha256Hex("document " + id),
+            SchemaFields.SPLADE_STATUS, "PENDING", SchemaFields.SPLADE_RETRY_COUNT, "2")));
+      }
+      runtime.commitOps().maybeRefreshBlocking();
+      var held = new AtomicBoolean();
+      var batches = new AtomicInteger();
+      var fallbackCalls = new AtomicInteger();
+      var sparse = mock(SpladeEncoder.class);
+      when(sparse.encodeBatch(anyList())).thenAnswer(call -> {
+        if (batches.incrementAndGet() == 2) throw new IllegalStateException("batch requires per-document fallback");
+        return Collections.nCopies(((List<?>) call.getArgument(0)).size(), Map.of("term", 1f));
+      });
+      when(sparse.encode(anyString(), any())).thenAnswer(call -> {
+        io.justsearch.core.execution.InferenceRequest request = call.getArgument(1);
+        for (int i = 0; i < 2; i++) {
+          request.remainingNanos();
+          fallbackCalls.incrementAndGet();
+          held.set(true);
+        }
+        return Map.of("term", 1f);
+      });
+      var outcome = SpladeBackfillOps.processSpladeBackfill(new SpladeBackfillOps.BackfillContext(
+          runtime.documentFieldOps(), runtime.indexingCoordinator(), runtime.commitOps(), IndexingPacing.unthrottled(),
+          () -> sparse, () -> !held.get(), prefix + 1, true, false, LoggerFactory.getLogger(getClass())));
+      runtime.commitOps().maybeRefreshBlocking();
+      String cancelledId = String.format(Locale.ROOT, "doc%03d", prefix);
+      assertAll(
+          () -> assertEquals(1, fallbackCalls.get(), "fallback stops before its next native call"),
+          () -> assertEquals(prefix, outcome.docsProcessed(), "cancellation must preserve the earlier completed sparse slice"),
+          () -> assertTrue(outcome.success(), "cancellation must not cause systemic backoff"),
+          () -> assertEquals(prefix, runtime.indexCountOps().countByField(SchemaFields.SPLADE_STATUS, "COMPLETED"), "persisted completed prefix"),
+          () -> assertEquals(1, runtime.indexCountOps().countByField(SchemaFields.SPLADE_STATUS, "PENDING"), "persisted pending suffix"),
+          () -> assertEquals("2", runtime.documentFieldOps().getDocumentField(cancelledId, SchemaFields.SPLADE_RETRY_COUNT), "suffix retries unchanged"),
+          () -> assertEquals(2, batches.get(), "completed slices are not re-encoded"),
+          () -> assertDoesNotThrow(() -> verify(sparse).encode(eq("document " + cancelledId), any())));
+    }
+  }
+
   @ParameterizedTest(name = "{displayName} [{index}] {arguments}")
   @ValueSource(strings = {"ner", "sparse"})
   void cycleDeadlineLetsTheCurrentOperationFinishAndBoundsTheNextUnit(String stage) throws Exception {

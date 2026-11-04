@@ -31,10 +31,13 @@ import io.justsearch.indexerworker.splade.SpladeEncoder;
 import io.justsearch.indexing.SchemaFields;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.IdentityHashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.LongAdder;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -58,6 +61,38 @@ import org.mockito.junit.jupiter.MockitoExtension;
 @DisplayName("BackfillScheduler backfill-mode + per-stage recording (tempdoc 710 Move 2 item 4)")
 @ExtendWith(MockitoExtension.class)
 class BackfillSchedulerModeRecordingTest {
+  private String previousBackfillMode;
+  private final Map<Map<String, LongAdder>, Map<String, LongAdder>> previousMetrics =
+      new IdentityHashMap<>();
+
+  @BeforeEach
+  @SuppressWarnings("unchecked")
+  void saveMetrics() throws Exception {
+    var metrics = OperationalMetrics.getInstance();
+    previousBackfillMode = metrics.getBackfillMode();
+    for (String name : List.of("enrichmentCompleted", "batchTimingMs", "batchTimingCount", "enrichmentOutcomes")) {
+      var field = OperationalMetrics.class.getDeclaredField(name);
+      field.setAccessible(true);
+      var counters = (Map<String, LongAdder>) field.get(metrics);
+      var saved = new HashMap<String, LongAdder>();
+      counters.forEach((key, value) -> {
+        var copy = new LongAdder();
+        copy.add(value.sum());
+        saved.put(key, copy);
+      });
+      previousMetrics.put(counters, saved);
+    }
+  }
+
+  @AfterEach
+  void restoreMetrics() {
+    previousMetrics.forEach((counters, saved) -> {
+      counters.clear();
+      counters.putAll(saved);
+    });
+    OperationalMetrics.getInstance().recordBackfillMode(previousBackfillMode);
+  }
+
 
   @Mock DocumentFieldOps documentFieldOps;
   @Mock IndexingCoordinator indexingCoordinator;

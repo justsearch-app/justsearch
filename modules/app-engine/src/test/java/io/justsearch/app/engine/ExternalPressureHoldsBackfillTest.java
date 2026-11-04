@@ -40,12 +40,14 @@ import io.justsearch.indexerworker.loop.EmbeddingProviderLifecycle;
 import io.justsearch.indexerworker.ner.NerService;
 import io.justsearch.indexerworker.queue.JobQueue;
 import io.justsearch.indexerworker.splade.SpladeEncoder;
+import io.justsearch.indexerworker.metrics.OperationalMetrics;
 import io.justsearch.indexing.SchemaFields;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.IdentityHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -58,6 +60,9 @@ import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.concurrent.atomic.LongAdder;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -76,6 +81,38 @@ import org.junit.jupiter.api.Test;
  * The mocks explicitly identify their GPU resource, while the bus and sampler stay real.
  */
 final class ExternalPressureHoldsBackfillTest {
+  private String previousBackfillMode;
+  private final Map<Map<String, LongAdder>, Map<String, LongAdder>> previousMetrics =
+      new IdentityHashMap<>();
+
+  @BeforeEach
+  @SuppressWarnings("unchecked")
+  void saveMetrics() throws Exception {
+    var metrics = OperationalMetrics.getInstance();
+    previousBackfillMode = metrics.getBackfillMode();
+    for (String name : List.of("enrichmentCompleted", "batchTimingMs", "batchTimingCount", "enrichmentOutcomes")) {
+      var field = OperationalMetrics.class.getDeclaredField(name);
+      field.setAccessible(true);
+      var counters = (Map<String, LongAdder>) field.get(metrics);
+      var saved = new HashMap<String, LongAdder>();
+      counters.forEach((key, value) -> {
+        var copy = new LongAdder();
+        copy.add(value.sum());
+        saved.put(key, copy);
+      });
+      previousMetrics.put(counters, saved);
+    }
+  }
+
+  @AfterEach
+  void restoreMetrics() {
+    previousMetrics.forEach((counters, saved) -> {
+      counters.clear();
+      counters.putAll(saved);
+    });
+    OperationalMetrics.getInstance().recordBackfillMode(previousBackfillMode);
+  }
+
 
   private static final long MIB = 1024L * 1024L;
   private static final long GIB = 1024L * MIB;
