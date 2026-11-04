@@ -1,5 +1,6 @@
 """Offline parts of the real-use query writing (S30): families, gates, prompts, the model call."""
 import json
+import re
 import subprocess
 from pathlib import Path
 
@@ -181,6 +182,105 @@ def test_generation_errors_never_disclose_subprocess_arguments_or_output(
     assert error["returncode"] == (7 if failure == "exit" else None)
     assert error["elapsed_seconds"] >= 0
     assert error["reason"] == "generation failed"
+
+
+@pytest.fixture
+def generation_env(monkeypatch, tmp_path):
+    monkeypatch.setattr(ruq, "RECORD", tmp_path / "record")
+    monkeypatch.setattr(ruq, "WORK", tmp_path / "work")
+    monkeypatch.setattr(ruq, "_template", lambda _: "template")
+    monkeypatch.setattr(ruq, "known_item_prompt", lambda *a: "prompt")
+    monkeypatch.setattr(ruq, "topical_prompt", lambda *a: "prompt")
+    return {"qid": "ki-1", "kind": "known-item", "level": "partial", "target": "t"}
+
+
+@pytest.mark.parametrize("kind", ["known-item", "topical"])
+@pytest.mark.parametrize("query", [None, "ocean quotas"])
+def test_generation_keeps_extra_reply_fields_only_in_work(monkeypatch, generation_env, kind, query):
+    marker = "PRIVATE_REPLY_MARKER"
+    q = {**generation_env, "kind": kind, "members": ["t"]}
+    reply = {"query": query, "diagnostic": marker, "note": marker,
+             "topic": "shared ocean topic" if kind == "topical" else marker}
+    monkeypatch.setattr(ruq, "ask_claude", lambda _: (reply, json.dumps(reply)))
+    result = ruq.generate_one(q, {"t": {}}, {"t": "unrelated text"}, max_attempts=1)
+    committed = (ruq.RECORD / "generation.jsonl").read_text()
+    assert marker not in committed
+    row = json.loads(committed)
+    if query is None:
+        assert result is None and "output" not in row and "query" not in row
+    else:
+        expected = {"query": query}
+        if kind == "topical":
+            expected["topic"] = reply["topic"]
+        assert row["output"] == expected and result["output"] == expected
+    assert marker in (ruq.WORK / "generation.jsonl").read_text()
+
+
+@pytest.mark.parametrize("query,reason", [
+    ("PRIVATE_REJECTED_MARKER one two three four five", "6 words"),
+    ("PRIVATE_REJECTED_MARKER copied sequence", "verbatim leak"),
+])
+def test_generation_keeps_rejected_queries_and_retry_feedback_only_in_work(
+        monkeypatch, generation_env, query, reason):
+    replies = iter([{"query": query}, {"query": "ocean quotas"}])
+    monkeypatch.setattr(ruq, "ask_claude", lambda _: (next(replies), "raw reply"))
+    result = ruq.generate_one(generation_env, {"t": {}}, {"t": query}, max_attempts=2)
+    committed = (ruq.RECORD / "generation.jsonl").read_text()
+    assert "PRIVATE_REJECTED_MARKER" not in committed
+    rejected, accepted = [json.loads(line) for line in committed.splitlines()]
+    assert rejected["rejected"] == reason and not rejected["accepted"]
+    assert "query" not in rejected and "output" not in rejected
+    assert result["query"] == accepted["query"] == "ocean quotas"
+    assert "PRIVATE_REJECTED_MARKER" in (ruq.WORK / "generation.jsonl").read_text()
+
+
+@pytest.mark.parametrize("query", [17, ["PRIVATE_INVALID_MARKER"], {"excerpt": "PRIVATE_INVALID_MARKER"}])
+def test_generation_rejects_non_string_queries(monkeypatch, generation_env, query):
+    monkeypatch.setattr(ruq, "ask_claude", lambda _: ({"query": query}, "raw reply"))
+    assert ruq.generate_one(generation_env, {"t": {}}, {"t": "text"}, max_attempts=1) is None
+    row = ruq._jsonl(ruq.RECORD / "generation.jsonl")[0]
+    assert row["rejected"] == "invalid query" and "output" not in row and "query" not in row
+
+
+@pytest.mark.parametrize("feedback", [
+    "Your previous query had 7 words; use 2 to 4.", "PRIVATE_FEEDBACK_MARKER",
+])
+def test_generation_commits_only_fixed_numeric_feedback(monkeypatch, generation_env, feedback):
+    monkeypatch.setattr(ruq, "ask_claude", lambda _: ({"query": "ocean quotas"}, "raw reply"))
+    ruq.generate_one(generation_env, {"t": {}}, {"t": "text"}, feedback=feedback, max_attempts=1)
+    row = ruq._jsonl(ruq.RECORD / "generation.jsonl")[0]
+    assert row["feedback"] == (None if "PRIVATE" in feedback else feedback)
+    assert ruq._jsonl(ruq.WORK / "generation.jsonl")[0]["feedback"] == feedback
+
+
+def test_stored_generation_records_follow_the_committed_allow_list():
+    fields = {"at", "qid", "attempt_id", "round", "model", "template", "template_sha256",
+              "prompt_sha256", "params", "feedback", "accepted", "output", "query", "gates",
+              "rejected", "error"}
+    params = {"qid", "kind", "language", "clusters", "focus", "format", "level", "offset",
+              "source", "target", "traits", "group", "group_kind", "sources"}
+    rows = ruq._jsonl(ruq.RECORD / "generation.jsonl")
+    assert rows
+    for row in rows:
+        assert set(row) <= fields, row["attempt_id"]
+        assert set(row["params"]) <= params, row["attempt_id"]
+        assert row["feedback"] is None or re.fullmatch(
+            r"Your previous query had [0-9]+ words; use [0-9]+ to [0-9]+\.", row["feedback"])
+        if row["accepted"]:
+            assert set(row["output"]) <= ({"query", "topic"} if row["template"] == "topical" else {"query"})
+            assert row["output"]["query"] == row["query"]
+            assert row["gates"]["verbatim_leak"] == []
+        else:
+            assert "query" not in row and "output" not in row, row["attempt_id"]
+            assert "verbatim_leak" not in row.get("gates", {})
+        assert set(row.get("gates", {})) <= {"words", "verbatim_leak", "verbatim_leak_count"}
+        if "error" in row:
+            assert isinstance(row["error"], dict)
+            assert set(row["error"]) <= {"type", "returncode", "elapsed_seconds", "reason"}
+            assert row["error"]["reason"] == "generation failed"
+        if "rejected" in row:
+            assert row["rejected"] in {"no shared topic", "verbatim leak", "invalid query"} or re.fullmatch(
+                r"[0-9]+ words", row["rejected"])
 
 
 def test_chunk_report_and_format_cycle():

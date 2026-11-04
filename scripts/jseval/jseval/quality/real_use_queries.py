@@ -1,8 +1,8 @@
 """Queries for the public real-use collection (S30): extraction, clusters, targets, writing, gates.
 
 Every step is resumable. Derived document text stays under ``WORK`` and never enters Git; the
-committed record (``recipes/real-use-queries/``) holds prompt templates, prompt hashes, model
-outputs, document ids, cluster evidence and gate results only.
+committed record (``recipes/real-use-queries/``) holds prompt templates, prompt hashes, validated
+queries, document ids, cluster evidence and safe gate metadata only.
 
 ``prepare``   build or adopt the full index through the core's pausable background lifecycle,
               with a queue monitor that reports a stalled queue instead of waiting.
@@ -995,6 +995,49 @@ def _attempts(qid: str) -> int:
 _GEN_LOCK = threading.Lock()
 
 
+def _generation_record(row: dict) -> dict:
+    """Allow-listed public evidence; unrestricted replies and retry hints belong in WORK."""
+    out = {k: row[k] for k in ("at", "qid", "attempt_id", "round", "model", "template",
+                               "template_sha256", "prompt_sha256", "accepted") if k in row}
+    out["params"] = {k: row["params"][k] for k in (
+        "qid", "kind", "language", "clusters", "focus", "format", "level", "offset",
+        "source", "target", "traits", "group", "group_kind", "sources") if k in row["params"]}
+    feedback = row.get("feedback")
+    out["feedback"] = feedback if isinstance(feedback, str) and re.fullmatch(
+        r"Your previous query had [0-9]+ words; use [0-9]+ to [0-9]+\.", feedback) else None
+    if row.get("accepted"):
+        out["query"] = row["query"]
+        out["output"] = {"query": row["query"]}
+        topic = row.get("output", {}).get("topic")
+        if row["template"] == "topical" and isinstance(topic, str):
+            out["output"]["topic"] = topic
+    if "gates" in row:
+        out["gates"] = {"words": row["gates"]["words"]}
+        if row.get("accepted"):
+            out["gates"]["verbatim_leak"] = []
+        else:
+            out["gates"]["verbatim_leak_count"] = row["gates"].get(
+                "verbatim_leak_count", len(row["gates"].get("verbatim_leak", [])))
+    if "rejected" in row:
+        reason = row["rejected"]
+        out["rejected"] = reason if reason in ("no shared topic", "verbatim leak", "invalid query") \
+            or re.fullmatch(r"[0-9]+ words", reason) else "generation failed"
+    if "error" in row:
+        error = row["error"]
+        out["error"] = {k: error[k] for k in ("type", "returncode", "elapsed_seconds")
+                        if isinstance(error, dict) and k in error}
+        out["error"]["reason"] = "generation failed"
+    return out
+
+
+def _record_generation(row: dict) -> dict:
+    public = _generation_record(row)
+    with _GEN_LOCK:
+        _log(WORK / "generation.jsonl", row)
+        _log(RECORD / "generation.jsonl", public)
+    return public
+
+
 def generate_one(q: dict, rows: dict, texts: dict, *, feedback: str = "", round_: str = "initial",
                  max_attempts: int = 4) -> dict | None:
     """Generate until the verbatim-leak gate passes (partial/vague), recording every attempt.
@@ -1017,11 +1060,15 @@ def generate_one(q: dict, rows: dict, texts: dict, *, feedback: str = "", round_
         try:
             reply, raw = ask_claude(prompt)
             row["output"] = reply
+            row["raw"] = raw
             query = reply.get("query")
             if query is None:
                 row.update(accepted=False, rejected="no shared topic")
-                with _GEN_LOCK:
-                    _log(RECORD / "generation.jsonl", row)
+                _record_generation(row)
+                return None
+            if not isinstance(query, str):
+                row.update(accepted=False, rejected="invalid query")
+                _record_generation(row)
                 return None
             query = clean_query(query)
             row["query"] = query
@@ -1055,18 +1102,16 @@ def generate_one(q: dict, rows: dict, texts: dict, *, feedback: str = "", round_
                        "returncode": e.returncode if isinstance(e, subprocess.CalledProcessError) else None,
                        "elapsed_seconds": round(time.monotonic() - started, 3),
                        "reason": "generation failed"})
+            row["error_detail"] = str(e)
             if isinstance(e, SubscriptionRequired):
-                with _GEN_LOCK:
-                    _log(RECORD / "generation.jsonl", row)
+                _record_generation(row)
                 raise
             if isinstance(e, (RuntimeError, ValueError)) and "limit" in str(e).lower():
-                with _GEN_LOCK:
-                    _log(RECORD / "generation.jsonl", row)
+                _record_generation(row)
                 raise UsageLimit("Claude usage limit reached") from None
-        with _GEN_LOCK:
-            _log(RECORD / "generation.jsonl", row)
+        public = _record_generation(row)
         if row.get("accepted"):
-            return row
+            return public
     return None
 
 
