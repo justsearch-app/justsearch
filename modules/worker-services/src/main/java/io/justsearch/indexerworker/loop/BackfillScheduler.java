@@ -481,9 +481,9 @@ public final class BackfillScheduler {
   /** Reports useful advancement for sleep pacing, preserving stage continuation rules. */
   private boolean runIndividualBackfills(long cycleDeadlineNanos) {
     boolean anyActivity = false;
-    var provider = embeddingLifecycle.embeddingProvider();
-    boolean embeddingCanProgress = provider.isAvailable() && embeddingLifecycle.allowEmbeddingWrites()
-        && unitAllowed(provider.isUsingGpu());
+    boolean embeddingCanProgress = embeddingLifecycle.embeddingProvider().isAvailable()
+        && embeddingLifecycle.allowEmbeddingWrites()
+        && unitAllowed(embeddingLifecycle.embeddingProvider().isUsingGpu());
     if (embeddingCanProgress) {
       StageOutcome outcome = processEmbeddingBackfill(cycleDeadlineNanos);
       recordStageOutcome(BatchTimingKeys.EMBED, outcome);
