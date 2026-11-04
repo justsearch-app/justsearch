@@ -477,15 +477,18 @@ def test_stage_timing_splits_the_build_at_stage_completion_and_counts_pauses():
 
 
 class _SearchClient:
-    """Records each search request and answers with one hit and the given trace stages."""
+    """Records each search request and answers with one hit and the given metadata."""
 
-    def __init__(self, stages):
+    def __init__(self, stages, query_understanding=None):
         self.requests, self.stages = [], stages
+        self.query_understanding = query_understanding
 
     def post(self, path, json):
         self.requests.append(json)
         body = {"results": [{"id": "doc-a"}], "searchTrace": {"stages": [
             {"id": stage, "status": status} for stage, status in self.stages.items()]}}
+        if self.query_understanding is not None:
+            body["queryUnderstanding"] = self.query_understanding
         return type("Response", (), {"raise_for_status": lambda self: None, "json": lambda self: body})()
 
 
@@ -522,6 +525,21 @@ def test_triviality_refuses_a_rank_a_model_stage_shaped(stage):
     client = _SearchClient({**KEYWORD_TRACE, stage: "executed"})
     with pytest.raises(ValueError, match="not keyword search alone"):
         ruq.lexical_ranks(_Handle(), client, [("ki-1", "budget memo", "doc-a")])
+
+
+def test_triviality_refuses_query_understanding_boosts():
+    client = _SearchClient({**KEYWORD_TRACE, "query-understanding": "executed"},
+                           {"boosts": {"entity_organizations": ["Acme"]}, "answerType": "LOOKUP"})
+    with pytest.raises(ValueError, match="query-understanding boosts"):
+        ruq.lexical_ranks(_Handle(), client, [("ki-1", "budget memo", "doc-a")])
+
+
+@pytest.mark.parametrize("query_understanding", [None, {"answerType": "LOOKUP"},
+                                                {"boosts": {}, "answerType": "LOOKUP"}])
+def test_triviality_accepts_query_understanding_without_boosts(query_understanding):
+    # Classification can execute this trace stage without an LLM shaping the rank.
+    client = _SearchClient({**KEYWORD_TRACE, "query-understanding": "executed"}, query_understanding)
+    assert ruq.lexical_ranks(_Handle(), client, [("ki-1", "budget memo", "doc-a")]) == {"ki-1": 1}
 
 
 def test_prepare_applies_the_collection_configs_deadline_and_keeps_the_default_elsewhere(tmp_path, monkeypatch):

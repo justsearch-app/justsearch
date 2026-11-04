@@ -1187,7 +1187,8 @@ class _Ranker:
 
 # Keyword search alone (S30 triviality): the lexical leg, with the cross-encoder reranker,
 # LambdaMART, query expansion and freshness off, so a rank depends only on the engine and the
-# documents. Each response's trace must show it (``KEYWORD_OFF`` stages never executed).
+# documents. Each response's trace must show it (``KEYWORD_OFF`` stages never executed),
+# and query understanding must not have applied model-derived boosts.
 KEYWORD_PIPELINE = {"sparseEnabled": True, "denseEnabled": False, "spladeEnabled": False,
                     "fusionAlgorithm": "none", "lambdamartEnabled": False,
                     "crossEncoderEnabled": False, "crossEncoderWindow": 0,
@@ -1201,6 +1202,9 @@ def keyword_stages(body: dict) -> dict[str, str | None]:
     stages = {st.get("id"): st.get("status") for st in (body.get("searchTrace") or {}).get("stages", [])}
     if stages.get("sparse-retrieval") != "executed" or any(stages.get(st) == "executed" for st in KEYWORD_OFF):
         raise ValueError(f"search was not keyword search alone: {stages}")
+    # This trace stage also covers rule-based classification; only boosts imply LLM influence.
+    if (body.get("queryUnderstanding") or {}).get("boosts"):
+        raise ValueError("search was not keyword search alone: query-understanding boosts")
     return stages
 
 

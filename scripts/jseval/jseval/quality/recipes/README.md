@@ -211,7 +211,9 @@ Triviality is measured, not gated. The `gate` step ranks every known-item
 target with keyword search alone (the lexical leg, with the reranker and every
 model stage off) on the creation build, and records each query's rank and the
 share at rank 1 per recall level in `gates.json`. No query is dropped or
-rewritten to change that share. Keyword search alone ranks the target first for:
+rewritten to change that share. The gate refuses responses with model-derived
+query-understanding boosts; rule-based answer-type classification is accepted.
+Keyword search alone ranks the target first for:
 
 | recall level | rank 1 | queries | share |
 |---|---|---|---|
