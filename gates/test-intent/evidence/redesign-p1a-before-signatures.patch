@@ -1,0 +1,11 @@
+--- a/modules/app-engine/src/main/java/io/justsearch/app/engine/EngineKnowledgeClient.java
++++ b/modules/app-engine/src/main/java/io/justsearch/app/engine/EngineKnowledgeClient.java
+@@ -77,6 +77,8 @@
+   @Override public io.justsearch.core.scheduling.IndexingHold indexingHold() { return indexingHold; }
+ 
+   private static final Logger log = LoggerFactory.getLogger(EngineKnowledgeClient.class);
++
++  void bindSourceOrigins(java.util.function.Consumer<?> store) {}
+ 
+   /**
+    * How long a finished scan waits for its already-accepted progress frames to reach the consumer.

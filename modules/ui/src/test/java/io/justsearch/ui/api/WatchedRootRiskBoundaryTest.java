@@ -142,7 +142,8 @@ final class WatchedRootRiskBoundaryTest {
       assertTrue(body.path("success").asBoolean(), response.body());
       assertFalse(body.has("pendingId"), "a trusted click is not prompted: " + response.body());
     }
-    verify(indexing, times(4)).addWatchedRoot(eq("default"), eq(folder.toAbsolutePath().normalize()), any());
+    assertDoesNotThrow(() -> verify(indexing, times(4)).addAcceptedWatchedRoot(
+        eq("default"), eq(folder.toAbsolutePath().normalize()), any(), anyString()));
   }
 
   @Test
@@ -155,7 +156,8 @@ final class WatchedRootRiskBoundaryTest {
         Map.of("pendingId", pendingId, "execute", true), WINDOW);
     assertEquals(200, approved.statusCode(), approved.body());
     assertTrue(JSON.readTree(approved.body()).path("executed").asBoolean(), approved.body());
-    verify(indexing).addWatchedRoot(eq("default"), eq(folder.toAbsolutePath().normalize()), any());
+    assertDoesNotThrow(() -> verify(indexing).addAcceptedWatchedRoot(
+        eq("default"), eq(folder.toAbsolutePath().normalize()), any(), anyString()));
     assertTrue(pending.peek(pendingId).isEmpty());
   }
 }

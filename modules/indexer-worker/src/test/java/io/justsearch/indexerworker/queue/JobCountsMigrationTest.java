@@ -15,7 +15,7 @@ import org.junit.jupiter.api.io.TempDir;
 final class JobCountsMigrationTest {
   @TempDir Path temp;
 
-  @ParameterizedTest(name = "everySupportedVersionMigratesToV24WithoutChangingSavedRows({0})")
+  @ParameterizedTest(name = "{displayName} [{index}] {arguments}")
   @ValueSource(ints = {13,14,15,16,17,18,19,20,21,22,23})
   void everySupportedVersionMigratesToV24WithoutChangingSavedRows(int sourceVersion) throws Exception {
     Path db=temp.resolve("v"+sourceVersion+".db");
@@ -28,7 +28,7 @@ final class JobCountsMigrationTest {
     }
     try(var queue=new SqliteJobQueue(db)) {
       assertDoesNotThrow(queue::open);
-      assertEquals(26,version(queue),"V24 counts survive V25 and V26 durable force migration");
+      assertEquals(27,version(queue),"V24 counts survive V27 source origin migration");
       var conn=JobCountsTest.connection(queue);
       JobCountsTest.assertExact(queue,conn);
       try(var stmt=conn.createStatement();var row=stmt.executeQuery("SELECT path,state,attempts,last_updated,size_bytes,scan_id FROM jobs")) {
@@ -38,7 +38,7 @@ final class JobCountsMigrationTest {
       assertEquals(sourceVersion==23?41:0,queue.switchBufferAdmissions());
     }
     try(var queue=new SqliteJobQueue(db)) {
-      queue.open();assertEquals(26,version(queue));JobCountsTest.assertExact(queue,JobCountsTest.connection(queue));
+      queue.open();assertEquals(27,version(queue));JobCountsTest.assertExact(queue,JobCountsTest.connection(queue));
       assertEquals(sourceVersion==23?41:0,queue.switchBufferAdmissions());
     }
   }
@@ -59,7 +59,7 @@ final class JobCountsMigrationTest {
       stmt.execute("DROP TABLE switch_buffer_admissions");stmt.execute("PRAGMA user_version=23");
     }
     try(var queue=new SqliteJobQueue(db)) {
-      assertDoesNotThrow(queue::open);assertEquals(26,version(queue));
+      assertDoesNotThrow(queue::open);assertEquals(27,version(queue));
       assertEquals(0,assertDoesNotThrow(queue::switchBufferAdmissions));
       JobCountsTest.assertExact(queue,JobCountsTest.connection(queue));assertEquals(1,queue.queueDepth());
     }

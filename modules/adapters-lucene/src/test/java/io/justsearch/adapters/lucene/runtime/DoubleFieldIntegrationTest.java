@@ -241,7 +241,8 @@ class DoubleFieldIntegrationTest extends LuceneExecutorTestBase {
   void fingerprintForLegacyCatalogShapeMatchesBaseline() {
     var catalog = catalog();
     var shapes = catalog.fields().stream()
-        .filter(def -> !"splade_payload".equals(def.id()))
+        .filter(def -> !Set.of("splade_payload", "origin_id", "storage_status",
+            "storage_mount", "storage_key", "envelope_version").contains(def.id()))
         .map(def -> new FieldShape(def.id(), def.type(), def.stored(),
         def.docValues(), def.multiValued(), def.analyzer(), def.roles(), def.vectorDimension(), null)).toList();
     var input = new Inputs(catalog.version(), shapes, "fixed-analyzers", "float32", new Hnsw(16, 200),

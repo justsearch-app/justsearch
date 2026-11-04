@@ -1123,6 +1123,7 @@ public final class EngineRoot implements WorkerHost {
             () -> requestRestart(started), admission, authority.roots(),
             started::captureServingView);
     built.bindIndexingHold(gpuScheduling.indexingHold());
+    built.bindSourceOrigins(recordedIngestion::recordSourceOrigin);
     built.bindProjectionSourceIds(projectionSeedSources.stream()
         .map(io.justsearch.app.api.indexing.ProjectionSeedSource::sourceId)
         .sorted().toList());

@@ -42,6 +42,13 @@ public final class SchemaFields {
   // Author / sender fields (populated from Tika metadata for email and Office docs)
   public static final String AUTHOR = "author";
 
+  // Optional source provenance envelope (stored only; absent on legacy documents).
+  public static final String ORIGIN_ID = "origin_id";
+  public static final String STORAGE_STATUS = "storage_status";
+  public static final String STORAGE_MOUNT = "storage_mount";
+  public static final String STORAGE_KEY = "storage_key";
+  public static final String ENVELOPE_VERSION = "envelope_version";
+
   // Metadata fields
   public static final String SIZE_BYTES = "size_bytes";
   /** SHA-256 of the exact source bytes from which the stored extraction was produced. */

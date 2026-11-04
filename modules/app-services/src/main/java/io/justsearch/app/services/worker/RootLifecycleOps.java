@@ -43,6 +43,11 @@ final class RootLifecycleOps {
     private final SyncOps syncOps;
     private final ExecutorService walkExecutor;
     private final java.util.function.BiConsumer<java.util.function.Consumer<EngineContext>, EngineContext> submitWalk;
+    private java.util.function.Consumer<io.justsearch.app.api.indexing.SourceOrigin> sourceOrigins = ignored -> {};
+
+    void bindSourceOrigins(java.util.function.Consumer<io.justsearch.app.api.indexing.SourceOrigin> store) {
+        sourceOrigins = Objects.requireNonNull(store, "store");
+    }
 
     // ===== Tempdoc 599 §16/A1 — non-blocking folder-availability cache =====
     // U4 (the design's verified constraint) forbids a per-poll Files.isDirectory on the Head REQUEST
@@ -389,13 +394,22 @@ final class RootLifecycleOps {
      * @param path the root path to watch
      */
     void addWatchedRoot(String collection, Path path, EngineContext engineContext) {
+        addWatchedRoot(collection, path, engineContext, () -> sourceOrigins.accept(
+                io.justsearch.app.api.indexing.SourceOrigin.accepted(
+                    io.justsearch.app.api.indexing.SourceOrigin.Kind.WATCHED,
+                    io.justsearch.app.api.indexing.SourceOrigin.watchedRoot(path, collection),
+                    io.justsearch.app.api.indexing.SourceOrigin.Approval.declared(engineContext),
+                    System.currentTimeMillis())));
+    }
+
+    void addWatchedRoot(String collection, Path path, EngineContext engineContext, Runnable accepted) {
         Path normalized = path == null ? null : path.toAbsolutePath().normalize();
         var existing = normalized != null && watchedRoots.containsKey(normalized)
                 ? watchedRootsState.captureRootProducer(normalized, true) : null;
         WatchInitialization initialization;
         synchronized (watchedRootsState.lifecycleLock()) {
-            initialization = existing == null ? prepareWatchedRoot(collection, path)
-                    : existing.run(() -> prepareWatchedRoot(collection, path), () -> null);
+            initialization = existing == null ? prepareWatchedRoot(collection, path, accepted)
+                    : existing.run(() -> prepareWatchedRoot(collection, path, accepted), () -> null);
         }
         if (initialization == null) return;
         // The caller must release this monitor before the Engine worker acquires its fence.
@@ -418,7 +432,7 @@ final class RootLifecycleOps {
     private record WatchInitialization(Path path, String collection,
             WatchedRootsState.RootProducerFence fence, Object ticket) {}
 
-    private WatchInitialization prepareWatchedRoot(String collection, Path path) {
+    private WatchInitialization prepareWatchedRoot(String collection, Path path, Runnable accepted) {
         if (path == null || !Files.isDirectory(path, java.nio.file.LinkOption.NOFOLLOW_LINKS) || !Files.isReadable(path)) {
             throw new IllegalArgumentException("Path is not an accessible directory: " + path);
         }
@@ -447,6 +461,11 @@ final class RootLifecycleOps {
         // "Scanning" and re-queuing a redundant full walk. This guards EVERY caller (UI op + agent tool),
         // including ones the FE busy-overlay guard can't reach. Reindex is unaffected: it takes a different
         // path (reindexWatchedRoots/markIndexed) and never reaches this method.
+        // Commit declaration evidence before persisting or scheduling the new declaration. A
+        // fully initialized idempotent re-add is not another accepted declaration.
+        if (!watchedRoots.containsKey(normalized)) {
+            accepted.run();
+        }
         if (!watchedRootsState.register(normalized,
                 IngestCollectionPolicy.DEFAULT_COLLECTION.equals(collectionName) ? null : collectionName, true)) {
             if (!watchedRootsState.isInitializationPending(normalized)) {

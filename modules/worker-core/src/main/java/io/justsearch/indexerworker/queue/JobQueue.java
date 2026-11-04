@@ -23,6 +23,11 @@ import io.justsearch.indexerworker.ingest.IngestionOutcome;
  */
 public interface JobQueue extends Closeable {
 
+  /** Persist accepted declaration evidence independently of queue and operation retention. */
+  default void recordSourceOrigins(List<io.justsearch.app.api.indexing.SourceOrigin> origins) {
+    throw new UnsupportedOperationException("Source origin persistence is unavailable");
+  }
+
   /** Declared ownership for hintless maintenance admissions; recorded plans remain authoritative. */
   default void useDeclaredCollectionRoots(
       java.util.function.Supplier<List<io.justsearch.app.api.knowledge.IngestCollectionPolicy.RootBinding>> roots) {}

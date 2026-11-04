@@ -45,6 +45,18 @@ public final class AddWatchedRootHandler implements OperationHandler {
 
   @Override
   public OperationResult execute(String argumentsJson, EngineContext engineContext) {
+    return execute(argumentsJson, engineContext, null);
+  }
+
+  @Override
+  public io.justsearch.agent.api.registry.OperationExecution executeRecorded(String argumentsJson,
+      io.justsearch.agent.api.registry.InvocationProvenance provenance, EngineContext engineContext,
+      io.justsearch.agent.api.registry.OperationRecordHandle record) {
+    return io.justsearch.agent.api.registry.OperationExecution.finished(
+        execute(argumentsJson, engineContext, record.key()));
+  }
+
+  private OperationResult execute(String argumentsJson, EngineContext engineContext, String operationKey) {
     String pathArg;
     String collection;
     try {
@@ -101,7 +113,8 @@ public final class AddWatchedRootHandler implements OperationHandler {
         return OperationResult.failure(
             "Path does not exist or is not a directory: " + p);
       }
-      indexing.addWatchedRoot(collection, p, engineContext);
+      if (operationKey == null) indexing.addWatchedRoot(collection, p, engineContext);
+      else indexing.addAcceptedWatchedRoot(collection, p, engineContext, operationKey);
       return OperationResult.success(
           "Added watched root " + p, Map.of("path", p.toString(), "collection", collection));
     } catch (IllegalArgumentException e) {

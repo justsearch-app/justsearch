@@ -78,6 +78,17 @@ public final class EngineKnowledgeClient extends KnowledgeClient {
 
   private static final Logger log = LoggerFactory.getLogger(EngineKnowledgeClient.class);
 
+  private Consumer<io.justsearch.app.api.indexing.SourceOrigin> sourceOrigins;
+
+  void bindSourceOrigins(Consumer<io.justsearch.app.api.indexing.SourceOrigin> store) {
+    sourceOrigins = Objects.requireNonNull(store, "store");
+  }
+
+  @Override
+  protected void recordSourceOrigin(io.justsearch.app.api.indexing.SourceOrigin origin) {
+    Objects.requireNonNull(sourceOrigins, "Source origin store is not attached").accept(origin);
+  }
+
   /**
    * How long a finished scan waits for its already-accepted progress frames to reach the consumer.
    * Generous on purpose: the alternative to waiting is dropping the terminal event, and a scan ends

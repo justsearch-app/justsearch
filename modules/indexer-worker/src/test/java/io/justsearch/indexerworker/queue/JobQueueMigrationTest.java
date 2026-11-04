@@ -103,9 +103,9 @@ final class JobQueueMigrationTest {
     }
   }
 
-  @ParameterizedTest(name = "releasedVersionUpgradesToV26KeepingAdmissionCount({0})")
+  @ParameterizedTest(name = "{displayName} [{index}] {arguments}")
   @ValueSource(ints = {22, 23, 24})
-  void releasedVersionUpgradesToV26KeepingAdmissionCount(int version) throws Exception {
+  void releasedVersionUpgradesToV27KeepingAdmissionCount(int version) throws Exception {
     Path db = tempDir.resolve("released-v" + version + ".db");
     try (var queue = new SqliteJobQueue(db)) {
       queue.open();
@@ -143,8 +143,8 @@ final class JobQueueMigrationTest {
         var statement = connection.createStatement()) {
       try (ResultSet rs = statement.executeQuery("PRAGMA user_version")) {
         assertTrue(rs.next());
-        assertEquals(26, rs.getInt(1),
-            "a V" + version + " queue must reach V26 so older readers refuse durable force admissions");
+        assertEquals(27, rs.getInt(1),
+            "a V" + version + " queue must reach V27 so older readers refuse unsupported origin storage");
       }
       statement.execute("INSERT INTO switch_buffer "
           + "(generation, key, op, payload, last_updated, revision, accepted_order) "
@@ -1119,7 +1119,7 @@ final class JobQueueMigrationTest {
         assertTrue(rs.next());
         assertEquals(SqliteSchema.TARGET_VERSION, rs.getInt(1));
       }
-      assertEquals(26, SqliteSchema.TARGET_VERSION);
+      assertEquals(27, SqliteSchema.TARGET_VERSION);
       assertTrue(hasTable(stmt, "document_identity_import"));
       List<String> columns = new java.util.ArrayList<>();
       try (ResultSet rs = stmt.executeQuery("PRAGMA table_info(document_identity_import)")) {
