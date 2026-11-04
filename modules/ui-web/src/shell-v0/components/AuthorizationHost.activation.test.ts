@@ -61,18 +61,20 @@ async function nativeButton(testid: string): Promise<HTMLButtonElement> {
 }
 
 /** A pointer click as a browser sends it: press, release, click carrying its click count. */
-function pointerClick(button: HTMLButtonElement, detail: number): void {
+function pointerClick(button: HTMLElement, detail: number): void {
   button.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, composed: true, cancelable: true }));
   button.dispatchEvent(new PointerEvent('pointerup', { bubbles: true, composed: true, cancelable: true }));
   button.dispatchEvent(new MouseEvent('click', { bubbles: true, composed: true, cancelable: true, detail }));
 }
 
 /** A key event plus the native default a browser runs when it is not cancelled. */
-function key(button: HTMLButtonElement, type: 'keydown' | 'keyup', value: string, repeat = false): void {
+function key(button: HTMLElement, type: 'keydown' | 'keyup', value: string, repeat = false): void {
   const event = new KeyboardEvent(type, { key: value, repeat, bubbles: true, composed: true, cancelable: true });
   button.dispatchEvent(event);
-  // happy-dom has no keyboard activation: Enter clicks on (every) keydown, Space on release.
-  if (!event.defaultPrevented && ((type === 'keydown' && value === 'Enter') || (type === 'keyup' && value === ' '))) button.click();
+  // happy-dom has no keyboard activation: a button clicks on (every) Enter keydown, buttons and
+  // checkboxes on Space release.
+  const enter = type === 'keydown' && value === 'Enter' && button instanceof HTMLButtonElement;
+  if (!event.defaultPrevented && (enter || (type === 'keyup' && value === ' '))) button.click();
 }
 
 function answered(kind: Kind, id: string, decision: Promise<unknown>): Promise<boolean> {
@@ -213,4 +215,58 @@ it('Review re-presents the open prompt: the activation that asked for it cannot 
   vi.advanceTimersByTime(400);
   pointerClick(button, 1);
   await expect(decision).resolves.toEqual({ approved: false, allowAlways: false });
+});
+
+/** The Always-allow checkbox on the open authorize prompt. */
+function allowAlwaysBox(): HTMLInputElement {
+  return host.shadowRoot!.querySelector<HTMLInputElement>('[data-testid="authorization-allow-always"] input')!;
+}
+
+/** Two lightweight prompts; the first is answered by a deliberate Approve and the second is on screen. */
+async function secondPresented() {
+  const first = enqueue('lightweight', 'first');
+  const second = enqueue('lightweight', 'second') as Promise<AuthorizationDecision>;
+  await settle();
+  vi.advanceTimersByTime(1000);
+  pointerClick(await nativeButton('authorization-approve'), 1);
+  await settle();
+  await expect(first).resolves.toEqual({ approved: true, allowAlways: false });
+  return { second };
+}
+
+it.each(['checkbox', 'label'] as const)('S1 a click on the next prompt’s Always-allow %s 30 ms after it appears does not tick it; a deliberate Approve stays one-time', async part => {
+  const { second } = await secondPresented();
+  vi.advanceTimersByTime(30);
+  const box = allowAlwaysBox();
+  pointerClick(part === 'checkbox' ? box : box.closest('label')!, 1);
+  await settle();
+  expect(box.checked, 'the early click did not tick it').toBe(false);
+  vi.advanceTimersByTime(400);
+  pointerClick(await nativeButton('authorization-approve'), 1);
+  await expect(second).resolves.toEqual({ approved: true, allowAlways: false });
+});
+
+it('S1 Space pressed on the Always-allow checkbox before the prompt arms does not tick it on release', async () => {
+  const { second } = await secondPresented();
+  const box = allowAlwaysBox();
+  key(box, 'keydown', ' ');
+  vi.advanceTimersByTime(500);
+  key(box, 'keyup', ' ');
+  await settle();
+  expect(box.checked).toBe(false);
+  vi.advanceTimersByTime(400);
+  pointerClick(await nativeButton('authorization-approve'), 1);
+  await expect(second).resolves.toEqual({ approved: true, allowAlways: false });
+});
+
+it.each(['pointer', 'Space'] as const)('S1 a deliberate %s on the Always-allow checkbox after arming ticks it', async how => {
+  const { second } = await secondPresented();
+  vi.advanceTimersByTime(400);
+  const box = allowAlwaysBox();
+  if (how === 'pointer') pointerClick(box.closest('label')!, 1);
+  else { key(box, 'keydown', ' '); key(box, 'keyup', ' '); }
+  await settle();
+  expect(box.checked).toBe(true);
+  pointerClick(await nativeButton('authorization-approve'), 1);
+  await expect(second).resolves.toEqual({ approved: true, allowAlways: true });
 });

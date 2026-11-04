@@ -1,0 +1,97 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
+  },
+  "createdAt": "2026-11-04T01:09:45.612Z",
+  "revision": "2cfacd7576a92e76df975710cdbb33679b136bca",
+  "tree": "d56efa4abc2ea907b8b28797d6ead3e6c6238edc",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/components/AuthorizationHost.activation.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/mh5fno0e/tmp/test-intent-vitest-34812-1793754557583.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 2381
+    },
+    {
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/components/AuthorizationHost.activation-lockdown.test.ts\" --config vitest.config.lockdown.ts --reporter=json --outputFile=\"/home/elias/.cache/am/mh5fno0e/tmp/test-intent-vitest-34812-1793754559965.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 25646
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/components/AuthorizationHost.activation.test.ts#S1 a deliberate pointer on the Always-allow checkbox after arming ticks it",
+      "file": "modules/ui-web/src/shell-v0/components/AuthorizationHost.activation.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:e21d39c859f06f3b800b6fcb5bb4b66be02726b8567f705be0916bc451719ad2",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "S1 a deliberate pointer on the Always-allow checkbox after arming ticks it",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/AuthorizationHost.activation.test.ts#S1 a deliberate Space on the Always-allow checkbox after arming ticks it",
+      "file": "modules/ui-web/src/shell-v0/components/AuthorizationHost.activation.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:e21d39c859f06f3b800b6fcb5bb4b66be02726b8567f705be0916bc451719ad2",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "S1 a deliberate Space on the Always-allow checkbox after arming ticks it",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/AuthorizationHost.activation-lockdown.test.ts#S1 a deliberate click on Always allow after arming ticks it and the approval sends allowAlways true",
+      "file": "modules/ui-web/src/shell-v0/components/AuthorizationHost.activation-lockdown.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:95b362a97ebe21bb47e5a42c810983a841255d9c545fed0fff0dee76975fbb47",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "S1 a deliberate click on Always allow after arming ticks it and the approval sends allowAlways true",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/AuthorizationHost.activation-lockdown.test.ts#S2 a lightweight ceremony closed by dialog.close() releases modality; the pill opens the panel and Review reopens it in its modality",
+      "file": "modules/ui-web/src/shell-v0/components/AuthorizationHost.activation-lockdown.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:95b362a97ebe21bb47e5a42c810983a841255d9c545fed0fff0dee76975fbb47",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "S2 a lightweight ceremony closed by dialog.close() releases modality; the pill opens the panel and Review reopens it in its modality",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:5b1f5b845beb5f736ed89416e9715691ec146249744692b5b9167c75991270f3"
+}

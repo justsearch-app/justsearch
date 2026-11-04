@@ -95,6 +95,19 @@ is dropped or changed:
 | AuthorizationHost.test (all cases that decide), AuthorizationHost.toplayer (queue and A1 cases), StatusPanel.approvals (decision cases) | fake `performance` clock only; the activation helper advances it 400 ms before the click | the prompt arms after 400 ms; no other timer is faked |
 | pendingAuthorizationWithdrawal (7 cases), statusCompletion "mounted authorization host and real pending bridge…" | the activation helper advances the already-fake clock 400 ms before the decision click | as above; these files already fake all timers |
 
+## Round 10 changes to this slice's own checks
+
+The arming rule covers every input on a newly presented prompt (the Always-allow checkbox and the
+typed confirmation as well as the decision buttons), and a ceremony the platform closes without a
+decision (Escape, `dialog.close()`) releases modality and scroll lock and stays pending. Existing
+checks are unchanged except:
+
+| Check | Change | Reason |
+| --- | --- | --- |
+| Shell.status "C12 a … ceremony opens on arrival in the shell, is listed in Needs you, and Review returns to it" (3 cases) | after `dialog.close()` it now asserts modality and scroll lock are released and the request is still listed, clicks the real status pill, asserts the panel opened and clicks Review there (it clicked the hidden panel's Review button directly); every earlier assertion is kept | the direct click hid that a natively closed ceremony left the app modal, so the pill could not open the panel |
+| AuthorizationHost.activation `pointerClick` and `key` helpers | accept any element; `key` simulates Enter's native click only on buttons | the new checkbox cases press the checkbox and its label |
+| AuthorizationHost.activation-lockdown page and `beforeAll` | the isolated page also mounts a status pill wired to the host (as the shell does) and an approval route that posts the decision through OperationClient; `beforeAll` loads the page once before the cases | the S1 and S2 cases click the real pill and observe `allowAlways` on the wire; the larger import graph made the first case's cold load exceed its time limit under load |
+
 ```json
 {
   "entries": [
@@ -760,7 +773,7 @@ is dropped or changed:
         "modules/ui-web/src/shell-v0/chrome/Shell.status.test.ts"
       ],
       "class": "New",
-      "behaviour": "In the shell as mounted, a lightweight approval, a typed approval and a plugin capability request each open on arrival in their own modality (typed and capability modal, lightweight non-modal), are listed in Needs you, and the panel's Review reopens a closed ceremony and focuses it (typed field, otherwise Deny).",
+      "behaviour": "In the shell as mounted, a lightweight approval, a typed approval and a plugin capability request each open on arrival in their own modality (typed and capability modal, lightweight non-modal), are listed in Needs you, and after the ceremony is closed natively, the real status pill opens the panel and its Review reopens the same ceremony and focuses it (typed field, otherwise Deny).",
       "sources": [
         {
           "kind": "delegated-choice",
@@ -1266,6 +1279,95 @@ is dropped or changed:
           "choice": "C12 (must not break) One decision, one execution: the same authorization reached from the panel, a dialog and an MCP announcement executes once; repeated clicks are idempotent; expired, withdrawn or superseded requests (run cancelled, engine restart, answered elsewhere) cannot execute and leave the panel. | Repair round 9 (independent verifier, real Chromium: with two plugin capability requests queued, a native double-click on the first prompt's Allow always granted both plugins, as did repeated activation of the same button, and the grant survived reload): one click or key press answers exactly one permission or approval prompt. After a prompt is answered and the next queued prompt is presented, its decision buttons ignore activation until a fresh, deliberate interaction: the pointer released and pressed again on the new prompt after a short arming delay (at least 400 ms); keyboard Enter/Space auto-repeat must not answer the next prompt either. Applies to every ceremony kind (operation approvals, live agent approvals, capability consent); modality per kind, top layer, fail-closed, focus and one-decision-executes-once are kept.",
           "label": "agent choice"
         }
+      ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/components/AuthorizationHost.activation.test.ts",
+        "modules/ui-web/src/shell-v0/components/AuthorizationHost.activation-lockdown.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "A newly presented approval ignores its Always-allow checkbox and typed confirmation as it ignores its decision buttons: a pointer click on the checkbox or its label, or Space pressed on it, before the prompt armed (400 ms after it appeared, by a press that started after that) does not tick it, so a later deliberate Approve resolves and sends allowAlways false; a key pressed in the typed confirmation before it armed enters nothing, nor do its auto-repeats after arming.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed accordingly",
+          "delegationLocation": "task t-20261103-shell user turn 2026-11-03 ~16:20Z (reply to the orchestrator's plan)",
+          "delegationScope": "the frame-build plan: S1 · Status: the pill and status panel, built on the existing data, replacing about a dozen old pieces (the status bar, bell, pop-ups, task list and others)",
+          "choice": "C12 (must not break) One decision, one execution: the same authorization reached from the panel, a dialog and an MCP announcement executes once; repeated clicks are idempotent; expired, withdrawn or superseded requests (run cancelled, engine restart, answered elsewhere) cannot execute and leave the panel. | Repair round 10 (independent verifier, real Chromium on 2cfacd7576: a click on the next queued prompt's Always allow checkbox 30 ms after it appeared ticked it, and a later deliberate Allow sent allowAlways: true over HTTP, broadening a one-time approval into a durable permission): the arming rule that guards the decision buttons (400 ms and a fresh press that started after the prompt appeared; keyboard on release of a non-repeated press) applies to every input on a newly presented prompt: the Always-allow checkbox, the typed-confirmation field and the allow-once, allow-always and deny buttons.",
+          "label": "agent choice"
+        }
+      ],
+      "repaired": true,
+      "evidence": "gates/test-intent/evidence/shell-s1-frame-status-round10-s1-repair.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/components/AuthorizationHost.activation.test.ts#S1 a click on the next prompt’s Always-allow checkbox 30 ms after it appears does not tick it; a deliberate Approve stays one-time",
+        "modules/ui-web/src/shell-v0/components/AuthorizationHost.activation.test.ts#S1 a click on the next prompt’s Always-allow label 30 ms after it appears does not tick it; a deliberate Approve stays one-time",
+        "modules/ui-web/src/shell-v0/components/AuthorizationHost.activation.test.ts#S1 Space pressed on the Always-allow checkbox before the prompt arms does not tick it on release",
+        "modules/ui-web/src/shell-v0/components/AuthorizationHost.activation-lockdown.test.ts#S1 a checkbox click on the next approval’s Always allow 30 ms after it appears does not tick it; a later deliberate Approve sends allowAlways false",
+        "modules/ui-web/src/shell-v0/components/AuthorizationHost.activation-lockdown.test.ts#S1 a label click on the next approval’s Always allow 30 ms after it appears does not tick it; a later deliberate Approve sends allowAlways false",
+        "modules/ui-web/src/shell-v0/components/AuthorizationHost.activation-lockdown.test.ts#S1 a key pressed in the next typed approval before it arms, and its auto-repeat after, enters nothing; typing after it arms does"
+      ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/components/AuthorizationHost.activation.test.ts",
+        "modules/ui-web/src/shell-v0/components/AuthorizationHost.activation-lockdown.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "Once an approval has armed, a deliberate pointer click on the Always-allow checkbox or its label, or a fresh Space press on it, ticks it, and the following Approve resolves and sends allowAlways true. A lightweight approval closed with dialog.close() stays pending and listed; the real status pill opens the panel and its Review reopens it non-modal.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed accordingly",
+          "delegationLocation": "task t-20261103-shell user turn 2026-11-03 ~16:20Z (reply to the orchestrator's plan)",
+          "delegationScope": "the frame-build plan: S1 · Status: the pill and status panel, built on the existing data, replacing about a dozen old pieces (the status bar, bell, pop-ups, task list and others)",
+          "choice": "C12 (must not break) One decision, one execution: the same authorization reached from the panel, a dialog and an MCP announcement executes once; repeated clicks are idempotent; expired, withdrawn or superseded requests (run cancelled, engine restart, answered elsewhere) cannot execute and leave the panel. | Repair round 10 (independent verifier, real Chromium on 2cfacd7576: a click on the next queued prompt's Always allow checkbox 30 ms after it appeared ticked it, and a later deliberate Allow sent allowAlways: true over HTTP, broadening a one-time approval into a durable permission): the arming rule that guards the decision buttons (400 ms and a fresh press that started after the prompt appeared; keyboard on release of a non-repeated press) applies to every input on a newly presented prompt: the Always-allow checkbox, the typed-confirmation field and the allow-once, allow-always and deny buttons.",
+          "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed accordingly",
+          "delegationLocation": "task t-20261103-shell user turn 2026-11-03 ~16:20Z (reply to the orchestrator's plan)",
+          "delegationScope": "the frame-build plan: S1 · Status: the pill and status panel, built on the existing data, replacing about a dozen old pieces (the status bar, bell, pop-ups, task list and others)",
+          "choice": "C12 (must not break) One decision, one execution: the same authorization reached from the panel, a dialog and an MCP announcement executes once; repeated clicks are idempotent; expired, withdrawn or superseded requests (run cancelled, engine restart, answered elsewhere) cannot execute and leave the panel. | Repair round 10 (independent verifier, real Chromium on 2cfacd7576: after the native dialog closed by itself (Escape, dialog.close(), a cancel event) modal ownership and scroll lock stayed active, so clicking the status pill could not open the panel and the request could not be reviewed): any native close releases modality and scroll lock exactly as a decision does, the request stays pending and listed in Needs you, and clicking the real pill then Review reopens the same ceremony with its correct modality.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/shell-s1-frame-status-round10-new.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/components/AuthorizationHost.activation.test.ts#S1 a deliberate pointer on the Always-allow checkbox after arming ticks it",
+        "modules/ui-web/src/shell-v0/components/AuthorizationHost.activation.test.ts#S1 a deliberate Space on the Always-allow checkbox after arming ticks it",
+        "modules/ui-web/src/shell-v0/components/AuthorizationHost.activation-lockdown.test.ts#S1 a deliberate click on Always allow after arming ticks it and the approval sends allowAlways true",
+        "modules/ui-web/src/shell-v0/components/AuthorizationHost.activation-lockdown.test.ts#S2 a lightweight ceremony closed by dialog.close() releases modality; the pill opens the panel and Review reopens it in its modality"
+      ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/components/AuthorizationHost.activation-lockdown.test.ts",
+        "modules/ui-web/src/shell-v0/chrome/Shell.status.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "A modal ceremony (typed approval, plugin capability request) the platform closes without a decision (Escape, dialog.close()) releases modality and the scroll lock; the request stays pending (nothing is approved or granted) and listed in Needs you; clicking the real status pill opens the panel, and its Review reopens the same ceremony modal in the top layer and focuses it.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed accordingly",
+          "delegationLocation": "task t-20261103-shell user turn 2026-11-03 ~16:20Z (reply to the orchestrator's plan)",
+          "delegationScope": "the frame-build plan: S1 · Status: the pill and status panel, built on the existing data, replacing about a dozen old pieces (the status bar, bell, pop-ups, task list and others)",
+          "choice": "C12 (must not break) One decision, one execution: the same authorization reached from the panel, a dialog and an MCP announcement executes once; repeated clicks are idempotent; expired, withdrawn or superseded requests (run cancelled, engine restart, answered elsewhere) cannot execute and leave the panel. | Repair round 10 (independent verifier, real Chromium on 2cfacd7576: after the native dialog closed by itself (Escape, dialog.close(), a cancel event) modal ownership and scroll lock stayed active, so clicking the status pill could not open the panel and the request could not be reviewed): any native close releases modality and scroll lock exactly as a decision does, the request stays pending and listed in Needs you, and clicking the real pill then Review reopens the same ceremony with its correct modality.",
+          "label": "agent choice"
+        }
+      ],
+      "repaired": true,
+      "evidence": "gates/test-intent/evidence/shell-s1-frame-status-round10-s2-repair.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/components/AuthorizationHost.activation-lockdown.test.ts#S2 a typed ceremony closed by Escape releases modality; the pill opens the panel and Review reopens it in its modality",
+        "modules/ui-web/src/shell-v0/components/AuthorizationHost.activation-lockdown.test.ts#S2 a typed ceremony closed by dialog.close() releases modality; the pill opens the panel and Review reopens it in its modality",
+        "modules/ui-web/src/shell-v0/components/AuthorizationHost.activation-lockdown.test.ts#S2 a capability ceremony closed by Escape releases modality; the pill opens the panel and Review reopens it in its modality",
+        "modules/ui-web/src/shell-v0/components/AuthorizationHost.activation-lockdown.test.ts#S2 a capability ceremony closed by dialog.close() releases modality; the pill opens the panel and Review reopens it in its modality",
+        "modules/ui-web/src/shell-v0/chrome/Shell.status.test.ts#C12 a typed ceremony opens on arrival in the shell, is listed in Needs you, and Review returns to it",
+        "modules/ui-web/src/shell-v0/chrome/Shell.status.test.ts#C12 a capability ceremony opens on arrival in the shell, is listed in Needs you, and Review returns to it"
       ]
     }
   ]

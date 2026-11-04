@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
   },
-  "createdAt": "2026-11-04T00:04:36.313Z",
-  "revision": "ffa2a5833396157d299c95275d84275c438cae13",
-  "tree": "25df5a345a75cbf60a741dc53e097333d529d59f",
+  "createdAt": "2026-11-04T01:11:27.827Z",
+  "revision": "2cfacd7576a92e76df975710cdbb33679b136bca",
+  "tree": "5234cbf1a7ebb1411faf37a7bce7801fb5a8eaf0",
   "environment": {
     "platform": "linux",
     "arch": "x64",
@@ -18,16 +18,16 @@
   },
   "runs": [
     {
-      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/components/AuthorizationHost.activation.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/_qphb1n6/tmp/test-intent-vitest-12623-1793750662105.json\"",
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/components/AuthorizationHost.activation.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/mh5fno0e/tmp/test-intent-vitest-36498-1793754667298.json\"",
       "cwd": "modules/ui-web",
       "exitCode": 0,
-      "durationMs": 1319
+      "durationMs": 2336
     },
     {
-      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/components/AuthorizationHost.activation-lockdown.test.ts\" --config vitest.config.lockdown.ts --reporter=json --outputFile=\"/home/elias/.cache/am/_qphb1n6/tmp/test-intent-vitest-12623-1793750663425.json\"",
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/components/AuthorizationHost.activation-lockdown.test.ts\" --config vitest.config.lockdown.ts --reporter=json --outputFile=\"/home/elias/.cache/am/mh5fno0e/tmp/test-intent-vitest-36498-1793754669634.json\"",
       "cwd": "modules/ui-web",
       "exitCode": 0,
-      "durationMs": 12886
+      "durationMs": 18192
     }
   ],
   "checks": [
@@ -35,7 +35,7 @@
       "id": "modules/ui-web/src/shell-v0/components/AuthorizationHost.activation.test.ts#a fresh press after the delay answers the next lightweight prompt exactly once",
       "file": "modules/ui-web/src/shell-v0/components/AuthorizationHost.activation.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:d95846ffd07a78c0f50d332a90874576d53ef75abbae7418151a56143c34cac0",
+      "contentDigest": "sha256:e21d39c859f06f3b800b6fcb5bb4b66be02726b8567f705be0916bc451719ad2",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -50,7 +50,7 @@
       "id": "modules/ui-web/src/shell-v0/components/AuthorizationHost.activation.test.ts#a fresh press after the delay answers the next typed prompt exactly once",
       "file": "modules/ui-web/src/shell-v0/components/AuthorizationHost.activation.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:d95846ffd07a78c0f50d332a90874576d53ef75abbae7418151a56143c34cac0",
+      "contentDigest": "sha256:e21d39c859f06f3b800b6fcb5bb4b66be02726b8567f705be0916bc451719ad2",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -65,7 +65,7 @@
       "id": "modules/ui-web/src/shell-v0/components/AuthorizationHost.activation.test.ts#a fresh press after the delay answers the next capability prompt exactly once",
       "file": "modules/ui-web/src/shell-v0/components/AuthorizationHost.activation.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:d95846ffd07a78c0f50d332a90874576d53ef75abbae7418151a56143c34cac0",
+      "contentDigest": "sha256:e21d39c859f06f3b800b6fcb5bb4b66be02726b8567f705be0916bc451719ad2",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -80,7 +80,7 @@
       "id": "modules/ui-web/src/shell-v0/components/AuthorizationHost.activation.test.ts#a fresh \" \" press after the delay answers the next prompt on release",
       "file": "modules/ui-web/src/shell-v0/components/AuthorizationHost.activation.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:d95846ffd07a78c0f50d332a90874576d53ef75abbae7418151a56143c34cac0",
+      "contentDigest": "sha256:e21d39c859f06f3b800b6fcb5bb4b66be02726b8567f705be0916bc451719ad2",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -95,7 +95,7 @@
       "id": "modules/ui-web/src/shell-v0/components/AuthorizationHost.activation-lockdown.test.ts#a deliberate click after the delay answers the next prompt exactly once",
       "file": "modules/ui-web/src/shell-v0/components/AuthorizationHost.activation-lockdown.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:e8778dfadb77c6010be72dd60286b7861414a5e346ec046f997c0bd8036a5fb4",
+      "contentDigest": "sha256:95b362a97ebe21bb47e5a42c810983a841255d9c545fed0fff0dee76975fbb47",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -110,7 +110,7 @@
       "id": "modules/ui-web/src/shell-v0/components/AuthorizationHost.activation-lockdown.test.ts#a fresh Enter press after the delay answers the next prompt exactly once",
       "file": "modules/ui-web/src/shell-v0/components/AuthorizationHost.activation-lockdown.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:e8778dfadb77c6010be72dd60286b7861414a5e346ec046f997c0bd8036a5fb4",
+      "contentDigest": "sha256:95b362a97ebe21bb47e5a42c810983a841255d9c545fed0fff0dee76975fbb47",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -123,5 +123,5 @@
     }
   ],
   "failBefore": null,
-  "digest": "sha256:5d8c4b300c7a0ecf56eca8fede7b4dae897dd52b83fe3ca5cb2a4aedfe7b77d3"
+  "digest": "sha256:e66e4d9845b4c49b4decda67633dbda72f77280edc53b55e10aaf5aca8692018"
 }

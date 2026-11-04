@@ -65,10 +65,11 @@ interface CapabilityItem {
 type CeremonyItem = AuthorizeItem | CapabilityItem;
 
 /**
- * How long a newly presented prompt ignores its decision buttons. Answering one prompt presents the
- * next queued one in the same dialog, under the same pointer and focus: without this, the second
- * press of a double-click, a repeated activation or a key's auto-repeat would answer it too. A
- * deliberate decision on the new prompt is a press that starts after this delay.
+ * How long a newly presented prompt ignores its inputs (decision buttons, the Always-allow checkbox,
+ * the typed confirmation). Answering one prompt presents the next queued one in the same dialog,
+ * under the same pointer and focus: without this, the second press of a double-click, a repeated
+ * activation or a key's auto-repeat would answer or change it too. A deliberate input on the new
+ * prompt is a press that starts after this delay.
  */
 const ARMING_DELAY_MS = 400;
 
@@ -90,12 +91,19 @@ export class AuthorizationHost extends JfElement {
   private consentListener: ((e: Event) => void) | null = null;
   /** 569 Move 4 — the native <dialog> on the trusted channel (Top Layer when modal). */
   private readonly dialogRef: Ref<HTMLDialogElement> = createRef();
-  /** When the active prompt was presented; its decision buttons arm {@link ARMING_DELAY_MS} later. */
+  /** When the active prompt was presented; its inputs arm {@link ARMING_DELAY_MS} later. */
   private presentedAt = 0;
   /** The pointer press on this prompt that a pointer click may complete; null when none started here. */
   private press: { at: number; button: Element | null } | null = null;
-  /** The armed, unrepeated Enter/Space press on a decision button that its release completes. */
+  /** The armed, unrepeated Enter/Space press on a control that its release completes. */
   private keyPress: { key: string; button: Element } | null = null;
+  /** Keys pressed in the typed confirmation after the prompt armed: only their auto-repeat may type. */
+  private readonly typingKeys = new Set<string>();
+  /**
+   * The open prompt's dialog was closed without a decision (Escape, `dialog.close()`): it stays pending
+   * and listed in the status panel, and only Review (or the next prompt) presents a ceremony again.
+   */
+  private dismissed = false;
 
   constructor() {
     super();
@@ -259,7 +267,9 @@ export class AuthorizationHost extends JfElement {
       this.modal.close();
       this.show(next);
     } else {
-      // Reviewing re-presents the open prompt: the activation that asked for it cannot answer it.
+      // Reviewing re-presents the open prompt (reopening it if it was closed without a decision):
+      // the activation that asked for it cannot answer it.
+      this.dismissed = false;
       this.arm();
     }
     this.requestUpdate();
@@ -350,6 +360,7 @@ export class AuthorizationHost extends JfElement {
     this.active = item;
     this.typed = '';
     this.allowAlways = false;
+    this.dismissed = false;
     this.arm();
   }
 
@@ -357,52 +368,84 @@ export class AuthorizationHost extends JfElement {
     this.presentedAt = performance.now();
     this.press = null;
     this.keyPress = null;
+    this.typingKeys.clear();
   }
 
   private armed(at = performance.now()): boolean {
     return at - this.presentedAt >= ARMING_DELAY_MS;
   }
 
-  private static decisionButton(e: Event): Element | null {
+  /** The clickable control an event belongs to: a decision button or the Always-allow checkbox (with its label). */
+  private static control(e: Event): Element | null {
     return e.composedPath().find((node): node is Element =>
-      node instanceof Element && node.matches('.actions > jf-button')) ?? null;
+      node instanceof Element && node.matches('.actions > jf-button, label.allow-always')) ?? null;
+  }
+
+  private static typedField(e: Event): boolean {
+    const origin = e.composedPath()[0];
+    return origin instanceof HTMLInputElement && origin.type === 'text';
   }
 
   /**
-   * One deliberate interaction answers one prompt. Pointer clicks must complete a press that started
-   * on the same decision button after the prompt armed; keyboard activation happens on the release of
-   * an armed press that never auto-repeated (the native Enter-on-keydown and repeat clicks are
-   * refused). Other activations (assistive technology's default action) only wait for arming.
+   * One deliberate interaction answers or changes one prompt. Pointer clicks on a decision button or
+   * the Always-allow checkbox must complete a press that started on the same control after the prompt
+   * armed; keyboard activation happens on the release of an armed press that never auto-repeated (the
+   * native Enter-on-keydown, Space-on-release of an earlier press and repeat clicks are refused). Other
+   * activations (assistive technology's default action) only wait for arming. The typed confirmation
+   * takes keys pressed after arming (and their repeats) and other edits (paste, drop) after arming.
    */
   private readonly onPointerDown = (e: PointerEvent): void => {
-    this.press = { at: performance.now(), button: AuthorizationHost.decisionButton(e) };
+    this.press = { at: performance.now(), button: AuthorizationHost.control(e) };
   };
 
   private readonly onClick = (e: MouseEvent): void => {
-    const button = AuthorizationHost.decisionButton(e);
-    if (!button) return;
+    const control = AuthorizationHost.control(e);
+    if (!control) return;
     const press = this.press;
-    if (e.detail > 0) this.press = null;
+    // A label click is followed by the click it forwards to its checkbox: both complete the one press.
+    if (e.detail > 0 && !(control.matches('label') && !(e.composedPath()[0] instanceof HTMLInputElement))) this.press = null;
     const deliberate = this.armed() && (e.detail === 0
-      || (press !== null && press.button === button && this.armed(press.at)));
+      || (press !== null && press.button === control && this.armed(press.at)));
     if (deliberate) return;
     e.preventDefault();
     e.stopPropagation();
   };
 
   private readonly onKey = (e: KeyboardEvent): void => {
-    if (e.key !== 'Enter' && e.key !== ' ') return;
-    const button = AuthorizationHost.decisionButton(e);
-    if (!button) return;
+    if (AuthorizationHost.typedField(e)) {
+      if (e.type === 'keyup') { this.typingKeys.delete(e.key); return; }
+      if (e.key === 'Tab') return;
+      if (!e.repeat && this.armed()) this.typingKeys.add(e.key);
+      if (!this.typingKeys.has(e.key)) e.preventDefault();
+      return;
+    }
+    const control = AuthorizationHost.control(e);
+    // A checkbox toggles on Space only; Enter does nothing there.
+    if (!control || !(e.key === ' ' || (e.key === 'Enter' && !control.matches('label')))) return;
     e.preventDefault();
     const pending = this.keyPress;
     this.keyPress = null;
     if (e.type === 'keydown') {
-      if (!e.repeat && this.armed()) this.keyPress = { key: e.key, button };
-    } else if (pending?.key === e.key && pending.button === button && this.armed()) {
-      const control = e.composedPath()[0];
-      if (control instanceof HTMLButtonElement) control.click();
+      if (!e.repeat && this.armed()) this.keyPress = { key: e.key, button: control };
+    } else if (pending?.key === e.key && pending.button === control && this.armed()) {
+      const origin = e.composedPath()[0];
+      if (origin instanceof HTMLButtonElement || origin instanceof HTMLInputElement) origin.click();
     }
+  };
+
+  private readonly onBeforeInput = (e: InputEvent): void => {
+    if (AuthorizationHost.typedField(e) && !this.armed()) e.preventDefault();
+  };
+
+  /**
+   * The platform closed the dialog without a decision (Escape, `dialog.close()`): release modality and
+   * scroll lock as a decision does. The prompt stays pending; Review presents it again. A close the
+   * host started for the next prompt arrives after that prompt reopened the dialog, and is ignored.
+   */
+  private readonly onClose = (): void => {
+    if (this.dialogRef.value?.open) return;
+    this.dismissed = true;
+    this.modal.close();
   };
 
   /**
@@ -472,8 +515,8 @@ export class AuthorizationHost extends JfElement {
     // (high-risk typed-confirm + capability) open MODAL → the browser Top Layer, which no
     // skin overlay can occlude. Low/medium authorize opens non-modal (565 §3.D non-blocking).
     this.dispatchEvent(new CustomEvent('status-requests-changed', { bubbles: true, composed: true }));
-    if (this.active) this.modal.open({ nonBlocking: this.isLightweight() });
-    else this.modal.close();
+    if (!this.active) this.modal.close();
+    else if (!this.dismissed) this.modal.open({ nonBlocking: this.isLightweight() });
   }
 
   override render(): TemplateResult {
@@ -497,10 +540,12 @@ export class AuthorizationHost extends JfElement {
         class="ceremony ${this.isLightweight() ? 'lightweight' : ''}"
         data-testid=${testid}
         @cancel=${(e: Event) => e.preventDefault()}
+        @close=${this.onClose}
         @pointerdown=${{ handleEvent: this.onPointerDown, capture: true }}
         @click=${{ handleEvent: this.onClick, capture: true }}
         @keydown=${{ handleEvent: this.onKey, capture: true }}
         @keyup=${{ handleEvent: this.onKey, capture: true }}
+        @beforeinput=${{ handleEvent: this.onBeforeInput, capture: true }}
       >
         ${keyed(identity, body)}
       </dialog>

@@ -77,10 +77,24 @@ it.each(['lightweight', 'typed', 'capability'] as const)('C12 a %s ceremony open
     const panel = pill.shadowRoot!.querySelector('jf-status-panel')!;
     const row = panel.shadowRoot!.querySelector(kind === 'capability' ? '[data-fact^="consent:"]' : '[data-fact="authorization:arrival"]');
     expect(row, 'listed in Needs you').not.toBeNull();
-    // Dismissed by some other path: Review reopens the same ceremony and focuses it.
+    // Closed natively without a decision: modality and scroll lock end, the request stays listed,
+    // and the real pill opens the panel, whose Review reopens the same ceremony and focuses it.
     dialog.close(); expect(dialog.open).toBe(false);
-    [...row!.querySelectorAll('button')].find(b => b.textContent!.trim().startsWith('Review'))!.click();
     await settle();
+    expect(modalOwnsFocus(), 'a native close releases modality').toBe(false);
+    expect(document.documentElement.style.overflow, 'and the scroll lock').toBe('');
+    expect(panel.shadowRoot!.querySelector(kind === 'capability' ? '[data-fact^="consent:"]' : '[data-fact="authorization:arrival"]'),
+      'still listed in Needs you').not.toBeNull();
+    const panelHidden = () => pill.shadowRoot!.querySelector('jf-status-panel')!.hasAttribute('hidden');
+    expect(panelHidden()).toBe(true);
+    pill.shadowRoot!.querySelector<HTMLButtonElement>('.trigger')!.click();
+    await settle();
+    expect(panelHidden(), 'the pill opens the panel').toBe(false);
+    const review = [...panel.shadowRoot!.querySelector(kind === 'capability' ? '[data-fact^="consent:"]' : '[data-fact="authorization:arrival"]')!
+      .querySelectorAll('button')].find(b => b.textContent!.trim().startsWith('Review'))!;
+    review.click();
+    await settle();
+    expect(panelHidden(), 'Review closes the panel').toBe(true);
     expect(host.shadowRoot!.querySelector('dialog')).toBe(dialog);
     expect(dialog.open, 'Review reopens it').toBe(true);
     expect(modalOwnsFocus()).toBe(kind !== 'lightweight');
