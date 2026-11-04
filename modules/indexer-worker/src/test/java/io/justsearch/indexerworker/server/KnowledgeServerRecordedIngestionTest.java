@@ -1659,6 +1659,152 @@ final class KnowledgeServerRecordedIngestionTest {
     } finally { server.close(); }
   }
 
+  @Test
+  @Timeout(value = 15, unit = TimeUnit.MINUTES)
+  void firstMaintenanceDuringRecordedMigrationExtractsEachCapturedFileOnce(@TempDir Path tempDir)
+      throws Exception {
+    var layout = WorkerBootFixture.layout(tempDir);
+    var previousConfig = io.justsearch.configuration.resolved.ConfigStore.globalOrNull();
+    WorkerBootFixture.publishConfig(layout.dataDir(), layout.indexBase(), "BLUE_GREEN_MIGRATE",
+        java.util.Map.of("justsearch.extraction.sandbox.mode", "IN_PROCESS"));
+    var installedConfig = io.justsearch.configuration.resolved.ConfigStore.globalOrNull();
+    var entered = new CountDownLatch(1);
+    var release = new CountDownLatch(1);
+    var extractions = new java.util.concurrent.ConcurrentHashMap<Path, AtomicInteger>();
+    String operation = "01994180-0000-7000-8000-000000000165";
+    Path root = Files.createDirectory(tempDir.resolve("captured-sources"));
+    var files = List.of(Files.writeString(root.resolve("first.txt"), "First cobaltcaptured source with enough text for the actual lexical indexing pipeline. ".repeat(10)),
+        Files.writeString(root.resolve("second.txt"), "Second cobaltcaptured source with enough text for the actual lexical indexing pipeline. ".repeat(10)));
+    try (var _ = io.justsearch.indexerworker.services.NoVolumeIdentityExtension.withVolumeIdentity(true)) {
+      // Direct queue seeding must also reproduce the explicit ingest's volume record. Pin
+      // known volume evidence so a sandbox without /dev/disk/by-uuid covers the same policy.
+      io.justsearch.indexerworker.services.ExplicitIngestRecords.recordRoot(layout.indexBase(), root);
+      String fingerprint;
+      try (var seed = withoutDeferredModels(helperServer(layout))) {
+        seed.start();
+        assertTrue(((DefaultWorkerAppServices) seed.appServices()).ingestService().rootCheck().admits(root),
+            "fixture must admit the captured root on its recorded volume");
+        var method = KnowledgeServer.class.getDeclaredMethod("expectedIndexFingerprintOrNull");
+        method.setAccessible(true);
+        fingerprint = (String) method.invoke(seed);
+      }
+      String active = layout.genManager().readStateBestEffort().active_generation();
+      String building = layout.genManager().startRecordedMigration(operation, "recorded-test", fingerprint,
+          active, List.of()).building_generation();
+      try (var queue = new SqliteJobQueue(layout.dataDir().resolve("jobs.db"))) {
+        queue.open();
+        var walk = queue.beginCapturedWalk(operation, PLAN_HASH, true);
+        for (Path file : files) {
+          var entry = new JobQueue.EnqueueEntry(file, Files.size(file),
+              new JobQueue.EnqueueProvenance("agent", "CAPTURE"),
+              io.justsearch.indexerworker.loop.SourceContentHash.sha256(file)).withinRoot(root);
+          assertEquals(1, queue.enqueueRecordedEntries(operation, walk.enumerationEpoch(), List.of(entry), null));
+        }
+        queue.closeRecordedWalkEnumeration(operation, walk.enumerationEpoch(), JobQueue.WalkEnumerationOutcome.COMPLETE);
+        assertTrue(queue.listSwitchBufferOpsStrictForGeneration(building).isEmpty());
+      }
+      var attached = new AtomicBoolean();
+      var runtimeWitness = new AtomicReference<RecordedIngestionLifecycle.CheckedBulkRuntime>();
+      var lifecycle = new RecordedIngestionLifecycle() {
+        @Override public IndexGenerationManager.BootOwnership bootOwnership(JobQueue queue) {
+          return new IndexGenerationManager.BootOwnership.Recorded(operation, active,
+              "recorded-test", fingerprint, true, true, List.of());
+        }
+        @Override public JobQueue.RecordedClaimDecision recordedClaimDecision(String key) {
+          return attached.get() && operation.equals(key)
+              ? JobQueue.RecordedClaimDecision.ALLOW_FORCE : JobQueue.RecordedClaimDecision.DENY;
+        }
+        @Override public Attachment attach(JobQueue queue, CheckedServingGeneration generation,
+            java.util.function.BooleanSupplier online) {
+          attached.set(true);
+          return () -> attached.set(false);
+        }
+        @Override public Attachment attach(JobQueue queue, CheckedServingGeneration generation,
+            java.util.function.BooleanSupplier online, CheckedBulkRuntime bulkRuntime) {
+          runtimeWitness.set(bulkRuntime);
+          return attach(queue, generation, online);
+        }
+      };
+      org.mockito.stubbing.Answer<Object> sandboxFactory = call -> {
+        if (!call.getMethod().getName().equals("inProcessStructured") || call.getArguments().length != 6) {
+          return call.callRealMethod();
+        }
+        var extractor = org.mockito.Mockito.spy(
+            (io.justsearch.indexerworker.extract.TimeboxedContentExtractor) call.callRealMethod());
+        org.mockito.Mockito.doAnswer(extraction -> {
+          Path file = extraction.getArgument(0);
+          extractions.computeIfAbsent(file, ignored -> new AtomicInteger()).incrementAndGet();
+          if (entered.getCount() > 0) {
+            entered.countDown();
+            try {
+              if (!release.await(5, TimeUnit.MINUTES)) throw new IOException("maintenance never released extraction");
+            } catch (InterruptedException interrupted) {
+              Thread.currentThread().interrupt();
+              throw new IOException("extraction interrupted", interrupted);
+            }
+          }
+          return extraction.callRealMethod();
+        }).when(extractor).extractArtifact(org.mockito.ArgumentMatchers.any(Path.class));
+        return extractor;
+      };
+      // Hold the issued claim before starting the real sandbox's extraction timebox. The
+      // synchronization wait must not consume its parser timeout on a loaded machine.
+      try (var _ = org.mockito.Mockito.mockStatic(
+              io.justsearch.indexerworker.extract.ExtractionSandboxFactory.class, sandboxFactory);
+          var executors = new TestEngineExecutors();
+          var server = withoutDeferredModels(new KnowledgeServer(executors,
+              WorkerBootFixture.workerConfig(layout.dataDir()), null,
+              io.justsearch.app.api.runtime.ManagedChildRegistry.noop(), lifecycle))) {
+        try {
+          server.start();
+          server.releaseModelReadyLatchForTests();
+          assertTrue(entered.await(5, TimeUnit.MINUTES), "real Green loop must claim captured work");
+          var queue = (SqliteJobQueue) server.jobQueueForTests();
+          var published = new CountDownLatch(1);
+          @SuppressWarnings("unchecked")
+          var outcomeObserver = (java.util.function.Consumer<String>) getField(queue, "outcomeObserver");
+          queue.setOutcomeObserver(outcome -> {
+            outcomeObserver.accept(outcome);
+            if (queue.completedCount() == files.size()) published.countDown();
+          });
+          var receipts = new java.util.HashMap<Path, String>();
+          try (var connection = java.sql.DriverManager.getConnection("jdbc:sqlite:" + layout.dataDir().resolve("jobs.db"));
+              var query = connection.createStatement();
+              var rows = query.executeQuery("SELECT path,unit_revision FROM jobs WHERE scan_id='" + operation + "'")) {
+            while (rows.next()) receipts.put(Path.of(rows.getString(1)), rows.getString(2));
+          }
+          var producer = (DefaultWorkerAppServices) server.appServices();
+          try (var _ = producer.mutationAdmission().enter(producer.mutationOwnerToken())) {
+            var runtime = runtimeWitness.get().current().orElseThrow();
+            assertEquals(IndexGenerationManager.BootDisposition.BUILDING, runtime.disposition());
+            assertEquals(building, runtime.writableGeneration());
+            assertEquals(building, runtime.buildingGeneration());
+            for (Path file : files) assertTrue(queue.enqueueMaintenanceFileForGeneration(building,
+                JobQueue.EnqueueEntry.stat(file).withinRoot(root), null));
+          }
+          release.countDown();
+          assertTrue(published.await(5, TimeUnit.MINUTES), "the real producer must publish both files");
+          assertEquals(files.size(), queue.completedCount(), "the real producer must publish both files");
+          assertEquals(2, queue.recordedWalk(operation).orElseThrow().completedUnits());
+          server.lifecycleManagerForTests().commitOps().maybeRefreshBlocking();
+          for (Path file : files) {
+            assertEquals(1, extractions.get(file).get(), "first maintenance must not extract " + file + " twice");
+            var receipt = queue.listSwitchBufferOpsStrictForGeneration(building).stream()
+                .filter(op -> op.key().equals("path:" + file)).findFirst().orElseThrow();
+            assertEquals(receipts.get(file),
+                io.justsearch.indexerworker.queue.SwitchBufferUpsert.decode(receipt.payload()).unitRevision(),
+                "publication and replay must retain the originally issued revision");
+            assertNotNull(server.lifecycleManagerForTests().documentFieldOps().getDocumentField(
+                file.toString(), io.justsearch.indexing.SchemaFields.SOURCE_SHA256));
+          }
+        } finally { release.countDown(); }
+      }
+    } finally {
+      release.countDown();
+      io.justsearch.configuration.resolved.ConfigStore.restoreGlobal(installedConfig, previousConfig);
+    }
+  }
+
   private static RecordedIngestionLifecycle fencedBootLifecycle(AtomicBoolean observed) {
     return new RecordedIngestionLifecycle() {
       @Override public IndexGenerationManager.BootOwnership bootOwnership(JobQueue queue) {

@@ -3,6 +3,7 @@ package io.justsearch.indexerworker.queue;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+import io.justsearch.adapters.lucene.runtime.PathPrefixScope;
 import io.justsearch.indexerworker.ingest.IngestionOutcome;
 import io.justsearch.indexerworker.ingest.IngestionOutcomeClass;
 import io.justsearch.indexerworker.ingest.IngestionReasonCodes;
@@ -161,7 +162,7 @@ final class RediscoveryAdmissionTest {
     }
   }
 
-  @ParameterizedTest
+  @ParameterizedTest(name = "{displayName} [{index}] {arguments}")
   @ValueSource(strings = {"PENDING", "PROCESSING", "DONE", "FAILED", "RETRY_EXHAUSTED"})
   void identicalCandidateEnumerationRetainsRevisionAndReplayWitness(String state) throws Exception {
     Path file = Files.writeString(temporary.resolve("candidate.txt"), "candidate bytes");
@@ -180,6 +181,9 @@ final class RediscoveryAdmissionTest {
     }
     try (var queue = open(db)) {
       assertEquals(1, queue.enqueueEnumeratedFilesForGeneration("green", List.of(entry), "docs"));
+      assertEquals(saved, row(db));
+      assertEquals(receipts, queue.listSwitchBufferOpsStrictForGeneration("green"));
+      assertTrue(queue.enqueueMaintenanceFileForGeneration("green", entry, "docs"));
       assertEquals(saved, row(db));
       assertEquals(receipts, queue.listSwitchBufferOpsStrictForGeneration("green"));
       assertEquals(1, queue.enqueueEnumeratedFilesForGeneration("next", List.of(entry), "docs"));
@@ -228,6 +232,353 @@ final class RediscoveryAdmissionTest {
       assertNotEquals(claim.unitRevision(), next.unitRevision());
       if (change.equals("force")) assertTrue(next.forceReindex());
     }
+  }
+
+  private static final String CAPTURE = "01994180-0000-7000-8000-000000000164";
+  private static final String TARGET = "g-" + CAPTURE;
+
+  @ParameterizedTest(name = "{displayName} [{index}] {arguments}")
+  @CsvSource({"false,false,false", "true,false,false", "true,true,false", "false,false,true"})
+  void firstMaintenanceAttachesCapturedReceiptWithoutSpendingClaim(
+      boolean claimed, boolean force, boolean resumed) throws Exception {
+    Path file = Files.writeString(temporary.resolve("captured.txt"), "captured bytes");
+    Path db = temporary.resolve("captured.db");
+    try (var queue = capturedQueue(db)) {
+      capture(queue, file, "docs", force, resumed, temporary);
+      JobQueue.IndexJob claim = claimed ? queue.pollPending(1).getFirst() : null;
+      if (claim != null) assertTrue(claim.recordedForce());
+      sql(db, "UPDATE jobs SET attempts=3,retry_after=9999999999999,first_failed_at=123,error_message='retained history'");
+      var before = row(db);
+      assertEquals(force ? "1" : "0", before.get("force_reindex"));
+      var walk = queue.recordedWalk(CAPTURE);
+      var maintenance = JobQueue.EnqueueEntry.stat(file,
+          new JobQueue.EnqueueProvenance("system", "SYSTEM_INTERNAL"))
+          .withinRoot(temporary.resolve("unused/.."));
+      assertTrue(queue.enqueueMaintenanceFileForGeneration(TARGET, maintenance, "docs"));
+      assertEquals(before, row(db), "first maintenance must retain every captured job fact");
+      assertEquals(walk, queue.recordedWalk(CAPTURE), "attachment is outside walk progress");
+      var receipts = queue.listSwitchBufferOpsStrictForGeneration(TARGET);
+      assertEquals(1, receipts.size());
+      var receipt = SwitchBufferUpsert.decode(receipts.getFirst().payload());
+      assertEquals("UPSERT", receipts.getFirst().op());
+      assertEquals(before.get("unit_revision"), receipt.unitRevision());
+      assertEquals(before.get("planned_source_sha256"), receipt.sourceSha256());
+      assertEquals("docs", receipt.collection());
+      assertEquals(temporary, receipt.ingestionRoot());
+      assertEquals(new JobQueue.EnqueueProvenance("agent", "CAPTURE"), receipt.provenance());
+      assertTrue(queue.enqueueMaintenanceFileForGeneration(TARGET, maintenance, "docs"));
+      assertEquals(before, row(db));
+      assertEquals(receipts, queue.listSwitchBufferOpsStrictForGeneration(TARGET));
+      if (claim != null) {
+        assertTrue(queue.ownsClaimForPublication(claim), "the original extraction still owns publication");
+        assertTrue(queue.markClaimDone(claim, skipped(), null));
+      }
+    }
+  }
+
+  @ParameterizedTest(name = "{displayName} [{index}] {arguments}")
+  @ValueSource(booleans = {false, true})
+  void firstMaintenanceRetainsEarlierEpochMemberAndReceiptAfterReopen(boolean claimed) throws Exception {
+    Path file = Files.writeString(temporary.resolve("earlier-epoch.txt"), "retained bytes");
+    Path db = temporary.resolve("earlier-epoch.db");
+    Map<String, String> before;
+    List<SwitchBufferCapableQueue.SwitchBufferOp> receipts;
+    try (var queue = capturedQueue(db)) {
+      capture(queue, file, "docs", true, true, temporary);
+      // Open captures fence claims, and COMPLETE retires unseen members. Seed the retained case
+      // on a re-observed member of the completed epoch-2 walk, before issuing any claim.
+      sql(db, "UPDATE jobs SET walk_seen_epoch=1");
+      var walk = queue.recordedWalk(CAPTURE).orElseThrow();
+      assertEquals(JobQueue.WalkEnumerationOutcome.COMPLETE, walk.enumerationOutcome());
+      assertEquals(2, walk.enumerationEpoch());
+      assertEquals("1", row(db).get("walk_seen_epoch"));
+      JobQueue.IndexJob claim = claimed ? queue.pollPending(1).getFirst() : null;
+      before = row(db);
+      assertEquals(claimed ? "PROCESSING" : "PENDING", before.get("state"));
+      assertEquals("1", before.get("force_reindex"));
+      assertTrue(queue.listSwitchBufferOpsStrictForGeneration(TARGET).isEmpty());
+      var maintenance = JobQueue.EnqueueEntry.stat(file,
+          new JobQueue.EnqueueProvenance("system", "SYSTEM_INTERNAL")).withinRoot(temporary);
+      assertTrue(queue.enqueueMaintenanceFileForGeneration(TARGET, maintenance, "docs"));
+      assertEquals(before.get("unit_revision"), row(db).get("unit_revision"),
+          "first maintenance must not replace the retained earlier-epoch revision");
+      assertEquals(before, row(db), "first maintenance must retain every earlier-epoch job fact");
+      assertEquals(walk, queue.recordedWalk(CAPTURE).orElseThrow());
+      receipts = queue.listSwitchBufferOpsStrictForGeneration(TARGET);
+      assertReceiptCopiesRow(before, file, receipts);
+      if (claim != null) assertTrue(queue.ownsClaimForPublication(claim));
+    }
+    try (var queue = capturedQueue(db)) {
+      assertEquals(before, row(db), "reopen must preserve the earlier-epoch row including claim identity");
+      assertEquals(receipts, queue.listSwitchBufferOpsStrictForGeneration(TARGET));
+      assertReceiptCopiesRow(before, file, queue.listSwitchBufferOpsStrictForGeneration(TARGET));
+    }
+  }
+
+  @ParameterizedTest(name = "{displayName} [{index}] {arguments}")
+  @CsvSource({"false,false", "false,true", "true,false", "true,true"})
+  void firstMaintenanceRetainsSameBytesForegroundReaddWithoutReceipt(boolean claimed, boolean force) throws Exception {
+    Path file = Files.writeString(temporary.resolve("foreground-readd.txt"), "captured bytes");
+    Path db = temporary.resolve("foreground-readd.db");
+    Map<String, String> before;
+    List<SwitchBufferCapableQueue.SwitchBufferOp> receipts;
+    try (var queue = capturedQueue(db)) {
+      capture(queue, file, "docs", false, false, temporary);
+      var captured = row(db);
+      var foreground = JobQueue.EnqueueEntry.stat(file,
+          new JobQueue.EnqueueProvenance("user", "HTTP")).withinRoot(temporary).withForceReindex(force);
+      assertEquals(1, queue.enqueueEntries(List.of(foreground), "docs"));
+      assertNotEquals(captured.get("unit_revision"), row(db).get("unit_revision"));
+      JobQueue.IndexJob claim = claimed ? queue.pollPending(1).getFirst() : null;
+      before = row(db);
+      assertEquals(claimed ? "PROCESSING" : "PENDING", before.get("state"));
+      assertEquals(force ? "1" : "0", before.get("force_reindex"));
+      assertEquals("user", before.get("originator"));
+      assertEquals("HTTP", before.get("transport"));
+      assertEquals(CAPTURE, before.get("scan_id"));
+      assertEquals(captured.get("planned_source_sha256"), before.get("planned_source_sha256"));
+      assertEquals(captured.get("admitted_source_sha256"), before.get("admitted_source_sha256"));
+      assertTrue(queue.listSwitchBufferOpsStrictForGeneration(TARGET).isEmpty(),
+          "public foreground admission must not have supplied a generation receipt");
+      var maintenance = JobQueue.EnqueueEntry.stat(file,
+          new JobQueue.EnqueueProvenance("system", "SYSTEM_INTERNAL")).withinRoot(temporary);
+      assertTrue(queue.enqueueMaintenanceFileForGeneration(TARGET, maintenance, "docs"));
+      assertEquals(before.get("unit_revision"), row(db).get("unit_revision"),
+          "first maintenance must not replace the same-bytes foreground revision");
+      assertEquals(before, row(db), "first maintenance must retain the same-bytes foreground revision and claim");
+      receipts = queue.listSwitchBufferOpsStrictForGeneration(TARGET);
+      assertReceiptCopiesRow(before, file, receipts);
+      if (claim != null) assertTrue(queue.ownsClaimForPublication(claim));
+    }
+    try (var queue = capturedQueue(db)) {
+      assertEquals(before, row(db), "reopen must preserve the foreground row including claim identity");
+      assertEquals(receipts, queue.listSwitchBufferOpsStrictForGeneration(TARGET));
+      assertReceiptCopiesRow(before, file, queue.listSwitchBufferOpsStrictForGeneration(TARGET));
+    }
+  }
+
+  private static void assertReceiptCopiesRow(Map<String, String> retained, Path file,
+      List<SwitchBufferCapableQueue.SwitchBufferOp> receipts) throws Exception {
+    assertEquals(1, receipts.size());
+    assertEquals("UPSERT", receipts.getFirst().op());
+    assertEquals("path:" + file, receipts.getFirst().key());
+    var receipt = SwitchBufferUpsert.decode(receipts.getFirst().payload());
+    assertEquals(retained.get("unit_revision"), receipt.unitRevision());
+    assertEquals(retained.get("planned_source_sha256"), receipt.sourceSha256());
+    assertEquals(retained.get("collection"), receipt.collection());
+    assertEquals(Path.of(retained.get("ingestion_root")), receipt.ingestionRoot());
+    assertEquals(new JobQueue.EnqueueProvenance(retained.get("originator"), retained.get("transport")),
+        receipt.provenance());
+  }
+
+  @Test
+  void pendingCapturedAttachmentAndReceiptIdentitySurviveReopen() throws Exception {
+    Path file = Files.writeString(temporary.resolve("reopen.txt"), "durable bytes");
+    Path db = temporary.resolve("reopen.db");
+    Map<String, String> before;
+    List<SwitchBufferCapableQueue.SwitchBufferOp> receipts;
+    try (var queue = capturedQueue(db)) {
+      capture(queue, file, null, true, false, null);
+      before = row(db);
+      assertTrue(queue.enqueueMaintenanceFileForGeneration(TARGET,
+          JobQueue.EnqueueEntry.stat(file), null));
+      assertEquals(before, row(db), "pending capture must not be re-admitted");
+      receipts = queue.listSwitchBufferOpsStrictForGeneration(TARGET);
+      assertEquals(1, receipts.size());
+    }
+    try (var queue = capturedQueue(db)) {
+      assertEquals(before, row(db));
+      assertEquals(receipts, queue.listSwitchBufferOpsStrictForGeneration(TARGET));
+      assertTrue(queue.enqueueMaintenanceFileForGeneration(TARGET,
+          JobQueue.EnqueueEntry.stat(file), null));
+      assertEquals(before, row(db));
+      assertEquals(receipts, queue.listSwitchBufferOpsStrictForGeneration(TARGET),
+          "a repeated attachment cannot change receipt order or revision");
+    }
+  }
+
+  @Test
+  void rejectedCapturedReceiptRollsBackAndCanBeRetriedAfterReopen() throws Exception {
+    Path file = Files.writeString(temporary.resolve("atomic.txt"), "atomic bytes");
+    Path db = temporary.resolve("atomic.db");
+    Map<String, String> before;
+    try (var queue = capturedQueue(db)) {
+      capture(queue, file, "docs", false, false, temporary);
+      var claim = queue.pollPending(1).getFirst();
+      before = row(db);
+      var walk = queue.recordedWalk(CAPTURE);
+      sql(db, "CREATE TRIGGER reject_receipt BEFORE INSERT ON switch_buffer "
+          + "BEGIN SELECT RAISE(ABORT, 'injected receipt failure'); END");
+      assertFalse(queue.enqueueMaintenanceFileForGeneration(TARGET,
+          JobQueue.EnqueueEntry.stat(file).withinRoot(temporary), "docs"));
+      assertEquals(before, row(db));
+      assertEquals(walk, queue.recordedWalk(CAPTURE));
+      assertTrue(queue.ownsClaimForPublication(claim));
+      assertTrue(queue.listSwitchBufferOpsStrictForGeneration(TARGET).isEmpty());
+    }
+    try (var queue = capturedQueue(db)) {
+      assertTrue(queue.listSwitchBufferOpsStrictForGeneration(TARGET).isEmpty());
+      sql(db, "DROP TRIGGER reject_receipt");
+      // Recovery may re-authorize PROCESSING; attachment must preserve that recovered row.
+      var recovered = row(db);
+      assertTrue(queue.enqueueMaintenanceFileForGeneration(TARGET,
+          JobQueue.EnqueueEntry.stat(file).withinRoot(temporary), "docs"));
+      assertEquals(recovered, row(db), "retry must attach, not replace recovered work");
+      assertEquals(1, queue.listSwitchBufferOpsStrictForGeneration(TARGET).size());
+    }
+  }
+
+  @ParameterizedTest(name = "{displayName} [{index}] {arguments}")
+  @ValueSource(strings = {"bytes", "collection", "collection-null", "retained-collection-null", "root", "root-null",
+      "retained-root-null", "generation",
+      "native-target", "force", "planned-hash", "admitted-hash", "DONE", "FAILED", "RETRY_EXHAUSTED",
+      "cancelled", "open", "streaming", "sealed", "unseen-resumed", "missing-manifest", "missing-membership",
+      "future-epoch", "zero-epoch", "release-revision", "root-revision"})
+  void maintenanceWithoutCapturedProofKeepsExistingAdmission(String difference) throws Exception {
+    Path root = Files.createDirectory(temporary.resolve("root"));
+    Path file = Files.writeString(root.resolve("different.txt"), "original bytes");
+    Path db = temporary.resolve("different.db");
+    try (var queue = capturedQueue(db)) {
+      var walk = difference.equals("streaming")
+          ? queue.beginRecordedWalk(CAPTURE, "a".repeat(64), true)
+          : queue.beginCapturedWalk(CAPTURE, "a".repeat(64), true);
+      var captured = new JobQueue.EnqueueEntry(file, Files.size(file), null, SourceContentHash.sha256(file))
+          .withinRoot(difference.equals("retained-root-null") ? null : root);
+      queue.enqueueRecordedEntries(CAPTURE, walk.enumerationEpoch(), List.of(captured),
+          difference.equals("retained-collection-null") ? null : "docs");
+      if (difference.equals("unseen-resumed")) {
+        walk = queue.beginCapturedWalk(CAPTURE, "a".repeat(64), false);
+      }
+      if (!difference.equals("open")) queue.closeRecordedWalkEnumeration(CAPTURE, walk.enumerationEpoch(),
+          difference.equals("cancelled") ? JobQueue.WalkEnumerationOutcome.CANCELLED
+              : JobQueue.WalkEnumerationOutcome.COMPLETE);
+      if (difference.equals("unseen-resumed")) {
+        assertEquals("DONE", row(db).get("state"));
+        assertEquals("SOURCE_REMOVED", row(db).get("last_reason_code"));
+        assertTrue(queue.listSwitchBufferOpsStrictForGeneration(TARGET).isEmpty());
+      }
+      switch (difference) {
+        case "bytes" -> Files.writeString(file, "genuinely newer bytes");
+        case "planned-hash" -> sql(db, "UPDATE jobs SET planned_source_sha256='" + "b".repeat(64) + "'");
+        case "admitted-hash" -> sql(db, "UPDATE jobs SET admitted_source_sha256='" + "b".repeat(64) + "'");
+        case "DONE", "sealed" -> {
+          assertTrue(queue.markClaimDone(queue.pollPending(1).getFirst(), skipped(), null));
+          if (difference.equals("sealed")) assertNotNull(queue.trySealRecordedWalk(CAPTURE).sealedAt());
+        }
+        case "FAILED", "RETRY_EXHAUSTED" -> {
+          assertTrue(queue.markClaimFailed(queue.pollPending(1).getFirst(),
+              IngestionOutcome.of(IngestionOutcomeClass.PARSER_FAILED, "PARSER_FAILED", IngestionRetryPolicy.NONE), null));
+          if (difference.equals("RETRY_EXHAUSTED")) sql(db, "UPDATE jobs SET state='RETRY_EXHAUSTED'");
+        }
+        case "missing-manifest" -> sql(db, "UPDATE ingestion_walk_progress SET manifest_sha256=NULL");
+        case "missing-membership" -> sql(db, "UPDATE jobs SET walk_seen_epoch=NULL");
+        case "future-epoch" -> sql(db, "UPDATE jobs SET walk_seen_epoch=99");
+        case "zero-epoch" -> sql(db, "UPDATE jobs SET walk_seen_epoch=0");
+        case "release-revision" -> sql(db, "UPDATE jobs SET unit_revision='release030/job/old'");
+        case "root-revision" -> sql(db, "UPDATE jobs SET unit_revision='root2:old'");
+        default -> { }
+      }
+      String before = row(db).get("unit_revision");
+      var incoming = JobQueue.EnqueueEntry.stat(file).withinRoot(
+          difference.equals("root") ? temporary : difference.equals("root-null") ? null : root)
+          .withForceReindex(difference.equals("force"));
+      String target = difference.equals("generation") ? "g-other"
+          : difference.equals("native-target") ? "native" : TARGET;
+      String collection = difference.equals("collection") ? "other"
+          : difference.equals("collection-null") ? null : "docs";
+      if (List.of("missing-manifest", "missing-membership").contains(difference)) {
+        var retained = row(db);
+        assertFalse(queue.enqueueMaintenanceFileForGeneration(target, incoming, collection));
+        assertEquals(retained, row(db), "existing admission still refuses invalid or stopped membership");
+        assertTrue(queue.listSwitchBufferOpsStrictForGeneration(target).isEmpty());
+        return;
+      }
+      assertTrue(queue.enqueueMaintenanceFileForGeneration(target, incoming, collection));
+      assertNotEquals(before, row(db).get("unit_revision"), "unqualified work follows normal admission");
+      assertEquals(1, queue.listSwitchBufferOpsStrictForGeneration(target).size());
+      assertEquals(SourceContentHash.sha256(file), row(db).get("admitted_source_sha256"));
+      if (difference.equals("force")) assertEquals("1", row(db).get("force_reindex"));
+    }
+  }
+
+  @ParameterizedTest(name = "{displayName} [{index}] {arguments}")
+  @CsvSource({"UPSERT,false", "DELETE,false", "DELETE_PREFIX,false", "DELETE_COLLECTION,false",
+      "UPSERT,true", "DELETE,true", "DELETE_PREFIX,true", "DELETE_COLLECTION,true"})
+  void foregroundMutationAroundCapturedAttachmentKeepsExistingMaintenancePrecedence(
+      String mutation, boolean attachFirst) throws Exception {
+    Path file = Files.writeString(temporary.resolve("foreground.txt"), "captured bytes");
+    Path db = temporary.resolve("foreground.db");
+    try (var queue = capturedQueue(db)) {
+      capture(queue, file, "docs", false, false, temporary);
+      var original = row(db);
+      var entry = JobQueue.EnqueueEntry.stat(file).withinRoot(temporary);
+      if (attachFirst) {
+        assertTrue(queue.enqueueMaintenanceFileForGeneration(TARGET, entry, "docs"));
+        assertEquals(original, row(db), "attach before the foreground mutation without replacing captured work");
+      }
+      var foreground = JobQueue.EnqueueEntry.stat(file,
+          new JobQueue.EnqueueProvenance("user", "HTTP")).withinRoot(temporary);
+      switch (mutation) {
+        case "UPSERT" -> assertTrue(queue.enqueueAndBufferFileForGeneration(TARGET, foreground, "docs", null));
+        case "DELETE" -> {
+          assertTrue(queue.putSwitchBufferForGeneration(TARGET, "path:" + file, "DELETE",
+              new SwitchBufferDelete(file.toString(), SwitchBufferDelete.Origin.EXPLICIT, null).encode()));
+          assertEquals(1, queue.deleteByExactPath(file.toString()));
+        }
+        case "DELETE_PREFIX" -> {
+          assertTrue(queue.putSwitchBufferForGeneration(TARGET, "prefix:" + temporary, "DELETE_PREFIX",
+              new PathPrefixScope(temporary.toString(), List.of()).encode()));
+          assertEquals(1, queue.deleteByPathPrefix(temporary.toString()));
+        }
+        case "DELETE_COLLECTION" -> {
+          assertTrue(queue.putSwitchBufferForGeneration(TARGET, "collection:docs", "DELETE_COLLECTION", "docs"));
+          queue.deleteByCollection("docs");
+        }
+        default -> throw new AssertionError(mutation);
+      }
+      var foregroundReceipts = queue.listSwitchBufferOpsStrictForGeneration(TARGET);
+      boolean matchingReceiptRetained = mutation.equals("UPSERT")
+          || (attachFirst && (mutation.equals("DELETE_PREFIX") || mutation.equals("DELETE_COLLECTION")));
+      Map<String, String> replacement = matchingReceiptRetained ? row(db) : null;
+      assertTrue(queue.enqueueMaintenanceFileForGeneration(TARGET, entry, "docs"));
+      var current = row(db);
+      if (replacement != null) {
+        assertEquals(replacement, current);
+        assertEquals(foregroundReceipts, queue.listSwitchBufferOpsStrictForGeneration(TARGET));
+      } else {
+        assertNotEquals(original.get("unit_revision"), current.get("unit_revision"),
+            "without a matching receipt, recreation follows existing admission");
+        if (!mutation.equals("DELETE")) assertTrue(
+            queue.listSwitchBufferOpsStrictForGeneration(TARGET).containsAll(foregroundReceipts),
+            "containing deletion receipts keep their precedence and identity");
+      }
+      var upsert = queue.listSwitchBufferOpsStrictForGeneration(TARGET).stream()
+          .filter(op -> op.key().equals("path:" + file)).findFirst().orElseThrow();
+      assertEquals(current.get("unit_revision"), SwitchBufferUpsert.decode(upsert.payload()).unitRevision());
+    }
+  }
+
+  private SqliteJobQueue capturedQueue(Path db) throws Exception {
+    var queue = new SqliteJobQueue(db, ignored -> JobQueue.RecordedClaimDecision.ALLOW_FORCE);
+    queue.open();
+    return queue;
+  }
+
+  private void capture(SqliteJobQueue queue, Path file, String collection, boolean force, boolean resumed,
+      Path ingestionRoot) throws Exception {
+    var walk = queue.beginCapturedWalk(CAPTURE, "a".repeat(64), true);
+    var entry = new JobQueue.EnqueueEntry(file, Files.size(file),
+        new JobQueue.EnqueueProvenance("agent", "CAPTURE"), SourceContentHash.sha256(file))
+        .withinRoot(ingestionRoot).withForceReindex(force);
+    if (force) assertEquals(1, queue.enqueueEntries(List.of(entry), collection));
+    assertEquals(1, queue.enqueueRecordedEntries(CAPTURE, walk.enumerationEpoch(), List.of(entry), collection));
+    if (resumed) {
+      walk = queue.beginCapturedWalk(CAPTURE, "a".repeat(64), false);
+      assertEquals(2, walk.enumerationEpoch());
+      assertEquals(1, queue.enqueueRecordedEntries(CAPTURE, walk.enumerationEpoch(), List.of(entry), collection));
+    }
+    queue.closeRecordedWalkEnumeration(CAPTURE, walk.enumerationEpoch(), JobQueue.WalkEnumerationOutcome.COMPLETE);
+    assertTrue(queue.listSwitchBufferOpsStrictForGeneration(TARGET).isEmpty());
   }
 
   private static SqliteJobQueue open(Path db) throws Exception {
