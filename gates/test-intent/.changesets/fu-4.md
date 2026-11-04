@@ -202,3 +202,14 @@ No Deliver item was moved to preservation.
   "note": "Codex acceptor on 685963f28a: entry 1 New accept; FUD1-FUD4 and P1-P3 citations match the settled scenarios; both evidence files valid against current sources. Component verification: Codex verifier-1 01a1a7bf on e3b90f7b04 (FUD1-4 fail before / pass after; P1-P3 pass both)."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a1a83e-fba9-7ac0-9509-fff74bca3489",
+  "verdict": "accept",
+  "digest": "sha256:989539e35cd4bfa81dfc3b4df04394e91aee4ee6abf20e913c2cd36ec702eb5c",
+  "note": "Codex acceptor on d83bba55f0: entry 1 New accept, entry 2 Structural rule kept (stress-suite registration) accept."
+}
+```
