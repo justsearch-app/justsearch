@@ -17,6 +17,7 @@ import { requestCapability, listPendingConsentRequests, resolveConsentRequest } 
 let host: AuthorizationHost;
 
 beforeEach(() => {
+  vi.useFakeTimers({ toFake: ['performance'] });
   host = document.createElement('jf-authorization-host') as AuthorizationHost;
   document.body.appendChild(host);
 });
@@ -26,6 +27,7 @@ afterEach(() => {
   setAuthorizationPresenter(null);
   for (const request of listPendingConsentRequests()) resolveConsentRequest(request.id, 'deny');
   vi.restoreAllMocks();
+  vi.useRealTimers();
 });
 
 async function settle(): Promise<void> {
@@ -69,6 +71,7 @@ describe('Move 4 — trusted ceremony on the Top Layer', () => {
         await (button as unknown as { updateComplete: Promise<unknown> }).updateComplete;
         const control = button.shadowRoot!.querySelector('jf-control')!;
         await (control as unknown as { updateComplete: Promise<unknown> }).updateComplete;
+        vi.advanceTimersByTime(400); // the prompt arms before it accepts a decision
         control.shadowRoot!.querySelector('button')!.click();
         await settle();
       };

@@ -64,6 +64,14 @@ interface CapabilityItem {
 
 type CeremonyItem = AuthorizeItem | CapabilityItem;
 
+/**
+ * How long a newly presented prompt ignores its decision buttons. Answering one prompt presents the
+ * next queued one in the same dialog, under the same pointer and focus: without this, the second
+ * press of a double-click, a repeated activation or a key's auto-repeat would answer it too. A
+ * deliberate decision on the new prompt is a press that starts after this delay.
+ */
+const ARMING_DELAY_MS = 400;
+
 export class AuthorizationHost extends JfElement {
   static properties = {
     active: { attribute: false },
@@ -82,6 +90,12 @@ export class AuthorizationHost extends JfElement {
   private consentListener: ((e: Event) => void) | null = null;
   /** 569 Move 4 — the native <dialog> on the trusted channel (Top Layer when modal). */
   private readonly dialogRef: Ref<HTMLDialogElement> = createRef();
+  /** When the active prompt was presented; its decision buttons arm {@link ARMING_DELAY_MS} later. */
+  private presentedAt = 0;
+  /** The pointer press on this prompt that a pointer click may complete; null when none started here. */
+  private press: { at: number; button: Element | null } | null = null;
+  /** The armed, unrepeated Enter/Space press on a decision button that its release completes. */
+  private keyPress: { key: string; button: Element } | null = null;
 
   constructor() {
     super();
@@ -243,9 +257,10 @@ export class AuthorizationHost extends JfElement {
       // prompt's presentation so the selected one opens in its own modality (typed and capability
       // ceremonies modal in the top layer, lightweight non-modal), as the queue does.
       this.modal.close();
-      this.typed = '';
-      this.allowAlways = false;
-      this.active = next;
+      this.show(next);
+    } else {
+      // Reviewing re-presents the open prompt: the activation that asked for it cannot answer it.
+      this.arm();
     }
     this.requestUpdate();
     void this.updateComplete.then(() => {
@@ -310,10 +325,8 @@ export class AuthorizationHost extends JfElement {
     });
     if (this.active && owns(this.active)) {
       supersede(this.active);
-      this.active = null;
+      this.show(null);
       this.modal.close();
-      this.typed = '';
-      this.allowAlways = false;
       denied++;
     }
     if (denied > 0) {
@@ -328,11 +341,69 @@ export class AuthorizationHost extends JfElement {
     // End the previous ceremony before rendering the next: an already-open native dialog cannot
     // switch between show() and showModal(), and each queued prompt owns its own modality.
     this.modal.close();
-    this.active = this.queue.shift()!;
-    this.typed = '';
-    this.allowAlways = false;
+    this.show(this.queue.shift()!);
     this.requestUpdate();
   }
+
+  /** Make `item` the presented prompt (or none) with fresh state; nothing done before it can answer it. */
+  private show(item: CeremonyItem | null): void {
+    this.active = item;
+    this.typed = '';
+    this.allowAlways = false;
+    this.arm();
+  }
+
+  private arm(): void {
+    this.presentedAt = performance.now();
+    this.press = null;
+    this.keyPress = null;
+  }
+
+  private armed(at = performance.now()): boolean {
+    return at - this.presentedAt >= ARMING_DELAY_MS;
+  }
+
+  private static decisionButton(e: Event): Element | null {
+    return e.composedPath().find((node): node is Element =>
+      node instanceof Element && node.matches('.actions > jf-button')) ?? null;
+  }
+
+  /**
+   * One deliberate interaction answers one prompt. Pointer clicks must complete a press that started
+   * on the same decision button after the prompt armed; keyboard activation happens on the release of
+   * an armed press that never auto-repeated (the native Enter-on-keydown and repeat clicks are
+   * refused). Other activations (assistive technology's default action) only wait for arming.
+   */
+  private readonly onPointerDown = (e: PointerEvent): void => {
+    this.press = { at: performance.now(), button: AuthorizationHost.decisionButton(e) };
+  };
+
+  private readonly onClick = (e: MouseEvent): void => {
+    const button = AuthorizationHost.decisionButton(e);
+    if (!button) return;
+    const press = this.press;
+    if (e.detail > 0) this.press = null;
+    const deliberate = this.armed() && (e.detail === 0
+      || (press !== null && press.button === button && this.armed(press.at)));
+    if (deliberate) return;
+    e.preventDefault();
+    e.stopPropagation();
+  };
+
+  private readonly onKey = (e: KeyboardEvent): void => {
+    if (e.key !== 'Enter' && e.key !== ' ') return;
+    const button = AuthorizationHost.decisionButton(e);
+    if (!button) return;
+    e.preventDefault();
+    const pending = this.keyPress;
+    this.keyPress = null;
+    if (e.type === 'keydown') {
+      if (!e.repeat && this.armed()) this.keyPress = { key: e.key, button };
+    } else if (pending?.key === e.key && pending.button === button && this.armed()) {
+      const control = e.composedPath()[0];
+      if (control instanceof HTMLButtonElement) control.click();
+    }
+  };
 
   /**
    * Tempdoc 875 C.2 — whether the backend would actually keep an "always allow" promise for this
@@ -366,19 +437,17 @@ export class AuthorizationHost extends JfElement {
     const honoured =
       current?.kind === 'authorize' ? AuthorizationHost.honoursAllowAlways(current.prompt) : true;
     const allowAlways = approved && honoured && this.allowAlways;
-    this.active = null;
-    this.typed = '';
-    this.allowAlways = false;
+    this.show(null);
     if (current?.kind === 'authorize') current.resolve({ approved, allowAlways });
     this.requestUpdate();
     this.pumpQueue();
   }
 
-  private decideCapability(decision: ConsentDecision): void {
+  private decideCapability(decision: ConsentDecision, expectedId: ConsentRequest['id']): void {
     const current = this.active;
-    this.active = null;
-    this.typed = '';
-    if (current?.kind === 'capability') resolveConsentRequest(current.request.id, decision);
+    if (current?.kind !== 'capability' || current.request.id !== expectedId) return;
+    this.show(null);
+    resolveConsentRequest(current.request.id, decision);
     this.requestUpdate();
     this.pumpQueue();
   }
@@ -428,6 +497,10 @@ export class AuthorizationHost extends JfElement {
         class="ceremony ${this.isLightweight() ? 'lightweight' : ''}"
         data-testid=${testid}
         @cancel=${(e: Event) => e.preventDefault()}
+        @pointerdown=${{ handleEvent: this.onPointerDown, capture: true }}
+        @click=${{ handleEvent: this.onClick, capture: true }}
+        @keydown=${{ handleEvent: this.onKey, capture: true }}
+        @keyup=${{ handleEvent: this.onKey, capture: true }}
       >
         ${keyed(identity, body)}
       </dialog>
@@ -513,14 +586,14 @@ export class AuthorizationHost extends JfElement {
             variant="danger"
             data-testid="capability-deny"
             label="Deny"
-            .onActivate=${() => this.decideCapability('deny')}
+            .onActivate=${() => this.decideCapability('deny', request.id)}
           >
             Deny
           </jf-button>
           <jf-button
             data-testid="capability-allow-once"
             label="Allow once"
-            .onActivate=${() => this.decideCapability('allow-once')}
+            .onActivate=${() => this.decideCapability('allow-once', request.id)}
           >
             Allow once
           </jf-button>
@@ -529,10 +602,10 @@ export class AuthorizationHost extends JfElement {
             variant="primary"
             data-testid="capability-allow-always"
             label="Allow always"
-            .onActivate=${() => this.decideCapability('allow-always')}
+            .onActivate=${() => this.decideCapability('allow-always', request.id)}
           >
             Allow always
-          </button>
+          </jf-button>
         </div>
       </div>
     `;

@@ -194,6 +194,9 @@ async def approval(page, *, failure):
     await expect(ceremony).to_have_count(1)
     lookups = fixture.matching("GET", "/api/chat/approval")
     assert len(lookups) == 1 and f"sessionId={fixture.session_id}" in lookups[0].query, lookups
+    # A newly presented ceremony ignores activation for 400 ms (AuthorizationHost ARMING_DELAY_MS),
+    # so a stray double-click cannot answer it; a person's deliberate click comes after that.
+    await page.wait_for_timeout(450)
     await page.get_by_test_id("authorization-approve").click()
     request = await fixture.wait_request("POST", APPROVE)
     assert request.body == {"sessionId": fixture.session_id, "callId": pending["callId"]}, request

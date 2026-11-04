@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
   },
-  "createdAt": "2026-11-03T23:20:29.551Z",
-  "revision": "902b99b8ce7f100860b42085b2539faeb8477885",
-  "tree": "71723e4d15b6552602ef45e61102d5db02db4a69",
+  "createdAt": "2026-11-04T00:05:12.265Z",
+  "revision": "ffa2a5833396157d299c95275d84275c438cae13",
+  "tree": "a0fd3e57aebe7f409741791501c944d3e10b57ee",
   "environment": {
     "platform": "linux",
     "arch": "x64",
@@ -18,10 +18,10 @@
   },
   "runs": [
     {
-      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/state/frameStatus.test.ts\" \"src/shell-v0/components/StatusPanel.approvals.test.ts\" \"src/shell-v0/components/StatusPanel.history.test.ts\" \"src/shell-v0/components/StatusPanel.running.test.ts\" \"src/shell-v0/components/StatusPill.design.test.ts\" \"src/shell-v0/components/StatusPill.feedback.test.ts\" \"src/shell-v0/components/StatusPill.test.ts\" \"src/shell-v0/components/StatusPill.transitions.test.ts\" \"src/shell-v0/components/RetiredStatusElements.test.ts\" \"src/shell-v0/views/ActivitySurface.actions.test.ts\" \"src/shell-v0/chrome/Shell.test.ts\" \"src/shell-v0/components/IndexingPause.test.ts\" \"src/shell-v0/components/indexingTaskWaiting.test.ts\" \"src/shell-v0/substrates/tasks/indexingJobsQueueRail.test.ts\" \"src/shell-v0/components/AuthorizationHost.toplayer.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/p4e0hp68/tmp/test-intent-vitest-8176-1793748022507.json\"",
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/state/frameStatus.test.ts\" \"src/shell-v0/components/StatusPanel.approvals.test.ts\" \"src/shell-v0/components/StatusPanel.history.test.ts\" \"src/shell-v0/components/StatusPanel.running.test.ts\" \"src/shell-v0/components/StatusPill.design.test.ts\" \"src/shell-v0/components/StatusPill.feedback.test.ts\" \"src/shell-v0/components/StatusPill.test.ts\" \"src/shell-v0/components/StatusPill.transitions.test.ts\" \"src/shell-v0/components/RetiredStatusElements.test.ts\" \"src/shell-v0/views/ActivitySurface.actions.test.ts\" \"src/shell-v0/chrome/Shell.test.ts\" \"src/shell-v0/components/IndexingPause.test.ts\" \"src/shell-v0/components/indexingTaskWaiting.test.ts\" \"src/shell-v0/substrates/tasks/indexingJobsQueueRail.test.ts\" \"src/shell-v0/components/AuthorizationHost.toplayer.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/_qphb1n6/tmp/test-intent-vitest-13294-1793750697011.json\"",
       "cwd": "modules/ui-web",
       "exitCode": 0,
-      "durationMs": 7038
+      "durationMs": 15241
     }
   ],
   "checks": [
@@ -374,7 +374,7 @@
       "id": "modules/ui-web/src/shell-v0/components/StatusPanel.approvals.test.ts#Needs you (moved from proposed-effect cards and agent activity) accept executes once and records acceptance; reject records rejection without applying",
       "file": "modules/ui-web/src/shell-v0/components/StatusPanel.approvals.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:2ec1b311505342cf3c3146f232d98d178a2d4318749daabc50100bdc4ab2a80a",
+      "contentDigest": "sha256:4cb28912ccf89184bc22fae407680acc710db5fae9c14abdc782ec3a77484393",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -389,7 +389,7 @@
       "id": "modules/ui-web/src/shell-v0/components/StatusPanel.approvals.test.ts#Needs you (moved from proposed-effect cards and agent activity) multiple proposals preserve rationale and rank the least-confident first without inventing confidence",
       "file": "modules/ui-web/src/shell-v0/components/StatusPanel.approvals.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:2ec1b311505342cf3c3146f232d98d178a2d4318749daabc50100bdc4ab2a80a",
+      "contentDigest": "sha256:4cb28912ccf89184bc22fae407680acc710db5fae9c14abdc782ec3a77484393",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -404,7 +404,7 @@
       "id": "modules/ui-web/src/shell-v0/components/StatusPanel.approvals.test.ts#Needs you (moved from proposed-effect cards and agent activity) HIGH/agent requires the exact typed operation and preserves consent provenance",
       "file": "modules/ui-web/src/shell-v0/components/StatusPanel.approvals.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:2ec1b311505342cf3c3146f232d98d178a2d4318749daabc50100bdc4ab2a80a",
+      "contentDigest": "sha256:4cb28912ccf89184bc22fae407680acc710db5fae9c14abdc782ec3a77484393",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -419,7 +419,7 @@
       "id": "modules/ui-web/src/shell-v0/components/StatusPanel.approvals.test.ts#Needs you (moved from proposed-effect cards and agent activity) HIGH/user requires the exact typed operation and preserves consent provenance",
       "file": "modules/ui-web/src/shell-v0/components/StatusPanel.approvals.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:2ec1b311505342cf3c3146f232d98d178a2d4318749daabc50100bdc4ab2a80a",
+      "contentDigest": "sha256:4cb28912ccf89184bc22fae407680acc710db5fae9c14abdc782ec3a77484393",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -434,7 +434,7 @@
       "id": "modules/ui-web/src/shell-v0/components/StatusPanel.approvals.test.ts#Needs you (moved from proposed-effect cards and agent activity) MEDIUM/agent requires the exact typed operation and preserves consent provenance",
       "file": "modules/ui-web/src/shell-v0/components/StatusPanel.approvals.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:2ec1b311505342cf3c3146f232d98d178a2d4318749daabc50100bdc4ab2a80a",
+      "contentDigest": "sha256:4cb28912ccf89184bc22fae407680acc710db5fae9c14abdc782ec3a77484393",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -449,7 +449,7 @@
       "id": "modules/ui-web/src/shell-v0/components/StatusPanel.approvals.test.ts#Needs you (moved from proposed-effect cards and agent activity) user MEDIUM proposal dispatches without a ceremony or client-minted confirmation token",
       "file": "modules/ui-web/src/shell-v0/components/StatusPanel.approvals.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:2ec1b311505342cf3c3146f232d98d178a2d4318749daabc50100bdc4ab2a80a",
+      "contentDigest": "sha256:4cb28912ccf89184bc22fae407680acc710db5fae9c14abdc782ec3a77484393",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -464,7 +464,7 @@
       "id": "modules/ui-web/src/shell-v0/components/StatusPanel.approvals.test.ts#Needs you (moved from proposed-effect cards and agent activity) plugin capability requests remain reachable through the protected host",
       "file": "modules/ui-web/src/shell-v0/components/StatusPanel.approvals.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:2ec1b311505342cf3c3146f232d98d178a2d4318749daabc50100bdc4ab2a80a",
+      "contentDigest": "sha256:4cb28912ccf89184bc22fae407680acc710db5fae9c14abdc782ec3a77484393",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -479,7 +479,7 @@
       "id": "modules/ui-web/src/shell-v0/components/StatusPanel.approvals.test.ts#Needs you (moved from proposed-effect cards and agent activity) C12 announcement and panel representations share one decision; stale clicks cannot approve the next request",
       "file": "modules/ui-web/src/shell-v0/components/StatusPanel.approvals.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:2ec1b311505342cf3c3146f232d98d178a2d4318749daabc50100bdc4ab2a80a",
+      "contentDigest": "sha256:4cb28912ccf89184bc22fae407680acc710db5fae9c14abdc782ec3a77484393",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -1664,7 +1664,7 @@
       "id": "modules/ui-web/src/shell-v0/components/AuthorizationHost.toplayer.test.ts#Move 4 — trusted ceremony on the Top Layer A1 selecting typed → capability from the status panel applies the selected prompt’s own modality",
       "file": "modules/ui-web/src/shell-v0/components/AuthorizationHost.toplayer.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:8792a0b9a0fcee8ef9a770ca81e6f53657a6ce5b352830765e906acd2ab29618",
+      "contentDigest": "sha256:dec34d963aa26659944acc62e00d9b1b17b84aca4b30d9d1dc409aeb40242699",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -1679,7 +1679,7 @@
       "id": "modules/ui-web/src/shell-v0/components/AuthorizationHost.toplayer.test.ts#Move 4 — trusted ceremony on the Top Layer A1 selecting capability → typed from the status panel applies the selected prompt’s own modality",
       "file": "modules/ui-web/src/shell-v0/components/AuthorizationHost.toplayer.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:8792a0b9a0fcee8ef9a770ca81e6f53657a6ce5b352830765e906acd2ab29618",
+      "contentDigest": "sha256:dec34d963aa26659944acc62e00d9b1b17b84aca4b30d9d1dc409aeb40242699",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -1722,5 +1722,5 @@
     }
   ],
   "failBefore": null,
-  "digest": "sha256:e53937fdce8765129b97ea1d7d787d6ebd2fd175c48b84a720df09ed9af0798a"
+  "digest": "sha256:ed37a03a87ac6103a364e9b94239603274b9df7972390b94c667338e52b64f82"
 }

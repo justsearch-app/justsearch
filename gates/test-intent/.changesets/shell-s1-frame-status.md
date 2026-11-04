@@ -82,6 +82,19 @@ the gate it carried. No assertion is dropped:
 | AuthorizationHost.toplayer "A1 selecting … from the status panel …" (6 cases) | uses the host as the shell mounts it (no `status-panel` attribute); "nothing opens until one is selected" becomes "the first opens on arrival in its own modality, both are listed", and reviewing the open one keeps it open in that modality; the selection and modality assertions are unchanged | opening on arrival is the restored behaviour; the cases still fail before for the A1 reason (`<second> modality`) |
 | StatusPanel.approvals (8 cases) | the fixture no longer sets the retired `statusPanel` property; assertions unchanged | the property is removed |
 
+## Round 9 changes to this slice's own checks
+
+A newly presented ceremony ignores its decision buttons until a fresh press that starts at least
+400 ms after it was presented, so one click or key press answers one prompt (a double-click, a
+repeated activation or a key's auto-repeat no longer answers the next queued prompt). Existing checks
+that click a decision button the instant a prompt appears now let that delay pass first; no assertion
+is dropped or changed:
+
+| Check | Change | Reason |
+| --- | --- | --- |
+| AuthorizationHost.test (all cases that decide), AuthorizationHost.toplayer (queue and A1 cases), StatusPanel.approvals (decision cases) | fake `performance` clock only; the activation helper advances it 400 ms before the click | the prompt arms after 400 ms; no other timer is faked |
+| pendingAuthorizationWithdrawal (7 cases), statusCompletion "mounted authorization host and real pending bridge…" | the activation helper advances the already-fake clock 400 ms before the decision click | as above; these files already fake all timers |
+
 ```json
 {
   "entries": [
@@ -1165,6 +1178,95 @@ the gate it carried. No assertion is dropped:
         }
       ],
       "conflictSearch": "decision records searched for a conflict: none"
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/components/AuthorizationHost.activation.test.ts",
+        "modules/ui-web/src/shell-v0/components/AuthorizationHost.activation-lockdown.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "One deliberate interaction answers one prompt. A newly presented ceremony (lightweight approval, typed approval, plugin capability request; on arrival, after the previous one is answered, or brought forward by Review) ignores its decision buttons until a press that starts at least 400 ms after it was presented: a double-click, repeated activation of the same native button, a pointer press begun earlier, or Enter/Space pressed again or auto-repeating cannot answer the next queued prompt, and a plugin grant made that way is not persisted. Keyboard activation of a decision completes on the release of an unrepeated press; an activation with no pointer or key press (assistive technology's default action) waits only for the delay.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed accordingly",
+          "delegationLocation": "task t-20261103-shell user turn 2026-11-03 ~16:20Z (reply to the orchestrator's plan)",
+          "delegationScope": "the frame-build plan: S1 · Status: the pill and status panel, built on the existing data, replacing about a dozen old pieces (the status bar, bell, pop-ups, task list and others)",
+          "choice": "C12 (must not break) One decision, one execution: the same authorization reached from the panel, a dialog and an MCP announcement executes once; repeated clicks are idempotent; expired, withdrawn or superseded requests (run cancelled, engine restart, answered elsewhere) cannot execute and leave the panel. | Repair round 9 (independent verifier, real Chromium: with two plugin capability requests queued, a native double-click on the first prompt's Allow always granted both plugins, as did repeated activation of the same button, and the grant survived reload): one click or key press answers exactly one permission or approval prompt. After a prompt is answered and the next queued prompt is presented, its decision buttons ignore activation until a fresh, deliberate interaction: the pointer released and pressed again on the new prompt after a short arming delay (at least 400 ms); keyboard Enter/Space auto-repeat must not answer the next prompt either. Applies to every ceremony kind (operation approvals, live agent approvals, capability consent); modality per kind, top layer, fail-closed, focus and one-decision-executes-once are kept.",
+          "label": "agent choice"
+        }
+      ],
+      "repaired": true,
+      "evidence": "gates/test-intent/evidence/shell-s1-frame-status-round9-repair.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/components/AuthorizationHost.activation.test.ts#a double-click answers only the first queued lightweight prompt",
+        "modules/ui-web/src/shell-v0/components/AuthorizationHost.activation.test.ts#a double-click answers only the first queued typed prompt",
+        "modules/ui-web/src/shell-v0/components/AuthorizationHost.activation.test.ts#a double-click answers only the first queued capability prompt",
+        "modules/ui-web/src/shell-v0/components/AuthorizationHost.activation.test.ts#repeated activation of the same native button answers only the first lightweight prompt",
+        "modules/ui-web/src/shell-v0/components/AuthorizationHost.activation.test.ts#repeated activation of the same native button answers only the first typed prompt",
+        "modules/ui-web/src/shell-v0/components/AuthorizationHost.activation.test.ts#repeated activation of the same native button answers only the first capability prompt",
+        "modules/ui-web/src/shell-v0/components/AuthorizationHost.activation.test.ts#held Enter auto-repeat answers only the first lightweight prompt",
+        "modules/ui-web/src/shell-v0/components/AuthorizationHost.activation.test.ts#held Enter auto-repeat answers only the first typed prompt",
+        "modules/ui-web/src/shell-v0/components/AuthorizationHost.activation.test.ts#held Enter auto-repeat answers only the first capability prompt",
+        "modules/ui-web/src/shell-v0/components/AuthorizationHost.activation.test.ts#a key pressed again before the next prompt arms does not answer it (\"Enter\")",
+        "modules/ui-web/src/shell-v0/components/AuthorizationHost.activation.test.ts#a key pressed again before the next prompt arms does not answer it (\" \")",
+        "modules/ui-web/src/shell-v0/components/AuthorizationHost.activation.test.ts#a pointer press that began before the next prompt armed does not answer it",
+        "modules/ui-web/src/shell-v0/components/AuthorizationHost.activation.test.ts#a fresh \"Enter\" press after the delay answers the next prompt on release",
+        "modules/ui-web/src/shell-v0/components/AuthorizationHost.activation.test.ts#assistive-technology activation (no pointer or key press) answers an armed prompt",
+        "modules/ui-web/src/shell-v0/components/AuthorizationHost.activation.test.ts#Review re-presents the open prompt: the activation that asked for it cannot answer it",
+        "modules/ui-web/src/shell-v0/components/AuthorizationHost.activation-lockdown.test.ts#a native double-click on Allow always grants only the first plugin, across reload",
+        "modules/ui-web/src/shell-v0/components/AuthorizationHost.activation-lockdown.test.ts#repeated native activation of the same button answers one prompt",
+        "modules/ui-web/src/shell-v0/components/AuthorizationHost.activation-lockdown.test.ts#Enter pressed and held on the next prompt before it arms answers nothing"
+      ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/components/AuthorizationHost.activation.test.ts",
+        "modules/ui-web/src/shell-v0/components/AuthorizationHost.activation-lockdown.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "Once a prompt has armed, a deliberate pointer click or a fresh Enter/Space press answers it exactly once, for every ceremony kind, and the dialog closes when the queue is empty.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed accordingly",
+          "delegationLocation": "task t-20261103-shell user turn 2026-11-03 ~16:20Z (reply to the orchestrator's plan)",
+          "delegationScope": "the frame-build plan: S1 · Status: the pill and status panel, built on the existing data, replacing about a dozen old pieces (the status bar, bell, pop-ups, task list and others)",
+          "choice": "C12 (must not break) One decision, one execution: the same authorization reached from the panel, a dialog and an MCP announcement executes once; repeated clicks are idempotent; expired, withdrawn or superseded requests (run cancelled, engine restart, answered elsewhere) cannot execute and leave the panel. | Repair round 9 (independent verifier, real Chromium: with two plugin capability requests queued, a native double-click on the first prompt's Allow always granted both plugins, as did repeated activation of the same button, and the grant survived reload): one click or key press answers exactly one permission or approval prompt. After a prompt is answered and the next queued prompt is presented, its decision buttons ignore activation until a fresh, deliberate interaction: the pointer released and pressed again on the new prompt after a short arming delay (at least 400 ms); keyboard Enter/Space auto-repeat must not answer the next prompt either. Applies to every ceremony kind (operation approvals, live agent approvals, capability consent); modality per kind, top layer, fail-closed, focus and one-decision-executes-once are kept.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/shell-s1-frame-status-round9-new.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/components/AuthorizationHost.activation.test.ts#a fresh press after the delay answers the next lightweight prompt exactly once",
+        "modules/ui-web/src/shell-v0/components/AuthorizationHost.activation.test.ts#a fresh press after the delay answers the next typed prompt exactly once",
+        "modules/ui-web/src/shell-v0/components/AuthorizationHost.activation.test.ts#a fresh press after the delay answers the next capability prompt exactly once",
+        "modules/ui-web/src/shell-v0/components/AuthorizationHost.activation.test.ts#a fresh \" \" press after the delay answers the next prompt on release",
+        "modules/ui-web/src/shell-v0/components/AuthorizationHost.activation-lockdown.test.ts#a deliberate click after the delay answers the next prompt exactly once",
+        "modules/ui-web/src/shell-v0/components/AuthorizationHost.activation-lockdown.test.ts#a fresh Enter press after the delay answers the next prompt exactly once"
+      ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/components/AuthorizationHost.test.ts",
+        "modules/ui-web/src/shell-v0/operations/pendingAuthorizationWithdrawal.test.ts",
+        "modules/ui-web/src/api/statusCompletion.test.ts"
+      ],
+      "class": "Adaptation",
+      "moved": [
+        "instrumentation"
+      ],
+      "whatMoved": "The decision-click helpers let the ceremony's 400 ms arming delay pass before clicking: AuthorizationHost.test fakes only the performance clock (vi.useFakeTimers({ toFake: ['performance'] }) in beforeEach, real timers restored in afterEach) and activateJfButton advances it 400 ms; pendingAuthorizationWithdrawal's approve() and statusCompletion's mounted-host case already fake all timers and advance them 400 ms before the click. Inputs, prompts, preconditions, the observed decisions, requests and notes, and every expected outcome are unchanged.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed accordingly",
+          "delegationLocation": "task t-20261103-shell user turn 2026-11-03 ~16:20Z (reply to the orchestrator's plan)",
+          "delegationScope": "the frame-build plan: S1 · Status: the pill and status panel, built on the existing data, replacing about a dozen old pieces (the status bar, bell, pop-ups, task list and others)",
+          "choice": "C12 (must not break) One decision, one execution: the same authorization reached from the panel, a dialog and an MCP announcement executes once; repeated clicks are idempotent; expired, withdrawn or superseded requests (run cancelled, engine restart, answered elsewhere) cannot execute and leave the panel. | Repair round 9 (independent verifier, real Chromium: with two plugin capability requests queued, a native double-click on the first prompt's Allow always granted both plugins, as did repeated activation of the same button, and the grant survived reload): one click or key press answers exactly one permission or approval prompt. After a prompt is answered and the next queued prompt is presented, its decision buttons ignore activation until a fresh, deliberate interaction: the pointer released and pressed again on the new prompt after a short arming delay (at least 400 ms); keyboard Enter/Space auto-repeat must not answer the next prompt either. Applies to every ceremony kind (operation approvals, live agent approvals, capability consent); modality per kind, top layer, fail-closed, focus and one-decision-executes-once are kept.",
+          "label": "agent choice"
+        }
+      ]
     }
   ]
 }

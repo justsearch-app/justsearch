@@ -2,7 +2,7 @@
 /**
  * Tempdoc 550 C3: <jf-authorization-host> + authorizationBroker — the one ceremony surface.
  */
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import './AuthorizationHost.js';
 import type { AuthorizationHost } from './AuthorizationHost.js';
 import {
@@ -20,6 +20,7 @@ import {
 let host: AuthorizationHost;
 
 beforeEach(() => {
+  vi.useFakeTimers({ toFake: ['performance'] });
   host = document.createElement('jf-authorization-host') as AuthorizationHost;
   document.body.appendChild(host);
 });
@@ -27,6 +28,7 @@ beforeEach(() => {
 afterEach(() => {
   if (host.parentNode) host.remove();
   setAuthorizationPresenter(null);
+  vi.useRealTimers();
   // Test isolation: some tests deliberately leave a plugin consent request pending; drain the global
   // consent state so a later test's fresh host doesn't inherit it as a queued capability ceremony.
   for (const r of listPendingConsentRequests()) resolveConsentRequest(r.id, 'deny');
@@ -47,6 +49,8 @@ async function activateJfButton(el: Element | null | undefined): Promise<void> {
   await (el as unknown as { updateComplete: Promise<unknown> }).updateComplete;
   const control = el.shadowRoot!.querySelector('jf-control')!;
   await (control as unknown as { updateComplete: Promise<unknown> }).updateComplete;
+  // A newly presented prompt ignores activation until its arming delay has passed.
+  vi.advanceTimersByTime(400);
   (control.shadowRoot!.querySelector('button') as HTMLButtonElement).click();
 }
 

@@ -21,7 +21,8 @@ async function activate(el: Element | null) {
   if (!el) throw new Error('Missing decision button');
   const button = el as JfButton; await button.updateComplete;
   const control = button.shadowRoot!.querySelector('jf-control') as HTMLElement & { updateComplete: Promise<unknown> };
-  await control.updateComplete; control.shadowRoot!.querySelector<HTMLButtonElement>('button')!.click(); await flush();
+  // A newly presented prompt ignores activation until its arming delay has passed.
+  await control.updateComplete; vi.advanceTimersByTime(400); control.shadowRoot!.querySelector<HTMLButtonElement>('button')!.click(); await flush();
 }
 function action(label: string) { return [...panel().shadowRoot!.querySelectorAll<HTMLButtonElement>('article button')].find(b => b.textContent!.trim() === label)!; }
 function seed(risk: string) {
@@ -32,13 +33,14 @@ function seed(risk: string) {
   }] } as OperationCatalog);
 }
 beforeEach(async () => {
+  vi.useFakeTimers({ toFake: ['performance'] });
   vi.stubGlobal('fetch', vi.fn(async () => new Response('{}', { status: 503 })));
   __resetAiStateForTest(); __resetPendingForTest(); __resetJournalForTest(); resetOps();
   host = new AuthorizationHost(); document.body.append(host);
   pill = new StatusPill(); pill.authorizationHost = () => host; document.body.append(pill); await flush();
 });
 afterEach(() => { pill.remove(); host.remove(); __resetAiStateForTest(); __resetPendingForTest(); __resetJournalForTest(); resetOps();
-  for (const r of listPendingConsentRequests()) resolveConsentRequest(r.id, 'deny'); vi.unstubAllGlobals(); });
+  for (const r of listPendingConsentRequests()) resolveConsentRequest(r.id, 'deny'); vi.unstubAllGlobals(); vi.useRealTimers(); });
 describe('Needs you (moved from proposed-effect cards and agent activity)', () => {
   it('accept executes once and records acceptance; reject records rejection without applying', async () => {
     proposeEffect({ kind: 'open-modal', modalId: 'm1' }, CORE_PROVENANCE, 'agent'); await flush();
