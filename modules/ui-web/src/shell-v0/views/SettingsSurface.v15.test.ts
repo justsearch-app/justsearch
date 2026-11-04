@@ -68,6 +68,7 @@ import {
   __resetSessionRegistryForTest,
 } from '../plugin-api/sessionRegistry.js';
 import { requestMemberTab } from '../router/memberTabIntent.js';
+import { present } from '../display/present.js';
 import {
   setCustomThemeEntries,
   __resetCatalogForTest,
@@ -325,12 +326,41 @@ describe('SettingsSurface — V1.5 Themes section', () => {
   });
 });
 
-describe('SettingsSurface — V1.5 Rail section', () => {
+/**
+ * Shell slice 2 — the former rail list mirrors the top bar (item 8 of the frame repair): the
+ * switcher's areas in the switcher's own fixed order, then the windows the More menu lists in the
+ * saved order. System and Settings have fixed places of their own and are not listed.
+ */
+const frameSurface = (id: string, placement: Surface['placement'] = 'RAIL'): Surface => ({
+  id,
+  presentation: { labelKey: id, descriptionKey: `${id}.desc` },
+  audience: 'USER',
+  placement,
+  consumes: { resources: [], operations: [], prompts: [], diagnosticChannels: [] },
+  mountTag: `jf-${id.replace(/\W/g, '-')}`,
+  provenance: { tier: 'CORE', contributorId: 'core', version: '1' },
+});
+const FRAME_FIXTURE: SurfaceCatalog = {
+  ...RAIL_FIXTURE,
+  // Catalog order deliberately differs from the switcher's.
+  entries: [
+    frameSurface('acme.notes-surface'),
+    frameSurface('core.brain-surface'),
+    frameSurface('core.system-surface'),
+    frameSurface('core.library-surface'),
+    frameSurface('core.settings-surface', 'MODAL'),
+    frameSurface('core.search-v3-surface'),
+    frameSurface('acme.graph-surface'),
+  ],
+};
+const AREA_IDS = ['core.search-v3-surface', 'core.library-surface', 'core.brain-surface'];
+
+describe('SettingsSurface — V1.5 Rail section (the switcher and the More menu)', () => {
   beforeEach(() => {
     __resetUserConfigForTest();
     __resetThemeStateForTest();
     resetSurfaceCatalog();
-    seedSurfaceCatalog(RAIL_FIXTURE);
+    seedSurfaceCatalog(FRAME_FIXTURE);
     __resetSessionRegistryForTest();
   });
 
@@ -339,53 +369,56 @@ describe('SettingsSurface — V1.5 Rail section', () => {
     vi.restoreAllMocks();
   });
 
-  it('lists rail surfaces in catalog order by default', async () => {
+  const listed = (root: ShadowRoot, name: string): string[] =>
+    Array.from(root.querySelectorAll(`ul.rail-list[aria-label="${name}"] .rail-row`)).map((r) => r.getAttribute('data-surface-id') ?? '');
+  /** Every row's label, top to bottom: what a reader sees, whatever the list markup. */
+  const labels = (root: ShadowRoot): string[] =>
+    Array.from(root.querySelectorAll('.rail-label')).map((n) => n.textContent?.trim() ?? '');
+  const labelOf = (id: string): string => present({ kind: 'surface', id }).label;
+
+  it('lists the switcher areas in the switcher order, then the More windows in catalog order, in the design words', async () => {
     // Tempdoc 855 P1 — Rail is a sub-anchor of the "layout" category now (register-driven paging).
     const el = await mountSurface('layout');
     const root = el.shadowRoot!;
-    const labels = Array.from(root.querySelectorAll('.rail-label')).map((n) =>
-      n.textContent?.trim(),
-    );
-    // §2.A: rail-customization shows human labels, not raw surface ids.
-    expect(labels).toEqual(['Search', 'Library', 'Settings']);
+    expect(labels(root)).toEqual([...AREA_IDS, 'acme.notes-surface', 'acme.graph-surface'].map(labelOf));
+    // §2.A: the rows show human labels, not raw surface ids.
+    expect(labels(root).every((l) => l && !l.includes('core.'))).toBe(true);
+    const section = root.querySelector('ul.rail-list')!.closest('.section')!;
+    expect(section.querySelector('h3')!.textContent).toContain('Switcher');
+    expect(section.textContent).not.toMatch(/\brail\b|surface/i);
+    const checkbox = section.querySelector<HTMLInputElement>('[data-surface-id="core.library-surface"] input[type="checkbox"]')!;
+    expect(checkbox.getAttribute('aria-label')).toMatch(/^Show .+ in the switcher$/);
+    expect(listed(root, 'Switcher')).toEqual(AREA_IDS);
+    expect(listed(root, 'More menu windows')).toEqual(['acme.notes-surface', 'acme.graph-surface']);
   });
 
-  it('respects userConfig.surfaceOrder', async () => {
-    setSurfaceOrder([
-      'core.settings-surface',
-      'core.search-surface',
-      'core.library-surface',
-    ]);
+  it('respects userConfig.surfaceOrder for the More windows; the switcher keeps its fixed order', async () => {
+    setSurfaceOrder(['acme.graph-surface', 'core.brain-surface', 'acme.notes-surface', 'core.search-v3-surface']);
     const el = await mountSurface('layout');
     const root = el.shadowRoot!;
-    const labels = Array.from(root.querySelectorAll('.rail-label')).map((n) =>
-      n.textContent?.trim(),
-    );
-    expect(labels[0]).toBe('Settings');
-    expect(labels[1]).toBe('Search');
-    expect(labels[2]).toBe('Library');
+    expect(labels(root)).toEqual([...AREA_IDS, 'acme.graph-surface', 'acme.notes-surface'].map(labelOf));
+    expect(listed(root, 'Switcher')).toEqual(AREA_IDS);
+    expect(listed(root, 'More menu windows')).toEqual(['acme.graph-surface', 'acme.notes-surface']);
   });
 
   it('hidden surfaces have visibility=false reflected in checkbox', async () => {
-    setSurfaceVisibility('core.settings-surface', false);
+    setSurfaceVisibility('core.brain-surface', false);
+    setSurfaceVisibility('acme.graph-surface', false);
     const el = await mountSurface('layout');
     const root = el.shadowRoot!;
-    const rows = Array.from(root.querySelectorAll('.rail-row')) as HTMLElement[];
-    const settingsRow = rows.find((r) =>
-      r.querySelector('.rail-label')?.textContent?.includes('Settings'),
-    );
-    expect(settingsRow).toBeTruthy();
-    const checkbox = settingsRow!.querySelector(
-      'input[type="checkbox"]',
-    ) as HTMLInputElement;
-    expect(checkbox.checked).toBe(false);
+    const checked = (id: string): boolean =>
+      root.querySelector<HTMLInputElement>(`.rail-row[data-surface-id="${id}"] input[type="checkbox"]`)!.checked;
+    expect(checked('core.brain-surface')).toBe(false);
+    expect(checked('acme.graph-surface')).toBe(false);
+    expect(checked('core.library-surface')).toBe(true);
+    expect(checked('acme.notes-surface')).toBe(true);
   });
 
-  it('move-down arrow on first surface updates surfaceOrder', async () => {
+  it('move-down arrow on the first More window updates surfaceOrder; the switcher areas have no arrows', async () => {
     const el = await mountSurface('layout');
     const root = el.shadowRoot!;
-    const firstRow = root.querySelector('.rail-row') as HTMLElement;
-    // Find the down arrow (second .rail-arrow button in the row).
+    expect(root.querySelectorAll('ul.rail-list[aria-label="Switcher"] .rail-arrow')).toHaveLength(0);
+    const firstRow = root.querySelector('ul.rail-list[aria-label="More menu windows"] .rail-row') as HTMLElement;
     // 574 B1 — the arrows are now <jf-button class="rail-arrow">; the host carries the
     // `title` (not aria-label, which jf-control puts on the inner button), and `disabled`
     // is the reflected jf-button property.
@@ -397,12 +430,9 @@ describe('SettingsSurface — V1.5 Rail section', () => {
     expect(downArrow!.disabled).toBe(false);
     await activateJfButton(downArrow!);
     await new Promise((resolve) => setTimeout(resolve, 0));
-    // After moving the first item (search) down, library should be first.
-    const labels = Array.from(root.querySelectorAll('.rail-label')).map((n) =>
-      n.textContent?.trim(),
-    );
-    expect(labels[0]).toBe('Library');
-    expect(labels[1]).toBe('Search');
+    // After moving the first window (notes) down, graph is first.
+    expect(listed(root, 'More menu windows')).toEqual(['acme.graph-surface', 'acme.notes-surface']);
+    expect(listed(root, 'Switcher')).toEqual(AREA_IDS);
   });
 });
 

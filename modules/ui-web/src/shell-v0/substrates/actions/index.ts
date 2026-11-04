@@ -458,7 +458,10 @@ export function dispatchEffectToChrome(
       });
       return true;
     case 'navigate':
-      if (typeof window !== 'undefined' && window.location) {
+      // FR3 — a bare window id is the record of a destination its action already opened through
+      // the app's router (Go to Library); written into the address it stacked a second entry no view
+      // owns, so Back had to be pressed twice. Only an address or a fragment moves the location.
+      if (typeof window !== 'undefined' && window.location && (effect.to.startsWith('#') || effect.to.includes('://'))) {
         window.location.hash = effect.to;
       }
       return true;

@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
   },
-  "createdAt": "2026-11-04T11:11:36.689Z",
-  "revision": "a07eb770d626ed707748b9ce0d42ddda29816290",
-  "tree": "ed8119a32e34adace3217235ffb82e1d198c3daa",
+  "createdAt": "2026-11-04T13:45:08.319Z",
+  "revision": "6fe76d255f0115b08fb4ef9125e2aa4bd44811a3",
+  "tree": "e41dd93af608e5fc024b44d7f0e5db7c0dc42a44",
   "environment": {
     "platform": "linux",
     "arch": "x64",
@@ -18,10 +18,16 @@
   },
   "runs": [
     {
-      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/chrome/ShellAreas.test.ts\" \"src/shell-v0/chrome/Shell.globalKeys.test.ts\" \"src/shell-v0/views/search-v3/SearchV3View.test.ts\" \"src/shell-v0/views/HelpSurface.test.ts\" \"src/api/admissionFetch.test.ts\" \"src/shell-v0/chrome/Shell.navigation.test.ts\" \"src/shell-v0/chrome/Shell.frame.test.ts\" \"src/shell-v0/chrome/TopBar.test.ts\" \"src/shell-v0/views/SettingsSurface.section-address.test.ts\" \"src/shell-v0/chrome/RetiredFrameElements.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/4yb3ztlv/tmp/test-intent-vitest-34883-1793790691295.json\"",
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/chrome/ShellAreas.test.ts\" \"src/shell-v0/chrome/Shell.globalKeys.test.ts\" \"src/shell-v0/views/search-v3/SearchV3View.test.ts\" \"src/shell-v0/views/HelpSurface.test.ts\" \"src/api/admissionFetch.test.ts\" \"src/shell-v0/chrome/Shell.navigation.test.ts\" \"src/shell-v0/chrome/Shell.frame.test.ts\" \"src/shell-v0/chrome/TopBar.test.ts\" \"src/shell-v0/views/SettingsSurface.section-address.test.ts\" \"src/shell-v0/chrome/RetiredFrameElements.test.ts\" \"src/shell-v0/views/SettingsSurface.v15.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/stqej_cs/tmp/test-intent-vitest-29319-1793799831539.json\"",
       "cwd": "modules/ui-web",
       "exitCode": 0,
-      "durationMs": 5392
+      "durationMs": 4648
+    },
+    {
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/chrome/Shell.frame-lockdown.test.ts\" --config vitest.config.lockdown.ts --reporter=json --outputFile=\"/home/elias/.cache/am/stqej_cs/tmp/test-intent-vitest-29319-1793799836188.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 72126
     }
   ],
   "checks": [
@@ -74,13 +80,13 @@
       "id": "modules/ui-web/src/shell-v0/chrome/Shell.globalKeys.test.ts#C8: area keys and F6 work from a text field; an AltGr combination is left to typing",
       "file": "modules/ui-web/src/shell-v0/chrome/Shell.globalKeys.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:dde719f4d7429ecd9d9cb41277118ebac450919e9c133bd2f20d6c8196c9776d",
+      "contentDigest": "sha256:093fd928f6bf1e7d25eb22ae10cd2d990f8dfce2f352cc4cead0bb5adb9b9a2a",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
       "cases": [
         {
-          "name": "Shell global chords — the shared typing guard (tempdoc 864 Layer 2(a)) C8: area keys and F6 work from a text field; an AltGr combination is left to typing",
+          "name": "Shell global chords and their guards (tempdoc 864 Layer 2) C8: area keys and F6 work from a text field; an AltGr combination is left to typing",
           "status": "passed"
         }
       ]
@@ -89,13 +95,13 @@
       "id": "modules/ui-web/src/shell-v0/chrome/Shell.globalKeys.test.ts#864: ignores an IME-composing chord and an auto-repeat chord",
       "file": "modules/ui-web/src/shell-v0/chrome/Shell.globalKeys.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:dde719f4d7429ecd9d9cb41277118ebac450919e9c133bd2f20d6c8196c9776d",
+      "contentDigest": "sha256:093fd928f6bf1e7d25eb22ae10cd2d990f8dfce2f352cc4cead0bb5adb9b9a2a",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
       "cases": [
         {
-          "name": "Shell global chords — the shared typing guard (tempdoc 864 Layer 2(a)) 864: ignores an IME-composing chord and an auto-repeat chord",
+          "name": "Shell global chords and their guards (tempdoc 864 Layer 2) 864: ignores an IME-composing chord and an auto-repeat chord",
           "status": "passed"
         }
       ]
@@ -104,28 +110,13 @@
       "id": "modules/ui-web/src/shell-v0/chrome/Shell.globalKeys.test.ts#864: stands down while a modal owns the keyboard",
       "file": "modules/ui-web/src/shell-v0/chrome/Shell.globalKeys.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:dde719f4d7429ecd9d9cb41277118ebac450919e9c133bd2f20d6c8196c9776d",
+      "contentDigest": "sha256:093fd928f6bf1e7d25eb22ae10cd2d990f8dfce2f352cc4cead0bb5adb9b9a2a",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
       "cases": [
         {
-          "name": "Shell global chords — the shared typing guard (tempdoc 864 Layer 2(a)) 864: stands down while a modal owns the keyboard",
-          "status": "passed"
-        }
-      ]
-    },
-    {
-      "id": "modules/ui-web/src/shell-v0/chrome/Shell.globalKeys.test.ts#leaves a chord alone while a <select> has focus — the omission 857 closed elsewhere",
-      "file": "modules/ui-web/src/shell-v0/chrome/Shell.globalKeys.test.ts",
-      "runner": "vitest",
-      "contentDigest": "sha256:dde719f4d7429ecd9d9cb41277118ebac450919e9c133bd2f20d6c8196c9776d",
-      "executed": true,
-      "skipped": false,
-      "outcome": "passed",
-      "cases": [
-        {
-          "name": "Shell global chords — the shared typing guard (tempdoc 864 Layer 2(a)) leaves a chord alone while a <select> has focus — the omission 857 closed elsewhere",
+          "name": "Shell global chords and their guards (tempdoc 864 Layer 2) 864: stands down while a modal owns the keyboard",
           "status": "passed"
         }
       ]
@@ -134,28 +125,13 @@
       "id": "modules/ui-web/src/shell-v0/chrome/Shell.globalKeys.test.ts#still claims the same chord when focus is on a control the reader does NOT type into",
       "file": "modules/ui-web/src/shell-v0/chrome/Shell.globalKeys.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:dde719f4d7429ecd9d9cb41277118ebac450919e9c133bd2f20d6c8196c9776d",
+      "contentDigest": "sha256:093fd928f6bf1e7d25eb22ae10cd2d990f8dfce2f352cc4cead0bb5adb9b9a2a",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
       "cases": [
         {
-          "name": "Shell global chords — the shared typing guard (tempdoc 864 Layer 2(a)) still claims the same chord when focus is on a control the reader does NOT type into",
-          "status": "passed"
-        }
-      ]
-    },
-    {
-      "id": "modules/ui-web/src/shell-v0/chrome/Shell.globalKeys.test.ts#leaves a chord alone while a shadow-nested <input> has focus",
-      "file": "modules/ui-web/src/shell-v0/chrome/Shell.globalKeys.test.ts",
-      "runner": "vitest",
-      "contentDigest": "sha256:dde719f4d7429ecd9d9cb41277118ebac450919e9c133bd2f20d6c8196c9776d",
-      "executed": true,
-      "skipped": false,
-      "outcome": "passed",
-      "cases": [
-        {
-          "name": "Shell global chords — the shared typing guard (tempdoc 864 Layer 2(a)) leaves a chord alone while a shadow-nested <input> has focus",
+          "name": "Shell global chords and their guards (tempdoc 864 Layer 2) still claims the same chord when focus is on a control the reader does NOT type into",
           "status": "passed"
         }
       ]
@@ -209,7 +185,7 @@
       "id": "modules/ui-web/src/shell-v0/chrome/Shell.navigation.test.ts",
       "file": "modules/ui-web/src/shell-v0/chrome/Shell.navigation.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:910b8458ed556a23c70d5cb6bc410527a358a9e3664f40aad5be2f4a74bb7972",
+      "contentDigest": "sha256:aeb6325434fe51dff7b06386205da15c62279dce3404dfe62292a50e27d90ba1",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -247,7 +223,7 @@
           "status": "passed"
         },
         {
-          "name": "FR3 the window tab is part of the address a tab click names the tab in the address without a new entry; Back/Forward and reload restore it",
+          "name": "FR3 the window tab is part of the address a tab click names the tab in the address as a new entry; Back returns to the tab before; Forward and reload restore it",
           "status": "passed"
         },
         {
@@ -487,8 +463,53 @@
           "status": "passed"
         }
       ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/chrome/Shell.frame-lockdown.test.ts#1280×800: the notice can be read, the pill is not cut and \"Choose destination\" is offered",
+      "file": "modules/ui-web/src/shell-v0/chrome/Shell.frame-lockdown.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:f7f2fdf933cc6d7373e0a60185b15cd8717ac9f8f12e418b9adc1da84d3a619d",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "L3 a notice for a window that does not exist is readable at every size 1280×800: the notice can be read, the pill is not cut and \"Choose destination\" is offered",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/chrome/Shell.frame-lockdown.test.ts#900×700: the notice can be read, the pill is not cut and \"Choose destination\" is offered",
+      "file": "modules/ui-web/src/shell-v0/chrome/Shell.frame-lockdown.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:f7f2fdf933cc6d7373e0a60185b15cd8717ac9f8f12e418b9adc1da84d3a619d",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "L3 a notice for a window that does not exist is readable at every size 900×700: the notice can be read, the pill is not cut and \"Choose destination\" is offered",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/SettingsSurface.v15.test.ts#move-down arrow on the first More window updates surfaceOrder; the switcher areas have no arrows",
+      "file": "modules/ui-web/src/shell-v0/views/SettingsSurface.v15.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:4d5a826d2bb3ed570c43a3f532a36c513b6aa6be990a4de8919d48c9d5ed9814",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "SettingsSurface — V1.5 Rail section (the switcher and the More menu) move-down arrow on the first More window updates surfaceOrder; the switcher areas have no arrows",
+          "status": "passed"
+        }
+      ]
     }
   ],
   "failBefore": null,
-  "digest": "sha256:d585141bf6152c537f1e7d9ee797831014a955c38f13f702abeb358088d9a6dc"
+  "digest": "sha256:046f43f41704f98cb3e5c4cfbef49314f586d8a8d862e2962f8184a347ddbfba"
 }

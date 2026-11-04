@@ -61,6 +61,7 @@ import '../components/RetiredStatusElements.js';
 import './RetiredFrameElements.js';
 import './TopBar.js';
 import type { TopBar, TopBarDestination, TopBarSelection } from './TopBar.js';
+import { FRAME_AREAS, FRAME_FIXED_WINDOWS } from '../layout/frameAreas.js';
 import { undoStatusNotice, type StatusPill } from '../components/StatusPill.js';
 // §21.E — register the PendingEffect chrome surface. Renders nothing
 // when the queue is empty; floats in lower-right when a proposal lands.
@@ -485,18 +486,33 @@ export class Shell extends JfElement {
     if (e.button === 3) this.appBack();
     else this.appForward();
   };
-  /** A window host's tab row changed tab: the address names the tab (replace, not a new entry). */
+  /**
+   * A window host's tab row changed tab: a navigation like any other (FR3), so Back returns to the
+   * tab before. The entry being left first names the tab it showed, which an address reached
+   * without one (a switcher choice) did not, so Back reopens that tab rather than keeping this one.
+   */
   private readonly onWindowTabChange = (e: Event): void => {
-    const tab = (e as CustomEvent<{ id?: string }>).detail?.id;
+    const { id: tab, previous } = (e as CustomEvent<{ id?: string; previous?: string }>).detail ?? {};
     const host = this.hostOfTabEvent(e);
     if (!tab || !host) return;
+    if (previous) this.replaceAddressState(host, { tab: previous });
     this.hostTabs.set(host, tab);
-    this.replaceAddressState(host, { tab });
+    this.activateSurface(host, { tab }, 'BUTTON');
   };
-  /** The Settings window changed section: the address names it (replace, so Back still closes once). */
+  /** The section the Settings window shows (it keeps the last one between openings). */
+  private settingsSection: string | null = null;
+  /**
+   * The Settings window changed section: the address names it (replace, so Back still closes once).
+   * Only while the window is open: Settings mounts ahead of its first opening and reports the section
+   * it starts on, which must never overwrite a section the address asks for (FR3, reload).
+   */
   private readonly onSettingsSectionChange = (e: Event): void => {
     const section = (e as CustomEvent<{ id?: string }>).detail?.id;
-    if (section) this.replaceAddressState(SETTINGS_SURFACE_ID, { section });
+    if (!section) return;
+    this.settingsSection = section;
+    if (this.shadowRoot?.querySelector<SettingsWindow>('jf-settings-window')?.open) {
+      this.replaceAddressState(SETTINGS_SURFACE_ID, { section });
+    }
   };
 
   // Slice 496 §3.A: bound handler for navigate-with-context events.
@@ -1468,10 +1484,15 @@ export class Shell extends JfElement {
         // left alone afterwards.
         if (!win.open) this.settingsOpenPushed = info.pushed;
         win.open = true;
+        // C9 — the Settings entry remembers the area it opened over, so a reload (or Back to this
+        // entry) shows that area underneath, and closing returns to it.
+        this.keepAreaUnderSettings();
         // Shell slice 2 — `?section=<category>` opens that Settings section (reload, deep link,
-        // Back/Forward). Unknown sections are ignored: the window keeps the section it shows.
+        // Back/Forward). Unknown sections are ignored: the window keeps the section it shows, and an
+        // address without one is completed with it.
         const section = state?.section;
         if (typeof section === 'string' && findCategory(section)) requestMemberTab(SETTINGS_SURFACE_ID, section);
+        else if (this.settingsSection) this.replaceAddressState(SETTINGS_SURFACE_ID, { section: this.settingsSection });
         if (state?.focusSettingsRecovery === true || state?.focusSettingsRecovery === 'true') {
           win.focusSettingsRecovery();
         }
@@ -1914,7 +1935,11 @@ export class Shell extends JfElement {
    *     does, so a boot-entered session was otherwise left with NO projection for its whole life.
    */
   private onSettingsWindowClose(): void {
-    if (this.settingsOpenPushed) {
+    // C9 — an app entry before the Settings entry is the area it opened over: Settings reached by
+    // Forward, a reload or a pasted address sits on one too, not only an opening that pushed.
+    // Returning there means a later Back never lands on Settings again.
+    const index = (window.history.state as { jsNavIndex?: unknown } | null)?.jsNavIndex;
+    if (this.settingsOpenPushed || (typeof index === 'number' && index > 0)) {
       this.settingsOpenPushed = false;
       window.history.back();
       return;
@@ -1924,7 +1949,40 @@ export class Shell extends JfElement {
     const fallback =
       this.surfaces.find((s) => s.id === 'core.search-v3-surface') ?? this.surfaces[0];
     const target = this.activeId ?? fallback?.id ?? null;
-    if (target) this.activateSurface(target, {}, 'BUTTON');
+    if (!target) return;
+    // The Settings entry is the first the app owns (opened straight from a link): the area replaces
+    // it, so there is no Settings entry left for Back to reopen.
+    const tab = this.hostTabs.get(target);
+    const address: ShellAddressNavigation = { kind: 'navigate', target, state: tab ? { tab } : {} };
+    try {
+      window.history.replaceState({ ...(window.history.state as Record<string, unknown> | null), surfaceId: target, jsNavIndex: 0 },
+        '', `#${canonicalize(address)}`);
+    } catch {
+      // history API failure is non-fatal.
+    }
+    void this.intentRouter?.dispatch({ address, transport: 'BUTTON' }, { pushHistory: false, taskOrigin: 'fresh' });
+  }
+
+  /**
+   * Record on the Settings entry the area underneath it, or — when the entry already names one (a
+   * reload, Back or Forward onto it) — show that area underneath again.
+   */
+  private keepAreaUnderSettings(): void {
+    const entry = (window.history.state as Record<string, unknown> | null) ?? {};
+    const over = entry.settingsOver;
+    if (typeof over === 'string' && over !== SETTINGS_SURFACE_ID && getSurface(over)) {
+      if (over === this.activeId) return;
+      this.activeId = over;
+      updateShellContext({ activeSurface: over });
+      this.updateDocumentTitle(over);
+      return;
+    }
+    if (!this.activeId) return;
+    try {
+      window.history.replaceState({ ...entry, settingsOver: this.activeId }, '');
+    } catch {
+      // history API failure is non-fatal.
+    }
   }
 
   /**
@@ -1970,11 +2028,7 @@ export class Shell extends JfElement {
   }
 
   /** The area order of the switcher; Ctrl+1/2/3 follow it. */
-  private static readonly AREAS: ReadonlyArray<{ id: string; shortcut: string }> = [
-    { id: INTERACTION_SURFACE_ID, shortcut: 'Ctrl+1' },
-    { id: 'core.library-surface', shortcut: 'Ctrl+2' },
-    { id: 'core.brain-surface', shortcut: 'Ctrl+3' },
-  ];
+  private static readonly AREAS = FRAME_AREAS;
 
   /** Ctrl+1/2/3 (⌘ on macOS). AltGr (Ctrl+Alt) types characters on many layouts, so it never counts. */
   private static areaShortcut(e: KeyboardEvent): string | null {
@@ -2016,8 +2070,8 @@ export class Shell extends JfElement {
 
   /**
    * Slice 501 — global keyboard shortcut handler (capture phase).
-   * Guards: IME composition, auto-repeat and an open dialog stand every chord down; chords that
-   * would edit text stand down while the reader types (C8).
+   * Guards: IME composition, auto-repeat and an open dialog stand every chord down. None of these
+   * chords inserts or removes text, so they also work from a text field (C8, FR3).
    */
   private handleGlobalKey(e: KeyboardEvent): void {
     // Tempdoc 864 Layer 2(b) — IME composition and auto-repeat, by the app's ONE definition.
@@ -2045,19 +2099,19 @@ export class Shell extends JfElement {
       this.activateSurface(HELP_SURFACE_ID, {}, 'BUTTON');
       return;
     }
-    // Tempdoc 864 Layer 2(a) — THE shared typing guard (857 PR-A). The SUBJECT is "where is
-    // focus?" (a capture-phase `event.target` is retargeted to the shadow host). W5 is an explicit
-    // Ask command, including from the automatically focused composer. In a text field Alt+Left/Right
-    // are left to the platform, whose own history traversal now stays in step with the app (FR3).
-    const askShortcut = e.ctrlKey && e.shiftKey && e.key === 'A';
-    if (isTypingTarget(deepActiveElement()) && !askShortcut) return;
-    if (e.altKey && e.key === 'ArrowLeft') {
+    // FR3 — Alt+Left/Right are Back and Forward wherever focus is: they edit no text, and Back often
+    // lands in a text field (the Search composer takes focus on arrival), where a typing guard used
+    // to swallow the Forward that followed. The chord is the app's alone, so nothing under it (a
+    // tab row's or an option group's arrow keys) also acts on it.
+    if (e.altKey && !e.ctrlKey && !e.metaKey && !e.shiftKey && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')) {
       e.preventDefault();
-      this.appBack();
-    } else if (e.altKey && e.key === 'ArrowRight') {
-      e.preventDefault();
-      this.appForward();
-    } else if (askShortcut) {
+      e.stopPropagation();
+      if (e.key === 'ArrowLeft') this.appBack();
+      else this.appForward();
+      return;
+    }
+    // W5 is an explicit Ask command, including from the automatically focused composer.
+    if (e.ctrlKey && e.shiftKey && e.key === 'A') {
       e.preventDefault();
       this.handleAskAiShortcut();
     }
@@ -2304,7 +2358,7 @@ export class Shell extends JfElement {
 
   /** More › More: rail windows that are neither an area nor System (catalog contributions, plugins). */
   private pluginWindows(): TopBarDestination[] {
-    const fixed = new Set<string>([...Shell.AREAS.map(a => a.id), SYSTEM_SURFACE_ID]);
+    const fixed = new Set<string>([...Shell.AREAS.map(a => a.id), ...FRAME_FIXED_WINDOWS]);
     return this.surfaces.filter(s => !fixed.has(s.id)).map(s => this.destination(s.id));
   }
 

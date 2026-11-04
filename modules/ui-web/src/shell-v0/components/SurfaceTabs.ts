@@ -122,6 +122,13 @@ export class SurfaceTabs extends JfElement {
       color: var(--text-primary);
       border-bottom-color: var(--accent-tint);
     }
+    /* X1 — forced colours repaint every border, the unselected tab's transparent one included, so
+       both tabs drew the same underline. The tab keeps its own system colours: only the selected
+       tab is underlined (a shape, in Highlight), the others have none. */
+    @media (forced-colors: active) {
+      .tabs button { forced-color-adjust: none; color: CanvasText; background: Canvas; border-bottom-color: Canvas; }
+      .tabs button.active { border-bottom-color: Highlight; }
+    }
     /* 578 §9.4.B — the TRUST member keeps a visible audit marker so its trust framing survives
        living beside DIAGNOSTIC members. Uses existing role tokens only (no new colour). */
     .alt-marker {
@@ -158,15 +165,18 @@ export class SurfaceTabs extends JfElement {
   }
 
   private select(id: string): void {
-    if (id === this.resolvedActiveId) return;
+    const previous = this.resolvedActiveId;
+    if (id === previous) return;
     this.activeId = id;
     this.dispatchEvent(
-      new CustomEvent('tab-change', { detail: { id }, bubbles: true, composed: true }),
+      new CustomEvent('tab-change', { detail: { id, previous }, bubbles: true, composed: true }),
     );
   }
 
   /** Roving-tabindex arrow-key navigation across the tab strip (571 §11.2-D5). */
   private onKeydown(e: KeyboardEvent): void {
+    // Only plain keys move between tabs: Alt+Left/Right are Back and Forward, never a tab change.
+    if (e.altKey || e.ctrlKey || e.metaKey) return;
     const ids = this.items.map((t) => t.id);
     const active = this.resolvedActiveId;
     if (active === undefined) return;

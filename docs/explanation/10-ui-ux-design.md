@@ -88,15 +88,21 @@ toggle are gone (Settings › Appearance › Detail level remains).
 
 Every view has a `justsearch://surface/<id>` address in the URL hash. A window's open tab is
 part of it (`?tab=<tab id>`, for example `core.library-surface?tab=core.browse-surface`), and
-so is the Settings section (`core.settings-surface?section=<category>`); changing either
-replaces the address rather than adding a history entry. Member and retired surface IDs
+so is the Settings section (`core.settings-surface?section=<category>`). Switching a window
+tab adds a history entry, so Back returns to the tab before; changing the Settings section
+replaces the address, so closing Settings stays one step. The section in the address always
+wins over the one Settings remembers from its last opening. Member and retired surface IDs
 remain deep-linkable and open their host window on the right tab.
 
 Back and Forward (Alt+Left/Right and the mouse's back and forward buttons) run on the
 browser's own history, so the address and the window shown never disagree; the navigation
 journal follows each entry by an identifier stored with it and resumes the last view on a
-bare launch. Back does nothing on the first view the app owns. In a text field Alt+Left/Right
-are left to the platform, whose history traversal is the same history.
+bare launch. Back does nothing on the first view the app owns. Alt+Left/Right navigate from a
+text field too (they edit no text), and nothing under them also acts on them. Every
+navigation is one entry, including one made from the command palette. Settings opens over
+the area it was reached from; its entry remembers that area, so a reload keeps it underneath,
+and closing Settings (Escape, the close button, the backdrop or Back) returns to it once:
+Back never reopens Settings from there.
 
 ### Main windows
 
@@ -174,7 +180,8 @@ Feedback from the user's own actions appears inside the pill for a few seconds. 
 the pill shows engine unreachable, search limited, needs you or problems, that feedback
 appears beside it instead. In both cases it remains available in Earlier. The top bar
 makes room for the pill's words rather than truncating them; below 720 px the pill is its
-icon and the notice keeps its action. A request waiting for the reader appears only under
+icon, the notice's words move under the top bar (wrapping rather than cut) and the notice
+keeps its action. A request waiting for the reader appears only under
 Needs you; it joins Earlier once answered, expired or withdrawn. Status
 transitions and action feedback are announced to screen readers. The panel updates
 while open, preserving expanded details; switching windows closes it. The Help surface
@@ -237,9 +244,9 @@ composition by an input method editor takes precedence. Tab follows reachable co
 The frame's keys: Ctrl+1/2/3 switch areas, F6 and Shift+F6 move between the top bar, the
 window tab row, the content and the details pane (skipping regions a window does not have),
 F1 opens Help & shortcuts, and Alt+Left/Right go back and forward. None of them fires during
-input-method composition, on key repeat or while a dialog owns the keyboard; Ctrl+1/2/3 and
-F6 also work from a text field because they do not edit text (AltGr combinations, which do
-type on many layouts, are left alone).
+input-method composition, on key repeat or while a dialog owns the keyboard; Ctrl+1/2/3,
+F6 and Alt+Left/Right also work from a text field because they do not edit text (AltGr
+combinations, which do type on many layouts, are left alone).
 
 Dropping folders onto the shell dispatches the add-to-index action. Result context menus
 expose the actions appropriate to the result through the shared menu; do not promise a
@@ -289,7 +296,9 @@ another theme.
   that every view passes.
 - **High contrast:** keep the app's high-contrast setting and OS forced-colours support
   working. High-contrast overrides strengthen text/border contrast; OS forced-colours
-  also removes blur. Do not rely on transparency to convey state.
+  also removes blur. Do not rely on transparency to convey state; forced colours repaint
+  transparent borders too, so a selected window tab marks itself with an underline in
+  `Highlight` that the other tabs do not have.
 - **Semantics:** use the roles the actual controls implement. Current result containers
   use `list` / `listitem`, and shared menus use `menu` / `menuitem`.
 - **Destructive actions:** require a confirmation before destructive work. Settings'

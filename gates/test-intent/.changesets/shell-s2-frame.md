@@ -27,6 +27,18 @@ cursor, so the conversation variant of (c) is recorded as New without a fail-bef
 that only exists in new modules (top bar, F6 regions, tab and section in the address, Ctrl+1/2/3) is
 recorded without a fail-before (`gates/test-intent/evidence/shell-s2-frame-new.json`).
 
+Frame repair (after independent checks on 6fe76d255f) fails before on 6fe76d255f with assertion
+failures (`gates/test-intent/evidence/shell-s2-frame-repair-2.json`), most of them in a real browser
+(`Shell.frame-lockdown.test.ts`, the lockdown Vitest selection, headless Chromium over a private
+Vite server): the L3 notice at 600×400, Settings closing once after Back/Forward and after a
+reload, the Settings section in the address against the one Settings starts on, Alt+Left/Right from
+the Search text box, a window tab as a history step (orchestrator decision: a tab change adds an
+entry; Alt+arrows, mouse buttons and browser buttons land on the same views), one entry per palette
+navigation, the selected tab in forced colours, and Settings › Layout following the switcher's
+order and words. Settings' remembered section and the navigation journal keep their stored formats;
+the Settings history entry additionally records the area it opened over (`settingsOver` in the
+entry's history state).
+
 `Shell.navigation.test.ts` restores the HTML session-history rule for `replaceState` in its own run:
 happy-dom 21 drops the entries after the current one on `replaceState`, which Chromium, WebView2 and
 WebKit do not, and Forward is only testable under the spec's behaviour.
@@ -49,6 +61,10 @@ WebKit do not, and Forward is only testable under the spec's behaviour.
 | SearchV3View.test "W7 renders Search in the title band and rail…" (rail button label, name, title) | same test renamed "…the top bar switcher…": segment label, accessible name, tooltip "Search · Ctrl+1" | kept at the switcher; tooltip gains the shortcut (FR1) |
 | HelpSurface.test "lists only shortcuts that actually fire…" (Ctrl + D row present) | same test: Ctrl + D row absent; Ctrl/⌘ + 1/2/3, F6/Shift + F6, F1 rows present | kept: the table mirrors the real bindings |
 | frameStatus.test "C12 the broadcast advisory and the request-scoped prompt…" (waiting advisory in Earlier with no actions) | same test: not in Earlier while waiting; frameStatus "L4b …" pins the answered/expired/withdrawn rows and their inert actions | changed by L4b |
+| Shell.globalKeys.test "leaves a chord alone while a <select> has focus…", "…while a shadow-nested <input> has focus" | Shell.globalKeys.test "FR3: Alt+Left/Right are claimed in a <select>, a shadow <input> and a <textarea>…"; Shell.frame-lockdown "Back into Search puts focus in its text box…" | expectation reversed (frame repair item 3): Alt+Left/Right navigate from every control |
+| Shell.navigation.test "a tab click names the tab in the address without a new entry…" | Shell.navigation.test "a tab click names the tab in the address as a new entry…"; Shell.frame-lockdown "Library › Browse adds an entry…" | expectation reversed (orchestrator decision, item 4); address, Back/Forward and reload assertions kept |
+| SettingsSurface.v15.test "lists rail surfaces in catalog order by default", "respects userConfig.surfaceOrder" | same file: "lists the switcher areas in the switcher order…", "respects userConfig.surfaceOrder for the More windows…" | changed by item 8: the list mirrors the top bar |
+| SettingsSurface.v15.test "hidden surfaces have visibility=false…", "move-down arrow on first surface…" | same file, on a fixture of the real areas plus two More windows | kept (input re-encoding); the move-down case adds "areas have no arrows" |
 | admissionFetch.test UPGRADE_PREPARING fixture (no preparationId) | same tests with the real upgrade body (`preparationId`); admissionFetch "L4a …" pins the closing engine | kept (input re-encoding); L4a adds the closing case |
 
 ```json
@@ -156,7 +172,7 @@ WebKit do not, and Forward is only testable under the spec's behaviour.
       "items": ["modules/ui-web/src/shell-v0/chrome/Shell.globalKeys.test.ts"],
       "class": "Adaptation",
       "moved": ["input re-encoding"],
-      "whatMoved": "The typing-guard cases keep Alt+Left (and add Alt+Right) as the guarded chord: unclaimed in a <select> and a shadow <input>, claimed on a button. The IME/repeat and modal cases press Ctrl+2, F6, F1 and Alt+Left instead of Ctrl+D; the oracle (stands down while composing, repeating or under a modal; claimed otherwise) is unchanged. The file header names the current chords.",
+      "whatMoved": "The IME/repeat and modal cases press Ctrl+2, F6, F1 and Alt+Left instead of Ctrl+D; the oracle (stands down while composing, repeating or under a modal; claimed otherwise) is unchanged, and the modal case also presses Alt+Left. The button case keeps Alt+Left and adds Alt+Right as the claimed chord. The file header names the current chords and their guards.",
       "sources": [
         { "kind": "owner-adopted-scenario", "task": "t-20261103-shell", "scenario": "C8",
           "quote": "Keyboard ownership: new shortcuts (Ctrl+1/2/3, F6) never fire inside text fields where they would edit text, during IME composition, on key repeat, or under another modal.",
@@ -166,7 +182,7 @@ WebKit do not, and Forward is only testable under the spec's behaviour.
     {
       "items": ["modules/ui-web/src/shell-v0/chrome/Shell.globalKeys.test.ts"],
       "class": "New",
-      "behaviour": "Ctrl+1/2/3 and F6 work from a text field (they do not edit text); AltGr (Ctrl+Alt) and Ctrl+Shift digit combinations are left to typing; Ctrl+D is no longer taken; Ctrl+2, F6, F1 and Alt+Left stand down during IME composition, on key repeat and under a modal.",
+      "behaviour": "Ctrl+1/2/3, F6 and Alt+Left/Right work from a text field (they do not edit text); AltGr (Ctrl+Alt) and Ctrl+Shift digit combinations are left to typing; Ctrl+D is no longer taken; Ctrl+2, F6, F1 and Alt+Left stand down during IME composition, on key repeat and under a modal.",
       "sources": [
         { "kind": "owner-adopted-scenario", "task": "t-20261103-shell", "scenario": "C8",
           "quote": "Keyboard ownership: new shortcuts (Ctrl+1/2/3, F6) never fire inside text fields where they would edit text, during IME composition, on key repeat, or under another modal.",
@@ -177,9 +193,7 @@ WebKit do not, and Forward is only testable under the spec's behaviour.
         "modules/ui-web/src/shell-v0/chrome/Shell.globalKeys.test.ts#C8: area keys and F6 work from a text field; an AltGr combination is left to typing",
         "modules/ui-web/src/shell-v0/chrome/Shell.globalKeys.test.ts#864: ignores an IME-composing chord and an auto-repeat chord",
         "modules/ui-web/src/shell-v0/chrome/Shell.globalKeys.test.ts#864: stands down while a modal owns the keyboard",
-        "modules/ui-web/src/shell-v0/chrome/Shell.globalKeys.test.ts#leaves a chord alone while a <select> has focus — the omission 857 closed elsewhere",
-        "modules/ui-web/src/shell-v0/chrome/Shell.globalKeys.test.ts#still claims the same chord when focus is on a control the reader does NOT type into",
-        "modules/ui-web/src/shell-v0/chrome/Shell.globalKeys.test.ts#leaves a chord alone while a shadow-nested <input> has focus"
+        "modules/ui-web/src/shell-v0/chrome/Shell.globalKeys.test.ts#still claims the same chord when focus is on a control the reader does NOT type into"
       ]
     },
     {
@@ -317,7 +331,7 @@ WebKit do not, and Forward is only testable under the spec's behaviour.
     {
       "items": ["modules/ui-web/src/shell-v0/chrome/Shell.navigation.test.ts"],
       "class": "New",
-      "behaviour": "Back stays in the app on its first view; mouse buttons 3/4 are Back/Forward; rapid area switching, a late boot response and reload mid-navigation keep the reader's view and Back step; the window tab and the Settings section are part of the address (replace, not a new entry) and survive Back/Forward and reload; deep links to every window, a member id and retired aliases land on the right window and tab; Settings closes once onto its area by Escape or browser Back and a deep link arriving while it is open closes it; a pre-change journal and userState load and a userState write keeps every co-resident value.",
+      "behaviour": "Back stays in the app on its first view; mouse buttons 3/4 are Back/Forward; rapid area switching, a late boot response and reload mid-navigation keep the reader's view and Back step; the window tab and the Settings section are part of the address and survive Back/Forward and reload (a tab change is a new entry, a section change replaces); deep links to every window, a member id and retired aliases land on the right window and tab; Settings closes once onto its area by Escape or browser Back and a deep link arriving while it is open closes it; a pre-change journal and userState load and a userState write keeps every co-resident value.",
       "sources": [
         { "kind": "owner-adopted-scenario", "task": "t-20261103-shell", "scenario": "FR3",
           "quote": "The window tab and Settings section are part of the address.",
@@ -431,6 +445,133 @@ WebKit do not, and Forward is only testable under the spec's behaviour.
         "evidence": "node scripts/ci/gen-token-names.mjs reports 238 tokens and the file is unchanged by a second run; the ui-web gates (31/31) and the full vitest run pass on the final tree.",
         "unresolvedRisks": "None known."
       }
+    },
+    {
+      "items": ["modules/ui-web/src/shell-v0/chrome/Shell.globalKeys.test.ts"],
+      "class": "Obsolete",
+      "removedChecks": "'leaves a chord alone while a <select> has focus — the omission 857 closed elsewhere' and 'leaves a chord alone while a shadow-nested <input> has focus': the expectation that Alt+Left/Right are unclaimed while a <select> or a text field has focus. Alt+Left/Right edit no text, and Back lands in the Search composer, where the guard swallowed the Forward that followed (frame repair item 3); they now navigate from every control and stop propagating. No chord of this handler is typing-guarded any more.",
+      "sources": [
+        { "kind": "owner-adopted-scenario", "task": "t-20261103-shell", "scenario": "FR3", "quote": "Back and forward (Alt+Left/Right, mouse buttons) work reliably: same-surface navigation keeps the earlier entry; Back then Forward returns to the later view; browser history and the stage stay in step.", "label": "agent-drafted, owner-adopted" },
+        { "kind": "owner-adopted-scenario", "task": "t-20261103-shell", "scenario": "C8", "quote": "Keyboard ownership: new shortcuts (Ctrl+1/2/3, F6) never fire inside text fields where they would edit text, during IME composition, on key repeat, or under another modal.", "label": "agent-drafted, owner-adopted" }
+      ],
+      "conflictSearch": "decision records searched for a conflict: none — docs/decisions/*.md (54 records) searched for history entry, pushState, Alt+Left, typing guard, window tab, surfaceOrder, activity rail, forced colours; the only hits are about content hashes (0021, 0038 and others), not navigation"
+    },
+    {
+      "items": ["modules/ui-web/src/shell-v0/chrome/Shell.globalKeys.test.ts"],
+      "class": "New",
+      "repaired": true,
+      "behaviour": "FR3: Alt+Left/Right are claimed in a <select>, a shadow <input> and a <textarea>, and the focused control's own keydown never sees them; Shift+Alt and Ctrl+Alt arrows stay the platform's.",
+      "sources": [
+        { "kind": "owner-adopted-scenario", "task": "t-20261103-shell", "scenario": "FR3", "quote": "Back and forward (Alt+Left/Right, mouse buttons) work reliably: same-surface navigation keeps the earlier entry; Back then Forward returns to the later view; browser history and the stage stay in step.", "label": "agent-drafted, owner-adopted" },
+        { "kind": "owner-adopted-scenario", "task": "t-20261103-shell", "scenario": "C8", "quote": "Keyboard ownership: new shortcuts (Ctrl+1/2/3, F6) never fire inside text fields where they would edit text, during IME composition, on key repeat, or under another modal.", "label": "agent-drafted, owner-adopted" }
+      ],
+      "evidence": "gates/test-intent/evidence/shell-s2-frame-repair-2.json",
+      "newChecks": ["modules/ui-web/src/shell-v0/chrome/Shell.globalKeys.test.ts#FR3: Alt+Left/Right are claimed in a <select>, a shadow <input> and a <textarea>, and reach nothing under them"]
+    },
+    {
+      "items": ["modules/ui-web/src/shell-v0/chrome/Shell.navigation.test.ts"],
+      "class": "Obsolete",
+      "removedChecks": "'a tab click names the tab in the address without a new entry; Back/Forward and reload restore it': the expectation that a window tab change adds no history entry. Orchestrator decision for the frame repair (item 4): switching a window tab adds a history entry and Back returns to the previous tab. The address, Back/Forward and reload assertions stay in the replacement test.",
+      "sources": [
+        { "kind": "owner-adopted-scenario", "task": "t-20261103-shell", "scenario": "FR3", "quote": "Back and forward (Alt+Left/Right, mouse buttons) work reliably: same-surface navigation keeps the earlier entry; Back then Forward returns to the later view; browser history and the stage stay in step.", "label": "agent-drafted, owner-adopted" },
+        { "kind": "owner-adopted-scenario", "task": "t-20261103-shell", "scenario": "FR3", "quote": "The window tab and Settings section are part of the address.", "label": "agent-drafted, owner-adopted" }
+      ],
+      "conflictSearch": "decision records searched for a conflict: none — docs/decisions/*.md (54 records) searched for history entry, pushState, Alt+Left, typing guard, window tab, surfaceOrder, activity rail, forced colours; the only hits are about content hashes (0021, 0038 and others), not navigation"
+    },
+    {
+      "items": ["modules/ui-web/src/shell-v0/chrome/Shell.navigation.test.ts"],
+      "class": "New",
+      "repaired": true,
+      "behaviour": "A window tab change is one new history entry (the journal keeps one entry for the window); Back returns to the tab before, which the departing entry now names (`?tab=folders`), Forward and reload restore the later tab.",
+      "sources": [
+        { "kind": "owner-adopted-scenario", "task": "t-20261103-shell", "scenario": "FR3", "quote": "Back and forward (Alt+Left/Right, mouse buttons) work reliably: same-surface navigation keeps the earlier entry; Back then Forward returns to the later view; browser history and the stage stay in step.", "label": "agent-drafted, owner-adopted" },
+        { "kind": "owner-adopted-scenario", "task": "t-20261103-shell", "scenario": "FR3", "quote": "The window tab and Settings section are part of the address.", "label": "agent-drafted, owner-adopted" }
+      ],
+      "evidence": "gates/test-intent/evidence/shell-s2-frame-repair-2.json",
+      "newChecks": ["modules/ui-web/src/shell-v0/chrome/Shell.navigation.test.ts#a tab click names the tab in the address as a new entry; Back returns to the tab before; Forward and reload restore it"]
+    },
+    {
+      "items": ["modules/ui-web/src/shell-v0/chrome/Shell.frame-lockdown.test.ts"],
+      "class": "New",
+      "repaired": true,
+      "behaviour": "In headless Chromium over the real Shell, router, journal, top bar, pill, Settings window, palette and Library tab row: (1) at 600×400 the unknown-window notice is readable under the top bar (real size, inside the window, not cut, not covered, not hidden from assistive technology) and the pill is not cut; (2) Settings → browser Back → Forward → Escape keeps the area and the next Back does not reopen Settings; (7) reload with Settings open keeps the area underneath and closing returns to it once; (5) a Settings › Developer link opens Developer and reload keeps it while the window catalog answers late; (3) after Alt+Left lands in Search's text box, Alt+Right goes Forward and edits nothing; (4) Library › Browse adds one entry and Alt+arrows, mouse buttons and browser buttons all land on Folders/Browse; (6) a Ctrl+K area is one entry; (9) in forced colours only the selected tab carries an underline, in Highlight.",
+      "sources": [
+        { "kind": "owner-adopted-scenario", "task": "t-20261103-shell", "scenario": "L3", "quote": "Expected: in the new top bar it shows without truncating the pill or wrapping, at all three sizes.", "label": "agent-drafted, owner-adopted" },
+        { "kind": "owner-adopted-scenario", "task": "t-20261103-shell", "scenario": "FR2", "quote": "at 600×400 a minimal bar (brand dot, active area menu, pill as icon with count, settings, more). Nothing overflows.", "label": "agent-drafted, owner-adopted" },
+        { "kind": "owner-adopted-scenario", "task": "t-20261103-shell", "scenario": "C9", "quote": "Settings dismissal history: direct Settings entry and section deep links, reload, backdrop, Escape and browser Back/Forward close it once, keep the underlying area, and never need a second Back.", "label": "agent-drafted, owner-adopted" },
+        { "kind": "owner-adopted-scenario", "task": "t-20261103-shell", "scenario": "FR3", "quote": "Back and forward (Alt+Left/Right, mouse buttons) work reliably: same-surface navigation keeps the earlier entry; Back then Forward returns to the later view; browser history and the stage stay in step.", "label": "agent-drafted, owner-adopted" },
+        { "kind": "owner-adopted-scenario", "task": "t-20261103-shell", "scenario": "FR3", "quote": "The window tab and Settings section are part of the address.", "label": "agent-drafted, owner-adopted" },
+        { "kind": "owner-adopted-scenario", "task": "t-20261103-shell", "scenario": "X1", "quote": "no new hard-coded colours, sizes or z-indexes (ui-web gates).", "label": "agent-drafted, owner-adopted" }
+      ],
+      "evidence": "gates/test-intent/evidence/shell-s2-frame-repair-2.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/chrome/Shell.frame-lockdown.test.ts#600×400: the notice can be read, the pill is not cut and \"Choose destination\" is offered",
+        "modules/ui-web/src/shell-v0/chrome/Shell.frame-lockdown.test.ts#Settings, browser Back, browser Forward, close: the next Back does not reopen Settings",
+        "modules/ui-web/src/shell-v0/chrome/Shell.frame-lockdown.test.ts#reload with Settings open keeps the area underneath; closing returns to it once",
+        "modules/ui-web/src/shell-v0/chrome/Shell.frame-lockdown.test.ts#a link to Settings › Developer opens Developer, and reload keeps it, while the engine is slow to answer",
+        "modules/ui-web/src/shell-v0/chrome/Shell.frame-lockdown.test.ts#Back into Search puts focus in its text box; Alt+Right still goes Forward and edits nothing",
+        "modules/ui-web/src/shell-v0/chrome/Shell.frame-lockdown.test.ts#Library › Browse adds an entry; Alt+arrows, mouse buttons and browser buttons all land on the same tabs",
+        "modules/ui-web/src/shell-v0/chrome/Shell.frame-lockdown.test.ts#opening an area from the Ctrl+K palette is one step: one Back returns",
+        "modules/ui-web/src/shell-v0/chrome/Shell.frame-lockdown.test.ts#the selected window tab is told apart from the others by a shape in a system colour"
+      ]
+    },
+    {
+      "items": ["modules/ui-web/src/shell-v0/chrome/Shell.frame-lockdown.test.ts"],
+      "class": "New",
+      "behaviour": "L3 at 1280×800 and 900×700: the same readable-notice oracle (the notice shows in the pill there); the pill is not cut and 'Choose destination' is offered.",
+      "sources": [
+        { "kind": "owner-adopted-scenario", "task": "t-20261103-shell", "scenario": "L3", "quote": "Expected: in the new top bar it shows without truncating the pill or wrapping, at all three sizes.", "label": "agent-drafted, owner-adopted" }
+      ],
+      "evidence": "gates/test-intent/evidence/shell-s2-frame-new.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/chrome/Shell.frame-lockdown.test.ts#1280×800: the notice can be read, the pill is not cut and \"Choose destination\" is offered",
+        "modules/ui-web/src/shell-v0/chrome/Shell.frame-lockdown.test.ts#900×700: the notice can be read, the pill is not cut and \"Choose destination\" is offered"
+      ]
+    },
+    {
+      "items": ["modules/ui-web/src/shell-v0/views/SettingsSurface.v15.test.ts"],
+      "class": "Obsolete",
+      "removedChecks": "'lists rail surfaces in catalog order by default' (catalog order, Settings listed) and 'respects userConfig.surfaceOrder' (the saved order also reordering Search and Library): the list now mirrors the top bar (frame repair item 8): the switcher's areas in its fixed order (Ctrl+1/2/3 follow it), then the More windows in the saved order; Settings and System have fixed places and are not listed.",
+      "sources": [
+        { "kind": "owner-adopted-scenario", "task": "t-20261103-shell", "scenario": "FR1", "quote": "Top bar replaces title bar and rail: brand, switcher (Search, Library, AI Brain), status pill, Settings, More (⋯).", "label": "agent-drafted, owner-adopted" },
+        { "kind": "owner-adopted-scenario", "task": "t-20261103-shell", "scenario": "FR5", "quote": "Layout compatibility: a saved layout's `rail.visible:false` hides the switcher (areas stay reachable by palette and Ctrl+1/2/3); `statusBar.visible:false` hides plugin status in the pill, never notices or needs-you; split layouts keep the second window pane with its picker; focus/zen keep working.", "label": "agent-drafted, owner-adopted" }
+      ],
+      "conflictSearch": "decision records searched for a conflict: none — docs/decisions/*.md (54 records) searched for history entry, pushState, Alt+Left, typing guard, window tab, surfaceOrder, activity rail, forced colours; the only hits are about content hashes (0021, 0038 and others), not navigation"
+    },
+    {
+      "items": ["modules/ui-web/src/shell-v0/views/SettingsSurface.v15.test.ts"],
+      "class": "New",
+      "repaired": true,
+      "behaviour": "Settings › Layout lists the switcher's areas in the switcher's order, then the More menu's windows in catalog or saved order, under the heading 'Switcher' with no 'rail' or 'surface' wording; checkboxes read 'Show <area> in the switcher'.",
+      "sources": [
+        { "kind": "owner-adopted-scenario", "task": "t-20261103-shell", "scenario": "FR1", "quote": "Top bar replaces title bar and rail: brand, switcher (Search, Library, AI Brain), status pill, Settings, More (⋯).", "label": "agent-drafted, owner-adopted" },
+        { "kind": "owner-adopted-scenario", "task": "t-20261103-shell", "scenario": "FR5", "quote": "Layout compatibility: a saved layout's `rail.visible:false` hides the switcher (areas stay reachable by palette and Ctrl+1/2/3); `statusBar.visible:false` hides plugin status in the pill, never notices or needs-you; split layouts keep the second window pane with its picker; focus/zen keep working.", "label": "agent-drafted, owner-adopted" }
+      ],
+      "evidence": "gates/test-intent/evidence/shell-s2-frame-repair-2.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/views/SettingsSurface.v15.test.ts#lists the switcher areas in the switcher order, then the More windows in catalog order, in the design words",
+        "modules/ui-web/src/shell-v0/views/SettingsSurface.v15.test.ts#respects userConfig.surfaceOrder for the More windows; the switcher keeps its fixed order"
+      ]
+    },
+    {
+      "items": ["modules/ui-web/src/shell-v0/views/SettingsSurface.v15.test.ts"],
+      "class": "Adaptation",
+      "moved": ["input re-encoding", "instrumentation"],
+      "whatMoved": "'hidden surfaces have visibility=false reflected in checkbox' and the move-down case run on a fixture of the real areas plus two More windows (the old fixture's Settings row is no longer listed, and its first row is now an area without arrows). Rows are found by `data-surface-id`; the hidden-row case checks an area and a window instead of Settings; the move-down case moves the first More window. The oracles (checkbox reflects surfaceVisibility; Move down writes surfaceOrder and the list reorders) are unchanged.",
+      "sources": [
+        { "kind": "owner-adopted-scenario", "task": "t-20261103-shell", "scenario": "FR1", "quote": "Top bar replaces title bar and rail: brand, switcher (Search, Library, AI Brain), status pill, Settings, More (⋯).", "label": "agent-drafted, owner-adopted" },
+        { "kind": "owner-adopted-scenario", "task": "t-20261103-shell", "scenario": "FR5", "quote": "Layout compatibility: a saved layout's `rail.visible:false` hides the switcher (areas stay reachable by palette and Ctrl+1/2/3); `statusBar.visible:false` hides plugin status in the pill, never notices or needs-you; split layouts keep the second window pane with its picker; focus/zen keep working.", "label": "agent-drafted, owner-adopted" }
+      ]
+    },
+    {
+      "items": ["modules/ui-web/src/shell-v0/views/SettingsSurface.v15.test.ts"],
+      "class": "New",
+      "behaviour": "The switcher's areas carry no reorder arrows (their order is fixed); moving a More window does not move an area.",
+      "sources": [
+        { "kind": "owner-adopted-scenario", "task": "t-20261103-shell", "scenario": "FR1", "quote": "Top bar replaces title bar and rail: brand, switcher (Search, Library, AI Brain), status pill, Settings, More (⋯).", "label": "agent-drafted, owner-adopted" }
+      ],
+      "evidence": "gates/test-intent/evidence/shell-s2-frame-new.json",
+      "newChecks": ["modules/ui-web/src/shell-v0/views/SettingsSurface.v15.test.ts#move-down arrow on the first More window updates surfaceOrder; the switcher areas have no arrows"]
     }
   ]
 }

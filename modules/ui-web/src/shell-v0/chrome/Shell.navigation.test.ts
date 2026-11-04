@@ -301,16 +301,23 @@ describe('FR3 Back and Forward run on browser history, which the journal follows
 });
 
 describe('FR3 the window tab is part of the address', () => {
-  it('a tab click names the tab in the address without a new entry; Back/Forward and reload restore it', async () => {
+  it('a tab click names the tab in the address as a new entry; Back returns to the tab before; Forward and reload restore it', async () => {
     let shell = await mount();
     await area(shell, LIBRARY);
     const length = window.history.length;
+    const journal = getJournalState().entries.length;
     const tabs = shell.shadowRoot!.querySelector('jf-stage')!.shadowRoot!.querySelector('jf-nav-host-probe')!
       .shadowRoot!.querySelector('jf-surface-tabs')!;
     tabs.shadowRoot!.querySelector<HTMLButtonElement>(`button[data-tab-id="${BROWSE}"]`)!.click();
     await settle(shell);
     expect(address()).toBe(`${LIBRARY}?tab=${BROWSE}`);
-    expect(window.history.length).toBe(length);
+    // A tab is a step Back can return to (orchestrator decision, FR3); the journal keeps one entry per window.
+    expect(window.history.length).toBe(length + 1);
+    expect(getJournalState().entries).toHaveLength(journal);
+    await browserBack(shell);
+    expect([stageTag(shell), hostTab(shell), address()]).toEqual(['jf-nav-host-probe', 'folders', `${LIBRARY}?tab=folders`]);
+    await browserForward(shell);
+    expect([hostTab(shell), address()]).toEqual([BROWSE, `${LIBRARY}?tab=${BROWSE}`]);
     await area(shell, SEARCH);
     await browserBack(shell);
     expect([hostTab(shell), address()]).toEqual([BROWSE, `${LIBRARY}?tab=${BROWSE}`]);
