@@ -15,10 +15,11 @@ queries, document ids, cluster evidence and safe gate metadata only.
               clusters, every topical group, and a fixed-seed sample by source, format, language.
 ``generate``  write queries through ``claude -p`` (subscription, no tools); verbatim-leak gate
               with regeneration.
-``gate``      lexical-only (``mode: text``) rank of every known-item target on the prepared
-              index; regenerate rank-1 partial/vague queries for ``--rounds`` rounds, then drop
-              the fewest seeded rank-1 ones that leave at most half rank 1 (recorded with every
-              other drop and its reason); distinguishability reports.
+``gate``      drop queries failing the offline gates and repeated query texts (each drop
+              recorded with its reason); measure and record, never gate, triviality: the
+              keyword-search-alone rank (lexical leg; reranker and every model stage off) of
+              every known-item target on the prepared index, per query and per recall level;
+              distinguishability reports.
 ``write``     the stored collection: known-item judgments (target 2, byte-identical copy 1),
               topical queries pending labels.
 """
@@ -69,7 +70,7 @@ LEVELS = ("exact", "partial", "vague")
 QUOTAS = {("bundestag", "de"): 30, ("eurlex", "de"): 15, ("eurlex", "en"): 15,
           ("safedocs", "de"): 20, ("govdata", "de"): 15, ("wikipedia", "de"): 10,
           ("wikipedia", "en"): 15, ("enron", "en"): 30, ("govdocs1", "en"): 30}
-SPARE = 1.1  # planned per quota: leak/triviality drops leave about the quota
+SPARE = 1.1  # planned per quota: leak drops leave about the quota
 TOPICAL = {"de": 70, "en": 70}  # candidate groups; a group without a shared topic yields none
 EXCERPT_CHARS = 2500
 DEEP_MIN_WORDS = 1500
@@ -808,7 +809,16 @@ def select_subset(rows: dict[str, dict], documents: set[str], content: dict[str,
 
 
 def subset(size: int) -> int:
-    """Shrink the stored collection to the selection; queries and judgments stay as they are."""
+    """Shrink the stored collection to the selection; queries and judgments stay as they are.
+
+    Refuses when ``subset.json`` exists: the selection depends on the stored queries, so a
+    rerun after queries were dropped would silently change the corpus and its index.
+    """
+    if (RECORD / "subset.json").exists():
+        print(f"subset refused: {RECORD / 'subset.json'} already fixes the collection's documents; "
+              "selecting again would change the corpus. Remove it deliberately to reselect.",
+              file=sys.stderr)
+        return 2
     c, _ = _collection()
     rows = _recipe_rows()
     full = population(rows)
@@ -1039,7 +1049,7 @@ def generate_one(q: dict, rows: dict, texts: dict, *, feedback: str = "", round_
                  max_attempts: int = 4) -> dict | None:
     """Generate until the verbatim-leak gate passes (partial/vague), recording every attempt.
 
-    A rejection adds its reason to the caller's feedback (a triviality hint stays in force)."""
+    A rejection adds its reason to the caller's feedback (which stays in force)."""
     base = feedback
     for attempt in range(max_attempts):
         if q["kind"] == "known-item":
@@ -1175,10 +1185,33 @@ class _Ranker:
         return self.m.ranked_doc_ids(locations, self.documents)
 
 
-def lexical_ranks(handle, client, items: list[tuple[str, str, str]]) -> dict[str, int | None]:
-    """Lexical-only (``mode: text``, the refined request otherwise) rank of each target."""
+# Keyword search alone (S30 triviality): the lexical leg, with the cross-encoder reranker,
+# LambdaMART, query expansion and freshness off, so a rank depends only on the engine and the
+# documents. Each response's trace must show it (``KEYWORD_OFF`` stages never executed).
+KEYWORD_PIPELINE = {"sparseEnabled": True, "denseEnabled": False, "spladeEnabled": False,
+                    "fusionAlgorithm": "none", "lambdamartEnabled": False,
+                    "crossEncoderEnabled": False, "crossEncoderWindow": 0,
+                    "expansionEnabled": False, "freshnessEnabled": False}
+KEYWORD_OFF = ("dense-retrieval", "splade-retrieval", "expansion", "lambdamart", "cross-encoder",
+               "freshness")
+
+
+def keyword_stages(body: dict) -> dict[str, str | None]:
+    """The trace stage statuses of a keyword-alone response; refuses any other pipeline."""
+    stages = {st.get("id"): st.get("status") for st in (body.get("searchTrace") or {}).get("stages", [])}
+    if stages.get("sparse-retrieval") != "executed" or any(stages.get(st) == "executed" for st in KEYWORD_OFF):
+        raise ValueError(f"search was not keyword search alone: {stages}")
+    return stages
+
+
+def lexical_ranks(handle, client, items: list[tuple[str, str, str]],
+                  stages: Counter | None = None) -> dict[str, int | None]:
+    """Keyword-alone (``KEYWORD_PIPELINE``, the refined request otherwise) rank of each target.
+
+    ``stages`` counts the ``stage:status`` pairs the responses' traces report.
+    """
     from .run import request_for
-    request = request_for("text")
+    request = {**request_for("text"), "pipeline": KEYWORD_PIPELINE}
     out = {}
     for qid, text, target in items:
         for attempt in range(5):
@@ -1189,67 +1222,59 @@ def lexical_ranks(handle, client, items: list[tuple[str, str, str]]) -> dict[str
                 if attempt == 4:
                     raise
                 time.sleep(10)
+        seen = keyword_stages(body)
+        if stages is not None:
+            stages.update(f"{k}:{v}" for k, v in seen.items())
         locations = [(h.get("fields") or {}).get("path") or h.get("id") for h in body.get("results", [])]
         ranked = handle.ranked_doc_ids(locations)
         out[qid] = ranked.index(target) + 1 if target in ranked else None
     return out
 
 
-def gate(timeout_sec: float, rounds: int, url: str | None = None, root: Path | None = None) -> int:
-    """Triviality loop on the prepared index (adopting it) or on a running build engine."""
+def gate(timeout_sec: float, url: str | None = None, root: Path | None = None,
+         cache_root: Path | None = None) -> int:
+    """Gates and the keyword-alone measurement on the prepared index or on a running build engine.
+
+    On the prepared index this is scoring: it runs only inside the core's exclusive window
+    (``scripts/dev/admission.py exclusive``) and never builds; ``quality prepare`` builds.
+    """
     c, _ = _collection()
     if url:
-        report = _gate(c, url, _Ranker(root, c), rounds)
+        report = _gate(c, url, _Ranker(root, c))
         report["engine"] = "build engine (lexical index complete)"
     else:
-        with _open(c, timeout_sec) as handle:
-            handle.wait()
-            report = _gate(c, handle.base_url, handle, rounds)
+        from .run import require_exclusive
+        require_exclusive(ix.REPO_ROOT)
+        config = replace(ix.IndexConfig(), timeout_sec=timeout_sec)
+        config = replace(config, cache_root=cache_root) if cache_root else config
+        with ix.prepare_index(c, config, prepared_only=True) as handle:
+            handle.wait(prepared_only=True)
+            report = _gate(c, handle.base_url, handle)
             report["generation"] = handle.index_state.get("generation")
+            # The index key holds machine-specific hashes; it stays out of committed records.
     _write_json(RECORD / "gates.json", report)
     print(canonical_json(report["summary"]))
     return 0
 
 
-def _gate(c: Collection, base_url: str, handle, rounds: int) -> dict:
+def _gate(c: Collection, base_url: str, handle) -> dict:
+    """S30 gates: drops only queries without an accepted generation that meets the offline
+    gates (verbatim leak, word limit) and repeated query texts. Triviality (keyword search
+    alone ranks the target first) is measured once per known-item query and recorded, never
+    gated: no query is dropped or regenerated for it."""
     records, texts = load_texts()
     rows = _recipe_rows()
     planned = {q["qid"]: q for q in load_plan(c.documents)}
-    df = Counter(t for text in texts.values() for t in set(tokens(text)))
-    results = {}
-    with httpx.Client(base_url=base_url, timeout=600) as client:
-        for rnd in range(rounds + 1):
-            done = {q: r for q, r in _accepted().items() if q in planned and meets_gates(planned[q], r, texts)}
-            ki = sorted(qid for qid in done if planned[qid]["kind"] == "known-item")
-            ranks = lexical_ranks(handle, client, [(qid, done[qid]["query"], planned[qid]["target"])
-                                                   for qid in ki if qid not in results
-                                                   or results[qid]["query"] != done[qid]["query"]])
-            for qid, rank in ranks.items():
-                results[qid] = {"query": done[qid]["query"], "rank": rank}
-            over = {}
-            for level in ("partial", "vague"):
-                ids = [q for q in ki if planned[q]["level"] == level]
-                first = sorted(q for q in ids if results[q]["rank"] == 1)
-                excess = len(first) - len(ids) // 2
-                if excess > 0:
-                    # Twice the excess per round (each regeneration may stay rank 1).
-                    over[level] = random.Random(SEED + rnd).sample(first, min(len(first), 2 * excess))
-            print(canonical_json({"round": rnd, "rank1": {lv: sum(1 for q in ki if planned[q]["level"] == lv
-                                                                  and results[q]["rank"] == 1) for lv in LEVELS},
-                                  "excess": {k: len(v) for k, v in over.items()}}), file=sys.stderr, flush=True)
-            if not over or rnd == rounds:
-                break
-            for level, qids in over.items():
-                for qid in qids:
-                    # An accepted regeneration supersedes the earlier query; a failed one keeps it.
-                    target = planned[qid]["target"]
-                    generate_one(planned[qid], rows, texts, round_=f"triviality-{rnd + 1}",
-                                 feedback=triviality_feedback(planned[qid], done[qid]["query"], rare_words(
-                                     done[qid]["query"], texts[target], df)))
     done = {q: r for q, r in _accepted().items() if q in planned and meets_gates(planned[q], r, texts)}
-    trivial = triviality_drops(planned, done, results)
-    dropped = {q: {"reason": "triviality", "level": planned[q]["level"], "query": done[q]["query"],
-                   "lexical_rank": results[q]["rank"]} for q in trivial}
+    ki = sorted(qid for qid in done if planned[qid]["kind"] == "known-item")
+    stages = Counter()
+    with httpx.Client(base_url=base_url, timeout=600) as client:
+        ranks = lexical_ranks(handle, client, [(qid, done[qid]["query"], planned[qid]["target"]) for qid in ki],
+                              stages)
+    results = {qid: {"query": done[qid]["query"], "rank": rank} for qid, rank in ranks.items()}
+    print(canonical_json({"rank1": {lv: sum(1 for q in ki if planned[q]["level"] == lv and results[q]["rank"] == 1)
+                                    for lv in LEVELS}}), file=sys.stderr, flush=True)
+    dropped = {}
     attempts = defaultdict(list)
     for row in _jsonl(RECORD / "generation.jsonl"):
         attempts[row["qid"]].append(row)
@@ -1258,55 +1283,28 @@ def _gate(c: Collection, base_url: str, handle, rounds: int) -> dict:
         dropped[qid] = {"reason": "gates", "attempts": len(attempts[qid]),
                         "last_rejection": next((r.get("rejected") or r.get("error") or "no longer meets the gates"
                                                 for r in reversed(attempts[qid])), "never generated")}
-    report = gate_report(planned, {q: r for q, r in done.items() if q not in trivial}, results, records, texts, rows)
+    kept = dict(done)
+    for qid, first in duplicates(kept).items():
+        dropped[qid] = {"reason": "duplicate", "kind": planned[qid]["kind"], "query": kept[qid]["query"],
+                        "duplicate_of": first}
+        del kept[qid]
+    report = gate_report(planned, kept, results, records, texts, rows)
+    report["ranking"] = {"pipeline": KEYWORD_PIPELINE, "trace_stages": dict(sorted(stages.items()))}
     report["dropped"] = dict(sorted(dropped.items()))
     report["summary"]["dropped"] = dict(sorted(Counter(d["reason"] for d in dropped.values()).items()))
-    report["summary"]["triviality_drop_seed"] = TRIVIALITY_DROP_SEED
     return report
 
 
-TRIVIALITY_DROP_SEED = f"{SEED}/triviality-drop"
-
-
-def triviality_drops(planned: dict, done: dict, results: dict) -> list[str]:
-    """The fewest rank-1 queries per partial/vague level whose drop leaves at most half rank 1,
-    sampled by ``TRIVIALITY_DROP_SEED`` among that level's rank-1 queries (never by hand).
-
-    Their targets stay in the corpus. With ``n`` queries of which ``r`` are rank 1, dropping
-    ``k`` of the rank-1 ones passes when ``r - k <= (n - k) / 2``, i.e. ``k >= 2r - n``.
-    """
-    out = []
-    for level in ("partial", "vague"):
-        ids = sorted(q for q in done if planned[q]["kind"] == "known-item" and planned[q]["level"] == level)
-        first = [q for q in ids if results[q]["rank"] == 1]
-        k = max(0, 2 * len(first) - len(ids))
-        out += random.Random(f"{TRIVIALITY_DROP_SEED}/{level}").sample(first, k)
-    return sorted(out)
-
-
-RARE_DF = 5  # a query word found in at most this many documents points straight at its file
-
-
-def rare_words(query: str, target_text: str, df: Counter) -> list[str]:
-    """Query words that occur in the target and in at most ``RARE_DF`` documents."""
-    present = set(tokens(target_text))
-    return [t for t in dict.fromkeys(tokens(query)) if t in present and df[t] <= RARE_DF]
-
-
-def triviality_feedback(q: dict, query: str, rare: list[str]) -> str:
-    """Regeneration hint for a partial/vague query whose target plain keyword search ranks first."""
-    if rare:
-        hint = ("These words occur in almost no other file and point straight at it: "
-                + ", ".join(rare) + ". Keep at most one of them; replace the others with what a "
-                "person would recall instead (a broader term, a synonym, the organisation or "
-                "place, or a half-remembered spelling).")
-    else:
-        hint = ("Write how a person would recall it weeks later, without its most distinctive "
-                "literal words.")
-    low, high = word_bounds(q)
-    # Replacing words tends to add some; the reply must still fit the word limit.
-    return (f"Your previous query \"{query}\" finds the file with plain keyword search alone. "
-            f"{hint} Use {low} to {high} words in total. Do not repeat the previous query.")
+def duplicates(done: dict) -> dict[str, str]:
+    """Queries whose text (case-folded) repeats an earlier query id's: qid -> that first qid."""
+    first, out = {}, {}
+    for qid in sorted(done):
+        key = done[qid]["query"].casefold()
+        if key in first:
+            out[qid] = first[key]
+        else:
+            first[key] = qid
+    return out
 
 
 def gate_report(planned, done, results, records, texts, rows) -> dict:
@@ -1337,15 +1335,13 @@ def gate_report(planned, done, results, records, texts, rows) -> dict:
                 for v, es in sorted(groups.items())}
 
     strata = {k: stratum(k) for k in ("level", "source", "format", "language", "in_cluster", "focus")}
-    triviality = {lv: {**strata["level"].get(lv, {}),
-                       "passed": strata["level"].get(lv, {}).get("rank1_share", 0) <= .5 if lv != "exact" else None}
-                  for lv in LEVELS}
     leak_failures = [qid for qid in ki if planned[qid]["level"] != "exact" and per_query[qid]["verbatim_leak"]]
     leak_failures += [qid for qid in per_query if planned[qid]["kind"] == "topical" and per_query[qid]["verbatim_leak"]]
     distinguish = distinguishability([planned[q]["target"] for q in ki], records, texts)
     summary = {"accepted": len(per_query), "known_item": len(ki),
                "topical": len(per_query) - len(ki), "verbatim_leak_failures": len(leak_failures),
-               "triviality": {lv: {k: triviality[lv].get(k) for k in ("queries", "rank1", "rank1_share", "passed")}
+               # Measured, not gated (S30): keyword search alone ranks the target first.
+               "triviality": {lv: {k: strata["level"].get(lv, {}).get(k) for k in ("queries", "rank1", "rank1_share")}
                               for lv in LEVELS},
                "distinguishability_passed": {s: v["passed"] for s, v in distinguish.items()}}
     return {"summary": summary, "strata": strata, "distinguishability": distinguish, "queries": per_query}
@@ -1381,15 +1377,14 @@ def write() -> int:
     planned = {q["qid"]: q for q in load_plan(c.documents)}
     done = {q: r for q, r in _accepted().items() if q in planned}
     gates = json.loads((RECORD / "gates.json").read_text(encoding="utf-8"))["queries"]
-    seen, queries, judgments = set(), {}, {}
+    queries, judgments = {}, {}
     by_content = defaultdict(list)
     for doc, h in c.content.items():
         by_content[h].append(doc)
     for qid in sorted(done):
         q, text = planned[qid], done[qid]["query"]
-        if qid not in gates or gates[qid]["query"] != text or text.casefold() in seen:
-            continue
-        seen.add(text.casefold())
+        if qid not in gates or gates[qid]["query"] != text:
+            continue  # dropped by the gate (gates.json records why)
         if q["kind"] == "known-item":
             groups = {"lang": q["language"], "kind": "known-item", "level": q["level"],
                       "source": q["source"], "format": q["format"], "focus": q["focus"],
@@ -1403,6 +1398,8 @@ def write() -> int:
                      dict(c.metadata))
     if new.document_identity() != c.document_identity():
         raise ValueError("documents changed while writing queries")
+    if dup := duplicates({q: {"query": t.text} for q, t in queries.items()}):
+        raise ValueError(f"repeated query texts the gate did not drop: {sorted(dup)}")
     qcoll.write_collection(new, Path(__file__).with_name("recipes") / COLLECTION)
     pending = len(qcoll.pending_queries(new, cfg))
     counts = {**new.counts(), "pending": pending}
@@ -1437,9 +1434,9 @@ def main(argv=None) -> int:
     p.add_argument("--retry", action="store_true", help="regenerate queries failing the current gates")
     p = steps.add_parser("gate")
     p.add_argument("--timeout-sec", type=float, default=3 * 3600)
-    p.add_argument("--rounds", type=int, default=3)
     p.add_argument("--url", help="a running build engine of this collection (with --root)")
     p.add_argument("--root", type=Path, help="that engine's index entry root")
+    p.add_argument("--cache-root", type=Path, help="index cache root (default: the quality cache)")
     steps.add_parser("write")
     args = parser.parse_args(argv)
     if args.step == "prepare":
@@ -1451,7 +1448,7 @@ def main(argv=None) -> int:
     if args.step == "generate":
         return generate(args.concurrency, args.retry)
     if args.step == "gate":
-        return gate(args.timeout_sec, args.rounds, args.url, args.root)
+        return gate(args.timeout_sec, args.url, args.root, args.cache_root)
     return {"clusters": clusters, "plan": plan, "write": write}[args.step]()
 
 

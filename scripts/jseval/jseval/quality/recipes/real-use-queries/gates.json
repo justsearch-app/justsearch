@@ -1,36 +1,36 @@
 {
  "distinguishability": {
   "bundestag": {
-   "length_separability": 0.06451612903225806,
-   "max_target_5gram_coverage": 0.3225806451612903,
-   "native_base_rate": 0.6774193548387096,
-   "other_median_words": 1853.5,
-   "others": 154,
+   "length_separability": 0.0625,
+   "max_target_5gram_coverage": 0.4375,
+   "native_base_rate": 0.5625,
+   "other_median_words": 1871,
+   "others": 153,
    "passed": true,
-   "target_median_words": 2300,
-   "targets": 31,
+   "target_median_words": 2209.5,
+   "targets": 32,
    "token_cap": 2000
   },
   "enron": {
-   "length_separability": 0.1935483870967742,
-   "max_target_5gram_coverage": 0.06451612903225806,
-   "native_base_rate": 0.25806451612903225,
-   "other_median_words": 230.0,
-   "others": 82,
+   "length_separability": 0.21875,
+   "max_target_5gram_coverage": 0.0625,
+   "native_base_rate": 0.21875,
+   "other_median_words": 230,
+   "others": 81,
    "passed": true,
-   "target_median_words": 212,
-   "targets": 31,
+   "target_median_words": 214.0,
+   "targets": 32,
    "token_cap": 2000
   },
   "eurlex": {
-   "length_separability": 0.1111111111111111,
-   "max_target_5gram_coverage": 0.18518518518518517,
-   "native_base_rate": 0.5185185185185185,
-   "other_median_words": 643,
-   "others": 229,
+   "length_separability": 0.10714285714285714,
+   "max_target_5gram_coverage": 0.17857142857142858,
+   "native_base_rate": 0.5357142857142857,
+   "other_median_words": 640.5,
+   "others": 228,
    "passed": true,
-   "target_median_words": 722,
-   "targets": 27,
+   "target_median_words": 802.5,
+   "targets": 28,
    "token_cap": 2000
   },
   "govdata": {
@@ -56,14 +56,14 @@
    "token_cap": 2000
   },
   "safedocs": {
-   "length_separability": 0.047619047619047616,
-   "max_target_5gram_coverage": 0.09523809523809523,
-   "native_base_rate": 0.09523809523809523,
-   "other_median_words": 267.5,
-   "others": 24,
+   "length_separability": 0.045454545454545456,
+   "max_target_5gram_coverage": 0.09090909090909091,
+   "native_base_rate": 0.09090909090909091,
+   "other_median_words": 311,
+   "others": 23,
    "passed": true,
-   "target_median_words": 566,
-   "targets": 21,
+   "target_median_words": 480.0,
+   "targets": 22,
    "token_cap": 2000
   },
   "wikipedia": {
@@ -84,34 +84,40 @@
    "last_rejection": "verbatim leak",
    "reason": "gates"
   },
-  "ki-032": {
-   "level": "partial",
-   "lexical_rank": 1,
-   "query": "Jelpke Anfrage Inlandsgeheimdienst Minderjährige",
-   "reason": "triviality"
-  },
-  "ki-056": {
-   "level": "partial",
-   "lexical_rank": 1,
-   "query": "Sternberg Allegheny netting affiliates",
-   "reason": "triviality"
-  },
   "ki-071": {
    "attempts": 14,
    "last_rejection": "6 words",
    "reason": "gates"
   },
-  "ki-080": {
-   "level": "partial",
-   "lexical_rank": 1,
-   "query": "Durchführungsverordnung 129/2013 Agrarbetriebe Anpassung",
-   "reason": "triviality"
+  "tp-016": {
+   "duplicate_of": "tp-015",
+   "kind": "topical",
+   "query": "Hamburger Großhandel Umsatzstatistik monatlich",
+   "reason": "duplicate"
   },
-  "ki-155": {
-   "level": "partial",
-   "lexical_rank": 1,
-   "query": "Grote Bauland Eichendorffstraße Immobilienmakler",
-   "reason": "triviality"
+  "tp-017": {
+   "duplicate_of": "tp-015",
+   "kind": "topical",
+   "query": "Hamburger Großhandel Umsatzstatistik monatlich",
+   "reason": "duplicate"
+  },
+  "tp-033": {
+   "duplicate_of": "tp-032",
+   "kind": "topical",
+   "query": "Industrieproduktion Hamburg Monatsberichte Statistikamt",
+   "reason": "duplicate"
+  },
+  "tp-045": {
+   "duplicate_of": "tp-004",
+   "kind": "topical",
+   "query": "Bundestag Drucksachen 18. Wahlperiode",
+   "reason": "duplicate"
+  },
+  "tp-047": {
+   "duplicate_of": "tp-044",
+   "kind": "topical",
+   "query": "Lobbyeinfluss auf Regierungsentwürfe Anfragen Linke",
+   "reason": "duplicate"
   },
   "tp-096": {
    "attempts": 16,
@@ -124,7 +130,7 @@
    "reason": "gates"
   }
  },
- "generation": "g-20261104-120953",
+ "generation": "g-20261104-173716",
  "queries": {
   "ki-001": {
    "absent_word_share": 0.25,
@@ -139,7 +145,7 @@
    "absent_word_share": 0.0,
    "kind": "known-item",
    "level": "partial",
-   "lexical_rank": 2,
+   "lexical_rank": 1,
    "query": "Eurofighter Diehl Boeing Bundesregierung",
    "verbatim_leak": [],
    "words": 4
@@ -166,7 +172,7 @@
    "absent_word_share": 0.2,
    "kind": "known-item",
    "level": "partial",
-   "lexical_rank": 4,
+   "lexical_rank": 1,
    "query": "Göring-Eckardt Asylpaket Bundestagssitzung 2016",
    "verbatim_leak": [],
    "words": 4
@@ -202,7 +208,7 @@
    "absent_word_share": 0.6,
    "kind": "known-item",
    "level": "vague",
-   "lexical_rank": 1,
+   "lexical_rank": 3,
    "query": "Grüne Anfrage Biomasse-Verein Staatsgelder",
    "verbatim_leak": [],
    "words": 4
@@ -211,7 +217,7 @@
    "absent_word_share": 0.5,
    "kind": "known-item",
    "level": "exact",
-   "lexical_rank": 1,
+   "lexical_rank": 3,
    "query": "Alterspräsident Antrag Geschäftsordnung Lebensjahre",
    "verbatim_leak": [],
    "words": 4
@@ -220,7 +226,7 @@
    "absent_word_share": 0.75,
    "kind": "known-item",
    "level": "vague",
-   "lexical_rank": 2,
+   "lexical_rank": 6,
    "query": "A6 Ausbau Privatfinanzierung Grüne",
    "verbatim_leak": [],
    "words": 4
@@ -238,7 +244,7 @@
    "absent_word_share": 0.75,
    "kind": "known-item",
    "level": "partial",
-   "lexical_rank": 25,
+   "lexical_rank": 24,
    "query": "Korte Lobbyeinfluss Personenverkehr Reform",
    "verbatim_leak": [],
    "words": 4
@@ -247,7 +253,7 @@
    "absent_word_share": 0.6,
    "kind": "known-item",
    "level": "vague",
-   "lexical_rank": 1,
+   "lexical_rank": 12,
    "query": "AfD Sicherheitsdebatte Bundestag Kanzler-Regierungserklärung",
    "verbatim_leak": [],
    "words": 4
@@ -265,7 +271,7 @@
    "absent_word_share": 0.0,
    "kind": "known-item",
    "level": "partial",
-   "lexical_rank": 2,
+   "lexical_rank": 1,
    "query": "Kipping Corona Sanktionen Aussetzung",
    "verbatim_leak": [],
    "words": 4
@@ -328,7 +334,7 @@
    "absent_word_share": 0.75,
    "kind": "known-item",
    "level": "vague",
-   "lexical_rank": 2,
+   "lexical_rank": 11,
    "query": "Lobbyismus Verbrauchervertragsgesetz Linke Regierungsantwort",
    "verbatim_leak": [],
    "words": 4
@@ -396,6 +402,15 @@
    "verbatim_leak": [],
    "words": 5
   },
+  "ki-032": {
+   "absent_word_share": 0.0,
+   "kind": "known-item",
+   "level": "partial",
+   "lexical_rank": 1,
+   "query": "Jelpke Anfrage Inlandsgeheimdienst Minderjährige",
+   "verbatim_leak": [],
+   "words": 4
+  },
   "ki-033": {
    "absent_word_share": 0.25,
    "kind": "known-item",
@@ -418,7 +433,7 @@
    "absent_word_share": 0.25,
    "kind": "known-item",
    "level": "partial",
-   "lexical_rank": 2,
+   "lexical_rank": 1,
    "query": "CBS email game peanuts",
    "verbatim_leak": [],
    "words": 4
@@ -472,7 +487,7 @@
    "absent_word_share": 0.5,
    "kind": "known-item",
    "level": "partial",
-   "lexical_rank": 2,
+   "lexical_rank": 1,
    "query": "Cera teleconference dial-in",
    "verbatim_leak": [],
    "words": 3
@@ -481,7 +496,7 @@
    "absent_word_share": 0.5,
    "kind": "known-item",
    "level": "vague",
-   "lexical_rank": 1,
+   "lexical_rank": 21,
    "query": "Tana fuel supplier amendment",
    "verbatim_leak": [],
    "words": 4
@@ -594,6 +609,15 @@
    "verbatim_leak": [],
    "words": 4
   },
+  "ki-056": {
+   "absent_word_share": 0.25,
+   "kind": "known-item",
+   "level": "partial",
+   "lexical_rank": 1,
+   "query": "Sternberg Allegheny netting affiliates",
+   "verbatim_leak": [],
+   "words": 4
+  },
   "ki-057": {
    "absent_word_share": 0.5,
    "kind": "known-item",
@@ -697,7 +721,7 @@
    "absent_word_share": 0.0,
    "kind": "known-item",
    "level": "partial",
-   "lexical_rank": 18,
+   "lexical_rank": 1,
    "query": "Einfuhrwerte Kommission Januar 2013",
    "verbatim_leak": [],
    "words": 4
@@ -706,7 +730,7 @@
    "absent_word_share": 0.75,
    "kind": "known-item",
    "level": "vague",
-   "lexical_rank": 5,
+   "lexical_rank": 10,
    "query": "Rübenzucker Zollaufschläge Aussetzung Wirtschaftsjahr",
    "verbatim_leak": [],
    "words": 4
@@ -715,7 +739,7 @@
    "absent_word_share": 0.0,
    "kind": "known-item",
    "level": "exact",
-   "lexical_rank": 2,
+   "lexical_rank": 1,
    "query": "Durchführungsverordnung Nr. 4/2013 Olivenöl Tunesien",
    "verbatim_leak": [],
    "words": 5
@@ -724,7 +748,7 @@
    "absent_word_share": 0.5,
    "kind": "known-item",
    "level": "vague",
-   "lexical_rank": 3,
+   "lexical_rank": 11,
    "query": "Pauschalwerte Zitrusfrüchte Januar 2013",
    "verbatim_leak": [],
    "words": 4
@@ -733,7 +757,7 @@
    "absent_word_share": 0.0,
    "kind": "known-item",
    "level": "exact",
-   "lexical_rank": 2,
+   "lexical_rank": 3,
    "query": "Verordnung 68/2013 Katalog der Einzelfuttermittel",
    "verbatim_leak": [],
    "words": 5
@@ -742,7 +766,7 @@
    "absent_word_share": 0.4,
    "kind": "known-item",
    "level": "partial",
-   "lexical_rank": 6,
+   "lexical_rank": 1,
    "query": "Zucker Importzölle Preise 2012/13",
    "verbatim_leak": [],
    "words": 4
@@ -760,7 +784,7 @@
    "absent_word_share": 0.25,
    "kind": "known-item",
    "level": "partial",
-   "lexical_rank": 2,
+   "lexical_rank": 1,
    "query": "IFRS 1 Staatsdarlehen Ausnahme",
    "verbatim_leak": [],
    "words": 4
@@ -769,7 +793,7 @@
    "absent_word_share": 0.25,
    "kind": "known-item",
    "level": "vague",
-   "lexical_rank": 5,
+   "lexical_rank": 2,
    "query": "Eigenmittel Clearingstellen Delegierte Verordnung",
    "verbatim_leak": [],
    "words": 4
@@ -783,11 +807,20 @@
    "verbatim_leak": [],
    "words": 4
   },
+  "ki-080": {
+   "absent_word_share": 0.2,
+   "kind": "known-item",
+   "level": "partial",
+   "lexical_rank": 1,
+   "query": "Durchführungsverordnung 129/2013 Agrarbetriebe Anpassung",
+   "verbatim_leak": [],
+   "words": 4
+  },
   "ki-081": {
    "absent_word_share": 0.5,
    "kind": "known-item",
    "level": "vague",
-   "lexical_rank": 2,
+   "lexical_rank": 1,
    "query": "EMIR Clearinghaus Liquiditätsrisiko Verordnung",
    "verbatim_leak": [],
    "words": 4
@@ -832,7 +865,7 @@
    "absent_word_share": 0.5,
    "kind": "known-item",
    "level": "partial",
-   "lexical_rank": 19,
+   "lexical_rank": 1,
    "query": "Zimbabwe Durchführungsverordnung Feburary sanctions",
    "verbatim_leak": [],
    "words": 4
@@ -850,7 +883,7 @@
    "absent_word_share": 0.25,
    "kind": "known-item",
    "level": "partial",
-   "lexical_rank": 12,
+   "lexical_rank": 2,
    "query": "Šemeta toy candy customs",
    "verbatim_leak": [],
    "words": 4
@@ -859,7 +892,7 @@
    "absent_word_share": 0.25,
    "kind": "known-item",
    "level": "vague",
-   "lexical_rank": 3,
+   "lexical_rank": 2,
    "query": "2013 pesticide residue limits",
    "verbatim_leak": [],
    "words": 4
@@ -904,7 +937,7 @@
    "absent_word_share": 0.0,
    "kind": "known-item",
    "level": "vague",
-   "lexical_rank": 7,
+   "lexical_rank": 1,
    "query": "solar panel import registration",
    "verbatim_leak": [],
    "words": 4
@@ -922,7 +955,7 @@
    "absent_word_share": 0.5,
    "kind": "known-item",
    "level": "partial",
-   "lexical_rank": 2,
+   "lexical_rank": 4,
    "query": "2013 motorbike approval regulaton",
    "verbatim_leak": [],
    "words": 4
@@ -931,7 +964,7 @@
    "absent_word_share": 0.5,
    "kind": "known-item",
    "level": "vague",
-   "lexical_rank": 1,
+   "lexical_rank": 14,
    "query": "Einwohnerzahlen Hamburg Q1 2020",
    "verbatim_leak": [],
    "words": 4
@@ -940,7 +973,7 @@
    "absent_word_share": 0.2,
    "kind": "known-item",
    "level": "exact",
-   "lexical_rank": 1,
+   "lexical_rank": 2,
    "query": "Verarbeitendes Gewerbe Hamburg Febuar 2015",
    "verbatim_leak": [],
    "words": 5
@@ -967,7 +1000,7 @@
    "absent_word_share": 0.2,
    "kind": "known-item",
    "level": "exact",
-   "lexical_rank": 2,
+   "lexical_rank": 1,
    "query": "Einzelhandel Hamburg Juni 2019 Umstaz",
    "verbatim_leak": [],
    "words": 5
@@ -985,7 +1018,7 @@
    "absent_word_share": 0.5,
    "kind": "known-item",
    "level": "vague",
-   "lexical_rank": 27,
+   "lexical_rank": 24,
    "query": "Hamburg Industrieproduktion 2022 Güterarten",
    "verbatim_leak": [],
    "words": 4
@@ -994,7 +1027,7 @@
    "absent_word_share": 0.0,
    "kind": "known-item",
    "level": "exact",
-   "lexical_rank": 2,
+   "lexical_rank": 1,
    "query": "Ausfuhr Hamburg 2. Quartal 2025",
    "verbatim_leak": [],
    "words": 5
@@ -1003,7 +1036,7 @@
    "absent_word_share": 0.25,
    "kind": "known-item",
    "level": "partial",
-   "lexical_rank": 13,
+   "lexical_rank": 7,
    "query": "Hamburg Großhandel Mitarbeiter 2024",
    "verbatim_leak": [],
    "words": 4
@@ -1030,7 +1063,7 @@
    "absent_word_share": 0.25,
    "kind": "known-item",
    "level": "partial",
-   "lexical_rank": 2,
+   "lexical_rank": 5,
    "query": "Hamburg Einzelhandle Statistik 2019",
    "verbatim_leak": [],
    "words": 4
@@ -1057,7 +1090,7 @@
    "absent_word_share": 0.25,
    "kind": "known-item",
    "level": "partial",
-   "lexical_rank": 2,
+   "lexical_rank": 6,
    "query": "Hamburg Einzelhandl Umsatz 2016",
    "verbatim_leak": [],
    "words": 4
@@ -1120,7 +1153,7 @@
    "absent_word_share": 0.5,
    "kind": "known-item",
    "level": "vague",
-   "lexical_rank": 13,
+   "lexical_rank": 1,
    "query": "Tenino bussiness stats 1997",
    "verbatim_leak": [],
    "words": 4
@@ -1174,7 +1207,7 @@
    "absent_word_share": 0.25,
    "kind": "known-item",
    "level": "vague",
-   "lexical_rank": 3,
+   "lexical_rank": 1,
    "query": "FIPSE Russian grant guidlines",
    "verbatim_leak": [],
    "words": 4
@@ -1201,7 +1234,7 @@
    "absent_word_share": 0.75,
    "kind": "known-item",
    "level": "vague",
-   "lexical_rank": 1,
+   "lexical_rank": 16,
    "query": "archaeology relics training slides",
    "verbatim_leak": [],
    "words": 4
@@ -1219,7 +1252,7 @@
    "absent_word_share": 0.75,
    "kind": "known-item",
    "level": "partial",
-   "lexical_rank": 5,
+   "lexical_rank": 1,
    "query": "Labor Meldung ORU spreadsheet",
    "verbatim_leak": [],
    "words": 4
@@ -1300,7 +1333,7 @@
    "absent_word_share": 0.5,
    "kind": "known-item",
    "level": "vague",
-   "lexical_rank": 1,
+   "lexical_rank": 5,
    "query": "wetland windflower Pacific Northwest",
    "verbatim_leak": [],
    "words": 4
@@ -1336,7 +1369,7 @@
    "absent_word_share": 0.25,
    "kind": "known-item",
    "level": "partial",
-   "lexical_rank": 4,
+   "lexical_rank": 1,
    "query": "Hispanic population estimates multiracial",
    "verbatim_leak": [],
    "words": 4
@@ -1401,6 +1434,15 @@
    "level": "exact",
    "lexical_rank": 1,
    "query": "Pressemitteilung Wandsbeker Winterzauber 2009",
+   "verbatim_leak": [],
+   "words": 4
+  },
+  "ki-155": {
+   "absent_word_share": 0.5,
+   "kind": "known-item",
+   "level": "partial",
+   "lexical_rank": 1,
+   "query": "Grote Bauland Eichendorffstraße Immobilienmakler",
    "verbatim_leak": [],
    "words": 4
   },
@@ -1516,7 +1558,7 @@
    "absent_word_share": 0.6,
    "kind": "known-item",
    "level": "vague",
-   "lexical_rank": 2,
+   "lexical_rank": 1,
    "query": "Bits manipulieren Hardware-Port Spickzettel",
    "verbatim_leak": [],
    "words": 4
@@ -1534,7 +1576,7 @@
    "absent_word_share": 0.25,
    "kind": "known-item",
    "level": "partial",
-   "lexical_rank": 3,
+   "lexical_rank": 2,
    "query": "Energietechnik Kerntechnik Atomausstieg Photovoltaik",
    "verbatim_leak": [],
    "words": 4
@@ -1570,7 +1612,7 @@
    "absent_word_share": 0.6,
    "kind": "known-item",
    "level": "vague",
-   "lexical_rank": 1,
+   "lexical_rank": 2,
    "query": "Pure-Lead Batterie lange Lagerfähigkeit",
    "verbatim_leak": [],
    "words": 4
@@ -1588,7 +1630,7 @@
    "absent_word_share": 0.5,
    "kind": "known-item",
    "level": "partial",
-   "lexical_rank": 2,
+   "lexical_rank": 1,
    "query": "Stadtwerke Deregulierung Netzauslastung Industrie",
    "verbatim_leak": [],
    "words": 4
@@ -1597,7 +1639,7 @@
    "absent_word_share": 0.75,
    "kind": "known-item",
    "level": "vague",
-   "lexical_rank": 2,
+   "lexical_rank": 1,
    "query": "CUTEC Harz Forschungsinstitut Defizit",
    "verbatim_leak": [],
    "words": 4
@@ -1651,7 +1693,7 @@
    "absent_word_share": 0.667,
    "kind": "known-item",
    "level": "vague",
-   "lexical_rank": 27,
+   "lexical_rank": 24,
    "query": "hydropower downsides notes",
    "verbatim_leak": [],
    "words": 3
@@ -1678,7 +1720,7 @@
    "absent_word_share": 0.5,
    "kind": "known-item",
    "level": "vague",
-   "lexical_rank": 1,
+   "lexical_rank": 5,
    "query": "warmth storage underground seasons",
    "verbatim_leak": [],
    "words": 4
@@ -1705,7 +1747,7 @@
    "absent_word_share": 0.25,
    "kind": "known-item",
    "level": "vague",
-   "lexical_rank": 1,
+   "lexical_rank": 7,
    "query": "military solar power office",
    "verbatim_leak": [],
    "words": 4
@@ -1863,18 +1905,6 @@
    "verbatim_leak": [],
    "words": 4
   },
-  "tp-016": {
-   "kind": "topical",
-   "query": "Hamburger Großhandel Umsatzstatistik monatlich",
-   "verbatim_leak": [],
-   "words": 4
-  },
-  "tp-017": {
-   "kind": "topical",
-   "query": "Hamburger Großhandel Umsatzstatistik monatlich",
-   "verbatim_leak": [],
-   "words": 4
-  },
   "tp-018": {
    "kind": "topical",
    "query": "Einfuhrzölle Zucker Preise 2013",
@@ -1965,12 +1995,6 @@
    "verbatim_leak": [],
    "words": 4
   },
-  "tp-033": {
-   "kind": "topical",
-   "query": "Industrieproduktion Hamburg Monatsberichte Statistikamt",
-   "verbatim_leak": [],
-   "words": 4
-  },
   "tp-034": {
    "kind": "topical",
    "query": "Hamburg Industrie Investitionsstatistik Umweltschutz",
@@ -2037,23 +2061,11 @@
    "verbatim_leak": [],
    "words": 5
   },
-  "tp-045": {
-   "kind": "topical",
-   "query": "Bundestag Drucksachen 18. Wahlperiode",
-   "verbatim_leak": [],
-   "words": 4
-  },
   "tp-046": {
    "kind": "topical",
    "query": "Zölle auf Getreideeinfuhr 2013",
    "verbatim_leak": [],
    "words": 4
-  },
-  "tp-047": {
-   "kind": "topical",
-   "query": "Lobbyeinfluss auf Regierungsentwürfe Anfragen Linke",
-   "verbatim_leak": [],
-   "words": 5
   },
   "tp-048": {
    "kind": "topical",
@@ -2536,80 +2548,108 @@
    "words": 4
   }
  },
+ "ranking": {
+  "pipeline": {
+   "crossEncoderEnabled": false,
+   "crossEncoderWindow": 0,
+   "denseEnabled": false,
+   "expansionEnabled": false,
+   "freshnessEnabled": false,
+   "fusionAlgorithm": "none",
+   "lambdamartEnabled": false,
+   "sparseEnabled": true,
+   "spladeEnabled": false
+  },
+  "trace_stages": {
+   "branch-fusion:executed": 186,
+   "branch-fusion:skipped": 1,
+   "chunk-merge:executed": 187,
+   "correction:skipped": 187,
+   "cross-encoder:skipped": 187,
+   "dense-retrieval:skipped": 187,
+   "expansion:skipped": 187,
+   "freshness:disabled": 187,
+   "fusion:skipped": 187,
+   "lambdamart:skipped": 187,
+   "query-understanding:executed": 187,
+   "sparse-retrieval:executed": 187,
+   "splade-retrieval:skipped": 187
+  }
+ },
  "strata": {
   "focus": {
    "deep": {
-    "median_rank": 3.0,
+    "median_rank": 1.5,
     "not_in_top50": 4,
     "queries": 34,
-    "rank1": 12,
-    "rank1_share": 0.353,
+    "rank1": 17,
+    "rank1_share": 0.5,
     "verbatim_leaks": 0
    },
    "start": {
     "median_rank": 1,
     "not_in_top50": 11,
-    "queries": 149,
-    "rank1": 106,
-    "rank1_share": 0.711,
+    "queries": 153,
+    "rank1": 115,
+    "rank1_share": 0.752,
     "verbatim_leaks": 0
    }
   },
   "format": {
    "csv": {
-    "median_rank": 4,
+    "median_rank": 2,
     "not_in_top50": 2,
     "queries": 5,
-    "rank1": 1,
-    "rank1_share": 0.2,
+    "rank1": 2,
+    "rank1_share": 0.4,
     "verbatim_leaks": 0
    },
    "doc": {
     "median_rank": 1.0,
     "not_in_top50": 0,
     "queries": 4,
-    "rank1": 3,
-    "rank1_share": 0.75,
+    "rank1": 4,
+    "rank1_share": 1.0,
     "verbatim_leaks": 0
    },
    "eml": {
-    "median_rank": 1,
+    "median_rank": 1.0,
     "not_in_top50": 0,
-    "queries": 31,
-    "rank1": 26,
-    "rank1_share": 0.839,
+    "queries": 32,
+    "rank1": 28,
+    "rank1_share": 0.875,
     "verbatim_leaks": 0
    },
    "html": {
-    "median_rank": 1,
+    "median_rank": 1.0,
     "not_in_top50": 2,
-    "queries": 41,
-    "rank1": 25,
-    "rank1_share": 0.61,
+    "queries": 42,
+    "rank1": 30,
+    "rank1_share": 0.714,
     "verbatim_leaks": 0
    },
    "md": {
     "median_rank": 1.0,
     "not_in_top50": 0,
     "queries": 12,
-    "rank1": 10,
-    "rank1_share": 0.833,
+    "rank1": 9,
+    "rank1_share": 0.75,
     "verbatim_leaks": 0
    },
    "pdf": {
     "median_rank": 1,
     "not_in_top50": 8,
-    "queries": 61,
-    "rank1": 38,
-    "rank1_share": 0.623,
+    "queries": 63,
+    "rank1": 44,
+    "rank1_share": 0.698,
     "verbatim_leaks": 0
    },
    "ppt": {
     "median_rank": 1,
     "not_in_top50": 0,
     "queries": 5,
-    "rank1": 4,
-    "rank1_share": 0.8,
+    "rank1": 3,
+    "rank1_share": 0.6,
     "verbatim_leaks": 0
    },
    "txt": {
@@ -2621,15 +2661,15 @@
     "verbatim_leaks": 0
    },
    "xls": {
-    "median_rank": 3.0,
+    "median_rank": 1.0,
     "not_in_top50": 1,
     "queries": 4,
-    "rank1": 2,
-    "rank1_share": 0.5,
+    "rank1": 3,
+    "rank1_share": 0.75,
     "verbatim_leaks": 0
    },
    "xlsx": {
-    "median_rank": 2.0,
+    "median_rank": 4.0,
     "not_in_top50": 2,
     "queries": 16,
     "rank1": 5,
@@ -2639,37 +2679,37 @@
   },
   "in_cluster": {
    "in-cluster": {
-    "median_rank": 2.0,
+    "median_rank": 1.0,
     "not_in_top50": 7,
-    "queries": 84,
-    "rank1": 38,
-    "rank1_share": 0.452,
+    "queries": 86,
+    "rank1": 48,
+    "rank1_share": 0.558,
     "verbatim_leaks": 0
    },
    "singleton": {
     "median_rank": 1,
     "not_in_top50": 8,
-    "queries": 99,
-    "rank1": 80,
-    "rank1_share": 0.808,
+    "queries": 101,
+    "rank1": 84,
+    "rank1_share": 0.832,
     "verbatim_leaks": 0
    }
   },
   "language": {
    "de": {
-    "median_rank": 1.0,
+    "median_rank": 1,
     "not_in_top50": 10,
-    "queries": 92,
-    "rank1": 51,
-    "rank1_share": 0.554,
+    "queries": 95,
+    "rank1": 61,
+    "rank1_share": 0.642,
     "verbatim_leaks": 0
    },
    "en": {
-    "median_rank": 1,
+    "median_rank": 1.0,
     "not_in_top50": 5,
-    "queries": 91,
-    "rank1": 67,
-    "rank1_share": 0.736,
+    "queries": 92,
+    "rank1": 71,
+    "rank1_share": 0.772,
     "verbatim_leaks": 0
    }
   },
@@ -2678,54 +2718,54 @@
     "median_rank": 1,
     "not_in_top50": 0,
     "queries": 65,
-    "rank1": 59,
-    "rank1_share": 0.908,
+    "rank1": 60,
+    "rank1_share": 0.923,
     "verbatim_leaks": 0
    },
    "partial": {
-    "median_rank": 1.5,
+    "median_rank": 1.0,
     "not_in_top50": 4,
-    "queries": 56,
-    "rank1": 28,
-    "rank1_share": 0.5,
+    "queries": 60,
+    "rank1": 44,
+    "rank1_share": 0.733,
     "verbatim_leaks": 0
    },
    "vague": {
-    "median_rank": 1.5,
+    "median_rank": 2.0,
     "not_in_top50": 11,
     "queries": 62,
-    "rank1": 31,
-    "rank1_share": 0.5,
+    "rank1": 28,
+    "rank1_share": 0.452,
     "verbatim_leaks": 0
    }
   },
   "source": {
    "bundestag": {
-    "median_rank": 1,
+    "median_rank": 1.0,
     "not_in_top50": 3,
-    "queries": 31,
-    "rank1": 19,
-    "rank1_share": 0.613,
+    "queries": 32,
+    "rank1": 20,
+    "rank1_share": 0.625,
     "verbatim_leaks": 0
    },
    "enron": {
-    "median_rank": 1,
+    "median_rank": 1.0,
     "not_in_top50": 0,
-    "queries": 31,
-    "rank1": 26,
-    "rank1_share": 0.839,
+    "queries": 32,
+    "rank1": 28,
+    "rank1_share": 0.875,
     "verbatim_leaks": 0
    },
    "eurlex": {
-    "median_rank": 2,
+    "median_rank": 1.0,
     "not_in_top50": 2,
-    "queries": 27,
-    "rank1": 10,
-    "rank1_share": 0.37,
+    "queries": 28,
+    "rank1": 18,
+    "rank1_share": 0.643,
     "verbatim_leaks": 0
    },
    "govdata": {
-    "median_rank": 2.0,
+    "median_rank": 4.0,
     "not_in_top50": 2,
     "queries": 16,
     "rank1": 5,
@@ -2736,30 +2776,30 @@
     "median_rank": 1.0,
     "not_in_top50": 3,
     "queries": 30,
-    "rank1": 20,
-    "rank1_share": 0.667,
+    "rank1": 22,
+    "rank1_share": 0.733,
     "verbatim_leaks": 0
    },
    "safedocs": {
-    "median_rank": 1,
+    "median_rank": 1.0,
     "not_in_top50": 5,
-    "queries": 21,
-    "rank1": 15,
-    "rank1_share": 0.714,
+    "queries": 22,
+    "rank1": 17,
+    "rank1_share": 0.773,
     "verbatim_leaks": 0
    },
    "wikipedia": {
     "median_rank": 1,
     "not_in_top50": 0,
     "queries": 27,
-    "rank1": 23,
-    "rank1_share": 0.852,
+    "rank1": 22,
+    "rank1_share": 0.815,
     "verbatim_leaks": 0
    }
   }
  },
  "summary": {
-  "accepted": 310,
+  "accepted": 309,
   "distinguishability_passed": {
    "bundestag": true,
    "enron": true,
@@ -2770,32 +2810,28 @@
    "wikipedia": true
   },
   "dropped": {
-   "gates": 4,
-   "triviality": 4
+   "duplicate": 5,
+   "gates": 4
   },
-  "known_item": 183,
-  "topical": 127,
+  "known_item": 187,
+  "topical": 122,
   "triviality": {
    "exact": {
-    "passed": null,
     "queries": 65,
-    "rank1": 59,
-    "rank1_share": 0.908
+    "rank1": 60,
+    "rank1_share": 0.923
    },
    "partial": {
-    "passed": true,
-    "queries": 56,
-    "rank1": 28,
-    "rank1_share": 0.5
+    "queries": 60,
+    "rank1": 44,
+    "rank1_share": 0.733
    },
    "vague": {
-    "passed": true,
     "queries": 62,
-    "rank1": 31,
-    "rank1_share": 0.5
+    "rank1": 28,
+    "rank1_share": 0.452
    }
   },
-  "triviality_drop_seed": "20261104/triviality-drop",
   "verbatim_leak_failures": 0
  }
 }

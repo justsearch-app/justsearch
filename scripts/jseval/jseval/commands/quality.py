@@ -8,6 +8,7 @@ directory. check/baseline use the refined Search request on prepared indexes; ab
 """
 from __future__ import annotations
 
+from dataclasses import replace
 import functools
 import json
 import subprocess
@@ -262,6 +263,26 @@ def cmd_ablate(ctx, **kwargs):
     _execute_quality(ctx, 'ablate', **kwargs)
 
 
+def _prepare_timeout_sec(ref: str, qcfg) -> float | None:
+    """The collection config's ``prepare_timeout_sec`` (background-preparation deadline), if any.
+
+    Read from the same config file ``resolve_collection`` uses (a stored collection's own
+    ``quality.config.json``, else the packaged ``config/<collection>.json``). The deadline is a
+    lifecycle setting, never an index-key input; collections without it keep ``IndexConfig``'s.
+    """
+    own = Path(ref) / 'quality.config.json'
+    path = own if (Path(ref) / 'collection.v1.json').is_file() and own.is_file() \
+        else qcoll.CONFIG_DIR / f'{qcfg.collection}.json'
+    if not path.is_file():
+        return None
+    value = json.loads(path.read_text(encoding='utf-8')).get('prepare_timeout_sec')
+    if value is None:
+        return None
+    if isinstance(value, bool) or not isinstance(value, (int, float)) or value <= 0:
+        raise qcoll.CollectionError(f'{path}: prepare_timeout_sec must be a positive number of seconds')
+    return float(value)
+
+
 @quality_group.command('prepare')
 @click.argument('collection')
 @click.option('--documents-dir', type=click.Path(file_okay=False, path_type=Path))
@@ -274,8 +295,14 @@ def cmd_prepare(ctx, collection, documents_dir, models_dir, cache_root):
     """Build/confirm an index through pausable background admission, outside scoring."""
     from ..quality.index import IndexConfig, IndexRefused, prepare_index
     # The index depends on documents only (K1): a corpus-only collection prepares too (K2).
-    c, _cfg, _ka = _checked_collection(ctx, collection, scored=False)
+    c, qcfg, _ka = _checked_collection(ctx, collection, scored=False)
     cfg = IndexConfig(documents_dir=documents_dir, models_dir=models_dir, cache_root=cache_root)
+    try:
+        timeout_sec = _prepare_timeout_sec(collection, qcfg)
+    except (qcoll.CollectionError, ValueError) as e:
+        _invalid(ctx, str(e))
+    if timeout_sec is not None:
+        cfg = replace(cfg, timeout_sec=timeout_sec)
     try:
         with prepare_index(c, cfg) as handle:
             handle.wait()

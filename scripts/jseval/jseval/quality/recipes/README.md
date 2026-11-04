@@ -146,7 +146,10 @@ every source's targets keep other files to be told apart from), then the fill
 moves strata toward their shares of the 2,890 files. OCR-routed PDFs are only
 kept, never sampled; 88 are in the subset. EUR-Lex German PDFs have no files
 beyond their five targets. The 2,890-file population stays defined by the
-recipe and `excluded.json`, so the collection can grow back.
+recipe and `excluded.json`, so the collection can grow back. `subset` refuses
+to run while `subset.json` exists: the selection depends on the stored queries,
+so selecting again after a query drop would silently change the corpus and its
+index. Removing `subset.json` deliberately is the only way to reselect.
 
 Its index is keyed by document identity. Editing queries or judgments reuses
 the prepared index. Prepare it once in the background, GPU allowed, with the
@@ -158,6 +161,12 @@ python -m jseval quality prepare real-use     # or: python -m jseval.quality.rea
 python -m jseval quality baseline real-use
 python -m jseval quality check real-use
 ```
+
+`prepare` gives real-use a 2-hour background-preparation deadline
+(`prepare_timeout_sec: 7200` in `config/real-use.json`); a fresh build spends
+most of its time on embeddings and took 62 minutes under load. Every other
+collection keeps the 1,800 s default. The deadline is a lifecycle setting, not
+an index-key input, so no collection's key changes with it.
 
 `gpu.env` sets the ONNX Runtime CUDA path (also prefixed to
 `LD_LIBRARY_PATH`), `JUSTSEARCH_GPU_ENABLED=true`,
@@ -174,6 +183,11 @@ the inputs and outputs without document text:
 - prompt templates (`prompts/`);
 - every generation attempt (`generation.jsonl`: model, template and prompt
   SHA-256, parameters, model output, gate results);
+  the first 272 known-item attempts used a template with SHA-256
+  `5e178a92e060b124864f06f24c84c675794edb8029c2248aa5474ab4caae4f7c` that was
+  never committed. It was not preserved and cannot be recovered; its hash stays
+  in those records. 49 stored queries come from it. `prompts/known-item.txt` is
+  the later template, not that one;
 - clusters with their evidence (`clusters.json`);
 - the stratified plan (`plan.json`);
 - the gate results per query and stratum, and every dropped query with its
@@ -188,9 +202,33 @@ from scoring until a pooled labelling pass; `check` reports how many are
 pending.
 
 The plan holds 10% spare queries (`SPARE`) for drops. Four planned queries
-never passed the verbatim-leak and word-limit gates (reason `gates`). After the
-triviality regeneration rounds, partial queries still had 32 of 60 targets at
-lexical rank 1. The gate then dropped the fewest that leave at most half (4,
-28 of 56), sampled with the recorded seed among the rank-1 partial queries
-(reason `triviality`). Their targets stay in the corpus. That leaves 183
-known-item queries.
+never passed the verbatim-leak and word-limit gates (reason `gates`). Five
+topical queries repeat an earlier query's text and are dropped (reason
+`duplicate`). That leaves 187 known-item queries, all judged, and 122 topical
+queries pending labels.
+
+Triviality is measured, not gated. The `gate` step ranks every known-item
+target with keyword search alone (the lexical leg, with the reranker and every
+model stage off) on the creation build, and records each query's rank and the
+share at rank 1 per recall level in `gates.json`. No query is dropped or
+rewritten to change that share. Keyword search alone ranks the target first for:
+
+| recall level | rank 1 | queries | share |
+|---|---|---|---|
+| exact | 60 | 65 | 92% |
+| partial | 44 | 60 | 73% |
+| vague | 28 | 62 | 45% |
+
+On this 1,000-file collection, keyword search alone finds most exact and
+partial targets first. Those queries can show that a search mode keeps or loses
+what keyword search already finds, but they cannot show much improvement over
+it. The measurement's power to tell search modes apart rests on the rest: the
+vague queries, the targets keyword search does not rank first, and the topical
+queries once they are labelled. Cite these shares wherever real-use scores are
+cited.
+
+Earlier versions of the gate did act on triviality. It regenerated rank-1
+partial and vague queries (rounds `triviality-1` to `triviality-6` in
+`generation.jsonl`) and then dropped 4 rank-1 partial queries by a seed. The
+drops are undone. The regenerations stay: 55 of the 187 known-item queries are
+the accepted output of such a round, and the record shows which ones.

@@ -28,6 +28,7 @@
 {"groups": {"cluster": "in-cluster", "focus": "start", "format": "pdf", "kind": "known-item", "lang": "de", "level": "partial", "source": "bundestag"}, "qid": "ki-029", "text": "Hemmelgarn construction Holzpreise Lieferengpässe"}
 {"groups": {"cluster": "in-cluster", "focus": "start", "format": "pdf", "kind": "known-item", "lang": "de", "level": "vague", "source": "bundestag"}, "qid": "ki-030", "text": "Unionsfraktion Wirtschaftsabschwung Abwanderung Kapitl"}
 {"groups": {"cluster": "in-cluster", "focus": "start", "format": "pdf", "kind": "known-item", "lang": "de", "level": "exact", "source": "bundestag"}, "qid": "ki-031", "text": "Drucksache 19/20929 Anhänger Gespanne Haftung"}
+{"groups": {"cluster": "in-cluster", "focus": "start", "format": "pdf", "kind": "known-item", "lang": "de", "level": "partial", "source": "bundestag"}, "qid": "ki-032", "text": "Jelpke Anfrage Inlandsgeheimdienst Minderjährige"}
 {"groups": {"cluster": "in-cluster", "focus": "start", "format": "pdf", "kind": "known-item", "lang": "de", "level": "vague", "source": "bundestag"}, "qid": "ki-033", "text": "Nastić Sabotage Gasleitungen Ostsee"}
 {"groups": {"cluster": "in-cluster", "focus": "start", "format": "eml", "kind": "known-item", "lang": "en", "level": "exact", "source": "enron"}, "qid": "ki-034", "text": "Bonneville Responses to Customer Comments"}
 {"groups": {"cluster": "in-cluster", "focus": "start", "format": "eml", "kind": "known-item", "lang": "en", "level": "partial", "source": "enron"}, "qid": "ki-035", "text": "CBS email game peanuts"}
@@ -50,6 +51,7 @@
 {"groups": {"cluster": "singleton", "focus": "start", "format": "eml", "kind": "known-item", "lang": "en", "level": "exact", "source": "enron"}, "qid": "ki-052", "text": "RE TDC Corporation"}
 {"groups": {"cluster": "singleton", "focus": "start", "format": "eml", "kind": "known-item", "lang": "en", "level": "vague", "source": "enron"}, "qid": "ki-054", "text": "Skilling Outlook switchover questionnaire"}
 {"groups": {"cluster": "singleton", "focus": "start", "format": "eml", "kind": "known-item", "lang": "en", "level": "exact", "source": "enron"}, "qid": "ki-055", "text": "FW Hola mi primo"}
+{"groups": {"cluster": "singleton", "focus": "start", "format": "eml", "kind": "known-item", "lang": "en", "level": "partial", "source": "enron"}, "qid": "ki-056", "text": "Sternberg Allegheny netting affiliates"}
 {"groups": {"cluster": "singleton", "focus": "start", "format": "eml", "kind": "known-item", "lang": "en", "level": "vague", "source": "enron"}, "qid": "ki-057", "text": "Kaminski attending Pilar videoconference"}
 {"groups": {"cluster": "singleton", "focus": "start", "format": "eml", "kind": "known-item", "lang": "en", "level": "exact", "source": "enron"}, "qid": "ki-058", "text": "Demo w/ Louise"}
 {"groups": {"cluster": "singleton", "focus": "start", "format": "eml", "kind": "known-item", "lang": "en", "level": "partial", "source": "enron"}, "qid": "ki-059", "text": "Duke New Albany Zisman"}
@@ -71,6 +73,7 @@
 {"groups": {"cluster": "in-cluster", "focus": "start", "format": "html", "kind": "known-item", "lang": "de", "level": "partial", "source": "eurlex"}, "qid": "ki-077", "text": "IFRS 1 Staatsdarlehen Ausnahme"}
 {"groups": {"cluster": "in-cluster", "focus": "deep", "format": "html", "kind": "known-item", "lang": "de", "level": "vague", "source": "eurlex"}, "qid": "ki-078", "text": "Eigenmittel Clearingstellen Delegierte Verordnung"}
 {"groups": {"cluster": "in-cluster", "focus": "start", "format": "html", "kind": "known-item", "lang": "de", "level": "exact", "source": "eurlex"}, "qid": "ki-079", "text": "Durchführungsverordnung Nr. 9/2013 Liberia"}
+{"groups": {"cluster": "in-cluster", "focus": "start", "format": "html", "kind": "known-item", "lang": "de", "level": "partial", "source": "eurlex"}, "qid": "ki-080", "text": "Durchführungsverordnung 129/2013 Agrarbetriebe Anpassung"}
 {"groups": {"cluster": "in-cluster", "focus": "deep", "format": "html", "kind": "known-item", "lang": "de", "level": "vague", "source": "eurlex"}, "qid": "ki-081", "text": "EMIR Clearinghaus Liquiditätsrisiko Verordnung"}
 {"groups": {"cluster": "in-cluster", "focus": "start", "format": "html", "kind": "known-item", "lang": "de", "level": "exact", "source": "eurlex"}, "qid": "ki-082", "text": "Durchführungsverordnung Nr. 41/2013 Einreihung Kommision"}
 {"groups": {"cluster": "in-cluster", "focus": "start", "format": "html", "kind": "known-item", "lang": "en", "level": "partial", "source": "eurlex"}, "qid": "ki-083", "text": "Silva Rodríguez Obst Einfuhrwerte"}
@@ -140,6 +143,7 @@
 {"groups": {"cluster": "singleton", "focus": "start", "format": "pdf", "kind": "known-item", "lang": "de", "level": "partial", "source": "safedocs"}, "qid": "ki-152", "text": "Ganztagsschule Aschaffenburg Hausaufgabenbetreuung Mittagessen"}
 {"groups": {"cluster": "singleton", "focus": "deep", "format": "pdf", "kind": "known-item", "lang": "de", "level": "vague", "source": "safedocs"}, "qid": "ki-153", "text": "Sitzungsniederschrift Ein-Euro-Jobs Haushlat Jobcenter"}
 {"groups": {"cluster": "singleton", "focus": "start", "format": "pdf", "kind": "known-item", "lang": "de", "level": "exact", "source": "safedocs"}, "qid": "ki-154", "text": "Pressemitteilung Wandsbeker Winterzauber 2009"}
+{"groups": {"cluster": "singleton", "focus": "start", "format": "pdf", "kind": "known-item", "lang": "de", "level": "partial", "source": "safedocs"}, "qid": "ki-155", "text": "Grote Bauland Eichendorffstraße Immobilienmakler"}
 {"groups": {"cluster": "singleton", "focus": "start", "format": "pdf", "kind": "known-item", "lang": "de", "level": "vague", "source": "safedocs"}, "qid": "ki-156", "text": "Mädelstrip Spa Kurztrip Bayern"}
 {"groups": {"cluster": "singleton", "focus": "start", "format": "pdf", "kind": "known-item", "lang": "de", "level": "exact", "source": "safedocs"}, "qid": "ki-157", "text": "Schlosspark Schwanberg Veranstaltungen 2011 program"}
 {"groups": {"cluster": "singleton", "focus": "start", "format": "pdf", "kind": "known-item", "lang": "de", "level": "partial", "source": "safedocs"}, "qid": "ki-158", "text": "Realschule Dachau Anmeldeformular Schüler"}

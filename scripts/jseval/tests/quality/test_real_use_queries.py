@@ -332,29 +332,44 @@ def test_reply_parsing_takes_the_first_object_and_word_bounds_follow_the_level()
     assert not ruq.meets_gates(q, {"query": "one two three four five"}, {"t": "x"})
 
 
-def test_triviality_feedback_names_rare_target_words():
-    from collections import Counter
-    df = Counter({"priska": 1, "schule": 40, "aschaffenburg": 3})
-    rare = ruq.rare_words("Priska Schule Aschaffenburg Ferien", "priska schule aschaffenburg", df)
-    assert rare == ["priska", "aschaffenburg"]
-    text = ruq.triviality_feedback({"kind": "known-item", "level": "partial"}, "Priska Schule", rare)
-    assert "priska, aschaffenburg" in text and "Keep at most one" in text
-    assert "Use 2 to 4 words in total" in text  # replacements must not lengthen the query
-    assert "weeks later" in ruq.triviality_feedback({"kind": "known-item", "level": "vague"}, "x y", [])
+def test_triviality_is_measured_never_dropped_or_regenerated(monkeypatch, tmp_path):
+    # S30 (amended): keyword search alone ranking the target first is recorded per query and per
+    # recall level; no query is dropped or rewritten for it. Gate and duplicate drops stay.
+    def q(qid, kind="known-item", level="partial"):
+        return {"qid": qid, "kind": kind, "level": level, "target": f"d-{qid}", "source": "enron",
+                "format": "eml", "language": "en", "clusters": [], "focus": "start",
+                "members": [f"d-{qid}"]}
 
+    plan = [q("ki-1"), q("ki-2"), q("ki-3", level="vague"), q("ki-4", level="exact"), q("ki-5"),
+            q("tp-1", kind="topical"), q("tp-2", kind="topical")]
+    accepted = {"ki-1": "budget memo", "ki-2": "travel claim", "ki-3": "boat party", "ki-4": "x y z",
+                "tp-1": "shared topic", "tp-2": "Shared Topic"}  # ki-5 never met the gates
+    monkeypatch.setattr(ruq, "RECORD", tmp_path)
+    monkeypatch.setattr(ruq, "load_texts", lambda: ({}, {f"d-{x['qid']}": "other words" for x in plan}))
+    monkeypatch.setattr(ruq, "_recipe_rows", dict)
+    monkeypatch.setattr(ruq, "load_plan", lambda documents: plan)
+    monkeypatch.setattr(ruq, "_accepted", lambda: {k: {"query": v, "gates": {"verbatim_leak": [],
+                                                       "words": len(v.split())}} for k, v in accepted.items()})
+    monkeypatch.setattr(ruq, "distinguishability", lambda *a, **k: {})
+    monkeypatch.setattr(ruq, "lexical_ranks", lambda handle, client, items, stages: {
+        qid: 1 for qid, _, _ in items})  # every known-item target ranks first
 
-def test_triviality_drops_take_the_fewest_seeded_rank1_queries_per_level():
-    planned = {f"p{i}": {"kind": "known-item", "level": "partial"} for i in range(10)}
-    planned |= {f"v{i}": {"kind": "known-item", "level": "vague"} for i in range(4)}
-    planned |= {"e0": {"kind": "known-item", "level": "exact"}, "t0": {"kind": "topical"}}
-    rank = {f"p{i}": 1 if i < 7 else 3 for i in range(10)} | {f"v{i}": 1 if i < 2 else None for i in range(4)}
-    rank |= {"e0": 1}
-    results = {q: {"rank": r} for q, r in rank.items()}
-    done = dict.fromkeys(planned)
-    drops = ruq.triviality_drops(planned, done, results)
-    assert len(drops) == 4 and all(results[q]["rank"] == 1 and q.startswith("p") for q in drops)
-    assert (7 - 4) / (10 - 4) <= .5 and (7 - 3) / (10 - 3) > .5  # 4 is the fewest that pass
-    assert drops == ruq.triviality_drops(planned, done, results)  # fixed seed, not by hand
+    def regenerate(*a, **k):
+        raise AssertionError("the gate regenerated a query")
+
+    monkeypatch.setattr(ruq, "generate_one", regenerate)
+    c = type("C", (), {"documents": {}})()
+    report = ruq._gate(c, "http://127.0.0.1:9", _Handle())
+    assert set(report["queries"]) == {"ki-1", "ki-2", "ki-3", "ki-4", "tp-1"}
+    assert {k: d["reason"] for k, d in report["dropped"].items()} == {"ki-5": "gates", "tp-2": "duplicate"}
+    assert all(report["queries"][k]["lexical_rank"] == 1 for k in ("ki-1", "ki-2", "ki-3", "ki-4"))
+    assert report["summary"]["triviality"] == {
+        "exact": {"queries": 1, "rank1": 1, "rank1_share": 1.0},
+        "partial": {"queries": 2, "rank1": 2, "rank1_share": 1.0},
+        "vague": {"queries": 1, "rank1": 1, "rank1_share": 1.0}}
+    assert "triviality_drop_seed" not in report["summary"]
+    for name in ("triviality_drops", "triviality_feedback", "rare_words", "TRIVIALITY_DROP_SEED"):
+        assert not hasattr(ruq, name), name
 
 
 def test_plan_is_scoped_to_the_documents_the_collection_still_holds():
@@ -459,3 +474,145 @@ def test_stage_timing_splits_the_build_at_stage_completion_and_counts_pauses():
     assert ruq.stage_timing(disabled, 2)["incomplete"] == []
     enabled = [{**r, "spladePendingCount": 2, "spladeEnabled": True} if "queue" in r else r for r in rows]
     assert ruq.stage_timing(enabled, 2)["incomplete"] == ["other_enrichment"]
+
+
+class _SearchClient:
+    """Records each search request and answers with one hit and the given trace stages."""
+
+    def __init__(self, stages):
+        self.requests, self.stages = [], stages
+
+    def post(self, path, json):
+        self.requests.append(json)
+        body = {"results": [{"id": "doc-a"}], "searchTrace": {"stages": [
+            {"id": stage, "status": status} for stage, status in self.stages.items()]}}
+        return type("Response", (), {"raise_for_status": lambda self: None, "json": lambda self: body})()
+
+
+class _Handle:
+    def ranked_doc_ids(self, locations):
+        return list(locations)
+
+
+KEYWORD_TRACE = {"sparse-retrieval": "executed", "dense-retrieval": "disabled", "fusion": "skipped",
+                 "lambdamart": "skipped", "cross-encoder": "skipped", "expansion": "skipped"}
+
+
+def test_triviality_ranks_with_keyword_search_alone():
+    # S30: the reranker is a model stage, not keyword search, and it is not deterministic
+    # (it can run, be skipped or time out per request). The gate turns it and every other
+    # model stage off explicitly instead of inheriting the engine's text preset.
+    client = _SearchClient(KEYWORD_TRACE)
+    assert ruq.lexical_ranks(_Handle(), client, [("ki-1", "budget memo", "doc-a")]) == {"ki-1": 1}
+    pipeline = client.requests[0].get("pipeline") or {}
+    assert pipeline.get("sparseEnabled") is True, client.requests[0]
+    assert not any(pipeline.get(k, True) for k in ("denseEnabled", "spladeEnabled", "lambdamartEnabled",
+                                                   "crossEncoderEnabled", "expansionEnabled", "freshnessEnabled"))
+    assert pipeline["fusionAlgorithm"] == "none" and pipeline["crossEncoderWindow"] == 0
+
+
+def test_triviality_records_the_trace_stages_it_ranked_with():
+    stages = __import__("collections").Counter()
+    ruq.lexical_ranks(_Handle(), _SearchClient(KEYWORD_TRACE), [("ki-1", "budget memo", "doc-a")], stages)
+    assert stages["cross-encoder:skipped"] == 1 and stages["sparse-retrieval:executed"] == 1
+
+
+@pytest.mark.parametrize("stage", ["cross-encoder", "lambdamart", "dense-retrieval", "expansion"])
+def test_triviality_refuses_a_rank_a_model_stage_shaped(stage):
+    client = _SearchClient({**KEYWORD_TRACE, stage: "executed"})
+    with pytest.raises(ValueError, match="not keyword search alone"):
+        ruq.lexical_ranks(_Handle(), client, [("ki-1", "budget memo", "doc-a")])
+
+
+def test_prepare_applies_the_collection_configs_deadline_and_keeps_the_default_elsewhere(tmp_path, monkeypatch):
+    from click.testing import CliRunner
+    from jseval.cli import main
+    from jseval.quality import collections, index
+    from tests.quality.helpers import make_collection
+    seen = []
+
+    class Handle:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *a):
+            return False
+
+        def wait(self):
+            pass
+
+    monkeypatch.setattr(index, "prepare_index", lambda c, cfg: seen.append((c.name, cfg)) or Handle())
+    out = CliRunner().invoke(main, ["quality", "prepare", "real-use"])
+    assert out.exit_code == 0, out.output
+    assert seen[-1][0] == "real-use" and seen[-1][1].timeout_sec == 7200
+    raw = json.loads((collections.CONFIG_DIR / "real-use.json").read_text(encoding="utf-8"))
+    assert raw["prepare_timeout_sec"] == 7200
+    # A collection whose config names no deadline keeps IndexConfig's 1,800 s.
+    c = make_collection()
+    folder = collections.write_collection(c, tmp_path / "collection")
+    (folder / "quality.config.json").write_text(json.dumps({
+        "schema": collections.CONFIG_SCHEMA, "collection": c.name, "language": c.language,
+        "source": {"kind": "synthetic"}, "judgments": "official", "expected": c.counts()}))
+    out = CliRunner().invoke(main, ["quality", "prepare", str(folder)])
+    assert out.exit_code == 0, out.output
+    assert seen[-1][1].timeout_sec == index.IndexConfig().timeout_sec == 1800
+    others = [p.stem for p in collections.CONFIG_DIR.glob("*.json") if p.stem != "real-use"]
+    assert others and not any("prepare_timeout_sec" in json.loads(p.read_text(encoding="utf-8"))
+                              for p in collections.CONFIG_DIR.glob("*.json") if p.stem != "real-use")
+
+
+def test_subset_refuses_to_replace_an_existing_selection(tmp_path, monkeypatch, capsys):
+    # Reselecting after queries changed would silently change the corpus (and its index key).
+    monkeypatch.setattr(ruq, "RECORD", tmp_path)
+    (tmp_path / "subset.json").write_text('{"documents": 1000}\n')
+
+    def reselect():
+        raise AssertionError("subset reselected over an existing subset.json")
+
+    monkeypatch.setattr(ruq, "_collection", reselect)
+    assert ruq.subset(1000) == 2
+    assert (tmp_path / "subset.json").read_text() == '{"documents": 1000}\n'
+    assert "subset refused" in capsys.readouterr().err
+
+
+def test_duplicate_query_texts_are_found_case_folded_and_keep_the_first_id():
+    done = {"tq-2": {"query": "Ontario Update"}, "tq-1": {"query": "ontario update"},
+            "tq-3": {"query": "other"}}
+    assert ruq.duplicates(done) == {"tq-2": "tq-1"}
+
+
+def test_gate_records_explain_every_planned_query_the_collection_lacks():
+    # Every planned query of the stored collection's documents is either stored or recorded as
+    # dropped in gates.json with its reason; repeated texts among them carry "duplicate".
+    from jseval.quality import collections
+    c, _ = collections.resolve_collection("real-use")
+    planned = {q["qid"] for q in ruq.load_plan(c.documents)}
+    record = json.loads((ruq.RECORD / "gates.json").read_text(encoding="utf-8"))
+    dropped = record["dropped"]
+    assert planned - set(c.queries) == set(dropped), sorted((planned - set(c.queries)) ^ set(dropped))
+    assert not set(dropped) & set(c.queries)
+    assert {d["reason"] for d in dropped.values()} <= {"gates", "duplicate"}  # triviality is never a drop
+    for qid, d in dropped.items():
+        if d["reason"] == "duplicate":
+            assert d["duplicate_of"] in c.queries
+            assert d["query"].casefold() == c.queries[d["duplicate_of"]].text.casefold()
+    assert record["summary"]["dropped"] == dict(sorted(
+        __import__("collections").Counter(d["reason"] for d in dropped.values()).items()))
+    # Triviality is recorded, not gated: every stored known-item query carries its keyword rank,
+    # and the per-level shares are counted from those ranks.
+    known = {q for q in c.queries if c.queries[q].groups["kind"] == "known-item"}
+    assert len(known) == 187 and len(set(c.queries) - known) == 122
+    assert set(record["queries"]) == set(c.queries)
+    assert all(record["queries"][q]["query"] == c.queries[q].text for q in c.queries)
+    assert all(record["queries"][q]["level"] == c.queries[q].groups["level"] for q in known)
+    for level in ruq.LEVELS:
+        ranks = [record["queries"][q]["lexical_rank"] for q in known if c.queries[q].groups["level"] == level]
+        share = record["summary"]["triviality"][level]
+        assert share == {"queries": len(ranks), "rank1": ranks.count(1),
+                         "rank1_share": round(ranks.count(1) / len(ranks), 3)}
+    assert {lv: (v["rank1"], v["queries"]) for lv, v in record["summary"]["triviality"].items()} == {
+        "exact": (60, 65), "partial": (44, 60), "vague": (28, 62)}
+    # The stored ranks come from keyword search alone; the trace never shows a model stage.
+    assert record["ranking"]["pipeline"] == ruq.KEYWORD_PIPELINE
+    assert not any(k.split(":")[0] in ruq.KEYWORD_OFF and k.endswith(":executed")
+                   for k in record["ranking"]["trace_stages"])
