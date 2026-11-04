@@ -4,7 +4,12 @@ This project follows the [Contributor Covenant v2.1](https://www.contributor-cov
 
 ## Reporting
 
-If you experience or witness unacceptable behavior, please report it by opening a GitHub issue or contacting the maintainers directly.
+If you experience or witness unacceptable behavior, please report it in a
+[GitHub issue](https://github.com/justsearch-app/justsearch/issues). This project has no private contact
+address. For something that should not be public, use the **Report** option in the "…" menu of the
+comment or issue ([how](https://docs.github.com/en/communities/maintaining-your-safety-on-github/reporting-abuse-or-spam)).
+Where GitHub offers it, the report can go to this repository's maintainers; otherwise it goes to
+GitHub's staff.
 
 ## Enforcement
 

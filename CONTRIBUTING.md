@@ -180,7 +180,8 @@ a whole under additional terms in the future (e.g. a commercial licence alongsid
 This is **not** a copyright assignment and does **not** make JustSearch proprietary. It exists because,
 with only the open-source licence, the project could never offer a dual/commercial licence later without
 the consent of every past contributor — the CLA preserves that option now, while contributors are few.
-If you contribute on behalf of an employer, see §8 of the CLA (a Corporate CLA may be needed).
+If you contribute on behalf of an employer, see §8 of the CLA (a Corporate CLA may be needed). To
+arrange one, [open an issue](https://github.com/justsearch-app/justsearch/issues/new) titled "Corporate CLA".
 
 ## Project Structure
 
