@@ -85,12 +85,12 @@ class QualityConfig:
     most_changed: int = 10
     top: int = 5
     layout: str = "opaque"
-    witness_formats: tuple[str, ...] = ("txt",)
+    witness_formats: tuple[str, ...] | None = None
 
     def __post_init__(self) -> None:
         if self.layout not in ("opaque", "as-is"):
             raise CollectionError(f"unknown collection layout: {self.layout!r}")
-        if (not self.witness_formats or
+        if self.witness_formats is not None and (not self.witness_formats or
                 any(f not in ("txt", "md", "html", "eml") for f in self.witness_formats)):
             raise CollectionError("witness_formats must list verified text formats")
 
@@ -98,7 +98,7 @@ class QualityConfig:
         # Keep the historical defaults byte-for-byte compatible.
         return {**({"layout": self.layout} if self.layout != "opaque" else {}),
                 **({"witness_formats": list(self.witness_formats)}
-                   if self.witness_formats != ("txt",) else {})}
+                   if self.witness_formats is not None else {})}
 
     def margin(self, group: str) -> float:
         return float(self.margins.get(group, self.margins["default"]))
@@ -127,7 +127,7 @@ class QualityConfig:
                    min_group_size=int(d.get("min_group_size", 20)),
                    most_changed=int(rep.get("most_changed", 10)), top=int(rep.get("top", 5)),
                    layout=d.get("layout", "opaque"),
-                   witness_formats=tuple(d.get("witness_formats", ["txt"])))
+                   witness_formats=tuple(d["witness_formats"]) if "witness_formats" in d else None)
 
 
 def known_aliases() -> list[str]:

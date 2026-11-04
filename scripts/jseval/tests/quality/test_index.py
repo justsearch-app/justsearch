@@ -47,6 +47,22 @@ def env_for(config):
     return {"JUSTSEARCH_MODELS_DIR": str(config.models_dir), "JUSTSEARCH_SPLADE_ENABLED": "false"}
 
 
+@pytest.mark.parametrize('all_markdown', [False, True])
+def test_legacy_witness_selection_keeps_custom_extensions(collection, config, tmp_path, all_markdown):
+    c, source = collection
+    paths = {doc: str(Path(rel).with_suffix('.md')) if all_markdown or doc == 'ANSWER-1' else rel
+             for doc, rel in c.documents.items()}
+    for doc, rel in c.documents.items():
+        (source / rel).rename(source / paths[doc])
+    c = replace(c, documents=paths, version='')
+    root = tmp_path / 'entry'
+    root.mkdir()
+    m = ix._materialize(c, replace(config, documents_dir=source), root)
+    longest, samples = ix._witness_documents(c, m, root / 'documents', 3)
+    assert longest == 'ANSWER-1'
+    assert samples == sorted(c.documents)
+
+
 def test_key_ignores_head_and_reviewed_request_file_but_hashes_every_other_input(collection, config):
     c, _ = collection
     key = lambda: ix.compute_index_key(c, config, env_for(config))[0]

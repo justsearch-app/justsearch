@@ -71,7 +71,7 @@ def test_witnesses_never_read_binary_or_restricted_originals(tmp_path, monkeypat
         (tmp_path / rel).write_bytes(b'x' * sizes[doc])
     opaque = replace(opaque_source, documents=opaque_paths, version='')
     assert index._witness_documents(opaque_source, opaque, tmp_path, 3) == ('note', ['note', 'short'])
-    assert cfg.layout == 'opaque' and cfg.witness_formats == ('txt',)
+    assert cfg.layout == 'opaque' and cfg.witness_formats is None
     assert cfg.identity_metadata() == {}
 
 
@@ -82,7 +82,7 @@ def test_layout_and_witnesses_key_collection(tmp_path, monkeypatch):
     cfg = index.IndexConfig(repo_root=tmp_path)
     env = {'JUSTSEARCH_MODELS_DIR': str(tmp_path)}
     opaque = index.compute_index_key(c, cfg, env)[0]
-    for metadata in [{'layout': 'as-is'}, {'witness_formats': ['md']}]:
+    for metadata in [{'layout': 'as-is'}, {'witness_formats': ['md']}, {'witness_formats': ['txt']}]:
         changed = replace(c, metadata=metadata, version='')
         assert index.compute_index_key(changed, cfg, env)[0] != opaque
 

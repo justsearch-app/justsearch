@@ -252,7 +252,7 @@ class Collection:
             **({"layout": self.metadata["layout"]}
                if self.metadata.get("layout", "opaque") != "opaque" else {}),
             **({"witness_formats": self.metadata["witness_formats"]}
-               if self.metadata.get("witness_formats", ["txt"]) != ["txt"] else {}),
+               if self.metadata.get("witness_formats") is not None else {}),
         }))
 
     def counts(self) -> dict[str, Any]:

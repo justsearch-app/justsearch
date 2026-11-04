@@ -29,6 +29,14 @@ rate limits. Raw downloads use `jseval.dataset_cache`. The quality lifecycle
 retains its existing clean-engine, prepared-distribution and admission checks;
 Gradle builds use `js-gradle-slot`.
 
+Every request, including robots.txt, uses at most five manually checked redirects.
+Redirects stay on the original host unless the recipe's `redirect_hosts` table
+permits a destination. The recipe permits Digital Corpora's S3 destination;
+undeclared host changes are refused. Robots reads have a 512 KiB cap and a
+60-second timeout; failed policy checks disallow the fetch. Tar processing has a
+fixed 2 GiB expanded-byte cap, counting skipped files and metadata, and stops
+after the selected members. The pinned Enron tar expands to 1,823,016,960 bytes.
+
 | Source | Files | Selection and reuse |
 | --- | ---: | --- |
 | GovDocs1 | 1,000 | Numbered archives 000/001, format quotas and bounded file sizes; original member bytes. Source permits redistribution to its knowledge; third-party rights retained. |
@@ -41,6 +49,9 @@ Gradle builds use `js-gradle-slot`.
 
 Total: **2,960 files**, 1,120 German and 1,840 English. The recipe records per-file
 source, source identifier, origin URL, licence name/URL and attribution. Its
+`licenses` table holds shared terms; each document's `license.ref` selects them,
+with per-document fields overriding the shared values. Individual article,
+revision and dataset attributions remain on their document rows. Its
 `selection` entries record methods and hashes of selection metadata. Selection
 metadata does not need downloading again to reproduce the pinned files.
 
@@ -69,3 +80,5 @@ The config selects `layout: "as-is"`; original extensions and manifest paths
 reach the engine verbatim. Only the six Markdown notes are eligible for source
 passage probes. All files remain covered by source-byte and extracted-text
 digests. Existing collections retain their default opaque `.txt` layout.
+An unset `witness_formats` preserves historical witness selection across every
+document; an explicit list filters by the original file extension.

@@ -154,7 +154,6 @@ def test_http_honours_robots_and_rate_limits(corpus, monkeypatch):
         if request.full_url.endswith('robots.txt'):
             return addinfourl(io.BytesIO(b'User-agent: *\nDisallow: /private\n'), {}, request.full_url, 200)
         raise HTTPError(request.full_url, 429, 'rate limited', {'Retry-After': '60'}, None)
-    monkeypatch.setattr(corpus, 'urlopen', open_request)
     monkeypatch.setattr(corpus, '_document_open', open_request)
     with pytest.raises(collections.CollectionError, match='robots'):
         corpus.PublicHTTP().open('https://example.org/private/file')
@@ -173,10 +172,11 @@ def test_redirect_checks_target_policy_before_request(corpus, monkeypatch):
         requests.append(request.full_url)
         raise HTTPError(request.full_url, 302, 'redirect',
                         {'Location': 'https://other.example.org/private/file'}, None)
-    monkeypatch.setattr(corpus, 'urlopen', robots)
-    monkeypatch.setattr(corpus, '_document_open', document)
+    monkeypatch.setattr(corpus, '_document_open', lambda request, **kw:
+                        robots(request, **kw) if request.full_url.endswith('robots.txt')
+                        else document(request, **kw))
     with pytest.raises(collections.CollectionError, match='robots'):
-        corpus.PublicHTTP().open('https://example.org/download')
+        corpus.PublicHTTP({'example.org': ['other.example.org']}).open('https://example.org/download')
     assert requests == ['https://example.org/download']
 
 
@@ -189,6 +189,145 @@ def test_robots_wildcards_specific_allow_and_terminal_rules(corpus):
     assert not corpus._robots_allowed(parser, 'https://example.org/draft report.pdf')
     assert corpus._robots_allowed(parser, 'https://example.org/draft report.pdf.html')
     assert corpus._robots_allowed(parser, 'https://example.org/public?download=1')
+
+
+@pytest.fixture
+def http_site():
+    """Exercise urllib's real redirect handling on an owned loopback server."""
+    from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+    from threading import Thread
+    routes, calls = {}, []
+    class Handler(BaseHTTPRequestHandler):
+        def do_GET(self):
+            calls.append((self.headers['Host'], self.path))
+            status, headers, body = routes.get(self.path, (200, {}, b'OK'))
+            self.send_response(status)
+            for key, value in headers.items():
+                self.send_header(key, value)
+            self.end_headers()
+            self.wfile.write(body)
+        def log_message(self, *_):
+            pass
+    server = ThreadingHTTPServer(('127.0.0.1', 0), Handler)
+    thread = Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        yield f'http://127.0.0.1:{server.server_port}', routes, calls
+    finally:
+        server.shutdown()
+        thread.join()
+        server.server_close()
+
+
+def test_robots_download_is_capped(corpus, http_site):
+    url, routes, calls = http_site
+    routes['/robots.txt'] = (200, {}, b'#' * (512 * 1024 + 1))
+    with pytest.raises(collections.CollectionError, match='robots'):
+        corpus.PublicHTTP().open(url + '/document')
+    assert [path for _, path in calls] == ['/robots.txt']
+
+
+@pytest.mark.parametrize('redirect_robots', [False, True])
+def test_cross_host_redirect_refused_before_target_contact(corpus, http_site, redirect_robots):
+    url, routes, calls = http_site
+    start = '/robots.txt' if redirect_robots else '/document'
+    routes[start] = (302, {'Location': url.replace('127.0.0.1', 'localhost') + '/target'}, b'')
+    with pytest.raises(collections.CollectionError):
+        corpus.PublicHTTP().open(url + '/document')
+    assert all(host.startswith('127.0.0.1:') for host, _ in calls)
+    assert '/target' not in [path for _, path in calls]
+
+
+@pytest.mark.parametrize('redirect_robots', [False, True])
+def test_declared_redirect_host_is_allowed(corpus, http_site, redirect_robots):
+    url, routes, calls = http_site
+    start = '/robots.txt' if redirect_robots else '/document'
+    routes[start] = (302, {'Location': url.replace('127.0.0.1', 'localhost') + '/target'}, b'')
+    with corpus.PublicHTTP({'127.0.0.1': ['localhost']}).open(url + '/document') as response:
+        assert response.read() == b'OK'
+    assert any(host.startswith('localhost:') and path == '/target' for host, path in calls)
+
+
+@pytest.mark.parametrize('redirect_robots', [False, True])
+def test_redirect_limit_includes_robots(corpus, http_site, redirect_robots):
+    url, routes, calls = http_site
+    start = '/robots.txt' if redirect_robots else '/document'
+    routes[start] = (302, {'Location': '/hop-1'}, b'')
+    for n in range(1, 7):
+        routes[f'/hop-{n}'] = (302, {'Location': f'/hop-{n + 1}'}, b'')
+    with pytest.raises(collections.CollectionError, match='too many redirects'):
+        corpus.PublicHTTP().open(url + '/document')
+    assert '/hop-5' in [path for _, path in calls]
+    assert '/hop-6' not in [path for _, path in calls]
+
+
+@pytest.mark.parametrize('target', ['file:///tmp/private', 'https://user:pass@example.org/private'])
+def test_redirect_url_checks_include_robots(corpus, http_site, target):
+    url, routes, calls = http_site
+    routes['/robots.txt'] = (302, {'Location': target}, b'')
+    with pytest.raises(collections.CollectionError, match='robots'):
+        corpus.PublicHTTP().open(url + '/document')
+    assert [path for _, path in calls] == ['/robots.txt']
+
+
+def test_shared_license_references_preserve_attribution_and_overrides(corpus, fixture_recipe, tmp_path):
+    expected = deepcopy(fixture_recipe['documents'])
+    fixture_recipe['licenses'] = {'shared': expected[0]['license']}
+    for d in fixture_recipe['documents']:
+        d['license'] = {'ref': 'shared'}
+    fixture_recipe['documents'][1]['license'].update(name='Specific terms', attribution='Article revision 123')
+    expected[1]['license'].update(name='Specific terms', attribution='Article revision 123')
+    path = tmp_path / 'recipe.json'
+    path.write_text(json.dumps(fixture_recipe))
+    assert corpus.load_recipe(path)['documents'] == expected
+    fixture_recipe['documents'][0]['license']['ref'] = 'missing'
+    with pytest.raises(ValueError, match='unknown licence reference'):
+        corpus.validate_recipe(fixture_recipe)
+
+
+@pytest.mark.parametrize('kind', ['skipped', 'metadata'])
+def test_tar_aggregate_expansion_is_capped(corpus, fixture_recipe, tmp_path, monkeypatch, kind):
+    # A selected two-byte file after a compressible skipped member or PAX header.
+    # Neither expansion passes through the selected-member size check.
+    recipe = deepcopy(fixture_recipe)
+    artifact, doc = recipe['artifacts'][2], recipe['documents'][2]
+    stream = io.BytesIO()
+    with tarfile.open(fileobj=stream, mode='w:gz') as tar:
+        info = tarfile.TarInfo('skipped')
+        info.size = 2 * 1024 * 1024 if kind == 'skipped' else 0
+        if kind == 'metadata':
+            info.pax_headers = {'comment': 'x' * (2 * 1024 * 1024)}
+        tar.addfile(info, io.BytesIO(b'x' * info.size))
+        info = tarfile.TarInfo(doc['member'])
+        info.size = 2
+        tar.addfile(info, io.BytesIO(b'OK'))
+    payload = stream.getvalue()
+    artifact.update(bytes=len(payload), sha256=hashlib.sha256(payload).hexdigest())
+    doc.update(bytes=2, sha256=hashlib.sha256(b'OK').hexdigest())
+    dataset_cache.store('public-real-use', {k: artifact[k] for k in ('url', 'sha256')},
+                        filenames=['payload'], populate=lambda dest: (dest / 'payload').write_bytes(payload))
+    monkeypatch.setattr(corpus, 'MAX_TAR_EXPANDED_BYTES', 64 * 1024, raising=False)
+    with pytest.raises(collections.CollectionError, match='expanded'):
+        corpus.materialize(recipe, tmp_path / 'limited')
+    assert not (tmp_path / 'limited').exists()
+
+
+def test_tar_stops_after_selection(corpus, fixture_recipe, tmp_path):
+    import gzip
+    recipe = deepcopy(fixture_recipe)
+    artifact, doc = recipe['artifacts'][2], recipe['documents'][2]
+    original = b'Subject: Meeting\n\nThe original message.\n'
+    info = tarfile.TarInfo(doc['member'])
+    info.size = len(original)
+    # An incomplete PAX header after the selected member must never be parsed.
+    trailing = tarfile.TarInfo('truncated metadata')
+    trailing.type, trailing.size = tarfile.XHDTYPE, 1024
+    payload = gzip.compress(info.tobuf() + original.ljust(512, b'\0') + trailing.tobuf())
+    artifact.update(bytes=len(payload), sha256=hashlib.sha256(payload).hexdigest())
+    dataset_cache.store('public-real-use', {k: artifact[k] for k in ('url', 'sha256')},
+                        filenames=['payload'], populate=lambda dest: (dest / 'payload').write_bytes(payload))
+    root = corpus.materialize(recipe, tmp_path / 'selected')
+    assert (root / doc['path']).read_bytes() == original
 
 
 def test_committed_recipe_and_slice(corpus):

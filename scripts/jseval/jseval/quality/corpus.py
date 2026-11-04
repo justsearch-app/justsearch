@@ -6,6 +6,7 @@ Only Wikipedia's explicitly declared HTML-to-note derivation interprets content.
 from __future__ import annotations
 
 from collections import Counter, defaultdict
+import gzip
 import hashlib
 from html.parser import HTMLParser
 import json
@@ -16,7 +17,7 @@ import tarfile
 import tempfile
 import time
 from urllib.parse import unquote, urljoin, urlsplit
-from urllib.request import HTTPRedirectHandler, Request, build_opener, urlopen
+from urllib.request import HTTPRedirectHandler, Request, build_opener
 from urllib.robotparser import RobotFileParser
 from urllib.error import HTTPError
 import zipfile
@@ -30,6 +31,10 @@ RECIPE_DIR = Path(__file__).with_name('recipes')
 SCHEMA = 'jseval.quality.public-corpus.v1'
 USER_AGENT = 'JustSearch-quality-corpus/1.0'
 SHA = re.compile(r'[0-9a-f]{64}')
+MAX_ROBOTS_BYTES = 512 * 1024
+# The pinned Enron tar expands to 1,823,016,960 bytes, including tar metadata.
+# A fixed 2 GiB ceiling leaves margin without trusting recipe-supplied limits.
+MAX_TAR_EXPANDED_BYTES = 2 * 1024 ** 3
 
 
 class _NoRedirect(HTTPRedirectHandler):
@@ -80,9 +85,21 @@ def load_recipe(ref='real-use') -> dict:
     try:
         recipe = json.loads(path.read_text(encoding='utf-8'))
         validate_recipe(recipe)
+        for doc in recipe['documents']:
+            doc['license'] = _document_license(recipe, doc)
     except (OSError, ValueError, KeyError, TypeError) as error:
         raise CollectionError(f'{path}: {error}') from None
     return recipe
+
+
+def _document_license(recipe: dict, doc: dict) -> dict:
+    licence = doc['license']
+    if 'ref' not in licence:
+        return licence
+    ref = licence['ref']
+    if ref not in recipe.get('licenses', {}):
+        raise ValueError(f'unknown licence reference: {ref}')
+    return {**recipe['licenses'][ref], **{k: v for k, v in licence.items() if k != 'ref'}}
 
 
 def validate_recipe(recipe: dict) -> None:
@@ -103,6 +120,13 @@ def validate_recipe(recipe: dict) -> None:
         if not SHA.fullmatch(a['sha256']) or type(a['bytes']) is not int or a['bytes'] <= 0:
             raise ValueError('invalid artifact checksum/size')
         artifacts[a['id']] = a
+    for host, destinations in recipe.get('redirect_hosts', {}).items():
+        if host not in {urlsplit(a['url']).hostname for a in artifacts.values()}:
+            raise ValueError('redirect policy must name an artifact host')
+        if not isinstance(destinations, list) or any(
+                not isinstance(h, str) or not h or urlsplit('https://' + h).netloc != h
+                or urlsplit('https://' + h).hostname != h for h in destinations):
+            raise ValueError('redirect destinations must be hostnames')
     paths, ids = set(), set()
     # Match identifiers across the entire recipe, not just the file's own row.
     identifiers = {d['id'].casefold() for d in recipe['documents']}
@@ -125,7 +149,7 @@ def validate_recipe(recipe: dict) -> None:
             raise ValueError('invalid document checksum/size')
         if d['format'] != Path(rel).suffix.lstrip('.') or d['language'] not in ('de', 'en'):
             raise ValueError('invalid format/language')
-        if not all(d['license'].get(k) for k in ('name', 'url', 'attribution')):
+        if not all(_document_license(recipe, d).get(k) for k in ('name', 'url', 'attribution')):
             raise ValueError('source licence and attribution are required per file')
         if not d['source'] or not d['source_id'] or not d['origin_url']:
             raise ValueError('source provenance required per file')
@@ -147,46 +171,61 @@ def validate_recipe(recipe: dict) -> None:
 
 class PublicHTTP:
     """Sequential HTTP, per-host spacing, robots and explicit rate-limit refusal."""
-    def __init__(self):
+    def __init__(self, redirect_hosts=None):
         self.robots = {}
         self.last = {}
+        self.redirect_hosts = redirect_hosts or {}
 
-    def open(self, url, headers=None, *, _redirects=0):
+    def open(self, url, headers=None):
+        host = urlsplit(url).hostname
+        allowed = {host, *self.redirect_hosts.get(host, [])}
+        return self._open(url, headers, allowed=allowed)
+
+    def _open(self, url, headers=None, *, allowed, robots=False, redirects=0):
         parts = urlsplit(url)
         if (parts.scheme not in ('http', 'https') or not parts.hostname
                 or parts.username is not None or parts.password is not None):
             raise CollectionError('document URL must be public HTTP(S)')
-        if _redirects > 5:
+        if parts.hostname not in allowed:
+            raise CollectionError(f'redirect host is not permitted: {parts.hostname}')
+        if redirects > 5:
             raise CollectionError(f'too many redirects: {url}')
         host = f'{parts.scheme}://{parts.netloc}'
-        if host not in self.robots:
+        if not robots and host not in self.robots:
             parser = RobotFileParser(host + '/robots.txt')
             try:
-                with urlopen(Request(parser.url, headers={'User-Agent': USER_AGENT}), timeout=60) as r:
-                    parser.parse(r.read().decode('utf-8', errors='replace').splitlines())
+                with self._open(parser.url, allowed=allowed, robots=True) as r:
+                    data = r.read(MAX_ROBOTS_BYTES + 1)
+                    if len(data) > MAX_ROBOTS_BYTES:
+                        raise CollectionError('robots.txt exceeds byte cap')
+                    parser.parse(data.decode('utf-8', errors='replace').splitlines())
             except HTTPError as e:
                 # RFC 9309 §2.3.1.3: a 4xx robots response is unavailable,
                 # not a directive. Rate limiting must still stop the fetch.
                 if 400 <= e.code < 500 and e.code != 429:
                     parser.parse([])
                 else:
-                    raise
+                    raise CollectionError(f'robots.txt fetch disallowed: HTTP {e.code}') from e
+                e.close()
+            except (OSError, ValueError, CollectionError) as e:
+                raise CollectionError(f'robots.txt fetch disallowed: {e}') from e
             self.robots[host] = parser
-        parser = self.robots[host]
-        if not _robots_allowed(parser, url):
+        parser = self.robots.get(host) if not robots else None
+        if parser is not None and not _robots_allowed(parser, url):
             raise CollectionError(f'robots.txt forbids fetching {url}')
-        rate = parser.request_rate(USER_AGENT)
-        delay = max(.25, parser.crawl_delay(USER_AGENT) or 0,
+        rate = parser.request_rate(USER_AGENT) if parser else None
+        delay = max(.25, (parser.crawl_delay(USER_AGENT) or 0) if parser else 0,
                     rate.seconds / rate.requests if rate and rate.requests else 0)
         time.sleep(max(0, self.last.get(host, 0) + delay - time.monotonic()))
         self.last[host] = time.monotonic()
         try:
-            response = _document_open(Request(url, headers={'User-Agent': USER_AGENT, **(headers or {})}), timeout=120)
+            response = _document_open(Request(url, headers={'User-Agent': USER_AGENT, **(headers or {})}),
+                                      timeout=60 if robots else 120)
         except HTTPError as error:
             if error.code in (301, 302, 303, 307, 308) and error.headers.get('Location'):
                 target = urljoin(url, error.headers['Location'])
                 error.close()
-                return self.open(target, headers, _redirects=_redirects + 1)
+                return self._open(target, headers, allowed=allowed, robots=robots, redirects=redirects + 1)
             raise
         if response.status != 200:
             response.close()
@@ -222,7 +261,7 @@ def _verify(path: Path, row: dict):
 
 def fetch(recipe: dict) -> dict:
     validate_recipe(recipe)
-    client = PublicHTTP()
+    client = PublicHTTP(recipe.get('redirect_hosts'))
     for a in recipe['artifacts']:
         _raw(a, fetch=True, client=client)
     return summary(recipe)
@@ -239,6 +278,20 @@ def _write_member(stream, target, row):
                 raise CollectionError(f'download/member exceeds recorded size: {row.get("path", row.get("url"))}')
             out.write(block)
     _verify(target, row)
+
+
+class _BoundedTar:
+    """Count gzip output before tarfile can consume skipped data or metadata."""
+    def __init__(self, stream):
+        self.stream = stream
+        self.remaining = MAX_TAR_EXPANDED_BYTES
+
+    def read(self, size):
+        data = self.stream.read(min(size, self.remaining + 1))
+        self.remaining -= len(data)
+        if self.remaining < 0:
+            raise CollectionError('tar expanded bytes exceed fixed cap')
+        return data
 
 
 def wikipedia_note(html: str, title: str) -> bytes:
@@ -295,7 +348,8 @@ def materialize(recipe: dict, out: Path | None = None) -> Path:
                             _write_member(stream, staging / d['path'], d)
             elif a.get('archive') == 'tar.gz':
                 wanted = {d['member']: d for d in rows}
-                with tarfile.open(path, 'r|gz') as archive:
+                with gzip.open(path, 'rb') as expanded, tarfile.open(
+                        fileobj=_BoundedTar(expanded), mode='r|') as archive:
                     for member in archive:
                         if member.name not in wanted:
                             continue
@@ -304,6 +358,8 @@ def materialize(recipe: dict, out: Path | None = None) -> Path:
                             raise CollectionError('invalid tar member')
                         with archive.extractfile(member) as stream:
                             _write_member(stream, staging / d['path'], d)
+                        if not wanted:
+                            break
                 if wanted:
                     raise CollectionError('missing tar members')
             else:

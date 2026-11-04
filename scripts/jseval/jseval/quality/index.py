@@ -471,7 +471,7 @@ def _canary_query(base_url: str, candidates) -> str:
 
 
 def _witness_documents(c: Collection, m: Collection, docs: Path, sample_size: int):
-    formats = c.metadata.get("witness_formats", ["txt"])
+    formats = c.metadata.get("witness_formats")
     prohibited = set()
     source = c.metadata.get("source", {})
     if source.get("kind") == "public-recipe":
@@ -479,7 +479,8 @@ def _witness_documents(c: Collection, m: Collection, docs: Path, sample_size: in
         prohibited = {d["id"] for d in load_recipe(source["recipe"])["documents"]
                       if d["source"] in ("govdocs1", "safedocs")}
     eligible = [doc for doc in m.documents
-                if doc not in prohibited and Path(c.documents[doc]).suffix.lstrip(".") in formats]
+                if doc not in prohibited and (formats is None or
+                    Path(c.documents[doc]).suffix.lstrip(".") in formats)]
     if not eligible:
         raise IndexRefused("collection has no eligible probe witness document")
     longest = max(eligible, key=lambda doc: ((docs / m.documents[doc]).stat().st_size, doc))
