@@ -40,7 +40,7 @@ from .collections import load_collection, write_collection, write_documents
 from .types import (Collection, atomic_write_text, canonical_json,
                     canonical_manifest_text, sha256_text)
 
-# Individual files only. These assemble/run requests, never extraction or writes.
+# Individual files only. Reviewed request-time and harness-only code, never engine inputs.
 # New files (including new reranker classes) are index-shaping until reviewed here.
 QUERY_TIME_ONLY = frozenset({
     "modules/app-services/src/main/java/io/justsearch/app/services/worker/KnowledgeSearchEngine.java",
@@ -64,8 +64,11 @@ QUERY_TIME_ONLY = frozenset({
     # Dispatches actions; all materialization/ingestion remains in index.py and
     # collections.py, which (along with types.py) deliberately stay in the key.
     "scripts/jseval/jseval/commands/quality.py",
-    # Offline query writing for stored collections, and its tests: reads extracted text from an
-    # already prepared index and searches it; never materializes, ingests or writes an index.
+    # Corpus acquisition does not shape what the engine indexes: document bytes are pinned
+    # independently by the collection's content digests in the key (K1).
+    "scripts/jseval/jseval/quality/corpus.py",
+    # Query planning/writing does not shape what the engine indexes either; document bytes
+    # remain pinned by those same collection content digests (K1).
     "scripts/jseval/jseval/quality/real_use_queries.py",
     "scripts/jseval/tests/quality/test_real_use_queries.py",
 })

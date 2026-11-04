@@ -729,16 +729,56 @@ def parse_reply(stdout: str) -> dict:
     return value
 
 
+# Reviewed against Claude Code 2.1.316 and https://code.claude.com/docs/en/env-vars.
+# Reject presence, including empty values; provider/auth selection must not be ambiguous.
+# ANTHROPIC_ includes API keys, custom headers/endpoints, profiles and federation credentials.
+AUTH_OVERRIDE_PREFIXES = ("ANTHROPIC_", "CLAUDE_CODE_USE_")
+AUTH_OVERRIDES = frozenset({"AWS_BEARER_TOKEN_BEDROCK", "CLAUDE_CODE_API_BASE_URL",
+                            "CLAUDE_CODE_API_KEY_FILE_DESCRIPTOR", "CLAUDE_CODE_CUSTOM_OAUTH_URL"})
+
+
+class SubscriptionRequired(RuntimeError):
+    pass
+
+
 def ask_claude(prompt: str, *, timeout: float = 180) -> tuple[dict, str]:
     """One tool-less, session-less ``claude -p`` call on the subscription model."""
-    with tempfile.TemporaryDirectory(prefix="ruq-") as cwd:
-        r = subprocess.run(["claude", "-p", prompt, "--model", MODEL, "--output-format", "json",
-                            "--tools", "", "--strict-mcp-config", "--setting-sources", "",
-                            "--no-session-persistence"],
+    env = dict(os.environ)
+    forbidden = {name for name in env
+                 if name.startswith(AUTH_OVERRIDE_PREFIXES) or name in AUTH_OVERRIDES}
+    if forbidden:
+        raise SubscriptionRequired("Claude subscription required; remove API/provider overrides")
+    env = {k: v for k, v in env.items()
+           if not k.startswith(AUTH_OVERRIDE_PREFIXES) and k not in AUTH_OVERRIDES}
+    env["CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC"] = "1"
+    WORK.mkdir(parents=True, exist_ok=True)
+    with tempfile.TemporaryDirectory(prefix="ruq-", dir=WORK) as cwd:
+        # Even inherited debug settings must never direct prompt-bearing logs into Git.
+        env["CLAUDE_CODE_DEBUG_LOGS_DIR"] = str(Path(cwd) / "claude.debug.log")
+        # This CLI's JSON status path reads cached credentials, without refreshing or querying
+        # the network. Use the same settings, environment and cwd as generation. Unknown or
+        # unavailable status fails closed; a console OAuth login is not a subscription.
+        try:
+            status = subprocess.run(["claude", "--setting-sources", "", "auth", "status", "--json"],
+                                    capture_output=True, text=True, timeout=30, cwd=cwd, env=env,
+                                    stdin=subprocess.DEVNULL)
+            auth = json.loads(status.stdout)
+            subscribed = (status.returncode == 0 and isinstance(auth, dict)
+                          and auth.get("loggedIn") is True and auth.get("authMethod") == "claude.ai"
+                          and auth.get("apiProvider") == "firstParty"
+                          and auth.get("subscriptionType") in ("pro", "max", "ultra", "team", "enterprise"))
+        except (OSError, subprocess.SubprocessError, ValueError):
+            subscribed = False
+        if not subscribed:
+            raise SubscriptionRequired("Claude subscription authentication could not be verified") from None
+        command = ["claude", "-p", prompt, "--model", MODEL, "--output-format", "json",
+                   "--tools", "", "--strict-mcp-config", "--setting-sources", "",
+                   "--no-session-persistence"]
+        r = subprocess.run(command,
                            capture_output=True, text=True, timeout=timeout, cwd=cwd,
-                           stdin=subprocess.DEVNULL)
+                           stdin=subprocess.DEVNULL, env=env)
     if r.returncode != 0 and not r.stdout:
-        raise RuntimeError(f"claude exited {r.returncode}: {r.stderr[-500:]}")
+        raise subprocess.CalledProcessError(r.returncode, command, output=r.stdout, stderr=r.stderr)
     return parse_reply(r.stdout), r.stdout
 
 
@@ -791,6 +831,7 @@ def generate_one(q: dict, rows: dict, texts: dict, *, feedback: str = "", round_
                "template_sha256": sha256_text(_template(template)),
                "prompt_sha256": sha256_text(prompt), "params": {k: q[k] for k in q if k not in ("members",)},
                "feedback": feedback or None}
+        started = time.monotonic()
         try:
             reply, raw = ask_claude(prompt)
             row["output"] = reply
@@ -825,12 +866,21 @@ def generate_one(q: dict, rows: dict, texts: dict, *, feedback: str = "", round_
                                                + ". Rephrase without them.")))
             else:
                 row["accepted"] = True
-        except (subprocess.TimeoutExpired, RuntimeError, ValueError) as e:
-            row.update(accepted=False, error=f"{type(e).__name__}: {e}")
-            if "limit" in str(e).lower():
+        except (subprocess.SubprocessError, OSError, RuntimeError, ValueError) as e:
+            # Subprocess exceptions include the prompt in cmd/args and may carry document
+            # text in stdout/stderr. No exception message or subprocess output enters Git.
+            row.update(accepted=False, error={"type": type(e).__name__,
+                       "returncode": e.returncode if isinstance(e, subprocess.CalledProcessError) else None,
+                       "elapsed_seconds": round(time.monotonic() - started, 3),
+                       "reason": "generation failed"})
+            if isinstance(e, SubscriptionRequired):
                 with _GEN_LOCK:
                     _log(RECORD / "generation.jsonl", row)
-                raise UsageLimit(str(e)) from e
+                raise
+            if isinstance(e, (RuntimeError, ValueError)) and "limit" in str(e).lower():
+                with _GEN_LOCK:
+                    _log(RECORD / "generation.jsonl", row)
+                raise UsageLimit("Claude usage limit reached") from None
         with _GEN_LOCK:
             _log(RECORD / "generation.jsonl", row)
         if row.get("accepted"):

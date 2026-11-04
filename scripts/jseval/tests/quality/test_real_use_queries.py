@@ -1,10 +1,30 @@
 """Offline parts of the real-use query writing (S30): families, gates, prompts, the model call."""
 import json
 import subprocess
+from pathlib import Path
 
 import pytest
 
 from jseval.quality import real_use_queries as ruq
+
+
+SUBSCRIPTION = {"loggedIn": True, "authMethod": "claude.ai", "apiProvider": "firstParty",
+                "subscriptionType": "max"}
+AUTH_OVERRIDES = ("ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "ANTHROPIC_BASE_URL",
+                  "CLAUDE_CODE_USE_BEDROCK", "CLAUDE_CODE_USE_VERTEX", "CLAUDE_CODE_USE_FOUNDRY",
+                  "AWS_BEARER_TOKEN_BEDROCK", "ANTHROPIC_CUSTOM_HEADERS", "ANTHROPIC_PROFILE",
+                  "ANTHROPIC_FEDERATION_RULE_ID", "ANTHROPIC_FOUNDRY_API_KEY",
+                  "CLAUDE_CODE_USE_ANTHROPIC_AWS", "CLAUDE_CODE_USE_ANTHROPIC_GOOGLE_CLOUD",
+                  "CLAUDE_CODE_API_KEY_FILE_DESCRIPTOR", "CLAUDE_CODE_API_BASE_URL")
+
+
+@pytest.fixture
+def subscription_env(monkeypatch, tmp_path):
+    import os
+    for name in os.environ.keys() | set(AUTH_OVERRIDES):
+        if name.startswith(("ANTHROPIC_", "CLAUDE_CODE_USE_")) or name in AUTH_OVERRIDES:
+            monkeypatch.delenv(name, raising=False)
+    monkeypatch.setattr(ruq, "WORK", tmp_path / "work")
 
 
 def test_families_from_recipe_metadata():
@@ -58,23 +78,109 @@ def test_prompts_render_and_keep_copy_rule_by_level():
     assert "File 2: b.pdf" in topical and '{"query": null}' in topical
 
 
-def test_model_call_is_tool_less_and_session_less(monkeypatch):
-    seen = {}
+def test_model_call_is_tool_less_and_session_less(monkeypatch, subscription_env):
+    seen = []
 
     def fake_run(cmd, **kw):
-        seen.update(cmd=cmd, kw=kw)
+        seen.append((cmd, kw))
+        if "auth" in cmd:
+            return subprocess.CompletedProcess(cmd, 0, json.dumps(SUBSCRIPTION), "")
         return subprocess.CompletedProcess(cmd, 0, json.dumps(
             {"is_error": False, "result": 'Sure: {"query": "Fangquoten Ostsee"}'}), "")
     monkeypatch.setattr(ruq.subprocess, "run", fake_run)
     reply, _ = ruq.ask_claude("prompt")
     assert reply == {"query": "Fangquoten Ostsee"}
-    cmd = seen["cmd"]
+    assert len(seen) == 2 and "auth" in seen[0][0] and "status" in seen[0][0]
+    cmd, kw = seen[1]
     assert cmd[:3] == ["claude", "-p", "prompt"] and cmd[cmd.index("--model") + 1] == ruq.MODEL
     assert cmd[cmd.index("--tools") + 1] == "" and "--strict-mcp-config" in cmd
     assert "--no-session-persistence" in cmd and "bypassPermissions" not in cmd
-    assert seen["kw"]["stdin"] is subprocess.DEVNULL
+    assert kw["stdin"] is subprocess.DEVNULL
+    assert seen[0][1]["env"] == kw["env"]
+    assert not set(AUTH_OVERRIDES) & kw["env"].keys()
+    assert Path(kw["cwd"]).is_relative_to(ruq.WORK)
+    assert Path(kw["env"]["CLAUDE_CODE_DEBUG_LOGS_DIR"]).is_relative_to(ruq.WORK)
     with pytest.raises(ValueError, match="claude error"):
         ruq.parse_reply(json.dumps({"is_error": True, "result": "usage limit reached"}))
+
+
+@pytest.mark.parametrize("name", AUTH_OVERRIDES)
+@pytest.mark.parametrize("value", ["SECRET_OVERRIDE", ""])
+def test_api_or_provider_override_refuses_before_any_subprocess(
+        monkeypatch, subscription_env, name, value):
+    monkeypatch.setenv(name, value)
+    calls = []
+    def fake_run(cmd, **kw):
+        calls.append(cmd)
+        return subprocess.CompletedProcess(cmd, 0, json.dumps({"result": '{"query": "a b"}'}), "")
+    monkeypatch.setattr(ruq.subprocess, "run", fake_run)
+    with pytest.raises(RuntimeError, match="subscription") as error:
+        ruq.ask_claude("PRIVATE_PROMPT")
+    assert not calls
+    assert "SECRET_OVERRIDE" not in str(error.value) and "PRIVATE_PROMPT" not in str(error.value)
+
+
+@pytest.mark.parametrize("status", [
+    {**SUBSCRIPTION, "loggedIn": False}, {**SUBSCRIPTION, "authMethod": "api_key"},
+    {**SUBSCRIPTION, "authMethod": "api_key_helper"}, {**SUBSCRIPTION, "authMethod": "oauth_token"},
+    {**SUBSCRIPTION, "apiProvider": "bedrock"}, {**SUBSCRIPTION, "subscriptionType": None},
+    {**SUBSCRIPTION, "subscriptionType": "unknown"}, {},
+])
+def test_non_subscription_status_never_starts_generation(monkeypatch, subscription_env, status):
+    calls = []
+    def fake_run(cmd, **kw):
+        calls.append(cmd)
+        return subprocess.CompletedProcess(cmd, 0, json.dumps(status), "")
+    monkeypatch.setattr(ruq.subprocess, "run", fake_run)
+    with pytest.raises(RuntimeError, match="subscription"):
+        ruq.ask_claude("PRIVATE_PROMPT")
+    assert len(calls) == 1 and "-p" not in calls[0]
+
+
+@pytest.mark.parametrize("failure", ["timeout", "exit", "missing", "json"])
+def test_unavailable_auth_status_fails_closed(monkeypatch, subscription_env, failure):
+    secret = "PRIVATE_AUTH_DIAGNOSTIC"
+    calls = []
+    def fake_run(cmd, **kw):
+        calls.append(cmd)
+        if failure == "timeout":
+            raise subprocess.TimeoutExpired(cmd, 30, output=secret, stderr=secret)
+        if failure == "missing":
+            raise FileNotFoundError(secret)
+        return subprocess.CompletedProcess(cmd, 1 if failure == "exit" else 0, secret, secret)
+    monkeypatch.setattr(ruq.subprocess, "run", fake_run)
+    with pytest.raises(RuntimeError, match="subscription") as error:
+        ruq.ask_claude("PRIVATE_PROMPT")
+    assert len(calls) == 1 and "-p" not in calls[0]
+    assert secret not in str(error.value)
+
+
+@pytest.mark.parametrize("failure", ["timeout", "exit", "parse", "runtime"])
+def test_generation_errors_never_disclose_subprocess_arguments_or_output(
+        monkeypatch, tmp_path, failure):
+    secret = "PRIVATE_DOCUMENT_MARKER"
+    cmd = ["claude", "-p", secret]
+    errors = {"timeout": subprocess.TimeoutExpired(cmd, 180, output=secret, stderr=secret),
+              "exit": subprocess.CalledProcessError(7, cmd, output=secret, stderr=secret),
+              "parse": ValueError(secret), "runtime": RuntimeError(secret)}
+    monkeypatch.setattr(ruq, "RECORD", tmp_path / "record")
+    monkeypatch.setattr(ruq, "WORK", tmp_path / "work")
+    monkeypatch.setattr(ruq, "_template", lambda _: "template")
+    monkeypatch.setattr(ruq, "known_item_prompt", lambda *a: secret)
+    def fail(_):
+        raise errors[failure]
+    monkeypatch.setattr(ruq, "ask_claude", fail)
+    q = {"qid": "ki-1", "kind": "known-item", "target": "t"}
+    assert ruq.generate_one(q, {"t": {}}, {"t": secret}, max_attempts=1) is None
+    for path in ruq.RECORD.rglob("*"):
+        if path.is_file():
+            assert secret not in path.read_text()
+    error = ruq._jsonl(ruq.RECORD / "generation.jsonl")[0]["error"]
+    assert set(error) == {"type", "returncode", "elapsed_seconds", "reason"}
+    assert error["type"] == type(errors[failure]).__name__
+    assert error["returncode"] == (7 if failure == "exit" else None)
+    assert error["elapsed_seconds"] >= 0
+    assert error["reason"] == "generation failed"
 
 
 def test_chunk_report_and_format_cycle():

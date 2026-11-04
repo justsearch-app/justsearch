@@ -65,8 +65,8 @@ def test_stored_collection_data_is_outside_the_tree_key(collection, config):
     cfg.parent.mkdir(parents=True)
     cfg.write_text("{}")
     assert key() == first
-    code = config.repo_root / "scripts/jseval/jseval/quality/corpus.py"
-    code.write_text("# extraction-adjacent code stays keyed")
+    code = config.repo_root / "scripts/jseval/jseval/quality/collections.py"
+    code.write_text("# document materialization code stays keyed")
     assert key() != first
 
 
