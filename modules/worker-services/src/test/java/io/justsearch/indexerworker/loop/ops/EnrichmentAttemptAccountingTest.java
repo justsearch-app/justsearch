@@ -267,12 +267,15 @@ class EnrichmentAttemptAccountingTest {
         new SpladeBackfillOps.BackfillContext(fields, coordinator, commits, IndexingPacing.unthrottled(),
             () -> splade, () -> true, 100, true, false, LoggerFactory.getLogger(getClass()))));
     assertEquals(64L, outcome.accounting().counters().get("splade.computed"));
-    assertEquals(65, outcome.accounting().count(SPLADE, CANCELLED));
+    assertEquals(64, outcome.accounting().count(SPLADE, PUBLISHED));
+    assertEquals(1, outcome.accounting().count(SPLADE, CANCELLED));
     assertEquals(0, outcome.accounting().count(SPLADE, FAILED_CHARGED));
-    assertEquals(0, outcome.docsProcessed());
-    assertFalse(outcome.accounting().counters().containsKey("splade.accepted"));
-    verify(coordinator, never()).publishEnrichmentBatch(anyList(), anyMap());
-    verifyNoInteractions(commits);
+    assertEquals(64, outcome.docsProcessed());
+    assertEquals(64L, outcome.accounting().counters().get("splade.accepted"));
+    assertTrue(outcome.success(), "cancellation must not set systemic backoff");
+    assertDoesNotThrow(() -> verify(coordinator).publishEnrichmentBatch(anyList(), anyMap()));
+    assertDoesNotThrow(() -> verify(commits).commitAndTrack(
+        io.justsearch.adapters.lucene.runtime.CommitReason.BACKFILL_SPLADE));
   }
 
   @Test

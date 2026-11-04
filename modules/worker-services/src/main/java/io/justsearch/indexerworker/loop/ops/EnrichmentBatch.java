@@ -3,6 +3,7 @@ package io.justsearch.indexerworker.loop.ops;
 
 import io.justsearch.adapters.lucene.runtime.DocumentFieldOps;
 import io.justsearch.adapters.lucene.runtime.IndexingCoordinator;
+import io.justsearch.indexerworker.inference.LocalSessionAcquisition;
 import io.justsearch.adapters.lucene.runtime.LuceneRuntimeTypes.BatchUpdateResult;
 import java.io.IOException;
 import java.util.HashMap;
@@ -55,6 +56,11 @@ final class EnrichmentBatch {
   EnrichmentBatch accounting(EnrichmentAccounting accounting) {
     this.accounting = accounting;
     return this;
+  }
+
+  ScopedValue.Carrier inferenceCancellation(BooleanSupplier stop, BooleanSupplier unavailable) {
+    return LocalSessionAcquisition.withCancellation(
+        () -> hardStop(stop, coordinator, deletionEpoch, authority) || unavailable.getAsBoolean());
   }
 
   boolean stopped(BooleanSupplier stop) {
@@ -138,8 +144,8 @@ final class EnrichmentBatch {
     }
   }
 
-  void cancelled(EnrichmentAccounting.Stage stage, Throwable failure) {
-    if (accounting != null) accounting.cancelled(stage, failure);
+  boolean cancelled(EnrichmentAccounting.Stage stage, Throwable failure) {
+    return accounting != null && accounting.cancelled(stage, failure);
   }
 
   private void examined(String id, Map<String, Object> updates) {

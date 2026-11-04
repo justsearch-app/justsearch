@@ -43,7 +43,7 @@ public final class DisambiguationBackfillOps {
    * <p>Acknowledges progress only after coherent reads, source replacement, and snapshot
    * publication succeed. The final page retires sources absent from the completed scan.
    */
-  public static void processDisambiguationBackfill(BackfillContext context) {
+  public static boolean processDisambiguationBackfill(BackfillContext context) {
     try {
       var coordinator = context.indexingCoordinator();
       var authority = coordinator == null ? null : coordinator.enrichmentAuthority();
@@ -52,35 +52,42 @@ public final class DisambiguationBackfillOps {
       BooleanSupplier stopped = () -> EnrichmentBatch.hardStop(
           () -> !context.runningSupplier().getAsBoolean() || service == null || !service.isAvailable()
               || context.serviceSupplier().get() != service, coordinator, epoch, authority);
-      if (service == null || !service.isAvailable() || stopped.getAsBoolean()) return;
+      if (service == null || !service.isAvailable() || stopped.getAsBoolean()) return false;
       var state = context.documentFieldOps().entityCorpusState();
-      if (state.pendingNer() != 0) return;
-      if (!service.prepareReconciliation(state.revision(), state.readerKey())) return;
+      if (state.pendingNer() != 0) return false;
+      if (!service.prepareReconciliation(state.revision(), state.readerKey())) return false;
       var page = context.documentFieldOps().entityPage(
           state.readerKey(), service.reconciliationCursor(), context.batchSize());
       Map<String, Map<String, List<String>>> sources = new LinkedHashMap<>();
       for (var document : page.documents()) {
         context.pacing().pace();
-        if (stopped.getAsBoolean() || context.serviceSupplier().get() != service) return;
+        if (stopped.getAsBoolean() || context.serviceSupplier().get() != service) return false;
         sources.put(document.id(), document.mentions());
       }
-      if (stopped.getAsBoolean() || context.serviceSupplier().get() != service) return;
+      if (stopped.getAsBoolean() || context.serviceSupplier().get() != service) return false;
       service.replaceSources(sources, () -> {
         context.pacing().pace();
         return !stopped.getAsBoolean() && context.serviceSupplier().get() == service;
       });
-      if (stopped.getAsBoolean() || context.serviceSupplier().get() != service) return;
+      if (stopped.getAsBoolean() || context.serviceSupplier().get() != service) return false;
       var current = context.documentFieldOps().entityCorpusState();
-      if (!state.equals(current)) return;
-      if (coordinator == null) service.acknowledgeReconciliation(page.cursor(), page.exhausted());
-      else coordinator.withEnrichmentAuthority(authority, () -> {
+      if (!state.equals(current)) return false;
+      if (coordinator == null) {
+        service.acknowledgeReconciliation(page.cursor(), page.exhausted());
+        return true;
+      }
+      boolean[] acknowledged = {false};
+      coordinator.withEnrichmentAuthority(authority, () -> {
         if (!stopped.getAsBoolean() && context.serviceSupplier().get() == service) {
           service.acknowledgeReconciliation(page.cursor(), page.exhausted());
+          acknowledged[0] = true;
         }
         return null;
       });
+      return acknowledged[0];
     } catch (Exception failure) {
       context.log().warn("Disambiguation batch incomplete; retrying next idle cycle", failure);
+      return false;
     }
   }
 }

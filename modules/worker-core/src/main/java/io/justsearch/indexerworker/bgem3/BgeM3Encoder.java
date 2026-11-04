@@ -205,8 +205,7 @@ public class BgeM3Encoder implements AutoCloseable {
     var acquisition = LocalSessionAcquisition.background();
     // Spec E §2.2 (Owner decision 9): without a measured activation, the plan read for this call
     // sends bulk work to the CPU session, with a status reason. Without a plan: as today.
-    boolean bulkOnCpu =
-        GpuCallPacker.bulkCpuReason(sessions.arenaPlan(), EncoderRole.BGE_M3).isPresent();
+    boolean bulkOnCpu = isBulkOnCpu();
     if (texts.size() <= 1) {
       return encodeBatchInternal(texts, acquisition, bulkOnCpu);
     }
@@ -221,6 +220,11 @@ public class BgeM3Encoder implements AutoCloseable {
   /** Returns the underlying tokenizer (for sharing with query encoders). */
   public HuggingFaceTokenizer tokenizer() {
     return tokenizer;
+  }
+
+  /** The plan's unconditional CPU route applies even when the query GPU session is warm. */
+  public boolean isBulkOnCpu() {
+    return GpuCallPacker.bulkCpuReason(sessions.arenaPlan(), EncoderRole.BGE_M3).isPresent();
   }
 
   public boolean isGpuAvailable() {
@@ -396,6 +400,7 @@ public class BgeM3Encoder implements AutoCloseable {
       try (io.opentelemetry.context.Scope _ = ortSpan.makeCurrent()) {
         try (var lease = onCpu ? sessions.acquireCpu(acquisition) : sessions.acquire(acquisition)) {
           ortSpan.setAttribute("encoder.gpu", !lease.isCpu());
+          LocalSessionAcquisition.checkCancellation();
           try (OrtSession.Result result = lease.run(inputs)) {
             // ORT-call timing recorded at the Lease choke point (tempdoc 710 Move 2).
 

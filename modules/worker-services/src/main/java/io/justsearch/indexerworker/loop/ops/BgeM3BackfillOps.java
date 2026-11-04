@@ -4,6 +4,7 @@ package io.justsearch.indexerworker.loop.ops;
 import io.justsearch.adapters.lucene.runtime.CommitOps;
 import io.justsearch.adapters.lucene.runtime.DocumentFieldOps;
 import io.justsearch.adapters.lucene.runtime.IndexingCoordinator;
+import io.justsearch.indexerworker.inference.LocalSessionAcquisition;
 import io.justsearch.indexerworker.bgem3.BgeM3Encoder;
 import io.justsearch.indexerworker.bgem3.BgeM3Output;
 import io.justsearch.indexerworker.coordination.WorkerSignalBus;
@@ -50,7 +51,22 @@ public final class BgeM3BackfillOps {
       // Tempdoc 712/931: see SpladeBackfillOps.BackfillContext — same flag, same reason. This lane
       // writes the sparse and dense pair together, so a chunk it selects gets sparse data too.
       boolean chunkSpladeEnabled,
-      Logger log) {}
+      Logger log,
+      BooleanSupplier unitAllowed) {
+    public BackfillContext(
+        DocumentFieldOps documentFieldOps,
+        IndexingCoordinator indexingCoordinator,
+        CommitOps commitOps,
+        WorkerSignalBus signalBus,
+        Supplier<BgeM3Encoder> encoderSupplier,
+        BooleanSupplier runningSupplier,
+        int batchSize,
+        boolean commitAfterBatch,
+        boolean chunkSpladeEnabled,
+        Logger log) {
+      this(documentFieldOps, indexingCoordinator, commitOps, signalBus, encoderSupplier, runningSupplier, batchSize, commitAfterBatch, chunkSpladeEnabled, log, () -> true);
+    }
+  }
 
   /**
    * Processes a batch of BGE-M3 backfill documents.
@@ -174,7 +190,7 @@ public final class BgeM3BackfillOps {
           batch.started(List.of(batchDocIds.get(i)), batchIsChunk.get(i)
               ? EnrichmentAccounting.Stage.CHUNK_EMBED : EnrichmentAccounting.Stage.EMBED);
         }
-        outputs = encoder.encodeBatch(batchContents);
+        outputs = batch.inferenceCancellation(() -> !context.runningSupplier().getAsBoolean(), unavailable).call(() -> encoder.encodeBatch(batchContents));
         // A short/empty result is as unusable as null for the index-aligned loop in Phase 3 —
         // trusting its length to match batchDocIds is what crash-loops the embedding-chunk
         // sibling of this method (EmbeddingBackfillOps#processChunkEmbeddingBackfill). Route
@@ -193,7 +209,7 @@ public final class BgeM3BackfillOps {
         }
         boolean cancelled = false;
         for (var stage : EnrichmentAccounting.Stage.values()) cancelled |= accounting.cancelled(stage, e);
-        if (cancelled) return StageOutcome.observed(false, processed, t0, accounting);
+        if (cancelled) return StageOutcome.observed(true, processed, t0, accounting);
         context.log().error("BGE-M3 batch encoding failed: {}", e.getMessage());
         // Fallback to per-doc encoding
         int perDocFailed = 0;
@@ -205,8 +221,9 @@ public final class BgeM3BackfillOps {
           String docId = batchDocIds.get(i);
           boolean isChunk = batchIsChunk.get(i);
           try {
-            BgeM3Output output = encoder.encode(
-                batchContents.get(i), io.justsearch.core.execution.InferenceRequest.background());
+            String fallbackText = batchContents.get(i);
+            BgeM3Output output = batch.inferenceCancellation(() -> !context.runningSupplier().getAsBoolean(), unavailable).call(() -> encoder.encode(
+                fallbackText, LocalSessionAcquisition.backgroundInference()));
             if (output != null) {
               batch.computed(docId, EnrichmentAccounting.Stage.SPLADE);
               if (output.denseVector() != null && output.denseVector().length > 0) {
@@ -367,7 +384,11 @@ public final class BgeM3BackfillOps {
   }
 
   private static boolean shouldInterrupt(BackfillContext context) {
-    return !context.runningSupplier().getAsBoolean()
-        || context.signalBus().shouldYieldGpuBackfill(); // tempdoc 630: GPU-claimed OR energy-reduced
+    BgeM3Encoder current = context.encoderSupplier().get();
+    return !context.unitAllowed().getAsBoolean() || !context.runningSupplier().getAsBoolean()
+        || (context.signalBus().isEnergyReduced()
+            || (current != null && !current.isBulkOnCpu()
+                && LoopPacingPolicy.requiresGpu(current.isGpuAvailable(), current.getOrtCudaStatus())
+                && (context.signalBus().isMainGpuActive() || context.signalBus().isBulkHeld()))); // tempdoc 630: GPU-claimed OR energy-reduced
   }
 }

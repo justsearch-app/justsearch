@@ -40,12 +40,14 @@ import io.justsearch.indexerworker.loop.EmbeddingProviderLifecycle;
 import io.justsearch.indexerworker.ner.NerService;
 import io.justsearch.indexerworker.queue.JobQueue;
 import io.justsearch.indexerworker.splade.SpladeEncoder;
+import io.justsearch.indexerworker.metrics.OperationalMetrics;
 import io.justsearch.indexing.SchemaFields;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.IdentityHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -58,6 +60,9 @@ import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.concurrent.atomic.LongAdder;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -71,12 +76,43 @@ import org.junit.jupiter.api.Test;
  * tick is placed exactly: ticks 1-2 before the cycle (cycle entry still admits it), tick 3, the
  * raise, inside the first batch. The profile is P12 (on NO_GPU the gate never holds).
  *
- * <p>Inside a running cycle the only stop that reads the hold is the bus fold, {@code
- * shouldYieldGpuBackfill() || isBulkHeld()} (Spec E section 1.3 item 1); removing just that fold
- * lets batch 2 start, and these checks fail by assertion. On the base before step E3 (with the
- * sampler copied in) the bus takes no gate, every batch starts, and they fail by assertion too.
+ * <p>E3c-a admits resources per scheduler unit. The native sparse encode is the GPU-unit
+ * boundary; content selection may continue while held so eligible CPU stages can advance.
+ * The mocks explicitly identify their GPU resource, while the bus and sampler stay real.
  */
 final class ExternalPressureHoldsBackfillTest {
+  private String previousBackfillMode;
+  private final Map<Map<String, LongAdder>, Map<String, LongAdder>> previousMetrics =
+      new IdentityHashMap<>();
+
+  @BeforeEach
+  @SuppressWarnings("unchecked")
+  void saveMetrics() throws Exception {
+    var metrics = OperationalMetrics.getInstance();
+    previousBackfillMode = metrics.getBackfillMode();
+    for (String name : List.of("enrichmentCompleted", "batchTimingMs", "batchTimingCount", "enrichmentOutcomes")) {
+      var field = OperationalMetrics.class.getDeclaredField(name);
+      field.setAccessible(true);
+      var counters = (Map<String, LongAdder>) field.get(metrics);
+      var saved = new HashMap<String, LongAdder>();
+      counters.forEach((key, value) -> {
+        var copy = new LongAdder();
+        copy.add(value.sum());
+        saved.put(key, copy);
+      });
+      previousMetrics.put(counters, saved);
+    }
+  }
+
+  @AfterEach
+  void restoreMetrics() {
+    previousMetrics.forEach((counters, saved) -> {
+      counters.clear();
+      counters.putAll(saved);
+    });
+    OperationalMetrics.getInstance().recordBackfillMode(previousBackfillMode);
+  }
+
 
   private static final long MIB = 1024L * 1024L;
   private static final long GIB = 1024L * MIB;
@@ -91,6 +127,7 @@ final class ExternalPressureHoldsBackfillTest {
     int batchSize = ResolvedConfig.Ai.BackfillPacing.DEFAULTS.embeddingBackfillBatchSize();
     fixture.pending(6 * batchSize);
     SpladeEncoder splade = mock(SpladeEncoder.class);
+    when(splade.isGpuAvailable()).thenReturn(true);
     NerService ner = mock(NerService.class);
     when(ner.isAvailable()).thenReturn(true);
     AtomicInteger encodes = new AtomicInteger();
@@ -111,8 +148,8 @@ final class ExternalPressureHoldsBackfillTest {
     assertTimeoutPreemptively(Duration.ofSeconds(30), scheduler::runIdleCycle,
         "the cycle returns once the hold is raised");
 
-    assertEquals(1, fixture.batchStarts.get(),
-        "the in-flight batch finishes and no further combined batch starts after the raise");
+    assertEquals(1, encodes.get(),
+        "the in-flight GPU slice finishes and no further GPU slice starts after the raise");
     assertTrue(fixture.bus.shouldYieldGpuBackfill(), "the bus yields while external use holds");
     fixture.assertPausedForExternalUse();
 
@@ -126,6 +163,7 @@ final class ExternalPressureHoldsBackfillTest {
     fixture.pending(ResolvedConfig.Ai.BackfillPacing.DEFAULTS.bgeM3BackfillBatchSize());
     fixture.onFirstBatchStart = fixture::tick;
     BgeM3Encoder bge = mock(BgeM3Encoder.class);
+    when(bge.isGpuAvailable()).thenReturn(true);
     when(bge.encodeBatch(anyList())).thenAnswer(inv -> {
       List<String> contents = inv.getArgument(0);
       List<BgeM3Output> out = new ArrayList<>();

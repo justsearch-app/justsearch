@@ -31,10 +31,13 @@ import io.justsearch.indexerworker.splade.SpladeEncoder;
 import io.justsearch.indexing.SchemaFields;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.IdentityHashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.LongAdder;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -58,6 +61,38 @@ import org.mockito.junit.jupiter.MockitoExtension;
 @DisplayName("BackfillScheduler backfill-mode + per-stage recording (tempdoc 710 Move 2 item 4)")
 @ExtendWith(MockitoExtension.class)
 class BackfillSchedulerModeRecordingTest {
+  private String previousBackfillMode;
+  private final Map<Map<String, LongAdder>, Map<String, LongAdder>> previousMetrics =
+      new IdentityHashMap<>();
+
+  @BeforeEach
+  @SuppressWarnings("unchecked")
+  void saveMetrics() throws Exception {
+    var metrics = OperationalMetrics.getInstance();
+    previousBackfillMode = metrics.getBackfillMode();
+    for (String name : List.of("enrichmentCompleted", "batchTimingMs", "batchTimingCount", "enrichmentOutcomes")) {
+      var field = OperationalMetrics.class.getDeclaredField(name);
+      field.setAccessible(true);
+      var counters = (Map<String, LongAdder>) field.get(metrics);
+      var saved = new HashMap<String, LongAdder>();
+      counters.forEach((key, value) -> {
+        var copy = new LongAdder();
+        copy.add(value.sum());
+        saved.put(key, copy);
+      });
+      previousMetrics.put(counters, saved);
+    }
+  }
+
+  @AfterEach
+  void restoreMetrics() {
+    previousMetrics.forEach((counters, saved) -> {
+      counters.clear();
+      counters.putAll(saved);
+    });
+    OperationalMetrics.getInstance().recordBackfillMode(previousBackfillMode);
+  }
+
 
   @Mock DocumentFieldOps documentFieldOps;
   @Mock IndexingCoordinator indexingCoordinator;
@@ -344,14 +379,8 @@ class BackfillSchedulerModeRecordingTest {
     assertEquals("idle", OperationalMetrics.getInstance().getBackfillMode());
   }
 
-  /**
-   * The other direction of §20a's re-stamp: a pass that DID advance documents keeps "individual".
-   * {@code runIndividualBackfills}' pacing flag is false even here (a parent-embedding batch never
-   * sets it — only the chunk loop and a SPLADE pass over a non-empty backlog do), so a re-stamp
-   * keyed on that flag instead of on ACTIVITY would stamp "idle" over a working cycle.
-   */
+  /** Parent advancement keeps the individual gauge and now also selects active sleep (E3c-a). */
   @Test
-  @DisplayName("§20a: an individual pass that DOES advance documents keeps mode=individual")
   void individualMode_withWorkDone_keepsIndividual() {
     seedDoc(
         "doc-3",
@@ -367,8 +396,7 @@ class BackfillSchedulerModeRecordingTest {
 
     boolean didWork = scheduler.runIdleCycle();
 
-    // The pacing flag stays false — this is exactly the signal a naive re-stamp would have used.
-    assertEquals(false, didWork);
+    assertTrue(didWork, "successful parent-only work selects active sleep");
     assertTrue(
         OperationalMetrics.getInstance()
                 .getEnrichmentCompleted()
