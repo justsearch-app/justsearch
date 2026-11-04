@@ -101,12 +101,12 @@ in the acceptance module suite. The shared dev-stack check is reserved for the o
         {
           "kind": "owner-words",
           "quote": "A captured-plan member admitted at enumeration epoch 1 that is still PENDING or PROCESSING when the walk closes COMPLETE at a later epoch (walk_seen_epoch < enumeration_epoch).",
-          "location": "task redesign-c4 audit repair request"
+          "location": "task redesign-c4 request"
         },
         {
           "kind": "owner-words",
           "quote": "After capture, a foreground re-add through the public enqueueEntries (provenance user/HTTP, same bytes, root and collection; not buffered for the generation), once left PENDING and once claimed (PROCESSING), each with and without force.",
-          "location": "task redesign-c4 audit repair request"
+          "location": "task redesign-c4 request"
         }
       ],
       "evidence": "gates/test-intent/evidence/redesign-c4-repair.json",
