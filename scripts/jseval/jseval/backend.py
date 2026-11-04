@@ -107,12 +107,18 @@ def start_backend(
     dataset_name: str | None = None,
     pin_selector_key: str | None = None,
     raw_context=None,
+    startup_admission: bool = True,
+    prepared_only: bool = False,
 ) -> BackendInfo:
     """Build and launch the installed eval Engine, then wait for backend readiness.
 
     Returns a BackendInfo with the Popen handle and data directory path.
     llm=True is refused because the shared eval contract uses read-only settings.
     Uses a single deadline for all readiness checks.
+
+    ``startup_admission=False`` is for a quality build whose engine startup and
+    lifetime already belong to its pausable work lock. Nested build tools still
+    acquire their own admission; no admission token is supplied to bypass them.
 
     health_timeout_sec=None resolves JSEVAL_HEALTH_TIMEOUT_SEC from the
     environment before falling back to the 120s default — the only lever that
@@ -175,7 +181,11 @@ def start_backend(
     gradlew_name = "gradlew.bat" if sys.platform == "win32" else "gradlew"
     gradlew = resolved_root / gradlew_name
 
-    if not gradlew.is_file():
+    if prepared_only:
+        if clean or index_cache_mode != "off":
+            raise ValueError("prepared-only start cannot clean or build/adopt an index")
+        require_prepared(resolved_root, resolved_data)
+    if not prepared_only and not gradlew.is_file():
         raise FileNotFoundError(f"{gradlew_name} not found at {gradlew}")
 
     if clean and resolved_data.is_dir():
@@ -237,6 +247,8 @@ def start_backend(
         port=port,
         llm=llm,
         health_timeout_sec=health_timeout_sec,
+        **({"startup_admission": False} if not startup_admission else {}),
+        **({"prepared_only": True} if prepared_only else {}),
     )
     return BackendInfo(proc=proc, data_dir=resolved_data, spawn_env=env)
 
@@ -244,10 +256,82 @@ def start_backend(
 def _install_distribution(resolved_root: Path, env: dict[str, str]) -> None:
     """Build the distribution before the lifetime helper or runner is needed."""
     command = ["node", str(resolved_root / "scripts/lib/tool-invoker.cjs"), "gradle",
-               ":modules:ui:installDist", "-PskipWebBuild=true", "--quiet"]
-    result = subprocess.run(command, cwd=str(resolved_root), env=env, check=False)
-    if result.returncode != 0:
-        raise RuntimeError(f"Backend installDist failed (exit {result.returncode})")
+               ":modules:ui:installDist", "-PskipWebBuild=true", "--quiet", "--no-daemon"]
+    if env.get("JSEVAL_GRADLE_SLOT"):
+        # Queue without invalidating the usable distribution. The child takes
+        # build admission and changes the receipt only after the slot is held.
+        script = ("import os,sys; from pathlib import Path; from jseval.backend import "
+                  "_install_distribution_admitted; "
+                  "_install_distribution_admitted(Path(sys.argv[1]), dict(os.environ), sys.argv[2:])")
+        result = subprocess.run([env["JSEVAL_GRADLE_SLOT"], "-w", "3600", sys.executable,
+                                 "-c", script, str(resolved_root), *command],
+                                cwd=str(resolved_root), env=env, check=False)
+        if result.returncode != 0:
+            raise RuntimeError(f"Backend installDist failed (exit {result.returncode})")
+        return
+    _install_distribution_admitted(resolved_root, env, command)
+
+
+def _install_distribution_admitted(resolved_root: Path, env: dict[str, str], command: list[str]) -> None:
+    identity = None
+    if (resolved_root / ".git").exists():
+        try:
+            identity = source_identity(resolved_root)
+        except (OSError, subprocess.CalledProcessError):
+            log.warning("Cannot attest install distribution source; prepared-only start will refuse it")
+    dist = resolved_root / "modules/ui/build/install/ui"
+    receipt = dist / ".jseval-source.json"
+    # Admission covers receipt invalidation, every distribution write, and the
+    # replacement attestation. Abrupt death during Gradle must leave no receipt.
+    with _machine_admission(env) as admitted:
+        receipt.unlink(missing_ok=True)
+        result = subprocess.run(command, cwd=str(resolved_root), env=admitted, check=False)
+        if result.returncode != 0:
+            raise RuntimeError(f"Backend installDist failed (exit {result.returncode})")
+        if (identity is not None and source_identity(resolved_root) == identity
+                and (dist / "bin" / ("ui.bat" if sys.platform == "win32" else "ui")).is_file()):
+            import json
+            import tempfile
+            with tempfile.NamedTemporaryFile(mode="w", dir=dist, delete=False) as out:
+                pending = Path(out.name)
+                try:
+                    out.write(json.dumps(identity))
+                    out.close()
+                    pending.replace(receipt)
+                finally:
+                    pending.unlink(missing_ok=True)
+        else:
+            log.warning("Install distribution source unavailable or changed; prepared-only start will refuse it")
+
+
+def source_identity(root: Path) -> tuple[str, str | None]:
+    """Pin HEAD and all nonignored working bytes, including untracked files/deletions."""
+    import hashlib
+    commit = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=root).decode().strip()
+    diff = subprocess.check_output(["git", "diff", "HEAD", "--binary", "--no-ext-diff"], cwd=root)
+    raw = subprocess.check_output(["git", "ls-files", "--others", "--exclude-standard", "-z"], cwd=root)
+    digest = hashlib.sha256(diff)
+    for name in sorted(filter(None, raw.split(b"\0"))):
+        p = root / os.fsdecode(name)
+        digest.update(name + b"\0")
+        digest.update(os.fsencode(os.readlink(p)) if p.is_symlink() else p.read_bytes())
+    return commit, digest.hexdigest() if diff or raw else None
+
+
+def require_prepared(root: Path, data: Path | None = None) -> None:
+    """Read-only preflight. Never call Gradle or recover/rebuild a missing index."""
+    import json
+    dist = root / "modules/ui/build/install/ui"
+    if not (dist / "bin" / ("ui.bat" if sys.platform == "win32" else "ui")).is_file():
+        raise RuntimeError("not ready: install distribution missing; prepare the index outside the scoring window")
+    try:
+        receipt = json.loads((dist / ".jseval-source.json").read_text())
+        if receipt != list(source_identity(root)):
+            raise ValueError("candidate differs from installed distribution")
+    except (OSError, ValueError) as e:
+        raise RuntimeError(f"not ready: install distribution identity unavailable or stale ({e}); rebuild outside the scoring window") from e
+    if data is not None and not any((data / "index/default").glob("**/segments_*")):
+        raise RuntimeError("not ready: prepared index missing; prepare it outside the scoring window")
 
 
 def _machine_admission(env: dict[str, str]):
@@ -279,17 +363,22 @@ def _boot_and_wait(
     port: int,
     llm: bool,
     health_timeout_sec: float,
+    startup_admission: bool = True,
+    prepared_only: bool = False,
 ) -> subprocess.Popen:
-    with _machine_admission(env) as admitted:
+    scope = _machine_admission(env) if startup_admission else contextlib.nullcontext(env)
+    with scope as admitted:
         return _boot_admitted(
             resolved_root=resolved_root, resolved_data=resolved_data, gradlew=gradlew,
             env=admitted, port=port, llm=llm, health_timeout_sec=health_timeout_sec,
+            **({"prepared_only": True} if prepared_only else {}),
         )
 
 
 def _boot_admitted(
     *, resolved_root: Path, resolved_data: Path, gradlew: Path,
     env: dict[str, str], port: int, llm: bool, health_timeout_sec: float,
+    prepared_only: bool = False,
 ) -> subprocess.Popen:
     """Build installDist, start the bound persistent runner and wait for readiness.
 
@@ -297,15 +386,12 @@ def _boot_admitted(
     """
     if sys.platform == "linux" and threading.current_thread() is not threading.main_thread():
         raise RuntimeError("Linux eval backends must be launched from the process-lifetime main thread")
-    _install_distribution(resolved_root, env)
+    if prepared_only:
+        require_prepared(resolved_root, resolved_data)
+    else:
+        _install_distribution(resolved_root, env)
     cmd = ["node", str(resolved_root / "scripts" / "dev" / "eval-runner.cjs")]
-    if sys.platform == "linux":
-        import json
-        import platform
-        architecture = {"amd64": "x86_64", "x64": "x86_64"}.get(platform.machine().lower(), platform.machine().lower())
-        spec = json.loads((resolved_root / "contracts/native-targets/spec.v1.json").read_text())
-        helper = resolved_root / "modules/ui/build/install/ui" / spec["targets"][f"linux-{architecture}"]["paths"]["bound-exec"]
-        cmd = [str(helper), "exec", str(os.getpid()), "--", *cmd]
+    cmd = bind_command(resolved_root, cmd)
 
     log.info("Starting backend: %s (port=%d, data=%s)", " ".join(cmd), port, resolved_data)
 
@@ -370,6 +456,18 @@ def _boot_admitted(
         log.info("LLM inference available")
 
     return proc
+
+
+def bind_command(root: Path, command: list[str]) -> list[str]:
+    """Bind an owned command to this caller's lifetime (Linux, main thread only)."""
+    if sys.platform != "linux":
+        return command
+    import json
+    import platform
+    architecture = {"amd64": "x86_64", "x64": "x86_64"}.get(platform.machine().lower(), platform.machine().lower())
+    spec = json.loads((root / "contracts/native-targets/spec.v1.json").read_text())
+    helper = root / "modules/ui/build/install/ui" / spec["targets"][f"linux-{architecture}"]["paths"]["bound-exec"]
+    return [str(helper), "exec", str(os.getpid()), "--", *command]
 
 
 def _run_with_cache(

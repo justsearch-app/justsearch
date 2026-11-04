@@ -209,6 +209,13 @@ class ConfirmResult:
     failures: list[str]
     checks: dict = field(default_factory=dict)
 
+    @property
+    def transient_failures(self) -> list[str]:
+        """Serving failures are not evidence that stored index content is corrupt."""
+        prefixes = tuple(name + "." for name, detail in self.checks.items()
+                         if isinstance(detail, dict) and detail.get("transient") is True)
+        return [f for f in self.failures if f.startswith(prefixes)]
+
 
 # --------------------------------------------------------------------------- #
 # Canonical hashing (mirrors jseval/manifest.py::_sha256_canonical).
@@ -679,6 +686,7 @@ def compute_selector(
     spawn_env: Mapping[str, str],
     dataset_name: str | None = None,
     raw_context=None,
+    index_key: str | None = None,
 ) -> SelectorKey:
     """Static candidate selector (751 sec M.2 -- heuristic, never authoritative).
 
@@ -696,17 +704,25 @@ def compute_selector(
     the adopter bind identical corpus components by construction (finding 2). When
     BOTH are ``None`` the caller is axis-less (v0 selector with no corpus) and no
     corpus components are added -- today's behavior for axis-less callers.
+
+    ``index_key`` opts into the quality core's fail-safe source/content key in
+    place of commit + dirt. Other axes and all live confirmation checks remain.
     """
     components: dict = {"schema_version": _SELECTOR_SCHEMA_VERSION}
     try:
-        git_sha = _git_sha_full(repo_root)
+        if index_key is not None and not index_key.strip():
+            raise IdentityUnavailable("index_key: empty")
+        git_sha = _git_sha_full(repo_root) if index_key is None else index_key
         if git_sha is None:
             return SelectorKey(
                 None, components,
                 "git_sha: git rev-parse HEAD unavailable in " + str(repo_root),
             )
-        components["git_sha"] = git_sha
-        components["dirty_state_hash"] = _dirty_state_hash(repo_root)
+        if index_key is None:
+            components["git_sha"] = git_sha
+            components["dirty_state_hash"] = _dirty_state_hash(repo_root)
+        else:
+            components["index_key"] = index_key
 
         models_dir = _resolve_models_dir(repo_root, spawn_env)
         embed = _read_sha256_sidecar(
@@ -772,6 +788,7 @@ def compute_live_identity(
     base_url: str,
     spawn_env: Mapping[str, str],
     timeout: float = 10.0,
+    index_key: str | None = None,
 ) -> IndexIdentity:
     """Authoritative index identity from the running backend (751 sec M.1).
 
@@ -787,14 +804,19 @@ def compute_live_identity(
     build_state / commit_time are deliberately excluded from the key: they vary
     per build and belong to the entry attestation the publish step assembles,
     not to the identity.
+
+    With ``index_key``, replace only commit + dirt with the caller's fail-safe
+    index key. Live model/fingerprint fields are still read and compared.
     """
+    if index_key is not None and not index_key.strip():
+        raise IdentityUnavailable("index_key: empty")
     repo_root = _resolve_repo_root(spawn_env)
-    git_sha = _git_sha_full(repo_root)
+    git_sha = _git_sha_full(repo_root) if index_key is None else index_key
     if git_sha is None:
         raise IdentityUnavailable(
             "git_sha: git rev-parse HEAD unavailable in " + str(repo_root),
         )
-    dirty = _dirty_state_hash(repo_root)
+    dirty = _dirty_state_hash(repo_root) if index_key is None else None
 
     models_dir = _resolve_models_dir(repo_root, spawn_env)
     ner = _ner_model_hash(models_dir)
@@ -814,6 +836,10 @@ def compute_live_identity(
         "vector_format": meta["vector_format"],
         "runtime_config": _runtime_config(spawn_env),
     }
+    if index_key is not None:
+        components.pop("git_sha")
+        components.pop("dirty_state_hash")
+        components["index_key"] = index_key
     return IndexIdentity(_sha256_canonical(components), components)
 
 
@@ -823,6 +849,7 @@ def confirm_adoption(
     adopted_data_dir: Path,
     spawn_env: Mapping[str, str],
     timeout: float = 30.0,
+    index_key: str | None = None,
 ) -> ConfirmResult:
     """Confirm an adopted cache entry against the live backend (751 sec M.2).
 
@@ -831,6 +858,9 @@ def confirm_adoption(
     collected (no short-circuit) and any transport error, timeout, or missing
     key inside a check fails THAT check with a named reason; this function never
     raises out.
+
+    ``index_key`` must be the same fail-safe key used for candidate selection;
+    omitted, existing callers retain commit-and-dirty-state confirmation.
     """
     failures: list[str] = []
     checks: dict = {}
@@ -840,7 +870,8 @@ def confirm_adoption(
 
     # -- Check 1: live identity key equals the entry's recorded key. --------- #
     try:
-        live = compute_live_identity(base_url, spawn_env, timeout=timeout)
+        live = compute_live_identity(base_url, spawn_env, timeout=timeout,
+                                     **({"index_key": index_key} if index_key is not None else {}))
         entry_ident = entry_doc.get("identity") or {}
         entry_key = entry_ident.get("key")
         entry_comps = entry_ident.get("components") or {}
@@ -866,10 +897,10 @@ def confirm_adoption(
             checks["identity"] = {"ok": False, "diffs": diffs}
     except IdentityUnavailable as e:
         fail("identity.unavailable: " + e.reason)
-        checks["identity"] = {"ok": False, "reason": e.reason}
+        checks["identity"] = {"ok": False, "reason": e.reason, "transient": True}
     except Exception as e:  # pragma: no cover - defensive last resort
         fail("identity.error: " + type(e).__name__)
-        checks["identity"] = {"ok": False, "reason": str(e)}
+        checks["identity"] = {"ok": False, "reason": str(e), "transient": True}
 
     # -- Checks 2-5 share one client; each guards its own transport. --------- #
     try:
@@ -881,6 +912,7 @@ def confirm_adoption(
             _confirm_canary(client, entry_doc, fail, checks)
     except Exception as e:  # pragma: no cover - defensive last resort
         fail("confirm.error: " + type(e).__name__)
+        checks["confirm"] = {"ok": False, "transient": True}
 
     # -- Check 6: watched roots match the entry's recorded roots (fix F-A). --- #
     _confirm_watched_roots(adopted_data_dir, entry_doc, fail, checks)
@@ -955,7 +987,7 @@ def _confirm_binding(client, adopted_data_dir, fail, checks) -> None:
     doc, err = _get_json(client, "/api/debug/state")
     if err is not None:
         fail("binding.debug_state: " + err)
-        checks["binding"] = {"ok": False, "reason": err}
+        checks["binding"] = {"ok": False, "reason": err, "transient": True}
         return
     bound = _deep_find(doc, "justsearch.data.dir")
     if bound is _MISSING or not isinstance(bound, str):
@@ -973,7 +1005,7 @@ def _confirm_generation(status, status_err, entry_doc, fail, checks) -> None:
     """Check 3: adopted generation serving, no migration in flight (751 sec M.2)."""
     if status_err is not None:
         fail("generation.status: " + status_err)
-        checks["generation"] = {"ok": False, "reason": status_err}
+        checks["generation"] = {"ok": False, "reason": status_err, "transient": True}
         return
     detail: dict = {}
     ok = True
@@ -1009,7 +1041,7 @@ def _confirm_counts(status, status_err, entry_doc, fail, checks) -> None:
     """Check 4: attestation counts match; chunk-vector coverage >= 99.9%."""
     if status_err is not None:
         fail("counts.status: " + status_err)
-        checks["counts"] = {"ok": False, "reason": status_err}
+        checks["counts"] = {"ok": False, "reason": status_err, "transient": True}
         return
     entry_counts = ((entry_doc.get("attestation") or {}).get("counts")) or {}
     ok = True
@@ -1091,22 +1123,24 @@ def _confirm_canary(client, entry_doc, fail, checks) -> None:
         time.sleep(2.0)
     if resp is None or resp.status_code != 200:
         fail("canary.http: " + str(last_err))
-        checks["canary"] = {"ok": False, "reason": last_err}
+        checks["canary"] = {"ok": False, "reason": last_err, "transient": True}
         return
     try:
         body = resp.json()
     except ValueError:
         fail("canary.body: non-JSON search response")
-        checks["canary"] = {"ok": False, "reason": "non-JSON"}
+        checks["canary"] = {"ok": False, "reason": "non-JSON", "transient": True}
         return
 
     ok = True
     trace = body.get("searchTrace") or {}
-    stages = {s.get("id"): s.get("status") for s in (trace.get("stages") or [])}
+    details = {s.get("id"): s for s in (trace.get("stages") or [])}
+    stages = {sid: s.get("status") for sid, s in details.items()}
     for sid in required:
         st = stages.get(sid)
         if st != "executed":
-            fail("canary.stage." + str(sid) + ": status=" + str(st))
+            fail("canary.stage." + str(sid) + ": status=" + str(st)
+                 + " reason=" + str(details.get(sid, {}).get("reason")))
             ok = False
     degr = trace.get("degradation") or {}
     truthy = sorted(k for k, v in degr.items() if v)
@@ -1117,7 +1151,8 @@ def _confirm_canary(client, entry_doc, fail, checks) -> None:
     if not isinstance(total, int) or total <= 0:
         fail("canary.totalHits: " + str(total))
         ok = False
-    checks["canary"] = {"ok": ok, "stages": stages, "totalHits": total}
+    checks["canary"] = {"ok": ok, "stages": stages, "totalHits": total,
+                        "transient": not ok}
 
 
 # --------------------------------------------------------------------------- #
