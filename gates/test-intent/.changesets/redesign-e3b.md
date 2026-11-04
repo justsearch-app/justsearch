@@ -30,6 +30,17 @@ The oversized-parent preservation check exercises that ordering through the real
   "entries": [
     {
       "items": [
+        "modules/app-engine/src/test/java/io/justsearch/app/engine/ExternalPressureHoldsBackfillTest.java"
+      ],
+      "class": "Adaptation",
+      "moved": [
+        "signature",
+        "instrumentation"
+      ],
+      "whatMoved": "The same pending parent documents now answer queryPendingPage in document-ID order with the requested limit, cursor and exhaustion metadata. Other stage pages are empty, matching their existing lack of pending work. getEnrichmentInputPage supplies the same text and SPLADE/NER state within the requested text budget; its atomic read carries the former content-read batch counter and first-batch pressure tick. The publication stub now returns accepted-ID receipts and removes those IDs from the same pending set, preserving the previous successful-update behavior. Both tests retain every assertion, input count, pressure threshold, raise timing, timeout and clear/resume check."
+    },
+    {
+      "items": [
         "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/BackfillSchedulerProviderGateTest.java",
         "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/BackfillIndexingRulesTest.java",
         "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/BlankChunkReadinessIntegrationTest.java",
