@@ -1,0 +1,71 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
+  },
+  "createdAt": "2026-11-04T01:30:47.358Z",
+  "revision": "ec31f0861f8e6b1bc5392331eb21a9607c17082e",
+  "tree": "9859cc38e4be14e3e19747076b45487d14af3bcd",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": "openjdk version \"25.0.4.1\" 2026-08-18 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "./gradlew :modules:adapters-lucene:test --tests \"io.justsearch.adapters.lucene.runtime.SpladePendingSelectionTest.pageAndContentReadCountsStayBoundedAsBacklogGrows\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 4446
+    },
+    {
+      "command": "./gradlew :modules:worker-services:test --tests \"io.justsearch.indexerworker.loop.ops.EnrichmentPreservationTest.oversizedRetainedParentStillAllowsPendingChunkToAdvanceWithinThreeCycles\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 3839
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/SpladePendingSelectionTest.java#pageAndContentReadCountsStayBoundedAsBacklogGrows",
+      "file": "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/SpladePendingSelectionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:2937db1652144fc719d98bb0a3b2b873e096c28ce0192698d63658c2cc06a21e",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "pageAndContentReadCountsStayBoundedAsBacklogGrows(int) [1] 1000",
+          "status": "passed"
+        },
+        {
+          "name": "pageAndContentReadCountsStayBoundedAsBacklogGrows(int) [2] 50000",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/EnrichmentPreservationTest.java#oversizedRetainedParentStillAllowsPendingChunkToAdvanceWithinThreeCycles",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/EnrichmentPreservationTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:e59bc3a3bfed2568c68ea625fda90115800f4e75405ff404085331e951cd7dfd",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "oversizedRetainedParentStillAllowsPendingChunkToAdvanceWithinThreeCycles()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:750f25c14f990d0f6fc32589828037653bbfadbe116e0ba4f1081edca26d1a3b"
+}
