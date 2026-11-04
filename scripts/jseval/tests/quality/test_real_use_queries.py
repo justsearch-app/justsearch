@@ -565,7 +565,10 @@ def test_gate_has_no_external_engine_path(option, capsys):
       for value in ("-Djustsearch.qu.enabled=true", "-Djustsearch.llm.enabled=on", "@hidden-options",
                     # The launcher keeps the backslash and splits at the space; shlex did not.
                     r"-Dpadding=x\ -Djustsearch.qu.enabled=true",
-                    '"-Djustsearch.qu.enabled=true"', "-XX:VMOptionsFile=/tmp/opts")],
+                    '"-Djustsearch.qu.enabled=true"', "-XX:VMOptionsFile=/tmp/opts",
+                    # The JVM removes embedded quotes: no contiguous property name needed.
+                    '-Djust""search.qu.enabled=true -Djust""search.llm.enabled=true',
+                    "-Djava.awt.headless=true -Dother=1")],
 ])
 def test_gate_refuses_before_start_or_date_only_extraction(env, monkeypatch):
     from jseval.quality import run

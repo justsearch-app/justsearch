@@ -1224,6 +1224,9 @@ def lexical_ranks(handle, client, items: list[tuple[str, str, str]],
     return out
 
 
+KEYWORD_JVM_OPTIONS_ALLOWED = frozenset({"-Djava.awt.headless=true"})
+
+
 def require_keyword_environment(env: dict) -> None:
     """Refuse before engine startup: response metadata omits date-only QU boosts.
 
@@ -1236,14 +1239,13 @@ def require_keyword_environment(env: dict) -> None:
             or env.get("JUSTSEARCH_LLM_ENABLED", "").strip().lower() != "false"):
         raise ValueError("keyword measurement requires JUSTSEARCH_QU_ENABLED absent or false "
                          "and JUSTSEARCH_LLM_ENABLED=false")
-    # No parsing: launchers split these texts differently (escapes, quotes), so any JustSearch
-    # property or option file anywhere in the raw text is refused, whatever its value.
+    # No parsing at all: launchers and the JVM split and unquote these texts differently
+    # (escapes, embedded quotes), so each variable must be empty or exactly an allowed value.
     for name in ("JAVA_OPTS", "UI_OPTS", "JAVA_TOOL_OPTIONS", "JDK_JAVA_OPTIONS", "_JAVA_OPTIONS"):
-        text = env.get(name, os.environ.get(name, ""))
-        lowered = text.lower()
-        if "justsearch" in lowered or "@" in text or "vmoptionsfile" in lowered or "-xx:flags" in lowered:
-            raise ValueError(f"keyword measurement refuses JustSearch properties or option files "
-                             f"in {name}")
+        text = env.get(name, os.environ.get(name, "")).strip()
+        if text and text not in KEYWORD_JVM_OPTIONS_ALLOWED:
+            raise ValueError(f"keyword measurement allows {name} only empty or one of "
+                             f"{sorted(KEYWORD_JVM_OPTIONS_ALLOWED)}")
 
 
 def gate(timeout_sec: float, cache_root: Path | None = None) -> int:
