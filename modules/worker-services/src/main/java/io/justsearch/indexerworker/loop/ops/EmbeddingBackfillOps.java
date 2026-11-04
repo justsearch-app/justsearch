@@ -359,6 +359,7 @@ public final class EmbeddingBackfillOps {
         failed = 1;
       }
     } catch (Exception e) {
+      if (batch.storageFailed()) throw e;
       if (batch.retired(() -> providerRetired(context, embeddingProvider), EnrichmentAccounting.Stage.EMBED)) return null;
       if (batch.cancelled(EnrichmentAccounting.Stage.EMBED, e)) return null;
       if (checkInterrupt(context, embeddingProvider, "Backfill")
@@ -468,6 +469,7 @@ public final class EmbeddingBackfillOps {
           batchChunkIds.add(chunkId);
           batchContents.add(chunkContent);
         } catch (Exception e) {
+          if (accounting.storageFailed()) throw e;
           accounting.cancelled(EnrichmentAccounting.Stage.CHUNK_EMBED, e);
           context.log().error("Chunk backfill content fetch failed for {}: {}", chunkId, e.getMessage());
           failures.add(chunkId);
@@ -544,6 +546,7 @@ public final class EmbeddingBackfillOps {
               failed++;
             }
           } catch (Exception e) {
+            if (accounting.storageFailed()) throw e;
             if (batch.retired(() -> providerRetired(context, embeddingProvider), EnrichmentAccounting.Stage.CHUNK_EMBED)) break;
             if (accounting.cancelled(EnrichmentAccounting.Stage.CHUNK_EMBED, e)) break;
             if (stopped(context, batch, embeddingProvider, "Chunk backfill")

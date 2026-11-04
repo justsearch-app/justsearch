@@ -165,6 +165,7 @@ public final class BgeM3BackfillOps {
           batchContents.add(content);
           batchIsChunk.add(isChunk);
         } catch (Exception e) {
+          if (accounting.storageFailed()) throw e;
           context.log().error("BGE-M3 content fetch failed for {}: {}", docId, e.getMessage());
           failed++;
         }
@@ -233,6 +234,7 @@ public final class BgeM3BackfillOps {
             if (batch.retired(unavailable, EnrichmentAccounting.Stage.values())) break;
             if (writeOutput(batch, docId, isChunk, output)) processed++;
           } catch (Exception e2) {
+            if (accounting.storageFailed()) throw e2;
             if (batch.retired(unavailable, EnrichmentAccounting.Stage.values())) break;
             boolean cancelledFallback = false;
             for (var stage : EnrichmentAccounting.Stage.values()) cancelledFallback |= accounting.cancelled(stage, e2);
@@ -328,8 +330,10 @@ public final class BgeM3BackfillOps {
       return StageOutcome.observed(true, processed, t0, accounting);
 
     } catch (Exception e) {
+      boolean cancelled = false;
+      for (var stage : EnrichmentAccounting.Stage.values()) cancelled |= accounting.cancelled(stage, e);
       context.log().error("Error during BGE-M3 backfill", e);
-      return StageOutcome.observed(false, 0, t0, accounting);
+      return StageOutcome.observed(cancelled, 0, t0, accounting);
     }
   }
 

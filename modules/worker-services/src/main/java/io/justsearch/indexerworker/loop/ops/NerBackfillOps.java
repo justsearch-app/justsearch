@@ -148,6 +148,7 @@ public final class NerBackfillOps {
           processed++;
 
         } catch (Exception e) {
+          if (accounting.storageFailed()) throw e;
           if (batch.retired(unavailable, EnrichmentAccounting.Stage.NER)) break;
           boolean cancelled = accounting.cancelled(EnrichmentAccounting.Stage.NER, e);
           context.log().error("NER backfill failed for doc {}: {}", docId, e.getMessage());

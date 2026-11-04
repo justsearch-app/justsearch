@@ -148,6 +148,7 @@ public final class SpladeBackfillOps {
           batchDocIds.add(docId);
           batchContents.add(content);
         } catch (Exception e) {
+          if (accounting.storageFailed()) throw e;
           accounting.cancelled(EnrichmentAccounting.Stage.SPLADE, e);
           context.log().error("SPLADE content fetch failed for {}: {}", docId, e.getMessage());
           markedFailed +=
@@ -253,6 +254,7 @@ public final class SpladeBackfillOps {
               updates.put(SchemaFields.SPLADE_RETRY_COUNT, "0");
               if (batch.update(batchDocIds.get(i), updates)) processed++;
             } catch (Exception e2) {
+              if (accounting.storageFailed()) throw e2;
               if (batch.retired(unavailable, EnrichmentAccounting.Stage.SPLADE)) break;
               if (accounting.cancelled(EnrichmentAccounting.Stage.SPLADE, e2)) break;
               if (context.spladeEncoderSupplier().get() != encoder || isSystemicFailure(e2)) {
@@ -321,9 +323,9 @@ public final class SpladeBackfillOps {
       if (context.indexingCoordinator().enrichmentAuthority() != authority) {
         accounting.rejectedRetiredOutcomes();
       }
-      accounting.cancelled(EnrichmentAccounting.Stage.SPLADE, e);
+      boolean cancelled = accounting.cancelled(EnrichmentAccounting.Stage.SPLADE, e);
       context.log().error("Error during SPLADE backfill", e);
-      return StageOutcome.observed(false, 0, t0, accounting);
+      return StageOutcome.observed(cancelled, 0, t0, accounting);
     }
   }
 

@@ -167,7 +167,29 @@ public final class CombinedEnrichmentBackfillOps {
       Set<String> publishedDocIds,
       BooleanSupplier spladeAllowedSupplier,
       Consumer<Boolean> spladeBackfillResult,
-      java.util.function.Predicate<Boolean> unitAllowed) {
+      java.util.function.Predicate<Boolean> unitAllowed,
+      java.util.function.Predicate<EnrichmentAccounting.Stage> stageAllowed) {
+    public BackfillContext(
+        DocumentFieldOps documentFieldOps, IndexingCoordinator indexingCoordinator,
+        CommitOps commitOps, IndexingPacing pacing,
+        Supplier<EmbeddingProvider> embeddingProviderSupplier,
+        Supplier<SpladeEncoder> spladeEncoderSupplier, Supplier<NerService> nerServiceSupplier,
+        BooleanSupplier runningSupplier, BooleanSupplier allowEmbeddingWritesSupplier,
+        int batchSize, Logger log, boolean chunkVectorsEnabled, boolean chunkSpladeEnabled,
+        boolean lateChunkingEnabled, int chunkSlotsPerBatch,
+        java.util.ArrayDeque<String> parentIdCache, java.util.ArrayDeque<String> chunkIdCache,
+        int[] batchesSinceCommit, BooleanSupplier stopRequestedSupplier,
+        BooleanSupplier hardStopRequestedSupplier, BooleanSupplier embedShareExhaustedSupplier,
+        WindowedEmbedProgress windowedEmbedProgress, Set<String> publishedDocIds,
+        BooleanSupplier spladeAllowedSupplier, Consumer<Boolean> spladeBackfillResult,
+        java.util.function.Predicate<Boolean> unitAllowed) {
+      this(documentFieldOps, indexingCoordinator, commitOps, pacing, embeddingProviderSupplier,
+          spladeEncoderSupplier, nerServiceSupplier, runningSupplier, allowEmbeddingWritesSupplier,
+          batchSize, log, chunkVectorsEnabled, chunkSpladeEnabled, lateChunkingEnabled,
+          chunkSlotsPerBatch, parentIdCache, chunkIdCache, batchesSinceCommit, stopRequestedSupplier,
+          hardStopRequestedSupplier, embedShareExhaustedSupplier, windowedEmbedProgress,
+          publishedDocIds, spladeAllowedSupplier, spladeBackfillResult, unitAllowed, stage -> true);
+    }
     public BackfillContext(
         DocumentFieldOps documentFieldOps, IndexingCoordinator indexingCoordinator,
         CommitOps commitOps, IndexingPacing pacing,
@@ -365,7 +387,9 @@ public final class CombinedEnrichmentBackfillOps {
 
       // Phase 0: bounded document-ID pages, independently resumable for each stage.
       EmbeddingProvider selectedEmbeddingProvider = context.embeddingProviderSupplier().get();
-      boolean embedAvailable = embeddingReady(context, selectedEmbeddingProvider)
+      boolean embedAvailable = (context.stageAllowed().test(EnrichmentAccounting.Stage.EMBED)
+          || context.stageAllowed().test(EnrichmentAccounting.Stage.CHUNK_EMBED))
+          && embeddingReady(context, selectedEmbeddingProvider)
           && context.unitAllowed().test(selectedEmbeddingProvider.isUsingGpu());
       SpladeEncoder selectedSplade = context.spladeEncoderSupplier().get();
       boolean spladeConfigured = selectedSplade != null;
@@ -374,22 +398,27 @@ public final class CombinedEnrichmentBackfillOps {
           && context.unitAllowed().test(LoopPacingPolicy.requiresGpu(
               selectedSplade.isGpuAvailable(), selectedSplade.getOrtCudaStatus()));
       NerService selectedNer = context.nerServiceSupplier().get();
-      boolean nerAvailable = selectedNer != null && selectedNer.isAvailable()
+      boolean nerAvailable = context.stageAllowed().test(EnrichmentAccounting.Stage.NER)
+          && selectedNer != null && selectedNer.isAvailable()
           && context.unitAllowed().test(LoopPacingPolicy.requiresGpu(
               selectedNer.isGpuAvailable(), selectedNer.getOrtCudaStatus()));
 
       // Each stage contributes one bounded page. Interleave stages as before; the
       // unexamined suffix stays behind its stage cursor rather than in an all-ID cache.
       List<List<String>> stagePending = new ArrayList<>();
-      if (embedAvailable) stagePending.add(EnrichmentSelection.page(selection,
-          context.documentFieldOps(), SchemaFields.EMBEDDING_STATUS, context.batchSize(), false));
+      if (embedAvailable && context.stageAllowed().test(EnrichmentAccounting.Stage.EMBED)) {
+        stagePending.add(EnrichmentSelection.page(selection, context.documentFieldOps(),
+            SchemaFields.EMBEDDING_STATUS, context.batchSize(), false));
+      }
       if (spladeAvailable) stagePending.add(EnrichmentSelection.page(selection,
           context.documentFieldOps(), SchemaFields.SPLADE_STATUS, context.batchSize(),
           !context.chunkSpladeEnabled()));
       if (nerAvailable) stagePending.add(EnrichmentSelection.page(selection,
           context.documentFieldOps(), SchemaFields.NER_STATUS, context.batchSize(), false));
       int chunkSlotsPerBatch = context.chunkSlotsPerBatch();
-      List<String> chunkPage = embedAvailable && context.chunkVectorsEnabled() && chunkSlotsPerBatch > 0
+      List<String> chunkPage = embedAvailable
+          && context.stageAllowed().test(EnrichmentAccounting.Stage.CHUNK_EMBED)
+          && context.chunkVectorsEnabled() && chunkSlotsPerBatch > 0
           ? EnrichmentSelection.page(selection, context.documentFieldOps(),
               SchemaFields.CHUNK_EMBEDDING_STATUS, chunkSlotsPerBatch, false) : List.of();
       Set<String> alreadyPublished = new HashSet<>();
@@ -401,8 +430,16 @@ public final class CombinedEnrichmentBackfillOps {
       context.windowedEmbedProgress().reconcile(context.documentFieldOps(), authority,
           epochAtSelection, selectedEmbeddingProvider);
       if (embedAvailable) {
-        for (String id : context.windowedEmbedProgress().owners()) {
+        var owners = context.windowedEmbedProgress().owners();
+        boolean parentsAllowed = context.stageAllowed().test(EnrichmentAccounting.Stage.EMBED);
+        boolean chunksAllowed = context.stageAllowed().test(EnrichmentAccounting.Stage.CHUNK_EMBED);
+        // A held retained owner must not occupy the other dense stage's selection slots.
+        var ownerFields = parentsAllowed == chunksAllowed ? Map.<String, Map<String, String>>of()
+            : context.documentFieldOps().getDocumentFieldsBatchOrThrow(owners, Set.of(SchemaFields.IS_CHUNK));
+        for (String id : owners) {
           if (parents.size() >= context.batchSize()) break;
+          boolean chunk = "true".equals(ownerFields.getOrDefault(id, Map.of()).get(SchemaFields.IS_CHUNK));
+          if (!(chunk ? chunksAllowed : parentsAllowed)) continue;
           if (!context.publishedDocIds().contains(id)) parents.add(id);
         }
       }
@@ -484,10 +521,14 @@ public final class CombinedEnrichmentBackfillOps {
             chunkDocIds.contains(docId)
                 || "true".equalsIgnoreCase(docFields.get(SchemaFields.IS_CHUNK));
 
-        boolean docEmbedAvailable = embedAvailable && context.windowedEmbedProgress().canAdmit(docId);
+        boolean docEmbedAvailable = embedAvailable
+            && context.stageAllowed().test(isChunkDoc ? EnrichmentAccounting.Stage.CHUNK_EMBED
+                : EnrichmentAccounting.Stage.EMBED)
+            && context.windowedEmbedProgress().canAdmit(docId);
 
         if (isChunkDoc) {
-          if (embedAvailable && context.chunkVectorsEnabled()
+          if (embedAvailable && context.stageAllowed().test(EnrichmentAccounting.Stage.CHUNK_EMBED)
+              && context.chunkVectorsEnabled()
               && SchemaFields.EMBEDDING_STATUS_PENDING.equals(docFields.get(SchemaFields.CHUNK_EMBEDDING_STATUS))) {
             accounting.select(docId, EnrichmentAccounting.Stage.CHUNK_EMBED);
           }
@@ -571,7 +612,8 @@ public final class CombinedEnrichmentBackfillOps {
         String spladeStatus = docFields.get(SchemaFields.SPLADE_STATUS);
         String nerStatus = docFields.get(SchemaFields.NER_STATUS);
 
-        if (embedAvailable && SchemaFields.EMBEDDING_STATUS_PENDING.equals(embedStatus)) {
+        if (embedAvailable && context.stageAllowed().test(EnrichmentAccounting.Stage.EMBED)
+            && SchemaFields.EMBEDDING_STATUS_PENDING.equals(embedStatus)) {
           accounting.select(docId, EnrichmentAccounting.Stage.EMBED);
         }
         if (spladeAvailable && SchemaFields.SPLADE_STATUS_PENDING.equals(spladeStatus)) {
@@ -1297,8 +1339,7 @@ public final class CombinedEnrichmentBackfillOps {
         if (!context.spladeAllowedSupplier().getAsBoolean()) break;
         SpladeEncoder encoder = context.spladeEncoderSupplier().get();
         if (encoder == null) {
-          systemicSpladeFailure = true;
-          context.spladeBackfillResult().accept(false);
+          accounting.retired(EnrichmentAccounting.Stage.SPLADE);
           break;
         }
         int end = Math.min(start + bulkPace.spladePhaseDocs(), spladeDocIds.size());
@@ -1361,7 +1402,6 @@ public final class CombinedEnrichmentBackfillOps {
           unitsDone++;
         }
       }
-      if (attemptedSplade && !systemicSpladeFailure) context.spladeBackfillResult().accept(true);
       spladeMs = (System.nanoTime() - tSplade) / 1_000_000;
       updatesByDocId.forEach(accounting::computed);
       // Phase 4: Single batch write (one RMW per doc with all enrichments)
@@ -1380,7 +1420,19 @@ public final class CombinedEnrichmentBackfillOps {
             SchemaFields.NER_STATUS_COMPLETED.equals(entry.getValue().get(SchemaFields.NER_STATUS)))) {
           context.documentFieldOps().markNerPublished();
         }
-        var result = batch.updateBatch(batchUpdates);
+        io.justsearch.adapters.lucene.runtime.LuceneRuntimeTypes.BatchUpdateResult result;
+        try {
+          result = batch.updateBatch(batchUpdates);
+        } finally {
+          // A receipt records the accepted prefix before result() can throw.
+          for (String docId : batch.acceptedIds()) {
+            var updates = updatesByDocId.get(docId);
+            if (updates != null && (updates.get(SchemaFields.VECTOR) instanceof float[]
+                || updates.get(SchemaFields.CHUNK_VECTOR) instanceof float[])) {
+              context.windowedEmbedProgress().forget(docId);
+            }
+          }
+        }
         written = result.updatedCount();
         // The exclusion set keeps its pre-receipt members: later batches in this cycle exclude
         // exactly the documents they excluded before publication receipts existed. Receipts feed
@@ -1404,15 +1456,8 @@ public final class CombinedEnrichmentBackfillOps {
           }
         }
       }
+      if (attemptedSplade && !systemicSpladeFailure) context.spladeBackfillResult().accept(true);
       boolean completeBatchWrite = written == batchUpdates.size() && written > 0;
-      // Release each accepted owner independently: a withheld peer must not pin its slot.
-      for (String docId : batch.acceptedIds()) {
-        var updates = updatesByDocId.get(docId);
-        if (updates != null && (updates.get(SchemaFields.VECTOR) instanceof float[]
-            || updates.get(SchemaFields.CHUNK_VECTOR) instanceof float[])) {
-          context.windowedEmbedProgress().forget(docId);
-        }
-      }
       // These counts feed the metrics that existed before publication receipts, so they keep
       // their complete-batch inputs; per-document receipts and writer corrections feed only the
       // outcome accounting.

@@ -53,6 +53,8 @@ final class EnrichmentBatch {
 
   java.util.Set<String> acceptedIds() { return acceptedIds; }
 
+  boolean storageFailed() { return accounting != null && accounting.storageFailed(); }
+
   EnrichmentBatch accounting(EnrichmentAccounting accounting) {
     this.accounting = accounting;
     return this;
@@ -94,8 +96,14 @@ final class EnrichmentBatch {
 
   private io.justsearch.adapters.lucene.runtime.LuceneRuntimeTypes.EnrichmentPublicationReceipt publish(
       List<Map.Entry<String, Map<String, Object>>> updates) {
-    return authority == null ? coordinator.publishEnrichmentBatch(updates, inputs)
-        : coordinator.publishEnrichmentBatch(updates, inputs, authority);
+    try {
+      return authority == null ? coordinator.publishEnrichmentBatch(updates, inputs)
+          : coordinator.publishEnrichmentBatch(updates, inputs, authority);
+    } catch (RuntimeException failure) {
+      // A closed writer can fail before entering its ordered mutation loop.
+      return new io.justsearch.adapters.lucene.runtime.LuceneRuntimeTypes.EnrichmentPublicationReceipt(
+          List.of(), List.of(), failure);
+    }
   }
 
   java.util.Set<String> ids() {
@@ -163,6 +171,7 @@ final class EnrichmentBatch {
             List.of(), List.of(id), null)
         : publish(List.of(Map.entry(id, updates)));
     if (accounting != null) accounting.published(List.of(Map.entry(id, updates)), receipt);
+    acceptedIds.addAll(receipt.acceptedIds());
     rejectRetiredOutcomes();
     boolean accepted = receipt.result().updatedCount() == 1;
     return accepted;
