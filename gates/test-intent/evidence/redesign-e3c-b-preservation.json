@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
   },
-  "createdAt": "2026-11-04T12:37:25.479Z",
-  "revision": "844d5ff0bc26f72fff7ea2b6906d23dabd7b07a8",
-  "tree": "83d3951590f0bdf03e4e640b25c2caa7e2a6fc9f",
+  "createdAt": "2026-11-04T14:37:03.447Z",
+  "revision": "f6c905bd11ab83cc8b0941a1b94cc5f17d8a5a65",
+  "tree": "30c87dd82ad638ec3f1060199d8685f9b20aa943",
   "environment": {
     "platform": "linux",
     "arch": "x64",
@@ -21,31 +21,31 @@
       "command": "./gradlew :modules:worker-services:test --tests \"io.justsearch.adapters.lucene.runtime.EnrichmentStorageBackoffTest.acceptedPrefixReceiptsAlreadyHoldOnTheBase\" --tests \"io.justsearch.adapters.lucene.runtime.EnrichmentStorageBackoffTest.individualSparseStorageBackoffAlreadyHoldsOnTheBase\" --tests \"io.justsearch.adapters.lucene.runtime.EnrichmentStorageBackoffTest.rowFailurePublishesHealthyPeersChargesOnceAndSetsNoBackoff\" --tests \"io.justsearch.indexerworker.loop.BackfillResourceAdmissionTest\" --tests \"io.justsearch.indexerworker.loop.BackfillSchedulerSlowBatchTest\" --tests \"io.justsearch.indexerworker.loop.ops.EnrichmentInternalStopTest\" --tests \"io.justsearch.indexerworker.loop.ops.EnrichmentUnitBoundaryTest\" --tests \"io.justsearch.indexerworker.loop.ops.CombinedEnrichmentLongDocumentTest\" --tests \"io.justsearch.indexerworker.loop.ops.EnrichmentPreservationTest\" --tests \"io.justsearch.indexerworker.loop.ops.EnrichmentAttemptAccountingTest\" --tests \"io.justsearch.indexerworker.loop.ops.EnrichmentHardStopRepairTest\" --tests \"io.justsearch.indexerworker.loop.ops.EnrichmentAuthorityRaceTest\" --tests \"io.justsearch.indexerworker.loop.ops.EnrichmentRevisionRaceTest\" --tests \"io.justsearch.indexerworker.loop.ops.EnrichmentStorageDispositionTest\" --tests \"io.justsearch.indexerworker.loop.ops.EnrichmentMapperDispositionTest\" --tests \"io.justsearch.indexerworker.loop.ops.EnrichmentQuarantineProgressTest\" --tests \"io.justsearch.indexerworker.loop.ops.EnrichmentExclusionPublicationTest\" --tests \"io.justsearch.indexerworker.loop.ops.CombinedEnrichmentFailureAccountingTest\" --tests \"io.justsearch.indexerworker.loop.EnrichmentReceiptPreservationTest\" --tests \"io.justsearch.indexerworker.loop.BulkHoldKeepsQueryOnGpuTest\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 88589
+      "durationMs": 86420
     },
     {
       "command": "./gradlew :modules:worker-core:test --tests \"io.justsearch.indexerworker.splade.BackgroundInferenceCancellationTest\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 4733
+      "durationMs": 5430
     },
     {
       "command": "./gradlew :modules:adapters-lucene:test --tests \"io.justsearch.adapters.lucene.runtime.EnrichmentPublicationReceiptTest\" --tests \"io.justsearch.adapters.lucene.runtime.SparseRmwPreservationTest\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 5670
+      "durationMs": 5466
     },
     {
       "command": "./gradlew :modules:ort-common:test --tests \"io.justsearch.ort.SessionAcquisitionRequestTest\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 2208
+      "durationMs": 1502
     },
     {
       "command": "./gradlew :modules:app-engine:test --tests \"io.justsearch.app.engine.ExternalPressureHoldsBackfillTest\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 4848
+      "durationMs": 4438
     }
   ],
   "checks": [
@@ -53,7 +53,7 @@
       "id": "modules/worker-services/src/test/java/io/justsearch/adapters/lucene/runtime/EnrichmentStorageBackoffTest.java#acceptedPrefixReceiptsAlreadyHoldOnTheBase",
       "file": "modules/worker-services/src/test/java/io/justsearch/adapters/lucene/runtime/EnrichmentStorageBackoffTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:174529508788791a73a6431aa07a059c626a8feab0070a5625be3eca26e72739",
+      "contentDigest": "sha256:c09027dccc8c53e7cf28dbb6cd3f812079e91d41ab94edb440e4dff217b53a09",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -68,7 +68,7 @@
       "id": "modules/worker-services/src/test/java/io/justsearch/adapters/lucene/runtime/EnrichmentStorageBackoffTest.java#individualSparseStorageBackoffAlreadyHoldsOnTheBase",
       "file": "modules/worker-services/src/test/java/io/justsearch/adapters/lucene/runtime/EnrichmentStorageBackoffTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:174529508788791a73a6431aa07a059c626a8feab0070a5625be3eca26e72739",
+      "contentDigest": "sha256:c09027dccc8c53e7cf28dbb6cd3f812079e91d41ab94edb440e4dff217b53a09",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -95,7 +95,7 @@
       "id": "modules/worker-services/src/test/java/io/justsearch/adapters/lucene/runtime/EnrichmentStorageBackoffTest.java#rowFailurePublishesHealthyPeersChargesOnceAndSetsNoBackoff",
       "file": "modules/worker-services/src/test/java/io/justsearch/adapters/lucene/runtime/EnrichmentStorageBackoffTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:174529508788791a73a6431aa07a059c626a8feab0070a5625be3eca26e72739",
+      "contentDigest": "sha256:c09027dccc8c53e7cf28dbb6cd3f812079e91d41ab94edb440e4dff217b53a09",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -3854,5 +3854,5 @@
     }
   ],
   "failBefore": null,
-  "digest": "sha256:d2adca5c5d37b6c49bb2af132856affa59b0bf0c9c92c5e2f7ae53262f70cfe1"
+  "digest": "sha256:dc367012b63d2e55facd398faeb1a232bfd4db7669fd9372e4d5f046c667887e"
 }
