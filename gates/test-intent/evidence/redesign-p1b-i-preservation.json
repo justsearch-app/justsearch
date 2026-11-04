@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
   },
-  "createdAt": "2026-11-04T09:48:50.020Z",
-  "revision": "724d009f8121b93ecfaf66e15fc73f22d912af4b",
-  "tree": "ae990629cf951c3d5f65a3ed8f73fb9e4b14d303",
+  "createdAt": "2026-11-04T11:10:59.192Z",
+  "revision": "9dc61ca628dbb378d91cc113186cf15bea8ee312",
+  "tree": "1d2aeabafc6ef70082e451cf12d52e4a7c881fe6",
   "environment": {
     "platform": "linux",
     "arch": "x64",
@@ -21,13 +21,13 @@
       "command": "./gradlew :modules:adapters-lucene:test --tests \"io.justsearch.adapters.lucene.runtime.SourceEnvelopePreservationTest.catalogKeepsEnvelopeThroughEnrichmentAndMetadataPatches\" --tests \"io.justsearch.adapters.lucene.runtime.SourceEnvelopePreservationTest.envelopeAdditionsUseBothExistingParityCertificationPaths\" --tests \"io.justsearch.adapters.lucene.runtime.SourceEnvelopePreservationTest.populatedLegacyIndexOpensAndStampsNewFingerprintOnlyAfterSuccessfulCommit\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 3515
+      "durationMs": 3240
     },
     {
       "command": "./gradlew :modules:worker-services:test --tests \"io.justsearch.indexerworker.rag.ChunkDocumentWriterTest.supplementaryChunksAreExactAndPendingAfterFreshWriteRegenerationAndReopen\" --tests \"io.justsearch.indexerworker.rag.ChunkDocumentWriterTest.canonicalZeroChunkDeclarationsQualifyFreshAndReopenedLibraries\" --tests \"io.justsearch.indexerworker.rag.ChunkDocumentWriterTest.invalidPlanIsRefusedBeforeParentAndLexicalPublication\" --tests \"io.justsearch.indexerworker.loop.SourceWitnessCertificationTest.unmodifiedShortcutReadsContentOnlyOnce\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 5536
+      "durationMs": 4512
     }
   ],
   "checks": [
@@ -138,5 +138,5 @@
     }
   ],
   "failBefore": null,
-  "digest": "sha256:4f2758597262dc32a0137656a572a7cd9205c1e4f7be6933b0f5a91e6b0b6908"
+  "digest": "sha256:bbc8dc1fc6c2d79baac6da4afeb4e13278393af0f74f0ee17a4869b060d776d8"
 }
