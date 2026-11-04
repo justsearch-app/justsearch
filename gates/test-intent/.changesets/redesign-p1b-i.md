@@ -223,3 +223,14 @@ reads, and forbid per-source identity leases and directory observation.
 The orchestrator owns dev-stack publication/restart and isolated bind-mount checks.
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a1a6b3-08d4-7c83-b329-73ecf837833e",
+  "verdict": "accept",
+  "digest": "sha256:d8b36b4d1e1da4e8155d18531fd33f49f20d988d271041e869b3214484fdff8d",
+  "note": "Codex verifier-3 on 93e2d01479: entries 1, 2, 3 accept (New). P1b-1, origin unknown, P1b-6 and preservation pass; earlier stale-storage and contradictory-device defects reproduce on old revisions and pass now. One variation (absent absolute source path, ext4) gives unknown; settled as unreadable evidence by the orchestrator's narrowing decision."
+}
+```
