@@ -284,3 +284,14 @@ Pending independent verification.
   "note": "Round 3 on 5d1c711e3d: 8 New, 4 Adaptation; repaired entries fail before by assertion; oracles kept. Earlier rounds rejected (MCP exact-JSON entry lacked a New entry; then its source). Transcribed by the orchestrator from the verifier's answer (Codex sandbox)."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a1a8ec-0fff-7c72-a267-c66ad43e8e27",
+  "verdict": "accept",
+  "digest": "sha256:d2a712a4dc73f25098de856241e984438326866b77f9972e3bce7ec43e124949",
+  "note": "After CI on ff05cf9ecd: only the PMD qualifier fix, two commented empty catch blocks and the regenerated Java evidence changed since 5d1c711e3d; assertions unchanged; PMD zero violations; the evidence keeps the same four checks with assertion fail-before against 7588c01d38. Transcribed by the orchestrator from the verifier's answer (Codex sandbox)."
+}
+```
