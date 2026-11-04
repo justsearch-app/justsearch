@@ -41,7 +41,9 @@ class AuthorizationRejectTest {
     try {
       PendingAuthorizationStore.class.getMethod("setLifecycleSinks", AuthorizationOutcomeStore.class,
           PendingAuthorizationChangeRegistry.class).invoke(pending, outcomes, changes);
-    } catch (NoSuchMethodException beforeReject) { }
+    } catch (NoSuchMethodException beforeReject) {
+      // The baseline has no lifecycle sinks; the tests then fail on the missing behaviour.
+    }
     subscription = changes.subscribeTyped(events::add);
     var controller = new AuthorizationController(capsules, pending, null, dispatcher, List.of());
     app = Javalin.create(c -> {
@@ -55,7 +57,9 @@ class AuthorizationRejectTest {
     try {
       var reject = AuthorizationController.class.getMethod("handleReject", Context.class);
       app.post("/api/authorizations/reject", ctx -> reject.invoke(controller, ctx));
-    } catch (NoSuchMethodException beforeReject) { }
+    } catch (NoSuchMethodException beforeReject) {
+      // The baseline has no reject route; the tests then fail on the missing route.
+    }
     app.start(0);
   }
 

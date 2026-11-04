@@ -595,7 +595,7 @@ public final class McpToolSurface {
     try {
       String key = (String) arguments.get("operationKey");
       var outcome = facade.operationOutcome(key);
-      var deniedAt = pendingAuthorizationStore == null ? Optional.<java.time.Instant>empty()
+      var deniedAt = pendingAuthorizationStore == null ? Optional.<Instant>empty()
           : pendingAuthorizationStore.rejectedAt(key);
       if (deniedAt.isPresent()) {
         outcome = new io.justsearch.app.api.operations.OperationOutcomeView(
