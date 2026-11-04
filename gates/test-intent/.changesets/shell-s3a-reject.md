@@ -94,8 +94,12 @@ No independent acceptance is claimed by this builder.
       "items": [
         "modules/ui-web/src/shell-v0/state/frameStatus.test.ts"
       ],
-      "class": "New",
-      "behaviour": "L5 keeps an actively waiting request only in Needs you, including its retained advisory. Answered history remains inert and cannot execute.",
+      "class": "Adaptation",
+      "moved": [
+        "input re-encoding",
+        "instrumentation"
+      ],
+      "whatMoved": "The current MCP gate fixture carries its exact pendingId while the older legacy row remains unkeyed; the observation selects those same history rows by identity instead of outcome wording. The whole waiting/answered/expired and inert-history oracle is kept. C12's added find assertion restates the existing not-toContain assertion: it is preservation, not a repair, and passes before and after in shell-s3a-reject-history.json.",
       "sources": [
         {
           "kind": "owner-words",
@@ -103,11 +107,7 @@ No independent acceptance is claimed by this builder.
           "location": "task t-20261103-shell request (L5 builder brief, 2026-11-04)"
         }
       ],
-      "repaired": true,
-      "evidence": "gates/test-intent/evidence/shell-s3a-reject-history.json",
-      "newChecks": [
-        "modules/ui-web/src/shell-v0/state/frameStatus.test.ts#C12 the broadcast advisory and the request-scoped prompt for one authorization give one decision route"
-      ]
+      "evidence": "gates/test-intent/evidence/shell-s3a-reject-history.json"
     },
     {
       "items": [
@@ -126,6 +126,16 @@ No independent acceptance is claimed by this builder.
       "newChecks": [
         "modules/ui-web/src/shell-v0/state/frameStatus.authorization.test.ts#legacy gate rows without a pending id never hide an answered row for the same operation"
       ]
+    },
+    {
+      "items": [
+        "modules/ui/src/test/java/io/justsearch/ui/api/mcp/McpOperationKeyTest.java"
+      ],
+      "class": "Adaptation",
+      "moved": [
+        "signature"
+      ],
+      "whatMoved": "The pending-store stub and verifications use the create overload with the gate's pendingId as the final argument and assert that exact link. The whole oracle is kept: the server-minted key and preparation nonce survive without a caller key; the caller-supplied key is retained separately from public arguments; public arguments contain no operationKey; the error response still routes approval to the app. Exact public-argument equality is also asserted."
     }
   ]
 }
