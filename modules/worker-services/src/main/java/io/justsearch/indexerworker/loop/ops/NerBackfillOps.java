@@ -64,7 +64,12 @@ public final class NerBackfillOps {
     var authority = context.indexingCoordinator().enrichmentAuthority();
     NerService selectedService = context.nerServiceSupplier().get();
     long methodStart = System.nanoTime();
-    EnrichmentAccounting accounting = new EnrichmentAccounting();
+    long cancellationEpoch = context.indexingCoordinator().bulkDeleteEpoch();
+    EnrichmentAccounting accounting = new EnrichmentAccounting(stage ->
+        EnrichmentBatch.hardStop(() -> !context.runningSupplier().getAsBoolean(),
+            context.indexingCoordinator(), cancellationEpoch, authority)
+            || selectedService == null || !selectedService.isAvailable()
+            || context.nerServiceSupplier().get() != selectedService);
     try {
       List<String> pendingIds =
           EnrichmentSelection.page(selection, context.documentFieldOps(),
@@ -148,6 +153,7 @@ public final class NerBackfillOps {
           processed++;
 
         } catch (Exception e) {
+          if (accounting.storageFailed()) throw e;
           if (batch.retired(unavailable, EnrichmentAccounting.Stage.NER)) break;
           boolean cancelled = accounting.cancelled(EnrichmentAccounting.Stage.NER, e);
           context.log().error("NER backfill failed for doc {}: {}", docId, e.getMessage());

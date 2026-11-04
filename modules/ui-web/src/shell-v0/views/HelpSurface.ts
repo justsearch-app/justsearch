@@ -83,8 +83,10 @@ const SHORTCUTS: ShortcutRow[] = [
   { keys: 'Enter', desc: 'Run the query (in the search bar)' },
   { keys: 'Shift + Enter', desc: 'New line in the search bar' },
   { keys: 'Ctrl + Enter', desc: 'Run the query the other way: ask instead of search, or search instead of ask' },
-  { keys: 'Alt + ← / →', desc: 'Go back / forward between views (when not typing)' },
-  { keys: 'Ctrl + D', desc: 'Bookmark the current view, or remove its bookmark (when not typing)' },
+  { keys: 'Ctrl / ⌘ + 1 / 2 / 3', desc: 'Go to Search, Library or AI Brain' },
+  { keys: 'Alt + ← / →', desc: 'Go back / forward between views (the mouse back and forward buttons do the same)' },
+  { keys: 'F6 / Shift + F6', desc: 'Move between the top bar, the window tabs, the content and the details pane' },
+  { keys: 'F1', desc: 'Open Help & shortcuts' },
   { keys: 'Ctrl + Shift + A', desc: 'Open the Search view to ask the AI (when not typing; needs the chat model)' },
   { keys: 'Esc', desc: 'Close an open menu, popover or dialog' },
   // Tempdoc 857 PR-A — J/K is the only keyboard navigation the product has for a run's steps, and it

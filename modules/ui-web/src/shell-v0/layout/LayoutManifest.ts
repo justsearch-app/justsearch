@@ -49,7 +49,7 @@ export const DEFAULT_LAYOUT: LayoutManifest = {
   id: 'core.default',
   displayName: 'Default',
   version: '1.0',
-  description: 'Standard layout with rail and stage.',
+  description: 'Standard layout: the area switcher above one window.',
   zones: {
     rail: { visible: true },
     stage: { exclusive: true },
@@ -61,7 +61,7 @@ export const FOCUS_LAYOUT: LayoutManifest = {
   id: 'core.focus',
   displayName: 'Focus',
   version: '1.0',
-  description: 'Minimal layout — single surface, no rail, no status deck.',
+  description: 'Minimal layout — one window, no area switcher, no plugin status.',
   zones: {
     // Tempdoc 508-followup §β3 — focus mode hides BOTH rail and status
     // deck, making the layout switch visibly distinct from default.
@@ -83,7 +83,7 @@ export const ZEN_LAYOUT: LayoutManifest = {
   id: 'core.zen',
   displayName: 'Zen',
   version: '1.0',
-  description: 'Distraction-free — stage only, no rail, no status deck.',
+  description: 'Distraction-free — one window only, no area switcher, no plugin status.',
   zones: {
     rail: { visible: false },
     stage: { exclusive: true },
@@ -102,7 +102,7 @@ export const SPLIT_LAYOUT: LayoutManifest = {
   id: 'core.split',
   displayName: 'Split',
   version: '1.0',
-  description: 'Two surfaces side-by-side in the stage.',
+  description: 'Two windows side by side.',
   zones: {
     rail: { visible: true },
     stage: { exclusive: false, splitAxis: 'horizontal' },

@@ -15,7 +15,7 @@ npm install          # first time only
 npm run dev          # starts Vite
 ```
 
-Open `http://127.0.0.1:5173/`. The Lit shell renders its chrome, rail, and surfaces with no backend,
+Open `http://127.0.0.1:5173/`. The Lit shell renders its chrome (the top bar) and surfaces with no backend,
 but data views remain empty or show `Connecting…`. `?demo=true` does not supply data to the current
 shell. For deterministic browser captures with data, use `jsharness ui-shot --fixtures`; for real
 search, indexing, and AI behavior, run a backend.
@@ -70,7 +70,7 @@ top of that file).
   All backend calls go through here. Typed domain modules live in
   `src/api/domains/` (`search.ts`, `status.ts`, `settings.ts`, `suggest.ts`, etc.).
 - **Shell + surfaces** (`src/shell-v0/`): Lit `<jf-*>` custom elements. The
-  production chrome is `<jf-shell>` / `<jf-rail>` / `<jf-stage>`; view surfaces
+  production chrome is `<jf-shell>` / `<jf-top-bar>` / `<jf-stage>`; view surfaces
   live in `shell-v0/views/*Surface.ts` and the declarative render layer in
   `shell-v0/renderers/`.
 - **State**: Lit reactive controllers and signals (`@lit-labs/signals`) within

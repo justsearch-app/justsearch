@@ -8,7 +8,7 @@
   "adopters": [
     "modules/ui-web/src/shell-v0/components/ContextMenu.ts",
     "modules/ui-web/src/shell-v0/components/Peek.ts",
-    "modules/ui-web/src/shell-v0/components/BookmarksPopover.ts",
+    "modules/ui-web/src/shell-v0/chrome/TopBar.ts",
     "modules/ui-web/src/shell-v0/components/StatusPill.ts",
     "modules/ui-web/src/shell-v0/components/RetrospectivePanel.ts",
     "modules/ui-web/src/shell-v0/components/SourcesPane.ts",

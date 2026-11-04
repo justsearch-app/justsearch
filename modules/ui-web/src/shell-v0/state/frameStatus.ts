@@ -184,13 +184,29 @@ export function deriveFrameStatus(input: FrameStatusInput): FrameStatus {
     if (!sections[fact.section].some(row => row.id === fact.id)) sections[fact.section].push(fact);
   };
   for (const fact of input.conditions ?? []) add(fact);
+  // L4b — a request that still waits lives in Needs you only; its advisory joins Earlier once the
+  // request is answered, expires or is withdrawn (it then leaves `authorizations`).
+  const waiting = new Set((input.authorizations ?? [])
+    .filter(request => !request.expiresAt || Date.parse(request.expiresAt) > now)
+    .map(request => request.pendingId));
   for (const record of input.advisories ?? []) {
+    const pendingId = record.event.classExtras.pendingId;
+    if (record.event.classId === 'authorization.pending' && typeof pendingId === 'string' && waiting.has(pendingId)) continue;
     const fact = advisoryStatusFact(record);
     // Retained authorization advisories are history, never another execution route.
     add(record.event.classId === 'authorization.pending' ? { ...fact, actions: [] } : fact);
   }
+  // L4b — the ledger records the same gate firing as a GATED row ("Approval requested: …") with no
+  // pending id. While requests for an operation wait, its latest GATED rows (one per waiting
+  // request) are those requests: they join Earlier once the request is answered, expires or leaves.
+  const heldGates = new Set<string>();
+  for (const operationId of new Set((input.authorizations ?? []).filter(r => waiting.has(r.pendingId)).map(r => r.operationId))) {
+    const count = new Set((input.authorizations ?? []).filter(r => waiting.has(r.pendingId) && r.operationId === operationId).map(r => r.pendingId)).size;
+    (input.activity ?? []).filter(entry => entry.gate?.disposition === 'GATED' && entry.gate.operationId === operationId)
+      .sort((a, b) => Date.parse(b.occurredAt) - Date.parse(a.occurredAt)).slice(0, count).forEach(entry => heldGates.add(entry.id));
+  }
   for (const entry of input.activity ?? []) {
-    if (entry.isRoutine || entry.operationOutcomeKey) continue;
+    if (entry.isRoutine || entry.operationOutcomeKey || heldGates.has(entry.id)) continue;
     const words = activityWords(entry);
     add({ id: `activity:${entry.id}`, section: 'earlier', title: words.title,
       ...(words.detail ? { detail: words.detail } : {}), tone: words.tone, occurredAt: entry.occurredAt,

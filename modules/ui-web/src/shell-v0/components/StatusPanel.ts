@@ -6,7 +6,9 @@ import type { FrameStatus, StatusAction, StatusFact, StatusSection } from '../st
 import type { StatusBarItem } from '../commands/StatusBarRegistry.js';
 import { formatRelativeIso } from '../../utils/relativeTime.js';
 import { glyphChar, statusGlyph } from '../utils/statusTone.js';
-// 559 Authority VI — plugin items keep one line and overflow by priority into "…", never clip.
+// 559 Authority VI — plugin items keep one line and overflow by priority into "…";
+// a lone item wider than the row wraps inside it instead, and an element wider than the row is
+// contained by it (L2).
 import { OverflowController } from '../primitives/adaptiveBar.js';
 import './ProvenanceChip.js';
 import './IndexingControls.js';
@@ -91,7 +93,11 @@ export class StatusPanel extends JfElement {
     .unread { font-size: var(--font-size-xs); color: var(--text-tint); }
     .plugins { display: flex; flex-wrap: nowrap; align-items: center; gap: var(--jf-space-3); min-width: 0; }
     .plugins.open { flex-wrap: wrap; }
-    .plugin { display: flex; flex-wrap: wrap; align-items: center; gap: var(--jf-space-2); max-width: 100%; }
+    .plugin { display: flex; flex-wrap: wrap; align-items: center; gap: var(--jf-space-2); max-width: 100%; min-width: 0; }
+    /* L2 — a plugin's own element may be wider than the row (a fixed width, a min-width): the row
+       contains it, never the panel scrolling sideways. Its words stay reachable as the tooltip. */
+    .plugin-body { display: block; min-width: 0; max-inline-size: 100%; overflow: hidden; }
+    .plugin-body > * { max-inline-size: 100%; box-sizing: border-box; }
     .empty { padding: var(--jf-space-4); }
     @media (forced-colors: active) {
       :host::before { background: Canvas; border-color: CanvasText; }
@@ -152,10 +158,13 @@ export class StatusPanel extends JfElement {
   /** Plugin row: registry order is priority order; hidden items stay one click away. */
   private renderPlugins(): TemplateResult | typeof nothing {
     if (!this.plugins.length) return nothing;
-    const shown = this.pluginsOpen ? this.plugins : this.plugins.slice(0, this.overflow.visibleCount);
+    // L2 — the first item always shows directly (wrapping inside the row, provenance beside it);
+    // "… N more" collects only items that do not fit after it, never the only one.
+    const shown = this.pluginsOpen ? this.plugins : this.plugins.slice(0, Math.max(1, this.overflow.visibleCount));
     const hidden = this.plugins.length - shown.length;
     return html`<div class="plugins ${this.pluginsOpen ? 'open' : ''}" role="group" aria-label="Plugin status">${repeat(shown, item => item.id,
-      item => html`<span class="plugin" data-plugin-item=${item.id}>${this.pluginOutput(item)}<jf-provenance-chip .provenance=${item.provenance}></jf-provenance-chip></span>`)}
+      item => { const output = this.pluginOutput(item); return html`<span class="plugin" data-plugin-item=${item.id}><span class="plugin-body"
+        title=${(typeof output === 'string' ? output : output.textContent ?? '').trim()}>${output}</span><jf-provenance-chip .provenance=${item.provenance}></jf-provenance-chip></span>`; })}
       ${hidden > 0 || this.pluginsOpen && this.overflow.visibleCount < this.plugins.length ? html`<button type="button" aria-expanded=${this.pluginsOpen}
         @click=${() => { this.pluginsOpen = !this.pluginsOpen; }}>${this.pluginsOpen ? 'Fewer' : `… ${hidden} more`}</button>` : nothing}</div>`;
   }
@@ -163,7 +172,7 @@ export class StatusPanel extends JfElement {
   // to the app frame, never to a popover.
   override render(): TemplateResult {
     const model = this.model;
-    return html`<div class="panel" role="dialog" aria-label="What's going on" tabindex="-1"
+    return html`<div class="panel" data-testid="status-panel" role="dialog" aria-label="What's going on" tabindex="-1"
       @focusin=${(event: FocusEvent) => {
         const row = event.composedPath().find(node => node instanceof HTMLElement && node.matches('article')) as HTMLElement | undefined;
         this.focusedRow = row ? { id: row.getAttribute('data-fact'), section: row.closest('section')?.getAttribute('aria-label') ?? null } : null;

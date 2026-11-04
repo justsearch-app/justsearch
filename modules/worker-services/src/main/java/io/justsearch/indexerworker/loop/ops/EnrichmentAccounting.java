@@ -3,6 +3,9 @@ package io.justsearch.indexerworker.loop.ops;
 
 import io.justsearch.adapters.lucene.runtime.LuceneRuntimeTypes.EnrichmentPublicationReceipt;
 import io.justsearch.indexing.SchemaFields;
+import java.io.InterruptedIOException;
+import java.nio.channels.ClosedByInterruptException;
+import java.nio.channels.FileLockInterruptionException;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -10,6 +13,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CancellationException;
+import java.util.function.Predicate;
 
 /** Selection tickets are observations only; they never decide whether to encode or write. */
 public final class EnrichmentAccounting {
@@ -33,10 +37,16 @@ public final class EnrichmentAccounting {
   public enum Disposition { PUBLISHED, COMPLETED_EMPTY, FAILED_CHARGED, DEFERRED, REJECTED_STALE, REJECTED_OUTPUT, CANCELLED }
   public record Ticket(String documentId, Stage stage) {}
 
-  public record Summary(Map<Ticket, Disposition> tickets, Map<String, Long> counters) {
+  public record Summary(Map<Ticket, Disposition> tickets, Map<String, Long> counters,
+      Set<Stage> storageFailures) {
     public Summary {
       tickets = Map.copyOf(tickets);
       counters = Map.copyOf(counters);
+      storageFailures = Set.copyOf(storageFailures);
+    }
+
+    public Summary(Map<Ticket, Disposition> tickets, Map<String, Long> counters) {
+      this(tickets, counters, Set.of());
     }
 
     public static Summary empty() { return new Summary(Map.of(), Map.of()); }
@@ -54,6 +64,17 @@ public final class EnrichmentAccounting {
   private final Set<Ticket> acceptedStages = new HashSet<>();
   private final Set<Ticket> terminalFailures = new HashSet<>();
   private final Map<String, Long> observations = new HashMap<>();
+  private final Set<Stage> storageFailures = java.util.EnumSet.noneOf(Stage.class);
+
+  private final Predicate<Stage> cancellationRequested;
+
+  public EnrichmentAccounting() { this(stage -> false); }
+
+  EnrichmentAccounting(Predicate<Stage> cancellationRequested) {
+    this.cancellationRequested = cancellationRequested;
+  }
+
+  boolean storageFailed() { return !storageFailures.isEmpty(); }
 
   void select(List<String> ids, Stage stage) {
     for (String id : ids) select(id, stage);
@@ -101,15 +122,11 @@ public final class EnrichmentAccounting {
   void advanced(Stage stage) { observations.merge(stage.key + ".window_advances", 1L, Long::sum); }
 
   boolean cancelled(Stage stage, Throwable failure) {
-    for (Throwable cause = failure; cause != null; cause = cause.getCause()) {
-      if (cause instanceof CancellationException || cause instanceof InterruptedException) {
-        tickets.replaceAll((ticket, disposition) -> ticket.stage() == stage
-            && disposition == Disposition.DEFERRED && !retired.contains(ticket)
-                ? Disposition.CANCELLED : disposition);
-        return true;
-      }
-    }
-    return false;
+    if (!isCancellation(stage, failure)) return false;
+    tickets.replaceAll((ticket, disposition) -> ticket.stage() == stage
+        && disposition == Disposition.DEFERRED && !retired.contains(ticket)
+            ? Disposition.CANCELLED : disposition);
+    return true;
   }
 
   void cancelRemaining() {
@@ -126,6 +143,12 @@ public final class EnrichmentAccounting {
         Ticket ticket = new Ticket(update.getKey(), stage);
         var fields = update.getValue();
         if (!fields.containsKey(stage.status) && !fields.containsKey(stage.retry)) continue;
+        // Only the unaccepted part of a systemic write holds a stage. Row-local storage
+        // withholding, stale rejection and cancellation alone never establish a backoff.
+        if (receipt.failure() != null && !accepted.contains(update.getKey())
+            && !rejected.contains(update.getKey()) && !isCancellation(stage, receipt.failure())) {
+          storageFailures.add(stage);
+        }
         boolean corrected = receipt.correctedFailedStatuses()
             .getOrDefault(update.getKey(), Set.of()).contains(stage.status);
         if (accepted.contains(update.getKey())) {
@@ -161,7 +184,18 @@ public final class EnrichmentAccounting {
     for (Ticket ticket : terminalFailures) counters.merge(ticket.stage().key + ".failed", 1L, Long::sum);
     for (Ticket ticket : acceptedStages) counters.merge(ticket.stage().key + ".accepted", 1L, Long::sum);
     for (Ticket ticket : computed) counters.merge(ticket.stage().key + ".computed", 1L, Long::sum);
-    return new Summary(tickets, counters);
+    return new Summary(tickets, counters, storageFailures);
+  }
+
+  private boolean isCancellation(Stage stage, Throwable failure) {
+    if (failure == null) return false;
+    if (cancellationRequested.test(stage)) return true;
+    for (Throwable cause = failure; cause != null; cause = cause.getCause()) {
+      if (cause instanceof CancellationException || cause instanceof InterruptedException
+          || cause instanceof InterruptedIOException || cause instanceof ClosedByInterruptException
+          || cause instanceof FileLockInterruptionException) return true;
+    }
+    return false;
   }
 
   private static boolean completed(Object status) {

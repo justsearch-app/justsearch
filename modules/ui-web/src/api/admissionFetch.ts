@@ -41,10 +41,12 @@ export async function fetchWithAdmissionWait(
     if (response.status !== 429 && response.status !== 503) return response;
     let code: unknown;
     let retrySafe: boolean;
+    let preparation: unknown;
     try {
-      const refusal = (await response.clone().json()) as { errorCode?: unknown; retrySafe?: unknown };
+      const refusal = (await response.clone().json()) as { errorCode?: unknown; retrySafe?: unknown; preparationId?: unknown };
       code = refusal.errorCode;
       retrySafe = refusal.retrySafe === true;
+      preparation = refusal.preparationId;
     } catch {
       return response;
     }
@@ -52,7 +54,11 @@ export async function fetchWithAdmissionWait(
     const upgrade = response.status === 503 && code === 'UPGRADE_PREPARING';
     if ((!capacity && !upgrade) || !retrySafe || !replayable) return response;
     const delay = retryDelay(response.headers.get('Retry-After'));
-    reportAdmissionWait(upgrade, delay);
+    // L4a — the same refusal code also answers while the engine is closing (an outage, not an
+    // update); only a refusal naming an upgrade preparation says an update is being prepared.
+    // A closing engine is shown by the status pill, so its wait is not announced again here.
+    const preparingUpdate = upgrade && typeof preparation === 'string' && preparation.length > 0;
+    if (capacity || preparingUpdate) reportAdmissionWait(preparingUpdate, delay);
     if (signal) waitObservers.get(signal)?.(delay);
     await response.body?.cancel();
     await wait(delay, signal);

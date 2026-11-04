@@ -119,12 +119,16 @@ function makeId(): string {
  * captures edits the user made after arriving (typing a query, changing
  * filters) that replaceState recorded but the original journal entry missed.
  */
-function snapshotCurrentEntry(): void {
+function snapshotCurrentEntry(incomingUrl: string): void {
   if (cursor < 0 || cursor >= entries.length) return;
   if (typeof window === 'undefined') return;
   const hash = window.location.hash;
   if (!hash || !hash.startsWith('#justsearch://')) return;
   const currentUrl = canonicalSurfaceUrl(hash.slice(1));
+  // A browser arrival (hash change, deep link, popstate) has already moved the address to the
+  // incoming view, so the address bar no longer describes the departing entry. Reading it here
+  // used to overwrite conversation A's entry with B's address when B arrived as a URL (FR3 (a)).
+  if (currentUrl === incomingUrl) return;
   // On boot/popstate the URL already names the incoming surface, not the departing one.
   const address = parseUrl(currentUrl);
   if (address?.kind !== 'navigate' || canonicalSurfaceId(address.target) !== entries[cursor]!.surfaceId) return;
@@ -153,12 +157,17 @@ export function recordNavigation(
   if (isNavigatingHistory) return;
 
   // A browser traversal/reload already moved to an existing view. Its browser-state marker
-  // names this journal's entry, so restore the cursor rather than appending a return trip.
-  if (surfaceId === CONVERSATION_SURFACE && transport === 'URL_BAR' && typeof window !== 'undefined') {
+  // names this journal's entry, so restore the cursor rather than appending a return trip. Every
+  // app history entry carries the marker (URLProjector), so the journal follows browser Back and
+  // Forward for every window, not only Search. A conversation entry must also match its address:
+  // Search coalesces refinements into one entry, and a stale marker must not claim another subject.
+  if (transport === 'URL_BAR' && typeof window !== 'undefined') {
     const entryId = window.history.state?.navigationJournalId;
-    const restored = entries.findIndex(entry => entry.id === entryId && entry.url === url);
+    const restored = entries.findIndex(entry => entry.id === entryId && entry.surfaceId === surfaceId
+      && (surfaceId !== CONVERSATION_SURFACE || entry.url === url));
     if (restored >= 0) {
       cursor = restored;
+      if (entries[restored]!.url !== url) entries[restored] = { ...entries[restored]!, url };
       persist();
       fireListeners();
       return;
@@ -183,7 +192,7 @@ export function recordNavigation(
   }
 
   // Fix A: capture the departing surface's final state before recording the new entry.
-  snapshotCurrentEntry();
+  snapshotCurrentEntry(url);
 
   // Refinements within one view coalesce; opening another conversation replaces the subject
   // even though it stays on Search v3, and must remain reachable with the app's Back control.
@@ -300,36 +309,6 @@ export async function navigateForward(dispatch: DispatchFn): Promise<void> {
   if (!canGoForward()) return;
   cursor++;
   const entry = entries[cursor]!;
-  const parsed = parseUrl(entry.url);
-  const state = parsed && parsed.kind === 'navigate' ? parsed.state : {};
-  isNavigatingHistory = true;
-  try {
-    await dispatch(
-      {
-        address: { kind: 'navigate', target: entry.surfaceId, state },
-        transport: 'BUTTON',
-      },
-      { pushHistory: false },
-    );
-  } finally {
-    isNavigatingHistory = false;
-  }
-  persist();
-  fireListeners();
-}
-
-/**
- * Tempdoc 609 §R (T1.2) — jump directly to a journal entry by id (the Recents menu). Generalizes
- * navigateBack/Forward (which step by one) to an arbitrary entry, the "future tray menu / history surface"
- * the journal was built for (§3.1). Moves the cursor to that entry and dispatches its address with the same
- * `isNavigatingHistory` suppression, so selecting a recent surface restores it without re-journaling.
- */
-export async function navigateToEntry(id: string, dispatch: DispatchFn): Promise<void> {
-  ensureInitialized();
-  const idx = entries.findIndex((e) => e.id === id);
-  if (idx < 0) return;
-  cursor = idx;
-  const entry = entries[idx]!;
   const parsed = parseUrl(entry.url);
   const state = parsed && parsed.kind === 'navigate' ? parsed.state : {};
   isNavigatingHistory = true;

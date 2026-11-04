@@ -70,6 +70,14 @@ export function modalOwnsFocus(): boolean {
 }
 
 /**
+ * How many modals are entered — for the one window that is itself a place in history (Settings):
+ * when it is the only modal, Back and Forward still apply to it as browser Back and Forward do.
+ */
+export function openModalDepth(): number {
+  return openModalCount;
+}
+
+/**
  * Test seam: drop every entered modality. Module state outlives a test's DOM, so a case that leaves
  * a modal open would otherwise make the NEXT case's global keys silently inert.
  */

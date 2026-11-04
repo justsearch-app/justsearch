@@ -8,12 +8,12 @@ description: "Secondary view behavioral specification (Library, Brain, Health, S
 
 # Secondary Views Behavioral Reference
 
-[`search-ui-behavior.md`](search-ui-behavior.md) documents the search experience (Zones A, C, D, E). This document covers the secondary views accessed through Zone B (the ActivityRail), plus the ActivityRail itself. Together they form the complete UI behavioral reference.
+[`search-ui-behavior.md`](search-ui-behavior.md) documents the search experience (Zones A, C, D, E). This document covers the secondary views reached from Zone B (the top bar), plus the top bar itself. Together they form the complete UI behavioral reference.
 
 > **Current main window:** Search (`core.search-v3-surface`, `jf-sv3-window`) owns Search, Ask, Structured and Delegate. The retired `core.unified-chat-surface`, `core.search-surface` and `core.agent-surface` ids alias directly to it. Mode-specific Ask, free-chat and extract addresses prepare this window and wait for Send. Workflow addresses show an unavailable notice. Library pairs with Search in a split.
 
-Source files (Lit surfaces under `modules/ui-web/src/shell-v0/`): the rail chrome
-`chrome/ShellRail.ts`, and the view surfaces `views/LibrarySurface.ts`,
+Source files (Lit surfaces under `modules/ui-web/src/shell-v0/`): the frame
+`chrome/TopBar.ts`, and the view surfaces `views/LibrarySurface.ts`,
 `views/BrainSurface.ts`, `views/HealthSurface.ts`, `views/SettingsSurface.ts`,
 `views/HelpSurface.ts`.
 
@@ -30,41 +30,17 @@ Source files (Lit surfaces under `modules/ui-web/src/shell-v0/`): the rail chrom
 
 ---
 
-## 1. ActivityRail (Zone B)
+## 1. Top bar (Zone B)
 
-**Source:** `shell-v0/chrome/ShellRail.ts` (the `<jf-rail>` nav)
+**Source:** `shell-v0/chrome/TopBar.ts` (`<jf-top-bar>`, rendered by `chrome/Shell.ts`)
 
-The ActivityRail is a vertical icon strip on the left edge of the window. It provides top-level view switching.
-
-### Navigation items
-
-Six items, split into two groups by a thin horizontal divider:
-
-| # | ID | Icon | Label | Tint color | Group |
-|---|-----|------|-------|------------|-------|
-| 1 | `core.search-v3-surface` | Search | Search | teal | Primary |
-| 2 | `library` | Library | Library | amber | Primary |
-| 3 | `brain` | Brain | AI Brain | teal | Primary |
-| 4 | `health` | Activity | Health | emerald | Primary |
-| 5 | `help` | HelpCircle | Help | _(no tint property)_ | Secondary |
-| 6 | `settings` | Settings | Settings | purple | Secondary | _(tempdoc 855: fixed rail affordance, same pattern as Help — opens the Settings window as a `Placement.MODAL` overlay rather than navigating into Stage; see §5.)_
-
-### Active state
-
-- When a non-search item is active, a `motion.div` with `layoutId="rail-indicator"` renders behind the icon, providing a smooth spring animation between items (`stiffness: 400, damping: 30`).
-- The active indicator uses the item's tint color for background and inset glow: e.g., `bg-teal-500/15` + `shadow-[inset_0_0_12px_rgba(20,184,166,0.15)]`.
-- **Exception (historical):** the retired standalone Search rail item had no background when active (`bg-transparent`), merging with the top bar; the current Search window follows the normal active-indicator treatment.
-- Inactive items are `text-[var(--text-muted)]` with hover states.
-
-### Keyboard
-
-Each group is a Radix `RovingFocusGroup.Root` with `orientation="vertical"`. Arrow Up/Down moves focus within a group. Items are native `<button>` elements, so Enter and Space activate via browser default behavior (no custom key handlers).
-
-The two groups are separate roving focus containers — keyboard focus does not cross the divider automatically.
-
-### View prefetching
-
-On `mouseEnter` or `focus`, the target view's chunk is prefetched via dynamic `import()`. This reduces Suspense fallback duration when switching views. View switches are wrapped in `startTransition()` to prevent React synchronous-input errors.
+Shell slice 2 replaced the ActivityRail and the title bar with one top bar: the brand, the area
+switcher (Search, Library, AI Brain; Ctrl+1/2/3), the status pill, Settings (the Settings window,
+see §5) and the More (⋯) menu (System, Help & shortcuts, About, plugin windows under “More”, and a
+Developer group while the developer view tier is on). A window's own tabs sit in its tab row
+(Library: Folders, Browse; AI Brain: AI Brain, Memory). Sizes, keyboard (F6 regions, Back and
+Forward), layouts and addresses are described in
+[`10-ui-ux-design.md` §2](../explanation/10-ui-ux-design.md#2-shell-structure).
 
 ---
 
@@ -538,8 +514,9 @@ The `ui.mode` setting (`'simple'` default / `'advanced'`) gates features across 
 | Settings | All 6 sections visible | _(no difference)_ |
 | Health | Full dashboard | _(no difference)_ |
 
-The toggle lives in the top bar, Settings → Interface, and the Brain surface header; all three
-controls project the same live `uiModeState` value.
+The toggle lives in Settings → Appearance → Interface (“Detail level”) and the Brain surface header;
+both controls project the same live `uiModeState` value. (The title bar's copy retired in shell
+slice 2.)
 
 ### ConfirmDialog pattern
 

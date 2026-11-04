@@ -1,13 +1,14 @@
 // @vitest-environment happy-dom
 
 /**
- * Tests for slice 472's userConfig-driven rail filtering + ordering.
+ * Tests for slice 472's userConfig-driven window list filtering + ordering (was ShellRail.test.ts;
+ * shell slice 2 moved the rail's windows into the top bar's switcher and More menu).
  *
  * The chrome `<jf-shell>` reads `userConfig.surfaceVisibility` +
- * `userConfig.surfaceOrder` and applies them to the rail catalog
+ * `userConfig.surfaceOrder` and applies them to the RAIL-placement catalog
  * snapshot in `refreshSurfaces()`. This test exercises that
  * pipeline by seeding the SurfaceCatalog, mutating userConfig, and
- * asserting Shell's `surfaces` array reflects the changes.
+ * asserting Shell's `surfaces` array (the switcher areas + More windows) reflects the changes.
  */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -94,14 +95,24 @@ interface ShellElement extends HTMLElement {
   updateComplete: Promise<void>;
 }
 
-/** Every rail button that claims to navigate to `id` — the pinned affordance AND catalog slots. */
-async function railButtonsFor(shell: ShellElement, id: string): Promise<Element[]> {
-  const rail = shell.shadowRoot?.querySelector('jf-rail') as
-    | (HTMLElement & { updateComplete: Promise<void> })
-    | null;
-  if (!rail) return [];
-  await rail.updateComplete;
-  return [...(rail.shadowRoot?.querySelectorAll(`[data-surface-id="${id}"]`) ?? [])];
+type TopBarElement = HTMLElement & { updateComplete: Promise<void> };
+
+/** Every top-bar control that claims to navigate to `id`: switcher, Settings, an open menu's rows. */
+async function topBarButtonsFor(shell: ShellElement, id: string): Promise<Element[]> {
+  const bar = shell.shadowRoot?.querySelector('jf-top-bar') as TopBarElement | null;
+  if (!bar) return [];
+  await bar.updateComplete;
+  return [...(bar.shadowRoot?.querySelectorAll(`[data-surface-id="${id}"]`) ?? [])];
+}
+
+/** Open the More (⋯) menu and return the surface ids its rows open. */
+async function moreMenuIds(shell: ShellElement): Promise<string[]> {
+  const bar = shell.shadowRoot?.querySelector('jf-top-bar') as TopBarElement | null;
+  await bar?.updateComplete;
+  bar?.shadowRoot?.querySelector<HTMLButtonElement>('.more-trigger')?.click();
+  await bar?.updateComplete;
+  return [...(bar?.shadowRoot?.querySelectorAll('[role="menu"] [data-surface-id]') ?? [])]
+    .map(row => row.getAttribute('data-surface-id') ?? '');
 }
 
 async function renderShell(): Promise<ShellElement> {
@@ -157,10 +168,13 @@ describe('Shell — userConfig-driven rail (slice 472)', () => {
     expect(ids).not.toContain('core.settings-surface');
   });
 
-  it('renders exactly ONE settings button — the pinned affordance, never a catalog slot (855 S1)', async () => {
+  it('renders exactly ONE settings button — the top bar\'s gear, never a catalog slot (855 S1)', async () => {
     seedFiveCoreSurfaces();
     const shell = await renderShell();
-    const buttons = await railButtonsFor(shell, 'core.settings-surface');
+    // Shell slice 2 — the pinned affordance moved from the rail foot to the top bar; a stale catalog
+    // declaring Settings RAIL must still not add a second one (in the switcher or the More menu).
+    expect(await moreMenuIds(shell)).not.toContain('core.settings-surface');
+    const buttons = await topBarButtonsFor(shell, 'core.settings-surface');
     expect(buttons).toHaveLength(1);
     // The survivor is the pinned MODAL affordance: it opens a window, so it declares
     // aria-haspopup="dialog" — the catalog slot never does.
@@ -225,7 +239,14 @@ describe('Shell — userConfig-driven rail (slice 472)', () => {
   });
 });
 
-describe('Shell — Simple/Detailed rail filter (tempdoc 586 F-2)', () => {
+/**
+ * Tempdoc 586 F-2 trimmed System from the rail in Simple mode. Shell slice 2 retired that trim with
+ * the rail: System is a fixed row of the More menu in every detail level and never a switcher area
+ * (design-system §7 "More (⋯) menu"). What the old tests also pinned — AI Brain stays reachable in
+ * Simple mode, Settings is never a window-list entry, a DEEPLINK window never joins the list — is
+ * pinned here at the new owner.
+ */
+describe('Shell — System in the More menu in both detail levels (was the 586 F-2 rail filter)', () => {
   beforeEach(() => {
     resetSurfaceCatalog();
     __resetUserConfigForTest();
@@ -250,14 +271,17 @@ describe('Shell — Simple/Detailed rail filter (tempdoc 586 F-2)', () => {
     __resetUiModeForTest();
   });
 
-  it('Simple mode hides System from the rail but keeps AI Brain (Theme Editor is DEEPLINK — never on the rail)', async () => {
+  it('Simple mode: System is a More-menu row, not an area; AI Brain stays an area (Theme Editor is DEEPLINK — never listed)', async () => {
     seedSurfacesWithDiagnostics();
     setUiMode('simple');
     const shell = await renderShell();
     const ids = shell.surfaces.map((s) => s.id);
-    // The advanced/diagnostic surface drops off in Simple mode...
-    expect(ids).not.toContain('core.system-surface');
-    // ...while AI Brain stays (the user's explicit choice), as do the consumer surfaces.
+    // System is reachable in Simple mode too — from More, never from the switcher.
+    expect(await moreMenuIds(shell)).toContain('core.system-surface');
+    const bar = shell.shadowRoot?.querySelector('jf-top-bar') as TopBarElement;
+    expect(bar.shadowRoot?.querySelector('nav [data-surface-id="core.system-surface"]')).toBeNull();
+    // AI Brain stays an area (the user's explicit choice), as do the consumer windows.
+    expect(bar.shadowRoot?.querySelector('nav [data-surface-id="core.brain-surface"]')).not.toBeNull();
     expect(ids).toContain('core.brain-surface');
     expect(ids).toContain('core.library-surface');
     expect(ids).toContain('core.search-surface');
@@ -268,12 +292,13 @@ describe('Shell — Simple/Detailed rail filter (tempdoc 586 F-2)', () => {
     expect(ids).not.toContain('vendor.token-editor.editor-surface');
   });
 
-  it('Detailed mode restores System (Theme Editor stays off the rail — it is DEEPLINK, not RAIL)', async () => {
+  it('Detailed mode: System is the same More-menu row (Theme Editor stays unlisted — it is DEEPLINK, not RAIL)', async () => {
     seedSurfacesWithDiagnostics();
     setUiMode('advanced');
     const shell = await renderShell();
     const ids = shell.surfaces.map((s) => s.id);
     expect(ids).toContain('core.system-surface');
+    expect(await moreMenuIds(shell)).toContain('core.system-surface');
     expect(ids).toContain('core.brain-surface');
     // 855 §5 item 2 — DEEPLINK placement means Detailed mode does not restore it either; it was
     // never excluded by the Simple-mode filter to begin with.
