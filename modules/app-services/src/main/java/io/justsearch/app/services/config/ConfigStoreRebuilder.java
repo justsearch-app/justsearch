@@ -266,6 +266,9 @@ public final class ConfigStoreRebuilder {
   public static void contributeUiSettings(ResolvedConfigBuilder builder, UiSettings settings) {
     builder.putSettings("justsearch.index.base_path", settings.getIndexBasePath());
     builder.putSettings("justsearch.llm.model_path", settings.getLlmModelPath());
+    if (Boolean.FALSE.equals(settings.getPictureReadingEnabled())) {
+      builder.putSettings(EnvRegistry.MMPROJ_MODEL.configKey(), "none");
+    }
     // ${user.home} expansion used to happen only in SettingsController's server.exe promotion, so a
     // placeholder resolved differently before and after a settings PUT. Tempdoc 883 decision 4
     // slice 2 deleted that promotion; the expansion moves here, where the value actually enters the

@@ -1,0 +1,202 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
+  },
+  "createdAt": "2026-11-04T21:19:13.987Z",
+  "revision": "bcc5ece3c64961dbd224dffbae599675e265ac85",
+  "tree": "00c1333867047bcbdc1edec04e948522b3be79d3",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": "openjdk version \"25.0.4.1\" 2026-08-18 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "./gradlew :modules:app-services:test --tests \"io.justsearch.app.services.settings.UiSettingsCurrentEnvelopeTest\" --tests \"io.justsearch.app.services.settings.UiSettingsStoreContextLengthMigrationTest\" --tests \"io.justsearch.app.services.settings.UiSettingsStoreRevisionTest\" --tests \"io.justsearch.app.services.settings.LiteralExclusionSettingsTest\" --tests \"io.justsearch.app.services.settings.RerankerPreferenceTest\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 20955
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/settings/UiSettingsCurrentEnvelopeTest.java",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/settings/UiSettingsCurrentEnvelopeTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:88a1ba978d97bf3ed90975072cf382e601b3f64399ca19296683fdf682a07ece",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "currentEnvelopeAndReopen(Path)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/settings/UiSettingsStoreContextLengthMigrationTest.java",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/settings/UiSettingsStoreContextLengthMigrationTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:7e167460b9d8bad697430650ab31d89dbfab46ad32dd72c4d0885dd50365d5ae",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "migration is idempotent across repeated loads before the next accepted replacement",
+          "status": "passed"
+        },
+        {
+          "name": "a schema-1 file is migratable, not fatal and not quarantined",
+          "status": "passed"
+        },
+        {
+          "name": "an unversioned legacy file migrates the same way",
+          "status": "passed"
+        },
+        {
+          "name": "schema-1 contextLength 4096 (the old default) migrates to 0 = auto",
+          "status": "passed"
+        },
+        {
+          "name": "a FUTURE version is still fatal — migrating forward is not the same as downgrading",
+          "status": "passed"
+        },
+        {
+          "name": "a prepared replacement after migration rewrites the file at the current version",
+          "status": "passed"
+        },
+        {
+          "name": "at schema 2 a deliberate 4096 is left alone — the migration is not re-applied",
+          "status": "passed"
+        },
+        {
+          "name": "a schema-1 value that is not the old default is preserved as a real override",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/settings/UiSettingsStoreRevisionTest.java",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/settings/UiSettingsStoreRevisionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:290aed54914f991bfc63e7b8cdc7b14b06f206a542caf7a141744e4b38c4bd35",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "preparesPrivateCandidateBeforeReplacingFile()",
+          "status": "passed"
+        },
+        {
+          "name": "earlierV5QuerySelectionWithoutRuntimeDescriptorRemainsReadable()",
+          "status": "passed"
+        },
+        {
+          "name": "exactProjectionPreservesAcceptedCandidateRatherThanStampingTransientWindowTime()",
+          "status": "passed"
+        },
+        {
+          "name": "incompleteEnvelopesCannotMasqueradeAsLegacyDefaults()",
+          "status": "passed"
+        },
+        {
+          "name": "nonDirectoryParentCannotProveEmptyStore()",
+          "status": "passed"
+        },
+        {
+          "name": "legacyTwoStartsAtZeroAndOldReaderRefusesThree()",
+          "status": "passed"
+        },
+        {
+          "name": "queryRoleSelectionRejectsMixedModelAndTokenizerDirectories()",
+          "status": "passed"
+        },
+        {
+          "name": "invalidWitnessCannotBecomeSuccessfulDefaultDuringInspection()",
+          "status": "passed"
+        },
+        {
+          "name": "foreignPreparationAndReadOnlyModeCannotWrite()",
+          "status": "passed"
+        },
+        {
+          "name": "oversizedVersionCannotWrapIntoReadableLegacySchema()",
+          "status": "passed"
+        },
+        {
+          "name": "queryRoleSelectionDistinguishesLegacyFromDisabledAndSurvivesReboot()",
+          "status": "passed"
+        },
+        {
+          "name": "recoveryNotificationIsOutsideReplacement()",
+          "status": "passed"
+        },
+        {
+          "name": "explicitNullQuerySelectionIsNotLegacyFallback()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/settings/LiteralExclusionSettingsTest.java",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/settings/LiteralExclusionSettingsTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:c74c0a4f5d6789ce07a84df1f66b6d24a05f59989d853b35e1723a054b9eb6cc",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "RF55V6ExactEntriesSurviveSaveReloadWithUnrelatedFieldsAndLegacyFallbacks()",
+          "status": "passed"
+        },
+        {
+          "name": "RF55PublicSaveCanRetainOrRemoveExactTokensButCannotCreateOrModifyThem()",
+          "status": "passed"
+        },
+        {
+          "name": "RF55EveryLegacyVersionKeepsItsStringMeaningAndCannotCarryTypedState()",
+          "status": "passed"
+        },
+        {
+          "name": "RF55ResetClearsLegacyAndPrecisePolicyTogether()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/settings/RerankerPreferenceTest.java",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/settings/RerankerPreferenceTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:03a38a89d0947f212870c9c1410ff96b5fd9ab57553c47cb4489852c76e010c0",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "currentEnvelopeReopensOffAndExactSelectionAfterRestart(Path)",
+          "status": "passed"
+        },
+        {
+          "name": "patchRetainsFilesAndIdentityUntilTheUserChangesThePath(Path)",
+          "status": "passed"
+        },
+        {
+          "name": "schemaSixMigrationKeepsDisabledWitnessAndAcquisitionPreferences(Path)",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:23651d4743be5eaa1e7a560c3a6c072e2b36250d8af429da66fa88523588819a"
+}

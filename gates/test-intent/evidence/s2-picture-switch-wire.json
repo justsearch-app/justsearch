@@ -1,0 +1,65 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
+  },
+  "createdAt": "2026-11-04T21:35:21.394Z",
+  "revision": "bcc5ece3c64961dbd224dffbae599675e265ac85",
+  "tree": "aea4fa63e05beb483c70cffcde5839f20ac67b85",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": "openjdk version \"25.0.4.1\" 2026-08-18 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "./gradlew :modules:app-services:test --tests \"io.justsearch.app.services.registry.emitter.UIOperationViewConformanceTest\" --tests \"io.justsearch.app.services.registry.operations.handlers.PictureReadingInstallIntentTest\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 20837
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/registry/emitter/UIOperationViewConformanceTest.java",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/registry/emitter/UIOperationViewConformanceTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:cfc429b85dbe0d040048c849450e487e64d2ea969a64396a051c35107b3d2aeb",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "the emitted core-operation wire matches the committed golden",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/registry/operations/handlers/PictureReadingInstallIntentTest.java",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/registry/operations/handlers/PictureReadingInstallIntentTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:ec766aa903152dc93d6a96dfe94dbb892dc161aa590e263b5a1eee152eea540d",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "anOrdinaryInstallKeepsItsExistingEntryWithoutAPictureEnable()",
+          "status": "passed"
+        },
+        {
+          "name": "consentedPictureIntentReachesTheInstallerThroughTheOperationAndFacade()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:751415deac8a8e1480d405f3fc35c51ec3a89eb18537846d8bd818e2f5f6f7d0"
+}

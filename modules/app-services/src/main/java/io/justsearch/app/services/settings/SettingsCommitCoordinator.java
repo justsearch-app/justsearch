@@ -995,6 +995,13 @@ public final class SettingsCommitCoordinator implements SettingsCommitOwner {
       UiSettings preparedCandidate = store.prepareCandidate(candidate);
       // A recovery reset starts from quarantined bytes with no readable prior settings.
       // Its committed defaults are applied by the already-required successor boot.
+      boolean pictureComponentChanged = !active.recoveryReset() && !Objects.equals(
+          active.priorSettings.getPictureReadingEnabled(), preparedCandidate.getPictureReadingEnabled());
+      pictureComponentChanged |= !active.recoveryReset()
+          && preparedCandidate.getPictureReadingPreferenceRevision() == next.acceptedRevision();
+      preparedCandidate.setPictureReadingPreferenceRevision(pictureComponentChanged
+          ? next.acceptedRevision() : active.recoveryReset() ? 0
+              : active.priorSettings.getPictureReadingPreferenceRevision());
       boolean chatComponentChanged = !active.recoveryReset() && !Objects.equals(
           active.priorSettings.getChatEnabled(), preparedCandidate.getChatEnabled());
       ResolvedConfig resolved = Objects.requireNonNull(prepareConfig.apply(preparedCandidate, candidateContext), "Prepared config");
@@ -1056,13 +1063,20 @@ public final class SettingsCommitCoordinator implements SettingsCommitOwner {
       if (changedKeys.restartRequired().contains("justsearch.index.base_path")) {
         servingResolved = servingResolved.retainingIndexBasePathFrom(serving);
       }
-      if (!changedKeys.component().isEmpty() || prepareReranker || chatComponentChanged
+      if (!changedKeys.component().isEmpty() || prepareReranker || chatComponentChanged || pictureComponentChanged
           || candidateContext.hasChatProfile() || candidateContext.forceGenerativeRefresh()) {
         var affected = new java.util.TreeMap<String, Set<String>>(changedKeys.component());
         if (prepareReranker) {
           // The switch is not a model-path change: On restores the retained selection, Off only
           // disables the role. A path the same save changes arrives as its own key.
           affected.merge("encoders", Set.of("rerankerEnabled"), (left, right) -> {
+            var keys = new java.util.TreeSet<>(left);
+            keys.addAll(right);
+            return Set.copyOf(keys);
+          });
+        }
+        if (pictureComponentChanged) {
+          affected.merge("generative", Set.of("pictureReadingEnabled"), (left, right) -> {
             var keys = new java.util.TreeSet<>(left);
             keys.addAll(right);
             return Set.copyOf(keys);

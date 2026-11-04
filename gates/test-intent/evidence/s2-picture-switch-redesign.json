@@ -1,0 +1,90 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
+  },
+  "createdAt": "2026-11-04T21:00:00.731Z",
+  "revision": "bcc5ece3c64961dbd224dffbae599675e265ac85",
+  "tree": "66d9d2144d2b614a324200c84e5b7601611f589e",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/BrainSurface.redesign.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/3y_wn4b3/tmp/test-intent-vitest-3-1793825995106.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 5623
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/views/BrainSurface.redesign.test.ts",
+      "file": "modules/ui-web/src/shell-v0/views/BrainSurface.redesign.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:84bac254e576da81f38669fa49a30edaddf5dfbeababdf6b0c6a20d01e5a5526",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "AI Brain redesign behaviour duplicates the saved answer switch with distinct ids and one busy state; stopping keeps files and background work",
+          "status": "passed"
+        },
+        {
+          "name": "AI Brain redesign behaviour keeps runtime evidence in the sentence and disables feature switches when observations become unknown",
+          "status": "passed"
+        },
+        {
+          "name": "AI Brain redesign behaviour preserves null answer intent as automatic rather than saving false",
+          "status": "passed"
+        },
+        {
+          "name": "AI Brain redesign behaviour opens information without toggling, keeps one panel through updates, and restores focus on Escape and outside click",
+          "status": "passed"
+        },
+        {
+          "name": "AI Brain redesign behaviour blocks concurrent acquisition choices and converges another window on focus",
+          "status": "passed"
+        },
+        {
+          "name": "AI Brain redesign behaviour a retained surface cannot start a newer choice while its earlier request is still unanswered",
+          "status": "passed"
+        },
+        {
+          "name": "AI Brain redesign behaviour ignores late settings and plan responses from before a newer refresh",
+          "status": "passed"
+        },
+        {
+          "name": "AI Brain redesign behaviour a missing declined answer package asks for its real size and licence and downloads after consent",
+          "status": "passed"
+        },
+        {
+          "name": "AI Brain redesign behaviour accept is disabled until the manifest and every download size are known, with retry",
+          "status": "passed"
+        },
+        {
+          "name": "AI Brain redesign behaviour retains progress across a tab switch and remount and blocks plan changes while paused",
+          "status": "passed"
+        },
+        {
+          "name": "AI Brain redesign behaviour graphics memory uses all-app device data and stale or absent values remain unknown",
+          "status": "passed"
+        },
+        {
+          "name": "AI Brain redesign behaviour consent lists only planned packages, excluding declined siblings and already installed files",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:d4c40cd21d72622538f38261f82387178b1c9db192fdf082ea8cbd1efdeaa43e"
+}

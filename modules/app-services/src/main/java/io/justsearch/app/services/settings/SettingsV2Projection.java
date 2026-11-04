@@ -37,7 +37,9 @@ public final class SettingsV2Projection {
     return new SettingsV2(ui, llm, indexPaths, persistenceMode.name().toLowerCase(Locale.ROOT),
         witness, null, null, settings.configuredApiPort(), null,
         blankToNull(settings.getRerankerModelPath()),
-        blankToNull(settings.getCitationScorerModelPath()), null, settings.getRerankerEnabled(), null, settings.getPauseAnswersWhileIndexing());
+        blankToNull(settings.getCitationScorerModelPath()), null, settings.getRerankerEnabled(), null, settings.getPauseAnswersWhileIndexing(), settings.getPictureReadingEnabled(),
+        io.justsearch.configuration.EnvRegistry.MMPROJ_MODEL.get().filter(value -> !value.isBlank())
+            .map(value -> !"none".equalsIgnoreCase(value.trim())).orElse(null), null);
   }
 
   private static String blankToNull(String value) {

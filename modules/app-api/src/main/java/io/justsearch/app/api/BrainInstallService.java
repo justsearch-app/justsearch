@@ -49,6 +49,15 @@ public interface BrainInstallService {
     return startInstall(acceptTerms);
   }
 
+  /** Carries the consented picture-reader enable intent through acquisition completion. */
+  default AiInstallService.Attempt startInstall(boolean acceptTerms, boolean enableRerankerOnCompletion,
+      boolean enablePictureReadingOnCompletion) throws Exception {
+    if (enablePictureReadingOnCompletion) {
+      throw new UnsupportedOperationException("Picture reading install intent unavailable");
+    }
+    return startInstall(acceptTerms, enableRerankerOnCompletion);
+  }
+
   /**
    * Cancel a running install. Idempotent if no install is running. Returns
    * the post-cancel install status snapshot.

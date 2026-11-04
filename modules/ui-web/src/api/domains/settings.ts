@@ -43,6 +43,8 @@ export interface LLMSettings {
 
 export interface AppSettings {
   rerankerEnabled?: boolean | null;
+  pictureReadingEnabled?: boolean | null;
+  pictureReadingOverrideEnabled?: boolean | null;
   pauseAnswersWhileIndexing?: boolean | null;
   ui?: UISettings | undefined;
   llm?: LLMSettings | undefined;

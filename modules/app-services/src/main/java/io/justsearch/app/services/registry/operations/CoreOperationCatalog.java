@@ -1139,7 +1139,8 @@ public final class CoreOperationCatalog implements OperationCatalog {
         START_AI_INSTALL,
         Presentation.forId(START_AI_INSTALL),
         Interface.of("{\"type\":\"object\",\"properties\":{\"acceptTerms\":{\"type\":\"boolean\"},"
-            + "\"enableRerankerOnCompletion\":{\"type\":\"boolean\"}}}", "{\"type\":\"object\"}"),
+            + "\"enableRerankerOnCompletion\":{\"type\":\"boolean\"},"
+            + "\"enablePictureReadingOnCompletion\":{\"type\":\"boolean\"}}}", "{\"type\":\"object\"}"),
         new OperationPolicy(
             RiskTier.MEDIUM,
             ConfirmStrategy.Inline.INSTANCE,

@@ -50,7 +50,7 @@ final class SettingsPatch {
         input.apiPort() == null ? null : normalized.configuredApiPort(), null,
         input.rerankerModelPath() == null ? null : normalized.getRerankerModelPath(),
         input.citationScorerModelPath() == null ? null : normalized.getCitationScorerModelPath(),
-        null, input.rerankerEnabled(), input.rerankerSwitchIntent(), input.pauseAnswersWhileIndexing());
+        null, input.rerankerEnabled(), input.rerankerSwitchIntent(), input.pauseAnswersWhileIndexing(), input.pictureReadingEnabled(), null, input.pictureReadingSwitchIntent());
   }
 
   /** Merges an incoming {@link SettingsV2} into the existing {@link UiSettings}. */
@@ -64,6 +64,16 @@ final class SettingsPatch {
       return base;
     }
 
+    if (incoming.pictureReadingEnabled() != null) {
+      boolean choiceChanged = !java.util.Objects.equals(
+          base.getPictureReadingEnabled(), incoming.pictureReadingEnabled());
+      base.setPictureReadingEnabled(incoming.pictureReadingEnabled());
+      if (incoming.witness() != null
+          && (choiceChanged || Boolean.TRUE.equals(incoming.pictureReadingSwitchIntent()))) {
+        base.setPictureReadingPreferenceRevision(
+            Math.addExact(incoming.witness().acceptedRevision(), 1));
+      }
+    }
     if (incoming.pauseAnswersWhileIndexing() != null) {
       base.setPauseAnswersWhileIndexing(incoming.pauseAnswersWhileIndexing());
     }

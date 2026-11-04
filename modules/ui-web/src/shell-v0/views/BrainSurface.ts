@@ -615,6 +615,9 @@ export class BrainSurface extends JfElement {
   private readonly pendingActions = new Set<string>();
   private featureOpener: HTMLElement | null = null;
   private consentFeature: string | null = null;
+  private pictureUncertain = false;
+  private pictureApplied: boolean | null = null;
+  private pictureTargetEnabled = false;
   declare featureInfo: BrainFeatureId | null;
   declare planLoading: boolean;
   declare planError: string | null;
@@ -1244,6 +1247,7 @@ export class BrainSurface extends JfElement {
         const changed = s.runtimeStatus !== this.runtimeStatus;
         this.runtimeStatus = s.runtimeStatus;
         if (changed && !this.pendingActions.has('reranker-switch')) this.rerankerApplied = null;
+        if (changed && !this.pendingActions.has('picture-switch')) this.pictureApplied = null;
         const reranker = s.runtimeStatus.onnxFeatures?.find(feature => feature.id === 'reranker');
         if (changed && !this.pendingActions.has('reranker-switch')
             && reranker?.status !== 'unknown' && reranker?.modelActive != null
@@ -1321,7 +1325,7 @@ export class BrainSurface extends JfElement {
   }
 
   private async refreshSettings(afterAnswerSave = false): Promise<void> {
-    if ((this.pendingActions.has('inference-switch') || this.pendingActions.has('reranker-switch') || this.pendingActions.has('answer-pause-switch')) && !afterAnswerSave) return;
+    if ((this.pendingActions.has('inference-switch') || this.pendingActions.has('reranker-switch') || this.pendingActions.has('answer-pause-switch') || this.pendingActions.has('picture-switch')) && !afterAnswerSave) return;
     const revision = ++this.refreshRevision;
     const choice = this.choiceRevision;
     const llmRevision = this.llmRevision;
@@ -1331,6 +1335,8 @@ export class BrainSurface extends JfElement {
     if (this.rerankerSettings?.witness?.acceptedRevision !== settings.witness?.acceptedRevision
         || this.rerankerSettings?.witness?.lastCommittedOperationKey !== settings.witness?.lastCommittedOperationKey) {
       this.rerankerApplied = null;
+      this.pictureApplied = null;
+      this.pictureUncertain = false;
     }
     this.rerankerSettings = settings;
     this.settings = { ...(settings.ui ?? {}), mode: getUiMode() } as UiSettings;
@@ -1453,15 +1459,35 @@ export class BrainSurface extends JfElement {
     }
     const mmproj = live && this._unifiedAiState?.runtime?.mode === 'online'
       ? this.runtimeStatus?.active?.mmprojActive ?? null : null;
+    const pictureOverride = this.rerankerSettings?.pictureReadingOverrideEnabled;
+    const pictureChoice = pictureOverride != null ? mmproj ?? pictureOverride
+      : this.pictureApplied ?? this.rerankerSettings?.pictureReadingEnabled
+        ?? (mmproj ?? this.packagePresent('chat'));
+    const pictureFiles = this.modelPresence?.packages?.find(p => p.id === 'chat')?.complete
+      ?? this.planPreview?.components?.find(c => c.id === 'chat')?.state === 'installed';
+    const pictureMismatch = mmproj === true && pictureChoice === false && this.pictureApplied === null;
     features.pictures = {
-      id: 'pictures', label: 'Text in scans and images', selected: mmproj === true,
-      installed: features.chat.installed, active: mmproj,
+      id: 'pictures', label: 'Text in scans and images', selected: pictureMismatch || pictureChoice,
+      installed: features.chat.installed, active: this.pictureApplied ?? mmproj,
       availability: features.chat.availability,
       state: !live ? 'Unknown — checking AI status' : !installed ? features.chat.availability === 'unavailable'
         ? 'Text in scans and images is unavailable on this computer'
         : 'Text in scans and images comes with the answer model’s files; it is not a separate download'
-        : mmproj === true ? 'On' : mmproj === false ? 'Off' : 'Unknown — engine observation unavailable',
-      size: null, switchable: false, blockedReason: null,
+        : this.pendingActions.has('picture-switch') ? this.pictureTargetEnabled ? 'Starting picture reading…' : 'Stopping picture reading…'
+        : this.pictureUncertain ? 'Unknown — checking picture reading after an interrupted change'
+        : pictureOverride === false ? 'Off — operator controlled'
+        : pictureOverride === true ? mmproj === true ? 'On — operator controlled'
+          : mmproj === false ? 'Unavailable — operator picture reader is not active' : 'Enabled by an operator override'
+        : pictureMismatch ? 'On — the saved Off choice is not applied'
+        : !pictureChoice ? 'Off - files and read text kept'
+        : !pictureFiles ? 'Unavailable — picture reading files are missing'
+        : 'On',
+      size: null, switchable: installed,
+      blockedReason: !live ? 'Checking AI status before changing features.'
+        : pictureOverride != null ? 'Text in scans and images is controlled by an operator override; change that override first'
+        : features.chat.availability === 'unavailable' ? 'Text in scans and images is unavailable on this computer'
+        : !this.settingsRead || !this.rerankerSettings?.witness ? 'Saved picture reading choice is not known. Refresh settings before changing it.'
+        : this.planLockReason(),
     };
     return features;
   }
@@ -1511,6 +1537,16 @@ export class BrainSurface extends JfElement {
 
   private async changeFeature(feature: BrainFeature): Promise<void> {
     if (feature.blockedReason || this.planLockReason()) return;
+    if (feature.id === 'pictures' && this.hasInstalledAi()) {
+      const complete = this.modelPresence?.packages?.find(p => p.id === 'chat')?.complete
+        ?? this.planPreview?.components?.find(c => c.id === 'chat')?.state === 'installed';
+      if (!feature.selected && !complete) {
+        const component = this.planPreview?.components?.find(c => c.id === 'chat');
+        if (component?.declined || component?.state === 'declined') await this.setComponentDeclined('chat', false);
+        if (!this.runtimeError) await this.startInstall('pictures');
+      } else await this.setPictureReadingEnabled(!feature.selected);
+      return;
+    }
     if (feature.id === 'reranker' && this.hasInstalledAi()) {
       if (!feature.selected && !feature.installed) {
         const component = this.planPreview?.components?.find(c => c.id === 'reranker');
@@ -1556,7 +1592,7 @@ export class BrainSurface extends JfElement {
       meaning: 'Find files by what they mean, even when they use different words.',
       reranker: 'Reorders search results to put the best match first.',
       chat: 'Answers written from your files, with sources you can check.',
-      pictures: 'Reads text and content in scans and pictures when the engine has a projector attached.',
+      pictures: 'Finds text in scans and pictures. Off keeps files and text already read; On resumes waiting files.',
     };
     return html`<div id=${`brain-feature-panel-${feature.id}`} class="feature-panel" tabindex="-1" role="region" aria-label=${`About ${feature.label}`}>
       <strong>${feature.label}</strong>
@@ -1783,6 +1819,7 @@ export class BrainSurface extends JfElement {
     }
     if (this.pendingActions.has('inference-switch')) return 'Saving the answer choice';
     if (this.pendingActions.has('reranker-switch')) return 'Changing…';
+    if (this.pendingActions.has('picture-switch')) return 'Changing picture reading…';
     return null;
   }
 
@@ -1864,6 +1901,7 @@ export class BrainSurface extends JfElement {
       this.runtimeError = null;
       const data = (await this.invokeOp('core.start-ai-install', { acceptTerms: true,
         ...(feature === 'reranker' ? { enableRerankerOnCompletion: true } : {}),
+        ...(feature === 'pictures' ? { enablePictureReadingOnCompletion: true } : {}),
       })) as InstallStatus;
       if (data) {
         void refreshAiInstallNow();
@@ -1970,6 +2008,30 @@ export class BrainSurface extends JfElement {
         requireSettingsWitness(this.rerankerSettings?.witness));
       await executeSettingsAttempt(
         (path, init) => authorizedFetch(this.base() + path, init), attempt);
+      await this.refreshSettings(true);
+    });
+  }
+
+  private async setPictureReadingEnabled(enabled: boolean): Promise<void> {
+    await this.withBusy('picture-switch', async () => {
+      this.pictureTargetEnabled = enabled;
+      this.runtimeError = null;
+      ++this.choiceRevision;
+      const attempt = createSettingsAttempt({ pictureReadingEnabled: enabled, pictureReadingSwitchIntent: true },
+        requireSettingsWitness(this.rerankerSettings?.witness));
+      try {
+        const result = await executeSettingsAttempt(
+          (path, init) => authorizedFetch(this.base() + path, init), attempt, { timeoutMs: 240_000 });
+        this.pictureApplied = enabled;
+        this.rerankerSettings = { ...this.rerankerSettings, pictureReadingEnabled: enabled, witness: result.witness };
+        this.pictureUncertain = false;
+      } catch (error) {
+        if (error instanceof SettingsAttemptError
+            && ['SETTINGS_COMPLETION_UNKNOWN', 'SETTINGS_RECEIPT_INVALID'].includes(error.code)) {
+          this.pictureUncertain = true;
+        }
+        throw error;
+      }
       await this.refreshSettings(true);
     });
   }

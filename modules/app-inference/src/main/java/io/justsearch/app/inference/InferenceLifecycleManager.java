@@ -1099,6 +1099,11 @@ public class InferenceLifecycleManager
     return servingInference().chatProfileId();
   }
 
+  /** The effective choice also gates user-run servers without changing their ownership. */
+  public boolean pictureReadingEnabled() {
+    return InferenceConfig.pictureReadingEnabled(configured.resolved());
+  }
+
   public boolean hasVisionCapability() {
     InferenceConfig cfg = servingInference();
     boolean configHasVision = cfg != null && cfg.mmprojPath() != null;
@@ -2377,7 +2382,7 @@ public class InferenceLifecycleManager
               failure.getMessage(), failure);
         },
         drained -> prepareResolvedConfigStep(
-            candidate, candidateResolved, enabled, restartIfOnline, drained)));
+            candidate.withPictureReading(candidateResolved), candidateResolved, enabled, restartIfOnline, drained)));
   }
 
   private PreparedConfigApply prepareResolvedConfigStep(
@@ -2741,15 +2746,17 @@ public class InferenceLifecycleManager
   }
 
   private ConfigApplyResult applyConfiguration(
-      InferenceConfig newConfig, ResolvedConfig suppliedResolved, RestartPolicy policy,
+      InferenceConfig requestedConfig, ResolvedConfig suppliedResolved, RestartPolicy policy,
       TransitionReason transitionReason, LlamaServerOps.AdoptionPolicy adoptionPolicy)
       throws ModeTransitionException {
-    if (newConfig == null) {
+    if (requestedConfig == null) {
       InferenceFailure failure =
           new InferenceFailure.ConfigFailure(ConfigCode.CONFIG_REQUIRED, "Config is required");
       recordApplyRefusal(failure);
       throw modeTransition(ModeTransitionException.Reason.CONFIG_REQUIRED, "Config is required");
     }
+    ResolvedConfig resolved = suppliedResolved != null ? suppliedResolved : ConfigStore.global().get();
+    InferenceConfig newConfig = requestedConfig.withPictureReading(resolved);
     RestartPolicy effective = policy == null ? RestartPolicy.RESTART_IF_ONLINE : policy;
     final ConfiguredInference incumbentConfiguration;
     final LlamaServerConfigContext candidate;
@@ -2792,7 +2799,6 @@ public class InferenceLifecycleManager
         recordApplyRefusal(new InferenceFailure.ConfigFailure(ConfigCode.EXTERNAL_SERVER_CONFLICT, message));
         throw modeTransition(ModeTransitionException.Reason.EXTERNAL_SERVER_CONFLICT, message);
       }
-      ResolvedConfig resolved = suppliedResolved != null ? suppliedResolved : ConfigStore.global().get();
       candidate = new LlamaServerConfigContext(newConfig, resolved);
       if (!shouldRestart) {
         try {

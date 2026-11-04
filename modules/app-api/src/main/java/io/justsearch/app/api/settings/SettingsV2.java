@@ -24,7 +24,11 @@ public record SettingsV2(
     Boolean rerankerEnabled,
     @com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL)
     Boolean rerankerSwitchIntent,
-    Boolean pauseAnswersWhileIndexing
+    Boolean pauseAnswersWhileIndexing,
+    Boolean pictureReadingEnabled,
+    Boolean pictureReadingOverrideEnabled,
+    @com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL)
+    Boolean pictureReadingSwitchIntent
 ) {
   public SettingsV2 {
     // Do not replace nulls with defaults here.
@@ -36,6 +40,9 @@ public record SettingsV2(
     }
     if (Boolean.TRUE.equals(rerankerSwitchIntent) && rerankerEnabled == null) {
       throw new IllegalArgumentException("Reranker switch intent requires rerankerEnabled");
+    }
+    if (Boolean.TRUE.equals(pictureReadingSwitchIntent) && pictureReadingEnabled == null) {
+      throw new IllegalArgumentException("Picture switch intent requires pictureReadingEnabled");
     }
     // settingsMode is server-set only (ignored in POST body).
   }
@@ -101,6 +108,17 @@ public record SettingsV2(
     this(ui, llm, indexPaths, settingsMode, witness, operationKey, state, apiPort,
         restartScheduled, rerankerModelPath, citationScorerModelPath, composition, rerankerEnabled,
         rerankerSwitchIntent, null);
+  }
+
+  /** Compatibility for callers without the picture-reading preference. */
+  public SettingsV2(UiSettingsV2 ui, LlmSettingsV2 llm, List<String> indexPaths, String settingsMode,
+      SettingsWitness witness, String operationKey, String state, Integer apiPort,
+      Boolean restartScheduled, String rerankerModelPath, String citationScorerModelPath,
+      CompositionV2 composition, Boolean rerankerEnabled, Boolean rerankerSwitchIntent,
+      Boolean pauseAnswersWhileIndexing) {
+    this(ui, llm, indexPaths, settingsMode, witness, operationKey, state, apiPort,
+        restartScheduled, rerankerModelPath, citationScorerModelPath, composition, rerankerEnabled,
+        rerankerSwitchIntent, pauseAnswersWhileIndexing, null, null, null);
   }
 
   public static SettingsV2 empty() {

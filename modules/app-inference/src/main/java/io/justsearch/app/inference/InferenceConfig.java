@@ -659,6 +659,18 @@ public record InferenceConfig(
     return directPath;
   }
 
+  /** Applies the effective projector choice to profile and runtime configuration routes too. */
+  public InferenceConfig withPictureReading(ResolvedConfig resolved) {
+    if (mmprojPath == null || pictureReadingEnabled(resolved)) return this;
+    return new InferenceConfig(serverExecutable, modelPath, null, serverPort, contextSize,
+        gpuLayers, vduMode, chatProfileId, chatPromptCacheMiB);
+  }
+
+  public static boolean pictureReadingEnabled(ResolvedConfig resolved) {
+    String selected = resolved.ai().mmprojModel();
+    return selected == null || !"none".equalsIgnoreCase(selected.trim());
+  }
+
   /**
    * Returns a copy of this config with {@code vduMode} set to the given value. All other fields are
    * preserved. Used by the lifecycle manager to toggle between normal and VDU server configurations.

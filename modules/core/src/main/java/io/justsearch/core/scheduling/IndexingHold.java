@@ -92,12 +92,23 @@ public final class IndexingHold {
   }
 
   /** Interruptible wait used by explicitly accepted work; each wake rechecks wall-clock expiry. */
-  public synchronized Lease acquire() throws InterruptedException {
+  public Lease acquire() throws InterruptedException {
+    return acquire(() -> true);
+  }
+
+  /** Returns null if the caller withdraws admission while waiting; policy stays unchanged. */
+  public synchronized Lease acquire(java.util.function.BooleanSupplier admitted) throws InterruptedException {
+    Objects.requireNonNull(admitted, "admitted");
     waiting++;
     try {
-      while (held()) wait(250L);
-      active++;
-      return new Lease();
+      while (admitted.getAsBoolean()) {
+        if (!held()) {
+          active++;
+          return new Lease();
+        }
+        wait(250L);
+      }
+      return null;
     } finally {
       waiting--;
     }

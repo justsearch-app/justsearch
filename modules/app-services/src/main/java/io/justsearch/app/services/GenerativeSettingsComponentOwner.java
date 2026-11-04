@@ -4,6 +4,8 @@ package io.justsearch.app.services;
 import io.justsearch.agent.api.registry.OperationResult;
 import io.justsearch.app.api.ModeTransitionException;
 import io.justsearch.app.api.UiSettings;
+import io.justsearch.app.api.chat.Hold;
+import io.justsearch.app.services.vdu.OfflineCoordinator;
 import io.justsearch.app.api.lifecycle.LifecycleReasonCode;
 import io.justsearch.app.api.settings.SettingsCommitOwner;
 import io.justsearch.app.api.settings.SettingsCandidateContext;
@@ -34,9 +36,16 @@ public final class GenerativeSettingsComponentOwner implements FixedSettingsComp
   private final ComponentHandle observation;
   private final Path baseDir;
   private final boolean liteMode;
+  private final OfflineCoordinator pictures;
 
   public GenerativeSettingsComponentOwner(InferenceLifecycleManager manager, ComponentHandle observation,
       Path baseDir, boolean liteMode) {
+    this(manager, observation, baseDir, liteMode, null);
+  }
+
+  public GenerativeSettingsComponentOwner(InferenceLifecycleManager manager, ComponentHandle observation,
+      Path baseDir, boolean liteMode, OfflineCoordinator pictures) {
+    this.pictures = pictures;
     this.manager = manager;
     this.observation = Objects.requireNonNull(observation, "observation");
     this.baseDir = Objects.requireNonNull(baseDir, "baseDir");
@@ -65,6 +74,49 @@ public final class GenerativeSettingsComponentOwner implements FixedSettingsComp
     Objects.requireNonNull(changedKeys, "changedKeys");
     Objects.requireNonNull(candidateContext, "candidateContext");
 
+    boolean switchingPictures = changedKeys.contains("pictureReadingEnabled");
+    if (switchingPictures) {
+      var override = desired.resolution("justsearch.mmproj.model");
+      if (override != null && override.isResolved() && override.sourceOrdinal() >= 400) {
+        throw refused("PICTURE_READING_OVERRIDDEN",
+            "Text in scans and images is controlled by an operator override; change that override first",
+            Map.of("source", override.sourceName()), null);
+      }
+      if (manager != null && manager.isUsingExternalLlamaServer()) {
+        throw refused("PICTURE_READING_EXTERNAL_SERVER",
+            "Text in scans and images cannot be switched while using a user-run answer server",
+            Map.of(), null);
+      }
+    }
+    Hold fence = switchingPictures && pictures != null ? pictures.fencePictureReading() : null;
+    Hold convergence;
+    try {
+      convergence = switchingPictures && manager != null && manager.chatHolds() != null
+          ? manager.chatHolds().freezeConvergence("picture-reading-settings") : null;
+    } catch (RuntimeException | Error failure) {
+      if (fence != null) fence.close();
+      throw failure;
+    }
+    Hold transition = new Hold() {
+      @Override public String owner() { return "picture-reading-settings"; }
+      @Override public void close() {
+        try { if (convergence != null) convergence.close(); }
+        finally { if (fence != null) fence.close(); }
+      }
+    };
+    try {
+      return prepareCandidate(candidate, desired, changedKeys, candidateContext,
+          switchingPictures, transition);
+    } catch (RuntimeException | Error failure) {
+      try { transition.close(); }
+      catch (RuntimeException | Error cleanup) { failure.addSuppressed(cleanup); }
+      throw failure;
+    }
+  }
+
+  private FixedSettingsComponentComposer.PreparedOwner prepareCandidate(UiSettings candidate,
+      ResolvedConfig desired, Set<String> changedKeys, SettingsCandidateContext candidateContext,
+      boolean switchingPictures, Hold transition) {
     // Capture every candidate input before starting physical work. The nullable UI bit resolves
     // through the same RuntimeSpec projection used by the boot/runtime reconciler.
     boolean chatEnabled = RuntimeSpec.fromSettings(candidate).chatEnabled();
@@ -94,6 +146,10 @@ public final class GenerativeSettingsComponentOwner implements FixedSettingsComp
           inference.contextSize(), inference.gpuLayers(), inference.vduMode(), profile.id(),
           inference.chatPromptCacheMiB());
     }
+    inference = inference.withPictureReading(desired);
+    if (switchingPictures && Boolean.TRUE.equals(candidate.getPictureReadingEnabled())) {
+      requireVerifiedProjector(inference);
+    }
     EngineComponentSnapshot.Component before = observation.snapshot();
     EngineComponentSnapshot.Component nonServingObservation =
         preparedObservation(desired, inference, enabled, false, before);
@@ -106,7 +162,7 @@ public final class GenerativeSettingsComponentOwner implements FixedSettingsComp
             "Managed generative inference was not composed at process boot",
             Map.of("changedKeys", Set.copyOf(changedKeys), "chatEnabled", true), null);
       }
-      return new AbsentPreparedOwner(nonServingObservation);
+      return new AbsentPreparedOwner(nonServingObservation, transition);
     }
 
     ComponentState stagingState = before.state() == ComponentState.READY
@@ -123,10 +179,10 @@ public final class GenerativeSettingsComponentOwner implements FixedSettingsComp
       // of these prebuilt observations after preparation does not allocate or inspect runtime,
       // beyond reading the window the candidate was launched with.
       var prepared = manager.prepareResolvedConfig(inference, desired, enabled,
-          candidateContext.forceGenerativeRefresh());
+          candidateContext.forceGenerativeRefresh() || switchingPictures);
       return new ManagedPreparedOwner(prepared,
           prepared.targetsOnline() ? withWindowNotice(servingObservation) : nonServingObservation,
-          observation, before, staging);
+          observation, before, staging, transition);
     } catch (ModeTransitionException failure) {
       restoreObservation(before, staging);
       throw refused(PREPARATION_REFUSED,
@@ -139,6 +195,36 @@ public final class GenerativeSettingsComponentOwner implements FixedSettingsComp
     } catch (RuntimeException failure) {
       restoreObservation(before, staging);
       throw failure;
+    }
+  }
+
+  private static void requireVerifiedProjector(InferenceConfig inference) {
+    Path projector = inference.mmprojPath();
+    if (projector == null || !Files.isRegularFile(projector)) {
+      throw refused("PICTURE_READING_FILES_MISSING",
+          "Picture reading files are missing. Review Install AI to download them.", Map.of(), null);
+    }
+    var registry = io.justsearch.configuration.model.ModelRegistryLoader
+        .loadFromClasspath("ai/model-registry.v2.json");
+    var companion = registry.packages().stream()
+        .filter(pkg -> pkg.variants().stream().anyMatch(variant ->
+            inference.modelPath().getFileName().toString().equals(variant.filename())))
+        .flatMap(pkg -> pkg.supportingFiles().stream())
+        .filter(file -> projector.getFileName().toString().equals(file.filename()))
+        .findFirst().orElse(null);
+    try {
+      if (companion == null || Files.size(projector) != companion.sizeBytes()
+          || !io.justsearch.app.services.ai.install.DownloadExecutor.sha256(projector)
+              .equalsIgnoreCase(companion.sha256())) {
+        throw refused("PICTURE_READING_FILES_MISMATCHED",
+            "Picture reading files do not match the answer model. Repair AI before switching on.",
+            Map.of(), null);
+      }
+    } catch (SettingsCommitOwner.Refused refusal) { throw refusal; }
+    catch (Exception failure) {
+      throw refused("PICTURE_READING_FILES_UNREADABLE",
+          "Picture reading files could not be verified. Repair AI before switching on.",
+          Map.of(), failure);
     }
   }
 
@@ -217,7 +303,7 @@ public final class GenerativeSettingsComponentOwner implements FixedSettingsComp
     return refusal;
   }
 
-  private record AbsentPreparedOwner(EngineComponentSnapshot.Component observation)
+  private record AbsentPreparedOwner(EngineComponentSnapshot.Component observation, Hold transition)
       implements FixedSettingsComponentComposer.PreparedOwner {
     @Override public void includeObservation(EngineComponentSnapshot.Component unexpected) {
       throw new UnsupportedOperationException("Absent generative owner has no component projection");
@@ -226,8 +312,8 @@ public final class GenerativeSettingsComponentOwner implements FixedSettingsComp
     @Override public void validate() {}
     @Override public void install() {}
     @Override public void notifyObservers() {}
-    @Override public void retire() {}
-    @Override public void abort() {}
+    @Override public void retire() { transition.close(); }
+    @Override public void abort() { transition.close(); }
   }
 
   private record ManagedPreparedOwner(
@@ -235,7 +321,8 @@ public final class GenerativeSettingsComponentOwner implements FixedSettingsComp
       EngineComponentSnapshot.Component observation,
       ComponentHandle handle,
       EngineComponentSnapshot.Component before,
-      EngineComponentSnapshot.Component staging)
+      EngineComponentSnapshot.Component staging,
+      Hold transition)
       implements FixedSettingsComponentComposer.PreparedOwner {
     private ManagedPreparedOwner {
       Objects.requireNonNull(candidate, "candidate");
@@ -267,7 +354,7 @@ public final class GenerativeSettingsComponentOwner implements FixedSettingsComp
         candidate.retireAfterSettingsCommit();
       } catch (ModeTransitionException failure) {
         throw new IllegalStateException("Committed generative candidate retirement failed", failure);
-      }
+      } finally { transition.close(); }
     }
 
     @Override public void abort() {
@@ -279,7 +366,7 @@ public final class GenerativeSettingsComponentOwner implements FixedSettingsComp
         }
       } catch (ModeTransitionException failure) {
         throw new IllegalStateException("Generative candidate rollback failed", failure);
-      }
+      } finally { transition.close(); }
     }
   }
 }

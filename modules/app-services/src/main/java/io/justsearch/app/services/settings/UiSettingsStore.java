@@ -61,7 +61,7 @@ public final class UiSettingsStore {
 
   private static final Logger log = LoggerFactory.getLogger(UiSettingsStore.class);
 
-  public static final int CURRENT_SCHEMA_VERSION = 8;
+  public static final int CURRENT_SCHEMA_VERSION = 9;
 
   /**
    * Versions this build can still read and migrate forward. {@code 0} is the unversioned legacy
@@ -69,7 +69,7 @@ public final class UiSettingsStore {
    * fatal by {@link StoreFormatVersions#requireReadable}, so every schema bump must extend this
    * list or every existing install fails to start.
    */
-  private static final int[] READABLE_LEGACY_VERSIONS = {0, 1, 2, 3, 4, 5, 6, 7};
+  private static final int[] READABLE_LEGACY_VERSIONS = {0, 1, 2, 3, 4, 5, 6, 7, 8};
 
   /**
    * The pre-883 shipped default for {@code contextLength}. Tempdoc 883 made the context window a
@@ -356,6 +356,10 @@ public final class UiSettingsStore {
         }
         witness = new SettingsWitness(revision.longValue(), key.isNull() ? null : key.asText());
       }
+      if (resolvedVersion >= 9
+          && settings.getPictureReadingPreferenceRevision() > witness.acceptedRevision()) {
+        throw new CorruptDurableStoreException("ui-settings", "picture reading preference is ahead of settings revision");
+      }
       if (settings.getRerankerPreferenceRevision() > witness.acceptedRevision()) {
         throw new CorruptDurableStoreException("ui-settings", "reranker preference is ahead of settings revision");
       }
@@ -431,6 +435,10 @@ public final class UiSettingsStore {
    * spelled 0 = auto. Any other positive value is a deliberate operator override and is preserved.
    */
   private static UiSettings migrate(UiSettings settings, int storedVersion) {
+    if (storedVersion < 9) {
+      settings.setPictureReadingEnabled(null);
+      settings.setPictureReadingPreferenceRevision(0);
+    }
     if (storedVersion < 8) settings.setPauseAnswersWhileIndexing(null);
     if (storedVersion < 7) {
       settings.setRerankerEnabled(null);
