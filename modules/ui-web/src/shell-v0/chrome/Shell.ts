@@ -230,6 +230,7 @@ import {
   registerKeybinding as registerKeybindingEntry,
   attachKeybindingDispatcher,
   loadPersistedKeybindings,
+  isMac,
 } from '../commands/KeybindingRegistry.js';
 import { invokeCommand } from '../commands/CommandRegistry.js';
 import { CORE_PROVENANCE } from '../primitives/provenance.js';
@@ -2103,7 +2104,9 @@ export class Shell extends JfElement {
     // lands in a text field (the Search composer takes focus on arrival), where a typing guard used
     // to swallow the Forward that followed. The chord is the app's alone, so nothing under it (a
     // tab row's or an option group's arrow keys) also acts on it.
-    if (e.altKey && !e.ctrlKey && !e.metaKey && !e.shiftKey && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')) {
+    // On macOS Option+Left/Right move the caret by word, so in a text field the chord stays the text's (C8).
+    if (e.altKey && !e.ctrlKey && !e.metaKey && !e.shiftKey && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')
+      && !(isMac() && isTypingTarget(deepActiveElement()))) {
       e.preventDefault();
       e.stopPropagation();
       if (e.key === 'ArrowLeft') this.appBack();

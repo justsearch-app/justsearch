@@ -159,6 +159,23 @@ describe('Shell global chords and their guards (tempdoc 864 Layer 2)', () => {
     expect(press({ key: 'ArrowRight', altKey: true, ctrlKey: true }).defaultPrevented).toBe(false);
   });
 
+  /**
+   * C8 on macOS — Option+Left/Right move the caret by word in a text field, so there the chord is
+   * left to the text; outside a text field it is still Back and Forward.
+   */
+  it('C8 macOS: Option+Left/Right stay word moves in a text field and navigate elsewhere', () => {
+    vi.spyOn(navigator, 'platform', 'get').mockReturnValue('MacIntel');
+    const input = focusInShadow('textarea');
+    expect(press({ key: 'ArrowLeft', altKey: true }).defaultPrevented).toBe(false);
+    expect(press({ key: 'ArrowRight', altKey: true }).defaultPrevented).toBe(false);
+    input.blur();
+    const button = document.createElement('button');
+    button.className = 'probe-host';
+    document.body.appendChild(button);
+    button.focus();
+    expect(press({ key: 'ArrowLeft', altKey: true }).defaultPrevented).toBe(true);
+  });
+
   it('still claims the same chord when focus is on a control the reader does NOT type into', () => {
     focusInShadow('button');
     expect(press({ key: 'ArrowLeft', altKey: true }).defaultPrevented).toBe(true);

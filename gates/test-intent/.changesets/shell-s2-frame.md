@@ -39,6 +39,11 @@ order and words. Settings' remembered section and the navigation journal keep th
 the Settings history entry additionally records the area it opened over (`settingsOver` in the
 entry's history state).
 
+Orchestrator repair on 8a6eb41201 (macOS): Option+Left/Right move the caret by word in a text
+field, so there the app leaves the chord to the text; it fails before on 8a6eb41201
+(`gates/test-intent/evidence/shell-s2-frame-repair-3.json`). The Settings nav anchor for the
+layout's area list reads "Switcher" (backend message `settings.section.rail`).
+
 `Shell.navigation.test.ts` restores the HTML session-history rule for `replaceState` in its own run:
 happy-dom 21 drops the entries after the current one on `replaceState`, which Chromium, WebView2 and
 WebKit do not, and Forward is only testable under the spec's behaviour.
@@ -467,6 +472,17 @@ WebKit do not, and Forward is only testable under the spec's behaviour.
       ],
       "evidence": "gates/test-intent/evidence/shell-s2-frame-repair-2.json",
       "newChecks": ["modules/ui-web/src/shell-v0/chrome/Shell.globalKeys.test.ts#FR3: Alt+Left/Right are claimed in a <select>, a shadow <input> and a <textarea>, and reach nothing under them"]
+    },
+    {
+      "items": ["modules/ui-web/src/shell-v0/chrome/Shell.globalKeys.test.ts"],
+      "class": "New",
+      "repaired": true,
+      "behaviour": "C8 on macOS: Option+Left/Right in a text field stay the text's word moves (not claimed by the app); outside a text field they are still Back and Forward.",
+      "sources": [
+        { "kind": "owner-adopted-scenario", "task": "t-20261103-shell", "scenario": "C8", "quote": "Keyboard ownership: new shortcuts (Ctrl+1/2/3, F6) never fire inside text fields where they would edit text, during IME composition, on key repeat, or under another modal.", "label": "agent-drafted, owner-adopted" }
+      ],
+      "evidence": "gates/test-intent/evidence/shell-s2-frame-repair-3.json",
+      "newChecks": ["modules/ui-web/src/shell-v0/chrome/Shell.globalKeys.test.ts#C8 macOS: Option+Left/Right stay word moves in a text field and navigate elsewhere"]
     },
     {
       "items": ["modules/ui-web/src/shell-v0/chrome/Shell.navigation.test.ts"],
