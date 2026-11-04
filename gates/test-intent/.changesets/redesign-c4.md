@@ -205,3 +205,25 @@ in the acceptance module suite. The shared dev-stack check is reserved for the o
   "note": "Audit (Codex reviewer): entry 1 rejected - committed tests lack a retained earlier-epoch member (walk_seen_epoch < enumeration_epoch) and a same-bytes foreground re-add without a receipt (pending and claimed); entries 2 and 3 accept."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a1a427-0bb8-7af1-a2de-df7863d765b8",
+  "verdict": "accept",
+  "digest": "sha256:ececed93da75d4d7518f05a507821d2ebadc6801c5e865059e52b4e8b4c289ce",
+  "note": "Codex verifier-3 on 086c446c2a: six added cases fail on dfd154ff65 by assertion (revision replaced) and pass after and on 24b3c7f470; 53 selected cases pass; evidence validates; reading-order departure disclosed."
+}
+```
+
+```json
+{
+  "kind": "audit",
+  "role": "reviewer",
+  "session": "01a1a426-e89d-7a03-aa12-c0347c611d21",
+  "verdict": "accept",
+  "digest": "sha256:ececed93da75d4d7518f05a507821d2ebadc6801c5e865059e52b4e8b4c289ce",
+  "note": "Codex audit-2 on 086c446c2a: all three entries accept; no must-fix findings."
+}
+```
