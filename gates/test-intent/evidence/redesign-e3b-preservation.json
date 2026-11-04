@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
   },
-  "createdAt": "2026-11-04T01:30:47.358Z",
-  "revision": "ec31f0861f8e6b1bc5392331eb21a9607c17082e",
-  "tree": "9859cc38e4be14e3e19747076b45487d14af3bcd",
+  "createdAt": "2026-11-04T03:25:16.341Z",
+  "revision": "7cb1b578ace1630cfe4551ab0840aa45e5f35aeb",
+  "tree": "85ffbc9a1aaf57d2bc1192fe22058c3f8ffbf6b9",
   "environment": {
     "platform": "linux",
     "arch": "x64",
@@ -21,13 +21,13 @@
       "command": "./gradlew :modules:adapters-lucene:test --tests \"io.justsearch.adapters.lucene.runtime.SpladePendingSelectionTest.pageAndContentReadCountsStayBoundedAsBacklogGrows\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 4446
+      "durationMs": 4427
     },
     {
       "command": "./gradlew :modules:worker-services:test --tests \"io.justsearch.indexerworker.loop.ops.EnrichmentPreservationTest.oversizedRetainedParentStillAllowsPendingChunkToAdvanceWithinThreeCycles\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 3839
+      "durationMs": 3544
     }
   ],
   "checks": [
@@ -35,7 +35,7 @@
       "id": "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/SpladePendingSelectionTest.java#pageAndContentReadCountsStayBoundedAsBacklogGrows",
       "file": "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/SpladePendingSelectionTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:2937db1652144fc719d98bb0a3b2b873e096c28ce0192698d63658c2cc06a21e",
+      "contentDigest": "sha256:6a86d11c745684695fab2bb4f0b1826def34d4b7070032c2553bdf20ffdbb33c",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -67,5 +67,5 @@
     }
   ],
   "failBefore": null,
-  "digest": "sha256:750f25c14f990d0f6fc32589828037653bbfadbe116e0ba4f1081edca26d1a3b"
+  "digest": "sha256:079daa9d1523fba2beb5fb7c6e832ee0fcc4f425171a7ae4f87416152b08e257"
 }
