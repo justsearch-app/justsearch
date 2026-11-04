@@ -288,3 +288,14 @@ tracing supplies document identity. No shared dev stack is started by this candi
   "note": "Codex verifier-1 on 8e7f97e5cd: entries 1,3,4,5,6 accept; entry 2 (BackfillResourceAdmissionTest) reject: leaves OperationalMetrics singleton changed (backfillMode idle->individual, completions {}->{embed=1}), no after-test restoration. Separate product failure: cancelled SPLADE error fallback drops the completed 64-row prefix."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a1a5dd-cdd6-7481-a92a-43757d756be8",
+  "verdict": "accept",
+  "digest": "sha256:571509ea4457e31e137220118589659873077c79e83487fe89d1b7674d74d62c",
+  "note": "Codex verifier-2 on a06c2bf951: entries 1-5 New accept, 6 Adaptation accept. 100 repair cases fail before by assertion and pass after; 687 preservation pass both; 137-execution fixture audit found no singleton-state leaks. Failed-native-call timing named unverified; real-app pause check left to the orchestrator."
+}
+```
