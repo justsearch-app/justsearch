@@ -28,6 +28,9 @@ public interface JobQueue extends Closeable {
     throw new UnsupportedOperationException("Source origin persistence is unavailable");
   }
 
+  /** Existing durable declaration for this admission; absence never creates approval evidence. */
+  default Optional<String> sourceOriginId(IndexJob claim) { return Optional.empty(); }
+
   /** Declared ownership for hintless maintenance admissions; recorded plans remain authoritative. */
   default void useDeclaredCollectionRoots(
       java.util.function.Supplier<List<io.justsearch.app.api.knowledge.IngestCollectionPolicy.RootBinding>> roots) {}

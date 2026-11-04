@@ -594,6 +594,19 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
     }
   }
 
+  @Override
+  public java.util.Optional<String> sourceOriginId(IndexJob claim) {
+    lockTimed();
+    try {
+      ensureOpen();
+      return SqliteSourceOrigins.find(connection, claim);
+    } catch (SQLException failure) {
+      throw new IllegalStateException("Source origin lookup is unavailable", failure);
+    } finally {
+      unlockAfterChanges();
+    }
+  }
+
   private final Path dbPath;
   @Override
   public void recordSourceOrigins(List<io.justsearch.app.api.indexing.SourceOrigin> origins) {
