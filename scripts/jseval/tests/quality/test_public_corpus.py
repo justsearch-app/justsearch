@@ -163,6 +163,23 @@ def test_http_honours_robots_and_rate_limits(corpus, monkeypatch):
     assert error.value.code == 429
 
 
+@pytest.mark.parametrize('extension', ['Crawl-delay: 1', 'Request-rate: 1/10'])
+def test_http_robots_extensions_do_not_split_access_group(corpus, monkeypatch, extension):
+    from urllib.response import addinfourl
+    calls = []
+    text = ('User-agent: JustSearch-quality-corpus\n' + extension + '\n'
+            'User-agent: OtherBot\nDisallow: /private\n')
+    def open_request(request, **_):
+        calls.append(request.full_url)
+        data = text.encode() if request.full_url.endswith('robots.txt') else b'OK'
+        return addinfourl(io.BytesIO(data), {}, request.full_url, 200)
+    monkeypatch.setattr(corpus, '_document_open', open_request)
+    monkeypatch.setattr(corpus.time, 'sleep', lambda _: None)
+    with pytest.raises(collections.CollectionError, match='robots.txt forbids'):
+        corpus.PublicHTTP().open('https://example.org/private/file')
+    assert calls == ['https://example.org/robots.txt']
+
+
 def test_redirect_checks_target_policy_before_request(corpus, monkeypatch):
     from urllib.response import addinfourl
     requests = []
@@ -273,6 +290,12 @@ def test_robots_agent_groups(corpus, text, path, allowed):
     ('Crawl-delay: 20\nUser-agent: JustSearch-quality-corpus\nCrawl-delay: 2', 2),
     ('Crawl-delay: 20\nUser-agent: JustSearch-quality-corpus\nCrawl-delay: 2\n'
      'User-agent: JustSearch-quality-corpus\nRequest-rate: 1/6', 6),
+    ('Allow: /\nUser-agent: JustSearch\nCrawl-delay: 8', 8),
+    ('Allow: /\nUser-agent: quality-corpus\nRequest-rate: 1/10', 10),
+    ('Allow: /\nUser-agent: JUSTSEARCH\nCrawl-delay: 8\nRequest-rate: 1/10', 10),
+    ('Allow: /\nUser-agent: JustSearch\nCrawl-delay: 12\nDisallow: /private\n'
+     'User-agent: JustSearch-quality-corpus\nCrawl-delay: 2', 12),
+    ('Allow: /\nUser-agent: OtherJustSearch\nCrawl-delay: 8\nRequest-rate: 1/10', .25),
 ])
 def test_http_robots_pacing_and_timeouts(corpus, monkeypatch, directives, delay):
     from urllib.response import addinfourl

@@ -69,8 +69,9 @@ class _RobotsPolicy:
     only when there is no explicit product-token group (§2.2.1).
     """
     def __init__(self, lines):
-        groups = []
-        agents, rules, delays = [], [], []
+        groups, pacing_groups = [], []
+        agents, rules, pacing_agents, delays = [], [], [], []
+        has_rules = False
         has_directive = False
         for line in lines:
             field, sep, value = line.lstrip('\ufeff').split('#', 1)[0].partition(':')
@@ -78,14 +79,22 @@ class _RobotsPolicy:
                 continue
             field, value = field.strip().lower(), value.strip()
             if field == 'user-agent':
+                if has_rules:
+                    groups.append((agents, rules))
+                    agents, rules = [], []
+                    has_rules = False
                 if has_directive:
-                    groups.append((agents, rules, delays))
-                    agents, rules, delays = [], [], []
+                    pacing_groups.append((pacing_agents, delays))
+                    pacing_agents, delays = [], []
                     has_directive = False
                 if value:
                     agents.append(value.lower())
+                    pacing_agents.append(value.lower())
             elif agents and field in ('allow', 'disallow', 'crawl-delay', 'request-rate'):
                 has_directive = True
+                # RFC 9309 extensions must not split access-rule groups.
+                if field in ('allow', 'disallow'):
+                    has_rules = True
                 if field in ('allow', 'disallow') and value:
                     terminal = value.endswith('$')
                     pattern = value[:-1] if terminal else value
@@ -97,13 +106,19 @@ class _RobotsPolicy:
                     requests, seconds = map(int, value.split('/'))
                     if requests:
                         delays.append(seconds / requests)
-        groups.append((agents, rules, delays))
+        groups.append((agents, rules))
+        pacing_groups.append((pacing_agents, delays))
         token = USER_AGENT.split('/', 1)[0].lower()
         selected = [g for g in groups if token in g[0]]
         if not selected:
             selected = [g for g in groups if '*' in g[0]]
-        self.rules = [rule for _, rules, _ in selected for rule in rules]
-        self.delay = max((delay for _, _, delays in selected for delay in delays), default=0)
+        self.rules = [rule for _, rules in selected for rule in rules]
+        # Keep the pre-RFC pacing minimum for substring-matching agents,
+        # independently of the exact product-token selection for access rules.
+        paced = [g for g in pacing_groups if any(agent in token for agent in g[0])]
+        if not paced:
+            paced = [g for g in pacing_groups if '*' in g[0]]
+        self.delay = max((delay for _, delays in paced for delay in delays), default=0)
 
 
 def _robots_match(pattern: str, terminal: bool, path: str) -> bool:
