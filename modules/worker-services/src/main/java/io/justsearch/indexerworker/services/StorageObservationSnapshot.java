@@ -19,11 +19,9 @@ public final class StorageObservationSnapshot {
   }
 
   private final Evidence evidence;
-  private final List<LinuxRootIdentityLease.Mount> mounts;
-  private final Map<LinuxRootIdentityLease.Mount, String> keys;
+  private List<LinuxRootIdentityLease.Mount> mounts;
+  private Map<LinuxRootIdentityLease.Mount, String> keys;
   private final boolean observed;
-  private boolean validated;
-  private boolean current;
 
   private StorageObservationSnapshot(Evidence evidence, List<LinuxRootIdentityLease.Mount> mounts,
       Map<LinuxRootIdentityLease.Mount, String> keys, boolean observed) {
@@ -55,7 +53,15 @@ public final class StorageObservationSnapshot {
 
   static StorageObservationSnapshot linux(Evidence evidence) {
     try {
-      var mounts = List.copyOf(LinuxRootIdentityLease.parseMounts(evidence.mountInfo()));
+      return linux(evidence, List.copyOf(LinuxRootIdentityLease.parseMounts(evidence.mountInfo())));
+    } catch (IOException | IllegalArgumentException | SecurityException unavailable) {
+      return new StorageObservationSnapshot(evidence, List.of(), Map.of(), true);
+    }
+  }
+
+  private static StorageObservationSnapshot linux(
+      Evidence evidence, List<LinuxRootIdentityLease.Mount> mounts) {
+    try {
       for (var mount : mounts) {
         if (!mount.point().normalize().equals(mount.point())) {
           throw new IOException("Noncanonical Linux mount point");
@@ -79,26 +85,30 @@ public final class StorageObservationSnapshot {
       }
       return new StorageObservationSnapshot(evidence, mounts, Map.copyOf(keys), true);
     } catch (IOException | IllegalArgumentException | SecurityException unavailable) {
-      return new StorageObservationSnapshot(null, List.of(), Map.of(), true);
+      return new StorageObservationSnapshot(evidence, mounts, Map.of(), true);
     }
   }
 
-  /** Once at the publication boundary, after extraction/embedding; a changed topology is unknown. */
+  /** Compare once per source; reuse UUID/device evidence until the mount topology changes. */
   public void validateForPublication() {
-    if (validated) return;
-    validated = true;
     if (evidence == null) return;
+    StorageObservationSnapshot refreshed;
     try {
-      current = mounts.equals(LinuxRootIdentityLease.parseMounts(evidence.mountInfo()));
+      var latest = List.copyOf(LinuxRootIdentityLease.parseMounts(evidence.mountInfo()));
+      if (mounts.equals(latest)) return;
+      refreshed = linux(evidence, latest);
     } catch (IOException | IllegalArgumentException | SecurityException unavailable) {
-      current = false;
+      // Retry observation once; its failure yields unknown rather than stale evidence.
+      refreshed = linux(evidence);
     }
+    mounts = refreshed.mounts;
+    keys = refreshed.keys;
   }
 
   public SourceEnvelope envelope(Path source, String originId) {
     validateForPublication();
     if (!observed) return new SourceEnvelope(originId, StorageStatus.NOT_OBSERVED, null, null);
-    var mount = current ? LinuxRootIdentityLease.selectMount(mounts, source.toAbsolutePath().normalize()) : null;
+    var mount = LinuxRootIdentityLease.selectMount(mounts, source.toAbsolutePath().normalize());
     String key = mount == null ? null : keys.get(mount);
     return key == null ? new SourceEnvelope(originId, StorageStatus.UNKNOWN, null, null)
         : new SourceEnvelope(originId, StorageStatus.KNOWN, mount.point().toString(), key);

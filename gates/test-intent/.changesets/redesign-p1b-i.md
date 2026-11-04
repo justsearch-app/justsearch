@@ -12,9 +12,13 @@ precedence, moves and source-wide convergence remain P1b-ii. Help files, agent h
 and pre-upgrade roots carry no origin_id until P3. No new origin records are fabricated.
 
 Linux fixtures control mountinfo, UUID inventories and source-device resolution. The snapshot
-is captured lazily at the first publication and validated once before use. Every publication
-in that batch uses the same immutable evidence; a detected topology change invalidates the
-batch's storage evidence. No per-source filesystem calls or directory leases are added.
+is captured lazily at the first publication and compared with the mount table immediately before
+each source's writes. Changed or unreadable topology triggers one re-observation; failed evidence
+is unknown. Parent, active lexical projection and chunks of one source use the same envelope.
+With unchanged topology, UUID inventory and device resolution are independent of source count;
+mount reads are bounded by capture plus one comparison per source. No per-source lease or
+directory observation is added. A topology change between that comparison and the same thread's
+Lucene write remains undetectable without a kernel mount lock; the next admission re-observes.
 Windows/macOS dispatch is not_observed; actual Windows execution requires CI.
 
 Independent execution evidence and acceptance are intentionally not written by this builder.
@@ -67,10 +71,11 @@ production APIs as assertion failures on P1a; publication assertions also inspec
     },
     {
       "items": [
-        "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/StorageObservationSnapshotTest.java"
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/StorageObservationSnapshotTest.java",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/SourceStoragePublicationTest.java"
       ],
       "class": "New",
-      "behaviour": "P1b-5/6: controlled mountinfo and UUID inventories yield effective mount plus UUID:type:filesystem-root identity, distinguishing bind roots. Missing, ambiguous, malformed or unreadable evidence yields unknown and never ancestor storage. One batch takes two mount-table reads (snapshot and publication validation), one UUID inventory, and one block-device lookup per mount, regardless of source count. Detected topology changes make the batch unknown. Portable observation produces not_observed.",
+      "behaviour": "P1b-5/6: controlled mountinfo and UUID inventories yield effective mount plus UUID:type:filesystem-root identity, distinguishing bind roots. Missing, ambiguous, malformed or unreadable evidence yields unknown and never ancestor storage. UUID inventory and device resolution do not grow with source count while topology is unchanged; mount reads are bounded by batch capture plus one comparison per source, with no per-source identity lease or directory observation. Mount replacement, removal, unreadability and failed UUID re-observation before the first source and between sources commit refreshed evidence or unknown, never stale known. Real JobBatchWriter publication checks inspect committed target/active parents and every chunk, requiring one coherent envelope per source, including later sources after re-observation. Portable observation produces not_observed.",
       "sources": [
         {
           "kind": "owner-words",
@@ -79,8 +84,8 @@ production APIs as assertion failures on P1a; publication assertions also inspec
         },
         {
           "kind": "owner-words",
-          "location": "task redesign-p1b-i request",
-          "quote": "P1b-6 One snapshot per batch: mount-table reads for a batch of one file and of many files are equal; no per-source lease or UUID discovery; a topology change between observation and publication yields refreshed coherent evidence or unknown, never stale known."
+          "location": "task redesign-p1b-i request, Decision: freshness at each source's publication",
+          "quote": "Immediately before each source's writes (parent, active lexical projection, chunks), re-read the mount table once and compare it with the batch snapshot. Unchanged: use the snapshot. Changed or unreadable: re-observe once (a fresh snapshot, including the UUID inventory) and use it for this and the later sources of the batch; if re-observation fails, unknown. Every write of one source uses the same envelope."
         },
         {
           "kind": "owner-words",
@@ -88,14 +93,16 @@ production APIs as assertion failures on P1a; publication assertions also inspec
           "quote": "Windows and macOS = not_observed"
         }
       ],
-      "evidence": "gates/test-intent/evidence/redesign-p1b-i.json",
+      "evidence": "gates/test-intent/evidence/redesign-p1b-i-storage-repair.json",
       "newChecks": [
         "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/StorageObservationSnapshotTest.java#effectiveMountAndBindSubtreesHaveIndependentKeys",
         "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/StorageObservationSnapshotTest.java#uncertainEffectiveMountNeverFallsBackToAncestor",
-        "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/StorageObservationSnapshotTest.java#mountReadsAndUuidDiscoveryAreConstantForTheWholeBatch",
-        "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/StorageObservationSnapshotTest.java#changedOrUnreadableTopologyBeforePublicationCannotPublishStaleKnown",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/StorageObservationSnapshotTest.java#uuidAndDeviceDiscoveryDoNotGrowWithUnchangedSourceCount",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/StorageObservationSnapshotTest.java#changedOrUnreadableTopologyBeforeAndBetweenSourcesCannotReturnStaleKnown",
         "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/StorageObservationSnapshotTest.java#ambiguousAndMalformedUuidAliasesCannotIdentifyADevice",
-        "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/StorageObservationSnapshotTest.java#nonLinuxObservationDoesNotInventStorage"
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/StorageObservationSnapshotTest.java#nonLinuxObservationDoesNotInventStorage",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/SourceStoragePublicationTest.java#topologyChangesNeverCommitStaleKnownStorage",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/SourceStoragePublicationTest.java#unchangedTopologyKeepsDiscoveryIndependentOfSourceCount"
       ],
       "repaired": true
     },
@@ -124,14 +131,18 @@ production APIs as assertion failures on P1a; publication assertions also inspec
 
 ## Verification commands
 
-Run serially through js-gradle-slot. The evidence runner handles its own before-state checkout;
-the builder's manual before experiment uses a shared clone in $TMPDIR/before, with its own build folders.
+Run serially through js-gradle-slot. Manual before experiments use shared clones under $TMPDIR,
+with separate build folders. Run the evidence command from a temporary shared candidate clone
+with the candidate's changed files copied in: its internal before checkout then writes only that
+temporary clone's Git metadata, leaving the source repository untouched. Copy the produced
+evidence back. The new storage entry uses the new evidence file; accepted entries 1 and 3 retain
+their original evidence.
 
 Repair evidence (every selected method must fail by assertion before, and pass after):
 
 ```bash
 env -u DISPLAY -u WAYLAND_DISPLAY js-gradle-slot node scripts/governance/gates/test-intent/run-evidence.mjs \
-  --out gates/test-intent/evidence/redesign-p1b-i.json \
+  --out gates/test-intent/evidence/redesign-p1b-i-storage-repair.json \
   --before a07eb770d626ed707748b9ce0d42ddda29816290 \
   --check modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/SourceEnvelopePublicationTest.java#normalPublicationCarriesEnvelopeToTargetActiveAndEveryChunk \
   --check modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/SourceEnvelopePublicationTest.java#regeneratedChunksCopyTheExistingParentsCompleteEnvelope \
@@ -141,12 +152,19 @@ env -u DISPLAY -u WAYLAND_DISPLAY js-gradle-slot node scripts/governance/gates/t
   --check modules/indexing/src/test/java/io/justsearch/indexing/SourceEnvelopeUnknownOriginTest.java#versionedEnvelopeWithoutOriginIsUnknownOriginRatherThanLegacy \
   --check modules/worker-services/src/test/java/io/justsearch/indexerworker/services/StorageObservationSnapshotTest.java#effectiveMountAndBindSubtreesHaveIndependentKeys \
   --check modules/worker-services/src/test/java/io/justsearch/indexerworker/services/StorageObservationSnapshotTest.java#uncertainEffectiveMountNeverFallsBackToAncestor \
-  --check modules/worker-services/src/test/java/io/justsearch/indexerworker/services/StorageObservationSnapshotTest.java#mountReadsAndUuidDiscoveryAreConstantForTheWholeBatch \
-  --check modules/worker-services/src/test/java/io/justsearch/indexerworker/services/StorageObservationSnapshotTest.java#changedOrUnreadableTopologyBeforePublicationCannotPublishStaleKnown \
+  --check modules/worker-services/src/test/java/io/justsearch/indexerworker/services/StorageObservationSnapshotTest.java#uuidAndDeviceDiscoveryDoNotGrowWithUnchangedSourceCount \
+  --check modules/worker-services/src/test/java/io/justsearch/indexerworker/services/StorageObservationSnapshotTest.java#changedOrUnreadableTopologyBeforeAndBetweenSourcesCannotReturnStaleKnown \
   --check modules/worker-services/src/test/java/io/justsearch/indexerworker/services/StorageObservationSnapshotTest.java#ambiguousAndMalformedUuidAliasesCannotIdentifyADevice \
   --check modules/worker-services/src/test/java/io/justsearch/indexerworker/services/StorageObservationSnapshotTest.java#nonLinuxObservationDoesNotInventStorage \
+  --check modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/SourceStoragePublicationTest.java#topologyChangesNeverCommitStaleKnownStorage \
+  --check modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/SourceStoragePublicationTest.java#unchangedTopologyKeepsDiscoveryIndependentOfSourceCount \
   --check modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/SourceEnvelopePreservationTest.java#malformedEnvelopeNeverDecodesKnown
 ```
+
+The added topology check was also overlaid onto pre-repair HEAD 68ed4f26b1 in the manual
+shared before clone. Its four between-source variants fail the stale-known assertion; its four
+before-first-source variants pass. The repair evidence command above uses the P1a base, where
+committed rows lack the envelope and fail that assertion instead.
 
 Preservation evidence (run the same selected checks in the before clone and candidate; the
 runner's --before mode requires failures, so the preservation evidence command has no --before):
@@ -163,12 +181,23 @@ env -u DISPLAY -u WAYLAND_DISPLAY js-gradle-slot node scripts/governance/gates/t
   --check modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/SourceWitnessCertificationTest.java#unmodifiedShortcutReadsContentOnlyOnce
 ```
 
+Required broader checks (one invocation at a time, in the background):
+
+```bash
+env -u DISPLAY -u WAYLAND_DISPLAY js-gradle-slot ./gradlew \
+  :modules:indexing:test :modules:worker-core:test :modules:indexer-worker:test \
+  :modules:worker-services:test :modules:adapters-lucene:test :modules:app-engine:test \
+  -PskipWebBuild=true --continue --console=plain
+node scripts/dev/java-prepush.mjs --unreferenced
+```
+
 The selected chunk checks cover exact content/offsets, split boundaries, declarations and lexical
 preservation. The broader before-clone and module runs also execute the chunk collection-inheritance
 and SPLADE checks; their custom display names are unsuitable for evidence-runner method identifiers. The catalog preservation check covers stored text, lexical postings,
 collection scope and enrichment/RMW/reopen. The compatibility check exercises a populated index,
 fixed query results and fingerprint commit ordering. The shortcut check counts per-source content
-reads; the observation fixture counts batch-only mount/UUID/source-device discovery.
+reads; storage checks compare UUID/device discovery for one and many sources, bound mount
+reads, and forbid per-source identity leases and directory observation.
 The orchestrator owns dev-stack publication/restart and isolated bind-mount checks.
 
 ## Acceptance records

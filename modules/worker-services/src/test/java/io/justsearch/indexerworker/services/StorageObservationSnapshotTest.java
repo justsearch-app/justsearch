@@ -51,30 +51,54 @@ final class StorageObservationSnapshotTest {
     assertNull(observed.storageKey());
   }
 
-  @ParameterizedTest(name = "{displayName} [{index}] {arguments}")
-  @ValueSource(ints = {1, 100})
-  void mountReadsAndUuidDiscoveryAreConstantForTheWholeBatch(int files) {
+  @Test
+  void uuidAndDeviceDiscoveryDoNotGrowWithUnchangedSourceCount() {
+    var one = observeSources(1);
+    var many = observeSources(100);
+    assertEquals(one.uuidReads.get(), many.uuidReads.get(), "UUID discovery is independent of source count");
+    assertEquals(one.sourceReads.get(), many.sourceReads.get(), "device resolution is independent of source count");
+  }
+
+  private static Fixture observeSources(int files) {
     var fixture = new Fixture(List.of(ROOT, DISK));
     Object snapshot = fixture.capture();
-    for (int i = 0; i < files; i++) {
-      assertEquals(StorageStatus.KNOWN, envelope(snapshot, "/media/disk/file" + i).storageStatus());
+    try (var roots = org.mockito.Mockito.mockStatic(RootIdentity.class, org.mockito.Mockito.CALLS_REAL_METHODS);
+        var directories = org.mockito.Mockito.mockStatic(java.nio.file.Files.class)) {
+      for (int i = 0; i < files; i++) {
+        assertEquals(StorageStatus.KNOWN, envelope(snapshot, "/media/disk/file" + i).storageStatus());
+      }
+      roots.verify(() -> RootIdentity.capture(org.mockito.ArgumentMatchers.any(Path.class)),
+          org.mockito.Mockito.never());
+      roots.verify(() -> RootIdentity.hold(org.mockito.ArgumentMatchers.any(Path.class)),
+          org.mockito.Mockito.never());
+      directories.verifyNoInteractions(); // No directory observation or UUID-directory discovery.
     }
-    assertEquals(2, fixture.mountReads.get(), "one snapshot bracketed by one publication validation");
-    assertEquals(1, fixture.uuidReads.get(), "UUID discovery belongs to the batch");
-    assertEquals(2, fixture.sourceReads.get(), "block-device lookup is once per mount, never per source");
+    assertTrue(fixture.mountReads.get() <= files + 1, "at most capture plus one comparison per source");
+    return fixture;
   }
 
   @Test
-  void changedOrUnreadableTopologyBeforePublicationCannotPublishStaleKnown() {
+  void changedOrUnreadableTopologyBeforeAndBetweenSourcesCannotReturnStaleKnown() {
     for (boolean unreadable : List.of(false, true)) {
-      var fixture = new Fixture(List.of(ROOT, DISK));
-      Object snapshot = fixture.capture();
-      fixture.lines = List.of(ROOT, "3 1 8:3 / /media/disk rw - ext4 /dev/disk3 rw");
-      fixture.mountFailure = unreadable;
-      assertEquals(StorageStatus.UNKNOWN, envelope(snapshot, "/media/disk/file").storageStatus());
-      assertEquals(StorageStatus.UNKNOWN, envelope(snapshot, "/other/file").storageStatus());
-      assertEquals(2, fixture.mountReads.get());
-      assertEquals(1, fixture.uuidReads.get());
+      for (boolean afterFirstSource : List.of(false, true)) {
+        var fixture = new Fixture(List.of(ROOT, DISK));
+        Object snapshot = fixture.capture();
+        if (afterFirstSource) assertEquals("bbbb-2222:ext4:/", envelope(snapshot, "/media/disk/first").storageKey());
+        fixture.lines = List.of(ROOT, "3 1 8:3 / /media/disk rw - ext4 /dev/disk3 rw");
+        fixture.uuids = Map.of("8:1", "aaaa-1111", "8:3", "cccc-3333");
+        fixture.mountFailure = unreadable;
+        var observed = envelope(snapshot, "/media/disk/later");
+        assertFalse(observed.storageStatus() == StorageStatus.KNOWN
+            && "bbbb-2222:ext4:/".equals(observed.storageKey()), "never reuse the removed mount's storage");
+        if (unreadable || observed.storageStatus() == StorageStatus.UNKNOWN) {
+          assertEquals(StorageStatus.UNKNOWN, observed.storageStatus());
+          assertNull(observed.storageKey());
+          assertNull(observed.storageMount());
+        } else {
+          assertEquals("cccc-3333:ext4:/", observed.storageKey());
+          assertEquals("/media/disk", observed.storageMount());
+        }
+      }
     }
   }
 
