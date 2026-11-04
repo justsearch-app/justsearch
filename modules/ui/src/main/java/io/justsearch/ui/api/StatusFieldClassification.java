@@ -109,6 +109,7 @@ final class StatusFieldClassification {
           "watched roots, indexed or never, walk errors and completion, collections,"
               + " delete-detection marks (not timestamps or prune counts)"),
       Map.entry("BulkWorkGate", "bulk work mode and reasons"),
+      Map.entry("HeavyIndexingState", "heavy indexing backlog threshold state"),
       Map.entry("StatusPublicationBackstop",
           "STATE fields of canonical status, per this classification"));
 

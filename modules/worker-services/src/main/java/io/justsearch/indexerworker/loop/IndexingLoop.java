@@ -106,6 +106,7 @@ public class IndexingLoop implements Closeable {
   // Tempdoc 516 Slice 4d (W6): backfill batch-size constants moved to BackfillScheduler.
 
   private final JobQueue jobQueue;
+  private final HeavyIndexingState heavyIndexing = new HeavyIndexingState();
   private final CommitOps commitOps;
   /** The active generation's lexical projection; Green remains the only queue producer. */
   private final AtomicReference<RunningRuntime> activeLexicalSource = new AtomicReference<>();
@@ -199,7 +200,7 @@ public class IndexingLoop implements Closeable {
   private final CountDownLatch activationGate = new CountDownLatch(1);
   private final Object probePublicationMonitor = new Object();
   private final Object cutoverPauseMonitor = new Object();
-  private boolean cutoverPauseRequested;
+  private volatile boolean cutoverPauseRequested;
   private boolean cutoverPaused;
   private long indexedSinceCommit = 0;
   private long lastCommitTime = System.currentTimeMillis();
@@ -748,6 +749,7 @@ public class IndexingLoop implements Closeable {
     try {
     while (running.get() && !Thread.currentThread().isInterrupted()) {
       try {
+        heavyIndexing();
         if (lease != null && hold.held()) {
           // Retain ownership across batches: buffered writes must be published before quiet.
           if (!finishIdleCommit()) {
@@ -932,6 +934,7 @@ public class IndexingLoop implements Closeable {
     }
 
     } finally {
+      heavyIndexing.update(false, 0, 0);
       try { finalizeShutdownCommit(); }
       finally { if (lease != null) lease.close(); }
     }
@@ -1027,6 +1030,7 @@ public class IndexingLoop implements Closeable {
 
   private boolean pauseForServiceOutage(long deadline) {
     serviceOutagePausedUntilMs = deadline;
+    heavyIndexing.update(false, 0, 0);
     try {
       return sleepAfterError(Math.max(0, deadline - System.currentTimeMillis()));
     } finally {
@@ -1297,6 +1301,24 @@ public class IndexingLoop implements Closeable {
   // Tempdoc 516 Slice 4a.2 (W5.1): indexChunks delegate inlined into JobBatchWriter (single
   // caller).
 
+  /** Live owner read: no window, cached queue response or retained successor can hold this on. */
+  public boolean heavyIndexing() {
+    boolean processing = isRunning() && !cutoverPauseRequested
+        && serviceOutagePausedUntilMs() == 0 && !signalBus.isIndexingHeld()
+        && !signalBus.isEnergyReduced() && !signalBus.isBulkHeld();
+    if (!processing) return heavyIndexing.update(false, 0, 0);
+    try {
+      var counts = jobQueue.jobStateCounts();
+      return heavyIndexing.update(true, counts.pendingReadyCount() + counts.processingCount(),
+          backfillScheduler.pendingEmbeddingDocuments());
+    } catch (IOException | RuntimeException failure) {
+      // An unavailable index is not running heavy work. Never retain an old automatic pause.
+      heavyIndexing.update(false, 0, 0);
+      log.debug("Heavy indexing could not be sampled", failure);
+      return false;
+    }
+  }
+
   /**
    * Checks if the indexing loop is running.
    *
@@ -1325,6 +1347,7 @@ public class IndexingLoop implements Closeable {
     synchronized (cutoverPauseMonitor) {
       if (!isRunning()) return loopThread == null || !loopThread.isAlive();
       cutoverPauseRequested = true;
+      heavyIndexing.update(false, 0, 0);
       cutoverPauseMonitor.notifyAll();
       while (!cutoverPaused && isRunning()) {
         long remaining = deadline - System.nanoTime();

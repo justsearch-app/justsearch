@@ -266,6 +266,9 @@ final class AgentLlmCaller {
       } catch (java.util.concurrent.CancellationException cancelled) {
         throw cancelled;
       } catch (RuntimeException e) {
+        if (io.justsearch.app.api.chat.AnswersPausedException.causedByPause(e)) {
+          throw new io.justsearch.app.api.chat.AnswersPausedException();
+        }
         llmAttempt++;
         if (llmAttempt > llmDecision.maxRetries()) {
           agentTelemetry.recordRetryExhausted(AgentErrorCode.LLM_TRANSIENT);
@@ -477,6 +480,9 @@ final class AgentLlmCaller {
       }
 
       if (errorHolder.getNow(null) != null) {
+        if (io.justsearch.app.api.chat.AnswersPausedException.causedByPause(errorHolder.getNow(null))) {
+          throw new io.justsearch.app.api.chat.AnswersPausedException();
+        }
         if (errorHolder.getNow(null) instanceof java.util.concurrent.CancellationException cancelled) throw cancelled;
         throw new RuntimeException("LLM call failed", errorHolder.getNow(null));
       }

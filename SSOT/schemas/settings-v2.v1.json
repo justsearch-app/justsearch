@@ -57,6 +57,9 @@
         }
       }
     },
+    "pauseAnswersWhileIndexing" : {
+      "type" : [ "boolean", "null" ]
+    },
     "operationKey" : {
       "type" : [ "string", "null" ]
     },

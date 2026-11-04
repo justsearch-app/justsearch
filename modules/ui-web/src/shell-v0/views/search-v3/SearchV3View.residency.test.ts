@@ -93,6 +93,23 @@ afterEach(() => {
   resetSearchState(); __resetAiStateForTest(); vi.unstubAllGlobals(); vi.restoreAllMocks();
 });
 describe('NR15 human admission and RR15 refusal recovery', () => {
+  it('keeps an indexing-paused question and a newer draft across same-tab reload', async () => {
+    http.mockImplementation(async (url: unknown) => String(url).includes('/dispatch')
+      ? new Response(JSON.stringify({ errorCode: 'CHAT_UNAVAILABLE', reason: 'INDEXING',
+        error: 'Answers paused while indexing', forceAllowed: false }), { status: 503 })
+      : new Response('{}'));
+    const el = await mount(); await send(el, 'paused question');
+    expect(el.shadowRoot!.textContent).toContain('Answers paused while indexing');
+    expect(el.shadowRoot!.textContent).toContain('paused question');
+    expect(dispatches()).toHaveLength(1); expect(loads()).toHaveLength(0);
+    expect(action(el, 'sv3-residency-force')).toBeNull();
+    await type(el, 'newer draft'); el.remove();
+    const restored = await mount();
+    expect(field(restored).value).toBe('newer draft');
+    expect(restored.shadowRoot!.textContent).toContain('paused question');
+    expect(dispatches()).toHaveLength(1);
+  });
+
   it('marks explicit human Send and removes an unaccepted optimistic answer', async () => {
     const el = await mount(); await send(el, '  original A  ');
     expect(body().allowLoad).toBe(true);

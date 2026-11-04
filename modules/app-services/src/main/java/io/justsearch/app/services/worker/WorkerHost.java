@@ -26,6 +26,8 @@ public interface WorkerHost extends Closeable {
   default io.justsearch.core.scheduling.IndexingHold indexingHold() { return null; }
 
 
+  default boolean heavyIndexing() { return false; }
+
   /** Exact physical serving view retained by an operation after publication capture. */
   interface ServingLease extends AutoCloseable {
     <T> T withClient(KnowledgeClient client,

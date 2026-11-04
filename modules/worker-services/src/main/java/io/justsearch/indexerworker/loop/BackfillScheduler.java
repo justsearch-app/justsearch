@@ -232,6 +232,12 @@ public final class BackfillScheduler {
     return new StageAvailability(embedding, sparse, ner);
   }
 
+  /** Pending meaning documents, read from the same index the backfill runner owns. */
+  long pendingEmbeddingDocuments() throws java.io.IOException {
+    return indexCountOps.countByFieldOrThrow(
+        SchemaFields.EMBEDDING_STATUS, SchemaFields.EMBEDDING_STATUS_PENDING);
+  }
+
   /**
    * Runs one backfill cycle from the idle branch. Returns {@code true} if any backfill stage
    * (combined or individual) reported progress, so the caller can pick the active-vs-truly-idle

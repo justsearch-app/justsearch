@@ -1069,6 +1069,9 @@ public final class ConversationEngine {
         throw new LlmStreamException(cancelled.getMessage(), cancelled.reasonCode(), fullText.toString(),
             reasoningBlocks.isEmpty() ? null : List.copyOf(reasoningBlocks));
       }
+      if (io.justsearch.app.api.chat.AnswersPausedException.causedByPause(err)) {
+        throw new io.justsearch.app.api.chat.AnswersPausedException();
+      }
       throw new LlmStreamException(err.getMessage() == null ? err.toString() : err.getMessage(), "LLM_ERROR",
           fullText.toString(), null);
     }
@@ -1383,6 +1386,10 @@ public final class ConversationEngine {
   }
 
   static SseEvent refusalEvent(Throwable failure) {
+    if (io.justsearch.app.api.chat.AnswersPausedException.causedByPause(failure)) {
+      return new SseEvent("error", Map.of("error", io.justsearch.app.api.chat.AnswersPausedException.MESSAGE,
+          "errorCode", "CHAT_UNAVAILABLE", "reason", "INDEXING", "forceAllowed", false));
+    }
     RuntimeException refused = io.justsearch.app.services.worker.EngineRefusals.find(failure);
     String code;
     int retryAfter;

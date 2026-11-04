@@ -175,6 +175,7 @@ public final class BootstrapInferenceFactory {
             executors instanceof GenerationLifetimeSource source
                 ? source.deviceLostRecovery()
                 : io.justsearch.app.api.chat.DeviceLostRecovery.UNAVAILABLE);
+        controller.setAnswersPaused(manager::answersPausedWhileIndexing);
         manager.installActuationRouter(controller);
         // Spec E step E2: chat generation reaches indexing pacing through the Engine's bulk gate.
         if (executors instanceof GenerationLifetimeSource source) {

@@ -50,7 +50,7 @@ final class SettingsPatch {
         input.apiPort() == null ? null : normalized.configuredApiPort(), null,
         input.rerankerModelPath() == null ? null : normalized.getRerankerModelPath(),
         input.citationScorerModelPath() == null ? null : normalized.getCitationScorerModelPath(),
-        null, input.rerankerEnabled(), input.rerankerSwitchIntent());
+        null, input.rerankerEnabled(), input.rerankerSwitchIntent(), input.pauseAnswersWhileIndexing());
   }
 
   /** Merges an incoming {@link SettingsV2} into the existing {@link UiSettings}. */
@@ -64,6 +64,9 @@ final class SettingsPatch {
       return base;
     }
 
+    if (incoming.pauseAnswersWhileIndexing() != null) {
+      base.setPauseAnswersWhileIndexing(incoming.pauseAnswersWhileIndexing());
+    }
     if (incoming.apiPort() != null) {
       base.setApiPort(incoming.apiPort());
     }

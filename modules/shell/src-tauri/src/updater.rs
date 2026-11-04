@@ -3587,14 +3587,14 @@ mod tests {
     }
 
     #[test]
-    fn ui_settings_v7_successor_reads_legacy_v1_without_changing_strategy_identity() {
+    fn ui_settings_v8_successor_reads_legacy_v1_without_changing_strategy_identity() {
         let mut local: LocalStoreRegister = serde_json::from_str(LOCAL_STORE_REGISTER).unwrap();
         let old = local
             .durable_stores
             .iter_mut()
             .find(|store| store.id == "ui-settings")
             .unwrap();
-        assert_eq!(old.current_version, 7);
+        assert_eq!(old.current_version, 8);
         assert_eq!(old.reconciliation, "READ_V0_OR_V1_AND_WRITE_V1");
         old.current_version = 1;
 
@@ -3603,8 +3603,8 @@ mod tests {
             .iter_mut()
             .find(|store| store.owner_id == "ui-settings")
             .unwrap();
-        assert_eq!(successor.format_version, 7);
-        successor.readable_source_versions = vec![0, 1, 2, 3, 4, 5, 6, 7];
+        assert_eq!(successor.format_version, 8);
+        successor.readable_source_versions = vec![0, 1, 2, 3, 4, 5, 6, 7, 8];
         let accepted = test_descriptor(compatibility.clone());
         validate_store_compatibility_against(local, &accepted).unwrap();
 

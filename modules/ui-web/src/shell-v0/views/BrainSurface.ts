@@ -1221,7 +1221,10 @@ export class BrainSurface extends JfElement {
       // Adopt only non-null snapshots: the store retains its last-known snapshot when
       // the connection goes stale (aiStateStore §B7), so a null here means "no data
       // yet" (pre-first-poll) and must not clobber an already-known value.
-      if (s.inference) this.inference = s.inference;
+      if (s.inference && s.inference !== this.inference) {
+        this.inference = s.inference;
+        void this.refreshSettings();
+      }
       if (s.status) this.systemStatus = s.status;
       // Tempdoc 663 Stage 3/5 — install/runtime/pack status now come from the shared, always-on
       // `aiInstallPoll` (via aiStateStore), replacing this surface's own one-shot fetch + the
@@ -1318,7 +1321,7 @@ export class BrainSurface extends JfElement {
   }
 
   private async refreshSettings(afterAnswerSave = false): Promise<void> {
-    if ((this.pendingActions.has('inference-switch') || this.pendingActions.has('reranker-switch')) && !afterAnswerSave) return;
+    if ((this.pendingActions.has('inference-switch') || this.pendingActions.has('reranker-switch') || this.pendingActions.has('answer-pause-switch')) && !afterAnswerSave) return;
     const revision = ++this.refreshRevision;
     const choice = this.choiceRevision;
     const llmRevision = this.llmRevision;
@@ -1959,6 +1962,18 @@ export class BrainSurface extends JfElement {
     });
   }
 
+  private async setPauseAnswersWhileIndexing(enabled: boolean): Promise<void> {
+    await this.withBusy('answer-pause-switch', async () => {
+      this.runtimeError = null;
+      ++this.choiceRevision;
+      const attempt = createSettingsAttempt({ pauseAnswersWhileIndexing: enabled },
+        requireSettingsWitness(this.rerankerSettings?.witness));
+      await executeSettingsAttempt(
+        (path, init) => authorizedFetch(this.base() + path, init), attempt);
+      await this.refreshSettings(true);
+    });
+  }
+
   private async setRerankerEnabled(enabled: boolean): Promise<void> {
     await this.withBusy('reranker-switch', async () => {
       this.runtimeError = null;
@@ -2396,6 +2411,7 @@ export class BrainSurface extends JfElement {
       : reindexRequired ? 'Rebuild search to use these models'
       : repairRemedyHeadline(repairRemedy) ? repairRemedyHeadline(repairRemedy)
       : aiState === 'not_installed' ? "AI isn't installed yet"
+      : this.inference?.answersPausedWhileIndexing === true ? 'Answers paused while indexing'
       : aiState === 'online' && !readingPictures ? processorOnly ? 'AI is running on the processor' : 'AI is ready'
       : sc.label;
     const installSize = this.planPreview?.totalDownloadBytes;
@@ -2407,7 +2423,7 @@ export class BrainSurface extends JfElement {
     return html`
       <div data-testid="brain-simple-panel">
         <h1 class="brain-headline" tabindex="-1">${headline}${aiState === 'installing' && pct !== null ? ` ${pct}%` : ''}</h1>
-        <p class="brain-sentence">${this.renderBrainSentence(aiVerdict, installed, features, readingPictures)}</p>
+        <p class="brain-sentence">${this.inference?.answersPausedWhileIndexing === true && known ? html`Answers resume automatically when heavy indexing ends. The answer model stays loaded.` : this.renderBrainSentence(aiVerdict, installed, features, readingPictures)}</p>
         <div class="brain-status-detail">${aiState === 'connecting' ? html`<jf-pulse-dots></jf-pulse-dots>` : nothing}${known ? (aiState === 'installing' || repairRemedy.kind === 'none' ? sc.sub : repairRemedy.kind === 'manual' ? repairRemedySub(repairRemedy) : nothing) : `Waiting for live install and AI observations. ${indexingActivity.summary}${indexingActivity.detail ? ` — ${indexingActivity.detail}` : ''}`}${this.installStalled() ? html` <span role="status">Download stalled — no recent progress.</span>` : nothing}</div>
         ${known && (!installed || aiState === 'installing' || activationRequired) ? html`<div class="status-row">
           <jf-button class=${primaryAction.primary && !installed ? 'install-action' : ''}
@@ -3226,6 +3242,14 @@ export class BrainSurface extends JfElement {
           ${this.brainFeatures().chat.size ?? ''}
           <button type="button" aria-expanded=${!!this.expanded.model} @click=${() => this.toggleSection('model')}>${icon({ name: 'folder', size: 14 })} Change</button>
           ${this.expanded.model ? this.settingInput('modelPath', 'Model path') : nothing}
+        </div></div>
+        <div class="advanced-row"><div>Pause answers while indexing<p>Wait during heavy indexing; keep the answer model loaded</p></div><div>
+          <button type="button" class="component-toggle" role="switch" aria-label="Pause answers while indexing"
+            aria-checked=${this.rerankerSettings?.pauseAnswersWhileIndexing === true}
+            ?disabled=${!this.settingsRead || !this.rerankerSettings?.witness || !!this.busy['answer-pause-switch']}
+            @click=${() => this.setPauseAnswersWhileIndexing(this.rerankerSettings?.pauseAnswersWhileIndexing !== true)}><span></span></button>
+          <span>${!this.settingsRead ? 'Checking saved choice…' : this.busy['answer-pause-switch'] ? 'Changing…'
+            : this.rerankerSettings?.pauseAnswersWhileIndexing === true ? 'On' : 'Off'}</span>
         </div></div>
         ${this.renderSlider('contextWindow', 'Reading memory', 'How much text it reads at once', 131072)}
         ${this.renderSlider('maxTokens', 'Longest answer', 'Upper limit for one answer', 16384)}

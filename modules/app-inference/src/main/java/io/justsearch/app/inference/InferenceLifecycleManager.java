@@ -143,6 +143,13 @@ public class InferenceLifecycleManager
     generation.fenceForRecovery();
   }
 
+  /** Binds the saved policy and the live Engine backlog observation. */
+  public void setAnswersPaused(java.util.function.BooleanSupplier paused) {
+    generation.setAnswersPaused(paused);
+  }
+
+  public boolean answersPausedWhileIndexing() { return generation.answersPaused(); }
+
   /** The generation-in-flight signal (Spec A §5): GENERATE leases, queue, edges. */
   public GenerationActivity generationActivity() {
     return generation;

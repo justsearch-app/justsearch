@@ -1,0 +1,265 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
+  },
+  "createdAt": "2026-11-04T11:35:39.598Z",
+  "revision": "a07eb770d626ed707748b9ce0d42ddda29816290",
+  "tree": "5f5dbaa8309e4dd795ee1aa76d8dedc99714c55c",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": "openjdk version \"25.0.4.1\" 2026-08-18 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "./gradlew :modules:worker-services:test --tests \"io.justsearch.indexerworker.loop.HeavyIndexingStateTest\" --tests \"io.justsearch.indexerworker.loop.IndexingLoopHeavyIndexingTest\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 12190
+    },
+    {
+      "command": "./gradlew :modules:app-inference:test --tests \"io.justsearch.app.inference.chat.IndexingAnswerAdmissionTest\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 1954
+    },
+    {
+      "command": "./gradlew :modules:app-services:test --tests \"io.justsearch.app.services.settings.AnswerPausePreferenceTest\" --tests \"io.justsearch.app.services.conversation.ConversationIndexingPauseTest\" --tests \"io.justsearch.app.services.chat.ChatResidencyTest.indexingPauseRefusesAnswersWithoutUnloadingAndPolicyOffReopensImmediately\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 3264
+    },
+    {
+      "command": "./gradlew :modules:ui:test --tests \"io.justsearch.ui.api.AnswerPauseSettingsHttpTest\" --tests \"io.justsearch.ui.api.IndexingPauseWireTest\" --tests \"io.justsearch.ui.api.mcp.IndexingPauseMcpTest\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 9266
+    },
+    {
+      "command": "./gradlew :modules:app-agent:test --tests \"io.justsearch.agent.AgentIndexingPauseTest\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 1900
+    },
+    {
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/BrainSurface.answer-pause.test.ts\" \"src/shell-v0/views/search-v3/SearchV3View.residency.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/00fn8lmv/tmp/test-intent-vitest-244-1793792131050.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 8547
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/HeavyIndexingStateTest.java",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/HeavyIndexingStateTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:13e52290588b7224e5a7ea3bd892c5500a0f3b2ea18f4985e36f60bd50ec559b",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "holdAndRestartRecomputeAndSingleFileUpdatesNeverEnter()",
+          "status": "passed"
+        },
+        {
+          "name": "thresholdsAndOverlappingBacklogsUseHysteresis()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/IndexingLoopHeavyIndexingTest.java",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/IndexingLoopHeavyIndexingTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:eedcef454f43705debf81201430bb949de99d80f32581f5780a4969f65a6ce99",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "ownerReadsLiveCountsAndReleasesOnHoldsFailureStopAndRecovery()",
+          "status": "passed"
+        },
+        {
+          "name": "anOwnerObservedPauseResetsHysteresisWithoutAWindowReadingIt()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/chat/IndexingAnswerAdmissionTest.java",
+      "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/chat/IndexingAnswerAdmissionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:dcc908f95db0b5780b7d4eb76d74011e6e5969286cde415b37e1b50752b3ae7a",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "pauseRefusesNewAnswersAndQueuedAnswersButFinishesAnIssuedLease()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/settings/AnswerPausePreferenceTest.java",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/settings/AnswerPausePreferenceTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:944a29d44f0db695ead6429a0578a74d640da82ed5a5bc7def28a70b7dab22a0",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "pausePatchSurvivesReopenAndNeverChangesAnswerIntent(Path)",
+          "status": "passed"
+        },
+        {
+          "name": "everyLegacyVersionLoadsWithoutAnAutomaticPauseAndKeepsIntent(Path)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/conversation/ConversationIndexingPauseTest.java",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/conversation/ConversationIndexingPauseTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:e3ab648fb69dde25ea957c62e3aeb6a653a2c354a0fc0511df5706afd941e0a6",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "pausedGenerationHasAnExplicitStreamOutcome()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatResidencyTest.java#indexingPauseRefusesAnswersWithoutUnloadingAndPolicyOffReopensImmediately",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatResidencyTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:6fe26da1d50f6380bd532c017baeedacca035910880830cfec40e38478f9326d",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "indexingPauseRefusesAnswersWithoutUnloadingAndPolicyOffReopensImmediately()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/AnswerPauseSettingsHttpTest.java",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/AnswerPauseSettingsHttpTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:84d4b111fda384674c2e11e13915dcde2dc34bf65efff1e1feda3d2b58a48721",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "witnessedPolicyPatchPersistsAndAStaleWindowCannotOverwriteIt(Path)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/IndexingPauseWireTest.java",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/IndexingPauseWireTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:716358f43888e927e4ea806059be771325bde012ba828b17dbfe70701fff6568",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aPauseAfterChatDispatchStillFailsOnTheRunWithItsExplicitReason()",
+          "status": "passed"
+        },
+        {
+          "name": "proxyKeepsThePausedOutcomeWhenIndexingStartsAfterTheFirstGate()",
+          "status": "passed"
+        },
+        {
+          "name": "httpRefusalNamesThePauseAndAllowsNoForce()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/mcp/IndexingPauseMcpTest.java",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/mcp/IndexingPauseMcpTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:8a5cc78fa0f8237c3dfd23723a8a374df090715d1133d7097afc84048fc1a3cd",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "mcpProjectionCarriesTheSamePausedReasonAndWords()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-agent/src/test/java/io/justsearch/agent/AgentIndexingPauseTest.java",
+      "file": "modules/app-agent/src/test/java/io/justsearch/agent/AgentIndexingPauseTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:86534027f103748069657f13afe9629101facb4958928f752be15dda667ad8db",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aPausedAnswerDoesNotRetryOrHideThePause()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/BrainSurface.answer-pause.test.ts",
+      "file": "modules/ui-web/src/shell-v0/views/BrainSurface.answer-pause.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:5c2dd34e132b92453989a4ce225754a684b9af4f66e4c770ba01c4de9a8746df",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "defaults off, saves only the pause policy, and waits for the witnessed save",
+          "status": "passed"
+        },
+        {
+          "name": "uses the Engine pause observation for wording and converges a second window",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.residency.test.ts#keeps an indexing-paused question and a newer draft across same-tab reload",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.residency.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:8a69c2e02adeda5dd67d893e56ba533a9653a6e10400a2863c9007ff12fd628f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "NR15 human admission and RR15 refusal recovery keeps an indexing-paused question and a newer draft across same-tab reload",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:1276ce94b665d9e3ead0aa9b5e24aae0728f86b302b5f5d9ae0b060bd8367ed4"
+}

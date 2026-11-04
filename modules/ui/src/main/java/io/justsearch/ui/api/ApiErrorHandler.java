@@ -307,6 +307,9 @@ public final class ApiErrorHandler {
      * typed exceptions first, then standard Java exceptions, then message hints.
      */
     public static ApiErrorCode resolve(Exception e) {
+        if (io.justsearch.app.api.chat.AnswersPausedException.causedByPause(e)) {
+            return ApiErrorCode.CHAT_UNAVAILABLE;
+        }
         if (e == null) {
             return ApiErrorCode.INTERNAL_ERROR;
         }

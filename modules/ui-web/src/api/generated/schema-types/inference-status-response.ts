@@ -11,6 +11,7 @@
 import { z } from 'zod';
 
 export interface InferenceStatusResponse {
+  answersPausedWhileIndexing?: boolean;
   activeModelId?: string;
   available?: boolean;
   configuredContextTokens?: number;
@@ -58,6 +59,7 @@ export interface InferenceStatusResponse {
   vduQueueSize?: number;
 }
 export const inferenceStatusResponseSchema = z.strictObject({
+  "answersPausedWhileIndexing": z.boolean().optional(),
   "activeModelId": z.string().optional(),
   "available": z.boolean().optional(),
   "configuredContextTokens": z.number().int().optional(),

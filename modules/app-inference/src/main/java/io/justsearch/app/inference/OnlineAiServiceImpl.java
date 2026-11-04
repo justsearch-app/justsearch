@@ -262,6 +262,9 @@ public final class OnlineAiServiceImpl
   }
 
   @Override
+  public boolean answersPausedWhileIndexing() { return manager.answersPausedWhileIndexing(); }
+
+  @Override
   public RuntimeInfo runtimeInfo() {
     InferenceConfig cfg = manager.currentConfig();
     if (cfg == null) {

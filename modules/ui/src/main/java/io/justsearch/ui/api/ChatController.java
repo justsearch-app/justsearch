@@ -397,6 +397,10 @@ public final class ChatController {
     } catch (io.justsearch.app.api.DocumentService.UnavailableException unavailable) {
       LOG.warn("Chat document service unavailable for shape {}", shapeId.value(), unavailable);
       sink.accept(errorEvent(message(unavailable), ApiErrorCode.SERVICE_UNAVAILABLE));
+    } catch (io.justsearch.app.api.chat.AnswersPausedException paused) {
+      sink.accept(new SseEvent("error", ChatResidencyGate.refusalBody(
+          new io.justsearch.app.api.chat.ChatRefusal(io.justsearch.app.api.chat.RefusalReason.INDEXING,
+              java.util.Optional.empty(), false), null, null)));
     } catch (Exception e) {
       LOG.error("Chat dispatch failed for shape {}", shapeId.value(), e);
       sink.accept(errorEvent(message(e), ApiErrorCode.BAD_REQUEST));

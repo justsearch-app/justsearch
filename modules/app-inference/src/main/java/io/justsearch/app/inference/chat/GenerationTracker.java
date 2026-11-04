@@ -83,6 +83,19 @@ public final class GenerationTracker implements GenerationActivity {
   private int auxLeases;
   private int queuedTickets;
   private volatile boolean generating;
+  private volatile java.util.function.BooleanSupplier answersPaused = () -> false;
+
+  public void setAnswersPaused(java.util.function.BooleanSupplier paused) {
+    answersPaused = Objects.requireNonNull(paused, "paused");
+  }
+
+  public boolean answersPaused() { return answersPaused.getAsBoolean(); }
+
+  private void requireAnswerAdmission(Kind kind) {
+    if (kind == Kind.GENERATE && answersPaused()) {
+      throw new io.justsearch.app.api.chat.AnswersPausedException();
+    }
+  }
   private volatile long epoch;
   private volatile long idleSinceNanos;
   private volatile long lastTokenNanos = Long.MIN_VALUE;
@@ -195,6 +208,7 @@ public final class GenerationTracker implements GenerationActivity {
    */
   public Ticket queue(Kind kind, EngineWorkHandle work) {
     Objects.requireNonNull(kind, "kind");
+    requireAnswerAdmission(kind);
     Runnable lifetime = null;
     if ((kind == Kind.GENERATE || kind == Kind.VDU) && work != null) {
       lifetime = Objects.requireNonNull(generationLifetime.apply(work), "generation release");
@@ -413,6 +427,7 @@ public final class GenerationTracker implements GenerationActivity {
           queuedTickets--;
         }
         requireOpenLocked();
+        requireAnswerAdmission(kind);
         leased = true;
         leaseOpen = true;
         edge = openLeaseLocked(kind);
