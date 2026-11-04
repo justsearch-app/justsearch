@@ -248,6 +248,6 @@ The survey narrowed the broader MCP “no cited answers” claim on 2026-11-04: 
 - ChatGPT Go's exact US price; whether ChatGPT auto-cites uploaded files; NotebookLM tier-specific model variants.
 - Open WebUI's docs site returned HTTP 403 to our fetcher; all Open WebUI doc citations were verified against the rendering source repo (github.com/open-webui/docs) instead.
 - Curiosity.ai's current consumer product (documentation removed/404).
-- Whether any surveyed tool has published multilingual retrieval benchmarks: none has; all multilingual claims in this document are model-inherited or vendor-claimed unless marked "benchmarked".
+- Whether any surveyed tool has published multilingual retrieval benchmark results: none has. DigUp publishes small English, Bengali and Arabic query sets that it measures ranking changes with ([evals/multilingual.json](https://github.com/ARahim3/DigUp/blob/dc2651ad8299160bbe91e972f857e1a1599a8419/evals/multilingual.json)), without published scores. All multilingual claims in this document are model-inherited or vendor-claimed unless marked "benchmarked".
 
 **Corrections welcome.** This page will be wrong somewhere — these projects ship weekly. If a cell misrepresents your tool's current version, open an issue with a link and we will fix it and credit the correction.

@@ -117,7 +117,7 @@ Follow [Install (Windows)](#install-windows) above, point it at a folder, and se
 
 ## Why JustSearch
 
-Desktop file search is either **fast-but-lexical** (Everything — filenames, instantly; Recoll — full-text and
+Some desktop file-search tools are **fast-but-lexical** (Everything — filenames, instantly; Recoll — full-text and
 even OCR, but keyword matching only) or **smart-but-cloud** (NotebookLM, Copilot — capable, but your files
 leave your machine). Self-hosted server stacks (RAGFlow, Open WebUI, QAnything) can combine semantic retrieval,
 offline operation, multilingual models, and OCR — if you deploy and configure a Docker stack yourself.
