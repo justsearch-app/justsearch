@@ -10,8 +10,8 @@
 > QAnything — each combine {true hybrid retrieval × fully offline × multilingual × OCR} as Docker/server
 > deployments. DigUp also combines BM25/dense hybrid search, offline processing, multilingual search and OCR
 > in a single-install macOS app. What survives, as far as we know: no **single-install desktop app** ships
-> lexical + dense + learned-sparse retrieval with cross-encoder reranking together with the other three axes
-> out of the box, no surveyed tool documents a SPLADE learned-sparse retrieval leg, and no MCP retrieval server
+> lexical + dense retrieval with cross-encoder reranking (plus a separate learned-sparse mode) together with the other three axes
+> out of the box, no surveyed tool documents a SPLADE learned-sparse retrieval mode, and no MCP retrieval server
 > documents OCR for scanned documents or cited synthesized answers. The survey narrowed the desktop and
 > cited-answer claims on 2026-11-04: DigUp covers the broader desktop cell, and xerj documents cited extracts.
 > Details in the [Verdict](#verdict-does-the-uniqueness-claim-survive) section.
@@ -20,7 +20,7 @@
 
 ## What this document is
 
-JustSearch claims to occupy a specific feature cell: **true hybrid retrieval** (lexical + dense + learned-sparse, with cross-encoder reranking) **× local indexing and inference × multilingual × OCR for scanned documents**, packaged as a Windows desktop app with an MCP retrieval backend. A claim like that is only worth anything if it is checkable, so this page is the public version of the survey behind it: one row per tool a buyer would realistically consider, every cell sourced, every competitor represented at its current best — including the places where it beats JustSearch.
+JustSearch claims to occupy a specific feature cell: **true hybrid retrieval** (lexical + dense, with cross-encoder reranking; learned-sparse retrieval as a separate mode) **× local indexing and inference × multilingual × OCR for scanned documents**, packaged as a Windows desktop app with an MCP retrieval backend. A claim like that is only worth anything if it is checkable, so this page is the public version of the survey behind it: one row per tool a buyer would realistically consider, every cell sourced, every competitor represented at its current best — including the places where it beats JustSearch.
 
 JustSearch's own weaknesses, stated up front and repeated in its table row: **Windows-only; alpha (0.1.0); unsigned installer (SmartScreen warnings); ~9 GB model download; very young and unproven (repo created June 2026, 2 GitHub stars at survey date); retrieval benchmarked only in English, German, and French** despite a 70+-language embedding model.
 
@@ -34,7 +34,7 @@ Legend: **Offline** = indexing, retrieval, and built-in inference can work witho
 
 | Tool | Offline | Retrieval | Reranker | OCR | Multilingual | Cited answers | MCP | Formats | Platforms | License / price | Maturity |
 |---|---|---|---|---|---|---|---|---|---|---|---|
-| **JustSearch 0.1.0 (alpha)** | Yes for local processing after model download; desktop builds with an embedded release URL check for updates by default (including CI-built branch candidates and pre-releases). Current update controls: `JUSTSEARCH_AUTO_UPDATE_CHECK=false` suppresses automatic checks; policy `"appUpdatesEnabled": false` forbids all new updater checks and downloads. See [update controls and version caveat](reference/configuration/environment-variables.md#desktop-app-update-traffic-and-policy). | Hybrid: BM25 + dense embeddings + SPLADE learned-sparse | Yes, cross-encoder | Yes (scanned PDFs, images) | Claimed 70+ languages; **benchmarked only EN (BEIR/SciFact, Enron-QA, CLERC), DE (MIRACL-de), FR (MIRACL-fr)** | Yes (answers with cited passages) | Native server (6 tools in 0.1.0; 7 on main) | PDF, email, Office, "hundreds of formats" (claimed, not independently verified) | **Windows only** | Apache-2.0 / free | **Alpha.** Repo created 2026-06-23; 2 stars; unsigned installer; unproven |
+| **JustSearch 0.1.0 (alpha)** | Yes for local processing after model download; desktop builds with an embedded release URL check for updates by default (including CI-built branch candidates and pre-releases). Current update controls: `JUSTSEARCH_AUTO_UPDATE_CHECK=false` suppresses automatic checks; policy `"appUpdatesEnabled": false` forbids all new updater checks and downloads. See [update controls and version caveat](reference/configuration/environment-variables.md#desktop-app-update-traffic-and-policy). | Hybrid: BM25 + dense embeddings with cross-encoder reranking; separate SPLADE learned-sparse mode | Yes, cross-encoder | Yes (scanned PDFs, images) | Claimed 70+ languages; **benchmarked only EN (BEIR/SciFact, Enron-QA, CLERC), DE (MIRACL-de), FR (MIRACL-fr)** | Yes (answers with cited passages) | Native server (6 tools in 0.1.0; 7 on main) | PDF, email, Office, "hundreds of formats" (claimed, not independently verified) | **Windows only** | Apache-2.0 / free | **Alpha.** Repo created 2026-06-23; 2 stars; unsigned installer; unproven |
 
 Sources: https://github.com/justsearch-app/justsearch (README) and https://api.github.com/repos/justsearch-app/justsearch — accessed 2026-07-14.
 
@@ -213,14 +213,14 @@ The README claim evaluated in the original survey said JustSearch combines "{tru
 
 A narrower, still-checkable claim survives this survey:
 
-> **Among single-install desktop applications, we found no tool that ships {lexical + dense + learned-sparse hybrid retrieval with cross-encoder reranking} × {local indexing and inference} × {multilingual} × {OCR} out of the box.** DigUp on macOS combines the broader four axes in a desktop app, but does not document learned-sparse retrieval or cross-encoder reranking; the more specific combination above still has no surveyed desktop counterexample. RAGFlow, Open WebUI and QAnything are self-hosted Docker/server deployments requiring technical setup, and in Open WebUI's case the combination is opt-in configuration rather than default behavior. The tools that come closest are listed below — if you know another, open an issue and we will add it.
+> **Among single-install desktop applications, we found no tool that ships {lexical + dense hybrid retrieval with cross-encoder reranking} × {local indexing and inference} × {multilingual} × {OCR} out of the box.** DigUp on macOS combines the broader four axes in a desktop app, but does not document learned-sparse retrieval or cross-encoder reranking; the more specific combination above still has no surveyed desktop counterexample. RAGFlow, Open WebUI and QAnything are self-hosted Docker/server deployments requiring technical setup, and in Open WebUI's case the combination is opt-in configuration rather than default behavior. The tools that come closest are listed below — if you know another, open an issue and we will add it.
 
 The nearest misses, by deployment class:
 - **Desktop apps:** DigUp on macOS (hybrid + offline + multilingual + OCR; no learned-sparse leg or cross-encoder documented); AnythingLLM (3/4 — offline + OCR + optional reranker; vector-only, no lexical leg); Cherry Studio (~2.5/4 — local OCR options; embedding-only retrieval, cloud default preprocessor); Msty (vector-only, cloud-key reranker, no documented OCR).
 - **Windows search + MCP tools:** LocalSynapse (3/4 — offline + BM25/dense hybrid + native MCP server; no documented OCR or reranker, source now closed); File Brain (advertises keyword + multilingual dense + OCR; no reranker documented, v0.1.x, quiet since April 2026).
 - **MCP servers:** xerj (BM25/vector hybrid, optional local neural embeddings and cited extracts; no built-in OCR, learned-sparse leg or synthesized answers documented); lyonzin/knowledge-rag (hybrid + cross-encoder + offline; explicitly no OCR); shinpr/mcp-local-rag (hybrid-lite, no OCR, English-first).
 
-Two further factual differentiators held up across the whole survey and can be stated without hedging: **no surveyed tool of any deployment class documents a SPLADE-style learned-sparse component as a third retrieval leg**, and **no surveyed MCP retrieval server documents OCR for scanned documents or serves cited synthesized answers**.
+Two further factual differentiators held up across the whole survey and can be stated without hedging: **no surveyed tool of any deployment class documents a SPLADE-style learned-sparse retrieval mode**, and **no surveyed MCP retrieval server documents OCR for scanned documents or serves cited synthesized answers**.
 
 The survey narrowed the broader MCP “no cited answers” claim on 2026-11-04: xerj's README uses that term, and its MCP Hub renderer and batch-search docs show cited retrieved evidence, without answer synthesis (see the pinned Tier B sources). The OCR and cited-synthesis distinctions above still hold.
 
@@ -248,6 +248,6 @@ The survey narrowed the broader MCP “no cited answers” claim on 2026-11-04: 
 - ChatGPT Go's exact US price; whether ChatGPT auto-cites uploaded files; NotebookLM tier-specific model variants.
 - Open WebUI's docs site returned HTTP 403 to our fetcher; all Open WebUI doc citations were verified against the rendering source repo (github.com/open-webui/docs) instead.
 - Curiosity.ai's current consumer product (documentation removed/404).
-- Whether any surveyed tool has published multilingual retrieval benchmark results: none has. DigUp publishes small English, Bengali and Arabic query sets that it measures ranking changes with ([evals/multilingual.json](https://github.com/ARahim3/DigUp/blob/dc2651ad8299160bbe91e972f857e1a1599a8419/evals/multilingual.json)), without published scores. All multilingual claims in this document are model-inherited or vendor-claimed unless marked "benchmarked".
+- Whether any surveyed tool has published multilingual retrieval benchmark results: DigUp publishes small multilingual retrieval evaluation results, reporting 98/111 right-first and 109/111 top-five results across English, Bengali and Arabic ([site.toml](https://github.com/ARahim3/DigUp/blob/dc2651ad8299160bbe91e972f857e1a1599a8419/website/site.toml), [how it works](https://digup.arahim.dev/docs/how-it-works/)); the developer labels these small project tests, not a broad benchmark. No other surveyed tool publishes any. All multilingual claims in this document are model-inherited or vendor-claimed unless marked "benchmarked".
 
 **Corrections welcome.** This page will be wrong somewhere — these projects ship weekly. If a cell misrepresents your tool's current version, open an issue with a link and we will fix it and credit the correction.
