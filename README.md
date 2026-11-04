@@ -117,13 +117,15 @@ Follow [Install (Windows)](#install-windows) above, point it at a folder, and se
 
 ## Why JustSearch
 
-Desktop file search is either **fast-but-lexical** (Everything — filenames, instantly; Recoll — full-text and
+Some desktop file-search tools are **fast-but-lexical** (Everything — filenames, instantly; Recoll — full-text and
 even OCR, but keyword matching only) or **smart-but-cloud** (NotebookLM, Copilot — capable, but your files
 leave your machine). Self-hosted server stacks (RAGFlow, Open WebUI, QAnything) can combine semantic retrieval,
 offline operation, multilingual models, and OCR — if you deploy and configure a Docker stack yourself.
-JustSearch aims at the gap between those worlds: as far as we know, the only **single-install desktop app**
-that ships **{true hybrid retrieval × offline search and AI × multilingual × OCR}** out of the box — here is the
-[sourced comparison](docs/comparison.md) behind that sentence, and if we've missed a tool, please
+DigUp on macOS also combines hybrid search, offline processing, multilingual search and OCR in a
+single-install desktop app, without documented cross-encoder reranking. As far as we know, JustSearch
+is the only **single-install desktop app** that ships **{lexical + dense retrieval with cross-encoder
+reranking × offline search and AI × multilingual × OCR}** out of the box. See the
+[sourced comparison](docs/comparison.md); if we've missed a tool, please
 [open an issue](https://github.com/justsearch-app/justsearch/issues) and we'll list it.
 
 - **Hybrid retrieval, not single-model RAG** — keyword + dense vectors, fused and cross-encoder reranked; learned-sparse is a separate mode.
