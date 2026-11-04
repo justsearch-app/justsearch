@@ -1,0 +1,54 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
+  },
+  "createdAt": "2026-11-04T22:58:52.260Z",
+  "revision": "222f968617813b9b66b0da90c06852579bd3df60",
+  "tree": "a9505693d972f66aaa41c6152be53d6033241b72",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": "openjdk version \"25.0.4.1\" 2026-08-18 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "./gradlew :modules:app-services:test --tests \"io.justsearch.app.services.ai.install.PictureReadingInstallCompletionTest\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 17544
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/ai/install/PictureReadingInstallCompletionTest.java",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/ai/install/PictureReadingInstallCompletionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:f05861336e83f6546ba1334e1a55c96f93e3437a8c4ab9648495258f30bb8231",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "explicitOffAgainDuringDownloadWinsOverEarlierConsent(Path)",
+          "status": "passed"
+        },
+        {
+          "name": "consentedEnableTurnsPictureReadingOnAfterDownload(Path)",
+          "status": "passed"
+        },
+        {
+          "name": "unrelatedSaveDuringDownloadPreservesTheSaveAndAllowsEnable(Path)",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:cf2c9f6efe579351fcb5085dcbc9761f92277d97a207319d8e524fb408168a97"
+}

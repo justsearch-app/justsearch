@@ -455,6 +455,41 @@ The brief's adopted scenarios are quoted below. Evidence is emitted only by run-
         "modules/ui-web/src/shell-v0/views/BrainSurface.picture-switch.test.ts#reconciles an interrupted receipt with a changed witness by replaying the original attempt",
         "modules/ui-web/src/shell-v0/views/BrainSurface.picture-switch.test.ts#clears interrupted uncertainty when the original attempt is refused with an unchanged witness"
       ]
+    },
+    {
+      "items": [
+        "modules/app-services/src/test/java/io/justsearch/app/services/ai/install/PictureReadingInstallCompletionTest.java"
+      ],
+      "class": "New",
+      "behaviour": "Exercise the real asynchronous installer completion after a missing projector supporting file is downloaded over private loopback HTTP: consent enables picture reading durably; a newer explicit Off, including false-to-false, wins over the earlier consent; an unrelated public theme save echoing false neither fences enable nor gets reverted. Assert completion, retained downloaded bytes, unchanged answer intent and settings reopened from disk. Native preparation is supplied by RuntimeIntentTestFixture, so this does not claim real-model or GPU validation. Existing behaviour at 222f968617 is covered; isolated production mutations demonstrate assertion failures rather than an artificial fail-before against an already-correct baseline.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "V2",
+          "quote": "Switching picture reading at every stage (Engine starting, between documents, during reading, while saving a result) ends consistent: no late result after Off is lost or half-written; completed text stays searchable. The choice survives restart, upgrade, a profile or model change, Repair and runtime activation; a second window converges; failures (server restart fails, file missing or mismatched, settings write fails, process dies midway) leave a truthful prior or recovered state. A user-run (external) answer server: the switch refuses with a reason and never stops that server.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "C1",
+          "quote": "Switching on a part whose files are missing opens the existing consent listing everything the download will actually transfer (all missing selected parts, with sizes and licences), not only the switched part; closing or declining starts no transfer and leaves the switch as it was.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed accordingly",
+          "delegationLocation": "task t-20261101-uiimpl user turn proceed accordingly",
+          "delegationScope": "Implement the adopted picture-reading switch design, preserving newer explicit user choices and existing settings-owner semantics during installer completion.",
+          "choice": "Cover the existing picture-preference revision guard with a repeated explicit Off and an unrelated theme save that echoes the unchanged picture preference. Isolate native preparation while driving consent through the operation handler, real acquisition, completion and durable settings owner.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/s2-picture-switch-install-completion.json",
+      "newChecks": [
+        "modules/app-services/src/test/java/io/justsearch/app/services/ai/install/PictureReadingInstallCompletionTest.java"
+      ]
     }
   ]
 }
@@ -482,6 +517,7 @@ Paths below are relative to `modules/`. The repaired production configuration pr
 | core.reconfigure, ordinary settings refresh, retained profile | app-services/src/main/java/io/justsearch/app/services/settings/SettingsCommitCoordinator.java:174; app-services/src/main/java/io/justsearch/app/services/config/ConfigStoreRebuilder.java:94 | Retained profile uses the same repaired preparation; its internal source is not operator authority | PictureReadingProfileRepairTest.reconfigureRetainingAnActivatedProfileCannotReopenSavedOff; switchesBothWaysAfterActivationAndRetainedProfilePreparation |
 | Explicit switch / profile-bearing prepared generative apply | app-services/src/main/java/io/justsearch/app/services/GenerativeSettingsComponentOwner.java:80,143,148 | Repaired: refuse by source identity, retain the resolved projector path, then apply withPictureReading; verification remains required when enabling | PictureReadingProfileRepairTest.switchesBothWaysAfterActivationAndRetainedProfilePreparation; operatorProjectorKeepsItsPathAndRefusesSwitchesAfterProfilePreparation; environmentProjectorSourceRefusesSwitchesRegardlessOfItsOrdinal |
 | Install completion / Repair / runtime activation | app-services/src/main/java/io/justsearch/app/services/ai/install/AiInstallService.java:2566; app-services/src/main/java/io/justsearch/app/services/ai/runtime/RuntimeActivationService.java:974 | Existing settings owner and candidate context lead to the same builder and generative owner | PictureReadingInstallIntentTest; PictureReadingProfileRepairTest. Full installation and Repair remain independent real-system checks |
+| Consented missing-file picture enable completion | app-services/src/main/java/io/justsearch/app/services/ai/install/AiInstallService.java:1476,2328 | Completion reads the latest settings witness; the picture-choice revision preserves a newer explicit Off while unrelated saves remain eligible for enable | PictureReadingInstallCompletionTest: all three cases exercise real HTTP acquisition and durable completion; native preparation remains a fixture |
 | Prepared lifecycle transaction, crash recovery | app-inference/src/main/java/io/justsearch/app/inference/InferenceLifecycleManager.java:2385; app-services/src/main/java/io/justsearch/app/services/settings/SettingsCommitCoordinator.java:1512 | Prepared candidates apply withPictureReading; recovery uses the same context and prepared owner | PictureReadingConfigurationTest.preparedPictureChangeWaitsForRepliesAndAbortRestoresTheProjector; real crash recovery remains unverified here |
 | Runtime apply, residency reload and VDU configuration / restore | app-inference/src/main/java/io/justsearch/app/inference/InferenceLifecycleManager.java:2759,2077,2125 | Common apply strips projector from resolved none; transition fence waits for the VDU hold/restore before publishing new settings | PictureReadingConfigurationTest.runtimeAndProfileAppliesCannotReattachAProjectorWhileOff; PictureReadingCoordinatorTest.offDuringReadingReturnsTheClaimAndOnUsesANewAttempt |
 | Admission predicate readers | app-inference/src/main/java/io/justsearch/app/inference/InferenceLifecycleManager.java:1103; app-services/src/main/java/io/justsearch/app/services/bootstrap/phases/OfflineCoordinatorBuilder.java:90 | The manager reads its configured resolved snapshot; coordinator and batch share that supplier plus a temporary fence | PictureReadingProfileRepairTest.assertOff via activation and refresh checks; PictureReadingCoordinatorTest |
@@ -508,3 +544,22 @@ All Gradle invocations used `env -u DISPLAY -u WAYLAND_DISPLAY`, `js-gradle-slot
 | `git diff --check`; `git ls-remote origin refs/heads/main` | Clean whitespace; remote main remains bcc5ece3c64961dbd224dffbae599675e265ac85, so no rebase required. |
 
 Repairs and evidence are complete and uncommitted. Open: orchestrator must resolve or classify the existing focused runtime-profile fixture failure and obtain independent verification/acceptance. No check that was skipped is claimed as passing.
+
+
+## Installer completion coverage addition
+
+Only tests and test-intent records changed. The existing VDU entry table is unchanged; the projector-route table now names the real completion coverage at its existing owner. No VDU or projector configuration route was added. The new tests inspect installer outcomes, downloaded bytes and persisted settings reopened from disk; no assertion relies on a local fixture value that production cannot change.
+
+All three cases pass at the unmodified `222f968617` baseline in the temporary shared clone as well as in the candidate. These are new checks of existing behaviour, so `--before 222f968617` would correctly pass rather than demonstrate a repaired defect; it was not used as artificial fail-before evidence. Instead, two isolated mutations demonstrate each assertion's sensitivity. Only the clone's production file was mutated, and it was restored byte-for-byte from that baseline after the runs (`git diff --exit-code -- AiInstallService.java` passed). No mutation entered the candidate.
+
+| Check | Observed result |
+| --- | --- |
+| `env -u DISPLAY js-gradle-slot ./gradlew :modules:app-services:test --tests io.justsearch.app.services.ai.install.PictureReadingInstallCompletionTest :modules:app-services:pmdTest -PskipWebBuild=true --console=plain` | BUILD SUCCESSFUL; all three new tests passed; PMD passed. |
+| `env -u DISPLAY js-gradle-slot node scripts/governance/gates/test-intent/run-evidence.mjs --out gates/test-intent/evidence/s2-picture-switch-install-completion.json --check modules/app-services/src/test/java/io/justsearch/app/services/ai/install/PictureReadingInstallCompletionTest.java` | Exit 0; three executed, passed, none skipped. Evidence is script-generated. |
+| Same evidence runner on unmodified shared-clone baseline, output `build/picture-completion-baseline.json` | Exit 0; all three passed. Each tree used its own build folder. |
+| Clone mutation: remove only the `getPictureReadingPreferenceRevision() > picturePreferenceAtInstallStart.witness().acceptedRevision()` guard term; same evidence runner, output `build/picture-completion-without-revision-guard.json` | Exit 1; `explicitOffAgainDuringDownloadWinsOverEarlierConsent` failed with AssertionFailedError at line 59 (expected false, actual true); both enable cases passed. |
+| Clone mutation: restore the guard and change completion's `candidate.setPictureReadingEnabled(true)` to false; same evidence runner, output `build/picture-completion-enable-suppressed.json` | Exit 1; `consentedEnableTurnsPictureReadingOnAfterDownload` and `unrelatedSaveDuringDownloadPreservesTheSaveAndAllowsEnable` failed with AssertionFailedError at lines 44 and 77 (expected true, actual false); newer-Off case passed. |
+| `node scripts/governance/gates/test-intent/cli.mjs` | Exit 1; only `test-intent/acceptance-missing`. No acceptance record written. |
+| `git diff --check`; `git ls-remote origin refs/heads/main` | Passed; main remains `bcc5ece3c64961dbd224dffbae599675e265ac85`, so no rebase required. |
+
+`.agents/preflight` is absent. No unrelated suites were run. Shared resources touched: Gradle cache, CPU/build slot and admission queue; loopback servers and temporary settings/operations databases belonged to these tests. No running owner application, dev stack or GPU was used. Native preparation and actual GPU/model activation remain outside these bounded completion checks. Changes are uncommitted and unpushed.
