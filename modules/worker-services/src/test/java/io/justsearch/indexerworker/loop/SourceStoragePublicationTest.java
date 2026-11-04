@@ -50,9 +50,19 @@ final class SourceStoragePublicationTest extends LuceneExecutorTestBase {
     assertTrue(many.mountReads <= 11, "at most capture plus one comparison per source");
   }
 
+  @ParameterizedTest(name = "{displayName} [{index}] row {arguments}")
+  @ValueSource(ints = {1, 2, 3, 4, 5, 6, 7})
+  void selfConsistentDeviceEvidenceDeterminesCommittedStorage(int row) throws Exception {
+    publish(temporary, 1, null, row);
+  }
+
   private StorageFixture publish(Path directory, int files, String change) throws Exception {
+    return publish(directory, files, change, 0);
+  }
+
+  private StorageFixture publish(Path directory, int files, String change, int deviceCase) throws Exception {
     Files.createDirectories(directory);
-    boolean chunked = change != null;
+    boolean chunked = change != null || deviceCase != 0;
     String content = "provenance lexical needle " + (chunked ? "one two three four five six seven eight.\n".repeat(600) : "short source");
     Path targetPath = directory.resolve("target");
     Path activePath = directory.resolve("active");
@@ -108,6 +118,14 @@ final class SourceStoragePublicationTest extends LuceneExecutorTestBase {
       assertEquals(files, extracted.size());
       writer.beginBatch();
       var storage = new StorageFixture();
+      storage.deviceCase = deviceCase;
+      if (deviceCase != 0) {
+        String device = deviceCase == 3 || deviceCase == 4 ? "0:45" : "8:2";
+        String type = deviceCase == 3 ? "btrfs" : deviceCase == 4 ? "tmpfs" : "ext4";
+        String source = deviceCase == 4 || deviceCase == 5 ? "none" : "/dev/child";
+        storage.topology = List.of("1 0 8:1 / / rw - ext4 /dev/ancestor rw",
+            "2 1 " + device + " / " + directory + " rw - " + type + " " + source + " rw");
+      }
       storage.install(writer);
       // Forbid identity capture/leases while allowing the batch storage observer's dispatch.
       Class<?> rootIdentity = Class.forName("io.justsearch.indexerworker.services.RootIdentity");
@@ -145,7 +163,15 @@ final class SourceStoragePublicationTest extends LuceneExecutorTestBase {
             if (changed) assertFalse("known".equals(parentFields.get("storage_status"))
                 && "aaaa-1111:ext4:/".equals(key),
                 "P1b-6: later source must never commit the old mount's known storage");
-            if (!changed) assertEquals("aaaa-1111:ext4:/", key);
+            if (deviceCase != 0) {
+              String expected = switch (deviceCase) {
+                case 1, 5 -> "bbbb-2222:ext4:/";
+                case 3 -> "cccc-3333:btrfs:/";
+                default -> null;
+              };
+              assertEquals(expected, key,
+                  "device case " + deviceCase + ": contradictory or uncertain evidence must never publish another device's UUID");
+            } else if (!changed) assertEquals("aaaa-1111:ext4:/", key);
             else if (change.endsWith("replaced")) {
               assertTrue(key == null || "bbbb-2222:ext4:/".equals(key), "replacement evidence or unknown");
             } else assertNull(key, "uncertain storage must be unknown");
@@ -159,7 +185,8 @@ final class SourceStoragePublicationTest extends LuceneExecutorTestBase {
               }
               assertEquals(key == null ? "unknown" : "known", stored.get("storage_status"));
               assertEquals(key, stored.get("storage_key"));
-              assertEquals(key == null ? null : "/", stored.get("storage_mount"));
+              assertEquals(key == null ? null : deviceCase == 0 ? "/" : directory.toString(),
+                  stored.get("storage_mount"));
               assertEquals(ORIGIN, stored.get("origin_id"));
             }
           }
@@ -171,6 +198,7 @@ final class SourceStoragePublicationTest extends LuceneExecutorTestBase {
 
   private static final class StorageFixture {
     List<String> topology = List.of("1 0 8:1 / / rw - ext4 /dev/first rw");
+    int deviceCase;
     boolean unreadable;
     boolean uuidFailure;
     int mountReads;
@@ -199,13 +227,38 @@ final class SourceStoragePublicationTest extends LuceneExecutorTestBase {
             case "uuidDevices" -> {
               uuidReads++;
               if (uuidFailure) throw new java.io.IOException("unreadable UUID inventory");
+              if (deviceCase != 0) {
+                var lease = Class.forName("io.justsearch.indexerworker.services.LinuxRootIdentityLease");
+                var unique = lease.getDeclaredMethod("uniqueUuidDevices", Map.class);
+                unique.setAccessible(true);
+                yield unique.invoke(null, Map.of("8:1", List.of("aaaa-1111"),
+                    "8:2", deviceCase == 7 ? List.of("bbbb-2222", "dddd-4444") : List.of("bbbb-2222"),
+                    "8:3", List.of("cccc-3333"), "0:45", List.of("eeee-5555")));
+              }
               yield Map.of("8:1", "aaaa-1111", "8:2", "bbbb-2222");
             }
             case "sourceDevice" -> {
               sourceReads++;
               var device = args[0].getClass().getDeclaredMethod("device");
               device.setAccessible(true);
-              yield device.invoke(args[0]);
+              if (deviceCase == 0) yield device.invoke(args[0]);
+              var lease = Class.forName("io.justsearch.indexerworker.services.LinuxRootIdentityLease");
+              var resolve = lease.getDeclaredMethod("sourceDevice", args[0].getClass());
+              resolve.setAccessible(true);
+              try (var filesystem = mockStatic(Files.class, CALLS_REAL_METHODS)) {
+                filesystem.when(() -> Files.readAttributes(Path.of("/dev/ancestor"), "unix:rdev,mode"))
+                    .thenReturn(Map.of("mode", 0060000, "rdev", 2049L));
+                if (deviceCase == 6) {
+                  filesystem.when(() -> Files.readAttributes(Path.of("/dev/child"), "unix:rdev,mode"))
+                      .thenThrow(new java.io.IOException("unreadable source"));
+                } else {
+                  long rdev = deviceCase == 2 ? 2049L : deviceCase == 3 ? 2051L : 2050L;
+                  filesystem.when(() -> Files.readAttributes(Path.of("/dev/child"), "unix:rdev,mode"))
+                      .thenReturn(Map.of("mode", 0060000, "rdev", rdev));
+                }
+                try { yield resolve.invoke(null, args[0]); }
+                catch (java.lang.reflect.InvocationTargetException failure) { throw failure.getCause(); }
+              }
             }
             default -> throw new UnsupportedOperationException(method.getName());
           });

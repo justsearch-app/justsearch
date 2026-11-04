@@ -271,7 +271,8 @@ final class LinuxRootIdentityLease implements RootIdentityLease {
         return deviceNumber(((Number) attributes.get("rdev")).longValue());
       }
     }
-    return mount.device();
+    // An anonymous mount without a block source cannot supply a persistent device identity.
+    return mount.device().startsWith("0:") ? null : mount.device();
   }
 
   static String encodeVolume(String uuid, String type, Path filesystemRoot) {

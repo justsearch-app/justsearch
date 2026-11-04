@@ -71,7 +71,11 @@ public final class StorageObservationSnapshot {
       Map<LinuxRootIdentityLease.Mount, String> keys = new HashMap<>();
       for (var mount : mounts) {
         try {
-          String uuid = uuids.get(evidence.sourceDevice(mount));
+          String device = evidence.sourceDevice(mount);
+          // Only anonymous mount devices (for example btrfs) need source-device identity.
+          // A different resolved device for an ordinary mount is contradictory evidence.
+          if (device == null || (!mount.device().startsWith("0:") && !mount.device().equals(device))) continue;
+          String uuid = uuids.get(device);
           if (uuid == null) continue;
           // Reuse the identity lease's validation; the catalog stores the readable tuple.
           LinuxRootIdentityLease.encodeVolume(uuid, mount.type(), mount.filesystemRoot());

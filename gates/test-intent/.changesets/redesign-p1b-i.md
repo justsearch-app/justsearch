@@ -75,8 +75,13 @@ production APIs as assertion failures on P1a; publication assertions also inspec
         "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/SourceStoragePublicationTest.java"
       ],
       "class": "New",
-      "behaviour": "P1b-5/6: controlled mountinfo and UUID inventories yield effective mount plus UUID:type:filesystem-root identity, distinguishing bind roots. Missing, ambiguous, malformed or unreadable evidence yields unknown and never ancestor storage. UUID inventory and device resolution do not grow with source count while topology is unchanged; mount reads are bounded by batch capture plus one comparison per source, with no per-source identity lease or directory observation. Mount replacement, removal, unreadability and failed UUID re-observation before the first source and between sources commit refreshed evidence or unknown, never stale known. Real JobBatchWriter publication checks inspect committed target/active parents and every chunk, requiring one coherent envelope per source, including later sources after re-observation. Portable observation produces not_observed.",
+      "behaviour": "P1b-5/6: controlled mountinfo and UUID inventories yield effective mount plus UUID:type:filesystem-root identity, distinguishing bind roots. Missing, ambiguous, malformed or unreadable evidence yields unknown and never ancestor storage. UUID inventory and device resolution do not grow with source count while topology is unchanged; mount reads are bounded by batch capture plus one comparison per source, with no per-source identity lease or directory observation. Mount replacement, removal, unreadability and failed UUID re-observation before the first source and between sources commit refreshed evidence or unknown, never stale known. Real JobBatchWriter publication checks inspect committed target/active parents and every chunk, requiring one coherent envelope per source, including later sources after re-observation. Device evidence case table rows 1-7 run through the real extractor/writer and committed target/active parents and chunks: matching non-anonymous devices are known; contradictory devices are unknown; anonymous btrfs uses its block source; anonymous non-block sources are unknown; non-anonymous non-block sources use the unique mount-table UUID; unreadable sources and duplicate UUID aliases are unknown. Portable observation produces not_observed.",
       "sources": [
+        {
+          "kind": "owner-words",
+          "location": "task redesign-p1b-i request, Decision: self-consistent device evidence",
+          "quote": "for a non-anonymous mount-table device, a source path resolving to a different block device is contradictory evidence and gives unknown, never the other device's UUID; anonymous devices (btrfs) keep resolving through the source block device; every other existing case is unchanged."
+        },
         {
           "kind": "owner-words",
           "location": "task redesign-p1b-i request",
@@ -95,6 +100,7 @@ production APIs as assertion failures on P1a; publication assertions also inspec
       ],
       "evidence": "gates/test-intent/evidence/redesign-p1b-i-storage-repair.json",
       "newChecks": [
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/SourceStoragePublicationTest.java#selfConsistentDeviceEvidenceDeterminesCommittedStorage",
         "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/StorageObservationSnapshotTest.java#effectiveMountAndBindSubtreesHaveIndependentKeys",
         "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/StorageObservationSnapshotTest.java#uncertainEffectiveMountNeverFallsBackToAncestor",
         "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/StorageObservationSnapshotTest.java#uuidAndDeviceDiscoveryDoNotGrowWithUnchangedSourceCount",
@@ -156,6 +162,7 @@ env -u DISPLAY -u WAYLAND_DISPLAY js-gradle-slot node scripts/governance/gates/t
   --check modules/worker-services/src/test/java/io/justsearch/indexerworker/services/StorageObservationSnapshotTest.java#changedOrUnreadableTopologyBeforeAndBetweenSourcesCannotReturnStaleKnown \
   --check modules/worker-services/src/test/java/io/justsearch/indexerworker/services/StorageObservationSnapshotTest.java#ambiguousAndMalformedUuidAliasesCannotIdentifyADevice \
   --check modules/worker-services/src/test/java/io/justsearch/indexerworker/services/StorageObservationSnapshotTest.java#nonLinuxObservationDoesNotInventStorage \
+  --check modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/SourceStoragePublicationTest.java#selfConsistentDeviceEvidenceDeterminesCommittedStorage \
   --check modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/SourceStoragePublicationTest.java#topologyChangesNeverCommitStaleKnownStorage \
   --check modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/SourceStoragePublicationTest.java#unchangedTopologyKeepsDiscoveryIndependentOfSourceCount \
   --check modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/SourceEnvelopePreservationTest.java#malformedEnvelopeNeverDecodesKnown
@@ -165,6 +172,21 @@ The added topology check was also overlaid onto pre-repair HEAD 68ed4f26b1 in th
 shared before clone. Its four between-source variants fail the stale-known assertion; its four
 before-first-source variants pass. The repair evidence command above uses the P1a base, where
 committed rows lack the envelope and fail that assertion instead.
+
+The device-evidence publication check covers case-table rows 1-7 through the real source-device
+helper, extractor and writer, inspecting committed target/active parents and chunks. Overlay it
+onto pre-repair HEAD 4fcfb0381d and the P1a base in separate shared clones, then run:
+
+```bash
+env -u DISPLAY -u WAYLAND_DISPLAY js-gradle-slot ./gradlew :modules:worker-services:test \
+  --tests '*SourceStoragePublicationTest.selfConsistentDeviceEvidenceDeterminesCommittedStorage' \
+  -PskipWebBuild=true --console=plain
+```
+
+Row 2 must fail on pre-repair HEAD because the committed key is aaaa-1111:ext4:/ rather than
+absent, and on P1a because the committed envelope is absent. Rows 1, 3 and 5-7 preserve their
+pre-repair outcomes. Row 4 additionally proves that an anonymous non-block source cannot use
+an inventory entry for its anonymous mount-table device.
 
 Preservation evidence (run the same selected checks in the before clone and candidate; the
 runner's --before mode requires failures, so the preservation evidence command has no --before):
