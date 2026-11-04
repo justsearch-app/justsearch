@@ -1419,3 +1419,14 @@ checks are unchanged except:
   "note": "Final acceptance on b4ee2624ce: the 38 earlier entries unchanged (accepted in rounds 2 and 4); three new Obsolete entries with production-removal sources; decision-record conflict search repeated, none. Transcribed by the orchestrator from the verifier's answer (Codex sandbox)."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a1a429-d20f-79f2-85cd-84e67b53ed58",
+  "verdict": "accept",
+  "digest": "sha256:3e19d8d69f6a5ed6e74fd45f2743200aa9e6fb32e6745da0d09b5bf0fc23f09d",
+  "note": "Round 8 (rounds 8-10 entries): early checkbox and typed input rejected before arming, native close releases modality and the real pill -> panel -> Review path reopens the ceremony, C12 activation and R8 arrival hold; 32 independent Chromium checks; no guarantee weakened. Transcribed by the orchestrator from the verifier's answer (Codex sandbox)."
+}
+```
