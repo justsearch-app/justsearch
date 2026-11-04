@@ -283,3 +283,14 @@ The orchestrator owns the dev-stack backlog/heap check. No shared dev stack is s
   "note": "Codex acceptor-4 on 0351cab29d: entries 1-6 and 8 accept; entry 7 rejected - P5 is a ceiling but the check requires exactly 201 searches, which would reject a correct optimization."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a1a497-70ee-7fa3-9ea2-b0bf6d9334d2",
+  "verdict": "accept",
+  "digest": "sha256:1aa7a8eb635747e573d5e5db284dbe4d1dd312cda42c9c039527e8c58fe3bb7e",
+  "note": "Codex acceptor-5 on d8064b0b1e: all nine entries accept; ceiling oracle confirmed (201 at 1k and 50k, lower counts pass); behaviour verified by verifier-1 (session 01a1a42e) on the same production code."
+}
+```
