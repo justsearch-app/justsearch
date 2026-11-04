@@ -15,7 +15,6 @@ The user's answer-policy decision is quoted below. P1/P2 here identify the deliv
     {
       "items": [
         "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/HeavyIndexingStateTest.java",
-        "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/IndexingLoopHeavyIndexingTest.java",
         "modules/app-inference/src/test/java/io/justsearch/app/inference/chat/IndexingAnswerAdmissionTest.java",
         "modules/app-services/src/test/java/io/justsearch/app/services/settings/AnswerPausePreferenceTest.java",
         "modules/app-services/src/test/java/io/justsearch/app/services/conversation/ConversationIndexingPauseTest.java",
@@ -68,7 +67,6 @@ The user's answer-policy decision is quoted below. P1/P2 here identify the deliv
       "evidence": "gates/test-intent/evidence/s2-pause-answers-new.json",
       "newChecks": [
         "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/HeavyIndexingStateTest.java",
-        "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/IndexingLoopHeavyIndexingTest.java",
         "modules/app-inference/src/test/java/io/justsearch/app/inference/chat/IndexingAnswerAdmissionTest.java",
         "modules/app-services/src/test/java/io/justsearch/app/services/settings/AnswerPausePreferenceTest.java",
         "modules/app-services/src/test/java/io/justsearch/app/services/conversation/ConversationIndexingPauseTest.java",
@@ -175,7 +173,6 @@ The user's answer-policy decision is quoted below. P1/P2 here identify the deliv
     {
       "items": [
         "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.residency.test.ts",
-        "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/IndexingLoopHeavyIndexingTest.java",
         "modules/ui/src/test/java/io/justsearch/ui/api/IndexingPauseWireTest.java",
         "modules/ui/src/test/java/io/justsearch/ui/api/IndexingPauseGenerationHttpTest.java"
       ],
@@ -206,7 +203,6 @@ The user's answer-policy decision is quoted below. P1/P2 here identify the deliv
       "evidence": "gates/test-intent/evidence/s2-pause-answers-repair.json",
       "newChecks": [
         "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.residency.test.ts#automatically answers an indexing-paused question once after Engine resume across repeated polls and windows",
-        "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/IndexingLoopHeavyIndexingTest.java",
         "modules/ui/src/test/java/io/justsearch/ui/api/IndexingPauseWireTest.java#readinessUnionAcceptsTheTypedIndexingRefusal",
         "modules/ui/src/test/java/io/justsearch/ui/api/IndexingPauseGenerationHttpTest.java"
       ]
@@ -214,7 +210,6 @@ The user's answer-policy decision is quoted below. P1/P2 here identify the deliv
     {
       "items": [
         "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.residency.test.ts",
-        "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/IndexingLoopHeavyIndexingTest.java",
         "modules/app-services/src/test/java/io/justsearch/app/services/conversation/ConversationIndexingContinuationTest.java"
       ],
       "class": "New",
@@ -245,8 +240,114 @@ The user's answer-policy decision is quoted below. P1/P2 here identify the deliv
       "newChecks": [
         "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.residency.test.ts#automatically continues a 200 SSE indexing refusal for core.rag-ask with the same turn and preserves a newer draft",
         "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.residency.test.ts#automatically continues a 200 SSE indexing refusal for core.free-chat with the same turn and preserves a newer draft",
-        "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/IndexingLoopHeavyIndexingTest.java#aSampleCapturedBeforeManualPauseCannotRestoreClearedHysteresis",
         "modules/app-services/src/test/java/io/justsearch/app/services/conversation/ConversationIndexingContinuationTest.java"
+      ]
+    },
+    {
+      "items": [
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/IndexingLoopHeavyIndexingTest.java",
+        "modules/app-services/src/test/java/io/justsearch/app/services/conversation/HierarchicalShapeRunnerTest.java"
+      ],
+      "class": "New",
+      "repaired": true,
+      "behaviour": "Repair round 3: sample and publication run under one lock. An older 50-file observation cannot overwrite drain-to-zero followed by 20 new files. Manual hold/reset during a sample clears hysteresis; its existing interleaving now waits for the serialized reset before resuming. A bulk GPU hold does not exclude file ingestion or CPU-runnable embedding backlog; GPU-only embedding backlog remains excluded. Hierarchical sections, final synthesis and single-pass synthesis retain CHAT_UNAVAILABLE, INDEXING, forceAllowed=false and the exact pause wording for synchronous and callback refusals after initial admission, and never synthesize placeholders from a paused section. Baseline c93a9c0f49 supplies assertion fail-before for the race, GPU-held file/CPU backlog and callback section/final refusals; cases already correct on the baseline remain in the same parameterized checks as preservation coverage. Earlier worker evidence references are superseded because this round changes that test file. The same evidence also runs the full modified worker test class on both trees, retaining manual-pause/reset, availability, hold, failure, stopped-owner and recovery coverage.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "P1",
+          "quote": "(user Q1: \"Wait, model stays\") Advanced settings has a \"Pause answers while indexing\" switch, default off (existing installs unchanged). On: while the Engine runs heavy indexing (bulk import, reindex, meaning backfill; not picture reading), new questions from the page, agents and HTTP get an explicit \"Answers paused while indexing\" outcome instead of an answer, an answer already streaming finishes, drafts and conversations are kept, search stays available; when heavy indexing ends (finish, fail, cancel, manual pause) answers resume by themselves with the model still loaded. The saved answers on/off choice is never changed by the pause.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "P2",
+          "quote": "Pause and user intent: switching answers off during a pause keeps them off after indexing; turning the pause switch off mid-indexing resumes answers at once; overlapping indexing work ending in any order releases the pause only when none is left; the choice survives restart and upgrade; a second window converges; Engine recovery mid-pause settles to the right state; a stale window or queue poll cannot hold answers paused. (challenger-4 #11)",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-words",
+          "quote": "Wait, model stays (Recommended)",
+          "location": "task t-20261101-uiimpl user turn Q1"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/s2-pause-answers-repair3.json",
+      "newChecks": [
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/IndexingLoopHeavyIndexingTest.java",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/IndexingLoopHeavyIndexingTest.java#drainedBacklogThenSmallNewBatchCannotBeOverwrittenByAnOlderSample",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/IndexingLoopHeavyIndexingTest.java#gpuHoldOnlyExcludesGpuEmbeddingWork",
+        "modules/app-services/src/test/java/io/justsearch/app/services/conversation/HierarchicalShapeRunnerTest.java#generationPauseAfterAdmissionRemainsTypedAndStopsThePipeline"
+      ]
+    },
+    {
+      "items": [
+        "modules/app-inference/src/test/java/io/justsearch/app/inference/IndexingPauseGenerationRoutesTest.java",
+        "modules/app-services/src/test/java/io/justsearch/app/services/conversation/WorkflowIndexingPauseTest.java"
+      ],
+      "class": "New",
+      "repaired": true,
+      "behaviour": "Repair round 3 route sweep: a legacy stream queue refusal calls the terminal error handler with the typed pause instead of leaving the caller waiting; unified streaming and completion retain the typed pause, make no upstream request and leak no generation tickets. A workflow LLM step preserves a thrown or SSE-encoded pause and aborts before subsequent nodes, node output or success. Fail-before targets c93a9c0f49 in a temporary shared clone; known-correct route variants remain preservation cases.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "P1",
+          "quote": "(user Q1: \"Wait, model stays\") Advanced settings has a \"Pause answers while indexing\" switch, default off (existing installs unchanged). On: while the Engine runs heavy indexing (bulk import, reindex, meaning backfill; not picture reading), new questions from the page, agents and HTTP get an explicit \"Answers paused while indexing\" outcome instead of an answer, an answer already streaming finishes, drafts and conversations are kept, search stays available; when heavy indexing ends (finish, fail, cancel, manual pause) answers resume by themselves with the model still loaded. The saved answers on/off choice is never changed by the pause.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "P2",
+          "quote": "Pause and user intent: switching answers off during a pause keeps them off after indexing; turning the pause switch off mid-indexing resumes answers at once; overlapping indexing work ending in any order releases the pause only when none is left; the choice survives restart and upgrade; a second window converges; Engine recovery mid-pause settles to the right state; a stale window or queue poll cannot hold answers paused. (challenger-4 #11)",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-words",
+          "quote": "Wait, model stays (Recommended)",
+          "location": "task t-20261101-uiimpl user turn Q1"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/s2-pause-answers-repair3-sweep.json",
+      "newChecks": [
+        "modules/app-inference/src/test/java/io/justsearch/app/inference/IndexingPauseGenerationRoutesTest.java",
+        "modules/app-services/src/test/java/io/justsearch/app/services/conversation/WorkflowIndexingPauseTest.java"
+      ]
+    },
+    {
+      "items": [
+        "modules/app-agent/src/test/java/io/justsearch/agent/AgentLoopServiceTest.java",
+        "modules/ui/src/test/java/io/justsearch/ui/api/IndexingPauseDispatchTest.java"
+      ],
+      "class": "New",
+      "repaired": true,
+      "behaviour": "Repair round 3 route sweep: agent step-ceiling finalization, handoff escalation and synchronous wrapped refusal retain the explicit pause message with the existing UNAVAILABLE, TRANSIENT, ABORT agent outcome, terminate without a fabricated answer and never retry. Chat dispatch recognizes a wrapped typed pause instead of translating it to BAD_REQUEST. Controlled refusals happen at generation after earlier agent turns or initial chat admission; c93a9c0f49 supplies assertion fail-before.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "P1",
+          "quote": "(user Q1: \"Wait, model stays\") Advanced settings has a \"Pause answers while indexing\" switch, default off (existing installs unchanged). On: while the Engine runs heavy indexing (bulk import, reindex, meaning backfill; not picture reading), new questions from the page, agents and HTTP get an explicit \"Answers paused while indexing\" outcome instead of an answer, an answer already streaming finishes, drafts and conversations are kept, search stays available; when heavy indexing ends (finish, fail, cancel, manual pause) answers resume by themselves with the model still loaded. The saved answers on/off choice is never changed by the pause.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "P2",
+          "quote": "Pause and user intent: switching answers off during a pause keeps them off after indexing; turning the pause switch off mid-indexing resumes answers at once; overlapping indexing work ending in any order releases the pause only when none is left; the choice survives restart and upgrade; a second window converges; Engine recovery mid-pause settles to the right state; a stale window or queue poll cannot hold answers paused. (challenger-4 #11)",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-words",
+          "quote": "Wait, model stays (Recommended)",
+          "location": "task t-20261101-uiimpl user turn Q1"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/s2-pause-answers-repair3-agent-dispatch.json",
+      "newChecks": [
+        "modules/app-agent/src/test/java/io/justsearch/agent/AgentLoopServiceTest.java#indexingPauseInEveryAgentGenerationPhaseStopsWithUnavailable",
+        "modules/ui/src/test/java/io/justsearch/ui/api/IndexingPauseDispatchTest.java"
       ]
     }
   ]

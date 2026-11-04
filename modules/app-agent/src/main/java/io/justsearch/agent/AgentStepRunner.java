@@ -646,6 +646,9 @@ final class AgentStepRunner {
                 result = escalated;
               }
             } catch (RuntimeException e) {
+              if (io.justsearch.app.api.chat.AnswersPausedException.causedByPause(e)) {
+                throw new io.justsearch.app.api.chat.AnswersPausedException();
+              }
               LOG.warn("Handoff escalation failed, falling through to text response", e);
             }
           }

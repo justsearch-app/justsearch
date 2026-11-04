@@ -210,6 +210,9 @@ final class AgentLlmCaller {
       String text = result.textContent();
       return text != null && !text.isBlank() ? text : null;
     } catch (Exception e) {
+      if (io.justsearch.app.api.chat.AnswersPausedException.causedByPause(e)) {
+        throw new io.justsearch.app.api.chat.AnswersPausedException();
+      }
       LOG.warn("Finalize LLM call failed", e);
       return null;
     }
@@ -561,6 +564,9 @@ final class AgentLlmCaller {
     } catch (RuntimeException e) {
       chatSpan.recordException(e);
       chatSpan.setStatus(StatusCode.ERROR, "llm-call-failed");
+      if (io.justsearch.app.api.chat.AnswersPausedException.causedByPause(e)) {
+        throw new io.justsearch.app.api.chat.AnswersPausedException();
+      }
       throw e;
     } finally {
       long durationMs = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - chatStartNanos);

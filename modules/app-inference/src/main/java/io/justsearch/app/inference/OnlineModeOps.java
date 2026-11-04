@@ -672,7 +672,13 @@ final class OnlineModeOps {
 
               // No work handle on this path: the lease counts the generation, with no pacing.
               GenerationTask task = new GenerationTask();
-              task.queue(null);
+              try {
+                task.queue(null);
+              } catch (RuntimeException refused) {
+                pump.close();
+                reportStreamFailure("Stream chat admission", refused, trackedOnError);
+                return null;
+              }
               onlineRequestLock.lock();
               try {
                 GenerationLease lease = task.admit();

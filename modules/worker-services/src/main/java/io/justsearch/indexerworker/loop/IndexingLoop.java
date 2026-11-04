@@ -1303,21 +1303,27 @@ public class IndexingLoop implements Closeable {
 
   /** Live owner read: no window, cached queue response or retained successor can hold this on. */
   public boolean heavyIndexing() {
-    long generation = heavyIndexing.generation();
-    boolean processing = isRunning() && !cutoverPauseRequested
-        && serviceOutagePausedUntilMs() == 0 && !signalBus.isIndexingHeld()
-        && !signalBus.isEnergyReduced() && !signalBus.isBulkHeld();
-    if (!processing) return heavyIndexing.update(false, 0, 0);
-    try {
-      var counts = jobQueue.jobStateCounts();
-      return heavyIndexing.updateIfCurrent(generation, true, counts.pendingReadyCount() + counts.processingCount(),
-          backfillScheduler.pendingEmbeddingDocuments());
-    } catch (IOException | RuntimeException failure) {
-      // An unavailable index is not running heavy work. Never retain an old automatic pause.
-      heavyIndexing.updateIfCurrent(generation, false, 0, 0);
-      log.debug("Heavy indexing could not be sampled", failure);
-      return false;
+    // Sampling and publication share the reset lock: an older count cannot publish after a
+    // newer count has drained the backlog and started a smaller batch.
+    synchronized (heavyIndexing) {
+      if (!heavyIndexingCanProgress()) return heavyIndexing.update(false, 0, 0);
+      try {
+        var counts = jobQueue.jobStateCounts();
+        long embeddings = backfillScheduler.pendingEmbeddingDocuments();
+        return heavyIndexing.update(heavyIndexingCanProgress(),
+            counts.pendingReadyCount() + counts.processingCount(), embeddings);
+      } catch (IOException | RuntimeException failure) {
+        // An unavailable index is not running heavy work. Never retain an old automatic pause.
+        heavyIndexing.update(false, 0, 0);
+        log.debug("Heavy indexing could not be sampled", failure);
+        return false;
+      }
     }
+  }
+
+  private boolean heavyIndexingCanProgress() {
+    return isRunning() && !cutoverPauseRequested && serviceOutagePausedUntilMs() == 0
+        && !signalBus.isIndexingHeld() && !signalBus.isEnergyReduced();
   }
 
   /**
