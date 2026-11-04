@@ -735,9 +735,12 @@ export async function consumeShapeStream(
           const err = new Error(message) as Error & {
             code?: string;
             errorClass?: string;
+            chatRefusal?: ChatRefusalDetail;
           };
           if (p?.errorCode) err.code = p.errorCode as string;
           if (p?.errorClass) err.errorClass = p.errorClass as string;
+          const refusal = parseChatRefusal(JSON.stringify(payload));
+          if (refusal) err.chatRefusal = refusal;
           errorFromEvent = err;
         }
         try {

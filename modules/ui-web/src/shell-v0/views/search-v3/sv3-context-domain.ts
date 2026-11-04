@@ -464,17 +464,20 @@ export class Sv3ContextDomain {
   /** Resolve saved context before opening a turn. Null refuses; [] means confirmed empty context. */
   async followUpContext(
     sessionId: string,
+    continuingTurnId?: string,
   ): Promise<ReturnType<typeof sv3FollowUpContext> | null> {
     if (!await this.confirmContextForAsk(sessionId)
       || !this.host.connected() || this.host.activeConversationId() !== sessionId) return null;
-    return this.followUpContextOf(sessionId);
+    return this.followUpContextOf(sessionId, continuingTurnId);
   }
 
-  followUpContextOf(sessionId: string): ReturnType<typeof sv3FollowUpContext> | null {
-    if (this.host.session(sessionId)?.turns.some(turn => turn.status === 'unfinished')) return null;
+  followUpContextOf(sessionId: string, continuingTurnId?: string): ReturnType<typeof sv3FollowUpContext> | null {
     const session = this.host.session(sessionId);
     if (session?.history == null) return null;
-    return sv3FollowUpContext(session.turns, projectSv3TurnContexts(session.turns, session.history), session.history);
+    // Only the explicitly refused attempt is being continued. Other unfinished turns still block.
+    const turns = session.turns.filter(turn => continuingTurnId === undefined || turn.dispatchTurnId !== continuingTurnId);
+    if (turns.some(turn => turn.status === 'unfinished')) return null;
+    return sv3FollowUpContext(turns, projectSv3TurnContexts(turns, session.history), session.history);
   }
 
   buildContextInspectorView(): InspectorView {

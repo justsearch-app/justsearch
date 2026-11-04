@@ -1061,7 +1061,7 @@ export class SearchV3View extends JfElement {
     search: () => this.search,
     submitTurn: (question, now, kind, target, shape, selectionKind, dispatchTurnId) => {
       this.sessions = submitInSession(this.sessions, question, now, kind, target, shape, selectionKind, dispatchTurnId);
-      return latestTurnRef(this.sessions);
+      return latestTurnRef(this.sessions, dispatchTurnId);
     },
     dropTurn: ref => { this.sessions = dropTurn(this.sessions, ref); },
     setReasoning: (ref, blocks) => { this.sessions = setTurnReasoning(this.sessions, ref, blocks); },

@@ -122,6 +122,65 @@ describe('NR15 human admission and RR15 refusal recovery', () => {
     expect(dispatches()).toHaveLength(2);
   });
 
+  it.each(['core.rag-ask', 'core.free-chat'] as const)(
+    'automatically continues a 200 SSE indexing refusal for %s with the same turn and preserves a newer draft', async shape => {
+      const el = await mount(shape);
+      let refuse!: (response: Response) => void;
+      let answer!: (response: Response) => void;
+      let answered = false;
+      http.mockImplementation(async (url: unknown) => {
+        const href = String(url);
+        if (href.includes('/dispatch')) return new Promise<Response>(resolve => {
+          if (dispatches().length === 1) refuse = resolve; else answer = resolve;
+        });
+        if (!href.includes('/history') && !href.includes('/api/thread/')) return new Response('{}');
+        const messages = [{ id: '11111111-2222-4333-8444-555555555551', role: 'user',
+          content: 'saved waiting question', shapeId: shape, turnId: body().turnId },
+        ...(answered ? [{ id: '11111111-2222-4333-8444-555555555552', role: 'assistant',
+          content: 'Answer', shapeId: shape, turnId: body().turnId }] : [])];
+        if (href.includes('/history')) return new Response(JSON.stringify({ sessionId: body().conversationId, messages }));
+        if (href.includes('/api/thread/')) return new Response(JSON.stringify({ conversationId: body().conversationId,
+          events: messages.map((m, i) => ({ id: m.id, occurredAt: `2026-11-04T00:00:0${i}Z`,
+            kind: m.role === 'user' ? 'USER_MESSAGE' : 'ASSISTANT_MESSAGE', content: m.content,
+            originator: m.role, attributes: { shapeId: shape, turnId: m.turnId } })) }));
+        return new Response('{}');
+      });
+      await send(el, 'saved waiting question');
+      refuse(new Response('event: error\ndata: ' + JSON.stringify({ errorCode: 'CHAT_UNAVAILABLE',
+        reason: 'INDEXING', error: 'Answers paused while indexing', forceAllowed: false }) + '\n\n',
+      { status: 200, headers: { 'content-type': 'text/event-stream' } }));
+      await settle(el);
+      expect(el.shadowRoot!.textContent).toContain('Answers paused while indexing');
+      expect(el.shadowRoot!.textContent).toContain('Your question will send automatically when answers resume.');
+      const bytes = sessionStorage.getItem(`justsearch.draft.attachment.v1.search-v3.${shape}`);
+      expect(bytes).not.toBeNull();
+      expect(JSON.parse(bytes!).payload.task).toMatchObject({ delivery: 'unaccepted',
+        dispatchTurnId: body().turnId, raw: 'saved waiting question' });
+      // Read the saved question through the page's record-check interface while it waits.
+      el.shadowRoot!.querySelector('jf-sv3-main')!.dispatchEvent(new CustomEvent('sv3-record-check',
+        { bubbles: true, composed: true }));
+      await settle(el);
+      expect(el.shadowRoot!.querySelector('jf-sv3-main')!.shadowRoot!
+        .querySelectorAll('[data-testid=sv3-turn-question]')).toHaveLength(1);
+      indexingState(true); await settle(el);
+      expect(dispatches()).toHaveLength(1);
+      indexingState(false); indexingState(false); await settle(el);
+      expect(dispatches()).toHaveLength(2);
+      expect(body(1)).toMatchObject({ turnId: body().turnId, conversationId: body().conversationId,
+        [shape === 'core.free-chat' ? 'prompt' : 'question']: 'saved waiting question' });
+      await type(el, 'newer draft');
+      expect(field(el).value).toBe('newer draft');
+      indexingState(true); indexingState(false); await settle(el);
+      expect(dispatches()).toHaveLength(2);
+      answered = true; answer(done()); await settle(el);
+      const main = el.shadowRoot!.querySelector('jf-sv3-main')!.shadowRoot!;
+      expect(main.querySelector<HTMLElement & { text: string }>('[data-testid=sv3-turn-markdown]')?.text).toBe('Answer');
+      expect(main.querySelectorAll('[data-testid=sv3-turn-question]')).toHaveLength(1);
+      expect(field(el).value).toBe('newer draft');
+      indexingState(true); indexingState(false); await settle(el);
+      expect(dispatches()).toHaveLength(2);
+    });
+
   it.each(['edit', 'cancel', 'discard', 'new', 'answers off'] as const)(
     'cancels automatic indexing continuation on %s', async cancel => {
       const el = await mount();

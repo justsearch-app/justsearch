@@ -210,6 +210,44 @@ The user's answer-policy decision is quoted below. P1/P2 here identify the deliv
         "modules/ui/src/test/java/io/justsearch/ui/api/IndexingPauseWireTest.java#readinessUnionAcceptsTheTypedIndexingRefusal",
         "modules/ui/src/test/java/io/justsearch/ui/api/IndexingPauseGenerationHttpTest.java"
       ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.residency.test.ts",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/IndexingLoopHeavyIndexingTest.java",
+        "modules/app-services/src/test/java/io/justsearch/app/services/conversation/ConversationIndexingContinuationTest.java"
+      ],
+      "class": "New",
+      "repaired": true,
+      "behaviour": "Repair round 2: a typed INDEXING refusal inside an HTTP 200 SSE stream enters the same live automatic waiting path as a pre-stream HTTP 503 refusal, for grounded answers and free chat. The browser reads the already-saved unanswered question through the page record-check interface while waiting. Resume retains that visible turn and its turn id, sends once, and preserves a newer draft. The Engine reuses the already-persisted unanswered question across repeated refusals and injects it once, with prior history preserved for persistent shapes. A controlled interleaving captures 50 files, stalls the embedding read, observes manual pause/reset, resumes at 20, then releases the old read; the stale sample cannot restore hysteresis, while a fresh 50-file sample can still enter. Fail-before checks target 69812a2711 in the temporary shared clone.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "P1",
+          "quote": "(user Q1: \"Wait, model stays\") Advanced settings has a \"Pause answers while indexing\" switch, default off (existing installs unchanged). On: while the Engine runs heavy indexing (bulk import, reindex, meaning backfill; not picture reading), new questions from the page, agents and HTTP get an explicit \"Answers paused while indexing\" outcome instead of an answer, an answer already streaming finishes, drafts and conversations are kept, search stays available; when heavy indexing ends (finish, fail, cancel, manual pause) answers resume by themselves with the model still loaded. The saved answers on/off choice is never changed by the pause.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "P2",
+          "quote": "Pause and user intent: switching answers off during a pause keeps them off after indexing; turning the pause switch off mid-indexing resumes answers at once; overlapping indexing work ending in any order releases the pause only when none is left; the choice survives restart and upgrade; a second window converges; Engine recovery mid-pause settles to the right state; a stale window or queue poll cannot hold answers paused. (challenger-4 #11)",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-words",
+          "quote": "Wait, model stays (Recommended)",
+          "location": "task t-20261101-uiimpl user turn Q1"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/s2-pause-answers-repair2.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.residency.test.ts#automatically continues a 200 SSE indexing refusal for core.rag-ask with the same turn and preserves a newer draft",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.residency.test.ts#automatically continues a 200 SSE indexing refusal for core.free-chat with the same turn and preserves a newer draft",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/IndexingLoopHeavyIndexingTest.java#aSampleCapturedBeforeManualPauseCannotRestoreClearedHysteresis",
+        "modules/app-services/src/test/java/io/justsearch/app/services/conversation/ConversationIndexingContinuationTest.java"
+      ]
     }
   ]
 }

@@ -652,9 +652,11 @@ export class Sv3DraftDomain {
       if (!this.humanOwned(task) || operation.signal.aborted) return;
       const reason = this.humanUnavailable(task.saved.shape, force);
       const session = task.saved.target === null ? null : this.host.session(task.saved.target);
+      const continuingTurnId = task.refusal?.reason === 'INDEXING' ? task.saved.dispatchTurnId : undefined;
       const context = task.saved.shape === SV3_MODEL_SHAPE_ID || session === null ? []
-        : session.history === null && task.saved.place === null && session.turns.length === 0 ? []
-        : this.contextDomain.followUpContextOf(session.id);
+        : session.history === null && task.saved.place === null && session.turns.every(turn =>
+          continuingTurnId !== undefined && turn.dispatchTurnId === continuingTurnId && !turn.savedOutcome) ? []
+        : this.contextDomain.followUpContextOf(session.id, continuingTurnId);
       if (reason || (task.saved.target !== null && this.contextDomain.hasPendingWrite(task.saved.target))
         || JSON.stringify(context) !== JSON.stringify(task.context)) {
         task.revoked = true;

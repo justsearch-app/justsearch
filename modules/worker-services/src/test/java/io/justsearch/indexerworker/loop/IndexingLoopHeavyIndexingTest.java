@@ -69,6 +69,69 @@ final class IndexingLoopHeavyIndexingTest {
   }
 
   @Test
+  void aSampleCapturedBeforeManualPauseCannotRestoreClearedHysteresis() throws Exception {
+    var files = new AtomicLong(50);
+    var hold = new IndexingHold();
+    var signals = mock(WorkerSignalBus.class);
+    when(signals.indexingHold()).thenReturn(hold);
+    when(signals.isIndexingHeld()).thenAnswer(ignored -> hold.held());
+    var queue = mock(JobQueue.class);
+    when(queue.jobStateCounts()).thenAnswer(ignored ->
+        new JobQueue.JobStateCounts(files.get(), files.get(), 0, 0, 0));
+    var polling = new CountDownLatch(1);
+    var releaseLoop = new CountDownLatch(1);
+    when(queue.pollPending(anyInt())).thenAnswer(ignored -> {
+      polling.countDown();
+      assertTrue(releaseLoop.await(30, TimeUnit.SECONDS));
+      return List.of();
+    });
+    var sampling = new CountDownLatch(1);
+    var releaseSample = new CountDownLatch(1);
+    var sampler = new java.util.concurrent.atomic.AtomicReference<Thread>();
+    var counts = mock(IndexCountOps.class);
+    when(counts.countByFieldOrThrow(SchemaFields.EMBEDDING_STATUS,
+        SchemaFields.EMBEDDING_STATUS_PENDING)).thenAnswer(ignored -> {
+      if (Thread.currentThread() == sampler.get()) {
+        sampling.countDown();
+        assertTrue(releaseSample.await(10, TimeUnit.SECONDS));
+      }
+      return 0;
+    });
+    var loop = new IndexingLoop(
+        io.justsearch.indexerworker.TestWorkerExecutorRegistrations.ocr(),
+        io.justsearch.indexerworker.TestWorkerExecutorRegistrations.timebox(), queue,
+        mock(IndexingCoordinator.class), mock(CommitOps.class), mock(DocumentFieldOps.class),
+        counts, () -> null, signals, IndexingPacing.unthrottled(),
+        null, null, null, null, null, null, null);
+    var provider = mock(io.justsearch.indexerworker.embed.EmbeddingProvider.class);
+    when(provider.isAvailable()).thenReturn(true);
+    loop.getEmbeddingLifecycle().setEmbeddingProvider(provider);
+    var stale = new java.util.concurrent.FutureTask<Boolean>(loop::heavyIndexing);
+    var thread = new Thread(stale, "heavy-indexing-stale-sample");
+    sampler.set(thread);
+    try {
+      loop.start();
+      assertTrue(polling.await(5, TimeUnit.SECONDS));
+      thread.start();
+      assertTrue(sampling.await(5, TimeUnit.SECONDS), "50 files captured before the embedding read stalls");
+      hold.pause(null, "USER_PAUSED");
+      assertFalse(loop.heavyIndexing(), "manual pause clears hysteresis while the old read is stalled");
+      files.set(20);
+      hold.resume();
+      releaseSample.countDown();
+      assertFalse(stale.get(5, TimeUnit.SECONDS), "the pre-pause sample must not publish its 50-file backlog");
+      assertFalse(loop.heavyIndexing(), "resuming at 20 files must remain below the entry threshold");
+      files.set(50);
+      assertTrue(loop.heavyIndexing(), "a fresh sample can still enter heavy indexing");
+    } finally {
+      releaseSample.countDown();
+      releaseLoop.countDown();
+      thread.join(5000);
+      loop.close();
+    }
+  }
+
+  @Test
   void anOwnerObservedPauseResetsHysteresisWithoutAWindowReadingIt() throws Exception {
     var files = new AtomicLong(50);
     var hold = new IndexingHold();

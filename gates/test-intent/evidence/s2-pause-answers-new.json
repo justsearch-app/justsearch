@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
   },
-  "createdAt": "2026-11-04T12:26:35.017Z",
-  "revision": "b4b0d60ac51a33ce4939ddbde43494cd44f5577b",
-  "tree": "8a342dc0b8c8015a0a6ae7afce753ed99c4f1307",
+  "createdAt": "2026-11-04T13:46:27.247Z",
+  "revision": "69812a27116e5166f1fa3aaee9f6db38c6bf3f48",
+  "tree": "1901137d1feb6bd47a5e76f95002b03b827e4829",
   "environment": {
     "platform": "linux",
     "arch": "x64",
@@ -21,37 +21,37 @@
       "command": "./gradlew :modules:worker-services:test --tests \"io.justsearch.indexerworker.loop.HeavyIndexingStateTest\" --tests \"io.justsearch.indexerworker.loop.IndexingLoopHeavyIndexingTest\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 21469
+      "durationMs": 12831
     },
     {
       "command": "./gradlew :modules:app-inference:test --tests \"io.justsearch.app.inference.chat.IndexingAnswerAdmissionTest\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 3210
+      "durationMs": 4010
     },
     {
       "command": "./gradlew :modules:app-services:test --tests \"io.justsearch.app.services.settings.AnswerPausePreferenceTest\" --tests \"io.justsearch.app.services.conversation.ConversationIndexingPauseTest\" --tests \"io.justsearch.app.services.chat.ChatResidencyTest.indexingPauseRefusesAnswersWithoutUnloadingAndPolicyOffReopensImmediately\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 4021
+      "durationMs": 5542
     },
     {
       "command": "./gradlew :modules:ui:test --tests \"io.justsearch.ui.api.AnswerPauseSettingsHttpTest\" --tests \"io.justsearch.ui.api.IndexingPauseWireTest\" --tests \"io.justsearch.ui.api.mcp.IndexingPauseMcpTest\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 5134
+      "durationMs": 12451
     },
     {
       "command": "./gradlew :modules:app-agent:test --tests \"io.justsearch.agent.AgentIndexingPauseTest\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 2674
+      "durationMs": 4010
     },
     {
-      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/BrainSurface.answer-pause.test.ts\" \"src/shell-v0/views/search-v3/SearchV3View.residency.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/9w92so1n/tmp/test-intent-vitest-1206-1793795187285.json\"",
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/BrainSurface.answer-pause.test.ts\" \"src/shell-v0/views/search-v3/SearchV3View.residency.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/nywh_y0y/tmp/test-intent-vitest-1421-1793799975868.json\"",
       "cwd": "modules/ui-web",
       "exitCode": 0,
-      "durationMs": 7730
+      "durationMs": 11377
     }
   ],
   "checks": [
@@ -78,7 +78,7 @@
       "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/IndexingLoopHeavyIndexingTest.java",
       "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/IndexingLoopHeavyIndexingTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:58dc840a790db42edecf27f8758eef1a5ec368b7674edb2368fe63776adb6ce6",
+      "contentDigest": "sha256:3279fc2aca7b41e5982b913c1da1d2a0a44622e95e3d90cf6a76e84ee09cb276",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -93,6 +93,10 @@
         },
         {
           "name": "[3] gpu-held",
+          "status": "passed"
+        },
+        {
+          "name": "aSampleCapturedBeforeManualPauseCannotRestoreClearedHysteresis()",
           "status": "passed"
         },
         {
@@ -264,13 +268,21 @@
       "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.residency.test.ts",
       "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.residency.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:04fb95c2b82cd35d71510c5e974184279b99f662ad39ee37801c7c088ec73887",
+      "contentDigest": "sha256:ec0ccfeedfef7683bdeeed2f391d051803977a39ff12a6f0eedbafa52ba85f19",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
       "cases": [
         {
           "name": "NR15 human admission and RR15 refusal recovery automatically answers an indexing-paused question once after Engine resume across repeated polls and windows",
+          "status": "passed"
+        },
+        {
+          "name": "NR15 human admission and RR15 refusal recovery automatically continues a 200 SSE indexing refusal for core.rag-ask with the same turn and preserves a newer draft",
+          "status": "passed"
+        },
+        {
+          "name": "NR15 human admission and RR15 refusal recovery automatically continues a 200 SSE indexing refusal for core.free-chat with the same turn and preserves a newer draft",
           "status": "passed"
         },
         {
@@ -773,5 +785,5 @@
     }
   ],
   "failBefore": null,
-  "digest": "sha256:1e6f0dda177f919fa5f364f67fe8f40348bc3e011fbdb91138e99cf6cf0937ab"
+  "digest": "sha256:52e56403b5e1cd067e5d2bfbed8d565a406e35aa8e2f167b7b25d9dcbd4c71cc"
 }

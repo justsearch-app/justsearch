@@ -192,7 +192,9 @@ export class Sv3AskDomain {
   async runAsk(rawQuestion: string, scope: Sv3AskScope | null = null, schema?: string, modelAnswer = false,
     options: { task?: HumanTask; continuation?: boolean; turnAction?: boolean; record?: string; authored?: string } = {}): Promise<void> {
     let question = rawQuestion.trim();
-    if (question === '' || this.streaming || this.activeSession?.turns.some(turn => turn.status === 'unfinished')) return;
+    const continuingTurnId = options.task?.refusal?.reason === 'INDEXING' ? options.task.saved.dispatchTurnId : undefined;
+    if (question === '' || this.streaming || this.activeSession?.turns.some(turn => turn.status === 'unfinished'
+      && (continuingTurnId === undefined || turn.dispatchTurnId !== continuingTurnId))) return;
     if (!options.task && !options.turnAction && !this.draftDomain.draftMayIssue(false)) return;
     const handoff = options.task ? { shapeId: options.task.saved.shape, selection: options.task.selection }
       : modelAnswer ? null : this.draftDomain.preparedHandoff;
@@ -229,7 +231,7 @@ export class Sv3AskDomain {
     if (sessionId !== null && !modelAnswer) {
       this.contextAskPending.add(sessionId);
       try {
-        const resolved = await this.contextDomain.followUpContext(sessionId);
+        const resolved = await this.contextDomain.followUpContext(sessionId, continuingTurnId);
         if (resolved === null || !this.host.connected() || this.host.activeConversationId() !== sessionId) {
           this.contextDomain.refuseQuestion(sessionId, question);
           this.host.requestUpdate();
@@ -252,7 +254,7 @@ export class Sv3AskDomain {
     if (this.draftDomain.humanUnavailable(shapeId, options.continuation) !== '') { this.host.requestUpdate(); return; }
     task.context = context.map(m => ({ ...m }));
     task.saved.target = sessionId ?? this.transport.createConversationId();
-    const dispatchId = crypto.randomUUID();
+    const dispatchId = continuingTurnId ?? crypto.randomUUID();
     task.saved.dispatchTurnId = dispatchId;
     task.saved.delivery = 'unknown';
     task.refusal = null;
