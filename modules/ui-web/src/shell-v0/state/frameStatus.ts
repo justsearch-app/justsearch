@@ -205,6 +205,9 @@ export function deriveFrameStatus(input: FrameStatusInput): FrameStatus {
     // Retained authorization advisories are history, never another execution route.
     add(record.event.classId === 'authorization.pending' ? { ...fact, actions: [] } : fact);
   }
+  // L4b/L5 — only an exact request id can hold a gate out of Earlier. Operation-id/recency
+  // guesses can hide a newer answered request while an older request still waits. Legacy rows
+  // have no request identity and remain history.
   for (const entry of input.activity ?? []) {
     if (entry.isRoutine || entry.operationOutcomeKey) continue;
     const pendingId = entry.gate?.pendingId;

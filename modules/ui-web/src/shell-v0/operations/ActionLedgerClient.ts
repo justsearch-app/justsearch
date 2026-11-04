@@ -113,7 +113,8 @@ export interface UnifiedActionEntry {
   readonly outcome?: string;
   /**
    * Present on trust-gate rows: the structured disposition (GATED | DENIED | APPROVED) and the
-   * humanized operation, so a presenter can word the row without parsing {@link label}.
+   * humanized operation, so a presenter can word the row without parsing {@link label}. The optional
+   * pending id ties a gate row to its exact request (L4b/L5); legacy rows have no request identity.
    */
   readonly gate?: { readonly disposition: string; readonly operation: string; readonly pendingId?: string };
   /** Present on grant-lifecycle rows: the structured action (ISSUED | CONSUMED | REVOKED) and the humanized subject. */

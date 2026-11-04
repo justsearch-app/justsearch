@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
   },
-  "createdAt": "2026-11-04T18:51:44.843Z",
-  "revision": "2665136517ede81aefaa348a70d1ccd7e55647e4",
-  "tree": "ad0b1085fa71afb1a750b5ba612cb2717c2a98b4",
+  "createdAt": "2026-11-04T19:06:28.696Z",
+  "revision": "516e1439146f4661ce156872f860f3c53baf33e3",
+  "tree": "801134cf90108772ac8f8f695dc9b75ffa3096ad",
   "environment": {
     "platform": "linux",
     "arch": "x64",
@@ -18,10 +18,10 @@
   },
   "runs": [
     {
-      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/state/frameStatus.authorization.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/6l3zzmsk/tmp/test-intent-vitest-64-1793818303189.json\"",
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/state/frameStatus.authorization.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/zc6f1p_5/tmp/test-intent-vitest-391-1793819187510.json\"",
       "cwd": "modules/ui-web",
       "exitCode": 0,
-      "durationMs": 1651
+      "durationMs": 1184
     }
   ],
   "checks": [
@@ -42,5 +42,5 @@
     }
   ],
   "failBefore": null,
-  "digest": "sha256:a0205f4f8bc7a20b58abcc7615b7c6e3381d68fb794a6a211ee2b50466a76fd1"
+  "digest": "sha256:9c9c0701cac8833bef9d2eafc28035f2b75a55b1307893dc94fd69bb9c1f529c"
 }

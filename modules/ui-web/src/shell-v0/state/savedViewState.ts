@@ -39,7 +39,7 @@ export function isViewSaved(url: string): boolean {
 }
 
 /** Alias-aware identity; keep the existing record's id, label, URL and profile. */
-export function findSavedView(url: string): SavedView | undefined {
+function findSavedView(url: string): SavedView | undefined {
   const place = canonicalSurfaceUrl(url);
   return getSavedViews().find(view => canonicalSurfaceUrl(view.url) === place);
 }

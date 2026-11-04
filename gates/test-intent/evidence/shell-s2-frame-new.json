@@ -1,0 +1,530 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
+  },
+  "createdAt": "2026-11-04T15:37:06.100Z",
+  "revision": "38c6e7027f4f254a678f273d15b167e2958d562b",
+  "tree": "f8fd5e8bd20b7eee0b68208e175ed1bba15934b6",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/chrome/ShellAreas.test.ts\" \"src/shell-v0/chrome/Shell.globalKeys.test.ts\" \"src/shell-v0/views/search-v3/SearchV3View.test.ts\" \"src/shell-v0/views/HelpSurface.test.ts\" \"src/api/admissionFetch.test.ts\" \"src/shell-v0/chrome/Shell.navigation.test.ts\" \"src/shell-v0/chrome/Shell.frame.test.ts\" \"src/shell-v0/chrome/TopBar.test.ts\" \"src/shell-v0/views/SettingsSurface.section-address.test.ts\" \"src/shell-v0/chrome/RetiredFrameElements.test.ts\" \"src/shell-v0/views/SettingsSurface.v15.test.ts\" \"src/shell-v0/views/settingsRegister.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/rv_1re3g/tmp/test-intent-vitest-27017-1793806510133.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 5958
+    },
+    {
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/chrome/Shell.frame-lockdown.test.ts\" --config vitest.config.lockdown.ts --reporter=json --outputFile=\"/home/elias/.cache/am/rv_1re3g/tmp/test-intent-vitest-27017-1793806516092.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 110004
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/chrome/ShellAreas.test.ts#renders exactly ONE settings button — the top bar's gear, never a catalog slot (855 S1)",
+      "file": "modules/ui-web/src/shell-v0/chrome/ShellAreas.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:7573b6de32a70a4e81f366fddbdc399917f3823dae0860136b49e435c2cc6dfe",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Shell — userConfig-driven rail (slice 472) renders exactly ONE settings button — the top bar's gear, never a catalog slot (855 S1)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/chrome/ShellAreas.test.ts#Simple mode: System is a More-menu row, not an area; AI Brain stays an area (Theme Editor is DEEPLINK — never listed)",
+      "file": "modules/ui-web/src/shell-v0/chrome/ShellAreas.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:7573b6de32a70a4e81f366fddbdc399917f3823dae0860136b49e435c2cc6dfe",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Shell — System in the More menu in both detail levels (was the 586 F-2 rail filter) Simple mode: System is a More-menu row, not an area; AI Brain stays an area (Theme Editor is DEEPLINK — never listed)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/chrome/ShellAreas.test.ts#Detailed mode: System is the same More-menu row (Theme Editor stays unlisted — it is DEEPLINK, not RAIL)",
+      "file": "modules/ui-web/src/shell-v0/chrome/ShellAreas.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:7573b6de32a70a4e81f366fddbdc399917f3823dae0860136b49e435c2cc6dfe",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Shell — System in the More menu in both detail levels (was the 586 F-2 rail filter) Detailed mode: System is the same More-menu row (Theme Editor stays unlisted — it is DEEPLINK, not RAIL)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/chrome/Shell.globalKeys.test.ts#C8: area keys and F6 work from a text field; an AltGr combination is left to typing",
+      "file": "modules/ui-web/src/shell-v0/chrome/Shell.globalKeys.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:9dfda1257fd9623fd337103da96ccce2cce6d1091f07b2d480749ab09a407dae",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Shell global chords and their guards (tempdoc 864 Layer 2) C8: area keys and F6 work from a text field; an AltGr combination is left to typing",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/chrome/Shell.globalKeys.test.ts#864: ignores an IME-composing chord and an auto-repeat chord",
+      "file": "modules/ui-web/src/shell-v0/chrome/Shell.globalKeys.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:9dfda1257fd9623fd337103da96ccce2cce6d1091f07b2d480749ab09a407dae",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Shell global chords and their guards (tempdoc 864 Layer 2) 864: ignores an IME-composing chord and an auto-repeat chord",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/chrome/Shell.globalKeys.test.ts#864: stands down while a modal owns the keyboard",
+      "file": "modules/ui-web/src/shell-v0/chrome/Shell.globalKeys.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:9dfda1257fd9623fd337103da96ccce2cce6d1091f07b2d480749ab09a407dae",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Shell global chords and their guards (tempdoc 864 Layer 2) 864: stands down while a modal owns the keyboard",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/chrome/Shell.globalKeys.test.ts#still claims the same chord when focus is on a control the reader does NOT type into",
+      "file": "modules/ui-web/src/shell-v0/chrome/Shell.globalKeys.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:9dfda1257fd9623fd337103da96ccce2cce6d1091f07b2d480749ab09a407dae",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Shell global chords and their guards (tempdoc 864 Layer 2) still claims the same chord when focus is on a control the reader does NOT type into",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.test.ts#W7 renders Search in the title band and the top bar switcher using the real catalog message bundle",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:5687bd2643600307b7c10b9640227d9495f8b6e4d23b95fb22522cd8feeec1fd",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "the window mounts with its five regions W7 renders Search in the title band and the top bar switcher using the real catalog message bundle",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/HelpSurface.test.ts#lists only shortcuts that actually fire; the defunct `/` and `??` rows are gone",
+      "file": "modules/ui-web/src/shell-v0/views/HelpSurface.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:7fe65abb0b93afe8d547c35ee39039481867d594a6b3e1da760d200247b4feb0",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "HelpSurface — keyboard shortcuts (tempdoc 586 P-3) lists only shortcuts that actually fire; the defunct `/` and `??` rows are gone",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/api/admissionFetch.test.ts#L4a only a refusal naming an upgrade preparation says an update is being prepared",
+      "file": "modules/ui-web/src/api/admissionFetch.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:8f5248c21c1984187fffd6a6f60e3f02e333d2c6273ef8bfb26b43582f53295f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "pre-execution admission waits L4a only a refusal naming an upgrade preparation says an update is being prepared",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/chrome/Shell.navigation.test.ts",
+      "file": "modules/ui-web/src/shell-v0/chrome/Shell.navigation.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:aeb6325434fe51dff7b06386205da15c62279dce3404dfe62292a50e27d90ba1",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "FR3 Back and Forward run on browser history, which the journal follows (a) an incoming same-window address (conversation B while A is shown) keeps A: Back returns to A",
+          "status": "passed"
+        },
+        {
+          "name": "FR3 Back and Forward run on browser history, which the journal follows (b) Back then Forward after Search → Library returns to Library, and browser history agrees",
+          "status": "passed"
+        },
+        {
+          "name": "FR3 Back and Forward run on browser history, which the journal follows (c) Library → Search → Library by area clicks, then browser Back and Forward: stage, address and journal stay in step",
+          "status": "passed"
+        },
+        {
+          "name": "FR3 Back and Forward run on browser history, which the journal follows (c) with a conversation open in Search, browser Back and Forward move the journal cursor instead of appending entries",
+          "status": "passed"
+        },
+        {
+          "name": "FR3 Back and Forward run on browser history, which the journal follows Back on the first view the app owns stays in the app; the mouse back and forward buttons are Back and Forward",
+          "status": "passed"
+        },
+        {
+          "name": "FR3 Back and Forward run on browser history, which the journal follows rapid area switching lands on the last area, with each step on the Back stack",
+          "status": "passed"
+        },
+        {
+          "name": "FR3 Back and Forward run on browser history, which the journal follows a late boot response after the reader switched areas does not move them back",
+          "status": "passed"
+        },
+        {
+          "name": "FR3 Back and Forward run on browser history, which the journal follows reload mid-navigation keeps the view and its Back step",
+          "status": "passed"
+        },
+        {
+          "name": "FR3 the window tab is part of the address a tab click names the tab in the address as a new entry; Back returns to the tab before; Forward and reload restore it",
+          "status": "passed"
+        },
+        {
+          "name": "FR3 the window tab is part of the address returning to a window by the switcher keeps its tab in the address",
+          "status": "passed"
+        },
+        {
+          "name": "FR6 deep links land on the right window and tab justsearch://surface/core.search-v3-surface opens jf-nav-search-probe",
+          "status": "passed"
+        },
+        {
+          "name": "FR6 deep links land on the right window and tab justsearch://surface/core.library-surface opens jf-nav-host-probe",
+          "status": "passed"
+        },
+        {
+          "name": "FR6 deep links land on the right window and tab justsearch://surface/core.brain-surface opens jf-nav-brain-probe",
+          "status": "passed"
+        },
+        {
+          "name": "FR6 deep links land on the right window and tab justsearch://surface/core.system-surface opens jf-nav-system-probe",
+          "status": "passed"
+        },
+        {
+          "name": "FR6 deep links land on the right window and tab justsearch://surface/core.help-surface opens jf-nav-help-probe",
+          "status": "passed"
+        },
+        {
+          "name": "FR6 deep links land on the right window and tab justsearch://surface/core.unified-chat-surface opens jf-nav-search-probe",
+          "status": "passed"
+        },
+        {
+          "name": "FR6 deep links land on the right window and tab justsearch://surface/core.search-surface opens jf-nav-search-probe",
+          "status": "passed"
+        },
+        {
+          "name": "FR6 deep links land on the right window and tab a member id opens its host on that tab, and the address names the tab",
+          "status": "passed"
+        },
+        {
+          "name": "FR6 deep links land on the right window and tab Settings opens over the window it was reached from",
+          "status": "passed"
+        },
+        {
+          "name": "C9 / FR3 the Settings section is part of the address a section deep link opens that section; a section change replaces the address; Escape closes once onto the area",
+          "status": "passed"
+        },
+        {
+          "name": "C9 / FR3 the Settings section is part of the address browser Back closes Settings once and keeps the area; Forward reopens it",
+          "status": "passed"
+        },
+        {
+          "name": "C9 / FR3 the Settings section is part of the address a deep link arriving while Settings is open closes it and lands on the window and tab",
+          "status": "passed"
+        },
+        {
+          "name": "FR6 / C11 saved navigation state and bookmarks load after the upgrade a pre-change journal resumes the last view; bookmarks and co-resident values survive a userState write",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/chrome/Shell.frame.test.ts",
+      "file": "modules/ui-web/src/shell-v0/chrome/Shell.frame.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:53acc325d1350b785f245be69938d4315f59ead111eadff6775960e31a562e3e",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "FR1 / FR4 / FR8 the frame is one top bar over the window area has a banner (the top bar), a navigation (the switcher) and one main with the page heading",
+          "status": "passed"
+        },
+        {
+          "name": "FR1 / FR4 / FR8 the frame is one top bar over the window area carries no rail, back/forward buttons, recents, bookmarks, Copy URL, Simple/Detailed toggle or backend address",
+          "status": "passed"
+        },
+        {
+          "name": "FR1 / FR4 / FR8 the frame is one top bar over the window area the status pill sits in the top bar and its name states its state",
+          "status": "passed"
+        },
+        {
+          "name": "FR1 / FR4 / FR8 the frame is one top bar over the window area Ctrl+1/2/3 switch areas and the switcher follows",
+          "status": "passed"
+        },
+        {
+          "name": "FR1 / FR4 / FR8 the frame is one top bar over the window area F1 opens Help & shortcuts",
+          "status": "passed"
+        },
+        {
+          "name": "FR5 saved layouts map onto the frame core.focus (rail.visible:false) hides the switcher; Ctrl+2 and the palette still reach the areas",
+          "status": "passed"
+        },
+        {
+          "name": "FR5 saved layouts map onto the frame core.zen (rail.visible:false) hides the switcher; Ctrl+2 and the palette still reach the areas",
+          "status": "passed"
+        },
+        {
+          "name": "FR5 saved layouts map onto the frame acme.custom-no-rail (rail.visible:false) hides the switcher; Ctrl+2 and the palette still reach the areas",
+          "status": "passed"
+        },
+        {
+          "name": "FR5 saved layouts map onto the frame statusBar.visible:false hides plugin status in the pill only",
+          "status": "passed"
+        },
+        {
+          "name": "FR5 saved layouts map onto the frame a split layout keeps the second window pane with its picker",
+          "status": "passed"
+        },
+        {
+          "name": "FR5 saved layouts map onto the frame the window list respects a layout's rail.surfaces (switcher and More list only what it names)",
+          "status": "passed"
+        },
+        {
+          "name": "FR7 plugin windows, overrides and provenance a catalog window contribution is listed under More › More and mounts with host injection",
+          "status": "passed"
+        },
+        {
+          "name": "FR7 plugin windows, overrides and provenance a surface override mounts the override and the provenance badge says a non-core element is active",
+          "status": "passed"
+        },
+        {
+          "name": "FR7 plugin windows, overrides and provenance the Developer group follows the developer view tier (API explorer listed only when present)",
+          "status": "passed"
+        },
+        {
+          "name": "FR7 plugin windows, overrides and provenance About opens Settings at the section that shows the version; Copy link copies this view's address",
+          "status": "passed"
+        },
+        {
+          "name": "FR8 F6 cycles top bar → window tabs → content → details pane moves through the present regions in order, wraps, and Shift+F6 goes back",
+          "status": "passed"
+        },
+        {
+          "name": "FR8 F6 cycles top bar → window tabs → content → details pane skips a region a window does not have (Search has no tab row here)",
+          "status": "passed"
+        },
+        {
+          "name": "L3 the unknown-destination notice names what happened in words that fit the top bar and offers the destinations",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/chrome/TopBar.test.ts",
+      "file": "modules/ui-web/src/shell-v0/chrome/TopBar.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:bd027c00358b1a375921bdec0a5056db03fd0a32b6177580104f3cf239c38662",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "FR1 the top bar: brand, switcher, status slot, Settings, More renders the brand, three areas in order with the active one current, a status slot, Settings and More",
+          "status": "passed"
+        },
+        {
+          "name": "FR1 the top bar: brand, switcher, status slot, Settings, More tooltips show the shortcuts, and assistive tech gets the same shortcut",
+          "status": "passed"
+        },
+        {
+          "name": "FR1 the top bar: brand, switcher, status slot, Settings, More an area, Settings and a More row each report one selection",
+          "status": "passed"
+        },
+        {
+          "name": "FR1 the top bar: brand, switcher, status slot, Settings, More every area and window is addressable by exactly one data-surface-id while a menu is closed",
+          "status": "passed"
+        },
+        {
+          "name": "FR7 the More (⋯) menu holds System, Help & shortcuts (F1) and About; plugin windows under \"More\"; no Developer group by default",
+          "status": "passed"
+        },
+        {
+          "name": "FR7 the More (⋯) menu shows the Developer group only while the developer tier is on: API explorer, Copy link, backend address",
+          "status": "passed"
+        },
+        {
+          "name": "FR7 the More (⋯) menu About reports its own selection without claiming a window id",
+          "status": "passed"
+        },
+        {
+          "name": "FR7 the More (⋯) menu opens with focus on the first row; arrows move, Escape closes and returns focus to ⋯",
+          "status": "passed"
+        },
+        {
+          "name": "FR7 the More (⋯) menu closes on an outside click",
+          "status": "passed"
+        },
+        {
+          "name": "FR2 / FR5 the switcher at the minimal size and under a layout that hides it the minimal bar's area button names the active area and opens the three areas as a radio menu",
+          "status": "passed"
+        },
+        {
+          "name": "FR2 / FR5 the switcher at the minimal size and under a layout that hides it switcherVisible=false hides the switcher (and its navigation landmark); Settings and More stay",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/SettingsSurface.section-address.test.ts",
+      "file": "modules/ui-web/src/shell-v0/views/SettingsSurface.section-address.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:231f6b6dc91c460f4a5fbbeb79460789433dc8fa76636b72e8fc512dd96e5f06",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "reports each section it shows — on mount and when a section is requested — for the address",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/chrome/RetiredFrameElements.test.ts",
+      "file": "modules/ui-web/src/shell-v0/chrome/RetiredFrameElements.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:dbe22a036f45aaed082ad16adba55e41052e6b1e3590505b99e27036bcb18d79",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "frozen jf-rail is defined, in the vocabulary and inert without listeners",
+          "status": "passed"
+        },
+        {
+          "name": "frozen jf-recents-menu is defined, in the vocabulary and inert without listeners",
+          "status": "passed"
+        },
+        {
+          "name": "frozen jf-bookmarks-popover is defined, in the vocabulary and inert without listeners",
+          "status": "passed"
+        },
+        {
+          "name": "the top bar is reserved from authored presentations, like the shell and the status pill",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/chrome/Shell.frame-lockdown.test.ts#1280×800: the notice can be read, the pill is not cut and \"Choose destination\" is offered",
+      "file": "modules/ui-web/src/shell-v0/chrome/Shell.frame-lockdown.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:635554c328d7b4a244d51664a4e67f99c0233730dd0fffcdd2ecfc83a6103d47",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "L3 a notice for a window that does not exist is readable at every size 1280×800: the notice can be read, the pill is not cut and \"Choose destination\" is offered",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/chrome/Shell.frame-lockdown.test.ts#900×700: the notice can be read, the pill is not cut and \"Choose destination\" is offered",
+      "file": "modules/ui-web/src/shell-v0/chrome/Shell.frame-lockdown.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:635554c328d7b4a244d51664a4e67f99c0233730dd0fffcdd2ecfc83a6103d47",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "L3 a notice for a window that does not exist is readable at every size 900×700: the notice can be read, the pill is not cut and \"Choose destination\" is offered",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/SettingsSurface.v15.test.ts#move-down arrow on the first More window updates surfaceOrder; the switcher areas have no arrows",
+      "file": "modules/ui-web/src/shell-v0/views/SettingsSurface.v15.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:173a3602f38faecbc46402d9c3844567233ff125c84a635f587b068756139ec4",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "SettingsSurface — V1.5 Rail section (the switcher and the More menu) move-down arrow on the first More window updates surfaceOrder; the switcher areas have no arrows",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/settingsRegister.test.ts#the Settings search indexes the switcher list by the nav's own label: \"switcher\" finds it, \"rail\" does not",
+      "file": "modules/ui-web/src/shell-v0/views/settingsRegister.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:8ba7ecfa63e5d7eea78920df31d7e870e4349c33c999a2389a4745f8059d070b",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "the Layout sub-anchor in the shipped words (shell slice 2) the Settings search indexes the switcher list by the nav's own label: \"switcher\" finds it, \"rail\" does not",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:7ec665a2db514b1bd7e2bcd44b008a8aa8df0d045c94c7a4f405696ffa41da87"
+}

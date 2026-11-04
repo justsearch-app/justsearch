@@ -124,6 +124,7 @@ import {
 import { deriveFocus, type Landmark } from '../primitives/navigation.js';
 import { viewportWindow } from '../primitives/scrollViewport.js';
 import { takeMemberTabIntent, subscribeMemberTab } from '../router/memberTabIntent.js';
+import { FRAME_AREAS, FRAME_FIXED_WINDOWS } from '../layout/frameAreas.js';
 import type { Surface } from '../../api/types/surface.js';
 import type { RendererUserConfig } from '../renderers/userConfig.js';
 import {
@@ -791,6 +792,10 @@ export class SettingsSurface extends JfElement {
       color: var(--text-secondary);
       line-height: 1.5;
     }
+    /* The heading line over a second list in one section (Layout › More windows). */
+    p.help.list-intro {
+      margin: var(--jf-space-3) 0 var(--jf-space-2) 0;
+    }
     /* Slice 477 H1 — V1.5 user-authorship sections */
     .rail-list,
     .plugin-list {
@@ -1092,6 +1097,13 @@ export class SettingsSurface extends JfElement {
 
   override updated(changed: PropertyValues): void {
     super.updated(changed);
+    // Shell slice 2 — the open section is part of the address (`?section=<category id>`); the
+    // frame replaces the address when it changes, so Back still closes the window in one step.
+    if (changed.has('activeCategory')) {
+      this.dispatchEvent(new CustomEvent('settings-section-change', {
+        detail: { id: this.activeCategory }, bubbles: true, composed: true,
+      }));
+    }
     if (this.recoveryFocusRequested) void this.focusPendingSettingsRecovery();
     // 569 Move 6 — apply-time RUNTIME conformance: once per applied presentation, audit the
     // declared region's RENDERED DOM (computed-contrast oracle). A failure quarantines the region
@@ -2199,36 +2211,73 @@ export class SettingsSurface extends JfElement {
   }
 
   /**
-   * Slice 477 H1 — V1.5 Rail customization section.
+   * Slice 477 H1 — V1.5 Rail customization section; shell slice 2 — the switcher and the More menu.
    *
-   * Per-surface visibility checkbox + up/down arrow buttons for
-   * reordering. Drag-to-reorder is V1.5.1 polish (richer UX, library
-   * dep, accessibility surface); up/down buttons are accessible by
-   * default and require no library.
-   *
-   * The order shown reflects the current `userConfig.surfaceOrder`
-   * applied to the catalog (catalog order is the fallback for
-   * surfaces not in `surfaceOrder`). Visibility checkbox reflects
-   * `userConfig.surfaceVisibility` (absent = visible).
+   * The list mirrors the top bar: first the switcher's areas in the switcher's own fixed order
+   * (Ctrl+1/2/3 follow it, so they have a visibility checkbox and no reorder arrows), then the
+   * windows the More menu lists, in `userConfig.surfaceOrder` (catalog order as the fallback), each
+   * with a visibility checkbox and up/down arrows. System and Settings have fixed places of their
+   * own and are not listed. Visibility reflects `userConfig.surfaceVisibility` (absent = visible).
    */
   private renderRail(): TemplateResult {
-    const orderedSurfaces = this.applyOrderToSurfaces(this.railSurfaces);
+    const areas = FRAME_AREAS.map((a) => this.railSurfaces.find((s) => s.id === a.id))
+      .filter((s): s is Surface => s !== undefined);
+    const windows = this.moreMenuWindows();
     const visibility = this.userConfig.surfaceVisibility ?? {};
     const hasOverrides =
       this.userConfig.surfaceVisibility !== undefined ||
       this.userConfig.surfaceOrder !== undefined;
+    const row = (s: Surface, where: string, move?: { idx: number; last: number }): TemplateResult => {
+      const visible = visibility[s.id] !== false;
+      const label = present({ kind: 'surface', id: s.id }).label;
+      return html`
+        <li class="rail-row" data-surface-id=${s.id}>
+          <input
+            type="checkbox"
+            ?checked=${visible}
+            @change=${(e: Event) =>
+              this.host_.layout.setSurfaceVisibility(s.id, (e.target as HTMLInputElement).checked)}
+            aria-label=${`Show ${label} in the ${where}`}
+          />
+          <span class="rail-label" style=${visible ? '' : 'opacity: 0.5'}>${label}</span>
+          ${move ? html`
+            <jf-button
+              class="rail-arrow"
+              variant="ghost"
+              size="icon"
+              label="Move up"
+              title="Move up"
+              ?disabled=${move.idx === 0}
+              .onActivate=${() => this.moveRailSurface(move.idx, -1)}
+            >
+              ${icon({ name: 'chevron-up', size: 14 })}
+            </jf-button>
+            <jf-button
+              class="rail-arrow"
+              variant="ghost"
+              size="icon"
+              label="Move down"
+              title="Move down"
+              ?disabled=${move.idx === move.last}
+              .onActivate=${() => this.moveRailSurface(move.idx, 1)}
+            >
+              ${icon({ name: 'chevron-down', size: 14 })}
+            </jf-button>` : nothing}
+        </li>
+      `;
+    };
     return html`
       <div class="section">
-        <h3>${icon({ name: 'menu', size: 12 })} Rail</h3>
+        <h3>${icon({ name: 'menu', size: 12 })} Switcher</h3>
         <p class="help" style="margin: 0 0 0.5rem 0">
-          Reorder or hide surfaces in the activity rail.
+          Choose which areas the switcher shows. A hidden area still opens with its shortcut or from Ctrl+K.
           ${hasOverrides
             ? html`
                 <jf-button
                   size="sm"
                   label="Reset"
                   style="margin-left: 0.5rem"
-                  title="Reset rail to catalog defaults"
+                  title="Show every area and window in the default order"
                   .onActivate=${() => this.host_.layout.clearAllLayoutOverrides()}
                 >
                   Reset
@@ -2236,51 +2285,22 @@ export class SettingsSurface extends JfElement {
               `
             : nothing}
         </p>
-        <ul class="rail-list">
-          ${orderedSurfaces.map((s, idx) => {
-            const visible = visibility[s.id] !== false;
-            const isFirst = idx === 0;
-            const isLast = idx === orderedSurfaces.length - 1;
-            return html`
-              <li class="rail-row">
-                <input
-                  type="checkbox"
-                  ?checked=${visible}
-                  @change=${(e: Event) =>
-                    this.host_.layout.setSurfaceVisibility(s.id, (e.target as HTMLInputElement).checked)}
-                  aria-label=${`Show ${present({ kind: 'surface', id: s.id }).label} in rail`}
-                />
-                <span class="rail-label" style=${visible ? '' : 'opacity: 0.5'}>
-                  ${present({ kind: 'surface', id: s.id }).label}
-                </span>
-                <jf-button
-                  class="rail-arrow"
-                  variant="ghost"
-                  size="icon"
-                  label="Move up"
-                  title="Move up"
-                  ?disabled=${isFirst}
-                  .onActivate=${() => this.moveRailSurface(idx, -1)}
-                >
-                  ${icon({ name: 'chevron-up', size: 14 })}
-                </jf-button>
-                <jf-button
-                  class="rail-arrow"
-                  variant="ghost"
-                  size="icon"
-                  label="Move down"
-                  title="Move down"
-                  ?disabled=${isLast}
-                  .onActivate=${() => this.moveRailSurface(idx, 1)}
-                >
-                  ${icon({ name: 'chevron-down', size: 14 })}
-                </jf-button>
-              </li>
-            `;
-          })}
+        <ul class="rail-list" aria-label="Switcher">
+          ${areas.map((s) => row(s, 'switcher'))}
         </ul>
+        ${windows.length > 0 ? html`
+          <p class="help list-intro">Windows listed under More (⋯).</p>
+          <ul class="rail-list" aria-label="More menu windows">
+            ${windows.map((s, idx) => row(s, 'More menu', { idx, last: windows.length - 1 }))}
+          </ul>` : nothing}
       </div>
     `;
+  }
+
+  /** The windows the More menu lists, in the order it lists them (areas and fixed rows excluded). */
+  private moreMenuWindows(): Surface[] {
+    const areaIds = new Set(FRAME_AREAS.map((a) => a.id));
+    return this.applyOrderToSurfaces(this.railSurfaces.filter((s) => !areaIds.has(s.id) && !FRAME_FIXED_WINDOWS.has(s.id)));
   }
 
   /**
@@ -2643,7 +2663,7 @@ export class SettingsSurface extends JfElement {
   }
 
   private moveRailSurface(idx: number, delta: -1 | 1): void {
-    const ordered = this.applyOrderToSurfaces(this.railSurfaces);
+    const ordered = this.moreMenuWindows();
     const target = idx + delta;
     if (target < 0 || target >= ordered.length) return;
     const next = [...ordered];

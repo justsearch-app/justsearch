@@ -458,7 +458,10 @@ export function dispatchEffectToChrome(
       });
       return true;
     case 'navigate':
-      if (typeof window !== 'undefined' && window.location) {
+      // FR3 — a bare window id is the record of a destination its action already opened through
+      // the app's router (Go to Library); written into the address it stacked a second entry no view
+      // owns, so Back had to be pressed twice. Only an address or a fragment moves the location.
+      if (typeof window !== 'undefined' && window.location && (effect.to.startsWith('#') || effect.to.includes('://'))) {
         window.location.hash = effect.to;
       }
       return true;
@@ -783,17 +786,18 @@ export function registerShellActions(deps: ShellActionDeps): void {
     });
   };
 
-  const navigateAction = (id: string, title: string, target: string): void =>
+  const navigateAction = (id: string, title: string, target: string, shortcut?: string): void =>
     shellAction(id, title, () => {
       deps.navigate(target);
       return { kind: 'navigate' as const, to: target };
-    });
+    }, shortcut ? { shortcut } : {});
 
   // Tempdoc 923 / Search Thread S5b — the standalone Search rail surface is retired; its retrieve
   // tier folded into the one window (core.search-v3-surface). Search is the place; Ask and
   // Delegate are consequences inside it, so there is exactly one palette destination for the place.
-  navigateAction('core.action.shell.go-to-search', 'Go to Search', 'core.search-v3-surface');
-  navigateAction('core.action.shell.go-to-library', 'Go to Library', 'core.library-surface');
+  // Shell slice 2 — the three areas carry the switcher's shortcuts (Shell.handleGlobalKey owns the keys).
+  navigateAction('core.action.shell.go-to-search', 'Go to Search', 'core.search-v3-surface', 'Ctrl+1');
+  navigateAction('core.action.shell.go-to-library', 'Go to Library', 'core.library-surface', 'Ctrl+2');
   navigateAction('core.action.shell.go-to-settings', 'Go to Settings', 'core.settings-surface');
   // Rules need both saved values; open the Library editor through the shared focus route.
   shellAction('core.action.shell.go-to-indexing-rules', 'Change indexing rules', () => {
@@ -807,7 +811,7 @@ export function registerShellActions(deps: ShellActionDeps): void {
   // were the two install-flavoured ones below, so "open Brain" (and Memory, which is a TAB on Brain
   // — the coverage register names "command palette 'Go to Brain'" as its documented reach) was
   // unreachable by name. This makes the documented route true.
-  navigateAction('core.action.shell.go-to-brain', 'Go to Brain', 'core.brain-surface');
+  navigateAction('core.action.shell.go-to-brain', 'Go to Brain', 'core.brain-surface', 'Ctrl+3');
 
   // 727 F-1 — `core.start-ai-install` / `core.repair-ai-install` are deliberately excluded from
   // `canProjectOperationAsZeroArgAction` below: both require `acceptTerms: true`

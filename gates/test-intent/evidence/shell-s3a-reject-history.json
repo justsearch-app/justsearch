@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
   },
-  "createdAt": "2026-11-04T18:50:56.509Z",
-  "revision": "2665136517ede81aefaa348a70d1ccd7e55647e4",
-  "tree": "ad0b1085fa71afb1a750b5ba612cb2717c2a98b4",
+  "createdAt": "2026-11-04T19:06:19.999Z",
+  "revision": "516e1439146f4661ce156872f860f3c53baf33e3",
+  "tree": "fc9bd0e0ccf1dcc0270d8ad29fa07ce599c9d7ca",
   "environment": {
     "platform": "linux",
     "arch": "x64",
@@ -18,10 +18,10 @@
   },
   "runs": [
     {
-      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/state/frameStatus.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/6l3zzmsk/tmp/test-intent-vitest-64-1793818247649.json\"",
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/state/frameStatus.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/zc6f1p_5/tmp/test-intent-vitest-236-1793819174598.json\"",
       "cwd": "modules/ui-web",
       "exitCode": 0,
-      "durationMs": 1569
+      "durationMs": 1136
     }
   ],
   "checks": [
@@ -29,7 +29,7 @@
       "id": "modules/ui-web/src/shell-v0/state/frameStatus.test.ts#C12 the broadcast advisory and the request-scoped prompt for one authorization give one decision route",
       "file": "modules/ui-web/src/shell-v0/state/frameStatus.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:a5f70d15ecad05f51f3debaf01db983bf5f31087c1a0697bb2137b6f595f8e87",
+      "contentDigest": "sha256:ed6227dd15963a6714c9246520d4d581f75fcc2bb1c7c5af7b03165c5f04f281",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -42,26 +42,25 @@
     }
   ],
   "failBefore": {
-    "ref": "2665136517",
-    "revision": "2665136517ede81aefaa348a70d1ccd7e55647e4",
+    "ref": "7588c01d38",
+    "revision": "7588c01d3822c1d58358c22e28b8f4c52f6ef632",
     "overlays": [],
     "patches": [],
     "runs": [
       {
-        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/state/frameStatus.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/6l3zzmsk/tmp/test-intent-vitest-64-1793818254453.json\"",
+        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/state/frameStatus.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/zc6f1p_5/tmp/test-intent-vitest-236-1793819178424.json\"",
         "cwd": "<before-worktree>",
-        "exitCode": 1,
-        "durationMs": 1444,
-        "output": "JSON report written to /home/elias/.cache/am/6l3zzmsk/tmp/test-intent-vitest-64-1793818254453.json\n\n"
+        "exitCode": 0,
+        "durationMs": 1060
       }
     ],
     "checks": [
       {
         "id": "modules/ui-web/src/shell-v0/state/frameStatus.test.ts#C12 the broadcast advisory and the request-scoped prompt for one authorization give one decision route",
-        "classification": "assertion",
-        "detail": "frame status projection C12 the broadcast advisory and the request-scoped prompt for one authorization give one decision route:  AssertionError: expected { id: 'advisory:auth-adv', …(6) } to be undefined\n    at /home/elias/.cache/am/6l3zzmsk/tmp/test-intent-before-dv6qVr/modules/ui-web/src/shell-v0/state/frameStatus.test.ts:120:72\n    at file:///home/elias/.cache/am/6l3zzmsk/tmp/test-intent-before-dv6qVr/modules/ui-web/node_m"
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
       }
     ]
   },
-  "digest": "sha256:83f2a0bd9ec9c2a4027e096de3a390c8536a9e491f3a367ef7344dab95f3be65"
+  "digest": "sha256:20177e7318e35e75001da9576dd78c3a3eaf24a22f76d62fbe89429d8f873b25"
 }

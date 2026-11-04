@@ -4,6 +4,7 @@ import { deriveFrameStatus, completedLongWork, FINISHED_DWELL_MS, authorizationD
   type StatusFact } from './frameStatus.js';
 import type { AiState } from './aiStateStore.js';
 import type { AdvisoryRecord } from '../components/advisory/AdvisoryStore.js';
+import { projectBackend, type BackendLedgerEntry } from '../operations/ActionLedgerClient.js';
 const now = 100_000;
 const RECONNECT_GRACE_MS = 10_000;
 type FrameStatusInput = Parameters<typeof deriveFrameStatus>[0];
@@ -116,12 +117,60 @@ describe('frame status projection', () => {
     const m = derive({ authorizations: [request], advisories: [broadcast] });
     expect(m.sections.needs.map(f => f.id)).toEqual(['authorization:exact-target1']);
     expect(m.sections.needs[0]!.actions).toEqual([{ kind: 'authorization', target: 'exact-target1', label: 'Review request' }]);
-    // L5: while waiting, its broadcast cannot duplicate the request in Earlier.
+    // L4b/L5: while waiting, its broadcast cannot duplicate the request in Earlier.
     expect(m.sections.earlier.find(f => f.id === 'advisory:auth-adv')).toBeUndefined();
+    expect(m.sections.earlier.map(f => f.id)).not.toContain('advisory:auth-adv');
     // Answered elsewhere / withdrawn: the request leaves, the history stays inert.
     const answered = derive({ authorizations: [], advisories: [broadcast] });
     expect(answered.sections.needs).toEqual([]);
     expect(answered.sections.earlier[0]!.actions).toEqual([]);
+  });
+  it('L4b a waiting approval is in Needs you only; it enters Earlier once answered, expired or withdrawn', () => {
+    const request = { pendingId: 'p-wait', operationId: 'core.reindex', expiresAt: new Date(now + 50_000).toISOString() };
+    const broadcast: AdvisoryRecord = { ...advisory(), key: 'auth-wait', sourceRenderHint: 'REQUIRES_ACK', event: { ...advisory().event, id: 'auth-wait',
+      classId: 'authorization.pending', renderHint: 'REQUIRES_ACK', classExtras: { pendingId: 'p-wait', operationId: 'core.reindex' } } };
+    const waiting = derive({ authorizations: [request], advisories: [broadcast] });
+    expect(waiting.sections.needs.map(f => f.id)).toEqual(['authorization:p-wait']);
+    expect(waiting.sections.earlier.map(f => f.id)).toEqual([]);
+    // Expired: the request cannot be answered any more; the history row (inert, unread) appears.
+    const expired = derive({ authorizations: [{ ...request, expiresAt: new Date(now - 1).toISOString() }], advisories: [broadcast] });
+    expect(expired.sections.needs).toEqual([]);
+    expect(expired.sections.earlier.map(f => [f.id, f.unread, f.actions])).toEqual([['advisory:auth-wait', true, []]]);
+    // Answered or withdrawn: the request left `authorizations`.
+    const answered = derive({ authorizations: [], advisories: [broadcast] });
+    expect(answered.sections.earlier.map(f => f.id)).toEqual(['advisory:auth-wait']);
+    // Another request waiting does not hold back this one's history.
+    const other = derive({ authorizations: [{ ...request, pendingId: 'p-other' }], advisories: [broadcast] });
+    expect(other.sections.earlier.map(f => f.id)).toEqual(['advisory:auth-wait']);
+  });
+  it('L4b an MCP request also recorded as a GATED ledger row waits in Needs you only; the row joins Earlier once it is answered or expires', () => {
+    // The real shapes: PendingAuthorizationAdvisoryProjector's advisory (classExtras pendingId,
+    // operationId, riskTier, gateBehavior, expiresAt) and ActionLedgerProjection.toWireRow's gate row
+    // for the same firing (the exact pending id), projected by the ledger client the controller uses.
+    // The older row predates request identity and must remain visible.
+    const expiresAt = new Date(now + 120_000).toISOString();
+    const request = { pendingId: '7f1c2a9e-mcp', operationId: 'core.ingest-files', expiresAt };
+    const broadcast: AdvisoryRecord = { key: '7f1c2a9e-mcp', origin: 'stream', acknowledged: false, sourceRenderHint: 'REQUIRES_ACK', event: {
+      id: '7f1c2a9e-mcp', classId: 'authorization.pending', occurredAt: new Date(now - 1_000).toISOString(), renderHint: 'REQUIRES_ACK',
+      classExtras: { pendingId: '7f1c2a9e-mcp', operationId: 'core.ingest-files', riskTier: 'MEDIUM', gateBehavior: 'CONFIRM', expiresAt },
+      diagnosticsLink: null, provenance: null, primaryAction: null, bodyI18nKey: null } };
+    const row = (occurredAt: string, disposition: string, pendingId?: string): BackendLedgerEntry => ({ id: `gate:${occurredAt}:core.ingest-files:${disposition}`,
+      kind: 'gate', occurredAt, originator: 'agent', transport: 'MCP', operationId: 'core.ingest-files', outcome: disposition,
+      disposition, gateBehavior: 'CONFIRM', sourceTier: 'USER', ...(pendingId ? { pendingId } : {}) } as BackendLedgerEntry);
+    const gated = projectBackend(row(new Date(now - 1_000).toISOString(), 'GATED', request.pendingId));
+    const earlierGate = projectBackend(row(new Date(now - 3_600_000).toISOString(), 'GATED'));
+    // Observe the same gate history rows independent of their terminal outcome wording.
+    const requested = (m: ReturnType<typeof derive>) => m.sections.earlier
+      .filter(f => f.id === `activity:${gated.id}` || f.id === `activity:${earlierGate.id}`).map(f => f.id);
+    const waiting = derive({ authorizations: [request], advisories: [broadcast], activity: [earlierGate, gated] });
+    expect(waiting.sections.needs.map(f => f.id)).toEqual(['authorization:7f1c2a9e-mcp']);
+    // The earlier, already answered request for the same operation stays history.
+    expect(requested(waiting)).toEqual([`activity:${earlierGate.id}`]);
+    const answered = derive({ authorizations: [], advisories: [broadcast], activity: [earlierGate, gated] });
+    expect(answered.sections.needs).toEqual([]);
+    expect(requested(answered)).toEqual(expect.arrayContaining([`activity:${gated.id}`, `activity:${earlierGate.id}`]));
+    const expired = derive({ authorizations: [{ ...request, expiresAt: new Date(now - 1).toISOString() }], advisories: [broadcast], activity: [gated] });
+    expect(requested(expired)).toEqual(expect.arrayContaining([`activity:${gated.id}`]));
   });
   it('ST1 working shows the most important running item with its measured progress only', () => {
     const indexing = ai({ status: { worker: { core: { indexState: 'INDEXING', pendingJobs: 400 }, enrichment: {} } } as AiState['status'], episodeMaxPendingJobs: 1600 });

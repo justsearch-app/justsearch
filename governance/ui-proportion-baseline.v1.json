@@ -70,17 +70,17 @@
       ]
     },
     {
-      "$comment": "Frame status S1: the bottom-left task tray (jf-task-list) retired; its indexing aggregate is the status panel's indexing row. The relation is unchanged: the open panel (a popover over the page, anchored under the title-bar pill) must not cover the rail's Settings control or the Help affordance. The minWidthPx floor on the panel keeps both rows non-vacuous (a closed panel is a 0x0 rect).",
+      "$comment": "Frame status S1: the bottom-left task tray (jf-task-list) retired; its indexing aggregate is the status panel's indexing row. Shell slice 2 retired the rail and its Help affordance: the open panel (a popover anchored under the top bar's pill) must not cover the top bar's Settings or More buttons beside that pill. The minWidthPx floor on the panel keeps both rows non-vacuous (a closed panel is a 0x0 rect). The panel is addressed by its data-testid: the measurer matches a selector inside one tree at a time, so the S1 form `jf-status-panel .panel` (a host plus a class inside its shadow root) never resolved and the row errored on every capture.",
       "uiShotStep": "tasks-occlusion",
       "elements": [
         {
-          "selector": "jf-status-panel .panel",
+          "selector": "[data-testid=\"status-panel\"]",
           "minWidthPx": 320,
           "mustNotOverlapSelector": "button[data-surface-id=\"core.settings-surface\"]"
         },
         {
-          "selector": "[data-help-affordance]",
-          "mustNotOverlapSelector": "jf-status-panel .panel"
+          "selector": "button.more-trigger",
+          "mustNotOverlapSelector": "[data-testid=\"status-panel\"]"
         }
       ]
     },

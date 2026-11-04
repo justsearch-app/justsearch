@@ -233,13 +233,71 @@ export function flushPendingNavigationWrite(): void {
  * The projector then activates for the new surface, which performs its own
  * initial replaceState.
  */
-export function pushAddress(addr: ShellAddressNavigation): void {
-  const url = canonicalize(addr);
+export function pushAddress(addr: ShellAddressNavigation): boolean {
+  const relative = toRelative(canonicalize(addr));
   try {
-    window.history.pushState({ surfaceId: addr.target }, '', toRelative(url));
+    // FR3 — two adjacent entries for one address make Back a press that changes nothing: the
+    // push becomes the entry the app is on.
+    if (isCurrentUrl(relative)) {
+      window.history.replaceState(entryState(addr.target, historyIndex()), '', relative);
+      return false;
+    }
+    // A bare document entry (no app address yet: the first launch) is not a view Back can return
+    // to, so the first app entry above it is position 0 and Back stays inside the app.
+    const index = window.location.hash.startsWith('#justsearch://') ? historyIndex() + 1 : 0;
+    window.history.pushState(entryState(addr.target, index, true), '', relative);
+    return true;
   } catch {
     // history API failure is non-fatal — chrome still navigates in-memory.
+    return false;
   }
+}
+
+/**
+ * FR3 — the app's position in this tab's browser history: 0 for the first entry the app owns,
+ * one more for every entry it pushes. Back has an earlier app view exactly when this is above 0,
+ * which is what lets Back use the browser's own history (so the address and the stage can never
+ * disagree) without ever leaving the app from its first entry.
+ */
+export function historyIndex(): number {
+  if (typeof window === 'undefined') return 0;
+  const index = (window.history.state as { jsNavIndex?: unknown } | null)?.jsNavIndex;
+  return typeof index === 'number' && Number.isInteger(index) && index >= 0 ? index : lastIndex;
+}
+
+/** The last position the app wrote or observed; a fresh browser-made entry sits one above it. */
+let lastIndex = 0;
+
+/**
+ * Adopt the entry a browser traversal or a browser-made push (a pasted or clicked
+ * `#justsearch://` address) landed on: an entry the browser made itself carries no app state, so
+ * it gets the next position and the journal entry that now describes it.
+ */
+export function adoptCurrentEntry(surfaceId: string): void {
+  if (typeof window === 'undefined') return;
+  const state = window.history.state as { jsNavIndex?: unknown } | null;
+  if (typeof state?.jsNavIndex === 'number') {
+    lastIndex = state.jsNavIndex;
+    return;
+  }
+  try {
+    window.history.replaceState(entryState(surfaceId, lastIndex + 1, true), '');
+  } catch {
+    // history API failure non-fatal.
+  }
+}
+
+/** The history state of an app entry: its window, position and the journal entry describing it. */
+function entryState(surfaceId: string, index: number, fresh = false): Record<string, unknown> {
+  lastIndex = index;
+  const journal = getJournalState();
+  const entry = journal.entries[journal.cursor];
+  return {
+    ...(fresh ? {} : (window.history.state as Record<string, unknown> | null) ?? {}),
+    surfaceId,
+    jsNavIndex: index,
+    ...(entry ? { navigationJournalId: entry.id } : {}),
+  };
 }
 
 /**
@@ -289,16 +347,15 @@ function writeUrl(surfaceId: string, schema: ResolvedSchema, push = false): void
         );
         recordNavigation(surfaceId, address, present({ kind: 'surface', id: surfaceId }).label, 'BUTTON');
       }
-      const journal = conversationView ? getJournalState() : null;
-      const entry = journal?.entries[journal.cursor];
-      window.history.pushState({ surfaceId, ...(entry ? { navigationJournalId: entry.id } : {}) }, '', url);
+      window.history.pushState(entryState(surfaceId, historyIndex() + 1, true), '', url);
       return;
     }
     const journal = conversationView ? getJournalState() : null;
     const entry = journal?.entries[journal.cursor];
-    window.history.replaceState(conversationView
-      ? { ...window.history.state, surfaceId, ...(entry?.url === address ? { navigationJournalId: entry.id } : {}) }
-      : { surfaceId }, '', url);
+    // Replace keeps the entry's app state (position and journal marker) for every window: the
+    // address changed, not the place in history.
+    window.history.replaceState({ ...window.history.state, surfaceId, jsNavIndex: historyIndex(),
+      ...(entry?.url === address ? { navigationJournalId: entry.id } : {}) }, '', url);
   } catch {
     // history API failure non-fatal.
   }

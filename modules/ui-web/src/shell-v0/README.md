@@ -8,17 +8,17 @@ rail-view components) was decommissioned and fully removed (ADR-0032,
 
 Mount path: `src/main.jsx` side-effect-imports `./shell-v0/index.ts`
 (`src/main.jsx:70`), whose barrel (`index.ts`) registers every `<jf-*>`
-custom element, including the chrome itself: `<jf-shell>`, `<jf-rail>`,
-and `<jf-stage>` are defined in `chrome/Shell.ts`
-(`customElements.define('jf-shell', Shell)` at `chrome/Shell.ts:2397`,
-`'jf-rail'` at `:2674`, `'jf-stage'` at `:2980`). Production boot then
+custom element, including the chrome itself: `<jf-shell>` and `<jf-stage>`
+are defined in `chrome/Shell.ts` and `<jf-top-bar>` in `chrome/TopBar.ts`
+(shell slice 2 retired the rail; `chrome/RetiredFrameElements.ts` keeps its
+name as an inert element for presentations). Production boot then
 mounts `<jf-shell>` directly (no React root, no `ReactDOM.render`).
 
 ## Layout
 
 ```
 shell-v0/
-├── chrome/              — the production chrome: jf-shell / jf-rail / jf-stage
+├── chrome/              — the production chrome: jf-shell / jf-top-bar / jf-stage
 │                           (chrome/Shell.ts), OverlayHost
 ├── views/                — surface views mounted into the stage (ActivitySurface,
 │                           BrainSurface, search-v3/SearchV3View, ApiExplorerView, ...)

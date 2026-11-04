@@ -1,0 +1,227 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
+  },
+  "createdAt": "2026-11-04T15:37:23.807Z",
+  "revision": "38c6e7027f4f254a678f273d15b167e2958d562b",
+  "tree": "bf46a099c9782e4625e8e4b738903bf83afcd576",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/chrome/Shell.navigation.test.ts\" \"src/api/admissionFetch.test.ts\" \"src/shell-v0/state/frameStatus.test.ts\" \"src/shell-v0/components/StatusPanel.plugins.test.ts\" \"src/shell-v0/chrome/Shell.frame.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/rv_1re3g/tmp/test-intent-vitest-27728-1793806629982.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 6366
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/chrome/Shell.navigation.test.ts#(a) an incoming same-window address (conversation B while A is shown) keeps A: Back returns to A",
+      "file": "modules/ui-web/src/shell-v0/chrome/Shell.navigation.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:aeb6325434fe51dff7b06386205da15c62279dce3404dfe62292a50e27d90ba1",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "FR3 Back and Forward run on browser history, which the journal follows (a) an incoming same-window address (conversation B while A is shown) keeps A: Back returns to A",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/chrome/Shell.navigation.test.ts#(b) Back then Forward after Search → Library returns to Library, and browser history agrees",
+      "file": "modules/ui-web/src/shell-v0/chrome/Shell.navigation.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:aeb6325434fe51dff7b06386205da15c62279dce3404dfe62292a50e27d90ba1",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "FR3 Back and Forward run on browser history, which the journal follows (b) Back then Forward after Search → Library returns to Library, and browser history agrees",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/chrome/Shell.navigation.test.ts#(c) Library → Search → Library by area clicks, then browser Back and Forward: stage, address and journal stay in step",
+      "file": "modules/ui-web/src/shell-v0/chrome/Shell.navigation.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:aeb6325434fe51dff7b06386205da15c62279dce3404dfe62292a50e27d90ba1",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "FR3 Back and Forward run on browser history, which the journal follows (c) Library → Search → Library by area clicks, then browser Back and Forward: stage, address and journal stay in step",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/api/admissionFetch.test.ts#L4a a closing engine (no upgrade preparation) waits and retries without announcing an update",
+      "file": "modules/ui-web/src/api/admissionFetch.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:8f5248c21c1984187fffd6a6f60e3f02e333d2c6273ef8bfb26b43582f53295f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "pre-execution admission waits L4a a closing engine (no upgrade preparation) waits and retries without announcing an update",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/state/frameStatus.test.ts#L4b a waiting approval is in Needs you only; it enters Earlier once answered, expired or withdrawn",
+      "file": "modules/ui-web/src/shell-v0/state/frameStatus.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:68fb7101a28d2a32e7539327c01b06fe1719adc88b76ec75b17981a71251deb4",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "frame status projection L4b a waiting approval is in Needs you only; it enters Earlier once answered, expired or withdrawn",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/state/frameStatus.test.ts#C12 the broadcast advisory and the request-scoped prompt for one authorization give one decision route",
+      "file": "modules/ui-web/src/shell-v0/state/frameStatus.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:68fb7101a28d2a32e7539327c01b06fe1719adc88b76ec75b17981a71251deb4",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "frame status projection C12 the broadcast advisory and the request-scoped prompt for one authorization give one decision route",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/StatusPanel.plugins.test.ts#L2 a single item wider than the row shows directly, with its provenance, and no \"… 1 more\"",
+      "file": "modules/ui-web/src/shell-v0/components/StatusPanel.plugins.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:3833b4149a53f01217a3936df5c8c5bbee27dcab287b4a5c9e22ebae6fc63ad3",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "L2 a single item wider than the row shows directly, with its provenance, and no \"… 1 more\"",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/StatusPanel.plugins.test.ts#L2 with more items than fit, the first shows and \"… N more\" counts only the rest",
+      "file": "modules/ui-web/src/shell-v0/components/StatusPanel.plugins.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:3833b4149a53f01217a3936df5c8c5bbee27dcab287b4a5c9e22ebae6fc63ad3",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "L2 with more items than fit, the first shows and \"… N more\" counts only the rest",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/chrome/Shell.frame.test.ts#names what happened in words that fit the top bar and offers the destinations",
+      "file": "modules/ui-web/src/shell-v0/chrome/Shell.frame.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:53acc325d1350b785f245be69938d4315f59ead111eadff6775960e31a562e3e",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "L3 the unknown-destination notice names what happened in words that fit the top bar and offers the destinations",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "a07eb770d626ed707748b9ce0d42ddda29816290",
+    "revision": "a07eb770d626ed707748b9ce0d42ddda29816290",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/chrome/Shell.navigation.test.ts\" \"src/api/admissionFetch.test.ts\" \"src/shell-v0/state/frameStatus.test.ts\" \"src/shell-v0/components/StatusPanel.plugins.test.ts\" \"src/shell-v0/chrome/Shell.frame.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/rv_1re3g/tmp/test-intent-vitest-27728-1793806638263.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 5247,
+        "output": "JSON report written to /home/elias/.cache/am/rv_1re3g/tmp/test-intent-vitest-27728-1793806638263.json\n\n"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui-web/src/shell-v0/chrome/Shell.navigation.test.ts#(a) an incoming same-window address (conversation B while A is shown) keeps A: Back returns to A",
+        "classification": "assertion",
+        "detail": "FR3 Back and Forward run on browser history, which the journal follows (a) an incoming same-window address (conversation B while A is shown) keeps A: Back returns to A:  AssertionError: expected [ Array(1) ] to deeply equal [ …(2) ]\n    at /home/elias/.cache/am/rv_1re3g/tmp/test-intent-before-Le3pWO/modules/ui-web/src/shell-v0/chrome/Shell.navigation.test.ts:175:55\n    at file:///home/elias/dev/justsearch/.claude/worktrees/shell-s2/modules/ui-web/node_modules/@vites"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/chrome/Shell.navigation.test.ts#(b) Back then Forward after Search → Library returns to Library, and browser history agrees",
+        "classification": "assertion",
+        "detail": "FR3 Back and Forward run on browser history, which the journal follows (b) Back then Forward after Search → Library returns to Library, and browser history agrees:  AssertionError: expected [ 'jf-nav-search-probe', …(1) ] to deeply equal [ 'jf-nav-host-probe', …(1) ]\n    at /home/elias/.cache/am/rv_1re3g/tmp/test-intent-before-Le3pWO/modules/ui-web/src/shell-v0/chrome/Shell.navigation.test.ts:196:42\n    at file:///home/elias/dev/justsearch/.claude/worktrees/she"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/chrome/Shell.navigation.test.ts#(c) Library → Search → Library by area clicks, then browser Back and Forward: stage, address and journal stay in step",
+        "classification": "assertion",
+        "detail": "FR3 Back and Forward run on browser history, which the journal follows (c) Library → Search → Library by area clicks, then browser Back and Forward: stage, address and journal stay in step:  AssertionError: expected [ 'jf-nav-host-probe', …(2) ] to deeply equal [ 'jf-nav-host-probe', …(2) ]\n    at /home/elias/.cache/am/rv_1re3g/tmp/test-intent-before-Le3pWO/modules/ui-web/src/shell-v0/chrome/Shell.navigation.test.ts:221:65\n    at file:///home/elias/dev/justsearch/.claude/worktrees/shell"
+      },
+      {
+        "id": "modules/ui-web/src/api/admissionFetch.test.ts#L4a a closing engine (no upgrade preparation) waits and retries without announcing an update",
+        "classification": "assertion",
+        "detail": "pre-execution admission waits L4a a closing engine (no upgrade preparation) waits and retries without announcing an update:  AssertionError: expected [ Array(1) ] to deeply equal []\n    at /home/elias/.cache/am/rv_1re3g/tmp/test-intent-before-Le3pWO/modules/ui-web/src/api/admissionFetch.test.ts:50:43\n    at file:///home/elias/dev/justsearch/.claude/worktrees/shell-s2/modules/ui-web/node_modules/@vitest/runner/dist/chunk-a"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/state/frameStatus.test.ts#L4b a waiting approval is in Needs you only; it enters Earlier once answered, expired or withdrawn",
+        "classification": "assertion",
+        "detail": "frame status projection L4b a waiting approval is in Needs you only; it enters Earlier once answered, expired or withdrawn:  AssertionError: expected [ 'advisory:auth-wait' ] to deeply equal []\n    at /home/elias/.cache/am/rv_1re3g/tmp/test-intent-before-Le3pWO/modules/ui-web/src/shell-v0/state/frameStatus.test.ts:133:53\n    at file:///home/elias/dev/justsearch/.claude/worktrees/shell-s2/modules/ui-web/node_modules/@vites"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/state/frameStatus.test.ts#C12 the broadcast advisory and the request-scoped prompt for one authorization give one decision route",
+        "classification": "assertion",
+        "detail": "frame status projection C12 the broadcast advisory and the request-scoped prompt for one authorization give one decision route:  AssertionError: expected [ 'advisory:auth-adv' ] to not include 'advisory:auth-adv'\n    at Proxy.<anonymous> (file:///home/elias/dev/justsearch/.claude/worktrees/shell-s2/modules/ui-web/node_modules/@vitest/expect/dist/index.js:1319:15)\n    at Proxy.<anonymous> (file:///home/elias/dev/justsearch/.cl"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/StatusPanel.plugins.test.ts#L2 a single item wider than the row shows directly, with its provenance, and no \"… 1 more\"",
+        "classification": "assertion",
+        "detail": "L2 a single item wider than the row shows directly, with its provenance, and no \"… 1 more\":  AssertionError: expected [] to deeply equal [ 'plugin.wide' ]\n    at /home/elias/.cache/am/rv_1re3g/tmp/test-intent-before-Le3pWO/modules/ui-web/src/shell-v0/components/StatusPanel.plugins.test.ts:51:106\n    at file:///home/elias/dev/justsearch/.claude/worktrees/shell-s2/modules/ui-web/node_modules/"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/StatusPanel.plugins.test.ts#L2 with more items than fit, the first shows and \"… N more\" counts only the rest",
+        "classification": "assertion",
+        "detail": "L2 with more items than fit, the first shows and \"… N more\" counts only the rest:  AssertionError: expected [] to deeply equal [ 'plugin.one' ]\n    at /home/elias/.cache/am/rv_1re3g/tmp/test-intent-before-Le3pWO/modules/ui-web/src/shell-v0/components/StatusPanel.plugins.test.ts:61:106\n    at file:///home/elias/dev/justsearch/.claude/worktrees/shell-s2/modules/ui-web/node_modules/@"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/chrome/Shell.frame.test.ts#names what happened in words that fit the top bar and offers the destinations",
+        "classification": "assertion",
+        "detail": "L3 the unknown-destination notice names what happened in words that fit the top bar and offers the destinations:  AssertionError: expected 'Couldn\\'t find core.librray-surface. …' to be 'Couldn\\'t find that window' // Object.is equality\n    at /home/elias/.cache/am/rv_1re3g/tmp/test-intent-before-Le3pWO/modules/ui-web/src/shell-v0/chrome/Shell.frame.test.ts:329:28\n    at file:///home/elias/dev/justsearch/.claud"
+      }
+    ]
+  },
+  "digest": "sha256:6332c247c08c4e3c446e2dac2afe74f8bebdb84141c3d79c35cd566f256b74e2"
+}

@@ -20,11 +20,12 @@ TID_INSTALL_COMPONENT_LIST = "install-component-list"
 TID_BRAIN_SIMPLE_ACTION = "brain-simple-action"
 TID_INSTALL_CONSENT_DIALOG = "install-consent-dialog"
 
-# Activity rail navigation — the rail renders each nav button with
-# `data-surface-id="core.<x>-surface"` (`Shell.ts` renderRailButton) and a `@click` that selects
-# the surface; there are NO per-view `activity-*` testids. Nav clicks therefore target the
-# surface id (Playwright pierces the rail's open shadow root). Repointed from the stale
-# `activity-*` testids that no longer exist on the rail (559/571 rail rework).
+# Frame navigation — shell slice 2 retired the left rail: the top bar (`chrome/TopBar.ts`) renders
+# each area segment (Search, Library, AI Brain), the Settings button and, while the More menu is
+# open, each More row with `data-surface-id="core.<x>-surface"` (one element per id). Nav clicks
+# therefore keep targeting the surface id (Playwright pierces the bar's open shadow root). Windows
+# with no always-visible control (System, Help, plugin windows) fall back to the hash route.
+# The `RAIL_*` names are kept for the many steps that use them.
 RAIL_SURFACE_SEARCH = "core.search-v3-surface"
 # Synthetic readiness control for historical bundles; never used by current cameras.
 RAIL_SURFACE_OLDER_MAIN = "core.unified-chat-surface"
@@ -50,7 +51,7 @@ CSS_SEARCH_RESULT_ROW = f'[data-testid="{TID_SEARCH_RESULT_ROW}"]'
 # (components/chat/MarkdownBlock.ts). Selection is a row click, so there is no per-row select checkbox.
 CSS_INSPECTOR_PANE = 'jf-inspector-pane'
 CSS_CITATION_HIGHLIGHT = '.cite-ref, [data-cite-key]'
-# tempdoc 855: Settings is a MODAL surface — the rail affordance opens the `<jf-settings-window>`
+# tempdoc 855: Settings is a MODAL surface — the top bar's Settings button opens the `<jf-settings-window>`
 # dialog over the stage instead of mounting the surface into it. `dialog[open]` is the readiness
 # signal (the window element itself is always in the DOM, so its content stays connected while
 # closed); the mounted `<jf-settings-surface>` is the content signal.
@@ -171,7 +172,7 @@ class Selector:
 SEARCH_INPUT = Selector(role="searchbox", name="Search files", testid=TID_SEARCH_INPUT)
 
 
-# Navigation views — maps view name to the rail button's surface id
+# Navigation views — maps view name to the window's surface id (top-bar control or hash route)
 VIEWS: dict[str, str] = {
     "home": RAIL_SURFACE_SEARCH,
     "search": RAIL_SURFACE_SEARCH,

@@ -107,15 +107,18 @@ async def assert_recents_fit(page, state: str) -> None:
 
 
 async def _await_app_ready(page, *, timeout_ms: int = 15_000) -> None:
-    """Block until the app shell has mounted (rail button visible), else raise
+    """Block until the app shell has mounted (an area button visible), else raise
     AppNotMountedError with the best-available reason (Vite stderr tail / error-overlay
     text / failed resource status / honest fallback). ONE gate, reused by every capture path."""
     try:
-        # WP1.5a promotes Search v3; retain the older main rail as a known-good control.
-        # Only an actually visible Search rail button establishes shell readiness.
+        # WP1.5a promotes Search v3; retain the older main surface id as a known-good control.
+        # Only an actually visible area control establishes shell readiness: the switcher's Search
+        # segment, or below 720 px the minimal bar's area button (shell slice 2), which renders
+        # only once the catalog has named the areas.
         await page.locator(
             f'{S.rail_css(S.RAIL_SURFACE_SEARCH)}:visible, '
-            f'{S.rail_css(S.RAIL_SURFACE_OLDER_MAIN)}:visible'
+            f'{S.rail_css(S.RAIL_SURFACE_OLDER_MAIN)}:visible, '
+            'jf-top-bar .area-trigger:visible'
         ).first.wait_for(state="visible", timeout=timeout_ms)
         return
     except Exception:
@@ -453,24 +456,31 @@ async def _set_density_in_settings(page, label: str) -> None:
 
 
 async def _set_detail_level_in_settings(page, label: str) -> None:
-    """Select the header's backend-persisted detail level and await its witnessed receipt."""
-    # The reachable authority is Shell's persistent header toggle: a named group of pressed
-    # buttons. Settings also projects the value, but this header control is always reachable.
-    group = page.get_by_role("group", name="Detail level").first
-    btn = group.get_by_role("button", name=label, exact=True)
+    """Select the backend-persisted detail level in Settings and await its witnessed receipt."""
+    # Shell slice 2 retired the title bar's Simple/Detailed toggle (FR4); Settings › Appearance ›
+    # Interface holds the one control, a radio group named "Detail level" whose radios name
+    # their option ("Simple …", "Detailed …"). Same POST, same witnessed receipt.
+    await page.locator(S.rail_css(S.RAIL_SURFACE_SETTINGS)).first.click()
+    settings = page.locator(S.CSS_SETTINGS_WINDOW_CONTENT)
+    await page.locator(S.CSS_SETTINGS_WINDOW_DIALOG).wait_for(state="visible", timeout=10_000)
+    await settings.first.wait_for(state="attached", timeout=10_000)
+    await settings.locator('[data-settings-category="appearance"]').click()
+    group = settings.get_by_role("radiogroup", name="Detail level").first
+    btn = group.get_by_role("radio", name=label)
     await btn.wait_for(state="visible", timeout=10_000)
-    if await btn.get_attribute("aria-pressed") == "true":
-        return
-    async with page.expect_response(
-        lambda response: "/api/settings/v2" in response.url
-        and response.request.method == "POST",
-        timeout=15_000,
-    ) as response_info:
-        await btn.click()
-    response = await response_info.value
-    receipt = await response.json()
-    if response.status != 200 or receipt.get("state") != "COMPLETE":
-        raise AssertionError(f"Detail-level settings write did not complete: {receipt!r}")
+    if await btn.get_attribute("aria-checked") != "true":
+        async with page.expect_response(
+            lambda response: "/api/settings/v2" in response.url
+            and response.request.method == "POST",
+            timeout=15_000,
+        ) as response_info:
+            await btn.click()
+        response = await response_info.value
+        receipt = await response.json()
+        if response.status != 200 or receipt.get("state") != "COMPLETE":
+            raise AssertionError(f"Detail-level settings write did not complete: {receipt!r}")
+    await page.get_by_test_id("settings-window-close").click()
+    await page.locator(S.CSS_SETTINGS_WINDOW_DIALOG).wait_for(state="hidden", timeout=10_000)
 
 
 async def _navigate_and_search(page, url: str, query: str = "justsearch", *, timeout_ms: int = 60_000) -> None:
@@ -1226,9 +1236,9 @@ def _build_steps(ui_url: str, cooldown_ms: int, timeout_ms: int) -> list[Step]:
 
     def _mode_setup(mode: str):
         async def setup(page):
-            # UI mode is the persistent header's "Detail level" pressed-button group. Its async
-            # patch is complete only
-            # after the witnessed settings POST returns a COMPLETE receipt.
+            # UI mode is Settings' "Detail level" radio group (shell slice 2: the title bar's toggle
+            # retired). Its async patch is complete only after the witnessed settings POST returns
+            # a COMPLETE receipt.
             await page.locator(S.rail_css(S.RAIL_SURFACE_SEARCH)).first.wait_for(state="visible", timeout=15_000)
             await _set_detail_level_in_settings(page, _MODE_LABEL.get(mode, "Simple"))
             if cooldown_ms > 0:
@@ -1769,9 +1779,11 @@ def _build_steps(ui_url: str, cooldown_ms: int, timeout_ms: int) -> list[Step]:
             await asyncio.sleep(cooldown_ms / 1000)
 
     async def setup_tasks_occlusion(page):
-        # Tempdoc 813 Slice D — the capture that proves the redesigned Tasks panel cannot cover the
-        # rail's bottom controls. Registered in governance/ui-proportion-baseline.v1.json with TWO
-        # mustNotOverlapSelector rows (Settings + the Help affordance) AND a `minWidthPx` floor on
+        # Tempdoc 813 Slice D — the capture that proves the open status panel cannot cover the
+        # frame's controls. Shell slice 2: those are the top bar's Settings and More buttons beside
+        # the pill the panel hangs from (the rail and its Help affordance retired). Registered in
+        # governance/ui-proportion-baseline.v1.json with TWO mustNotOverlapSelector rows (Settings +
+        # More) AND a `minWidthPx` floor on
         # the panel itself (now the status panel, S1): a hidden panel yields a 0x0 rect that satisfies any overlap check
         # vacuously (ui_proportion_gate._rects_overlap), so the non-vacuity companion is what makes
         # the two occlusion rows mean anything.
@@ -1789,9 +1801,9 @@ def _build_steps(ui_url: str, cooldown_ms: int, timeout_ms: int) -> list[Step]:
         # even while enrichment ran), and this step only captures anything BECAUSE it was removed.
         await page.set_viewport_size({"width": 1280, "height": 800})
         await page.goto(demo, wait_until="domcontentloaded", timeout=timeout_ms)
-        # Land on a plain rail surface rather than the default chat landing: the assertion is about
-        # the SHELL's bottom-left corner versus the rail, so the least surface-specific screen is the
-        # least likely to drift for reasons unrelated to the relation being measured.
+        # Land on a plain area rather than the default chat landing: the assertion is about the
+        # frame's controls versus the panel, so the least window-specific screen is the least
+        # likely to drift for reasons unrelated to the relation being measured.
         try:
             btn = page.locator(S.rail_css(S.RAIL_SURFACE_LIBRARY))
             await btn.wait_for(state="visible", timeout=15_000)
@@ -1804,7 +1816,7 @@ def _build_steps(ui_url: str, cooldown_ms: int, timeout_ms: int) -> list[Step]:
         await page.locator(S.rail_css(S.RAIL_SURFACE_SETTINGS)).first.wait_for(
             state="visible", timeout=15_000
         )
-        await page.locator("[data-help-affordance]").first.wait_for(state="visible", timeout=15_000)
+        await page.locator("jf-top-bar button.more-trigger").first.wait_for(state="visible", timeout=15_000)
         # Frame status S1: the bottom-left task tray retired; its indexing aggregate is the status
         # panel's indexing row, opened from the title-bar pill. Wait on the row itself, not the
         # panel host (always mounted, hidden while closed), so the occlusion rows cannot pass vacuously.

@@ -9,6 +9,7 @@
     "modules/ui-web/src/shell-v0/controllers/testing/HaltBackend.ts",
     "modules/ui-web/src/shell-v0/plugin-api/testHostApi.ts",
     "modules/ui-web/src/shell-v0/renderers/resourceViewContract.ts",
+    "modules/ui-web/src/shell-v0/state/savedViewState.ts",
     "modules/ui-web/src/shell-v0/substrates/profiles/diff.ts",
     "modules/ui-web/src/shell-v0/themes/surfaceComposition.ts",
     "modules/ui-web/src/shell-v0/themes/token-names.generated.ts",

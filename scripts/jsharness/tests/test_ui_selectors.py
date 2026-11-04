@@ -212,7 +212,7 @@ class _HarnessLocator:
         if self.selector == _BRAIN_ADVANCED_TOGGLE:
             self.page.advanced_open = not self.page.advanced_open  # the real button opens and closes
         for label in ("Simple", "Detailed"):
-            if f"role=button;name={label};" in self.selector:
+            if f"role=button;name={label};" in self.selector or f"role=radio;name={label};" in self.selector:
                 self.page.checked_labels = {label}
 
     async def scroll_into_view_if_needed(self, **kwargs):
@@ -229,7 +229,7 @@ class _HarnessLocator:
         self.page.calls.append(("get_attribute", self.selector, name))
         if name == "aria-valuetext":
             return self.page.density
-        if name == "aria-pressed":
+        if name in ("aria-pressed", "aria-checked"):
             checked = any(
                 f"name={label};" in self.selector for label in self.page.checked_labels
             )
@@ -239,6 +239,9 @@ class _HarnessLocator:
     def get_by_role(self, role, name=None, exact=None):
         suffix = f"role={role};name={name};exact={exact}"
         return _HarnessLocator(self.page, f"{self.selector} >> {suffix}")
+
+    def locator(self, selector):
+        return _HarnessLocator(self.page, f"{self.selector} >> {selector}")
 
 
 class _Response:
@@ -331,16 +334,20 @@ def test_density_setup_uses_the_native_range_and_checks_its_user_facing_stop():
 def test_detail_level_setup_awaits_a_complete_settings_post():
     page = _HarnessPage()
     asyncio.run(_set_detail_level_in_settings(page, "Detailed"))
+    # Shell slice 2 retired the title-bar toggle (FR4): the one control is Settings' "Detail level" radio group.
     assert any(
-        "role=group;name=Detail level" in call[1] and "role=button;name=Detailed;exact=True" in call[1]
+        "role=radiogroup;name=Detail level" in call[1] and "role=radio;name=Detailed" in call[1]
         for call in page.calls if call[0] == "wait_for"
     )
     assert any(
-        "role=button;name=Detailed" in call[1]
+        "role=radio;name=Detailed" in call[1]
         for call in page.calls if call[0] == "click"
     )
     predicates = [call[1] for call in page.calls if call[0] == "expect_response_args"]
     assert len(predicates) == 1 and callable(predicates[0])
+    assert page.checked_labels == {"Detailed"}
+    # Settings is closed again before the step's capture.
+    assert ("click", "testid=settings-window-close", {}) in page.calls
 
 
 def test_detail_level_setup_does_not_invent_a_write_when_already_selected():
@@ -348,6 +355,7 @@ def test_detail_level_setup_does_not_invent_a_write_when_already_selected():
     page.checked_labels.add("Detailed")
     asyncio.run(_set_detail_level_in_settings(page, "Detailed"))
     assert not any(call[0] == "expect_response_args" for call in page.calls)
+    assert ("click", "testid=settings-window-close", {}) in page.calls
 
 
 @pytest.mark.parametrize("global_mode", ["Simple", "Detailed"])
