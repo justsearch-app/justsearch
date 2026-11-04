@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
   },
-  "createdAt": "2026-11-03T18:55:18.914Z",
-  "revision": "60939ee924ea5d7d21aa8f87405aba13d48f3f9b",
-  "tree": "39209293b7c277e4a5871cb93159f54da2e83bd6",
+  "createdAt": "2026-11-04T01:21:33.528Z",
+  "revision": "5367ca37ae697435ffa3a7f7b94c0420e0b3f23a",
+  "tree": "eed19bc4b66fb03ddea2c260c8b485961a887f0c",
   "environment": {
     "platform": "linux",
     "arch": "x64",
@@ -21,7 +21,7 @@
       "command": "./gradlew :modules:indexer-worker:test --tests \"io.justsearch.indexerworker.queue.RediscoveryAdmissionTest.maintenanceWithoutCapturedProofKeepsExistingAdmission\" --tests \"io.justsearch.indexerworker.queue.RediscoveryAdmissionTest.identicalCandidateEnumerationRetainsRevisionAndReplayWitness\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 7896
+      "durationMs": 5301
     }
   ],
   "checks": [
@@ -29,7 +29,7 @@
       "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/RediscoveryAdmissionTest.java#maintenanceWithoutCapturedProofKeepsExistingAdmission",
       "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/RediscoveryAdmissionTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:0b6d668e74a80faafebe927d54cb8c36fb884d3ce346e594883033e1c72b9dcd",
+      "contentDigest": "sha256:551ce2bdb2d1c112e5e80ce44828945d8f6fbdf4ceda8fb8593e59bf30cd21c4",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -144,7 +144,7 @@
       "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/RediscoveryAdmissionTest.java#identicalCandidateEnumerationRetainsRevisionAndReplayWitness",
       "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/RediscoveryAdmissionTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:0b6d668e74a80faafebe927d54cb8c36fb884d3ce346e594883033e1c72b9dcd",
+      "contentDigest": "sha256:551ce2bdb2d1c112e5e80ce44828945d8f6fbdf4ceda8fb8593e59bf30cd21c4",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -173,5 +173,5 @@
     }
   ],
   "failBefore": null,
-  "digest": "sha256:f24854eca5d9727a43a3e53a207058bf6ebd831735acdb8c9d979f2dce05b5b6"
+  "digest": "sha256:4fc13b0d36881e428012f605dcd0fe5547316a9b951bf481482674fdf132a0f5"
 }

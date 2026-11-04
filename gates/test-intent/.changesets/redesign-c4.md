@@ -8,7 +8,7 @@ author-session: 01a1a255-4b83-7ae0-9e36-ae9e7bb62711
 # Test-intent entries
 
 The orchestrator/verifier produces execution evidence and acceptance after committing the candidate.
-The builder writes neither evidence nor acceptance records.
+The builder refreshes execution evidence for the audit repair; acceptance records remain the verifier's responsibility.
 
 Repair run-evidence arguments:
 
@@ -16,6 +16,8 @@ Repair run-evidence arguments:
 --out gates/test-intent/evidence/redesign-c4-repair.json
 --before dfd154ff65035e0676a2822f6ea687bf3a010473
 --check modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/RediscoveryAdmissionTest.java#firstMaintenanceAttachesCapturedReceiptWithoutSpendingClaim
+--check modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/RediscoveryAdmissionTest.java#firstMaintenanceRetainsEarlierEpochMemberAndReceiptAfterReopen
+--check modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/RediscoveryAdmissionTest.java#firstMaintenanceRetainsSameBytesForegroundReaddWithoutReceipt
 --check modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/RediscoveryAdmissionTest.java#pendingCapturedAttachmentAndReceiptIdentitySurviveReopen
 --check modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/RediscoveryAdmissionTest.java#rejectedCapturedReceiptRollsBackAndCanBeRetriedAfterReopen
 --check modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/RediscoveryAdmissionTest.java#foregroundMutationAroundCapturedAttachmentKeepsExistingMaintenancePrecedence
@@ -24,11 +26,19 @@ Repair run-evidence arguments:
 ```
 
 No --before-patch is required. Both changed test files are transplanted by --check; the shared fixture helper ExplicitIngestRecords (which records the captured root's volume, as an explicit ingest of that root does) is overlaid.
+The unchanged run-evidence producer runs under `js-gradle-slot`; a temporary execution adapter
+uses shared clones under `$TMPDIR` for its before-state checkout and cleanup. Test selection,
+assertion classification and evidence generation are unchanged.
 The foreground matrix's attach-first cases fail before; its mutation-first cases preserve baseline behavior.
-The resume fixture re-observes the original admission through `beginCapturedWalk` and
-`enqueueRecordedEntries`, which advances its membership to the resumed epoch. The preservation
-matrix separately checks that an unseen earlier-epoch member closes as DONE/SOURCE_REMOVED
-without a receipt; subsequent maintenance still uses ordinary admission.
+The existing resume fixture re-observes the original admission through `beginCapturedWalk` and
+`enqueueRecordedEntries`, which advances its membership to the resumed epoch. The retained
+earlier-epoch check seeds `walk_seen_epoch=1` on a member of a COMPLETE epoch-2 captured walk,
+before leaving it PENDING or claiming it. A real-path probe confirmed that open captures fence
+claims and an unseen epoch-1 member is retired as DONE/SOURCE_REMOVED at COMPLETE epoch 2.
+The new same-bytes foreground matrix uses public `enqueueEntries` without generation buffering,
+covering PENDING and PROCESSING, each with and without force. Both checks compare the entire
+retained row, validate the single receipt against that row, and reopen to check persistence.
+The preservation matrix still checks unseen-member retirement and ordinary later admission.
 
 Preservation run-evidence arguments (no fail-before requirement):
 
@@ -51,7 +61,7 @@ in the acceptance module suite. The shared dev-stack check is reserved for the o
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/KnowledgeServerRecordedIngestionTest.java"
       ],
       "class": "New",
-      "behaviour": "First maintenance attaches one missing generation receipt to equivalent PENDING/PROCESSING captured work without modifying any job or walk fact. Claims, owed force, recorded-force authority and retained provenance survive; repeated attachment and reopen retain receipt identity; a rejected receipt rolls back and a retry attaches to the recovered row. Foreground mutations replace or remove the old work and keep existing maintenance precedence. A running recorded migration publishes the original revisions with one extraction per file.",
+      "behaviour": "First maintenance attaches one missing generation receipt to equivalent PENDING/PROCESSING captured work without modifying any job or walk fact. Claims, owed force, recorded-force authority and retained provenance survive; repeated attachment and reopen retain receipt identity; a rejected receipt rolls back and a retry attaches to the recovered row. Retained earlier-epoch PENDING/PROCESSING members attach without a row change. Same-bytes public foreground re-adds without receipts retain their newer revision, user/HTTP provenance, force bit and claim in both states, with and without force; their receipts copy that row and survive reopen. Other foreground mutations replace or remove the old work and keep existing maintenance precedence. A running recorded migration publishes the original revisions with one extraction per file.",
       "sources": [
         {
           "kind": "owner-words",
@@ -87,11 +97,23 @@ in the acceptance module suite. The shared dev-stack check is reserved for the o
           "kind": "owner-words",
           "quote": "a row changed by a newer foreground mutation does not qualify (its state, hashes or membership no longer match), so no receipt is attached, and admission then proceeds as today",
           "location": "task redesign-c4 request"
+        },
+        {
+          "kind": "owner-words",
+          "quote": "A captured-plan member admitted at enumeration epoch 1 that is still PENDING or PROCESSING when the walk closes COMPLETE at a later epoch (walk_seen_epoch < enumeration_epoch).",
+          "location": "task redesign-c4 audit repair request"
+        },
+        {
+          "kind": "owner-words",
+          "quote": "After capture, a foreground re-add through the public enqueueEntries (provenance user/HTTP, same bytes, root and collection; not buffered for the generation), once left PENDING and once claimed (PROCESSING), each with and without force.",
+          "location": "task redesign-c4 audit repair request"
         }
       ],
       "evidence": "gates/test-intent/evidence/redesign-c4-repair.json",
       "newChecks": [
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/RediscoveryAdmissionTest.java#firstMaintenanceAttachesCapturedReceiptWithoutSpendingClaim",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/RediscoveryAdmissionTest.java#firstMaintenanceRetainsEarlierEpochMemberAndReceiptAfterReopen",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/RediscoveryAdmissionTest.java#firstMaintenanceRetainsSameBytesForegroundReaddWithoutReceipt",
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/RediscoveryAdmissionTest.java#pendingCapturedAttachmentAndReceiptIdentitySurviveReopen",
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/RediscoveryAdmissionTest.java#rejectedCapturedReceiptRollsBackAndCanBeRetriedAfterReopen",
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/RediscoveryAdmissionTest.java#foregroundMutationAroundCapturedAttachmentKeepsExistingMaintenancePrecedence",

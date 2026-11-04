@@ -276,6 +276,101 @@ final class RediscoveryAdmissionTest {
     }
   }
 
+  @ParameterizedTest(name = "{displayName} [{index}] {arguments}")
+  @ValueSource(booleans = {false, true})
+  void firstMaintenanceRetainsEarlierEpochMemberAndReceiptAfterReopen(boolean claimed) throws Exception {
+    Path file = Files.writeString(temporary.resolve("earlier-epoch.txt"), "retained bytes");
+    Path db = temporary.resolve("earlier-epoch.db");
+    Map<String, String> before;
+    List<SwitchBufferCapableQueue.SwitchBufferOp> receipts;
+    try (var queue = capturedQueue(db)) {
+      capture(queue, file, "docs", true, true, temporary);
+      // Open captures fence claims, and COMPLETE retires unseen members. Seed the retained case
+      // on a re-observed member of the completed epoch-2 walk, before issuing any claim.
+      sql(db, "UPDATE jobs SET walk_seen_epoch=1");
+      var walk = queue.recordedWalk(CAPTURE).orElseThrow();
+      assertEquals(JobQueue.WalkEnumerationOutcome.COMPLETE, walk.enumerationOutcome());
+      assertEquals(2, walk.enumerationEpoch());
+      assertEquals("1", row(db).get("walk_seen_epoch"));
+      JobQueue.IndexJob claim = claimed ? queue.pollPending(1).getFirst() : null;
+      before = row(db);
+      assertEquals(claimed ? "PROCESSING" : "PENDING", before.get("state"));
+      assertEquals("1", before.get("force_reindex"));
+      assertTrue(queue.listSwitchBufferOpsStrictForGeneration(TARGET).isEmpty());
+      var maintenance = JobQueue.EnqueueEntry.stat(file,
+          new JobQueue.EnqueueProvenance("system", "SYSTEM_INTERNAL")).withinRoot(temporary);
+      assertTrue(queue.enqueueMaintenanceFileForGeneration(TARGET, maintenance, "docs"));
+      assertEquals(before.get("unit_revision"), row(db).get("unit_revision"),
+          "first maintenance must not replace the retained earlier-epoch revision");
+      assertEquals(before, row(db), "first maintenance must retain every earlier-epoch job fact");
+      assertEquals(walk, queue.recordedWalk(CAPTURE).orElseThrow());
+      receipts = queue.listSwitchBufferOpsStrictForGeneration(TARGET);
+      assertReceiptCopiesRow(before, file, receipts);
+      if (claim != null) assertTrue(queue.ownsClaimForPublication(claim));
+    }
+    try (var queue = capturedQueue(db)) {
+      assertEquals(before, row(db), "reopen must preserve the earlier-epoch row including claim identity");
+      assertEquals(receipts, queue.listSwitchBufferOpsStrictForGeneration(TARGET));
+      assertReceiptCopiesRow(before, file, queue.listSwitchBufferOpsStrictForGeneration(TARGET));
+    }
+  }
+
+  @ParameterizedTest(name = "{displayName} [{index}] {arguments}")
+  @CsvSource({"false,false", "false,true", "true,false", "true,true"})
+  void firstMaintenanceRetainsSameBytesForegroundReaddWithoutReceipt(boolean claimed, boolean force) throws Exception {
+    Path file = Files.writeString(temporary.resolve("foreground-readd.txt"), "captured bytes");
+    Path db = temporary.resolve("foreground-readd.db");
+    Map<String, String> before;
+    List<SwitchBufferCapableQueue.SwitchBufferOp> receipts;
+    try (var queue = capturedQueue(db)) {
+      capture(queue, file, "docs", false, false, temporary);
+      var captured = row(db);
+      var foreground = JobQueue.EnqueueEntry.stat(file,
+          new JobQueue.EnqueueProvenance("user", "HTTP")).withinRoot(temporary).withForceReindex(force);
+      assertEquals(1, queue.enqueueEntries(List.of(foreground), "docs"));
+      assertNotEquals(captured.get("unit_revision"), row(db).get("unit_revision"));
+      JobQueue.IndexJob claim = claimed ? queue.pollPending(1).getFirst() : null;
+      before = row(db);
+      assertEquals(claimed ? "PROCESSING" : "PENDING", before.get("state"));
+      assertEquals(force ? "1" : "0", before.get("force_reindex"));
+      assertEquals("user", before.get("originator"));
+      assertEquals("HTTP", before.get("transport"));
+      assertEquals(CAPTURE, before.get("scan_id"));
+      assertEquals(captured.get("planned_source_sha256"), before.get("planned_source_sha256"));
+      assertEquals(captured.get("admitted_source_sha256"), before.get("admitted_source_sha256"));
+      assertTrue(queue.listSwitchBufferOpsStrictForGeneration(TARGET).isEmpty(),
+          "public foreground admission must not have supplied a generation receipt");
+      var maintenance = JobQueue.EnqueueEntry.stat(file,
+          new JobQueue.EnqueueProvenance("system", "SYSTEM_INTERNAL")).withinRoot(temporary);
+      assertTrue(queue.enqueueMaintenanceFileForGeneration(TARGET, maintenance, "docs"));
+      assertEquals(before.get("unit_revision"), row(db).get("unit_revision"),
+          "first maintenance must not replace the same-bytes foreground revision");
+      assertEquals(before, row(db), "first maintenance must retain the same-bytes foreground revision and claim");
+      receipts = queue.listSwitchBufferOpsStrictForGeneration(TARGET);
+      assertReceiptCopiesRow(before, file, receipts);
+      if (claim != null) assertTrue(queue.ownsClaimForPublication(claim));
+    }
+    try (var queue = capturedQueue(db)) {
+      assertEquals(before, row(db), "reopen must preserve the foreground row including claim identity");
+      assertEquals(receipts, queue.listSwitchBufferOpsStrictForGeneration(TARGET));
+      assertReceiptCopiesRow(before, file, queue.listSwitchBufferOpsStrictForGeneration(TARGET));
+    }
+  }
+
+  private static void assertReceiptCopiesRow(Map<String, String> retained, Path file,
+      List<SwitchBufferCapableQueue.SwitchBufferOp> receipts) throws Exception {
+    assertEquals(1, receipts.size());
+    assertEquals("UPSERT", receipts.getFirst().op());
+    assertEquals("path:" + file, receipts.getFirst().key());
+    var receipt = SwitchBufferUpsert.decode(receipts.getFirst().payload());
+    assertEquals(retained.get("unit_revision"), receipt.unitRevision());
+    assertEquals(retained.get("planned_source_sha256"), receipt.sourceSha256());
+    assertEquals(retained.get("collection"), receipt.collection());
+    assertEquals(Path.of(retained.get("ingestion_root")), receipt.ingestionRoot());
+    assertEquals(new JobQueue.EnqueueProvenance(retained.get("originator"), retained.get("transport")),
+        receipt.provenance());
+  }
+
   @Test
   void pendingCapturedAttachmentAndReceiptIdentitySurviveReopen() throws Exception {
     Path file = Files.writeString(temporary.resolve("reopen.txt"), "durable bytes");
