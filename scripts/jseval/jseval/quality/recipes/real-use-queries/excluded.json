@@ -1,0 +1,1262 @@
+{
+ "documents": [
+  {
+   "doc": "ru-0173d788b21c05fd9f41c6e1",
+   "format": "pdf",
+   "language": "en",
+   "path": "Downloads/Office/Working copies/Reference document (67).pdf",
+   "preview": {
+    "contentTruncated": true,
+    "extractionParserId": "tika-policy-ocr",
+    "extractionPolicyId": "tika-default-v8",
+    "extractionStatus": "SUCCESS_PARTIAL",
+    "textProvenance": "vdu_pending",
+    "totalChars": 302483,
+    "vduStatus": "PENDING"
+   },
+   "reason": "extraction truncated to the policy cap (SUCCESS_PARTIAL, contentTruncated); the core witness refuses truncated extractions",
+   "source": "govdocs1"
+  },
+  {
+   "doc": "ru-01f3497d20f6de3acbb41a4e",
+   "format": "pdf",
+   "language": "de",
+   "path": "Bundestag/20. Wahlperiode/Drucksachen/Drucksache 20-02520.pdf",
+   "preview": {
+    "contentTruncated": true,
+    "extractionParserId": "tika-policy-ocr",
+    "extractionPolicyId": "tika-default-v8",
+    "extractionStatus": "SUCCESS_PARTIAL",
+    "textProvenance": "vdu_pending",
+    "totalChars": 3424879,
+    "vduStatus": "PENDING"
+   },
+   "reason": "extraction truncated to the policy cap (SUCCESS_PARTIAL, contentTruncated); the core witness refuses truncated extractions",
+   "source": "bundestag"
+  },
+  {
+   "doc": "ru-0268e0c03ee221bf0ec12efc",
+   "format": "pdf",
+   "language": "de",
+   "path": "Downloads/Web/www.bildungshaus-salmuenster.de/Downloaded document.pdf",
+   "preview": {
+    "contentTruncated": true,
+    "extractionParserId": "tika-policy-ocr",
+    "extractionPolicyId": "tika-default-v8",
+    "extractionStatus": "SUCCESS_PARTIAL",
+    "textProvenance": "vdu_pending",
+    "totalChars": 34458,
+    "vduStatus": "PENDING"
+   },
+   "reason": "extraction truncated to the policy cap (SUCCESS_PARTIAL, contentTruncated); the core witness refuses truncated extractions",
+   "source": "safedocs"
+  },
+  {
+   "doc": "ru-0ae62dbd497181de53ff8e13",
+   "format": "pdf",
+   "language": "en",
+   "path": "Downloads/Office/Archive/Reference document (97).pdf",
+   "preview": {
+    "contentTruncated": true,
+    "extractionParserId": "tika-policy-ocr",
+    "extractionPolicyId": "tika-default-v8",
+    "extractionStatus": "SUCCESS_PARTIAL",
+    "textProvenance": "vdu_pending",
+    "totalChars": 100026,
+    "vduStatus": "PENDING"
+   },
+   "reason": "extraction truncated to the policy cap (SUCCESS_PARTIAL, contentTruncated); the core witness refuses truncated extractions",
+   "source": "govdocs1"
+  },
+  {
+   "doc": "ru-11f5a822509176056b8356e9",
+   "evidence": {
+    "build": "second_build",
+    "contentTruncated": null,
+    "imagePageCount": 0,
+    "index_key_prefix": "61ac1064e36a2c4f",
+    "ocrWordCount": 10324,
+    "pageCount": 52,
+    "pagesMissingReadableText": 0,
+    "route": "ocr_full"
+   },
+   "format": "pdf",
+   "language": "de",
+   "path": "Bundestag/19. Wahlperiode/Drucksachen/Drucksache 19-13366.pdf",
+   "reason": "OCR'd PDF of 40 or more pages (decision 2026-11-04 05:45: the design's PDF page cap); its OCR can exceed the 30 s per-document budget under load and truncate",
+   "source": "bundestag"
+  },
+  {
+   "doc": "ru-1737363bf8017cdffa516b68",
+   "format": "pdf",
+   "language": "de",
+   "path": "Bundestag/20. Wahlperiode/Drucksachen/Drucksache 20-02992.pdf",
+   "preview": {
+    "contentTruncated": true,
+    "extractionParserId": "tika-policy-ocr",
+    "extractionPolicyId": "tika-default-v8",
+    "extractionStatus": "SUCCESS_PARTIAL",
+    "textProvenance": "vdu_pending",
+    "totalChars": 268826,
+    "vduStatus": "PENDING"
+   },
+   "reason": "extraction truncated to the policy cap (SUCCESS_PARTIAL, contentTruncated); the core witness refuses truncated extractions",
+   "source": "bundestag"
+  },
+  {
+   "doc": "ru-184c2456746259292719302c",
+   "evidence": {
+    "build": "second_build",
+    "contentTruncated": null,
+    "imagePageCount": 57,
+    "index_key_prefix": "61ac1064e36a2c4f",
+    "ocrWordCount": 327,
+    "pageCount": 57,
+    "pagesMissingReadableText": 0,
+    "route": "ocr_selective"
+   },
+   "format": "pdf",
+   "language": "en",
+   "path": "Downloads/Office/Working copies/Reference document (46).pdf",
+   "reason": "OCR'd PDF of 40 or more pages (decision 2026-11-04 05:45: the design's PDF page cap); its OCR can exceed the 30 s per-document budget under load and truncate",
+   "source": "govdocs1"
+  },
+  {
+   "doc": "ru-1b75e6d2f0c39da5a888fde0",
+   "format": "pdf",
+   "language": "en",
+   "path": "Downloads/Office/Archive/Reference document (141).pdf",
+   "preview": {
+    "contentTruncated": true,
+    "extractionParserId": "tika-policy-ocr",
+    "extractionPolicyId": "tika-default-v8",
+    "extractionStatus": "SUCCESS_PARTIAL",
+    "textProvenance": "vdu_pending",
+    "totalChars": 20646,
+    "vduStatus": "PENDING"
+   },
+   "reason": "extraction truncated to the policy cap (SUCCESS_PARTIAL, contentTruncated); the core witness refuses truncated extractions",
+   "source": "govdocs1"
+  },
+  {
+   "doc": "ru-1e55fdfe07d5d8af00cd2cd7",
+   "evidence": {
+    "build": "second_build",
+    "contentTruncated": null,
+    "imagePageCount": 30,
+    "index_key_prefix": "61ac1064e36a2c4f",
+    "ocrWordCount": 18090,
+    "pageCount": 42,
+    "pagesMissingReadableText": 0,
+    "route": "ocr_full"
+   },
+   "format": "pdf",
+   "language": "en",
+   "path": "Downloads/Office/Reference/Reference document (101).pdf",
+   "reason": "OCR'd PDF of 40 or more pages (decision 2026-11-04 05:45: the design's PDF page cap); its OCR can exceed the 30 s per-document budget under load and truncate",
+   "source": "govdocs1"
+  },
+  {
+   "doc": "ru-1e8b9d37125ea965595efb48",
+   "format": "pdf",
+   "language": "en",
+   "path": "Downloads/Office/Reference/Reference document (75).pdf",
+   "preview": {
+    "contentTruncated": true,
+    "extractionParserId": "tika-policy-ocr",
+    "extractionPolicyId": "tika-default-v8",
+    "extractionStatus": "SUCCESS_PARTIAL",
+    "textProvenance": "vdu_pending",
+    "totalChars": 70308,
+    "vduStatus": "PENDING"
+   },
+   "reason": "extraction truncated to the policy cap (SUCCESS_PARTIAL, contentTruncated); the core witness refuses truncated extractions",
+   "source": "govdocs1"
+  },
+  {
+   "doc": "ru-21e4eb850b7c1821c4ab9901",
+   "format": "pdf",
+   "language": "en",
+   "path": "Downloads/Office/Reference/Reference document (126).pdf",
+   "preview": {
+    "contentTruncated": true,
+    "extractionParserId": "tika-policy-ocr",
+    "extractionPolicyId": "tika-default-v8",
+    "extractionStatus": "SUCCESS_PARTIAL",
+    "textProvenance": "vdu_pending",
+    "totalChars": 6995,
+    "vduStatus": "PENDING"
+   },
+   "reason": "extraction truncated to the policy cap (SUCCESS_PARTIAL, contentTruncated); the core witness refuses truncated extractions",
+   "source": "govdocs1"
+  },
+  {
+   "doc": "ru-24cf073a9fe3ea89a9d14ad3",
+   "format": "ppt",
+   "language": "en",
+   "path": "Downloads/Office/Reference/Reference slides (34).ppt",
+   "preview": null,
+   "reason": "parser failed (engine job FAILED, PARSER_FAILED, retry policy NONE: ExtractionException: Sandbox parser failed)",
+   "source": "govdocs1"
+  },
+  {
+   "doc": "ru-2a4f95d404b1e5222a8fab02",
+   "format": "pdf",
+   "language": "en",
+   "path": "Downloads/Office/Archive/Reference document (32).pdf",
+   "preview": {
+    "contentTruncated": true,
+    "extractionParserId": "tika-policy-ocr",
+    "extractionPolicyId": "tika-default-v8",
+    "extractionStatus": "SUCCESS_PARTIAL",
+    "textProvenance": "vdu_pending",
+    "totalChars": 10645,
+    "vduStatus": "PENDING"
+   },
+   "reason": "extraction truncated to the policy cap (SUCCESS_PARTIAL, contentTruncated); the core witness refuses truncated extractions",
+   "source": "govdocs1"
+  },
+  {
+   "doc": "ru-2a979db168cd8bf2ba3d6467",
+   "format": "pdf",
+   "language": "de",
+   "path": "Bundestag/20. Wahlperiode/Plenarprotokolle/Plenarprotokoll 20-118.pdf",
+   "preview": {
+    "contentTruncated": true,
+    "extractionParserId": "tika-policy-ocr",
+    "extractionPolicyId": "tika-default-v8",
+    "extractionStatus": "SUCCESS_PARTIAL",
+    "textProvenance": "vdu_pending",
+    "totalChars": 963193,
+    "vduStatus": "PENDING"
+   },
+   "reason": "extraction truncated to the policy cap (SUCCESS_PARTIAL, contentTruncated); the core witness refuses truncated extractions",
+   "source": "bundestag"
+  },
+  {
+   "doc": "ru-333089203f28c62eafa5b9b9",
+   "evidence": {
+    "build": "second_build",
+    "contentTruncated": null,
+    "imagePageCount": 0,
+    "index_key_prefix": "61ac1064e36a2c4f",
+    "ocrWordCount": 14323,
+    "pageCount": 72,
+    "pagesMissingReadableText": 0,
+    "route": "ocr_full"
+   },
+   "format": "pdf",
+   "language": "en",
+   "path": "Downloads/Office/Reference/Reference document (140).pdf",
+   "reason": "OCR'd PDF of 40 or more pages (decision 2026-11-04 05:45: the design's PDF page cap); its OCR can exceed the 30 s per-document budget under load and truncate",
+   "source": "govdocs1"
+  },
+  {
+   "doc": "ru-34d252b2f80b97450fdda8d6",
+   "format": "pdf",
+   "language": "de",
+   "path": "Bundestag/20. Wahlperiode/Drucksachen/Drucksache 20-02772.pdf",
+   "preview": {
+    "contentTruncated": true,
+    "extractionParserId": "tika-policy-ocr",
+    "extractionPolicyId": "tika-default-v8",
+    "extractionStatus": "SUCCESS_PARTIAL",
+    "textProvenance": "vdu_pending",
+    "totalChars": 73138,
+    "vduStatus": "PENDING"
+   },
+   "reason": "extraction truncated to the policy cap (SUCCESS_PARTIAL, contentTruncated); the core witness refuses truncated extractions",
+   "source": "bundestag"
+  },
+  {
+   "doc": "ru-3d5d303f844525d938c92abf",
+   "evidence": {
+    "build": "second_build",
+    "contentTruncated": null,
+    "imagePageCount": 0,
+    "index_key_prefix": "61ac1064e36a2c4f",
+    "ocrWordCount": 6219,
+    "pageCount": 40,
+    "pagesMissingReadableText": 0,
+    "route": "ocr_full"
+   },
+   "format": "pdf",
+   "language": "de",
+   "path": "Bundestag/18. Wahlperiode/Drucksachen/Drucksache 18-03426.pdf",
+   "reason": "OCR'd PDF of 40 or more pages (decision 2026-11-04 05:45: the design's PDF page cap); its OCR can exceed the 30 s per-document budget under load and truncate",
+   "source": "bundestag"
+  },
+  {
+   "doc": "ru-43752b461c0991beb5ba632d",
+   "format": "pdf",
+   "language": "de",
+   "path": "Bundestag/20. Wahlperiode/Plenarprotokolle/Plenarprotokoll 20-184.pdf",
+   "preview": {
+    "contentTruncated": true,
+    "extractionParserId": "tika-policy-ocr",
+    "extractionPolicyId": "tika-default-v8",
+    "extractionStatus": "SUCCESS_PARTIAL",
+    "textProvenance": "vdu_pending",
+    "totalChars": 951662,
+    "vduStatus": "PENDING"
+   },
+   "reason": "extraction truncated to the policy cap (SUCCESS_PARTIAL, contentTruncated); the core witness refuses truncated extractions",
+   "source": "bundestag"
+  },
+  {
+   "doc": "ru-44261ab65988df85214e71fd",
+   "evidence": {
+    "build": "second_build",
+    "contentTruncated": null,
+    "imagePageCount": 0,
+    "index_key_prefix": "61ac1064e36a2c4f",
+    "ocrWordCount": 22566,
+    "pageCount": 95,
+    "pagesMissingReadableText": 0,
+    "route": "ocr_full"
+   },
+   "format": "pdf",
+   "language": "de",
+   "path": "Bundestag/20. Wahlperiode/Drucksachen/Drucksache 20-03086.pdf",
+   "reason": "OCR'd PDF of 40 or more pages (decision 2026-11-04 05:45: the design's PDF page cap); its OCR can exceed the 30 s per-document budget under load and truncate",
+   "source": "bundestag"
+  },
+  {
+   "doc": "ru-464139f55e5b76564f919404",
+   "format": "pdf",
+   "language": "de",
+   "path": "Bundestag/20. Wahlperiode/Plenarprotokolle/Plenarprotokoll 20-069.pdf",
+   "preview": {
+    "contentTruncated": true,
+    "extractionParserId": "tika-policy-ocr",
+    "extractionPolicyId": "tika-default-v8",
+    "extractionStatus": "SUCCESS_PARTIAL",
+    "textProvenance": "vdu_pending",
+    "totalChars": 959941,
+    "vduStatus": "PENDING"
+   },
+   "reason": "extraction truncated to the policy cap (SUCCESS_PARTIAL, contentTruncated); the core witness refuses truncated extractions",
+   "source": "bundestag"
+  },
+  {
+   "doc": "ru-474a2e5c38b2fc05175023ee",
+   "format": "pdf",
+   "language": "de",
+   "path": "Bundestag/20. Wahlperiode/Drucksachen/Drucksache 20-03764.pdf",
+   "preview": {
+    "contentTruncated": true,
+    "extractionParserId": "tika-policy-ocr",
+    "extractionPolicyId": "tika-default-v8",
+    "extractionStatus": "SUCCESS_PARTIAL",
+    "textProvenance": "vdu_pending",
+    "totalChars": 62241,
+    "vduStatus": "PENDING"
+   },
+   "reason": "extraction truncated to the policy cap (SUCCESS_PARTIAL, contentTruncated); the core witness refuses truncated extractions",
+   "source": "bundestag"
+  },
+  {
+   "doc": "ru-498871580f3e08e1da187250",
+   "evidence": {
+    "build": "second_build",
+    "contentTruncated": null,
+    "imagePageCount": 0,
+    "index_key_prefix": "61ac1064e36a2c4f",
+    "ocrWordCount": 3856,
+    "pageCount": 40,
+    "pagesMissingReadableText": 0,
+    "route": "ocr_full"
+   },
+   "format": "pdf",
+   "language": "de",
+   "path": "Bundestag/20. Wahlperiode/Drucksachen/Drucksache 20-06355.pdf",
+   "reason": "OCR'd PDF of 40 or more pages (decision 2026-11-04 05:45: the design's PDF page cap); its OCR can exceed the 30 s per-document budget under load and truncate",
+   "source": "bundestag"
+  },
+  {
+   "doc": "ru-49b9bd7110c08b65be47fdf3",
+   "evidence": {
+    "build": "second_build",
+    "contentTruncated": null,
+    "imagePageCount": 0,
+    "index_key_prefix": "61ac1064e36a2c4f",
+    "ocrWordCount": 13,
+    "pageCount": 169,
+    "pagesMissingReadableText": 0,
+    "route": "ocr_selective"
+   },
+   "format": "pdf",
+   "language": "en",
+   "path": "Downloads/Office/Reference/Reference document (58).pdf",
+   "reason": "OCR'd PDF of 40 or more pages (decision 2026-11-04 05:45: the design's PDF page cap); its OCR can exceed the 30 s per-document budget under load and truncate",
+   "source": "govdocs1"
+  },
+  {
+   "doc": "ru-4caa56125fec5c963521b4b7",
+   "evidence": {
+    "build": "second_build",
+    "contentTruncated": null,
+    "imagePageCount": 4,
+    "index_key_prefix": "61ac1064e36a2c4f",
+    "ocrWordCount": 17126,
+    "pageCount": 41,
+    "pagesMissingReadableText": 0,
+    "route": "ocr_full"
+   },
+   "format": "pdf",
+   "language": "en",
+   "path": "Downloads/Office/Archive/Reference document (95).pdf",
+   "reason": "OCR'd PDF of 40 or more pages (decision 2026-11-04 05:45: the design's PDF page cap); its OCR can exceed the 30 s per-document budget under load and truncate",
+   "source": "govdocs1"
+  },
+  {
+   "doc": "ru-4f2de25070216de240b8075b",
+   "format": "pdf",
+   "language": "de",
+   "path": "Bundestag/20. Wahlperiode/Plenarprotokolle/Plenarprotokoll 20-196.pdf",
+   "preview": {
+    "contentTruncated": true,
+    "extractionParserId": "tika-policy-ocr",
+    "extractionPolicyId": "tika-default-v8",
+    "extractionStatus": "SUCCESS_PARTIAL",
+    "textProvenance": "vdu_pending",
+    "totalChars": 890697,
+    "vduStatus": "PENDING"
+   },
+   "reason": "extraction truncated to the policy cap (SUCCESS_PARTIAL, contentTruncated); the core witness refuses truncated extractions",
+   "source": "bundestag"
+  },
+  {
+   "doc": "ru-4fc3c2f6fff69faf926a0c69",
+   "format": "pdf",
+   "language": "en",
+   "path": "Downloads/Office/Archive/Reference document (106).pdf",
+   "preview": {
+    "contentTruncated": true,
+    "extractionParserId": "tika-policy-ocr",
+    "extractionPolicyId": "tika-default-v8",
+    "extractionStatus": "SUCCESS_PARTIAL",
+    "textProvenance": "vdu_pending",
+    "totalChars": 3597,
+    "vduStatus": "PENDING"
+   },
+   "reason": "extraction truncated to the policy cap (SUCCESS_PARTIAL, contentTruncated); the core witness refuses truncated extractions",
+   "source": "govdocs1"
+  },
+  {
+   "doc": "ru-54e791becdff987954f8e5b3",
+   "evidence": {
+    "build": "second_build",
+    "contentTruncated": null,
+    "imagePageCount": 0,
+    "index_key_prefix": "61ac1064e36a2c4f",
+    "ocrWordCount": 14640,
+    "pageCount": 47,
+    "pagesMissingReadableText": 0,
+    "route": "ocr_full"
+   },
+   "format": "pdf",
+   "language": "en",
+   "path": "Downloads/Office/Archive/Reference document (137).pdf",
+   "reason": "OCR'd PDF of 40 or more pages (decision 2026-11-04 05:45: the design's PDF page cap); its OCR can exceed the 30 s per-document budget under load and truncate",
+   "source": "govdocs1"
+  },
+  {
+   "doc": "ru-5752e89d853aa62154bcf48c",
+   "evidence": {
+    "build": "second_build",
+    "contentTruncated": null,
+    "imagePageCount": 0,
+    "index_key_prefix": "61ac1064e36a2c4f",
+    "ocrWordCount": 28539,
+    "pageCount": 57,
+    "pagesMissingReadableText": 0,
+    "route": "ocr_full"
+   },
+   "format": "pdf",
+   "language": "en",
+   "path": "Downloads/Office/Working copies/Reference document (100).pdf",
+   "reason": "OCR'd PDF of 40 or more pages (decision 2026-11-04 05:45: the design's PDF page cap); its OCR can exceed the 30 s per-document budget under load and truncate",
+   "source": "govdocs1"
+  },
+  {
+   "doc": "ru-5d80687aaf1bd2fa1aa66ba2",
+   "format": "pdf",
+   "language": "en",
+   "path": "Downloads/Office/Reference/Reference document (129).pdf",
+   "preview": {
+    "contentTruncated": true,
+    "extractionParserId": "tika-policy-ocr",
+    "extractionPolicyId": "tika-default-v8",
+    "extractionStatus": "SUCCESS_PARTIAL",
+    "textProvenance": "vdu_pending",
+    "totalChars": 12993,
+    "vduStatus": "PENDING"
+   },
+   "reason": "extraction truncated to the policy cap (SUCCESS_PARTIAL, contentTruncated); the core witness refuses truncated extractions",
+   "source": "govdocs1"
+  },
+  {
+   "doc": "ru-617318723326fa2f07e408db",
+   "format": "pdf",
+   "language": "en",
+   "path": "Downloads/Office/Working copies/Reference document (117).pdf",
+   "preview": {
+    "contentTruncated": true,
+    "extractionParserId": "tika-policy-ocr",
+    "extractionPolicyId": "tika-default-v8",
+    "extractionStatus": "SUCCESS_PARTIAL",
+    "textProvenance": "vdu_pending",
+    "totalChars": 86046,
+    "vduStatus": "PENDING"
+   },
+   "reason": "extraction truncated to the policy cap (SUCCESS_PARTIAL, contentTruncated); the core witness refuses truncated extractions",
+   "source": "govdocs1"
+  },
+  {
+   "doc": "ru-666c69d05ec4dc7d00217c45",
+   "format": "pdf",
+   "language": "en",
+   "path": "Downloads/Office/Reference/Reference document (76).pdf",
+   "preview": {
+    "contentTruncated": true,
+    "extractionParserId": "tika-policy-ocr",
+    "extractionPolicyId": "tika-default-v8",
+    "extractionStatus": "SUCCESS_PARTIAL",
+    "textProvenance": "vdu_pending",
+    "totalChars": 106575,
+    "vduStatus": "PENDING"
+   },
+   "reason": "extraction truncated to the policy cap (SUCCESS_PARTIAL, contentTruncated); the core witness refuses truncated extractions",
+   "source": "govdocs1"
+  },
+  {
+   "doc": "ru-691d7f5e9fbe5ce3f7dc0d90",
+   "format": "pdf",
+   "language": "en",
+   "path": "Downloads/Office/Archive/Reference document (124).pdf",
+   "preview": {
+    "contentTruncated": true,
+    "extractionParserId": "tika-policy-ocr",
+    "extractionPolicyId": "tika-default-v8",
+    "extractionStatus": "SUCCESS_PARTIAL",
+    "textProvenance": "vdu_pending",
+    "totalChars": 120219,
+    "vduStatus": "PENDING"
+   },
+   "reason": "extraction truncated to the policy cap (SUCCESS_PARTIAL, contentTruncated); the core witness refuses truncated extractions",
+   "source": "govdocs1"
+  },
+  {
+   "doc": "ru-698f1a395c602df381c0e3c5",
+   "format": "pdf",
+   "language": "en",
+   "path": "Downloads/Office/Working copies/Reference document (108).pdf",
+   "preview": {
+    "contentTruncated": true,
+    "extractionParserId": "tika-policy-ocr",
+    "extractionPolicyId": "tika-default-v8",
+    "extractionStatus": "SUCCESS_PARTIAL",
+    "textProvenance": "vdu_pending",
+    "totalChars": 515390,
+    "vduStatus": "PENDING"
+   },
+   "reason": "extraction truncated to the policy cap (SUCCESS_PARTIAL, contentTruncated); the core witness refuses truncated extractions",
+   "source": "govdocs1"
+  },
+  {
+   "doc": "ru-6c7a7f4beb266cd2ccce71ba",
+   "evidence": {
+    "build": "second_build",
+    "contentTruncated": null,
+    "imagePageCount": 1,
+    "index_key_prefix": "61ac1064e36a2c4f",
+    "ocrWordCount": 6,
+    "pageCount": 41,
+    "pagesMissingReadableText": 0,
+    "route": "ocr_selective"
+   },
+   "format": "pdf",
+   "language": "en",
+   "path": "Downloads/Office/Archive/Reference document (71).pdf",
+   "reason": "OCR'd PDF of 40 or more pages (decision 2026-11-04 05:45: the design's PDF page cap); its OCR can exceed the 30 s per-document budget under load and truncate",
+   "source": "govdocs1"
+  },
+  {
+   "doc": "ru-6cb8dba317d067cf0b56da7a",
+   "evidence": {
+    "build": "second_build",
+    "contentTruncated": null,
+    "imagePageCount": 0,
+    "index_key_prefix": "61ac1064e36a2c4f",
+    "ocrWordCount": 1,
+    "pageCount": 105,
+    "pagesMissingReadableText": 0,
+    "route": "ocr_selective"
+   },
+   "format": "pdf",
+   "language": "en",
+   "path": "Downloads/Office/Archive/Reference document (27).pdf",
+   "reason": "OCR'd PDF of 40 or more pages (decision 2026-11-04 05:45: the design's PDF page cap); its OCR can exceed the 30 s per-document budget under load and truncate",
+   "source": "govdocs1"
+  },
+  {
+   "doc": "ru-6e525c791bdb722344ad6a1a",
+   "evidence": {
+    "build": "second_build",
+    "contentTruncated": true,
+    "imagePageCount": 3,
+    "index_key_prefix": "61ac1064e36a2c4f",
+    "ocrWordCount": 37478,
+    "pageCount": 109,
+    "pagesMissingReadableText": 18,
+    "route": "ocr_full"
+   },
+   "format": "pdf",
+   "language": "en",
+   "path": "Downloads/Office/Reference/Reference document (141).pdf",
+   "reason": "OCR'd PDF of 40 or more pages (decision 2026-11-04 05:45: the design's PDF page cap); its OCR can exceed the 30 s per-document budget under load and truncate",
+   "source": "govdocs1"
+  },
+  {
+   "doc": "ru-6e6e691dd3d18848a37def4d",
+   "format": "pdf",
+   "language": "de",
+   "path": "Bundestag/19. Wahlperiode/Drucksachen/Drucksache 19-04175.pdf",
+   "preview": {
+    "contentTruncated": true,
+    "extractionParserId": "tika-policy-ocr",
+    "extractionPolicyId": "tika-default-v8",
+    "extractionStatus": "SUCCESS_PARTIAL",
+    "textProvenance": "vdu_pending",
+    "totalChars": 35030,
+    "vduStatus": "PENDING"
+   },
+   "reason": "extraction truncated to the policy cap (SUCCESS_PARTIAL, contentTruncated); the core witness refuses truncated extractions",
+   "source": "bundestag"
+  },
+  {
+   "doc": "ru-74c0d3374061cb6275972c7a",
+   "evidence": {
+    "build": "second_build",
+    "contentTruncated": null,
+    "imagePageCount": 0,
+    "index_key_prefix": "61ac1064e36a2c4f",
+    "ocrWordCount": 13833,
+    "pageCount": 56,
+    "pagesMissingReadableText": 0,
+    "route": "ocr_full"
+   },
+   "format": "pdf",
+   "language": "de",
+   "path": "Bundestag/19. Wahlperiode/Drucksachen/Drucksache 19-08783.pdf",
+   "reason": "OCR'd PDF of 40 or more pages (decision 2026-11-04 05:45: the design's PDF page cap); its OCR can exceed the 30 s per-document budget under load and truncate",
+   "source": "bundestag"
+  },
+  {
+   "doc": "ru-7770c9022eb338b4249f9b85",
+   "format": "pdf",
+   "language": "de",
+   "path": "Bundestag/19. Wahlperiode/Plenarprotokolle/Plenarprotokoll 19-031.pdf",
+   "preview": {
+    "contentTruncated": true,
+    "extractionParserId": "tika-policy-ocr",
+    "extractionPolicyId": "tika-default-v8",
+    "extractionStatus": "SUCCESS_PARTIAL",
+    "textProvenance": "vdu_pending",
+    "totalChars": 738288,
+    "vduStatus": "PENDING"
+   },
+   "reason": "extraction truncated to the policy cap (SUCCESS_PARTIAL, contentTruncated); the core witness refuses truncated extractions",
+   "source": "bundestag"
+  },
+  {
+   "doc": "ru-7a3a783bfceb99953f4be21c",
+   "format": "pdf",
+   "language": "en",
+   "path": "Downloads/Office/Archive/Reference document (62).pdf",
+   "preview": {
+    "contentTruncated": true,
+    "extractionParserId": "tika-policy-ocr",
+    "extractionPolicyId": "tika-default-v8",
+    "extractionStatus": "SUCCESS_PARTIAL",
+    "textProvenance": "vdu_pending",
+    "totalChars": 191831,
+    "vduStatus": "PENDING"
+   },
+   "reason": "extraction truncated to the policy cap (SUCCESS_PARTIAL, contentTruncated); the core witness refuses truncated extractions",
+   "source": "govdocs1"
+  },
+  {
+   "doc": "ru-7ff936cca9ea909b670e213a",
+   "evidence": {
+    "build": "second_build",
+    "contentTruncated": null,
+    "imagePageCount": 11,
+    "index_key_prefix": "61ac1064e36a2c4f",
+    "ocrWordCount": 1871,
+    "pageCount": 116,
+    "pagesMissingReadableText": 0,
+    "route": "ocr_selective"
+   },
+   "format": "pdf",
+   "language": "de",
+   "path": "Bundestag/18. Wahlperiode/Drucksachen/Drucksache 18-03427.pdf",
+   "reason": "OCR'd PDF of 40 or more pages (decision 2026-11-04 05:45: the design's PDF page cap); its OCR can exceed the 30 s per-document budget under load and truncate",
+   "source": "bundestag"
+  },
+  {
+   "doc": "ru-8657ce4b5d608ae1f276b22b",
+   "format": "pdf",
+   "language": "en",
+   "path": "Downloads/Office/Reference/Reference document (136).pdf",
+   "preview": {
+    "contentTruncated": true,
+    "extractionParserId": "tika-policy-ocr",
+    "extractionPolicyId": "tika-default-v8",
+    "extractionStatus": "SUCCESS_PARTIAL",
+    "textProvenance": "vdu_pending",
+    "totalChars": 1094430,
+    "vduStatus": "PENDING"
+   },
+   "reason": "extraction truncated to the policy cap (SUCCESS_PARTIAL, contentTruncated); the core witness refuses truncated extractions",
+   "source": "govdocs1"
+  },
+  {
+   "doc": "ru-9affcfa45f7b959fc05cb441",
+   "format": "doc",
+   "language": "en",
+   "path": "Downloads/Office/Working copies/Office document (25).doc",
+   "preview": null,
+   "reason": "parser failed (engine job FAILED, PARSER_FAILED, retry policy NONE: ExtractionException: Sandbox parser failed)",
+   "source": "govdocs1"
+  },
+  {
+   "doc": "ru-9e2a14d4b875be78450fea3f",
+   "evidence": {
+    "build": "second_build",
+    "contentTruncated": null,
+    "imagePageCount": 0,
+    "index_key_prefix": "61ac1064e36a2c4f",
+    "ocrWordCount": 30572,
+    "pageCount": 86,
+    "pagesMissingReadableText": 0,
+    "route": "ocr_full"
+   },
+   "format": "pdf",
+   "language": "en",
+   "path": "Downloads/Office/Working copies/Reference document (145).pdf",
+   "reason": "OCR'd PDF of 40 or more pages (decision 2026-11-04 05:45: the design's PDF page cap); its OCR can exceed the 30 s per-document budget under load and truncate",
+   "source": "govdocs1"
+  },
+  {
+   "doc": "ru-9e81cc7866e5bcdafd815c6e",
+   "evidence": {
+    "build": "second_build",
+    "contentTruncated": null,
+    "imagePageCount": 6,
+    "index_key_prefix": "61ac1064e36a2c4f",
+    "ocrWordCount": 11148,
+    "pageCount": 51,
+    "pagesMissingReadableText": 0,
+    "route": "ocr_full"
+   },
+   "format": "pdf",
+   "language": "en",
+   "path": "Downloads/Office/Working copies/Reference document (68).pdf",
+   "reason": "OCR'd PDF of 40 or more pages (decision 2026-11-04 05:45: the design's PDF page cap); its OCR can exceed the 30 s per-document budget under load and truncate",
+   "source": "govdocs1"
+  },
+  {
+   "doc": "ru-9e8e8f35fa407c5a19651ae5",
+   "evidence": {
+    "build": "second_build",
+    "contentTruncated": null,
+    "imagePageCount": 0,
+    "index_key_prefix": "61ac1064e36a2c4f",
+    "ocrWordCount": 12433,
+    "pageCount": 40,
+    "pagesMissingReadableText": 0,
+    "route": "ocr_full"
+   },
+   "format": "pdf",
+   "language": "en",
+   "path": "Downloads/Office/Reference/Reference document (134).pdf",
+   "reason": "OCR'd PDF of 40 or more pages (decision 2026-11-04 05:45: the design's PDF page cap); its OCR can exceed the 30 s per-document budget under load and truncate",
+   "source": "govdocs1"
+  },
+  {
+   "doc": "ru-a2177a66d53a0a192e3f34e8",
+   "evidence": {
+    "build": "second_build",
+    "contentTruncated": null,
+    "imagePageCount": 0,
+    "index_key_prefix": "61ac1064e36a2c4f",
+    "ocrWordCount": 3,
+    "pageCount": 164,
+    "pagesMissingReadableText": 0,
+    "route": "ocr_selective"
+   },
+   "format": "pdf",
+   "language": "en",
+   "path": "Downloads/Office/Reference/Reference document (68).pdf",
+   "reason": "OCR'd PDF of 40 or more pages (decision 2026-11-04 05:45: the design's PDF page cap); its OCR can exceed the 30 s per-document budget under load and truncate",
+   "source": "govdocs1"
+  },
+  {
+   "doc": "ru-a3443aef9c16afd22e130faa",
+   "format": "pdf",
+   "language": "en",
+   "path": "Downloads/Office/Reference/Reference document (9).pdf",
+   "preview": {
+    "contentTruncated": true,
+    "extractionParserId": "tika-policy-ocr",
+    "extractionPolicyId": "tika-default-v8",
+    "extractionStatus": "SUCCESS_PARTIAL",
+    "textProvenance": "vdu_pending",
+    "totalChars": 9238,
+    "vduStatus": "PENDING"
+   },
+   "reason": "extraction truncated to the policy cap (SUCCESS_PARTIAL, contentTruncated); the core witness refuses truncated extractions",
+   "source": "govdocs1"
+  },
+  {
+   "doc": "ru-a649c0c296d4ac4ef5952089",
+   "format": "doc",
+   "language": "en",
+   "path": "Downloads/Office/Reference/Office document (16).doc",
+   "preview": null,
+   "reason": "parser failed (engine job FAILED, PARSER_FAILED, retry policy NONE: ExtractionException: Sandbox parser failed)",
+   "source": "govdocs1"
+  },
+  {
+   "doc": "ru-a7aa1f3b11b5d632f5f70af6",
+   "format": "pdf",
+   "language": "en",
+   "path": "Downloads/Office/Archive/Reference document (64).pdf",
+   "preview": {
+    "contentTruncated": true,
+    "extractionParserId": "tika-policy-ocr",
+    "extractionPolicyId": "tika-default-v8",
+    "extractionStatus": "SUCCESS_PARTIAL",
+    "textProvenance": "vdu_pending",
+    "totalChars": 69071,
+    "vduStatus": "PENDING"
+   },
+   "reason": "extraction truncated to the policy cap (SUCCESS_PARTIAL, contentTruncated); the core witness refuses truncated extractions",
+   "source": "govdocs1"
+  },
+  {
+   "doc": "ru-ad6a3657c742e5901762e533",
+   "evidence": {
+    "build": "second_build",
+    "contentTruncated": null,
+    "imagePageCount": 10,
+    "index_key_prefix": "61ac1064e36a2c4f",
+    "ocrWordCount": 20155,
+    "pageCount": 58,
+    "pagesMissingReadableText": 0,
+    "route": "ocr_full"
+   },
+   "format": "pdf",
+   "language": "en",
+   "path": "Downloads/Office/Archive/Reference document (131).pdf",
+   "reason": "OCR'd PDF of 40 or more pages (decision 2026-11-04 05:45: the design's PDF page cap); its OCR can exceed the 30 s per-document budget under load and truncate",
+   "source": "govdocs1"
+  },
+  {
+   "doc": "ru-b1031edd38691f7364361a1c",
+   "format": "pdf",
+   "language": "de",
+   "path": "Bundestag/19. Wahlperiode/Plenarprotokolle/Plenarprotokoll 19-140.pdf",
+   "preview": {
+    "contentTruncated": true,
+    "extractionParserId": "tika-policy-ocr",
+    "extractionPolicyId": "tika-default-v8",
+    "extractionStatus": "SUCCESS_PARTIAL",
+    "textProvenance": "vdu_pending",
+    "totalChars": 1324628,
+    "vduStatus": "PENDING"
+   },
+   "reason": "extraction truncated to the policy cap (SUCCESS_PARTIAL, contentTruncated); the core witness refuses truncated extractions",
+   "source": "bundestag"
+  },
+  {
+   "doc": "ru-b42afa0159ab8758c2bad155",
+   "format": "pdf",
+   "language": "de",
+   "path": "Downloads/Web/servier.at/Downloaded document.pdf",
+   "preview": {
+    "contentTruncated": true,
+    "extractionParserId": "tika-policy-ocr",
+    "extractionPolicyId": "tika-default-v8",
+    "extractionStatus": "SUCCESS_PARTIAL",
+    "textProvenance": "vdu_pending",
+    "totalChars": 11086,
+    "vduStatus": "PENDING"
+   },
+   "reason": "extraction truncated to the policy cap (SUCCESS_PARTIAL, contentTruncated); the core witness refuses truncated extractions",
+   "source": "safedocs"
+  },
+  {
+   "doc": "ru-b7e5d7df3b3b8b55f7930a78",
+   "format": "pdf",
+   "language": "en",
+   "path": "Downloads/Office/Working copies/Reference document (10).pdf",
+   "preview": {
+    "contentTruncated": true,
+    "extractionParserId": "tika-policy-ocr",
+    "extractionPolicyId": "tika-default-v8",
+    "extractionStatus": "SUCCESS_PARTIAL",
+    "textProvenance": "vdu_pending",
+    "totalChars": 37997,
+    "vduStatus": "PENDING"
+   },
+   "reason": "extraction truncated to the policy cap (SUCCESS_PARTIAL, contentTruncated); the core witness refuses truncated extractions",
+   "source": "govdocs1"
+  },
+  {
+   "doc": "ru-bdf1d48d7a343538a149df5b",
+   "format": "pdf",
+   "language": "en",
+   "path": "Downloads/Office/Reference/Reference document (26).pdf",
+   "preview": {
+    "contentTruncated": true,
+    "extractionParserId": "tika-policy-ocr",
+    "extractionPolicyId": "tika-default-v8",
+    "extractionStatus": "SUCCESS_PARTIAL",
+    "textProvenance": "vdu_pending",
+    "totalChars": 151604,
+    "vduStatus": "PENDING"
+   },
+   "reason": "extraction truncated to the policy cap (SUCCESS_PARTIAL, contentTruncated); the core witness refuses truncated extractions",
+   "source": "govdocs1"
+  },
+  {
+   "doc": "ru-c1bf59baafac14d757e5f511",
+   "format": "pdf",
+   "language": "en",
+   "path": "Downloads/Office/Archive/Reference document (75).pdf",
+   "preview": {
+    "contentTruncated": true,
+    "extractionParserId": "tika-policy-ocr",
+    "extractionPolicyId": "tika-default-v8",
+    "extractionStatus": "SUCCESS_PARTIAL",
+    "textProvenance": "vdu_pending",
+    "totalChars": 91023,
+    "vduStatus": "PENDING"
+   },
+   "reason": "extraction truncated to the policy cap (SUCCESS_PARTIAL, contentTruncated); the core witness refuses truncated extractions",
+   "source": "govdocs1"
+  },
+  {
+   "doc": "ru-c26f19c24f86c02cf3fea1e5",
+   "evidence": {
+    "build": "second_build",
+    "contentTruncated": null,
+    "imagePageCount": 0,
+    "index_key_prefix": "61ac1064e36a2c4f",
+    "ocrWordCount": 3217,
+    "pageCount": 63,
+    "pagesMissingReadableText": 0,
+    "route": "ocr_full"
+   },
+   "format": "pdf",
+   "language": "de",
+   "path": "Bundestag/20. Wahlperiode/Drucksachen/Drucksache 20-02771.pdf",
+   "reason": "OCR'd PDF of 40 or more pages (decision 2026-11-04 05:45: the design's PDF page cap); its OCR can exceed the 30 s per-document budget under load and truncate",
+   "source": "bundestag"
+  },
+  {
+   "doc": "ru-c6175e09b2a775691bb905c5",
+   "format": "pdf",
+   "language": "de",
+   "path": "Bundestag/19. Wahlperiode/Plenarprotokolle/Plenarprotokoll 19-174.pdf",
+   "preview": {
+    "contentTruncated": true,
+    "extractionParserId": "tika-policy-ocr",
+    "extractionPolicyId": "tika-default-v8",
+    "extractionStatus": "SUCCESS_PARTIAL",
+    "textProvenance": "vdu_pending",
+    "totalChars": 931180,
+    "vduStatus": "PENDING"
+   },
+   "reason": "extraction truncated to the policy cap (SUCCESS_PARTIAL, contentTruncated); the core witness refuses truncated extractions",
+   "source": "bundestag"
+  },
+  {
+   "doc": "ru-c70803c638617e6cdc5c2c8b",
+   "format": "pdf",
+   "language": "en",
+   "path": "Downloads/Office/Archive/Reference document (113).pdf",
+   "preview": {
+    "contentTruncated": true,
+    "extractionParserId": "tika-policy-ocr",
+    "extractionPolicyId": "tika-default-v8",
+    "extractionStatus": "SUCCESS_PARTIAL",
+    "textProvenance": "vdu_pending",
+    "totalChars": 10775,
+    "vduStatus": "PENDING"
+   },
+   "reason": "extraction truncated to the policy cap (SUCCESS_PARTIAL, contentTruncated); the core witness refuses truncated extractions",
+   "source": "govdocs1"
+  },
+  {
+   "doc": "ru-ca7cd6fd075bfc27296c84d9",
+   "format": "pdf",
+   "language": "en",
+   "path": "Downloads/Office/Reference/Reference document (100).pdf",
+   "preview": {
+    "contentTruncated": true,
+    "extractionParserId": "tika-policy-ocr",
+    "extractionPolicyId": "tika-default-v8",
+    "extractionStatus": "SUCCESS_PARTIAL",
+    "textProvenance": "vdu_pending",
+    "totalChars": 427213,
+    "vduStatus": "PENDING"
+   },
+   "reason": "extraction truncated to the policy cap (SUCCESS_PARTIAL, contentTruncated); the core witness refuses truncated extractions",
+   "source": "govdocs1"
+  },
+  {
+   "doc": "ru-cf947025bedac507cc680f29",
+   "format": "ppt",
+   "language": "en",
+   "path": "Downloads/Office/Reference/Reference slides (29).ppt",
+   "preview": null,
+   "reason": "parser failed (engine job FAILED, PARSER_FAILED, retry policy NONE: ExtractionException: Sandbox parser failed)",
+   "source": "govdocs1"
+  },
+  {
+   "doc": "ru-d58def635883e897ea93becd",
+   "format": "pdf",
+   "language": "de",
+   "path": "Downloads/Web/www.l-art.at/Downloaded document.pdf",
+   "preview": {
+    "contentTruncated": true,
+    "extractionParserId": "tika-policy-ocr",
+    "extractionPolicyId": "tika-default-v8",
+    "extractionStatus": "SUCCESS_PARTIAL",
+    "textProvenance": "vdu_pending",
+    "totalChars": 2940,
+    "vduStatus": "PENDING"
+   },
+   "reason": "extraction truncated to the policy cap (SUCCESS_PARTIAL, contentTruncated); the core witness refuses truncated extractions",
+   "source": "safedocs"
+  },
+  {
+   "doc": "ru-d7fa79253fe3543f4264ac78",
+   "format": "pdf",
+   "language": "en",
+   "path": "Downloads/Office/Archive/Reference document (74).pdf",
+   "preview": {
+    "contentTruncated": true,
+    "extractionParserId": "tika-policy-ocr",
+    "extractionPolicyId": "tika-default-v8",
+    "extractionStatus": "SUCCESS_PARTIAL",
+    "textProvenance": "vdu_pending",
+    "totalChars": 39599,
+    "vduStatus": "PENDING"
+   },
+   "reason": "extraction truncated to the policy cap (SUCCESS_PARTIAL, contentTruncated); the core witness refuses truncated extractions",
+   "source": "govdocs1"
+  },
+  {
+   "doc": "ru-d9fc215fc70c12535f9b92cd",
+   "evidence": {
+    "build": "second_build",
+    "contentTruncated": null,
+    "imagePageCount": 0,
+    "index_key_prefix": "61ac1064e36a2c4f",
+    "ocrWordCount": 15172,
+    "pageCount": 53,
+    "pagesMissingReadableText": 0,
+    "route": "ocr_full"
+   },
+   "format": "pdf",
+   "language": "de",
+   "path": "Bundestag/20. Wahlperiode/Drucksachen/Drucksache 20-05027.pdf",
+   "reason": "OCR'd PDF of 40 or more pages (decision 2026-11-04 05:45: the design's PDF page cap); its OCR can exceed the 30 s per-document budget under load and truncate",
+   "source": "bundestag"
+  },
+  {
+   "doc": "ru-dc4bba100e854d5b37a9dda1",
+   "evidence": {
+    "build": "second_build",
+    "contentTruncated": null,
+    "imagePageCount": 55,
+    "index_key_prefix": "61ac1064e36a2c4f",
+    "ocrWordCount": 67,
+    "pageCount": 59,
+    "pagesMissingReadableText": 0,
+    "route": "ocr_selective"
+   },
+   "format": "pdf",
+   "language": "en",
+   "path": "Downloads/Office/Working copies/Reference document (113).pdf",
+   "reason": "OCR'd PDF of 40 or more pages (decision 2026-11-04 05:45: the design's PDF page cap); its OCR can exceed the 30 s per-document budget under load and truncate",
+   "source": "govdocs1"
+  },
+  {
+   "doc": "ru-e1036b552586db2619bc4e69",
+   "evidence": {
+    "build": "second_build",
+    "contentTruncated": null,
+    "imagePageCount": 0,
+    "index_key_prefix": "61ac1064e36a2c4f",
+    "ocrWordCount": 10818,
+    "pageCount": 40,
+    "pagesMissingReadableText": 0,
+    "route": "ocr_full"
+   },
+   "format": "pdf",
+   "language": "de",
+   "path": "Bundestag/20. Wahlperiode/Drucksachen/Drucksache 20-05583.pdf",
+   "reason": "OCR'd PDF of 40 or more pages (decision 2026-11-04 05:45: the design's PDF page cap); its OCR can exceed the 30 s per-document budget under load and truncate",
+   "source": "bundestag"
+  },
+  {
+   "doc": "ru-ea958fc1faea6d3edac94c6e",
+   "format": "pdf",
+   "language": "en",
+   "path": "Downloads/Office/Working copies/Reference document (83).pdf",
+   "preview": {
+    "contentTruncated": true,
+    "extractionParserId": "tika-policy-ocr",
+    "extractionPolicyId": "tika-default-v8",
+    "extractionStatus": "SUCCESS_PARTIAL",
+    "textProvenance": "vdu_pending",
+    "totalChars": 71174,
+    "vduStatus": "PENDING"
+   },
+   "reason": "extraction truncated to the policy cap (SUCCESS_PARTIAL, contentTruncated); the core witness refuses truncated extractions",
+   "source": "govdocs1"
+  },
+  {
+   "doc": "ru-f9ecdc011d39c48d1a4eece9",
+   "evidence": {
+    "build": "second_build",
+    "contentTruncated": true,
+    "imagePageCount": 0,
+    "index_key_prefix": "61ac1064e36a2c4f",
+    "ocrWordCount": 48932,
+    "pageCount": 64,
+    "pagesMissingReadableText": 1,
+    "route": "ocr_full"
+   },
+   "format": "pdf",
+   "language": "de",
+   "path": "Bundestag/18. Wahlperiode/Plenarprotokolle/Plenarprotokoll 18-012.pdf",
+   "reason": "OCR'd PDF of 40 or more pages (decision 2026-11-04 05:45: the design's PDF page cap); its OCR can exceed the 30 s per-document budget under load and truncate",
+   "source": "bundestag"
+  },
+  {
+   "doc": "ru-fa52eb2c5cc1251826896611",
+   "format": "pdf",
+   "language": "de",
+   "path": "Bundestag/20. Wahlperiode/Plenarprotokolle/Plenarprotokoll 20-114.pdf",
+   "preview": {
+    "contentTruncated": true,
+    "extractionParserId": "tika-policy-ocr",
+    "extractionPolicyId": "tika-default-v8",
+    "extractionStatus": "SUCCESS_PARTIAL",
+    "textProvenance": "vdu_pending",
+    "totalChars": 862198,
+    "vduStatus": "PENDING"
+   },
+   "reason": "extraction truncated to the policy cap (SUCCESS_PARTIAL, contentTruncated); the core witness refuses truncated extractions",
+   "source": "bundestag"
+  },
+  {
+   "doc": "ru-fd14c623a3166fdf55d5339d",
+   "format": "pdf",
+   "language": "de",
+   "path": "Bundestag/20. Wahlperiode/Plenarprotokolle/Plenarprotokoll 20-024.pdf",
+   "preview": {
+    "contentTruncated": true,
+    "extractionParserId": "tika-policy-ocr",
+    "extractionPolicyId": "tika-default-v8",
+    "extractionStatus": "SUCCESS_PARTIAL",
+    "textProvenance": "vdu_pending",
+    "totalChars": 917721,
+    "vduStatus": "PENDING"
+   },
+   "reason": "extraction truncated to the policy cap (SUCCESS_PARTIAL, contentTruncated); the core witness refuses truncated extractions",
+   "source": "bundestag"
+  }
+ ],
+ "first_build": {
+  "failed_jobs": 4,
+  "index_key_prefix": "47c736567cd820c7",
+  "indexed_documents": 2956,
+  "truncated": 40
+ },
+ "note": "Files of the 2,960-file recipe that the engine at the build commit does not hold completely. The real-use collection excludes them; the recipe keeps them.",
+ "ocr_page_cap": {
+  "decided": "2026-11-04 05:45",
+  "dropped_queries": [
+   "ki-142"
+  ],
+  "excluded": [
+   "ru-11f5a822509176056b8356e9",
+   "ru-184c2456746259292719302c",
+   "ru-1e55fdfe07d5d8af00cd2cd7",
+   "ru-333089203f28c62eafa5b9b9",
+   "ru-3d5d303f844525d938c92abf",
+   "ru-44261ab65988df85214e71fd",
+   "ru-498871580f3e08e1da187250",
+   "ru-49b9bd7110c08b65be47fdf3",
+   "ru-4caa56125fec5c963521b4b7",
+   "ru-54e791becdff987954f8e5b3",
+   "ru-5752e89d853aa62154bcf48c",
+   "ru-6c7a7f4beb266cd2ccce71ba",
+   "ru-6cb8dba317d067cf0b56da7a",
+   "ru-6e525c791bdb722344ad6a1a",
+   "ru-74c0d3374061cb6275972c7a",
+   "ru-7ff936cca9ea909b670e213a",
+   "ru-9e2a14d4b875be78450fea3f",
+   "ru-9e81cc7866e5bcdafd815c6e",
+   "ru-9e8e8f35fa407c5a19651ae5",
+   "ru-a2177a66d53a0a192e3f34e8",
+   "ru-ad6a3657c742e5901762e533",
+   "ru-c26f19c24f86c02cf3fea1e5",
+   "ru-d9fc215fc70c12535f9b92cd",
+   "ru-dc4bba100e854d5b37a9dda1",
+   "ru-e1036b552586db2619bc4e69",
+   "ru-f9ecdc011d39c48d1a4eece9"
+  ],
+  "page_evidence": "visualExtractionEvidence of the second build (route, pageCount) for every document it held",
+  "rule": "exclude OCR'd PDFs (visual evidence route ocr_full or ocr_selective) of >= 40 pages; also any OCR'd PDF whose measured OCR time reached >= 15 s of the 30 s DEFAULT_BUDGET_MS in either build, where the logs give per-document timing",
+  "timing_evidence": "none: neither build's engine.log records per-document OCR or extraction time (it logs the OCR config, budgetMs=30000, and batch totals only), so the timing rule excluded nothing"
+ },
+ "second_build": {
+  "failed_jobs": 0,
+  "index_key_prefix": "61ac1064e36a2c4f",
+  "indexed_documents": 2916,
+  "note": "Still in the collection (decision pending). Extracted completely in the first build, truncated in the second: the PDF OCR per-document elapsed budget (PdfOcrEngine DEFAULT_BUDGET_MS 30 s) truncates large OCR documents under machine load, so the core witness refused the second build.",
+  "ocr_route_documents": 433,
+  "ocr_route_documents_with_at_least_40_pages": 26,
+  "truncated": [
+   {
+    "contentTruncated": true,
+    "doc": "ru-6e525c791bdb722344ad6a1a",
+    "imagePageCount": 3,
+    "ocrWordCount": 37478,
+    "pageCount": 109,
+    "pagesMissingReadableText": 18,
+    "path": "Downloads/Office/Reference/Reference document (141).pdf",
+    "route": "ocr_full"
+   },
+   {
+    "contentTruncated": true,
+    "doc": "ru-f9ecdc011d39c48d1a4eece9",
+    "imagePageCount": 0,
+    "ocrWordCount": 48932,
+    "pageCount": 64,
+    "pagesMissingReadableText": 1,
+    "path": "Bundestag/18. Wahlperiode/Plenarprotokolle/Plenarprotokoll 18-012.pdf",
+    "route": "ocr_full"
+   }
+  ]
+ }
+}

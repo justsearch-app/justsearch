@@ -235,6 +235,14 @@ class Collection:
         return {"count": len(self.documents), "manifest_sha256": self.manifest_sha256,
                 "content_sha256": self.content_sha256}
 
+    def document_identity(self) -> dict[str, Any]:
+        """What an index of this collection is built and witnessed from (K1): the population
+        plus the materialization layout and witness formats. Queries and judgments are absent,
+        so editing them never changes an index key or a data-folder owner."""
+        return {"population": self.index_population(),
+                "layout": self.metadata.get("layout", "opaque"),
+                "witness_formats": self.metadata.get("witness_formats")}
+
     def queries_payload(self) -> list:
         out = []
         for qid in sorted(self.queries):

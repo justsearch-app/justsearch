@@ -70,6 +70,16 @@ through pausable background admission and may wait for the Gradle slot. Scoring
 never builds or repairs an index and refuses missing, corrupt or stale inputs
 as **not ready**. Re-run preparation outside the exclusive window.
 
+An index is keyed and owned by the collection's document identity: population
+(count, manifest and content digests), layout and witness formats. Stored
+collection data under `jseval/quality/config/` and `jseval/quality/recipes/` is
+not part of the source key. Editing queries or judgments therefore reuses the
+prepared index; changing a document, the layout or the witness formats builds a
+new one. `prepare` also accepts a corpus-only collection without scored queries.
+`baseline`, `check` and `score` refuse such a collection. A config's
+`pending_kinds` names query kinds stored without judgments until a later
+labelling pass. Those queries are counted as pending and excluded from scoring.
+
 MIRACL fr runs only with `quality full-suite --window-seconds SECONDS`, which
 requires an explicit window and includes all four collections. Relative recipe
 paths (including Enron) resolve from the current checkout first, then the main

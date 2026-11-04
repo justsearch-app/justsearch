@@ -1,0 +1,5314 @@
+{
+ "queries": [
+  {
+   "clusters": [
+    "cl-0321"
+   ],
+   "focus": "start",
+   "format": "pdf",
+   "kind": "known-item",
+   "language": "de",
+   "level": "exact",
+   "offset": 0,
+   "qid": "ki-001",
+   "source": "bundestag",
+   "target": "ru-e47a7548441ad15c30668830",
+   "traits": [
+    "misspelling"
+   ]
+  },
+  {
+   "clusters": [
+    "cl-0316"
+   ],
+   "focus": "deep",
+   "format": "pdf",
+   "kind": "known-item",
+   "language": "de",
+   "level": "partial",
+   "offset": 17043,
+   "qid": "ki-002",
+   "source": "bundestag",
+   "target": "ru-1aef7c93e7a6045ddf9801d7",
+   "traits": [
+    "not-in-document",
+    "other-language"
+   ]
+  },
+  {
+   "clusters": [
+    "cl-0303"
+   ],
+   "focus": "start",
+   "format": "pdf",
+   "kind": "known-item",
+   "language": "de",
+   "level": "vague",
+   "offset": 0,
+   "qid": "ki-003",
+   "source": "bundestag",
+   "target": "ru-17b55f6c91cf4567a9c04972",
+   "traits": [
+    "not-in-document"
+   ]
+  },
+  {
+   "clusters": [
+    "cl-0266"
+   ],
+   "focus": "start",
+   "format": "pdf",
+   "kind": "known-item",
+   "language": "de",
+   "level": "exact",
+   "offset": 0,
+   "qid": "ki-004",
+   "source": "bundestag",
+   "target": "ru-fc0e2a2b1b3531b2598eb991",
+   "traits": []
+  },
+  {
+   "clusters": [
+    "cl-0261"
+   ],
+   "focus": "start",
+   "format": "pdf",
+   "kind": "known-item",
+   "language": "de",
+   "level": "partial",
+   "offset": 0,
+   "qid": "ki-005",
+   "source": "bundestag",
+   "target": "ru-52cd4df75dc7707fea62415f",
+   "traits": [
+    "not-in-document"
+   ]
+  },
+  {
+   "clusters": [
+    "cl-0389"
+   ],
+   "focus": "start",
+   "format": "pdf",
+   "kind": "known-item",
+   "language": "de",
+   "level": "vague",
+   "offset": 0,
+   "qid": "ki-006",
+   "source": "bundestag",
+   "target": "ru-51aeb611a1bf75efda035bc0",
+   "traits": [
+    "not-in-document",
+    "other-language"
+   ]
+  },
+  {
+   "clusters": [
+    "cl-0393"
+   ],
+   "focus": "start",
+   "format": "pdf",
+   "kind": "known-item",
+   "language": "de",
+   "level": "exact",
+   "offset": 0,
+   "qid": "ki-007",
+   "source": "bundestag",
+   "target": "ru-79d3e6c5936bc5db0e376ecf",
+   "traits": []
+  },
+  {
+   "clusters": [
+    "cl-0311"
+   ],
+   "focus": "start",
+   "format": "pdf",
+   "kind": "known-item",
+   "language": "de",
+   "level": "partial",
+   "offset": 0,
+   "qid": "ki-008",
+   "source": "bundestag",
+   "target": "ru-55832eb3ec5ea05c9dee3d6d",
+   "traits": [
+    "not-in-document",
+    "other-language"
+   ]
+  },
+  {
+   "clusters": [
+    "cl-0278"
+   ],
+   "focus": "start",
+   "format": "pdf",
+   "kind": "known-item",
+   "language": "de",
+   "level": "vague",
+   "offset": 0,
+   "qid": "ki-009",
+   "source": "bundestag",
+   "target": "ru-15c33bf47cb13482b4754391",
+   "traits": [
+    "not-in-document"
+   ]
+  },
+  {
+   "clusters": [
+    "cl-0363"
+   ],
+   "focus": "start",
+   "format": "pdf",
+   "kind": "known-item",
+   "language": "de",
+   "level": "exact",
+   "offset": 0,
+   "qid": "ki-010",
+   "source": "bundestag",
+   "target": "ru-6f697a43f75cc9040eaeafa1",
+   "traits": []
+  },
+  {
+   "clusters": [
+    "cl-0292"
+   ],
+   "focus": "deep",
+   "format": "pdf",
+   "kind": "known-item",
+   "language": "de",
+   "level": "partial",
+   "offset": 13231,
+   "qid": "ki-011",
+   "source": "bundestag",
+   "target": "ru-11f134129d9adb25b089da0a",
+   "traits": [
+    "not-in-document"
+   ]
+  },
+  {
+   "clusters": [
+    "cl-0290"
+   ],
+   "focus": "start",
+   "format": "pdf",
+   "kind": "known-item",
+   "language": "de",
+   "level": "vague",
+   "offset": 0,
+   "qid": "ki-012",
+   "source": "bundestag",
+   "target": "ru-6400142603cafb38a93c4344",
+   "traits": [
+    "not-in-document",
+    "misspelling"
+   ]
+  },
+  {
+   "clusters": [
+    "cl-0368"
+   ],
+   "focus": "start",
+   "format": "pdf",
+   "kind": "known-item",
+   "language": "de",
+   "level": "exact",
+   "offset": 0,
+   "qid": "ki-013",
+   "source": "bundestag",
+   "target": "ru-69109c2b4d6bb6dca0644d57",
+   "traits": []
+  },
+  {
+   "clusters": [
+    "cl-0010",
+    "cl-0359"
+   ],
+   "focus": "start",
+   "format": "pdf",
+   "kind": "known-item",
+   "language": "de",
+   "level": "partial",
+   "offset": 0,
+   "qid": "ki-014",
+   "source": "bundestag",
+   "target": "ru-39793f0d94b024eb5869d2de",
+   "traits": [
+    "not-in-document",
+    "other-language"
+   ]
+  },
+  {
+   "clusters": [
+    "cl-0345"
+   ],
+   "focus": "start",
+   "format": "pdf",
+   "kind": "known-item",
+   "language": "de",
+   "level": "vague",
+   "offset": 0,
+   "qid": "ki-015",
+   "source": "bundestag",
+   "target": "ru-eff3a148955afd59de1a2822",
+   "traits": [
+    "not-in-document"
+   ]
+  },
+  {
+   "clusters": [
+    "cl-0322"
+   ],
+   "focus": "start",
+   "format": "pdf",
+   "kind": "known-item",
+   "language": "de",
+   "level": "exact",
+   "offset": 0,
+   "qid": "ki-016",
+   "source": "bundestag",
+   "target": "ru-fda6089aca25011d2a91270e",
+   "traits": []
+  },
+  {
+   "clusters": [
+    "cl-0348"
+   ],
+   "focus": "start",
+   "format": "pdf",
+   "kind": "known-item",
+   "language": "de",
+   "level": "partial",
+   "offset": 0,
+   "qid": "ki-017",
+   "source": "bundestag",
+   "target": "ru-ab72c14c0b02aa5b52a13fbe",
+   "traits": [
+    "not-in-document"
+   ]
+  },
+  {
+   "clusters": [
+    "cl-0342"
+   ],
+   "focus": "deep",
+   "format": "pdf",
+   "kind": "known-item",
+   "language": "de",
+   "level": "vague",
+   "offset": 17722,
+   "qid": "ki-018",
+   "source": "bundestag",
+   "target": "ru-a79e206aa7efdf701bcf0cb2",
+   "traits": [
+    "not-in-document"
+   ]
+  },
+  {
+   "clusters": [
+    "cl-0355"
+   ],
+   "focus": "start",
+   "format": "pdf",
+   "kind": "known-item",
+   "language": "de",
+   "level": "exact",
+   "offset": 0,
+   "qid": "ki-019",
+   "source": "bundestag",
+   "target": "ru-69de880ff6ee3c6789b18599",
+   "traits": [
+    "misspelling"
+   ]
+  },
+  {
+   "clusters": [
+    "cl-0372"
+   ],
+   "focus": "start",
+   "format": "pdf",
+   "kind": "known-item",
+   "language": "de",
+   "level": "partial",
+   "offset": 0,
+   "qid": "ki-020",
+   "source": "bundestag",
+   "target": "ru-7931882ced72b2144c29028d",
+   "traits": [
+    "not-in-document",
+    "other-language"
+   ]
+  },
+  {
+   "clusters": [
+    "cl-0390"
+   ],
+   "focus": "deep",
+   "format": "pdf",
+   "kind": "known-item",
+   "language": "de",
+   "level": "vague",
+   "offset": 9334,
+   "qid": "ki-021",
+   "source": "bundestag",
+   "target": "ru-bc5959a37ed038cc99e78a29",
+   "traits": [
+    "not-in-document",
+    "other-language"
+   ]
+  },
+  {
+   "clusters": [
+    "cl-0351"
+   ],
+   "focus": "start",
+   "format": "pdf",
+   "kind": "known-item",
+   "language": "de",
+   "level": "exact",
+   "offset": 0,
+   "qid": "ki-022",
+   "source": "bundestag",
+   "target": "ru-b3507c69ce4e01cc048da55b",
+   "traits": []
+  },
+  {
+   "clusters": [
+    "cl-0374"
+   ],
+   "focus": "deep",
+   "format": "pdf",
+   "kind": "known-item",
+   "language": "de",
+   "level": "partial",
+   "offset": 16248,
+   "qid": "ki-023",
+   "source": "bundestag",
+   "target": "ru-ed6061779b46ca3ba7b53cfa",
+   "traits": [
+    "not-in-document"
+   ]
+  },
+  {
+   "clusters": [
+    "cl-0360"
+   ],
+   "focus": "start",
+   "format": "pdf",
+   "kind": "known-item",
+   "language": "de",
+   "level": "vague",
+   "offset": 0,
+   "qid": "ki-024",
+   "source": "bundestag",
+   "target": "ru-d9513fef5bdd7996255a246b",
+   "traits": [
+    "not-in-document"
+   ]
+  },
+  {
+   "clusters": [
+    "cl-0356"
+   ],
+   "focus": "start",
+   "format": "pdf",
+   "kind": "known-item",
+   "language": "de",
+   "level": "exact",
+   "offset": 0,
+   "qid": "ki-025",
+   "source": "bundestag",
+   "target": "ru-324457059dbff131d845ddbd",
+   "traits": [
+    "misspelling"
+   ]
+  },
+  {
+   "clusters": [
+    "cl-0304"
+   ],
+   "focus": "deep",
+   "format": "pdf",
+   "kind": "known-item",
+   "language": "de",
+   "level": "partial",
+   "offset": 8133,
+   "qid": "ki-026",
+   "source": "bundestag",
+   "target": "ru-479619e3f1b05162419e5871",
+   "traits": [
+    "not-in-document",
+    "other-language"
+   ]
+  },
+  {
+   "clusters": [
+    "cl-0268"
+   ],
+   "focus": "start",
+   "format": "pdf",
+   "kind": "known-item",
+   "language": "de",
+   "level": "vague",
+   "offset": 0,
+   "qid": "ki-027",
+   "source": "bundestag",
+   "target": "ru-4e951aae63fb4a7047fb6b4a",
+   "traits": [
+    "not-in-document",
+    "misspelling"
+   ]
+  },
+  {
+   "clusters": [
+    "cl-0300"
+   ],
+   "focus": "start",
+   "format": "pdf",
+   "kind": "known-item",
+   "language": "de",
+   "level": "exact",
+   "offset": 0,
+   "qid": "ki-028",
+   "source": "bundestag",
+   "target": "ru-663954d2af4d34e847398d2e",
+   "traits": []
+  },
+  {
+   "clusters": [
+    "cl-0361"
+   ],
+   "focus": "start",
+   "format": "pdf",
+   "kind": "known-item",
+   "language": "de",
+   "level": "partial",
+   "offset": 0,
+   "qid": "ki-029",
+   "source": "bundestag",
+   "target": "ru-47ef32bb310f0fe440850124",
+   "traits": [
+    "not-in-document",
+    "other-language"
+   ]
+  },
+  {
+   "clusters": [
+    "cl-0392"
+   ],
+   "focus": "start",
+   "format": "pdf",
+   "kind": "known-item",
+   "language": "de",
+   "level": "vague",
+   "offset": 0,
+   "qid": "ki-030",
+   "source": "bundestag",
+   "target": "ru-85c110469a544322c66196b8",
+   "traits": [
+    "not-in-document",
+    "misspelling"
+   ]
+  },
+  {
+   "clusters": [
+    "cl-0347"
+   ],
+   "focus": "start",
+   "format": "pdf",
+   "kind": "known-item",
+   "language": "de",
+   "level": "exact",
+   "offset": 0,
+   "qid": "ki-031",
+   "source": "bundestag",
+   "target": "ru-f8ab11e66bca8f4f933fb92a",
+   "traits": [
+    "misspelling"
+   ]
+  },
+  {
+   "clusters": [
+    "cl-0291"
+   ],
+   "focus": "start",
+   "format": "pdf",
+   "kind": "known-item",
+   "language": "de",
+   "level": "partial",
+   "offset": 0,
+   "qid": "ki-032",
+   "source": "bundestag",
+   "target": "ru-3b9d311a7f67587541677cef",
+   "traits": [
+    "not-in-document"
+   ]
+  },
+  {
+   "clusters": [
+    "cl-0375"
+   ],
+   "focus": "start",
+   "format": "pdf",
+   "kind": "known-item",
+   "language": "de",
+   "level": "vague",
+   "offset": 0,
+   "qid": "ki-033",
+   "source": "bundestag",
+   "target": "ru-350c69d93e62a67e954b11a8",
+   "traits": [
+    "not-in-document"
+   ]
+  },
+  {
+   "clusters": [
+    "cl-0024"
+   ],
+   "focus": "start",
+   "format": "eml",
+   "kind": "known-item",
+   "language": "en",
+   "level": "exact",
+   "offset": 0,
+   "qid": "ki-034",
+   "source": "enron",
+   "target": "ru-6034434309da0ce026f65860",
+   "traits": [
+    "mail"
+   ]
+  },
+  {
+   "clusters": [
+    "cl-0021"
+   ],
+   "focus": "start",
+   "format": "eml",
+   "kind": "known-item",
+   "language": "en",
+   "level": "partial",
+   "offset": 0,
+   "qid": "ki-035",
+   "source": "enron",
+   "target": "ru-d7675cb40d0d83c5b24e1d98",
+   "traits": [
+    "not-in-document",
+    "mail"
+   ]
+  },
+  {
+   "clusters": [
+    "cl-0020"
+   ],
+   "focus": "start",
+   "format": "eml",
+   "kind": "known-item",
+   "language": "en",
+   "level": "vague",
+   "offset": 0,
+   "qid": "ki-036",
+   "source": "enron",
+   "target": "ru-1edbf7f85c8e6caa7a60cc9f",
+   "traits": [
+    "not-in-document",
+    "misspelling",
+    "mail"
+   ]
+  },
+  {
+   "clusters": [
+    "cl-0022"
+   ],
+   "focus": "start",
+   "format": "eml",
+   "kind": "known-item",
+   "language": "en",
+   "level": "exact",
+   "offset": 0,
+   "qid": "ki-037",
+   "source": "enron",
+   "target": "ru-de809b30705dba00368f8264",
+   "traits": [
+    "mail"
+   ]
+  },
+  {
+   "clusters": [
+    "cl-0001",
+    "cl-0011",
+    "cl-0023"
+   ],
+   "focus": "start",
+   "format": "eml",
+   "kind": "known-item",
+   "language": "en",
+   "level": "partial",
+   "offset": 0,
+   "qid": "ki-038",
+   "source": "enron",
+   "target": "ru-39c14805960dd87550c447bd",
+   "traits": [
+    "not-in-document",
+    "mail"
+   ]
+  },
+  {
+   "clusters": [],
+   "focus": "start",
+   "format": "eml",
+   "kind": "known-item",
+   "language": "en",
+   "level": "vague",
+   "offset": 0,
+   "qid": "ki-039",
+   "source": "enron",
+   "target": "ru-a5f7ea0a2a8d5d8e5447259b",
+   "traits": [
+    "not-in-document",
+    "mail"
+   ]
+  },
+  {
+   "clusters": [],
+   "focus": "start",
+   "format": "eml",
+   "kind": "known-item",
+   "language": "en",
+   "level": "exact",
+   "offset": 0,
+   "qid": "ki-040",
+   "source": "enron",
+   "target": "ru-8baccb4d28490d3f28e9f8d3",
+   "traits": [
+    "mail"
+   ]
+  },
+  {
+   "clusters": [],
+   "focus": "start",
+   "format": "eml",
+   "kind": "known-item",
+   "language": "en",
+   "level": "partial",
+   "offset": 0,
+   "qid": "ki-041",
+   "source": "enron",
+   "target": "ru-98861bde70d4bda16388f46d",
+   "traits": [
+    "not-in-document",
+    "mail"
+   ]
+  },
+  {
+   "clusters": [],
+   "focus": "start",
+   "format": "eml",
+   "kind": "known-item",
+   "language": "en",
+   "level": "vague",
+   "offset": 0,
+   "qid": "ki-042",
+   "source": "enron",
+   "target": "ru-4d150cac5e1ae52032145f1b",
+   "traits": [
+    "not-in-document",
+    "mail"
+   ]
+  },
+  {
+   "clusters": [],
+   "focus": "start",
+   "format": "eml",
+   "kind": "known-item",
+   "language": "en",
+   "level": "exact",
+   "offset": 0,
+   "qid": "ki-043",
+   "source": "enron",
+   "target": "ru-c85a4160969e871717eacb70",
+   "traits": [
+    "mail"
+   ]
+  },
+  {
+   "clusters": [],
+   "focus": "start",
+   "format": "eml",
+   "kind": "known-item",
+   "language": "en",
+   "level": "partial",
+   "offset": 0,
+   "qid": "ki-044",
+   "source": "enron",
+   "target": "ru-9a9cf6015dea84f85b8cdf31",
+   "traits": [
+    "not-in-document",
+    "misspelling",
+    "other-language",
+    "mail"
+   ]
+  },
+  {
+   "clusters": [],
+   "focus": "start",
+   "format": "eml",
+   "kind": "known-item",
+   "language": "en",
+   "level": "vague",
+   "offset": 0,
+   "qid": "ki-045",
+   "source": "enron",
+   "target": "ru-8208810a38313683bb5bbc20",
+   "traits": [
+    "not-in-document",
+    "mail"
+   ]
+  },
+  {
+   "clusters": [],
+   "focus": "start",
+   "format": "eml",
+   "kind": "known-item",
+   "language": "en",
+   "level": "exact",
+   "offset": 0,
+   "qid": "ki-046",
+   "source": "enron",
+   "target": "ru-2b11663b3c8f9c8f0db8057a",
+   "traits": [
+    "mail"
+   ]
+  },
+  {
+   "clusters": [],
+   "focus": "start",
+   "format": "eml",
+   "kind": "known-item",
+   "language": "en",
+   "level": "partial",
+   "offset": 0,
+   "qid": "ki-047",
+   "source": "enron",
+   "target": "ru-3dfff694a26d0aa52da92a13",
+   "traits": [
+    "not-in-document",
+    "mail"
+   ]
+  },
+  {
+   "clusters": [],
+   "focus": "start",
+   "format": "eml",
+   "kind": "known-item",
+   "language": "en",
+   "level": "vague",
+   "offset": 0,
+   "qid": "ki-048",
+   "source": "enron",
+   "target": "ru-5c59bb95483f25545206ebca",
+   "traits": [
+    "not-in-document",
+    "mail"
+   ]
+  },
+  {
+   "clusters": [],
+   "focus": "start",
+   "format": "eml",
+   "kind": "known-item",
+   "language": "en",
+   "level": "exact",
+   "offset": 0,
+   "qid": "ki-049",
+   "source": "enron",
+   "target": "ru-1cbf80ab6dc505099d576dd3",
+   "traits": [
+    "mail"
+   ]
+  },
+  {
+   "clusters": [],
+   "focus": "start",
+   "format": "eml",
+   "kind": "known-item",
+   "language": "en",
+   "level": "partial",
+   "offset": 0,
+   "qid": "ki-050",
+   "source": "enron",
+   "target": "ru-48b8a9a42bf4e3580138a00a",
+   "traits": [
+    "not-in-document",
+    "misspelling",
+    "mail"
+   ]
+  },
+  {
+   "clusters": [],
+   "focus": "deep",
+   "format": "eml",
+   "kind": "known-item",
+   "language": "en",
+   "level": "vague",
+   "offset": 31213,
+   "qid": "ki-051",
+   "source": "enron",
+   "target": "ru-04321217233f77b8c8385012",
+   "traits": [
+    "not-in-document",
+    "mail"
+   ]
+  },
+  {
+   "clusters": [],
+   "focus": "start",
+   "format": "eml",
+   "kind": "known-item",
+   "language": "en",
+   "level": "exact",
+   "offset": 0,
+   "qid": "ki-052",
+   "source": "enron",
+   "target": "ru-634e009fd1ab4cb8baa6d6e8",
+   "traits": [
+    "mail"
+   ]
+  },
+  {
+   "clusters": [],
+   "focus": "deep",
+   "format": "eml",
+   "kind": "known-item",
+   "language": "en",
+   "level": "partial",
+   "offset": 5845,
+   "qid": "ki-053",
+   "source": "enron",
+   "target": "ru-f7a1d6153f2f52647aa576ae",
+   "traits": [
+    "not-in-document",
+    "mail"
+   ]
+  },
+  {
+   "clusters": [],
+   "focus": "start",
+   "format": "eml",
+   "kind": "known-item",
+   "language": "en",
+   "level": "vague",
+   "offset": 0,
+   "qid": "ki-054",
+   "source": "enron",
+   "target": "ru-966edfb157b598c2ae82510a",
+   "traits": [
+    "not-in-document",
+    "mail"
+   ]
+  },
+  {
+   "clusters": [],
+   "focus": "start",
+   "format": "eml",
+   "kind": "known-item",
+   "language": "en",
+   "level": "exact",
+   "offset": 0,
+   "qid": "ki-055",
+   "source": "enron",
+   "target": "ru-5a23a38a5660a86e4003573b",
+   "traits": [
+    "mail"
+   ]
+  },
+  {
+   "clusters": [],
+   "focus": "start",
+   "format": "eml",
+   "kind": "known-item",
+   "language": "en",
+   "level": "partial",
+   "offset": 0,
+   "qid": "ki-056",
+   "source": "enron",
+   "target": "ru-9c17911a7a5caa7550af9c32",
+   "traits": [
+    "not-in-document",
+    "mail"
+   ]
+  },
+  {
+   "clusters": [],
+   "focus": "start",
+   "format": "eml",
+   "kind": "known-item",
+   "language": "en",
+   "level": "vague",
+   "offset": 0,
+   "qid": "ki-057",
+   "source": "enron",
+   "target": "ru-34bdd577d90cd0fc24ba9990",
+   "traits": [
+    "not-in-document",
+    "mail"
+   ]
+  },
+  {
+   "clusters": [],
+   "focus": "start",
+   "format": "eml",
+   "kind": "known-item",
+   "language": "en",
+   "level": "exact",
+   "offset": 0,
+   "qid": "ki-058",
+   "source": "enron",
+   "target": "ru-4c0c56b38ddc845f3fdf66eb",
+   "traits": [
+    "mail"
+   ]
+  },
+  {
+   "clusters": [],
+   "focus": "start",
+   "format": "eml",
+   "kind": "known-item",
+   "language": "en",
+   "level": "partial",
+   "offset": 0,
+   "qid": "ki-059",
+   "source": "enron",
+   "target": "ru-b250d0af2df45b56290219a0",
+   "traits": [
+    "not-in-document",
+    "mail"
+   ]
+  },
+  {
+   "clusters": [],
+   "focus": "start",
+   "format": "eml",
+   "kind": "known-item",
+   "language": "en",
+   "level": "vague",
+   "offset": 0,
+   "qid": "ki-060",
+   "source": "enron",
+   "target": "ru-d8dc43579e4d9197985a6b14",
+   "traits": [
+    "not-in-document",
+    "mail"
+   ]
+  },
+  {
+   "clusters": [],
+   "focus": "start",
+   "format": "eml",
+   "kind": "known-item",
+   "language": "en",
+   "level": "exact",
+   "offset": 0,
+   "qid": "ki-061",
+   "source": "enron",
+   "target": "ru-5207be003bceb8a999956326",
+   "traits": [
+    "mail"
+   ]
+  },
+  {
+   "clusters": [],
+   "focus": "start",
+   "format": "eml",
+   "kind": "known-item",
+   "language": "en",
+   "level": "partial",
+   "offset": 0,
+   "qid": "ki-062",
+   "source": "enron",
+   "target": "ru-c66f6b9c2dbc692f3a48c843",
+   "traits": [
+    "not-in-document",
+    "other-language",
+    "mail"
+   ]
+  },
+  {
+   "clusters": [],
+   "focus": "start",
+   "format": "eml",
+   "kind": "known-item",
+   "language": "en",
+   "level": "vague",
+   "offset": 0,
+   "qid": "ki-063",
+   "source": "enron",
+   "target": "ru-744e5793edf90e208671194c",
+   "traits": [
+    "not-in-document",
+    "mail"
+   ]
+  },
+  {
+   "clusters": [],
+   "focus": "start",
+   "format": "eml",
+   "kind": "known-item",
+   "language": "en",
+   "level": "exact",
+   "offset": 0,
+   "qid": "ki-064",
+   "source": "enron",
+   "target": "ru-375358c361474deef09d8e4f",
+   "traits": [
+    "mail"
+   ]
+  },
+  {
+   "clusters": [],
+   "focus": "start",
+   "format": "eml",
+   "kind": "known-item",
+   "language": "en",
+   "level": "partial",
+   "offset": 0,
+   "qid": "ki-065",
+   "source": "enron",
+   "target": "ru-3833b8d9e749569f3eec8a46",
+   "traits": [
+    "not-in-document",
+    "mail"
+   ]
+  },
+  {
+   "clusters": [],
+   "focus": "start",
+   "format": "eml",
+   "kind": "known-item",
+   "language": "en",
+   "level": "vague",
+   "offset": 0,
+   "qid": "ki-066",
+   "source": "enron",
+   "target": "ru-20c8d7a12e56975340cb6441",
+   "traits": [
+    "not-in-document",
+    "other-language",
+    "mail"
+   ]
+  },
+  {
+   "clusters": [
+    "cl-0145"
+   ],
+   "focus": "start",
+   "format": "html",
+   "kind": "known-item",
+   "language": "de",
+   "level": "exact",
+   "offset": 0,
+   "qid": "ki-067",
+   "source": "eurlex",
+   "target": "ru-454535ccdac4dcec86503177",
+   "traits": []
+  },
+  {
+   "clusters": [
+    "cl-0025"
+   ],
+   "focus": "start",
+   "format": "pdf",
+   "kind": "known-item",
+   "language": "de",
+   "level": "partial",
+   "offset": 0,
+   "qid": "ki-068",
+   "source": "eurlex",
+   "target": "ru-5dba7f3bcc13c1c700f81dcf",
+   "traits": [
+    "not-in-document"
+   ]
+  },
+  {
+   "clusters": [
+    "cl-0099"
+   ],
+   "focus": "start",
+   "format": "html",
+   "kind": "known-item",
+   "language": "de",
+   "level": "vague",
+   "offset": 0,
+   "qid": "ki-069",
+   "source": "eurlex",
+   "target": "ru-df24ab6e24521f0cb662c28a",
+   "traits": [
+    "not-in-document"
+   ]
+  },
+  {
+   "clusters": [
+    "cl-0028"
+   ],
+   "focus": "start",
+   "format": "pdf",
+   "kind": "known-item",
+   "language": "de",
+   "level": "exact",
+   "offset": 0,
+   "qid": "ki-070",
+   "source": "eurlex",
+   "target": "ru-07b90afd74ea43394344f6d2",
+   "traits": []
+  },
+  {
+   "clusters": [
+    "cl-0070"
+   ],
+   "focus": "start",
+   "format": "html",
+   "kind": "known-item",
+   "language": "de",
+   "level": "partial",
+   "offset": 0,
+   "qid": "ki-071",
+   "source": "eurlex",
+   "target": "ru-fb74b1762fc5c5801b5ff876",
+   "traits": [
+    "not-in-document"
+   ]
+  },
+  {
+   "clusters": [
+    "cl-0027"
+   ],
+   "focus": "start",
+   "format": "pdf",
+   "kind": "known-item",
+   "language": "de",
+   "level": "vague",
+   "offset": 0,
+   "qid": "ki-072",
+   "source": "eurlex",
+   "target": "ru-a8df84dd1fad60ff19d43165",
+   "traits": [
+    "not-in-document"
+   ]
+  },
+  {
+   "clusters": [
+    "cl-0003",
+    "cl-0092"
+   ],
+   "focus": "start",
+   "format": "html",
+   "kind": "known-item",
+   "language": "de",
+   "level": "exact",
+   "offset": 0,
+   "qid": "ki-073",
+   "source": "eurlex",
+   "target": "ru-1addc2a8ba44561040961be1",
+   "traits": []
+  },
+  {
+   "clusters": [
+    "cl-0026"
+   ],
+   "focus": "start",
+   "format": "pdf",
+   "kind": "known-item",
+   "language": "de",
+   "level": "partial",
+   "offset": 0,
+   "qid": "ki-074",
+   "source": "eurlex",
+   "target": "ru-9176af3263f1c91b45f2fcaf",
+   "traits": [
+    "not-in-document"
+   ]
+  },
+  {
+   "clusters": [
+    "cl-0148"
+   ],
+   "focus": "start",
+   "format": "html",
+   "kind": "known-item",
+   "language": "de",
+   "level": "vague",
+   "offset": 0,
+   "qid": "ki-075",
+   "source": "eurlex",
+   "target": "ru-e2cd658d06341b8d16103c9b",
+   "traits": [
+    "not-in-document"
+   ]
+  },
+  {
+   "clusters": [
+    "cl-0029"
+   ],
+   "focus": "start",
+   "format": "pdf",
+   "kind": "known-item",
+   "language": "de",
+   "level": "exact",
+   "offset": 0,
+   "qid": "ki-076",
+   "source": "eurlex",
+   "target": "ru-c63d88df838d317563d18eb6",
+   "traits": []
+  },
+  {
+   "clusters": [
+    "cl-0207"
+   ],
+   "focus": "start",
+   "format": "html",
+   "kind": "known-item",
+   "language": "de",
+   "level": "partial",
+   "offset": 0,
+   "qid": "ki-077",
+   "source": "eurlex",
+   "target": "ru-2f10915e16afe98bc7b51889",
+   "traits": [
+    "not-in-document",
+    "misspelling"
+   ]
+  },
+  {
+   "clusters": [
+    "cl-0176"
+   ],
+   "focus": "deep",
+   "format": "html",
+   "kind": "known-item",
+   "language": "de",
+   "level": "vague",
+   "offset": 12338,
+   "qid": "ki-078",
+   "source": "eurlex",
+   "target": "ru-c0ddcf54b327d4ac48ccb25b",
+   "traits": [
+    "not-in-document"
+   ]
+  },
+  {
+   "clusters": [
+    "cl-0033"
+   ],
+   "focus": "start",
+   "format": "html",
+   "kind": "known-item",
+   "language": "de",
+   "level": "exact",
+   "offset": 0,
+   "qid": "ki-079",
+   "source": "eurlex",
+   "target": "ru-32587661329bf9ac3d4754a2",
+   "traits": []
+  },
+  {
+   "clusters": [
+    "cl-0153"
+   ],
+   "focus": "start",
+   "format": "html",
+   "kind": "known-item",
+   "language": "de",
+   "level": "partial",
+   "offset": 0,
+   "qid": "ki-080",
+   "source": "eurlex",
+   "target": "ru-5ec64bf2ee4a758d5ad5e8f0",
+   "traits": [
+    "not-in-document"
+   ]
+  },
+  {
+   "clusters": [
+    "cl-0177"
+   ],
+   "focus": "deep",
+   "format": "html",
+   "kind": "known-item",
+   "language": "de",
+   "level": "vague",
+   "offset": 109206,
+   "qid": "ki-081",
+   "source": "eurlex",
+   "target": "ru-e002dd6bc2026a4e64282008",
+   "traits": [
+    "not-in-document"
+   ]
+  },
+  {
+   "clusters": [
+    "cl-0065"
+   ],
+   "focus": "start",
+   "format": "html",
+   "kind": "known-item",
+   "language": "de",
+   "level": "exact",
+   "offset": 0,
+   "qid": "ki-082",
+   "source": "eurlex",
+   "target": "ru-5d703fde5abb84edde0918e6",
+   "traits": [
+    "misspelling"
+   ]
+  },
+  {
+   "clusters": [
+    "cl-0055"
+   ],
+   "focus": "start",
+   "format": "html",
+   "kind": "known-item",
+   "language": "en",
+   "level": "partial",
+   "offset": 0,
+   "qid": "ki-083",
+   "source": "eurlex",
+   "target": "ru-8cec63e3b684093bf01581f9",
+   "traits": [
+    "not-in-document",
+    "other-language"
+   ]
+  },
+  {
+   "clusters": [
+    "cl-0125"
+   ],
+   "focus": "start",
+   "format": "html",
+   "kind": "known-item",
+   "language": "en",
+   "level": "vague",
+   "offset": 0,
+   "qid": "ki-084",
+   "source": "eurlex",
+   "target": "ru-6c5dff8c533fd20b36652476",
+   "traits": [
+    "not-in-document",
+    "misspelling"
+   ]
+  },
+  {
+   "clusters": [
+    "cl-0173"
+   ],
+   "focus": "start",
+   "format": "html",
+   "kind": "known-item",
+   "language": "en",
+   "level": "exact",
+   "offset": 0,
+   "qid": "ki-085",
+   "source": "eurlex",
+   "target": "ru-3e76dc32976654bb55109de4",
+   "traits": [
+    "misspelling"
+   ]
+  },
+  {
+   "clusters": [
+    "cl-0169"
+   ],
+   "focus": "start",
+   "format": "html",
+   "kind": "known-item",
+   "language": "en",
+   "level": "partial",
+   "offset": 0,
+   "qid": "ki-086",
+   "source": "eurlex",
+   "target": "ru-0abf15de533a61010233e096",
+   "traits": [
+    "not-in-document",
+    "misspelling",
+    "other-language"
+   ]
+  },
+  {
+   "clusters": [
+    "cl-0151"
+   ],
+   "focus": "deep",
+   "format": "html",
+   "kind": "known-item",
+   "language": "en",
+   "level": "vague",
+   "offset": 12330,
+   "qid": "ki-087",
+   "source": "eurlex",
+   "target": "ru-f875b257dbe566abfe9256da",
+   "traits": [
+    "not-in-document"
+   ]
+  },
+  {
+   "clusters": [
+    "cl-0053"
+   ],
+   "focus": "start",
+   "format": "html",
+   "kind": "known-item",
+   "language": "en",
+   "level": "exact",
+   "offset": 0,
+   "qid": "ki-088",
+   "source": "eurlex",
+   "target": "ru-ee8f4577c0563e52d04ec05e",
+   "traits": []
+  },
+  {
+   "clusters": [
+    "cl-0066"
+   ],
+   "focus": "start",
+   "format": "html",
+   "kind": "known-item",
+   "language": "en",
+   "level": "partial",
+   "offset": 0,
+   "qid": "ki-089",
+   "source": "eurlex",
+   "target": "ru-da814b81f425c0ba07374051",
+   "traits": [
+    "not-in-document"
+   ]
+  },
+  {
+   "clusters": [
+    "cl-0058"
+   ],
+   "focus": "deep",
+   "format": "html",
+   "kind": "known-item",
+   "language": "en",
+   "level": "vague",
+   "offset": 700287,
+   "qid": "ki-090",
+   "source": "eurlex",
+   "target": "ru-4b8d32cd992ccff35ee59138",
+   "traits": [
+    "not-in-document"
+   ]
+  },
+  {
+   "clusters": [
+    "cl-0074"
+   ],
+   "focus": "start",
+   "format": "html",
+   "kind": "known-item",
+   "language": "en",
+   "level": "exact",
+   "offset": 0,
+   "qid": "ki-091",
+   "source": "eurlex",
+   "target": "ru-b9a39848e23191cccd16bd0c",
+   "traits": []
+  },
+  {
+   "clusters": [
+    "cl-0193"
+   ],
+   "focus": "start",
+   "format": "html",
+   "kind": "known-item",
+   "language": "en",
+   "level": "partial",
+   "offset": 0,
+   "qid": "ki-092",
+   "source": "eurlex",
+   "target": "ru-33570c0824522f636f3284fa",
+   "traits": [
+    "not-in-document",
+    "misspelling"
+   ]
+  },
+  {
+   "clusters": [
+    "cl-0009",
+    "cl-0047"
+   ],
+   "focus": "start",
+   "format": "html",
+   "kind": "known-item",
+   "language": "en",
+   "level": "vague",
+   "offset": 0,
+   "qid": "ki-093",
+   "source": "eurlex",
+   "target": "ru-34766b71cf9af2169a6ade62",
+   "traits": [
+    "not-in-document"
+   ]
+  },
+  {
+   "clusters": [
+    "cl-0191"
+   ],
+   "focus": "start",
+   "format": "html",
+   "kind": "known-item",
+   "language": "en",
+   "level": "exact",
+   "offset": 0,
+   "qid": "ki-094",
+   "source": "eurlex",
+   "target": "ru-656d91d210c0893f37a2e60d",
+   "traits": []
+  },
+  {
+   "clusters": [
+    "cl-0032"
+   ],
+   "focus": "start",
+   "format": "html",
+   "kind": "known-item",
+   "language": "en",
+   "level": "partial",
+   "offset": 0,
+   "qid": "ki-095",
+   "source": "eurlex",
+   "target": "ru-a11963c6115e9485bbf31aa6",
+   "traits": [
+    "not-in-document"
+   ]
+  },
+  {
+   "clusters": [
+    "cl-0206"
+   ],
+   "focus": "deep",
+   "format": "html",
+   "kind": "known-item",
+   "language": "en",
+   "level": "vague",
+   "offset": 11697,
+   "qid": "ki-096",
+   "source": "eurlex",
+   "target": "ru-6b915f10e74292fbb89401e3",
+   "traits": [
+    "not-in-document"
+   ]
+  },
+  {
+   "clusters": [
+    "cl-0076"
+   ],
+   "focus": "start",
+   "format": "html",
+   "kind": "known-item",
+   "language": "en",
+   "level": "exact",
+   "offset": 0,
+   "qid": "ki-097",
+   "source": "eurlex",
+   "target": "ru-39ddc4180f2495999e6788c7",
+   "traits": [
+    "misspelling"
+   ]
+  },
+  {
+   "clusters": [
+    "cl-0192"
+   ],
+   "focus": "start",
+   "format": "html",
+   "kind": "known-item",
+   "language": "en",
+   "level": "partial",
+   "offset": 0,
+   "qid": "ki-098",
+   "source": "eurlex",
+   "target": "ru-ff8acaa61035c80c699af125",
+   "traits": [
+    "not-in-document",
+    "misspelling"
+   ]
+  },
+  {
+   "clusters": [
+    "cl-0228"
+   ],
+   "focus": "start",
+   "format": "xlsx",
+   "kind": "known-item",
+   "language": "de",
+   "level": "vague",
+   "offset": 0,
+   "qid": "ki-099",
+   "source": "govdata",
+   "target": "ru-91a1d39c58a82563a976af23",
+   "traits": [
+    "not-in-document"
+   ]
+  },
+  {
+   "clusters": [
+    "cl-0257"
+   ],
+   "focus": "start",
+   "format": "xlsx",
+   "kind": "known-item",
+   "language": "de",
+   "level": "exact",
+   "offset": 0,
+   "qid": "ki-100",
+   "source": "govdata",
+   "target": "ru-e9a73a58ede5f561f914e6b0",
+   "traits": [
+    "misspelling"
+   ]
+  },
+  {
+   "clusters": [
+    "cl-0251"
+   ],
+   "focus": "start",
+   "format": "xlsx",
+   "kind": "known-item",
+   "language": "de",
+   "level": "partial",
+   "offset": 0,
+   "qid": "ki-101",
+   "source": "govdata",
+   "target": "ru-5de7dd1c083d7c0978277741",
+   "traits": [
+    "not-in-document"
+   ]
+  },
+  {
+   "clusters": [
+    "cl-0252"
+   ],
+   "focus": "deep",
+   "format": "xlsx",
+   "kind": "known-item",
+   "language": "de",
+   "level": "vague",
+   "offset": 6062,
+   "qid": "ki-102",
+   "source": "govdata",
+   "target": "ru-d14fb3020596c36e6e7db5b0",
+   "traits": [
+    "not-in-document",
+    "misspelling"
+   ]
+  },
+  {
+   "clusters": [
+    "cl-0238"
+   ],
+   "focus": "start",
+   "format": "xlsx",
+   "kind": "known-item",
+   "language": "de",
+   "level": "exact",
+   "offset": 0,
+   "qid": "ki-103",
+   "source": "govdata",
+   "target": "ru-edf9b355f707ccf7115d8b0b",
+   "traits": [
+    "misspelling"
+   ]
+  },
+  {
+   "clusters": [
+    "cl-0244"
+   ],
+   "focus": "deep",
+   "format": "xlsx",
+   "kind": "known-item",
+   "language": "de",
+   "level": "partial",
+   "offset": 9231,
+   "qid": "ki-104",
+   "source": "govdata",
+   "target": "ru-d5231031a8af253d4c7a36ad",
+   "traits": [
+    "not-in-document"
+   ]
+  },
+  {
+   "clusters": [
+    "cl-0230"
+   ],
+   "focus": "deep",
+   "format": "xlsx",
+   "kind": "known-item",
+   "language": "de",
+   "level": "vague",
+   "offset": 28308,
+   "qid": "ki-105",
+   "source": "govdata",
+   "target": "ru-7b5e5022ef2a33139d1b4342",
+   "traits": [
+    "not-in-document"
+   ]
+  },
+  {
+   "clusters": [
+    "cl-0226"
+   ],
+   "focus": "start",
+   "format": "xlsx",
+   "kind": "known-item",
+   "language": "de",
+   "level": "exact",
+   "offset": 0,
+   "qid": "ki-106",
+   "source": "govdata",
+   "target": "ru-df7ade0f69e6191756314d0c",
+   "traits": []
+  },
+  {
+   "clusters": [
+    "cl-0245"
+   ],
+   "focus": "deep",
+   "format": "xlsx",
+   "kind": "known-item",
+   "language": "de",
+   "level": "partial",
+   "offset": 8277,
+   "qid": "ki-107",
+   "source": "govdata",
+   "target": "ru-6553d91ed43fced57c08e1ae",
+   "traits": [
+    "not-in-document"
+   ]
+  },
+  {
+   "clusters": [
+    "cl-0248"
+   ],
+   "focus": "deep",
+   "format": "xlsx",
+   "kind": "known-item",
+   "language": "de",
+   "level": "vague",
+   "offset": 9935,
+   "qid": "ki-108",
+   "source": "govdata",
+   "target": "ru-b9f504f9d960bd15716ec91d",
+   "traits": [
+    "not-in-document",
+    "misspelling"
+   ]
+  },
+  {
+   "clusters": [
+    "cl-0240"
+   ],
+   "focus": "start",
+   "format": "xlsx",
+   "kind": "known-item",
+   "language": "de",
+   "level": "exact",
+   "offset": 0,
+   "qid": "ki-109",
+   "source": "govdata",
+   "target": "ru-ec48af929114c011ad12f49a",
+   "traits": []
+  },
+  {
+   "clusters": [
+    "cl-0234"
+   ],
+   "focus": "deep",
+   "format": "xlsx",
+   "kind": "known-item",
+   "language": "de",
+   "level": "partial",
+   "offset": 13409,
+   "qid": "ki-110",
+   "source": "govdata",
+   "target": "ru-bbebda46a70af95b47bf3896",
+   "traits": [
+    "not-in-document",
+    "misspelling"
+   ]
+  },
+  {
+   "clusters": [
+    "cl-0249"
+   ],
+   "focus": "deep",
+   "format": "xlsx",
+   "kind": "known-item",
+   "language": "de",
+   "level": "vague",
+   "offset": 8222,
+   "qid": "ki-111",
+   "source": "govdata",
+   "target": "ru-e2339cb54da450d45ceed651",
+   "traits": [
+    "not-in-document",
+    "other-language"
+   ]
+  },
+  {
+   "clusters": [
+    "cl-0247"
+   ],
+   "focus": "start",
+   "format": "xlsx",
+   "kind": "known-item",
+   "language": "de",
+   "level": "exact",
+   "offset": 0,
+   "qid": "ki-112",
+   "source": "govdata",
+   "target": "ru-bc1bfb0a90b8c56eedbf9499",
+   "traits": []
+  },
+  {
+   "clusters": [
+    "cl-0237"
+   ],
+   "focus": "start",
+   "format": "xlsx",
+   "kind": "known-item",
+   "language": "de",
+   "level": "partial",
+   "offset": 0,
+   "qid": "ki-113",
+   "source": "govdata",
+   "target": "ru-422dc18684ddced870f5f83e",
+   "traits": [
+    "not-in-document",
+    "misspelling"
+   ]
+  },
+  {
+   "clusters": [
+    "cl-0233"
+   ],
+   "focus": "start",
+   "format": "xlsx",
+   "kind": "known-item",
+   "language": "de",
+   "level": "vague",
+   "offset": 0,
+   "qid": "ki-114",
+   "source": "govdata",
+   "target": "ru-296312b433c16e2ebf7c8ba3",
+   "traits": [
+    "not-in-document"
+   ]
+  },
+  {
+   "clusters": [
+    "cl-0007"
+   ],
+   "focus": "start",
+   "format": "html",
+   "kind": "known-item",
+   "language": "en",
+   "level": "exact",
+   "offset": 0,
+   "qid": "ki-115",
+   "source": "govdocs1",
+   "target": "ru-503267ff0c22c0843f9c76f1",
+   "traits": []
+  },
+  {
+   "clusters": [
+    "cl-0004"
+   ],
+   "focus": "deep",
+   "format": "pdf",
+   "kind": "known-item",
+   "language": "en",
+   "level": "partial",
+   "offset": 7735,
+   "qid": "ki-116",
+   "source": "govdocs1",
+   "target": "ru-89ceae15c98382ac494b54a7",
+   "traits": [
+    "not-in-document"
+   ]
+  },
+  {
+   "clusters": [
+    "cl-0002",
+    "cl-0005"
+   ],
+   "focus": "start",
+   "format": "ppt",
+   "kind": "known-item",
+   "language": "en",
+   "level": "vague",
+   "offset": 0,
+   "qid": "ki-117",
+   "source": "govdocs1",
+   "target": "ru-e74245b4c5e2b9f6eb3b7ebc",
+   "traits": [
+    "not-in-document"
+   ]
+  },
+  {
+   "clusters": [],
+   "focus": "start",
+   "format": "csv",
+   "kind": "known-item",
+   "language": "en",
+   "level": "exact",
+   "offset": 0,
+   "qid": "ki-118",
+   "source": "govdocs1",
+   "target": "ru-a932b0c354d1671de0f5acaf",
+   "traits": []
+  },
+  {
+   "clusters": [],
+   "focus": "deep",
+   "format": "doc",
+   "kind": "known-item",
+   "language": "en",
+   "level": "partial",
+   "offset": 59350,
+   "qid": "ki-119",
+   "source": "govdocs1",
+   "target": "ru-98b12c85e11b0871099836d5",
+   "traits": [
+    "not-in-document"
+   ]
+  },
+  {
+   "clusters": [],
+   "focus": "start",
+   "format": "html",
+   "kind": "known-item",
+   "language": "en",
+   "level": "vague",
+   "offset": 0,
+   "qid": "ki-120",
+   "source": "govdocs1",
+   "target": "ru-f323085705d8c0e3517fb260",
+   "traits": [
+    "not-in-document",
+    "misspelling"
+   ]
+  },
+  {
+   "clusters": [],
+   "focus": "start",
+   "format": "pdf",
+   "kind": "known-item",
+   "language": "en",
+   "level": "exact",
+   "offset": 0,
+   "qid": "ki-121",
+   "source": "govdocs1",
+   "target": "ru-77554bb106b88227d164df12",
+   "traits": [
+    "misspelling"
+   ]
+  },
+  {
+   "clusters": [],
+   "focus": "start",
+   "format": "ppt",
+   "kind": "known-item",
+   "language": "en",
+   "level": "partial",
+   "offset": 0,
+   "qid": "ki-122",
+   "source": "govdocs1",
+   "target": "ru-02758dfa9aa8d88e4780e1a6",
+   "traits": [
+    "not-in-document",
+    "misspelling"
+   ]
+  },
+  {
+   "clusters": [],
+   "focus": "start",
+   "format": "txt",
+   "kind": "known-item",
+   "language": "en",
+   "level": "vague",
+   "offset": 0,
+   "qid": "ki-123",
+   "source": "govdocs1",
+   "target": "ru-01c17870524ed0be28212332",
+   "traits": [
+    "not-in-document"
+   ]
+  },
+  {
+   "clusters": [],
+   "focus": "start",
+   "format": "xls",
+   "kind": "known-item",
+   "language": "en",
+   "level": "exact",
+   "offset": 0,
+   "qid": "ki-124",
+   "source": "govdocs1",
+   "target": "ru-5f1c3fe94a875715a7d05f2f",
+   "traits": []
+  },
+  {
+   "clusters": [],
+   "focus": "deep",
+   "format": "csv",
+   "kind": "known-item",
+   "language": "en",
+   "level": "partial",
+   "offset": 214475,
+   "qid": "ki-125",
+   "source": "govdocs1",
+   "target": "ru-8fa95d1ddde67e2cca074a45",
+   "traits": [
+    "not-in-document",
+    "misspelling",
+    "other-language"
+   ]
+  },
+  {
+   "clusters": [],
+   "focus": "deep",
+   "format": "doc",
+   "kind": "known-item",
+   "language": "en",
+   "level": "vague",
+   "offset": 102964,
+   "qid": "ki-126",
+   "source": "govdocs1",
+   "target": "ru-42fc77ae6e7bb14c3e5f6cf3",
+   "traits": [
+    "not-in-document",
+    "misspelling"
+   ]
+  },
+  {
+   "clusters": [],
+   "focus": "start",
+   "format": "html",
+   "kind": "known-item",
+   "language": "en",
+   "level": "exact",
+   "offset": 0,
+   "qid": "ki-127",
+   "source": "govdocs1",
+   "target": "ru-6f341c56cea5636ebae7fbaf",
+   "traits": []
+  },
+  {
+   "clusters": [],
+   "focus": "start",
+   "format": "pdf",
+   "kind": "known-item",
+   "language": "en",
+   "level": "partial",
+   "offset": 0,
+   "qid": "ki-128",
+   "source": "govdocs1",
+   "target": "ru-df48493872c43fd7e4b5586d",
+   "traits": [
+    "not-in-document",
+    "other-language"
+   ]
+  },
+  {
+   "clusters": [],
+   "focus": "start",
+   "format": "ppt",
+   "kind": "known-item",
+   "language": "en",
+   "level": "vague",
+   "offset": 0,
+   "qid": "ki-129",
+   "source": "govdocs1",
+   "target": "ru-565e2295f58fa6e4b049a362",
+   "traits": [
+    "not-in-document"
+   ]
+  },
+  {
+   "clusters": [],
+   "focus": "start",
+   "format": "txt",
+   "kind": "known-item",
+   "language": "en",
+   "level": "exact",
+   "offset": 0,
+   "qid": "ki-130",
+   "source": "govdocs1",
+   "target": "ru-b8ae15251f4201937125b9b4",
+   "traits": []
+  },
+  {
+   "clusters": [],
+   "focus": "deep",
+   "format": "xls",
+   "kind": "known-item",
+   "language": "en",
+   "level": "partial",
+   "offset": 160729,
+   "qid": "ki-131",
+   "source": "govdocs1",
+   "target": "ru-eed1d946c3fdc5b1797d7c53",
+   "traits": [
+    "not-in-document",
+    "other-language"
+   ]
+  },
+  {
+   "clusters": [],
+   "focus": "deep",
+   "format": "csv",
+   "kind": "known-item",
+   "language": "en",
+   "level": "vague",
+   "offset": 43800,
+   "qid": "ki-132",
+   "source": "govdocs1",
+   "target": "ru-ec24973274736d03754a87fc",
+   "traits": [
+    "not-in-document"
+   ]
+  },
+  {
+   "clusters": [],
+   "focus": "start",
+   "format": "doc",
+   "kind": "known-item",
+   "language": "en",
+   "level": "exact",
+   "offset": 0,
+   "qid": "ki-133",
+   "source": "govdocs1",
+   "target": "ru-2ff0f9292b7582511c3a7d16",
+   "traits": []
+  },
+  {
+   "clusters": [],
+   "focus": "start",
+   "format": "html",
+   "kind": "known-item",
+   "language": "en",
+   "level": "partial",
+   "offset": 0,
+   "qid": "ki-134",
+   "source": "govdocs1",
+   "target": "ru-7d8a31aa8c8b0876b4a8b3b9",
+   "traits": [
+    "not-in-document",
+    "misspelling"
+   ]
+  },
+  {
+   "clusters": [],
+   "focus": "deep",
+   "format": "pdf",
+   "kind": "known-item",
+   "language": "en",
+   "level": "vague",
+   "offset": 50506,
+   "qid": "ki-135",
+   "source": "govdocs1",
+   "target": "ru-75fa93e6ec95681803904d0f",
+   "traits": [
+    "not-in-document"
+   ]
+  },
+  {
+   "clusters": [],
+   "focus": "start",
+   "format": "ppt",
+   "kind": "known-item",
+   "language": "en",
+   "level": "exact",
+   "offset": 0,
+   "qid": "ki-136",
+   "source": "govdocs1",
+   "target": "ru-6ac08e98aef8628be1ae28b8",
+   "traits": [
+    "misspelling"
+   ]
+  },
+  {
+   "clusters": [],
+   "focus": "deep",
+   "format": "txt",
+   "kind": "known-item",
+   "language": "en",
+   "level": "partial",
+   "offset": 10237,
+   "qid": "ki-137",
+   "source": "govdocs1",
+   "target": "ru-2bca4ccc7ff36e7ef48d954f",
+   "traits": [
+    "not-in-document"
+   ]
+  },
+  {
+   "clusters": [],
+   "focus": "start",
+   "format": "xls",
+   "kind": "known-item",
+   "language": "en",
+   "level": "vague",
+   "offset": 0,
+   "qid": "ki-138",
+   "source": "govdocs1",
+   "target": "ru-05d73ae61ab0cbc71a33b849",
+   "traits": [
+    "not-in-document"
+   ]
+  },
+  {
+   "clusters": [],
+   "focus": "start",
+   "format": "csv",
+   "kind": "known-item",
+   "language": "en",
+   "level": "exact",
+   "offset": 0,
+   "qid": "ki-139",
+   "source": "govdocs1",
+   "target": "ru-af228054e2e6a0261d5b99fd",
+   "traits": []
+  },
+  {
+   "clusters": [],
+   "focus": "start",
+   "format": "doc",
+   "kind": "known-item",
+   "language": "en",
+   "level": "partial",
+   "offset": 0,
+   "qid": "ki-140",
+   "source": "govdocs1",
+   "target": "ru-bda887feb7cdda66838979fd",
+   "traits": [
+    "not-in-document"
+   ]
+  },
+  {
+   "clusters": [],
+   "focus": "start",
+   "format": "html",
+   "kind": "known-item",
+   "language": "en",
+   "level": "vague",
+   "offset": 0,
+   "qid": "ki-141",
+   "source": "govdocs1",
+   "target": "ru-4c5a9a335794c24c48c3a27e",
+   "traits": [
+    "not-in-document"
+   ]
+  },
+  {
+   "clusters": [],
+   "focus": "start",
+   "format": "pdf",
+   "kind": "known-item",
+   "language": "en",
+   "level": "exact",
+   "offset": 0,
+   "qid": "ki-142",
+   "source": "govdocs1",
+   "target": "ru-6c7a7f4beb266cd2ccce71ba",
+   "traits": []
+  },
+  {
+   "clusters": [],
+   "focus": "deep",
+   "format": "ppt",
+   "kind": "known-item",
+   "language": "en",
+   "level": "partial",
+   "offset": 9022,
+   "qid": "ki-143",
+   "source": "govdocs1",
+   "target": "ru-dea6cbb21e05cbca416db0d4",
+   "traits": [
+    "not-in-document",
+    "misspelling"
+   ]
+  },
+  {
+   "clusters": [],
+   "focus": "start",
+   "format": "txt",
+   "kind": "known-item",
+   "language": "en",
+   "level": "vague",
+   "offset": 0,
+   "qid": "ki-144",
+   "source": "govdocs1",
+   "target": "ru-eacb9e426c1ba5f75be62869",
+   "traits": [
+    "not-in-document"
+   ]
+  },
+  {
+   "clusters": [],
+   "focus": "start",
+   "format": "xls",
+   "kind": "known-item",
+   "language": "en",
+   "level": "exact",
+   "offset": 0,
+   "qid": "ki-145",
+   "source": "govdocs1",
+   "target": "ru-c67e61b43425868fcf391ad2",
+   "traits": []
+  },
+  {
+   "clusters": [],
+   "focus": "deep",
+   "format": "csv",
+   "kind": "known-item",
+   "language": "en",
+   "level": "partial",
+   "offset": 24005,
+   "qid": "ki-146",
+   "source": "govdocs1",
+   "target": "ru-0c65563aff07ddacfb0af9c4",
+   "traits": [
+    "not-in-document"
+   ]
+  },
+  {
+   "clusters": [],
+   "focus": "deep",
+   "format": "doc",
+   "kind": "known-item",
+   "language": "en",
+   "level": "vague",
+   "offset": 62592,
+   "qid": "ki-147",
+   "source": "govdocs1",
+   "target": "ru-3b0fe5d8d9a47fec9aff1b44",
+   "traits": [
+    "not-in-document"
+   ]
+  },
+  {
+   "clusters": [],
+   "focus": "start",
+   "format": "pdf",
+   "kind": "known-item",
+   "language": "de",
+   "level": "exact",
+   "offset": 0,
+   "qid": "ki-148",
+   "source": "safedocs",
+   "target": "ru-67719081c75e22a40448fdaa",
+   "traits": []
+  },
+  {
+   "clusters": [],
+   "focus": "start",
+   "format": "pdf",
+   "kind": "known-item",
+   "language": "de",
+   "level": "partial",
+   "offset": 0,
+   "qid": "ki-149",
+   "source": "safedocs",
+   "target": "ru-5ec03d681fd9a4c0d399b2ab",
+   "traits": [
+    "not-in-document"
+   ]
+  },
+  {
+   "clusters": [],
+   "focus": "start",
+   "format": "pdf",
+   "kind": "known-item",
+   "language": "de",
+   "level": "vague",
+   "offset": 0,
+   "qid": "ki-150",
+   "source": "safedocs",
+   "target": "ru-7022f05015eb93b242e09309",
+   "traits": [
+    "not-in-document"
+   ]
+  },
+  {
+   "clusters": [],
+   "focus": "start",
+   "format": "pdf",
+   "kind": "known-item",
+   "language": "de",
+   "level": "exact",
+   "offset": 0,
+   "qid": "ki-151",
+   "source": "safedocs",
+   "target": "ru-557a550130d4b3fe5788ced8",
+   "traits": []
+  },
+  {
+   "clusters": [],
+   "focus": "start",
+   "format": "pdf",
+   "kind": "known-item",
+   "language": "de",
+   "level": "partial",
+   "offset": 0,
+   "qid": "ki-152",
+   "source": "safedocs",
+   "target": "ru-c2b34824c99df88e9828778b",
+   "traits": [
+    "not-in-document"
+   ]
+  },
+  {
+   "clusters": [],
+   "focus": "deep",
+   "format": "pdf",
+   "kind": "known-item",
+   "language": "de",
+   "level": "vague",
+   "offset": 106301,
+   "qid": "ki-153",
+   "source": "safedocs",
+   "target": "ru-98692b80a4b6ddceae81efbe",
+   "traits": [
+    "not-in-document",
+    "misspelling"
+   ]
+  },
+  {
+   "clusters": [],
+   "focus": "start",
+   "format": "pdf",
+   "kind": "known-item",
+   "language": "de",
+   "level": "exact",
+   "offset": 0,
+   "qid": "ki-154",
+   "source": "safedocs",
+   "target": "ru-e3e933d0f284fd1e9aaf9529",
+   "traits": []
+  },
+  {
+   "clusters": [],
+   "focus": "start",
+   "format": "pdf",
+   "kind": "known-item",
+   "language": "de",
+   "level": "partial",
+   "offset": 0,
+   "qid": "ki-155",
+   "source": "safedocs",
+   "target": "ru-40530db418e229ec89fcef30",
+   "traits": [
+    "not-in-document"
+   ]
+  },
+  {
+   "clusters": [],
+   "focus": "start",
+   "format": "pdf",
+   "kind": "known-item",
+   "language": "de",
+   "level": "vague",
+   "offset": 0,
+   "qid": "ki-156",
+   "source": "safedocs",
+   "target": "ru-c00ac1e60724e80aff3ce189",
+   "traits": [
+    "not-in-document",
+    "other-language"
+   ]
+  },
+  {
+   "clusters": [],
+   "focus": "start",
+   "format": "pdf",
+   "kind": "known-item",
+   "language": "de",
+   "level": "exact",
+   "offset": 0,
+   "qid": "ki-157",
+   "source": "safedocs",
+   "target": "ru-933b2b864d3f855a93672785",
+   "traits": [
+    "other-language"
+   ]
+  },
+  {
+   "clusters": [],
+   "focus": "start",
+   "format": "pdf",
+   "kind": "known-item",
+   "language": "de",
+   "level": "partial",
+   "offset": 0,
+   "qid": "ki-158",
+   "source": "safedocs",
+   "target": "ru-73931cc5e904f42e4fe98d0c",
+   "traits": [
+    "not-in-document"
+   ]
+  },
+  {
+   "clusters": [],
+   "focus": "deep",
+   "format": "pdf",
+   "kind": "known-item",
+   "language": "de",
+   "level": "vague",
+   "offset": 13958,
+   "qid": "ki-159",
+   "source": "safedocs",
+   "target": "ru-5bbbbdd164a0c3aa462f722d",
+   "traits": [
+    "not-in-document"
+   ]
+  },
+  {
+   "clusters": [],
+   "focus": "start",
+   "format": "pdf",
+   "kind": "known-item",
+   "language": "de",
+   "level": "exact",
+   "offset": 0,
+   "qid": "ki-160",
+   "source": "safedocs",
+   "target": "ru-3cc899f8173506a2aa6d82e6",
+   "traits": []
+  },
+  {
+   "clusters": [],
+   "focus": "deep",
+   "format": "pdf",
+   "kind": "known-item",
+   "language": "de",
+   "level": "partial",
+   "offset": 8285,
+   "qid": "ki-161",
+   "source": "safedocs",
+   "target": "ru-b955ac2a49bcbd185702776b",
+   "traits": [
+    "not-in-document"
+   ]
+  },
+  {
+   "clusters": [],
+   "focus": "start",
+   "format": "pdf",
+   "kind": "known-item",
+   "language": "de",
+   "level": "vague",
+   "offset": 0,
+   "qid": "ki-162",
+   "source": "safedocs",
+   "target": "ru-3c5811e5f46c50ff5df92a9c",
+   "traits": [
+    "not-in-document"
+   ]
+  },
+  {
+   "clusters": [],
+   "focus": "start",
+   "format": "pdf",
+   "kind": "known-item",
+   "language": "de",
+   "level": "exact",
+   "offset": 0,
+   "qid": "ki-163",
+   "source": "safedocs",
+   "target": "ru-7b09865449e56528076a087e",
+   "traits": [
+    "misspelling"
+   ]
+  },
+  {
+   "clusters": [],
+   "focus": "start",
+   "format": "pdf",
+   "kind": "known-item",
+   "language": "de",
+   "level": "partial",
+   "offset": 0,
+   "qid": "ki-164",
+   "source": "safedocs",
+   "target": "ru-6fa581e611a24bc8ed18a854",
+   "traits": [
+    "not-in-document"
+   ]
+  },
+  {
+   "clusters": [],
+   "focus": "start",
+   "format": "pdf",
+   "kind": "known-item",
+   "language": "de",
+   "level": "vague",
+   "offset": 0,
+   "qid": "ki-165",
+   "source": "safedocs",
+   "target": "ru-7c05aabf4f1873b900089526",
+   "traits": [
+    "not-in-document"
+   ]
+  },
+  {
+   "clusters": [],
+   "focus": "start",
+   "format": "pdf",
+   "kind": "known-item",
+   "language": "de",
+   "level": "exact",
+   "offset": 0,
+   "qid": "ki-166",
+   "source": "safedocs",
+   "target": "ru-dfc3e2364f27d91dec070f9f",
+   "traits": []
+  },
+  {
+   "clusters": [],
+   "focus": "start",
+   "format": "pdf",
+   "kind": "known-item",
+   "language": "de",
+   "level": "partial",
+   "offset": 0,
+   "qid": "ki-167",
+   "source": "safedocs",
+   "target": "ru-b031ea0c6645d20b392467a3",
+   "traits": [
+    "not-in-document",
+    "other-language"
+   ]
+  },
+  {
+   "clusters": [],
+   "focus": "start",
+   "format": "pdf",
+   "kind": "known-item",
+   "language": "de",
+   "level": "vague",
+   "offset": 0,
+   "qid": "ki-168",
+   "source": "safedocs",
+   "target": "ru-819dcfeee8e80b2ae3fc0750",
+   "traits": [
+    "not-in-document"
+   ]
+  },
+  {
+   "clusters": [],
+   "focus": "start",
+   "format": "pdf",
+   "kind": "known-item",
+   "language": "de",
+   "level": "exact",
+   "offset": 0,
+   "qid": "ki-169",
+   "source": "safedocs",
+   "target": "ru-431136314542c8c30324df9a",
+   "traits": []
+  },
+  {
+   "clusters": [
+    "cl-0018"
+   ],
+   "focus": "deep",
+   "format": "html",
+   "kind": "known-item",
+   "language": "de",
+   "level": "partial",
+   "offset": 8626,
+   "qid": "ki-170",
+   "source": "wikipedia",
+   "target": "ru-9172c6e8c50fd2a677cea6c9",
+   "traits": [
+    "not-in-document"
+   ]
+  },
+  {
+   "clusters": [],
+   "focus": "start",
+   "format": "html",
+   "kind": "known-item",
+   "language": "de",
+   "level": "vague",
+   "offset": 0,
+   "qid": "ki-171",
+   "source": "wikipedia",
+   "target": "ru-c1ff9ce07b9808ada4fb682b",
+   "traits": [
+    "not-in-document",
+    "other-language"
+   ]
+  },
+  {
+   "clusters": [],
+   "focus": "start",
+   "format": "md",
+   "kind": "known-item",
+   "language": "de",
+   "level": "exact",
+   "offset": 0,
+   "qid": "ki-172",
+   "source": "wikipedia",
+   "target": "ru-57911abdf6d2969ba6f1d884",
+   "traits": []
+  },
+  {
+   "clusters": [],
+   "focus": "start",
+   "format": "html",
+   "kind": "known-item",
+   "language": "de",
+   "level": "partial",
+   "offset": 0,
+   "qid": "ki-173",
+   "source": "wikipedia",
+   "target": "ru-ef70ccac43beedd7ee682983",
+   "traits": [
+    "not-in-document"
+   ]
+  },
+  {
+   "clusters": [],
+   "focus": "start",
+   "format": "md",
+   "kind": "known-item",
+   "language": "de",
+   "level": "vague",
+   "offset": 0,
+   "qid": "ki-174",
+   "source": "wikipedia",
+   "target": "ru-8bc44c55caf771f5814b7e8a",
+   "traits": [
+    "not-in-document"
+   ]
+  },
+  {
+   "clusters": [],
+   "focus": "start",
+   "format": "html",
+   "kind": "known-item",
+   "language": "de",
+   "level": "exact",
+   "offset": 0,
+   "qid": "ki-175",
+   "source": "wikipedia",
+   "target": "ru-d67f94f5f2c5f78ff4d22d2b",
+   "traits": [
+    "misspelling"
+   ]
+  },
+  {
+   "clusters": [],
+   "focus": "start",
+   "format": "md",
+   "kind": "known-item",
+   "language": "de",
+   "level": "partial",
+   "offset": 0,
+   "qid": "ki-176",
+   "source": "wikipedia",
+   "target": "ru-8dc77abc96212d807809429f",
+   "traits": [
+    "not-in-document"
+   ]
+  },
+  {
+   "clusters": [],
+   "focus": "start",
+   "format": "html",
+   "kind": "known-item",
+   "language": "de",
+   "level": "vague",
+   "offset": 0,
+   "qid": "ki-177",
+   "source": "wikipedia",
+   "target": "ru-238128618dc1df0b9f1d1981",
+   "traits": [
+    "not-in-document"
+   ]
+  },
+  {
+   "clusters": [],
+   "focus": "start",
+   "format": "md",
+   "kind": "known-item",
+   "language": "de",
+   "level": "exact",
+   "offset": 0,
+   "qid": "ki-178",
+   "source": "wikipedia",
+   "target": "ru-623df575e80c6b20a14a874a",
+   "traits": []
+  },
+  {
+   "clusters": [],
+   "focus": "start",
+   "format": "html",
+   "kind": "known-item",
+   "language": "de",
+   "level": "partial",
+   "offset": 0,
+   "qid": "ki-179",
+   "source": "wikipedia",
+   "target": "ru-db8744bf3c290dae88cdd73f",
+   "traits": [
+    "not-in-document",
+    "other-language"
+   ]
+  },
+  {
+   "clusters": [],
+   "focus": "start",
+   "format": "md",
+   "kind": "known-item",
+   "language": "de",
+   "level": "vague",
+   "offset": 0,
+   "qid": "ki-180",
+   "source": "wikipedia",
+   "target": "ru-81ad9f8f6bda19f7ee531a1f",
+   "traits": [
+    "not-in-document"
+   ]
+  },
+  {
+   "clusters": [
+    "cl-0019"
+   ],
+   "focus": "start",
+   "format": "html",
+   "kind": "known-item",
+   "language": "en",
+   "level": "exact",
+   "offset": 0,
+   "qid": "ki-181",
+   "source": "wikipedia",
+   "target": "ru-e6ed62ce0a9bb9fadc6bd095",
+   "traits": []
+  },
+  {
+   "clusters": [],
+   "focus": "start",
+   "format": "html",
+   "kind": "known-item",
+   "language": "en",
+   "level": "partial",
+   "offset": 0,
+   "qid": "ki-182",
+   "source": "wikipedia",
+   "target": "ru-1d081aaecd23de80b8279730",
+   "traits": [
+    "not-in-document"
+   ]
+  },
+  {
+   "clusters": [],
+   "focus": "deep",
+   "format": "md",
+   "kind": "known-item",
+   "language": "en",
+   "level": "vague",
+   "offset": 24418,
+   "qid": "ki-183",
+   "source": "wikipedia",
+   "target": "ru-2efa68e5e1a0dfc8277a1b47",
+   "traits": [
+    "not-in-document"
+   ]
+  },
+  {
+   "clusters": [],
+   "focus": "start",
+   "format": "html",
+   "kind": "known-item",
+   "language": "en",
+   "level": "exact",
+   "offset": 0,
+   "qid": "ki-184",
+   "source": "wikipedia",
+   "target": "ru-1a2e1fb4220e2928ea370151",
+   "traits": [
+    "misspelling"
+   ]
+  },
+  {
+   "clusters": [],
+   "focus": "start",
+   "format": "md",
+   "kind": "known-item",
+   "language": "en",
+   "level": "partial",
+   "offset": 0,
+   "qid": "ki-185",
+   "source": "wikipedia",
+   "target": "ru-85e0f440f04cafa7d12f0341",
+   "traits": [
+    "not-in-document"
+   ]
+  },
+  {
+   "clusters": [],
+   "focus": "deep",
+   "format": "html",
+   "kind": "known-item",
+   "language": "en",
+   "level": "vague",
+   "offset": 7921,
+   "qid": "ki-186",
+   "source": "wikipedia",
+   "target": "ru-ccaf20d52eadd8071376a46e",
+   "traits": [
+    "not-in-document"
+   ]
+  },
+  {
+   "clusters": [],
+   "focus": "start",
+   "format": "md",
+   "kind": "known-item",
+   "language": "en",
+   "level": "exact",
+   "offset": 0,
+   "qid": "ki-187",
+   "source": "wikipedia",
+   "target": "ru-ad29545b946ba8e6baedcf94",
+   "traits": [
+    "other-language"
+   ]
+  },
+  {
+   "clusters": [],
+   "focus": "start",
+   "format": "html",
+   "kind": "known-item",
+   "language": "en",
+   "level": "partial",
+   "offset": 0,
+   "qid": "ki-188",
+   "source": "wikipedia",
+   "target": "ru-40f8bd995ac1333e436a1457",
+   "traits": [
+    "not-in-document"
+   ]
+  },
+  {
+   "clusters": [],
+   "focus": "start",
+   "format": "md",
+   "kind": "known-item",
+   "language": "en",
+   "level": "vague",
+   "offset": 0,
+   "qid": "ki-189",
+   "source": "wikipedia",
+   "target": "ru-06c181575a5d0c615d8e8b82",
+   "traits": [
+    "not-in-document"
+   ]
+  },
+  {
+   "clusters": [],
+   "focus": "start",
+   "format": "html",
+   "kind": "known-item",
+   "language": "en",
+   "level": "exact",
+   "offset": 0,
+   "qid": "ki-190",
+   "source": "wikipedia",
+   "target": "ru-caed2b9edb0a1ea7ba580961",
+   "traits": []
+  },
+  {
+   "clusters": [],
+   "focus": "start",
+   "format": "md",
+   "kind": "known-item",
+   "language": "en",
+   "level": "partial",
+   "offset": 0,
+   "qid": "ki-191",
+   "source": "wikipedia",
+   "target": "ru-0093e1c8406013c0d1e45530",
+   "traits": [
+    "not-in-document"
+   ]
+  },
+  {
+   "clusters": [],
+   "focus": "start",
+   "format": "html",
+   "kind": "known-item",
+   "language": "en",
+   "level": "vague",
+   "offset": 0,
+   "qid": "ki-192",
+   "source": "wikipedia",
+   "target": "ru-2c72a514384c4a8414b82497",
+   "traits": [
+    "not-in-document",
+    "other-language"
+   ]
+  },
+  {
+   "clusters": [],
+   "focus": "start",
+   "format": "md",
+   "kind": "known-item",
+   "language": "en",
+   "level": "exact",
+   "offset": 0,
+   "qid": "ki-193",
+   "source": "wikipedia",
+   "target": "ru-327af4cc6f83c6543eb3eb43",
+   "traits": []
+  },
+  {
+   "clusters": [],
+   "focus": "start",
+   "format": "html",
+   "kind": "known-item",
+   "language": "en",
+   "level": "partial",
+   "offset": 0,
+   "qid": "ki-194",
+   "source": "wikipedia",
+   "target": "ru-7c8b89acc0dffe0afcf36f40",
+   "traits": [
+    "not-in-document"
+   ]
+  },
+  {
+   "clusters": [],
+   "focus": "deep",
+   "format": "md",
+   "kind": "known-item",
+   "language": "en",
+   "level": "vague",
+   "offset": 28262,
+   "qid": "ki-195",
+   "source": "wikipedia",
+   "target": "ru-e2919aa3fc1ce574f3ae5f61",
+   "traits": [
+    "not-in-document"
+   ]
+  },
+  {
+   "clusters": [],
+   "focus": "start",
+   "format": "html",
+   "kind": "known-item",
+   "language": "en",
+   "level": "exact",
+   "offset": 0,
+   "qid": "ki-196",
+   "source": "wikipedia",
+   "target": "ru-4b2c0cd2ab2dd118423b4d8e",
+   "traits": []
+  },
+  {
+   "group": "cl-0008",
+   "group_kind": "near-duplicate",
+   "kind": "topical",
+   "language": "en",
+   "members": [
+    "ru-318569c853a6129c0fe5e875",
+    "ru-8f11750e8fccebe3db43301a"
+   ],
+   "qid": "tp-001",
+   "sources": [
+    "enron"
+   ]
+  },
+  {
+   "group": "cl-0010",
+   "group_kind": "near-duplicate",
+   "kind": "topical",
+   "language": "de",
+   "members": [
+    "ru-39793f0d94b024eb5869d2de",
+    "ru-ba54334538e82d8881b8d96f"
+   ],
+   "qid": "tp-002",
+   "sources": [
+    "bundestag"
+   ]
+  },
+  {
+   "group": "cl-0011",
+   "group_kind": "near-duplicate",
+   "kind": "topical",
+   "language": "en",
+   "members": [
+    "ru-39c14805960dd87550c447bd",
+    "ru-b0593840df58825293fbd2e3"
+   ],
+   "qid": "tp-003",
+   "sources": [
+    "enron"
+   ]
+  },
+  {
+   "group": "cl-0016",
+   "group_kind": "near-duplicate",
+   "kind": "topical",
+   "language": "de",
+   "members": [
+    "ru-8923444ba0a3b7da9a5701f3",
+    "ru-e3b0fa5bc9198d0db3a1cd61"
+   ],
+   "qid": "tp-004",
+   "sources": [
+    "bundestag"
+   ]
+  },
+  {
+   "group": "cl-0018",
+   "group_kind": "near-duplicate",
+   "kind": "topical",
+   "language": "de",
+   "members": [
+    "ru-9172c6e8c50fd2a677cea6c9",
+    "ru-9e607a99e1461c26efa92c07"
+   ],
+   "qid": "tp-005",
+   "sources": [
+    "wikipedia"
+   ]
+  },
+  {
+   "group": "cl-0019",
+   "group_kind": "near-duplicate",
+   "kind": "topical",
+   "language": "en",
+   "members": [
+    "ru-b978b171c6d550b9871e3c16",
+    "ru-e6ed62ce0a9bb9fadc6bd095"
+   ],
+   "qid": "tp-006",
+   "sources": [
+    "wikipedia"
+   ]
+  },
+  {
+   "group": "cl-0020",
+   "group_kind": "enron-thread",
+   "kind": "topical",
+   "language": "en",
+   "members": [
+    "ru-1edbf7f85c8e6caa7a60cc9f",
+    "ru-771e7b82013142c093431a16"
+   ],
+   "qid": "tp-007",
+   "sources": [
+    "enron"
+   ]
+  },
+  {
+   "group": "cl-0021",
+   "group_kind": "enron-thread",
+   "kind": "topical",
+   "language": "en",
+   "members": [
+    "ru-1b58686e93a592bfa39df86f",
+    "ru-d7675cb40d0d83c5b24e1d98"
+   ],
+   "qid": "tp-008",
+   "sources": [
+    "enron"
+   ]
+  },
+  {
+   "group": "cl-0022",
+   "group_kind": "enron-thread",
+   "kind": "topical",
+   "language": "en",
+   "members": [
+    "ru-318569c853a6129c0fe5e875",
+    "ru-8f11750e8fccebe3db43301a",
+    "ru-de809b30705dba00368f8264"
+   ],
+   "qid": "tp-009",
+   "sources": [
+    "enron"
+   ]
+  },
+  {
+   "group": "cl-0023",
+   "group_kind": "enron-thread",
+   "kind": "topical",
+   "language": "en",
+   "members": [
+    "ru-39c14805960dd87550c447bd",
+    "ru-b0593840df58825293fbd2e3"
+   ],
+   "qid": "tp-010",
+   "sources": [
+    "enron"
+   ]
+  },
+  {
+   "group": "cl-0024",
+   "group_kind": "enron-thread",
+   "kind": "topical",
+   "language": "en",
+   "members": [
+    "ru-0dd5f0d657acbf80aed8b1d3",
+    "ru-4d371870caacffddebfae1bc",
+    "ru-6034434309da0ce026f65860",
+    "ru-8a8c114b7fbd5e2048363730",
+    "ru-a28457707922ed8532179a2b",
+    "ru-ba5a08211298474ce2918775",
+    "ru-d0380e3353976e781d5e58f6",
+    "ru-d0b41f4496c01a5fd829a160"
+   ],
+   "qid": "tp-011",
+   "sources": [
+    "enron"
+   ]
+  },
+  {
+   "group": "tg-0002",
+   "group_kind": "topic",
+   "kind": "topical",
+   "language": "de",
+   "members": [
+    "ru-013cc6e289a2ea87b5626aa0",
+    "ru-7649baa72365cdfabedd2560",
+    "ru-bbebda46a70af95b47bf3896",
+    "ru-eb42cacf8fb91c8ed5b6ee67",
+    "ru-ec48af929114c011ad12f49a",
+    "ru-edf9b355f707ccf7115d8b0b"
+   ],
+   "qid": "tp-012",
+   "sources": [
+    "govdata"
+   ]
+  },
+  {
+   "group": "tg-0003",
+   "group_kind": "topic",
+   "kind": "topical",
+   "language": "de",
+   "members": [
+    "ru-03def27fe0f9f64606a45b14",
+    "ru-4c6be8adfda5ee15b88bcd3f",
+    "ru-6bfb8a1e2231d3c909aa3190",
+    "ru-93aa0d1e5da73200214aa6df",
+    "ru-dd4f81876eaead862bc36160",
+    "ru-e5fc4c442fe0a8d5036fcdfc"
+   ],
+   "qid": "tp-013",
+   "sources": [
+    "govdata"
+   ]
+  },
+  {
+   "group": "tg-0008",
+   "group_kind": "topic",
+   "kind": "topical",
+   "language": "de",
+   "members": [
+    "ru-059c29aabf8a8502511b175b",
+    "ru-2d4393a2810493ff1e70b95d",
+    "ru-5de7dd1c083d7c0978277741",
+    "ru-bc1bfb0a90b8c56eedbf9499",
+    "ru-e4c21a6d0e8b716f965bbc22",
+    "ru-ff0c7a2026a0ee68681b452f"
+   ],
+   "qid": "tp-014",
+   "sources": [
+    "govdata"
+   ]
+  },
+  {
+   "group": "tg-0010",
+   "group_kind": "topic",
+   "kind": "topical",
+   "language": "de",
+   "members": [
+    "ru-2d5f9eb62ed02364c1952ec9",
+    "ru-62834b46baaa26535e96c021",
+    "ru-b9f504f9d960bd15716ec91d",
+    "ru-d14fb3020596c36e6e7db5b0",
+    "ru-e72cbcb18a626380abb1bc14",
+    "ru-f399158a953f930f9017bda5"
+   ],
+   "qid": "tp-015",
+   "sources": [
+    "govdata"
+   ]
+  },
+  {
+   "group": "tg-0011",
+   "group_kind": "topic",
+   "kind": "topical",
+   "language": "de",
+   "members": [
+    "ru-47dcce08b1c4246e8acf8403",
+    "ru-63a2d898090a4e63fef3a8c5",
+    "ru-6553d91ed43fced57c08e1ae",
+    "ru-8b3b184f4cdc5ab3a0586404",
+    "ru-d5231031a8af253d4c7a36ad",
+    "ru-f57c523952949ebebd42c000"
+   ],
+   "qid": "tp-016",
+   "sources": [
+    "govdata"
+   ]
+  },
+  {
+   "group": "tg-0012",
+   "group_kind": "topic",
+   "kind": "topical",
+   "language": "de",
+   "members": [
+    "ru-563edefa093049b4643e9d28",
+    "ru-5cba91bf664e2a8d588c658d",
+    "ru-6df526bbf6218841f08873b7",
+    "ru-cc3d06a1b8ae58cfd3da6699",
+    "ru-f11fd5088e16b050222de5a4",
+    "ru-fcaa4eff623ac20682ddccb2"
+   ],
+   "qid": "tp-017",
+   "sources": [
+    "govdata"
+   ]
+  },
+  {
+   "group": "tg-0013",
+   "group_kind": "topic",
+   "kind": "topical",
+   "language": "de",
+   "members": [
+    "ru-5bbdc66cb47babf3ab1946ed",
+    "ru-73824ab0ce405aa6b1af6831",
+    "ru-9176af3263f1c91b45f2fcaf",
+    "ru-bf82e6c620263199adf209e7",
+    "ru-df24ab6e24521f0cb662c28a",
+    "ru-e6722c0def8307f56f30317b"
+   ],
+   "qid": "tp-018",
+   "sources": [
+    "eurlex"
+   ]
+  },
+  {
+   "group": "tg-0014",
+   "group_kind": "topic",
+   "kind": "topical",
+   "language": "de",
+   "members": [
+    "ru-694f66707fb409e6db438148",
+    "ru-91a1d39c58a82563a976af23",
+    "ru-a3927f00061446500a501cbd",
+    "ru-bcaa33a85b61fad744e06104",
+    "ru-f1cb32de3b86adbd46b95317",
+    "ru-f3db5f1839aebbc38351fa34"
+   ],
+   "qid": "tp-019",
+   "sources": [
+    "govdata"
+   ]
+  },
+  {
+   "group": "tg-0015",
+   "group_kind": "topic",
+   "kind": "topical",
+   "language": "de",
+   "members": [
+    "ru-1ade640d18949e2a2a351bb0",
+    "ru-1e69203bdd906acb945ed3fa",
+    "ru-93ba9ed1a113330d99ba4a0a",
+    "ru-93ea88c48470c1cb6fe79c30",
+    "ru-a0c418c087cccc696d624834",
+    "ru-a39f975984b8cd0109d14f55"
+   ],
+   "qid": "tp-020",
+   "sources": [
+    "govdata"
+   ]
+  },
+  {
+   "group": "tg-0017",
+   "group_kind": "topic",
+   "kind": "topical",
+   "language": "de",
+   "members": [
+    "ru-196537902fd652f1f9ad077f",
+    "ru-5d5ed328043db12d01dae8b9",
+    "ru-6901e3e5e044940bc046f739",
+    "ru-c920aab4606d9af842aded4b",
+    "ru-ebb2666927c674479b82ed4d"
+   ],
+   "qid": "tp-021",
+   "sources": [
+    "govdata"
+   ]
+  },
+  {
+   "group": "tg-0018",
+   "group_kind": "topic",
+   "kind": "topical",
+   "language": "de",
+   "members": [
+    "ru-0f218f0fab1280a86ba1928c",
+    "ru-25c68e8b1179bb713610bd6d",
+    "ru-2685d20f5250d3e5a4d54d67",
+    "ru-699a4a8c867525f3b6b621a5",
+    "ru-8e04a2e3c37a0661355c7038",
+    "ru-ccf787f17e79e4f255bcd6e7"
+   ],
+   "qid": "tp-022",
+   "sources": [
+    "eurlex"
+   ]
+  },
+  {
+   "group": "tg-0019",
+   "group_kind": "topic",
+   "kind": "topical",
+   "language": "de",
+   "members": [
+    "ru-245fb923511e661a4c23cf3a",
+    "ru-302c67a17219ee7072ca07e5",
+    "ru-4a66b455dcb391716e1f19c6",
+    "ru-57195d7c2407f44623f5705e",
+    "ru-d3aa32ce3c317a5f4791101e",
+    "ru-fb74b1762fc5c5801b5ff876"
+   ],
+   "qid": "tp-023",
+   "sources": [
+    "eurlex"
+   ]
+  },
+  {
+   "group": "tg-0020",
+   "group_kind": "topic",
+   "kind": "topical",
+   "language": "de",
+   "members": [
+    "ru-6edbcdc7758ea8b5b2ccd53d",
+    "ru-7ebf172864b11aab8410a1f7",
+    "ru-8647ab772659c04ddc4ac5f1",
+    "ru-a46feed6853e39736e32c971",
+    "ru-d6e148bb275138f8501a76fe",
+    "ru-dafd70376b123c5e90ab37b9"
+   ],
+   "qid": "tp-024",
+   "sources": [
+    "eurlex"
+   ]
+  },
+  {
+   "group": "tg-0021",
+   "group_kind": "topic",
+   "kind": "topical",
+   "language": "de",
+   "members": [
+    "ru-173ac78baaf222fa0e4b35a4",
+    "ru-431144dd88688f5a1b73f4da",
+    "ru-64e34d7fb2183b0fb38f886f",
+    "ru-73a431e9237abccf432ababb",
+    "ru-cc9befd8adaf7d6a9262e2be",
+    "ru-f240cde0111d6c3eda92cf6a"
+   ],
+   "qid": "tp-025",
+   "sources": [
+    "eurlex"
+   ]
+  },
+  {
+   "group": "tg-0023",
+   "group_kind": "topic",
+   "kind": "topical",
+   "language": "de",
+   "members": [
+    "ru-23af8464d4cb16e1ec0cd666",
+    "ru-369d9362390778a2efdfe3b7",
+    "ru-454535ccdac4dcec86503177",
+    "ru-5015dc4e570c60576cfd0f79",
+    "ru-5ec5b72e2a703a87e07af665",
+    "ru-b38f15c975ff19bfc208dfcd"
+   ],
+   "qid": "tp-026",
+   "sources": [
+    "eurlex"
+   ]
+  },
+  {
+   "group": "tg-0025",
+   "group_kind": "topic",
+   "kind": "topical",
+   "language": "de",
+   "members": [
+    "ru-54a414ad22c727f6c6a80268",
+    "ru-5dba7f3bcc13c1c700f81dcf",
+    "ru-90fa79438260a5ce33e751a6",
+    "ru-92d66347d06075971fcac4e6",
+    "ru-c63d88df838d317563d18eb6",
+    "ru-db8135bd066f1a80d32b3ee8"
+   ],
+   "qid": "tp-027",
+   "sources": [
+    "eurlex"
+   ]
+  },
+  {
+   "group": "tg-0026",
+   "group_kind": "topic",
+   "kind": "topical",
+   "language": "de",
+   "members": [
+    "ru-5b90f45967d0a43080d23a3c",
+    "ru-5e33e4f8ee8453e911a086e3",
+    "ru-64e1537bad6d31a6ef471a88",
+    "ru-a75cb5f6cbecad5d8129d4ec",
+    "ru-bd3439d38477d78df4ae86b9",
+    "ru-cbeb56cda3dbcb69688b912c"
+   ],
+   "qid": "tp-028",
+   "sources": [
+    "eurlex"
+   ]
+  },
+  {
+   "group": "tg-0027",
+   "group_kind": "topic",
+   "kind": "topical",
+   "language": "de",
+   "members": [
+    "ru-94b39c4e92027ba5fdefa8c8",
+    "ru-a8df84dd1fad60ff19d43165",
+    "ru-c4edff9dff31c8d16b14f9ac"
+   ],
+   "qid": "tp-029",
+   "sources": [
+    "eurlex"
+   ]
+  },
+  {
+   "group": "tg-0028",
+   "group_kind": "topic",
+   "kind": "topical",
+   "language": "de",
+   "members": [
+    "ru-5ec2382a6a62d1ca506b6787",
+    "ru-ab94c4befae8a83b12abaaa2",
+    "ru-cb0c23d4e8a9df324de33760",
+    "ru-d87e0d4c8ba232f836179b21",
+    "ru-e4a6cdc102f0610fb8a5bb85",
+    "ru-fef337b88e84e568e29a6cbc"
+   ],
+   "qid": "tp-030",
+   "sources": [
+    "bundestag"
+   ]
+  },
+  {
+   "group": "tg-0029",
+   "group_kind": "topic",
+   "kind": "topical",
+   "language": "de",
+   "members": [
+    "ru-07cbc5d1debd925d659cb454",
+    "ru-08c43f5d75b2f0bb106d68ef",
+    "ru-09a8214366e01b55ad1f6607",
+    "ru-8fca7d5a5d0c23bf8b2106d8",
+    "ru-a3ca5e76e82d696b4785fc9b",
+    "ru-edd2e40c5084abf2983012f5"
+   ],
+   "qid": "tp-031",
+   "sources": [
+    "govdata"
+   ]
+  },
+  {
+   "group": "tg-0030",
+   "group_kind": "topic",
+   "kind": "topical",
+   "language": "de",
+   "members": [
+    "ru-083c20c631bf5f0bd2ed6cc3",
+    "ru-0a7f999e90f24f14adaf08a6",
+    "ru-5795b254087f75f25a41a4c3",
+    "ru-6a51e0c0415001ce6b8e15fd",
+    "ru-82b017d5d05f84b5393a59dd",
+    "ru-ca2cfebcb4c2f4a023068589"
+   ],
+   "qid": "tp-032",
+   "sources": [
+    "govdata"
+   ]
+  },
+  {
+   "group": "tg-0031",
+   "group_kind": "topic",
+   "kind": "topical",
+   "language": "de",
+   "members": [
+    "ru-0779b93dfce5ac2c3b2268a8",
+    "ru-23e5e3d9a4f3ae626a7367a1",
+    "ru-4e8b9f80dae797267a415745",
+    "ru-7c2e53b707afffda294427ec",
+    "ru-b43f5fe4044bedc7c2d1ce7d",
+    "ru-e9a73a58ede5f561f914e6b0"
+   ],
+   "qid": "tp-033",
+   "sources": [
+    "govdata"
+   ]
+  },
+  {
+   "group": "tg-0033",
+   "group_kind": "topic",
+   "kind": "topical",
+   "language": "de",
+   "members": [
+    "ru-5ca5a203951e9aaa5a166dbb",
+    "ru-a8406865323a0a58cc5b827c",
+    "ru-ad6e8cea0be7456d25f6184f"
+   ],
+   "qid": "tp-034",
+   "sources": [
+    "govdata"
+   ]
+  },
+  {
+   "group": "tg-0034",
+   "group_kind": "topic",
+   "kind": "topical",
+   "language": "de",
+   "members": [
+    "ru-1a43638f2a3edd22fd601463",
+    "ru-6bf646bdbce527588bb4b585",
+    "ru-aa92f5d674a36e72edea71a4",
+    "ru-bd90b721bbc66a6981908fb3",
+    "ru-da36c533c8393421ac150081",
+    "ru-f8c19c1005a134c1170f6fbb"
+   ],
+   "qid": "tp-035",
+   "sources": [
+    "bundestag"
+   ]
+  },
+  {
+   "group": "tg-0035",
+   "group_kind": "topic",
+   "kind": "topical",
+   "language": "de",
+   "members": [
+    "ru-243f43ad5bc1be4cd2f3aec4",
+    "ru-3c18b38d2fcf51da25016751",
+    "ru-79d3e6c5936bc5db0e376ecf",
+    "ru-7ec70d586860157c65bdf06a",
+    "ru-bc5959a37ed038cc99e78a29",
+    "ru-bee39dbe8ddcb9d74f4730ef"
+   ],
+   "qid": "tp-036",
+   "sources": [
+    "bundestag"
+   ]
+  },
+  {
+   "group": "tg-0036",
+   "group_kind": "topic",
+   "kind": "topical",
+   "language": "de",
+   "members": [
+    "ru-32833302170827144ea4ce86",
+    "ru-7156968c32bb945c97b5b151",
+    "ru-ab4ec981ffaa6f4632362bbd",
+    "ru-bdd52373524442f1b50076eb",
+    "ru-c1c4589e2827d2b63cc43fd9",
+    "ru-e498fc94dee3ce4f7217971f"
+   ],
+   "qid": "tp-037",
+   "sources": [
+    "bundestag"
+   ]
+  },
+  {
+   "group": "tg-0037",
+   "group_kind": "topic",
+   "kind": "topical",
+   "language": "de",
+   "members": [
+    "ru-4359b766478e4b5257108c4c",
+    "ru-5cb6cfe893f7f802d67a16e4",
+    "ru-f873cdd63aeb88ed5d78c155"
+   ],
+   "qid": "tp-038",
+   "sources": [
+    "govdata"
+   ]
+  },
+  {
+   "group": "tg-0038",
+   "group_kind": "topic",
+   "kind": "topical",
+   "language": "de",
+   "members": [
+    "ru-0a4c88a011f0725f6425d2b1",
+    "ru-65b5add3e5d723aa3108ab75",
+    "ru-e750d0bde7fd80d526b3e5a0",
+    "ru-ead24390ffc6ad0fc3b2e7f0"
+   ],
+   "qid": "tp-039",
+   "sources": [
+    "govdata"
+   ]
+  },
+  {
+   "group": "tg-0039",
+   "group_kind": "topic",
+   "kind": "topical",
+   "language": "de",
+   "members": [
+    "ru-46a587763ca3f13c67926656",
+    "ru-5e08f975aaf902fede8497cd",
+    "ru-97a6982e04cab17592ce337e",
+    "ru-c92514573efc743c694fec6a",
+    "ru-d8469348bba5203a88f5c722",
+    "ru-e07c3d7803009eaaf6c4fe33"
+   ],
+   "qid": "tp-040",
+   "sources": [
+    "govdata"
+   ]
+  },
+  {
+   "group": "tg-0041",
+   "group_kind": "topic",
+   "kind": "topical",
+   "language": "de",
+   "members": [
+    "ru-04d17b863566d39ce5e20096",
+    "ru-1fb99cc38206eee6c2730a23",
+    "ru-469f15fde4b4d10dda145afa",
+    "ru-c6901d2940eb83b0a5409723",
+    "ru-d2ca61ace0a4e9df98862616"
+   ],
+   "qid": "tp-041",
+   "sources": [
+    "govdata"
+   ]
+  },
+  {
+   "group": "tg-0042",
+   "group_kind": "topic",
+   "kind": "topical",
+   "language": "de",
+   "members": [
+    "ru-5773ee11ca8002550073a0bc",
+    "ru-adc276527c869f0e9ccb3aa2",
+    "ru-da50d06ecfece73af7cf406d",
+    "ru-f25615da38f03cb8448ff182"
+   ],
+   "qid": "tp-042",
+   "sources": [
+    "govdata"
+   ]
+  },
+  {
+   "group": "tg-0043",
+   "group_kind": "topic",
+   "kind": "topical",
+   "language": "de",
+   "members": [
+    "ru-0f30536e83f8955aa43083a3",
+    "ru-1a37723c318bb95a113f4487",
+    "ru-2068387693ca66e22c12e2c4",
+    "ru-4df8fbbfc460b31bdf913b9e",
+    "ru-798fc799e41ebf8852f60540",
+    "ru-f14674448a8d4d49f0b7ae42"
+   ],
+   "qid": "tp-043",
+   "sources": [
+    "bundestag"
+   ]
+  },
+  {
+   "group": "tg-0044",
+   "group_kind": "topic",
+   "kind": "topical",
+   "language": "de",
+   "members": [
+    "ru-0ff10c34c172415dec77c07a",
+    "ru-1353c367a521d871ba77bca7",
+    "ru-172515c6e25897b69e246144",
+    "ru-39793f0d94b024eb5869d2de",
+    "ru-ba54334538e82d8881b8d96f",
+    "ru-f60007326b72b397076c30c7"
+   ],
+   "qid": "tp-044",
+   "sources": [
+    "bundestag",
+    "safedocs"
+   ]
+  },
+  {
+   "group": "tg-0045",
+   "group_kind": "topic",
+   "kind": "topical",
+   "language": "de",
+   "members": [
+    "ru-17b55f6c91cf4567a9c04972",
+    "ru-1fb14241f017ccbfdb024b01",
+    "ru-8923444ba0a3b7da9a5701f3",
+    "ru-e3b0fa5bc9198d0db3a1cd61"
+   ],
+   "qid": "tp-045",
+   "sources": [
+    "bundestag"
+   ]
+  },
+  {
+   "group": "tg-0046",
+   "group_kind": "topic",
+   "kind": "topical",
+   "language": "de",
+   "members": [
+    "ru-02a9aa98d13c7784a326ce74",
+    "ru-086dabc88ce29c0954407ba4",
+    "ru-31643471071a2efd399339fc",
+    "ru-365573e56c80cc48f74b52eb"
+   ],
+   "qid": "tp-046",
+   "sources": [
+    "eurlex"
+   ]
+  },
+  {
+   "group": "tg-0047",
+   "group_kind": "topic",
+   "kind": "topical",
+   "language": "de",
+   "members": [
+    "ru-c0e80d408f7438393b985205",
+    "ru-d9513fef5bdd7996255a246b",
+    "ru-f8ab11e66bca8f4f933fb92a"
+   ],
+   "qid": "tp-047",
+   "sources": [
+    "bundestag"
+   ]
+  },
+  {
+   "group": "tg-0048",
+   "group_kind": "topic",
+   "kind": "topical",
+   "language": "de",
+   "members": [
+    "ru-12b0e56339b246268b3f42a9",
+    "ru-273fffc352fa878c999ba6d3",
+    "ru-4abc916065b354f295e30489",
+    "ru-52cd4df75dc7707fea62415f"
+   ],
+   "qid": "tp-048",
+   "sources": [
+    "bundestag"
+   ]
+  },
+  {
+   "group": "tg-0049",
+   "group_kind": "topic",
+   "kind": "topical",
+   "language": "de",
+   "members": [
+    "ru-668ec8659bec07d857c0dc29",
+    "ru-735141d946233bf2206d3d5b",
+    "ru-a4ffe9c1bda21256ccdfcafd",
+    "ru-c69846cdc0437dc48946852f",
+    "ru-d0aca3a8cc830dbc6060dfa1",
+    "ru-ea587a8866f66089aa1f82ca"
+   ],
+   "qid": "tp-049",
+   "sources": [
+    "eurlex"
+   ]
+  },
+  {
+   "group": "tg-0050",
+   "group_kind": "topic",
+   "kind": "topical",
+   "language": "de",
+   "members": [
+    "ru-280eaab5eba4e56c25772f5e",
+    "ru-663954d2af4d34e847398d2e",
+    "ru-7760d89a5b5e053021e98d69",
+    "ru-8d028e14b6855ce8cb5ad357",
+    "ru-ade90c33e32a8082da5f7f3e",
+    "ru-d1fa73158ad376ce75ec9ce5"
+   ],
+   "qid": "tp-050",
+   "sources": [
+    "bundestag"
+   ]
+  },
+  {
+   "group": "tg-0051",
+   "group_kind": "topic",
+   "kind": "topical",
+   "language": "de",
+   "members": [
+    "ru-4ddf6dfebcac23b317bbb1fc",
+    "ru-677d7da974a87c0a4e79310c",
+    "ru-70695167485cf4f0e16d8287",
+    "ru-85461ec0e1928e35f5edb325",
+    "ru-8561032e2f93a2d577f798b9",
+    "ru-8f85fe260a557cb36e534e33"
+   ],
+   "qid": "tp-051",
+   "sources": [
+    "eurlex"
+   ]
+  },
+  {
+   "group": "tg-0052",
+   "group_kind": "topic",
+   "kind": "topical",
+   "language": "de",
+   "members": [
+    "ru-07b90afd74ea43394344f6d2",
+    "ru-854356c5e0b5168ee60709c3",
+    "ru-89dc77c8000f1402ec144942",
+    "ru-cea51b3a8a5cc00eb89dfbb9"
+   ],
+   "qid": "tp-052",
+   "sources": [
+    "eurlex"
+   ]
+  },
+  {
+   "group": "tg-0054",
+   "group_kind": "topic",
+   "kind": "topical",
+   "language": "de",
+   "members": [
+    "ru-094174a424357122760ab1ff",
+    "ru-d1c55970bd7d5565360186b7",
+    "ru-fd3ff9c9e6cc5a66672f58d6",
+    "ru-fe464acecae0a62269623a69"
+   ],
+   "qid": "tp-053",
+   "sources": [
+    "eurlex"
+   ]
+  },
+  {
+   "group": "tg-0055",
+   "group_kind": "topic",
+   "kind": "topical",
+   "language": "de",
+   "members": [
+    "ru-11e230b2793b03760b3c12c6",
+    "ru-32587661329bf9ac3d4754a2",
+    "ru-3b6b2a7644c2d10d16fdc8e7",
+    "ru-3d0baddbba93169c2c50b012",
+    "ru-6b84f33c3ffaaf77bc06bd94"
+   ],
+   "qid": "tp-054",
+   "sources": [
+    "eurlex"
+   ]
+  },
+  {
+   "group": "tg-0056",
+   "group_kind": "topic",
+   "kind": "topical",
+   "language": "de",
+   "members": [
+    "ru-1744a04ae17c0caa6d07e265",
+    "ru-29bb3b7ffb241fc127b00bc1",
+    "ru-b1cf4653551514469a8bc1e4",
+    "ru-e968181dec7a51ad80bf91ee",
+    "ru-f33c2cf6cf4bb59105122169"
+   ],
+   "qid": "tp-055",
+   "sources": [
+    "eurlex"
+   ]
+  },
+  {
+   "group": "tg-0057",
+   "group_kind": "topic",
+   "kind": "topical",
+   "language": "de",
+   "members": [
+    "ru-3eecd25cad35b679857b3927",
+    "ru-668fd034de0eb9b19f1d545c",
+    "ru-a0e31daafc9f9c44d29ba3e3",
+    "ru-d14c0ae1c8220f2623722abf",
+    "ru-ddf7be145d8348eebc6c02fb"
+   ],
+   "qid": "tp-056",
+   "sources": [
+    "bundestag"
+   ]
+  },
+  {
+   "group": "tg-0058",
+   "group_kind": "topic",
+   "kind": "topical",
+   "language": "de",
+   "members": [
+    "ru-53879c6ba30711bd7b5213c2",
+    "ru-5d9d8fba275bb5e8e51e0812",
+    "ru-5ed934a0eaf74c8a2684e6ab",
+    "ru-d21d5f152c7d4d40445d0e8f",
+    "ru-e2cb6e5848be63271d9d57fc"
+   ],
+   "qid": "tp-057",
+   "sources": [
+    "govdata"
+   ]
+  },
+  {
+   "group": "tg-0059",
+   "group_kind": "topic",
+   "kind": "topical",
+   "language": "de",
+   "members": [
+    "ru-5d703fde5abb84edde0918e6",
+    "ru-7ca143c91e35e2d4dee9c8f7",
+    "ru-ab919638e8955b0024f8f12f",
+    "ru-d02fb721a57ec6aec9726712",
+    "ru-f77bc75295d15277bc992a3a"
+   ],
+   "qid": "tp-058",
+   "sources": [
+    "eurlex"
+   ]
+  },
+  {
+   "group": "tg-0060",
+   "group_kind": "topic",
+   "kind": "topical",
+   "language": "de",
+   "members": [
+    "ru-0120ede492c5211cb409a162",
+    "ru-295d6834068f759cb586e2ff",
+    "ru-296312b433c16e2ebf7c8ba3",
+    "ru-a1248c05c0b45b23d1e8a616"
+   ],
+   "qid": "tp-059",
+   "sources": [
+    "govdata"
+   ]
+  },
+  {
+   "group": "tg-0061",
+   "group_kind": "topic",
+   "kind": "topical",
+   "language": "de",
+   "members": [
+    "ru-0333f1f3e3660ea13b339b8c",
+    "ru-1addc2a8ba44561040961be1",
+    "ru-303aa4f28eea44c92641a9a6",
+    "ru-5873e279d66cd05a413ac185"
+   ],
+   "qid": "tp-060",
+   "sources": [
+    "eurlex"
+   ]
+  },
+  {
+   "group": "tg-0062",
+   "group_kind": "topic",
+   "kind": "topical",
+   "language": "de",
+   "members": [
+    "ru-0602b124ec1be325406e411a",
+    "ru-40a74f3d96b5901a0da61367",
+    "ru-678cd3b61f29732ce8652f50",
+    "ru-e905e338c38c7434d5d18549"
+   ],
+   "qid": "tp-061",
+   "sources": [
+    "bundestag"
+   ]
+  },
+  {
+   "group": "tg-0063",
+   "group_kind": "topic",
+   "kind": "topical",
+   "language": "de",
+   "members": [
+    "ru-31a8b87494c6e1358ed4b2b5",
+    "ru-7b5e5022ef2a33139d1b4342",
+    "ru-a10023f20904d04da3646f8e",
+    "ru-ef4abd2d6351a4a861e8fb52"
+   ],
+   "qid": "tp-062",
+   "sources": [
+    "govdata"
+   ]
+  },
+  {
+   "group": "tg-0064",
+   "group_kind": "topic",
+   "kind": "topical",
+   "language": "de",
+   "members": [
+    "ru-4a321f857bbec3d559bbf04f",
+    "ru-70f74fff820b54191df4f51a",
+    "ru-a50dcb329dac2ea36a764061",
+    "ru-c0c3dc9af6225ccff92c01ff"
+   ],
+   "qid": "tp-063",
+   "sources": [
+    "eurlex"
+   ]
+  },
+  {
+   "group": "tg-0066",
+   "group_kind": "topic",
+   "kind": "topical",
+   "language": "de",
+   "members": [
+    "ru-9172c6e8c50fd2a677cea6c9",
+    "ru-9e607a99e1461c26efa92c07",
+    "ru-a708c87bed9d2fc25b5bbf19",
+    "ru-f1a5919285b7dd5b2aeb5697"
+   ],
+   "qid": "tp-064",
+   "sources": [
+    "wikipedia"
+   ]
+  },
+  {
+   "group": "tg-0067",
+   "group_kind": "topic",
+   "kind": "topical",
+   "language": "de",
+   "members": [
+    "ru-09a5e06cfdb8f06ec12e3750",
+    "ru-7a55f2b77f92f3f0452b82a3",
+    "ru-b91512eb317a163a2780c911",
+    "ru-f070f870433e410f3d157d69"
+   ],
+   "qid": "tp-065",
+   "sources": [
+    "eurlex"
+   ]
+  },
+  {
+   "group": "tg-0068",
+   "group_kind": "topic",
+   "kind": "topical",
+   "language": "de",
+   "members": [
+    "ru-0329c4deaa82ced4e6cb74e3",
+    "ru-245b4365070bff7d81e9b75d",
+    "ru-8b9e97815410c7cf40f3c154"
+   ],
+   "qid": "tp-066",
+   "sources": [
+    "eurlex"
+   ]
+  },
+  {
+   "group": "tg-0069",
+   "group_kind": "topic",
+   "kind": "topical",
+   "language": "de",
+   "members": [
+    "ru-065737f359249f5e3e6bf511",
+    "ru-6fcb426d03756292c555c03e",
+    "ru-ba23272ef8f4a4fa7efa45d3"
+   ],
+   "qid": "tp-067",
+   "sources": [
+    "bundestag"
+   ]
+  },
+  {
+   "group": "tg-0070",
+   "group_kind": "topic",
+   "kind": "topical",
+   "language": "de",
+   "members": [
+    "ru-2515b54fb8f155852e4d3d39",
+    "ru-8486f936ba26b8aa9404473f",
+    "ru-9758c53949233952cf88b166"
+   ],
+   "qid": "tp-068",
+   "sources": [
+    "eurlex"
+   ]
+  },
+  {
+   "group": "tg-0071",
+   "group_kind": "topic",
+   "kind": "topical",
+   "language": "de",
+   "members": [
+    "ru-26f9f9d050dc8ed0f4b3d405",
+    "ru-3cf8f1ee3ca9480c6f6dd88d",
+    "ru-cad62cea4b234ca0d3648253"
+   ],
+   "qid": "tp-069",
+   "sources": [
+    "eurlex"
+   ]
+  },
+  {
+   "group": "tg-0072",
+   "group_kind": "topic",
+   "kind": "topical",
+   "language": "de",
+   "members": [
+    "ru-2b7f643e62b95d6df7094112",
+    "ru-53bd78d7935149d7469215b4",
+    "ru-6a93e658ee588d58d0a958cc"
+   ],
+   "qid": "tp-070",
+   "sources": [
+    "govdata"
+   ]
+  },
+  {
+   "group": "tg-0073",
+   "group_kind": "topic",
+   "kind": "topical",
+   "language": "de",
+   "members": [
+    "ru-2de2c0b93f6062edf9803809",
+    "ru-4a999640583b45afaad72779",
+    "ru-747ebf160441315529181476"
+   ],
+   "qid": "tp-071",
+   "sources": [
+    "bundestag"
+   ]
+  },
+  {
+   "group": "tg-0074",
+   "group_kind": "topic",
+   "kind": "topical",
+   "language": "de",
+   "members": [
+    "ru-32305362845536f81533f473",
+    "ru-7a54f7538a8a6a7819b226f1",
+    "ru-e9bdf06a8cc629a88b80c50e"
+   ],
+   "qid": "tp-072",
+   "sources": [
+    "govdata"
+   ]
+  },
+  {
+   "group": "tg-0075",
+   "group_kind": "topic",
+   "kind": "topical",
+   "language": "de",
+   "members": [
+    "ru-416da22e800b17f020cb9567",
+    "ru-53822da586ffc0a84706ccd3",
+    "ru-5f85e0775a55684dd52302b5"
+   ],
+   "qid": "tp-073",
+   "sources": [
+    "bundestag"
+   ]
+  },
+  {
+   "group": "tg-0076",
+   "group_kind": "topic",
+   "kind": "topical",
+   "language": "de",
+   "members": [
+    "ru-3511b9d1d764366da2f49150",
+    "ru-55832eb3ec5ea05c9dee3d6d",
+    "ru-b75a5dff58e16b54e188abde"
+   ],
+   "qid": "tp-074",
+   "sources": [
+    "bundestag"
+   ]
+  },
+  {
+   "group": "tg-0078",
+   "group_kind": "topic",
+   "kind": "topical",
+   "language": "en",
+   "members": [
+    "ru-363b42b1d9e20e6998be4b27",
+    "ru-38723f8839b9ab866ee62bd3",
+    "ru-4f37b344b15ff3910930dd2f",
+    "ru-8cec63e3b684093bf01581f9",
+    "ru-8fe2dd7c19870dcdb8581a49",
+    "ru-a187db40e8c4e89201fec91c"
+   ],
+   "qid": "tp-075",
+   "sources": [
+    "eurlex"
+   ]
+  },
+  {
+   "group": "tg-0079",
+   "group_kind": "topic",
+   "kind": "topical",
+   "language": "en",
+   "members": [
+    "ru-254a6558c20b35e7fef04596",
+    "ru-47758d9bbb229812ec412034",
+    "ru-4a16ecd45f370e823a79beb4",
+    "ru-573fe8cf72735bebf6e38e1e",
+    "ru-ba5b0c9e05173a48d1f21cb3",
+    "ru-cf402475dedcfb00d0ab96a8"
+   ],
+   "qid": "tp-076",
+   "sources": [
+    "eurlex"
+   ]
+  },
+  {
+   "group": "tg-0081",
+   "group_kind": "topic",
+   "kind": "topical",
+   "language": "en",
+   "members": [
+    "ru-028dd8f933b3d932402dd651",
+    "ru-340386bef23387186b7a0fec",
+    "ru-3eae5992da0a36b42005362e",
+    "ru-b5c55f350c79037e103c49d8",
+    "ru-d16807375bc548049ef51fbc",
+    "ru-e60f69d76e9cc1c6628bb127"
+   ],
+   "qid": "tp-077",
+   "sources": [
+    "eurlex"
+   ]
+  },
+  {
+   "group": "tg-0082",
+   "group_kind": "topic",
+   "kind": "topical",
+   "language": "en",
+   "members": [
+    "ru-65d0d3a33ca28ec1a5bb67fe",
+    "ru-829f724cf21bf886722998d2",
+    "ru-979c6764eddb5cc095c1e99d",
+    "ru-a7f793bd44a3d7e4c273bb36",
+    "ru-ac0ca3eed68e466aca4f0313",
+    "ru-efdead9015d8acdecf466f6c"
+   ],
+   "qid": "tp-078",
+   "sources": [
+    "eurlex"
+   ]
+  },
+  {
+   "group": "tg-0083",
+   "group_kind": "topic",
+   "kind": "topical",
+   "language": "en",
+   "members": [
+    "ru-2839966daa3b0f6b0e3c951a",
+    "ru-33570c0824522f636f3284fa",
+    "ru-34766b71cf9af2169a6ade62",
+    "ru-4304de73327e1823e8e676c9",
+    "ru-aa3bfa0ac6d3eff7fc1f8ff0",
+    "ru-dbdbc2e4064b820f0135bcea"
+   ],
+   "qid": "tp-079",
+   "sources": [
+    "eurlex"
+   ]
+  },
+  {
+   "group": "tg-0085",
+   "group_kind": "topic",
+   "kind": "topical",
+   "language": "en",
+   "members": [
+    "ru-4988ec388316587ce8858c6b",
+    "ru-57539db98758aaf42f3461ab",
+    "ru-8286ab73b4bf7a0cc1c29a07",
+    "ru-93ca892cf00ef236324a6d99",
+    "ru-99db38713c33bef49cd79786",
+    "ru-e87ea068edb4d61d571743a1"
+   ],
+   "qid": "tp-080",
+   "sources": [
+    "eurlex"
+   ]
+  },
+  {
+   "group": "tg-0087",
+   "group_kind": "topic",
+   "kind": "topical",
+   "language": "en",
+   "members": [
+    "ru-a9a5b7c845e34dbe84a6b729",
+    "ru-bf4b22370c5d41c699ee8e93",
+    "ru-caa3c95fd50014b1eb7771fe",
+    "ru-cca9a72bc6c676ead0b2b474",
+    "ru-df31a6fa91b74a467c9677b2",
+    "ru-dffec99943cbb0311853fb40"
+   ],
+   "qid": "tp-081",
+   "sources": [
+    "eurlex"
+   ]
+  },
+  {
+   "group": "tg-0088",
+   "group_kind": "topic",
+   "kind": "topical",
+   "language": "en",
+   "members": [
+    "ru-05f6856e87522f45163bed8b",
+    "ru-14913361fb0eb1bf85008769",
+    "ru-687ca44fcc508d8a6dadee07",
+    "ru-c0449cbe01e357ab633e9f80",
+    "ru-e0a964f11daebf90c9f00739",
+    "ru-f2eecb1d183b661a7c2306a0"
+   ],
+   "qid": "tp-082",
+   "sources": [
+    "eurlex"
+   ]
+  },
+  {
+   "group": "tg-0089",
+   "group_kind": "topic",
+   "kind": "topical",
+   "language": "en",
+   "members": [
+    "ru-9010ed69e6b28edede358526",
+    "ru-934c63ea37ed99f1de80649c",
+    "ru-b2daf5df7c841a5cfb9691fc",
+    "ru-cedf179b1275e3c0f8d79cb1",
+    "ru-ed0f55d1bad52efa7c2fe64b",
+    "ru-f8ecd7f504c17b9f382fdccb"
+   ],
+   "qid": "tp-083",
+   "sources": [
+    "eurlex"
+   ]
+  },
+  {
+   "group": "tg-0090",
+   "group_kind": "topic",
+   "kind": "topical",
+   "language": "en",
+   "members": [
+    "ru-096a1fd2f71acc350a9c4972",
+    "ru-7702d627699d3aa0aa72eabc",
+    "ru-7e7e874c38b106bdd3fc3068"
+   ],
+   "qid": "tp-084",
+   "sources": [
+    "eurlex"
+   ]
+  },
+  {
+   "group": "tg-0092",
+   "group_kind": "topic",
+   "kind": "topical",
+   "language": "en",
+   "members": [
+    "ru-44b342dedc2baf886a3e7309",
+    "ru-97ecd257404e6910eaf59101",
+    "ru-a8a25b125c90956025920e51"
+   ],
+   "qid": "tp-085",
+   "sources": [
+    "eurlex"
+   ]
+  },
+  {
+   "group": "tg-0093",
+   "group_kind": "topic",
+   "kind": "topical",
+   "language": "en",
+   "members": [
+    "ru-3752ea9c5efa25a4c4723296",
+    "ru-4098bfc5b78159808a233d0e",
+    "ru-63fc55a6958e1774de829c7e",
+    "ru-7c2beb067c74f4e66fd2d431",
+    "ru-a0614284b0a7334e53a38dac"
+   ],
+   "qid": "tp-086",
+   "sources": [
+    "eurlex"
+   ]
+  },
+  {
+   "group": "tg-0094",
+   "group_kind": "topic",
+   "kind": "topical",
+   "language": "en",
+   "members": [
+    "ru-0b2be76d4f499f86f35b41a0",
+    "ru-229f53928e9d3ea6da7849ab",
+    "ru-8baccb4d28490d3f28e9f8d3",
+    "ru-95eafd2a4885c1d59692508f",
+    "ru-ec2fdc91707f95c33222aa3a",
+    "ru-f4f37e34ef54d14f4fdc1c09"
+   ],
+   "qid": "tp-087",
+   "sources": [
+    "enron"
+   ]
+  },
+  {
+   "group": "tg-0095",
+   "group_kind": "topic",
+   "kind": "topical",
+   "language": "en",
+   "members": [
+    "ru-2674c8c38719127be0e8cb3d",
+    "ru-43bb96cc5f3163593a271592",
+    "ru-8731169720df10d03e2a2133",
+    "ru-89b66afe930ed4189090d1c9",
+    "ru-ad101fd289ea0c3e835bd2e0",
+    "ru-ee8f4577c0563e52d04ec05e"
+   ],
+   "qid": "tp-088",
+   "sources": [
+    "eurlex"
+   ]
+  },
+  {
+   "group": "tg-0096",
+   "group_kind": "topic",
+   "kind": "topical",
+   "language": "en",
+   "members": [
+    "ru-025e32cf7947fc703e11c396",
+    "ru-1217905616e80a45d2582e6d",
+    "ru-1ae8cc75503230dc7e2ee8cf",
+    "ru-2a87cc3b01f1fc42a167f763",
+    "ru-d7fbd0f1b906567225d67536",
+    "ru-e9d01f392c9dbbf0cf53e3ab"
+   ],
+   "qid": "tp-089",
+   "sources": [
+    "eurlex"
+   ]
+  },
+  {
+   "group": "tg-0097",
+   "group_kind": "topic",
+   "kind": "topical",
+   "language": "en",
+   "members": [
+    "ru-1de52180a7b802ac35553766",
+    "ru-3163e5ee4b8d28adc9e51de2",
+    "ru-a69e9a44904cb70173c734fc"
+   ],
+   "qid": "tp-090",
+   "sources": [
+    "eurlex"
+   ]
+  },
+  {
+   "group": "tg-0098",
+   "group_kind": "topic",
+   "kind": "topical",
+   "language": "en",
+   "members": [
+    "ru-0ea53a18746717fff719e6bb",
+    "ru-311175e16ca1c70ac5a23ab1",
+    "ru-6639d596f0bb2459e17d412d",
+    "ru-93469b4e452353780af3f8f7",
+    "ru-9b082bd8ff65fc9b911377c4",
+    "ru-ec5c613fcc4dcf9174f6ee10"
+   ],
+   "qid": "tp-091",
+   "sources": [
+    "enron"
+   ]
+  },
+  {
+   "group": "tg-0099",
+   "group_kind": "topic",
+   "kind": "topical",
+   "language": "en",
+   "members": [
+    "ru-3ed33b32ecd1dadf02b474fc",
+    "ru-867bf7bc9150c9e2a6f59100",
+    "ru-a949c6900bc601a69a757241",
+    "ru-afc652b303d4e61a25a01e05",
+    "ru-c13745bf757fb539ab90781b",
+    "ru-ebd1851d4800a1edc6caa3a9"
+   ],
+   "qid": "tp-092",
+   "sources": [
+    "eurlex"
+   ]
+  },
+  {
+   "group": "tg-0100",
+   "group_kind": "topic",
+   "kind": "topical",
+   "language": "en",
+   "members": [
+    "ru-19dce6fa4355c0f9c7bc9da5",
+    "ru-2efa68e5e1a0dfc8277a1b47",
+    "ru-4c8131f556dddda4d9e0b842",
+    "ru-7aa3a0717ba058def9a439bb",
+    "ru-a13c231b2a5e75bb836300ee",
+    "ru-e2919aa3fc1ce574f3ae5f61"
+   ],
+   "qid": "tp-093",
+   "sources": [
+    "wikipedia"
+   ]
+  },
+  {
+   "group": "tg-0102",
+   "group_kind": "topic",
+   "kind": "topical",
+   "language": "en",
+   "members": [
+    "ru-52fdffadc79117885f98c8ba",
+    "ru-61bb2d7693abb05225a504eb",
+    "ru-ac4209a547bc1a5409b71bae"
+   ],
+   "qid": "tp-094",
+   "sources": [
+    "enron"
+   ]
+  },
+  {
+   "group": "tg-0103",
+   "group_kind": "topic",
+   "kind": "topical",
+   "language": "en",
+   "members": [
+    "ru-159f015ce9111597e3acba69",
+    "ru-67bdf7d3ba91ac1a0b30a3c9",
+    "ru-7838f394cedeb4f3a62e9e9c",
+    "ru-c580d0a1d537d0c4ed5ff01d",
+    "ru-ccaf20d52eadd8071376a46e",
+    "ru-d65ed0f047bd94f1b32e46ca"
+   ],
+   "qid": "tp-095",
+   "sources": [
+    "wikipedia"
+   ]
+  },
+  {
+   "group": "tg-0104",
+   "group_kind": "topic",
+   "kind": "topical",
+   "language": "en",
+   "members": [
+    "ru-144b55b6d071d7527d822b34",
+    "ru-6b915f10e74292fbb89401e3",
+    "ru-9293eb91ba19778896e00de7",
+    "ru-9cf5ebabaaa64f10eba05023",
+    "ru-a7271aa48c98ce196a7cb9df",
+    "ru-cd5d2ef3400d2acedb4e6b0d"
+   ],
+   "qid": "tp-096",
+   "sources": [
+    "eurlex"
+   ]
+  },
+  {
+   "group": "tg-0105",
+   "group_kind": "topic",
+   "kind": "topical",
+   "language": "en",
+   "members": [
+    "ru-04f62eee57037f99c255cee7",
+    "ru-5e5cd703719edcf9692d7fd9",
+    "ru-7b76e716b2911c4b1d56dcb2",
+    "ru-89ceae15c98382ac494b54a7",
+    "ru-922238e6b0f9daff7ecd105a",
+    "ru-be9981bfad32e1537f96bbe7"
+   ],
+   "qid": "tp-097",
+   "sources": [
+    "govdocs1"
+   ]
+  },
+  {
+   "group": "tg-0106",
+   "group_kind": "topic",
+   "kind": "topical",
+   "language": "en",
+   "members": [
+    "ru-1c6de7dd1977c5ca5100ba3a",
+    "ru-3c8e9b15490054093ae06899",
+    "ru-3cd0e56a937b0f59b6b463ab",
+    "ru-7478ec570dd6866527144f7f",
+    "ru-7ab00f13037eba1fa61cdd0f",
+    "ru-970738ba0f4788ec41c17c6c"
+   ],
+   "qid": "tp-098",
+   "sources": [
+    "govdocs1"
+   ]
+  },
+  {
+   "group": "tg-0108",
+   "group_kind": "topic",
+   "kind": "topical",
+   "language": "en",
+   "members": [
+    "ru-0384b160b5597235ea4702ac",
+    "ru-40fd2e74a8c142c3fd50e2cc",
+    "ru-b9b0e3df682ed5efcf78073b",
+    "ru-d854565fd647be5d1dbe5bd8",
+    "ru-fa7c45d46de985ba3f960c85"
+   ],
+   "qid": "tp-099",
+   "sources": [
+    "wikipedia"
+   ]
+  },
+  {
+   "group": "tg-0110",
+   "group_kind": "topic",
+   "kind": "topical",
+   "language": "en",
+   "members": [
+    "ru-2945a10a062eaf2c695e4d25",
+    "ru-346e06c626179f7cb76c57d0",
+    "ru-484c8961fc91f0768e107886",
+    "ru-656d91d210c0893f37a2e60d",
+    "ru-def62bfed0db54df980f315c",
+    "ru-ff8acaa61035c80c699af125"
+   ],
+   "qid": "tp-100",
+   "sources": [
+    "eurlex"
+   ]
+  },
+  {
+   "group": "tg-0111",
+   "group_kind": "topic",
+   "kind": "topical",
+   "language": "en",
+   "members": [
+    "ru-3e76dc32976654bb55109de4",
+    "ru-63417cb4e90dedc113a591a4",
+    "ru-685219a30e23ff0338889939",
+    "ru-ec42e68b38c4f5e8e4e941dc",
+    "ru-f068493be749da6397c6067b",
+    "ru-f078381a762c310df799f970"
+   ],
+   "qid": "tp-101",
+   "sources": [
+    "eurlex"
+   ]
+  },
+  {
+   "group": "tg-0112",
+   "group_kind": "topic",
+   "kind": "topical",
+   "language": "en",
+   "members": [
+    "ru-36a8f90cff3b35436c88c78f",
+    "ru-37f384eb73e0148f041652a3",
+    "ru-6634f55c994fbf6649065aba",
+    "ru-9a052f6c164e2719ac210a47",
+    "ru-d7034eb58c17e476e4566025"
+   ],
+   "qid": "tp-102",
+   "sources": [
+    "eurlex"
+   ]
+  },
+  {
+   "group": "tg-0113",
+   "group_kind": "topic",
+   "kind": "topical",
+   "language": "en",
+   "members": [
+    "ru-378752e720e84cfdb9f8eebc",
+    "ru-847bde9969e285a6e70bac95",
+    "ru-92f646236b5e4af49d13254b",
+    "ru-d86dfc559dc6b77130ffcb8c",
+    "ru-f6019897765ae6724e68fb72",
+    "ru-fcbd93a92cb20fef05e9dbdd"
+   ],
+   "qid": "tp-103",
+   "sources": [
+    "govdocs1"
+   ]
+  },
+  {
+   "group": "tg-0114",
+   "group_kind": "topic",
+   "kind": "topical",
+   "language": "en",
+   "members": [
+    "ru-0abf15de533a61010233e096",
+    "ru-497bf4ca3092736832440b94",
+    "ru-6bda37578d3cb7809dbb662a",
+    "ru-ab726cccae877b8b551d6ba3",
+    "ru-db9765d2af0497208bfed949"
+   ],
+   "qid": "tp-104",
+   "sources": [
+    "eurlex"
+   ]
+  },
+  {
+   "group": "tg-0115",
+   "group_kind": "topic",
+   "kind": "topical",
+   "language": "en",
+   "members": [
+    "ru-183885a6f5e716ca257b188d",
+    "ru-1911eda51bef534c6af2fa02",
+    "ru-3cb179303f827bef13c8dcd0",
+    "ru-749f14031b00fff6219e849c",
+    "ru-9e48061da34457f4e01071d3"
+   ],
+   "qid": "tp-105",
+   "sources": [
+    "govdocs1"
+   ]
+  },
+  {
+   "group": "tg-0116",
+   "group_kind": "topic",
+   "kind": "topical",
+   "language": "en",
+   "members": [
+    "ru-1375f7a98350f89fc042f5ab",
+    "ru-1e457f4e390a831bb74f8d89",
+    "ru-339065d469db0defa15af578",
+    "ru-5ef563083f6fac3769ee2add",
+    "ru-96aedf4521dc4097f6de57e4"
+   ],
+   "qid": "tp-106",
+   "sources": [
+    "govdocs1"
+   ]
+  },
+  {
+   "group": "tg-0117",
+   "group_kind": "topic",
+   "kind": "topical",
+   "language": "en",
+   "members": [
+    "ru-3bf5d89d96ae4aa02079b928",
+    "ru-442bcac309f659c55213a0fc",
+    "ru-64da07dd6f9f91e4f867a56c",
+    "ru-7d4ced7b9aeb27ded778719d",
+    "ru-da814b81f425c0ba07374051"
+   ],
+   "qid": "tp-107",
+   "sources": [
+    "eurlex"
+   ]
+  },
+  {
+   "group": "tg-0118",
+   "group_kind": "topic",
+   "kind": "topical",
+   "language": "en",
+   "members": [
+    "ru-5915166680e6c55a7682ba6a",
+    "ru-5d2b6fcfacc9df047f3ebe0c",
+    "ru-81bd2007d24682c6a5d4094c",
+    "ru-b978b171c6d550b9871e3c16",
+    "ru-e6ed62ce0a9bb9fadc6bd095"
+   ],
+   "qid": "tp-108",
+   "sources": [
+    "wikipedia"
+   ]
+  },
+  {
+   "group": "tg-0119",
+   "group_kind": "topic",
+   "kind": "topical",
+   "language": "en",
+   "members": [
+    "ru-18e0a2a9df64ff123103fb4d",
+    "ru-4543fcbca82f57e1b97549bf",
+    "ru-948c7e4e402db2e9a9547014",
+    "ru-eacef617c5ad45072d54e56e"
+   ],
+   "qid": "tp-109",
+   "sources": [
+    "govdocs1"
+   ]
+  },
+  {
+   "group": "tg-0120",
+   "group_kind": "topic",
+   "kind": "topical",
+   "language": "en",
+   "members": [
+    "ru-19fcc60eae07f8b2f5cd34d0",
+    "ru-7e7299e937721ba30a8c55cd",
+    "ru-90ae17778336f4cc9bd624c5",
+    "ru-af1c3fad03d3fd153b0cbeeb"
+   ],
+   "qid": "tp-110",
+   "sources": [
+    "govdocs1"
+   ]
+  },
+  {
+   "group": "tg-0121",
+   "group_kind": "topic",
+   "kind": "topical",
+   "language": "en",
+   "members": [
+    "ru-3ec8fca5f456943d0ad550e6",
+    "ru-52cee303b20c2d6e69e2f79f",
+    "ru-afa8a56f66de68a42b60d44c",
+    "ru-c8904fc94639f99bd296ce7b"
+   ],
+   "qid": "tp-111",
+   "sources": [
+    "eurlex"
+   ]
+  },
+  {
+   "group": "tg-0122",
+   "group_kind": "topic",
+   "kind": "topical",
+   "language": "en",
+   "members": [
+    "ru-42fc77ae6e7bb14c3e5f6cf3",
+    "ru-89d0f9979e41adede6074100",
+    "ru-e573d16ddce014c777838458",
+    "ru-f74703e6331658d3da254b8c"
+   ],
+   "qid": "tp-112",
+   "sources": [
+    "govdocs1"
+   ]
+  },
+  {
+   "group": "tg-0123",
+   "group_kind": "topic",
+   "kind": "topical",
+   "language": "en",
+   "members": [
+    "ru-6d5f6b4ae8fc26783f249917",
+    "ru-af228054e2e6a0261d5b99fd",
+    "ru-ec24973274736d03754a87fc",
+    "ru-ff2d5b3542c9fa3a40dd1583"
+   ],
+   "qid": "tp-113",
+   "sources": [
+    "govdocs1"
+   ]
+  },
+  {
+   "group": "tg-0125",
+   "group_kind": "topic",
+   "kind": "topical",
+   "language": "en",
+   "members": [
+    "ru-1bc99e76126fde0f3cc2c214",
+    "ru-993c6d8a3bf528f34002188a",
+    "ru-f234a72a567d46af6ded0ded",
+    "ru-f92d8093ce673c3429d78a91"
+   ],
+   "qid": "tp-114",
+   "sources": [
+    "govdocs1"
+   ]
+  },
+  {
+   "group": "tg-0126",
+   "group_kind": "topic",
+   "kind": "topical",
+   "language": "en",
+   "members": [
+    "ru-02ff37f1a0409f83891a6d93",
+    "ru-931b6640d296570b93b0f475",
+    "ru-e03f451a2de9bb5265041b56"
+   ],
+   "qid": "tp-115",
+   "sources": [
+    "govdocs1",
+    "wikipedia"
+   ]
+  },
+  {
+   "group": "tg-0128",
+   "group_kind": "topic",
+   "kind": "topical",
+   "language": "en",
+   "members": [
+    "ru-0713cd3fdf42db6a84d0e792",
+    "ru-a9642284b396c377ca6dd012",
+    "ru-e74245b4c5e2b9f6eb3b7ebc"
+   ],
+   "qid": "tp-116",
+   "sources": [
+    "govdocs1"
+   ]
+  },
+  {
+   "group": "tg-0130",
+   "group_kind": "topic",
+   "kind": "topical",
+   "language": "en",
+   "members": [
+    "ru-11d789e8461c7aef4b819398",
+    "ru-4c5a9a335794c24c48c3a27e",
+    "ru-f5dcf9382c274401fd567535"
+   ],
+   "qid": "tp-117",
+   "sources": [
+    "govdocs1"
+   ]
+  },
+  {
+   "group": "tg-0131",
+   "group_kind": "topic",
+   "kind": "topical",
+   "language": "en",
+   "members": [
+    "ru-1343edd0474891f5f667c43d",
+    "ru-5438451665b2e882b8208d30",
+    "ru-b3b4a9ce8cbfaa8a0359b98d"
+   ],
+   "qid": "tp-118",
+   "sources": [
+    "govdocs1"
+   ]
+  },
+  {
+   "group": "tg-0132",
+   "group_kind": "topic",
+   "kind": "topical",
+   "language": "en",
+   "members": [
+    "ru-17164a3d74e1db088e563aae",
+    "ru-1fd51fb2220d3f8587be2a8c",
+    "ru-e9eac3e3e2dbbdb84c48d273"
+   ],
+   "qid": "tp-119",
+   "sources": [
+    "govdocs1"
+   ]
+  },
+  {
+   "group": "tg-0133",
+   "group_kind": "topic",
+   "kind": "topical",
+   "language": "en",
+   "members": [
+    "ru-1b2546b4ba0705c837107c80",
+    "ru-987d7aa42e6d1258f7235e1e",
+    "ru-b532e55122dc69e80bc390ef"
+   ],
+   "qid": "tp-120",
+   "sources": [
+    "govdocs1"
+   ]
+  },
+  {
+   "group": "tg-0134",
+   "group_kind": "topic",
+   "kind": "topical",
+   "language": "en",
+   "members": [
+    "ru-2296fdb29bb715af09621f35",
+    "ru-33772f41a643283552721ec7",
+    "ru-67ea4051029ce5f0ee973b8a"
+   ],
+   "qid": "tp-121",
+   "sources": [
+    "enron"
+   ]
+  },
+  {
+   "group": "tg-0135",
+   "group_kind": "topic",
+   "kind": "topical",
+   "language": "en",
+   "members": [
+    "ru-2f15c447fe95ac0f28251715",
+    "ru-3f1b104197a54a595970bb56",
+    "ru-5a2a1d3a02d6e012876b7079"
+   ],
+   "qid": "tp-122",
+   "sources": [
+    "govdocs1"
+   ]
+  },
+  {
+   "group": "tg-0136",
+   "group_kind": "topic",
+   "kind": "topical",
+   "language": "en",
+   "members": [
+    "ru-318569c853a6129c0fe5e875",
+    "ru-8f11750e8fccebe3db43301a",
+    "ru-de809b30705dba00368f8264"
+   ],
+   "qid": "tp-123",
+   "sources": [
+    "enron"
+   ]
+  },
+  {
+   "group": "tg-0137",
+   "group_kind": "topic",
+   "kind": "topical",
+   "language": "en",
+   "members": [
+    "ru-3842b338600c476bb4d051d7",
+    "ru-a124c9d35a0180d779ef8fec",
+    "ru-c115bb57e9aab6aacbdf7ec3"
+   ],
+   "qid": "tp-124",
+   "sources": [
+    "govdocs1"
+   ]
+  },
+  {
+   "group": "tg-0138",
+   "group_kind": "topic",
+   "kind": "topical",
+   "language": "en",
+   "members": [
+    "ru-3bcccdfa3aa222bf50e0c2f2",
+    "ru-47959fcb9cf3d1904696c355",
+    "ru-e8f4c8d1db994c2df7f0e946"
+   ],
+   "qid": "tp-125",
+   "sources": [
+    "govdocs1"
+   ]
+  },
+  {
+   "group": "tg-0139",
+   "group_kind": "topic",
+   "kind": "topical",
+   "language": "en",
+   "members": [
+    "ru-472fffa515719eea20e40b82",
+    "ru-9a0daf3a7446d7da71964a50",
+    "ru-d2a666d2f7f88f08d0ff51b9"
+   ],
+   "qid": "tp-126",
+   "sources": [
+    "enron"
+   ]
+  },
+  {
+   "group": "tg-0140",
+   "group_kind": "topic",
+   "kind": "topical",
+   "language": "en",
+   "members": [
+    "ru-57862fda5f6bbed9233d6288",
+    "ru-cc95924ed4a06ea64c008c10",
+    "ru-f7ca752570d4503f317269b4"
+   ],
+   "qid": "tp-127",
+   "sources": [
+    "govdocs1"
+   ]
+  },
+  {
+   "group": "tg-0141",
+   "group_kind": "topic",
+   "kind": "topical",
+   "language": "en",
+   "members": [
+    "ru-5b324d17c1352de106b9102e",
+    "ru-6ba15b5becb47536cbfc73fa",
+    "ru-7971be62e12066c151cc636a"
+   ],
+   "qid": "tp-128",
+   "sources": [
+    "enron"
+   ]
+  },
+  {
+   "group": "tg-0142",
+   "group_kind": "topic",
+   "kind": "topical",
+   "language": "en",
+   "members": [
+    "ru-5c5fd8fde68f61c2ed6a422e",
+    "ru-6c3b25b5b440a96e786d8a30",
+    "ru-9efe2721a1b861edf47387a3"
+   ],
+   "qid": "tp-129",
+   "sources": [
+    "govdocs1"
+   ]
+  },
+  {
+   "group": "tg-0144",
+   "group_kind": "topic",
+   "kind": "topical",
+   "language": "en",
+   "members": [
+    "ru-13f2b687136f778a7e5e332e",
+    "ru-8810b8db9231f36bd52ac40a",
+    "ru-9e81cc7866e5bcdafd815c6e"
+   ],
+   "qid": "tp-130",
+   "sources": [
+    "govdocs1"
+   ]
+  },
+  {
+   "group": "tg-0146",
+   "group_kind": "topic",
+   "kind": "topical",
+   "language": "en",
+   "members": [
+    "ru-5c59bb95483f25545206ebca",
+    "ru-a7763e6bf6ebc68d56ef08af",
+    "ru-f4538b1adcfa4a1f5a5e1077"
+   ],
+   "qid": "tp-131",
+   "sources": [
+    "enron"
+   ]
+  },
+  {
+   "group": "tg-0147",
+   "group_kind": "topic",
+   "kind": "topical",
+   "language": "en",
+   "members": [
+    "ru-396d3cdef35ef17dd6732b2c",
+    "ru-a471915f57033a3cb49a1da8",
+    "ru-fc0c446a60108cc715f63f21"
+   ],
+   "qid": "tp-132",
+   "sources": [
+    "govdocs1"
+   ]
+  }
+ ],
+ "quotas": {
+  "bundestag/de": 30,
+  "enron/en": 30,
+  "eurlex/de": 15,
+  "eurlex/en": 15,
+  "govdata/de": 15,
+  "govdocs1/en": 30,
+  "safedocs/de": 20,
+  "wikipedia/de": 10,
+  "wikipedia/en": 15
+ },
+ "seed": 20261104,
+ "spare": 1.1
+}

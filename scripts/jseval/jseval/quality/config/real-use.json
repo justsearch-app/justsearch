@@ -1,0 +1,45 @@
+{
+  "schema": "jseval.quality.config.v1",
+  "collection": "real-use",
+  "language": "mul",
+  "source": {
+    "kind": "public-recipe",
+    "recipe": "real-use",
+    "slice": "real-use"
+  },
+  "judgments": "pooled",
+  "layout": "as-is",
+  "witness_formats": [
+    "md"
+  ],
+  "groups": [
+    "lang",
+    "kind"
+  ],
+  "pending_kinds": [
+    "topical"
+  ],
+  "expected": {
+    "queries": 309,
+    "pending": 122,
+    "judgments": 187,
+    "positives": 187,
+    "grades": {
+      "2": 187
+    },
+    "documents": 2890
+  },
+  "margins": {
+    "default": 0.01
+  },
+  "alpha": 0.05,
+  "bootstrap": {
+    "resamples": 10000,
+    "seed": 20261102
+  },
+  "unjudged": {
+    "max_differing_share": 0.1
+  },
+  "min_group_size": 20,
+  "notes": "Full public real-use collection: 2,890 of the recipe's 2,960 files. Excluded with evidence (recipes/real-use-queries/excluded.json): 4 GovDocs1 Office files whose parser fails, 40 PDFs truncated at the extraction policy cap in the first build, and 26 OCR'd PDFs of 40 or more pages (the design's PDF page cap; their OCR can exceed the 30 s per-document budget under load). 187 known-item queries (exact/partial/vague recall, half German, about half of targets in near-duplicate clusters or natural families) judge their one target grade 2; the corpus has no byte-identical copies, so no grade 1. 122 topical queries from clusters or topic groups are stored with kind topical and no judgments: pending_kinds keeps them out of scoring until pooled labelling. Queries were written by claude-sonnet-5-5 and gated (verbatim leak, lexical triviality, distinguishability); the generation record is in recipes/real-use-queries/. Groups: lang is the target document's language."
+}

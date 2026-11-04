@@ -43,11 +43,17 @@ def _never_crash(command):
     return run
 
 
-def _checked_collection(ctx, ref: str):
-    """Resolve a collection and run its known-answer checks; any failure stops with exit 2."""
+def _checked_collection(ctx, ref: str, *, scored: bool = True):
+    """Resolve a collection and run its known-answer checks; any failure stops with exit 2.
+
+    ``scored`` (score, compare) returns only the scored queries and refuses a collection that
+    has none; otherwise (known-answers, prepare) the whole stored collection, corpus-only too.
+    """
     try:
         c, cfg = qcoll.resolve_collection(ref)
-        ka = known_answers.check(c, cfg)
+        ka = known_answers.check(c, cfg, require_scored=scored)
+        if scored:
+            c = qcoll.scored_collection(c, cfg)
     except (qcoll.CollectionError, known_answers.KnownAnswerFailure) as e:
         _invalid(ctx, str(e))
     except Exception as e:  # ir_datasets missing files, unreadable source: never a pass
@@ -90,9 +96,10 @@ def cmd_corpus_materialize(recipe, out):
 @_never_crash
 def cmd_known_answers(ctx, collection: str) -> None:
     """Run the known-answer checks of COLLECTION (counts, constructed rankings)."""
-    c, _cfg, ka = _checked_collection(ctx, collection)
+    c, _cfg, ka = _checked_collection(ctx, collection, scored=False)
     counts = ka.counts
-    click.echo(f"PASS {c.name} known answers: {ka.checks} checks; {counts['queries']} queries, "
+    click.echo(f"PASS {c.name} known answers: {ka.checks} checks; {counts['queries']} queries"
+               + (f" ({ka.pending} pending labels, not scored)" if ka.pending else "") + ", "
                f"{counts['judgments']} judgments ({counts['positives']} positive), "
                f"{counts['documents']} documents; version {c.version[:16]}")
 
@@ -266,7 +273,8 @@ def cmd_ablate(ctx, **kwargs):
 def cmd_prepare(ctx, collection, documents_dir, models_dir, cache_root):
     """Build/confirm an index through pausable background admission, outside scoring."""
     from ..quality.index import IndexConfig, IndexRefused, prepare_index
-    c, _cfg, _ka = _checked_collection(ctx, collection)
+    # The index depends on documents only (K1): a corpus-only collection prepares too (K2).
+    c, _cfg, _ka = _checked_collection(ctx, collection, scored=False)
     cfg = IndexConfig(documents_dir=documents_dir, models_dir=models_dir, cache_root=cache_root)
     try:
         with prepare_index(c, cfg) as handle:

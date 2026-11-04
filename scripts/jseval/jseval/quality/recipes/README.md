@@ -108,3 +108,68 @@ passage probes. All files remain covered by source-byte and extracted-text
 digests. Existing collections retain their default opaque `.txt` layout.
 An unset `witness_formats` preserves historical witness selection across every
 document; an explicit list filters by the original file extension.
+
+## Collection `real-use`
+
+`real-use/` is the full-corpus collection (config `real-use`, layout `as-is`,
+witness format `md`, groups `lang` × `kind`). It holds 2,890 of the recipe's
+2,960 files. The recipe still pins all of them. The 70 excluded files are listed
+with evidence in `real-use-queries/excluded.json`:
+
+- 4 GovDocs1 Office files whose sandbox parser fails.
+- 40 PDFs (14 Bundestag, 23 GovDocs1, 3 SafeDocs) whose extraction the first
+  build truncated at the policy cap.
+- 26 OCR'd PDFs of 40 or more pages (`ocr_page_cap`). This is the design's PDF
+  page cap; the sources without page counts had slipped past it. The page
+  counts and OCR routes come from the second build's visual-extraction
+  evidence.
+
+The core witness refuses parser failures and truncated extractions. OCR
+truncation depends on load, because the PDF OCR has a 30-second per-document
+budget. The second build truncated two more large PDFs (109 and 64 pages,
+recorded under `second_build`) and was not adopted. Both are under the page cap.
+The decision also excludes any OCR'd PDF whose OCR took 15 s or more. Neither
+build's engine log records per-document OCR time, so that rule excluded
+nothing. Clusters (`clusters.json`) were computed on the 2,916-file population.
+Eight clusters lose members. One of them, the Drucksachen run cl-0279, keeps
+only one member. No known-item target's in-cluster status rests on a lost
+member. One known-item query (ki-142) lost its target and was dropped. One topical
+query keeps two of its three members.
+
+Its index is keyed by document identity. Editing queries or judgments reuses
+the prepared index. Prepare it once in the background, GPU allowed, with the
+runtime environment it is keyed with:
+
+```sh
+source ~/.cache/justsearch-quality/real-use-queries/gpu.env   # recorded with the index
+python -m jseval quality prepare real-use     # or: python -m jseval.quality.real_use_queries prepare
+python -m jseval quality baseline real-use
+python -m jseval quality check real-use
+```
+
+`gpu.env` sets the ONNX Runtime CUDA path (also prefixed to
+`LD_LIBRARY_PATH`), `JUSTSEARCH_GPU_ENABLED=true`,
+`JUSTSEARCH_LLM_ENABLED=false` and `JAVA_TOOL_OPTIONS=-Djava.awt.headless=true`.
+The index key covers the JUSTSEARCH_* variables and JAVA_TOOL_OPTIONS, so a
+different value builds a different index.
+
+Queries come from `jseval.quality.real_use_queries` and cover S30. Its steps
+are `extract`, `clusters`, `plan`, `generate`, `gate` and `write`; each is
+resumable. Derived document text stays under
+`~/.cache/justsearch-quality/real-use-queries/`. `real-use-queries/` records
+the inputs and outputs without document text:
+
+- prompt templates (`prompts/`);
+- every generation attempt (`generation.jsonl`: model, template and prompt
+  SHA-256, parameters, model output, gate results);
+- clusters with their evidence (`clusters.json`);
+- the stratified plan (`plan.json`);
+- the gate results per query and stratum (`gates.json`);
+- extraction sizing (`chunks.json`).
+
+Known-item queries have one target each, judged grade 2. A byte-identical copy
+would get grade 1, but the corpus has none. Topical queries come from clusters
+or topic groups, never from a single document. They are stored with
+`kind: topical` and no judgments. The config's `pending_kinds` excludes them
+from scoring until a pooled labelling pass; `check` reports how many are
+pending.
