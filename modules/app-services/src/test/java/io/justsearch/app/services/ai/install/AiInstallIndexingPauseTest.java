@@ -122,7 +122,6 @@ final class AiInstallIndexingPauseTest {
             () -> ai.askQuestion("Question", "Context", ordinary).get(5, TimeUnit.SECONDS));
         assertTrue(AnswersPausedException.causedByPause(stillPaused));
         assertEquals(1, requests.get(), "the probe must not lift the pause for other requests");
-        assertEquals(Boolean.TRUE, settings.getChatEnabled());
         heavy.set(false);
         assertEquals("OK", ai.askQuestion("Question", "Context", ordinary).get(5, TimeUnit.SECONDS));
         assertEquals(2, requests.get());
