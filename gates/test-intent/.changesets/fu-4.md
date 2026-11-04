@@ -20,33 +20,33 @@ The builder leaves execution evidence and acceptance to the orchestrator, as ass
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/RetirementMaintenanceProcessTest.java"
       ],
       "class": "New",
-      "behaviour": "FU4-1 through FU4-4: retirement maintenance retains valid pending/claimed ROOT and exact obligations, attribution, retry history and receipts across fresh ROOT journals, reconciliation and reopen. Real timeboxed Tika extraction and Lucene publication complete once per file, including later queued work. The running upgraded application uses a real delayed process child and real maintenance service calls 60 seconds apart. Preservation checks retain changed-source, different-obligation, forced/live, recorded, retry, deletion, recovery and ordinary-path rules.",
+      "behaviour": "FUD1 through FUD4: retirement maintenance retains valid pending/claimed ROOT and exact obligations, attribution, retry history and receipts across fresh ROOT journals, reconciliation and reopen. Real timeboxed Tika extraction and Lucene publication complete once per file, including later queued work. The running upgraded application uses a real delayed process child and real maintenance service calls 60 seconds apart. Preservation checks retain changed-source, different-obligation, forced/live, recorded, retry, deletion, recovery and ordinary-path rules.",
       "sources": [
         {
           "kind": "owner-adopted-scenario",
           "task": "fu-4",
-          "scenario": "FU4-1",
+          "scenario": "FUD1",
           "quote": "Claimed ROOT work: an unindexed, unrecorded file with a valid ROOT owner stays owned across one and several retirement-maintenance admissions, each with the newly journalled ROOT receipt; its original extraction publishes once",
           "label": "agent-drafted, owner-adopted"
         },
         {
           "kind": "owner-adopted-scenario",
           "task": "fu-4",
-          "scenario": "FU4-2",
+          "scenario": "FUD2",
           "quote": "Ready pending work: the same admissions keep a valid ready PENDING unit, its attribution and retry history; after reopen and retirement reconciliation it is still claimable under its retained owner.",
           "label": "agent-drafted, owner-adopted"
         },
         {
           "kind": "owner-adopted-scenario",
           "task": "fu-4",
-          "scenario": "FU4-3",
+          "scenario": "FUD3",
           "quote": "Alternate retirement admission: the same preservation through enqueueRelease030LiveSyncEntries, including an existing exact receipt, which maintenance does not replace (nor its source witness).",
           "label": "agent-drafted, owner-adopted"
         },
         {
           "kind": "owner-adopted-scenario",
           "task": "fu-4",
-          "scenario": "FU4-4",
+          "scenario": "FUD4",
           "quote": "Batch progress: several successful sub-minute extractions keep one batch outstanding across several admissions (arranged so main re-admits before the batch writes); every file publishes with one extraction each, and a later batch progresses.",
           "label": "agent-drafted, owner-adopted"
         },
@@ -143,9 +143,9 @@ use the authentic `switching` upgrade fixture in both trials, allowing retiremen
 before the ordinary trial and retaining it through its real replay barrier in the retirement trial.
 No shared dev stack or existing service is used.
 
-Scenario mapping: FU4-1 -> claimedRootKeepsOriginalExtractionAcrossFreshReceipts; FU4-2 ->
-readyPendingRetainsHistoryAndCanBeClaimedAfterReopen; FU4-3 ->
-alternateMaintenanceRetainsRootAndExactReceiptWitness; FU4-4 ->
+Scenario mapping: FUD1 -> claimedRootKeepsOriginalExtractionAcrossFreshReceipts; FUD2 ->
+readyPendingRetainsHistoryAndCanBeClaimedAfterReopen; FUD3 ->
+alternateMaintenanceRetainsRootAndExactReceiptWitness; FUD4 ->
 outstandingBatchPublishesOnceAndLaterBatchProgresses. Each compares stable queue fields rather
 than last_updated. Legacy ROOTs without saved source identities exercise the ordinary metadata
 fallback only after full receipt/claim authority validation; changed bytes still cross the real
