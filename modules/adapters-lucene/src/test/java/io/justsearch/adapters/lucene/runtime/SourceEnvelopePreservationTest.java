@@ -106,10 +106,19 @@ final class SourceEnvelopePreservationTest extends LuceneExecutorTestBase {
     var known = (java.util.Optional<?>) assertDoesNotThrow(() -> decode.invoke(null, VALUES));
     assertTrue(known.isPresent());
     assertEquals("KNOWN", type.getMethod("storageStatus").invoke(known.orElseThrow()).toString());
+    var originUnknown = new HashMap<>(VALUES);
+    originUnknown.remove("origin_id");
+    var observed = (java.util.Optional<?>) assertDoesNotThrow(() -> decode.invoke(null, originUnknown));
+    assertTrue(observed.isPresent(), "versioned envelopes without an origin are distinct from legacy");
+    assertNull(type.getMethod("originId").invoke(observed.orElseThrow()));
+    assertEquals("KNOWN", type.getMethod("storageStatus").invoke(observed.orElseThrow()).toString());
     var malformed = new ArrayList<Map<String, Object>>();
     malformed.add(Map.of());
     for (String name : ENVELOPE) {
-      var missing = new HashMap<>(VALUES); missing.remove(name); malformed.add(missing);
+      // A versioned envelope may omit origin_id for admissions without a durable declaration.
+      if (!name.equals("origin_id")) {
+        var missing = new HashMap<>(VALUES); missing.remove(name); malformed.add(missing);
+      }
       var invalid = new HashMap<>(VALUES); invalid.put(name, "malformed"); malformed.add(invalid);
     }
     for (var fields : malformed) {

@@ -515,6 +515,16 @@ public final class IndexingDocumentOps {
       String parentDocUid,
       boolean chunkSpladeEnabled,
       ChunkDocumentWriter.ChunkPlan chunkPlan) {
+    return indexDeclaredChunks(filePath, extraction, indexingCoordinator, parentMetadata, collection,
+        parentDocUid, chunkSpladeEnabled, chunkPlan, Map.of());
+  }
+
+  /** Publishes each chunk with its own copy of the parent's admission/storage evidence. */
+  public static int indexDeclaredChunks(
+      Path filePath, ExtractionResult extraction, IndexingCoordinator indexingCoordinator,
+      ParentIndexMetadata parentMetadata, String collection, String parentDocUid,
+      boolean chunkSpladeEnabled, ChunkDocumentWriter.ChunkPlan chunkPlan,
+      Map<String, Object> envelope) {
     String content = extraction.content();
     String parentDocId = PathNormalizer.normalizeKey(filePath);
     ChunkDocumentWriter.ParentChunkMetadata chunkMetadata = null;
@@ -523,7 +533,8 @@ public final class IndexingDocumentOps {
           parentMetadata != null
               ? parentMetadata
               : deriveParentMetadata(filePath, extraction, null, null);
-      chunkMetadata = metadata.toChunkMetadata(collection, parentDocUid);
+      chunkMetadata = new ChunkDocumentWriter.ParentChunkMetadata(metadata.mime(), metadata.mimeBase(),
+          metadata.fileKind(), metadata.language(), metadata.parentTokenCount(), collection, parentDocUid, envelope);
     }
     return ChunkDocumentWriter.replaceDeclaredChunks(
         indexingCoordinator, parentDocId, content, chunkMetadata, chunkPlan, chunkSpladeEnabled);

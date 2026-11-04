@@ -271,7 +271,7 @@ public final class JobBatchExtractor {
         batchStats.recordSkipped();
         return null;
       }
-      envelope = admission.envelope();
+      envelope = admission.envelope().withOrigin(jobQueue.sourceOriginId(claim).orElse(null));
       sourceRealPath = filePath.toRealPath();
       String docUid;
       DocumentIdentityStore identityStore = null;

@@ -27,6 +27,12 @@ record RootIdentity(Path realPath, StableFileIdentity stableFileIdentity) {
     }
   }
 
+  static StorageObservationSnapshot storageSnapshot() {
+    return PlatformPaths.isLinux()
+        ? StorageObservationSnapshot.linux(StorageObservationSnapshot.systemEvidence())
+        : StorageObservationSnapshot.notObserved();
+  }
+
   /** Captures an immutable registration witness without retaining a native resource. */
   static RootIdentity capture(Path root) throws IOException {
     Path normalized = normalize(root);

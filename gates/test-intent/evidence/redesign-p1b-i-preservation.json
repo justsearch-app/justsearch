@@ -1,0 +1,142 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
+  },
+  "createdAt": "2026-11-04T13:14:25.714Z",
+  "revision": "3e1db6d230de383e993b116d30eba8be0d2f7700",
+  "tree": "b34346b85984c870fddef5a614250c2b87f31076",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": "openjdk version \"25.0.4.1\" 2026-08-18 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "./gradlew :modules:adapters-lucene:test --tests \"io.justsearch.adapters.lucene.runtime.SourceEnvelopePreservationTest.catalogKeepsEnvelopeThroughEnrichmentAndMetadataPatches\" --tests \"io.justsearch.adapters.lucene.runtime.SourceEnvelopePreservationTest.envelopeAdditionsUseBothExistingParityCertificationPaths\" --tests \"io.justsearch.adapters.lucene.runtime.SourceEnvelopePreservationTest.populatedLegacyIndexOpensAndStampsNewFingerprintOnlyAfterSuccessfulCommit\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 2907
+    },
+    {
+      "command": "./gradlew :modules:worker-services:test --tests \"io.justsearch.indexerworker.rag.ChunkDocumentWriterTest.supplementaryChunksAreExactAndPendingAfterFreshWriteRegenerationAndReopen\" --tests \"io.justsearch.indexerworker.rag.ChunkDocumentWriterTest.canonicalZeroChunkDeclarationsQualifyFreshAndReopenedLibraries\" --tests \"io.justsearch.indexerworker.rag.ChunkDocumentWriterTest.invalidPlanIsRefusedBeforeParentAndLexicalPublication\" --tests \"io.justsearch.indexerworker.loop.SourceWitnessCertificationTest.unmodifiedShortcutReadsContentOnlyOnce\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 4459
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/SourceEnvelopePreservationTest.java#catalogKeepsEnvelopeThroughEnrichmentAndMetadataPatches",
+      "file": "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/SourceEnvelopePreservationTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:cb157606011e5a4173027d4f938ccc261142f3b129cca0a418e1f00d5e81fad2",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "catalogKeepsEnvelopeThroughEnrichmentAndMetadataPatches()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/SourceEnvelopePreservationTest.java#envelopeAdditionsUseBothExistingParityCertificationPaths",
+      "file": "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/SourceEnvelopePreservationTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:cb157606011e5a4173027d4f938ccc261142f3b129cca0a418e1f00d5e81fad2",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "envelopeAdditionsUseBothExistingParityCertificationPaths()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/SourceEnvelopePreservationTest.java#populatedLegacyIndexOpensAndStampsNewFingerprintOnlyAfterSuccessfulCommit",
+      "file": "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/SourceEnvelopePreservationTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:cb157606011e5a4173027d4f938ccc261142f3b129cca0a418e1f00d5e81fad2",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "populatedLegacyIndexOpensAndStampsNewFingerprintOnlyAfterSuccessfulCommit()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/rag/ChunkDocumentWriterTest.java#supplementaryChunksAreExactAndPendingAfterFreshWriteRegenerationAndReopen",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/rag/ChunkDocumentWriterTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:13ac22aa45ef3d5fb5ff0354eb82260f23fd131144e050340963dda01f2d6a39",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "supplementaryChunksAreExactAndPendingAfterFreshWriteRegenerationAndReopen()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/rag/ChunkDocumentWriterTest.java#canonicalZeroChunkDeclarationsQualifyFreshAndReopenedLibraries",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/rag/ChunkDocumentWriterTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:13ac22aa45ef3d5fb5ff0354eb82260f23fd131144e050340963dda01f2d6a39",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "canonicalZeroChunkDeclarationsQualifyFreshAndReopenedLibraries()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/rag/ChunkDocumentWriterTest.java#invalidPlanIsRefusedBeforeParentAndLexicalPublication",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/rag/ChunkDocumentWriterTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:13ac22aa45ef3d5fb5ff0354eb82260f23fd131144e050340963dda01f2d6a39",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "invalidPlanIsRefusedBeforeParentAndLexicalPublication()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/SourceWitnessCertificationTest.java#unmodifiedShortcutReadsContentOnlyOnce",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/SourceWitnessCertificationTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:4b72b252331709316b231a1c35d10e12b2e5a6cd5ab1e616b28e4c58a4cfc186",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "unmodifiedShortcutReadsContentOnlyOnce()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:daa86e15c3a44dd1ac2d5b3834f3a232dba046ba79bedfd66c3be24d27425518"
+}

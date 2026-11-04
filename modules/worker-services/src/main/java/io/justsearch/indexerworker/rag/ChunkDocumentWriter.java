@@ -43,7 +43,17 @@ public final class ChunkDocumentWriter {
       String language,
       Long parentTokenCount,
       String collection,
-      String parentDocUid) {}
+      String parentDocUid,
+      Map<String, Object> envelope) {
+    public ParentChunkMetadata {
+      envelope = envelope == null ? Map.of() : Map.copyOf(envelope);
+    }
+
+    public ParentChunkMetadata(String mime, String mimeBase, String fileKind, String language,
+        Long parentTokenCount, String collection, String parentDocUid) {
+      this(mime, mimeBase, fileKind, language, parentTokenCount, collection, parentDocUid, Map.of());
+    }
+  }
 
   /**
    * Regenerates chunk docs for a parent doc by loading metadata from the existing parent document.
@@ -84,6 +94,18 @@ public final class ChunkDocumentWriter {
     String collection = documentFieldOps.getDocumentField(parentDocId, SchemaFields.COLLECTION);
     String parentDocUid = documentFieldOps.getDocumentField(parentDocId, SchemaFields.DOC_UID);
 
+    Map<String, Object> envelope;
+    try {
+      envelope = new HashMap<>(documentFieldOps.getDocumentFieldsBatchOrThrow(List.of(parentDocId),
+          java.util.Set.of(SchemaFields.ORIGIN_ID, SchemaFields.STORAGE_STATUS,
+              SchemaFields.STORAGE_MOUNT, SchemaFields.STORAGE_KEY, SchemaFields.ENVELOPE_VERSION))
+          .getOrDefault(parentDocId, Map.of()));
+    } catch (java.io.IOException unreadable) {
+      throw new io.justsearch.adapters.lucene.runtime.IndexRuntimeIOException(
+          io.justsearch.adapters.lucene.runtime.IndexRuntimeIOException.Reason.DISK_IO,
+          "Cannot read parent provenance before chunk replacement", unreadable);
+    }
+
     boolean isMarkdown = "markdown".equalsIgnoreCase(fileKind);
     String preview = LanguageUtils.contentPreview(content, CONTENT_PREVIEW_MAX_CHARS, isMarkdown);
     String language = LanguageUtils.resolveLanguage(preview);
@@ -94,7 +116,7 @@ public final class ChunkDocumentWriter {
         parentDocId,
         content,
         new ParentChunkMetadata(
-            mime, mimeBase, fileKind, language, parentTokenCount, collection, parentDocUid),
+            mime, mimeBase, fileKind, language, parentTokenCount, collection, parentDocUid, envelope),
         chunkSpladeEnabled);
   }
 
@@ -303,6 +325,8 @@ public final class ChunkDocumentWriter {
           fields.put(SchemaFields.COLLECTION, meta.collection);
         }
       }
+
+      fields.putAll(meta.envelope());
 
       fields.put(SchemaFields.INDEXED_AT, System.currentTimeMillis());
 
