@@ -60,6 +60,30 @@ def quality_group() -> None:
     """Search quality: prepared real-engine checks, baselines and comparisons."""
 
 
+@quality_group.group('corpus')
+def corpus_group():
+    """Fetch and verify the checksum-pinned public real-use corpus."""
+
+
+@corpus_group.command('fetch')
+@click.argument('recipe', default='real-use')
+@_never_crash
+def cmd_corpus_fetch(recipe):
+    from ..quality import corpus
+    click.echo(json.dumps(corpus.fetch(corpus.load_recipe(recipe)), ensure_ascii=False))
+
+
+@corpus_group.command('materialize')
+@click.argument('recipe', default='real-use')
+@click.option('--out', type=click.Path(file_okay=False, path_type=Path))
+@_never_crash
+def cmd_corpus_materialize(recipe, out):
+    from ..quality import corpus
+    r = corpus.load_recipe(recipe)
+    root = corpus.materialize(r, out)
+    click.echo(json.dumps({'root': str(root), **corpus.summary(r)}, ensure_ascii=False))
+
+
 @quality_group.command("known-answers")
 @click.argument("collection")
 @click.pass_context

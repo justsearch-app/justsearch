@@ -193,11 +193,13 @@ class Collection:
     queries: dict[str, QueryText]
     judgments: dict[str, dict[str, int]]
     documents: dict[str, str]  # doc_id -> relpath
-    content: dict[str, str]  # doc_id -> sha256 of document_text(...) (exactly the documents)
+    content: dict[str, str]  # doc_id -> sha256 of exact materialized source bytes
     metadata: dict[str, Any] = field(default_factory=dict)
     version: str = ""
 
     def __post_init__(self) -> None:
+        if self.metadata.get("layout", "opaque") not in ("opaque", "as-is"):
+            raise ValueError("unknown collection layout")
         self.documents = {d: canonical_relpath(r) for d, r in self.documents.items()}
         by_path: dict[str, str] = {}
         for doc_id, rel in self.documents.items():
@@ -247,6 +249,10 @@ class Collection:
             "judgments_sha256": self.judgments_sha256,
             "manifest_sha256": self.manifest_sha256,
             "content_sha256": self.content_sha256,
+            **({"layout": self.metadata["layout"]}
+               if self.metadata.get("layout", "opaque") != "opaque" else {}),
+            **({"witness_formats": self.metadata["witness_formats"]}
+               if self.metadata.get("witness_formats") is not None else {}),
         }))
 
     def counts(self) -> dict[str, Any]:
