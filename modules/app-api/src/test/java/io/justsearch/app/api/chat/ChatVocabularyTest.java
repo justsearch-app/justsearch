@@ -37,7 +37,7 @@ final class ChatVocabularyTest {
         "DEVICE_LOST_LIMIT"), names(FailedCode.class));
     assertEquals(List.of("COLD_START", "BOOT_ORDER", "RECONFIGURE", "MODEL_SWITCH", "VDU",
         "RECOVERY", "RELOAD", "STEP_DOWN"), names(LoadingCause.class));
-    assertEquals(List.of("GPU_BUSY", "GAME_MODE", "RELOAD_BACKOFF", "LOADING", "BUSY", "OFF",
+    assertEquals(List.of("INDEXING", "GPU_BUSY", "GAME_MODE", "RELOAD_BACKOFF", "LOADING", "BUSY", "OFF",
         "FAILED", "REFUSED", "ENGINE_STOPPING", "DEVICE_RECOVERING", "SELF_TEST", "EXTERNAL_SERVER"),
         names(RefusalReason.class));
     assertEquals(List.of("HUMAN_CHAT", "AGENT_CHAT", "ASSIST", "BACKGROUND", "AUX"),

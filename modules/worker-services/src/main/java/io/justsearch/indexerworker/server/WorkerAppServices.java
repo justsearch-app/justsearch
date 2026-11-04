@@ -45,6 +45,8 @@ public interface WorkerAppServices extends Closeable {
 
   String indexingLoopState();
 
+  default boolean heavyIndexing() { return false; }
+
   /** This composed service owns a started writer loop; deferred/read-only services return false. */
   boolean recordedWriterReady();
 

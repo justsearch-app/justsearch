@@ -81,6 +81,8 @@ public interface OnlineAiRuntimeIntrospection {
    */
   RuntimeInfo runtimeInfo();
 
+  default boolean answersPausedWhileIndexing() { return false; }
+
   /**
    * Returns the launched context-window record, or {@code null} when this process launched no
    * server (nothing started yet, or an adopted external instance whose window it did not choose).

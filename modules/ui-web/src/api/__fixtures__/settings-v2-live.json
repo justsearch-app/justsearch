@@ -38,5 +38,6 @@
     "freeBytes" : 10,
     "footprintBytes" : 20
   },
-  "rerankerEnabled" : null
+  "rerankerEnabled" : null,
+  "pauseAnswersWhileIndexing" : null
 }

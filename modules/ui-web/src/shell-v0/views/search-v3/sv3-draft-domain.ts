@@ -159,6 +159,30 @@ export class Sv3DraftDomain {
 
   private humanRetryTimer: ReturnType<typeof setTimeout> | null = null;
 
+  // Only this live window owns automatic continuation; recovered session copies never send.
+  private indexingWaitTask: HumanTask | null = null;
+  private indexingWaitSnapshot: AiState['inference'] = null;
+
+  waitingForIndexing(task: HumanTask): boolean {
+    return this.indexingWaitTask === task && this.humanOwned(task);
+  }
+
+  onAnswerStatus(snapshot: AiState): void {
+    const task = this.indexingWaitTask;
+    if (task === null) return;
+    if (snapshot.chatDisabledBySpec) {
+      this.revokeHumanTask();
+      this.saveRecovery();
+      return;
+    }
+    // A new explicit Engine observation releases the wait. Contact ticks and stale snapshots
+    // cannot retry a refusal, and removing ownership before issuance makes repeated polls inert.
+    if (!snapshot.snapshotLive || snapshot.inference === this.indexingWaitSnapshot
+      || snapshot.inference?.answersPausedWhileIndexing !== false) return;
+    this.indexingWaitTask = null;
+    void this.continueHumanTask(false);
+  }
+
   assigningHumanDraft = false;
 
   private draftReviewValue = false;
@@ -494,6 +518,7 @@ export class Sv3DraftDomain {
 
   /** Revocation is latched before any callback can arrive. Leaving never sends Stop. */
   revokeHumanTask(abandonInitial = false): void {
+    this.indexingWaitTask = null;
     this.humanEpoch += 1;
     if (this.humanTask !== null) {
       this.humanTask.revoked = true;
@@ -608,6 +633,7 @@ export class Sv3DraftDomain {
     if (task === null || this.humanLoad !== null || this.host.streaming() || !this.humanOwned(task)
       || task.saved.delivery !== 'unaccepted' || task.refusal === null
       || (force ? task.refusal.forceAllowed !== true : Date.now() < task.retryAt)) return;
+    this.indexingWaitTask = null;
     const operation = new AbortController();
     this.humanLoadValue = operation;
     this.host.requestUpdate();
@@ -626,9 +652,11 @@ export class Sv3DraftDomain {
       if (!this.humanOwned(task) || operation.signal.aborted) return;
       const reason = this.humanUnavailable(task.saved.shape, force);
       const session = task.saved.target === null ? null : this.host.session(task.saved.target);
+      const continuingTurnId = task.refusal?.reason === 'INDEXING' ? task.saved.dispatchTurnId : undefined;
       const context = task.saved.shape === SV3_MODEL_SHAPE_ID || session === null ? []
-        : session.history === null && task.saved.place === null && session.turns.length === 0 ? []
-        : this.contextDomain.followUpContextOf(session.id);
+        : session.history === null && task.saved.place === null && session.turns.every(turn =>
+          continuingTurnId !== undefined && turn.dispatchTurnId === continuingTurnId && !turn.savedOutcome) ? []
+        : this.contextDomain.followUpContextOf(session.id, continuingTurnId);
       if (reason || (task.saved.target !== null && this.contextDomain.hasPendingWrite(task.saved.target))
         || JSON.stringify(context) !== JSON.stringify(task.context)) {
         task.revoked = true;
@@ -647,7 +675,13 @@ export class Sv3DraftDomain {
 
   scheduleHumanRetry(task: HumanTask): void {
     if (this.humanRetryTimer !== null) clearTimeout(this.humanRetryTimer);
-    // A timer only refreshes the affordance. It never issues a request.
+    if (task.refusal?.reason === 'INDEXING' && this.humanOwned(task)) {
+      this.indexingWaitTask = task;
+      this.indexingWaitSnapshot = this.host.aiSnapshot()?.inference ?? null;
+      this.humanRetryTimer = null;
+      return;
+    }
+    // Other refusals require manual retry. A timer only refreshes their affordance.
     this.humanRetryTimer = setTimeout(() => { this.humanRetryTimer = null; this.host.requestUpdate(); }, Math.min(2147483647, Math.max(0, task.retryAt - Date.now())));
   }
 

@@ -554,6 +554,18 @@ public final class ConversationEngine {
     // the context with the conversation history. EPHEMERAL shapes still start empty.
     String sessionId = sessionIdFor(shape, body);
     List<Map<String, Object>> initialMessages = new ArrayList<>();
+    String recordId = persistenceKey(shape, body);
+    // An INDEXING refusal may arrive after the question was saved. Its continuation retains
+    // the turn id: reuse that unanswered question in the record, but inject it only once here.
+    Map<String, Object> pendingQuestion = null;
+    if (recordId != null && conversationStore != null && body.get(TURN_ID_KEY) instanceof String turnId) {
+      var history = conversationStore.loadHistory(recordId);
+      if (history.stream().noneMatch(msg -> "assistant".equals(msg.get("role")) && turnId.equals(msg.get(TURN_ID_KEY)))) {
+        pendingQuestion = history.stream()
+            .filter(msg -> "user".equals(msg.get("role")) && turnId.equals(msg.get(TURN_ID_KEY)))
+            .findFirst().orElse(null);
+      }
+    }
     if (sessionId != null && conversationStore != null) {
       // Tempdoc 610 Phase C — seed the prompt from the EFFECTIVE context (the
       // history trimmed to the session's context floor, if set), NOT the full
@@ -561,6 +573,10 @@ public final class ConversationEngine {
       // display path (/history) keeps loadHistory, so the transcript still
       // shows everything above the floor as out-of-context.
       initialMessages.addAll(conversationStore.loadEffectiveContext(sessionId));
+      if (pendingQuestion != null) {
+        Object turnId = pendingQuestion.get(TURN_ID_KEY);
+        initialMessages.removeIf(msg -> "user".equals(msg.get("role")) && turnId.equals(msg.get(TURN_ID_KEY)));
+      }
     }
     // Tempdoc 561 P-A/P-B — the canonical-record WRITE key, decoupled from the history-LOAD key
     // (sessionId). PERSISTENT shapes already record under sessionId below (and load their history
@@ -658,6 +674,12 @@ public final class ConversationEngine {
             && injectorRun.forwarded.stream().noneMatch(prior -> prior == msg)) prompt = msg;
       }
       for (Map<String, Object> msg : injectorRun.messages) {
+        if (msg == prompt && pendingQuestion != null) {
+          if (!Objects.equals(msg.get("content"), pendingQuestion.get("content"))) {
+            throw new IllegalArgumentException("Turn id already belongs to a different question");
+          }
+          continue;
+        }
         conversationStore.appendMessage(sessionId, shape.id().value(), msg == prompt ? correlated(body, msg) : msg);
       }
     } else if (threadId != null && conversationStore != null) {
@@ -665,7 +687,11 @@ public final class ConversationEngine {
       // context-augmented injector message — RAGContext injects "Documents:\n<retrieved>\n\nQuestion:
       // <q>" for the LLM, which must never become the thread's user bubble.
       conversationStore.createSession(threadId, shape.id().value());
-      conversationStore.appendMessage(threadId, shape.id().value(), threadUserMessage(body));
+      var question = threadUserMessage(body);
+      if (pendingQuestion != null && !Objects.equals(question.get("content"), pendingQuestion.get("content"))) {
+        throw new IllegalArgumentException("Turn id already belongs to a different question");
+      }
+      if (pendingQuestion == null) conversationStore.appendMessage(threadId, shape.id().value(), question);
     }
 
     // Tempdoc 610 §I.2/§J — per-phase token attribution for the meter breakdown + inspector. The three
@@ -1069,6 +1095,9 @@ public final class ConversationEngine {
         throw new LlmStreamException(cancelled.getMessage(), cancelled.reasonCode(), fullText.toString(),
             reasoningBlocks.isEmpty() ? null : List.copyOf(reasoningBlocks));
       }
+      if (io.justsearch.app.api.chat.AnswersPausedException.causedByPause(err)) {
+        throw new io.justsearch.app.api.chat.AnswersPausedException();
+      }
       throw new LlmStreamException(err.getMessage() == null ? err.toString() : err.getMessage(), "LLM_ERROR",
           fullText.toString(), null);
     }
@@ -1383,6 +1412,10 @@ public final class ConversationEngine {
   }
 
   static SseEvent refusalEvent(Throwable failure) {
+    if (io.justsearch.app.api.chat.AnswersPausedException.causedByPause(failure)) {
+      return new SseEvent("error", Map.of("error", io.justsearch.app.api.chat.AnswersPausedException.MESSAGE,
+          "errorCode", "CHAT_UNAVAILABLE", "reason", "INDEXING", "forceAllowed", false));
+    }
     RuntimeException refused = io.justsearch.app.services.worker.EngineRefusals.find(failure);
     String code;
     int retryAfter;

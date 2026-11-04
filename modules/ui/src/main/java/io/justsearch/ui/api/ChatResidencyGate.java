@@ -150,7 +150,7 @@ public final class ChatResidencyGate {
    */
   public static ApiErrorCode codeFor(RefusalReason reason) {
     return switch (reason) {
-      case GPU_BUSY, GAME_MODE, RELOAD_BACKOFF, SELF_TEST, BUSY, DEVICE_RECOVERING, EXTERNAL_SERVER ->
+      case INDEXING, GPU_BUSY, GAME_MODE, RELOAD_BACKOFF, SELF_TEST, BUSY, DEVICE_RECOVERING, EXTERNAL_SERVER ->
           ApiErrorCode.CHAT_UNAVAILABLE;
       case LOADING -> ApiErrorCode.AI_STARTING;
       case OFF, FAILED, REFUSED -> ApiErrorCode.AI_OFFLINE;
@@ -161,6 +161,7 @@ public final class ChatResidencyGate {
   /** The words a person reads for a refusal. */
   static String messageFor(RefusalReason reason) {
     return switch (reason) {
+      case INDEXING -> io.justsearch.app.api.chat.AnswersPausedException.MESSAGE;
       case GPU_BUSY -> "Chat is paused: another application needs the graphics memory.";
       case GAME_MODE -> "Chat is paused while a game is running.";
       case RELOAD_BACKOFF -> "Chat was paused a moment ago to free graphics memory; it can load"

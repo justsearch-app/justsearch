@@ -210,6 +210,9 @@ final class AgentLlmCaller {
       String text = result.textContent();
       return text != null && !text.isBlank() ? text : null;
     } catch (Exception e) {
+      if (io.justsearch.app.api.chat.AnswersPausedException.causedByPause(e)) {
+        throw new io.justsearch.app.api.chat.AnswersPausedException();
+      }
       LOG.warn("Finalize LLM call failed", e);
       return null;
     }
@@ -266,6 +269,9 @@ final class AgentLlmCaller {
       } catch (java.util.concurrent.CancellationException cancelled) {
         throw cancelled;
       } catch (RuntimeException e) {
+        if (io.justsearch.app.api.chat.AnswersPausedException.causedByPause(e)) {
+          throw new io.justsearch.app.api.chat.AnswersPausedException();
+        }
         llmAttempt++;
         if (llmAttempt > llmDecision.maxRetries()) {
           agentTelemetry.recordRetryExhausted(AgentErrorCode.LLM_TRANSIENT);
@@ -477,6 +483,9 @@ final class AgentLlmCaller {
       }
 
       if (errorHolder.getNow(null) != null) {
+        if (io.justsearch.app.api.chat.AnswersPausedException.causedByPause(errorHolder.getNow(null))) {
+          throw new io.justsearch.app.api.chat.AnswersPausedException();
+        }
         if (errorHolder.getNow(null) instanceof java.util.concurrent.CancellationException cancelled) throw cancelled;
         throw new RuntimeException("LLM call failed", errorHolder.getNow(null));
       }
@@ -555,6 +564,9 @@ final class AgentLlmCaller {
     } catch (RuntimeException e) {
       chatSpan.recordException(e);
       chatSpan.setStatus(StatusCode.ERROR, "llm-call-failed");
+      if (io.justsearch.app.api.chat.AnswersPausedException.causedByPause(e)) {
+        throw new io.justsearch.app.api.chat.AnswersPausedException();
+      }
       throw e;
     } finally {
       long durationMs = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - chatStartNanos);

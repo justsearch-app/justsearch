@@ -29,6 +29,7 @@ export interface SettingsV2 {
     modelPath?: string | null;
     serverExecutable?: string | null;
   } | null;
+  pauseAnswersWhileIndexing?: boolean | null;
   operationKey?: string | null;
   rerankerEnabled?: boolean | null;
   rerankerModelPath?: string | null;
@@ -92,6 +93,7 @@ export const settingsV2Schema = z.strictObject({
     "modelPath": z.string().nullable().optional(),
     "serverExecutable": z.string().nullable().optional(),
   }).nullable().optional(),
+  "pauseAnswersWhileIndexing": z.boolean().nullable().optional(),
   "operationKey": z.string().nullable().optional(),
   "rerankerEnabled": z.boolean().nullable().optional(),
   "rerankerModelPath": z.string().nullable().optional(),

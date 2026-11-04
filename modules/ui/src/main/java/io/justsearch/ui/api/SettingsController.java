@@ -242,7 +242,7 @@ public class SettingsController {
     return new SettingsV2(settings.ui(), settings.llm(), settings.indexPaths(),
         settings.settingsMode(), settings.witness(), settings.operationKey(), settings.state(),
         settings.apiPort(), settings.restartScheduled(), settings.rerankerModelPath(),
-        settings.citationScorerModelPath(), null, settings.rerankerEnabled(), settings.rerankerSwitchIntent());
+        settings.citationScorerModelPath(), null, settings.rerankerEnabled(), settings.rerankerSwitchIntent(), settings.pauseAnswersWhileIndexing());
   }
 
   private static CompositionV2 composition(Object value) {

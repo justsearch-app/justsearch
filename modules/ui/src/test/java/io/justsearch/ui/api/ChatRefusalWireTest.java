@@ -26,7 +26,7 @@ final class ChatRefusalWireTest {
       var refusal = new ChatRefusal(reason, Optional.of(Duration.ofSeconds(5)), true);
       Map<String, Object> body = ChatResidencyGate.refusalBody(refusal, null, null);
       String expected = switch (reason.name()) {
-        case "GPU_BUSY", "GAME_MODE", "RELOAD_BACKOFF", "SELF_TEST", "BUSY", "DEVICE_RECOVERING", "EXTERNAL_SERVER" ->
+        case "INDEXING", "GPU_BUSY", "GAME_MODE", "RELOAD_BACKOFF", "SELF_TEST", "BUSY", "DEVICE_RECOVERING", "EXTERNAL_SERVER" ->
             "CHAT_UNAVAILABLE";
         case "LOADING" -> "AI_STARTING";
         case "OFF", "FAILED", "REFUSED" -> "AI_OFFLINE";

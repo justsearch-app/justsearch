@@ -218,6 +218,11 @@ public final class HierarchicalShapeRunner implements ShapeRunner {
                 + (excerpt.length() > 200 ? excerpt.substring(0, 200) + "..." : excerpt));
         failedSections++;
       } catch (Exception e) {
+        SseEvent refusal = ConversationEngine.refusalEvent(e);
+        if (refusal != null) {
+          sink.accept(refusal);
+          return;
+        }
         LOG.warn("Section {} summarization failed", i + 1, e);
         sectionSummaries.add("[Section " + (i + 1) + " could not be summarized]");
         failedSections++;
@@ -287,6 +292,11 @@ public final class HierarchicalShapeRunner implements ShapeRunner {
       Throwable error = failure.get();
       if (error instanceof java.util.concurrent.CancellationException cancelled) throw cancelled;
       if (error != null) {
+        SseEvent refusal = ConversationEngine.refusalEvent(error);
+        if (refusal != null) {
+          sink.accept(refusal);
+          return;
+        }
         LOG.error("Hierarchical synthesis failed", error);
         emitError(sink, error.getMessage() == null ? "Synthesis failed" : error.getMessage(), "SYNTHESIS_FAILED");
         return;

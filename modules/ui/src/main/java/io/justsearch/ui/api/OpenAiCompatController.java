@@ -276,6 +276,11 @@ public final class OpenAiCompatController implements AutoCloseable {
           ? GenerationTracker.Kind.GENERATE : GenerationTracker.Kind.AUX;
       try {
         exchange.lease(admission.admit(kind, exchange.work));
+      } catch (io.justsearch.app.api.chat.AnswersPausedException paused) {
+        ctx.status(503).json(ChatResidencyGate.refusalBody(
+            new io.justsearch.app.api.chat.ChatRefusal(io.justsearch.app.api.chat.RefusalReason.INDEXING,
+                java.util.Optional.empty(), false), null, null));
+        return;
       } catch (IllegalStateException unavailable) {
         respondOffline(ctx, "llama-server unavailable: " + unavailable.getMessage());
         return;

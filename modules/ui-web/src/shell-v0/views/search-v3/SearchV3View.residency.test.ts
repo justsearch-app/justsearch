@@ -17,6 +17,10 @@ let http: ReturnType<typeof vi.fn>;
 const dispatches = () => http.mock.calls.filter(c => String(c[0]).includes('/api/chat/dispatch'));
 const loads = () => http.mock.calls.filter(c => String(c[0]).includes('/api/chat/load-anyway'));
 const body = (i = 0) => JSON.parse(dispatches()[i]![1].body as string) as Record<string, unknown>;
+function indexingState(paused: boolean): void {
+  __feedForTest({ inference: { mode: 'online', available: true, answersPausedWhileIndexing: paused } });
+  __feedContactForTest();
+}
 function state(docs = 42, unloaded = false, enabled = true): void {
   __feedForTest({ inference: { mode: 'online', available: true } as never,
     status: { inference: { chatEnabledSpec: enabled }, worker: { core: { indexedDocuments: docs } },
@@ -28,7 +32,7 @@ function state(docs = 42, unloaded = false, enabled = true): void {
 const refusal = (forceAllowed = true, reason = 'GPU_BUSY', retryAfterMs?: number) => new Response(JSON.stringify({
   errorCode: 'CHAT_UNAVAILABLE', error: 'Chat is paused for another application.', reason, forceAllowed, retryAfterMs,
 }), { status: 503 });
-const done = () => new Response('event: content\ndata: {"text":"Answer"}\n\nevent: done\ndata: {}\n\n', { headers: { 'content-type': 'text/event-stream' } });
+const done = () => new Response('event: chunk\ndata: {"text":"Answer"}\n\nevent: done\ndata: {}\n\n', { headers: { 'content-type': 'text/event-stream' } });
 const passage = (selectionText: string) => ({ kind: 'text-range',
   address: { coords: 'canonical', docId: '/chosen.txt', startChar: 0, endChar: selectionText.length },
   selectionText, hostEntity: { kind: 'doc', id: '/chosen.txt' } } as const);
@@ -93,6 +97,127 @@ afterEach(() => {
   resetSearchState(); __resetAiStateForTest(); vi.unstubAllGlobals(); vi.restoreAllMocks();
 });
 describe('NR15 human admission and RR15 refusal recovery', () => {
+  it('automatically answers an indexing-paused question once after Engine resume across repeated polls and windows', async () => {
+    const other = await mount();
+    const el = await mount();
+    let finish!: (response: Response) => void;
+    http.mockImplementation(async (url: unknown) => String(url).includes('/dispatch')
+      ? dispatches().length === 1 ? new Response(JSON.stringify({ errorCode: 'CHAT_UNAVAILABLE', reason: 'INDEXING',
+        error: 'Answers paused while indexing', forceAllowed: false }), { status: 503 }) : new Promise<Response>(resolve => { finish = resolve; })
+      : new Response('{}'));
+    await send(el, 'waiting question');
+    expect(dispatches()).toHaveLength(1);
+    expect(el.shadowRoot!.textContent).toContain('Answers paused while indexing');
+    indexingState(true); await settle(el);
+    expect(dispatches()).toHaveLength(1);
+    indexingState(false); indexingState(false); await settle(el); await settle(other);
+    expect(dispatches()).toHaveLength(2);
+    expect(body(1).question).toBe('waiting question');
+    indexingState(true); indexingState(false); await settle(el);
+    expect(dispatches()).toHaveLength(2);
+    finish(done()); await settle(el);
+    expect(el.shadowRoot!.querySelector('jf-sv3-main')!.shadowRoot!
+      .querySelector<HTMLElement & { text: string }>('[data-testid=sv3-turn-markdown]')?.text).toBe('Answer');
+    indexingState(true); indexingState(false); await settle(el);
+    expect(dispatches()).toHaveLength(2);
+  });
+
+  it.each(['core.rag-ask', 'core.free-chat'] as const)(
+    'automatically continues a 200 SSE indexing refusal for %s with the same turn and preserves a newer draft', async shape => {
+      const el = await mount(shape);
+      let refuse!: (response: Response) => void;
+      let answer!: (response: Response) => void;
+      let answered = false;
+      http.mockImplementation(async (url: unknown) => {
+        const href = String(url);
+        if (href.includes('/dispatch')) return new Promise<Response>(resolve => {
+          if (dispatches().length === 1) refuse = resolve; else answer = resolve;
+        });
+        if (!href.includes('/history') && !href.includes('/api/thread/')) return new Response('{}');
+        const messages = [{ id: '11111111-2222-4333-8444-555555555551', role: 'user',
+          content: 'saved waiting question', shapeId: shape, turnId: body().turnId },
+        ...(answered ? [{ id: '11111111-2222-4333-8444-555555555552', role: 'assistant',
+          content: 'Answer', shapeId: shape, turnId: body().turnId }] : [])];
+        if (href.includes('/history')) return new Response(JSON.stringify({ sessionId: body().conversationId, messages }));
+        if (href.includes('/api/thread/')) return new Response(JSON.stringify({ conversationId: body().conversationId,
+          events: messages.map((m, i) => ({ id: m.id, occurredAt: `2026-11-04T00:00:0${i}Z`,
+            kind: m.role === 'user' ? 'USER_MESSAGE' : 'ASSISTANT_MESSAGE', content: m.content,
+            originator: m.role, attributes: { shapeId: shape, turnId: m.turnId } })) }));
+        return new Response('{}');
+      });
+      await send(el, 'saved waiting question');
+      refuse(new Response('event: error\ndata: ' + JSON.stringify({ errorCode: 'CHAT_UNAVAILABLE',
+        reason: 'INDEXING', error: 'Answers paused while indexing', forceAllowed: false }) + '\n\n',
+      { status: 200, headers: { 'content-type': 'text/event-stream' } }));
+      await settle(el);
+      expect(el.shadowRoot!.textContent).toContain('Answers paused while indexing');
+      expect(el.shadowRoot!.textContent).toContain('Your question will send automatically when answers resume.');
+      const bytes = sessionStorage.getItem(`justsearch.draft.attachment.v1.search-v3.${shape}`);
+      expect(bytes).not.toBeNull();
+      expect(JSON.parse(bytes!).payload.task).toMatchObject({ delivery: 'unaccepted',
+        dispatchTurnId: body().turnId, raw: 'saved waiting question' });
+      // Read the saved question through the page's record-check interface while it waits.
+      el.shadowRoot!.querySelector('jf-sv3-main')!.dispatchEvent(new CustomEvent('sv3-record-check',
+        { bubbles: true, composed: true }));
+      await settle(el);
+      expect(el.shadowRoot!.querySelector('jf-sv3-main')!.shadowRoot!
+        .querySelectorAll('[data-testid=sv3-turn-question]')).toHaveLength(1);
+      indexingState(true); await settle(el);
+      expect(dispatches()).toHaveLength(1);
+      indexingState(false); indexingState(false); await settle(el);
+      expect(dispatches()).toHaveLength(2);
+      expect(body(1)).toMatchObject({ turnId: body().turnId, conversationId: body().conversationId,
+        [shape === 'core.free-chat' ? 'prompt' : 'question']: 'saved waiting question' });
+      await type(el, 'newer draft');
+      expect(field(el).value).toBe('newer draft');
+      indexingState(true); indexingState(false); await settle(el);
+      expect(dispatches()).toHaveLength(2);
+      answered = true; answer(done()); await settle(el);
+      const main = el.shadowRoot!.querySelector('jf-sv3-main')!.shadowRoot!;
+      expect(main.querySelector<HTMLElement & { text: string }>('[data-testid=sv3-turn-markdown]')?.text).toBe('Answer');
+      expect(main.querySelectorAll('[data-testid=sv3-turn-question]')).toHaveLength(1);
+      expect(field(el).value).toBe('newer draft');
+      indexingState(true); indexingState(false); await settle(el);
+      expect(dispatches()).toHaveLength(2);
+    });
+
+  it.each(['edit', 'cancel', 'discard', 'new', 'answers off'] as const)(
+    'cancels automatic indexing continuation on %s', async cancel => {
+      const el = await mount();
+      http.mockImplementation(async (url: unknown) => String(url).includes('/dispatch')
+        ? new Response(JSON.stringify({ errorCode: 'CHAT_UNAVAILABLE', reason: 'INDEXING',
+          error: 'Answers paused while indexing', forceAllowed: false }), { status: 503 }) : new Response('{}'));
+      await send(el, 'waiting question'); indexingState(true); await settle(el);
+      if (cancel === 'edit') await type(el, 'edited question');
+      else if (cancel === 'cancel') clickAction(el, 'sv3-residency-stop');
+      else if (cancel === 'discard') clickAction(el, 'sv3-residency-discard');
+      else if (cancel === 'new') el.shadowRoot!.querySelector('jf-sv3-sidebar')!.dispatchEvent(new CustomEvent('sv3-session-new', { bubbles: true, composed: true }));
+      else state(42, false, false);
+      await settle(el);
+      indexingState(false); await settle(el);
+      // Switching answers back on cannot resurrect an abandoned continuation.
+      state(); indexingState(false); await settle(el);
+      expect(dispatches()).toHaveLength(1);
+      if (cancel === 'answers off') expect(el.shadowRoot!.textContent).toContain('waiting question');
+    });
+
+  it('keeps an indexing-paused question and a newer draft across same-tab reload', async () => {
+    http.mockImplementation(async (url: unknown) => String(url).includes('/dispatch')
+      ? new Response(JSON.stringify({ errorCode: 'CHAT_UNAVAILABLE', reason: 'INDEXING',
+        error: 'Answers paused while indexing', forceAllowed: false }), { status: 503 })
+      : new Response('{}'));
+    const el = await mount(); await send(el, 'paused question');
+    expect(el.shadowRoot!.textContent).toContain('Answers paused while indexing');
+    expect(el.shadowRoot!.textContent).toContain('paused question');
+    expect(dispatches()).toHaveLength(1); expect(loads()).toHaveLength(0);
+    expect(action(el, 'sv3-residency-force')).toBeNull();
+    await type(el, 'newer draft'); el.remove();
+    const restored = await mount();
+    expect(field(restored).value).toBe('newer draft');
+    expect(restored.shadowRoot!.textContent).toContain('paused question');
+    expect(dispatches()).toHaveLength(1);
+  });
+
   it('marks explicit human Send and removes an unaccepted optimistic answer', async () => {
     const el = await mount(); await send(el, '  original A  ');
     expect(body().allowLoad).toBe(true);
@@ -220,7 +345,7 @@ describe('NR15 human admission and RR15 refusal recovery', () => {
   });
   it('EOF without a terminal remains unknown delivery and blocks a second submission', async () => {
     http.mockImplementation(async (url: unknown) => String(url).includes('/dispatch')
-      ? new Response('event: content\ndata: {"text":"partial"}\n\n', { headers: { 'content-type': 'text/event-stream' } }) : new Response('{}'));
+      ? new Response('event: chunk\ndata: {"text":"partial"}\n\n', { headers: { 'content-type': 'text/event-stream' } }) : new Response('{}'));
     const el = await mount(); await send(el, 'A'); await send(el, 'B');
     expect(dispatches()).toHaveLength(1); expect(field(el).value).toBe('B');
     expect(el.shadowRoot!.textContent).toContain('Delivery unknown');

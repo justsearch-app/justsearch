@@ -23,7 +23,8 @@ public record SettingsV2(
     CompositionV2 composition,
     Boolean rerankerEnabled,
     @com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL)
-    Boolean rerankerSwitchIntent
+    Boolean rerankerSwitchIntent,
+    Boolean pauseAnswersWhileIndexing
 ) {
   public SettingsV2 {
     // Do not replace nulls with defaults here.
@@ -90,6 +91,16 @@ public record SettingsV2(
       CompositionV2 composition, Boolean rerankerEnabled) {
     this(ui, llm, indexPaths, settingsMode, witness, operationKey, state, apiPort,
         restartScheduled, rerankerModelPath, citationScorerModelPath, composition, rerankerEnabled, null);
+  }
+
+  /** Compatibility for callers without the indexing pause policy. */
+  public SettingsV2(UiSettingsV2 ui, LlmSettingsV2 llm, List<String> indexPaths, String settingsMode,
+      SettingsWitness witness, String operationKey, String state, Integer apiPort,
+      Boolean restartScheduled, String rerankerModelPath, String citationScorerModelPath,
+      CompositionV2 composition, Boolean rerankerEnabled, Boolean rerankerSwitchIntent) {
+    this(ui, llm, indexPaths, settingsMode, witness, operationKey, state, apiPort,
+        restartScheduled, rerankerModelPath, citationScorerModelPath, composition, rerankerEnabled,
+        rerankerSwitchIntent, null);
   }
 
   public static SettingsV2 empty() {

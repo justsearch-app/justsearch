@@ -225,6 +225,13 @@ public final class EngineRoot implements WorkerHost {
     return bulkWork;
   }
 
+  @Override
+  public boolean heavyIndexing() {
+    KnowledgeServer current = server;
+    var services = current == null ? null : current.appServices();
+    return services != null && services.heavyIndexing();
+  }
+
   // ---- device loss (Spec A step 10, Spec E step E8) ----
 
   /** The restart path the composition root binds; fail closed until then. */

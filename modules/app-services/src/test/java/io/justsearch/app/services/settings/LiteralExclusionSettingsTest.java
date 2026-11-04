@@ -53,7 +53,7 @@ class LiteralExclusionSettingsTest {
       assertEquals(3072, reloaded.settings().getMaxTokens());
       assertEquals(new SettingsWitness(1, KEY), reloaded.witness());
     }
-    assertEquals(7, JSON.readTree(Files.readString(path)).path("schemaVersion").asInt());
+    assertEquals(8, JSON.readTree(Files.readString(path)).path("schemaVersion").asInt());
     assertThrows(UnsupportedStoreVersionException.class,
         () -> StoreFormatVersions.requireReadable("ui-settings", 6, 5, 0, 0, 1, 2, 3, 4));
   }
