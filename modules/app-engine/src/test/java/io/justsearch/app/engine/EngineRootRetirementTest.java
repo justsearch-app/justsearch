@@ -381,8 +381,10 @@ final class EngineRootRetirementTest {
 
   private static EngineKnowledgeClient client(DefaultEngineExecutorRegistry registry,
       WorkerAppServices services, WatchedRootsState roots, long deadlineMs) {
-    return new EngineKnowledgeClient(registry, () -> services, new ForegroundLoadGate(new ForegroundLoad()),
+    var client = new EngineKnowledgeClient(registry, () -> services, new ForegroundLoadGate(new ForegroundLoad()),
         deadlineMs, 100, IpcTelemetry.noop(), () -> {}, new EngineAdmissionController(8, 8, 1), roots);
+    client.bindSourceOrigins(ignored -> {});
+    return client;
   }
 
   private static void await(CountDownLatch latch) {

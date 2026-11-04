@@ -64,6 +64,84 @@ final class RecordedIngestionCoordinatorTest {
   private static final Clock CLOCK = Clock.systemUTC();
   @TempDir Path temp;
 
+  @ParameterizedTest(name = "{displayName} [{index}] {arguments}")
+  @ValueSource(strings = {"auto", "family", "session"})
+  void acceptedPartitionedImportsRetainOriginAndApprovalAfterHistoryExpiry(String approval) throws Exception {
+    String basis = switch (approval) {
+      case "auto" -> new OperationAuthorizationBasis.StructuralAuto().encode();
+      case "family" -> new OperationAuthorizationBasis.FamilyGrant("indexing", SourceTier.TRUSTED).encode();
+      case "session" -> new OperationAuthorizationBasis.EphemeralCapsule().encode();
+      default -> throw new AssertionError(approval);
+    };
+    String operationKey;
+    Path root;
+    Path nested;
+    try (Fixture f = new Fixture(temp, 1)) {
+      root = f.plan.roots().getFirst().path();
+      nested = Files.createDirectory(root.resolve("nested"));
+      var plan = RecordedRootPlan.partition(GENERATION, List.of(
+          new RecordedRootPlan.Root(root.resolve("unused/.."), null, false, false, List.of("*.tmp", "private/**"), List.of()),
+          new RecordedRootPlan.Root(nested, "child", false, false, List.of("*.bak"), List.of())));
+      var request = f.request(OperationAuthorizationBasis.decode(basis));
+      operationKey = request.key();
+      var prepared = RecordedParentFixture.prepare(request, plan);
+      f.runner.savePreparation(request, prepared);
+      var accepted = f.runner.acceptPrepared(request, prepared.nonce());
+      bindProducer(f.coordinator, (one, key, epoch, context, cancellation) ->
+          CompletableFuture.completedFuture(JobQueue.WalkEnumerationOutcome.COMPLETE));
+      try (var work = f.admission.admit(request.context(), false)) {
+        f.runner.start(accepted, handle -> f.coordinator.execute(handle, work.context()));
+        f.coordinator.maintain();
+      }
+      f.queue.enqueue(List.of(Files.writeString(root.resolve("expired.txt"), "expired queue history")));
+      try (var connection = java.sql.DriverManager.getConnection("jdbc:sqlite:" + temp.resolve("jobs.db"));
+          var statement = connection.createStatement()) {
+        try (var tables = statement.executeQuery("SELECT name FROM sqlite_master WHERE name='source_origin'")) {
+          assertTrue(tables.next(), "accepted imports require origin evidence outside expiring operation history");
+        }
+        try (var rows = statement.executeQuery("SELECT * FROM source_origin ORDER BY normalized_root")) {
+          assertTrue(rows.next());
+          assertEquals("IMPORT", rows.getString("kind"));
+          assertEquals(root.toString(), rows.getString("normalized_root"));
+          org.junit.jupiter.api.Assertions.assertNull(rows.getString("collection"), "retain the accepted unspecified collection");
+          var json = new tools.jackson.databind.ObjectMapper();
+          assertEquals(json.valueToTree(List.of(nested.toString())), json.readTree(rows.getString("partitions")));
+          assertEquals(json.valueToTree(List.of("*.tmp", "private/**")), json.readTree(rows.getString("request_exclusions")));
+          assertEquals(basis, rows.getString("authorization_basis"));
+          assertEquals("SYSTEM_INTERNAL", rows.getString("recorded_transport"));
+          assertEquals("TRUSTED", rows.getString("source_tier"));
+          assertEquals("INTERNAL", rows.getString("client_kind"));
+          assertEquals("core.ingest-files", rows.getString("producing_operation_id"));
+          assertEquals(operationKey, rows.getString("operation_key"));
+          assertEquals(approval.equals("session") ? "SESSION" : "DURABLE", rows.getString("approval_class"));
+          assertEquals("GATE", rows.getString("evidence_source"));
+          assertTrue(rows.next());
+          assertEquals(nested.toString(), rows.getString("normalized_root"));
+          assertEquals("child", rows.getString("collection"));
+          assertEquals(json.valueToTree(List.of("*.bak")), json.readTree(rows.getString("request_exclusions")));
+          assertFalse(rows.next(), "one origin per accepted partition");
+        }
+        statement.executeUpdate("UPDATE jobs SET state='DONE',last_updated=1");
+      }
+      try (var connection = java.sql.DriverManager.getConnection("jdbc:sqlite:" + temp.resolve("operations.db"));
+          var statement = connection.createStatement()) {
+        statement.executeUpdate("UPDATE operations SET completed_at=1,history_pending=0 WHERE completed_at IS NOT NULL");
+      }
+      f.operations.pruneHistory();
+      assertTrue(f.operations.find(operationKey).isEmpty(), "exercise actual operation retention");
+      assertEquals(1, f.queue.cleanupOldJobs(0), "exercise actual queue history expiry");
+      f.queue.cleanupOldLedgerEvents(0);
+    }
+    try (var queue = new SqliteJobQueue(temp.resolve("jobs.db"))) {
+      queue.open();
+      try (var connection = java.sql.DriverManager.getConnection("jdbc:sqlite:" + temp.resolve("jobs.db"));
+          var statement = connection.createStatement();
+          var rows = statement.executeQuery("SELECT count(*) FROM source_origin")) {
+        assertTrue(rows.next()); assertEquals(2, rows.getInt(1), "origin evidence outlives history and reopen");
+      }
+    }
+  }
+
   @Test
   void retainedChildPermissionRecoversAfterTransientDenialDespiteNewArrivals() throws Exception {
     try (Fixture f = new Fixture(temp, 1)) {

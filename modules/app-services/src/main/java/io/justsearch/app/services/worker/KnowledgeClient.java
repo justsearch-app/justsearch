@@ -344,6 +344,7 @@ public abstract class KnowledgeClient implements Closeable, SearchPort, Indexing
                 this::executeDeleteByPath, this::deleteById,
                 syncOps, walkExecutor,
                 (body, context) -> executeRootWalk(walkExecutor, body, context));
+            this.rootLifecycleOps.bindSourceOrigins(this::recordSourceOrigin);
         } catch (RuntimeException | Error failure) {
             closeBaseExecutors();
             throw failure;
@@ -1082,6 +1083,23 @@ public abstract class KnowledgeClient implements Closeable, SearchPort, Indexing
     public void addWatchedRoot(String collection, Path path, EngineContext engineContext) {
         rootLifecycleOps.addWatchedRoot(collection, path, engineContext);
     }
+
+    @Override
+    public void addAcceptedWatchedRoot(String collection, Path path, EngineContext engineContext,
+            String operationKey) {
+        Objects.requireNonNull(operationKey, "operationKey");
+        io.justsearch.app.services.intent.EngineProvenance.sourceTier(engineContext);
+        var approval = io.justsearch.app.api.indexing.SourceOrigin.Approval.gated(engineContext,
+                    io.justsearch.app.services.registry.operations.CoreOperationCatalog.ADD_WATCHED_ROOT.value(), operationKey);
+        rootLifecycleOps.addWatchedRoot(collection, path, engineContext, () -> recordSourceOrigin(
+                io.justsearch.app.api.indexing.SourceOrigin.accepted(
+                    io.justsearch.app.api.indexing.SourceOrigin.Kind.WATCHED,
+                    io.justsearch.app.api.indexing.SourceOrigin.watchedRoot(path, collection), approval,
+                    System.currentTimeMillis())));
+    }
+
+    /** The in-process Engine supplies the queue owner; transport-only test clients have no store. */
+    protected void recordSourceOrigin(io.justsearch.app.api.indexing.SourceOrigin origin) {}
 
     @Override
     public int deleteDocsByPathPrefix(Path pathPrefix, EngineContext engineContext) {

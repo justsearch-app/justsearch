@@ -168,6 +168,46 @@
       ]
     },
     {
+      "id": "origin_id",
+      "compatibleAddition": true,
+      "type": "keyword",
+      "stored": true,
+      "docValues": false,
+      "roles": []
+    },
+    {
+      "id": "storage_status",
+      "compatibleAddition": true,
+      "type": "keyword",
+      "stored": true,
+      "docValues": false,
+      "roles": []
+    },
+    {
+      "id": "storage_mount",
+      "compatibleAddition": true,
+      "type": "keyword",
+      "stored": true,
+      "docValues": false,
+      "roles": []
+    },
+    {
+      "id": "storage_key",
+      "compatibleAddition": true,
+      "type": "keyword",
+      "stored": true,
+      "docValues": false,
+      "roles": []
+    },
+    {
+      "id": "envelope_version",
+      "compatibleAddition": true,
+      "type": "keyword",
+      "stored": true,
+      "docValues": false,
+      "roles": []
+    },
+    {
       "id": "source_sha256",
       "type": "keyword",
       "stored": true,

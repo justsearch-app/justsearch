@@ -375,6 +375,7 @@ final class RecordedIngestionCoordinator implements RecordedIngestionService, Re
       }
       // This private runner check precedes retention of any caller-supplied handle or fresh origin.
       var child = attempts.acceptIngestChild(handle, plan.roots().getFirst());
+      recordImportOrigins(row, plan, Objects.requireNonNull(attached, "Source origin queue is not attached"));
       var parent = new Parent(row, stored, plan, handle, true);
       parent.physical = attached;
       parent.work = admitted.retain();
@@ -385,6 +386,24 @@ final class RecordedIngestionCoordinator implements RecordedIngestionService, Re
       return pending(parent.completion);
     }
     }
+  }
+
+  void recordSourceOrigin(io.justsearch.app.api.indexing.SourceOrigin origin) {
+    synchronized (lock) {
+      var physical = Objects.requireNonNull(attached, "Source origin queue is not attached");
+      if (physical.stopping) throw new IllegalStateException("Source origin queue is stopping");
+      physical.queue.recordSourceOrigins(List.of(origin));
+    }
+  }
+
+  private void recordImportOrigins(OperationRecord row, RecordedRootPlan plan, Attached physical) {
+    if (row.descriptor().kind() != OperationKind.INGEST) return;
+    io.justsearch.app.services.intent.EngineProvenance.sourceTier(row.context());
+    var approval = io.justsearch.app.api.indexing.SourceOrigin.Approval.gated(row.context(),
+        row.descriptor().operationRef(), row.key());
+    physical.queue.recordSourceOrigins(plan.roots().stream().map(root ->
+        io.justsearch.app.api.indexing.SourceOrigin.accepted(
+            io.justsearch.app.api.indexing.SourceOrigin.Kind.IMPORT, root, approval, row.acceptedAt())).toList());
   }
 
   @Override
@@ -664,6 +683,9 @@ final class RecordedIngestionCoordinator implements RecordedIngestionService, Re
       return passes == 1 || unknownChild || openChildParents.contains(row.key())
           ? new Reconciliation.Wait() : failed(RecordedIngestionSettlement.UNAVAILABLE);
     }
+    // Acceptance and this queue live in separate databases. An interrupted handoff is completed
+    // from the frozen operation before recovery can retire that last copy of its approval inputs.
+    recordImportOrigins(row, plan, physical);
     if (unknownBindingSeen) {
       return unknownChild || openChildParents.contains(row.key()) ? new Reconciliation.Wait()
           : failed(RecordedIngestionSettlement.UNAVAILABLE);

@@ -748,7 +748,7 @@
       "recoverability": "DERIVED",
       "upgradeHandling": "REBUILD",
       "format": "SQLite WAL schema v26 (durable force intent and admission source identity), an unversioned decimal admission high-water witness, and a strict unversioned JSON queue-triage receipt; queue-bound release-0.3.0 recovery Java Properties checkpoint with format=1 (independent of SQLite user_version)",
-      "currentVersion": 26,
+      "currentVersion": 27,
       "readableLegacyVersions": [
         0,
         1,

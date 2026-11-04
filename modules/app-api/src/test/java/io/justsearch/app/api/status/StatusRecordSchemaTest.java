@@ -725,6 +725,7 @@ final class StatusRecordSchemaTest {
         "chunk_total",                   // chunk geometry
         "content",                       // excluded by SearchResultFormatter (too large)
         "content_sha256",                // tempdoc 931 §C.6 — feedback capture key, stripped before the HTTP response
+        "origin_id", "storage_status", "storage_mount", "storage_key", "envelope_version", // internal provenance
         "source_sha256",                 // source-byte extraction provenance, surfaced through preview
         "projection_source_id",          // no-file source ownership witness, never a result field
         "projection_source_revision",    // no-file accepted revision witness for candidate replay

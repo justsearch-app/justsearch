@@ -35,6 +35,7 @@ package io.justsearch.indexerworker.queue;
  *   <li>V24: Transactional job counts and indexed readiness/claim selection</li>
  *   <li>V25: Versioned delete intents and durable watcher reload reconciliation receipts</li>
  *   <li>V26: Durable force intent and rediscovery source identity</li>
+ *   <li>V27: Durable source declaration and approval evidence</li>
  * </ul>
  */
 public final class SqliteSchema {
@@ -47,7 +48,33 @@ public final class SqliteSchema {
    * Target schema version. The migrate() method will upgrade the database
    * to this version using the migration ladder.
    */
-  public static final int TARGET_VERSION = 26;
+  public static final int TARGET_VERSION = 27;
+
+  static final String CREATE_SOURCE_ORIGIN = """
+      CREATE TABLE IF NOT EXISTS source_origin (
+        origin_id TEXT PRIMARY KEY NOT NULL,
+        kind TEXT NOT NULL CHECK(kind IN ('IMPORT','WATCHED')),
+        normalized_root TEXT NOT NULL,
+        collection TEXT,
+        single_file INTEGER NOT NULL CHECK(single_file IN (0,1)),
+        force_reindex INTEGER NOT NULL CHECK(force_reindex IN (0,1)),
+        partitions TEXT NOT NULL,
+        request_exclusions TEXT NOT NULL,
+        authorization_basis TEXT,
+        recorded_transport TEXT NOT NULL,
+        source_tier TEXT NOT NULL,
+        client_kind TEXT NOT NULL,
+        producing_operation_id TEXT,
+        operation_key TEXT,
+        approval_class TEXT NOT NULL CHECK(approval_class IN ('DURABLE','SESSION')),
+        evidence_source TEXT NOT NULL CHECK(evidence_source IN ('GATE','CALLER_DECLARED')),
+        accepted_at INTEGER NOT NULL,
+        CHECK ((evidence_source='GATE' AND authorization_basis IS NOT NULL
+          AND producing_operation_id IS NOT NULL AND operation_key IS NOT NULL)
+          OR (evidence_source='CALLER_DECLARED' AND authorization_basis IS NULL
+          AND producing_operation_id IS NULL AND operation_key IS NULL AND approval_class='DURABLE'))
+      )
+      """;
 
   /** Every re-admission retains REPLACE's full reset, while firing ordinary UPDATE triggers. */
   static final String REENQUEUE_JOB_ON_CONFLICT = """

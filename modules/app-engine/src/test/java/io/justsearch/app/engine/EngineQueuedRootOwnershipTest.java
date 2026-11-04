@@ -51,6 +51,7 @@ final class EngineQueuedRootOwnershipTest {
         var client = new EngineKnowledgeClient(registry, () -> services,
             new ForegroundLoadGate(new ForegroundLoad()), 5_000, 100,
             IpcTelemetry.noop(), () -> {}, admission)) {
+      client.bindSourceOrigins(ignored -> {});
       var field = KnowledgeClient.class.getDeclaredField("walkExecutor");
       field.setAccessible(true);
       var queue = (ExecutorService) field.get(client);

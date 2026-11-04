@@ -415,6 +415,11 @@ final class SqliteQueueMigrationOps {
         addColumnIfMissing(conn, "force_reindex", SqliteSchema.MIGRATE_V25_TO_V26_FORCE);
         addColumnIfMissing(conn, "admitted_source_sha256", SqliteSchema.MIGRATE_V25_TO_V26_SOURCE);
       }
+      case 27 -> {
+        try (Statement statement = conn.createStatement()) {
+          statement.execute(SqliteSchema.CREATE_SOURCE_ORIGIN);
+        }
+      }
       default -> throw new SQLException("Unknown migration version: " + version);
     }
   }

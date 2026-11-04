@@ -595,6 +595,18 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
   }
 
   private final Path dbPath;
+  @Override
+  public void recordSourceOrigins(List<io.justsearch.app.api.indexing.SourceOrigin> origins) {
+    lockTimed();
+    try {
+      ensureOpen();
+      inTransaction(() -> { SqliteSourceOrigins.record(connection, origins); return null; });
+    } catch (SQLException failure) {
+      throw new IllegalStateException("Source origin storage is unavailable", failure);
+    } finally {
+      unlockAfterChanges();
+    }
+  }
   private final ReentrantLock lock = new ReentrantLock();
   private static final ThreadLocal<Integer> FORGET_CALLBACK_DEPTH = ThreadLocal.withInitial(() -> 0);
   private final int maxAttempts;

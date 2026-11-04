@@ -120,6 +120,12 @@ public interface IndexingService {
     addWatchedPath(path, engineContext);
   }
 
+  /** Server-side operation path; the key identifies the gate's accepted producing operation. */
+  default void addAcceptedWatchedRoot(String collection, Path path, EngineContext engineContext,
+      String operationKey) {
+    addWatchedRoot(collection, path, engineContext);
+  }
+
   /**
    * Stop watching the given root and delete indexed documents.
    *

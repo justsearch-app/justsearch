@@ -164,7 +164,7 @@ final class QueueScaleV24MigrationEvidenceTest {
         .redirectErrorStream(true).redirectOutput(log.toFile()).start();
     awaitSuccess(probe);
     String text = Files.readString(log);
-    assertTrue(text.contains("Unsupported jobs database schema version 26 (this binary supports through 23)"), text);
+    assertTrue(text.contains("Unsupported jobs database schema version 27 (this binary supports through 23)"), text);
     System.out.println("Q13 " + text.strip());
   }
 
