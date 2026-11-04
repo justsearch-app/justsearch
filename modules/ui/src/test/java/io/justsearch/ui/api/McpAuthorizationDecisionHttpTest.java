@@ -37,9 +37,9 @@ class McpAuthorizationDecisionHttpTest {
   @TempDir Path directory;
   private final Clock clock = Clock.systemUTC();
   private final HttpClient client = HttpClient.newHttpClient();
-  private final PendingAuthorizationStore pending = new PendingAuthorizationStore();
-  private final AuthorizationOutcomeStore outcomes = new AuthorizationOutcomeStore();
-  private final PendingAuthorizationChangeRegistry changes = new PendingAuthorizationChangeRegistry();
+  private PendingAuthorizationStore pending = new PendingAuthorizationStore();
+  private AuthorizationOutcomeStore outcomes = new AuthorizationOutcomeStore();
+  private PendingAuthorizationChangeRegistry changes = new PendingAuthorizationChangeRegistry();
   private final List<PendingAuthorizationEvent> events = new CopyOnWriteArrayList<>();
   private final AtomicInteger executions = new AtomicInteger();
   private final List<OperationCatalog> catalogs = List.of(new AgentToolsOperationCatalog(), new CoreOperationCatalog());
@@ -165,6 +165,95 @@ class McpAuthorizationDecisionHttpTest {
     assertEquals(1, pending.size());
     assertEquals(newKey, pending.peek(events.getLast().pendingId()).orElseThrow().operationKey());
     assertEquals(0, executions.get());
+  }
+
+  @ParameterizedTest @org.junit.jupiter.params.provider.ValueSource(booleans = {false, true})
+  void oneAnswerWithdrawsEveryPendingOfTheSameKey(boolean deny) throws Exception {
+    String key = OperationKeys.generate(clock);
+    var ids = new ArrayList<String>();
+    for (int i = 0; i < 2; i++) {
+      tool("justsearch_ingest", Map.of("paths", List.of("/test/exact-target"), "operationKey", key));
+      ids.add(events.getLast().pendingId());
+    }
+    assertNotEquals(ids.get(0), ids.get(1));
+    String route = deny ? "/api/authorizations/reject" : "/api/authorizations/approve";
+    var answer = post(route, Map.of("pendingId", ids.get(0), "execute", true), true);
+    assertEquals(200, answer.statusCode(), answer.body());
+    assertEquals(0, pending.size());
+    for (var id : ids) {
+      assertTrue(pending.peek(id).isEmpty());
+      var terminal = events.stream().filter(e -> e.pendingId().equals(id)
+          && !e.disposition().equals("GATED")).toList();
+      assertEquals(1, terminal.size(), "every window receives one withdrawal for " + id);
+      assertEquals(deny ? "DENIED" : "APPROVED", terminal.getFirst().disposition());
+      assertEquals(410, post("/api/authorizations/approve", Map.of("pendingId", id, "execute", true), true).statusCode());
+    }
+    assertEquals(deny ? 0 : 1, executions.get());
+    var facts = tool("justsearch_operation_outcome", Map.of("operationKey", key)).path("structuredContent");
+    assertEquals(deny ? "failed" : "complete", facts.path("state").asText(), facts.toString());
+    assertEquals(deny ? "USER_DENIED" : "", facts.path("reason").asText());
+    long waitingEvents = events.stream().filter(e -> e.disposition().equals("GATED")).count();
+    tool("justsearch_ingest", Map.of("paths", List.of("/test/exact-target"), "operationKey", key));
+    assertEquals(waitingEvents, events.stream().filter(e -> e.disposition().equals("GATED")).count());
+    assertEquals(0, pending.size());
+    assertEquals(deny ? 0 : 1, executions.get());
+  }
+
+  @Test void evictedDenialRequiresFreshAnswerAndReportsPending() throws Exception {
+    String key = OperationKeys.generate(clock);
+    tool("justsearch_ingest", Map.of("paths", List.of("/test/exact-target"), "operationKey", key));
+    denyIngest(key); // Two pending ids still count as just one key decision.
+    var context = TestRequestContexts.mcp("bounded-decisions");
+    var provenance = TestRequestContexts.provenance(context, ExecutorTag.UI);
+    for (int i = 0; i < 512; i++) {
+      String id = pending.create("core.ingest-files", "{\"paths\":[\"/test/exact-target\"]}",
+          SourceTier.UNTRUSTED, RiskTier.HIGH, GateBehavior.TYPED_CONFIRM, "bounded decisions", null,
+          TransportTag.MCP, context, provenance, OperationKeys.generate(clock), false);
+      assertTrue(pending.reject(id).isPresent());
+      if (i == 510) {
+        var replay = tool("justsearch_ingest", Map.of("paths", List.of("/test/exact-target"), "operationKey", key));
+        assertEquals("USER_DENIED", replay.path("structuredContent").path("errorCode").asText(),
+            "511 newer keys retain the decision");
+      }
+    }
+    tool("justsearch_ingest", Map.of("paths", List.of("/test/exact-target"), "operationKey", key));
+    String id = events.getLast().pendingId();
+    assertTrue(pending.peek(id).isPresent());
+    assertEquals(0, executions.get());
+    var facts = tool("justsearch_operation_outcome", Map.of("operationKey", key)).path("structuredContent");
+    assertEquals("unknown", facts.path("state").asText(), facts.toString());
+    assertEquals("awaiting-approval", facts.path("phase").asText());
+    assertEquals("Operation awaits your approval", facts.path("message").asText());
+    assertEquals(200, post("/api/authorizations/approve", Map.of("pendingId", id, "execute", true), true).statusCode());
+    assertEquals(1, executions.get());
+  }
+
+  @ParameterizedTest @org.junit.jupiter.params.provider.ValueSource(booleans = {false, true})
+  void restartRequiresFreshAnswerAndOutcomeReportsTheNewPending(boolean frozen) throws Exception {
+    prepared = frozen;
+    String key = OperationKeys.generate(clock);
+    String oldId = denyIngest(key);
+    stop();
+    pending = new PendingAuthorizationStore();
+    outcomes = new AuthorizationOutcomeStore();
+    changes = new PendingAuthorizationChangeRegistry();
+    events.clear();
+    start(); // Reopen the same on-disk operation store with fresh process-local authority.
+    tool("justsearch_ingest", Map.of("paths", List.of("/test/exact-target"), "operationKey", key));
+    String newId = events.getLast().pendingId();
+    assertNotEquals(oldId, newId);
+    assertTrue(pending.peek(newId).isPresent());
+    assertEquals(0, executions.get());
+    assertEquals(410, post("/api/authorizations/approve", Map.of("pendingId", oldId, "execute", true), true).statusCode());
+    var facts = tool("justsearch_operation_outcome", Map.of("operationKey", key)).path("structuredContent");
+    assertEquals("unknown", facts.path("state").asText(), facts.toString());
+    assertEquals("awaiting-approval", facts.path("phase").asText());
+    assertEquals("Operation awaits your approval", facts.path("message").asText());
+    assertFalse(facts.has("completedAt"));
+    assertEquals(200, post("/api/authorizations/approve", Map.of("pendingId", newId, "execute", true), true).statusCode());
+    assertEquals(1, executions.get());
+    assertEquals("complete", tool("justsearch_operation_outcome", Map.of("operationKey", key))
+        .path("structuredContent").path("state").asText());
   }
 
   @ParameterizedTest @CsvSource({"core.apply-excludes,false", "core.ingest-files,false",

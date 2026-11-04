@@ -44,8 +44,10 @@ public final class PendingAuthorizationStore {
   private static final int MAX_ENTRIES = 512;
 
   private final ConcurrentHashMap<String, PendingAuthorization> pendings = new ConcurrentHashMap<>();
-  // Recent terminal decisions are process-local, just like pending ids and capsule keys.
-  private final java.util.Map<String, Rejection> rejected = new java.util.LinkedHashMap<>();
+  // Recent terminal decisions are process-local and bounded to 512, like pending ids.
+  // After restart or eviction the key must pass the gate and receive a fresh answer.
+  private final java.util.Map<String, Decision> decisions = new java.util.LinkedHashMap<>();
+  private final java.util.Set<String> rejectedIds = new java.util.LinkedHashSet<>();
   private java.util.function.BiConsumer<PendingAuthorization,
       io.justsearch.app.observability.operations.AuthorizationDisposition> changeListener = (p, d) -> {};
 
@@ -65,17 +67,32 @@ public final class PendingAuthorizationStore {
     };
   }
 
-  private record Rejection(String operationKey, Instant deniedAt) {}
+  private record Decision(
+      io.justsearch.app.observability.operations.AuthorizationDisposition disposition, Instant decidedAt) {}
 
   /** Recent process-local decisions, addressed by the agent's original operation key. */
   public synchronized Optional<Instant> rejectedAt(String operationKey) {
     if (operationKey == null) return Optional.empty();
-    return rejected.values().stream().filter(row -> operationKey.equals(row.operationKey()))
-        .map(Rejection::deniedAt).findFirst();
+    return Optional.ofNullable(decisions.get(operationKey))
+        .filter(row -> row.disposition() == io.justsearch.app.observability.operations.AuthorizationDisposition.DENIED)
+        .map(Decision::decidedAt);
+  }
+
+  /** Distinguish a remembered answer from an expired or unknown pending lookup. */
+  public synchronized boolean hasDecisionForKey(String operationKey) {
+    return operationKey != null && decisions.containsKey(operationKey);
   }
 
   public synchronized boolean wasRejected(String id) {
-    return rejected.containsKey(id);
+    return rejectedIds.contains(id);
+  }
+
+  /** A live authorization is not an accepted execution receipt. */
+  public synchronized Optional<PendingAuthorization> pendingForKey(String operationKey) {
+    if (operationKey == null) return Optional.empty();
+    return java.util.List.copyOf(pendings.values()).stream()
+        .filter(row -> operationKey.equals(row.operationKey()))
+        .map(row -> peek(row.id())).flatMap(Optional::stream).findFirst();
   }
 
   private void publish(PendingAuthorization pending,
@@ -195,7 +212,7 @@ public final class PendingAuthorizationStore {
       String operationKey, boolean undo, UUID preparationNonce,
       io.justsearch.agent.api.registry.OperationApprovalPreview approvalPreview, String id) {
     Objects.requireNonNull(id, "id");
-    if (pendings.containsKey(id) || rejected.containsKey(id)) {
+    if (pendings.containsKey(id) || rejectedIds.contains(id)) {
       throw new IllegalStateException("Pending authorization identity already used");
     }
     Instant now = clock.instant();
@@ -216,9 +233,7 @@ public final class PendingAuthorizationStore {
               java.util.Comparator.comparing(PendingAuthorization::createdAt)))
           .ifPresent(oldest -> pendings.remove(oldest.getKey(), oldest.getValue()));
     }
-    pendings.put(
-        id,
-        new PendingAuthorization(
+    var pending = new PendingAuthorization(
             id,
             operationId,
             argsJson,
@@ -229,7 +244,15 @@ public final class PendingAuthorizationStore {
             now,
             now.plus(ttl),
             requestedBy,
-            transport, engineContext, provenance, operationKey, undo, preparationNonce, approvalPreview));
+            transport, engineContext, provenance, operationKey, undo, preparationNonce, approvalPreview);
+    // A gate may have been in flight when another copy received the answer.
+    var decided = Optional.ofNullable(operationKey == null ? null : decisions.get(operationKey));
+    if (decided.isPresent()) {
+      remember(pending, decided.get().disposition());
+      publish(pending, decided.get().disposition());
+    } else {
+      pendings.put(id, pending);
+    }
     return id;
   }
 
@@ -264,7 +287,7 @@ public final class PendingAuthorizationStore {
       publish(pending, io.justsearch.app.observability.operations.AuthorizationDisposition.EXPIRED);
       return Optional.empty();
     }
-    publish(pending, io.justsearch.app.observability.operations.AuthorizationDisposition.APPROVED);
+    decide(pending, io.justsearch.app.observability.operations.AuthorizationDisposition.APPROVED);
     return Optional.of(pending);
   }
 
@@ -273,10 +296,36 @@ public final class PendingAuthorizationStore {
     var pending = peek(id);
     if (pending.isEmpty()) return Optional.empty();
     pendings.remove(id);
-    rejected.put(id, new Rejection(pending.get().operationKey(), clock.instant()));
-    while (rejected.size() > MAX_ENTRIES) rejected.remove(rejected.keySet().iterator().next());
-    publish(pending.get(), io.justsearch.app.observability.operations.AuthorizationDisposition.DENIED);
+    decide(pending.get(), io.justsearch.app.observability.operations.AuthorizationDisposition.DENIED);
     return pending;
+  }
+
+  private void remember(PendingAuthorization pending,
+      io.justsearch.app.observability.operations.AuthorizationDisposition disposition) {
+    String key = pending.operationKey() == null ? pending.id() : pending.operationKey();
+    decisions.putIfAbsent(key, new Decision(disposition, clock.instant()));
+    while (decisions.size() > MAX_ENTRIES) decisions.remove(decisions.keySet().iterator().next());
+    if (disposition == io.justsearch.app.observability.operations.AuthorizationDisposition.DENIED) {
+      rejectedIds.add(pending.id());
+      while (rejectedIds.size() > MAX_ENTRIES) rejectedIds.remove(rejectedIds.iterator().next());
+    }
+  }
+
+  private void decide(PendingAuthorization pending,
+      io.justsearch.app.observability.operations.AuthorizationDisposition disposition) {
+    var answered = new java.util.ArrayList<PendingAuthorization>();
+    answered.add(pending);
+    if (pending.operationKey() != null) {
+      for (var sibling : java.util.List.copyOf(pendings.values())) {
+        if (pending.operationKey().equals(sibling.operationKey())) {
+          pendings.remove(sibling.id());
+          answered.add(sibling);
+        }
+      }
+    }
+    // Remove every sibling and remember the answer before invoking any subscriber.
+    for (var row : answered) remember(row, disposition);
+    for (var row : answered) publish(row, disposition);
   }
 
   /** Test/diagnostic: current live entry count (does not prune). */

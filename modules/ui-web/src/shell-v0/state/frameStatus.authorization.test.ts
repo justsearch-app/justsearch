@@ -59,3 +59,36 @@ it('Earlier names automatic denial for both terminal ledger expiry and a stale k
     expect(model.sections.earlier.find(row => row.id === 'activity:expiry')!.title).toContain('Denied automatically');
   }
 });
+
+it('terminal ledger outcomes remain in Earlier before the waiting snapshot is withdrawn', () => {
+  for (const disposition of ['DENIED', 'APPROVED', 'EXPIRED']) {
+    const activity = unifiedActivity([gate('request', 'answered', 'GATED', -2000),
+      gate('answer', 'answered', disposition, -1000)], []);
+    for (const authorizations of [[{ pendingId: 'answered', operationId: 'core.apply-excludes' }], []]) {
+      const model = deriveFrameStatus({ ai: null, now, contactLostAt: null, activity, authorizations });
+      expect(model.sections.needs).toHaveLength(0);
+      expect(model.sections.earlier).toHaveLength(1);
+      expect(model.sections.earlier[0]!.title).toContain(disposition === 'DENIED' ? 'Denied by you'
+        : disposition === 'APPROVED' ? 'Allowed' : 'Denied automatically');
+    }
+  }
+});
+
+it('an expired advisory and its keyed gate produce exactly one Earlier row', () => {
+  const advisory = { key: 'expired', acknowledged: false, origin: 'stream', sourceRenderHint: 'REQUIRES_ACK', event: {
+    id: 'expired', classId: 'authorization.pending', occurredAt: new Date(now - 600_000).toISOString(),
+    renderHint: 'REQUIRES_ACK', classExtras: { pendingId: 'expired', operationId: 'core.apply-excludes',
+      expiresAt: new Date(now - 1000).toISOString() },
+  } } as AdvisoryRecord;
+  for (const disposition of ['GATED', 'EXPIRED']) {
+    const model = deriveFrameStatus({ ai: null, now, contactLostAt: null, advisories: [advisory],
+      authorizations: [{ pendingId: 'expired', operationId: 'core.apply-excludes',
+        expiresAt: new Date(now - 1000).toISOString() }],
+      activity: unifiedActivity([gate('request', 'expired', 'GATED', -2000),
+        ...(disposition === 'EXPIRED' ? [gate('expiry', 'expired', 'EXPIRED', -1000)] : [])], []),
+    });
+    expect(model.sections.needs).toHaveLength(0);
+    expect(model.sections.earlier).toHaveLength(1);
+    expect(model.sections.earlier[0]!.title).toContain('Denied automatically');
+  }
+});

@@ -189,11 +189,14 @@ export function deriveFrameStatus(input: FrameStatusInput): FrameStatus {
     !request.expiresAt || Date.parse(request.expiresAt) > now).map(request => request.pendingId));
   const terminal = new Map((input.activity ?? []).flatMap(entry => entry.gate?.pendingId
     && entry.gate.disposition !== 'GATED' ? [[entry.gate.pendingId, entry] as const] : []));
+  for (const id of terminal.keys()) waiting.delete(id);
+  const ledgerRequests = new Set((input.activity ?? []).flatMap(entry =>
+    !entry.isRoutine && !entry.operationOutcomeKey && entry.gate?.pendingId ? [entry.gate.pendingId] : []));
   for (const record of input.advisories ?? []) {
     if (record.event.classId === 'authorization.pending') {
       const extras = record.event.classExtras;
       const id = typeof extras.pendingId === 'string' ? extras.pendingId : '';
-      if (waiting.has(id) || terminal.has(id)) continue;
+      if (waiting.has(id) || ledgerRequests.has(id)) continue;
       const expired = typeof extras.expiresAt === 'string' && Date.parse(extras.expiresAt) <= now;
       const outcome = extras.disposition === 'DENIED' ? 'Denied by you' : extras.disposition === 'APPROVED'
         ? 'Allowed' : extras.disposition === 'EXPIRED' || expired ? 'Denied automatically' : 'Approval no longer pending';

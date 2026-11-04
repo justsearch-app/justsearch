@@ -13,6 +13,9 @@ carry that same id into the pending store. Only optional pendingId is added to
 persisted gate rows. No migration or rewrite is required. Workflow/chat gates
 use a different approval registry and retain their existing reject route.
 
+Denial memory is limited to the current engine run and the existing 512-decision bound.
+After restart or eviction, replay requires a new answer; this repair adds no persisted decision state.
+
 All added tests are durable. Reflective lookup in the Java checks is fail-before
 compatibility scaffolding only: missing production behavior stays missing.
 No independent acceptance is claimed by this builder.
@@ -145,8 +148,8 @@ No independent acceptance is claimed by this builder.
       "sources": [
         {
           "kind": "owner-words",
-          "quote": "McpOperationKeyTest.java's added exact-JSON assertions are new checks: give them a New entry with source and evidence",
-          "location": "task t-20261103-shell request (S3a repair brief, 2026-11-04; ea4e44dfb5 independent-check failures)"
+          "quote": "exact server-bound arguments",
+          "location": "task t-20261103-shell request (DE7 behavioural scenario, reaffirmed in final S3a repair brief item 5, 2026-11-04)"
         }
       ],
       "evidence": "gates/test-intent/evidence/shell-s3a-repair-key-json.json",
@@ -208,6 +211,60 @@ No independent acceptance is claimed by this builder.
         "signature"
       ],
       "whatMoved": "The late capsule-mint admission failure is injected into and verified on the pending-aware mint overload. All late-refusal, retryUnsafe, consumed-pending and no-dispatch assertions are retained."
+    },
+    {
+      "items": [
+        "modules/ui/src/test/java/io/justsearch/ui/api/McpAuthorizationDecisionHttpTest.java"
+      ],
+      "class": "New",
+      "behaviour": "One answer atomically withdraws all same-key pending copies and executes at most once. Denial memory is process-local and bounded to 512 decisions; after restart or eviction a replay needs a fresh answer and the outcome reports awaiting approval through existing fields.",
+      "sources": [
+        {
+          "kind": "owner-words",
+          "quote": "rejecting any pending of a key withdraws every pending of that key",
+          "location": "task t-20261103-shell request (final S3a repair brief item 1, 2026-11-04)"
+        },
+        {
+          "kind": "owner-words",
+          "quote": "approving one pending of a key withdraws the other pendings of that key (approving them later → 410, nothing runs)",
+          "location": "task t-20261103-shell request (final S3a repair brief item 1, 2026-11-04)"
+        },
+        {
+          "kind": "owner-words",
+          "quote": "after a restart or beyond the bound a replay asks the user again. Make sure that case never executes without a fresh answer and that the outcome tool then reports the new pending honestly (not \"denied\")",
+          "location": "task t-20261103-shell request (final S3a repair brief item 2, 2026-11-04)"
+        }
+      ],
+      "repaired": true,
+      "evidence": "gates/test-intent/evidence/shell-s3a-final-key-decisions.json",
+      "newChecks": [
+        "modules/ui/src/test/java/io/justsearch/ui/api/McpAuthorizationDecisionHttpTest.java"
+      ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/state/frameStatus.authorization.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "A terminal ledger row takes precedence over the waiting snapshot before withdrawal; an expired advisory and its keyed gate contribute exactly one Earlier row.",
+      "sources": [
+        {
+          "kind": "owner-words",
+          "quote": "a request is always in exactly one section: Needs you until a terminal outcome is known, then Earlier with that outcome; never missing, never in both.",
+          "location": "task t-20261103-shell request (final S3a repair brief item 3, 2026-11-04)"
+        },
+        {
+          "kind": "owner-words",
+          "quote": "exactly one Earlier row per request (\"Denied automatically\")",
+          "location": "task t-20261103-shell request (final S3a repair brief item 4, 2026-11-04)"
+        }
+      ],
+      "repaired": true,
+      "evidence": "gates/test-intent/evidence/shell-s3a-final-history.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/state/frameStatus.authorization.test.ts#terminal ledger outcomes remain in Earlier before the waiting snapshot is withdrawn",
+        "modules/ui-web/src/shell-v0/state/frameStatus.authorization.test.ts#an expired advisory and its keyed gate produce exactly one Earlier row"
+      ]
     }
   ]
 }

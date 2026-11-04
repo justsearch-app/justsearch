@@ -602,6 +602,11 @@ public final class McpToolSurface {
             io.justsearch.app.api.operations.OperationOutcomeView.State.FAILED, null,
             outcome.historySince(), null, deniedAt.get().toEpochMilli(), null, null,
             "USER_DENIED", null, "Operation denied by the user");
+      } else if (pendingAuthorizationStore != null && pendingAuthorizationStore.pendingForKey(key).isPresent()) {
+        outcome = new io.justsearch.app.api.operations.OperationOutcomeView(
+            io.justsearch.app.api.operations.OperationOutcomeView.State.UNKNOWN, "awaiting-approval",
+            outcome.historySince(), null, null, null, null, null, null,
+            "Operation awaits your approval");
       }
       return Map.of("content", List.of(Map.of("type", "text", "text", MAPPER.writeValueAsString(outcome))),
           "structuredContent", outcome);
@@ -1737,6 +1742,13 @@ public final class McpToolSurface {
               e.getMessage(), requestedBy,
               io.justsearch.agent.api.registry.TransportTag.MCP, engineContext, provenance,
               e.operationKey() == null ? operationKey : e.operationKey(), false, e.preparationNonce(), e.approvalPreview(), e.pendingId());
+      if (pendingAuthorizationStore.wasRejected(pendingId)) {
+        return errorContent(Map.of("error", "Operation denied by the user", "errorCode", "USER_DENIED",
+            "retryable", false, "operationKey", e.operationKey() == null ? operationKey : e.operationKey()));
+      }
+      if (pendingAuthorizationStore.hasDecisionForKey(e.operationKey() == null ? operationKey : e.operationKey())) {
+        return errorContent("This operation key has already been answered. Query its operation outcome.");
+      }
       if (pendingAuthorizationChanges != null) {
         // Tempdoc 655 fix pass: routing info only — no argsSummary/rationale on the broadcast
         // (see PendingAuthorizationEvent's doc comment for why). A subscriber fetches the
