@@ -36,3 +36,14 @@ input the derivation reads changes, and no assertion changes.
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a1a93d-a26e-7852-b126-8e533e193eb0",
+  "verdict": "accept",
+  "digest": "sha256:5f6261157adf4aad5e7905fb9779a397eedb2a7bae9351245255c05d74dd3aa6",
+  "note": "Typecheck fails on 51bfa7756c (TS2352 x3, TS6133) and passes after; the two files' 11 tests pass before and after; diff is the two tests and this changeset. Correction to the entry text: the derivation does read some of the added fields on the advisory-only path; three extra cases (advisory-only, GATED, EXPIRED) show identical outputs with the fields missing or null, so the oracle is kept. Transcribed by the orchestrator from the verifier's answer (Codex sandbox)."
+}
+```
