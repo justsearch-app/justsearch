@@ -359,3 +359,14 @@ and its admission slots. They do not start the dev stack, use a GPU, or touch ~/
   "note": "Claude acceptor on 28f5ad3faf: all seven entries accept (RE6, M7, M28 repaired; P12 primitive; version pins 6->7 and 27->28 New with fail-before; Adaptation); evidence by run-evidence validated. Behaviour: Claude verifier 23db5bbe on 799fdb505c (R-E, migrations, rollback, mixed upgrade, older-binary refusal, evaluator, inert hooks; 13,844 cases 0 failures)."
 }
 ```
+
+```json
+{
+  "kind": "audit",
+  "role": "reviewer",
+  "session": "01a1abe4-27ae-7891-92e8-a52087334874",
+  "verdict": "accept",
+  "digest": "sha256:37eec189dd0238aeca5884cacc9dd534e92bef1b40f9a1d0315fe3c5e84bf7b9",
+  "note": "Codex auditor on 9603811766 (PR #1150): all seven entries accept; four evidence files validate; no must-fix."
+}
+```
