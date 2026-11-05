@@ -102,7 +102,7 @@ configurations.named("integrationTestRuntimeOnly") {
 }
 
 dependencies {
-  testImplementation("com.fasterxml:classmate:1.7.2")
+  testImplementation("com.fasterxml:classmate:1.8.0")
 }
 
 publishing {

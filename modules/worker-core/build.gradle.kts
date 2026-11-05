@@ -131,7 +131,7 @@ testing {
         implementation(platform(libs.junit.bom))
         implementation(libs.junit.jupiter.api)
         implementation(libs.mockito.core)
-        implementation("org.junit.jupiter:junit-jupiter-params:5.14.3")
+        implementation("org.junit.jupiter:junit-jupiter-params:6.1.3")
         implementation(testFixtures(project(":modules:configuration")))
         implementation(testFixtures(project(":modules:ort-common"))) // §14.28 U1 helper
         implementation(libs.jackson.dataformat.yaml)
