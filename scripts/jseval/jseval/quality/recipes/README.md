@@ -269,9 +269,9 @@ the accepted output of such a round, and the record shows which ones.
 
 Topical queries ask for all files about a topic. `jseval.quality.topical_labels`
 labels them; its steps are `extract`, `pool`, `excerpts`, `judge`, `project`,
-`sample`, `second-judge`, `spot`, `accept` and `freeze`, each resumable.
-Document text, excerpts, prompts, replies, model grades before the freeze and
-the owner's sheet stay in `~/.cache/justsearch-quality/real-use-labels/`, never
+`sample`, `second-judge`, `accept` and `freeze`, each resumable.
+Document text, excerpts, prompts, replies and model grades before the freeze
+stay in `~/.cache/justsearch-quality/real-use-labels/`, never
 in Git.
 
 ```sh
@@ -286,7 +286,6 @@ python -m jseval.quality.topical_labels project
 python -m jseval.quality.topical_labels sample
 python -m jseval.quality.topical_labels second-judge --max-calls 2 --phase calibration
 python -m jseval.quality.topical_labels second-judge --max-calls 1000
-python -m jseval.quality.topical_labels spot     # 5 blocks for the owner, if the judges agree
 python -m jseval.quality.topical_labels accept
 python -m jseval.quality.topical_labels freeze
 ```
@@ -306,15 +305,15 @@ python -m jseval.quality.topical_labels freeze
   file name, the first ~600 characters and the two non-overlapping
   ~600-character windows sharing the most query terms (whole tokens of the
   existing tokenizer; this codebase has no German compound-splitting rule), at
-  most ~1,800 characters of text. Judge and user see exactly this text, marked
+  most ~1,800 characters of text. Both judges see exactly this text, marked
   as data. Limit: labels are agreement on the excerpt; relevance outside it
   can be missed.
   A run of six whitespace-separated words occurring at least eight times in
   the normalized document marks its words as repeated: those words contribute
   no query-term score, and windows with more than half their words repeated
   are excluded, so fewer than two passages may remain.
-  The first agreement sample and spot sheet were replaced after this rule
-  changed, before any owner answer was accepted.
+  The first agreement sample was replaced after this rule changed, before any
+  label was accepted.
 - **Judge.** `claude-opus-5-5` through `claude -p` on the subscription only,
   with the generator's refusal of API keys and provider overrides. Up to five
   files per call in seeded random order, each graded independently 0-3
@@ -334,7 +333,7 @@ python -m jseval.quality.topical_labels freeze
   complete graded pool (seed 20261105), at most 2 per query, 75 the primary
   judge calls relevant and 75 not, each half split by query language in
   proportion, at least 30 graded 1 or 2. Pair ids and order carry no stratum.
-  No owner grades these 150 pairs: they are the second judge's set.
+  These 150 pairs are the second judge's set.
 - **Second judge.** `gpt-6.1-sol`, another model family, through `codex exec`
   on the ChatGPT subscription only. Any `OPENAI_*` variable (API key, base URL
   and other endpoint overrides), the CLI's own `CODEX_API_KEY`,
@@ -368,21 +367,11 @@ python -m jseval.quality.topical_labels freeze
   an exclusive file lock for its lifetime; every labelling command first
   removes abandoned `codex-home-*` folders, leaving locked, active homes alone.
   SIGKILL cannot run cleanup: the login copy remains until the next run of
-  any labelling step (including `second-judge`, `spot`, `accept` or `freeze`).
+  any labelling step (including `second-judge`, `accept` or `freeze`).
 - **Decision**, fixed before any second grade: the judges agree when both give
   the same binary label (grade >= 2). Below 80% of the 150 pairs, unrounded
-  (119 of 150), FAIL, and the owner is not asked. At or above it, the owner's
-  spot check: 5 pairs drawn by a recorded seed (`20261105:<revision>:spot`)
-  from the pairs where the judges disagree, at least 2 the primary calls
-  relevant and the second not, 2 the other way and 2 from German queries,
-  each as far as such pairs exist; with fewer than 5 disagreements, all of
-  them plus primary grade-1/2 boundary pairs. The sheet is plain text, one
-  block per pair, no grades: the question "Would you want this file among the
-  results for this search?" and `Answer:` yes, no or unsure; the parser
-  refuses missing, duplicate or altered blocks, and every block must be
-  answered. An owner who sides against the primary judge (yes/no unlike its
-  label) on 4 or 5 of the 5 makes it FAIL; otherwise the spot result is
-  recorded as information and the decision is PASS. A FAIL allows one rubric
+  (119 of 150), FAIL. At or above it (120 of 150), PASS. The decision uses
+  only the judges' agreement. A FAIL allows one rubric
   or prompt revision, a full re-label, a new sample of new pairs and the second
   judge again; a second FAIL stops. A revision's decision is recorded once
   (`acceptance-r<revision>.json`): `accept` on a decided revision refuses. The
@@ -393,7 +382,9 @@ python -m jseval.quality.topical_labels freeze
   binary qrels for every topical pair through the collection writer, counts and
   grade histogram in the config, `topical` removed from `pending_kinds`. The
   record's provenance names the primary and second judge, their measured
-  agreement on the 150 pairs and the owner's spot-check result. Known-item
+  agreement on the 150 pairs. Its `human_check` field states that no human
+  checked the labels: they are model-graded and cross-checked on a sample by
+  a second model family, which may share blind spots. Known-item
   labels and document identity are unchanged, so the prepared index is
   reused. A query whose pool holds no relevant file is excluded from scoring
   with the recorded reason `no relevant document in pool` (config `excluded`),

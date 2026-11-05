@@ -75,7 +75,7 @@ def start_step(monkeypatch, step):
             getattr(tl, step)()
 
 
-@pytest.mark.parametrize("step", ["second_judge", "spot", "accept", "freeze"])
+@pytest.mark.parametrize("step", ["second_judge", "accept", "freeze"])
 def test_start_removes_abandoned_homes_after_sigkill(tmp_path, monkeypatch, step):
     with setup_process(tmp_path) as (process, home):
         process.kill()
@@ -93,7 +93,7 @@ def test_start_removes_abandoned_homes_after_sigkill(tmp_path, monkeypatch, step
         assert record.read_text() == "existing record\n"
 
 
-@pytest.mark.parametrize("step", ["second_judge", "spot", "accept", "freeze"])
+@pytest.mark.parametrize("step", ["second_judge", "accept", "freeze"])
 def test_start_preserves_a_home_locked_by_another_process(tmp_path, monkeypatch, step):
     with setup_process(tmp_path) as (_, home):
         with (home / "lock").open("a+b") as lock:

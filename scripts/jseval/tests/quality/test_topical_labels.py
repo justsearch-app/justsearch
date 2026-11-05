@@ -375,14 +375,13 @@ def test_excerpts_without_qualifying_repeated_runs_keep_their_exact_bytes(repeti
     assert "Bundestag" in got.split("Passage: ", 1)[1]
 
 
-def test_judge_and_user_see_exactly_the_same_excerpt(world, monkeypatch):
+def test_the_judge_sees_exactly_the_prepared_excerpt(world, monkeypatch):
     fake = judged(world, monkeypatch)
     ex = tl.load_excerpts(world.pools)
     shown = ex["tp-002"]
     prompts = [p for p in fake.prompts if world.c.queries["tp-002"].text in p]
     for doc, e in shown.items():
         assert any(f"\n{e['excerpt']}\n>>>END F" in p for p in prompts)
-        assert e["excerpt"] in tl.render_block("A001", world.c.queries["tp-002"].text, e["excerpt"])
     assert set(fake.models) == {"claude-opus-5-5"}
 
 
@@ -604,7 +603,7 @@ def test_projection_reports_calls_and_wall_time_from_recorded_calls(world, monke
     assert got["wall_hours"]["concurrency_4"]["median"] == round(112 * 34.5 / 4 / 3600, 2)
 
 
-# --------------------------------------------------------------------------- L3 sample and sheet
+# --------------------------------------------------------------------------- L3 sample
 
 
 def _population(n_queries=122, per_query=8, seed=1):
@@ -1117,21 +1116,13 @@ def test_tool_use_and_cli_errors_are_refused(fake_codex, tmp_path, monkeypatch, 
             tl.ask_codex("prompt", ["F1"], home=home)
 
 
-# --------------------------------------------------------------------------- L4 decision and spot check
+# --------------------------------------------------------------------------- L4 decision
 
 
-def _accept_with(sampled, monkeypatch, agree_share=1.0, against=0, revision=0):
-    """Second judge agreeing on ``agree_share`` of the sample; owner against the primary on
-    ``against`` spot pairs (when the spot check is needed)."""
+def _accept_with(sampled, monkeypatch, agree_share=1.0, revision=0):
+    """Second judge agreeing on ``agree_share`` of the sample."""
     pairs = json.loads((tl.WORK / "samples" / f"r{revision}-b1.json").read_text())["pairs"]
     second_judged(sampled, monkeypatch, _flips(pairs, round((1 - agree_share) * len(pairs))), revision=revision)
-    if agree_share >= tl.PASS_MARK:
-        assert tl.spot(revision) == 0
-        drawn = json.loads((tl.WORK / "samples" / f"r{revision}-spot.json").read_text())
-        answers = {p["id"]: ("no" if p["label"] else "yes") if n < against else ("yes" if p["label"] else "no")
-                   for n, p in enumerate(drawn["pairs"])}
-        sheet = tl.WORK / "samples" / f"r{revision}-spot.sheet.txt"
-        sheet.write_text(_answer(sheet.read_text(), answers))
     return tl.accept(revision)
 
 
@@ -1141,7 +1132,7 @@ def test_the_agreement_rule_at_the_080_boundary_is_unrounded(agree, outcome):
     rows = [{"label": 1, "second_label": 1}] * agree + [{"label": 1, "second_label": 0}] * (150 - agree)
     agreement = tl.judge_agreement(rows)
     assert agreement["agreement"] == agree / 150 and agreement["pairs"] == 150
-    assert tl.decide(agreement, {"pairs": 5, "against_primary": 0})["outcome"] == outcome
+    assert tl.decide(agreement)["outcome"] == outcome
 
 
 @pytest.mark.parametrize("agree,outcome", [(120, "PASS"), (119, "FAIL")])
@@ -1149,40 +1140,17 @@ def test_accept_applies_the_agreement_rule_on_the_150_pairs(sampled, monkeypatch
     result = _accept_with(sampled, monkeypatch, agree / 150)
     assert result["outcome"] == outcome
     assert result["agreement"] == {"pairs": 150, "agree": agree, "agreement": agree / 150, "pass_mark": 0.8}
-    if outcome == "FAIL":  # below the mark the owner is not asked
-        assert result["spot_check"] is None and result["next"].startswith("revise the rubric")
-        assert not (tl.WORK / "samples" / "r0-spot.json").exists()
-    else:
-        assert result["spot_check"]["against_primary"] == 0
-
-
-def test_at_or_above_the_mark_the_spot_check_is_required():
-    agreement = {"pairs": 150, "agree": 120, "agreement": 0.8, "pass_mark": 0.8}
-    with pytest.raises(tl.LabelError, match="spot check"):
-        tl.decide(agreement, None)
-
-
-@pytest.mark.parametrize("against,outcome", [(0, "PASS"), (3, "PASS"), (4, "FAIL"), (5, "FAIL")])
-def test_the_owner_against_the_primary_on_4_or_5_of_5_takes_the_failure_path(sampled, monkeypatch,
-                                                                              against, outcome):
-    result = _accept_with(sampled, monkeypatch, 140 / 150, against=against)
-    assert result["outcome"] == outcome and result["agreement"]["agree"] == 140
-    assert result["spot_check"]["against_primary"] == against and result["spot_check"]["pairs"] == 5
     if outcome == "FAIL":
-        assert result["next"].startswith("revise the rubric") and "second judge" in result["next"]
-    else:
-        assert "next" not in result
+        assert result["next"].startswith("revise the rubric")
 
 
 def test_a_recorded_failure_is_final_and_freeze_stays_blocked(sampled, monkeypatch):
-    drawn_path = tl.WORK / "samples" / "r0-spot.json"
-    assert _accept_with(sampled, monkeypatch, 140 / 150, against=4)["outcome"] == "FAIL"
+    assert _accept_with(sampled, monkeypatch, 119 / 150)["outcome"] == "FAIL"
     recorded = (tl.WORK / "acceptance-r0.json").read_text()
-    # The owner turns one opposing answer into "unsure": 3 of 5 against would now PASS.
-    first = json.loads(drawn_path.read_text())["pairs"][0]["id"]
-    sheet = tl.WORK / "samples" / "r0-spot.sheet.txt"
-    sheet.write_text(re.sub(rf"(=== {first} ===\n(?:.*\n)*?)Answer: \w+\n", r"\1Answer: unsure\n",
-                            sheet.read_text(), count=1))
+    # Replacing second-judge grades with complete agreement cannot replace the decision.
+    path = tl.WORK / "second" / "judgments.jsonl"
+    rows = tl.read_checkpoint(path)
+    tl.append_rows(path, [{**r, "grade": grade_of(r["qid"], r["doc"])} for r in rows])
     with pytest.raises(tl.LabelError, match="decided"):
         tl.accept(0)
     assert tl.main(["accept"]) == 2
@@ -1193,26 +1161,12 @@ def test_a_recorded_failure_is_final_and_freeze_stays_blocked(sampled, monkeypat
 
 
 def test_a_recorded_pass_is_final_too(sampled, monkeypatch):
-    assert _accept_with(sampled, monkeypatch, 140 / 150, against=0)["outcome"] == "PASS"
+    assert _accept_with(sampled, monkeypatch, 140 / 150)["outcome"] == "PASS"
     recorded = (tl.WORK / "acceptance-r0.json").read_text()
     with pytest.raises(tl.LabelError, match="decided"):
         tl.accept(0)
     assert (tl.WORK / "acceptance-r0.json").read_text() == recorded
     assert tl.freeze(0) == 0
-
-
-def test_unsure_is_not_against_the_primary_and_the_sheet_must_be_answered(sampled, monkeypatch):
-    second_judged(sampled, monkeypatch)
-    assert tl.spot() == 0
-    with pytest.raises(tl.LabelError, match="answer every spot block"):
-        tl.accept()
-    with pytest.raises(tl.LabelError, match="fixed"):
-        tl.spot()
-    drawn = json.loads((tl.WORK / "samples" / "r0-spot.json").read_text())
-    sheet = tl.WORK / "samples" / "r0-spot.sheet.txt"
-    sheet.write_text(_answer(sheet.read_text(), {p["id"]: "unsure" for p in drawn["pairs"]}))
-    result = tl.accept()
-    assert result["outcome"] == "PASS" and result["spot_check"]["answers"] == {"unsure": 5}
 
 
 def _rows(n_primary_only, n_second_only, n_agree, lang_of=lambda n: "de" if n % 3 == 0 else "en"):
@@ -1226,114 +1180,6 @@ def _rows(n_primary_only, n_second_only, n_agree, lang_of=lambda n: "de" if n % 
     return rows
 
 
-@pytest.mark.parametrize("seed", ["s1", "s2", "s3"])
-def test_spot_selection_meets_its_quotas_reproducibly(seed):
-    rows = _rows(20, 6, 120)
-    spot = tl.select_spot(rows, seed)
-    shuffled = rows[:]
-    random.Random(3).shuffle(shuffled)
-    assert tl.select_spot(shuffled, seed) == spot
-    assert len(spot) == 5 and sorted(p["id"] for p in spot) == ["S1", "S2", "S3", "S4", "S5"]
-    assert all(p["label"] != p["second_label"] for p in spot)
-    assert sum(1 for p in spot if p["label"] == 1) >= 2 and sum(1 for p in spot if p["label"] == 0) >= 2
-    assert sum(1 for p in spot if p["lang"] == "de") >= 2
-    others = {tuple(sorted(p["doc"] for p in tl.select_spot(rows, s))) for s in ("s1", "s2", "s3", "s4")}
-    assert len(others) > 1  # the seed chooses among the qualifying pairs
-
-
-def test_spot_quotas_take_what_exists_when_a_kind_is_rare():
-    rows = _rows(10, 1, 50, lang_of=lambda n: "de" if n == 3 else "en")
-    spot = tl.select_spot(rows, "s")
-    assert sum(1 for p in spot if p["label"] == 0) == 1 and sum(1 for p in spot if p["lang"] == "de") == 1
-    assert all(p["label"] != p["second_label"] for p in spot)
-
-
-@pytest.mark.parametrize("disagree", [0, 1, 3, 4])
-def test_fewer_than_five_disagreements_are_filled_with_primary_boundary_pairs(disagree):
-    rows = _rows(disagree - disagree // 2, disagree // 2, 60)
-    spot = tl.select_spot(rows, "s")
-    assert len(spot) == 5
-    assert sum(1 for p in spot if p["label"] != p["second_label"]) == disagree
-    fill = [p for p in spot if p["label"] == p["second_label"]]
-    assert all(p["grade"] in (1, 2) for p in fill) and len(fill) == 5 - disagree
-    assert sum(1 for p in spot if p["lang"] == "de") >= 2
-
-
-def test_the_spot_sheet_shows_no_grade_and_records_its_seed(sampled, monkeypatch):
-    second_judged(sampled, monkeypatch, _flips(sampled.sample["pairs"], 12))
-    assert tl.spot() == 0
-    drawn = json.loads((tl.WORK / "samples" / "r0-spot.json").read_text())
-    assert drawn["seed"] == f"{tl.SEED}:0:spot" and drawn["sample"] == "r0-b1"
-    rows = tl.paired(sampled.sample["pairs"], tl.second_judgments(
-        sampled.c, sampled.pools, tl.load_excerpts(sampled.pools), sampled.sample["pairs"]))
-    assert drawn["pairs"] == tl.select_spot(rows, drawn["seed"])
-    assert all(p["label"] != p["second_label"] for p in drawn["pairs"])
-    text = (tl.WORK / "samples" / "r0-spot.sheet.txt").read_text()
-    assert text.startswith(tl.sheet_header("r0-spot", 5))
-    assert len(re.findall(r"(?m)^Answer:", text)) == 5 and tl.QUESTION in text
-    for p in drawn["pairs"]:
-        block = re.search(rf"^=== {p['id']} ===\n(.*?)^=== end {p['id']} ===", text, re.M | re.S).group(1)
-        assert re.sub(r"(?m)^File excerpt:\n.*?\n(?=Would)", "", block, flags=re.S) == (
-            f"Search: {sampled.c.queries[p['qid']].text}\n{tl.QUESTION}\nAnswer:\n")
-        assert p["doc"] not in block.split("File excerpt:")[0]
-    outside = re.sub(r"(?ms)^File excerpt:\n.*?\n(?=Would)", "", text)
-    assert "grade" not in outside.lower() and "relevant" not in outside.lower()
-
-
-def _answer(text, answers):
-    for pid, a in answers.items():
-        text = re.sub(rf"(=== {pid} ===\n(?:.*\n)*?)Answer:\n", rf"\1Answer: {a}\n", text, count=1)
-    return text
-
-
-@pytest.fixture
-def spotted(sampled, monkeypatch):
-    second_judged(sampled, monkeypatch, _flips(sampled.sample["pairs"], 12))
-    assert tl.spot() == 0
-    drawn = json.loads((tl.WORK / "samples" / "r0-spot.json").read_text())
-    return SimpleNamespace(**vars(sampled), spot=drawn, sheet=tl.WORK / "samples" / "r0-spot.sheet.txt")
-
-
-def _parse(s, text):
-    return tl.parse_sheet(text, "r0-spot", s.spot["pairs"], s.c, tl.load_excerpts(s.pools))
-
-
-def test_the_parser_reads_answers_and_reports_unanswered_blocks(spotted):
-    ids = [p["id"] for p in spotted.spot["pairs"]]
-    text = _answer(spotted.sheet.read_text(), {ids[0]: "Yes", ids[1]: "no", ids[2]: " unsure "})
-    got = _parse(spotted, text.replace("\n", "\r\n"))
-    assert got["answers"] == {ids[0]: "yes", ids[1]: "no", ids[2]: "unsure"}
-    assert got["unanswered"] == sorted(ids[3:])
-
-
-@pytest.mark.parametrize("damage", ["missing", "duplicate", "altered", "unknown", "answer", "outside"])
-def test_the_parser_refuses_missing_duplicate_or_altered_blocks(spotted, damage):
-    text = spotted.sheet.read_text()
-    blocks = list(tl.BLOCK.finditer(text))
-    first = blocks[0].group(0)
-    if damage == "missing":
-        text = text.replace(first, "")
-    elif damage == "duplicate":
-        text = text + "\n" + first
-    elif damage == "altered":
-        text = text.replace(first, first.replace("Search: ", "Search: not ", 1))
-    elif damage == "unknown":
-        text = text.replace(first, first.replace(blocks[0].group(1), "Z999"))
-    elif damage == "answer":
-        text = text.replace(first, first.replace("Answer:", "Answer: probably"))
-    else:
-        text = text.replace("Edit only the Answer lines", "Edit what you like")
-    with pytest.raises(tl.LabelError):
-        _parse(spotted, text)
-
-
-def test_changed_second_grades_after_the_spot_draw_refuse(spotted):
-    rows = tl.read_checkpoint(tl.WORK / "second" / "judgments.jsonl")
-    tl.append_rows(tl.WORK / "second" / "judgments.jsonl", [{**rows[0], "grade": 3 - rows[0]["grade"]}])
-    with pytest.raises(tl.LabelError, match="changed since the spot check"):
-        tl.accept()
-
-
 def test_the_report_names_the_judges_confusion_by_language_and_grade():
     report = tl.agreement_report(_rows(2, 1, 3, lang_of=lambda n: "de"))
     assert report["confusion"] == {"primary_not_relevant/second_relevant": 1,
@@ -1343,7 +1189,7 @@ def test_the_report_names_the_judges_confusion_by_language_and_grade():
 
 
 @pytest.mark.parametrize("revision", [-1, 2])
-@pytest.mark.parametrize("step", ["judge", "sample", "second-judge", "spot", "accept", "freeze", "draw",
+@pytest.mark.parametrize("step", ["judge", "sample", "second-judge", "accept", "freeze", "draw",
                                   "batches", "second-batches"])
 def test_revision_bounds_are_checked_before_work(world, monkeypatch, revision, step):
     monkeypatch.setattr(ruq, "ask_claude", lambda *a, **kw: pytest.fail("model called"))
@@ -1352,7 +1198,6 @@ def test_revision_bounds_are_checked_before_work(world, monkeypatch, revision, s
         "judge": lambda: tl.judge(max_calls=0, revision=revision),
         "sample": lambda: tl.sample(revision),
         "second-judge": lambda: tl.second_judge(max_calls=0, revision=revision),
-        "spot": lambda: tl.spot(revision),
         "accept": lambda: tl.accept(revision),
         "freeze": lambda: tl.freeze(revision),
         "draw": lambda: tl.draw_sample(_population(), revision=revision),
@@ -1377,7 +1222,7 @@ def test_revision_one_requires_a_failed_decision_and_a_changed_rubric(sampled, m
 
 def test_revision_one_relabels_draws_new_pairs_judges_them_again_and_a_second_failure_stops(sampled,
                                                                                          monkeypatch):
-    assert _accept_with(sampled, monkeypatch, 1.0, against=4)["outcome"] == "FAIL"
+    assert _accept_with(sampled, monkeypatch, 0.5)["outcome"] == "FAIL"
     path = tl.RECORD / "prompts" / "topical-judge.txt"
     path.write_text(path.read_text() + "\nRevised rubric.\n")
     fake = FakeJudge(sampled.c)
@@ -1478,15 +1323,51 @@ def test_accept_waits_for_every_sample_pair_to_have_a_second_grade(sampled, monk
     tl.second_judge(max_calls=2)
     with pytest.raises(tl.LabelError, match="no second-judge grade yet"):
         tl.accept(0)
-    with pytest.raises(tl.LabelError, match="no second-judge grade yet"):
-        tl.spot(0)
 
 
 # --------------------------------------------------------------------------- L5 freeze
 
 
+@pytest.mark.parametrize("agree,outcome", [(120, "PASS"), (119, "FAIL")])
+def test_accept_without_a_sheet_uses_only_model_agreement(sampled, monkeypatch, agree, outcome):
+    second_judged(sampled, monkeypatch, _flips(sampled.sample["pairs"], 150 - agree))
+    assert not list((tl.WORK / "samples").glob("*.sheet.txt"))
+    assert tl.main(["accept"]) == 0
+    decision = json.loads((tl.WORK / "acceptance-r0.json").read_text())
+    assert decision["outcome"] == outcome
+    assert "spot_check" not in decision
+
+
+def test_spot_is_not_a_subcommand(capsys):
+    with pytest.raises(SystemExit) as exc:
+        tl.main(["spot", "--help"])
+    assert exc.value.code == 2
+    assert "invalid choice: 'spot'" in capsys.readouterr().err
+
+
+def test_frozen_provenance_explicitly_records_no_human_check(sampled, monkeypatch):
+    _frozen(sampled, monkeypatch)
+    audit = json.loads((sampled.record / "topical-labels.json").read_text())
+    assert "human_check" in audit and "spot_check" not in audit
+    assert audit["human_check"] == (
+        "No human checked the labels. They are model-graded and cross-checked on a sample "
+        "by a second model family, which may share blind spots.")
+
+
+@pytest.mark.parametrize("judge", ["primary", "second"])
+def test_freeze_refuses_grades_changed_since_the_decision(sampled, monkeypatch, judge):
+    assert _accept_with(sampled, monkeypatch)["outcome"] == "PASS"
+    path = tl.WORK / "judgments.jsonl" if judge == "primary" else tl.WORK / "second" / "judgments.jsonl"
+    rows = tl.read_checkpoint(path)
+    # Change the raw grade while preserving its binary label: the decision binds both.
+    tl.append_rows(path, [{**rows[0], "grade": rows[0]["grade"] ^ 1}])
+    with pytest.raises(tl.LabelError, match="model labels changed|current judges' grades"):
+        tl.freeze(0)
+    assert not (tl.RECORD / "topical-labels.json").exists()
+
+
 def _frozen(sampled, monkeypatch):
-    assert _accept_with(sampled, monkeypatch, 142 / 150, against=1)["outcome"] == "PASS"
+    assert _accept_with(sampled, monkeypatch, 142 / 150)["outcome"] == "PASS"
     assert tl.freeze(0) == 0
     c = qcoll.load_collection(sampled.record.parent / "real-use")
     cfg = qcoll.load_config(sampled.config_dir / "real-use.json")
@@ -1534,9 +1415,6 @@ def test_the_audit_record_holds_grades_and_provenance_but_no_text(sampled, monke
     assert audit["second_judge"] == {"model": "gpt-6.1-sol", "via": "codex exec (ChatGPT subscription)",
                                      "sample": "r0-b1"}
     assert audit["agreement"] == {"pairs": 150, "agree": 142, "agreement": 142 / 150, "pass_mark": 0.8}
-    spot = audit["spot_check"]
-    assert spot["pairs"] == 5 and spot["against_primary"] == 1 and spot["fail_at"] == 4
-    assert sum(spot["answers"].values()) == 5 and spot["role"].startswith("information")
     assert audit["decision"]["outcome"] == "PASS"
     for path in sampled.record.parent.rglob("*"):
         if path.is_file():
