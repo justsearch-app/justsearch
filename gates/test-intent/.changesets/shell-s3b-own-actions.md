@@ -1180,3 +1180,14 @@ metadata, shared dev stack or another session's service is used. No existing ass
   ]
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a1ab5a-374a-7ff3-89fd-5372f7db8232",
+  "verdict": "accept",
+  "digest": "sha256:5874dfe91d42437cc56a607d1afd182ad002622f18064235873a88c611e6ea11",
+  "note": "Round 3 on e502a22fc9: New 22, Adaptation 13, Obsolete 4, Incidental 1; 302 checks pass; repaired checks fail before by assertion (12 against origin/main, 11 against round 2). Earlier rounds: round 1 accepted with product failures since repaired; round 2 rejected one Adaptation (generic invocation oracle), restored here. Transcribed by the orchestrator from the verifier's answer (Codex sandbox)."
+}
+```
