@@ -516,3 +516,25 @@ the person's own action, so it waits in Needs you. The own-transport cases of th
   "note": "Audit (PR audit-selected): entry 15 cited an orchestrator decision as owner-words, and its repaired checks included the legacy no-request-id case, which passes on the baseline (its recorded failure came from an intermediate revision). Evidence integrity and the other 39 repair checks held. Repaired since: entry 15 cites ST7; the legacy case moved to its own non-repaired entry with its own evidence. Transcribed by the orchestrator from the auditor's answer (Codex sandbox)."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a1ace1-2a6b-78e1-abd6-d85653ddb1e5",
+  "verdict": "accept",
+  "digest": "sha256:e73a805573acef8f39d3f6a9bfd24772d38de82258c817d5dd8294643d2163df",
+  "note": "After the audit corrections: entry 15 cites ST7 and its expectations follow from it; the legacy no-request-id check is a separate non-repaired entry with valid evidence; all 45 checks' evidence validates, 43 repaired with assertion fail-before; covered tests unchanged. Transcribed by the orchestrator from the verifier's answer (Codex sandbox)."
+}
+```
+
+```json
+{
+  "kind": "audit",
+  "role": "verifier",
+  "session": "01a1acd5-944a-7e23-8496-c8cedd011975",
+  "verdict": "accept",
+  "digest": "sha256:e73a805573acef8f39d3f6a9bfd24772d38de82258c817d5dd8294643d2163df",
+  "note": "Independent audit (PR audit-selected): all 45 listed checks covered, 43 repaired checks with assertion fail-before; mixed keyed and legacy history across 120 orders fails before and passes after; existing assertion changes accounted for. Transcribed by the orchestrator from the auditor's answer (Codex sandbox)."
+}
+```
