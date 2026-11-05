@@ -1203,6 +1203,34 @@ The brief's adopted scenarios are quoted below; choices the scenarios leave open
           "label": "agent choice"
         }
       ]
+    },
+    {
+      "items": [
+        "modules/ui/src/test/java/io/justsearch/ui/HeadlessAppRemovalUsageWiringTest.java"
+      ],
+      "class": "New",
+      "behaviour": "Found live: after switching Best match first off, removal refused forever with 'Search is still starting - try again in a moment' while searches worked. Through the production composition (the real buildApi, Engine root, index start, handover and settings owner, in a temporary data folder): before the index half connects the reason is 'Search is still starting - try again in a moment'; once it has connected the part becomes removable, the removal deletes the offered staging file and records the decline; after the index half closes the reason returns and nothing is deleted. Before the change the part stayed refused after the handover. The removal is exercised on a staging file because the real registry's model hashes cannot be met by test bytes; answers are disabled here, so this covers Best match first's wiring only, and a held session is covered by ModelFileRemovalQueryOwnersTest and RerankerRemovalQueryOwnersTest.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "X1",
+          "quote": "Advanced settings > Downloaded files offers Remove files for best match first, for answers (its model and picture-reading file together, only when answers and picture reading are both off), and for other optional parts (SPLADE, entity recognition, citation scoring) when nothing uses them; the confirmation lists exactly what is deleted, its measured size, and what is kept because another part needs it. Not offered for picture reading alone (its file belongs to the answer model download), Understand meaning, runtime libraries, or imported, discovered or custom files. (challenger-4 #1, #10)",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed accordingly",
+          "delegationLocation": "task t-20261101-uiimpl user turn proceed accordingly",
+          "delegationScope": "Implement design D4 (narrow option) and its settlement for Remove files and Download again, within the settled scenarios X1-X4, N1 and N2.",
+          "choice": "Live test on the real Engine (after 5caaba06c7): the Engine composes its services with no index half, so the usage probe bound to that null construction argument refused Best match first's removal for the life of the process. The probe now resolves the live index half through the existing late-bound supplier at each call: it is unknown only until the index half has connected, and again once it has closed. Every other value in the removal wiring was checked for the same defect: the install owner's knowledge server is late-bound and not read by removal, pack import's is used only for a log line, and the recorded-ingestion owner, answer runtime and chat holds are real at composition. Dev tooling, outside the product-test gate: --isolated-models=reuse restarts an already marked folder keeping its private models and saved state, so crash recovery can be tested on the real Engine. It never cleans (the default soft clean would delete install records, so it is turned off and --clean hard is refused), and because a marked folder holds whatever its Engine saved it names what stays refused rather than listing what is allowed: a config or models folder, and saved settings or install records naming a path inside the shared models or graph cache. The marker, link, overlap and inherited-variable refusals are unchanged. scripts/dev/test-dev-runner-isolated-models-repairs.mjs and test-dev-mcp-surface-honesty.mjs are node tests, which run-evidence.mjs does not support: on 5caaba06c7 the six new reuse cases and the widened schema case fail, on the candidate all pass.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/s2-remove-files-live-wiring.json",
+      "newChecks": [
+        "modules/ui/src/test/java/io/justsearch/ui/HeadlessAppRemovalUsageWiringTest.java#bestMatchFirstRemovalFollowsTheLiveIndexHalfThroughTheProductionComposition"
+      ]
     }
   ]
 }

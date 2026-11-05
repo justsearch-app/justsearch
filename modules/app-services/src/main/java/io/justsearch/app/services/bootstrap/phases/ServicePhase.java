@@ -387,10 +387,13 @@ public final class ServicePhase {
     // or a surviving self-test keeps it in use), never from the server's mode (repair round 2).
     // Best match first's usage is asked of the index half's query owners at each removal (repair
     // round 4): a retired view issued queries still hold keeps it in use, which no health
-    // observation of the current view shows.
-    var knowledgeServer = in.knowledgeServer();
+    // observation of the current view shows. The Engine composes this phase before the index half
+    // connects, so the owner is resolved at each call: unknown only until it has really connected.
     aiInstallHelper.setRemovalUsageProbe(io.justsearch.app.services.ai.install.ModelFileUsage.probe(
-        knowledgeServer == null ? () -> WorkerHost.RerankerUse.UNKNOWN : knowledgeServer::rerankerUse,
+        () -> {
+          KnowledgeServerBootstrap indexHalf = in.knowledgeServerBootstrapSupplier().get();
+          return indexHalf == null ? WorkerHost.RerankerUse.UNKNOWN : indexHalf.rerankerUse();
+        },
         answerRuntime, chatHolds));
 
 
