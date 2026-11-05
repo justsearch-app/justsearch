@@ -436,3 +436,14 @@ the person's own action, so it waits in Needs you. The own-transport cases of th
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "7787f244-bdf8-46c5-9462-c2403aaf9886",
+  "verdict": "accept",
+  "digest": "sha256:424d96854c7abc64f06e0c3d2d27cd010ea35f77b2eba0fafc8ce60c9d382217",
+  "note": "Round 2 on 279a8dea3b: all 11 items pass, every repaired check fails before by assertion; item 4 held across 1440 orderings of two same-operation Allows; item 9 across all 24 orders. Labelling note: entry 14 labels an orchestrator decision as owner-adopted; its never-join-without-an-id expectation passes on the baseline and follows from L16. Round 1 (Claude verifier 531730fa-109e-421d-aecf-e039bd1fd924) accepted an earlier digest with items 4 and 9 failing; the Codex attempt before it stopped at model capacity. Transcribed by the orchestrator from the verifier's answer."
+}
+```
