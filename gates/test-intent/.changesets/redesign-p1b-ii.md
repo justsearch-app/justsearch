@@ -352,3 +352,25 @@ env -u DISPLAY -u WAYLAND_DISPLAY js-gradle-slot node scripts/governance/gates/t
   "note": "Codex verifier-2 on 56c91559f1: entries 1-6 accept; P1b-2/3/4/7/8 fail before and pass after (18 repair checks); ordinary scans pass incl. the store-failure guard (B1 repaired); preservation fixtures pass on both; C17/C20 pass."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a1aa23-2984-70e3-94db-f0926dd6d8e4",
+  "verdict": "accept",
+  "digest": "sha256:35d6c5d7cb02ffeff181d6338fd78d4cdebc69a5e92cba3720b33aa927b0dac8",
+  "note": "Codex acceptor-2 on 0871fb4f6b: entries 1-6 accept; repair evidence 27 cases with baseline assertion failures; preservation 122 passing cases incl. all 37 IndexedSourceMaintenanceTest invocations (C17 two, C20 three)."
+}
+```
+
+```json
+{
+  "kind": "audit",
+  "role": "reviewer",
+  "session": "01a1aa22-6af0-7192-8d9b-597a788a6931",
+  "verdict": "accept",
+  "digest": "sha256:35d6c5d7cb02ffeff181d6338fd78d4cdebc69a5e92cba3720b33aa927b0dac8",
+  "note": "Codex audit-2 on 0871fb4f6b: entries 1-6 accept; evidence digests and 52 check-content hashes match; maintenance class 37 cases incl. C17/C20."
+}
+```
