@@ -136,8 +136,14 @@ def test_cpu_list_is_allowed_and_exact(monkeypatch):
     with pytest.raises(sensitivity.SensitivityRefused, match='differs'):
         sensitivity.pin_cpus([2])
     java = Mock(pid=20); java.name.return_value = 'java'; java.cpu_affinity.return_value = [2, 3, 4, 5]
-    parent = Mock(); parent.name.return_value = 'node'; parent.children.return_value = [java]
+    parent = Mock(pid=10); parent.name.return_value = 'node'; parent.children.return_value = [java]
     parent.cpu_affinity.return_value = [2, 3, 4, 5]
+    for process in (parent, java):
+        process.threads.return_value = [SimpleNamespace(id=process.pid)]
+    read_text = Path.read_text
+    monkeypatch.setattr(Path, 'read_text', lambda path, *a, **kw:
+        'Cpus_allowed_list:\t2-5\n' if str(path) in (
+            '/proc/10/task/10/status', '/proc/20/task/20/status') else read_text(path, *a, **kw))
     monkeypatch.setattr(sensitivity.psutil, 'Process', lambda _: parent)
     assert sensitivity.engine_cpus(Mock(), [2, 3, 4, 5]) == [2, 3, 4, 5]
     java.cpu_affinity.return_value = [2]
@@ -466,7 +472,8 @@ def test_cold_sensitivity_window_refuses_before_reserving(tmp_path, monkeypatch)
     assert not list(tmp_path.iterdir())
 
 
-@pytest.mark.parametrize('fault', [None, 'startup', 'malformed', 'timeout', 'interrupt', 'postscore'])
+@pytest.mark.parametrize('fault', [None, 'startup', 'malformed', 'timeout', 'interrupt', 'postscore',
+                                 'affinity_before', 'affinity_after'])
 def test_worker_completion_and_cleanup_include_sensitivity(tmp_path, monkeypatch, fault):
     c = make_collection({'en/vague': 6}); fixture = make_run(c)
     arm = sensitivity.declaration(c, LAPTOP, [2, 3, 4, 5], 3, 42)
@@ -479,7 +486,16 @@ def test_worker_completion_and_cleanup_include_sensitivity(tmp_path, monkeypatch
     prepare = Mock(return_value=handle); monkeypatch.setattr(index, 'prepare_index', prepare)
     pin = Mock(); monkeypatch.setattr(sensitivity, 'pin_cpus', pin)
     readback = Mock(return_value={'provider': 'cpu'}); monkeypatch.setattr(sensitivity, 'effective_settings', readback)
-    affinity = Mock(return_value=[2, 3, 4, 5]); monkeypatch.setattr(sensitivity, 'engine_cpus', affinity)
+    def cpu_check(handle, requested, check=None):
+        failed = ((fault == 'affinity_before' and affinity.call_count == 1) or
+                  (fault == 'affinity_after' and affinity.call_count == 2))
+        if check is not None:
+            check.update(ok=not failed, threads=[{'pid': 20, 'tid': 21,
+                                                'mask': '2-6' if failed else '2-5'}])
+        if failed:
+            raise sensitivity.SensitivityRefused('thread 21 pid 20 mask 2-6 outside --cpus')
+        return [2, 3, 4, 5]
+    affinity = Mock(side_effect=cpu_check); monkeypatch.setattr(sensitivity, 'engine_cpus', affinity)
     monkeypatch.setattr(index, 'confirm', lambda _: SimpleNamespace(ok=fault != 'postscore', failures=['changed']))
     def query(client, h, qid, *a):
         if fault == 'timeout': raise TimeoutError('deadline')
@@ -487,7 +503,7 @@ def test_worker_completion_and_cleanup_include_sensitivity(tmp_path, monkeypatch
         result = next(q for q in fixture.results if q.qid == qid)
         return replace(result, error='malformed response' if fault == 'malformed' else None,
             timings={'elapsed_seconds': 15}, served=Served(result.served.legs, 'skipped', 'DISABLED'))
-    monkeypatch.setattr(run, 'search_query', query)
+    search = Mock(side_effect=query); monkeypatch.setattr(run, 'search_query', search)
     item = {'index_config': run._serial_config(index.IndexConfig()), 'sensitivity': arm,
         **{k: str(tmp_path/k) for k in ('collection', 'run', 'ready', 'go', 'done')}}
     Path(item['go']).touch()
@@ -498,9 +514,17 @@ def test_worker_completion_and_cleanup_include_sensitivity(tmp_path, monkeypatch
     assert prepare.call_args.kwargs['sensitivity'] == LAPTOP and prepare.call_args.kwargs['prepared_only'] is True
     handle.close.assert_called_once()
     done = json.loads(Path(item['done']).read_text())
-    if fault in ('startup', 'timeout', 'interrupt', 'postscore'):
+    if fault in ('startup', 'timeout', 'interrupt', 'postscore', 'affinity_before', 'affinity_after'):
         assert done['error'] is not None
         if Path(item['run']).exists(): assert RunRecord.read(item['run']).header.ended is None
+        if fault in ('affinity_before', 'affinity_after'):
+            assert 'thread 21 pid 20 mask 2-6' in done['error']
+            record = RunRecord.read(item['run'])
+            checks = record.header.sensitivity['cpu_affinity_checks']
+            phase = 'before_scoring' if fault == 'affinity_before' else 'after_scoring'
+            assert checks[phase] == {'ok': False, 'threads': [{'pid': 20, 'tid': 21, 'mask': '2-6'}]}
+            assert len(record.results) == (0 if fault == 'affinity_before' else 3)
+            assert search.call_count == len(record.results)
     else:
         record = RunRecord.read(item['run'])
         assert done['error'] is None and record.header.ended
@@ -508,6 +532,9 @@ def test_worker_completion_and_cleanup_include_sensitivity(tmp_path, monkeypatch
         assert set(q.qid for q in record.results) == set(arm['queries'])
         assert record.header.sensitivity['effective_cpus'] == [2, 3, 4, 5]
         assert record.header.sensitivity['effective_settings'] == {'provider': 'cpu'}
+        assert record.header.sensitivity['cpu_affinity_checks'] == {
+            phase: {'ok': True, 'threads': [{'pid': 20, 'tid': 21, 'mask': '2-5'}]}
+            for phase in ('before_scoring', 'after_scoring')}
         assert bool(compare.validate_run(c, record, {c.version}, 'arm', sensitivity=True)) == (fault == 'malformed')
         assert readback.call_count == affinity.call_count == 2
 

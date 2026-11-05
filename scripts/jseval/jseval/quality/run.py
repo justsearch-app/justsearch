@@ -285,17 +285,15 @@ def _collection_worker(plan: dict, item: dict, deadline: float) -> None:
     gpu_peak = None
     gpu_enabled = str(plan['hardware'].get('gpu_enabled', '')).lower() == 'true'
     arm = item.get('sensitivity')
+    cpu_checks = {}
     try:
         if arm is not None:
+            sensitivity.require_cpu_threads(arm['settings'], arm['requested_cpus'])
             sensitivity.pin_cpus(arm['requested_cpus'])
+            arm = {**arm, 'cpu_affinity_checks': cpu_checks}
         handle = index.prepare_index(c, cfg, prepared_only=True,
             **({'sensitivity': arm['settings']} if arm is not None else {}))
         handle.wait(prepared_only=True, deadline=deadline)
-        if arm is not None:
-            arm = sensitivity.history_key(arm,
-                sensitivity.effective_settings(handle.base_url, arm['settings']),
-                sensitivity.engine_cpus(handle, arm['requested_cpus']))
-            sensitivity.check_profile(arm, item.get('sensitivity_expected'))
         header = RunHeader(
             collection=c.name, collection_version=c.version, index_key=handle.index_key,
             index_population=handle.index_population, request_config=plan['request'],
@@ -313,6 +311,14 @@ def _collection_worker(plan: dict, item: dict, deadline: float) -> None:
         header = replace(header, started=datetime.fromtimestamp(
             time.time() - (time.monotonic()-start), timezone.utc).isoformat())
         RunRecord(header, ()).write(path)
+        if arm is not None:
+            arm = sensitivity.history_key(arm,
+                sensitivity.effective_settings(handle.base_url, arm['settings']),
+                sensitivity.engine_cpus(handle, arm['requested_cpus'],
+                                        cpu_checks.setdefault('before_scoring', {})))
+            sensitivity.check_profile(arm, item.get('sensitivity_expected'))
+            header = replace(header, sensitivity=arm)
+            RunRecord(header, ()).write(path)
         ready = time.monotonic()
         Path(item['ready']).touch()
         while not Path(item['go']).exists():
@@ -339,7 +345,8 @@ def _collection_worker(plan: dict, item: dict, deadline: float) -> None:
             # Lazy sessions can acquire their execution provider on the first query.
             header = replace(header, sensitivity=sensitivity.history_key(arm,
                 sensitivity.effective_settings(handle.base_url, arm['settings']),
-                sensitivity.engine_cpus(handle, arm['requested_cpus'])))
+                sensitivity.engine_cpus(handle, arm['requested_cpus'],
+                                        cpu_checks.setdefault('after_scoring', {}))))
             sensitivity.check_profile(header.sensitivity, item.get('sensitivity_expected'))
         scoring_end = time.monotonic()
     except BaseException as e:
@@ -353,6 +360,8 @@ def _collection_worker(plan: dict, item: dict, deadline: float) -> None:
         # A completion marker is written only after backend teardown succeeded.
         if header and failure is None:
             RunRecord(replace(header, ended=utc()), tuple(results)).write(path)
+        elif header and arm is not None:
+            RunRecord(header, tuple(results)).write(path)
         ended = time.monotonic()
         phases = ({'startup': ready-start, 'waiting': scoring_start-ready,
                    'scoring': scoring_end-scoring_start, 'cleanup': ended-scoring_end}
@@ -406,6 +415,8 @@ def execute(action: str, refs: tuple[str, ...], *, baseline_dir: Path,
     """Plan -> reserve -> run -> reap -> validate -> publish; no successful partial verdict."""
     overrides = sensitivity.settings(sets) if action == 'sensitivity' else None
     requested_cpus = sensitivity.cpus(cpus) if action == 'sensitivity' else None
+    if overrides is not None:
+        sensitivity.require_cpu_threads(overrides, requested_cpus)
     request = request_for(mode)
     if action == 'ablate' and mode is None:
         raise RunRefused('ablation must name an explicit mode')

@@ -6,6 +6,7 @@ from datetime import datetime
 import json
 import math
 import os
+from pathlib import Path
 import re
 
 import httpx
@@ -139,7 +140,19 @@ def pin_cpus(requested):
             raise SensitivityRefused('effective worker CPU set differs from --cpus')
 
 
-def engine_cpus(handle, requested):
+def require_cpu_threads(overrides, requested):
+    # ORT's default thread pool can assign affinities beyond an inherited process
+    # mask. An explicit positive count disables that automatic placement.
+    if requested is not None:
+        value = overrides.get('JUSTSEARCH_ORT_INTRA_OP_THREADS')
+        if value is None or not 1 <= int(value) <= len(requested):
+            raise SensitivityRefused('--cpus requires --set JUSTSEARCH_ORT_INTRA_OP_THREADS=N '
+                                     f'with 1 <= N <= {len(requested)}')
+
+
+def engine_cpus(handle, requested, check=None):
+    if check is not None:
+        check.update(ok=False, threads=[])
     parent = psutil.Process(handle._backend.proc.pid)
     processes = [parent, *parent.children(recursive=True)]
     jvms = [p for p in processes if p.name() in ('java', 'java.exe')]
@@ -147,8 +160,37 @@ def engine_cpus(handle, requested):
         raise SensitivityRefused('cannot read effective Engine JVM CPU set')
     effective = sorted(jvms[0].cpu_affinity())
     for process in processes:
-        if requested is not None and set(process.cpu_affinity()) != set(requested):
-            raise SensitivityRefused(f'effective CPU set differs from --cpus for pid {process.pid}')
+        if requested is None:
+            continue
+        for thread in process.threads():
+            mask = 'unavailable'
+            try:
+                status = Path(f'/proc/{process.pid}/task/{thread.id}/status').read_text()
+                mask = next(line.split(':', 1)[1].strip() for line in status.splitlines()
+                            if line.startswith('Cpus_allowed_list:'))
+                if not re.fullmatch(r'[0-9]+(?:-[0-9]+)?(?:,[0-9]+(?:-[0-9]+)?)*', mask):
+                    raise ValueError('malformed Cpus_allowed_list')
+                allowed = set()
+                for part in mask.split(','):
+                    ends = [int(n) for n in part.split('-')]
+                    lo, hi = ends[0], ends[-1]
+                    if hi < lo:
+                        raise ValueError('reversed CPU range')
+                    allowed.update(range(lo, hi+1))
+            except (OSError, ValueError, StopIteration) as e:
+                raise SensitivityRefused(f'thread {thread.id} pid {process.pid} mask {mask!r}: '
+                                         f'cannot read CPU affinity ({type(e).__name__})') from None
+            if check is not None:
+                check['threads'].append({'pid': process.pid, 'tid': thread.id, 'mask': mask})
+            if not allowed <= set(requested):
+                raise SensitivityRefused(f'thread {thread.id} pid {process.pid} mask {mask} '
+                                         f'outside --cpus {requested}')
+        leader_mask = process.cpu_affinity()
+        if set(leader_mask) != set(requested):
+            raise SensitivityRefused(f'effective CPU set differs from --cpus for thread {process.pid} '
+                                     f'pid {process.pid} mask {leader_mask}')
+    if check is not None:
+        check['ok'] = True
     return effective
 
 
