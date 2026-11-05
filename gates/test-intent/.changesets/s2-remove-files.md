@@ -241,12 +241,6 @@ The brief's adopted scenarios are quoted below; choices the scenarios leave open
         "modules/app-services/src/test/java/io/justsearch/app/services/ai/install/ModelFileRemovalTest.java#aDeclineTheSettingsOwnerRefusesDeletesNothing",
         "modules/app-services/src/test/java/io/justsearch/app/services/ai/install/ModelFileRemovalTest.java#eligibilityIsReadAgainUnderTheLock",
         "modules/app-services/src/test/java/io/justsearch/app/services/ai/install/ModelFileRemovalTest.java#partsThisStepCannotRemoveAreShownWithTheirReasonAndMeasuredSize",
-        "modules/app-services/src/test/java/io/justsearch/app/services/ai/install/ModelFileRemovalFenceTest.java#aUserCannotEnterWhileARemovalHoldsTheLock",
-        "modules/app-services/src/test/java/io/justsearch/app/services/ai/install/ModelFileRemovalFenceTest.java#aRemovalCannotBeginWhileAUserIsRegisteredAndNamesIt",
-        "modules/app-services/src/test/java/io/justsearch/app/services/ai/install/ModelFileRemovalFenceTest.java#aSecondRemovalCannotStartWhileOneRuns",
-        "modules/app-services/src/test/java/io/justsearch/app/services/ai/install/ModelFileRemovalFenceTest.java#bestMatchFirstIsInUseUntilTheWorkerReportsNoSession",
-        "modules/app-services/src/test/java/io/justsearch/app/services/ai/install/ModelFileRemovalFenceTest.java#theAnswerModelIsInUseWhileAProcessMayHoldItOrAHoldIsOpen",
-        "modules/app-services/src/test/java/io/justsearch/app/services/ai/install/ModelFileRemovalFenceTest.java#anUnboundProbeFailsClosed",
         "modules/app-services/src/test/java/io/justsearch/app/services/ai/install/ModelFileRemovalRoutesTest.java#aPackImportIsRefusedWhileRemovingAndARunningImportRefusesTheRemoval",
         "modules/app-services/src/test/java/io/justsearch/app/services/ai/install/ModelFileRemovalRoutesTest.java#aRuntimeActivationOrDeactivationIsRefusedWhileRemovingAndARunningOneRefusesTheRemoval",
         "modules/app-services/src/test/java/io/justsearch/app/services/ai/install/AiInstallServiceFileRemovalTest.java#theDeclineIsRecordedThroughTheSettingsOwnerAndRepairDoesNotBringThePartBack",
@@ -273,9 +267,6 @@ The brief's adopted scenarios are quoted below; choices the scenarios leave open
         "modules/ui-web/src/shell-v0/views/BrainSurface.remove-files.test.ts#Download again asks first; closing the consent saves nothing and accepting starts the included download",
         "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaServerLaunchFenceTest.java#aFencedStartLaunchesNothingAndIsARefusal",
         "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaServerLaunchFenceTest.java#anAdmittedLaunchIsRegisteredUntilItsProcessHasStarted",
-        "modules/app-services/src/test/java/io/justsearch/app/services/ai/install/ModelFileRemovalFenceTest.java#anAnswerServerLaunchInProgressRefusesTheAnswerModelRemovalOnly",
-        "modules/app-services/src/test/java/io/justsearch/app/services/ai/install/ModelFileRemovalFenceTest.java#aRemovalOfTheAnswerModelRefusesALaunchAndOtherRemovalsDoNot",
-        "modules/app-services/src/test/java/io/justsearch/app/services/ai/install/ModelFileRemovalFenceTest.java#aLaunchAndARemovalRacingNeverBothProceed",
         "modules/app-services/src/test/java/io/justsearch/app/services/ai/install/AiInstallServiceFileRemovalTest.java#anOpenInstalledModelActivationRefusesTheRemovalAndDeletesNothing",
         "modules/app-engine/src/test/java/io/justsearch/app/engine/RecordedInstallerGenerationBootProjectionTest.java#anOpenInstallerActivationIsReportedSoRemoveFilesRefuses"
       ]
@@ -592,7 +583,7 @@ The brief's adopted scenarios are quoted below; choices the scenarios leave open
       ],
       "class": "New",
       "repaired": true,
-      "behaviour": "Repair round 3 of the reviewed candidate (ba932039fe). A captured file is deleted only through a handle checked to be the verified file, never by name after the last check: on a platform without directory handles (a file system whose directory streams are not secure, as on Windows) a file swapped in under the captured name after the last check by name is kept in the removal folder ('kept - it changed while being removed'), and a still-captured verified file is put back ('kept - could not be deleted') instead of being deleted by name; before the change both were deleted by name. A new file written at a canonical place after its own file was captured (while that file is checked) is kept, measured and reported 'kept - a new file appeared here', and the removal says 'partly-removed', in the finished report, the page's report and after a crash; before the change the place was reported deleted and the removal 'removed'. A self-test candidate whose registration was refused and whose rollback stop failed keeps the answer model in use (the removal refuses with 'The answer model is being tested - try again when it finishes') until it is confirmed gone; before the change it was forgotten and the files were reported free. Each check failed by assertion on ba932039fe with only NoDirectoryHandlesFileSystem.java overlaid (a test file system over the real one whose directory streams are plain). AnswerFilesInUseTest and AiInstallServiceRemovalRepair2Test are now tagged cross-platform. The Windows handle path is covered by three Windows-only cases in ModelFileRemovalWindowsTest (a file swapped in before the deleting handle opens is not deleted; the captured name cannot be renamed while the verified handle is held, and that file is the one deleted; a captured file another program opened for writing cannot get the deleting handle and is kept); they did not run on this Linux host and run in the Windows CI lane.",
+      "behaviour": "Repair round 3 of the reviewed candidate (ba932039fe). On Windows a captured file is deleted only through the handle it was verified through; on POSIX its entry is checked and then unlinked by name relative to the checked removal folder's handle (under the threat model decided after the final review, programs running under the user's own account are trusted: such a program could swap a file at the moment of deletion, and can already change the user's files directly): on a platform without directory handles (a file system whose directory streams are not secure, as on Windows) a file swapped in under the captured name after the last check by name is kept in the removal folder ('kept - it changed while being removed'), and a still-captured verified file is put back ('kept - could not be deleted') instead of being deleted by name; before the change both were deleted by name. A new file written at a canonical place after its own file was captured (while that file is checked) is kept, measured and reported 'kept - a new file appeared here', and the removal says 'partly-removed', in the finished report, the page's report and after a crash; before the change the place was reported deleted and the removal 'removed'. A self-test candidate whose registration was refused and whose rollback stop failed keeps the answer model in use (the removal refuses with 'The answer model is being tested - try again when it finishes') until it is confirmed gone; before the change it was forgotten and the files were reported free. Each check failed by assertion on ba932039fe with only NoDirectoryHandlesFileSystem.java overlaid (a test file system over the real one whose directory streams are plain). AnswerFilesInUseTest and AiInstallServiceRemovalRepair2Test are now tagged cross-platform. The Windows handle path is covered by three Windows-only cases in ModelFileRemovalWindowsTest (a file swapped in before the deleting handle opens is not deleted; the captured name cannot be renamed while the verified handle is held, and that file is the one deleted; a captured file another program opened for writing cannot get the deleting handle and is kept); they did not run on this Linux host and run in the Windows CI lane.",
       "sources": [
         {
           "kind": "owner-adopted-scenario",
@@ -613,7 +604,7 @@ The brief's adopted scenarios are quoted below; choices the scenarios leave open
           "delegationQuote": "proceed accordingly",
           "delegationLocation": "task t-20261101-uiimpl user turn proceed accordingly",
           "delegationScope": "Implement design D4 (narrow option) and its settlement for Remove files and Download again, within the settled scenarios X1-X4, N1 and N2.",
-          "choice": "Repair round 3, Windows deletion: the captured file is opened once (CreateFileW, read and delete access, read sharing only, not following a link or reparse point, no backup semantics so a folder cannot be opened); its NTFS identity, link count and size are read from that handle and its SHA-256 by reading the same handle; only then is the handle's delete disposition set (SetFileInformationByHandle, FileDispositionInfo) and the handle closed. The decision named StandardOpenOption.DELETE_ON_CLOSE; a delete-on-close open cannot be withdrawn after a failed check and would delete a mismatched file, so the disposition is set only after the checks pass, which deletes exactly the opened file. When the handle cannot be opened or marked (in use for writing, a sharing violation, the calls unavailable) the file is kept and put back ('kept - could not be deleted'). On POSIX the directory-relative unlink with identity checks stays. No path deletes a captured file by name: a platform with neither is refused for that file. A file another program had already opened with delete sharing is deleted once that program closes it, as on Linux.",
+          "choice": "Repair round 3, Windows deletion: the captured file is opened once (CreateFileW, read and delete access, read sharing only, not following a link or reparse point, no backup semantics so a folder cannot be opened); its NTFS identity, link count and size are read from that handle and its SHA-256 by reading the same handle; only then is the handle's delete disposition set (SetFileInformationByHandle, FileDispositionInfo) and the handle closed. The decision named StandardOpenOption.DELETE_ON_CLOSE; a delete-on-close open cannot be withdrawn after a failed check and would delete a mismatched file, so the disposition is set only after the checks pass, which deletes exactly the opened file. When the handle cannot be opened or marked (in use for writing, a sharing violation, the calls unavailable) the file is kept and put back ('kept - could not be deleted'). On POSIX the entry is checked to be the verified file and then unlinked by name relative to the checked removal folder's handle, and a put-back by hard link drops the captured name by name (also in recovery): a program running under the user's own account could swap a file at the moment of deletion; such a program can already change the user's files directly (threat model decided after the final review). A platform with neither handle keeps the file. A file another program had already opened with delete sharing is deleted once that program closes it, as on Linux.",
           "label": "agent choice"
         },
         {
@@ -647,6 +638,108 @@ The brief's adopted scenarios are quoted below; choices the scenarios leave open
         "modules/app-services/src/test/java/io/justsearch/app/services/ai/install/ModelFileRemovalRepair3Test.java#aNewFileWrittenAtTheCanonicalPlaceWhileTheCapturedFileIsCheckedIsKeptAndReported",
         "modules/app-services/src/test/java/io/justsearch/app/services/ai/install/ModelFileRemovalRepair3Test.java#aNewFileAtTheCanonicalPlaceOfADeletedFileIsReportedAfterACrash",
         "modules/app-inference/src/test/java/io/justsearch/app/inference/AnswerFilesInUseTest.java#aSelfTestCandidateWhoseRegistrationWasRefusedAndWhoseRollbackFailedKeepsTheFilesInUse"
+      ]
+    },
+    {
+      "items": [
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/RerankerRemovalQueryOwnersTest.java",
+        "modules/app-services/src/test/java/io/justsearch/app/services/ai/install/ModelFileRemovalRepair4Test.java"
+      ],
+      "class": "New",
+      "repaired": true,
+      "behaviour": "Repair round 4 of the reviewed candidate (c12aac8d47). Best match first's files are in use while any query owner of the index half still holds a reranker session, read from that owner at the call: after switching Best match first off, a query view issued before Off keeps the previous view and its reranker, and the owner says the session is held until that view is released, also when only a child lease forked from it remains; before the change the answer was the serving view's alone (as the Worker's health report showed it), so the files read as free while the issued view still held them. A file that appears during a removal at one of the part's canonical places that was empty when the removal was prepared is kept, measured and reported 'kept - a new file appeared here', and the removal is 'partly-removed', not 'removed': the answer model's picture-reading file written while the model is being checked, a Best match first variant written while another variant is being checked, and the same picture-reading file after a crash, reported by recovery; before the change those places were never looked at and the removal said 'removed' (or recovery listed nothing). The Best match first check failed by assertion on c12aac8d47 with gates/test-intent/s2-remove-repair4-before.patch, which only adds the owner's call shape over that revision's rule (the serving view's reranker, as the health report showed it); the new-file checks failed by assertion on c12aac8d47 with no overlay or patch.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "X2",
+          "quote": "Removal refuses with a plain reason (switch it off first; a download, repair, import or activation is running; an index generation or recovery still needs it; a file is shared with a wanted part) and deletes nothing in that case. After removal: the part shows Not downloaded, Repair does not bring it back, the install total counts it again, \"Download again\" asks for consent and downloads only what is missing.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "X3",
+          "quote": "Removal is safe under failure: permission or sharing errors, a path replaced by a link, process death between steps, restart midway: the page reports the files actually left, never \"removed\" while files remain, and never re-enables the part; a second window or a repeated click cannot start a second removal. Source documents, the index and conversations are untouched.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "X4",
+          "quote": "Removal cannot race new users: Remove versus switching the part on, Repair, import, activation or index generation preparation, in both orders and through the page, agents and HTTP; once removal starts, no new user takes the files until it ends. On Windows removal waits for or refuses until native sessions and child processes have released the files. After partial deletion or a crash, removal intent and the files left are reported; recovery does not turn it into a deferred deletion. Linked or junctioned parent folders are refused. (challenger-4 #9, #10)",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed accordingly",
+          "delegationLocation": "task t-20261101-uiimpl user turn proceed accordingly",
+          "delegationScope": "Implement design D4 (narrow option) and its settlement for Remove files and Download again, within the settled scenarios X1-X4, N1 and N2.",
+          "choice": "Repair round 4, Best match first in use: the removal asks, inside its lock and at that moment, the index half's own owner of query views (KnowledgeServer.rerankerSessionHeld through EngineRoot and WorkerHost.rerankerUse) instead of the Worker's cached health report. Its answer is built from the owners it already counts for its retained-encoder cap: the serving view, every retired view issued work has not released (forked child leases keep their view retained), the boot, candidate, recovery, preparing, composing and rejected query owners, the not-yet-owned boot surfaces and failed compositions; one holds Best match first while its reranker assembly (or a partial one kept after a failed build) is not closed or its reranker session handle has not retired. While a composition or swap holds the owner's runtime lock the answer is unknown and the removal refuses ('Search is changing its models - try again in a moment'); a closed or absent index half refuses as before ('Search is still starting - try again in a moment'); a held session refuses with 'Best match first is still loaded - try again in a moment'. Any held reranker session refuses, also one on a custom file. No new query owner can load Best match first while the lock is held: the settings owner refuses switching it on, pointing it at other files or withdrawing its decline before any component is prepared, and a switch-on prepared before the lock was taken is seen by this answer (its owner is preparing or composing) and loses to the removal's witness; recovery and restarts compose from the saved, switched-off choice.",
+          "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed accordingly",
+          "delegationLocation": "task t-20261101-uiimpl user turn proceed accordingly",
+          "delegationScope": "Implement design D4 (narrow option) and its settlement for Remove files and Download again, within the settled scenarios X1-X4, N1 and N2.",
+          "choice": "Repair round 4, files at previously empty places: the removal record keeps the part's complete set of canonical places from preparation (every registry file of each variant considered, the historical folder the install contract records, and their staging files), present or not. Before the outcome is reported, when a removal stops, and in recovery, each of those places and each place the record names is looked at again; a file there that is not the part's own kept file (never captured, or put back) is kept, never deleted, measured (unknown stays unknown) and listed 'kept - a new file appeared here', and the outcome is 'partly-removed' (or 'not-removed' when nothing was deleted), never 'removed'. A record without the set (none was written by a released build) is read as having none.",
+          "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed accordingly",
+          "delegationLocation": "task t-20261101-uiimpl user turn proceed accordingly",
+          "delegationScope": "Implement design D4 (narrow option) and its settlement for Remove files and Download again, within the settled scenarios X1-X4, N1 and N2.",
+          "choice": "Threat model decided by the user after the final review ('Treat programs running under your own account as trusted (named as a limit)'): other accounts are kept out by the owner-only removal folder, as before. Two steps still act on a captured file by name and are kept: on POSIX the entry is checked to be the verified file and then unlinked by name relative to the checked removal folder's handle, and a put-back by hard link drops the captured name by name (also in recovery). Limit: another program running under your account could swap a file at the moment of deletion; such a program can already change your files directly. Other programs that open files in the models folder without JustSearch knowing are out of scope: on Windows the capture rename fails while a file is open, so that file is kept; on Linux an open file stays readable to that program until it closes it.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/s2-remove-files-repair4.json",
+      "newChecks": [
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/RerankerRemovalQueryOwnersTest.java#anIssuedViewFromBeforeOffKeepsBestMatchFirstInUseUntilItIsReleased",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/RerankerRemovalQueryOwnersTest.java#aForkedChildLeaseKeepsBestMatchFirstInUseAfterItsParentIsReleased",
+        "modules/app-services/src/test/java/io/justsearch/app/services/ai/install/ModelFileRemovalRepair4Test.java#aProjectorThatAppearsWhileTheAnswerModelIsHashedIsKeptAndTheRemovalIsNotComplete",
+        "modules/app-services/src/test/java/io/justsearch/app/services/ai/install/ModelFileRemovalRepair4Test.java#aNewlyAppearingBestMatchFirstVariantIsKeptAndTheRemovalIsNotComplete",
+        "modules/app-services/src/test/java/io/justsearch/app/services/ai/install/ModelFileRemovalRepair4Test.java#aFileAtAPreviouslyEmptyPlaceIsReportedByRecoveryAfterACrash"
+      ]
+    },
+    {
+      "items": [
+        "modules/app-services/src/test/java/io/justsearch/app/services/ai/install/ModelFileRemovalFenceTest.java",
+        "modules/app-services/src/test/java/io/justsearch/app/services/ai/install/ModelFileRemovalQueryOwnersTest.java"
+      ],
+      "class": "New",
+      "behaviour": "The removal lock and the runtime owners' in-use answers, re-run after repair round 4 changed how Best match first's use is read: the lock refuses users while a removal holds it and a removal while a user is registered, a second removal cannot start, the answer-server launch and the answer model's removal never both proceed; Best match first is in use until the index half's query owners, asked at each call, say none holds a session (held, a composition running, or the index half not running all refuse, and an owner that cannot answer refuses); the answer model is in use while a process may hold it or a hold is open; an unbound probe fails closed. These checks moved here from the first entry because the file changed; the first entry keeps its other checks and evidence. ModelFileRemovalQueryOwnersTest drives the removal through the composed probe: while the query owners report a held session it refuses with 'Best match first is still loaded - try again in a moment', deletes and declines nothing, and once they report it released the same removal deletes every retained variant; the owners are asked inside the lock at each removal.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "X4",
+          "quote": "Removal cannot race new users: Remove versus switching the part on, Repair, import, activation or index generation preparation, in both orders and through the page, agents and HTTP; once removal starts, no new user takes the files until it ends. On Windows removal waits for or refuses until native sessions and child processes have released the files. After partial deletion or a crash, removal intent and the files left are reported; recovery does not turn it into a deferred deletion. Linked or junctioned parent folders are refused. (challenger-4 #9, #10)",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed accordingly",
+          "delegationLocation": "task t-20261101-uiimpl user turn proceed accordingly",
+          "delegationScope": "Implement design D4 (narrow option) and its settlement for Remove files and Download again, within the settled scenarios X1-X4, N1 and N2.",
+          "choice": "Repair round 4, Best match first in use: the removal asks, inside its lock and at that moment, the index half's own owner of query views (KnowledgeServer.rerankerSessionHeld through EngineRoot and WorkerHost.rerankerUse) instead of the Worker's cached health report. Its answer is built from the owners it already counts for its retained-encoder cap: the serving view, every retired view issued work has not released (forked child leases keep their view retained), the boot, candidate, recovery, preparing, composing and rejected query owners, the not-yet-owned boot surfaces and failed compositions; one holds Best match first while its reranker assembly (or a partial one kept after a failed build) is not closed or its reranker session handle has not retired. While a composition or swap holds the owner's runtime lock the answer is unknown and the removal refuses ('Search is changing its models - try again in a moment'); a closed or absent index half refuses as before ('Search is still starting - try again in a moment'); a held session refuses with 'Best match first is still loaded - try again in a moment'. Any held reranker session refuses, also one on a custom file. No new query owner can load Best match first while the lock is held: the settings owner refuses switching it on, pointing it at other files or withdrawing its decline before any component is prepared, and a switch-on prepared before the lock was taken is seen by this answer (its owner is preparing or composing) and loses to the removal's witness; recovery and restarts compose from the saved, switched-off choice.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/s2-remove-files-repair4-fence.json",
+      "newChecks": [
+        "modules/app-services/src/test/java/io/justsearch/app/services/ai/install/ModelFileRemovalFenceTest.java#aUserCannotEnterWhileARemovalHoldsTheLock",
+        "modules/app-services/src/test/java/io/justsearch/app/services/ai/install/ModelFileRemovalFenceTest.java#aRemovalCannotBeginWhileAUserIsRegisteredAndNamesIt",
+        "modules/app-services/src/test/java/io/justsearch/app/services/ai/install/ModelFileRemovalFenceTest.java#aSecondRemovalCannotStartWhileOneRuns",
+        "modules/app-services/src/test/java/io/justsearch/app/services/ai/install/ModelFileRemovalFenceTest.java#bestMatchFirstIsInUseUntilTheQueryOwnersSayNoneHoldsASession",
+        "modules/app-services/src/test/java/io/justsearch/app/services/ai/install/ModelFileRemovalFenceTest.java#theAnswerModelIsInUseWhileAProcessMayHoldItOrAHoldIsOpen",
+        "modules/app-services/src/test/java/io/justsearch/app/services/ai/install/ModelFileRemovalFenceTest.java#anUnboundProbeFailsClosed",
+        "modules/app-services/src/test/java/io/justsearch/app/services/ai/install/ModelFileRemovalFenceTest.java#anAnswerServerLaunchInProgressRefusesTheAnswerModelRemovalOnly",
+        "modules/app-services/src/test/java/io/justsearch/app/services/ai/install/ModelFileRemovalFenceTest.java#aRemovalOfTheAnswerModelRefusesALaunchAndOtherRemovalsDoNot",
+        "modules/app-services/src/test/java/io/justsearch/app/services/ai/install/ModelFileRemovalFenceTest.java#aLaunchAndARemovalRacingNeverBothProceed",
+        "modules/app-services/src/test/java/io/justsearch/app/services/ai/install/ModelFileRemovalQueryOwnersTest.java#aHeldQueryOwnerRefusesTheRemovalAndItsReleaseLetsTheSameRemovalProceed"
       ]
     },
     {

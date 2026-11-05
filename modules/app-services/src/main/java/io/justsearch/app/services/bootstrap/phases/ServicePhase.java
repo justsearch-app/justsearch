@@ -47,6 +47,7 @@ import io.justsearch.app.services.worker.KnowledgeHttpApiAdapter;
 import io.justsearch.app.services.worker.KnowledgeServerBootstrap;
 import io.justsearch.app.services.worker.KnowledgeClient;
 import io.justsearch.app.services.worker.WorkerFeatureCache;
+import io.justsearch.app.services.worker.WorkerHost;
 import io.justsearch.gpu.GpuCapabilitiesService;
 import io.justsearch.telemetry.Telemetry;
 import java.util.List;
@@ -379,8 +380,13 @@ public final class ServicePhase {
     }
     // The answer model's usage is read from the processes the answer runtime started (a failed stop
     // or a surviving self-test keeps it in use), never from the server's mode (repair round 2).
+    // Best match first's usage is asked of the index half's query owners at each removal (repair
+    // round 4): a retired view issued queries still hold keeps it in use, which no health
+    // observation of the current view shows.
+    var knowledgeServer = in.knowledgeServer();
     aiInstallHelper.setRemovalUsageProbe(io.justsearch.app.services.ai.install.ModelFileUsage.probe(
-        workerFeatureCache, answerRuntime, chatHolds));
+        knowledgeServer == null ? () -> WorkerHost.RerankerUse.UNKNOWN : knowledgeServer::rerankerUse,
+        answerRuntime, chatHolds));
 
 
     // DiagnosticsService: SPI suppliers read from the late-bindings holder.

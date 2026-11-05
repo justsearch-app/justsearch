@@ -46,6 +46,7 @@ import java.util.EnumSet;
 import java.util.HashSet;
 import java.util.HexFormat;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -88,12 +89,20 @@ import tools.jackson.databind.json.JsonMapper;
  * <p>The removal folder is private (repair round 2): it is created owner-only (0700 on POSIX, a
  * protected owner-and-SYSTEM DACL on Windows), and before each capture, put-back and deletion it
  * must still be the same plain folder, owned by the Engine's user and writable by no one else;
- * otherwise the whole removal refuses or stops and nothing in that folder is touched. A captured
- * file is deleted only through a handle checked to be it, never by name (repair round 3): on POSIX
- * relative to the checked folder's own handle, on Windows through the one file handle its identity,
- * links and hash were read through; where neither exists it is kept. Afterwards each canonical place
- * whose file was captured is looked at again: a file that appeared there is kept and reported, and
- * the removal is not reported complete.
+ * otherwise the whole removal refuses or stops and nothing in that folder is touched. On Windows a
+ * captured file is deleted through the one file handle its identity, links and hash were read
+ * through (repair round 3); on POSIX its entry is checked and then unlinked by name relative to the
+ * checked removal folder's own handle; where neither exists it is kept. Afterwards every canonical
+ * place of the part is looked at again (repair round 4: also places that were empty when the
+ * removal was prepared): a file that appeared there is kept and reported, and the removal is not
+ * reported complete.
+ *
+ * <p>Threat model (decided by the user): programs running under the user's own account are
+ * trusted; other accounts are kept out by the owner-only removal folder. Two steps still act on a
+ * captured file by name: the POSIX check-then-unlink above, and dropping the captured name after a
+ * put-back by hard link ({@link #restoreWithoutOverwrite}, also in recovery). Another program
+ * running under the user's account could swap a file at the moment of deletion; such a program can
+ * already change the user's files directly.
  * The removal record is replaced only atomically (a disk without atomic replacement refuses the
  * removal before anything is moved), and a removal holds an upgrade-admission lease, so an
  * application upgrade waits for it or it refuses while one is being prepared.
@@ -650,26 +659,25 @@ final class ModelFileRemoval {
   }
 
   /**
-   * Repair round 3: once every file was handled, each canonical place whose own file was captured
-   * (deleted, or still in the removal folder) is looked at again. Anything there now arrived after
-   * the capture, possibly while the captured file was being hashed: it was not checked and is not
-   * JustSearch's verified download, so it is kept, never deleted, and reported as a new file, and
-   * the removal is not reported as complete while it is there.
+   * Repair rounds 3 and 4: once every file was handled (also when a removal stops, and in
+   * recovery), every canonical place of the part is looked at again: each one the journal names and
+   * the complete set recorded when the removal was prepared, so a place that was empty then is not
+   * skipped. Anything there that is not the part's own kept file (one never captured, or put back)
+   * arrived during the removal, possibly while a captured file was being hashed: it was not checked
+   * and is not JustSearch's verified download, so it is kept, never deleted, and reported as a new
+   * file, and the removal is not reported as complete while it is there.
    */
   private void recheckCanonical(Journal journal) {
-    Set<String> reported = new HashSet<>();
-    for (JournalFile f : journal.files) {
-      if (KEPT_NEW_FILE.equals(f.reason)) reported.add(f.path);
-    }
+    Set<String> places = new LinkedHashSet<>();
+    for (JournalFile f : journal.files) places.add(f.path);
+    if (journal.canonical != null) places.addAll(journal.canonical);
     List<JournalFile> appeared = new ArrayList<>();
-    for (JournalFile f : journal.files) {
-      boolean captured = "deleted".equals(f.state) || f.staged != null;
-      if (!captured || reported.contains(f.path)) continue;
-      Path canonical = canonicalOf(f.path);
+    for (String rel : places) {
+      if (accountedAtPlace(journal, rel)) continue;
+      Path canonical = canonicalOf(rel);
       if (canonical == null || !Files.exists(canonical, LinkOption.NOFOLLOW_LINKS)) continue;
-      if (f.staged != null && putBackByLink(root.resolve(f.staged).normalize(), canonical)) continue;
       JournalFile arrived = new JournalFile();
-      arrived.path = f.path;
+      arrived.path = rel;
       arrived.state = "kept";
       arrived.reason = KEPT_NEW_FILE;
       try {
@@ -679,9 +687,27 @@ final class ModelFileRemoval {
         arrived.sizeBytes = null; // unknown stays unknown
       }
       appeared.add(arrived);
-      reported.add(f.path);
     }
     journal.files.addAll(appeared);
+  }
+
+  /**
+   * Whether what sits at {@code rel} is already reported: a new file found earlier, the part's own
+   * file kept at its place (never captured, or put back), or a captured file put back by a link
+   * whose captured name could not be dropped (both names are the same file, which is not new).
+   */
+  private boolean accountedAtPlace(Journal journal, String rel) {
+    for (JournalFile f : journal.files) {
+      if (!f.path.equals(rel)) continue;
+      if (KEPT_NEW_FILE.equals(f.reason)) return true;
+      if ("kept".equals(f.state) && f.staged == null) return true;
+      Path canonical = canonicalOf(rel);
+      if (f.staged != null && canonical != null
+          && putBackByLink(root.resolve(f.staged).normalize(), canonical)) {
+        return true;
+      }
+    }
+    return false;
   }
 
   /**
@@ -705,6 +731,11 @@ final class ModelFileRemoval {
     long deleted = 0;
     boolean passingLeft = false;
     for (JournalFile f : journal.files) {
+      // A new file at any of the part's places is unresolved, also where nothing was a target.
+      if (KEPT_NEW_FILE.equals(f.reason)) {
+        passingLeft = true;
+        continue;
+      }
       if (!rels.contains(f.path) || "missing".equals(f.state)) continue;
       if ("deleted".equals(f.state)) deleted++;
       else if (f.reason == null || !OWNERSHIP_FAILURES.contains(f.reason)) passingLeft = true;
@@ -776,6 +807,9 @@ final class ModelFileRemoval {
       journal.label = pkg.label() == null ? packageId : pkg.label();
       journal.state = "running";
       journal.startedAtEpochMs = System.currentTimeMillis();
+      for (Expected e : expected(pkg, recorded)) {
+        if (!journal.canonical.contains(e.rel())) journal.canonical.add(e.rel());
+      }
       for (Found f : found) {
         JournalFile file = new JournalFile();
         file.path = f.expected().rel();
@@ -902,14 +936,14 @@ final class ModelFileRemoval {
 
   /**
    * Deletes the verified captured file, immediately after checking again that the removal folder is
-   * the private folder checked for this run, and only through a handle that was itself checked to be
-   * the verified file, so a file swapped in under the captured name meanwhile is never what gets
-   * deleted (repair round 3). POSIX: the models folder is opened without following links, its
-   * removal folder's handle is checked to be that folder, and the entry is checked and unlinked
-   * relative to that handle. Windows: the captured file is opened once for reading and deletion
-   * with no write, rename or delete sharing, its identity, link count, size and registry hash are
-   * read through that handle, and that handle deletes it. Where neither is available nothing is
-   * deleted by name: the file is kept.
+   * the private folder checked for this run (repair round 3). POSIX: the models folder is opened
+   * without following links, its removal folder's handle is checked to be that folder, and the
+   * entry is checked to be the verified file and then unlinked by name relative to that handle: a
+   * program running under the user's own account could swap the entry between the check and the
+   * unlink (the decided threat model trusts such programs; they can change the user's files
+   * directly). Windows: the captured file is opened once for reading and deletion with no write,
+   * rename or delete sharing, its identity, link count, size and registry hash are read through
+   * that handle, and that handle deletes it. Where neither is available the file is kept.
    *
    * @return {@code null} when deleted; {@link #KEPT_CHANGED} when the captured name no longer holds
    *     the verified file (it stays in the removal folder); otherwise why the still-captured file was
@@ -982,7 +1016,9 @@ final class ModelFileRemoval {
    * overwrite a file that took the place meanwhile, so the captured file stays in the removal
    * folder and is reported. If the captured name cannot be dropped after linking, the file is at
    * its place and its captured name is still reported in the removal folder (nothing at the
-   * canonical place is ever deleted to undo it).
+   * canonical place is ever deleted to undo it). The captured name is dropped by name: under the
+   * decided threat model a program running under the user's own account is trusted not to swap it
+   * in that moment.
    */
   static boolean restoreWithoutOverwrite(Path staged, Path canonical) {
     try {
@@ -1206,6 +1242,12 @@ final class ModelFileRemoval {
     public long startedAtEpochMs;
     public long finishedAtEpochMs;
     public List<JournalFile> files = new ArrayList<>();
+    /**
+     * Every canonical place the registry gives the part when the removal was prepared (each file of
+     * every variant considered and its staging files), present or not (repair round 4): before the
+     * outcome is reported, and by recovery, each is looked at again.
+     */
+    public List<String> canonical = new ArrayList<>();
 
     DownloadedFiles.Removal report() {
       DownloadedFiles.Removal r = new DownloadedFiles.Removal();
@@ -1299,6 +1341,10 @@ final class ModelFileRemoval {
         || !REMOVABLE.contains(journal.packageId) || journal.state == null
         || !JOURNAL_STATES.contains(journal.state) || journal.files == null) {
       return false;
+    }
+    if (journal.canonical == null) journal.canonical = new ArrayList<>();
+    for (String rel : journal.canonical) {
+      if (canonicalOf(rel) == null) return false;
     }
     for (JournalFile f : journal.files) {
       if (f == null || f.state == null || !FILE_STATES.contains(f.state)

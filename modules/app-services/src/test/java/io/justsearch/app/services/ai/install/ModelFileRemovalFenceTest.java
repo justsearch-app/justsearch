@@ -8,7 +8,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import io.justsearch.app.inference.chat.ChatHolds;
-import io.justsearch.app.services.worker.OnnxModelStatus;
+import io.justsearch.app.services.worker.WorkerHost;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
@@ -132,14 +132,23 @@ final class ModelFileRemovalFenceTest {
   }
 
   @Test
-  void bestMatchFirstIsInUseUntilTheWorkerReportsNoSession() {
+  void bestMatchFirstIsInUseUntilTheQueryOwnersSayNoneHoldsASession() {
+    // Asked of the index half's query owners at each call (repair round 4), never a cached report.
+    var use = new java.util.concurrent.atomic.AtomicReference<>(WorkerHost.RerankerUse.UNKNOWN);
+    var probe = ModelFileUsage.probe(use::get, Optional::empty, () -> false, null);
     assertEquals("Search is still starting - try again in a moment",
-        ModelFileUsage.reranker(List.of()).orElseThrow());
+        probe.apply("reranker").orElseThrow());
+    use.set(WorkerHost.RerankerUse.HELD);
     assertEquals("Best match first is still loaded - try again in a moment",
-        ModelFileUsage.reranker(List.of(new OnnxModelStatus("reranker", true, "/m", false, true)))
-            .orElseThrow());
-    assertTrue(ModelFileUsage.reranker(List.of(
-        new OnnxModelStatus("reranker", true, "/m", false, false))).isEmpty());
+        probe.apply("reranker").orElseThrow());
+    use.set(WorkerHost.RerankerUse.BUSY);
+    assertEquals("Search is changing its models - try again in a moment",
+        probe.apply("reranker").orElseThrow());
+    use.set(WorkerHost.RerankerUse.FREE);
+    assertTrue(probe.apply("reranker").isEmpty(), "read again at this call: now free");
+    assertEquals("JustSearch can't confirm nothing uses these files yet - try again in a moment",
+        ModelFileUsage.reranker(() -> { throw new IllegalStateException("unreadable"); })
+            .orElseThrow(), "an owner that cannot answer refuses");
   }
 
   @Test
