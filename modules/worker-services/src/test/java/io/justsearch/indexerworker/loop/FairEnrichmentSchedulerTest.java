@@ -93,7 +93,7 @@ class FairEnrichmentSchedulerTest extends LuceneExecutorTestBase {
 
   // ==================== D1 ====================
 
-  @ParameterizedTest
+  @ParameterizedTest(name = "{displayName} [{index}] {arguments}")
   @ValueSource(strings = {"separate", "dense", "ner", "bge"})
   void D1_continuingIngestionServesEveryContinuouslyEligibleLane(String configuration) throws Exception {
     try (var h = new Harness()) {
@@ -324,7 +324,7 @@ class FairEnrichmentSchedulerTest extends LuceneExecutorTestBase {
 
   // ==================== D5b ====================
 
-  @ParameterizedTest
+  @ParameterizedTest(name = "{displayName} [{index}] {arguments}")
   @ValueSource(strings = {"dense", "bge"})
   void D5b_oneProviderHoldCoversEveryLaneItServesThroughBothCallers(String provider) throws Exception {
     try (var h = new Harness()) {
@@ -575,7 +575,7 @@ class FairEnrichmentSchedulerTest extends LuceneExecutorTestBase {
    * while parents are pending, every cycle advances parents, retries are never charged, and a
    * fallback classification is always followed by its retained windows before another one.
    */
-  @ParameterizedTest
+  @ParameterizedTest(name = "{displayName} [{index}] {arguments}")
   @org.junit.jupiter.params.provider.CsvSource({"80,false", "4900,false", "4900,true"})
   void P1095_chunksAdvanceWithinThreeCyclesUnderTheOriginalLongDocumentCosts(
       long probeMs, boolean successful) throws Exception {

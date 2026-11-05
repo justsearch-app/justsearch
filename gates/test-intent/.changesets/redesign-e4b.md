@@ -280,17 +280,21 @@ orchestrator's on a committed candidate.
 }
 ```
 
-## Verification commands
+## Evidence commands
 
-The orchestrator commits the candidate first. Run sequentially in the background. The evidence
-runner writes these files; the builder does not write evidence JSON. The two isolated new files,
+Run sequentially in the background under `js-gradle-slot`. The evidence runner writes these
+files; the builder is authorized to regenerate them for this selector repair. The two isolated new files,
 `FairEnrichmentSchedulerTest` and `EnrichmentInterleaveAliasTest`, are exempt from entries; their
-fail-before is listed here for the verifier.
+fail-before is listed here for the verifier. Run in a disposable shared clone inside `$TMPDIR`
+with the current test and changeset edits copied in; copy the two generated evidence files back
+to the source worktree. The runner creates its before checkout in `$TMPDIR` against that
+clone, so Git metadata and build folders stay isolated from the source repository.
 
 ```bash
 env -u DISPLAY -u WAYLAND_DISPLAY js-gradle-slot node scripts/governance/gates/test-intent/run-evidence.mjs \
   --out gates/test-intent/evidence/redesign-e4b.json \
   --before 7a5ee0004c1dd2b3e7ed7cd71e3fc61eb02f7329 \
+  --before-root "$TMPDIR" \
   --check modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/FairEnrichmentSchedulerTest.java#D1_continuingIngestionServesEveryContinuouslyEligibleLane \
   --check modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/FairEnrichmentSchedulerTest.java#D2_pendingIngestionLetsOneAdmittedUnitFinishThenStopsFurtherIdleUnits \
   --check modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/FairEnrichmentSchedulerTest.java#D2_ingestionArrivingDuringAMultiCallDocumentKeepsTheUnitsRetainedProgress \
@@ -350,7 +354,9 @@ env -u DISPLAY -u WAYLAND_DISPLAY js-gradle-slot node scripts/governance/gates/t
   --check modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/EnrichmentPublicationReceiptTest.java
 ```
 
-Run the repair selectors manually on the base shared clone in its own build folders by
-transplanting only the new or revised test sources; they need no production overlay.
+Parameterized checks include their method signature in each invocation name, and the stall
+checks use their method names, so every `path#method` selector resolves in JUnit XML. All
+assertions and parameter values are unchanged. The repair run transplants these tests onto
+7a5ee0004c1dd2b3e7ed7cd71e3fc61eb02f7329; no compatibility patch or production overlay is needed.
 
 ## Acceptance records

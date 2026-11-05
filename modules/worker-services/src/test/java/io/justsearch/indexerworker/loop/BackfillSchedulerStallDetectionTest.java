@@ -250,7 +250,7 @@ class BackfillSchedulerStallDetectionTest {
   }
 
   @Test
-  @DisplayName("an eligible unit that keeps returning without advancing logs the stall WARN")
+  // an eligible unit that keeps returning without advancing logs the stall WARN
   void frozenEligibleUnitLogsTheStallWarn() {
     BackfillScheduler scheduler = scheduler();
     for (int cycle = 0; cycle < STALL_CYCLES - 1; cycle++) runCycle(scheduler, ids(0, 6), true);
@@ -262,7 +262,7 @@ class BackfillSchedulerStallDetectionTest {
 
   /** PINS: one WARN per stall episode, not one per cycle — a per-cycle WARN is log spam. */
   @Test
-  @DisplayName("the stall WARN is deduplicated across a single episode")
+  // the stall WARN is deduplicated across a single episode
   void stallWarnIsDeduplicatedPerEpisode() {
     BackfillScheduler scheduler = scheduler();
     for (int cycle = 0; cycle < STALL_CYCLES * 3; cycle++) runCycle(scheduler, ids(0, 6), true);
@@ -274,7 +274,7 @@ class BackfillSchedulerStallDetectionTest {
    * selected every cycle, yet each cycle publishes it, so the lane is advancing.
    */
   @Test
-  @DisplayName("publishing service never logs the stall WARN, even with an identical work-set")
+  // publishing service never logs the stall WARN, even with an identical work-set
   void publishingWorkSetDoesNotWarn() {
     BackfillScheduler scheduler = scheduler();
     for (int cycle = 0; cycle < STALL_CYCLES * 3; cycle++) {
@@ -285,7 +285,7 @@ class BackfillSchedulerStallDetectionTest {
 
   /** PINS: a stall episode that recovers re-arms the detector. */
   @Test
-  @DisplayName("the detector re-arms after the lane advances again")
+  // the detector re-arms after the lane advances again
   void detectorReArmsAfterRecovery() {
     BackfillScheduler scheduler = scheduler();
     for (int cycle = 0; cycle < STALL_CYCLES; cycle++) runCycle(scheduler, ids(0, 6), true);
