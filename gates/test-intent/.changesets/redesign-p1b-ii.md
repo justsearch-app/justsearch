@@ -300,3 +300,14 @@ recorded operation still surface. Execution evidence JSON and acceptance records
 to the orchestrator/verifier, per the B1 assignment.
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a1a9bc-a07c-7460-81b1-0a1e0056142e",
+  "verdict": "accept",
+  "digest": "sha256:b417bb34aafc2f14cd63acc9795237aac8043f2ce9dc0682a18761898503c4aa",
+  "note": "Codex verifier-2 on 56c91559f1: entries 1-6 accept; P1b-2/3/4/7/8 fail before and pass after (18 repair checks); ordinary scans pass incl. the store-failure guard (B1 repaired); preservation fixtures pass on both; C17/C20 pass."
+}
+```
