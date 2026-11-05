@@ -96,17 +96,27 @@ where it lives:
   native folders and `LD_LIBRARY_PATH`, the tesseract executable, its libraries
   and language data (resolved once and passed explicitly);
 - the whole models root (`--models-dir`): every package model discovery can
-  select, BGE-M3 and chat models included. Only bookkeeping whose readers cannot
-  change index contents is left out: ORT's legacy optimized siblings (only ever
-  deleted), chat identity receipts (read only to identify the chat model, which
-  quality runs disable) and writer temporaries. A `*.sha256` digest sidecar the
-  engine would trust (matching modification time and size) must equal its
-  model's digest, because index fingerprints come from it;
+  select, BGE-M3 included. Only files whose readers cannot change index
+  contents are left out: ORT's legacy optimized siblings (only ever deleted),
+  chat identity receipts and chat weights (`*.gguf`; read only by the chat
+  model, which quality runs switch off with `JUSTSEARCH_LLM_ENABLED=false` —
+  with the LLM in any other state the weights are keyed) and writer
+  temporaries. A `*.sha256` digest sidecar the engine would trust (matching
+  modification time and size) must equal its model's digest, because index
+  fingerprints come from it. Every file a `model_manifest.json` names (model
+  files, tokenizer, pooling and label configuration) is resolved as the
+  engine resolves it, following links before `..` and also lexically
+  normalized; it must be hashed bytes or lie inside the models root, so an
+  absolute name, a `../` climbing out or a link leading out of the root
+  refuses;
 - every other `JUSTSEARCH_*` setting by its literal value, except the listed
   resource locators (`JUSTSEARCH_FIELD_CATALOG`, `JUSTSEARCH_MCP_HOST_CONFIG`,
   `JUSTSEARCH_ONNXRUNTIME_NATIVE_PATH`, `JUSTSEARCH_NATIVE_PATH`,
   `JUSTSEARCH_SERVER_EXE`, `JUSTSEARCH_LLM_MODEL_PATH`), which key by the
-  content they name.
+  content they name. Relative locators and `LD_LIBRARY_PATH` entries resolve
+  against the engine's working directory (the snapshot) once, and the engine
+  receives those absolute paths. Locations the snapshot's `application.yaml`
+  names must lie inside the snapshot.
 
 Quality engines never use ORT's optimized-graph cache
 (`JUSTSEARCH_ORT_OPTIMIZED_CACHE_MAX_MB=0`, its folder inside the entry's data
@@ -128,7 +138,9 @@ GPU discovery (set `JUSTSEARCH_GPU_ENABLED=false`, or `true` with
 agents, `LD_PRELOAD`, an extraction-command override or any option value not on
 the allow-list, a per-package model location (`JUSTSEARCH_*_MODEL_PATH`; point
 `--models-dir` at a models root instead), a `models/` folder in the data folder,
-a missing or unreadable model, snapshot or OCR file. Such a
+a missing or unreadable model, snapshot or OCR file, a model manifest or
+`application.yaml` reference outside its hashed root, a relative JDK or OCR
+location, or an empty `LD_LIBRARY_PATH` entry. Such a
 refusal never quarantines a cached index. Snapshots that are not newest for a
 checkout, not used by a cache entry and not running are pruned. Indexes keyed
 before this identity (`jseval.quality.index.v1`) are never adopted; an
@@ -150,7 +162,9 @@ exactly its sources: a checkout edited since its last `prepare` (committed or
 not) is refused as a stale distribution before any engine starts, and so is a
 snapshot whose bytes no longer match its digest. Model files and index
 population are verified. Run headers record one digest per identity component
-(`identity`) and the runtime settings without machine paths. HTTP failures and reranker
+(`identity`) and the runtime settings without machine paths: resource locators
+as the digest of their content, every other path-like value (absolute, or with a
+separator) as the digest of the value; the key itself keeps the literal value. HTTP failures and reranker
 loading, contention, deadline or inference drops invalidate the run. Identical
 by-design skips in both arms remain comparable, with their reasons recorded.
 

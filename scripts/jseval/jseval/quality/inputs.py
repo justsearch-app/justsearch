@@ -7,11 +7,14 @@ says an input is unusable or unpinned; it is never evidence against a stored ind
 from __future__ import annotations
 
 import importlib
+import json
 import os
 from pathlib import Path
 import re
 import shutil
 import subprocess
+
+import yaml
 
 from .. import backend
 from . import distribution
@@ -38,7 +41,7 @@ HARNESS_MODULES = ("jseval.quality.index", "jseval.quality.collections", "jseval
 # Model-root bookkeeping, checked reader by reader; nothing else under the root is excluded.
 # - ORT legacy optimized siblings: OrtOptimizedModelStore.cleanupLegacy only deletes them.
 # - Chat identity receipts (*.justsearch-identity.v1): read only by InferenceConfig to identify
-#   the chat model, and the chat model is off for quality runs (JUSTSEARCH_LLM_ENABLED=false).
+#   the chat model, and the chat model is off for quality runs (see CHAT_WEIGHTS).
 # - Writer temporaries: Sha256SidecarCache's *.sha256.tmp and ChatArtifactIdentity's
 #   .chat-identity-*.tmp are only ever renamed onto the two sidecar names.
 # *.sha256 sidecars are not excluded blindly: model fingerprints (stored in index commit
@@ -46,6 +49,18 @@ HARNESS_MODULES = ("jseval.quality.index", "jseval.quality.collections", "jseval
 MODEL_BOOKKEEPING = (".optimized", ".opt-meta", ".cuda.optimized", ".cuda.opt-meta",
                      ".justsearch-identity.v1", ".sha256.tmp")
 SHA256_SIDECAR = ".sha256"
+# Chat weights and vision projectors (GGUF): read only by the inference child, which is never
+# created while the LLM is off. Quality runs force JUSTSEARCH_LLM_ENABLED=false
+# (IndexConfig.environment); the engine then decides no inference
+# (InferenceDecision.decideInferenceConfigured requires llmEnabled) and
+# BootstrapInferenceFactory.create returns before InferenceConfig resolves any model file.
+# With the LLM in any other state they are hashed like every other model file.
+CHAT_WEIGHTS = ".gguf"
+# File fields of model_manifest.json and their defaults (ModelManifest's compact constructor;
+# Jackson reads them snake_case). cpu/gpu have no default file: unset means no reference.
+MANIFEST = "model_manifest.json"
+MANIFEST_FILES = {"cpu": None, "gpu": None, "tokenizer": "tokenizer.json",
+                  "pooling_config": "pooling_config.json", "label_config": "config.json"}
 # Per-package model locations bypass the hashed models root; JUSTSEARCH_MODELS_DIR selects it.
 MODEL_PATH_OVERRIDES = ("JUSTSEARCH_EMBED_ONNX_MODEL_PATH", "JUSTSEARCH_SPLADE_MODEL_PATH",
                         "JUSTSEARCH_NER_MODEL_PATH", "JUSTSEARCH_BGE_M3_MODEL_PATH",
@@ -56,6 +71,8 @@ MODEL_PATH_OVERRIDES = ("JUSTSEARCH_EMBED_ONNX_MODEL_PATH", "JUSTSEARCH_SPLADE_M
 RESOURCE_LOCATORS = frozenset({"JUSTSEARCH_FIELD_CATALOG", "JUSTSEARCH_MCP_HOST_CONFIG",
                                "JUSTSEARCH_ONNXRUNTIME_NATIVE_PATH", "JUSTSEARCH_NATIVE_PATH",
                                "JUSTSEARCH_SERVER_EXE", "JUSTSEARCH_LLM_MODEL_PATH"})
+# The selected engine configuration inside a snapshot (JUSTSEARCH_CONFIG for every launch).
+ENGINE_CONFIG = "modules/ui/src/main/resources/headless-config/application.yaml"
 LFS_POINTER = b"version https://git-lfs.github.com/spec/v1\n"
 
 
@@ -101,6 +118,10 @@ def resolve_jdk(checkout: Path, environ) -> Path:
     """The launcher's own resolver (scripts/dev/lib/resolve-jdk.cjs), run once per inputs."""
     resolver = checkout / "scripts/dev/lib/resolve-jdk.cjs"
     memo = (str(resolver), environ.get("JAVA_HOME"), environ.get("JUSTSEARCH_DEV_JDK_HOME"), environ.get("PATH"))
+    for name in ("JAVA_HOME", "JUSTSEARCH_DEV_JDK_HOME"):
+        value = (environ.get(name) or "").strip()
+        if value and not os.path.isabs(value):
+            raise InputRefused(f"{name}={value!r} is relative to an unknown base; give an absolute path")
     if memo not in _jdk_cache:
         node = shutil.which("node", path=environ.get("PATH"))
         if not node or not resolver.is_file():
@@ -110,7 +131,10 @@ def resolve_jdk(checkout: Path, environ) -> Path:
                                 capture_output=True, text=True, timeout=60)
         if result.returncode != 0 or not result.stdout.strip():
             raise InputRefused(f"no usable JDK: {result.stderr.strip()[-500:]}")
-        _jdk_cache[memo] = Path(result.stdout.strip())
+        home = result.stdout.strip()
+        if not os.path.isabs(home):
+            raise InputRefused(f"the JDK resolver returned a relative home {home!r}")
+        _jdk_cache[memo] = Path(home)
     return _jdk_cache[memo]
 
 
@@ -128,11 +152,6 @@ def jdk_digest(home: Path) -> dict[str, str]:
 
 
 # --------------------------------------------------------------------------- native / GPU
-
-
-def library_path(value: str) -> list:
-    """LD_LIBRARY_PATH as the ordered content of its folders, never their locations."""
-    return [located(entry) for entry in value.split(os.pathsep) if entry]
 
 
 def native_selection(env) -> None:
@@ -177,6 +196,10 @@ def resolve_ocr(environ, launch_dir: Path) -> tuple[Path, Path]:
                                           "JUSTSEARCH_TESSDATA_PATH", "TESSDATA_PREFIX")) + (str(launch_dir),)
     if memo in _ocr_cache:
         return _ocr_cache[memo]
+    for name in ("JUSTSEARCH_TESSERACT_PATH", "TESSERACT_PATH", "JUSTSEARCH_TESSDATA_PATH", "TESSDATA_PREFIX"):
+        value = (environ.get(name) or "").strip()
+        if value and not os.path.isabs(value):
+            raise InputRefused(f"{name}={value!r} is relative to an unknown base; give an absolute path")
     exe = _path_like(environ.get("JUSTSEARCH_TESSERACT_PATH")) or _path_like(environ.get("TESSERACT_PATH"))
     if exe is None and (environ.get("JUSTSEARCH_TESSERACT_PATH") or "").strip():
         raise InputRefused("unresolvable OCR runtime: JUSTSEARCH_TESSERACT_PATH is not an executable tesseract")
@@ -242,10 +265,79 @@ def ocr_digest(exe: Path, data: Path) -> dict:
 # --------------------------------------------------------------------------- models
 
 
+def llm_off(env) -> bool:
+    """The LLM is off exactly as quality runs pin it; any other value counts as enabled."""
+    return env.get("JUSTSEARCH_LLM_ENABLED") == "false"
+
+
 def _bookkeeping(rel: str) -> bool:
     name = rel.rsplit("/", 1)[-1]
     return (name.endswith(MODEL_BOOKKEEPING + (SHA256_SIDECAR,))
             or (name.startswith(".chat-identity-") and name.endswith(".tmp")))
+
+
+def _unread(llm_off: bool):
+    """Files under the models root that never shape an index for this launch."""
+    return lambda rel: _bookkeeping(rel) or (llm_off and rel.endswith(CHAT_WEIGHTS))
+
+
+def _covered(candidate: str, root: str, contents: set[str], unread, what: str) -> None:
+    """A model reference must name hashed bytes, a folder in the hashed root, or a file that
+    would be hashed once it appears there; anything else changes indexing outside the key."""
+    real = os.path.realpath(candidate)
+    inside = os.path.commonpath([real, root]) == root
+    if os.path.isfile(real):
+        if real in contents:
+            return
+        reason = "a file the models hash leaves out" if inside else "outside the hashed models root"
+    elif os.path.isdir(real):
+        if inside:
+            return
+        reason = "a folder outside the hashed models root"
+    elif os.path.lexists(real) or not inside:
+        reason = "outside the hashed models root"
+    elif unread(os.path.relpath(real, root).replace(os.sep, "/")):
+        reason = "a file the models hash leaves out"
+    else:
+        return  # absent inside the root: it would enter the hash as soon as it appears
+    raise InputRefused(f"model manifest reference {what} resolves to {real}, {reason}; "
+                       f"keep every file a model package reads inside the models root")
+
+
+def _manifest_references(models: Path, hashed: dict[str, str], unread) -> None:
+    """Every file a model_manifest.json names, resolved as the engine's readers resolve it.
+
+    The readers take the package folder under JUSTSEARCH_MODELS_DIR and resolve each field
+    against it, two ways: Path.resolve, where the OS follows links before '..'
+    (BertNerInference.buildAssembly, ModelManifest.resolveModelPath/resolveExistingModelFile,
+    ModelAssetFingerprint, InferenceCompositionRoot), and resolve().normalize(), where '..'
+    applies first (ModelCapabilityResolver.inputCandidates). An absolute field replaces the
+    folder. Both resolutions must be covered.
+    """
+    root = os.path.realpath(models)
+    contents = {os.path.realpath(models / rel) for rel in hashed}
+    for rel in hashed:
+        if rel.rsplit("/", 1)[-1] != MANIFEST:
+            continue
+        manifest = models / rel
+        try:
+            doc = json.loads(manifest.read_text(encoding="utf-8"))
+        except (OSError, UnicodeDecodeError, ValueError) as e:
+            raise InputRefused(f"unreadable model manifest {manifest}: {e}") from None
+        if not isinstance(doc, dict):
+            raise InputRefused(f"model manifest {manifest} is not a JSON object")
+        folder = os.path.abspath(manifest.parent)
+        for field, default in MANIFEST_FILES.items():
+            value = doc.get(field)
+            if value is None or (isinstance(value, str) and not value.strip()):
+                value = default
+            if value is None:
+                continue
+            if not isinstance(value, str):
+                raise InputRefused(f"model manifest {manifest}: {field} is not a file name")
+            joined = os.path.join(folder, value)
+            for candidate in (joined, os.path.normpath(joined)):
+                _covered(candidate, root, contents, unread, f"{rel}: {field}={value!r}")
 
 
 def _effective_sidecar(sidecar: Path) -> str | None:
@@ -273,14 +365,16 @@ def _effective_sidecar(sidecar: Path) -> str | None:
         and size == st.st_size else None
 
 
-def model_hashes(models: Path) -> dict[str, str]:
+def model_hashes(models: Path, *, llm_off: bool) -> dict[str, str]:
     """Bytes of the whole models root: every package discovery can select (onnx/, splade/,
-    bge-m3/, chat models, manifests, tokenizers, configuration). Links are followed; a dangling
-    link, an LFS pointer, an unreadable file or folder, or a digest sidecar the engine would
-    trust that disagrees with its model's bytes refuses."""
+    bge-m3/, manifests, tokenizers, configuration), and chat weights unless the LLM is off.
+    Links are followed; a dangling link, an LFS pointer, an unreadable file or folder, a
+    manifest reference outside the hashed bytes, or a digest sidecar the engine would trust
+    that disagrees with its model's bytes refuses."""
     if not models.is_dir():
         raise InputRefused(f"no models root at {models}; pass --models-dir /path/to/shared/models")
-    out = _hashing(distribution.tree_digest, models, _bookkeeping)
+    unread = _unread(llm_off)
+    out = _hashing(distribution.tree_digest, models, unread)
     for rel in out:
         with (models / rel).open("rb") as stream:
             if stream.read(len(LFS_POINTER)) == LFS_POINTER:
@@ -294,6 +388,7 @@ def model_hashes(models: Path) -> dict[str, str]:
                                    f"delete it so the engine recomputes it")
     if not any(rel.endswith(".onnx") for rel in out):
         raise InputRefused(f"no model inputs under {models}; pass --models-dir /path/to/shared/models")
+    _manifest_references(models, out, unread)
     return out
 
 
@@ -322,11 +417,43 @@ def harness_digest() -> dict[str, str]:
     return dict(_harness)
 
 
-# --------------------------------------------------------------------------- location independence
+# --------------------------------------------------------------------------- locations
+
+# The engine's working directory is the snapshot: backend._boot_admitted starts the eval
+# launcher with cwd=<snapshot>, and scripts/dev/eval-runner.cjs starts the JVM with
+# cwd: root, root being the snapshot (path.resolve(__dirname, '../..')). Path.of, file reads
+# and the dynamic loader resolve relative locations against it.
+
+
+def pin_locations(env, workdir: Path) -> dict[str, str]:
+    """Listed resource settings and LD_LIBRARY_PATH as absolute, link-free locations,
+    resolved once against the engine's working directory; the launch receives these."""
+    def absolute(value: str) -> str:
+        if value.startswith("~"):
+            raise InputRefused(f"{value!r} relies on home expansion the engine does not perform; "
+                               f"give an absolute path")
+        return os.path.realpath(os.path.join(workdir, value))
+    out = {name: absolute(env[name]) for name in RESOURCE_LOCATORS if env.get(name, "").strip()}
+    value = env.get("LD_LIBRARY_PATH", "")
+    if value:
+        entries = value.split(os.pathsep)
+        if not all(entries):
+            raise InputRefused("LD_LIBRARY_PATH has an empty entry, which loads from the working "
+                               "directory; remove it")
+        out["LD_LIBRARY_PATH"] = os.pathsep.join(absolute(entry) for entry in entries)
+    return out
+
+
+def library_path(value: str) -> list:
+    """LD_LIBRARY_PATH as the ordered content of its folders, never their locations."""
+    return [located(entry) for entry in value.split(os.pathsep)] if value else []
 
 
 def located(value: str) -> dict:
-    """A path-valued setting as the content it locates; the path itself never enters the key."""
+    """A pinned location as the content it names; the location itself never enters the key."""
+    if not os.path.isabs(value):
+        raise InputRefused(f"location {value!r} is not resolved against the engine's working "
+                           f"directory (pin_locations)")
     p = Path(value)
     if not p.exists():
         return {"absent": True}
@@ -339,3 +466,48 @@ def runtime(env, skip) -> dict:
     """Remaining settings: resource locators by content, everything else by literal value."""
     return {name: located(value) if name in RESOURCE_LOCATORS and value.strip() else value
             for name, value in env.items() if name not in skip}
+
+
+def looks_like_path(value) -> bool:
+    return isinstance(value, str) and ("/" in value or "\\" in value or value.startswith("~"))
+
+
+def recorded(runtime_component: dict) -> dict:
+    """The runtime component as run records keep it: path-like values only as digests.
+
+    The key keeps every literal value; a record never carries a machine location.
+    """
+    return {name: {"sha256": sha256_text(value)} if looks_like_path(value) else value
+            for name, value in runtime_component.items()}
+
+
+def _scalars(node, where=""):
+    if isinstance(node, dict):
+        for k, v in node.items():
+            yield from _scalars(v, f"{where}.{k}" if where else str(k))
+    elif isinstance(node, list):
+        for i, v in enumerate(node):
+            yield from _scalars(v, f"{where}[{i}]")
+    else:
+        yield where, node
+
+
+def config_references(snapshot: Path) -> None:
+    """Every location the selected engine configuration names lies inside the snapshot.
+
+    The snapshot is hashed and immutable, and relative values resolve against it (the
+    engine's working directory), so such a reference is covered as written.
+    """
+    config = snapshot / ENGINE_CONFIG
+    try:
+        doc = yaml.safe_load(config.read_text(encoding="utf-8"))
+    except (OSError, UnicodeDecodeError, yaml.YAMLError) as e:
+        raise InputRefused(f"unreadable engine configuration {ENGINE_CONFIG}: {e}") from None
+    base = os.path.realpath(snapshot)
+    for where, value in _scalars(doc):
+        if not looks_like_path(value):
+            continue
+        real = os.path.realpath(os.path.join(base, value))
+        if value.startswith("~") or os.path.commonpath([real, base]) != base:
+            raise InputRefused(f"{ENGINE_CONFIG} names {where}={value!r} outside the snapshot; "
+                               f"set it through a listed resource setting or keep it in the repository")

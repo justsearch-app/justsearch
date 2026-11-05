@@ -3,7 +3,9 @@
 One check per review finding: every model package (BGE-M3 included) and the effective digest
 sidecars; no shared ORT optimized graph; the installation lock held through snapshot
 publication; unreadable folders refuse; no inherited Node code loading; settings keep their
-values unless they are listed resource locators.
+values unless they are listed resource locators; every file a model manifest, the engine
+configuration or a resource setting names is resolved as the engine resolves it and lies in
+a hashed root or is hashed itself; chat weights are keyed only while the LLM can run.
 """
 from __future__ import annotations
 
@@ -67,7 +69,7 @@ def test_every_model_package_discovery_can_select_is_keyed(models):
     assert "bge-m3/BAAI-bge-m3/model_fp16_with_sparse.onnx" in components["models"]
     seen = {key}
     for rel in ("bge-m3/BAAI-bge-m3/model_fp16_with_sparse.onnx", "bge-m3/BAAI-bge-m3/tokenizer.json",
-                "chat.gguf", "onnx/new-package/model.onnx"):
+                "onnx/new-package/model.onnx"):
         (models / rel).parent.mkdir(parents=True, exist_ok=True)
         (models / rel).write_bytes(b"changed " + rel.encode())
         new = keyed(models)[0]
@@ -294,3 +296,117 @@ def test_settings_keep_their_values_and_only_listed_locators_key_by_content(mode
     assert keyed(models, JUSTSEARCH_FIELD_CATALOG=str(one))[0] == keyed(models, JUSTSEARCH_FIELD_CATALOG=str(two))[0]
     two.write_text('{"x": 1}')
     assert keyed(models, JUSTSEARCH_FIELD_CATALOG=str(one))[0] != keyed(models, JUSTSEARCH_FIELD_CATALOG=str(two))[0]
+
+
+# --------------------------------------------------------------------------- 7: file references
+
+ENGINE_CONFIG = "modules/ui/src/main/resources/headless-config/application.yaml"
+
+
+def ner(models: Path, **manifest) -> Path:
+    """A NER package whose model_manifest.json carries ``manifest`` beside its CPU graph."""
+    package = models / "onnx/ner"
+    package.mkdir(parents=True, exist_ok=True)
+    (package / "model.onnx").write_bytes(b"ner graph")
+    if not (package / "tokenizer.json").is_symlink():
+        (package / "tokenizer.json").write_text("{}")
+    (package / "model_manifest.json").write_text(json.dumps({"cpu": "model.onnx", **manifest}))
+    return package
+
+
+@pytest.mark.parametrize("reference", ["absolute", "climbing"])
+def test_a_manifest_reference_outside_the_models_root_refuses(models, tmp_path, reference):
+    outside = tmp_path / "outside/tokenizer.json"
+    outside.parent.mkdir()
+    outside.write_text("{}")
+    # BertNerInference loads modelDir.resolve(manifest.tokenizer()): an absolute name replaces
+    # the folder, a relative one climbs from onnx/ner.
+    ner(models, tokenizer=str(outside) if reference == "absolute" else "../../../outside/tokenizer.json")
+    with pytest.raises(ix.InputUnavailable, match="tokenizer=.* outside the hashed models root"):
+        keyed(models)
+
+
+def test_a_manifest_reference_climbing_inside_the_models_root_is_keyed(models):
+    ner(models, tokenizer="../embed/tokenizer.json", label_config="../../onnx/embed/tokenizer.json")
+    key = keyed(models)[0]
+    (models / "onnx/embed/tokenizer.json").write_text('{"changed": 1}')
+    assert keyed(models)[0] != key
+
+
+def test_a_link_inside_the_models_root_resolves_as_the_engine_follows_it(models, tmp_path):
+    outside = tmp_path / "outside"
+    (outside / "dir").mkdir(parents=True)
+    (outside / "tokenizer.json").write_text("{}")
+    package = ner(models)
+    (package / "shared").symlink_to(outside / "dir", target_is_directory=True)
+    # The OS follows shared before '..': the engine reads outside/tokenizer.json, although the
+    # lexically normalized name (onnx/ner/tokenizer.json) is hashed.
+    ner(models, tokenizer="shared/../tokenizer.json")
+    with pytest.raises(ix.InputUnavailable, match="outside the hashed models root"):
+        keyed(models)
+    # A link to a file is hashed by the content it names, wherever that is.
+    ner(models)
+    (package / "tokenizer.json").unlink()
+    (package / "tokenizer.json").symlink_to(outside / "tokenizer.json")
+    key = keyed(models)[0]
+    (outside / "tokenizer.json").write_text('{"changed": 1}')
+    assert keyed(models)[0] != key
+
+
+@pytest.mark.parametrize("value, accepted", [("SSOT/catalogs/fields.v1.json", True),
+                                             ("{outside}", False), ("../../catalog.json", False)])
+def test_an_engine_configuration_reference_outside_the_snapshot_refuses(models, tmp_path, value, accepted):
+    catalog = tmp_path / "catalog.json"
+    catalog.write_text("{}")
+    checkout = write_checkout(tmp_path / "checkout")
+    (checkout / ENGINE_CONFIG).write_text(f"index:\n  field_catalog: {value.format(outside=catalog)}\n")
+    cfg = ix.IndexConfig(models_dir=models)
+    env = {**pinned_env(cfg), ix.DISTRIBUTION_ENV: distribution.create(checkout, ["configured", None])}
+    if accepted:
+        ix.compute_index_key(make_collection(), cfg, env)
+        return
+    with pytest.raises(ix.InputUnavailable, match="field_catalog=.* outside the snapshot"):
+        ix.compute_index_key(make_collection(), cfg, env)
+
+
+def test_a_relative_resource_setting_resolves_against_the_engines_working_directory(models, tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)  # what the harness process happens to run in names nothing
+    cfg = ix.IndexConfig(models_dir=models)
+    # The engine runs in snapshots/<digest>; from there ../../catalog.json is beside snapshots/.
+    catalog = distribution.ROOT / "catalog.json"
+    catalog.parent.mkdir(parents=True, exist_ok=True)
+    catalog.write_text("{}")
+    monkeypatch.setenv("JUSTSEARCH_FIELD_CATALOG", "../../catalog.json")
+    key, components = keyed(models)
+    assert components["runtime"]["JUSTSEARCH_FIELD_CATALOG"] == {"file": distribution.file_sha256(catalog)}
+    catalog.write_text('{"x": 1}')
+    assert keyed(models)[0] != key
+    # The engine receives the location that was hashed, never the relative value.
+    env = pinned_env(cfg)
+    assert ix._launch_env(cfg, tmp_path / "entry/data", env)["JUSTSEARCH_FIELD_CATALOG"] == str(catalog.resolve())
+    with pytest.raises(ix.InputUnavailable, match="not resolved against the engine's working directory"):
+        ix.compute_index_key(make_collection(), cfg, {**env, "JUSTSEARCH_FIELD_CATALOG": "../../catalog.json"})
+
+
+# --------------------------------------------------------------------------- 8: chat weights
+
+
+def test_chat_weights_leave_the_key_alone_while_the_llm_is_off(models):
+    c = make_collection()
+    cfg = ix.IndexConfig(models_dir=models)
+    env = pinned_env(cfg)
+    assert env["JUSTSEARCH_LLM_ENABLED"] == "false"
+    key, components = ix.compute_index_key(c, cfg, env)
+    assert "chat.gguf" not in components["models"]
+    (models / "chat.gguf").write_bytes(b"other chat weights")
+    (models / "compact").mkdir()
+    (models / "compact/mmproj-F16.gguf").write_bytes(b"projector")
+    assert ix.compute_index_key(c, cfg, env)[0] == key
+    # With the LLM in any other state the weights are keyed.
+    on = {**env, "JUSTSEARCH_LLM_ENABLED": "true"}
+    enabled = ix.compute_index_key(c, cfg, on)[0]
+    (models / "chat.gguf").write_bytes(b"third chat weights")
+    assert ix.compute_index_key(c, cfg, on)[0] != enabled
+    # Indexing models keep their whole closure.
+    (models / "onnx/embed/tokenizer.json").write_text('{"changed": 1}')
+    assert ix.compute_index_key(c, cfg, env)[0] != key

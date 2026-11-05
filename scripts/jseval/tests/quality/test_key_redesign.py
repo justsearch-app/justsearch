@@ -78,6 +78,7 @@ def cfg_for(checkout, models, **kw):
 def keyed(c, cfg, *, prepared_only=False):
     env = cfg.environment()
     env[ix.DISTRIBUTION_ENV] = ix._select_distribution(cfg, env, prepared_only)
+    ix.pin_locations(env)
     return ix.compute_index_key(c, cfg, env), env
 
 
@@ -581,14 +582,18 @@ def test_kr8_older_index_identity_is_refused_by_name(models, tmp_path, monkeypat
 # --------------------------------------------------------------------------- KR9
 
 
-def test_kr9_headers_record_identity_digests_without_machine_paths(checkout, models, installs, tmp_path):
+def test_kr9_headers_record_identity_digests_without_machine_paths(checkout, models, installs, tmp_path,
+                                                                   monkeypatch):
+    monkeypatch.setenv("JUSTSEARCH_ORT_PROFILING_DIR", str(tmp_path / "profiles"))
     c = make_collection()
     cfg = cfg_for(checkout, models)
     (key, components), env = keyed(c, cfg)
+    # The key keeps the literal value; the record keeps its digest.
+    assert components["runtime"]["JUSTSEARCH_ORT_PROFILING_DIR"] == str(tmp_path / "profiles")
     identity = ix.identity_digests(components)
     assert set(identity) == {"distribution", "harness", "jdk", "jvm_options", "library_path", "ocr",
                              "models", "runtime", "documents"}
-    h = header(c, index_key=key, identity=identity, index_state={"runtime": components["runtime"]})
+    h = header(c, index_key=key, identity=identity, index_state={"runtime": inputs.recorded(components["runtime"])})
     text = json.dumps(h.to_dict())
     assert RunHeader.from_dict(json.loads(text)) == h
     for path in (str(tmp_path), str(Path.home()), env["JAVA_HOME"], env["JUSTSEARCH_MODELS_DIR"]):
@@ -599,3 +604,37 @@ def test_kr9_headers_record_identity_digests_without_machine_paths(checkout, mod
     old = h.to_dict()
     del old["identity"]
     assert RunHeader.from_dict(old).identity == {}
+
+
+def test_kr9_run_records_keep_path_like_settings_only_as_digests(tmp_path, monkeypatch):
+    import time
+    from jseval.quality.types import RunRecord
+    from .helpers import make_run
+    c = make_collection()
+    fixture = make_run(c)
+    runtime = {"JUSTSEARCH_ORT_PROFILING_DIR": "/home/reviewer/profiles", "JUSTSEARCH_TRACE_DIR": "traces/run-1",
+               "JUSTSEARCH_CHUNK_SIZE": "512", "JUSTSEARCH_FIELD_CATALOG": {"file": "f" * 64}}
+    handle = Mock(index_key="prepared-key", index_population=c.index_population(), index_build="cached",
+                  index_cache_key="prepared-key", model_hashes=dict(fixture.header.model_hashes), env={},
+                  components={"runtime": runtime}, identity={"models": "a" * 64},
+                  index_state={"settled": True}, base_url="http://engine")
+    monkeypatch.setattr(run, "require_exclusive", lambda _: None)
+    monkeypatch.setattr(run.collections, "load_collection", lambda _: c)
+    monkeypatch.setattr(run.index, "prepare_index", lambda *a, **kw: handle)
+    monkeypatch.setattr(run.index, "confirm", lambda _: Mock(ok=True))
+    results = {r.qid: r for r in fixture.results}
+    monkeypatch.setattr(run, "search_query", lambda client, h, qid, *a: results[qid])
+    item = {"index_config": run._serial_config(ix.IndexConfig()),
+            **{k: str(tmp_path / k) for k in ("collection", "run", "ready", "go", "done")}}
+    Path(item["go"]).touch()
+    run._collection_worker({"request": run.refined_request(), "commit": fixture.header.commit,
+                            "dirty_hash": None, "mode": None, "hardware": {}, "budget": 600},
+                           item, time.monotonic() + 30)
+    assert json.loads(Path(item["done"]).read_text())["error"] is None
+    text = Path(item["run"]).read_text()
+    for literal in ("/home/reviewer/profiles", "traces/run-1"):
+        assert literal not in text
+    recorded = RunRecord.read(item["run"]).header.index_state["runtime"]
+    assert recorded == {"JUSTSEARCH_ORT_PROFILING_DIR": {"sha256": sha256_text("/home/reviewer/profiles")},
+                        "JUSTSEARCH_TRACE_DIR": {"sha256": sha256_text("traces/run-1")},
+                        "JUSTSEARCH_CHUNK_SIZE": "512", "JUSTSEARCH_FIELD_CATALOG": {"file": "f" * 64}}

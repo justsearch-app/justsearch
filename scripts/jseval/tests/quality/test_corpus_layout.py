@@ -78,7 +78,7 @@ def test_witnesses_never_read_binary_or_restricted_originals(tmp_path, monkeypat
 def test_layout_and_witnesses_key_collection(tmp_path, monkeypatch):
     c = Collection('key', 'en', {}, {}, {'d': 'Notes/Name.md'}, {'d': sha256_text('words')})
     from .conftest import pinned_env
-    monkeypatch.setattr(index.inputs, 'model_hashes', lambda _: {'model': 'fixed model'})
+    monkeypatch.setattr(index.inputs, 'model_hashes', lambda *a, **kw: {'model': 'fixed model'})
     cfg = index.IndexConfig(repo_root=tmp_path, models_dir=tmp_path)
     env = pinned_env(cfg)
     opaque = index.compute_index_key(c, cfg, env)[0]

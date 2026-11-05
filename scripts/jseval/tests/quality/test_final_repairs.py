@@ -139,7 +139,7 @@ def test_standalone_pointer_models_name_required_flag(tmp_path):
     (models/'onnx').mkdir(parents=True)
     (models/'onnx/model.onnx').write_text('version https://git-lfs.github.com/spec/v1\noid sha256:abc\nsize 1234\n')
     with pytest.raises(index.IndexRefused, match='--models-dir'):
-        index.model_hashes(models)
+        index.model_hashes(models, llm_off=True)
 
 
 def test_missing_standalone_enron_names_collection_argument(tmp_path, monkeypatch):

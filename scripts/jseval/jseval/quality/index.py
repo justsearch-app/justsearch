@@ -144,9 +144,9 @@ def _file_hash(path: Path) -> str:
         return hashlib.file_digest(f, "sha256").hexdigest()
 
 
-def model_hashes(models: Path) -> dict[str, str]:
+def model_hashes(models: Path, *, llm_off: bool) -> dict[str, str]:
     try:
-        return inputs.model_hashes(models)
+        return inputs.model_hashes(models, llm_off=llm_off)
     except inputs.InputRefused as e:
         raise InputUnavailable(str(e)) from None
 
@@ -169,15 +169,18 @@ def compute_index_key(collection: Collection, config: IndexConfig,
                      "JUSTSEARCH_TESSERACT_PATH", "JUSTSEARCH_TESSDATA_PATH"):
             if not env.get(name):
                 raise inputs.InputRefused(f"input not pinned: {name}")
+        snapshot = distribution.verify(env[DISTRIBUTION_ENV])
+        # The snapshot is hashed and immutable; what its engine configuration names must lie inside it.
+        inputs.config_references(distribution.path(snapshot))
         components = {
             "schema": SCHEMA,
-            "distribution": distribution.verify(env[DISTRIBUTION_ENV]),
+            "distribution": snapshot,
             "harness": inputs.harness_digest(),
             "jdk": inputs.jdk_digest(Path(env["JAVA_HOME"])),
             "jvm_options": {name: env.get(name, "") for name in inputs.JVM_OPTION_VARIABLES},
             "library_path": inputs.library_path(env.get("LD_LIBRARY_PATH", "")),
             "ocr": inputs.ocr_digest(Path(env["JUSTSEARCH_TESSERACT_PATH"]), Path(env["JUSTSEARCH_TESSDATA_PATH"])),
-            "models": inputs.model_hashes(Path(env["JUSTSEARCH_MODELS_DIR"])),
+            "models": inputs.model_hashes(Path(env["JUSTSEARCH_MODELS_DIR"]), llm_off=inputs.llm_off(env)),
             # Ports/data folders are lifecycle-owned; everything else is conservatively shaping.
             "runtime": inputs.runtime(env, OPERATIONAL_ENV | SEPARATELY_HASHED),
             "collection": collection.name, "documents": collection.document_identity()}
@@ -192,6 +195,15 @@ def identity_digests(components: Mapping[str, Any]) -> dict[str, str]:
     """One digest per key component: what a run header records instead of paths."""
     return {name: (value if name == "distribution" else sha256_text(canonical_json(value)))
             for name, value in components.items() if name not in ("schema", "collection")}
+
+
+def pin_locations(env: dict) -> None:
+    """Resolve every remaining location once against the selected snapshot, the engine's
+    working directory; the key hashes and the launch receives these absolute paths."""
+    try:
+        env.update(inputs.pin_locations(env, distribution.path(env[DISTRIBUTION_ENV])))
+    except inputs.InputRefused as e:
+        raise InputUnavailable(f"not ready: {e}") from None
 
 
 def _select_distribution(config: IndexConfig, env: Mapping[str, str], prepared_only: bool) -> str:
@@ -260,7 +272,7 @@ def _launch_env(config: IndexConfig, data: Path, env: Mapping[str, str]) -> dict
             "JUSTSEARCH_HOME": str(data), "JUSTSEARCH_DATA_DIR": str(data),
             "JUSTSEARCH_INDEX_BASE_PATH": str(data / "index/default"),
             "JUSTSEARCH_REPO_ROOT": str(snapshot),
-            "JUSTSEARCH_CONFIG": str(snapshot / "modules/ui/src/main/resources/headless-config/application.yaml"),
+            "JUSTSEARCH_CONFIG": str(snapshot / inputs.ENGINE_CONFIG),
             "JUSTSEARCH_SSOT_PATH": str(snapshot / "SSOT"),
             "JUSTSEARCH_STAGE_PLUGIN_MANIFEST": str(snapshot / "SSOT/manifests/plugins/pipeline-stage-plugins.v1.json")}
 
@@ -806,6 +818,7 @@ def prepare_index(collection: Collection, config: IndexConfig, *, prepared_only:
     env = config.environment()
     # Before any lock or engine: resolution/hashing failures never touch a cached entry.
     env[DISTRIBUTION_ENV] = _select_distribution(config, env, prepared_only)
+    pin_locations(env)
     try:
         lease = distribution.lease(env[DISTRIBUTION_ENV])
     except distribution.DistributionRefused as e:

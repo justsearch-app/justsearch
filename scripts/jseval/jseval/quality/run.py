@@ -25,7 +25,7 @@ import psutil
 
 from .. import backend
 from .._paths import REPO_ROOT
-from . import collections, compare, distribution, index, known_answers, report, scoring
+from . import collections, compare, distribution, index, inputs, known_answers, report, scoring
 from .types import (Outcome, QueryResult, RunHeader, RunRecord, Served,
                     atomic_write_text, canonical_json, sha256_text)
 
@@ -256,8 +256,9 @@ def _collection_worker(plan: dict, item: dict, deadline: float) -> None:
             started=utc(), ended=None, expected_legs=expected_legs(plan['mode']),
             expected_reranker='skipped' if plan['mode'] in ('text', 'vector') else 'executed',
             index_build=handle.index_build, index_cache_key=handle.index_cache_key,
-            # Location-independent: path-valued settings appear as the digest of their content.
-            index_state={**handle.index_state, 'runtime': handle.components['runtime']},
+            # Location-independent: resource settings appear as the digest of their content and
+            # every other path-like value as its own digest.
+            index_state={**handle.index_state, 'runtime': inputs.recorded(handle.components['runtime'])},
             identity=handle.identity, hardware=plan['hardware'],
             budget={'window_seconds': plan['budget']})
         # started includes this collection's backend start and confirmation for estimation.
@@ -438,7 +439,9 @@ def execute(action: str, refs: tuple[str, ...], *, baseline_dir: Path,
         if record:
             refusals[c.name] = [r.qid for r in record.results if compare.syntax_refused(r)]
             errors += compare.validate_run(c, record, {c.version}, c.name)
-            if dict(record.header.model_hashes) != models or index.model_hashes(Path(cfg.environment()['JUSTSEARCH_MODELS_DIR'])) != models:
+            pinned = cfg.environment()
+            if dict(record.header.model_hashes) != models or index.model_hashes(
+                    Path(pinned['JUSTSEARCH_MODELS_DIR']), llm_off=inputs.llm_off(pinned)) != models:
                 errors.append(f'{c.name}: result is from another model set')
             if record.header.commit != commit or record.header.request_config != request:
                 errors.append(f'{c.name}: result is from another candidate or request')

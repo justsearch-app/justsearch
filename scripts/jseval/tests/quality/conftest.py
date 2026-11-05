@@ -85,10 +85,12 @@ def isolated_inputs(monkeypatch, tmp_path_factory):
 
 
 def pinned_env(config, **overrides) -> dict:
-    """The complete pinned environment for ``config``, with its selected snapshot."""
+    """The complete pinned environment for ``config``, with its selected snapshot and every
+    location resolved against it, as ``prepare_index`` pins them."""
     env = config.environment()
     env[index.DISTRIBUTION_ENV] = index._select_distribution(config, env, False)
     env.update(overrides)
+    index.pin_locations(env)
     return env
 
 
