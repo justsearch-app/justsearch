@@ -29,6 +29,7 @@ import io.justsearch.ipc.ScanRootRequest;
 import io.justsearch.ipc.SubscribeIndexingJobsRequest;
 import java.util.Objects;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 import java.util.concurrent.ScheduledExecutorService;
@@ -1480,8 +1481,11 @@ public final class EngineKnowledgeClient extends KnowledgeClient {
     var walk = scheduleRootWalk(rootWalkExecutor(), ownedContext -> {
       fence.run(() -> {
         try (var work = admission.attach(ownedContext)) {
-          var terminal = foregroundLoad.call(work, () ->
-              scanRootWork(request, cancellation, ignored -> {}, work, recorded, delivery));
+          var policyAtStart = new AtomicReference<CoveragePolicy>();
+          var terminal = foregroundLoad.call(work, () -> {
+            policyAtStart.set(captureCoveragePolicy(root.excludePatterns()));
+            return scanRootWork(request, cancellation, ignored -> {}, work, recorded, delivery);
+          });
           outcome.set(cancellation.isCancelled() || "CLIENT_CANCELLED".equals(terminal.getTerminalReasonCode())
               ? JobQueue.WalkEnumerationOutcome.CANCELLED
               : terminal.getComplete() && terminal.getTerminalReasonCode().isEmpty()
@@ -1490,9 +1494,14 @@ public final class EngineKnowledgeClient extends KnowledgeClient {
             // #758: the reindex walk records a root-level refusal
             // as the root's state at once, as the boot walk does, instead of leaving it to read
             // indexed until the periodic sync asks.
-            roots.recordRecordedWalk(root.path(),
+            var currentPolicy = captureCoveragePolicy(null);
+            boolean samePolicy = policyAtStart.get() != null && currentPolicy != null
+                && policyAtStart.get().digest().equals(currentPolicy.digest());
+            roots.recordRecordedWalk(root, fence,
                 outcome.get() == JobQueue.WalkEnumerationOutcome.COMPLETE,
-                terminal.getTerminalReasonCode());
+                terminal.getTerminalReasonCode(),
+                terminal.getFilesWalked() - terminal.getFilesSkipped(),
+                samePolicy ? currentPolicy.globs() : null);
           }
         }
         return null;

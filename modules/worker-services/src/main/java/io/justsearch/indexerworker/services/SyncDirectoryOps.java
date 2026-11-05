@@ -848,6 +848,7 @@ final class SyncDirectoryOps {
       java.util.function.ToIntFunction<java.util.function.IntSupplier> recoveryAdmission,
       io.justsearch.indexerworker.queue.SwitchBufferCapableQueue.SwitchBufferOp originalRoot) {
     boolean upgradeRecovery = admissionMode == AdmissionMode.UPGRADE_RECOVERY;
+    if (Thread.currentThread().isInterrupted()) return syncDirectoryErrorResponse("Interrupted");
     if (cancelled.getAsBoolean()) return syncDirectoryErrorResponse("Cancelled");
     Path root = resolveSyncRoot(rootPath);
     if (root == null) {
@@ -928,7 +929,8 @@ final class SyncDirectoryOps {
           rootPath,
           filesDeleted,
           filesAdded);
-      return syncDirectoryResultResponse(filesDeleted, filesAdded);
+      return syncDirectoryResultResponse(filesDeleted, filesAdded).toBuilder()
+          .setEligibleFiles(walk.eligibleFiles()).build();
 
     } catch (Exception e) {
       log.error("syncDirectory failed for {}", rootPath, e);
@@ -1010,7 +1012,7 @@ final class SyncDirectoryOps {
 
   // ==================== Walk logic ====================
 
-  record SyncWalkPhaseResult(int filesAdded, boolean walkInterrupted, boolean walkIncomplete) {}
+  record SyncWalkPhaseResult(int filesAdded, boolean walkInterrupted, boolean walkIncomplete, long eligibleFiles) {}
 
   @SuppressWarnings("PMD.CognitiveComplexity")
   private SyncWalkPhaseResult walkAndEnqueueMissingFiles(
@@ -1284,7 +1286,7 @@ final class SyncDirectoryOps {
       if (!walkInterrupted[0] && !cancelled.getAsBoolean() && filesAdded > 0) {
         log.info("syncDirectory: enqueued {} missing files for indexing", filesAdded);
       }
-      return new SyncWalkPhaseResult(filesAdded, walkInterrupted[0], walkIncomplete[0]);
+      return new SyncWalkPhaseResult(filesAdded, walkInterrupted[0], walkIncomplete[0], counters[0]);
     }
   }
 

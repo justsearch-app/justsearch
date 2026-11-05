@@ -1,0 +1,157 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
+  },
+  "createdAt": "2026-11-05T08:20:41.281Z",
+  "revision": "a8d8a97405f57f6a7966e74a6aa7b085cbbd4c66",
+  "tree": "65d9c7989eae0e32a33170d15aab4bd32f1764d6",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": "openjdk version \"25.0.4.1\" 2026-08-18 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "./gradlew :modules:app-engine:test --tests \"io.justsearch.app.engine.EngineIncompleteCoverageTest.R1NonqualifyingSyncCannotClear\" --tests \"io.justsearch.app.engine.EngineIncompleteCoverageTest.R2RestrictedRecordedScopeCannotClear\" --tests \"io.justsearch.app.engine.EngineIncompleteCoverageTest.R2LiteralPolicyChangedDuringEnumerationCannotClear\" --tests \"io.justsearch.app.engine.EngineIncompleteCoverageTest.R4RemovedRegistrationRejectsAResultAwaitingApplication\" --tests \"io.justsearch.app.engine.EngineIncompleteCoverageTest.R5ReloadWhileUnreadableRetainsWarningAndBootAfterRepairClears\" --tests \"io.justsearch.app.engine.EngineIncompleteCoverageTest.R8SuccessfulSyncLeavesOtherWalkErrorsAndUnrelatedRootsAlone\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 6151
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineIncompleteCoverageTest.java#R1NonqualifyingSyncCannotClear",
+      "file": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineIncompleteCoverageTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:9e12b875d224e33e7aea1c90661f7d38427188864fc8612747ddf86ab9980a0f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "R1NonqualifyingSyncCannotClear(String) [1] skipped",
+          "status": "passed"
+        },
+        {
+          "name": "R1NonqualifyingSyncCannotClear(String) [2] deferred",
+          "status": "passed"
+        },
+        {
+          "name": "R1NonqualifyingSyncCannotClear(String) [3] unverified",
+          "status": "passed"
+        },
+        {
+          "name": "R1NonqualifyingSyncCannotClear(String) [4] failed",
+          "status": "passed"
+        },
+        {
+          "name": "R1NonqualifyingSyncCannotClear(String) [5] missing",
+          "status": "passed"
+        },
+        {
+          "name": "R1NonqualifyingSyncCannotClear(String) [6] wrong-volume",
+          "status": "passed"
+        },
+        {
+          "name": "R1NonqualifyingSyncCannotClear(String) [7] interrupted",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineIncompleteCoverageTest.java#R2RestrictedRecordedScopeCannotClear",
+      "file": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineIncompleteCoverageTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:9e12b875d224e33e7aea1c90661f7d38427188864fc8612747ddf86ab9980a0f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "R2RestrictedRecordedScopeCannotClear(String) [1] file",
+          "status": "passed"
+        },
+        {
+          "name": "R2RestrictedRecordedScopeCannotClear(String) [2] subtree",
+          "status": "passed"
+        },
+        {
+          "name": "R2RestrictedRecordedScopeCannotClear(String) [3] extra-exclusion",
+          "status": "passed"
+        },
+        {
+          "name": "R2RestrictedRecordedScopeCannotClear(String) [4] policy-changed",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineIncompleteCoverageTest.java#R2LiteralPolicyChangedDuringEnumerationCannotClear",
+      "file": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineIncompleteCoverageTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:9e12b875d224e33e7aea1c90661f7d38427188864fc8612747ddf86ab9980a0f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "R2LiteralPolicyChangedDuringEnumerationCannotClear()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineIncompleteCoverageTest.java#R4RemovedRegistrationRejectsAResultAwaitingApplication",
+      "file": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineIncompleteCoverageTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:9e12b875d224e33e7aea1c90661f7d38427188864fc8612747ddf86ab9980a0f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "R4RemovedRegistrationRejectsAResultAwaitingApplication()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineIncompleteCoverageTest.java#R5ReloadWhileUnreadableRetainsWarningAndBootAfterRepairClears",
+      "file": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineIncompleteCoverageTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:9e12b875d224e33e7aea1c90661f7d38427188864fc8612747ddf86ab9980a0f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "R5ReloadWhileUnreadableRetainsWarningAndBootAfterRepairClears()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineIncompleteCoverageTest.java#R8SuccessfulSyncLeavesOtherWalkErrorsAndUnrelatedRootsAlone",
+      "file": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineIncompleteCoverageTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:9e12b875d224e33e7aea1c90661f7d38427188864fc8612747ddf86ab9980a0f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "R8SuccessfulSyncLeavesOtherWalkErrorsAndUnrelatedRootsAlone()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:4b9cd9c2d67d3b1a1282f329555321e18c4875ab221a316c6e04dfa31c7b877c"
+}
