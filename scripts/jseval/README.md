@@ -82,15 +82,21 @@ index, including unknown `JUSTSEARCH_*` variables and ORT threads. Sensitivity
 never builds, repairs or quarantines. It refuses pending ingestion/enrichment
 work and confirms identity without the cross-encoder canary; preparation and
 normal checks keep that canary. GPU overrides still require pinned native
-libraries. CPU affinity is inherited by the backend's children and read back
-from the Engine JVM; a mismatch refuses the run.
+libraries. `--cpus` requires `JUSTSEARCH_ORT_INTRA_OP_THREADS` set by `--set`
+to at most the number of CPUs given. The affinity of every thread of the
+Engine's process tree is read back before scoring and again after it; a thread
+allowed outside the set refuses (before) or invalidates (after) the run. A
+thread that widens its mask and restores it between the two readbacks cannot
+be detected.
 
 Sensitivity exits **3**, labelled **SENSITIVITY**, and cannot be stored as a
 baseline or used by compare/check. Sampling excludes pending labels and is
 deterministic regardless of input order. Without matching sensitivity history,
 the window estimate allows 15 seconds per query plus startup, confirmation and
-cleanup; a run exceeding the 600-second window refuses before admission. Use
-`--sample` to fit a cold run. The report counts executed rerankers and skips by
+cleanup; a run exceeding the 600-second window refuses before admission. Sensitivity history is matched on the
+explicit overrides, CPU set and sample, not on the index key or inherited
+settings, so an estimate can be low; the window deadline still stops the run.
+Use `--sample` to fit a cold run. The report counts executed rerankers and skips by
 reason and fixed query group, including consecutive deadline skips. Disabled
 and deadline skips do not invalidate sensitivity; default skip rules are
 unchanged. Other failures still invalidate it. `SEARCH_DEADLINE_EXCEEDED` may include model loading or saturation
