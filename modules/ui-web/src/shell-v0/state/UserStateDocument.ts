@@ -1293,6 +1293,8 @@ const SENTINEL = Symbol('userstate-projection-sentinel');
  * Mutate the document via a producer function. The producer
  * receives the current snapshot and returns the next snapshot.
  * Subscribers fire after persistence.
+ * `persistFirst` keeps destructive edits out of the live document when saving fails; it throws
+ * the persistence error without notifying subscribers. Other edits retain the session-only fallback.
  *
  * Producer must return a NEW object reference; mutating in place
  * doesn't fire listeners (listener equality check would short-
@@ -1300,16 +1302,20 @@ const SENTINEL = Symbol('userstate-projection-sentinel');
  */
 export function mutateDocument(
   producer: (current: UserStateV1) => UserStateV1,
+  persistFirst = false,
 ): void {
   ensureInitialized();
   const produced = producer(docSig.get());
   if (produced === docSig.get()) return;
+  if (persistFirst && !saveDocument(produced)) {
+    throw lastPersistError ?? new Error('User state could not be saved.');
+  }
   // §11.3 / §13.3 — the producer mutates the V1-shape view. Re-key the active
   // profile from the flat slices into the storage authority; `docSig`
   // recomputes the internally-consistent view (profiles[activeProfileId] ===
   // flat slices) on the next read.
   storageSig.set(storageFromView(produced));
-  saveDocument(docSig.get());
+  if (!persistFirst) saveDocument(docSig.get());
   notify();
 }
 

@@ -26,6 +26,7 @@ import { captureSettingsPatch, saveAbsoluteSettings, type SettingsPatch } from '
 // DOM property, which is the only comparison that can notice.
 import { live } from 'lit/directives/live.js';
 import { ifDefined } from 'lit/directives/if-defined.js';
+import { keyed } from 'lit/directives/keyed.js';
 import { JfElement } from '../primitives/JfElement.js';
 import { authorizedFetch } from '../api/authorizedFetch.js';
 // Tempdoc 511 §511-followup-B: reset-settings now routes through
@@ -263,6 +264,7 @@ export class SettingsSurface extends JfElement {
     themeImportDraft: { state: true },
     renamingThemeId: { state: true },
     themeDeleteConfirm: { state: true },
+    themeDeleteError: { state: true },
     pluginRevokeConfirm: { state: true },
     renameDraft: { state: true },
     // Tempdoc 567 §9.4 — the glass/solid surface-mode toggle (FE-only pref, mirrors high-contrast).
@@ -303,6 +305,7 @@ export class SettingsSurface extends JfElement {
   declare renamingThemeId: string | null;
   /** DE1 — the custom theme whose deletion waits in its in-place band. */
   declare themeDeleteConfirm: string | null;
+  declare themeDeleteError: string | null;
   /** DE1 — the plugin whose revocation waits in its in-place band. */
   declare pluginRevokeConfirm: string | null;
   declare renameDraft: string;
@@ -407,6 +410,7 @@ export class SettingsSurface extends JfElement {
     this.themeImportDraft = '';
     this.renamingThemeId = null;
     this.themeDeleteConfirm = null;
+    this.themeDeleteError = null;
     this.pluginRevokeConfirm = null;
     this.renameDraft = '';
     this.surfaceMode = getSurfaceMode();
@@ -459,7 +463,7 @@ export class SettingsSurface extends JfElement {
       padding-block: var(--jf-space-2); border-block-end: var(--frame-hairline) solid var(--border-subtle); }
     .delete-dialog .typed-label { display: block; margin-block: var(--jf-space-4) var(--jf-space-2); color: var(--text-secondary); }
     .delete-dialog .typed-row { display: flex; flex-wrap: wrap; align-items: center; gap: var(--jf-space-2); }
-    .delete-dialog .typed-row input { flex: 1 1 12rem; min-inline-size: 0; padding: var(--jf-space-2) var(--jf-space-3);
+    .delete-dialog .typed-input { flex: 1 1 calc(6 * var(--jf-space-8)); min-inline-size: 0; padding: var(--jf-space-2) var(--jf-space-3);
       border: var(--frame-hairline) solid var(--border-subtle); border-radius: var(--frame-control-radius);
       background: var(--surface-2); color: var(--text-primary); font: inherit; font-family: var(--font-mono); }
     .delete-dialog .remaining { color: var(--text-secondary); font-size: var(--font-size-sm); }
@@ -1083,6 +1087,7 @@ export class SettingsSurface extends JfElement {
     this.deleteState = 'idle';
     this.confirmText = '';
     this.searchShortcutError = null;
+    this.themeDeleteError = null;
   }
 
   override disconnectedCallback(): void {
@@ -2176,6 +2181,8 @@ export class SettingsSurface extends JfElement {
           ${themes.map(renderEntry)}
         </div>
         ${this.renderThemeDeleteBand(themes)}
+        ${this.themeDeleteError ? html`<jf-error-alert class="theme-delete-error" tone="error"
+          .onDismiss=${() => { this.themeDeleteError = null; }}>${this.themeDeleteError}</jf-error-alert>` : nothing}
         ${this.renderThemeImport()}
       </div>
     `;
@@ -2648,6 +2655,7 @@ export class SettingsSurface extends JfElement {
    * changed but no reactive prop did, so request an explicit re-render.
    */
   private requestDeleteCustomTheme(entry: ThemeCatalogEntry): void {
+    this.themeDeleteError = null;
     if (this.themeDeleteConfirm === entry.id) {
       void this.updateComplete.then(() => this.shadowRoot?.querySelector<ConfirmBand>('.theme-delete-confirm')?.focusKeep());
       return;
@@ -2659,18 +2667,23 @@ export class SettingsSurface extends JfElement {
   private renderThemeDeleteBand(themes: readonly ThemeCatalogEntry[]): TemplateResult | typeof nothing {
     const entry = themes.find(theme => theme.id === this.themeDeleteConfirm);
     if (!entry) return nothing;
-    return html`<jf-confirm-band class="theme-delete-confirm" heading=${`Delete the theme ${entry.displayName}?`}
+    return html`${keyed(entry.id, html`<jf-confirm-band class="theme-delete-confirm" heading=${`Delete the theme ${entry.displayName}?`}
       consequence=${`${entry.displayName} is deleted from this computer${this.activeThemeId === entry.id ? ' and the default theme is used instead' : ''}. Other themes stay. This can't be undone.`}
       action-label=${`Delete ${entry.displayName}`}
       @confirm-band-confirm=${() => this.deleteCustomTheme(entry)}
-      @confirm-band-cancel=${() => { this.themeDeleteConfirm = null; }}></jf-confirm-band>`;
+      @confirm-band-cancel=${() => { this.themeDeleteConfirm = null; }}></jf-confirm-band>`)}`;
   }
 
   private deleteCustomTheme(entry: ThemeCatalogEntry): void {
     if (this.themeDeleteConfirm !== entry.id) return;
     this.themeDeleteConfirm = null;
-    this.host_.theme.deleteTheme?.(entry.id);
-    this.requestUpdate();
+    try {
+      this.themeDeleteError = null;
+      this.host_.theme.deleteTheme?.(entry.id);
+      this.requestUpdate();
+    } catch {
+      this.themeDeleteError = `Couldn't delete ${entry.displayName}. It has been kept. Try again.`;
+    }
   }
 
   /**
@@ -2901,6 +2914,7 @@ export class SettingsSurface extends JfElement {
           <label class="typed-label" for="delete-data-typed">Type <code>${phrase}</code> to confirm</label>
           <div class="typed-row">
             <input
+              class="typed-input"
               id="delete-data-typed"
               type="text"
               aria-label="Type DELETE to confirm"

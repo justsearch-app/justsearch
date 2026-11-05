@@ -514,8 +514,7 @@ export function deriveFrameStatus(input: FrameStatusInput): FrameStatus {
   const runningRank = (fact: StatusFact): number => ['indexing', 'rebuilding', 'ai-install'].includes(fact.id)
     ? ['indexing', 'rebuilding', 'ai-install'].indexOf(fact.id) : fact.id.startsWith('folder-work:') ? 4 : fact.id === FILE_ACTIVITY_ID ? 5 : 3;
   sections.running.sort((a, b) => runningRank(a) - runningRank(b));
-  sections.earlier.sort((a, b) => Number(!!b.unread) - Number(!!a.unread)
-    || (b.occurredAt ?? '').localeCompare(a.occurredAt ?? ''));
+  sections.earlier.sort((a, b) => (b.occurredAt ?? '').localeCompare(a.occurredAt ?? ''));
   const stale = !ai || ai.phase !== 'connected';
   let pill: StatusPillState;
   const pastGrace = input.contactLostAt !== null && now - input.contactLostAt >= RECONNECT_GRACE_MS;

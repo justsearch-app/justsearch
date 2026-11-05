@@ -269,9 +269,14 @@ describe('concurrent source facts', () => {
     expect(m.sections.running.find(f => f.id === 'folder-work:notes')!.stale).toBe(true);
     expect(m.sections.running.find(f => f.id === 'background:agent1')!.stale).toBe(true);
   });
-  it('ST7 unread sorts ahead of a newer read item and remains separate from seen and active state', () => {
+  it('ST7 Earlier orders advisories and completed operations newest first regardless of read state', () => {
     const read = advisory(true); const unread = { ...advisory(), key: 'older', event: { ...read.event, occurredAt: '2025-01-01T00:00:00Z' } };
-    expect(derive({ advisories: [read, unread] }).sections.earlier.map(f => f.id)).toEqual(['advisory:older', 'advisory:h1']);
+    const activity = [projectBackend({ id: 'done', kind: 'operation', operationId: 'core.reindex', outcome: 'SUCCESS',
+      originator: 'user', occurredAt: '2026-11-03T09:00:00Z' })];
+    const result = derive({ advisories: [unread, read], activity });
+    expect(result.sections.earlier.map(f => f.id)).toEqual(['advisory:h1', 'activity:done', 'advisory:older']);
+    expect(result.sections.earlier.map(f => !!f.unread)).toEqual([false, false, true]);
+    expect(result.sections.problems).toEqual([]);
   });
   it.each(['available', 'repair_required'])('ST4 update %s retains its existing Settings action', state => {
     expect(derive({ update: { state, availableVersion: '1.2.3' } as FrameStatusInput['update'] }).sections.needs[0]!.actions![0]!.target).toBe('core.settings-surface');

@@ -35,6 +35,15 @@ inverse Effect shape is persisted: successful receipts supply its path and colle
 
 All added checks are durable; none is scaffolding. No independent acceptance is recorded yet.
 
+Acceptor-1 repair: `shell-s3b-acceptor-repaired.json` compares the four repaired items with
+`b1b5ae0f3c400c3ca672fafddd43869412891d41`; focus and real quota failures run in isolated Chromium.
+`shell-s3b-acceptor-preservation.json` re-runs every check in the edited ordering files; the prior
+folder-removal repair assertions are re-run against their original baseline in
+`shell-s3b-acceptor-folder-preservation.json`. Evidence runs use temporary shared clones and private
+dependency copies. A temporary Git command adapter makes the evidence runner create shared clones
+instead of registering worktrees; a Node command adapter adds `--maxWorkers=4` to its Vitest calls.
+The evidence producer itself is unchanged, and source Git metadata is untouched.
+
 ```json
 {
   "entries": [
@@ -83,8 +92,7 @@ All added checks are durable; none is scaffolding. No independent acceptance is 
     {
       "items": [
         "modules/app-observability/src/test/java/io/justsearch/app/observability/operations/RemovedFolderRecordTest.java",
-        "modules/app-services/src/test/java/io/justsearch/app/services/registry/operations/handlers/RemoveWatchedRootHandlerTest.java",
-        "modules/ui-web/src/shell-v0/state/frameStatus.test.ts"
+        "modules/app-services/src/test/java/io/justsearch/app/services/registry/operations/handlers/RemoveWatchedRootHandlerTest.java"
       ],
       "class": "New",
       "behaviour": "A completed folder removal's durable receipt keeps the removed folder (path, and collection when not the default), the history projector hands it to the action ledger (live ring and journal), and every window builds Earlier's \"Removed <folder> from your library\" with \"Add <folder> again\" from that ledger row, including after a reload or engine restart; the window that removed it shows one row (its own notice), whose action goes once it can no longer run. The removal handler records the folder only on success; a folder that cannot be recorded never fails the removal; unreadable journal values read as no folder.",
@@ -112,8 +120,6 @@ All added checks are durable; none is scaffolding. No independent acceptance is 
       "repaired": true,
       "evidence": "gates/test-intent/evidence/shell-s3b-repaired.json",
       "newChecks": [
-        "modules/ui-web/src/shell-v0/state/frameStatus.test.ts#a window that did not remove the folder (or a reload) offers \"Add <folder> again\" from the removal record",
-        "modules/ui-web/src/shell-v0/state/frameStatus.test.ts#the window that removed it shows one row: its own notice, whose action goes once it can no longer run",
         "modules/app-observability/src/test/java/io/justsearch/app/observability/operations/RemovedFolderRecordTest.java#aCompletedRemovalReachesTheLedgerWithItsFolderAndTheJournalKeepsItAcrossARestart",
         "modules/app-observability/src/test/java/io/justsearch/app/observability/operations/RemovedFolderRecordTest.java#theJournalRoundTripsTheFolderAndReadsOlderOrUnreadableRowsWithoutOne",
         "modules/app-observability/src/test/java/io/justsearch/app/observability/operations/RemovedFolderRecordTest.java#aFolderThatCannotBeRecordedNeverFailsTheRemoval",
@@ -123,8 +129,7 @@ All added checks are durable; none is scaffolding. No independent acceptance is 
     },
     {
       "items": [
-        "modules/app-observability/src/test/java/io/justsearch/app/observability/operations/RemovedFolderRecordTest.java",
-        "modules/ui-web/src/shell-v0/state/frameStatus.test.ts"
+        "modules/app-observability/src/test/java/io/justsearch/app/observability/operations/RemovedFolderRecordTest.java"
       ],
       "class": "New",
       "behaviour": "Preservation: an older removal record without a path, a failed removal and other operations offer no re-add; the re-add is not offered while the folder is watched again; the metadata-only history entry and a receipt written before the field existed still read; Earlier offers Undo only where a backend undo exists and \"Add back to search\" for a forget. Passes before and after.",
@@ -144,11 +149,8 @@ All added checks are durable; none is scaffolding. No independent acceptance is 
       ],
       "evidence": "gates/test-intent/evidence/shell-s3b-preservation.json",
       "newChecks": [
-        "modules/ui-web/src/shell-v0/state/frameStatus.test.ts#an older removal record without a path, a failed removal and other operations offer no re-add",
-        "modules/ui-web/src/shell-v0/state/frameStatus.test.ts#the re-add is not offered while the folder is watched again (added back here or elsewhere)",
         "modules/app-observability/src/test/java/io/justsearch/app/observability/operations/RemovedFolderRecordTest.java#aFailedRemovalRecordsNoFolderToAddBack",
-        "modules/app-observability/src/test/java/io/justsearch/app/observability/operations/RemovedFolderRecordTest.java#aReceiptWrittenBeforeTheFieldExistedStillReadsAndOffersNoReAdd",
-        "modules/ui-web/src/shell-v0/state/frameStatus.test.ts#a completed operation without a backend undo offers no Undo; a forget offers \"Add back to search\""
+        "modules/app-observability/src/test/java/io/justsearch/app/observability/operations/RemovedFolderRecordTest.java#aReceiptWrittenBeforeTheFieldExistedStillReadsAndOffersNoReAdd"
       ]
     },
     {
@@ -874,6 +876,156 @@ All added checks are durable; none is scaffolding. No independent acceptance is 
         "evidence": "node scripts/ci/gen-token-names.mjs reported 240 tokens; npm run typecheck and node scripts/ci/run-ui-web-gates.mjs (31/31, including the contrast matrix) pass.",
         "unresolvedRisks": "None known."
       }
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/state/frameStatus.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "A completed folder removal's durable receipt keeps the removed folder (path, and collection when not the default), the history projector hands it to the action ledger (live ring and journal), and every window builds Earlier's \"Removed <folder> from your library\" with \"Add <folder> again\" from that ledger row, including after a reload or engine restart; the window that removed it shows one row (its own notice), whose action goes once it can no longer run. The removal handler records the folder only on success; a folder that cannot be recorded never fails the removal; unreadable journal values read as no folder.",
+      "sources": [
+        {
+          "kind": "owner-words",
+          "quote": "\"Add <folder> again\" exists only in the window that removed the folder; after a reload or in another window the removal shows without a way back, because the backend removal record carries no path. Expected: the removal record keeps the folder's path (additive field in the persisted record; older records without it keep reading, they just offer no re-add), and every window offers \"Add <folder> again\" from Earlier and from the undo notice while it lasts.",
+          "location": "task t-20261103-shell request (S3b builder brief, 2026-11-05)"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261103-shell",
+          "scenario": "ST7",
+          "quote": "Earlier lists persisted advisories and completed operations newest first, with Undo only where the journal/backend supports reversal; \"Add back to search\" (re-index) where forget cannot be reversed.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261103-shell",
+          "scenario": "DE7",
+          "quote": "Fail-closed teardown, single-use pending ids, exact server-bound arguments, rebuild gap key+hash binding, forget abort on navigation, durable grants list and revocation.",
+          "label": "agent-drafted, owner-adopted"
+        }
+      ],
+      "repaired": true,
+      "evidence": "gates/test-intent/evidence/shell-s3b-acceptor-folder-preservation.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/state/frameStatus.test.ts#a window that did not remove the folder (or a reload) offers \"Add <folder> again\" from the removal record",
+        "modules/ui-web/src/shell-v0/state/frameStatus.test.ts#the window that removed it shows one row: its own notice, whose action goes once it can no longer run"
+      ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/state/frameStatus.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "Preservation: an older removal record without a path, a failed removal and other operations offer no re-add; the re-add is not offered while the folder is watched again; the metadata-only history entry and a receipt written before the field existed still read; Earlier offers Undo only where a backend undo exists and \"Add back to search\" for a forget. Passes before and after.",
+      "sources": [
+        {
+          "kind": "owner-words",
+          "quote": "\"Add <folder> again\" exists only in the window that removed the folder; after a reload or in another window the removal shows without a way back, because the backend removal record carries no path. Expected: the removal record keeps the folder's path (additive field in the persisted record; older records without it keep reading, they just offer no re-add), and every window offers \"Add <folder> again\" from Earlier and from the undo notice while it lasts.",
+          "location": "task t-20261103-shell request (S3b builder brief, 2026-11-05)"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261103-shell",
+          "scenario": "ST7",
+          "quote": "Earlier lists persisted advisories and completed operations newest first, with Undo only where the journal/backend supports reversal; \"Add back to search\" (re-index) where forget cannot be reversed.",
+          "label": "agent-drafted, owner-adopted"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/shell-s3b-acceptor-preservation.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/state/frameStatus.test.ts#an older removal record without a path, a failed removal and other operations offer no re-add",
+        "modules/ui-web/src/shell-v0/state/frameStatus.test.ts#the re-add is not offered while the folder is watched again (added back here or elsewhere)",
+        "modules/ui-web/src/shell-v0/state/frameStatus.test.ts#a completed operation without a backend undo offers no Undo; a forget offers \"Add back to search\""
+      ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/views/SettingsSurface.ownActions-lockdown.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "DE1/C1/X1 repairs in real Chromium: switching from Delete Alpha to Delete Beta keeps one band, focuses Keep it and Escape returns to Delete Beta; a real localStorage quota failure keeps the theme, catalog, applied style and active selection unchanged and reports failure by the grid, for both active and inactive themes; freeing storage permits a successful delete which survives reload. The typed delete input follows the spacing token via its class.",
+      "sources": [
+        {
+          "kind": "owner-words",
+          "quote": "Opening a band for another item closes the first (one band open at a time) and moves focus to the new band's \"Keep it\"; Escape on it returns focus to Delete Beta.",
+          "location": "task t-20261103-shell request (bounded acceptor-1 repair brief, 2026-11-05; b1b5ae0f3c)"
+        },
+        {
+          "kind": "owner-words",
+          "quote": "The screen follows what was stored: the theme stays shown and the person sees that it could not be deleted (at the band/grid or in the pill).",
+          "location": "task t-20261103-shell request (bounded acceptor-1 repair brief, 2026-11-05; b1b5ae0f3c)"
+        },
+        {
+          "kind": "owner-words",
+          "quote": "Use the existing size/spacing tokens via a class.",
+          "location": "task t-20261103-shell request (bounded acceptor-1 repair brief, 2026-11-05; b1b5ae0f3c)"
+        }
+      ],
+      "repaired": true,
+      "evidence": "gates/test-intent/evidence/shell-s3b-acceptor-repaired.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/views/SettingsSurface.ownActions-lockdown.test.ts#DE1 switching from Delete Alpha to Delete Beta leaves one band, focuses Keep it, and Escape restores Delete Beta",
+        "modules/ui-web/src/shell-v0/views/SettingsSurface.ownActions-lockdown.test.ts#C1 a real quota failure keeps the custom theme and its active state, reports it by the grid, and permits retry (active=false)",
+        "modules/ui-web/src/shell-v0/views/SettingsSurface.ownActions-lockdown.test.ts#C1 a real quota failure keeps the custom theme and its active state, reports it by the grid, and permits retry (active=true)",
+        "modules/ui-web/src/shell-v0/views/SettingsSurface.ownActions-lockdown.test.ts#X1 the typed delete input uses the spacing token through its class"
+      ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/state/frameStatus.test.ts",
+        "modules/ui-web/src/shell-v0/components/StatusPanel.history.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "Earlier orders persisted advisories and completed operations newest first across read state; read/unread remains a marker and history never reactivates a resolved condition. DOM Details still acknowledges the selected unread row, even when it is second.",
+      "sources": [
+        {
+          "kind": "owner-words",
+          "quote": "Earlier is ordered newest first regardless of read state (read/unread stays a separate marker).",
+          "location": "task t-20261103-shell request (bounded acceptor-1 repair brief, 2026-11-05; b1b5ae0f3c)"
+        }
+      ],
+      "repaired": true,
+      "evidence": "gates/test-intent/evidence/shell-s3b-acceptor-repaired.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/state/frameStatus.test.ts#ST7 Earlier orders advisories and completed operations newest first regardless of read state",
+        "modules/ui-web/src/shell-v0/components/StatusPanel.history.test.ts#newest comes first regardless of read state; unread keeps its marker and history does not reactivate a resolved condition"
+      ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/state/frameStatus.test.ts",
+        "modules/ui-web/src/shell-v0/components/StatusPanel.history.test.ts"
+      ],
+      "class": "Obsolete",
+      "sources": [
+        {
+          "kind": "owner-words",
+          "quote": "Earlier is ordered newest first regardless of read state (read/unread stays a separate marker).",
+          "location": "task t-20261103-shell request (bounded acceptor-1 repair brief, 2026-11-05; b1b5ae0f3c)"
+        }
+      ],
+      "conflictSearch": "The adopted ST7 scenario requires newest-first Earlier. The two unread-first assertions contradicted that scenario; read state remains independently asserted. No scenario was changed.",
+      "note": "Replaced the frameStatus ST7 unread-first ordering assertion and StatusPanel.history unread-first ordering assertion with newest-first assertions. Preserved the unread marker, inactive history and acknowledgement checks, and added a completed-operation row between advisories."
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/state/frameStatus.test.ts",
+        "modules/ui-web/src/shell-v0/components/StatusPanel.history.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "Re-executed every check in both edited ordering test files, including all unchanged frame status, history, recovery and reversal checks.",
+      "sources": [
+        {
+          "kind": "owner-words",
+          "quote": "Re-run the evidence for every check in every test file you edit.",
+          "location": "task t-20261103-shell request (bounded acceptor-1 repair brief, 2026-11-05; b1b5ae0f3c)"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/shell-s3b-acceptor-preservation.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/state/frameStatus.test.ts",
+        "modules/ui-web/src/shell-v0/components/StatusPanel.history.test.ts"
+      ]
     }
   ]
 }
