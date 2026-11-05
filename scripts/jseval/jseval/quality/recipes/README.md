@@ -309,6 +309,12 @@ python -m jseval.quality.topical_labels freeze
   most ~1,800 characters of text. Judge and user see exactly this text, marked
   as data. Limit: labels are agreement on the excerpt; relevance outside it
   can be missed.
+  A run of six whitespace-separated words occurring at least eight times in
+  the normalized document marks its words as repeated: those words contribute
+  no query-term score, and windows with more than half their words repeated
+  are excluded, so fewer than two passages may remain.
+  The first agreement sample and spot sheet were replaced after this rule
+  changed, before any owner answer was accepted.
 - **Judge.** `claude-opus-5-5` through `claude -p` on the subscription only,
   with the generator's refusal of API keys and provider overrides. Up to five
   files per call in seeded random order, each graded independently 0-3
