@@ -80,8 +80,8 @@ final class AnswersInstallRig implements AutoCloseable {
         List.of(new SupportingFile("answer.gguf", sha, model.length,
             "http://127.0.0.1:" + server.getAddress().getPort() + "/answer-model")),
         0, null, null, "Apache-2.0", CapabilityTier.LLM);
-    store = new UiSettingsStore(UiSettingsStore.PersistenceMode.READ_WRITE,
-        home.resolve("settings.json"));
+    store = spy(new UiSettingsStore(UiSettingsStore.PersistenceMode.READ_WRITE,
+        home.resolve("settings.json")));
     var initial = new UiSettings();
     initial.setChatEnabled(false);
     initial.setPictureReadingEnabled(false);
@@ -92,7 +92,7 @@ final class AnswersInstallRig implements AutoCloseable {
     fixture = components == null
         ? new RuntimeIntentTestFixture(home.resolve("intent"), store, published)
         : new RuntimeIntentTestFixture(home.resolve("intent"), store, published, components);
-    settings = new SettingsServiceImpl(store, fixture.runner());
+    settings = spy(new SettingsServiceImpl(store, fixture.runner()));
     installer = spy(new AiInstallService(null, store, null, null, home, null, settings));
     doReturn(new ModelRegistry(2, "local answer model fixture", List.of(chat)))
         .when(installer).getManifest();

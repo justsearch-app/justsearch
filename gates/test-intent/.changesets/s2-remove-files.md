@@ -1080,7 +1080,7 @@ The brief's adopted scenarios are quoted below; choices the scenarios leave open
           "delegationQuote": "proceed accordingly",
           "delegationLocation": "task t-20261101-uiimpl user turn proceed accordingly",
           "delegationScope": "Implement design D4 (narrow option) and its settlement for Remove files and Download again, within the settled scenarios X1-X4, N1 and N2.",
-          "choice": "New-sequence round 2 (review must-fix, decided by the orchestrator): one atomic boundary between cancelling an install and its completion. Cancellation (core.cancel-ai-install, the HTTP cancel route and an op-lease drain) sets the install's cancel flag only under a completion boundary; a completion's settings change (answers, picture reading, Best match first) is admitted only under that same boundary, asked by the settings owner inside its commit admission, immediately before the settings file is replaced (the settings runner's commit admission gains an optional caller check, run under its own admission lock); a completion without a settings change claims it just before its completed bookkeeping. After a successful commit, cancellation reports 'AI install already completed; nothing was cancelled' (status key alreadyCompleted; no cancellation recorded, answers unchanged). After a successful cancellation the commit refuses, nothing is saved and the install ends cancelled, also when cancellation lands while the settings owner is still preparing the answer component. The same boundary covers the picture-reading and Best match first completion enables, which had the same check-then-commit gap. The should-fix check through the composed runtime (completion actually starting answers with picture reading Off and Pause answers while indexing enabled) is not added here: the rig has no answer runtime and a composed one is more than a small test; the live check covers it.",
+          "choice": "New-sequence round 2 (review must-fix, decided by the orchestrator): one in-process boundary between cancelling an install and its completion. Cancellation (core.cancel-ai-install, the HTTP cancel route and an op-lease drain) sets the install's cancel flag only under a completion boundary; a completion's settings change (answers, picture reading, Best match first) is admitted only under that same boundary, asked by the settings owner inside its commit admission, immediately before the settings file is replaced (the settings runner's commit admission gains an optional caller check, run under its own admission lock); a completion without a settings change claims it just before its completed bookkeeping. After a successful commit, cancellation reports 'AI install already completed; nothing was cancelled' (status key alreadyCompleted; no cancellation recorded, answers unchanged). After a successful cancellation the commit refuses, nothing is saved and the install ends cancelled, also when cancellation lands while the settings owner is still preparing the answer component. The picture-reading and Best match first completion enables go through the same boundary, which closes the same check-then-commit gap. What the tests cover (new-sequence round 3 qualifies this choice to it): through core.cancel-ai-install and the real settings owner, a cancel landing before commit admission for the answers and picture-reading enables, a cancel after the answers commit, and a cancel after an answers commit that then failed. Not separately tested at this boundary: the Best match first enable (its commit runs under the install lock, so a cancel waits for it), a completion without a settings change, the HTTP cancel route and an op-lease drain; these use the same code. The boundary is held in memory, so it arbitrates within one running process and promises nothing across a crash or restart: there the settings owner's own recovery decides what was saved. The should-fix check through the composed runtime (completion actually starting answers with picture reading Off and Pause answers while indexing enabled) is not added here: the rig has no answer runtime and a composed one is more than a small test; the live check covers it.",
           "label": "agent choice"
         }
       ],
@@ -1089,6 +1089,76 @@ The brief's adopted scenarios are quoted below; choices the scenarios leave open
         "modules/app-services/src/test/java/io/justsearch/app/services/ai/install/AnswersInstallCancellationBoundaryTest.java#cancelWhileTheAnswersEnableIsPreparingLeavesAnswersOffAndTheInstallCancelled",
         "modules/app-services/src/test/java/io/justsearch/app/services/ai/install/AnswersInstallCancellationBoundaryTest.java#cancelWhileThePictureReadingEnableIsPreparingSavesNothingAndCancels",
         "modules/app-services/src/test/java/io/justsearch/app/services/ai/install/AnswersInstallCancellationBoundaryTest.java#cancelAfterTheAnswersEnableCommittedReportsAlreadyCompletedAndChangesNothing"
+      ]
+    },
+    {
+      "items": [
+        "modules/app-services/src/test/java/io/justsearch/app/services/ai/install/AnswersInstallCommitOutcomeTest.java",
+        "modules/ui-web/src/shell-v0/views/BrainSurface.repairRun.test.ts"
+      ],
+      "class": "New",
+      "repaired": true,
+      "behaviour": "A cancel after a completion's settings commit failed, through the real start and cancel operations, installer and recorded settings owner. Component publication failing after the file replacement, a failure thrown after the commit returned (standing in for saving the operation's terminal state, injected around the real settings service because the fixture's operation store has no failure seam), and a failed replacement whose outcome cannot be read all leave the cancel operation reporting 'AI install already completed; nothing was cancelled' with alreadyCompleted and no cancellation recorded, and the first two leave answers saved on. A cancel refused after a commit leaves the install's status message unchanged. On the page, Cancel answered with alreadyCompleted emits no 'Download paused' toast, refreshes, and shows 'AI is ready' once the completed status arrives; an ordinary Cancel still says the download paused. Each failed by assertion on 1173ce93e1, with the rig's spies overlaid: the cancel was accepted, the status message became the already-completed text, and the page emitted the paused toast. After such a failure the install itself still ends failed, and the page shows that state rather than the completed one.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "N1",
+          "quote": "Answers on/off, Best match first, picture reading and Pause answers while indexing switches keep their behaviour and files; search by exact words and by meaning, indexing and its pacing work as today; installs, consent, decline and Repair of parts not removed keep today's behaviour; source documents, the index and conversations are never touched.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed accordingly",
+          "delegationLocation": "task t-20261101-uiimpl user turn proceed accordingly",
+          "delegationScope": "Implement design D4 (narrow option) and its settlement for Remove files and Download again, within the settled scenarios X1-X4, N1 and N2.",
+          "choice": "New-sequence round 3 (review must-fix, decided by the orchestrator): a settings failure no longer withdraws a completion's claim by itself. Applying settings can throw after the enable committed (component publication after the file replacement, saving the operation's terminal state), so the claim is cleared only when the saved settings witness still equals the one the commit started from, which proves nothing committed. A moved or unreadable witness keeps it: a later cancel reports already completed, not cancelled.",
+          "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed accordingly",
+          "delegationLocation": "task t-20261101-uiimpl user turn proceed accordingly",
+          "delegationScope": "Implement design D4 (narrow option) and its settlement for Remove files and Download again, within the settled scenarios X1-X4, N1 and N2.",
+          "choice": "New-sequence round 3 (review must-fix, decided by the orchestrator): when the cancel operation answers alreadyCompleted the page shows no paused or cancelled words and no toast; it refreshes and shows the install's real state, the existing completed state when the install finished. Delegated with it: a refused cancellation no longer writes 'Already completed; nothing was cancelled.' into the install status, because the page shows that field while an install runs; the operation's own result still says so for agents and HTTP callers.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/s2-remove-files-review-outcome.json",
+      "newChecks": [
+        "modules/app-services/src/test/java/io/justsearch/app/services/ai/install/AnswersInstallCommitOutcomeTest.java#cancelAfterComponentPublicationFailedPastTheCommitReportsAlreadyCompleted",
+        "modules/app-services/src/test/java/io/justsearch/app/services/ai/install/AnswersInstallCommitOutcomeTest.java#cancelAfterSavingTheTerminalStateFailedPastTheCommitReportsAlreadyCompleted",
+        "modules/app-services/src/test/java/io/justsearch/app/services/ai/install/AnswersInstallCommitOutcomeTest.java#cancelAfterAnUnreadableCommitOutcomeReportsAlreadyCompleted",
+        "modules/app-services/src/test/java/io/justsearch/app/services/ai/install/AnswersInstallCommitOutcomeTest.java#aRefusedCancellationLeavesTheInstallsOwnMessage",
+        "modules/ui-web/src/shell-v0/views/BrainSurface.repairRun.test.ts#Cancel says the download paused when it stopped, and shows the completed state when the install finished first"
+      ]
+    },
+    {
+      "items": [
+        "modules/app-services/src/test/java/io/justsearch/app/services/ai/install/AnswersInstallCommitOutcomeTest.java"
+      ],
+      "class": "New",
+      "behaviour": "The other side of the same rule: when the settings replacement fails and the saved witness proves nothing committed, the claim is withdrawn, so a later cancel is accepted as a cancel, with nothing saved and answers still off. This guards behaviour that already held on 1173ce93e1, so it passes there and has no fail-before; it stops the fix from keeping the claim on every failure.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "N1",
+          "quote": "Answers on/off, Best match first, picture reading and Pause answers while indexing switches keep their behaviour and files; search by exact words and by meaning, indexing and its pacing work as today; installs, consent, decline and Repair of parts not removed keep today's behaviour; source documents, the index and conversations are never touched.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed accordingly",
+          "delegationLocation": "task t-20261101-uiimpl user turn proceed accordingly",
+          "delegationScope": "Implement design D4 (narrow option) and its settlement for Remove files and Download again, within the settled scenarios X1-X4, N1 and N2.",
+          "choice": "New-sequence round 3 (review must-fix, decided by the orchestrator): a settings failure no longer withdraws a completion's claim by itself. Applying settings can throw after the enable committed (component publication after the file replacement, saving the operation's terminal state), so the claim is cleared only when the saved settings witness still equals the one the commit started from, which proves nothing committed. A moved or unreadable witness keeps it: a later cancel reports already completed, not cancelled.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/s2-remove-files-review-outcome-guard.json",
+      "newChecks": [
+        "modules/app-services/src/test/java/io/justsearch/app/services/ai/install/AnswersInstallCommitOutcomeTest.java#cancelAfterAProvenFailedReplacementIsAccepted"
       ]
     },
     {
@@ -1129,7 +1199,7 @@ The brief's adopted scenarios are quoted below; choices the scenarios leave open
           "delegationQuote": "proceed accordingly",
           "delegationLocation": "task t-20261101-uiimpl user turn proceed accordingly",
           "delegationScope": "Implement design D4 (narrow option) and its settlement for Remove files and Download again, within the settled scenarios X1-X4, N1 and N2.",
-          "choice": "New-sequence round 2 (review must-fix, decided by the orchestrator): one atomic boundary between cancelling an install and its completion. Cancellation (core.cancel-ai-install, the HTTP cancel route and an op-lease drain) sets the install's cancel flag only under a completion boundary; a completion's settings change (answers, picture reading, Best match first) is admitted only under that same boundary, asked by the settings owner inside its commit admission, immediately before the settings file is replaced (the settings runner's commit admission gains an optional caller check, run under its own admission lock); a completion without a settings change claims it just before its completed bookkeeping. After a successful commit, cancellation reports 'AI install already completed; nothing was cancelled' (status key alreadyCompleted; no cancellation recorded, answers unchanged). After a successful cancellation the commit refuses, nothing is saved and the install ends cancelled, also when cancellation lands while the settings owner is still preparing the answer component. The same boundary covers the picture-reading and Best match first completion enables, which had the same check-then-commit gap. The should-fix check through the composed runtime (completion actually starting answers with picture reading Off and Pause answers while indexing enabled) is not added here: the rig has no answer runtime and a composed one is more than a small test; the live check covers it.",
+          "choice": "New-sequence round 2 (review must-fix, decided by the orchestrator): one in-process boundary between cancelling an install and its completion. Cancellation (core.cancel-ai-install, the HTTP cancel route and an op-lease drain) sets the install's cancel flag only under a completion boundary; a completion's settings change (answers, picture reading, Best match first) is admitted only under that same boundary, asked by the settings owner inside its commit admission, immediately before the settings file is replaced (the settings runner's commit admission gains an optional caller check, run under its own admission lock); a completion without a settings change claims it just before its completed bookkeeping. After a successful commit, cancellation reports 'AI install already completed; nothing was cancelled' (status key alreadyCompleted; no cancellation recorded, answers unchanged). After a successful cancellation the commit refuses, nothing is saved and the install ends cancelled, also when cancellation lands while the settings owner is still preparing the answer component. The picture-reading and Best match first completion enables go through the same boundary, which closes the same check-then-commit gap. What the tests cover (new-sequence round 3 qualifies this choice to it): through core.cancel-ai-install and the real settings owner, a cancel landing before commit admission for the answers and picture-reading enables, a cancel after the answers commit, and a cancel after an answers commit that then failed. Not separately tested at this boundary: the Best match first enable (its commit runs under the install lock, so a cancel waits for it), a completion without a settings change, the HTTP cancel route and an op-lease drain; these use the same code. The boundary is held in memory, so it arbitrates within one running process and promises nothing across a crash or restart: there the settings owner's own recovery decides what was saved. The should-fix check through the composed runtime (completion actually starting answers with picture reading Off and Pause answers while indexing enabled) is not added here: the rig has no answer runtime and a composed one is more than a small test; the live check covers it.",
           "label": "agent choice"
         }
       ]

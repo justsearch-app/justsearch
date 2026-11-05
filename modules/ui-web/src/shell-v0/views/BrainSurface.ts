@@ -2228,10 +2228,13 @@ export class BrainSurface extends JfElement {
     // DE2 — pausing keeps everything downloaded and the next install resumes, so it no longer asks
     // first; it says what happened instead (C1).
     await this.withBusy('install-cancel', async () => {
-      const data = (await this.invokeOp('core.cancel-ai-install', {})) as InstallStatus;
+      const data = (await this.invokeOp('core.cancel-ai-install', {})) as InstallStatus & { alreadyCompleted?: boolean };
       if (data) {
         void refreshAiInstallNow();
-        emitEphemeralToast({ message: 'Download paused. Everything downloaded so far is kept, and installing again resumes where it stopped.' });
+        // The install finished first: nothing stopped, so the refreshed status is the whole outcome.
+        if (data.alreadyCompleted !== true) {
+          emitEphemeralToast({ message: 'Download paused. Everything downloaded so far is kept, and installing again resumes where it stopped.' });
+        }
       }
     });
   }

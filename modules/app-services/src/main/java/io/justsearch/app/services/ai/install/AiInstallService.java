@@ -152,7 +152,9 @@ public final class AiInstallService implements io.justsearch.app.api.AiInstallSe
    * The one boundary between cancellation and successful completion. {@link #cancel()} sets the
    * cancel flag only under it, and a completion's settings commit (or, without one, its completed
    * bookkeeping) is admitted only under it, from inside the settings owner's commit admission. So
-   * exactly one wins: a cancelled install commits nothing, a completed one cancels nothing.
+   * exactly one wins within this process: a cancelled install commits nothing, a completed one
+   * cancels nothing. A claim stands after a failed commit unless {@link #completionLost} proves
+   * nothing was saved.
    */
   private final Object completionBoundary = new Object();
   private boolean completionAdmitted;
@@ -1314,11 +1316,7 @@ public final class AiInstallService implements io.justsearch.app.api.AiInstallSe
   public boolean cancel() {
     synchronized (lock) {
       synchronized (completionBoundary) {
-        if (completionAdmitted) {
-          status.message = ALREADY_COMPLETED;
-          touch();
-          return false;
-        }
+        if (completionAdmitted) return false;
         cancelFlag.set(true);
       }
       status.cancelRequested = true;
@@ -1333,9 +1331,6 @@ public final class AiInstallService implements io.justsearch.app.api.AiInstallSe
     if (exec != null) exec.cancel();
     return true;
   }
-
-  /** What cancellation reports once the install's completion was admitted. */
-  public static final String ALREADY_COMPLETED = "Already completed; nothing was cancelled.";
 
   /**
    * Claims completion at the boundary {@link #cancel()} takes. Called from inside the settings
@@ -3090,11 +3085,11 @@ public final class AiInstallService implements io.justsearch.app.api.AiInstallSe
       result = settingsService.applyInternal(candidate, witness, context,
           io.justsearch.app.api.settings.SettingsCandidateContext.NONE, this::admitCompletion);
     } catch (RuntimeException | Error failure) {
-      if (completionLost(admittedBefore)) return false;
+      if (completionLost(admittedBefore, witness)) return false;
       throw failure;
     }
     if (!result.response().success()) {
-      if (completionLost(admittedBefore)) return false;
+      if (completionLost(admittedBefore, witness)) return false;
       log.warn("AI install settings refused: producer={}, code={}, details={}",
           producer, result.response().errorCode().orElse(null), result.response().errorDetails());
       throw new io.justsearch.app.api.settings.SettingsCommitOwner.Refused(result.response());
@@ -3107,12 +3102,26 @@ public final class AiInstallService implements io.justsearch.app.api.AiInstallSe
 
   /**
    * After an unsuccessful completion commit: true when cancellation won the boundary. Otherwise a
-   * claim this commit made is withdrawn, so a later cancellation is not told the install completed.
+   * claim this commit made is withdrawn only when the saved settings prove nothing committed. A
+   * failure can follow the commit (publishing components, saving the operation's terminal state),
+   * so a moved or unreadable witness keeps the claim: cancelling cannot report success while the
+   * saved feature stays on.
    */
-  private boolean completionLost(boolean admittedBefore) {
+  private boolean completionLost(boolean admittedBefore,
+      io.justsearch.app.api.settings.SettingsWitness expected) {
+    boolean nothingCommitted = savedSettingsStillAt(expected);
     synchronized (completionBoundary) {
       if (cancelFlag.get()) return true;
-      completionAdmitted = admittedBefore;
+      if (nothingCommitted) completionAdmitted = admittedBefore;
+      return false;
+    }
+  }
+
+  private boolean savedSettingsStillAt(io.justsearch.app.api.settings.SettingsWitness expected) {
+    try {
+      return expected.equals(settingsStore.inspect().witness());
+    } catch (RuntimeException unreadable) {
+      log.warn("Install completion outcome is uncertain: saved settings are unreadable", unreadable);
       return false;
     }
   }
