@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
   },
-  "createdAt": "2026-11-05T04:15:15.708Z",
-  "revision": "38d5e1e8123d7f71ce1b22e172b267eb806389fb",
-  "tree": "40f317023277ba079ea39a80fc521d899dce5d3b",
+  "createdAt": "2026-11-05T06:06:07.050Z",
+  "revision": "fcccb2528c21238d4b6383c70ec178be67f05d05",
+  "tree": "fcc3967313ae14c4f964f32857d57d57e59301d7",
   "environment": {
     "platform": "linux",
     "arch": "x64",
@@ -18,10 +18,10 @@
   },
   "runs": [
     {
-      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/components/StatusPanel.review.test.ts\" \"src/shell-v0/state/frameStatus.authorization.test.ts\" \"src/shell-v0/operations/pendingAuthorizationBridge.test.ts\" \"src/shell-v0/controllers/AgentSessionController.test.ts\" \"src/shell-v0/components/StatusPill.feedback.test.ts\" \"src/shell-v0/components/StatusPill.transitions.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/8fl_qenw/tmp/test-intent-vitest-13569-1793852109283.json\"",
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/components/StatusPanel.review.test.ts\" \"src/shell-v0/state/frameStatus.authorization.test.ts\" \"src/shell-v0/operations/pendingAuthorizationBridge.test.ts\" \"src/shell-v0/controllers/AgentSessionController.test.ts\" \"src/shell-v0/components/StatusPill.feedback.test.ts\" \"src/shell-v0/components/StatusPill.transitions.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/8exetk_q/tmp/s3a2-repair-checks/test-intent-vitest-2366-1793858760469.json\"",
       "cwd": "modules/ui-web",
       "exitCode": 0,
-      "durationMs": 2296
+      "durationMs": 2267
     }
   ],
   "checks": [
@@ -29,7 +29,7 @@
       "id": "modules/ui-web/src/shell-v0/components/StatusPanel.review.test.ts",
       "file": "modules/ui-web/src/shell-v0/components/StatusPanel.review.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:fab68b9b953b7001565979526911718a4786a4f1a431a7a8f1e6157cd47342bd",
+      "contentDigest": "sha256:f7a684dc6760bfaa1372995bd68a551d89fc8d6a0519f84a8433fe8f04cc060c",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -140,6 +140,22 @@
         },
         {
           "name": "DE3 only present, well-formed details that match what was shown allow it a live read with plain text refuses the Allow as unavailable, sends nothing, and the request stays answerable",
+          "status": "passed"
+        },
+        {
+          "name": "DE3 only present, well-formed details that match what was shown allow it initial and fresh pending details with no arguments refuse Allow, send no approval, and stay answerable",
+          "status": "passed"
+        },
+        {
+          "name": "DE3 only present, well-formed details that match what was shown allow it initial and fresh pending details with null arguments refuse Allow, send no approval, and stay answerable",
+          "status": "passed"
+        },
+        {
+          "name": "DE3 only present, well-formed details that match what was shown allow it initial and fresh pending details with non-text arguments refuse Allow, send no approval, and stay answerable",
+          "status": "passed"
+        },
+        {
+          "name": "DE3 only present, well-formed details that match what was shown allow it matching empty argument summaries allow, while changing nonempty arguments to empty refuses as changed",
           "status": "passed"
         },
         {
@@ -413,75 +429,75 @@
     "patches": [],
     "runs": [
       {
-        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/components/StatusPanel.review.test.ts\" \"src/shell-v0/state/frameStatus.authorization.test.ts\" \"src/shell-v0/operations/pendingAuthorizationBridge.test.ts\" \"src/shell-v0/controllers/AgentSessionController.test.ts\" \"src/shell-v0/components/StatusPill.feedback.test.ts\" \"src/shell-v0/components/StatusPill.transitions.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/8fl_qenw/tmp/test-intent-vitest-13569-1793852112867.json\"",
+        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/components/StatusPanel.review.test.ts\" \"src/shell-v0/state/frameStatus.authorization.test.ts\" \"src/shell-v0/operations/pendingAuthorizationBridge.test.ts\" \"src/shell-v0/controllers/AgentSessionController.test.ts\" \"src/shell-v0/components/StatusPill.feedback.test.ts\" \"src/shell-v0/components/StatusPill.transitions.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/8exetk_q/tmp/s3a2-repair-checks/test-intent-vitest-2366-1793858764654.json\"",
         "cwd": "<before-worktree>",
         "exitCode": 1,
-        "durationMs": 2504,
-        "output": "JSON report written to /home/elias/.cache/am/8fl_qenw/tmp/test-intent-vitest-13569-1793852112867.json\n\n"
+        "durationMs": 1918,
+        "output": "JSON report written to /home/elias/.cache/am/8exetk_q/tmp/s3a2-repair-checks/test-intent-vitest-2366-1793858764654.json\n\n"
       }
     ],
     "checks": [
       {
         "id": "modules/ui-web/src/shell-v0/components/StatusPanel.review.test.ts",
         "classification": "assertion",
-        "detail": "DE3 arrival: Needs you, no dialog, one announcement an agent request lists in Needs you with Allow, Deny and Review, opens no dialog and is announced once:  AssertionError: no dialog on arrival: expected true to be false // Object.is equality\n    at /home/elias/.cache/am/8fl_qenw/tmp/test-intent-before-C5kedQ/modules/ui-web/src/shell-v0/components/StatusPanel.review.test.ts:99:49\n    at processTicksAndRejections (node:internal/process/task_queues:104:5) | DE3 arrival: Needs you, no dialog, one a"
+        "detail": "DE3 arrival: Needs you, no dialog, one announcement an agent request lists in Needs you with Allow, Deny and Review, opens no dialog and is announced once:  AssertionError: no dialog on arrival: expected true to be false // Object.is equality\n    at /home/elias/.cache/am/8exetk_q/tmp/s3a2-repair-checks/test-intent-before-ZMG60R/modules/ui-web/src/shell-v0/components/StatusPanel.review.test.ts:100:49\n    at processTicksAndRejections (node:internal/proces | DE3 arrival: Needs you, no dialog, one a"
       },
       {
         "id": "modules/ui-web/src/shell-v0/state/frameStatus.authorization.test.ts#L9 a same-key copy withdrawn by a APPROVED answer adds no Earlier row: one row per decision",
         "classification": "assertion",
-        "detail": "L9 a same-key copy withdrawn by a APPROVED answer adds no Earlier row: one row per decision:  AssertionError: expected [ 'activity:answer', …(1) ] to deeply equal [ 'activity:answer' ]\n    at /home/elias/.cache/am/8fl_qenw/tmp/test-intent-before-C5kedQ/modules/ui-web/src/shell-v0/state/frameStatus.authorization.test.ts:105:55\n    at file:///home/elias/dev/justsearch/.claude/worktrees/shell-s"
+        "detail": "L9 a same-key copy withdrawn by a APPROVED answer adds no Earlier row: one row per decision:  AssertionError: expected [ 'activity:answer', …(1) ] to deeply equal [ 'activity:answer' ]\n    at /home/elias/.cache/am/8exetk_q/tmp/s3a2-repair-checks/test-intent-before-ZMG60R/modules/ui-web/src/shell-v0/state/frameStatus.authorization.test.ts:105:55\n    at file:///home/elias/.cache/am/8exetk_q/tm"
       },
       {
         "id": "modules/ui-web/src/shell-v0/state/frameStatus.authorization.test.ts#L9 a same-key copy withdrawn by a DENIED answer adds no Earlier row: one row per decision",
         "classification": "assertion",
-        "detail": "L9 a same-key copy withdrawn by a DENIED answer adds no Earlier row: one row per decision:  AssertionError: expected [ 'activity:answer', …(1) ] to deeply equal [ 'activity:answer' ]\n    at /home/elias/.cache/am/8fl_qenw/tmp/test-intent-before-C5kedQ/modules/ui-web/src/shell-v0/state/frameStatus.authorization.test.ts:105:55\n    at file:///home/elias/dev/justsearch/.claude/worktrees/shell-s"
+        "detail": "L9 a same-key copy withdrawn by a DENIED answer adds no Earlier row: one row per decision:  AssertionError: expected [ 'activity:answer', …(1) ] to deeply equal [ 'activity:answer' ]\n    at /home/elias/.cache/am/8exetk_q/tmp/s3a2-repair-checks/test-intent-before-ZMG60R/modules/ui-web/src/shell-v0/state/frameStatus.authorization.test.ts:105:55\n    at file:///home/elias/.cache/am/8exetk_q/tm"
       },
       {
         "id": "modules/ui-web/src/shell-v0/operations/pendingAuthorizationBridge.test.ts#DE3 a MCP request waits in Needs you, announced as a live arrival",
         "classification": "assertion",
-        "detail": "pendingAuthorizationBridge (tempdoc 655) DE3 a MCP request waits in Needs you, announced as a live arrival:  AssertionError: expected { pendingId: 'agent', …(7) } to match object { pendingId: 'agent', …(4) }\n(6 matching properties omitted from actual)\n    at Proxy.<anonymous> (file:///home/elias/dev/justsearch/.claude/worktrees/shell-s3a2/modules/ui-web/node_modules/@vitest/expect/dist/index.js:1283:10)"
+        "detail": "pendingAuthorizationBridge (tempdoc 655) DE3 a MCP request waits in Needs you, announced as a live arrival:  AssertionError: expected { pendingId: 'agent', …(7) } to match object { pendingId: 'agent', …(4) }\n(6 matching properties omitted from actual)\n    at Proxy.<anonymous> (file:///home/elias/.cache/am/8exetk_q/tmp/s3a2-repair-checks/test-intent-before-ZMG60R/modules/ui-web/node_modules/@vitest/expect/d"
       },
       {
         "id": "modules/ui-web/src/shell-v0/operations/pendingAuthorizationBridge.test.ts#DE3 a AGENT_LOOP request waits in Needs you, announced as a live arrival",
         "classification": "assertion",
-        "detail": "pendingAuthorizationBridge (tempdoc 655) DE3 a AGENT_LOOP request waits in Needs you, announced as a live arrival:  AssertionError: expected { pendingId: 'agent', …(7) } to match object { pendingId: 'agent', …(4) }\n(6 matching properties omitted from actual)\n    at Proxy.<anonymous> (file:///home/elias/dev/justsearch/.claude/worktrees/shell-s3a2/modules/ui-web/node_modules/@vitest/expect/dist/index.js:1283:10)"
+        "detail": "pendingAuthorizationBridge (tempdoc 655) DE3 a AGENT_LOOP request waits in Needs you, announced as a live arrival:  AssertionError: expected { pendingId: 'agent', …(7) } to match object { pendingId: 'agent', …(4) }\n(6 matching properties omitted from actual)\n    at Proxy.<anonymous> (file:///home/elias/.cache/am/8exetk_q/tmp/s3a2-repair-checks/test-intent-before-ZMG60R/modules/ui-web/node_modules/@vitest/expect/d"
       },
       {
         "id": "modules/ui-web/src/shell-v0/operations/pendingAuthorizationBridge.test.ts#DE3 a WORKFLOW request waits in Needs you, announced as a live arrival",
         "classification": "assertion",
-        "detail": "pendingAuthorizationBridge (tempdoc 655) DE3 a WORKFLOW request waits in Needs you, announced as a live arrival:  AssertionError: expected { pendingId: 'agent', …(7) } to match object { pendingId: 'agent', …(4) }\n(6 matching properties omitted from actual)\n    at Proxy.<anonymous> (file:///home/elias/dev/justsearch/.claude/worktrees/shell-s3a2/modules/ui-web/node_modules/@vitest/expect/dist/index.js:1283:10)"
+        "detail": "pendingAuthorizationBridge (tempdoc 655) DE3 a WORKFLOW request waits in Needs you, announced as a live arrival:  AssertionError: expected { pendingId: 'agent', …(7) } to match object { pendingId: 'agent', …(4) }\n(6 matching properties omitted from actual)\n    at Proxy.<anonymous> (file:///home/elias/.cache/am/8exetk_q/tmp/s3a2-repair-checks/test-intent-before-ZMG60R/modules/ui-web/node_modules/@vitest/expect/d"
       },
       {
         "id": "modules/ui-web/src/shell-v0/operations/pendingAuthorizationBridge.test.ts#DE3 a LLM_EMISSION request waits in Needs you, announced as a live arrival",
         "classification": "assertion",
-        "detail": "pendingAuthorizationBridge (tempdoc 655) DE3 a LLM_EMISSION request waits in Needs you, announced as a live arrival:  AssertionError: expected { pendingId: 'agent', …(7) } to match object { pendingId: 'agent', …(4) }\n(6 matching properties omitted from actual)\n    at Proxy.<anonymous> (file:///home/elias/dev/justsearch/.claude/worktrees/shell-s3a2/modules/ui-web/node_modules/@vitest/expect/dist/index.js:1283:10)"
+        "detail": "pendingAuthorizationBridge (tempdoc 655) DE3 a LLM_EMISSION request waits in Needs you, announced as a live arrival:  AssertionError: expected { pendingId: 'agent', …(7) } to match object { pendingId: 'agent', …(4) }\n(6 matching properties omitted from actual)\n    at Proxy.<anonymous> (file:///home/elias/.cache/am/8exetk_q/tmp/s3a2-repair-checks/test-intent-before-ZMG60R/modules/ui-web/node_modules/@vitest/expect/d"
       },
       {
         "id": "modules/ui-web/src/shell-v0/operations/pendingAuthorizationBridge.test.ts#DE3 a request rediscovered after a reload waits in Needs you without counting as a live arrival",
         "classification": "assertion",
-        "detail": "pendingAuthorizationBridge (tempdoc 655) DE3 a request rediscovered after a reload waits in Needs you without counting as a live arrival:  AssertionError: expected { pendingId: 'kept', …(7) } to match object { pendingId: 'kept', …(3) }\n(7 matching properties omitted from actual)\n    at Proxy.<anonymous> (file:///home/elias/dev/justsearch/.claude/worktrees/shell-s3a2/modules/ui-web/node_modules/@vitest/expect/dist/index.js:1283:10)"
+        "detail": "pendingAuthorizationBridge (tempdoc 655) DE3 a request rediscovered after a reload waits in Needs you without counting as a live arrival:  AssertionError: expected { pendingId: 'kept', …(7) } to match object { pendingId: 'kept', …(3) }\n(7 matching properties omitted from actual)\n    at Proxy.<anonymous> (file:///home/elias/.cache/am/8exetk_q/tmp/s3a2-repair-checks/test-intent-before-ZMG60R/modules/ui-web/node_modules/@vitest/expect/dis"
       },
       {
         "id": "modules/ui-web/src/shell-v0/operations/pendingAuthorizationBridge.test.ts#DE3 reviewing reads the live details again: fresh fields, null when gone, a failure when unreadable",
         "classification": "assertion",
-        "detail": "pendingAuthorizationBridge (tempdoc 655) DE3 reviewing reads the live details again: fresh fields, null when gone, a failure when unreadable:  AssertionError: the review can read the live details: expected undefined to be type of 'function'\n    at /home/elias/.cache/am/8fl_qenw/tmp/test-intent-before-C5kedQ/modules/ui-web/src/shell-v0/operations/pendingAuthorizationBridge.test.ts:518:61\n    at file:///home/elias/dev/justsearch/.claude/work"
+        "detail": "pendingAuthorizationBridge (tempdoc 655) DE3 reviewing reads the live details again: fresh fields, null when gone, a failure when unreadable:  AssertionError: the review can read the live details: expected undefined to be type of 'function'\n    at /home/elias/.cache/am/8exetk_q/tmp/s3a2-repair-checks/test-intent-before-ZMG60R/modules/ui-web/src/shell-v0/operations/pendingAuthorizationBridge.test.ts:518:61\n    at file:///home/elias/.cache/a"
       },
       {
         "id": "modules/ui-web/src/shell-v0/controllers/AgentSessionController.test.ts#DE3 the agent request waits in Needs you; its review reads the live gate again",
         "classification": "assertion",
-        "detail": "private live tool approval display DE3 the agent request waits in Needs you; its review reads the live gate again:  AssertionError: expected { pendingId: 'private-call', …(6) } to match object { pendingId: 'private-call', …(5) }\n(3 matching properties omitted from actual)\n    at Proxy.<anonymous> (file:///home/elias/dev/justsearch/.claude/worktrees/shell-s3a2/modules/ui-web/node_modules/@vitest/expect/dist/index."
+        "detail": "private live tool approval display DE3 the agent request waits in Needs you; its review reads the live gate again:  AssertionError: expected { pendingId: 'private-call', …(6) } to match object { pendingId: 'private-call', …(5) }\n(3 matching properties omitted from actual)\n    at Proxy.<anonymous> (file:///home/elias/.cache/am/8exetk_q/tmp/s3a2-repair-checks/test-intent-before-ZMG60R/modules/ui-web/node_modules/@v"
       },
       {
         "id": "modules/ui-web/src/shell-v0/components/StatusPill.feedback.test.ts#C6 rediscovered agent requests stay silent; a live arrival is escalated to the desktop once",
         "classification": "assertion",
-        "detail": "status feedback ownership C6 rediscovered agent requests stay silent; a live arrival is escalated to the desktop once:  AssertionError: expected \"vi.fn()\" to be called 1 times, but got 0 times\n    at /home/elias/.cache/am/8fl_qenw/tmp/test-intent-before-C5kedQ/modules/ui-web/src/shell-v0/components/StatusPill.feedback.test.ts:72:39\n    at file:///home/elias/dev/justsearch/.claude/worktrees/shell-s3a2/modules/ui-web/n"
+        "detail": "status feedback ownership C6 rediscovered agent requests stay silent; a live arrival is escalated to the desktop once:  AssertionError: expected \"vi.fn()\" to be called 1 times, but got 0 times\n    at /home/elias/.cache/am/8exetk_q/tmp/s3a2-repair-checks/test-intent-before-ZMG60R/modules/ui-web/src/shell-v0/components/StatusPill.feedback.test.ts:72:39\n    at file:///home/elias/.cache/am/8exetk_q/tmp/s3a2-repair-checks"
       },
       {
         "id": "modules/ui-web/src/shell-v0/components/StatusPill.transitions.test.ts#only a live agent arrival while unfocused reaches the desktop",
         "classification": "assertion",
-        "detail": "own-action receipts and desktop escalation (C1, ST14) only a live agent arrival while unfocused reaches the desktop:  AssertionError: expected \"vi.fn()\" to be called 1 times, but got 0 times\n    at /home/elias/.cache/am/8fl_qenw/tmp/test-intent-before-C5kedQ/modules/ui-web/src/shell-v0/components/StatusPill.transitions.test.ts:128:39\n    at file:///home/elias/dev/justsearch/.claude/worktrees/shell-s3a2/modules/ui-w"
+        "detail": "own-action receipts and desktop escalation (C1, ST14) only a live agent arrival while unfocused reaches the desktop:  AssertionError: expected \"vi.fn()\" to be called 1 times, but got 0 times\n    at /home/elias/.cache/am/8exetk_q/tmp/s3a2-repair-checks/test-intent-before-ZMG60R/modules/ui-web/src/shell-v0/components/StatusPill.transitions.test.ts:128:39\n    at file:///home/elias/.cache/am/8exetk_q/tmp/s3a2-repair-ch"
       }
     ]
   },
-  "digest": "sha256:1d2a3103932f973bd93e79f486f0ba8ece094c2ad88ff78373c584f7b8ec50ef"
+  "digest": "sha256:dee8edf578eeca8ca3930f23dc60f0ca652a09571268e1a660260465260988e8"
 }

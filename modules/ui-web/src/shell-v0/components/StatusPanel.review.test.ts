@@ -11,6 +11,7 @@ import { StatusPill } from './StatusPill.js';
 import type { StatusPanel } from './StatusPanel.js';
 import { AuthorizationHost } from './AuthorizationHost.js';
 import { requestAuthorization, type AuthorizationPrompt } from '../operations/authorizationBroker.js';
+import { OperationClient } from '../operations/OperationClient.js';
 import { proposeEffect, listPending, __resetPendingForTest } from '../substrates/pending-effects/index.js';
 import { __resetJournalForTest } from '../substrates/effects/index.js';
 import { CORE_PROVENANCE } from '../primitives/provenance.js';
@@ -320,7 +321,9 @@ describe('DE3 only present, well-formed details that match what was shown allow 
   ])('a live read with %s refuses the Allow as unavailable, sends nothing, and the request stays answerable', async (_, read) => {
     const refresh = vi.fn(async (): Promise<Partial<AuthorizationPrompt> | null> => read as Partial<AuthorizationPrompt>);
     const { decision, reject } = agent('bad', { refresh }); await openPanel(); await arm();
-    rowButton('authorization:bad', 'Allow').click(); await flush();
+    rowButton('authorization:bad', 'Allow').click();
+    const derived = await flush().then(() => true, (error: unknown) => ({ error }));
+    expect(derived, 'deriving the status model must not throw on malformed live details').toBe(true);
     expect(refresh).toHaveBeenCalledTimes(1);
     expect(await settled(decision), 'nothing is allowed on details that are not all there').toBe('waiting');
     expect(alert('bad')).toBe(UNAVAILABLE);
@@ -329,6 +332,54 @@ describe('DE3 only present, well-formed details that match what was shown allow 
     refresh.mockResolvedValue(details());
     rowButton('authorization:bad', 'Allow').click(); await flush();
     await expect(decision, 'still answerable: complete matching details allow it').resolves.toEqual({ approved: true, allowAlways: false });
+  });
+
+  it.each([
+    ['no arguments', {}],
+    ['null arguments', { argsSummary: null }],
+    ['non-text arguments', { argsSummary: 7 }],
+  ])('initial and fresh pending details with %s refuse Allow, send no approval, and stay answerable', async (_, args) => {
+    const body = { pendingId: 'incomplete', operationId: 'core.ingest-files', requestedBy: 'Claude Desktop', ...args };
+    const sent: unknown[] = [];
+    const fetchImpl = vi.fn(async (_url: RequestInfo | URL, init?: RequestInit) => {
+      if (init?.method === 'POST') {
+        sent.push(JSON.parse(String(init.body)));
+        return new Response(JSON.stringify({ capsule: 'test-capsule' }));
+      }
+      return new Response(JSON.stringify(body));
+    });
+    const client = new OperationClient({ apiBase: '', fetchImpl });
+    const initial = (await client.peekPending('incomplete'))!;
+    const { decision, reject } = agent('incomplete', { argsSummary: initial.argsSummary,
+      refresh: () => client.peekPending('incomplete') });
+    const answered = decision.then(result => result.approved ? client.approveByPendingId('incomplete', result.allowAlways) : null);
+    await openPanel(); await arm();
+    rowButton('authorization:incomplete', 'Allow').click(); await flush();
+    expect(sent, 'the identical incomplete responses cannot authorize a POST').toEqual([]);
+    expect(fetchImpl).toHaveBeenCalledTimes(2);
+    expect(await settled(decision)).toBe('waiting');
+    expect(alert('incomplete')).toBe(UNAVAILABLE);
+    // A complete refresh cannot authorize arguments that were never shown, either.
+    fetchImpl.mockResolvedValue(new Response(JSON.stringify(details())));
+    rowButton('authorization:incomplete', 'Allow').click(); await flush();
+    expect(sent).toEqual([]);
+    expect(alert('incomplete')).toBe(UNAVAILABLE);
+    rowButton('authorization:incomplete', 'Deny').click(); await flush();
+    expect(reject).toHaveBeenCalledTimes(1);
+    await expect(answered).resolves.toBeNull();
+  });
+
+  it('matching empty argument summaries allow, while changing nonempty arguments to empty refuses as changed', async () => {
+    const empty = agent('empty', { argsSummary: '', refresh: async () => details({ argsSummary: '' }) });
+    const changed = agent('emptied', { refresh: async () => details({ argsSummary: '' }) });
+    await openPanel(); await arm();
+    rowButton('authorization:empty', 'Allow').click(); await flush();
+    await expect(empty.decision).resolves.toMatchObject({ approved: true });
+    rowButton('authorization:emptied', 'Allow').click(); await flush();
+    expect(await settled(changed.decision)).toBe('waiting');
+    expect(alert('emptied')).toBe(CHANGED);
+    await arm(); rowButton('authorization:emptied', 'Allow').click(); await flush();
+    await expect(changed.decision).resolves.toMatchObject({ approved: true });
   });
 
   it.each([

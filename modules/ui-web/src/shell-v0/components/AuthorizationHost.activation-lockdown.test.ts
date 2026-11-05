@@ -23,6 +23,7 @@ declare global {
     requestApproval(id: string, typed: boolean): void;
     requestAgent(id: string, typed: boolean): void;
     requestLiveAgent(id: string, typed: boolean, cancellable?: boolean): void;
+    requestPendingAgent(id: string): Promise<void>;
     answers: Record<string, boolean>;
   }
 }
@@ -79,6 +80,14 @@ beforeAll(async () => {
                   return fresh && { operationId: fresh.operationId, gateBehavior: fresh.gateBehavior, riskTier: fresh.riskTier,
                     argsSummary: fresh.argsSummary, requestedBy: fresh.requestedBy };
                 } })
+                .then(decision => { window.answers[id] = decision.approved;
+                  return decision.approved ? client.approveByPendingId(id, decision.allowAlways) : null; });
+            };
+            // Read the initially shown details from the same pending route as the Allow refresh.
+            window.requestPendingAgent = async id => {
+              const initial = await client.peekPending(id);
+              void requestAuthorization({ ...initial, pendingId: id, gateBehavior: 'INLINE_CONFIRM',
+                arrival: 'needs-you', live: true, refresh: () => client.peekPending(id) })
                 .then(decision => { window.answers[id] = decision.approved;
                   return decision.approved ? client.approveByPendingId(id, decision.allowAlways) : null; });
             };
@@ -587,6 +596,36 @@ async function rejections(page: Page, status: { code: number }): Promise<string[
   });
   return received;
 }
+
+it.each([
+  ['no arguments', {}],
+  ['null arguments', { argsSummary: null }],
+  ['non-text arguments', { argsSummary: 7 }],
+])('DE3 initial and fresh pending details with %s refuse Allow, send no approval, and stay answerable', async (_, args) => {
+  const page = await opened();
+  const sent = await approvals(page);
+  const body = { pendingId: 'incomplete', operationId: 'core.incomplete', requestedBy: 'Claude Desktop', ...args };
+  const answers: Record<string, Pending> = { incomplete: { body } };
+  const reads = await pendingStore(page, answers);
+  await page.evaluate(() => window.requestPendingAgent('incomplete'));
+  await openList(page);
+  await page.waitForTimeout(600);
+  await panelRow(page, 'incomplete').getByRole('button', { name: 'Allow', exact: true }).click();
+  await expect.poll(() => reads.length).toBe(2);
+  await page.waitForTimeout(600);
+  expect(sent, 'identical incomplete initial and fresh details cannot authorize a POST').toEqual([]);
+  expect(await page.evaluate(() => window.answers)).toEqual({});
+  expect((await panelRow(page, 'incomplete').getByRole('alert').allTextContents()).join('')).toContain('details are unavailable');
+  answers.incomplete = 'same';
+  await panelRow(page, 'incomplete').getByRole('button', { name: 'Allow', exact: true }).click();
+  await expect.poll(() => reads.length).toBe(3);
+  await page.waitForTimeout(600);
+  expect(sent, 'a complete refresh cannot authorize arguments never shown as text').toEqual([]);
+  expect((await panelRow(page, 'incomplete').getByRole('alert').allTextContents()).join('')).toContain('details are unavailable');
+  await panelRow(page, 'incomplete').getByRole('button', { name: 'Deny', exact: true }).click();
+  await expect.poll(() => page.evaluate(() => window.answers)).toEqual({ incomplete: false });
+  expect(sent).toEqual([]);
+}, 30_000);
 
 it.each([
   ['an empty body', {}],

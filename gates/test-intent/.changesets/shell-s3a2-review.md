@@ -606,7 +606,7 @@ which is what that route returned there. No independent acceptance is claimed by
         "modules/ui-web/src/shell-v0/components/StatusPanel.review.test.ts"
       ],
       "class": "New",
-      "behaviour": "A live read whose operation or requester is not text refuses the Allow as unavailable, sends nothing and leaves the request answerable. Not claimed as fail-before by assertion: on 38d5e1e812 these reads are taken as changed details and the status model then throws (id.split / who.replace is not a function), so the check fails there with an exception.",
+      "behaviour": "A live read whose operation or requester is not text refuses the Allow as unavailable, sends nothing and leaves the request answerable. Deriving the status model must not throw; the baseline fails by assertion.",
       "sources": [
         {
           "kind": "owner-words",
@@ -614,10 +614,37 @@ which is what that route returned there. No independent acceptance is claimed by
           "location": "task t-20261103-shell request (S3a2 final repair brief from the independent check of 38d5e1e812, 2026-11-05)"
         }
       ],
-      "evidence": "gates/test-intent/evidence/shell-s3a2-review-repair2.json",
+      "evidence": "gates/test-intent/evidence/shell-s3a2-review-type-validation.json",
       "newChecks": [
         "modules/ui-web/src/shell-v0/components/StatusPanel.review.test.ts#a live read with an operation that is not text refuses the Allow as unavailable, sends nothing, and the request stays answerable",
         "modules/ui-web/src/shell-v0/components/StatusPanel.review.test.ts#a live read with a requester that is not text refuses the Allow as unavailable, sends nothing, and the request stays answerable"
+      ],
+      "repaired": true
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/components/StatusPanel.review.test.ts",
+        "modules/ui-web/src/shell-v0/components/AuthorizationHost.activation-lockdown.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "Allow requires argsSummary to be a string, possibly empty, in both the initially shown details and the fresh details for that press. Missing or non-string arguments in both reads refuse without an approval POST and leave Deny answerable. A complete refresh cannot authorize arguments never shown. Matching empty summaries allow; changing nonempty arguments to empty refuses as changed before a later deliberate Allow. The Chromium harness reads initial details from the pending route.",
+      "sources": [
+        {
+          "kind": "owner-words",
+          "quote": "Allow requires `argsSummary` to be present as a string (it may be empty) in BOTH the details shown and the fresh details read for that press; a missing key or a non-string value refuses the answer exactly like other malformed details (\"Its current details are unavailable…\"), sends nothing, and keeps the request answerable.",
+          "location": "task t-20261103-shell request (S3a2 exact repairs on fcccb2528c, 2026-11-05)"
+        }
+      ],
+      "repaired": true,
+      "evidence": "gates/test-intent/evidence/shell-s3a2-review-args-required.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/components/StatusPanel.review.test.ts#initial and fresh pending details with no arguments refuse Allow, send no approval, and stay answerable",
+        "modules/ui-web/src/shell-v0/components/StatusPanel.review.test.ts#initial and fresh pending details with null arguments refuse Allow, send no approval, and stay answerable",
+        "modules/ui-web/src/shell-v0/components/StatusPanel.review.test.ts#initial and fresh pending details with non-text arguments refuse Allow, send no approval, and stay answerable",
+        "modules/ui-web/src/shell-v0/components/AuthorizationHost.activation-lockdown.test.ts#DE3 initial and fresh pending details with no arguments refuse Allow, send no approval, and stay answerable",
+        "modules/ui-web/src/shell-v0/components/AuthorizationHost.activation-lockdown.test.ts#DE3 initial and fresh pending details with null arguments refuse Allow, send no approval, and stay answerable",
+        "modules/ui-web/src/shell-v0/components/AuthorizationHost.activation-lockdown.test.ts#DE3 initial and fresh pending details with non-text arguments refuse Allow, send no approval, and stay answerable",
+        "modules/ui-web/src/shell-v0/components/StatusPanel.review.test.ts#matching empty argument summaries allow, while changing nonempty arguments to empty refuses as changed"
       ]
     }
   ]

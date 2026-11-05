@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
   },
-  "createdAt": "2026-11-05T04:22:55.899Z",
-  "revision": "38d5e1e8123d7f71ce1b22e172b267eb806389fb",
-  "tree": "92582834dd291f45e6aca5883f0d17dde516610e",
+  "createdAt": "2026-11-05T06:00:03.711Z",
+  "revision": "fcccb2528c21238d4b6383c70ec178be67f05d05",
+  "tree": "53824ef6cace92c734cee5c725ba82a6131712b7",
   "environment": {
     "platform": "linux",
     "arch": "x64",
@@ -18,10 +18,10 @@
   },
   "runs": [
     {
-      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/components/AuthorizationHost.activation-lockdown.test.ts\" \"src/shell-v0/components/ElicitHost.queue-lockdown.test.ts\" --config vitest.config.lockdown.ts --reporter=json --outputFile=\"/home/elias/.cache/am/8fl_qenw/tmp/test-intent-vitest-19358-1793852452575.json\"",
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/components/AuthorizationHost.activation-lockdown.test.ts\" \"src/shell-v0/components/ElicitHost.queue-lockdown.test.ts\" --config vitest.config.lockdown.ts --reporter=json --outputFile=\"/home/elias/.cache/am/8exetk_q/tmp/s3a2-repair-checks/test-intent-vitest-8986-1793858238230.json\"",
       "cwd": "modules/ui-web",
       "exitCode": 0,
-      "durationMs": 63227
+      "durationMs": 82592
     }
   ],
   "checks": [
@@ -29,7 +29,7 @@
       "id": "modules/ui-web/src/shell-v0/components/AuthorizationHost.activation-lockdown.test.ts#DE3 a live-details read answering 200 with an empty body allows nothing and the request stays answerable",
       "file": "modules/ui-web/src/shell-v0/components/AuthorizationHost.activation-lockdown.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:a48172e9978de317b38358bfabcf207ae022adf8eacc55ef451fc460d55974e0",
+      "contentDigest": "sha256:9ea0306a238bda5d2c0b53f62da9b808c01eb1d16391be117fed0716810d7601",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -44,7 +44,7 @@
       "id": "modules/ui-web/src/shell-v0/components/AuthorizationHost.activation-lockdown.test.ts#DE3 a live-details read answering 200 with no operation allows nothing and the request stays answerable",
       "file": "modules/ui-web/src/shell-v0/components/AuthorizationHost.activation-lockdown.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:a48172e9978de317b38358bfabcf207ae022adf8eacc55ef451fc460d55974e0",
+      "contentDigest": "sha256:9ea0306a238bda5d2c0b53f62da9b808c01eb1d16391be117fed0716810d7601",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -59,7 +59,7 @@
       "id": "modules/ui-web/src/shell-v0/components/AuthorizationHost.activation-lockdown.test.ts#DE3 a live-details read answering 200 with no arguments allows nothing and the request stays answerable",
       "file": "modules/ui-web/src/shell-v0/components/AuthorizationHost.activation-lockdown.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:a48172e9978de317b38358bfabcf207ae022adf8eacc55ef451fc460d55974e0",
+      "contentDigest": "sha256:9ea0306a238bda5d2c0b53f62da9b808c01eb1d16391be117fed0716810d7601",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -74,7 +74,7 @@
       "id": "modules/ui-web/src/shell-v0/components/AuthorizationHost.activation-lockdown.test.ts#DE3 a live-details read answering 200 with no requester allows nothing and the request stays answerable",
       "file": "modules/ui-web/src/shell-v0/components/AuthorizationHost.activation-lockdown.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:a48172e9978de317b38358bfabcf207ae022adf8eacc55ef451fc460d55974e0",
+      "contentDigest": "sha256:9ea0306a238bda5d2c0b53f62da9b808c01eb1d16391be117fed0716810d7601",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -89,7 +89,7 @@
       "id": "modules/ui-web/src/shell-v0/components/AuthorizationHost.activation-lockdown.test.ts#DE3 a live-details read answering 200 with a malformed operation allows nothing and the request stays answerable",
       "file": "modules/ui-web/src/shell-v0/components/AuthorizationHost.activation-lockdown.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:a48172e9978de317b38358bfabcf207ae022adf8eacc55ef451fc460d55974e0",
+      "contentDigest": "sha256:9ea0306a238bda5d2c0b53f62da9b808c01eb1d16391be117fed0716810d7601",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -104,7 +104,7 @@
       "id": "modules/ui-web/src/shell-v0/components/AuthorizationHost.activation-lockdown.test.ts#DE3 a live-details read answering 200 with a null body allows nothing and the request stays answerable",
       "file": "modules/ui-web/src/shell-v0/components/AuthorizationHost.activation-lockdown.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:a48172e9978de317b38358bfabcf207ae022adf8eacc55ef451fc460d55974e0",
+      "contentDigest": "sha256:9ea0306a238bda5d2c0b53f62da9b808c01eb1d16391be117fed0716810d7601",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -119,7 +119,7 @@
       "id": "modules/ui-web/src/shell-v0/components/AuthorizationHost.activation-lockdown.test.ts#C12 a Deny pressed 100 ms after an Allow whose read is slow abandons that Allow: the failed Deny leaves nothing sent",
       "file": "modules/ui-web/src/shell-v0/components/AuthorizationHost.activation-lockdown.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:a48172e9978de317b38358bfabcf207ae022adf8eacc55ef451fc460d55974e0",
+      "contentDigest": "sha256:9ea0306a238bda5d2c0b53f62da9b808c01eb1d16391be117fed0716810d7601",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -183,65 +183,65 @@
     "patches": [],
     "runs": [
       {
-        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/components/AuthorizationHost.activation-lockdown.test.ts\" \"src/shell-v0/components/ElicitHost.queue-lockdown.test.ts\" --config vitest.config.lockdown.ts --reporter=json --outputFile=\"/home/elias/.cache/am/8fl_qenw/tmp/test-intent-vitest-19358-1793852517252.json\"",
+        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/components/AuthorizationHost.activation-lockdown.test.ts\" \"src/shell-v0/components/ElicitHost.queue-lockdown.test.ts\" --config vitest.config.lockdown.ts --reporter=json --outputFile=\"/home/elias/.cache/am/8exetk_q/tmp/s3a2-repair-checks/test-intent-vitest-8986-1793858326396.json\"",
         "cwd": "<before-worktree>",
         "exitCode": 1,
-        "durationMs": 58378,
-        "output": "JSON report written to /home/elias/.cache/am/8fl_qenw/tmp/test-intent-vitest-19358-1793852517252.json\n\n"
+        "durationMs": 76403,
+        "output": "JSON report written to /home/elias/.cache/am/8exetk_q/tmp/s3a2-repair-checks/test-intent-vitest-8986-1793858326396.json\n\n"
       }
     ],
     "checks": [
       {
         "id": "modules/ui-web/src/shell-v0/components/AuthorizationHost.activation-lockdown.test.ts#DE3 a live-details read answering 200 with an empty body allows nothing and the request stays answerable",
         "classification": "assertion",
-        "detail": "DE3 a live-details read answering 200 with an empty body allows nothing and the request stays answerable:  AssertionError: nothing is allowed on details that are not all there: expected [ { pendingId: 'bad', …(1) } ] to deeply equal []\n    at /home/elias/.cache/am/8fl_qenw/tmp/test-intent-before-4Ef8vZ/modules/ui-web/src/shell-v0/components/AuthorizationHost.activation-lockdown.test.ts:609:72\n    at file"
+        "detail": "DE3 a live-details read answering 200 with an empty body allows nothing and the request stays answerable:  AssertionError: nothing is allowed on details that are not all there: expected [ { pendingId: 'bad', …(1) } ] to deeply equal []\n    at /home/elias/.cache/am/8exetk_q/tmp/s3a2-repair-checks/test-intent-before-NQt94H/modules/ui-web/src/shell-v0/components/AuthorizationHost.activation-lockdown.test.ts"
       },
       {
         "id": "modules/ui-web/src/shell-v0/components/AuthorizationHost.activation-lockdown.test.ts#DE3 a live-details read answering 200 with no operation allows nothing and the request stays answerable",
         "classification": "assertion",
-        "detail": "DE3 a live-details read answering 200 with no operation allows nothing and the request stays answerable:  AssertionError: nothing is allowed on details that are not all there: expected [ { pendingId: 'bad', …(1) } ] to deeply equal []\n    at /home/elias/.cache/am/8fl_qenw/tmp/test-intent-before-4Ef8vZ/modules/ui-web/src/shell-v0/components/AuthorizationHost.activation-lockdown.test.ts:609:72\n    at file"
+        "detail": "DE3 a live-details read answering 200 with no operation allows nothing and the request stays answerable:  AssertionError: nothing is allowed on details that are not all there: expected [ { pendingId: 'bad', …(1) } ] to deeply equal []\n    at /home/elias/.cache/am/8exetk_q/tmp/s3a2-repair-checks/test-intent-before-NQt94H/modules/ui-web/src/shell-v0/components/AuthorizationHost.activation-lockdown.test.ts"
       },
       {
         "id": "modules/ui-web/src/shell-v0/components/AuthorizationHost.activation-lockdown.test.ts#DE3 a live-details read answering 200 with no arguments allows nothing and the request stays answerable",
         "classification": "assertion",
-        "detail": "DE3 a live-details read answering 200 with no arguments allows nothing and the request stays answerable:  AssertionError: nothing is allowed on details that are not all there: expected [ { pendingId: 'bad', …(1) } ] to deeply equal []\n    at /home/elias/.cache/am/8fl_qenw/tmp/test-intent-before-4Ef8vZ/modules/ui-web/src/shell-v0/components/AuthorizationHost.activation-lockdown.test.ts:609:72\n    at file"
+        "detail": "DE3 a live-details read answering 200 with no arguments allows nothing and the request stays answerable:  AssertionError: nothing is allowed on details that are not all there: expected [ { pendingId: 'bad', …(1) } ] to deeply equal []\n    at /home/elias/.cache/am/8exetk_q/tmp/s3a2-repair-checks/test-intent-before-NQt94H/modules/ui-web/src/shell-v0/components/AuthorizationHost.activation-lockdown.test.ts"
       },
       {
         "id": "modules/ui-web/src/shell-v0/components/AuthorizationHost.activation-lockdown.test.ts#DE3 a live-details read answering 200 with no requester allows nothing and the request stays answerable",
         "classification": "assertion",
-        "detail": "DE3 a live-details read answering 200 with no requester allows nothing and the request stays answerable:  AssertionError: nothing is allowed on details that are not all there: expected [ { pendingId: 'bad', …(1) } ] to deeply equal []\n    at /home/elias/.cache/am/8fl_qenw/tmp/test-intent-before-4Ef8vZ/modules/ui-web/src/shell-v0/components/AuthorizationHost.activation-lockdown.test.ts:609:72\n    at file"
+        "detail": "DE3 a live-details read answering 200 with no requester allows nothing and the request stays answerable:  AssertionError: nothing is allowed on details that are not all there: expected [ { pendingId: 'bad', …(1) } ] to deeply equal []\n    at /home/elias/.cache/am/8exetk_q/tmp/s3a2-repair-checks/test-intent-before-NQt94H/modules/ui-web/src/shell-v0/components/AuthorizationHost.activation-lockdown.test.ts"
       },
       {
         "id": "modules/ui-web/src/shell-v0/components/AuthorizationHost.activation-lockdown.test.ts#DE3 a live-details read answering 200 with a malformed operation allows nothing and the request stays answerable",
         "classification": "assertion",
-        "detail": "DE3 a live-details read answering 200 with a malformed operation allows nothing and the request stays answerable:  AssertionError: and the request stays listed, saying why: expected '' to contain 'details are unavailable'\n    at /home/elias/.cache/am/8fl_qenw/tmp/test-intent-before-4Ef8vZ/modules/ui-web/src/shell-v0/components/AuthorizationHost.activation-lockdown.test.ts:612:6\n    at file:///home/elias/dev/just"
+        "detail": "DE3 a live-details read answering 200 with a malformed operation allows nothing and the request stays answerable:  AssertionError: and the request stays listed, saying why: expected '' to contain 'details are unavailable'\n    at /home/elias/.cache/am/8exetk_q/tmp/s3a2-repair-checks/test-intent-before-NQt94H/modules/ui-web/src/shell-v0/components/AuthorizationHost.activation-lockdown.test.ts:651:6\n    at file:///"
       },
       {
         "id": "modules/ui-web/src/shell-v0/components/AuthorizationHost.activation-lockdown.test.ts#DE3 a live-details read answering 200 with a null body allows nothing and the request stays answerable",
         "classification": "assertion",
-        "detail": "DE3 a live-details read answering 200 with a null body allows nothing and the request stays answerable:  AssertionError: expected { bad: false } to deeply equal {}\n    at /home/elias/.cache/am/8fl_qenw/tmp/test-intent-before-4Ef8vZ/modules/ui-web/src/shell-v0/components/AuthorizationHost.activation-lockdown.test.ts:610:53\n    at file:///home/elias/dev/justsearch/.claude/worktrees/shell-s3a2/modules/ui-"
+        "detail": "DE3 a live-details read answering 200 with a null body allows nothing and the request stays answerable:  AssertionError: expected { bad: false } to deeply equal {}\n    at /home/elias/.cache/am/8exetk_q/tmp/s3a2-repair-checks/test-intent-before-NQt94H/modules/ui-web/src/shell-v0/components/AuthorizationHost.activation-lockdown.test.ts:649:53\n    at file:///home/elias/.cache/am/8exetk_q/tmp/s3a2-repair-c"
       },
       {
         "id": "modules/ui-web/src/shell-v0/components/AuthorizationHost.activation-lockdown.test.ts#C12 a Deny pressed 100 ms after an Allow whose read is slow abandons that Allow: the failed Deny leaves nothing sent",
         "classification": "assertion",
-        "detail": "C12 a Deny pressed 100 ms after an Allow whose read is slow abandons that Allow: the failed Deny leaves nothing sent:  AssertionError: an Allow abandoned by a later Deny never sends: expected [ { pendingId: 'race', …(1) } ] to deeply equal []\n    at /home/elias/.cache/am/8fl_qenw/tmp/test-intent-before-4Ef8vZ/modules/ui-web/src/shell-v0/components/AuthorizationHost.activation-lockdown.test.ts:644:66\n    at file:///h"
+        "detail": "C12 a Deny pressed 100 ms after an Allow whose read is slow abandons that Allow: the failed Deny leaves nothing sent:  AssertionError: an Allow abandoned by a later Deny never sends: expected [ { pendingId: 'race', …(1) } ] to deeply equal []\n    at /home/elias/.cache/am/8exetk_q/tmp/s3a2-repair-checks/test-intent-before-NQt94H/modules/ui-web/src/shell-v0/components/AuthorizationHost.activation-lockdown.test.ts:683:"
       },
       {
         "id": "modules/ui-web/src/shell-v0/components/ElicitHost.queue-lockdown.test.ts#C2 two queued required prompts each answer on a deliberate Submit when the host stays mounted",
         "classification": "assertion",
-        "detail": "C2 two queued required prompts each answer on a deliberate Submit when the host stays mounted:  Error: its caller resolves: expected { First: { name: 'first' } } to deeply equal { First: { name: 'first' }, …(1) }\n    at Proxy.__VITEST_POLL_CHAIN__ (file:///home/elias/dev/justsearch/.claude/worktrees/shell-s3a2/modules/ui-web/node_modules/vitest/dist/chunks/test.DNmyFkvJ.js:3748:47)\n    at /hom"
+        "detail": "C2 two queued required prompts each answer on a deliberate Submit when the host stays mounted:  Error: its caller resolves: expected { First: { name: 'first' } } to deeply equal { First: { name: 'first' }, …(1) }\n    at Proxy.__VITEST_POLL_CHAIN__ (file:///home/elias/.cache/am/8exetk_q/tmp/s3a2-repair-checks/test-intent-before-NQt94H/modules/ui-web/node_modules/vitest/dist/chunks/test.DNmyFkvJ"
       },
       {
         "id": "modules/ui-web/src/shell-v0/components/ElicitHost.queue-lockdown.test.ts#C2 two queued required prompts each answer on a deliberate Submit when the host is re-attached after navigating away and back",
         "classification": "assertion",
-        "detail": "C2 two queued required prompts each answer on a deliberate Submit when the host is re-attached after navigating away and back:  AssertionError: the queued prompt is modal again: expected false to be true // Object.is equality\n    at /home/elias/.cache/am/8fl_qenw/tmp/test-intent-before-4Ef8vZ/modules/ui-web/src/shell-v0/components/ElicitHost.queue-lockdown.test.ts:119:95\n    at file:///home/elias/dev/justsearch/.claude/workt"
+        "detail": "C2 two queued required prompts each answer on a deliberate Submit when the host is re-attached after navigating away and back:  AssertionError: the queued prompt is modal again: expected false to be true // Object.is equality\n    at /home/elias/.cache/am/8exetk_q/tmp/s3a2-repair-checks/test-intent-before-NQt94H/modules/ui-web/src/shell-v0/components/ElicitHost.queue-lockdown.test.ts:119:95\n    at file:///home/elias/.cache/am"
       },
       {
         "id": "modules/ui-web/src/shell-v0/components/ElicitHost.queue-lockdown.test.ts#C2 two queued required prompts each answer on a deliberate Submit when the host is replaced by a new host after navigating away and back",
         "classification": "assertion",
-        "detail": "C2 two queued required prompts each answer on a deliberate Submit when the host is replaced by a new host after navigating away and back:  Error: its caller resolves: expected { First: { name: 'first' } } to deeply equal { First: { name: 'first' }, …(1) }\n    at Proxy.__VITEST_POLL_CHAIN__ (file:///home/elias/dev/justsearch/.claude/worktrees/shell-s3a2/modules/ui-web/node_modules/vitest/dist/chunks/test.DNmyFkvJ.js:3748:47)\n    at /hom"
+        "detail": "C2 two queued required prompts each answer on a deliberate Submit when the host is replaced by a new host after navigating away and back:  Error: its caller resolves: expected { First: { name: 'first' } } to deeply equal { First: { name: 'first' }, …(1) }\n    at Proxy.__VITEST_POLL_CHAIN__ (file:///home/elias/.cache/am/8exetk_q/tmp/s3a2-repair-checks/test-intent-before-NQt94H/modules/ui-web/node_modules/vitest/dist/chunks/test.DNmyFkvJ"
       }
     ]
   },
-  "digest": "sha256:f4564a12f4fa002e6fdd79a51a835c4f1113abbcdfdeaa7cc90580d038ec02cc"
+  "digest": "sha256:01eaf8ee6de3037ecf22e9b423804ae7f03c05fd12971d231c2cac821959462b"
 }

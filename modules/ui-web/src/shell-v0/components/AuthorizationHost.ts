@@ -97,14 +97,16 @@ type FreshDetails = Awaited<ReturnType<NonNullable<AuthorizationPrompt['refresh'
 const FRESH_FIELDS = ['operationId', 'gateBehavior', 'riskTier', 'argsSummary', 'expiresAt', 'requestedBy'] as const;
 
 /**
- * DE3 — live details that may answer an Allow: an object naming the operation, every other field text or
- * absent; empty text counts as absent. Anything else (an empty or malformed answer) is unavailable.
+ * DE3 — live details that may answer an Allow: an object naming the operation and containing text
+ * arguments (possibly empty), every other field text or absent; other empty text counts as absent.
+ * Anything else (an empty or malformed answer) is unavailable.
  */
 function wellFormed(fresh: unknown): Partial<Record<(typeof FRESH_FIELDS)[number], string>> | undefined {
   if (!fresh || typeof fresh !== 'object' || Array.isArray(fresh)) return undefined;
   const raw = fresh as Record<string, unknown>;
   if (typeof raw.operationId !== 'string' || !raw.operationId) return undefined;
-  const out: Partial<Record<(typeof FRESH_FIELDS)[number], string>> = {};
+  if (typeof raw.argsSummary !== 'string') return undefined;
+  const out: Partial<Record<(typeof FRESH_FIELDS)[number], string>> = { argsSummary: raw.argsSummary };
   for (const key of FRESH_FIELDS) {
     const value = raw[key];
     if (value === undefined || value === null || value === '') continue;
@@ -371,6 +373,7 @@ export class AuthorizationHost extends JfElement {
     }
     // A later press (a Deny) abandons this read: what it finds then answers and shows nothing.
     const attempt = item.attempt;
+    const shownArgsSummary = item.prompt.argsSummary;
     this.checking.add(item);
     this.requestUpdate();
     let fresh: FreshDetails | undefined;
@@ -390,14 +393,14 @@ export class AuthorizationHost extends JfElement {
     if (!this.holds(item) || this.decided.has(id) || item.attempt !== attempt) return 'stale';
     if (fresh === null) { this.cancelMatching(prompt => prompt.pendingId === id); return 'gone'; }
     const details = wellFormed(fresh);
-    const shown = (key: 'argsSummary' | 'requestedBy'): string | undefined => item.prompt[key] || undefined;
+    const shownRequester = item.prompt.requestedBy || undefined;
     // What was shown and the live details lack (its arguments, who asked) is a partial answer, not a match.
-    if (!details || (shown('argsSummary') && !details.argsSummary) || (shown('requestedBy') && !details.requestedBy)) {
+    if (!details || typeof shownArgsSummary !== 'string' || (shownRequester && !details.requestedBy)) {
       this.answerErrors.set(item, DETAILS_UNAVAILABLE);
       return 'unavailable';
     }
     const changed = Object.entries(details).some(([key, value]) =>
-      (item.prompt[key as keyof AuthorizationPrompt] || undefined) !== value);
+      (key === 'argsSummary' ? shownArgsSummary : item.prompt[key as keyof AuthorizationPrompt] || undefined) !== value);
     item.prompt = { ...item.prompt, ...details };
     this.answerErrors.delete(item);
     if (changed) {
