@@ -835,7 +835,7 @@ export class AuthorizationHost extends JfElement {
                 this.allowAlways = (e.target as HTMLInputElement).checked;
               }}
             />
-            Always allow this action (don't ask again)
+            Always allow “${operationId}” without asking, for any agent with this access
           </label>`
         : ''}
       ${this.active && this.answerErrors.get(this.active) ? html`<p role="alert">${this.answerErrors.get(this.active)}</p>` : ''}

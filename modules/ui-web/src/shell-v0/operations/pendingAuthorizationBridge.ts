@@ -77,6 +77,7 @@ const OWN_TRANSPORTS = new Set(['BUTTON', 'PALETTE', 'RAIL']);
  */
 interface RetainedPendingSource {
   subscribe(listener: (snapshot: { readonly advisories: readonly {
+    readonly liveArrival?: boolean;
     readonly event: { readonly classId: string; readonly occurredAt?: string; readonly classExtras: Readonly<Record<string, unknown>> };
   }[] }) => void): () => void;
 }
@@ -141,9 +142,10 @@ export function startPendingAuthorizationBridge(
         return { lastPayload: env.payload as PendingAuthorizationPayload | null };
       },
     }),
-    (snapshot) => admit(snapshot.payload.lastPayload, false),
+    (snapshot) => admit(snapshot.payload.lastPayload, false, true),
   );
   const str = (value: unknown): string | undefined => typeof value === 'string' && value ? value : undefined;
+  let initialRetained = true;
   const stopRetained = opts.retained?.subscribe(retained => {
     for (const record of retained.advisories) {
       if (record.event.classId !== 'authorization.pending') continue;
@@ -154,11 +156,12 @@ export function startPendingAuthorizationBridge(
       // The retained record is the MCP projection (PendingAuthorizationAdvisoryProjector): an agent's.
       admit({ pendingId: str(extras.pendingId), operationId: str(extras.operationId),
         gateBehavior: str(extras.gateBehavior), riskTier: str(extras.riskTier), transport: 'MCP',
-        createdAt: record.event.occurredAt }, true);
+        createdAt: record.event.occurredAt }, true, !initialRetained && record.liveArrival === true);
     }
+    initialRetained = false;
   });
 
-  function admit(payload: PendingAuthorizationPayload | null, retained: boolean): void {
+  function admit(payload: PendingAuthorizationPayload | null, retained: boolean, live = false): void {
     if (!payload?.pendingId || !payload.operationId) {
       return;
     }
@@ -188,7 +191,9 @@ export function startPendingAuthorizationBridge(
     // A retained request whose state could not be read (or whose host was not mounted yet) is
     // tried again on the next snapshot: a transport failure is neither expiry nor an answer.
     const retry = retained ? () => { if (!stopped) handledIds.delete(pendingId); } : undefined;
-    void presentAndExecute(apiBase, payload, () => !stopped && waiting.get(pendingId) === entry, retry, !retained)
+    // MCP's advisory can beat its event here. Preserve the store's per-record live marker;
+    // the initial subscription and replay snapshots remain silent restorations.
+    void presentAndExecute(apiBase, payload, () => !stopped && waiting.get(pendingId) === entry, retry, live)
       .finally(() => { if (waiting.get(pendingId) === entry) waiting.delete(pendingId); });
   }
 

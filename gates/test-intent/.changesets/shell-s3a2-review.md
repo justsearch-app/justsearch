@@ -29,6 +29,11 @@ backend receives only the last press; every source but the person's own window g
 Needs you; each queued elicitation prompt answers its own caller and stays modal after a remount.
 Those checks fail on 38d5e1e812 and pass now.
 
+A/C repair on ae182f7c4c: MCP's live advisory can reach the bridge before its pending event.
+The retained-source adapter now carries the store's per-record live-arrival flag, while its initial
+subscription stays silent. Both durable operation choices say they cover any agent with this
+access; the operation and source-tier grant model and all offering rules stay unchanged.
+
 All added checks are durable. The reflective lookup of `ResourceApiModule.historyOutcome` in the
 Java check is fail-before compatibility scaffolding: on the baseline it reads the recorded outcome,
 which is what that route returned there. No independent acceptance is claimed by this builder.
@@ -645,6 +650,90 @@ which is what that route returned there. No independent acceptance is claimed by
         "modules/ui-web/src/shell-v0/components/AuthorizationHost.activation-lockdown.test.ts#DE3 initial and fresh pending details with null arguments refuse Allow, send no approval, and stay answerable",
         "modules/ui-web/src/shell-v0/components/AuthorizationHost.activation-lockdown.test.ts#DE3 initial and fresh pending details with non-text arguments refuse Allow, send no approval, and stay answerable",
         "modules/ui-web/src/shell-v0/components/StatusPanel.review.test.ts#matching empty argument summaries allow, while changing nonempty arguments to empty refuses as changed"
+      ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/components/AuthorizationArrival.scope.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "A: five consecutive live MCP requests announce assertively exactly once each, for both typed and inline gates, when the live advisory arrives before the pending-authorization event. The later event and repeated advisory snapshot do not repeat the announcement or open a dialog. The bridge retains the per-record live-arrival marker; subscribing to existing records stays silent.",
+      "sources": [
+        {
+          "kind": "owner-words",
+          "quote": "every live arrival of a backend pending authorization, whatever its source and gate (typed or not), is announced once, assertively, in the window; restoration (reload, reconnect, a later window) stays silent as now.",
+          "location": "task t-20261103-shell request (S3a2 exact A/C repair brief on ae182f7c4c, 2026-11-05)"
+        }
+      ],
+      "repaired": true,
+      "evidence": "gates/test-intent/evidence/shell-s3a2-review-announcement-scope.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/components/AuthorizationArrival.scope.test.ts#A five live MCP TYPED_CONFIRM arrivals announce once each when their advisory arrives first",
+        "modules/ui-web/src/shell-v0/components/AuthorizationArrival.scope.test.ts#A five live MCP INLINE_CONFIRM arrivals announce once each when their advisory arrives first"
+      ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/components/AuthorizationArrival.scope.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "C: panel and protected-dialog durable choices name the operation and any agent with this access, whether the current requester is named or unnamed. The visible label supplies the checkbox accessible name. No agent-specific durable receipt exists on these decision paths; backend grant semantics and offering rules are unchanged.",
+      "sources": [
+        {
+          "kind": "owner-words",
+          "quote": "the wording names the real scope, e.g. \"Always allow <operation> without asking, for any agent with this access\" (plain words, design-system section 8; no tier names), everywhere the choice appears (panel review and protected dialog), with its accessible name and any confirmation receipt saying the same.",
+          "location": "task t-20261103-shell request (S3a2 exact A/C repair brief on ae182f7c4c, 2026-11-05)"
+        }
+      ],
+      "repaired": true,
+      "evidence": "gates/test-intent/evidence/shell-s3a2-review-announcement-scope.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/components/AuthorizationArrival.scope.test.ts#C panel consent names operation and access scope for requester undefined",
+        "modules/ui-web/src/shell-v0/components/AuthorizationArrival.scope.test.ts#C panel consent names operation and access scope for requester Claude Desktop",
+        "modules/ui-web/src/shell-v0/components/AuthorizationArrival.scope.test.ts#C protected dialog consent names operation and access scope for requester undefined",
+        "modules/ui-web/src/shell-v0/components/AuthorizationArrival.scope.test.ts#C protected dialog consent names operation and access scope for requester Claude Desktop"
+      ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/components/AuthorizationArrival.scope.test.ts",
+        "modules/ui-web/src/shell-v0/components/AuthorizationHost.activation-lockdown.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "Complete rerun of every check in both edited test files. Preservation includes all named outside sources (and an unknown future source), event-first deduplication, silent reload/reconnect/later-window restoration, HIGH and unsupported-route durable suppression, and all Chromium activation, security, fresh-details and layout checks.",
+      "sources": [
+        {
+          "kind": "owner-words",
+          "quote": "every live arrival of a backend pending authorization, whatever its source and gate (typed or not), is announced once, assertively, in the window; restoration (reload, reconnect, a later window) stays silent as now.",
+          "location": "task t-20261103-shell request (S3a2 exact A/C repair brief on ae182f7c4c, 2026-11-05)"
+        },
+        {
+          "kind": "owner-words",
+          "quote": "the wording names the real scope, e.g. \"Always allow <operation> without asking, for any agent with this access\" (plain words, design-system section 8; no tier names), everywhere the choice appears (panel review and protected dialog), with its accessible name and any confirmation receipt saying the same.",
+          "location": "task t-20261103-shell request (S3a2 exact A/C repair brief on ae182f7c4c, 2026-11-05)"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/shell-s3a2-review-announcement-scope-preservation.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/components/AuthorizationArrival.scope.test.ts",
+        "modules/ui-web/src/shell-v0/components/AuthorizationHost.activation-lockdown.test.ts"
+      ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/components/AuthorizationHost.activation-lockdown.test.ts"
+      ],
+      "class": "Adaptation",
+      "moved": [
+        "input re-encoding"
+      ],
+      "whatMoved": "The existing Chromium activation checks locate the same enclosing durable-choice label by its stable test id after the consent wording changes. Operation-name waits become exact because the choice now also names that operation. Kept oracle: an early checkbox or label click does not tick the next prompt; a deliberate label click ticks it and sends allowAlways true; every existing assertion is unchanged. All historical evidence that names this file is regenerated against its original before revision, and the full file is rerun.",
+      "sources": [
+        {
+          "kind": "owner-words",
+          "quote": "the wording names the real scope, e.g. \"Always allow <operation> without asking, for any agent with this access\" (plain words, design-system section 8; no tier names), everywhere the choice appears (panel review and protected dialog), with its accessible name and any confirmation receipt saying the same.",
+          "location": "task t-20261103-shell request (S3a2 exact A/C repair brief on ae182f7c4c, 2026-11-05)"
+        }
       ]
     }
   ]

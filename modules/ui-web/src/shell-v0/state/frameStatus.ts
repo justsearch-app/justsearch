@@ -192,7 +192,7 @@ function authorizationReview(request: PendingStatusAuthorization, label: string,
     question: `Let ${who.replace(/^(The|An) /, word => word.toLowerCase())} run “${label}”?`, lines,
     timeout: deadline ?? (appAgent ? 'No deadline: it waits until you answer or the run stops' : 'No deadline: it waits until you answer'),
     ...(remaining === undefined ? {} : { remaining }),
-    ...(durable ? { allowAlways: { kind: 'authorization-allow-always' as const, target: request.pendingId, label: `Always allow “${label}” for ${who}` } }
+    ...(durable ? { allowAlways: { kind: 'authorization-allow-always' as const, target: request.pendingId, label: `Always allow “${label}” without asking, for any agent with this access` } }
       : { askedEveryTime: request.riskTier === 'HIGH' ? `“${label}” is asked every time; it can't be allowed permanently.`
         : appAgent ? 'The agent in Search asks every time; its requests can\'t be allowed permanently.'
           : 'This request is asked every time.' }),

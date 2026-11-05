@@ -250,13 +250,13 @@ it.each(['checkbox', 'label'] as const)('S1 a %s click on the next approval’s 
   const page = await opened();
   const sent = await approvals(page);
   await page.evaluate(() => { window.requestApproval('first', false); window.requestApproval('second', false); });
-  await page.getByText('core.first').waitFor();
+  await page.getByText('core.first', { exact: true }).waitFor();
   await page.waitForTimeout(600);
   // The next prompt lays out like the first: a stray click lands where the first one's control was.
   const box = page.getByTestId('authorization-allow-always').locator('input');
-  const at = (await (part === 'checkbox' ? box : page.getByText('Always allow this action')).boundingBox())!;
+  const at = (await (part === 'checkbox' ? box : page.getByTestId('authorization-allow-always')).boundingBox())!;
   await page.getByTestId('authorization-approve').click();
-  await page.getByText('core.second').waitFor();
+  await page.getByText('core.second', { exact: true }).waitFor();
   const appeared = Date.now();
   await page.waitForTimeout(30);
   await page.mouse.click(at.x + at.width / 2, at.y + at.height / 2);
@@ -272,9 +272,9 @@ it('S1 a deliberate click on Always allow after arming ticks it and the approval
   const page = await opened();
   const sent = await approvals(page);
   await page.evaluate(() => window.requestApproval('only', false));
-  await page.getByText('core.only').waitFor();
+  await page.getByText('core.only', { exact: true }).waitFor();
   await page.waitForTimeout(450);
-  await page.getByText('Always allow this action').click();
+  await page.getByTestId('authorization-allow-always').click();
   expect(await page.getByTestId('authorization-allow-always').locator('input').isChecked()).toBe(true);
   await page.getByTestId('authorization-approve').click();
   await expect.poll(() => sent.length).toBe(1);
