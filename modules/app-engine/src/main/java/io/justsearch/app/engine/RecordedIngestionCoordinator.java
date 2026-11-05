@@ -445,6 +445,21 @@ final class RecordedIngestionCoordinator implements RecordedIngestionService, Re
         .isPresent();
   }
 
+  private Set<String> retainedImportChildren() {
+    Set<String> retained = new HashSet<>();
+    for (var parent : operations.openRecords()) {
+      if (parent.descriptor().kind() != OperationKind.INGEST
+          || !"core.ingest-files".equals(parent.descriptor().operationRef())) continue;
+      // Read accepted membership, never the live runner's permissions or current watched roots.
+      var plan = resolver.resolve(parent, preparation(parent));
+      for (int index = 0; index < plan.roots().size(); index++) {
+        operations.findIngestChild(parent.key(), oneRoot(plan, index))
+            .ifPresent(child -> retained.add(child.key()));
+      }
+    }
+    return Set.copyOf(retained);
+  }
+
   @Override
   public Attachment attach(JobQueue queue, CheckedServingGeneration generation, BooleanSupplier online) throws IOException {
     return attach(queue, generation, online, Optional::empty);
@@ -461,6 +476,7 @@ final class RecordedIngestionCoordinator implements RecordedIngestionService, Re
       CheckedBulkRuntime bulkRuntime, CheckedGapAcceptance gapAcceptance) throws IOException {
     synchronized (lock) {
       if (attached != null) throw new IOException("Recorded ingestion still owns its prior queue");
+      queue.useRecordedWalkRetention(this::retainedImportChildren);
       queue.useSourceOriginAuthority(key -> {
         // Ordinary walks use scan ids, not recorded-operation keys. Keep their existing lookup.
         try { OperationKeys.timestampMillis(key); }

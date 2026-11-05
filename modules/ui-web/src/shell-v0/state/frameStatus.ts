@@ -27,7 +27,9 @@ export type StatusSection = 'needs' | 'problems' | 'running' | 'earlier';
 export interface StatusAction { readonly label: string; readonly kind: 'navigate' | 'advisory' | 'proposal' | 'reject-proposal' | 'authorization' | 'consent' | 'cancel-task' | 'plugin-copy' | 'dismiss-plugin' | 'install-toggle' | 'background-runs'
   | 'authorization-allow' | 'authorization-allow-always' | 'authorization-deny' | 'authorization-review'
   /** Opens the row's review inside the panel (the panel handles it; nothing leaves the panel). */
-  | 'review'; readonly target: string; }
+  | 'review'
+  /** L1 — adds a removed folder back (target: its path; `collection` when it was not the default). */
+  | 'add-folder-again'; readonly target: string; readonly collection?: string; }
 /** Ask the status pill to open the review of one Needs-you row (detail: the row id), e.g. from a waiting run. */
 export const STATUS_REVIEW_EVENT = 'jf-review-status-request';
 /** One consequence line of a request under review: what it touches, its risk, whether it can be undone. */
@@ -151,6 +153,12 @@ export function folderName(path: string): string {
   return trimmed.split(/[\\/]/).pop() || path;
 }
 
+/** A folder path compared the way the engine resolves it: either separator, no trailing one; Windows paths case-insensitively. */
+function folderKey(path: string): string {
+  const slash = path.replaceAll('\\', '/').replace(/\/+$/, '');
+  return /^[a-z]:/i.test(slash) || slash.startsWith('//') ? slash.toLowerCase() : slash;
+}
+
 /** An unanswered agent request expires unusable (the engine refuses stale approvals): name that consequence. */
 export function authorizationDeadline(expiresAt: string, now: number): string | undefined {
   const ms = Date.parse(expiresAt) - now;
@@ -204,7 +212,7 @@ function authorizationReview(request: PendingStatusAuthorization, label: string,
   };
 }
 
-function advisoryStatusFact(record: AdvisoryRecord): StatusFact {
+function advisoryStatusFact(record: AdvisoryRecord, watched: ReadonlySet<string> = new Set()): StatusFact {
   const e = record.event;
   const extras = e.classExtras;
   const chrome = advisoryClassChrome(e.classId);
@@ -229,8 +237,18 @@ function advisoryStatusFact(record: AdvisoryRecord): StatusFact {
     ...(e.diagnosticsLink ? { diagnostics: e.diagnosticsLink } : {}),
     actions: record.toast?.destinations?.length ? record.toast.destinations.map(choice => go(`Open ${choice.label}`, choice.id)) : e.primaryAction ? [{ kind: 'advisory', target: record.key,
       label: e.primaryActionKind === 'undo' ? 'Undo' : /forget/.test(operationId) ? 'Add back to search' : present({ kind: 'operation', id: e.primaryAction.target }).label || 'Review' }]
-      : record.toast?.onAction ? [{ kind: 'advisory', target: record.key, label: record.toast.actionLabel ?? 'Review' }] : [],
+      : record.toast?.onAction && toastActionAvailable(record, watched) ? [{ kind: 'advisory', target: record.key, label: record.toast.actionLabel ?? 'Review' }] : [],
   };
+}
+
+/**
+ * DE6/ST7 — a notice's action is offered only while it can still run: a reversal that ran or whose
+ * window closed is history, and adding a folder back is not offered while that folder is watched.
+ */
+export function toastActionAvailable(record: AdvisoryRecord, watched: ReadonlySet<string> = new Set()): boolean {
+  const toast = record.toast;
+  if (!toast?.onAction || toast.actionAvailable?.() === false) return false;
+  return !toast.restoresFolder || !watched.has(folderKey(toast.restoresFolder));
 }
 
 const GRANT_WORDS: Readonly<Record<string, readonly [string, NonNullable<StatusFact['tone']>]>> = {
@@ -285,6 +303,13 @@ export function deriveFrameStatus(input: FrameStatusInput): FrameStatus {
   for (const id of terminal.keys()) waiting.delete(id);
   const ledgerRequests = new Set((input.activity ?? []).flatMap(entry =>
     !entry.isRoutine && !entry.operationOutcomeKey && entry.gate?.pendingId ? [entry.gate.pendingId] : []));
+  // L1 — the folders watched now (by resolved path), and the removals this window already offers to undo.
+  const watched = new Set((input.roots ?? []).flatMap(root => {
+    const path = root.pathHash ? input.rootPaths?.get(root.pathHash) : undefined;
+    return path ? [folderKey(path)] : [];
+  }));
+  const offeredRestores = new Set((input.advisories ?? []).flatMap(record =>
+    record.toast?.restoresFolder ? [folderKey(record.toast.restoresFolder)] : []));
   for (const record of input.advisories ?? []) {
     if (record.event.classId === 'authorization.pending') {
       const extras = record.event.classExtras;
@@ -297,7 +322,7 @@ export function deriveFrameStatus(input: FrameStatusInput): FrameStatus {
         tone: outcome === 'Allowed' ? 'success' : outcome === 'Denied by you' ? 'failure' : 'neutral', actions: [] });
       continue;
     }
-    const fact = advisoryStatusFact(record);
+    const fact = advisoryStatusFact(record, watched);
     // Retained authorization advisories are history, never another execution route.
     add(record.event.classId === 'authorization.pending' ? { ...fact, actions: [] } : fact);
   }
@@ -313,12 +338,21 @@ export function deriveFrameStatus(input: FrameStatusInput): FrameStatus {
     const expiry = pendingId && input.advisories?.some(record => record.event.classId === 'authorization.pending'
       && record.event.classExtras.pendingId === pendingId && typeof record.event.classExtras.expiresAt === 'string'
       && Date.parse(record.event.classExtras.expiresAt) <= now);
+    const removed = entry.removedFolder;
+    // L1 — this window's own removal notice already offers the way back; one row per removal.
+    if (removed && offeredRestores.has(folderKey(removed.path))) continue;
     const words = entry.gate?.disposition === 'GATED' && pendingId
       ? { title: `${expiry ? 'Denied automatically' : 'Approval no longer pending'}: ${entry.gate.operation}`, tone: 'neutral' as const }
-      : activityWords(entry);
+      : removed ? { title: `Removed ${folderName(removed.path)} from your library`, tone: 'neutral' as const,
+        detail: `${removed.path}. Adding it again reads its files again.` }
+        : activityWords(entry);
+    // L1 — every window offers the way back from the removal record, while the folder is not watched.
+    const addAgain: StatusAction[] = removed && !watched.has(folderKey(removed.path))
+      ? [{ kind: 'add-folder-again', target: removed.path, label: `Add ${folderName(removed.path)} again`,
+        ...(removed.collection && removed.collection !== 'default' ? { collection: removed.collection } : {}) }] : [];
     add({ id: `activity:${entry.id}`, section: 'earlier', title: words.title,
       ...(words.detail ? { detail: words.detail } : {}), tone: words.tone, occurredAt: entry.occurredAt,
-      actions: [go('All activity', 'core.activity-surface')] });
+      actions: [...addAgain, go('All activity', 'core.activity-surface')] });
   }
   for (const root of input.roots ?? []) {
     // R4 — a folder is named by its folder name, with the full path as detail; the collection
@@ -480,8 +514,7 @@ export function deriveFrameStatus(input: FrameStatusInput): FrameStatus {
   const runningRank = (fact: StatusFact): number => ['indexing', 'rebuilding', 'ai-install'].includes(fact.id)
     ? ['indexing', 'rebuilding', 'ai-install'].indexOf(fact.id) : fact.id.startsWith('folder-work:') ? 4 : fact.id === FILE_ACTIVITY_ID ? 5 : 3;
   sections.running.sort((a, b) => runningRank(a) - runningRank(b));
-  sections.earlier.sort((a, b) => Number(!!b.unread) - Number(!!a.unread)
-    || (b.occurredAt ?? '').localeCompare(a.occurredAt ?? ''));
+  sections.earlier.sort((a, b) => (b.occurredAt ?? '').localeCompare(a.occurredAt ?? ''));
   const stale = !ai || ai.phase !== 'connected';
   let pill: StatusPillState;
   const pastGrace = input.contactLostAt !== null && now - input.contactLostAt >= RECONNECT_GRACE_MS;

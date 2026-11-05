@@ -35,6 +35,15 @@ public final class ActionLedgerProjection {
 
   /** A completed operation invocation (tempdoc 550 thesis I — typed {@link ActionEvent}). */
   public static ActionEvent projectOperation(OperationHistoryEntry op) {
+    return projectOperation(op, Optional.empty());
+  }
+
+  /**
+   * A completed operation invocation with its removal record: a successful folder removal names the
+   * folder (from the durable receipt, never the history entry), so every window can add it back.
+   */
+  public static ActionEvent projectOperation(OperationHistoryEntry op,
+      Optional<io.justsearch.app.api.operations.OperationReceipt.RemovedFolder> removedFolder) {
     return new ActionEvent.Operation(
         op.operationKey().map(key -> "operation:" + key).orElseGet(() -> deterministicId(
             "operation", op.endTime(), op.operationId().value(), op.outcome().name(),
@@ -49,7 +58,9 @@ public final class ActionLedgerProjection {
         op.executionId(),
         // Tempdoc 561 P-A1: the loop/session join key (the agent loop's sessionId), so the agent
         // History view projects from this one ledger filtered to a single session (P-B1).
-        op.provenance().correlationId());
+        op.provenance().correlationId(),
+        // L1: a successful folder removal names the folder, so every window can add it back.
+        removedFolder);
   }
 
   /**
@@ -170,6 +181,12 @@ public final class ActionLedgerProjection {
         m.put("operationId", op.operationId());
         m.put("outcome", op.outcome());
         op.executionId().ifPresent(id -> m.put("executionId", id));
+        op.removedFolder().ifPresent(folder -> {
+          Map<String, Object> removed = new LinkedHashMap<>();
+          removed.put("path", folder.path());
+          if (folder.collection() != null) removed.put("collection", folder.collection());
+          m.put("removedFolder", removed);
+        });
       }
       case ActionEvent.Navigation nav -> {
         m.put("targetSurface", nav.targetSurface());
@@ -278,7 +295,8 @@ public final class ActionLedgerProjection {
                         str(row, "operationId"),
                         str(row, "outcome"),
                         optional(row, "executionId"),
-                        correlationId);
+                        correlationId,
+                        removedFolder(row));
             case "navigation" ->
                 new ActionEvent.Navigation(
                     id,
@@ -332,6 +350,20 @@ public final class ActionLedgerProjection {
     } catch (RuntimeException malformed) {
       return Optional.empty();
     }
+  }
+
+  /**
+   * L1 — the removal record's folder, when the row has a readable one. Rows journaled before it
+   * existed, or with an unreadable value, read as no folder (they offer no re-add), never fail.
+   */
+  private static Optional<io.justsearch.app.api.operations.OperationReceipt.RemovedFolder> removedFolder(
+      Map<String, Object> row) {
+    if (!(row.get("removedFolder") instanceof Map<?, ?> folder)) return Optional.empty();
+    Object path = folder.get("path");
+    Object collection = folder.get("collection");
+    if (!(path instanceof String p)) return Optional.empty();
+    return io.justsearch.app.api.operations.OperationReceipt.RemovedFolder.of(
+        p, collection instanceof String c ? c : null);
   }
 
   private static String str(Map<String, Object> row, String key) {

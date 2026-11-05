@@ -30,9 +30,16 @@ export interface KeybindingEntry {
   readonly when?: string;
   /** Where this binding came from. */
   readonly source: 'default' | 'user' | 'plugin';
+
   /** Tempdoc 543 §3.A / §21.A2 — required typed provenance. */
   readonly provenance: Provenance;
 }
+
+/**
+ * C8 — commands that are also a text field's own (Undo, Redo), under whatever key they are bound:
+ * inside an editable control, or while a modal owns focus, the key keeps its native meaning.
+ */
+const TEXT_EDIT_COMMANDS: ReadonlySet<string> = new Set(['shell.undo', 'shell.redo', 'core.action.shell.undo', 'core.action.shell.redo']);
 
 interface ParsedKey {
   key: string;
@@ -194,6 +201,7 @@ export function attachKeybindingDispatcher(invoke: (commandId: string) => void):
       const modifierless = !parsed.mod && !parsed.ctrl && !parsed.meta && !parsed.alt;
       if (inEditable && modifierless) continue;
       if (modalOpen && modifierless) continue;
+      if (TEXT_EDIT_COMMANDS.has(entry.commandId) && (inEditable || modalOpen)) continue;
       if (!evaluateWhen(entry.when, ctx)) continue;
       e.preventDefault();
       invokeHandler(entry.commandId);

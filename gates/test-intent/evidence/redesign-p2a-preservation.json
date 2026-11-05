@@ -1,0 +1,573 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
+  },
+  "createdAt": "2026-11-05T12:53:48.683Z",
+  "revision": "010ecb63ea8c401b7441ac464d7d54f1bdccf653",
+  "tree": "87a2ca6abd72aa47cb78d8dbe3e21af527cc9c0c",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": "openjdk version \"25.0.4.1\" 2026-08-18 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "./gradlew :modules:worker-services:test --tests \"io.justsearch.indexerworker.loop.SourceEnvelopePublicationTest\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 9877
+    },
+    {
+      "command": "./gradlew :modules:adapters-lucene:test --tests \"io.justsearch.adapters.lucene.runtime.SourceEnvelopePreservationTest\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 3626
+    },
+    {
+      "command": "./gradlew :modules:indexer-worker:test --tests \"io.justsearch.indexerworker.queue.AdmissionSourceWitnessTest\" --tests \"io.justsearch.indexerworker.queue.SourceOriginLookupTest\" --tests \"io.justsearch.indexerworker.queue.SourceOriginMigrationTest\" --tests \"io.justsearch.indexerworker.queue.RecordedWalkReceiptValidationTest\" --tests \"io.justsearch.indexerworker.queue.RecordedWalkIssuedClaimsTest\" --tests \"io.justsearch.indexerworker.queue.RecordedWalkSealTest\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 10486
+    },
+    {
+      "command": "./gradlew :modules:app-services:test --tests \"io.justsearch.app.services.registry.executor.RecordedIngestRecoveryDecisionTest\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 2422
+    },
+    {
+      "command": "./gradlew :modules:app-observability:test --tests \"io.justsearch.app.observability.operations.SqliteOperationStoreTest\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 6963
+    },
+    {
+      "command": "./gradlew :modules:app-engine:test --tests \"io.justsearch.app.engine.RecordedIngestionCoordinatorTest.dispatchesAcceptedWatchedReindexThroughMembershipFencedProducer\" --tests \"io.justsearch.app.engine.RecordedIngestionCoordinatorTest.gatedImportPublishesItsParentOriginOnAllRowsIncludingReopenedReplay\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 6510
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/SourceEnvelopePublicationTest.java",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/SourceEnvelopePublicationTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:f08863c507503d5be69bca674d6ac6696297cde73abe3e70016dd0519b79f18f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "normalPublicationCarriesEnvelopeToTargetActiveAndEveryChunk(String) [1] watched-short",
+          "status": "passed"
+        },
+        {
+          "name": "normalPublicationCarriesEnvelopeToTargetActiveAndEveryChunk(String) [2] watched-long",
+          "status": "passed"
+        },
+        {
+          "name": "normalPublicationCarriesEnvelopeToTargetActiveAndEveryChunk(String) [3] import-short",
+          "status": "passed"
+        },
+        {
+          "name": "normalPublicationCarriesEnvelopeToTargetActiveAndEveryChunk(String) [4] import-long",
+          "status": "passed"
+        },
+        {
+          "name": "normalPublicationCarriesEnvelopeToTargetActiveAndEveryChunk(String) [5] exact-short",
+          "status": "passed"
+        },
+        {
+          "name": "normalPublicationCarriesEnvelopeToTargetActiveAndEveryChunk(String) [6] exact-long",
+          "status": "passed"
+        },
+        {
+          "name": "normalPublicationCarriesEnvelopeToTargetActiveAndEveryChunk(String) [7] legacy-short",
+          "status": "passed"
+        },
+        {
+          "name": "normalPublicationCarriesEnvelopeToTargetActiveAndEveryChunk(String) [8] legacy-long",
+          "status": "passed"
+        },
+        {
+          "name": "regeneratedChunksCopyTheExistingParentsCompleteEnvelope()",
+          "status": "passed"
+        },
+        {
+          "name": "unreadableParentEnvelopeCannotDeleteOrPublishReplacementChunks()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/SourceEnvelopePreservationTest.java",
+      "file": "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/SourceEnvelopePreservationTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:cb157606011e5a4173027d4f938ccc261142f3b129cca0a418e1f00d5e81fad2",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "populatedLegacyIndexOpensAndStampsNewFingerprintOnlyAfterSuccessfulCommit()",
+          "status": "passed"
+        },
+        {
+          "name": "malformedEnvelopeNeverDecodesKnown()",
+          "status": "passed"
+        },
+        {
+          "name": "envelopeAdditionsUseBothExistingParityCertificationPaths()",
+          "status": "passed"
+        },
+        {
+          "name": "catalogKeepsEnvelopeThroughEnrichmentAndMetadataPatches()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/AdmissionSourceWitnessTest.java",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/AdmissionSourceWitnessTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:17ec31f39f98cefc81bcca2f42240076044af328f9c3b5932d5667e1c917d98f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "queueAndExtractorUseIdenticalWitnesses()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/SourceOriginLookupTest.java",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/SourceOriginLookupTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:c3693cb42ebb5a483b1c01140542b9ed4b42f8e7881efc4e33bc93bfb679bb95",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "watchedAdmissionsUseDeclaredRootAndMissingRecordsStayAbsent()",
+          "status": "passed"
+        },
+        {
+          "name": "importsResolveOnlyTheirOperationAndNormalizedRootAfterReopen()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/SourceOriginMigrationTest.java",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/SourceOriginMigrationTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:eec35ad21354b158dccde8861af651503c4c71fd5a9bcad5519d2cd0241531ba",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "failedV27MigrationRollsBackTableAndVersion()",
+          "status": "passed"
+        },
+        {
+          "name": "freshAndV26QueuesHaveDurableOriginStorage(boolean) [1] false",
+          "status": "passed"
+        },
+        {
+          "name": "freshAndV26QueuesHaveDurableOriginStorage(boolean) [2] true",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/RecordedWalkReceiptValidationTest.java",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/RecordedWalkReceiptValidationTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:deafbe11989118d8441c2daeaeb3ba2b1f677ed3bcce5c27d34386325cd0b280",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "missing walks are gaps and present unsealed walks are not ready",
+          "status": "passed"
+        },
+        {
+          "name": "v1 sorted duplicate hashes and the bounded truncation boundary remain readable",
+          "status": "passed"
+        },
+        {
+          "name": "invalid orphan progress rolls back an earlier unrecorded job deletion",
+          "status": "passed"
+        },
+        {
+          "name": "historical failures do not make a repaired current walk fail",
+          "status": "passed"
+        },
+        {
+          "name": "sealed receipt round-trips through the typed view and reopen",
+          "status": "passed"
+        },
+        {
+          "name": "invalid acknowledged evidence blocks aged ledger cleanup atomically",
+          "status": "passed"
+        },
+        {
+          "name": "receipt hash preserves valid stored whitespace and key order",
+          "status": "passed"
+        },
+        {
+          "name": "invalid sealed evidence is rejected before read, duplicate seal, or ack",
+          "status": "passed"
+        },
+        {
+          "name": "invalid acknowledged evidence blocks progress-only pruning",
+          "status": "passed"
+        },
+        {
+          "name": "[1] completed_units",
+          "status": "passed"
+        },
+        {
+          "name": "[2] failed_units",
+          "status": "passed"
+        },
+        {
+          "name": "[3] revision",
+          "status": "passed"
+        },
+        {
+          "name": "[4] enumeration_epoch",
+          "status": "passed"
+        },
+        {
+          "name": "[5] enumeration_closed_at",
+          "status": "passed"
+        },
+        {
+          "name": "[6] sealed_at",
+          "status": "passed"
+        },
+        {
+          "name": "[7] acknowledged_revision",
+          "status": "passed"
+        },
+        {
+          "name": "invalid acknowledged evidence blocks aged recorded job cleanup atomically",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/RecordedWalkIssuedClaimsTest.java",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/RecordedWalkIssuedClaimsTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:e330dd8124f8e1ced5080c4094aee3eb887a6649e17fc07eeefc56f851007a00",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "missingProgressDoesNotEraseAStillIssuedOwner()",
+          "status": "passed"
+        },
+        {
+          "name": "revocationRaceRetainsTheClaimCapturedBeforeRevocation()",
+          "status": "passed"
+        },
+        {
+          "name": "pendingRowsAreNotOwnersAndOnlyRecordedEpochClaimsCount()",
+          "status": "passed"
+        },
+        {
+          "name": "closedQueueRejectsTheOwnershipRead()",
+          "status": "passed"
+        },
+        {
+          "name": "reopenedProcessingRowsHaveNoProcessLocalIssuedOwner()",
+          "status": "passed"
+        },
+        {
+          "name": "failedTerminalTransactionRetainsTheIssuedOwnerUntilCommitSucceeds()",
+          "status": "passed"
+        },
+        {
+          "name": "commitAndReturnReleaseOnlyTheExactIssuedOwner()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/RecordedWalkSealTest.java",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/RecordedWalkSealTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:1ba1874920f473d9fd873d6a47a48c1fa2db0d6341c85fa7e31cc19c91a67c8e",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "completeEmptyWalkSealsAndDuplicateReturnsImmutableReceipt()",
+          "status": "passed"
+        },
+        {
+          "name": "closedFailedCallbackCannotLeaveDeferredOrRetryableMemberPending()",
+          "status": "passed"
+        },
+        {
+          "name": "failedAndCancelledOrphanRecoveryBecomesTerminalSkip()",
+          "status": "passed"
+        },
+        {
+          "name": "receiptSortsAndTruncatesMoreThanOneHundredCurrentFailureHashes()",
+          "status": "passed"
+        },
+        {
+          "name": "failedAndCancelledClosureSkipsUnissuedAndIssuedReturnsBeforeSeal()",
+          "status": "passed"
+        },
+        {
+          "name": "administrativeClearKeepsUnsealedMemberAsTerminalSkip()",
+          "status": "passed"
+        },
+        {
+          "name": "sealedUnacknowledgedWalkSurvivesAdministrativeAndAgeCleanup()",
+          "status": "passed"
+        },
+        {
+          "name": "completeRetiresUnseenMemberWithoutRewritingIssuedObjectOrEffectHistory()",
+          "status": "passed"
+        },
+        {
+          "name": "maintenancePreflightSealsReadyWalkBeforeReplacementAdmission()",
+          "status": "passed"
+        },
+        {
+          "name": "mismatchingLedgerIdentityCoverageOrContentRefusesReceiptSeal()",
+          "status": "passed"
+        },
+        {
+          "name": "missingProgressAndMissingCurrentCoverageRefuseToSeal()",
+          "status": "passed"
+        },
+        {
+          "name": "administrativeSkipLateIndexedRollbackRetainsOwnerAndBlocksSeal()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/registry/executor/RecordedIngestRecoveryDecisionTest.java",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/registry/executor/RecordedIngestRecoveryDecisionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:3651b81db071541781a7cfd257952090d16e25ab89834b7d915f3c49646a7112",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "generationReadinessWaitsOnlyForAbsenceAndRefusesDifferentGeneration(Path)",
+          "status": "passed"
+        },
+        {
+          "name": "falseNullAndThrowingCapabilitiesWaitBeforeTrueAuthorizes(Path)",
+          "status": "passed"
+        },
+        {
+          "name": "hardStopRefusesLowAutoAndGrantIssuedAfterEngage(Path)",
+          "status": "passed"
+        },
+        {
+          "name": "reindexLowAutoWaitsForWorkerAndAuthorizesWhenWorkerIsOnline(Path)",
+          "status": "passed"
+        },
+        {
+          "name": "preparedBulkContinuationCannotAuthorizeOrdinaryIngestRecovery(Path)",
+          "status": "passed"
+        },
+        {
+          "name": "structuralAutoIsRefusedWhenFrozenEffectIsOutOfRoot(Path)",
+          "status": "passed"
+        },
+        {
+          "name": "permanentAuthorityRefusalWinsOverAbsentGenerationAndUnavailableCapability(Path)",
+          "status": "passed"
+        },
+        {
+          "name": "trustedStructuralAutoIngestAuthorizesTheExactFrozenPlan(Path)",
+          "status": "passed"
+        },
+        {
+          "name": "bindingFailuresRefuseContradictorySourceMissingBasisMalformedBasisBadPayloadAndIdentity(Path)",
+          "status": "passed"
+        },
+        {
+          "name": "unregisteredPluginTransportCannotUseTheUntrustedFallback(Path)",
+          "status": "passed"
+        },
+        {
+          "name": "ephemeralCapsuleBasisRefusesRestartEvenWhenCurrentGateIsAuto(Path)",
+          "status": "passed"
+        },
+        {
+          "name": "previouslyAutoMediumIngestRefusesWhenCurrentSourceIsUntrusted(Path)",
+          "status": "passed"
+        },
+        {
+          "name": "exactOperationGrantCannotBeReplacedByFamilyGrantAfterRevoke(Path)",
+          "status": "passed"
+        },
+        {
+          "name": "exactFamilyGrantCannotBeReplacedByOperationGrantAfterRevoke(Path)",
+          "status": "passed"
+        },
+        {
+          "name": "revokedOperationGrantCannotFallBackToCurrentUntrustedAuto(Path)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-observability/src/test/java/io/justsearch/app/observability/operations/SqliteOperationStoreTest.java",
+      "file": "modules/app-observability/src/test/java/io/justsearch/app/observability/operations/SqliteOperationStoreTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:7a2ed688cf4c29c28a88395041e8bf4382de5f29ccf10b02f796623a905e6a96",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "haltAfterAcceptanceBeforeFirstEffectLeavesAcceptedRowAndEmptyEffectStore()",
+          "status": "passed"
+        },
+        {
+          "name": "RF55V5SemanticMigrationAdvancesVersionAndPreservesExistingRowsAndSequence()",
+          "status": "passed"
+        },
+        {
+          "name": "orphanedWalCannotBeAppliedToFreshStoreAfterQuarantineInterruption()",
+          "status": "passed"
+        },
+        {
+          "name": "[1] quarantine-directory",
+          "status": "passed"
+        },
+        {
+          "name": "[2] quarantine-operations.db",
+          "status": "passed"
+        },
+        {
+          "name": "[3] quarantine-operations.db-wal",
+          "status": "passed"
+        },
+        {
+          "name": "[4] quarantine-operations.db-shm",
+          "status": "passed"
+        },
+        {
+          "name": "[5] quarantine-finalized",
+          "status": "passed"
+        },
+        {
+          "name": "[6] before-schema-commit",
+          "status": "passed"
+        },
+        {
+          "name": "interruptedQuarantineCannotResetTheHistoryFence(quarantine-directory)",
+          "status": "passed"
+        },
+        {
+          "name": "interruptedQuarantineCannotResetTheHistoryFence(quarantine-operations.db)",
+          "status": "passed"
+        },
+        {
+          "name": "interruptedQuarantineCannotResetTheHistoryFence(quarantine-operations.db-wal)",
+          "status": "passed"
+        },
+        {
+          "name": "interruptedQuarantineCannotResetTheHistoryFence(quarantine-operations.db-shm)",
+          "status": "passed"
+        },
+        {
+          "name": "interruptedQuarantineCannotResetTheHistoryFence(quarantine-finalized)",
+          "status": "passed"
+        },
+        {
+          "name": "interruptedQuarantineCannotResetTheHistoryFence(before-schema-commit)",
+          "status": "passed"
+        },
+        {
+          "name": "[1] before-accept",
+          "status": "passed"
+        },
+        {
+          "name": "[2] after-first-effect",
+          "status": "passed"
+        },
+        {
+          "name": "futureSchemaIsRefusedWithoutChangingDatabaseBytes()",
+          "status": "passed"
+        },
+        {
+          "name": "futureVersionInUncheckpointedWalIsAlsoRefused()",
+          "status": "passed"
+        },
+        {
+          "name": "freshStoreHasIndependentVersionAndSingletonFenceAndReopens()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-engine/src/test/java/io/justsearch/app/engine/RecordedIngestionCoordinatorTest.java#dispatchesAcceptedWatchedReindexThroughMembershipFencedProducer",
+      "file": "modules/app-engine/src/test/java/io/justsearch/app/engine/RecordedIngestionCoordinatorTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:2460109e2493eb91bd97e1d4388310128ef7562c9f94fff7037ddcc8ea0f114e",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "dispatchesAcceptedWatchedReindexThroughMembershipFencedProducer(boolean) [1] false",
+          "status": "passed"
+        },
+        {
+          "name": "dispatchesAcceptedWatchedReindexThroughMembershipFencedProducer(boolean) [2] true",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-engine/src/test/java/io/justsearch/app/engine/RecordedIngestionCoordinatorTest.java#gatedImportPublishesItsParentOriginOnAllRowsIncludingReopenedReplay",
+      "file": "modules/app-engine/src/test/java/io/justsearch/app/engine/RecordedIngestionCoordinatorTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:2460109e2493eb91bd97e1d4388310128ef7562c9f94fff7037ddcc8ea0f114e",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "gatedImportPublishesItsParentOriginOnAllRowsIncludingReopenedReplay(boolean) [1] false",
+          "status": "passed"
+        },
+        {
+          "name": "gatedImportPublishesItsParentOriginOnAllRowsIncludingReopenedReplay(boolean) [2] true",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:24ce6bbcc34ba25ac71e27a6f5bdef6ccc45e889c1e9823e25ae24cf11f0eed7"
+}

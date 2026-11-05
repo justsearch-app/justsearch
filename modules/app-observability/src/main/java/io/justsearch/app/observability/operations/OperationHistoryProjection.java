@@ -16,6 +16,18 @@ import java.util.Optional;
 public final class OperationHistoryProjection {
   private OperationHistoryProjection() {}
 
+  /**
+   * L1 — the folder a completed removal removed, from its durable receipt; empty for every other
+   * row and for receipts written before the field existed. Deliberately not part of the
+   * metadata-only history entry (the history wire never carries arguments): only the action
+   * ledger carries it, to the windows that offer "Add <folder> again".
+   */
+  public static Optional<io.justsearch.app.api.operations.OperationReceipt.RemovedFolder> removedFolder(
+      OperationHistoryRow row) {
+    if (row.state() != OperationState.COMPLETE || row.historyMode() == OperationHistoryMode.UNDO) return Optional.empty();
+    return Optional.ofNullable(row.receipt()).map(io.justsearch.app.api.operations.OperationReceipt::removedFolder);
+  }
+
   public static OperationHistoryEntry entry(OperationHistoryRow row) {
     boolean success = row.state() == OperationState.COMPLETE;
     OperationOutcome outcome = success

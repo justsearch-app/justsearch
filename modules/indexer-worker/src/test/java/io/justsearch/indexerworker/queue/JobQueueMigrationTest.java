@@ -143,7 +143,7 @@ final class JobQueueMigrationTest {
         var statement = connection.createStatement()) {
       try (ResultSet rs = statement.executeQuery("PRAGMA user_version")) {
         assertTrue(rs.next());
-        assertEquals(27, rs.getInt(1),
+        assertEquals(28, rs.getInt(1),
             "a V" + version + " queue must reach V27 so older readers refuse unsupported origin storage");
       }
       statement.execute("INSERT INTO switch_buffer "
@@ -1119,7 +1119,7 @@ final class JobQueueMigrationTest {
         assertTrue(rs.next());
         assertEquals(SqliteSchema.TARGET_VERSION, rs.getInt(1));
       }
-      assertEquals(27, SqliteSchema.TARGET_VERSION);
+      assertEquals(28, SqliteSchema.TARGET_VERSION);
       assertTrue(hasTable(stmt, "document_identity_import"));
       List<String> columns = new java.util.ArrayList<>();
       try (ResultSet rs = stmt.executeQuery("PRAGMA table_info(document_identity_import)")) {

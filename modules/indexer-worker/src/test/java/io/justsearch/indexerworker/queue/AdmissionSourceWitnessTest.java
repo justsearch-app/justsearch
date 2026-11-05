@@ -19,9 +19,14 @@ final class AdmissionSourceWitnessTest {
     Path file = Files.writeString(temporary.resolve("source.txt"), "source");
     try (var queue = new SqliteJobQueue(temporary.resolve("queue.db"))) {
       queue.open();
-      var observe = SqliteJobQueue.class.getDeclaredMethod("observeAdmissionSource", JobQueue.EnqueueEntry.class);
+      java.lang.reflect.Method observe;
+      try {
+        observe = SqliteJobQueue.class.getDeclaredMethod("observeAdmissionSource", JobQueue.EnqueueEntry.class, String.class);
+      } catch (NoSuchMethodException beforeBoundaryContext) {
+        observe = SqliteJobQueue.class.getDeclaredMethod("observeAdmissionSource", JobQueue.EnqueueEntry.class);
+      }
       observe.setAccessible(true);
-      Object source = observe.invoke(queue, new JobQueue.EnqueueEntry(file, Files.size(file), null, null, temporary));
+      Object source = observe(observe, queue, new JobQueue.EnqueueEntry(file, Files.size(file), null, null, temporary));
       assertNotNull(source);
       var witness = source.getClass().getDeclaredMethod("witness");
       witness.setAccessible(true);
@@ -49,11 +54,16 @@ final class AdmissionSourceWitnessTest {
           }
           return result;
         })) {
-          assertNull(observe.invoke(queue,
+          assertNull(observe(observe, queue,
               new JobQueue.EnqueueEntry(file, Files.size(file), null, null, temporary)),
               "the queue witness must bracket its real hash: " + timing);
         }
       }
     }
+  }
+
+  private static Object observe(java.lang.reflect.Method method, SqliteJobQueue queue,
+      JobQueue.EnqueueEntry entry) throws ReflectiveOperationException {
+    return method.invoke(queue, method.getParameterCount() == 1 ? new Object[] {entry} : new Object[] {entry, null});
   }
 }

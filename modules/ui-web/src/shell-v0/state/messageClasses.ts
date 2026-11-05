@@ -86,6 +86,10 @@ export const LOCAL_MESSAGE_CLASSES = {
     defaultSeverity: 'error',
     locality: 'window',
   },
+  // DE6 — a real reversal of the person's own action ("Skip rule added · Undo", "Removed Notes · Add
+  // Notes again") and its outcome (`state/ownReversals.ts`). No supersede: each offer stays in Earlier
+  // while it can still run; tone is per message.
+  'core.own-action': { renderHint: 'EPHEMERAL', supersede: false, locality: 'window' },
   // Admission control paused a request before execution; only the latest wait notice matters.
   'core.engine.wait': {
     renderHint: 'EPHEMERAL',

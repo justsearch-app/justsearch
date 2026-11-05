@@ -170,7 +170,8 @@ empty sections:
 - **Running:** indexing and enrichment, rebuilds, AI downloads, operations and background
   tasks, with progress and controls where available.
 - **Earlier:** action feedback, advisories and completed work, with details, read/unread
-  state and Mark all read. Reversal actions appear only where supported.
+  state and Mark all read. Reversal actions appear only where a real reversal exists and
+  only while it can still run (see [Confirming and undoing](#confirming-and-undoing)).
 
 Plugin status items render in a separate plugin row. The first item always shows,
 wrapping inside the row; further items that do not fit collect under “… N more”. The footer links to Activity (“All activity”) and Health. An empty panel says
@@ -186,6 +187,52 @@ Needs you; it joins Earlier once answered, expired or withdrawn. Status
 transitions and action feedback are announced to screen readers. The panel updates
 while open, preserving expanded details; switching windows closes it. The Help surface
 supplies keyboard guidance.
+
+#### Confirming and undoing
+
+Reversible beats confirmed. The person's own risky actions follow three tiers:
+
+- **Undo, where a real reversal exists.** A saved skip-rule change can be saved back as it
+  was, and a removed folder can be added again (its files are read again). The pill shows
+  the notice with its action (“Skip rule added · Undo”, “Removed Notes from your library ·
+  Add Notes again”) for a few seconds, held while the pill or the action is hovered or
+  focused; the notice stays in Earlier, and in System › Activity, with its action while the
+  reversal can still run. Ctrl+Z runs the notice's reversal while it shows and afterwards
+  runs the latest reversal still possible, unless the Effect Journal holds a newer
+  reversible effect (`state/ownReversals.ts`). A reversal runs at most once at a time and
+  never after it succeeded. If the world changed since (the settings were saved again
+  elsewhere, the folder is already back), the reversal closes and says why instead of
+  overwriting that change. Undo is never offered where nothing would be reversed. Ctrl+Z
+  keeps its text-editing meaning inside text fields and does nothing during input-method
+  composition, on key repeat or while a dialog owns the keyboard.
+- **In-place confirmation, where there is no reversal.** Removing a folder, removing
+  documents added by other apps, cancelling a rebuild, deleting a custom theme, revoking a
+  plugin, clearing failed jobs, rebuilding and resetting settings ask in a band under the
+  item (`components/ConfirmBand.ts`): one consequence sentence (what changes, what stays,
+  undo or not), a danger button named with the verb and object (“Remove Notes”) and
+  “Keep it”. Focus moves to “Keep it”; Escape or “Keep it” cancels and returns focus to the
+  control that asked. The verb answers once: a double-click or an auto-repeating key cannot
+  run the action twice. Catalog operations with an inline confirmation use the same band,
+  with a consequence sentence per operation.
+- **Typed confirmation in a dialog, for wide, irreversible acts.** Delete all local data,
+  applying exclusions to the index, forgetting an exact item and typed operation approvals
+  show the exact phrase to type. Delete all local data is a centred dialog that says who
+  asked, what is deleted, what stays and that it cannot be undone, with Cancel on the left
+  and the verb on the right; its statechart (`CONFIRM_CEREMONY`) remains the presentation
+  seam.
+
+Pausing an AI download no longer asks: everything downloaded is kept and installing again
+resumes, and a notice says so. Repairing an AI installation keeps its dialog because it
+discloses download size and licences, but it is not drawn as a danger dialog. An undo
+preview (Undo all AI actions, Restore to here, Undo this turn) executes exactly the
+previewed entries, not ones recorded after the preview was drawn, and says how many actions
+in its scope cannot be undone.
+
+After a folder is removed, every window offers “Add <folder> again” in Earlier, including
+after a reload: the engine's removal record keeps the removed folder's path (and its
+collection), and the action ledger carries it. Removal records written before this field
+existed still read, without the offer. The offer is not shown while the folder is watched
+again, and the window that removed the folder shows its own notice instead of a second row.
 
 #### Requests from agents and other apps
 
@@ -344,6 +391,7 @@ another theme.
   `Highlight` that the other tabs do not have.
 - **Semantics:** use the roles the actual controls implement. Current result containers
   use `list` / `listitem`, and shared menus use `menu` / `menuitem`.
-- **Destructive actions:** require a confirmation before destructive work. Settings'
-  Delete all data flow includes a typed DELETE confirmation; operation controls follow
-  their declared confirmation policy.
+- **Destructive actions:** offer Undo where a real reversal exists, confirm in place where
+  it does not, and type a phrase only for wide, irreversible acts (see
+  [Confirming and undoing](#confirming-and-undoing)). Confirmations say the consequence and
+  name the verb on the button; they never ask “Are you sure?” or answer “OK” or “Confirm”.

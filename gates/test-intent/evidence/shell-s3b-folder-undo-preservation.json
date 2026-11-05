@@ -1,0 +1,46 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
+  },
+  "createdAt": "2026-11-05T09:32:22.082Z",
+  "revision": "a279e9812fd4e6d9e923effc528929d7d117fa8c",
+  "tree": "b7a9bbbf675b991abd03bb14ab62618c3835a3f7",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/chrome/Shell.folderUndo.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/xdm2xvul/tmp/test-intent-vitest-228-1793871138592.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 3488
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/chrome/Shell.folderUndo.test.ts#a failed re-add reports the failure in the status pill",
+      "file": "modules/ui-web/src/shell-v0/chrome/Shell.folderUndo.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:3c4732be82fcd0ed0c03065cbf12bec025f0dc3fa857b5aead303f682c82c1f7",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "a failed re-add reports the failure in the status pill",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:a43d16dc7d50dd44b40764b9adb050cd06d14ecde81d0188ad6b05efb6346b79"
+}

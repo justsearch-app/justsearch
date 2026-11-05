@@ -21,7 +21,7 @@ import { emitEphemeralToast } from './advisory/ephemeralToast.js';
 import type { MultiplexedStream } from '../streaming/MultiplexedStream.js';
 import './StatusBadge.js';
 import './SystemNotice.js';
-import { transientPlacement, STATUS_REVIEW_EVENT, type StatusAction } from '../state/frameStatus.js';
+import { transientPlacement, toastActionAvailable, folderName, STATUS_REVIEW_EVENT, type StatusAction } from '../state/frameStatus.js';
 import type { AdvisoryStore, AdvisoryRecord } from './advisory/AdvisoryStore.js';
 import type { AuthorizationHost } from './AuthorizationHost.js';
 import './StatusPanel.js';
@@ -230,6 +230,7 @@ export class StatusPill extends JfElement {
       finally { this.executing.delete('install'); }
       return;
     }
+    if (action.kind === 'add-folder-again') { await this.addFolderAgain(action); return; }
     if (action.kind === 'plugin-copy') { await this.status.copyPluginError(action.target); return; }
     if (action.kind === 'dismiss-plugin') { this.status.dismissPluginError(action.target); return; }
     if (action.kind === 'cancel-task') { cancelTask(action.target); return; }
@@ -279,6 +280,26 @@ export class StatusPill extends JfElement {
     } catch (error) { emitEphemeralToast({ message: `Action failed: ${error instanceof Error ? error.message : String(error)}`, severity: 'error' }); }
     finally { this.executing.delete(action.target); }
   }
+  /**
+   * L1 — add a removed folder back from its removal record (any window, after a reload). Once per
+   * path at a time; the outcome is said in the pill and Earlier, and a refusal (the folder is already
+   * back, or gone from disk) is reported rather than dropped.
+   */
+  private async addFolderAgain(action: StatusAction): Promise<void> {
+    const key = `add-folder:${action.target}`;
+    if (this.executing.has(key)) return;
+    this.executing.add(key);
+    const name = folderName(action.target);
+    try {
+      const result = await getOperationClient(this.apiBase).invokeWithConsent('core.add-watched-root',
+        { args: { path: action.target, ...(action.collection ? { collection: action.collection } : {}) }, transport: 'BUTTON' },
+        { requestConsent: requestAuthorization });
+      if (!result.success) throw new Error(result.message || 'Add refused');
+      emitEphemeralToast({ message: `Added ${name} again. Reading its files.`, severity: 'success' });
+    } catch (error) {
+      emitEphemeralToast({ message: `Could not add ${name} again. ${error instanceof Error ? error.message : String(error)}`, severity: 'error' });
+    } finally { this.executing.delete(key); }
+  }
   /** Same label the panel's Earlier row uses for this record: an unlabelled action is not claimed as an undo. */
   private transientActionLabel(record: AdvisoryRecord): string { return record.toast?.actionLabel ?? 'Review'; }
   /**
@@ -287,8 +308,8 @@ export class StatusPill extends JfElement {
    */
   undoNotice(): boolean {
     const record = this.status.snapshot.advisories.find(row => row.key === this.status.transientKey);
-    if (!record?.toast?.onAction || this.transientActionLabel(record) !== 'Undo') return false;
-    void this.act({ kind: 'advisory', target: record.key, label: 'Undo' });
+    if (!record?.toast?.reversal || !toastActionAvailable(record)) return false;
+    void this.act({ kind: 'advisory', target: record.key, label: this.transientActionLabel(record) });
     return true;
   }
   override render() {
@@ -311,7 +332,9 @@ export class StatusPill extends JfElement {
         : html`<span class="symbol" aria-hidden="true">${symbols[pill.kind]}</span>`;
     const text = transient?.toast?.message ?? (pill.kind === 'needs' && pill.count != null ? (pill.count === 1 ? 'Needs you' : 'Need you') : pill.label);
     const shown = transient ?? beside;
-    const undo = shown?.toast?.onAction && this.transientActionLabel(shown) === 'Undo';
+    // DE6 — the notice's action shows while it can still run; a real reversal carries the Ctrl+Z hint.
+    const action = shown && toastActionAvailable(shown) ? shown : undefined;
+    const undo = action?.toast?.reversal === true;
     return html`<button type="button" class="trigger ${transient ? 'notice' : pill.kind} ${pill.stale ? 'stale' : ''}"
       aria-label=${label} aria-expanded=${this.open} aria-haspopup="dialog" title="What's going on · Ctrl+Shift+S"
       @click=${() => this.toggle()} @mouseenter=${() => this.status.pauseTransient(true)} @mouseleave=${() => this.status.pauseTransient(false)}
@@ -321,8 +344,8 @@ export class StatusPill extends JfElement {
       ${beside?.toast ? html`<span class="beside-notice" data-testid="status-notice" title=${beside.toast.message} @mouseenter=${() => this.status.pauseTransient(true)}
         @mouseleave=${() => this.status.pauseTransient(false)}>${beside.toast.message}</span>` : nothing}
       ${shown?.toast ? html`<span class="notice-below">${shown.toast.message}</span>` : nothing}
-      ${shown?.toast?.onAction ? html`<button class="transient-action" type="button" @mouseenter=${() => this.status.pauseTransient(true)} @mouseleave=${() => this.status.pauseTransient(false)} @focus=${() => this.status.pauseTransient(true)} @blur=${() => this.status.pauseTransient(false)} @click=${() => this.act({ kind: 'advisory', target: shown.key, label: this.transientActionLabel(shown) })}
-        aria-keyshortcuts=${undo ? 'Control+Z' : nothing}>${this.transientActionLabel(shown)}${undo ? html`<kbd aria-hidden="true">Ctrl+Z</kbd>` : nothing}</button>` : nothing}
+      ${action ? html`<button class="transient-action" type="button" @mouseenter=${() => this.status.pauseTransient(true)} @mouseleave=${() => this.status.pauseTransient(false)} @focus=${() => this.status.pauseTransient(true)} @blur=${() => this.status.pauseTransient(false)} @click=${() => this.act({ kind: 'advisory', target: action.key, label: this.transientActionLabel(action) })}
+        aria-keyshortcuts=${undo ? 'Control+Z' : nothing}>${this.transientActionLabel(action)}${undo ? html`<kbd aria-hidden="true">Ctrl+Z</kbd>` : nothing}</button>` : nothing}
       <div class="overlay" ?hidden=${!this.open} @click=${() => this.close()}></div>
       <jf-status-panel ?hidden=${!this.open} .model=${model} .plugins=${plugins} api-base=${this.apiBase}
         @status-close=${() => this.close()}

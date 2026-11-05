@@ -45,6 +45,9 @@ export function resolveSchema(
  * control renderer) and Layout children (passes the same root
  * schema, dispatches to a layout renderer).
  *
+ * Reuse the mounted child for the same declaration and dispatched tag so data updates
+ * preserve its controls, focus and in-place confirmation state.
+ *
  * Returns null when no renderer matches (caller renders an error
  * fallback).
  */
@@ -56,6 +59,7 @@ export function createChildRenderer(
   enabled: boolean,
   onChange: (value: unknown, path: string) => void,
   userConfig?: RendererUserConfig,
+  previous?: JsonFormsRendererBase | null,
 ): JsonFormsRendererBase | null {
   if ((childUischema as { type?: string }).type === 'Control') {
     const scope = (childUischema as { scope?: string }).scope;
@@ -85,7 +89,8 @@ export function createChildRenderer(
     // Walk the data along the same path
     const propValue = walkDataPath(rootData, childPath);
 
-    const child = document.createElement(tag) as JsonFormsRendererBase;
+    const child = previous?.localName === tag && previous.uischema === childUischema
+      ? previous : document.createElement(tag) as JsonFormsRendererBase;
     child.schema = resolvedSchema;
     child.uischema = childUischema;
     child.path = childPath;
@@ -103,7 +108,8 @@ export function createChildRenderer(
   if (!tag) {
     return null;
   }
-  const child = document.createElement(tag) as JsonFormsRendererBase;
+  const child = previous?.localName === tag && previous.uischema === childUischema
+    ? previous : document.createElement(tag) as JsonFormsRendererBase;
   child.schema = rootSchema;
   child.uischema = childUischema;
   child.path = parentPath;

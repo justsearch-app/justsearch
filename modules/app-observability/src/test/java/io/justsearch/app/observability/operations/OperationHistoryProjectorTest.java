@@ -293,7 +293,7 @@ final class OperationHistoryProjectorTest {
       var ledger = spy(new ActionLedgerChangeRegistry(ActionEventJournal.at(audit)));
       var failed = new CountDownLatch(1);
       doAnswer(call -> { boolean accepted = (boolean) call.callRealMethod(); if (!accepted) failed.countDown(); return accepted; })
-          .when(ledger).persistOperation(any());
+          .when(ledger).persistOperation(any(), any());
       var projector = new OperationHistoryProjector(store, new OperationHistoryStore(store),
           new OperationHistoryChangeRegistry(), ledger, executors);
       try (projector) {

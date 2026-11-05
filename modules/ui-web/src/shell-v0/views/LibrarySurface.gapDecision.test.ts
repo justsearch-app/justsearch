@@ -38,14 +38,26 @@ describe('Library recorded migration gap decision', () => {
     const cancel = Array.from(el.shadowRoot?.querySelectorAll('jf-button') ?? [])
       .find((button) => button.getAttribute('label') === 'Cancel rebuild') as (Element & { onActivate?: () => void }) | undefined;
     expect(cancel).toBeDefined();
+    type Band = HTMLElement & { consequence: string; actionLabel: string; updateComplete: Promise<unknown> };
+    const band = () => el.shadowRoot!.querySelector<Band>('.gap-decision jf-confirm-band');
+    const answer = async (which: 'confirm' | 'keep') => {
+      await band()!.updateComplete;
+      band()!.shadowRoot!.querySelector<HTMLElement & { onActivate(): void }>(`jf-button.${which}`)!.onActivate();
+      await pump(el);
+    };
+    // DE1 — the destructive confirmation is in place, under the rebuild it would stop.
     cancel?.onActivate?.();
     await pump(el);
+    expect(band()!.consequence).toContain('current index stays available');
+    expect(band()!.actionLabel).toBe('Cancel rebuild');
+    await answer('keep');
+    expect(band()).toBeNull();
     expect(invoke).not.toHaveBeenCalled();
     cancel?.onActivate?.();
     await pump(el);
+    await answer('confirm');
 
-    expect(confirm).toHaveBeenCalledWith(expect.stringContaining('current index stays available'),
-      { confirmLabel: 'Cancel rebuild', destructive: true });
+    expect(confirm).not.toHaveBeenCalled();
     expect(invoke).toHaveBeenCalledTimes(1);
     expect(invoke).toHaveBeenCalledWith('core.cancel-reindex',
       { reindexKey: key }, { consented: true });

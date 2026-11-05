@@ -111,7 +111,12 @@ describe('health recovery invocation', () => {
     await button.updateComplete;
     expect(invokeCalls()).toHaveLength(0);
     expect(fetchOp.mock.calls.filter(c => String(c[0]).includes('/authorizations/approve'))).toHaveLength(0);
-    button.shadowRoot!.querySelector<HTMLButtonElement>('.confirm-row button')!.click();
+    // DE1 — the rebuild asks in place; its verb carries the consent through the server gate.
+    const band = button.shadowRoot!.querySelector('jf-confirm-band') as (HTMLElement & { consequence: string; updateComplete: Promise<unknown> }) | null;
+    expect(band).not.toBeNull();
+    await band!.updateComplete;
+    expect(band!.consequence).toContain('Search keeps using the current index');
+    band!.shadowRoot!.querySelector<HTMLElement & { onActivate(): void }>('jf-button.confirm')!.onActivate();
     await vi.waitFor(() => expect(invokeCalls()).toHaveLength(2));
     const approval = fetchOp.mock.calls.find(c => String(c[0]).includes('/authorizations/approve'));
     expect(JSON.parse(String(approval?.[1]?.body)).pendingId).toBe('recovery-pending');

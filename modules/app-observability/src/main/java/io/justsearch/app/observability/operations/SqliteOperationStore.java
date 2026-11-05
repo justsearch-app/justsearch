@@ -296,6 +296,7 @@ public final class SqliteOperationStore implements OperationStore {
         if (version <= 4) {
           OperationSchema.migrateV4(statement);
         }
+        if (version <= 6) OperationSchema.migrateV6(statement);
         // v6 changes the closed kind/recovery interpretation, retaining the existing tables.
         if (version < OperationSchema.VERSION) {
           statement.execute("PRAGMA user_version = " + OperationSchema.VERSION);
@@ -1547,6 +1548,23 @@ public final class SqliteOperationStore implements OperationStore {
 
   @Override
   public long historySinceMillis() { return locked(this::readHistorySince); }
+
+  @Override
+  public java.util.Optional<io.justsearch.app.api.operations.ImportApprovalState> importApprovalState(long id) {
+    return locked(() -> {
+      try (var query = connection.prepareStatement("SELECT active_approval_binding,interruption_revision,"
+          + "interruption_reason FROM operations WHERE id=? AND kind='ingest' AND operation_ref='core.ingest-files'")) {
+        query.setLong(1, id);
+        try (var row = query.executeQuery()) {
+          if (!row.next()) return java.util.Optional.empty();
+          String encoded = row.getString(1);
+          return java.util.Optional.of(new io.justsearch.app.api.operations.ImportApprovalState(
+              encoded == null ? null : io.justsearch.app.api.operations.ImportApprovalBinding.decode(encoded),
+              row.getLong(2), row.getString(3)));
+        }
+      }
+    });
+  }
 
   @Override
   public void pruneHistory() {

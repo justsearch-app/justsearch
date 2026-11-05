@@ -37,6 +37,8 @@ import java.util.Optional;
 import java.util.function.Function;
 import java.time.Clock;
 import java.util.Objects;
+import io.justsearch.core.context.EngineContext;
+import java.util.function.BooleanSupplier;
 import java.util.Set;
 
 /** One preloaded authorization owner shared by recovery and subsequent request handling. */
@@ -157,6 +159,101 @@ public final class OperationAuthority {
       return new RecordedIngestRecoveryDecision.Wait();
     }
     return new RecordedIngestRecoveryDecision.Authorized(plan);
+  }
+
+  /** In-process proof owned by this authority, never reconstructed from persisted SESSION text. */
+  public final class LiveOriginApproval {
+    private final String operationKey;
+    private final String planHash;
+    private final BooleanSupplier acceptedOwnerLive;
+
+    private LiveOriginApproval(String operationKey, String planHash, BooleanSupplier acceptedOwnerLive) {
+      this.operationKey = operationKey;
+      this.planHash = planHash;
+      this.acceptedOwnerLive = acceptedOwnerLive;
+    }
+
+    private OperationAuthority owner() { return OperationAuthority.this; }
+  }
+
+  /**
+   * The accepted runner supplies its live ownership check; this token lives only in that process.
+   * It cannot be issued from an origin row or a recovered session approval.
+   */
+  public LiveOriginApproval liveOriginApproval(OperationRecord accepted, RecordedRootPlan frozenPlan,
+      BooleanSupplier acceptedOwnerLive) {
+    Objects.requireNonNull(acceptedOwnerLive, "acceptedOwnerLive");
+    if (accepted.state() != OperationState.RUNNING || !acceptedOwnerLive.getAsBoolean()
+        || accepted.descriptor().kind() != OperationKind.INGEST
+        || !(ingestPolicyBinding(accepted).basis() instanceof OperationAuthorizationBasis.EphemeralCapsule)) {
+      throw new IllegalArgumentException("No live accepted session owner");
+    }
+    return new LiveOriginApproval(accepted.key(),
+        io.justsearch.app.api.operations.CanonicalOperationArguments.digest(frozenPlan.toReplayPayload()),
+        acceptedOwnerLive);
+  }
+
+  /**
+   * Point-in-time origin evidence primitive, unused by execution until import-resume activation.
+   * This history-independent query proves no permission to continue an open operation.
+   * It proves no generation, physical storage, root membership or execution ownership.
+   */
+  public boolean evaluateOriginApproval(io.justsearch.app.api.indexing.SourceOrigin origin) {
+    return evaluateApproval(origin, null, null);
+  }
+
+  /** Open imports require the parent's active selection, including its interruption latch. */
+  public boolean evaluateImportApproval(io.justsearch.app.api.indexing.SourceOrigin origin,
+      io.justsearch.app.api.operations.ImportApprovalState active, LiveOriginApproval live) {
+    return active != null && evaluateApproval(origin, active, live);
+  }
+
+  private boolean evaluateApproval(io.justsearch.app.api.indexing.SourceOrigin origin,
+      io.justsearch.app.api.operations.ImportApprovalState active, LiveOriginApproval live) {
+    try {
+      if (origin == null || origin.kind() != io.justsearch.app.api.indexing.SourceOrigin.Kind.IMPORT
+          || origin.restartBinding() == null
+          || origin.approval().evidenceSource() != io.justsearch.app.api.indexing.SourceOrigin.EvidenceSource.GATE) return false;
+      var restart = origin.restartBinding();
+      var approval = origin.approval();
+      io.justsearch.app.api.operations.OperationKeys.timestampMillis(approval.operationKey());
+      if (active != null) {
+        var binding = active.binding();
+        if (binding == null || active.interruptionReason() != null
+            || active.interruptionRevision() != binding.interruptionRevision()
+            || !binding.id().equals(restart.bindingId())
+            || !binding.parentOperationKey().equals(approval.operationKey())
+            || !binding.planHash().equals(restart.planHash())) return false;
+      }
+      Operation operation = agentOperations.findByIdValue(approval.producingOperationId()).orElseThrow();
+      if (!AgentToolsOperationCatalog.INGEST_FILES.equals(operation.id())) return false;
+      TransportTag transport = TransportTag.valueOf(approval.transport());
+      if (sources.findByTransport(transport).isEmpty()) return false;
+      EngineContext context = new EngineContext(EngineContext.ClientKind.valueOf(approval.clientKind()),
+          "origin-approval", Optional.empty(), Optional.ofNullable(approval.authorizationBasis()),
+          approval.sourceTier(), approval.transport(), EngineContext.Survival.DURABLE,
+          EngineContext.Urgency.BACKGROUND);
+      EngineProvenance.sourceTier(context);
+      var verdict = evaluator.evaluate(operation.policy().risk(), transport);
+      if (verdict.gateBehavior() == GateBehavior.DENY) return false;
+      return switch (OperationAuthorizationBasis.decode(approval.authorizationBasis())) {
+        case OperationAuthorizationBasis.StructuralAuto ignored -> verdict.gateBehavior() == GateBehavior.AUTO;
+        case OperationAuthorizationBasis.PreparedContinuation ignored -> false;
+        case OperationAuthorizationBasis.EphemeralCapsule ignored -> live != null
+            && live.owner() == this && live.operationKey.equals(approval.operationKey())
+            && live.planHash.equals(restart.planHash()) && live.acceptedOwnerLive.getAsBoolean();
+        case OperationAuthorizationBasis.OperationGrant grant -> grants.isAllowed(
+            new DurableGrantStore.DurableGrant(DurableGrantStore.GrantKind.OPERATION,
+                grant.target(), grant.sourceTier()), operation.id().value(),
+            operation.policy().capabilityFamily(), operation.policy().risk(), context);
+        case OperationAuthorizationBasis.FamilyGrant grant -> grants.isAllowed(
+            new DurableGrantStore.DurableGrant(DurableGrantStore.GrantKind.FAMILY,
+                grant.target(), grant.sourceTier()), operation.id().value(),
+            operation.policy().capabilityFamily(), operation.policy().risk(), context);
+      };
+    } catch (RuntimeException malformed) {
+      return false;
+    }
   }
 
   /**

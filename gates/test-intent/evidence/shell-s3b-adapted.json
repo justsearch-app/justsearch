@@ -1,0 +1,502 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
+  },
+  "createdAt": "2026-11-05T09:07:09.895Z",
+  "revision": "a42d2cbed2cc46990f7872bef8715cd07e26eb80",
+  "tree": "ec1bcee14a548e533670cd4fc402a06e467f131d",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": "openjdk version \"25.0.4.1\" 2026-08-18 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "./gradlew :modules:app-observability:test --tests \"io.justsearch.app.observability.operations.OperationHistoryProjectorTest.realTimerRetriesARepairedSinkWithoutAnotherCompletion\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 7287
+    },
+    {
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/LibrarySurface.folderActions.test.ts\" \"src/shell-v0/views/LibrarySurface.otherSources.test.ts\" \"src/shell-v0/views/LibrarySurface.gapDecision.test.ts\" \"src/shell-v0/views/LibrarySurface.bulkOutcome.test.ts\" \"src/shell-v0/views/BulkOperationImmediateRefusal.test.ts\" \"src/shell-v0/views/HealthSurface.recovery.test.ts\" \"src/shell-v0/views/SettingsSurface.settingsRecovery.test.ts\" \"src/shell-v0/views/SettingsSurface.dataReset.test.ts\" \"src/shell-v0/components/ActionButton.render.test.ts\" \"src/shell-v0/components/StatusPill.design.test.ts\" \"src/shell-v0/chrome/Shell.status.test.ts\" \"src/shell-v0/views/BrainSurface.repairRun.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/o40bh6xh/tmp/test-intent-vitest-63399-1793869592817.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 37075
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/views/LibrarySurface.folderActions.test.ts#exposes row removal progress, suppresses repeats and keeps the other row usable",
+      "file": "modules/ui-web/src/shell-v0/views/LibrarySurface.folderActions.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:af47670d264fe0543a7f96624637237cea7c88310095f69d9abaae494401b832",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "exposes row removal progress, suppresses repeats and keeps the other row usable",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/LibrarySurface.folderActions.test.ts#R3 a completed removal offers to add the same folder again, once, with its plain consequence",
+      "file": "modules/ui-web/src/shell-v0/views/LibrarySurface.folderActions.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:af47670d264fe0543a7f96624637237cea7c88310095f69d9abaae494401b832",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "R3 a completed removal offers to add the same folder again, once, with its plain consequence",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/LibrarySurface.folderActions.test.ts#R3 a failed add-again says so and can be tried again",
+      "file": "modules/ui-web/src/shell-v0/views/LibrarySurface.folderActions.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:af47670d264fe0543a7f96624637237cea7c88310095f69d9abaae494401b832",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "R3 a failed add-again says so and can be tried again",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/LibrarySurface.folderActions.test.ts#a refused removal retains the row, explains retry without a live-watch claim, and retries",
+      "file": "modules/ui-web/src/shell-v0/views/LibrarySurface.folderActions.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:af47670d264fe0543a7f96624637237cea7c88310095f69d9abaae494401b832",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "a refused removal retains the row, explains retry without a live-watch claim, and retries",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/LibrarySurface.folderActions.test.ts#reconciles an uncertain removal response with current roots (NETWORK_ERROR)",
+      "file": "modules/ui-web/src/shell-v0/views/LibrarySurface.folderActions.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:af47670d264fe0543a7f96624637237cea7c88310095f69d9abaae494401b832",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "reconciles an uncertain removal response with current roots (NETWORK_ERROR)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/LibrarySurface.folderActions.test.ts#reconciles an uncertain removal response with current roots (SERIALIZATION_ERROR)",
+      "file": "modules/ui-web/src/shell-v0/views/LibrarySurface.folderActions.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:af47670d264fe0543a7f96624637237cea7c88310095f69d9abaae494401b832",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "reconciles an uncertain removal response with current roots (SERIALIZATION_ERROR)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/LibrarySurface.folderActions.test.ts#reconciles an uncertain removal response with current roots (HANDLER_FAILURE)",
+      "file": "modules/ui-web/src/shell-v0/views/LibrarySurface.folderActions.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:af47670d264fe0543a7f96624637237cea7c88310095f69d9abaae494401b832",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "reconciles an uncertain removal response with current roots (HANDLER_FAILURE)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/LibrarySurface.folderActions.test.ts#ignores an old removal response after returning and reads the current roots",
+      "file": "modules/ui-web/src/shell-v0/views/LibrarySurface.folderActions.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:af47670d264fe0543a7f96624637237cea7c88310095f69d9abaae494401b832",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "ignores an old removal response after returning and reads the current roots",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/LibrarySurface.folderActions.test.ts#names legacy inner folders and ancestor coverage in Remove confirmations",
+      "file": "modules/ui-web/src/shell-v0/views/LibrarySurface.folderActions.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:af47670d264fe0543a7f96624637237cea7c88310095f69d9abaae494401b832",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "names legacy inner folders and ancestor coverage in Remove confirmations",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/LibrarySurface.otherSources.test.ts#confirms first, then issues the DELETE for that collection",
+      "file": "modules/ui-web/src/shell-v0/views/LibrarySurface.otherSources.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:5e52f13eab50b9e244cba763e6c8b235f9e825bde32d01326f14893b089b9fdb",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "LibrarySurface — \"Other sources\" section (811 C-2a) confirms first, then issues the DELETE for that collection",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/LibrarySurface.otherSources.test.ts#issues nothing when the confirm is declined",
+      "file": "modules/ui-web/src/shell-v0/views/LibrarySurface.otherSources.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:5e52f13eab50b9e244cba763e6c8b235f9e825bde32d01326f14893b089b9fdb",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "LibrarySurface — \"Other sources\" section (811 C-2a) issues nothing when the confirm is declined",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/LibrarySurface.gapDecision.test.ts#offers exact-key cancellation during a rebuild only after destructive confirmation",
+      "file": "modules/ui-web/src/shell-v0/views/LibrarySurface.gapDecision.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:d45de5aee0b886dac5ccbb509bcfd5c59819042f62813c235c2497efbad3818e",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Library recorded migration gap decision offers exact-key cancellation during a rebuild only after destructive confirmation",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/LibrarySurface.bulkOutcome.test.ts#Library shows the terminal cancel outcome with its code",
+      "file": "modules/ui-web/src/shell-v0/views/LibrarySurface.bulkOutcome.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:144837160e92ce9905df919a6a9acc90c61fe9678431f38079774db2a85d50cc",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Library shows the terminal cancel outcome with its code",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/BulkOperationImmediateRefusal.test.ts#Library cancel keeps an immediate decision refusal code",
+      "file": "modules/ui-web/src/shell-v0/views/BulkOperationImmediateRefusal.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:452fd8df9d60f81d56a7eb3a0f1ae55ca160647222ca7a48688889d37899b68a",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Library cancel keeps an immediate decision refusal code",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/BulkOperationImmediateRefusal.test.ts#health shows an immediate refusal and a later failure after retry through its real control",
+      "file": "modules/ui-web/src/shell-v0/views/BulkOperationImmediateRefusal.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:452fd8df9d60f81d56a7eb3a0f1ae55ca160647222ca7a48688889d37899b68a",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "health shows an immediate refusal and a later failure after retry through its real control",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/BulkOperationImmediateRefusal.test.ts#brain shows an immediate refusal and a later failure after retry through its real control",
+      "file": "modules/ui-web/src/shell-v0/views/BulkOperationImmediateRefusal.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:452fd8df9d60f81d56a7eb3a0f1ae55ca160647222ca7a48688889d37899b68a",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "brain shows an immediate refusal and a later failure after retry through its real control",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/BulkOperationImmediateRefusal.test.ts#health-recommended shows an immediate refusal and a later failure after retry through its real control",
+      "file": "modules/ui-web/src/shell-v0/views/BulkOperationImmediateRefusal.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:452fd8df9d60f81d56a7eb3a0f1ae55ca160647222ca7a48688889d37899b68a",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "health-recommended shows an immediate refusal and a later failure after retry through its real control",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/HealthSurface.recovery.test.ts#HIGH rebuild waits for inline confirmation and carries consent through the server gate",
+      "file": "modules/ui-web/src/shell-v0/views/HealthSurface.recovery.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:24d237288c3ce2d1131fe3a9776bf7c5d1dbc1947845bf7084fceb1a2ec07d5d",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "health recovery invocation HIGH rebuild waits for inline confirmation and carries consent through the server gate",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/SettingsSurface.settingsRecovery.test.ts#R1 R4 preserves confirmation and Yes focus through stale polling and a status gap (USER)",
+      "file": "modules/ui-web/src/shell-v0/views/SettingsSurface.settingsRecovery.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:c2f3ccc08173c1b2521da445c06a67cca566effe29b1e6849e607d0eac89fd54",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "CR37c settings recovery R1 R4 preserves confirmation and Yes focus through stale polling and a status gap (USER)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/SettingsSurface.settingsRecovery.test.ts#R1 preserves confirmation, cancellation, errors and successful reset handling in User tier",
+      "file": "modules/ui-web/src/shell-v0/views/SettingsSurface.settingsRecovery.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:c2f3ccc08173c1b2521da445c06a67cca566effe29b1e6849e607d0eac89fd54",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "CR37c settings recovery R1 preserves confirmation, cancellation, errors and successful reset handling in User tier",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/SettingsSurface.settingsRecovery.test.ts#R1 R3 restores focus when pending confirmation blurs before the recovery hold clears",
+      "file": "modules/ui-web/src/shell-v0/views/SettingsSurface.settingsRecovery.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:c2f3ccc08173c1b2521da445c06a67cca566effe29b1e6849e607d0eac89fd54",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "CR37c settings recovery R1 R3 restores focus when pending confirmation blurs before the recovery hold clears",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/SettingsSurface.dataReset.test.ts#RS2 Cancel and an incomplete typed confirmation never invoke deletion",
+      "file": "modules/ui-web/src/shell-v0/views/SettingsSurface.dataReset.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:48ca2513f68ec0b88cd5b4d13c1e8d83a0cb5f2bfd5009640674033357b86a66",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "WP5.1 Settings reset RS2 Cancel and an incomplete typed confirmation never invoke deletion",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/SettingsSurface.dataReset.test.ts#RS3 typed confirmation sends the issued token once and describes automatic restart",
+      "file": "modules/ui-web/src/shell-v0/views/SettingsSurface.dataReset.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:48ca2513f68ec0b88cd5b4d13c1e8d83a0cb5f2bfd5009640674033357b86a66",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "WP5.1 Settings reset RS3 typed confirmation sends the issued token once and describes automatic restart",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/ActionButton.render.test.ts#asks in place with the consequence and the verb, never \"Are you sure?\", and fires once on the verb",
+      "file": "modules/ui-web/src/shell-v0/components/ActionButton.render.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:3496ead03fa3d08b8968731a11ccef329d2b083a506558f3962289971a3222fc",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "ActionButton — MEDIUM risk (DE1 in-place band) asks in place with the consequence and the verb, never \"Are you sure?\", and fires once on the verb",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/ActionButton.render.test.ts#Keep it returns to idle without firing and returns focus to the button that asked",
+      "file": "modules/ui-web/src/shell-v0/components/ActionButton.render.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:3496ead03fa3d08b8968731a11ccef329d2b083a506558f3962289971a3222fc",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "ActionButton — MEDIUM risk (DE1 in-place band) Keep it returns to idle without firing and returns focus to the button that asked",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/ActionButton.render.test.ts#requires typing the operationId to enable confirm",
+      "file": "modules/ui-web/src/shell-v0/components/ActionButton.render.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:3496ead03fa3d08b8968731a11ccef329d2b083a506558f3962289971a3222fc",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "ActionButton — HIGH risk requires typing the operationId to enable confirm",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/ActionButton.render.test.ts#respects requireConfirmText override over operationId",
+      "file": "modules/ui-web/src/shell-v0/components/ActionButton.render.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:3496ead03fa3d08b8968731a11ccef329d2b083a506558f3962289971a3222fc",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "ActionButton — HIGH risk respects requireConfirmText override over operationId",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/StatusPill.design.test.ts#ref-07 the undo notice names Ctrl+Z, and the shell undo command reverses that notice once",
+      "file": "modules/ui-web/src/shell-v0/components/StatusPill.design.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:1c4fdcc2f40c5d9d3c55f4e07aa57d4f3fc4f4882e81864be36d14b5f0f8cbc5",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "status pill drawing ref-07 the undo notice names Ctrl+Z, and the shell undo command reverses that notice once",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/chrome/Shell.status.test.ts#ref-07 the shell Undo command (Ctrl+Z) reverses the undo notice showing in the pill, not while typing, after a shell remount too",
+      "file": "modules/ui-web/src/shell-v0/chrome/Shell.status.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:e4cf90de3291bd800b86908c14481201545c20109e4a7f7598763981082b929d",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "ref-07 the shell Undo command (Ctrl+Z) reverses the undo notice showing in the pill, not while typing, after a shell remount too",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/BrainSurface.repairRun.test.ts#Repair requests a read immediately and only store observations change progress, Pause, Resume and Cancel",
+      "file": "modules/ui-web/src/shell-v0/views/BrainSurface.repairRun.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:d9841ce8039b0375ab99a313d0a2fb535cf41e65f5aed869de0a1752997709ab",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Brain running repair controls (B2/B8) Repair requests a read immediately and only store observations change progress, Pause, Resume and Cancel",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-observability/src/test/java/io/justsearch/app/observability/operations/OperationHistoryProjectorTest.java#realTimerRetriesARepairedSinkWithoutAnotherCompletion",
+      "file": "modules/app-observability/src/test/java/io/justsearch/app/observability/operations/OperationHistoryProjectorTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:bb495435dff1a00a98a39091639102a7903741abb47b4ebce39185a59897ab56",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "realTimerRetriesARepairedSinkWithoutAnotherCompletion()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:40e9a88ea928850c29bcaf3e5626edb28bba082e91188742cd172903071e2bef"
+}

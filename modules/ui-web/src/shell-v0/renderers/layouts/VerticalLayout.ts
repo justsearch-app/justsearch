@@ -17,6 +17,8 @@ import { createChildRenderer } from './layoutDispatch.js';
 type LayoutUISchema = UISchemaElement & { elements: UISchemaElement[] };
 
 export class VerticalLayout extends JsonFormsRendererBase {
+  private children_: (JsonFormsRendererBase | null)[] = [];
+
   static styles = css`
     :host {
       display: flex;
@@ -30,13 +32,14 @@ export class VerticalLayout extends JsonFormsRendererBase {
       return html``;
     }
     const elements = (this.uischema as LayoutUISchema).elements ?? [];
+    this.children_.length = elements.length;
     return html`
-      ${elements.map((childUischema) => this.renderChild(childUischema))}
+      ${elements.map((childUischema, index) => this.renderChild(childUischema, index))}
     `;
   }
 
-  private renderChild(childUischema: UISchemaElement): TemplateResult {
-    const child = createChildRenderer(
+  private renderChild(childUischema: UISchemaElement, index: number): TemplateResult {
+    const child = this.children_[index] = createChildRenderer(
       childUischema,
       this.schema,
       this.path,
@@ -44,6 +47,7 @@ export class VerticalLayout extends JsonFormsRendererBase {
       this.enabled,
       this.onChange,
       this.userConfig, // 543-fwd — was dropped (6 args), so child renderers lost user config
+      this.children_[index],
     );
     if (!child) {
       return html`<div>
